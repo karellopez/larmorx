@@ -185,6 +185,69 @@ def _vs_fsl(ours: Path, fsl: Path) -> str:
     return f"max|d| {rel:.2e} of max|FSL|, {100 * same.mean():.3f} % of the voxels the same"
 
 
+def _text_vs(ours: str, fsl: str) -> str:
+    """Printed numbers word by word: the same text, or how many words differ and by how much."""
+    a, b = ours.split(), fsl.split()
+    if a == b:
+        return "same text"
+    if len(a) != len(b):
+        return f"{len(a)} words vs {len(b)}"
+    diff = [(x, y) for x, y in zip(a, b, strict=True) if x != y]
+    try:
+        rel = max(abs(float(x) - float(y)) / max(abs(float(y)), 1.0) for x, y in diff)
+    except ValueError:
+        return f"{len(diff)} of {len(a)} words differ"
+    return f"{len(diff)} of {len(a)} numbers differ, at most {rel:.1e} relative"
+
+
+def _notes(outdir: Path, name: str, fsl_from: Path | None) -> list[str]:
+    """The checks of one case, from its run directories."""
+    notes = []
+    d = outdir / name
+    if (d / "orig1").is_dir() and (d / "orig14").is_dir():
+        fa, fb = _outputs(d / "orig1"), _outputs(d / "orig14")
+        same = fa.keys() == fb.keys() and all(_data(fa[k]) == _data(fb[k]) for k in fa)
+        texts = [(d / x / "stdout.txt").read_text(encoding="utf-8") for x in ("orig1", "orig14")]
+        notes.append("1 = 14 threads" if same and texts[0] == texts[1] else "THREADS DIFFER")
+    dirs = [d / "fsl"] + ([fsl_from / name / "fsl"] if fsl_from else [])
+    fsl_dir = next((p for p in dirs if (p / "stdout.txt").exists() or _outputs(p)), None)
+    ours = next((d / x for x in ("orig14", "orig1") if (d / x).is_dir()), None)
+    if fsl_dir is None or ours is None:
+        return notes
+    fo, ff = _outputs(ours), _outputs(fsl_dir)
+    if ff:
+        worst = [f"{k}: {_vs_fsl(fo[k], ff[k])}" for k in ff if k in fo]
+        odd = [w for w in worst if not w.endswith(": identical")]
+        notes.append(
+            f"vs FSL: {len(worst) - len(odd)}/{len(ff)} identical"
+            + (f" ({'; '.join(odd)})" if odd else "")
+        )
+    else:
+        text = (ours / "stdout.txt").read_text(encoding="utf-8")
+        fsl_text = (fsl_dir / "stdout.txt").read_text(encoding="utf-8")
+        notes.append(f"vs FSL: {_text_vs(text, fsl_text)}")
+    return notes
+
+
+def _table(outdir: Path, fsl_from: Path | None) -> None:
+    """The Markdown table of ``outdir``'s runs (FSL's from ``fsl_from`` unless run here too)."""
+    runs: dict[str, dict[str, dict]] = {}
+    for f in ([fsl_from / "bench.jsonl"] if fsl_from else []) + [outdir / "bench.jsonl"]:
+        for line in f.read_text(encoding="utf-8").splitlines():
+            r = json.loads(line)
+            if "impl" in r and (f.parent == outdir or r["impl"] == "fsl"):
+                runs.setdefault(r["case"], {})[r["impl"]] = r
+    print("| Case | " + " | ".join(f"{i} s (MiB)" for i in IMPLS) + " | Checks |")
+    print("|" + "---|" * (len(IMPLS) + 2))
+    for name, res in runs.items():
+        cells = [
+            f"{res[i]['wall']:.2f} ({res[i]['rss_kib'] / 1024:.0f})" if i in res else "-"
+            for i in IMPLS
+        ]
+        notes = "; ".join(_notes(outdir, name, fsl_from))
+        print(f"| {name} | " + " | ".join(cells) + f" | {notes} |")
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("outdir", type=Path)
@@ -192,7 +255,16 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--nc")
     ap.add_argument("--impl", default=",".join(IMPLS))
     ap.add_argument("--case", default=".")
+    ap.add_argument(
+        "--fsl-from",
+        type=Path,
+        help="an earlier output directory whose FSL runs the comparisons use (FSL run once)",
+    )
+    ap.add_argument("--table", action="store_true", help="only print the table of outdir's runs")
     o = ap.parse_args(argv)
+    if o.table:
+        _table(o.outdir, o.fsl_from)
+        return 0
     src = _sources()
     for p in src.values():
         p.read_bytes()  # into the page cache before the first timed run
@@ -202,11 +274,9 @@ def main(argv: list[str]) -> int:
     impls = o.impl.split(",")
     o.outdir.mkdir(parents=True, exist_ok=True)
     log = (o.outdir / "bench.jsonl").open("a", encoding="utf-8")
-    rows = []
     for name, steps in _cases(src).items():
         if not re.search(o.case, name):
             continue
-        res = {}
         for impl in impls:
             d = o.outdir / name / impl
             shutil.rmtree(d, ignore_errors=True)
@@ -218,7 +288,7 @@ def main(argv: list[str]) -> int:
                 program, args = steps[0]
                 cmd = [f"{prefix[0]}/{program}"] if impl == "fsl" else [*prefix, program]
                 r = _measure([*cmd, *args], env, d)
-            res[impl] = r
+            (d / "stdout.txt").write_text(r["stdout"], encoding="utf-8")
             line = {"case": name, "impl": impl, **{k: r[k] for k in ("code", "wall", "rss_kib")}}
             log.write(json.dumps(line) + "\n")
             log.flush()
@@ -227,42 +297,9 @@ def main(argv: list[str]) -> int:
                 f"{r['rss_kib'] / 1024:8.1f} MiB",
                 flush=True,
             )
-        notes = []
-        if "orig1" in res and "orig14" in res:
-            a, b = o.outdir / name / "orig1", o.outdir / name / "orig14"
-            fa, fb = _outputs(a), _outputs(b)
-            same = fa.keys() == fb.keys() and all(_data(fa[k]) == _data(fb[k]) for k in fa)
-            same = same and res["orig1"]["stdout"] == res["orig14"]["stdout"]
-            notes.append("1 = 14 threads" if same else "THREADS DIFFER")
-        if "fsl" in res and ("orig14" in res or "orig1" in res):
-            ours_dir = o.outdir / name / ("orig14" if "orig14" in res else "orig1")
-            ours_res = res["orig14" if "orig14" in res else "orig1"]
-            fo, ff = _outputs(ours_dir), _outputs(o.outdir / name / "fsl")
-            if ff:
-                worst = [f"{k}: {_vs_fsl(fo[k], ff[k])}" for k in ff if k in fo]
-                odd = [w for w in worst if not w.endswith(": identical")]
-                notes.append(
-                    f"vs FSL: {len(worst) - len(odd)}/{len(ff)} identical"
-                    + (f" ({'; '.join(odd)})" if odd else "")
-                )
-            else:
-                notes.append(
-                    "vs FSL: same text"
-                    if ours_res["stdout"] == res["fsl"]["stdout"]
-                    else f"vs FSL: {ours_res['stdout'].strip()!r} / {res['fsl']['stdout'].strip()!r}"
-                )
-        rows.append((name, res, notes))
-        print(f"{name:22s} {'; '.join(notes)}", flush=True)
+        print(f"{name:22s} {'; '.join(_notes(o.outdir, name, o.fsl_from))}", flush=True)
     print()
-    head = "| Case | " + " | ".join(f"{i} s (MiB)" for i in impls) + " | Notes |"
-    print(head)
-    print("|" + "---|" * (len(impls) + 2))
-    for name, res, notes in rows:
-        cells = [
-            f"{res[i]['wall']:.2f} ({res[i]['rss_kib'] / 1024:.0f})" if i in res else "-"
-            for i in impls
-        ]
-        print(f"| {name} | " + " | ".join(cells) + f" | {'; '.join(notes)} |")
+    _table(o.outdir, o.fsl_from)
     return 0
 
 

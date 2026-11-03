@@ -321,3 +321,16 @@ out of the original's suite). Its only inputs were:
 |---|---|---|
 | `cli::fslstats` | the preoptions (`-t`, `-K`, `-json`) and the usage, the passes, the thresholds and masks (`-l`, `-u`, `-k`, the masks `-P`, `-e`, `-E`, `-w` make), `-d`, `-a`, `-n`, the counts, the masked and unmasked means and standard deviations in FSL's blocks (FSL-182), `-D`, the extremes and their positions (FSL-181, FSL-184), the robust range (FSL-181, FSL-187), the percentiles (libstdc++'s order where NaN or ±0 make it matter), the histograms (FSL-186, FSL-187), the entropies (FSL-185), the bounding box (FSL-188), the centres of gravity, `-t` with `-k`, `-d` (FSL-183), the text and the JSON document (FSL-189), the messages and statuses, a crash's lost output | §2-§8; findings 21 |
 | `cli::fmt::json` | nlohmann/json's number form (the shortest round-trip digits; fixed notation from 1e-4 to below 1e15, an integral value with `.0`; else `d.ddde±XX`; `null`) | §6.2 |
+
+### Speed and FSL-187 in BET and FLIRT (relay 5 of fslmaths' and fslstats' part, 2026-11-03)
+
+By the same clean-room implementer, under the same rules; no new inputs but timed black-box runs
+of FSL 6.0.7.23 (the benchmarks of [`docs/benchmarks/fsl-maths.md`](../../docs/benchmarks/fsl-maths.md))
+and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row.
+
+| larmorx | What changed | Source |
+|---|---|---|
+| `maths::filters` | the separable pass and the direct sum a row of x at a time (the weights' sum once per position; the kernel's zeros left out of a finite volume's sums: a sum from +0 never changes by a ±0 product), every voxel's taps still added in their order; NaN results recomputed by x86-64's rules; the convolutions in place, volume by volume; `-fmean`'s convolution of ones computed on one volume for a series (its messages printed per volume) | the original's own design (§20); the same bits as before on every case of the suite and the benchmarks |
+| `maths::regions` | `-bptf`: the windows' sums that do not depend on the voxel once per `t`, the others for blocks of 64 voxels in the series' order, in waves written back in place (no copy of the image); a series holding a NaN filtered again on its own | the original's own design; the same bits |
+| `maths::image`, `cli::fslmaths` | the input's values moved, not copied, where they already have the computing type (mirrored in place); the output's values moved to the writer where writing converts nothing: one copy of the image held, as FSL holds | the memory rule (CLAUDE.md) |
+| `bet::params`, `bet` (`find_surface`), `cli::bet2`, `flirt::engine` (`clamp_range`) | FSL-187's `reproduce` switch in BET's and FLIRT's robust range (a value whose bin does not fit in an `int` counted in the first bin) and its notice where the correction moves the range; the defaults unchanged | the register's FSL-187 row; findings 22 of `docs/findings/fsl-maths-original.md` |

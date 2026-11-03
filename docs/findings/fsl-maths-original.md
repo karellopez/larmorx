@@ -324,3 +324,29 @@ with the far value are FSL's to every printed digit (`normmi` -1.3816, `mutualin
 `corratio` 0.0981845); the defaults are as before. FLIRT's mutual-information bins are taken
 over each image's own minimum and maximum after the clamping, so no value is far above their
 range: the clamping range is FLIRT's only FSL-187 path.
+
+## 23. Two differences the benchmarks show on real images, relay 5
+
+The benchmarks of [`docs/benchmarks/fsl-maths.md`](../benchmarks/fsl-maths.md) compare the
+original's outputs with FSL's on ds005040's images (the suite's cases are small synthetic
+images and fMRIPrep's calls, all identical or within the thresholds):
+- **`-s 5` on the T1w** (191 × 288 × 288, 0.85 × 0.83 × 0.83 mm: Gaussians of 49 and 51 taps):
+  30 % of the voxels differ from FSL's, by at most 2.8e-7 of FSL's largest value (§21's bound:
+  1e-5), but only 98.6 % are within 4 units in the last place, below §21's 99 %. The same
+  operation on the BOLD series (3 × 3 × 3.3 mm, 15 taps) is identical to FSL's in every voxel of
+  63 volumes, so the single-precision sums are FSL's; the cause is presumably the Gaussian's
+  values or extent at voxel sizes that are not exact in binary (§9: `2⌈4σ/d⌉ + 1` taps, `expf` of
+  single-precision products). Impulse probes (`probe_gauss.py`: a line of 81 voxels along y,
+  `-s 5`, voxel sizes 0.8333333, 0.85 and 1 mm): FSL's response has the spec's 49 (41) taps at
+  every size, and at 1 mm it is the original's bit for bit; at 0.8333333 and 0.85 mm 20 and 24 of
+  the 49 taps differ in their last bits from the spec's form (16 from the closest of the other
+  forms of the argument tried) (the products in single or double, `(i d)²`, `i² d²` or `i² (d²)`, `expf` or
+  `exp`, the kernel normalised first). Open: FSL's arithmetic of the Gaussian at voxel sizes not
+  exact in binary is a spec question (the BOLD's 3 and 3.3 mm are identical, the T1w's 0.85 and
+  0.83 mm within the bound).
+- **fslstats' unmasked `-S`** on a volume with many nonzero voxels (`-t <BOLD> -M -S -r`, 63
+  volumes of 136,400 voxels): `-M` and `-r` are FSL's text, `-S` differs in its last printed
+  digits in 54 of 63 volumes (at most 3.0e-10 relative; §10's bound 1e-6). §5.2's form (`Σ v²` of
+  single-precision squares widened, in double) is not FSL's order or precision exactly (the
+  goodvoxels calls, with few nonzero voxels, are identical). A spec question.
+

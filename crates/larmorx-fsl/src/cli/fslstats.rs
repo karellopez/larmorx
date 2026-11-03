@@ -153,8 +153,9 @@ fn read(
     let mut ns = Vec::new();
     let s = image::read_stored(settings, name, notices.mode(), &mut ns, settings.threads());
     notices.extend(ns);
-    let s = s.map_err(|e| read_failure(err, name, &e))?;
-    let (data, _) = s.values::<f32>(notices.fix());
+    let mut s = s.map_err(|e| read_failure(err, name, &e))?;
+    // the stored values moved (or dropped once converted): one copy of the image
+    let (data, _) = s.take_values::<f32>(notices.fix());
     Ok((s, data))
 }
 
@@ -206,8 +207,8 @@ fn run(
             let mut ns = Vec::new();
             let s = image::read_stored(settings, n, notices.mode(), &mut ns, settings.threads());
             notices.extend(ns);
-            let s = s.map_err(|e| read_failure(err, n, &e))?;
-            let (v, changed) = s.values::<i32>(notices.fix());
+            let mut s = s.map_err(|e| read_failure(err, n, &e))?;
+            let (v, changed) = s.take_values::<i32>(notices.fix());
             if changed {
                 image::fsl151(notices, "the index image's labels");
             }

@@ -27,7 +27,8 @@ reductions along T, X, Y, Z, `-roi`, `-bptf`, `-ztop`, `-ptoz`, `-pval`, `-pval0
 `-tensor_decomp` (relay 3; its eigenvectors' signs are its own: each one's largest component
 positive, where FSL's are LAPACK's) and `-roc` (relay 4): every operation of the usage text and
 the hidden ones. Where FSL convolves a large kernel by
-its FFT, the original computes the convolution by the direct sum, in the direct sum's
+its FFT, the original computes the convolution by the direct sum (faster than FSL's FFT on
+every kernel the benchmarks measured), in the direct sum's
 orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
 FSL's largest value on the record's cases). `implementation="auto"`
 (the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
@@ -245,8 +246,11 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original's speed work (an FFT for large kernels among it), golden cases and
-  record (its next relays).
+- The clean-room original's golden cases and record (its next relays). Its speed: the
+  [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 42 times faster than FSL on one thread, up to
+  356 times on 14; the direct sum outruns FSL's FFT on every kernel measured, so the original
+  has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)
+  is a follow-up.
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).
 - The goodvoxels mask with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

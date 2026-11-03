@@ -154,7 +154,8 @@ on standard error (`larmorx-nc: upstream defect FSL-<n> (fslstats) corrected: ..
 
 ## Not yet
 
-- The clean-room original's speed work, golden cases and record (its next relays).
+- The clean-room original's golden cases and record (its next relays); its speed: the
+  [benchmarks](../benchmarks/fsl-maths.md) (BET's call and a 63-volume `-t -M -S -r`).
 - zstd and bzip2 inputs are decompressed whole before they are read (about twice the memory of
   gzip ones; fMRIPrep writes neither).
 - The goodvoxels calls with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

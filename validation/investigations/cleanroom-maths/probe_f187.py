@@ -29,7 +29,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
 from larmorx_validation import oracle_cache
 from larmorx_validation.parity import fsl_stats_replica as rep
 
@@ -70,8 +69,7 @@ def _fsl(d: Path, program: str, args: list[str]) -> str:
         policy=oracle_cache.Policy(threads=1, family="fsl"),
         runner="cleanroom-maths-f187",
         inputs=[
-            d / n
-            for n in ("fa.nii.gz", "fb.nii.gz", "fa0.nii.gz", "fb0.nii.gz", "outl.nii.gz")
+            d / n for n in ("fa.nii.gz", "fb.nii.gz", "fa0.nii.gz", "fb0.nii.gz", "outl.nii.gz")
         ]
         + [d / "ident.mat"],
         timeout=600,

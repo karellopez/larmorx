@@ -223,7 +223,7 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
 | `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |
 
-## topup (`topup`; relay 1, 2026-11-03)
+## topup (`topup`; relays 1 and 2, 2026-11-03)
 
 `topup` (the estimation of the susceptibility-induced field from reversed phase-encoding images:
 its command line, configuration files, levels, field, cost, minimisers and outputs) was written
@@ -245,10 +245,12 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|
-| `topup::images` | the intensity scaling, the regridding (periodic cubic spline), the subsampling, the Gaussian smoothing, each level's periodic cubic spline coefficients (cyclic tridiagonal solve) and their interpolation | §4.1, §4.4, §4.5; findings |
-| `topup::spline` | the cubic B-spline basis and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (penalty: the two second differences that wrap around the ends), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
-| `topup::model` | one level's predictions (a line sampler when the displacement is along one axis), the mask, the cost, its gradient and the Gauss-Newton Hessian's voxel weights, the bending energy | §4.3, §4.6; findings |
-| `topup::stencil` | the Hessian as a 7 × 7 × 7 stencil per coefficient, assembled by contracting one axis at a time, its product and the preconditioned conjugate-gradient solve | §4.7, §11; larmorx's own design |
-| `topup::minimise` | Levenberg-Marquardt (damping, retries, the early end) and the scaled conjugate gradients | §4.7; Møller; findings |
+| `topup::images` | the intensity scaling, the regridding (periodic cubic spline, or trilinear with `--interp=linear`), the subsampling, the Gaussian smoothing (none for a negative width: FSL-125 reproduced), each level's periodic cubic spline coefficients (cyclic tridiagonal solve) and their interpolation | §4.1, §4.4, §4.5; findings |
+| `topup::spline` | the cubic and quadratic B-spline bases and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (penalty: the two second differences that wrap around the ends), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
+| `topup::model` | one level's predictions (a line sampler when the displacement is along one axis and nothing moves), the movements' sampling, the mask, the cost, its gradient (the movements' exact derivatives) and the Gauss-Newton Hessian (its voxel weights, the movements' dense blocks), the bending and membrane energies (FSL-117) | §4.3, §4.6; findings |
+| `topup::stencil` | the Hessian as a 7 × 7 × 7 stencil per coefficient, assembled by contracting one axis at a time, with the movements' columns and block; its product, single precision (`--numprec=float`) and the preconditioned conjugate-gradient solve | §4.7, §11; larmorx's own design |
+| `topup::movement` | the rigid-body matrices (the Euler order and signs, the centres), their derivatives, the free parameters | §4.3, §6; findings 13 |
+| `topup::minimise` | Levenberg-Marquardt (damping, retries, the early end, the end on a free parameter) and the scaled conjugate gradients, with `--debug`'s numbering | §4.7; Møller; findings |
 | `topup` (`estimate`) | the levels, the transitions between them, the full-resolution predictions | §2.4, §4.4, §6; findings |
-| `cli::topup` | the command line, the usage and its errors, the configuration files, the checks of the settings, the log, `-v`, the outputs and their order, FSL-119 to FSL-121 | §2, §3, §5, §6, §8; findings |
+| `cli::topup` | the command line, the usage and its errors, the configuration files, the checks of the settings, the log, the outputs and their order, FSL-117 to FSL-126 | §2, §3, §5, §6, §8, §10; findings |
+| `cli::topup_debug` | `-v`, `--debug`'s files, `--trace`'s stages, `--profile`'s file | §2.2, §5; findings 9, 16 |

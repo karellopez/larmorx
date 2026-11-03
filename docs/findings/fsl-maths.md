@@ -4,7 +4,8 @@
 (`fsl-avwutils 2209.6 fslmaths.cc` and `fslstats.cc`, `fsl-newimage 2601.0`, `fsl-miscmaths
 2412.6`, `fsl-cprob 2111.0`, `fsl-armawrap 0.7.0`, nlohmann/json 3.12.0). A clean-room implementer
 does not read this file; the behaviour it describes for them is in `specs/fslmaths.md` and
-`specs/fslstats.md` (to come) and the register's summary rows.
+`specs/fslstats.md` (written from it by the replica's author as the spec writer, 2026-11-03:
+behaviour, maths and conventions only) and the register's summary rows.
 
 The replica is `crates-nc/larmorx-nc-avwutils` (`larmorx-nc fsl fslmaths`), on the shared core's
 newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`, `kissfft`). Its parity suite is
@@ -46,10 +47,9 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   binarises the mask the same way, then multiplies (so a negative voxel outside the mask
   becomes -0.0, an infinite or NaN one NaN).
 - **Functions.** `-exp`, `-log` (only values above 0), `-sin`, `-cos`, `-tan`, `-asin`, `-acos`,
-  `-atan` take the `double` value and convert the result back to `T` (glibc's functions: `exp`,
-  `log` and `pow` as the core has them; `sin`, `cos`, `asin`, `acos`, `atan` correctly rounded
-  give glibc's results on every case so far; glibc's `asin` and `acos` return a positive NaN
-  outside [-1, 1], the others SSE's default). `-sqrt` takes `sqrtf` for `float` (only values
+  `-atan` take the `double` value and convert the result back to `T` (glibc 2.35's functions,
+  not correctly rounded: GLIBC-07, "Known differences" below; glibc's `asin` and `acos` return a
+  positive NaN outside [-1, 1], the others SSE's default). `-sqrt` takes `sqrtf` for `float` (only values
   above 0; others 0), `-recip` `(T) 1.0 / v` for non-zero values, `-abs` `(T) fabs((double) v)`
   (a float NaN loses its sign), `-sqr` `*this *= *this`, `-index` numbers the positive voxels
   in memory order (an `int` counter converted to `T`: wraps under `-dt char`), `-grid v s` sets
@@ -777,7 +777,24 @@ larmorx / FSL / the Python entry point's own cost): combine_masks 13.5 / 11.4 / 
 13.8; BET's calls fell too (`bet -F` of a 30-volume series 113 against FSL's 217). The replica
 runs on one thread: no thread test.
 
-## Not yet translated (later sub-tasks of the part)
+## Completeness, and the specs
 
 Every fslmaths operation (sub-task 3b, 2026-11-03) and every fslstats option (sub-task 4) is
-translated.
+translated. The specs (`specs/fslmaths.md`, `specs/fslstats.md`, sub-task 5c) restate this file's
+behaviour without FSL's routine names, for the clean-room originals. Points worth knowing for
+whoever reads the specs against this file:
+- **`-dog_edge`'s sigmas are voxels, in each slice's plane** (`gaussian_kernel2D` takes no voxel
+  sizes): the Python wrapper's docstring said mm and was corrected; `-s` and `-kernel gauss` are
+  in mm.
+- **`-grid` sets, it does not add**: the voxels on the grid's planes get the value (the usage's
+  "add a 3D grid" means drawing it); the wrapper's docstring was corrected.
+- **`-log` leaves values at or below 0 unchanged** (and NaN), while `-sqrt` sets them to 0: the
+  spec says so explicitly (an easy slip for a reimplementation).
+- **`-s` leaves its Gaussian as the current kernel**: fMRIPrep's goodvoxels step `-s 5 -div <img>
+  -dilD` dilates with the voxels where the sigma-5 Gaussian exceeds 0.5 (a radius of about 1.18
+  sigma), not the default box; the spec's §1 and §9 say so.
+- **FSL's TFCE has no step factor**: the enhancement is the sum over the thresholds of `size^E
+  h^H`, not the integral's Riemann sum (`... dh`); the spec's §14.1 says so, so that an original
+  built from the paper's formula does not scale its output by the step.
+- **The spec writer's verification**: the usage texts in both specs were compared byte for byte
+  with the replica's (`usage.rs`, `fslstats::USAGE`), which the suites check against FSL.

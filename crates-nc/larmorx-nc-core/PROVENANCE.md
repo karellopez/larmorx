@@ -15,7 +15,8 @@ files it was translated from are in `../fsl-source/`, unchanged (`MANIFEST.tsv`)
 crate uses it, and it uses no GPL crate.
 
 It is the shared core of the FSL replicas: each FSL library is translated once, here, and the
-tool crates build on it (`larmorx-nc-mcflirt`, `larmorx-nc-bet`; FLIRT, FAST and topup next).
+tool crates build on it (`larmorx-nc-mcflirt`, `larmorx-nc-bet`, `larmorx-nc-flirt`,
+`larmorx-nc-fast`, `larmorx-nc-topup`, `larmorx-nc-avwutils`).
 mcflirt's and BET's translations of the same libraries were joined into one at BET's merge
 (2026-10-25); every case of both replicas' records and golden tests gives the same bytes with
 the joined version.
@@ -210,3 +211,23 @@ Every source file starts with an SPDX header naming its licence and the files it
   compressed stream is zlib-rs's (pure Rust), whose blocks need not be zlib's: compressed files are
   compared decompressed (decision log, 2026-10-16). Saving converts and writes a volume's values
   chunk by chunk, with no copy of the image, so that it needs no more memory than FSL's.
+- **Reading streams** (fslmaths and fslstats, 2026-11-03): raw and gzip files are read as a
+  stream (`nifti::Source`), `load_header` reads the header's bytes only, and the data are
+  converted to the volume's type piece by piece (`open_image`, `ImageData::read`), so an image is
+  held once, in its type, as FSL's `znzread` holds it (before: up to three full copies; fslmaths'
+  `-Tstd` of a 63-volume series 116 MiB against FSL's 75, now 37.5). zstd and bzip2 files are
+  still decompressed whole first. The same values and messages (`docs/findings/fsl-maths.md`,
+  "Memory").
+- **fslmaths' and fslstats' maths** (2026-11-03): their double `sin`, `cos`, `tan`, `asin`,
+  `acos` and `atan` are correctly rounded (`larmorx_core::math`, CORE-MATH's): glibc 2.35's are
+  IBM's Accurate Mathematical Library (LGPL), not translated, so a double image may differ from
+  FSL's in the last place (GLIBC-07, measured: 0.07 to 0.21 % of double results, none rounded to
+  float). Their `exp`, `log` and `pow` are correctly rounded by default and glibc's (Arm's
+  Optimized Routines, `glibc_double`) with `reproduce`; the kernels' and filters' own `exp`,
+  `expf`, `logf`, `powf` and `pow` are glibc's in both modes.
+- **D13 hooks (fslmaths, fslstats)**: `volops::robust_range` returns FSL's robust range and the
+  corrected one (`RobustRange`, FSL-187), and each caller (bet2, FLIRT, fslmaths, fslstats) picks
+  by its mode and names the defect where the result changes; `Elem` and `Arith` for `u8` (FSL-154's
+  corrected `char` template of a uint8 image); `Volume::save_volume_coded` (FSL-157's int8
+  output); the NaN-free extremes, masked statistics and sorts (`vstats`, `filters`) that the
+  defaults use where they leave NaN out (FSL-153, FSL-162, FSL-168, FSL-181).

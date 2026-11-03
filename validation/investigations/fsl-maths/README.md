@@ -63,3 +63,12 @@ measurement on 10^8 arguments per function, and the check of `larmorx_core::math
   `roc`'s curve and areas, the error text of a failure. Result (2026-11-03): 56 checks, 0 differ.
   Run boxed with the replica built: `LARMORX_NC_BIN=crates-nc/target/release/larmorx-nc
   scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-maths/wrappers_check.py`.
+
+## The specs (sub-task 5c)
+
+- `spec_cases.py`: every parity-suite case that `specs/fslmaths.md` and `specs/fslstats.md` cite
+  in brackets (`[d13/bin-char]`, `[opt/p*]` as a prefix) exists in `fsl-maths-replica` or
+  `fsl-stats-replica`, so each "observed" citation names a case that runs FSL. Result
+  (2026-11-03): 38 and 15 citations, none missing. Run from the repository's root:
+  `PYTHONPATH=python:validation/src python -P validation/investigations/fsl-maths/spec_cases.py .`
+  (it only lists the cases; nothing runs).

@@ -557,8 +557,8 @@ def grid(
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
-    """``-grid <value> <spacing>``: a 3D grid of intensity ``value`` every ``spacing`` voxels
-    added to ``image``."""
+    """``-grid <value> <spacing>``: a 3D grid of intensity ``value`` drawn into ``image``: every
+    voxel on each ``spacing``-th plane along x, y or z set to ``value``."""
     ops = ["-grid", _finite("value", value), _whole("spacing", spacing)]
     return _typed(image, ops, dt, odt, n_threads, implementation, upstream_defects)
 
@@ -574,8 +574,8 @@ def dog_edge(
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
-    """``-dog_edge <sigma1> <sigma2>``: the difference-of-Gaussians edge filter (sigmas in mm;
-    typically 1.0 and 1.6)."""
+    """``-dog_edge <sigma1> <sigma2>``: the zero crossings of a difference-of-Gaussians filter
+    (sigmas in voxels, in each slice's plane; typically 1.0 and 1.6)."""
     ops = ["-dog_edge", _finite("sigma1", sigma1), _finite("sigma2", sigma2)]
     return _typed(image, ops, dt, odt, n_threads, implementation, upstream_defects)
 

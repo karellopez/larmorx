@@ -20,6 +20,7 @@ use crate::cnum;
 use crate::nifti::{self, dt};
 use crate::settings::Settings;
 use crate::sse;
+use crate::volops::{Arith, Op};
 use crate::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
 
 /// fslpy's image extensions of `imtest` and `remove_ext`, in its order (fslpy 3.27.0 added the
@@ -570,47 +571,31 @@ pub fn fslmaths_mas(
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     if volume::file_dtype(input, fsl).map_err(failed)? == dt::DOUBLE {
-        fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset, sse::mul_f64)
+        fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset)
     } else {
-        fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset, sse::mul_f32)
+        fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset)
     }
 }
 
-fn fslmaths_mas_t<T: Elem>(
+/// `-mas` with newimage's generic operations ([`crate::volops`]): the 3D input cloned over a
+/// 4D mask's time points, `binarise(0, max() + 1, exclusive)`, `*=` (`samesize(..., SUBSET)`).
+fn fslmaths_mas_t<T: Arith>(
     input: &str,
     mask: &str,
     output: &str,
     fsl: &Settings,
     reproduce_offset: bool,
-    mul: fn(T, T) -> T,
 ) -> Result<(), ToolFailure> {
     let (mut v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
     let (mut m, _, _) = volume::read_volume4d::<T>(mask, fsl).map_err(failed)?;
-    let mut err = String::new();
     if v.tsize() == 1 && v.tsize() < m.tsize() {
         let one = v.data.clone();
         v.data = (0..m.tsize()).flat_map(|_| one.iter().copied()).collect();
         v.dims[3] = m.tsize();
     }
-    // max() + 1 in T: exact in double for a float's maximum, then rounded as float addition
-    let hi = T::from_f64(m.max().to_f64() + 1.0);
-    let (zero, one) = (T::from_f64(0.0), T::from_f64(1.0));
-    for x in m.data.iter_mut() {
-        *x = if *x > zero && *x < hi { one } else { zero };
-    }
-    if v.dimensionality() < m.dimensionality()
-        || v.xsize() != m.xsize()
-        || v.ysize() != m.ysize()
-        || v.zsize() != m.zsize()
-    {
-        err.push_str("Image Exception : #3 :: Attempted to multiply images of different sizes\n");
-        err.push_str("Attempted to multiply images of different sizes\n");
-        return Err(ToolFailure { err, code: 1 });
-    }
-    let n = m.data.len();
-    for (i, x) in v.data.iter_mut().enumerate() {
-        *x = mul(*x, m.data[i % n]);
-    }
+    let hi = T::plus_int(m.max(), 1);
+    m.binarise(T::from_int(0), hi, false, false);
+    v.op_volume(Op::Mul, &m).map_err(failed)?.ok();
     v.display_max = 0.0;
     v.display_min = 0.0;
     save(&v, output, fsl, reproduce_offset)

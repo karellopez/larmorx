@@ -42,6 +42,7 @@ PARITY_MODULES = {
     "fsl-flirt-replica": "fsl_flirt_replica",
     "fsl-fast-replica": "fsl_fast_replica",
     "fsl-topup-replica": "fsl_topup_replica",
+    "fsl-maths-replica": "fsl_maths_replica",
     "fsl-flirt": "fsl_flirt",
     "fsl-fast": "fsl_fast",
     "ants-image-math": "ants_image_math",

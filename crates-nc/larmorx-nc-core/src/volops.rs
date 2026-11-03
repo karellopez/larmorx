@@ -506,7 +506,14 @@ fn mask_size_error(source: &str) -> FslError {
 /// `imageHistogram(vol, bins, min, max, hist, mask)`: every masked value counted in
 /// `hist[max(0, min((int)(fA*v + fB), bins-1))]`; the number of values, or -1 when
 /// `max <= min`.
-fn image_histogram<T: Arith>(vol: &Volume<T>, bins: i32, min: T, max: T, mask: &[T], hist: &mut [f64]) -> i64 {
+fn image_histogram<T: Arith>(
+    vol: &Volume<T>,
+    bins: i32,
+    min: T,
+    max: T,
+    mask: &[T],
+    hist: &mut [f64],
+) -> i64 {
     if max <= min {
         return -1;
     }
@@ -519,9 +526,7 @@ fn image_histogram<T: Arith>(vol: &Volume<T>, bins: i32, min: T, max: T, mask: &
         if !in_mask(mask, k) {
             continue;
         }
-        let b = cnum::f64_to_i32(fa * v.to_f64() + fb)
-            .min(bins - 1)
-            .max(0);
+        let b = cnum::f64_to_i32(fa * v.to_f64() + fb).min(bins - 1).max(0);
         hist[b as usize] += 1.0;
         n += 1;
     }
@@ -532,7 +537,10 @@ fn image_histogram<T: Arith>(vol: &Volume<T>, bins: i32, min: T, max: T, mask: &
 /// 1000-bin histogram between the (masked) extremes, the bins holding 2% and 98% of the
 /// values, refined over at most 10 passes while the range they span is under a tenth of the
 /// histogram's, in the type's own arithmetic where FSL's code computes in it.
-pub fn find_thresholds<T: Arith>(vol: &Volume<T>, mask: Option<&Volume<T>>) -> Result<(T, T), FslError> {
+pub fn find_thresholds<T: Arith>(
+    vol: &Volume<T>,
+    mask: Option<&Volume<T>>,
+) -> Result<(T, T), FslError> {
     const BINS: i32 = 1000;
     const MAX_PASSES: i32 = 10;
     let m: &[T] = mask.map_or(&[], |m| m.data.as_slice());
@@ -554,8 +562,7 @@ pub fn find_thresholds<T: Arith>(vol: &Volume<T>, mask: Option<&Volume<T>>) -> R
             top_bin = (top_bin + 1).min(BINS - 1);
             let range = T::diff(max, min);
             let tmpmin = T::from_f64(
-                min.to_f64()
-                    + sse::mul_f64(f64::from(bottom_bin) / f64::from(BINS), range),
+                min.to_f64() + sse::mul_f64(f64::from(bottom_bin) / f64::from(BINS), range),
             );
             max = T::from_f64(
                 min.to_f64() + sse::mul_f64(f64::from(top_bin + 1) / f64::from(BINS), range),

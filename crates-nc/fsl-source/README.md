@@ -31,7 +31,8 @@ them again.
 | fsl-basisfield | 2203.4 | https://git.fmrib.ox.ac.uk/fsl/basisfield | `basisfield.{h,cpp}`, `splinefield.{h,cpp}`, `fsl_splines.h` (topup's spline fields; `dctfield` and the older `splines.{h,c}` are not translated) |
 | fsl-warpfns | 2501.0 | https://git.fmrib.ox.ac.uk/fsl/warpfns | `warpfns.h` (FLIRT's `applyxfm4D`; topup's resampling: `raw_general_transform` and its wrappers), `warpfns.cc` (`rows_per_thread`), `fnirt_file_reader.{h,cpp}` (`deffield2jacobian`; the file reader itself, `fnirt_file_writer` and `point_list` are not translated) |
 | fsl-topup | 2203.5 | https://git.fmrib.ox.ac.uk/fsl/topup | `topup.cpp`, `topupfns.{h,cpp}`, `topup_costfunctions.{h,cpp}`, `topup_file_io.{h,cpp}`, `topup_matrices.{h,cpp}`, `applytopup.{h,cpp}`, `displacement_vector.{h,cpp}` |
-| fsl-avwutils | 2209.6 | https://git.fmrib.ox.ac.uk/fsl/avwutils | `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` (what the `bet` script runs of them) |
+| fsl-avwutils | 2209.6 | https://git.fmrib.ox.ac.uk/fsl/avwutils | `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` (what the `bet` script runs of them; fslmaths, and fslstats to come, in full) |
+| fsl-cprob | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/cprob | `drand.cc`, `ndtri.cc`, `polevl.cc`, `mtherr.cc`, `const.cc`, `mconf.h`, `cprob.h` (FSL's C++ wrapper of Stephen L. Moshier's Cephes library; fslmaths' random numbers and normal quantiles) |
 
 FSL is Copyright (C) 1999-2023 University of Oxford; the files carry their own notices
 (`nifti1.h`, `znzlib.{h,c}` and the code `legacyFunctions.cc` takes from `nifti1_io.c` were

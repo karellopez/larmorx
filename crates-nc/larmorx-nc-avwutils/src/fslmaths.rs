@@ -88,14 +88,17 @@ impl Ctx<'_, '_> {
     /// A crash of FSL's (both modes refuse): the message and exit status 1.
     fn refuse(&mut self, d: &'static Defect, what: &str) -> Stop {
         self.notice(d, what);
-        let line = format!("larmorx-nc: error: fslmaths: {what} ({}: FSL crashes here)\n", d.id);
+        let line = format!(
+            "larmorx-nc: error: fslmaths: {what} ({}: FSL crashes here)\n",
+            d.id
+        );
         self.eput(&line);
         Stop::Exit(1)
     }
 
     /// `(T) x` of a double: C's conversion, undefined for an integer type out of its range or
     /// for NaN (FSL-151: clamped, NaN as 0, by default).
-    fn to_t<T: Arith>(&mut self, x: f64, what: &str) -> T {
+    fn conv<T: Arith>(&mut self, x: f64, what: &str) -> T {
         if T::IS_FLOAT {
             return from_f64_nan(x);
         }
@@ -106,7 +109,10 @@ impl Ctx<'_, '_> {
         }
         self.notice(
             &defects::FSL_151,
-            format!("{what}: {} outside the internal type's range", cnum::fmt_g(x, 6)),
+            format!(
+                "{what}: {} outside the internal type's range",
+                cnum::fmt_g(x, 6)
+            ),
         );
         if self.reproduce() {
             T::from_f64(x)
@@ -118,11 +124,14 @@ impl Ctx<'_, '_> {
     }
 
     /// `(int) v` of a value: undefined out of `int`'s range or for NaN (FSL-151).
-    fn to_int<T: Arith>(&mut self, v: T, what: &str) -> i32 {
+    fn int_of<T: Arith>(&mut self, v: T, what: &str) -> i32 {
         if T::int_defined(v) {
             return T::to_int(v);
         }
-        self.notice(&defects::FSL_151, format!("{what}: a value outside int's range or NaN"));
+        self.notice(
+            &defects::FSL_151,
+            format!("{what}: a value outside int's range or NaN"),
+        );
         if self.reproduce() {
             T::to_int(v)
         } else {
@@ -336,10 +345,40 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
 
 /// The operations of later sub-tasks (refused until they are translated).
 const NOT_YET: &[&str] = &[
-    "-roc", "-kernel", "-s", "-subsamp2", "-subsamp2offc", "-pval", "-pval0", "-cpval", "-ztop",
-    "-ptoz", "-rank", "-ranknorm", "-fillh", "-fillh26", "-dilall", "-dilM", "-dilD", "-dilF",
-    "-ero", "-eroF", "-fmedian", "-fmean", "-fmeanu", "-edge", "-dog_edge", "-tfce_minT",
-    "-tfce_delta", "-tfce", "-tfceS", "-roi", "-inm", "-ing", "-tensor_decomp", "-bptf",
+    "-roc",
+    "-kernel",
+    "-s",
+    "-subsamp2",
+    "-subsamp2offc",
+    "-pval",
+    "-pval0",
+    "-cpval",
+    "-ztop",
+    "-ptoz",
+    "-rank",
+    "-ranknorm",
+    "-fillh",
+    "-fillh26",
+    "-dilall",
+    "-dilM",
+    "-dilD",
+    "-dilF",
+    "-ero",
+    "-eroF",
+    "-fmedian",
+    "-fmean",
+    "-fmeanu",
+    "-edge",
+    "-dog_edge",
+    "-tfce_minT",
+    "-tfce_delta",
+    "-tfce",
+    "-tfceS",
+    "-roi",
+    "-inm",
+    "-ing",
+    "-tensor_decomp",
+    "-bptf",
 ];
 
 fn read4d<T: Arith>(ctx: &Ctx, name: &str) -> Result<Volume<T>, FslError> {
@@ -391,39 +430,47 @@ fn looped_len<T: Elem>(v: &Volume<T>) -> usize {
     (v.nvoxels() * v.tsize()).max(0) as usize
 }
 
-/// `max()` and `min()` as fslmaths takes them (FSL-153: a NaN first voxel makes both NaN;
-/// corrected, the NaN voxels are left out).
-fn extremes<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, what: &str) -> (T, T) {
-    let fsl = v.extrema();
-    if !T::IS_FLOAT {
-        return fsl;
-    }
-    let fixed = v.extrema_without_nan().unwrap_or(fsl);
-    let same = fsl.0.to_f64().to_bits() == fixed.0.to_f64().to_bits()
-        && fsl.1.to_f64().to_bits() == fixed.1.to_f64().to_bits();
-    if !same {
-        ctx.notice(&defects::FSL_153, format!("{what}: the first voxel is NaN"));
-        if !ctx.reproduce() {
-            return fixed;
-        }
-    }
-    fsl
+/// `max()` and `min()` as FSL takes them (from the first voxel: a NaN first voxel makes both
+/// NaN, FSL-153), and with the NaN voxels left out (larmorx's correction).
+struct Extremes<T> {
+    fsl: (T, T),
+    fixed: (T, T),
 }
 
-/// The range test of `threshold`/`binarise` as FSL bounds it with `max() + 1` (or `min() - 1`)
-/// and as intended (FSL-152: no bound beyond the values): `(lower, upper)` of FSL, and whether
-/// the bound on each side is FSL's.
-struct Bounds<T> {
+impl<T: Arith> Extremes<T> {
+    fn of(v: &Volume<T>) -> Extremes<T> {
+        let fsl = v.extrema();
+        let fixed = if T::IS_FLOAT {
+            v.extrema_without_nan().unwrap_or(fsl)
+        } else {
+            fsl
+        };
+        Extremes { fsl, fixed }
+    }
+
+    /// Whether FSL's extremes are NaN where the corrected ones are not.
+    fn nan_first(&self) -> bool {
+        bits(self.fsl.0) != bits(self.fixed.0) || bits(self.fsl.1) != bits(self.fixed.1)
+    }
+}
+
+fn bits<T: Elem>(x: T) -> u64 {
+    x.to_f64().to_bits()
+}
+
+/// The range `threshold` and `binarise` test: `[lower, upper]` inclusive or `(lower, upper)`
+/// exclusive; an `open` side is FSL's `min() - 1` or `max() + 1`, meant to bound nothing.
+#[derive(Clone, Copy)]
+struct Range<T> {
     lower: T,
     upper: T,
-    /// FSL's `min() - 1` lower bound (else the operation's own).
-    lower_open: bool,
-    /// FSL's `max() + 1` upper bound.
-    upper_open: bool,
     inclusive: bool,
+    lower_open: bool,
+    upper_open: bool,
 }
 
-impl<T: Arith> Bounds<T> {
+impl<T: Arith> Range<T> {
+    /// FSL's test.
     fn fsl(&self, x: T) -> bool {
         if self.inclusive {
             x >= self.lower && x <= self.upper
@@ -432,56 +479,77 @@ impl<T: Arith> Bounds<T> {
         }
     }
 
+    /// The intended test: an open side bounds nothing (but a NaN voxel is outside, as in FSL).
     fn intended(&self, x: T) -> bool {
-        let lo = if self.lower_open {
-            !T::is_nan(x)
-        } else if self.inclusive {
-            x >= self.lower
-        } else {
-            x > self.lower
-        };
-        let hi = if self.upper_open {
-            !T::is_nan(x)
-        } else if self.inclusive {
-            x <= self.upper
-        } else {
-            x < self.upper
-        };
+        if T::is_nan(x) {
+            return false;
+        }
+        let lo = self.lower_open
+            || if self.inclusive {
+                x >= self.lower
+            } else {
+                x > self.lower
+            };
+        let hi = self.upper_open
+            || if self.inclusive {
+                x <= self.upper
+            } else {
+                x < self.upper
+            };
         lo && hi
     }
 }
 
-/// Which voxels are inside the range: FSL's test, or the intended one by default (FSL-152,
-/// named where they differ).
-fn inside<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, b: &Bounds<T>, what: &str) -> Vec<bool> {
-    let fsl: Vec<bool> = v.data.iter().map(|&x| b.fsl(x)).collect();
-    if !(b.lower_open || b.upper_open) {
-        return fsl;
+/// Which voxels are inside: FSL's range `fsl`; corrected, the intended test of `fixed` (the
+/// same range with corrected limits). FSL-152 is named where the open sides change voxels,
+/// FSL-153 where NaN extremes (`nan_first`) or the corrected limits do.
+fn select<T: Arith>(
+    ctx: &mut Ctx,
+    v: &Volume<T>,
+    fsl: &Range<T>,
+    fixed: &Range<T>,
+    nan_first: bool,
+    what: &str,
+) -> Vec<bool> {
+    let r_fsl: Vec<bool> = v.data.iter().map(|&x| fsl.fsl(x)).collect();
+    let r_mid: Vec<bool> = v.data.iter().map(|&x| fsl.intended(x)).collect();
+    let r_fix: Vec<bool> = v.data.iter().map(|&x| fixed.intended(x)).collect();
+    let n_open = r_fsl.iter().zip(&r_mid).filter(|(a, b)| a != b).count();
+    let n_lim = r_mid.iter().zip(&r_fix).filter(|(a, b)| a != b).count();
+    if n_open > 0 {
+        if nan_first {
+            ctx.notice(
+                &defects::FSL_153,
+                format!("{what}: the first voxel is NaN ({n_open} voxels)"),
+            );
+        } else {
+            ctx.notice(
+                &defects::FSL_152,
+                format!(
+                    "{what}: {n_open} voxels beyond the image's maximum plus 1 or minimum minus 1"
+                ),
+            );
+        }
     }
-    let want: Vec<bool> = v.data.iter().map(|&x| b.intended(x)).collect();
-    let n = fsl.iter().zip(&want).filter(|(a, b)| a != b).count();
-    if n == 0 {
-        return fsl;
+    if n_lim > 0 {
+        ctx.notice(
+            &defects::FSL_153,
+            format!("{what}: NaN voxels in the robust range ({n_lim} voxels)"),
+        );
     }
-    ctx.notice(
-        &defects::FSL_152,
-        format!("{what}: {n} voxels on the far side of the image's maximum plus 1 or minimum minus 1"),
-    );
-    if ctx.reproduce() { fsl } else { want }
+    if ctx.reproduce() { r_fsl } else { r_fix }
 }
 
-/// `binarise(lower, upper, tt)` with FSL-152's bounds.
-fn binarise_b<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, b: &Bounds<T>, what: &str) {
-    let ins = inside(ctx, v, b, what);
+/// `binarise(range)`: 1 inside, 0 outside.
+fn binarise_r<T: Arith>(v: &mut Volume<T>, ins: Vec<bool>) {
     let (one, zero) = (T::from_int(1), T::from_int(0));
     for (x, i) in v.data.iter_mut().zip(ins) {
         *x = if i { one } else { zero };
     }
 }
 
-/// `threshold(lower, upper, tt)` with FSL-152's bounds.
-fn threshold_b<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, b: &Bounds<T>, what: &str) {
-    let ins = inside(ctx, v, b, what);
+/// `threshold(range)`: 0 outside.
+fn threshold_r<T: Arith>(v: &mut Volume<T>, ins: Vec<bool>) {
     let zero = T::from_int(0);
     for (x, i) in v.data.iter_mut().zip(ins) {
         if !i {
@@ -490,31 +558,69 @@ fn threshold_b<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, b: &Bounds<T>, what: 
     }
 }
 
-/// `binarise(0, max() + 1, exclusive)` (`-bin`, `-mas`'s mask).
-fn bin_positive<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, what: &str) {
-    let (mx, _) = extremes(ctx, v, what);
-    let b = Bounds {
-        lower: T::from_int(0),
-        upper: T::plus_int(mx, 1),
+/// `binarise(lower, max() + 1, exclusive)` (`-bin`, `-binv`, `-mas`'s mask).
+fn bin_above<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, lower: T, what: &str) {
+    let e = Extremes::of(v);
+    let r = Range {
+        lower,
+        upper: T::plus_int(e.fsl.0, 1),
+        inclusive: false,
         lower_open: false,
         upper_open: true,
-        inclusive: false,
     };
-    binarise_b(ctx, v, &b, what);
+    let ins = select(ctx, v, &r, &r, e.nan_first(), what);
+    binarise_r(v, ins);
 }
 
-/// The robust range's limits (`robustmin()`/`robustmax()`, or with the mask of the positive
-/// voxels): FSL-153 corrected leaves the NaN voxels out.
-fn robust<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, mask: Option<&Volume<T>>, what: &str) -> Res<(T, T)> {
+/// `threshold(lower, max() + 1, inclusive)` (`upper = false`) or
+/// `threshold(min() - 1, upper, inclusive)`: `limit` FSL's bound and the corrected one.
+fn threshold_at<T: Arith>(
+    ctx: &mut Ctx,
+    v: &mut Volume<T>,
+    limit: (T, T),
+    upper: bool,
+    what: &str,
+) {
+    let e = Extremes::of(v);
+    let make = |l: T| {
+        if upper {
+            Range {
+                lower: T::plus_int(e.fsl.1, -1),
+                upper: l,
+                inclusive: true,
+                lower_open: true,
+                upper_open: false,
+            }
+        } else {
+            Range {
+                lower: l,
+                upper: T::plus_int(e.fsl.0, 1),
+                inclusive: true,
+                lower_open: false,
+                upper_open: true,
+            }
+        }
+    };
+    let (rf, rx) = (make(limit.0), make(limit.1));
+    let ins = select(ctx, v, &rf, &rx, e.nan_first(), what);
+    threshold_r(v, ins);
+}
+
+/// The robust range's limits (`robustmin()`, `robustmax()`, or with the mask of the positive
+/// voxels) as FSL computes them and with the NaN voxels left out (FSL-153's correction), with
+/// the warning FSL prints for an empty mask.
+fn robust<T: Arith>(
+    ctx: &mut Ctx,
+    v: &Volume<T>,
+    mask: Option<&Volume<T>>,
+) -> Res<((T, T), (T, T))> {
     let ((lo, hi), warning) = v.robust_limits_masked(mask)?;
     if let Some(w) = warning {
         ctx.eput(&format!("{w}\n"));
     }
     if !T::IS_FLOAT || !v.data.iter().any(|&x| T::is_nan(x)) {
-        return Ok((lo, hi));
+        return Ok(((lo, hi), (lo, hi)));
     }
-    // NaN voxels: counted in the histogram's lowest bin (and a NaN first voxel makes the
-    // extremes NaN); corrected, they are left out of the mask.
     let mut keep = Volume::<T>::new7(v.dims);
     let one = T::from_int(1);
     let m: &[T] = mask.map_or(&[], |m| m.data.as_slice());
@@ -529,36 +635,42 @@ fn robust<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, mask: Option<&Volume<T>>, what
     } else {
         volops::find_thresholds(v, Some(&keep))?
     };
-    let same = fixed.0.to_f64().to_bits() == lo.to_f64().to_bits()
-        && fixed.1.to_f64().to_bits() == hi.to_f64().to_bits();
-    if same {
-        return Ok((lo, hi));
-    }
-    ctx.notice(&defects::FSL_153, format!("{what}: NaN voxels in the robust range"));
-    Ok(if ctx.reproduce() { (lo, hi) } else { fixed })
+    Ok(((lo, hi), fixed))
 }
 
 /// `robustmin + (p / 100) * (robustmax - robustmin)` converted to `T`.
 fn robust_limit<T: Arith>(ctx: &mut Ctx, lo: T, hi: T, val: &str, what: &str) -> T {
     let p = cnum::atof(val) / 100.0;
     let x = lo.to_f64() + larmorx_nc_core::sse::mul_f64(p, T::diff(hi, lo));
-    ctx.to_t::<T>(x, what)
+    ctx.conv::<T>(x, what)
 }
 
 /// An integer division by zero, as FSL crashes on it (FSL-156: refused).
 fn trap(ctx: &mut Ctx, what: &str) -> Stop {
-    ctx.refuse(&defects::FSL_156, &format!("{what}: an integer division by zero"))
+    ctx.refuse(
+        &defects::FSL_156,
+        &format!("{what}: an integer division by zero"),
+    )
 }
 
 /// FSL-159: an image of another size than the current one for an operation that indexes it
 /// voxel by voxel. Corrected: refused as the other binary operations refuse it.
-fn other_size<T: Arith>(ctx: &mut Ctx, cur: &Volume<T>, img: &Volume<T>, verb: &str, opname: &str) -> Res<()> {
+fn other_size<T: Arith>(
+    ctx: &mut Ctx,
+    cur: &Volume<T>,
+    img: &Volume<T>,
+    verb: &str,
+    opname: &str,
+) -> Res<()> {
     let same_xyz = cur.dims[..3] == img.dims[..3];
     let t_ok = img.tsize() == 1 || img.tsize() == cur.tsize();
     if same_xyz && t_ok {
         return Ok(());
     }
-    ctx.notice(&defects::FSL_159, format!("{opname} with an image of another size"));
+    ctx.notice(
+        &defects::FSL_159,
+        format!("{opname} with an image of another size"),
+    );
     if ctx.reproduce() {
         return Ok(());
     }
@@ -587,7 +699,7 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 i += 1;
                 let name = string_arg(ctx, argv, i)?;
                 let mut m = load_new_image(ctx, &mut input, name)?;
-                bin_positive(ctx, &mut m, "-mas");
+                bin_above(ctx, &mut m, T::from_int(0), "-mas");
                 input.op_volume(Op::Mul, &m)?.ok();
             }
             "-add" | "-sub" | "-mul" => {
@@ -599,7 +711,7 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 };
                 let s = string_arg(ctx, argv, i)?;
                 if is_number(s) {
-                    let val = ctx.to_t::<T>(cnum::atof(s), op);
+                    let val = ctx.conv::<T>(cnum::atof(s), op);
                     let _ = input.op_scalar(opk, val);
                 } else {
                     let img = load_new_image(ctx, &mut input, s)?;
@@ -646,26 +758,8 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     ctx.eput(&format!("Error: {op} requires a number\n"));
                     return Err(Stop::Exit(1));
                 }
-                let t = ctx.to_t::<T>(cnum::atof(val), op);
-                let (mx, mn) = extremes(ctx, &input, op);
-                let b = if op == "-thr" {
-                    Bounds {
-                        lower: t,
-                        upper: T::plus_int(mx, 1),
-                        lower_open: false,
-                        upper_open: true,
-                        inclusive: true,
-                    }
-                } else {
-                    Bounds {
-                        lower: T::plus_int(mn, -1),
-                        upper: t,
-                        lower_open: true,
-                        upper_open: false,
-                        inclusive: true,
-                    }
-                };
-                threshold_b(ctx, &mut input, &b, op);
+                let t = ctx.conv::<T>(cnum::atof(val), op);
+                threshold_at(ctx, &mut input, (t, t), op == "-uthr", op);
             }
             "-range" => set_display_range = true,
             "-thrp" | "-thrP" | "-uthrp" | "-uthrP" => {
@@ -686,29 +780,12 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 };
                 // robustmin() + p * (robustmax() - robustmin()): three evaluations, each with
                 // its warning
-                let (lo, _) = robust(ctx, &input, mask.as_ref(), op)?;
-                let (_, hi) = robust(ctx, &input, mask.as_ref(), op)?;
-                let _ = robust(ctx, &input, mask.as_ref(), op)?;
-                let limit = robust_limit(ctx, lo, hi, val, op);
-                let (mx, mn) = extremes(ctx, &input, op);
-                let b = if op.starts_with("-thr") {
-                    Bounds {
-                        lower: limit,
-                        upper: T::plus_int(mx, 1),
-                        lower_open: false,
-                        upper_open: true,
-                        inclusive: true,
-                    }
-                } else {
-                    Bounds {
-                        lower: T::plus_int(mn, -1),
-                        upper: limit,
-                        lower_open: true,
-                        upper_open: false,
-                        inclusive: true,
-                    }
-                };
-                threshold_b(ctx, &mut input, &b, op);
+                let (lo, fix_lo) = robust(ctx, &input, mask.as_ref())?;
+                let (hi, fix_hi) = robust(ctx, &input, mask.as_ref())?;
+                let _ = robust(ctx, &input, mask.as_ref())?;
+                let limit = robust_limit(ctx, lo.0, hi.1, val, op);
+                let fixed = robust_limit(ctx, fix_lo.0, fix_hi.1, val, op);
+                threshold_at(ctx, &mut input, (limit, fixed), op.starts_with("-u"), op);
             }
             "-sqrt" => {
                 let n = looped_len(&input);
@@ -727,7 +804,7 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 let n = looped_len(&input);
                 for k in 0..n {
                     let r = glibc_double::pow(input.data[k].to_f64(), p);
-                    input.data[k] = ctx.to_t::<T>(r, "-pow");
+                    input.data[k] = ctx.conv::<T>(r, "-pow");
                 }
                 i += 1;
             }
@@ -753,7 +830,8 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 let n = looped_len(&input);
                 for k in 0..n {
                     let v = input.data[k];
-                    if op == "-log" && !(v > T::from_int(0)) {
+                    let positive = v > T::from_int(0);
+                    if op == "-log" && !positive {
                         continue;
                     }
                     let x = v.to_f64();
@@ -772,11 +850,17 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     let r = if x.is_nan() {
                         larmorx_nc_core::sse::quiet_f64(x)
                     } else if r.is_nan() {
-                        larmorx_nc_core::sse::DEFAULT_NAN_F64
+                        // glibc's asin and acos give a positive NaN outside [-1, 1]; the others'
+                        // NaN (sin, cos, tan of an infinity) is SSE's default
+                        if matches!(op, "-asin" | "-acos") {
+                            f64::NAN
+                        } else {
+                            larmorx_nc_core::sse::DEFAULT_NAN_F64
+                        }
                     } else {
                         r
                     };
-                    input.data[k] = ctx.to_t::<T>(r, op);
+                    input.data[k] = ctx.conv::<T>(r, op);
                 }
             }
             "-abs" => {
@@ -785,24 +869,17 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     input.data[k] = if T::IS_FLOAT {
                         volops::abs_value(v)
                     } else {
-                        ctx.to_t::<T>(v.to_f64().abs(), "-abs")
+                        ctx.conv::<T>(v.to_f64().abs(), "-abs")
                     };
                 }
             }
-            "-bin" => bin_positive(ctx, &mut input, "-bin"),
+            "-bin" => bin_above(ctx, &mut input, T::from_int(0), "-bin"),
             "-binv" => {
-                bin_positive(ctx, &mut input, "-binv");
+                bin_above(ctx, &mut input, T::from_int(0), "-binv");
                 let _ = input.op_scalar(Op::Mul, T::from_int(-1));
                 let _ = input.op_scalar(Op::Add, T::from_int(1));
-                let (mx, _) = extremes(ctx, &input, "-binv");
-                let b = Bounds {
-                    lower: T::from_f64(0.5),
-                    upper: T::plus_int(mx, 1),
-                    lower_open: false,
-                    upper_open: true,
-                    inclusive: false,
-                };
-                binarise_b(ctx, &mut input, &b, "-binv");
+                // (T) 0.5: to cope with a bit of rounding error
+                bin_above(ctx, &mut input, T::from_f64(0.5), "-binv");
             }
             "-index" => {
                 let n = looped_len(&input);
@@ -822,7 +899,7 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 if spacing == 0 {
                     return Err(trap(ctx, "-grid with a spacing of 0"));
                 }
-                let value = ctx.to_t::<T>(gv, "-grid");
+                let value = ctx.conv::<T>(gv, "-grid");
                 let (nx, ny, nz) = (input.xsize(), input.ysize(), input.zsize());
                 let nt = input.tsize();
                 let s = i64::from(spacing);
@@ -857,13 +934,13 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 for k in 0..n {
                     let rnd = ctx.drand.drand();
                     let add = if op == "-rand" {
-                        ctx.to_t::<T>(rnd - 1.0, op)
+                        ctx.conv::<T>(rnd - 1.0, op)
                     } else {
                         let (z, msg) = cprob::ndtri(rnd - 1.0);
                         if let Some(m) = msg {
                             printed.push_str(&m);
                         }
-                        ctx.to_t::<T>(z, op)
+                        ctx.conv::<T>(z, op)
                     };
                     input.data[k] = T::add(input.data[k], add);
                 }
@@ -897,7 +974,14 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
         input.display_min = 0.0;
     }
     if set_display_range {
-        let (mx, mn) = extremes(ctx, &input, "-range");
+        let e = Extremes::of(&input);
+        let (mut mx, mut mn) = e.fsl;
+        if e.nan_first() {
+            ctx.notice(&defects::FSL_153, "-range: the first voxel is NaN");
+            if !ctx.reproduce() {
+                (mx, mn) = e.fixed;
+            }
+        }
         input.display_max = mx.to_f32();
         input.display_min = mn.to_f32();
     }
@@ -918,7 +1002,7 @@ fn not_yet(ctx: &mut Ctx, op: &str) -> Stop {
 fn sqrt_t<T: Arith>(ctx: &mut Ctx, v: T) -> T {
     match T::DTYPE {
         dt::FLOAT => T::from_f32(v.to_f32().sqrt()),
-        _ => ctx.to_t::<T>(v.to_f64().sqrt(), "-sqrt"),
+        _ => ctx.conv::<T>(v.to_f64().sqrt(), "-sqrt"),
     }
 }
 
@@ -927,9 +1011,9 @@ fn rem<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, s: &str) -> Res<()> {
     let n = looped_len(input);
     if is_number(s) {
         let d = cnum::atof(s);
-        let denom = ctx.to_int::<f64>(d, "-rem's divisor");
+        let denom = ctx.int_of::<f64>(d, "-rem's divisor");
         for k in 0..n {
-            let v = ctx.to_int(input.data[k], "-rem");
+            let v = ctx.int_of(input.data[k], "-rem");
             match v.checked_rem(denom) {
                 Some(r) => input.data[k] = T::from_int(r),
                 None => return Err(trap(ctx, "-rem")),
@@ -949,8 +1033,8 @@ fn rem<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, s: &str) -> Res<()> {
                     let d = get4(&img, x, y, z, t2);
                     if T::nonzero(d) {
                         let k = t as usize * nvox + input.idx(x, y, z);
-                        let v = ctx.to_int(input.data[k], "-rem");
-                        let dd = ctx.to_int(d, "-rem's divisor");
+                        let v = ctx.int_of(input.data[k], "-rem");
+                        let dd = ctx.int_of(d, "-rem's divisor");
                         match v.checked_rem(dd) {
                             Some(r) => input.data[k] = T::from_int(r),
                             None => return Err(trap(ctx, "-rem")),
@@ -978,7 +1062,7 @@ fn div<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, s: &str) -> Res<()> {
     if is_number(s) {
         let d = cnum::atof(s);
         if d != 0.0 {
-            let val = ctx.to_t::<T>(d, "-div");
+            let val = ctx.conv::<T>(d, "-div");
             if input.op_scalar(Op::Div, val).is_err() {
                 return Err(trap(ctx, "-div"));
             }
@@ -1026,7 +1110,7 @@ fn max_min<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, s: &str, is_max: bool
     };
     let n = looped_len(input);
     if is_number(s) {
-        let p = ctx.to_t::<T>(cnum::atof(s), if is_max { "-max" } else { "-min" });
+        let p = ctx.conv::<T>(cnum::atof(s), if is_max { "-max" } else { "-min" });
         for k in 0..n {
             input.data[k] = pick(input.data[k], p);
         }
@@ -1139,7 +1223,11 @@ fn save_as<T: Arith, D: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str) -> Res<
         let mut changed = 0usize;
         for (o, &x) in out.data.iter_mut().zip(&v.data) {
             let f = x.to_f64();
-            let fixed = if f.is_nan() { 0.0 } else { f.trunc().clamp(lo, hi) };
+            let fixed = if f.is_nan() {
+                0.0
+            } else {
+                f.trunc().clamp(lo, hi)
+            };
             let fixed: D = if D::DTYPE == dt::UNSIGNED_CHAR {
                 D::from_int(fixed as i32 as u8 as i8 as i32)
             } else {
@@ -1160,4 +1248,77 @@ fn save_as<T: Arith, D: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str) -> Res<
         }
     }
     save(ctx, &out, name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings() -> Settings {
+        Settings::new().with("FSLOUTPUTTYPE", "NIFTI_GZ")
+    }
+
+    fn run(args: &[&str], mode: UpstreamDefects) -> (Res<u8>, String, String) {
+        let settings = settings();
+        let run = Run {
+            fsl: &settings,
+            mode,
+        };
+        let argv: Vec<String> = std::iter::once("fslmaths")
+            .chain(args.iter().copied())
+            .map(str::to_owned)
+            .collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = main(&argv, &run, &mut out, &mut err);
+        (
+            r,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    #[test]
+    fn numbers_as_miscmaths_reads_them() {
+        assert!(is_number("2.5"));
+        assert!(is_number("-1e3"));
+        assert!(is_number("nan"));
+        assert!(is_number(" 7"));
+        assert!(!is_number(""));
+        assert!(!is_number("5mm"));
+        assert!(!is_number("image.nii.gz"));
+    }
+
+    #[test]
+    fn usage_and_help() {
+        let (r, out, _) = run(&[], UpstreamDefects::Fix);
+        assert_eq!(r.unwrap(), 1);
+        assert!(out.starts_with("\nUsage: fslmaths [-dt <datatype>]"));
+        let (r, out, _) = run(&["--help"], UpstreamDefects::Fix);
+        assert_eq!(r.unwrap(), 0);
+        assert!(out.contains(" -kernel 3D : 3x3x3 box"));
+    }
+
+    #[test]
+    fn a_chain_on_a_written_image() {
+        let d = tempfile::tempdir().unwrap();
+        let p = |n: &str| d.path().join(n).to_string_lossy().into_owned();
+        let mut v = Volume::<f32>::new(4, 3, 2, 1);
+        for (k, x) in v.data.iter_mut().enumerate() {
+            *x = k as f32 - 5.0;
+        }
+        let opts = SaveOptions::new(volume::BUILDSTRING.as_bytes());
+        v.save_volume(&p("in"), &settings(), &opts).unwrap();
+        let (r, _, err) = run(
+            &[&p("in"), "-thr", "0", "-mul", "2", "-bin", &p("out")],
+            UpstreamDefects::Fix,
+        );
+        assert_eq!(r.unwrap(), 0, "{err}");
+        let (o, _, _) = volume::read_volume4d::<f32>(&p("out"), &settings()).unwrap();
+        let want: Vec<f32> = (0..24).map(|k| if k > 5 { 1.0 } else { 0.0 }).collect();
+        assert_eq!(o.data, want);
+        // an integer division by zero is refused (FSL-156)
+        let (r, _, err) = run(&[&p("in"), "-rem", "0", &p("out2")], UpstreamDefects::Fix);
+        assert!(matches!(r, Err(Stop::Exit(1))), "{err}");
+        assert!(err.contains("FSL-156"), "{err}");
+    }
 }

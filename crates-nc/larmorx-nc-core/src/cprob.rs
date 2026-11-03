@@ -12,6 +12,9 @@
 //! - [`ndtri`]: the inverse of the standard normal distribution function, with Cephes' error
 //!   report ([`mtherr`]: printed on standard output) outside `(0, 1)`.
 
+// Cephes' decimal constants are kept as written (the compiler rounds them as FSL's did).
+#![allow(clippy::excessive_precision, clippy::unreadable_literal)]
+
 use crate::glibc_double;
 
 /// Cephes' `MAXNUM` (2^1024 (1 - MACHEP)).
@@ -65,7 +68,8 @@ impl Drand {
     /// plus 1).
     pub fn drand(&mut self) -> f64 {
         self.ranwh();
-        let mut d = f64::from(self.sx) / 30269.0 + f64::from(self.sy) / 30307.0
+        let mut d = f64::from(self.sx) / 30269.0
+            + f64::from(self.sy) / 30307.0
             + f64::from(self.sz) / 30323.0;
         // unsigned short r = d (the sum is below 3: no overflow)
         let r = d as u16;

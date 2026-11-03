@@ -27,6 +27,7 @@ FSL or larmorx goes in a memory box (`scripts/orchestration/boxed.sh 8 ...`).
 | `t_probe.py`, `t_scg.py` | a Levenberg-Marquardt level and the scaled conjugate gradients from FSL's own start against `-v` (finding 9) |
 | `t_iout.py` | the corrected volumes and their mean from FSL's coefficients (finding 10) |
 | `t_trans.py` to `t_trans13.py` | the level transitions: sampling positions, intermediate knot spacings, refit penalties, energies (the transitions' section) |
+| `t_trans14.py` | a rejected hypothesis: the refits solved approximately by conjugate gradients (3D) change the field more than FSL's do |
 
 Example: `TOPUP_RUNS=<scratch>/runs python -P fsl_case.py case debug/one-level $TOPUP_RUNS/fsl-debug1`
 then `python -I proto3.py $TOPUP_RUNS/fsl-debug1`.

@@ -160,7 +160,7 @@ def test_without_the_replica(scripts, tmp_path):
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
         lx.fsl.topup(path, ACQ, implementation="replica")
     # a failure of the original: topup's message in the error
-    with pytest.raises(RuntimeError, match="clean-room original.*exit code 1"):
+    with pytest.raises(RuntimeError, match=r"clean-room original.*exit code 1"):
         lx.fsl.topup(path, [[0, 1, 0, 0.05]], **kw)
     with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl applytopup"):
         lx.fsl.applytopup(path, ACQ, [1], "base")

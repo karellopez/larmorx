@@ -937,7 +937,10 @@ mod tests {
             .unwrap_or(14);
         const LEN: usize = 4093; // not a multiple of 4: the scalar tail runs too
         let start = std::time::Instant::now();
-        let results: Vec<([u64; 9], u64, u64, u64, Vec<String>)> = std::thread::scope(|sc| {
+        // per thread: the values of each kind, the lanes kept and sent on, the values, the
+        // differences
+        type Counts = ([u64; 9], u64, u64, u64, Vec<String>);
+        let results: Vec<Counts> = std::thread::scope(|sc| {
             let handles: Vec<_> = (0..threads)
                 .map(|t| {
                     sc.spawn(move || {
@@ -957,8 +960,8 @@ mod tests {
                             let mut disp = v[..len].to_vec();
                             exp_in_place(&mut base);
                             crate::math::exp_in_place(&mut disp);
-                            for chunk in v[..len].chunks_exact(4) {
-                                let (_, ok) = fast4([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                            for chunk in v[..len].as_chunks::<4>().0 {
+                                let (_, ok) = fast4(*chunk);
                                 for (l, &o) in ok.iter().enumerate() {
                                     let x = chunk[l].to_bits();
                                     let a = x & (u64::MAX >> 1);

@@ -458,14 +458,14 @@ fn note157<T: Num>(ctx: &Ctx<'_>, img: &Img<T>, notices: &mut Notices) {
     let int8 = ctx.stored_type == DataType::I8;
     let differs = int8
         || ops::any(&img.data, |v| {
-        let x = v.to_f64();
-        let rounded = if x > 0.0 {
-            (x + 0.5).trunc()
-        } else {
-            (x - 0.5).trunc()
-        };
-        rounded != x.trunc() || (int8 && x.trunc() < 0.0)
-    });
+            let x = v.to_f64();
+            let rounded = if x > 0.0 {
+                (x + 0.5).trunc()
+            } else {
+                (x - 0.5).trunc()
+            };
+            rounded != x.trunc() || (int8 && x.trunc() < 0.0)
+        });
     if differs {
         let detail = match notices.mode() {
             UpstreamDefects::Fix => {

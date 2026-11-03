@@ -102,9 +102,8 @@ pub fn tfce<T: Num>(
     let fix = notices.fix();
     check_connectivity(notices, "-tfce", c)?;
     let [nx, ny, nz, nt] = img.dims;
-    if nx < 3 || ny < 3 || nz < 3 {
-        return Err(failure(NEEDS_SIZE));
-    }
+    // FSL tests each volume's step before the sizes (random testing, findings 26)
+    let small = nx < 3 || ny < 3 || nz < 3;
     let per = nx * ny * nz;
     let offs = offsets(c);
     let double = T::KIND == Kind::Double;
@@ -131,6 +130,9 @@ pub fn tfce<T: Num>(
         }
         if delta <= 0.0 {
             return Err(failure(NEEDS_DELTA));
+        }
+        if small {
+            return Err(failure(NEEDS_SIZE));
         }
         if delta.is_nan() && fix {
             notices.add(

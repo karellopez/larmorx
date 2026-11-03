@@ -13,7 +13,7 @@ use rayon::prelude::*;
 
 use super::filters::{EMPTY_MASK, abort_lines};
 use super::image::Img;
-use super::num::{self, Num};
+use super::num::{self, Kind, Num};
 use super::ops::{self, Stop};
 
 // ------------------------------------------------------------------------------------------
@@ -61,26 +61,32 @@ fn subsample_volume<T: Num>(
             for j in 0..oy {
                 for i in 0..ox {
                     let (x, y, z) = (2 * i as i64, 2 * j as i64, 2 * k as i64);
+                    // the sums in double, not in the computing type (a char image's sums do
+                    // not wrap: random testing, findings 29)
+                    let add = |s: f64, v: T| {
+                        let v = v.to_f64();
+                        num::nan64(s, v, s + v)
+                    };
                     let r = if offc {
-                        let mut s = T::zero();
+                        let mut s = 0.0f64;
                         for dz in 0..2 {
                             for dy in 0..2 {
                                 for dx in 0..2 {
-                                    s = s.add(at(x + dx, y + dy, z + dz));
+                                    s = add(s, at(x + dx, y + dy, z + dz));
                                 }
                             }
                         }
-                        s.to_f64() / 8.0
+                        s / 8.0
                     } else {
-                        let (mut f, mut e, mut kk) = (T::zero(), T::zero(), T::zero());
+                        let (mut f, mut e, mut kk) = (0.0f64, 0.0f64, 0.0f64);
                         for dz in -1i64..=1 {
                             for dy in -1i64..=1 {
                                 for dx in -1i64..=1 {
                                     let v = at(x + dx, y + dy, z + dz);
                                     match dx.abs() + dy.abs() + dz.abs() {
-                                        1 => f = f.add(v),
-                                        2 => e = e.add(v),
-                                        3 => kk = kk.add(v),
+                                        1 => f = add(f, v),
+                                        2 => e = add(e, v),
+                                        3 => kk = add(kk, v),
                                         _ => {}
                                     }
                                 }
@@ -89,7 +95,7 @@ fn subsample_volume<T: Num>(
                         let c = at(x, y, z).to_f64();
                         let mut r = 0.125 * c;
                         for (w, s) in [(0.0625, f), (0.0312, e), (0.0156, kk)] {
-                            let p = w * s.to_f64();
+                            let p = w * s;
                             r = num::nan64(r, p, r + p);
                         }
                         r
@@ -223,7 +229,13 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                     let steps = [1, nx, plane];
                     let mut sum = 0.0f64;
                     for a in 0..axes {
-                        let d = vol[i + steps[a]].sub(vol[i - steps[a]]).to_f64();
+                        let (p, m) = (vol[i + steps[a]], vol[i - steps[a]]);
+                        // C's arithmetic: char and short differences as int, not wrapped to
+                        // the type (random testing, findings 29)
+                        let d = match T::KIND {
+                            Kind::Float | Kind::Double => p.sub(m).to_f64(),
+                            _ => p.diff(m),
+                        };
                         let q = d * d / (vox[a] * vox[a]);
                         sum = num::nan64(sum, q, sum + q);
                     }
@@ -422,8 +434,10 @@ pub fn fill_holes<T: Num>(
     let op = if conn26 { "-fillh26" } else { "-fillh" };
     ops::bin_values(&mut img.data, notices, op);
     let [nx, ny, nz, nt] = img.dims;
+    // FSL crashes on any image with a size of 1 along an axis, holes or not (random testing,
+    // findings 27)
     let flat = [nx, ny, nz].contains(&1);
-    if flat && img.data.iter().any(|&v| v == T::zero()) {
+    if flat {
         if notices.reproduce() {
             return Err(Stop::Refuse(format!(
                 "{op} of an image with a size of 1 along an axis (FSL-165: FSL crashes here, an \

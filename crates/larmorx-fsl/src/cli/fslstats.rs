@@ -1105,17 +1105,24 @@ fn print_histogram(
             name_histogram_defects(notices, o, nan_changes && nan_only != rep, nan_only != h);
         }
     }
-    match h {
+    // an empty mask: FSL's message, then its histogram of zeros (random testing, findings 28)
+    let h = match h {
         Hist::Empty => {
             let _ = writeln!(err, "{HISTOGRAM_EMPTY}");
+            Hist::Counts(vec![0; c.nbins])
         }
-        Hist::None => {
+        other => other,
+    };
+    match h {
+        Hist::None | Hist::Empty => {
             if o == "-H" {
                 notices.add(
                     &defects::FSL_186,
                     "-H with a maximum not above its minimum prints nothing, as FSL does",
                 );
             }
+            // no histogram: no counts printed, an empty list in the JSON (findings 28)
+            p.json.insert(o.into(), J::A(Vec::new()));
         }
         Hist::Counts(counts) => {
             for &n in &counts {

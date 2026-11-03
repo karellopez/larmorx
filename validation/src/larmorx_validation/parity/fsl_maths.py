@@ -105,9 +105,9 @@ _FFT = (
     "question 14)"
 )
 _SUBSAMPLING = (
-    "FSL's single-precision subsampling arithmetic, which no simple order of the weighted sum "
-    "gives (findings 13; spec question 13), against the spec's sums: the voxels beyond 4 ulp "
-    "are those whose value cancels to near 0"
+    "FSL's arithmetic of -subsamp2offc's 2 x 2 x 2 means, which no order of a single or double "
+    "sum of the eight values gives (findings 13 and 29; spec question 13), against the spec's "
+    "mean: the voxels beyond 4 ulp are those whose value cancels to near 0"
 )
 #: Cases expected to miss §21's share of voxels within 4 ulp (only that check), and why: their
 #: largest difference stays inside the bound (1e-5 of FSL's largest magnitude), checked.
@@ -117,13 +117,7 @@ EXPECTED_DIVERGENCES: dict[str, str] = {
         _FFT,
     ),
     **dict.fromkeys(
-        (
-            "sub/subsamp2",
-            "sub/subsamp2offc",
-            "sub/subsamp2offc-double",
-            "sub/subsamp2-noform",
-            "sub/subsamp2-nan",
-        ),
+        ("sub/subsamp2offc", "sub/subsamp2offc-double"),
         _SUBSAMPLING,
     ),
 }
@@ -332,6 +326,8 @@ def compare(
             worst = int(d.max()) if d.size else 0
             if differ and "-tensor_decomp" in args:
                 _tensor_check(checks, name, fa, fb, x, y)
+            elif differ and "-tfce" in args:
+                _tfce_check(checks, name, x.ravel(), y.ravel())
             elif differ and any(a in _SUM_OPS for a in args):
                 _sum_check(checks, name, x.ravel(), y.ravel(), d)
             elif ulps and x.dtype == np.float64:
@@ -466,6 +462,30 @@ def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: 
 #: eigenvectors up to their sign (|cos| >= 0.9999) where the eigenvalues are distinct by more
 #: than 1e-4 relative.
 TENSOR_RELATIVE, TENSOR_MO, TENSOR_COS, TENSOR_DISTINCT = 1e-5, 1e-4, 0.9999, 1e-4
+#: §21's TFCE metric: the difference relative to the image's maximum enhancement.
+TFCE_RELATIVE = 1e-5
+
+
+def _tfce_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray) -> None:
+    """§21's TFCE metric: the difference at most 1e-5 of the image's maximum enhancement (FSL's
+    largest magnitude), the non-finite voxels identical."""
+    fin = np.isfinite(x) & np.isfinite(y)
+    same_nonfinite = bool(np.array_equal(x[~fin], y[~fin], equal_nan=True)) and bool(
+        np.array_equal(np.isfinite(x), np.isfinite(y))
+    )
+    x64, y64 = x[fin].astype(np.float64), y[fin].astype(np.float64)
+    top = float(np.abs(x64).max()) if x64.size else 0.0
+    worst = float(np.abs(x64 - y64).max()) if x64.size else 0.0
+    rel = worst / top if top > 0 else (0.0 if worst == 0 else np.inf)
+    checks(
+        f"{name}: values within TFCE's bound",
+        rel <= TFCE_RELATIVE and same_nonfinite,
+        metric="max |diff| / max |FSL|",
+        value=f"{rel:.3g}",
+        threshold=f"<= {TFCE_RELATIVE:g}; non-finite voxels identical",
+        detail=f"{int(np.count_nonzero(x64 != y64))} of {x.size} voxels differ"
+        + ("" if same_nonfinite else "; the NaN or infinite voxels differ"),
+    )
 
 
 def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.ndarray) -> None:
@@ -473,13 +493,16 @@ def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.nda
 
     x64, y64 = x.astype(np.float64), y.astype(np.float64)
     stem = name
-    for ext in (".nii.gz", ".nii", ".hdr.gz", ".hdr"):
+    for ext in (e + c for c in _COMPRESSED for e in (".nii", ".hdr")):
         stem = stem.removesuffix(ext)
     kind = stem.rsplit("_", 1)[-1] if "_" in stem else "FA"
     if kind in ("V1", "V2", "V3"):
         k = int(kind[1]) - 1
+        # the eigenvalues on the vectors' grid (a single slice's are written 2D, the vectors 4D)
         lam = [
-            np.asarray(_load(fa[name.replace(f"_{kind}", f"_L{j}")]).dataobj).astype(np.float64)
+            np.asarray(_load(fa[name.replace(f"_{kind}", f"_L{j}")]).dataobj)
+            .astype(np.float64)
+            .reshape(x64.shape[:-1])
             for j in (1, 2, 3)
         ]
         distinct = np.ones(lam[0].shape, bool)

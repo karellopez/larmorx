@@ -93,7 +93,8 @@ impl Morph {
 
 /// A morphological filter's window: the offsets of the kernel's voxels above 0.5 in the
 /// kernel's order (z slowest), the count FSL sizes it by (the values in [0.5, FLT_MAX], NaN
-/// counted), and whether an extent is even.
+/// counted), and whether a size of the kernel is even (FSL's warning goes by the kernel's sizes,
+/// not by the extent of its values above 0.5: random testing, findings 25).
 struct Window {
     offs: Vec<[i64; 3]>,
     count: usize,
@@ -118,12 +119,7 @@ fn window(k: &Kernel) -> Window {
             }
         }
     }
-    let even = !offs.is_empty()
-        && (0..3).any(|a| {
-            let lo = offs.iter().map(|o| o[a]).min().unwrap_or(0);
-            let hi = offs.iter().map(|o| o[a]).max().unwrap_or(0);
-            (hi - lo) % 2 == 1
-        });
+    let even = !k.is_empty() && k.dims.iter().any(|&n| n % 2 == 0);
     Window { offs, count, even }
 }
 
@@ -328,12 +324,18 @@ pub fn morph<T: Num>(
     let mut changed = false;
     let mut nan_seen = false;
     for t in 0..img.dims[3] {
-        if win.count == 0 {
+        if k.is_empty() {
+            // a kernel without voxels (FSL-161 reproduced)
             let _ = writeln!(err, "{EMPTY_MASK}");
             continue;
         }
         if win.even {
             let _ = writeln!(err, "{OFF_CENTRE_MORPH}");
+        }
+        if win.count == 0 && win.offs.is_empty() {
+            // no value of the kernel at or above 0.5: every voxel as it is, silently (findings
+            // 25)
+            continue;
         }
         let vol = &img.data[t * per..(t + 1) * per];
         let (out, met, ch) = morph_volume(vol, dims, &win, f, fix);

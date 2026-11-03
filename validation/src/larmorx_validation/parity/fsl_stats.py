@@ -192,9 +192,10 @@ def _close(a: float, b: float) -> bool:
 
 
 def _bounded_words(args: list[str], n_words: int) -> list[bool] | None:
-    """For one pass's printed line of ``n_words`` words: which words §10's bound applies to,
-    walking the options; ``None`` when the words cannot be attributed (a histogram that printed
-    nothing, a message): then every word must be identical."""
+    """For the printed output of ``n_words`` words (one pass, or several of the same options:
+    ``-t``, ``-K``; a histogram's counts one a line): which words §10's bound applies to, walking
+    the options; ``None`` when the words cannot be attributed (a histogram that printed nothing,
+    a message): then every word must be identical."""
     opts = list(args)
     masked = False
     while opts and opts[0] in ("-t", "-json", "-K"):
@@ -221,7 +222,9 @@ def _bounded_words(args: list[str], n_words: int) -> list[bool] | None:
         if o in _MAKE_MASKS:
             masked = True
         k += 1 + n_args
-    return out if len(out) == n_words else None
+    if out and n_words % len(out) == 0:
+        return out * (n_words // len(out))
+    return None
 
 
 def _compare_text(checks: CheckList, x: str, y: str, args: list[str]) -> None:
@@ -231,6 +234,9 @@ def _compare_text(checks: CheckList, x: str, y: str, args: list[str]) -> None:
     bad, worst = "", 0.0
     if len(xs) != len(ys):
         bad = f"{len(xs)} vs {len(ys)} lines: FSL {x[-160:]!r} / original {y[-160:]!r}"
+    # the bound's attribution over the whole output's words (a histogram spans lines)
+    bounds = _bounded_words(args, len(x.split()))
+    j = 0
     for k, (p, q) in enumerate(zip(xs, ys, strict=False)):
         if bad:
             break
@@ -238,9 +244,6 @@ def _compare_text(checks: CheckList, x: str, y: str, args: list[str]) -> None:
         if len(pw) != len(qw):
             bad = f"line {k + 1}: FSL {p[:160]!r} / original {q[:160]!r}"
             break
-        words = [w for w in pw if w]
-        bounds = _bounded_words(args, len(words))
-        j = 0
         for u, v in zip(pw, qw, strict=True):
             if u == v:
                 j += bool(u)

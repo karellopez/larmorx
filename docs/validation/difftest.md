@@ -122,6 +122,7 @@ and `::test_the_sizing_laws_and_a_case_predicted_over_the_limit`.
 | `fsl-flirt-programs` | `parity.fsl_flirt_replica` (the same payload; registered for part 2's short trials of the new paths) | replica vs flirt, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot | `-anglerep quaternion` registrations; avscale's matrices (`--allparams`, `--inverteddies`, a volume's centre of gravity); the coordinate programs' voxel and mm coordinates from files and standard input; rmsdiff with and without a mask; makerot's axes, centres and angles (since 2026-11-01) |
 | `fsl-flirt-part3` | `parity.fsl_flirt_replica` (the same payload; registered for part 3's trial of the new paths) | replica vs flirt, midtrans, pointflirt, applyxfm4D, extracttxt | midtrans of 2 to 4 drawn transforms (`-o`, `-v`, `--debug`, `--separate`, `--template`); pointflirt of 1 to 20 points and their drawn affine images (`-o`, `-v`, `--vox`); applyxfm4D on 3D and 4D images of every stored type with every interpolation (`-3D`, `-singlematrix`); flirt schedules with `alignpaxes` or a drawn parameter-subset mask; extracttxt with drawn words, counts and relative starts, negative ones included (since 2026-11-01) |
 | `fsl-fast` | `parity.fsl_fast_replica` (a whole `Run` as the case's payload: inputs as `@dt:` names; `-p` and multi-channel `-N` cases never cached, FSL's never-written voxels set to the defined values as in the suite) | replica vs fast | fMRIPrep's call; one to four channels of one brain-extracted phantom (T1-, T2- and PD-like contrasts, 2D slices, whole heads, crops of a real T1w), every option (short and long names), FSL's tissue priors with a drawn standard-to-input matrix (`-a`, `-P`), `-s`, every stored type, FSL's output types (since 2026-11-02) |
+| `fsl-fast-original` | `parity.fsl_fast` (the replica's draws, `difftest/tools/fsl_fast_original.py`; its `Run` payloads and treatment of FSL's never-written voxels; the permanent cases in `validation/difftest/cases/fsl-fast-original/`) | clean-room original vs fast | the same as `fsl-fast` (since 2026-11-03; its trial with `LARMORX_DIFFTEST_CACHE_MODE=use`) |
 | `resample-series` | `parity.resample_series` | port vs fMRIPrep's `ResampleSeries` | series, head motion, coregistration, targets, field maps, orders, modes |
 
 **Verdicts** (`difftest/core.py`): *agree* (the parity runner passed, or both programs rejected the
@@ -257,6 +258,11 @@ Random inputs must not make the cache grow without bound, and every finding must
   runs are stored (one entry per run, a few kilobytes of tiny inputs and outputs), so its replay
   and the permanent case built from it are served from the cache;
 - so the cache grows only by the findings, a few per night at most; nothing is ever deleted.
+- **a part's short trial** may run the originals through the cache in `use` mode instead
+  (`LARMORX_DIFFTEST_CACHE_MODE=use`, `runner.explore_mode`; `off` stays the default for nights):
+  its original runs are stored, so its replays, re-checks and permanent cases are served and no
+  original result is computed twice (every FSL run of a part through the cache, the briefs since
+  2026-11-02; FAST's clean-room trial of 2026-11-03 was the first: 9,005 cases, a few hundred MB).
 - a run whose original varies on its own machine is never cached, whatever the case's texts say:
   the cache applies ANTs' program-level rules to every ITK run (`policy.ants_never`: the
   velocity-field stages' clock-seeded sampling, ANTS-82; a smaller second image read past its

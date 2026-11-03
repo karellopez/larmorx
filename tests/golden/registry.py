@@ -356,6 +356,52 @@ def tissue_prior(c: int) -> lx.Image:
     return _frozen(anat().with_data(v.astype(np.float32)))
 
 
+@functools.cache
+def tissue_brain() -> lx.Image:
+    """FAST's input (a brain-extracted T1-like image): ``tissues`` inside its outer ellipsoid
+    (CSF 40, grey matter 100, white matter 160, with noise 0-39), 0 outside."""
+    v = np.where(ellipsoid(SHAPE3, 9, 10), tissues().data, 0)
+    return _frozen(anat().with_data(v.astype(np.float32)))
+
+
+@functools.cache
+def tissue_brain2() -> lx.Image:
+    """FAST's second channel: ``tissues2`` (a T2-like contrast) inside the same brain, 0
+    outside."""
+    v = np.where(ellipsoid(SHAPE3, 9, 10), tissues2().data, 0)
+    return _frozen(anat().with_data(v.astype(np.float32)))
+
+
+@functools.cache
+def tissue_brain_bright() -> lx.Image:
+    """``tissue_brain`` with one white-matter voxel at 2^24: the maximum FAST's own mask leaves
+    out (FSL-103)."""
+    v = tissue_brain().data.copy()
+    v[12, 10, 8] = 2.0**24
+    return _frozen(anat().with_data(v))
+
+
+def _write_analyze(path: Path) -> None:
+    """A big-endian int16 ANALYZE 7.5 pair (12 x 10 x 8) whose voxel sizes' product is negative
+    (-2, 2, 2: FSL reads it radiologically, without the x reversal) and whose scale field
+    (``funused1``) is 0.5, which FSL does not apply; written byte by byte (``lx.save`` writes
+    NIfTI)."""
+    import struct
+
+    shape = (12, 10, 8)
+    h = bytearray(348)
+    struct.pack_into(">i", h, 0, 348)
+    struct.pack_into(">i", h, 32, 16384)
+    h[38] = ord("r")
+    struct.pack_into(">8h", h, 40, 3, *shape, 1, 0, 0, 0)
+    struct.pack_into(">2h", h, 70, 4, 16)
+    struct.pack_into(">8f", h, 76, 0.0, -2.0, 2.0, 2.0, 1.0, 0.0, 0.0, 0.0)
+    struct.pack_into(">2f", h, 108, 0.0, 0.5)
+    v = ints(43, shape, 0, 50) + 200 * ellipsoid(shape, 7, 10) + 6 * np.indices(shape)[0]
+    path.write_bytes(bytes(h))
+    path.with_suffix(".img").write_bytes(v.astype(">i2").tobytes(order="F"))
+
+
 def _series_values() -> np.ndarray:
     """Integer time series with a trend and a slice- and voxel-dependent oscillation."""
     shape = SHAPE_TSHIFT
@@ -555,6 +601,11 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "tissue_prior01.nii": lambda p: lx.save(tissue_prior(1), p),
     "tissue_prior02.nii": lambda p: lx.save(tissue_prior(2), p),
     "tissue_prior03.nii": lambda p: lx.save(tissue_prior(3), p),
+    "tissue_brain.nii": lambda p: lx.save(tissue_brain(), p),
+    "tissue_brain2.nii": lambda p: lx.save(tissue_brain2(), p),
+    "tissue_brain_bright.nii": lambda p: lx.save(tissue_brain_bright(), p),
+    "analyze_scaled.hdr": _write_analyze,
+    "identity.mat": lambda p: p.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),
     "series.nii": _write_scaled_series,
     "series_negative.nii": _write_negative_series,
     "series_slope_inter.nii": _write_slope_inter_series,
@@ -954,11 +1005,9 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
-#: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original);
-#: FAST (2026-11-02) has its replica only, until its clean-room original is written.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.fast": "fsl fast",
-}
+#: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
+#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below): none is left.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -4542,3 +4591,116 @@ def _(ctx: Context) -> dict[str, Any]:
         "triangles": r.mesh.triangles,
         "robust_mask": rob.mask.data,
     }
+
+
+def _fast(ctx: Context, *argv: str, upstream_defects: str = "fix") -> str:
+    """``larmorx fsl fast <argv...>`` (the clean-room original, ``specs/fast.md``); its standard
+    output with the case's directory replaced."""
+    return _fsl(ctx, "fast", *argv, upstream_defects=upstream_defects).replace(
+        os.fspath(ctx.dir), "<dir>"
+    )
+
+
+def _fast_outputs(ctx: Context, base: str) -> dict[str, Any]:
+    """Every image FAST wrote under ``<dir>/<base>`` (their names are the keys, so the set of
+    files written is checked too)."""
+    return {p.name: Nifti(os.fspath(p)) for p in sorted(ctx.dir.glob(f"{base}_*.nii.gz"))}
+
+
+def _fast_input(ctx: Context, name: str, to: str) -> str:
+    """An input copied into the case's directory (FAST writes its outputs beside its input)."""
+    dst = ctx.dir / to
+    shutil.copy(ctx.file(name), dst)
+    return os.fspath(dst)
+
+
+@case("cli.fsl.fast", covers=("cli:fsl fast",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl fast``: fMRIPrep's call (``-I 0 -N -p -g -S 1``: no bias field, the member
+    probabilities, one binary image per class) on a three-tissue brain, every output named after
+    the input; the partial volumes' likelihoods go through the batched ``exp``
+    (``larmorx_core::math::exp_in_place``: AVX2 and FMA on Linux x64, the baseline path on
+    aarch64); the usage text and exit status without arguments."""
+    t1 = _fast_input(ctx, "tissue_brain.nii", "t1.nii")
+    _fast(ctx, "-I", "0", "-N", "-p", "-g", "-S", "1", t1)
+    return {**_fast_outputs(ctx, "t1"), **_status_outputs("usage", _fsl_status(ctx, "fast"))}
+
+
+@case("cli.fsl.fast.bias")
+def _(ctx: Context) -> dict[str, Any]:
+    """The default segmentation (the bias field's iterations, the MRF's random restarts) with
+    the restored image, the bias field, ``-o`` and the verbose messages."""
+    t1 = _fast_input(ctx, "tissue_brain.nii", "t1.nii")
+    stdout = _fast(ctx, "-t", "1", "-n", "3", "-B", "-b", "-v", "-o", ctx.out("seg"), t1)
+    return {**_fast_outputs(ctx, "seg"), "stdout": stdout}
+
+
+@case("cli.fsl.fast.multi")
+def _(ctx: Context) -> dict[str, Any]:
+    """Two channels (``-S 2``, channel 1 last): the multi-channel segmentation with its
+    covariances, bias fields, member probabilities and partial volumes (the batched ``exp``)."""
+    t2 = _fast_input(ctx, "tissue_brain2.nii", "t2.nii")
+    t1 = _fast_input(ctx, "tissue_brain.nii", "t1.nii")
+    _fast(ctx, "-S", "2", "-B", "-b", "-p", "-o", ctx.out("seg"), t2, t1)
+    return _fast_outputs(ctx, "seg")
+
+
+@case("cli.fsl.fast.priors")
+def _(ctx: Context) -> dict[str, Any]:
+    """Priors: three named with ``-A``, registered by FLIRT's clean-room original in the same
+    process with ``-a``'s matrix (the identity), used throughout with ``-P``; the registered
+    priors written as ``<out>_{csf,gm,wm}_stdspace``."""
+    t1 = _fast_input(ctx, "tissue_brain.nii", "t1.nii")
+    priors = [ctx.file(f"tissue_prior0{c}.nii") for c in (1, 2, 3)]
+    _fast(ctx, "-a", ctx.file("identity.mat"), "-A", *priors, "-P", "-o", ctx.out("seg"), t1)
+    return _fast_outputs(ctx, "seg")
+
+
+@case("cli.fsl.fast.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """FSL's defects reproduced: a maximum of 2^24 left out of the mask (FSL-103), against the
+    default, which keeps it and names the correction; the default's refusal of a NaN
+    smoothness (FSL-99)."""
+    t1 = _fast_input(ctx, "tissue_brain_bright.nii", "t1.nii")
+    _fast(ctx, "-N", "--nopve", "-o", ctx.out("rep"), t1, upstream_defects=REPRODUCE)
+    fix = _fsl_status(ctx, "fast", "-N", "--nopve", "-o", ctx.out("fix"), t1)
+    nan = _fsl_status(ctx, "fast", "-H", "nan", "-o", ctx.out("nan"), t1)
+    return {
+        **_fast_outputs(ctx, "rep"),
+        **_fast_outputs(ctx, "fix"),
+        **_status_outputs("fix", fix),
+        **_status_outputs("nan", nan),
+    }
+
+
+@case("py.fsl.fast", covers=("lx.fsl.fast",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.fast`` with the clean-room original on in-memory images: every output of one
+    channel; a single slice (the 2D neighbourhood and kernels)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # FSL-96's correction (-p's maps outside the mask: 0)
+        r = lx.fsl.fast(tissue_brain(), segments=True, probabilities=True, restored=True, bias_field=True, implementation="original")  # fmt: skip
+    flat = lx.fsl.fast(plane(), n_classes=2, implementation="original")
+    assert r.segments and r.probabilities and r.partial_volumes and r.restored and r.bias_fields
+    assert flat.partial_volumes is not None
+    return {
+        "seg": r.segmentation.data,
+        **{f"seg_{i}": im.data for i, im in enumerate(r.segments)},
+        **{f"prob_{i}": im.data for i, im in enumerate(r.probabilities)},
+        **{f"pve_{i}": im.data for i, im in enumerate(r.partial_volumes)},
+        "restore": r.restored[0].data,
+        "bias": r.bias_fields[0].data,
+        "plane_seg": flat.segmentation.data,
+        **{f"plane_pve_{i}": im.data for i, im in enumerate(flat.partial_volumes)},
+    }
+
+
+@case("cli.fsl.flirt.analyze")
+def _(ctx: Context) -> dict[str, Any]:
+    """The ANALYZE reader shared by BET's, FLIRT's and FAST's originals (``bet::image``): a
+    big-endian pair whose scale field FSL does not apply and whose voxel sizes' negative product
+    FSL reads radiologically, through FLIRT's ``-applyxfm`` with the identity."""
+    a = ctx.file("analyze_scaled.hdr")
+    out = ctx.out("out")
+    _flirt(ctx, "-in", a, "-ref", a, "-applyxfm", "-init", ctx.file("identity.mat"), "-out", out)
+    return {"image": Nifti(f"{out}.nii.gz")}

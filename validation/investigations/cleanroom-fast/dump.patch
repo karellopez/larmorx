@@ -1,0 +1,31 @@
+diff --git a/crates/larmorx-fsl/src/fast/single.rs b/crates/larmorx-fsl/src/fast/single.rs
+index 29a3dd6..56028b0 100644
+--- a/crates/larmorx-fsl/src/fast/single.rs
++++ b/crates/larmorx-fsl/src/fast/single.rs
+@@ -328,6 +328,13 @@ fn bias_field(
+         r[idx as usize] = rs;
+     }
+     let k = [&kernels[0][..], &kernels[1][..], &kernels[2][..]];
++    if let Ok(d) = std::env::var("LXFAST_DUMP") {
++        // a development hook (validation/investigations/cleanroom-fast/dump.patch): W, R
++        for (name, v) in [("w", &w), ("r", &r)] {
++            let bytes: Vec<u8> = v.iter().flat_map(|x| x.to_le_bytes()).collect();
++            let _ = std::fs::write(format!("{d}/{name}.f32"), bytes);
++        }
++    }
+     let w = bias::smooth(w, grid.shape, k);
+     let r = bias::smooth(r, grid.shape, k);
+     let mut b: Vec<f32> = grid
+diff --git a/validation/src/larmorx_validation/parity/fsl_fast.py b/validation/src/larmorx_validation/parity/fsl_fast.py
+index f856d59..2ef0791 100644
+--- a/validation/src/larmorx_validation/parity/fsl_fast.py
++++ b/validation/src/larmorx_validation/parity/fsl_fast.py
+@@ -91,7 +91,7 @@ def run_original(
+     env["OMP_NUM_THREADS"] = str(threads)
+     env["LARMORX_IMPLEMENTATION"] = "original"
+     for k, v in os.environ.items():
+-        if k in ("PYTHONPATH", "VIRTUAL_ENV"):
++        if k in ("PYTHONPATH", "VIRTUAL_ENV", "LXFAST_DUMP"):
+             env[k] = v
+     p = subprocess.run(
+         [*original_command(), "fsl", "fast", *args],

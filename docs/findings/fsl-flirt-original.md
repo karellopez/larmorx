@@ -597,3 +597,32 @@ Still open (what the spec does not settle, as spec questions in the handoff):
 - avscale's check residual sign in one of twelve cases;
 - registrations' paths (displacement on ill-posed random pairs, FSL-90's message counts during
   quaternion line searches, COG-warning counts, pairreg) as relay 5 lists them.
+
+## `-applyxfm`'s TR (FAST's clean-room original, relay 3, 2026-11-03)
+
+`-applyxfm` and `-applyisoxfm` write the input's TR (`pixdim[4]`) for a 3D input too, as §9.3
+says ("the output has the input's TR"), and as FSL reads it: its **absolute value**, and **1 for
+an input with a time axis** (`dim[0]` 4 or more, one volume or several) **whose TR is 0**; the
+format (NIfTI-1 or ANALYZE 7.5) does not matter; `pixdim[5..7]` are the reference's. The original
+wrote the reference's TR for a 3D input and a 4D input's raw `pixdim[4]`. Found by FAST's suite
+(`priors/A-a`: FSL's registered priors carry the template prior's `pixdim[4] = 0`, a 3D NIfTI;
+FSL's standard priors, ANALYZE with `dim[0] = 4` and `pixdim[4] = 0`, give 1).
+
+Black box (`validation/investigations/cleanroom-fast/applyxfm_tr.py`: FSL through the oracle
+cache, every input file keyed; a NIfTI reference with `pixdim[4..7] = 1.7, 1.3, 1.3, 1.3` and the
+identity), FSL's output `pixdim[4]`:
+
+| input | TR 0 | TR 2.5 | TR -2 |
+|---|---|---|---|
+| NIfTI, `dim[0] = 3` | 0 | 2.5 | 2 |
+| NIfTI, `dim[0] = 4`, one volume | 1 | 2.5 | 2 |
+| NIfTI, `dim[0] = 4`, two volumes | 1 | | |
+| ANALYZE, `dim[0] = 3` | 0 | 2.5 | |
+| ANALYZE, `dim[0] = 4`, one volume | 1 | 2.5 | |
+
+After a registration (`-dof 6 -out`) the output keeps the reference's TR (unchanged;
+`applyxfm_tr_inputs.py`'s images with FLIRT's `probe.py`). The original now reads the TR so in
+the apply path (`flirt::engine::apply`): the eleven outputs' headers are FSL's; FAST's 14 priors
+cases pass (12, and 2 both-error as before), and FLIRT's 28 suite cases that apply a matrix keep
+their statuses (25 pass, 2 both-error, 1 expected divergence). `-verbose 2`'s "Resampled volume"
+line keeps its TR as before (not observed otherwise).

@@ -1,0 +1,211 @@
+{
+ "defect": null,
+ "description": "a class of NaN variance makes the bias field's mean NaN: FSL's field, _restore and _bias are NaN outside the mask too (b \u00b7 M)",
+ "expect": "pass",
+ "found": {
+  "detail": "Bias field and restored image: relative difference (p99.9): ch1_restore.nii.gz: rel p99.9 0, differs outside the mask",
+  "n": 441,
+  "seed": "cleanroom-fast",
+  "shrink_moves": [
+   "dropped -o (-o seg)",
+   "dropped -t (-t 2)",
+   "dropped -n (--class=3)",
+   "ch1: axis 0 16 -> 8 voxels",
+   "dropped -s (-s {in:means})",
+   "ch1 (and its grid): origin at 0",
+   "ch1: axis 1 16 -> 8 voxels",
+   "ch1: axis 2 16 -> 8 voxels",
+   "ch1: axis 0 8 -> 4 voxels",
+   "ch1: axis 0 4 -> 2 voxels",
+   "ch1: axis 0 2 -> 1 voxels",
+   "ch1 (and its grid): millimetres"
+  ],
+  "signature": [
+   "Bias field and restored image: relative difference (pN.N)"
+  ]
+ },
+ "id": "bias-nan-outside-mask",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 1,
+   "classes": 3,
+   "nobias": false,
+   "output_type": "NIFTI2_GZ",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": true,
+   "-H": false,
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-R": false,
+   "-S 1": false,
+   "-W": false,
+   "-a": false,
+   "-b": false,
+   "-f": false,
+   "-g": false,
+   "-l": false,
+   "-n": true,
+   "-n long": true,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-s": true,
+   "-s order": "sorted",
+   "-t long": false,
+   "-v": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "axis0": 0.95,
+   "axis1": 0.9,
+   "axis2": 1.15,
+   "basename": "seg",
+   "bias0": 0.0075,
+   "bias1": -0.01,
+   "bias2": -0.0075,
+   "bias3": 0.005,
+   "brain centre0": 0.06,
+   "brain centre1": -0.06,
+   "brain centre2": 0.06,
+   "brain fraction": 0.3,
+   "centre0": -1.5,
+   "centre1": 0.0,
+   "centre2": -4.5,
+   "content": "head",
+   "dtype": "uint8",
+   "error": -0.05,
+   "extreme": false,
+   "field of view": 32.0,
+   "inter": 0.0,
+   "isotropic": true,
+   "kind": "single",
+   "n": "3",
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": 20.5,
+   "origin1": -17.0,
+   "origin2": 46.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "16x16x16",
+   "size": 8.0,
+   "slope": 0.5,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 0.8,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "units": "unknown",
+   "whole head": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-B"
+    ],
+    "name": "-B",
+    "optional": true
+   },
+   {
+    "args": [
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      0.95,
+      0.9,
+      1.15
+     ],
+     "bias": [
+      0.00375,
+      -0.005,
+      -0.00375,
+      0.00016666666666666666
+     ],
+     "brain": true,
+     "centre": [
+      2.0,
+      -2.0,
+      2.0
+     ],
+     "noise": 3.0,
+     "seed": 2135853209,
+     "size": 9.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 0.0,
+     "slope": 0.5
+    },
+    "shape": [
+     1,
+     8,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 441,
+  "options": [
+   "-B",
+   "-n",
+   "-o",
+   "-s",
+   "-t",
+   "FSLOUTPUTTYPE=NIFTI2_GZ"
+  ],
+  "seed": "cleanroom-fast",
+  "tool": "fsl-fast-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast",
+ "tier": "standard",
+ "tool": "fsl-fast-original"
+}

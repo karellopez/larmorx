@@ -1,0 +1,194 @@
+{
+ "defect": null,
+ "description": "FSLOUTPUTTYPE=NIFTI_ZST: the suite reads FSL's and the original's zstd images (it raised before)",
+ "expect": "pass",
+ "found": {
+  "detail": "e, band)\n  File \"<workspace>/larmorx/.claude/worktrees/agent-aa48faf7b7fe7f452/validation/src/larmorx_validation/parity/fsl_fast.py\", line 325, in compare\n    compare_images(images, a, b)\n  File \"<workspace>/larmorx/.claude/worktrees/agent-aa48faf7b7fe7f452/validation/src/larmorx_validation/parity/fsl_fast.py\", line 186, in compare_images\n    mask = _mask_of(a)\n           ^^^^^^^^^^^\nnibabel.tripwire.TripWireError: We need package backports.zstd for these functions, but ``import backports.zstd`` raised No module named 'backports'\n",
+  "n": 11,
+  "seed": "cleanroom-fast",
+  "shrink_moves": [
+   "dropped -o (-o fast)",
+   "dropped -v (-v)",
+   "dropped -B (-B)",
+   "dropped -t (--type=2)",
+   "ch1: axis 0 24 -> 12 voxels",
+   "ch1: axis 0 12 -> 6 voxels",
+   "ch1: axis 1 12 -> 6 voxels",
+   "ch1: axis 2 12 -> 6 voxels",
+   "ch1: axis 0 6 -> 3 voxels",
+   "ch1: axis 1 6 -> 3 voxels",
+   "ch1: axis 2 6 -> 3 voxels",
+   "ch1: axis 0 3 -> 1 voxels",
+   "ch1: axis 1 3 -> 1 voxels",
+   "ch1 (and its grid): plumb orientation",
+   "ch1 (and its grid): unit spacing",
+   "ch1 (and its grid): origin at 0",
+   "ch1 (and its grid): qform and sform codes 1",
+   "ch1 (and its grid): millimetres",
+   "ch1: content head -> blobs"
+  ],
+  "signature": [
+   "exception"
+  ]
+ },
+ "id": "zstd-outputs",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 1,
+   "classes": 3,
+   "nobias": false,
+   "output_type": "NIFTI_ZST",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": true,
+   "-H": false,
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-R": false,
+   "-S 1": false,
+   "-W": false,
+   "-a": false,
+   "-b": false,
+   "-f": false,
+   "-g": false,
+   "-l": false,
+   "-n": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-s": false,
+   "-t long": true,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "NIFTI_ZST",
+   "axis0": 0.85,
+   "axis1": 1.1,
+   "axis2": 0.9,
+   "basename": "fast",
+   "bias0": -0.0075,
+   "bias1": 0.0075,
+   "bias2": 0.0025,
+   "bias3": -0.0025,
+   "brain centre0": -0.08,
+   "brain centre1": 0.06,
+   "brain centre2": -0.02,
+   "brain fraction": 0.35,
+   "centre0": -2.5,
+   "centre1": -0.5,
+   "centre2": -0.5,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "field of view": 24.0,
+   "isotropic": false,
+   "kind": "single",
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": -38.25,
+   "origin1": -36.5,
+   "origin2": 39.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "24x12x12",
+   "size": 13.5,
+   "spacing0": 1.0,
+   "spacing1": 4.0,
+   "spacing2": 2.5,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "units": "unknown",
+   "whole head": true
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 257842907,
+     "size": 12.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     3
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 11,
+  "options": [
+   "-B",
+   "-o",
+   "-t",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_ZST"
+  ],
+  "seed": "cleanroom-fast",
+  "tool": "fsl-fast-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast",
+ "tier": "standard",
+ "tool": "fsl-fast-original"
+}

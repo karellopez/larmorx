@@ -18,6 +18,7 @@ pub mod common;
 pub mod convert_xfm;
 pub mod coords;
 pub mod extracttxt;
+pub mod fast;
 pub mod flirt;
 pub mod fmt;
 pub mod makerot;
@@ -52,6 +53,7 @@ pub const TOOLS: &[&str] = &[
     "pairreg",
     "extracttxt",
     "aff2rigid",
+    "fast",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -173,6 +175,7 @@ pub fn run_with(
         "pairreg" => Some(pairreg::main(args, settings, out, err)),
         "extracttxt" => Some(extracttxt::main(args, settings, out, err)),
         "aff2rigid" => Some(aff2rigid::main(args, settings, out, err)),
+        "fast" => Some(fast::main(args, settings, out, err)),
         _ => None,
     }
 }

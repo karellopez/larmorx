@@ -155,8 +155,19 @@ pub use logf::logf;
 /// tiny arguments, so they have no FMA-compiled copy.
 pub use sinf::{cosf, sinf};
 
+/// [`exp`] of every value of `x`, in place, with exactly [`exp`]'s bits for each (speed: its
+/// fast path four values at a time, compiled with AVX2 and FMA where the CPU has them so that
+/// the four run in one vector; [`exp`] itself for the values its fast path leaves).
+pub fn exp_in_place(x: &mut [f64]) {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+        return fma::exp_in_place(x);
+    }
+    exp::exp_in_place(x)
+}
+
 /// The kernels compiled with FMA enabled. AUDIT (unsafe): each call is guarded by
-/// `is_x86_feature_detected!("fma")` in `dispatch!`. Calling a `#[target_feature]` function
+/// `is_x86_feature_detected!("fma")` in `dispatch!` (and `"avx2"` for [`exp_in_place`]). Calling a `#[target_feature]` function
 /// requires `unsafe` only because the feature must be present, and the guard ensures it.
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
@@ -176,6 +187,17 @@ mod fma {
     }
     fma_copy!(cos);
     fma_copy!(exp);
+
+    #[inline]
+    pub(super) fn exp_in_place(x: &mut [f64]) {
+        #[target_feature(enable = "avx2,fma")]
+        fn kernel(x: &mut [f64]) {
+            super::exp::exp_in_place(x)
+        }
+        // SAFETY: only called after `is_x86_feature_detected!("avx2")` and `("fma")` returned
+        // true.
+        unsafe { kernel(x) }
+    }
     fma_copy!(log);
     fma_copy!(sin);
     fma_copy!(asin);
@@ -243,6 +265,34 @@ mod tests {
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),
+                    "{x:e}"
+                );
+            }
+        }
+    }
+
+    /// The dispatched `exp_in_place` (AVX2 and FMA on such a CPU) gives `exp`'s bits.
+    #[test]
+    fn exp_in_place_is_exp() {
+        let mut s = 0x2545_f491_4f6c_dd1du64;
+        let mut v = Vec::new();
+        for k in 0..600_000 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            v.push(match k % 3 {
+                0 => f64::from_bits(s),
+                1 => (s >> 11) as f64 / (1u64 << 53) as f64 * 1500.0 - 750.0,
+                _ => -((s >> 11) as f64 / (1u64 << 53) as f64) * 40.0,
+            });
+        }
+        for len in [v.len(), 7, 3, 0] {
+            let mut got = v[..len].to_vec();
+            super::exp_in_place(&mut got);
+            for (&x, &y) in v[..len].iter().zip(&got) {
+                let e = super::exp::exp(x);
+                assert!(
+                    e.to_bits() == y.to_bits() || (e.is_nan() && y.is_nan()),
                     "{x:e}"
                 );
             }

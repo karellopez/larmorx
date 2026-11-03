@@ -1,0 +1,18 @@
+diff --git a/crates/larmorx-fsl/src/fast/multi.rs b/crates/larmorx-fsl/src/fast/multi.rs
+index 6a25fb1..66ec62a 100644
+--- a/crates/larmorx-fsl/src/fast/multi.rs
++++ b/crates/larmorx-fsl/src/fast/multi.rs
+@@ -201,7 +201,12 @@ pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class
+                 }
+                 for i in 0..s {
+                     for j in 0..s {
+-                        cov[i * s + j] += qc * d[i] * d[j];
++                        // a development switch (validation/investigations/cleanroom-fast/self_band.py)
++                        if std::env::var("LXM_COV").is_ok() {
++                            cov[i * s + j] += qc * (d[i] * d[j]);
++                        } else {
++                            cov[i * s + j] += qc * d[i] * d[j];
++                        }
+                     }
+                 }
+             }

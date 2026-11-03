@@ -178,7 +178,10 @@ PAGES = [
         "/tools/fsl-fast/",
         "FAST",
         "fsl",
-        [("larmorx-nc replica", "fsl-fast-replica", "experimental", None, None)],
+        [
+            ("clean-room original", "fsl-fast", "experimental", None, None),
+            ("larmorx-nc replica", "fsl-fast-replica", "experimental", None, None),
+        ],
     ),
     (
         "/tools/resample-series/",

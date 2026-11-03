@@ -5,8 +5,8 @@
 - **Validated:** `larmorx fsl bet2`, `bet` and `betsurf` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in process, and `lx.fsl.bet` / `lx.fsl.betsurf(..., implementation='original')`
 - **Reference:** bet, bet2 and betsurf from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-01 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
-- **Original programs:** 256 runs: 240 from the oracle cache, 16 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
+- **Original programs:** 243 runs: 231 from the oracle cache, 12 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 - **127 of 168 cases within the thresholds** (exit status and messages identical, every file within its threshold); 30 where both refuse or FSL crashes and larmorx refuses; 6 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 4 pending (options that run FSL programs larmorx does not have yet).
 - **217 of 217 brains, masks and outlines with FSL's values, bit for bit**, 0 more within the thresholds; 3 of 3 meshes with FSL's vertices to the file's 6 decimals; 13 of 13 skull images bit-identical, 0 more within the masks' thresholds.
@@ -117,7 +117,7 @@ a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (e63df59da80d) |
+| larmorx | 0.0.1 (f0dd88b671b6) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

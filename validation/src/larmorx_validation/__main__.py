@@ -48,6 +48,7 @@ PARITY_MODULES = {
     "fsl-fast": "fsl_fast",
     "fsl-topup": "fsl_topup",
     "fsl-maths": "fsl_maths",
+    "fsl-stats": "fsl_stats",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",
     "ants-multiply-images": "ants_multiply_images",

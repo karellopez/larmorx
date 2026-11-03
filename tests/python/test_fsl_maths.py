@@ -5,8 +5,8 @@ pass their operations as the command line has them (in-memory images written in 
 type, numbers as their shortest text), in the caller's working directory, with FSL's settings and
 D13's choice of this call; the typed wrappers build the command lines they stand for; fslstats'
 printed numbers are read per volume and per label; a failure carries fslmaths' message without
-its usage text; without the program fslmaths runs its clean-room original in this process, and
-fslstats refuses clearly (no clean-room original yet). The
+its usage text; without the program fslmaths and fslstats run their clean-room originals in
+this process. The
 replicas themselves are checked by their golden tests (``crates-nc/larmorx-nc-cli/tests/
 golden.rs``) and by the parity suites against FSL."""
 
@@ -125,8 +125,30 @@ def test_without_the_replica(scripts, tmp_path):
     assert np.array_equal(np.asarray(m.data), data * (data > 20))
     with pytest.raises(RuntimeError, match="unknown option"):
         lx.fsl.fslmaths(image(), "-nosuchop", implementation="original")
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fslstats"):
-        lx.fsl.image_mean(image())
+    # fslstats' clean-room original: the typed wrappers and the generic call, -t and -K
+    a = data.astype(np.float64)
+    for impl in ("auto", "original"):
+        assert lx.fsl.image_mean((data, affine), implementation=impl) == pytest.approx(
+            a.mean(), abs=1e-6
+        )
+    nz = a[a != 0]
+    assert lx.fsl.image_std((data, affine), nonzero=True, n_threads=2) == pytest.approx(
+        nz.std(ddof=1), rel=1e-6
+    )
+    text = lx.fsl.fslstats((data, affine), "-R", "-p", 50, "-w", implementation="original")
+    words = text.split()
+    assert float(words[0]) == data.min() and float(words[1]) == data.max()
+    assert words[3:] == ["0", "5", "0", "4", "0", "3", "0", "1"]
+    labels = (np.where(data > 30, 2, 1).astype(np.int16), affine)
+    per = lx.fsl.fslstats((data, affine), "-M", index_mask=labels, json=True)
+    assert '"-M"' in per and per.count('"-M"') == 2
+    with pytest.raises(RuntimeError, match="Unrecognised option: -q"):
+        lx.fsl.fslstats(image(), "-q", implementation="original")
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-186"),
+        pytest.raises(RuntimeError, match="FSL-186"),
+    ):
+        lx.fsl.fslstats(image(), "-H", 5, 3, 3, implementation="original")
 
 
 def test_the_originals_filters(scripts):
@@ -218,7 +240,10 @@ def test_the_originals_roc(scripts):
     n = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, noise=(ramp, affine), n_threads=2, **orig)
     assert np.allclose([n.aroc, *n.aroc_quartiles], [0.620833, 0.491667, 0.75], atol=1e-5)
     assert n.curve.shape == (1002, 5)
-    with pytest.raises(RuntimeError, match="FSL-180"):
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-180"),
+        pytest.raises(RuntimeError, match="FSL-180"),
+    ):
         lx.fsl.roc((ramp, affine), (np.ones_like(truth), affine), 0.05, **orig)
 
 

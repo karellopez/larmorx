@@ -38,8 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup`, `applytopup`, `fslmaths` and
-/// `fslstats` have their replicas only; a test checks the list).
+/// FLIRT's, FAST's, topup's, applytopup's, fslmaths' and fslstats' programs are
+/// `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -422,13 +422,9 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["fslstats"]
-        );
-        // every FSL tool but mcflirt (`mri hmc`) and fslstats (the replica only) is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 1], larmorx_fsl::cli::TOOLS);
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -460,10 +456,13 @@ mod tests {
             out.starts_with("\nUsage: fslmaths [-dt <datatype>]"),
             "{out}"
         );
-        // fslstats has no original yet: `original` is an error that says so.
-        let (code, _, err) = run_options(&["lx", "fsl", "fslstats"], &original);
-        assert_ne!(code, 0);
-        assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
+        // fslstats runs its clean-room original (2026-11-03): no arguments, the usage (exit 1)
+        let (code, out, _) = run_options(&["lx", "fsl", "fslstats"], &original);
+        assert_eq!(code, 1);
+        assert!(
+            out.starts_with("Usage: fslstats [preoptions] <input> [options]\n"),
+            "{out}"
+        );
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
         let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
         assert_eq!(code, 1);

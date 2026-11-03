@@ -597,3 +597,17 @@ Source facts behind `specs/flirt.md` §14's table of 2026-11-03 (FSL 6.0.7.23; t
   `measurecost 12 U:1 ... rel 8`.
 - **-2D**: no `mode2D` condition on the sform messages; `double_end_slices` (one-slice images)
   builds a new volume without the forms.
+- **Questions 21 to 37 (part, relay 3b's first half)**: the weight product in `costfns.cc`
+  (`weight=wval*refweight(x,y,z); weight*=o1/smoothx; ...; if (weight<0.0) weight=0.0;`);
+  `calc_cog` (newimage) is the one centre of mass for FLIRT and mcflirt (`Costfn`'s `testCog`,
+  mcflirt's `refvol.cog`), blocks of `nlim = max(1000, (int64)sqrt(nvoxels))` flushed when `n >
+  nlim`; `raw_affine_transform` completes `vout`'s forms (sform from qform, qform from sform,
+  both from `vin.sform_mat()` (else qform) `* iaffbig`); `-applyxfm` resamples into a
+  `ShadowVolume` of the 4D output, whose header the completion does not reach; `call_fmrib_main`
+  maps uint8 to `fmrib_main<char>`; `measure_cost` and `optimise_strategy1` print `Erroneous dof`,
+  `optimise_strategy0` does not; nearest neighbour is `MISCMATHS::round` then `operator()(ix,iy,iz,
+  ep)` with `extraslice`'s `-1`/`size()` clamp; Armadillo 14.2.1's `inv()` (`op_inv_gen_full::
+  apply_direct`) fails only on `getrf`/`trtri` `info != 0` or a zero diagonal (no rcond test in the
+  default path; the symmetric path needs 100 rows); `inv(A)*v` is Armadillo's `solve` (`dgesv`).
+  BBR: `costfn()` calls `setcostfntype(currentcostfn)` before every evaluation, which calls
+  `set_bbr_seg` again while `is_bbr_set()` (`no_coords > 0`) is false.

@@ -1120,6 +1120,24 @@ volume:: Size = (nx,ny,nz,nt)`, `:: Dims = (dx,dy,dz,TR)` with that TR, `:: ROI 
 Minimum and maximum intensities are: <min> and <max>`) follows once, after the image is written
 (not observed for a 3D input; from the order of the outputs).
 
+(spec writer, 2026-11-03; questions 26, 31 and 32 of part 2: the implementer's observations are
+right; confirmed) **The forms written.** The output volume starts as a copy of the reference (its
+forms as FLIRT holds them, §4.1) and the resampling then completes its forms: an unset sform
+becomes the qform's matrix with the qform's code; an unset qform becomes the sform's matrix with
+the sform's code (its quaternion and offsets computed from that matrix by §3's matrix-to-quaternion
+conversion and **written as computed**, not converted to a matrix and back); when both are unset,
+both become `W_in·(D_in⁻¹·A⁻¹·D_ref)` (`W_in` the input's sform, else its qform, as FLIRT holds it;
+`D` the voxel-size diagonals, `D⁻¹` by reciprocals; `A` the matrix in mm; the voxel-to-voxel
+matrix's products `(D_in⁻¹·A⁻¹)·D_ref` first, then `W_in` times it, §12's products; stored in
+single precision), with the code of the input's form used, the quaternion again from that matrix;
+a reflection's positive determinant is written as it is. This holds for a registration's `-out`
+image and for applyxfm4D's output (its first volume's matrix; §15.7). `-applyxfm` and
+`-applyisoxfm` write the series as the reference copy it was made from, so their **unset forms
+stay unset** (the completion reaches only the resampled volume, not the series' header; observed: 0
+of 443 `-applyxfm` runs completed, 130 of 135 applyxfm4D runs and every `-nosearch` registration
+whose matrix is FSL's). A quaternion FSL computes from a matrix (a completed qform, `-applyisoxfm`'s,
+§9.3 above) is written once, as computed.
+
 (spec writer, 2026-11-02; question 10, observed by the implementer, confirmed) The image is
 written before the matrix: an image FSL cannot write (an output type it does not know) ends the
 run before `-omat` is written. (After a registration it is the other way round: `-omat`, §9.1,
@@ -1490,6 +1508,23 @@ reproduce FSL's outputs from this spec's text alone are in
 | 18 | `-debug`'s volumes and lines | §9.4 | right; with no boundary voxel the post line reads `is_bbr_set is 0` | high (source; the implementer's runs) |
 | 19 | `setoption`'s echo; a short tolerance list | §2.3, §7.3 | right: the next `measurecost`, `optimise`, `search` or optimisation stops with the index error | high (source) |
 | 20 | the free optimisations' start under gimbal lock; FSL-90's messages with `-dof 6` | §8.1 step 9 | the start right (the decomposition composed again; `P` keeps the start composed once); the "composed twice at dof 6" model wrong: the message prints at every invalid composition, the evaluations' included; an invalid start keeps only its scale (no translations: the spec's "translations and scale" was wrong) | high: on the suite's pair FSL's 8 messages with `-dof 6` are 4 invalid starts + 4 evaluations outside the unit ball, its 4 with 12 dof the 4 starts (the model counting the trace, `quat-messages`); the 4 invalid starts' `Starting with :` matrices are the identity |
+| 21 | the weighted costs' edge factors' order | §6.4 | right: `(((w_t·w_r)·f_x)·f_y)·f_z`, each factor's quotient first; a negative weight set to 0 | high (source; the implementer's trace of `real/weights-normcorr`) |
+| 22 | the sinc's and applyxfm4D's float spline's last bits | §9.2, §15.7 | (to be answered, relay 3b) | |
+| 23 | `leastsq`'s exact sums and order | §6.2 | (to be answered, relay 3b) | |
+| 24 | FSL-91/FSL-92 with `reproduce`: the ties of the line searches, sorts and list | §8.1, §8.2 | (to be answered, relay 3b) | |
+| 25 | mcflirt's centres of mass blocked too? | §8.1 step 3; `specs/mcflirt.md` §6.1 | right: every centre of mass of FSL's image library is the blocked sum of §8.1 step 3, mcflirt's (both its centres) included; `specs/mcflirt.md` §6.1's "one double sum" is to be corrected (the handoff) | high (source) |
+| 26 | the forms a registration's `-out` and applyxfm4D write when one is unset; `-applyxfm` keeps it | §9.3 | right: the resampling completes the copy of the reference's forms; `-applyxfm`'s series header is not completed | high (source; the implementer's 130 of 135 and 0 of 443 runs) |
+| 27 | an image with neither form: `V = S`, x not reversed | §15.2 | right (the spec's "else its voxel sizes" held; part 2's first reading `F·S` was the wrong one); the standard programs warn for such a `-std` image | high (source; 20 of the trial's 37 coordinate findings then agreed) |
+| 28 | BBR without boundary voxels: where the error and the NaN warning print | §6.5, §9.4 | right: the cost is set (and the boundary tried) at each pair's set-up, at `setoption costfunction bbr` and before each evaluation | high (source; FSL's lines on five schedules) |
+| 30 | applyxfm4D's char group signed; FSL-79's conversions | §15.7 | right: plain `char` (signed on x86-64) for uint8 and int8 (FSL-111); conversions through a 32-bit integer, wrapped | high (source; the 29 uint8 trial findings) |
+| 31 | a reference with neither form: the input's form through `W·D_in⁻¹·A⁻¹·D_ref` as both forms | §9.3 | right | high (source; the implementer's 25 probes) |
+| 32 | a quaternion computed from a matrix written as computed | §9.3 | right | high (source) |
+| 33 | `Erroneous dof`: once per row and per free start | §8.2 | right; also never for an optimisation in a parameter subset | high (source; 15 of 16 sampled trial cases) |
+| 34 | the qform as FSL holds it in the coordinate programs | §15.2 | right (§4.1's conversion) | high (source; 18 of 18 sampled findings) |
+| 35 | nearest neighbour outside: the nearest index first, then the extraslice rule | §9.2 | right: rounding half away from zero, then the edge rule on that index | high (source; trial #8481) |
+| 36 | the vector solves' LU | §12 | right: `dgesv`, the same factorisation as the inverse, then the two triangular solves; the solves' last bits are invisible in every printed output | medium for the solves' fused subtraction (not observable), high for the factorisation (source) |
+| 37 | a singular inverse during a registration with non-finite voxels | §12 | wrong reading: FSL's inverse fails only on an exact zero pivot; NaN or infinite matrices are inverted (NaN) and FLIRT goes on; the original must not stop on them in `reproduce` | high (source) |
+| 38 | `-debug`'s volumes on oblique and anisotropic images; `-debug` with BBR and no boundary point | §9.4 | (to be answered, relay 3b; §9.4 now states the lines at each evaluation) | |
 
 ## 15. FLIRT's other programs
 

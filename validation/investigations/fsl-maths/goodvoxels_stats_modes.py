@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """goodvoxels' four fslstats calls: the replica in both modes, the defects named."""
 
-import shutil, tempfile
+import shutil
+import tempfile
 from pathlib import Path
+
 from larmorx_validation.parity import defects
 from larmorx_validation.parity import fsl_maths_replica as m
 from larmorx_validation.parity.fsl_flirt_replica import run_replica

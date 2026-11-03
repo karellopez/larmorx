@@ -185,7 +185,7 @@ opened). Its only inputs were:
 | `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
 | `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |
 
-## FAST (`fast`; relays 1 and 2, 2026-11-03)
+## FAST (`fast`; relays 1 to 4, 2026-11-03)
 
 `fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command
 line, messages and outputs) was
@@ -221,3 +221,4 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `cli::options` (`Given::Words`) | an option of several text values (`-A`) | §2.2 |
 | `larmorx_core::math::exp_in_place` (relay 3) | the correctly rounded `exp`'s fast path four values at a time (vectorised with AVX2 and FMA through the core's audited dispatch), `exp` itself for the values it leaves: `exp`'s bits for every value; used by the partial volumes' likelihoods and the multi-channel initialisation | §10; CORE-MATH's `exp` (MIT, the core's port) |
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
+| `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |

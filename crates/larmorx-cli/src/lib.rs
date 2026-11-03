@@ -420,13 +420,9 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["applytopup"]
-        );
-        // every FSL tool but mcflirt (`mri hmc`) and applytopup (the replica only) is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 1], larmorx_fsl::cli::TOOLS);
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -442,10 +438,15 @@ mod tests {
             err.starts_with("\nPart of FSL (ID: 2412.6-dirty)\ntopup\n"),
             "{err}"
         );
-        // applytopup has no original yet: `original` is an error that says so.
+        // applytopup runs its clean-room original (2026-11-03): the compulsory options' block
+        // and the usage (exit 1)
         let (code, _, err) = run_options(&["lx", "fsl", "applytopup"], &original);
-        assert_ne!(code, 0);
-        assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
+        assert_eq!(code, 1);
+        assert!(
+            err.contains("COMPULSORY options have not been set")
+                && err.contains("\nPart of FSL (ID: 2412.6-dirty)\napplytopup (Version 1.0)\n"),
+            "{err}"
+        );
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
         let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
         assert_eq!(code, 1);

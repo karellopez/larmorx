@@ -3,7 +3,7 @@
 (written by the test, as in ``test_fsl_fast.py``) they pass topup's and applytopup's options, the
 acquisition parameters, FSL's settings and D13's choice, and read the outputs back; a
 :class:`TopupResult` given to ``applytopup`` is written back as topup's files; without the
-program topup runs its clean-room original in this process and applytopup refuses clearly. The
+program both run their clean-room originals in this process. The
 replicas themselves are checked by their golden tests (``crates-nc/larmorx-nc-cli/tests/
 golden.rs``) and by the parity suite against FSL, topup's original by its suite ``fsl-topup``."""
 
@@ -126,8 +126,8 @@ def smooth_pair(tmp_path: Path) -> Path:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    """Without ``larmorx-nc``, ``auto`` runs topup's clean-room original (in this process) and
-    ``replica`` refuses; applytopup has only its replica so far."""
+    """Without ``larmorx-nc``, ``auto`` runs topup's and applytopup's clean-room originals (in
+    this process) and ``replica`` refuses."""
     path = smooth_pair(tmp_path)
     kw: dict = dict(
         warpres=8.0,
@@ -162,10 +162,18 @@ def test_without_the_replica(scripts, tmp_path):
     # a failure of the original: topup's message in the error
     with pytest.raises(RuntimeError, match=r"clean-room original.*exit code 1"):
         lx.fsl.topup(path, [[0, 1, 0, 0.05]], **kw)
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl applytopup"):
-        lx.fsl.applytopup(path, ACQ, [1], "base")
-    with pytest.raises(NotImplementedError, match="larmorx-nc"):
-        lx.fsl.applytopup(path, ACQ, [1], "base", implementation="original")
+    # applytopup with the result: least-squares restoration of the pair, Jacobian modulation
+    pair_imgs = [path, path]
+    a = lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r)
+    assert a.corrected.implementation == _replica.ORIGINAL
+    assert np.asarray(a.corrected.data).shape == (12, 10, 6, 2)
+    j = lx.fsl.applytopup(path, ACQ, [1], r, method="jac", implementation="original")
+    assert np.asarray(j.corrected.data).shape == (12, 10, 6, 2)
+    assert np.isfinite(np.asarray(j.corrected.data)).all()
+    with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
+        lx.fsl.applytopup(path, ACQ, [1], r, implementation="replica")
+    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean-room original\).*vb2D"):
+        lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r, method="vb2D")
 
 
 def test_fmripreps_call(scripts, monkeypatch, tmp_path):

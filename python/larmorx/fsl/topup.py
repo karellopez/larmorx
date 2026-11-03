@@ -8,12 +8,12 @@ images, each displaced along its own phase encoding and modulated by the displac
 agree with their mean; ``applytopup`` corrects images with the result, by Jacobian modulation of
 each image or by least-squares restoration of pairs with opposite phase encodings.
 
-Two implementations of ``topup`` (``docs/licensing.md``): the bit-exact replica from
+Two implementations of each (``docs/licensing.md``): the bit-exact replica from
 ``larmorx-nc``, run as a separate program, and the clean-room original of this package
 (Apache-2.0, written from ``specs/topup.md``, run in this process); ``implementation="auto"``
-runs the replica when ``larmorx-nc`` is installed, else the original. ``applytopup`` has only its
-replica so far (its clean-room original is to be written from the same spec), so its ``"auto"``
-needs ``larmorx-nc``. FSL's deterministic defects are corrected by default (D13,
+runs the replica when ``larmorx-nc`` is installed, else the original. applytopup's original
+does not take the undocumented ``vb2D``, ``vb3D`` and ``vb4D`` methods yet. FSL's deterministic
+defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``); ``upstream_defects="reproduce"`` gives FSL's results. FSL's
 environment variables are settings of the call, never read from the process environment
 (CLAUDE.md rule 6): ``fsldir`` names the FSL installation whose shipped configurations
@@ -160,20 +160,25 @@ def _config(config: Any, fsldir: Any) -> str:
 
 
 def _run_original(
-    args: list[str], tmp: str, settings: dict[str, str], n_threads: int, upstream_defects: str
+    args: list[str],
+    tmp: str,
+    settings: dict[str, str],
+    n_threads: int,
+    upstream_defects: str,
+    tool: str = "topup",
 ) -> str:
-    """The clean-room original in this process, in ``tmp``, with FSL's settings of this call;
-    its notices become Python warnings; a failure raises ``RuntimeError`` with topup's message.
-    Its standard output."""
+    """The clean-room original of ``tool`` in this process, in ``tmp``, with FSL's settings of
+    this call; its notices become Python warnings; a failure raises ``RuntimeError`` with the
+    program's message. Its standard output."""
     env = [*settings.items(), (_defects.ENV, upstream_defects)]
     if n_threads > 0:
         env.append(("OMP_NUM_THREADS", str(n_threads)))
-    code, out, err = _core.fsl_run_original("topup", list(args), env, tmp)
+    code, out, err = _core.fsl_run_original(tool, list(args), env, tmp)
     _warn(err)
     if code != 0:
         tail = "\n".join((out + err).strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx fsl topup (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx fsl {tool} (the clean-room original) failed with exit code {code}:\n{tail}"
         )
     return out
 
@@ -388,8 +393,14 @@ def applytopup(
     ``"vb3D"`` and ``"vb4D"``; ``interp`` ``--interp``; ``datatype`` ``--datatype`` (the output's
     type; float when ``None``); ``verbose`` ``-v``.
 
-    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when applytopup
-    fails, and :class:`larmorx.ReplicaNotFoundError` without ``larmorx-nc``.
+    ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
+    clean-room original), ``"replica"`` or ``"original"`` (which does not take the ``vb``
+    methods yet).
+
+    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
+    fails, ``RuntimeError`` (applytopup's message) when the original does, and
+    :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
+    ``larmorx-nc``.
     """
     n_threads = _threads(n_threads)
     many = isinstance(images, (list, tuple))
@@ -410,8 +421,7 @@ def applytopup(
     if datatype is not None and datatype not in types:
         raise ValueError(f"datatype must be one of {', '.join(types)}, not {datatype!r}")
     selected = _replica.select("fsl", "applytopup", implementation)
-    assert selected is not None  # no clean-room original yet: select raises otherwise
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-applytopup-") as tmp:
         names = [_write_image(img, tmp, f"in{k + 1}", n_threads) for k, img in enumerate(items)]
         args = [
@@ -427,17 +437,22 @@ def applytopup(
             args.append(f"--datatype={datatype}")
         if verbose:
             args.append("-v")
-        process = _replica.run(
-            selected,
-            args,
-            cwd=tmp,
-            n_threads=n_threads,
-            upstream_defects=upstream_defects,
-            env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp, "FSLDIR": tmp},
-            exclude=lambda name: name.upper().startswith("FSL"),
-        )
-        _warn(process.stderr)
+        env = {"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp, "FSLDIR": tmp}
+        if selected is None:
+            stdout = _run_original(args, tmp, env, n_threads, upstream_defects, "applytopup")
+        else:
+            process = _replica.run(
+                selected,
+                args,
+                cwd=tmp,
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                env=env,
+                exclude=lambda name: name.upper().startswith("FSL"),
+            )
+            _warn(process.stderr)
+            stdout = process.stdout
         return ApplytopupResult(
             corrected=_read_image(os.path.join(tmp, "hifi.nii"), n_threads, impl),
-            stdout=process.stdout,
+            stdout=stdout,
         )

@@ -359,7 +359,6 @@ const NOT_YET: &[&str] = &[
     "-tfce",
     "-tfceS",
     "-roi",
-    "-tensor_decomp",
     "-bptf",
 ];
 
@@ -884,6 +883,14 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     }
                 }
             }
+            "-tensor_decomp" => {
+                if input.tsize() != 6 {
+                    ctx.put("Error: input to tensor option is not a tensor!\n");
+                    return Err(Stop::Exit(1));
+                }
+                let out = argv[argc - 1].clone();
+                tensor_decomp(ctx, &mut input, &out)?;
+            }
             "-seed" => {
                 i += 1;
                 let s = number_arg(ctx, argv, i)?;
@@ -1206,6 +1213,117 @@ fn convolve<T: Arith>(
         Err(ConvStop::Trap) => Err(trap(ctx, op)),
         Err(ConvStop::Exception(e)) => Err(Stop::Exception(e)),
     }
+}
+
+/// `-tensor_decomp`: each voxel's tensor (volumes 0 to 5: xx, xy, xz, yy, yz, zz, as `float`)
+/// decomposed by Armadillo's `eig_sym` (LAPACK `dsyevd`); where the largest eigenvalue is
+/// positive, the eigenvalues L1 >= L2 >= L3, FA, MD, the mode MO and the eigenvectors V1, V2, V3
+/// (in `float`, FSL's expressions), else 0 (FSL-166: a tensor holding a non-finite value, where
+/// FSL stops, is 0 too). The ten images are written at once as
+/// `<output>_L1` ... `<output>_V3` (`float`, with their display ranges); the pipeline goes on with
+/// the FA image (3D).
+fn tensor_decomp<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, out: &str) -> Res<()> {
+    let (nx, ny, nz) = (input.xsize(), input.ysize(), input.zsize());
+    let nvox = input.nvoxels().max(0) as usize;
+    let new3 = |t: i64| {
+        let mut v = Volume::<f32>::new(nx, ny, nz, t);
+        v.copy_properties(input);
+        v
+    };
+    let (mut l1, mut l2, mut l3) = (new3(1), new3(1), new3(1));
+    let (mut fa, mut md, mut mo) = (new3(1), new3(1), new3(1));
+    let (mut v1, mut v2, mut v3) = (new3(3), new3(3), new3(3));
+    let mut warnings = Vec::new();
+    for z in 0..nz {
+        for y in 0..ny {
+            for x in 0..nx {
+                let i = input.idx(x, y, z);
+                let c = |t: usize| f64::from(input.data[t * nvox + i].to_f32());
+                let mut m = Mat::zeros(3, 3);
+                let entries = [
+                    (0, 0, 0),
+                    (1, 0, 1),
+                    (1, 1, 3),
+                    (2, 0, 2),
+                    (2, 1, 4),
+                    (2, 2, 5),
+                ];
+                for (r, col, t) in entries {
+                    m.set(r, col, c(t));
+                    m.set(col, r, c(t));
+                }
+                let Some((vals, vecs)) = larmorx_nc_core::arma::eig_sym(&m, &mut warnings) else {
+                    // the decomposition failed (a non-finite value): D is empty and FSL reads its
+                    // third element (Armadillo's bounds check). FSL-166: the voxel left at 0.
+                    ctx.notice(
+                        &defects::FSL_166,
+                        format!("-tensor_decomp: voxel ({x}, {y}, {z}) holds a non-finite value"),
+                    );
+                    if ctx.reproduce() {
+                        return Err(Stop::Exception(FslError {
+                            printed: Vec::new(),
+                            type_name: "std::out_of_range",
+                            what: "Mat::operator(): index out of bounds".into(),
+                        }));
+                    }
+                    input.data[i] = T::from_int(0);
+                    continue;
+                };
+                if vals[2] > 0.0 {
+                    let (a, b, cc) = (vals[2] as f32, vals[1] as f32, vals[0] as f32);
+                    l1.data[i] = a;
+                    l2.data[i] = b;
+                    l3.data[i] = cc;
+                    let lmean = (a + b + cc) / 3.0;
+                    let lnum = 3.0
+                        * ((a - lmean) * (a - lmean)
+                            + (b - lmean) * (b - lmean)
+                            + (cc - lmean) * (cc - lmean));
+                    let lden = 2.0 * (a * a + b * b + cc * cc);
+                    fa.data[i] = (lnum / lden).sqrt();
+                    md.data[i] = lmean;
+                    let (e1, e2, e3) = (a - lmean, b - lmean, cc - lmean);
+                    let n = (e1 + e2 - 2.0 * e3) * (2.0 * e1 - e2 - e3) * (e1 - 2.0 * e2 + e3);
+                    let mut d = e1 * e1 + e2 * e2 + e3 * e3 - e1 * e2 - e2 * e3 - e1 * e3;
+                    d = (if 0.0 > d { 0.0 } else { d }).sqrt();
+                    d = 2.0 * d * d * d;
+                    let q = if d != 0.0 { f64::from(n / d) } else { 0.0 };
+                    let q = if q > -1.0 { q } else { -1.0 };
+                    mo.data[i] = (if q < 1.0 { q } else { 1.0 }) as f32;
+                    for k in 0..3 {
+                        v1.data[k * nvox + i] = vecs.at(k, 2) as f32;
+                        v2.data[k * nvox + i] = vecs.at(k, 1) as f32;
+                        v3.data[k * nvox + i] = vecs.at(k, 0) as f32;
+                    }
+                }
+                input.data[i] = ctx.conv::<T>(f64::from(fa.data[i]), "-tensor_decomp");
+            }
+        }
+    }
+    // deletevolume(5) .. deletevolume(1): the FA image alone
+    input.data.truncate(nvox);
+    input.dims[3] = 1;
+    let range = |v: &mut Volume<f32>, mx: f32, mn: f32| {
+        v.display_max = mx;
+        v.display_min = mn;
+    };
+    for (vol, suffix) in [(&mut l1, "_L1"), (&mut l2, "_L2"), (&mut l3, "_L3")] {
+        let (mx, mn) = vol.extrema();
+        range(vol, mx, mn);
+        save(ctx, vol, &format!("{out}{suffix}"))?;
+    }
+    range(&mut fa, 1.0, 0.0);
+    save(ctx, &fa, &format!("{out}_FA"))?;
+    let (mx, mn) = md.extrema();
+    range(&mut md, mx, mn);
+    save(ctx, &md, &format!("{out}_MD"))?;
+    range(&mut mo, 1.0, -1.0);
+    save(ctx, &mo, &format!("{out}_MO"))?;
+    for (vol, suffix) in [(&mut v1, "_V1"), (&mut v2, "_V2"), (&mut v3, "_V3")] {
+        range(vol, 1.0, -1.0);
+        save(ctx, vol, &format!("{out}{suffix}"))?;
+    }
+    Ok(())
 }
 
 /// `subsample_by_2(input, centred)` with extraslice extrapolation; FSL-163: a 4D image (FSL's

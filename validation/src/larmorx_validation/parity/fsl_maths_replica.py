@@ -101,7 +101,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v4.done"
+    marker = base / "v5.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -268,6 +268,28 @@ def _make_inputs(d: Path) -> None:
     blob2d[1:6, 1:5, 0] = 1
     blob2d[3, 2, 0] = 0
     _save(d / "blob2d.nii.gz", blob2d, dtype=np.uint8, affine=_affine((7, 6, 1)))
+    # v5: diffusion tensors (xx, xy, xz, yy, yz, zz), with non-positive and NaN voxels
+    tsh = (5, 4, 3)
+    a = rng.standard_normal((*tsh, 3, 3))
+    dten = np.einsum("...ij,...kj->...ik", a, a) * 1e-3
+    dten[0, 0, 0] = 0.0
+    dten[1, 0, 0] = -dten[1, 0, 0]
+    dten[2, 1, 1] = np.diag([2e-3, 1e-3, 1e-3])
+    tensor = np.stack(
+        [
+            dten[..., 0, 0],
+            dten[..., 0, 1],
+            dten[..., 0, 2],
+            dten[..., 1, 1],
+            dten[..., 1, 2],
+            dten[..., 2, 2],
+        ],
+        axis=-1,
+    ).astype(np.float32)
+    _save(d / "tensor.nii.gz", tensor, dtype=np.float32, affine=_affine(tsh))
+    tensornan = tensor.copy()
+    tensornan[3, 2, 1, 4] = np.nan
+    _save(d / "tensornan.nii.gz", tensornan, dtype=np.float32, affine=_affine(tsh))
 
 
 # ------------------------------------------------------------------------------------------------
@@ -278,12 +300,14 @@ def _make_inputs(d: Path) -> None:
 class Run:
     """A case: fslmaths' arguments (``@name`` names an input copied into the run directory) and
     the environment; ``undefined``: FSL reads memory it never wrote (the register entry): FSL is
-    not run, the replica must refuse in both modes."""
+    not run, the replica must refuse in both modes; ``fixed``: FSL stops (the register entry),
+    the default must give an output and name the defect."""
 
     args: tuple[str, ...]
     settings: tuple[tuple[str, str | None], ...] = ()
     fix: bool = True
     undefined: str = ""
+    fixed: str = ""
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -338,6 +362,16 @@ def _run_case(run: Run, checks: CheckList) -> None:
                 silent_ok=_SILENT,
             )
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
+    if run.fixed:
+        with tempfile.TemporaryDirectory(prefix="lx-nc-maths-") as c_:
+            c = Path(c_)
+            args = _prepare(run, c)
+            r = run_replica(PROGRAM, args, cwd=c, settings=settings, mode=defects.FIX)
+            checks(
+                f"{run.fixed}: the default gives an output and names the defect",
+                r.code == 0 and run.fixed in r.stderr and any(c.glob("out*")),
+                detail=f"exit {r.code}: {r.stderr[-200:]}",
+            )
 
 
 def fmriprep_calls() -> list[tuple[str, Path]]:
@@ -406,9 +440,13 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
 
 
 def _r(
-    *args: str, env: dict[str, str | None] | None = None, fix: bool = True, undefined: str = ""
+    *args: str,
+    env: dict[str, str | None] | None = None,
+    fix: bool = True,
+    undefined: str = "",
+    fixed: str = "",
 ) -> Run:
-    return Run(tuple(args), tuple((env or {}).items()), fix, undefined)
+    return Run(tuple(args), tuple((env or {}).items()), fix, undefined, fixed)
 
 
 #: name -> (tier, description, run).
@@ -962,17 +1000,42 @@ def _filter_cases() -> dict[str, tuple[str, str, Run]]:
         ),
         "norm/ing-int": (T, "-ing under -dt int", _r("-dt", "int", "@s3", "-ing", "1000", "out")),
         "norm/inm-nan": (T, "-inm with NaN voxels", _r("@nan3", "-inm", "100", "out")),
+        "tensor/decomp": (T, "-tensor_decomp", _r("@tensor", "-tensor_decomp", "out")),
+        "tensor/chain": (
+            T,
+            "-tensor_decomp, then the FA image multiplied by 2",
+            _r("@tensor", "-tensor_decomp", "-mul", "2", "out"),
+        ),
+        "tensor/double": (
+            T,
+            "-tensor_decomp under -dt double, an output name with its extension",
+            _r("-dt", "double", "@tensor", "-tensor_decomp", "out.nii.gz"),
+        ),
+        "d13/tensor-nan": (
+            T,
+            "FSL-166: -tensor_decomp with a NaN tensor",
+            _r("@tensornan", "-tensor_decomp", "out", fixed="FSL-166"),
+        ),
+        "tensor/not-a-tensor": (
+            T,
+            "-tensor_decomp of a 3-volume image",
+            _r("@f4", "-tensor_decomp", "out"),
+        ),
         # D13
         "d13/kernel-boxv3-null": (
             T,
             "FSL-158: -kernel boxv3 without its sizes (reads the null pointer)",
             _r(F3, "-kernel", "boxv3", "3", "out"),
         ),
-        "d13/subsamp2-4d": (T, "FSL-163: -subsamp2 of a 4D image", _r("@f4", "-subsamp2", "out")),
+        "d13/subsamp2-4d": (
+            T,
+            "FSL-163: -subsamp2 of a 4D image",
+            _r("@f4", "-subsamp2", "out", fixed="FSL-163"),
+        ),
         "d13/subsamp2offc-4d-odd": (
             T,
             "FSL-163: -subsamp2offc of a 4D image of odd sizes",
-            _r("@f4", "-subsamp2offc", "out"),
+            _r("@f4", "-subsamp2offc", "out", fixed="FSL-163"),
         ),
         "d13/subsamp2offc-4d-even": (
             T,
@@ -989,7 +1052,11 @@ def _filter_cases() -> dict[str, tuple[str, str, Run]]:
             "FSL-161: -dog_edge -1 -2 (a kernel without voxels)",
             _r(F3, "-dog_edge", "-1", "-2", "out"),
         ),
-        "d13/fillh-2d": (T, "FSL-165: -fillh of a 2D image", _r("@blob2d", "-fillh", "out")),
+        "d13/fillh-2d": (
+            T,
+            "FSL-165: -fillh of a 2D image",
+            _r("@blob2d", "-fillh", "out", fixed="FSL-165"),
+        ),
         "d13/s-zero": (T, "FSL-160: -s 0", _r(F3, "-s", "0", "out")),
         "d13/gauss-zero": (
             T,
@@ -1027,11 +1094,15 @@ def _filter_cases() -> dict[str, tuple[str, str, Run]]:
             _r(F3, "-kernel", "gauss", "-1", "-fmean", "out"),
         ),
         "d13/s-negative": (T, "FSL-161: -s -1", _r(F3, "-s", "-1", "out")),
-        "d13/fmedian-nan": (T, "FSL-162: -fmedian with NaN voxels", _r("@nan3", "-fmedian", "out")),
+        "d13/fmedian-nan": (
+            T,
+            "FSL-162: -fmedian with NaN voxels",
+            _r("@nan3", "-fmedian", "out", fixed="FSL-162"),
+        ),
         "d13/dilD-nan": (
             T,
             "FSL-162: -dilD with a NaN next to a zero voxel",
-            _r("@sparsenan3", "-dilD", "out"),
+            _r("@sparsenan3", "-dilD", "out", fixed="FSL-162"),
         ),
         "d13/fmean-int-trap": (
             T,

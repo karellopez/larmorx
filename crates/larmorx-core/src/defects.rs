@@ -558,6 +558,8 @@ defects! {
         "-dog_edge of a 4D image filters the first volume only: the zero crossings of the other volumes are taken from their unfiltered values";
     FSL_165 = "FSL-165", "fslmaths", true,
         "-fillh and -fillh26 of an image with a size of 1 along an axis (a single slice) crash (an integer division by zero in the test for the image's edge)";
+    FSL_166 = "FSL-166", "fslmaths", true,
+        "-tensor_decomp stops the program (an uncaught exception: Mat::operator(): index out of bounds) at a voxel whose tensor holds a NaN or an infinite value, instead of leaving that voxel at 0";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

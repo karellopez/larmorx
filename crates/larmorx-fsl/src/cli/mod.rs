@@ -27,6 +27,7 @@ pub mod options;
 pub mod pairreg;
 pub mod pointflirt;
 pub mod rmsdiff;
+pub mod topup;
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -54,6 +55,7 @@ pub const TOOLS: &[&str] = &[
     "extracttxt",
     "aff2rigid",
     "fast",
+    "topup",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -176,6 +178,7 @@ pub fn run_with(
         "extracttxt" => Some(extracttxt::main(args, settings, out, err)),
         "aff2rigid" => Some(aff2rigid::main(args, settings, out, err)),
         "fast" => Some(fast::main(args, settings, out, err)),
+        "topup" => Some(topup::main(args, settings, out, err)),
         _ => None,
     }
 }

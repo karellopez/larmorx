@@ -672,13 +672,28 @@ How `fslstats.cc` computes, and what decides the bits:
   histogram) without a message. Corrected: an error (status 1); `reproduce`: FSL's empty output.
   Cases: `d13/H-equal`, `d13/H-reversed`.
 - **FSL-187 (c; rule A): histogram bins beyond `int`.** `(int)(fA v + fB)` of a value more than
-  about 2^31 bins above the range is `INT_MIN`: the value counts in the first bin, not the last.
-  Reached by `-H` (values above its limits) and `-e`, `-E` (values above the robust range).
-  Corrected: the bin clamped (the last), named when a value moves. `find_thresholds` (the robust
-  range of `-r`, fslmaths' `-thrp`/`-thrP`, BET, FAST) meets the same conversion when its last
-  passes narrow the range far below an outlier; left as FSL's there (it is shared with the other
-  replicas: rule D, to measure on real images before changing their defaults). Cases:
-  `d13/H-far`, `d13/e-far`.
+  about 2^31 bins above the range is `INT_MIN` (x86-64's `cvttsd2si`; C leaves the conversion
+  undefined): the value counts in the first bin, not the last (`imageHistogram` clamps to
+  `[0, bins - 1]` after the conversion). Reached by fslstats' `-H` (values above its limits) and
+  `-e`, `-E` (values above the robust range), and by `find_thresholds` itself, the robust range
+  of fslstats' `-r`, `-e`, `-E`, fslmaths' `-thrp`, `-thrP`, `-uthrp`, `-uthrP`, bet2's `t2`,
+  `t98` and FLIRT's `-in`/`-ref` limits: its later passes narrow the 1000-bin histogram onto the
+  2 %-98 % values, and a value far above them leaves `int`'s range. Corrected: the bin clamped
+  (the last); named where the result changes (fslstats: the printed numbers; fslmaths: the
+  voxels a threshold selects; bet2 and FLIRT: the limits); `reproduce`: FSL's bins.
+  **Measured first (rule D, 2026-11-03,** `crates-nc/larmorx-nc-core/tests/robust_range_probe.rs`
+  **on the 272 images of** `validation/investigations/fsl-maths/robust_range_inputs.py`**):** none
+  of fMRIPrep's 66 `bet` and `flirt -bbr` inputs of the oracle runs, BET's 13 real images
+  (larmorx-testdata) or the FLIRT and FAST replica suites' inputs reaches it; only the fslstats
+  suite's two deliberate cases do (`outl`: its range moves from 0.007451 0.961979 to 0.009483
+  0.971723; `bigcount`: a bin leaves `int`'s range without moving the range). The smallest
+  synthetic trigger: 99 values on [0, 1) and one value at 1e12 (100 or fewer values: the far
+  value is 1 % or more of them and holds the 98 % limit itself); with 1000 values on [0, 1) one
+  value from about 3.2e6 up moves the range. An image whose values are packed far below one
+  hot voxel (a probability or statistics map with an artefact) makes sense and gets a wrong
+  range: rule A. Cases: `d13/H-far`, `d13/e-far` (fslstats: `-H`, `-e`, `-E`, `-r`),
+  `d13/thrp-far`, `d13/uthrP-far` (fslmaths). BET's and FLIRT's replica smoke tiers are
+  unchanged (no input reaches it); sub-task 6's records confirm.
 - **FSL-188 (c; rule A): `-w` of a 4D image without nonzero voxels.** x, y and z fall back to the
   whole image (the minima start at the far end and are swapped back), but the time range is
   `tsize - 1` and `2 - tsize` (negative from three volumes). Corrected: the whole time range,
@@ -692,12 +707,38 @@ How `fslstats.cc` computes, and what decides the bits:
 
 ## Known differences
 
-- **`-tan` in double** (`fn/double-tan`): glibc 2.35's `tan` (IBM's code) is not correctly
-  rounded (3 of the case's 210 values differ from the correctly rounded tangent) and the
-  replica's `tan` (the `libm` crate, FreeBSD's) differs from it in 11 of 210 values by one ulp.
-  In `float` (the default) the result is rounded to float and the cases are identical
-  (`fn/tan`). To decide: glibc's `tan` translated (its code is LGPL: in which package), or the
-  difference documented with a tolerance for `double` only.
+- **glibc's double functions (GLIBC-07, class d).** fslmaths' `-sin`, `-cos`, `-tan`, `-asin`,
+  `-acos`, `-atan`, `-exp`, `-log` and the hidden `-pow` compute `(T) f((double) v)` with glibc
+  2.35's functions, which are not correctly rounded. Measured by
+  `validation/probes/glibc-double-maths` (`measure --log2n 26`: 2^26 random arguments per family,
+  2026-11-03; glibc's functions called as black boxes):
+
+  | function | float voxels | double voxels | every int16 value | float results that differ |
+  |---|---|---|---|---|
+  | `sin` | 0.120 % | 0.119 % | 88 of 65,536 | 0 |
+  | `cos` | 0.085 % | 0.085 % | 94 of 65,536 | 0 |
+  | `tan` | 0.206 % | 0.206 % | 162 of 65,536 | 0 |
+  | `atan` | 0.082 % | 0.083 % | 0 of 65,536 | 0 |
+  | `asin` (on [-1, 1]) | 0.158 % | 0.158 % | 0 of 3 | 0 |
+  | `acos` (on [-1, 1]) | 0.070 % | 0.071 % | 0 of 3 | 0 |
+  | `exp` (on [-40, 40]) | 0.076 % | 0.076 % | 1 of 1,455 | 0 |
+  | `log` | 0.021 % | 0.021 % | 1 of 32,767 | 0 |
+  | `pow` (exponents on [-3, 3]) | 0.084 % | 0.082 % | 28 of 32,767 | 0 |
+
+  (Intensities: magnitudes log-uniform from 2^-10 to 2^17, both signs, positive for `log` and
+  `pow`.) Rounded to `float` (the default `-dt float`) no difference survives in 6.7 × 10^7
+  arguments of any function: a float image's result is FSL's. The replica computes every one
+  correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` was ported for it,
+  2026-11-03). With `reproduce` it gives glibc's bits for `exp`, `log` and `pow` (Arm's
+  Optimized Routines, the code glibc 2.35 ships, in `larmorx_nc_core::glibc_double`), and names
+  GLIBC-07 where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos` and `atan` are IBM's
+  Accurate Mathematical Library in glibc (LGPL): their code is never read or translated, so
+  they are correctly rounded in both modes and a double image differs from FSL's in the last
+  place on the measured fraction of its voxels. The suite reports those cases as expected
+  divergences (`fn/double-tan`: 3 of 210 voxels, one unit in the last place; `fn/double-sin`,
+  `-cos`, `-atan`, `-asin` happen to agree on their 210 values). Exact glibc bits for these six
+  would need the `cbrtf` route (a behaviour spec, then a clean-room implementation): for the
+  orchestrator to schedule. The replica's earlier `tan` (the `libm` crate, FreeBSD's) is gone.
 
 ## Not yet translated (later sub-tasks of the part)
 

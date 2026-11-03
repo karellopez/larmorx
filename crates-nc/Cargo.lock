@@ -199,7 +199,6 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
- "libm",
  "tempfile",
 ]
 

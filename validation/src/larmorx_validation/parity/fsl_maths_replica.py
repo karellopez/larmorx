@@ -110,7 +110,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v7.done"
+    marker = base / "v8.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -401,6 +401,10 @@ def _make_inputs(d: Path) -> None:
     _save(d / "roctruthneg.nii.gz", -np.ones(rsh, np.float32), dtype=np.float32)
     _save(d / "roctruthones.nii.gz", np.ones(rsh, np.float32), dtype=np.float32)
     _save(d / "roctruthsmall.nii.gz", truth[:6], dtype=np.float32, affine=_affine((6, 7, 6)))
+    # FSL-187 in the robust range: 1000 values on [0, 1) and one far above them (1e12)
+    far = (np.arange(1001, dtype=np.float64) / 1000).astype(np.float32)
+    far[1000] = 1e12
+    _save(d / "far3.nii.gz", far.reshape(7, 11, 13), dtype=np.float32)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -412,13 +416,18 @@ class Run:
     """A case: fslmaths' arguments (``@name`` names an input copied into the run directory) and
     the environment; ``undefined``: FSL reads memory it never wrote (the register entry): FSL is
     not run, the replica must refuse in both modes; ``fixed``: FSL stops (the register entry),
-    the default must give an output and name the defect."""
+    the default must give an output and name the defect; ``glibc``: the output passes through
+    glibc's double ``sin``, ``cos``, ``tan``, ``asin``, ``acos`` or ``atan`` (IBM's code in glibc,
+    LGPL), which the replica computes correctly rounded in both modes (GLIBC-07): FSL's output
+    may differ by at most that many units in the last place, on a few voxels (an expected
+    divergence, reported with its counts)."""
 
     args: tuple[str, ...]
     settings: tuple[tuple[str, str | None], ...] = ()
     fix: bool = True
     undefined: str = ""
     fixed: str = ""
+    glibc: int = 0
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -461,6 +470,10 @@ def _run_case(run: Run, checks: CheckList) -> None:
         oracle = run_oracle(args, cwd=a, settings=settings)
         replica = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         compare(checks, PROGRAM, oracle, replica, a, b)
+        if run.glibc and any(not c.passed for c in checks.checks):
+            reason = _glibc_divergence(a, b, run.glibc)
+            if reason is not None:
+                raise Outcome("expected-divergence", reason)
         if run.fix and replica.code == 0:
             fix_pass(
                 checks,
@@ -483,6 +496,49 @@ def _run_case(run: Run, checks: CheckList) -> None:
                 r.code == 0 and run.fixed in r.stderr and any(c.glob("out*")),
                 detail=f"exit {r.code}: {r.stderr[-200:]}",
             )
+
+
+#: How often glibc 2.35's double functions differ from the correctly rounded result on image
+#: intensities, measured by ``validation/probes/glibc-double-maths`` (2^26 random arguments
+#: of each family; ``[-1, 1]`` for ``asin`` and ``acos``).
+GLIBC_FREQUENCY = {
+    "sin": "0.12 %",
+    "cos": "0.085 %",
+    "tan": "0.21 %",
+    "asin": "0.16 %",
+    "acos": "0.071 %",
+    "atan": "0.083 %",
+}
+
+
+def _glibc_divergence(a: Path, b: Path, ulps: int) -> str | None:
+    """GLIBC-07's expected divergence: the same files and headers, double values at most ``ulps``
+    units in the last place apart on fewer than 2 % of the voxels; the reason, else ``None``."""
+    import nibabel as nib
+
+    fa, fb = sorted(a.glob("out*")), sorted(b.glob("out*"))
+    if [p.name for p in fa] != [p.name for p in fb] or len(fa) != 1:
+        return None
+    ia, ib = nib.load(fa[0]), nib.load(fb[0])
+    if ia.header.binaryblock != ib.header.binaryblock:
+        return None
+    x = np.asarray(ia.dataobj).ravel()
+    y = np.asarray(ib.dataobj).ravel()
+    if x.dtype != np.float64 or y.dtype != np.float64 or x.shape != y.shape:
+        return None
+    xi, yi = x.view(np.int64), y.view(np.int64)
+    # ulp distance between doubles of the same sign
+    same_sign = (xi < 0) == (yi < 0)
+    dist = np.where(same_sign, np.abs(xi - yi), np.iinfo(np.int64).max)
+    differ = int(np.count_nonzero(dist))
+    if differ == 0 or int(dist.max()) > ulps or differ >= 0.02 * x.size:
+        return None
+    freq = ", ".join(f"{k} {v}" for k, v in GLIBC_FREQUENCY.items())
+    return (
+        f"GLIBC-07: {differ} of {x.size} double voxels {int(dist.max())} unit(s) in the last place "
+        "from FSL's, where glibc 2.35's function (IBM's code, LGPL) is not correctly rounded and "
+        f"the replica is (measured on image intensities: {freq})"
+    )
 
 
 def fmriprep_calls() -> list[tuple[str, Path]]:
@@ -755,8 +811,9 @@ def _r(
     fix: bool = True,
     undefined: str = "",
     fixed: str = "",
+    glibc: int = 0,
 ) -> Run:
-    return Run(tuple(args), tuple((env or {}).items()), fix, undefined, fixed)
+    return Run(tuple(args), tuple((env or {}).items()), fix, undefined, fixed, glibc)
 
 
 #: name -> (tier, description, run).
@@ -944,6 +1001,16 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
             "-thrP of an image without positive voxels: the warnings",
             _r("@neg3", "-thrP", "20", "out"),
         ),
+        "d13/thrp-far": (
+            T,
+            "FSL-187: -thrp 50 of 1000 values on [0, 1) and one at 1e12 (the robust range)",
+            _r("@far3", "-thrp", "50", "out"),
+        ),
+        "d13/uthrP-far": (
+            T,
+            "FSL-187: -uthrP 98 of the same image (the positive voxels' robust range)",
+            _r("@far3", "-uthrP", "98", "out"),
+        ),
         "thr/thr-word": (T, "-thr without a number", _r(F3, "-thr", "five", "out")),
         "thr/uthrP-word": (T, "-uthrP without a number", _r(F3, "-uthrP", "x", "out")),
         "thr/thr-short": (
@@ -970,14 +1037,14 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
         "fn/tan-inf": (T, "-tan of infinite and NaN voxels", _r("@nan3", "-tan", "out")),
         "fn/exp-inf": (T, "-exp of infinite and NaN voxels", _r("@inf3", "-exp", "out")),
         "fn/log-inf": (T, "-log of infinite voxels", _r("@inf3", "-log", "out")),
-        "fn/double-sin": (T, "-sin in double", _r("@d3", "-sin", "out")),
-        "fn/double-cos": (T, "-cos in double", _r("@d3", "-cos", "out")),
-        "fn/double-tan": (T, "-tan in double", _r("@d3", "-tan", "out")),
-        "fn/double-atan": (T, "-atan in double", _r("@d3", "-atan", "out")),
+        "fn/double-sin": (T, "-sin in double", _r("@d3", "-sin", "out", glibc=1)),
+        "fn/double-cos": (T, "-cos in double", _r("@d3", "-cos", "out", glibc=1)),
+        "fn/double-tan": (T, "-tan in double", _r("@d3", "-tan", "out", glibc=1)),
+        "fn/double-atan": (T, "-atan in double", _r("@d3", "-atan", "out", glibc=1)),
         "fn/double-asin": (
             T,
             "-asin and -acos in double",
-            _r("@d3", "-div", "50", "-asin", "-mul", "0.5", "-acos", "out"),
+            _r("@d3", "-div", "50", "-asin", "-mul", "0.5", "-acos", "out", glibc=2),
         ),
         "fn/double-exp-log": (
             T,

@@ -1043,20 +1043,28 @@ fn range(ctx: &mut Ctx, st: &State, json: bool) -> Res<Out> {
 }
 
 /// `-r`: `vol.robustlimits(mask)`, with the warning of an empty mask; NaN values left out by
-/// default (FSL-181).
+/// default (FSL-181), values far above a pass's histogram counted in its last bin (FSL-187).
 fn robust(ctx: &mut Ctx, st: &State, json: bool) -> Res<Out> {
-    let ((lo, hi), warning) = st.vol.robust_limits_masked(st.mask.as_ref())?;
+    let (r, warning) = st.vol.robust_limits_masked(st.mask.as_ref())?;
     if let Some(w) = warning {
         ctx.eput(&format!("{w}\n"));
     }
+    let (lo, hi) = r.fsl;
     let fsl = nums(&[f64::from(lo), f64::from(hi)]);
+    const BINS: &str = "-r: values far above a pass's histogram in the robust range";
     if let Some(keep) = nan_free(&st.vol, st.mask.as_ref()) {
-        let fixed = if keep.no_mask_voxels() == 0 {
-            nums(&[0.0, 0.0])
+        let (fixed, bins) = if keep.no_mask_voxels() == 0 {
+            (nums(&[0.0, 0.0]), false)
         } else {
-            let (a, b) = volops::find_thresholds(&st.vol, Some(&keep))?;
-            nums(&[f64::from(a), f64::from(b)])
+            let k = volops::robust_range(&st.vol, Some(&keep))?;
+            (
+                nums(&[f64::from(k.fixed.0), f64::from(k.fixed.1)]),
+                k.differs(),
+            )
         };
+        if bins {
+            ctx.notice(&defects::FSL_187, BINS);
+        }
         return Ok(pick(
             ctx,
             json,
@@ -1065,6 +1073,10 @@ fn robust(ctx: &mut Ctx, st: &State, json: bool) -> Res<Out> {
             &defects::FSL_181,
             "-r: NaN values in the robust range",
         ));
+    }
+    if r.differs() {
+        let fixed = nums(&[f64::from(r.fixed.0), f64::from(r.fixed.1)]);
+        return Ok(pick(ctx, json, fsl, fixed, &defects::FSL_187, BINS));
     }
     Ok(fsl)
 }
@@ -1215,12 +1227,17 @@ fn histogram(
 /// element's index divides by its 0 columns: FSL crashes (FSL-185; the entropy 0 by default).
 fn entropy(ctx: &mut Ctx, vol: &Volume, mask: Option<&Volume>, json: bool, opt: &str) -> Res<Out> {
     const NBINS: i32 = 1000;
-    let ((lo, hi), _) = vol.robust_limits_masked(None)?;
+    let (r, _) = vol.robust_limits_masked(None)?;
+    let (lo, hi) = r.fsl;
     let keep = nan_free(vol, None);
-    let (flo, fhi) = match &keep {
-        Some(k) if k.no_mask_voxels() > 0 => volops::find_thresholds(vol, Some(k))?,
-        Some(_) => (0.0, 0.0),
-        None => (lo, hi),
+    // the corrected range: NaN values left out (FSL-181), far values in the last bin (FSL-187)
+    let (bins, (flo, fhi)) = match &keep {
+        Some(k) if k.no_mask_voxels() > 0 => {
+            let k = volops::robust_range(vol, Some(k))?;
+            (k.differs(), k.fixed)
+        }
+        Some(_) => (false, (0.0, 0.0)),
+        None => (r.differs(), r.fixed),
     };
     let (fsl, mut fixed) = hist_of(ctx, vol, mask, NBINS, lo, hi, opt, keep.is_some())?;
     if (flo, fhi) != (lo, hi) {
@@ -1254,7 +1271,11 @@ fn entropy(ctx: &mut Ctx, vol: &Volume, mask: Option<&Volume>, json: bool, opt: 
         return Ok(fixed_out);
     };
     let fsl_out = num(value(&h));
+    let range_note = format!("{opt}: values far above a pass's histogram in the robust range");
     if keep.is_some() {
+        if bins && fsl_out.text != fixed_out.text {
+            ctx.notice(&defects::FSL_187, range_note);
+        }
         return Ok(pick(
             ctx,
             json,
@@ -1262,6 +1283,16 @@ fn entropy(ctx: &mut Ctx, vol: &Volume, mask: Option<&Volume>, json: bool, opt: 
             fixed_out,
             &defects::FSL_181,
             &format!("{opt}: NaN values left out"),
+        ));
+    }
+    if bins {
+        return Ok(pick(
+            ctx,
+            json,
+            fsl_out,
+            fixed_out,
+            &defects::FSL_187,
+            &range_note,
         ));
     }
     Ok(if ctx.reproduce() { fsl_out } else { fixed_out })

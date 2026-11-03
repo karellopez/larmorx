@@ -334,6 +334,8 @@ defects! {
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,
         "tanh (double precision) is not correctly rounded: about one argument in five gets a result one unit in the last place from the exact value, and FSL's bet2 takes its surface's smoothness weight from it at every step, so where such a last bit survives (most of all where a self-intersecting surface is rerun, which amplifies it) the surface and the brain mask are other than the exact tanh gives";
+    GLIBC_07 = "GLIBC-07", "glibc 2.35", true,
+        "the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow are not correctly rounded: on image intensities, between 0.02 % (log) and 0.25 % (tan) of the arguments get a result one unit in the last place from the exact value, so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values)";
     AFNI_01 = "AFNI-01", "AFNI", true,
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
@@ -600,8 +602,8 @@ defects! {
         "-e and -E of an image whose robust range is empty (a constant image, after the thresholds and masks) crash fslstats (an integer division by zero indexing the empty histogram) instead of giving the entropy 0";
     FSL_186 = "FSL-186", "fslstats", true,
         "-H with a maximum that is not above the minimum prints no histogram, without a message";
-    FSL_187 = "FSL-187", "fslstats", true,
-        "the histograms of -H, -e and -E put a value more than about two billion bin widths above the histogram's range in the first bin instead of the last (its bin number does not fit in an int)";
+    FSL_187 = "FSL-187", "FSL", true,
+        "a value more than about two billion bin widths above a histogram's range is counted in its first bin instead of its last (its bin number does not fit in an int): in fslstats' histograms (-H, -e, -E), and in the robust range of fslstats (-r, -e, -E), fslmaths (-thrp, -thrP, -uthrp, -uthrP), bet2 and flirt, whose 2 % and 98 % limits move when most values are packed far below one value above them";
     FSL_188 = "FSL-188", "fslstats", true,
         "-w of a 4D image without nonzero voxels gives the time range as a first volume of tsize - 1 with a size of 2 - tsize (negative for three or more volumes), while the x, y and z ranges cover the whole image";
     FSL_189 = "FSL-189", "fslstats", true,

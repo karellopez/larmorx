@@ -1066,11 +1066,17 @@ impl Volume {
     }
 
     /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
-    /// `find_thresholds` without a mask: [`crate::volops::find_thresholds`]). The limits are
-    /// computed with SSE's NaNs (an infinite voxel makes `0 * inf`: x86-64's default NaN on
-    /// every platform).
-    pub fn robust_limits(&self) -> (f32, f32) {
-        crate::volops::find_thresholds(self, None).unwrap_or((0.0, 0.0))
+    /// `find_thresholds` without a mask: [`crate::volops::robust_range`]), as FSL computes them
+    /// and corrected (FSL-187: a value far above a pass's histogram range counted in its last
+    /// bin, not its first; the caller picks by its mode and names the defect where they
+    /// differ). The limits are computed with SSE's NaNs (an infinite voxel makes `0 * inf`:
+    /// x86-64's default NaN on every platform).
+    pub fn robust_limits(&self) -> crate::volops::RobustRange<f32> {
+        crate::volops::robust_range(self, None).unwrap_or(crate::volops::RobustRange {
+            fsl: (0.0, 0.0),
+            fixed: (0.0, 0.0),
+            overflow: false,
+        })
     }
 }
 
@@ -2196,7 +2202,7 @@ mod tests {
         for (i, d) in v.data.iter_mut().enumerate() {
             *d = i as f32;
         }
-        let (lo, hi) = v.robust_limits();
+        let (lo, hi) = v.robust_limits().pick(false);
         assert!(lo > 0.0 && lo < 40.0, "{lo}");
         assert!(hi > 960.0 && hi <= 999.0, "{hi}");
     }

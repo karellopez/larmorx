@@ -288,6 +288,16 @@ impl<'a> Flirt<'a> {
         defects::push_once(&mut self.notices, Notice::new(defect, self.mode, detail));
     }
 
+    /// `robustmin()`, `robustmax()` of the `which` image: corrected by default (FSL-187, named
+    /// where the limits differ), FSL's with `reproduce`.
+    fn robust_limits(&mut self, v: &Volume, which: &str) -> (f32, f32) {
+        let r = v.robust_limits();
+        if let Some(d) = r.notice(&format!("flirt {which}'s robust limits")) {
+            self.notice(&defects::FSL_187, d);
+        }
+        r.pick(self.mode.reproduce())
+    }
+
     /// `v.backgroundval()`. FSL-75: where FLIRT's buffer is too small for the border it writes,
     /// FLIRT corrupts its heap and takes the percentile of the values that fit (reproduced); the
     /// correction takes it over the whole border. Both named. A 1 x 1 x 1 volume has no border
@@ -566,7 +576,7 @@ impl<'a> Flirt<'a> {
             if tv.zsize() == 1 {
                 double_end_slices(&mut tv);
             }
-            (minval, maxval) = tv.robust_limits();
+            (minval, maxval) = self.robust_limits(&tv, "-in");
             if self.o.clamping {
                 newimagefns::clamp(&mut tv, minval, maxval);
             }
@@ -628,7 +638,7 @@ impl<'a> Flirt<'a> {
         if rv.zsize() == 1 && self.o.do_optimise {
             double_end_slices(&mut rv);
         }
-        let (minval, maxval) = rv.robust_limits();
+        let (minval, maxval) = self.robust_limits(&rv, "-ref");
         if self.o.clamping {
             newimagefns::clamp(&mut rv, minval, maxval);
         }

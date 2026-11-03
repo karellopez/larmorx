@@ -36,6 +36,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Defect, Notices, UpstreamDefects};
+use larmorx_core::math;
 use larmorx_nc_core::arma::Mat;
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::cprob::{self, Drand};
@@ -480,13 +481,15 @@ impl<T: Arith> Range<T> {
 
 /// Which voxels are inside: FSL's range `fsl`; corrected, the intended test of `fixed` (the
 /// same range with corrected limits). FSL-152 is named where the open sides change voxels,
-/// FSL-153 where NaN extremes (`nan_first`) or the corrected limits do.
+/// FSL-153 where NaN extremes (`nan_first`) do, and each defect of `causes` (the corrections
+/// of the limits: FSL-153's NaN voxels, FSL-187's bins) where the corrected limits do.
 fn select<T: Arith>(
     ctx: &mut Ctx,
     v: &Volume<T>,
     fsl: &Range<T>,
     fixed: &Range<T>,
     nan_first: bool,
+    causes: &[&'static Defect],
     what: &str,
 ) -> Vec<bool> {
     let r_fsl: Vec<bool> = v.data.iter().map(|&x| fsl.fsl(x)).collect();
@@ -510,10 +513,14 @@ fn select<T: Arith>(
         }
     }
     if n_lim > 0 {
-        ctx.notice(
-            &defects::FSL_153,
-            format!("{what}: NaN voxels in the robust range ({n_lim} voxels)"),
-        );
+        for &d in causes {
+            let why = if d.id == defects::FSL_187.id {
+                "values far above a pass's histogram in the robust range"
+            } else {
+                "NaN voxels in the robust range"
+            };
+            ctx.notice(d, format!("{what}: {why} ({n_lim} voxels)"));
+        }
     }
     if ctx.reproduce() { r_fsl } else { r_fix }
 }
@@ -546,7 +553,7 @@ fn bin_above<T: Arith>(ctx: &mut Ctx, v: &mut Volume<T>, lower: T, what: &str) {
         lower_open: false,
         upper_open: true,
     };
-    let ins = select(ctx, v, &r, &r, e.nan_first(), what);
+    let ins = select(ctx, v, &r, &r, e.nan_first(), &[], what);
     binarise_r(v, ins);
 }
 
@@ -557,6 +564,7 @@ fn threshold_at<T: Arith>(
     v: &mut Volume<T>,
     limit: (T, T),
     upper: bool,
+    causes: &[&'static Defect],
     what: &str,
 ) {
     let e = Extremes::of(v);
@@ -580,24 +588,32 @@ fn threshold_at<T: Arith>(
         }
     };
     let (rf, rx) = (make(limit.0), make(limit.1));
-    let ins = select(ctx, v, &rf, &rx, e.nan_first(), what);
+    let ins = select(ctx, v, &rf, &rx, e.nan_first(), causes, what);
     threshold_r(v, ins);
 }
 
+/// FSL's robust limits, the corrected ones and the defects whose corrections changed them.
+type Limits<T> = ((T, T), (T, T), Vec<&'static Defect>);
+
 /// The robust range's limits (`robustmin()`, `robustmax()`, or with the mask of the positive
-/// voxels) as FSL computes them and with the NaN voxels left out (FSL-153's correction), with
-/// the warning FSL prints for an empty mask.
-fn robust<T: Arith>(
-    ctx: &mut Ctx,
-    v: &Volume<T>,
-    mask: Option<&Volume<T>>,
-) -> Res<((T, T), (T, T))> {
-    let ((lo, hi), warning) = v.robust_limits_masked(mask)?;
+/// voxels) as FSL computes them and corrected: the NaN voxels left out (FSL-153) and values far
+/// above a pass's histogram counted in its last bin (FSL-187); with the warning FSL prints for
+/// an empty mask, and the defects whose corrections changed the limits.
+fn robust<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, mask: Option<&Volume<T>>) -> Res<Limits<T>> {
+    let (r, warning) = v.robust_limits_masked(mask)?;
     if let Some(w) = warning {
         ctx.eput(&format!("{w}\n"));
     }
+    let (lo, hi) = r.fsl;
+    let bins = |r: &volops::RobustRange<T>| -> Vec<&'static Defect> {
+        if r.differs() {
+            vec![&defects::FSL_187]
+        } else {
+            Vec::new()
+        }
+    };
     if !T::IS_FLOAT || !v.data.iter().any(|&x| T::is_nan(x)) {
-        return Ok(((lo, hi), (lo, hi)));
+        return Ok(((lo, hi), r.fixed, bins(&r)));
     }
     let mut keep = Volume::<T>::new7(v.dims);
     let one = T::from_int(1);
@@ -608,12 +624,14 @@ fn robust<T: Arith>(
             *d = one;
         }
     }
-    let fixed = if keep.no_mask_voxels() == 0 {
-        (T::from_int(0), T::from_int(0))
+    let (fixed, mut causes) = if keep.no_mask_voxels() == 0 {
+        ((T::from_int(0), T::from_int(0)), Vec::new())
     } else {
-        volops::find_thresholds(v, Some(&keep))?
+        let k = volops::robust_range(v, Some(&keep))?;
+        (k.fixed, bins(&k))
     };
-    Ok(((lo, hi), fixed))
+    causes.insert(0, &defects::FSL_153);
+    Ok(((lo, hi), fixed, causes))
 }
 
 /// `robustmin + (p / 100) * (robustmax - robustmin)` converted to `T`.
@@ -621,6 +639,26 @@ fn robust_limit<T: Arith>(ctx: &mut Ctx, lo: T, hi: T, val: &str, what: &str) ->
     let p = cnum::atof(val) / 100.0;
     let x = lo.to_f64() + larmorx_nc_core::sse::mul_f64(p, T::diff(hi, lo));
     ctx.conv::<T>(x, what)
+}
+
+/// The bits a value converted to `T` is stored with (no notice: for comparisons only).
+fn stored<T: Arith>(x: f64) -> u64 {
+    let v: T = if T::IS_FLOAT {
+        from_f64_nan(x)
+    } else {
+        T::from_f64(x)
+    };
+    v.to_f64().to_bits()
+}
+
+/// GLIBC-07's notice: `moved` voxels of `op` whose stored value glibc's last bit changes.
+fn last_bit_notice(ctx: &mut Ctx, op: &str, moved: usize) {
+    if moved > 0 {
+        ctx.notice(
+            &defects::GLIBC_07,
+            format!("{op}: {moved} voxels whose value glibc's last bit changes"),
+        );
+    }
 }
 
 /// An integer division by zero, as FSL crashes on it (FSL-156: refused).
@@ -952,7 +990,7 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     return Err(Stop::Exit(1));
                 }
                 let t = ctx.conv::<T>(cnum::atof(val), op);
-                threshold_at(ctx, &mut input, (t, t), op == "-uthr", op);
+                threshold_at(ctx, &mut input, (t, t), op == "-uthr", &[], op);
             }
             "-range" => set_display_range = true,
             "-thrp" | "-thrP" | "-uthrp" | "-uthrP" => {
@@ -973,12 +1011,13 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 };
                 // robustmin() + p * (robustmax() - robustmin()): three evaluations, each with
                 // its warning
-                let (lo, fix_lo) = robust(ctx, &input, mask.as_ref())?;
-                let (hi, fix_hi) = robust(ctx, &input, mask.as_ref())?;
+                let (lo, fix_lo, causes) = robust(ctx, &input, mask.as_ref())?;
+                let (hi, fix_hi, _) = robust(ctx, &input, mask.as_ref())?;
                 let _ = robust(ctx, &input, mask.as_ref())?;
                 let limit = robust_limit(ctx, lo.0, hi.1, val, op);
                 let fixed = robust_limit(ctx, fix_lo.0, fix_hi.1, val, op);
-                threshold_at(ctx, &mut input, (limit, fixed), op.starts_with("-u"), op);
+                let upper = op.starts_with("-u");
+                threshold_at(ctx, &mut input, (limit, fixed), upper, &causes, op);
             }
             "-sqrt" => {
                 let n = looped_len(&input);
@@ -994,11 +1033,22 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
             "-pow" => {
                 let s = number_arg(ctx, argv, i + 1)?;
                 let p = cnum::atof(s);
+                // correctly rounded by default, glibc's bits with `reproduce` (GLIBC-07; its
+                // NaN as glibc makes it in both modes)
                 let n = looped_len(&input);
+                let reproduce = ctx.reproduce();
+                let mut moved = 0usize;
                 for k in 0..n {
-                    let r = glibc_double::pow(input.data[k].to_f64(), p);
+                    let x = input.data[k].to_f64();
+                    let (g, cr) = (glibc_double::pow(x, p), math::pow(x, p));
+                    let cr = if g.is_nan() && cr.is_nan() { g } else { cr };
+                    if g.to_bits() != cr.to_bits() && stored::<T>(g) != stored::<T>(cr) {
+                        moved += 1;
+                    }
+                    let r = if reproduce { g } else { cr };
                     input.data[k] = ctx.conv::<T>(r, "-pow");
                 }
+                last_bit_notice(ctx, "-pow", moved);
                 i += 1;
             }
             "-invbin" => {
@@ -1020,7 +1070,14 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 }
             }
             "-exp" | "-log" | "-cos" | "-sin" | "-tan" | "-asin" | "-acos" | "-atan" => {
+                // Correctly rounded by default (larmorx_core::math, CORE-MATH's); glibc 2.35's
+                // functions are not (GLIBC-07). Its bits with `reproduce` where permissive code
+                // has them (exp, log: Arm's Optimized Routines, the code glibc 2.35 ships),
+                // named where they change a voxel; sin, cos, tan, asin, acos and atan (IBM's
+                // code in glibc, LGPL) are correctly rounded in both modes.
                 let n = looped_len(&input);
+                let reproduce = ctx.reproduce();
+                let mut moved = 0usize;
                 for k in 0..n {
                     let v = input.data[k];
                     let positive = v > T::from_int(0);
@@ -1028,33 +1085,45 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                         continue;
                     }
                     let x = v.to_f64();
-                    let r = match op {
-                        "-exp" => glibc_double::exp(x),
-                        "-log" => glibc_double::log(x),
-                        "-cos" => larmorx_core::math::cos(x),
-                        "-sin" => larmorx_core::math::sin(x),
-                        // libm (FreeBSD's msun): glibc's tan is not yet ported
-                        "-tan" => libm::tan(x),
-                        "-asin" => larmorx_core::math::asin(x),
-                        "-acos" => larmorx_core::math::acos(x),
-                        _ => larmorx_core::math::atan2(x, 1.0),
+                    let (cr, glibc) = match op {
+                        "-exp" => (math::exp(x), Some(glibc_double::exp(x))),
+                        "-log" => (math::log(x), Some(glibc_double::log(x))),
+                        "-cos" => (math::cos(x), None),
+                        "-sin" => (math::sin(x), None),
+                        "-tan" => (math::tan(x), None),
+                        "-asin" => (math::asin(x), None),
+                        "-acos" => (math::acos(x), None),
+                        _ => (math::atan2(x, 1.0), None),
                     };
                     // a NaN argument passed on quieted; a NaN made from a number is SSE's default
-                    let r = if x.is_nan() {
-                        larmorx_nc_core::sse::quiet_f64(x)
-                    } else if r.is_nan() {
-                        // glibc's asin and acos give a positive NaN outside [-1, 1]; the others'
-                        // NaN (sin, cos, tan of an infinity) is SSE's default
-                        if matches!(op, "-asin" | "-acos") {
-                            f64::NAN
+                    let nan = |r: f64| {
+                        if x.is_nan() {
+                            larmorx_nc_core::sse::quiet_f64(x)
+                        } else if r.is_nan() {
+                            // glibc's asin and acos give a positive NaN outside [-1, 1]; the
+                            // others' NaN (sin, cos, tan of an infinity) is SSE's default
+                            if matches!(op, "-asin" | "-acos") {
+                                f64::NAN
+                            } else {
+                                larmorx_nc_core::sse::DEFAULT_NAN_F64
+                            }
                         } else {
-                            larmorx_nc_core::sse::DEFAULT_NAN_F64
+                            r
                         }
-                    } else {
-                        r
                     };
-                    input.data[k] = ctx.conv::<T>(r, op);
+                    let r = match glibc {
+                        Some(g) if reproduce => g,
+                        _ => cr,
+                    };
+                    if let Some(g) = glibc
+                        && g.to_bits() != cr.to_bits()
+                        && stored::<T>(nan(g)) != stored::<T>(nan(cr))
+                    {
+                        moved += 1;
+                    }
+                    input.data[k] = ctx.conv::<T>(nan(r), op);
                 }
+                last_bit_notice(ctx, op, moved);
             }
             "-abs" => {
                 for k in 0..input.data.len() {

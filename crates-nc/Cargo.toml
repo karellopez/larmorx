@@ -47,8 +47,6 @@ flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", 
 ruzstd = "0.9.1"
 bzip2 = "0.6.1"
 rayon = "1.12.0"
-# libm: the root workspace's (pure Rust); fslmaths' `tan` until glibc's is ported.
-libm = "0.2.16"
 thiserror = "2.0.21"
 tempfile = "3.27.0"
 # Test-only: SHA-256 for the golden tests (larmorx-nc-cli/tests/golden.rs).

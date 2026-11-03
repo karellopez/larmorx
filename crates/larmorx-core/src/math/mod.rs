@@ -26,6 +26,7 @@ mod powf;
 mod powi;
 mod sin;
 mod sinf;
+mod tan;
 mod tanh;
 mod tanh_glibc;
 mod tanhf;
@@ -100,6 +101,11 @@ dispatch!(
     /// The arccosine of `x`, correctly rounded (CORE-MATH's `cr_acos`). ITK's `std::acos`
     /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`.
     acos
+);
+dispatch!(
+    /// The tangent of `x`, correctly rounded (CORE-MATH's `cr_tan`). FSL's `fslmaths -tan`
+    /// calls glibc's `tan`, which is not correctly rounded (GLIBC-07).
+    tan
 );
 dispatch!(
     /// The hyperbolic tangent of `x`, correctly rounded (CORE-MATH's `cr_tanh`). FSL's `bet2`
@@ -203,6 +209,7 @@ mod fma {
     fma_copy!(asin);
     fma_copy!(acos);
     fma_copy!(cbrt);
+    fma_copy!(tan);
     fma_copy!(tanh);
 
     #[inline]
@@ -240,6 +247,7 @@ mod tests {
             for (a, b) in [
                 (super::cos(x), super::cos::cos(x)),
                 (super::sin(x), super::sin::sin(x)),
+                (super::tan(x), super::tan::tan(x)),
                 (super::exp(x), super::exp::exp(x)),
                 (super::log(x.abs()), super::log::log(x.abs())),
                 (super::cbrt(x), super::cbrt::cbrt(x)),

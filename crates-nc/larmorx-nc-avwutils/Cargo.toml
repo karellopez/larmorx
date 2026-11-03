@@ -9,8 +9,6 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-nc-core.workspace = true
-# libm (pure Rust, FreeBSD's msun): `tan`, whose glibc code is not yet ported (CLAUDE.md rule 5)
-libm.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

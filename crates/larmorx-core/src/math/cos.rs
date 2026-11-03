@@ -39,7 +39,7 @@
 //! SOFTWARE.
 
 /// `f64` from its IEEE-754 bit pattern (tables are stored as exact bit patterns).
-const fn fb(bits: u64) -> f64 {
+pub(super) const fn fb(bits: u64) -> f64 {
     f64::from_bits(bits)
 }
 
@@ -47,15 +47,15 @@ const fn fb(bits: u64) -> f64 {
 
 /// 128-bit floating-point value `(hi/2^64 + lo/2^128) * 2^ex * (-1)^sgn` (`dint64_t`).
 #[derive(Clone, Copy)]
-struct Dint {
-    hi: u64,
-    lo: u64,
-    ex: i64,
-    sgn: u64,
+pub(super) struct Dint {
+    pub(super) hi: u64,
+    pub(super) lo: u64,
+    pub(super) ex: i64,
+    pub(super) sgn: u64,
 }
 
 impl Dint {
-    const fn new(hi: u64, lo: u64, ex: i64, sgn: u64) -> Self {
+    pub(super) const fn new(hi: u64, lo: u64, ex: i64, sgn: u64) -> Self {
         Self { hi, lo, ex, sgn }
     }
 
@@ -100,7 +100,7 @@ fn cmpu128(a: u128, b: u128) -> i32 {
 /// ZERO is a dint64_t representation of 0, which ensures that dint_tod(ZERO) = 0.
 const ZERO: Dint = Dint::new(0x0, 0x0, -1076, 0x0);
 /// MAGIC is a dint64_t representation of 1/2^11.
-const MAGIC: Dint = Dint::new(0x8000_0000_0000_0000, 0x0, -10, 0x0);
+pub(super) const MAGIC: Dint = Dint::new(0x8000_0000_0000_0000, 0x0, -10, 0x0);
 
 /// Compare the absolute values of a and b: -1 if |a| < |b|, 0 if |a| = |b|,
 /// +1 if |a| > |b| (`cmp_dint_abs`).
@@ -124,7 +124,7 @@ fn cmp_dint_abs(a: &Dint, b: &Dint) -> i32 {
 /// input field it needs before writing the corresponding output field, so returning
 /// the result by value is equivalent.
 #[inline(always)]
-fn add_dint(a: &Dint, b: &Dint) -> Dint {
+pub(super) fn add_dint(a: &Dint, b: &Dint) -> Dint {
     if (a.hi | a.lo) == 0 {
         return *b;
     }
@@ -208,7 +208,7 @@ fn add_dint(a: &Dint, b: &Dint) -> Dint {
 /// input; it reads the inputs before overwriting them, so returning by value is
 /// equivalent.
 #[inline(always)]
-fn mul_dint(a: &Dint, b: &Dint) -> Dint {
+pub(super) fn mul_dint(a: &Dint, b: &Dint) -> Dint {
     let bh = u128::from(b.hi);
     let bl = u128::from(b.lo);
 
@@ -246,7 +246,7 @@ fn mul_dint(a: &Dint, b: &Dint) -> Dint {
 /// Multiply two dint64_t numbers, assuming the low part of b is zero,
 /// with error bounded by 2 ulps (`mul_dint_21`).
 #[inline(always)]
-fn mul_dint_21(a: &Dint, b: &Dint) -> Dint {
+pub(super) fn mul_dint_21(a: &Dint, b: &Dint) -> Dint {
     let bh = u128::from(b.hi);
     let hi = u128::from(a.hi) * bh;
     let lo = u128::from(a.lo) * bh;
@@ -273,7 +273,7 @@ fn mul_dint_21(a: &Dint, b: &Dint) -> Dint {
 
 /// Convert a non-zero double to the corresponding dint64_t value (`dint_fromd`).
 #[inline(always)]
-fn dint_fromd(b: f64) -> Dint {
+pub(super) fn dint_fromd(b: f64) -> Dint {
     let (ex, hi) = fast_extract(b);
     // |b| = 2^(ex-52)*hi
     let t = hi.leading_zeros();
@@ -313,7 +313,7 @@ fn subnormalize_dint(a: &mut Dint) {
 
 /// Convert a dint64_t value to a double (`dint_tod`).
 #[inline(always)]
-fn dint_tod(a: &mut Dint) -> f64 {
+pub(super) fn dint_tod(a: &mut Dint) -> f64 {
     subnormalize_dint(a);
 
     let mut r = f64::from_bits((a.hi >> 11) | (0x3ffu64 << 52));
@@ -373,7 +373,7 @@ fn dint_tod(a: &mut Dint) -> f64 {
 /// 1/(2*pi) ~ T[0]/2^64 + T[1]/2^128 + ... + T[i]/2^((i+1)*64) + ...
 /// Computed with computeT() from sin.sage.
 #[rustfmt::skip]
-static T: [u64; 20] = [
+pub(super) static T: [u64; 20] = [
     0x28be60db9391054a, // i=0
     0x7f09d5f47d4d3770, // i=1
     0x36d8a5664f10e410, // i=2
@@ -400,7 +400,7 @@ static T: [u64; 20] = [
 /// (to nearest). Each entry is to be interpreted as (hi/2^64+lo/2^128)*2^ex*(-1)*sgn.
 /// Generated with computeS() from sin.sage.
 #[rustfmt::skip]
-static S: [Dint; 256] = [
+pub(super) static S: [Dint; 256] = [
     Dint::new(0x0000000000000000, 0x0000000000000000, 128, 0), // 0
     Dint::new(0xc90fc5f66525d257, 0x480f7956b6470765, -8, 0), // 1
     Dint::new(0xc90f87f3380388d5, 0xcb3ff35bd4d81baa, -7, 0), // 2
@@ -663,7 +663,7 @@ static S: [Dint; 256] = [
 /// (to nearest). Each entry is to be interpreted as (hi/2^64+lo/2^128)*2^ex*(-1)*sgn.
 /// Generated with computeC() from sin.sage.
 #[rustfmt::skip]
-static C: [Dint; 256] = [
+pub(super) static C: [Dint; 256] = [
     Dint::new(0x8000000000000000, 0x0000000000000000, 1, 0), // 0
     Dint::new(0xffffb10b10e80e95, 0x3031437d7eccb9df, 0, 0), // 1
     Dint::new(0xfffec42c7454926b, 0x38e310779edfec68, 0, 0), // 2
@@ -973,7 +973,7 @@ static PC: [Dint; 6] = [
 /// approximating sin2pi(xi) and cos2pi(xi) respectively, both with 53+15 bits of
 /// accuracy.
 #[rustfmt::skip]
-static SC: [[f64; 3]; 256] = [
+pub(super) static SC: [[f64; 3]; 256] = [
     [fb(0x0000000000000000), fb(0x0000000000000000), fb(0x3ff0000000000000)], // 0
     [fb(0xbdcc0f6c00000000), fb(0x3f6921f892b900fe), fb(0x3feffff621623fa0)], // 1
     [fb(0xbdc9c7935e000000), fb(0x3f7921f0ea27ce01), fb(0x3fefffd8858eca2e)], // 2
@@ -1234,7 +1234,7 @@ static SC: [[f64; 3]; 256] = [
 
 /// Multiply exactly a and b, such that hi + lo = a * b (`a_mul`).
 #[inline(always)]
-fn a_mul(a: f64, b: f64) -> (f64, f64) {
+pub(super) fn a_mul(a: f64, b: f64) -> (f64, f64) {
     let hi = a * b;
     let lo = a.mul_add(b, -hi);
     (hi, lo)
@@ -1243,7 +1243,7 @@ fn a_mul(a: f64, b: f64) -> (f64, f64) {
 /// Multiply a double with a double double: a * (bh + bl), with error bounded by
 /// ulp(lo) (`s_mul`).
 #[inline(always)]
-fn s_mul(a: f64, bh: f64, bl: f64) -> (f64, f64) {
+pub(super) fn s_mul(a: f64, bh: f64, bl: f64) -> (f64, f64) {
     let (hi, lo) = a_mul(a, bh); // exact
     let lo = a.mul_add(bl, lo);
     // the error is bounded by ulp(lo), where |lo| < |a*bl| + ulp(hi)
@@ -1261,7 +1261,7 @@ fn d_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
 }
 
 #[inline(always)]
-fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
+pub(super) fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
     let hi = a + b;
     let e = hi - a; // exact
     let lo = b - e; // exact
@@ -1272,7 +1272,7 @@ fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 /// and |xl| < 2^-52.36, with absolute error < 2^-77.09 (see evalPSfast() in sin.sage).
 /// Assume uh + ul approximates (xh+xl)^2 (`evalPSfast`).
 #[inline(always)]
-fn eval_ps_fast(xh: f64, xl: f64, uh: f64, ul: f64) -> (f64, f64) {
+pub(super) fn eval_ps_fast(xh: f64, xl: f64, uh: f64, ul: f64) -> (f64, f64) {
     let mut h = PSFAST[4]; // degree 7
     h = h.mul_add(uh, PSFAST[3]); // degree 5
     h = h.mul_add(uh, PSFAST[2]); // degree 3
@@ -1289,7 +1289,7 @@ fn eval_ps_fast(xh: f64, xl: f64, uh: f64, ul: f64) -> (f64, f64) {
 /// and |xl| < 2^-52.36, with relative error < 2^-69.96 (see evalPCfast() in sin.sage).
 /// Assume uh + ul approximates (xh+xl)^2 (`evalPCfast`).
 #[inline(always)]
-fn eval_pc_fast(uh: f64, ul: f64) -> (f64, f64) {
+pub(super) fn eval_pc_fast(uh: f64, ul: f64) -> (f64, f64) {
     let mut h = PCFAST[4]; // degree 6
     h = h.mul_add(uh, PCFAST[3]); // degree 4
     h = h.mul_add(uh, PCFAST[2]); // degree 2
@@ -1305,7 +1305,7 @@ fn eval_pc_fast(uh: f64, ul: f64) -> (f64, f64) {
 /// X^2. Absolute error bounded by 2^-132.999 with 0 <= Y < 0.003068 (see evalPS() in
 /// sin.sage), and relative error bounded by 2^-124.648 (`evalPS`).
 #[inline(always)]
-fn eval_ps(x: &Dint, x2: &Dint) -> Dint {
+pub(super) fn eval_ps(x: &Dint, x2: &Dint) -> Dint {
     let mut y = mul_dint_21(x2, &PS[5]); // degree 11
     y = add_dint(&y, &PS[4]); // degree 9
     y = mul_dint(&y, x2);
@@ -1323,7 +1323,7 @@ fn eval_ps(x: &Dint, x2: &Dint) -> Dint {
 /// X^2. Absolute/relative error bounded by 2^-125.999 with 0.999995 < Y <= 1
 /// (see evalPC() in sin.sage) (`evalPC`).
 #[inline(always)]
-fn eval_pc(x2: &Dint) -> Dint {
+pub(super) fn eval_pc(x2: &Dint) -> Dint {
     let mut y = mul_dint_21(x2, &PC[5]); // degree 10
     y = add_dint(&y, &PC[4]); // degree 8
     y = mul_dint(&y, x2);
@@ -1359,7 +1359,7 @@ fn normalize(x: &mut Dint) {
 /// we have |Xout - (Xin/(2pi) mod 1)| < 2^-126.67*|Xout|.
 /// Assert X is normalized at input, and normalize X at output (`reduce`).
 #[inline(always)]
-fn reduce(x: &mut Dint) {
+pub(super) fn reduce(x: &mut Dint) {
     let mut e = x.ex as i32;
     let mut u: u128;
 
@@ -1461,7 +1461,7 @@ fn reduce(x: &mut Dint) {
 /// Given Xin:=X with 0 <= Xin < 1, return i and modify X such that
 /// Xin = i/2^11 + Xout, with 0 <= Xout < 2^-11. This operation is exact (`reduce2`).
 #[inline(always)]
-fn reduce2(x: &mut Dint) -> i32 {
+pub(super) fn reduce2(x: &mut Dint) -> i32 {
     if x.ex <= -11 {
         return 0;
     }
@@ -1474,7 +1474,7 @@ fn reduce2(x: &mut Dint) -> i32 {
 
 /// h+l <- c1/2^64 + c0/2^128 (`set_dd`).
 #[inline(always)]
-fn set_dd(mut c1: u64, mut c0: u64) -> (f64, f64) {
+pub(super) fn set_dd(mut c1: u64, mut c0: u64) -> (f64, f64) {
     let (h, l);
     if c1 != 0 {
         let e = u64::from(c1.leading_zeros());

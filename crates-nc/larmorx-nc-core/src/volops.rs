@@ -459,24 +459,27 @@ impl<T: Arith> Volume<T> {
     }
 
     /// `calc_robustlimits(vol)` or, with a mask, `calc_robustlimits(vol, mask)`:
-    /// `[robustmin, robustmax]`, and the warning printed on standard error ("WARNING:: Empty
+    /// `[robustmin, robustmax]` as FSL computes them and corrected ([`RobustRange`], FSL-187),
+    /// and the warning printed on standard error ("WARNING:: Empty
     /// mask image in calc_robustlimits": the limits are then 0). `Err` is a mask of another
     /// size.
     pub fn robust_limits_masked(
         &self,
         mask: Option<&Volume<T>>,
-    ) -> Result<((T, T), Option<&'static str>), FslError> {
+    ) -> Result<(RobustRange<T>, Option<&'static str>), FslError> {
         if let Some(m) = mask
             && m.nvoxels() > 0
             && m.no_mask_voxels() == 0
         {
             let zero = T::from_int(0);
-            return Ok((
-                (zero, zero),
-                Some("WARNING:: Empty mask image in calc_robustlimits"),
-            ));
+            let r = RobustRange {
+                fsl: (zero, zero),
+                fixed: (zero, zero),
+                overflow: false,
+            };
+            return Ok((r, Some("WARNING:: Empty mask image in calc_robustlimits")));
         }
-        find_thresholds(self, mask).map(|r| (r, None))
+        robust_range(self, mask).map(|r| (r, None))
     }
 
     /// `newimagevox2mm_mat()`: the sform, else the qform, else the voxel sizes.
@@ -505,14 +508,17 @@ fn mask_size_error(source: &str) -> FslError {
 
 /// `imageHistogram(vol, bins, min, max, hist, mask)`: every masked value counted in
 /// `hist[max(0, min((int)(fA*v + fB), bins-1))]`; the number of values, or -1 when
-/// `max <= min`.
+/// `max <= min`. A value more than about 2^31 bins above the range converts to `INT_MIN` on
+/// x86-64 (C leaves the conversion undefined) and so counts in the first bin (FSL-187); with
+/// `clamp` it counts in the last. `overflow` is set when any value's bin did not fit.
 fn image_histogram<T: Arith>(
     vol: &Volume<T>,
     bins: i32,
-    min: T,
-    max: T,
+    (min, max): (T, T),
     mask: &[T],
     hist: &mut [f64],
+    clamp: bool,
+    overflow: &mut bool,
 ) -> i64 {
     if max <= min {
         return -1;
@@ -526,11 +532,76 @@ fn image_histogram<T: Arith>(
         if !in_mask(mask, k) {
             continue;
         }
-        let b = cnum::f64_to_i32(fa * v.to_f64() + fb).min(bins - 1).max(0);
+        let x = fa * v.to_f64() + fb;
+        let b = if x >= 2_147_483_648.0 {
+            *overflow = true;
+            if clamp { bins - 1 } else { 0 }
+        } else {
+            cnum::f64_to_i32(x).min(bins - 1).max(0)
+        };
         hist[b as usize] += 1.0;
         n += 1;
     }
     n
+}
+
+/// FSL's robust range and the corrected one (FSL-187): the same unless a value lies more than
+/// about 2^31 bins above a pass's histogram range, which FSL counts in the first bin.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RobustRange<T> {
+    /// `find_thresholds` as FSL computes it.
+    pub fsl: (T, T),
+    /// With such values counted in the last bin.
+    pub fixed: (T, T),
+    /// Whether any value's bin left `int`'s range in some pass (the ranges may still agree).
+    pub overflow: bool,
+}
+
+impl<T: Arith> RobustRange<T> {
+    /// The corrected range, or FSL's with `reproduce`.
+    pub fn pick(&self, reproduce: bool) -> (T, T) {
+        if reproduce { self.fsl } else { self.fixed }
+    }
+
+    /// Whether the two ranges differ (bit for bit).
+    pub fn differs(&self) -> bool {
+        let bits = |(a, b): (T, T)| (a.to_f64().to_bits(), b.to_f64().to_bits());
+        bits(self.fsl) != bits(self.fixed)
+    }
+
+    /// FSL-187's notice text for `what` (the caller's name of the range), when the ranges
+    /// differ.
+    pub fn notice(&self, what: &str) -> Option<String> {
+        self.differs().then(|| {
+            format!(
+                "{what}: values far above a pass's histogram range counted in its last bin, not \
+                 its first: robust range {} {} (FSL's {} {})",
+                self.fixed.0.to_f64(),
+                self.fixed.1.to_f64(),
+                self.fsl.0.to_f64(),
+                self.fsl.1.to_f64()
+            )
+        })
+    }
+}
+
+/// [`find_thresholds`] as FSL computes it and corrected ([`RobustRange`]); the corrected pass
+/// runs only when a value's bin did not fit in FSL's.
+pub fn robust_range<T: Arith>(
+    vol: &Volume<T>,
+    mask: Option<&Volume<T>>,
+) -> Result<RobustRange<T>, FslError> {
+    let (fsl, overflow) = thresholds(vol, mask, false)?;
+    let fixed = if overflow {
+        thresholds(vol, mask, true)?.0
+    } else {
+        fsl
+    };
+    Ok(RobustRange {
+        fsl,
+        fixed,
+        overflow,
+    })
 }
 
 /// `find_thresholds(vol, minval, maxval, mask, use_mask)` for any element type: from a
@@ -541,6 +612,17 @@ pub fn find_thresholds<T: Arith>(
     vol: &Volume<T>,
     mask: Option<&Volume<T>>,
 ) -> Result<(T, T), FslError> {
+    thresholds(vol, mask, false).map(|r| r.0)
+}
+
+/// [`find_thresholds`], with FSL-187's bins clamped when `clamp`; and whether any value's bin
+/// did not fit in an `int`.
+fn thresholds<T: Arith>(
+    vol: &Volume<T>,
+    mask: Option<&Volume<T>>,
+    clamp: bool,
+) -> Result<((T, T), bool), FslError> {
+    let mut overflow = false;
     const BINS: i32 = 1000;
     const MAX_PASSES: i32 = 10;
     let m: &[T] = mask.map_or(&[], |m| m.data.as_slice());
@@ -574,9 +656,10 @@ pub fn find_thresholds<T: Arith>(
             min = b;
             max = a;
         }
-        let mut validsize = image_histogram(vol, BINS, min, max, m, &mut hist);
+        let mut validsize =
+            image_histogram(vol, BINS, (min, max), m, &mut hist, clamp, &mut overflow);
         if validsize < 1 {
-            return Ok((min, max));
+            return Ok(((min, max), overflow));
         }
         if pass == MAX_PASSES {
             validsize -= i64::from(round_f64(hist[lowest_bin as usize]))
@@ -611,7 +694,7 @@ pub fn find_thresholds<T: Arith>(
         }
         pass += 1;
     }
-    Ok((thresh2, thresh98))
+    Ok(((thresh2, thresh98), overflow))
 }
 
 #[cfg(test)]

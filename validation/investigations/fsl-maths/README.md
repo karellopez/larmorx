@@ -38,3 +38,19 @@ oracle-output cache, and every run goes in a memory box
 
 Run boxed, with the replica built and the suite's inputs made:
 `scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-maths/stats_modes.py`.
+
+## The robust range's bins (FSL-187, rule D's measurement)
+
+- `robust_range_inputs.py`: the 272 images whose robust range FSL's programs take through
+  `find_thresholds` (fMRIPrep's `bet` and `flirt -bbr` inputs of the oracle runs, BET's real
+  images from larmorx-testdata, every input of the fslmaths, fslstats, FLIRT and FAST replica
+  suites), one path per line. Then
+  `LARMORX_ROBUST_RANGE_INPUTS=<list> cargo test --release -p larmorx-nc-core --test
+  robust_range_probe -- --ignored --nocapture` (in `crates-nc`, boxed) prints each image whose
+  values leave `int`'s range in a pass, whether its range moves, and the smallest synthetic
+  triggers. Result (2026-11-03): 2 of 272 images reach it, both the fslstats suite's deliberate
+  cases (`outl` moves, `bigcount` does not); none of fMRIPrep's; the smallest trigger is 99
+  values on [0, 1) and one at 1e12 (`docs/findings/fsl-maths.md`, FSL-187).
+
+`tan_correctly_rounded.py` is superseded by `validation/probes/glibc-double-maths` (GLIBC-07's
+measurement on 10^8 arguments per function, and the check of `larmorx_core::math::tan`).

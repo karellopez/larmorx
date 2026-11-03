@@ -9,8 +9,8 @@
 // prints them. See README.md.
 //
 // Usage: lapack_probe <case file>
-// The case file: u32 kind (0 gesv, 1 syrk, 2 gemm, 3 sym, 4 blas, 5 inv; inv: u32 n, u32 0,
-// A (n*n f64)); gesv: u32 n, u32 nrhs, A (n*n
+// The case file: u32 kind (0 gesv, 1 syrk, 2 gemm, 3 sym, 4 blas, 5 inv, 6 inv_sym; inv and
+// inv_sym: u32 n, u32 0, A (n*n f64)); gesv: u32 n, u32 nrhs, A (n*n
 // f64, column-major), B (n*nrhs f64); syrk: u32 k, u32 n, A (k*n f64); gemm: u32 m, u32 n, u32 k,
 // A (m*k f64), B (k*n f64): C = A*B; sym: u32 n, u32 nrhs, A (n*n), B (n*nrhs); blas: u32 op,
 // u32 m, u32 n, then op's arrays (see blas_op below).
@@ -29,6 +29,8 @@ extern void dsytrs_(const char* uplo, int* n, int* nrhs, double* a, int* lda, in
                     int* ldb, int* info);
 extern void dgetrf_(int* m, int* n, double* a, int* lda, int* ipiv, int* info);
 extern void dgetri_(int* n, double* a, int* lda, int* ipiv, double* work, int* lwork, int* info);
+extern void dsytri_(const char* uplo, int* n, double* a, int* lda, int* ipiv, double* work,
+                    int* info);
 extern void daxpy_(int* n, double* da, double* x, int* incx, double* y, int* incy);
 extern void dger_(int* m, int* n, double* alpha, double* x, int* incx, double* y, int* incy,
                   double* a, int* lda);
@@ -176,6 +178,32 @@ int main(int argc, char* argv[])
       dgetri_(&n, a, &n, ipiv, work, &lwork, &info);
       printf("info2 %d\n", info);
       for (int i = 0; i < n * n; i++) pd("inv", a[i]);
+    }
+  } else if (kind == 6) {
+    // Armadillo 14.2.1's auxlib::inv_sym: dsytrf('L') with solve_sym_fast's workspace, then
+    // dsytri('L'), then symmatl (the lower triangle copied to the upper).
+    int n = (int)p, info = 0;
+    double* a = malloc(sizeof(double) * n * n);
+    int* ipiv = malloc(sizeof(int) * n);
+    if (fread(a, 8, (size_t)n * n, f) != (size_t)n * n) return 2;
+    int lwork = n > 16 ? n : 16;
+    if (n > 16) {
+      double q[2] = {0.0, 0.0};
+      int lq = -1;
+      dsytrf_("L", &n, a, &n, ipiv, q, &lq, &info);
+      if ((int)q[0] > lwork) lwork = (int)q[0];
+    }
+    double* work = malloc(sizeof(double) * (lwork > n ? lwork : n));
+    dsytrf_("L", &n, a, &n, ipiv, work, &lwork, &info);
+    printf("info %d\n", info);
+    if (info == 0) {
+      dsytri_("L", &n, a, &n, ipiv, work, &info);
+      printf("info2 %d\n", info);
+      if (info == 0) {
+        for (int c = 0; c < n; c++)
+          for (int r = 0; r < c; r++) a[r + c * n] = a[c + r * n];
+        for (int i = 0; i < n * n; i++) pd("inv", a[i]);
+      }
     }
   } else if (kind == 4) {
     unsigned int nn;

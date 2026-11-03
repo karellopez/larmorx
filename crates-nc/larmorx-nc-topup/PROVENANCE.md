@@ -84,6 +84,7 @@ what it translates.
   band triangle has 32 or more subdiagonals or would pivot in LAPACK's band factorization, or
   whose condition estimate could fall below machine precision (Armadillo then switches to an
   approximate solution) are refused with `--method=lsr` (not replicated yet); with
-  `--method=vb2D` and `vb3D` also lines of more than 64 voxels (the first estimate's explicit
-  inverse: LAPACK's blocked `dgetri` and, from 100 rows, Armadillo's `dsytri`: not replicated
-  yet).
+  `--method=vb2D` and `vb3D` also lines of 65 to 99 voxels (and from 100 a first-estimate matrix
+  that is not symmetric): the first estimate's explicit inverse of a general matrix of more than
+  64 rows is LAPACK's blocked `dgetri` (`DGEMM`, `DTRSM('R', 'L', 'N', 'U')`), not replicated
+  yet.

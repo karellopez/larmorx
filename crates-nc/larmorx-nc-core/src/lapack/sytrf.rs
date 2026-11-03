@@ -605,6 +605,117 @@ pub fn solve_sym(a: &[f64], n: usize, b: &[f64], nrhs: usize) -> Option<Vec<f64>
     Some(x)
 }
 
+/// `dsytri('L')` (reference LAPACK 3.12.0, `SRC/dsytri.f`) of the factorisation [`sytrf_l`]
+/// leaves in the `n × n` array `a`: `info` for a zero 1 × 1 pivot, else the lower triangle of
+/// the inverse in place, from the last column to the first: a 1 × 1 pivot's reciprocal or a
+/// 2 × 2 pivot's closed-form inverse, the column(s) below by `DSYMV('L')` of the inverse so far
+/// ([`super::blas::dsymv_l`], `alpha = −1`, `beta = 0`) and the diagonal (and a 2 × 2 pivot's
+/// off-diagonal) corrected by `DDOT`; then the pivot's interchange of rows and columns in the
+/// trailing part. (The Fortran's own arithmetic rounds each operation as written.)
+pub fn sytri_l(a: &mut [f64], n: usize, lda: usize, ipiv: &[i32]) -> i32 {
+    let at = |r: usize, c: usize| c * lda + r;
+    for i in 0..n {
+        if ipiv[i] > 0 && a[at(i, i)] == 0.0 {
+            return (i + 1) as i32;
+        }
+    }
+    let ddot = |x: &[f64], y: &[f64]| super::blas::ddot_unit(x, y, 1);
+    // DSYMV('L', n-k, -1, A(k+1, k+1), lda, work, 1, 0, A(k+1, c), 1) for the 0-based column `c`
+    // and the trailing part from row and column `k` (0-based: k = K)
+    let symv = |a: &mut [f64], k: usize, c: usize| -> Vec<f64> {
+        let work: Vec<f64> = (k..n).map(|r| a[at(r, c)]).collect();
+        let mut y = vec![0.0f64; n - k];
+        super::blas::dsymv_l(
+            -1.0,
+            a,
+            MatRef {
+                off: at(k, k),
+                ld: lda,
+            },
+            &work,
+            0.0,
+            &mut y,
+        );
+        for (r, v) in y.into_iter().enumerate() {
+            a[at(k + r, c)] = v;
+        }
+        work
+    };
+    let col = |a: &[f64], k: usize, c: usize| -> Vec<f64> { (k..n).map(|r| a[at(r, c)]).collect() };
+    let mut k = n; // 1-based K
+    while k >= 1 {
+        let kk = k - 1;
+        let kstep = if ipiv[kk] > 0 {
+            a[at(kk, kk)] = 1.0 / a[at(kk, kk)];
+            if k < n {
+                let work = symv(a, k, kk);
+                let d = ddot(&work, &col(a, k, kk));
+                a[at(kk, kk)] -= d;
+            }
+            1
+        } else {
+            let t = a[at(kk, kk - 1)].abs();
+            let ak = a[at(kk - 1, kk - 1)] / t;
+            let akp1 = a[at(kk, kk)] / t;
+            let akkp1 = a[at(kk, kk - 1)] / t;
+            let d = t * (ak * akp1 - 1.0);
+            a[at(kk - 1, kk - 1)] = akp1 / d;
+            a[at(kk, kk)] = ak / d;
+            a[at(kk, kk - 1)] = -akkp1 / d;
+            if k < n {
+                let work = symv(a, k, kk);
+                let d1 = ddot(&work, &col(a, k, kk));
+                a[at(kk, kk)] -= d1;
+                let d2 = ddot(&col(a, k, kk), &col(a, k, kk - 1));
+                a[at(kk, kk - 1)] -= d2;
+                let work = symv(a, k, kk - 1);
+                let d3 = ddot(&work, &col(a, k, kk - 1));
+                a[at(kk - 1, kk - 1)] -= d3;
+            }
+            2
+        };
+        let kp = ipiv[kk].unsigned_abs() as usize; // 1-based
+        if kp != k {
+            let kp0 = kp - 1;
+            for r in kp..n {
+                a.swap(at(r, kk), at(r, kp0));
+            }
+            for r in 0..kp.saturating_sub(k + 1) {
+                a.swap(at(k + r, kk), at(kp0, k + r));
+            }
+            a.swap(at(kk, kk), at(kp0, kp0));
+            if kstep == 2 {
+                a.swap(at(kk, kk - 1), at(kp0, kk - 1));
+            }
+        }
+        if k < kstep {
+            break;
+        }
+        k -= kstep;
+    }
+    0
+}
+
+/// Armadillo 14.2.1's `auxlib::inv_sym` (`inv()` of a symmetric matrix of at least 100 rows):
+/// [`sytrf_l`] with Armadillo's workspace, [`sytri_l`], then the lower triangle copied to the
+/// upper (`symmatl`). `None` where either reports a singular pivot.
+pub fn inv_sym(a: &[f64], n: usize) -> Option<Vec<f64>> {
+    let mut f = a.to_vec();
+    let mut ipiv = vec![0i32; n];
+    if sytrf_l(&mut f, n, n, &mut ipiv, armadillo_lwork(n)) != 0 {
+        return None;
+    }
+    if sytri_l(&mut f, n, n, &ipiv) != 0 {
+        return None;
+    }
+    for c in 0..n {
+        for r in 0..c {
+            f[c * n + r] = f[r * n + c];
+        }
+    }
+    Some(f)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

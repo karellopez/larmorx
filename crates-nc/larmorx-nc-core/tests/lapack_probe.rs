@@ -10,7 +10,7 @@
 use larmorx_nc_core::arma::{Mat, syrk_t};
 use larmorx_nc_core::lapack::blas::{MatRef, axpy_k, dgemm, dgemv_n, dgemv_t_inc, dger, dsyr_l};
 use larmorx_nc_core::lapack::blocked::{gesv_any, gesv_one, getrf_any, getri_any};
-use larmorx_nc_core::lapack::sytrf::{armadillo_lwork, sytrf_l, sytrs_l};
+use larmorx_nc_core::lapack::sytrf::{armadillo_lwork, inv_sym, sytrf_l, sytri_l, sytrs_l};
 use std::fmt::Write as _;
 
 fn f64s(b: &[u8], off: usize, n: usize) -> Vec<f64> {
@@ -79,6 +79,23 @@ fn lapack_probe() {
                 writeln!(out, "info2 {info2}").unwrap();
                 for &v in &a {
                     pd(&mut out, "inv", v);
+                }
+            }
+        } else if h[0] == 6 {
+            let n = h[1] as usize;
+            let a0 = f64s(&b, 12, n * n);
+            let mut f = a0.clone();
+            let mut ipiv = vec![0i32; n];
+            let info = sytrf_l(&mut f, n, n, &mut ipiv, armadillo_lwork(n));
+            writeln!(out, "info {info}").unwrap();
+            if info == 0 {
+                let info2 = sytri_l(&mut f, n, n, &ipiv);
+                writeln!(out, "info2 {info2}").unwrap();
+                if info2 == 0 {
+                    let inv = inv_sym(&a0, n).expect("inverse");
+                    for &v in &inv {
+                        pd(&mut out, "inv", v);
+                    }
                 }
             }
         } else if h[0] == 3 {

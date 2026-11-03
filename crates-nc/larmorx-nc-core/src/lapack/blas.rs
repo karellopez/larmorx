@@ -706,6 +706,102 @@ pub fn dsymv_u(alpha: f64, a: &[f64], am: MatRef, x: &[f64], beta: f64, y: &mut 
     }
 }
 
+/// `DSYMV` with the lower triangle (`interface/symv.c`, one thread; Haswell `dsymv_L.c`):
+/// `y = beta·y + alpha·A·x` for the symmetric `n × n` matrix whose lower triangle `a` holds.
+///
+/// The columns in groups of four (`t1 = alpha·x[j..j+4]`): each diagonal term added to `y`, then
+/// the rows below the group's corner. With at least 12 rows below the group's first column, the
+/// corner's rows by the C loops, the rows up to the last multiple of four by the assembly kernel
+/// `dsymv_kernel_4x4` (`dsymv_L_microk_haswell-2.c`: for each row the four columns' `y =
+/// fma(t1, a, y)` in order, and each column's `a·x` fused into four lanes by row modulo 4,
+/// reduced as `(l0 + l2) + (l1 + l3)` and added to the corner's sum), the last rows by the C
+/// loop; otherwise every row by the C loops (each row's four columns interleaved: `y += t1·a`,
+/// `t2 += a·x`, two roundings: the C is not contracted, disassembled); then `y[j+c] +=
+/// alpha·t2[c]`. The last `n mod 4` columns one at a time by the C loop.
+pub fn dsymv_l(alpha: f64, a: &[f64], am: MatRef, x: &[f64], beta: f64, y: &mut [f64]) {
+    let m = x.len();
+    if m == 0 {
+        return;
+    }
+    if beta != 1.0 {
+        scal_beta(beta, &mut y[..m]);
+    }
+    if alpha == 0.0 {
+        return;
+    }
+    let el = |r: usize, c: usize| a[am.at(r, c)];
+    let offset1 = m / 4 * 4;
+    let mut j = 0;
+    while j < offset1 {
+        let tmp1 = [
+            alpha * x[j],
+            alpha * x[j + 1],
+            alpha * x[j + 2],
+            alpha * x[j + 3],
+        ];
+        let mut tmp2 = [0.0f64; 4];
+        for c in 0..4 {
+            y[j + c] += tmp1[c] * el(j + c, j + c);
+        }
+        // the corner: column c's rows j+c+1 .. j+4
+        for c in 0..3 {
+            for i in j + c + 1..j + 4 {
+                let v = el(i, j + c);
+                y[i] += tmp1[c] * v;
+                tmp2[c] += v * x[i];
+            }
+        }
+        let from = j + 1;
+        let mut i = j + 4;
+        if m - from >= 12 {
+            let m2 = m / 4 * 4;
+            if m2 > j + 4 {
+                let mut lanes = [[0.0f64; 4]; 4];
+                while i < m2 {
+                    for l in 0..4 {
+                        let r = i + l;
+                        let mut yv = y[r];
+                        for c in 0..4 {
+                            let v = el(r, j + c);
+                            yv = fma(tmp1[c], v, yv);
+                            lanes[c][l] = fma(x[r], v, lanes[c][l]);
+                        }
+                        y[r] = yv;
+                    }
+                    i += 4;
+                }
+                for c in 0..4 {
+                    let s = (lanes[c][0] + lanes[c][2]) + (lanes[c][1] + lanes[c][3]);
+                    tmp2[c] += s;
+                }
+            }
+        }
+        while i < m {
+            for c in 0..4 {
+                let v = el(i, j + c);
+                y[i] += tmp1[c] * v;
+                tmp2[c] += v * x[i];
+            }
+            i += 1;
+        }
+        for c in 0..4 {
+            y[j + c] += alpha * tmp2[c];
+        }
+        j += 4;
+    }
+    for j in offset1..m {
+        let temp1 = alpha * x[j];
+        let mut temp2 = 0.0f64;
+        y[j] += temp1 * el(j, j);
+        for i in j + 1..m {
+            let v = el(i, j);
+            y[i] += temp1 * v;
+            temp2 += v * x[i];
+        }
+        y[j] += alpha * temp2;
+    }
+}
+
 /// `DSYR2` with the upper triangle (`interface/syr2.c`): for each column `i`, `daxpy`'s kernel
 /// adds `alpha·x[i]·y[0..=i]`, then `alpha·y[i]·x[0..=i]`, to the column's top `i + 1` rows.
 pub fn dsyr2_u(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {

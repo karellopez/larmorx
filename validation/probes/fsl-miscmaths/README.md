@@ -103,15 +103,20 @@ inside a block, `dgemv('N')` below or above it); Armadillo's `inv()` of a genera
 `TRMV_NUN` and `DSCAL` per column). `check_lapack.py`'s `one_*` cases (one column, 9 to 256 rows,
 general and diagonally dominant) and `inv_*` cases (kind 5 of `lapack_probe.c`: 9 to 64 rows,
 general and spline normal matrices) compare them with `larmorx_nc_core::lapack::blocked`'s
-`gesv_one` and `getri_any`:
+`gesv_one` and `getri_any`; from 100 rows Armadillo inverts a symmetric matrix by `dsytrf('L')`
+(its solve's workspace), `dsytri('L')` and `symmatl`: the `isym_*` cases (kind 6: 100 to 256
+rows, spline normal and indefinite matrices, 1 × 1 and 2 × 2 pivots) compare them with
+`lapack::sytrf::inv_sym` (`sytri_l`, and `lapack::blas::dsymv_l`: OpenBLAS's Haswell `dsymv_L`
+with its assembly kernel):
 
 ```bash
 scripts/orchestration/boxed.sh 8 python -P validation/probes/fsl-miscmaths/check_lapack.py \
-    --probe <scratch>/lapack_probe --work <scratch>/lpvb --only one_,inv_
+    --probe <scratch>/lapack_probe --work <scratch>/lpvb --only one_,inv_,isym_
 ```
 
-Result on 2026-11-03: 46 cases (329,062 lines), 0 lines differ (the workspace size of every
-query included).
+Result on 2026-11-03: 62 cases (712,836 lines), 0 lines differ (the workspace size of every
+query included). `dsytri` is reference Fortran; OpenBLAS's `dsymv_L.c` C loops are not
+contracted into fused multiply-adds (disassembled), its 4 × 4 assembly kernel fuses.
 
 Facts it found (for the topup replica's findings, restricted):
 

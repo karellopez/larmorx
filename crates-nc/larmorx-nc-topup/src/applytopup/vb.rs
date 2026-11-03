@@ -72,10 +72,19 @@ fn trace_solve(a: &SpMat<f64>, b: &SpMat<f64>) -> Result<f64, FslError> {
 }
 
 /// `k * A.AsNEWMAT().i() * x`: the explicit inverse (`inv()`) times `x` by `dgemv` with
-/// `alpha = k`.
-fn scaled_inverse_times(a: &SpMat<f64>, x: &[f64], k: f64) -> Result<Vec<f64>, FslError> {
-    let ai = arma::inv(&a.as_dense()).map_err(|_| runtime_error(INV_ERROR))?;
-    let n = ai.rows();
+/// `alpha = k`. Armadillo inverts a general matrix of 65 to 99 rows (or of 100 rows or more that
+/// is not symmetric) by LAPACK's blocked `dgetri`, which is not replicated yet: refused.
+fn scaled_inverse_times(a: &SpMat<f64>, x: &[f64], k: f64) -> R<Vec<f64>> {
+    let d = a.as_dense();
+    let n = d.rows();
+    if n > GETRI_MAX_N && !(n >= 100 && arma::is_approx_sym(&d)) {
+        return Err(End::Refuse(format!(
+            "lines of {n} voxels along the phase encoding: the first estimate's explicit \
+             inverse of a general matrix of more than {GETRI_MAX_N} rows (LAPACK's blocked \
+             dgetri) is not replicated yet"
+        )));
+    }
+    let ai = arma::inv(&d).map_err(|_| runtime_error(INV_ERROR))?;
     let mut y = vec![0.0; n];
     let am = MatRef { off: 0, ld: n };
     blas::dgemv_n(n, n, k, ai.as_slice(), am, x, 1, 0.0, &mut y);
@@ -353,7 +362,7 @@ pub(super) fn vb_resample(
             fesz,
             scans_of: g,
         };
-        size_check(method, pesz)?;
+        size_check(pesz)?;
         let mut dv = DispVec::new(pesz, reproduce);
         match method {
             Vb::D2 => vb_2d(ctx, &coll, &mut dv, &field, scans, &mut ovol)?,
@@ -377,7 +386,7 @@ pub(super) fn vb_resample(
 }
 
 /// The sizes the replica follows FSL at.
-fn size_check(method: Vb, pesz: usize) -> R<()> {
+fn size_check(pesz: usize) -> R<()> {
     if pesz < 8 {
         return Err(End::Refuse(format!(
             "lines of {pesz} voxels along the phase encoding: Armadillo's solvers for systems \
@@ -388,13 +397,6 @@ fn size_check(method: Vb, pesz: usize) -> R<()> {
         return Err(End::Refuse(format!(
             "lines of {pesz} voxels along the phase encoding: OpenBLAS's LU of more than 256 \
              rows is not replicated yet"
-        )));
-    }
-    if method != Vb::D4 && pesz > GETRI_MAX_N {
-        return Err(End::Refuse(format!(
-            "lines of {pesz} voxels along the phase encoding: the first estimate's explicit \
-             inverse (LAPACK's blocked dgetri, from 100 rows Armadillo's dsytri) is not \
-             replicated yet beyond {GETRI_MAX_N} rows"
         )));
     }
     Ok(())

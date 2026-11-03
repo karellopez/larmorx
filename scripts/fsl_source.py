@@ -171,6 +171,10 @@ FILES = [
     ("fsl-miscmaths", "bfmatrix.cpp"),
     ("fsl-miscmaths", "nonlin.h"),
     ("fsl-miscmaths", "nonlin.cpp"),
+    # topup (2026-11-03): fsl-warpfns' resampling and the Jacobians of spline fields
+    ("fsl-warpfns", "warpfns.cc"),
+    ("fsl-warpfns", "fnirt_file_reader.h"),
+    ("fsl-warpfns", "fnirt_file_reader.cpp"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

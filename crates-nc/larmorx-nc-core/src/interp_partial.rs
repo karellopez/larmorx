@@ -19,7 +19,7 @@
 use crate::interp::{self, q_tri, round_f32};
 use crate::splinterpolator::{ExtrapolationType, Splinterpolator};
 use crate::sse;
-use crate::volume::{Extrapolation, FslError, Interpolation, Volume, mirrorclamp, periodicclamp};
+use crate::volume::{Extrapolation, FslError, Interpolation, Volume, periodicclamp};
 
 /// `volume<T>::extrapparams`: each field `None` takes the volume's own setting.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -111,6 +111,30 @@ pub fn valid_i<T: crate::volume::Elem>(
         && (zv || (z >= 0 && z < v.zsize()))
 }
 
+/// `periodicclamp(x, x1, x2)` as newimage's `extrapolate` calls it: miscmaths' `int` version
+/// with the `int64_t` index converted to `int` (only indices beyond 2^31 differ from
+/// [`periodicclamp`]: those of an infinite or NaN position, which x86-64 converts to
+/// `INT64_MIN`, wrap to 0).
+pub fn periodicclamp_int(x: i64, x1: i64, x2: i64) -> i64 {
+    periodicclamp(i64::from(x as i32), x1, x2)
+}
+
+/// newimage's `mirrorclamp(x, x1, x2)` (`int64_t`, its `periodicclamp` miscmaths' `int` one).
+pub fn mirrorclamp_int(x: i64, x1: i64, x2: i64) -> i64 {
+    if x2 < x1 {
+        return mirrorclamp_int(x, x2, x1);
+    }
+    if x1 == x2 {
+        return x1;
+    }
+    let x3 = 2 * x2 - x1 + 1;
+    let mut nx = periodicclamp_int(x, x1, x3);
+    if nx > x2 {
+        nx = 2 * x2 + 1 - nx;
+    }
+    nx
+}
+
 /// The voxel `(x, y, z)` of volume `t`, or the value `extrapolate(x, y, z, ep)` gives for a
 /// voxel outside it (`operator()(x, y, z, [t,] ep)`). `Err` is FSL's error for an extrapolation
 /// method `extrapolate` does not handle (`boundsassert`, `boundsexception`).
@@ -132,14 +156,14 @@ pub fn value_ep(
         Extrapolation::Zeropad => Ok(0.0),
         Extrapolation::Constpad => Ok(ep.padvalue(v)),
         Extrapolation::Periodic => Ok(at(
-            periodicclamp(x, 0, nx - 1),
-            periodicclamp(y, 0, ny - 1),
-            periodicclamp(z, 0, nz - 1),
+            periodicclamp_int(x, 0, nx - 1),
+            periodicclamp_int(y, 0, ny - 1),
+            periodicclamp_int(z, 0, nz - 1),
         )),
         Extrapolation::Mirror => Ok(at(
-            mirrorclamp(x, 0, nx - 1),
-            mirrorclamp(y, 0, ny - 1),
-            mirrorclamp(z, 0, nz - 1),
+            mirrorclamp_int(x, 0, nx - 1),
+            mirrorclamp_int(y, 0, ny - 1),
+            mirrorclamp_int(z, 0, nz - 1),
         )),
         Extrapolation::Extraslice => {
             let edge = |c: i64, n: i64| {

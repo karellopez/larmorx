@@ -996,7 +996,8 @@ impl<T: SplineValue> Splinterpolator<T> {
                             + 1267.0 / 960.0)
                 } else if ax < 3.5 {
                     ax -= 3.5;
-                    ax *= ax * ax;
+                    // `ax *= ax*ax`
+                    ax = ax * (ax * ax);
                     (1.0 / 720.0) * ax * ax
                 } else {
                     0.0
@@ -1303,6 +1304,8 @@ fn get_dwgt1(
 }
 
 /// `SplineColumn::get_poles(order, z, sf)`: the poles and the scale factor (orders 2 to 7).
+// The poles of orders 6 and 7 are written as FSL writes them (rounded to double as C rounds).
+#[allow(clippy::excessive_precision)]
 fn get_poles(order: u32) -> (Vec<f64>, u32) {
     match order {
         2 => (vec![2.0 * 2.0f64.sqrt() - 3.0], 8),

@@ -29,6 +29,7 @@ them again.
 | fsl-utils | 2412.6 | https://git.fmrib.ox.ac.uk/fsl/utils | `options.{h,cc}`, `parse.cc`, `usage.cc`, `functions.cc`, `matches.cc` |
 | fsl-fast4 | 2111.3 | https://git.fmrib.ox.ac.uk/fsl/fast4 | `fast_two.cc`, `mriseg_two.{h,cc}`, `multi_mriseg_two.{h,cc}` (the Tcl GUI and the lesion tools are not translated) |
 | fsl-basisfield | 2203.4 | https://git.fmrib.ox.ac.uk/fsl/basisfield | `basisfield.{h,cpp}`, `splinefield.{h,cpp}`, `fsl_splines.h` (topup's spline fields; `dctfield` and the older `splines.{h,c}` are not translated) |
+| fsl-warpfns | 2501.0 | https://git.fmrib.ox.ac.uk/fsl/warpfns | `warpfns.h` (FLIRT's `applyxfm4D`; topup's resampling: `raw_general_transform` and its wrappers), `warpfns.cc` (`rows_per_thread`), `fnirt_file_reader.{h,cpp}` (`deffield2jacobian`; the file reader itself, `fnirt_file_writer` and `point_list` are not translated) |
 | fsl-avwutils | 2209.6 | https://git.fmrib.ox.ac.uk/fsl/avwutils | `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` (what the `bet` script runs of them) |
 
 FSL is Copyright (C) 1999-2023 University of Oxford; the files carry their own notices

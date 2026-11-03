@@ -24,10 +24,12 @@
 
 use crate::arma::{self, Mat};
 use crate::basisfield::{FieldIndex, SplineField};
-use crate::interp_partial::{ExtrapParams, Interpolator, valid_f, value_ep};
+use crate::interp_partial::{
+    ExtrapParams, Interpolator, mirrorclamp_int, periodicclamp_int, valid_f, value_ep,
+};
 use crate::miscmaths::{INV_ERROR, SOLVE_ERROR};
 use crate::nifti::XFORM_UNKNOWN;
-use crate::volume::{Extrapolation, FslError, Volume, mirrorclamp, periodicclamp};
+use crate::volume::{Extrapolation, FslError, Volume};
 
 /// `NiftiIO::NIFTI_XFORM_ALIGNED_ANAT`.
 const XFORM_ALIGNED_ANAT: i32 = 2;
@@ -459,8 +461,7 @@ pub fn raw_general_transform(
         .chunks_mut(plane)
         .map(Some)
         .collect();
-    let mut valid_vol = valid;
-    let mut vchunks: Vec<Option<&mut [i8]>> = match valid_vol.as_deref_mut() {
+    let mut vchunks: Vec<Option<&mut [i8]>> = match valid {
         Some(v) => v.data[..plane * nzu].chunks_mut(plane).map(Some).collect(),
         None => Vec::new(),
     };
@@ -869,14 +870,14 @@ fn write_index(jac: &Volume, i: i64, j: i64, k: i64) -> Result<Option<usize>, Fs
     Ok(match jac.extrap {
         Extrapolation::Zeropad | Extrapolation::Constpad => None,
         Extrapolation::Periodic => lin(
-            periodicclamp(i, 0, nx - 1),
-            periodicclamp(j, 0, ny - 1),
-            periodicclamp(k, 0, nz - 1),
+            periodicclamp_int(i, 0, nx - 1),
+            periodicclamp_int(j, 0, ny - 1),
+            periodicclamp_int(k, 0, nz - 1),
         ),
         Extrapolation::Mirror => lin(
-            mirrorclamp(i, 0, nx - 1),
-            mirrorclamp(j, 0, ny - 1),
-            mirrorclamp(k, 0, nz - 1),
+            mirrorclamp_int(i, 0, nx - 1),
+            mirrorclamp_int(j, 0, ny - 1),
+            mirrorclamp_int(k, 0, nz - 1),
         ),
         Extrapolation::Extraslice => {
             let edge = |c: i64, n: i64| {

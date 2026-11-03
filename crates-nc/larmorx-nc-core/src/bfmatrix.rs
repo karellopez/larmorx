@@ -36,11 +36,12 @@ pub enum BFMatrix {
     Double(SpMat<f64>),
 }
 
-/// NEWMAT's element access out of range (`Mat::operator()` with bounds checks).
+/// NEWMAT's element access out of range (armawrap's `Mat::operator()` with Armadillo 14.2.1's
+/// bounds checks: `arma_stop_bounds_error` throws `std::out_of_range`).
 fn index_error() -> FslError {
     FslError {
         printed: Vec::new(),
-        type_name: "std::logic_error",
+        type_name: "std::out_of_range",
         what: "Mat::operator(): index out of bounds".to_owned(),
     }
 }
@@ -430,5 +431,21 @@ fn add_sparse<T: crate::spmat::SpElem>(
         m.add_assign(o)
     } else {
         m.add_assign(&o.scaled(s))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_index_out_of_range_is_armadillos_out_of_range() {
+        let m = BFMatrix::Full(Mat::zeros(2, 2));
+        let e = m.peek(3, 1).unwrap_err();
+        assert_eq!(e.type_name, "std::out_of_range");
+        assert_eq!(
+            e.terminate_text(),
+            "terminate called after throwing an instance of 'std::out_of_range'\n  what():  Mat::operator(): index out of bounds\n"
+        );
     }
 }

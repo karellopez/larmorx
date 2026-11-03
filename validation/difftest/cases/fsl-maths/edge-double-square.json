@@ -1,0 +1,206 @@
+{
+  "defect": null,
+  "description": "random testing (2026-11-03): -edge of a double series: FSL's build squares with x * x (GCC folds pow(x, 2.0)), not glibc's pow, which differed in the last place on 2 of 4608 voxels; fixed in the replica",
+  "expect": "pass",
+  "found": {
+    "detail": "every file bit-identical: out.nii.gz: 2 of 4608 values differ (max |diff| 4.44e-16)",
+    "n": 464,
+    "seed": "check1",
+    "shrink_moves": [
+      "dropped -dilD (-dilD)",
+      "dropped -Tmean (-Tmean)",
+      "img: axis 2 32 -> 16 voxels",
+      "img: axis 1 18 -> 9 voxels",
+      "img: axis 1 9 -> 4 voxels",
+      "img (and its grid): plumb orientation",
+      "img (and its grid): unit spacing",
+      "img (and its grid): sform = qform",
+      "img (and its grid): qform and sform codes 1",
+      "img: no slice timing"
+    ],
+    "signature": [
+      "every file bit-identical"
+    ]
+  },
+  "id": "edge-double-square",
+  "implementations": [
+    "replica"
+  ],
+  "reason": "",
+  "recipe": {
+    "extra": {
+      "output_type": "NIFTI_GZ",
+      "program": "fslmaths"
+    },
+    "features": {
+      "-dt": false,
+      "-kernel": false,
+      "-odt": false,
+      "FSLOUTPUTTYPE": "NIFTI_GZ",
+      "axis0": 1.15,
+      "axis1": 1.25,
+      "axis2": 0.95,
+      "bias0": -0.01,
+      "bias1": 0.0075,
+      "bias2": -0.005,
+      "bias3": 0.0075,
+      "centre0": -5.0,
+      "centre1": 0.5,
+      "centre2": -0.5,
+      "chain": 3,
+      "content": "head",
+      "dtype": "float64",
+      "extreme": false,
+      "family": "filter",
+      "filter": "-dilD",
+      "kind": "series",
+      "noise": 6.0,
+      "one slice": false,
+      "orientation": "axes",
+      "origin0": -4.75,
+      "origin1": -22.25,
+      "origin2": -57.0,
+      "output": "out.nii",
+      "period": 3,
+      "qfac": 1,
+      "qform_code": 0,
+      "range": "plain",
+      "reduction": "mean",
+      "sform": "other",
+      "sform_code": 2,
+      "shape": "9x18x32x8",
+      "shear0": -0.025,
+      "shear1": -0.05,
+      "shear2": 0.075,
+      "signal": 0.02,
+      "size": 29.5,
+      "size0": 9,
+      "size1": 18,
+      "size2": 32,
+      "slice_code": 6,
+      "spacing0": 1.2,
+      "spacing1": 4.0,
+      "spacing2": 1.2,
+      "suffix": ".nii",
+      "tissues": "t1",
+      "tr": 2.0,
+      "tunits": "sec",
+      "unary": "-edge",
+      "units": "mm",
+      "volumes": 8
+    },
+    "groups": [
+      {
+        "args": [
+          "{in:img}"
+        ],
+        "name": "input",
+        "optional": false
+      },
+      {
+        "args": [
+          "-edge"
+        ],
+        "name": "-edge",
+        "optional": true
+      },
+      {
+        "args": [
+          "out.nii"
+        ],
+        "name": "output",
+        "optional": false
+      }
+    ],
+    "inputs": {
+      "img": {
+        "content": {
+          "axes": [
+            1.15,
+            1.25,
+            0.95
+          ],
+          "bias": [
+            -0.01,
+            0.0075,
+            -0.005,
+            0.0075
+          ],
+          "centre": [
+            -5.0,
+            0.5,
+            -0.5
+          ],
+          "noise": 6.0,
+          "seed": 1329585210,
+          "size": 29.5,
+          "tissues": "t1",
+          "type": "head"
+        },
+        "dtype": "float64",
+        "geometry": {
+          "origin": [
+            -4.75,
+            -22.25,
+            -57.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          9,
+          4,
+          16,
+          8
+        ],
+        "signal": {
+          "amplitude": 0.02,
+          "period": 3
+        },
+        "suffix": ".nii",
+        "timing": {
+          "slice_code": 0,
+          "slice_duration": 0.0625,
+          "slice_end": 15,
+          "slice_start": 0,
+          "tr": 2.0,
+          "tunits": "sec"
+        },
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0
+        }
+      }
+    },
+    "n": 464,
+    "options": [
+      "-Tmean",
+      "-dilD",
+      "-edge",
+      "FSLOUTPUTTYPE=NIFTI_GZ",
+      "kind series"
+    ],
+    "seed": "check1",
+    "tool": "fsl-maths"
+  },
+  "rule": null,
+  "status": "fixed",
+  "suite": "fsl-maths-replica",
+  "tier": "standard",
+  "tool": "fsl-maths"
+}

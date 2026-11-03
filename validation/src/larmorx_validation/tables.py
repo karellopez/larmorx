@@ -189,6 +189,9 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "fsl-topup-replica": _bet,
     # topup's clean-room original (2026-11-03): fMRIPrep's calls counted as BET's
     "fsl-topup": _bet,
+    # fslmaths and fslstats (2026-11-03): fMRIPrep's calls counted as BET's
+    "fsl-maths-replica": _bet,
+    "fsl-stats-replica": _bet,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
     # standard records.
     "ants-apply-transforms-panel": _bit_identical(),

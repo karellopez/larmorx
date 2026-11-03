@@ -38,8 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup` and `applytopup` have their
-/// replicas only; a test checks the list).
+/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup`, `applytopup`, `fslmaths` and
+/// `fslstats` have their replicas only; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -62,6 +62,8 @@ const FSL_TOOLS: &[&str] = &[
     "fast",
     "topup",
     "applytopup",
+    "fslmaths",
+    "fslstats",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -412,7 +414,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats"),
             "{out}"
         );
         assert!(
@@ -420,9 +422,13 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(replica::replica_only("fsl").count(), 0);
-        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
+        assert_eq!(
+            replica::replica_only("fsl").collect::<Vec<_>>(),
+            ["fslmaths", "fslstats"]
+        );
+        // every FSL tool but mcflirt (`mri hmc`) and fslmaths and fslstats (the replicas only)
+        // is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -447,6 +453,12 @@ mod tests {
                 && err.contains("\nPart of FSL (ID: 2412.6-dirty)\napplytopup (Version 1.0)\n"),
             "{err}"
         );
+        // fslmaths and fslstats have no original yet: `original` is an error that says so.
+        for tool in ["fslmaths", "fslstats"] {
+            let (code, _, err) = run_options(&["lx", "fsl", tool], &original);
+            assert_ne!(code, 0);
+            assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
+        }
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
         let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
         assert_eq!(code, 1);
@@ -576,10 +588,11 @@ mod tests {
         assert!(err.starts_with("error: unknown command 'spm'"), "{err}");
         assert!(err.contains("Run 'lx --help'"), "{err}");
 
-        let (code, _, err) = run_capture(&["lx", "fsl", "fslmaths"]);
+        // (fslmaths was the example until it was ported, 2026-11-03)
+        let (code, _, err) = run_capture(&["lx", "fsl", "melodic"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(
-            err.starts_with("error: unknown fsl tool 'fslmaths'"),
+            err.starts_with("error: unknown fsl tool 'melodic'"),
             "{err}"
         );
 

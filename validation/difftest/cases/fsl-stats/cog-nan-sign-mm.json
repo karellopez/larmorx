@@ -1,0 +1,160 @@
+{
+  "defect": null,
+  "description": "random testing (2026-11-03): -E -c of an image holding NaN and infinities: the centre of gravity's NaN signs in millimetres (as cog-nan-sign-voxels)",
+  "expect": "pass",
+  "found": {
+    "detail": "stdout identical: line 1: FSL '0.000495 -nan -nan -nan ', replica '0.000495 nan nan nan '",
+    "n": 13220,
+    "seed": "fsl-maths-trial",
+    "shrink_moves": [
+      "dropped -e (-e)",
+      "dropped -V (-V)",
+      "img: axis 2 24 -> 12 voxels",
+      "img (and its grid): plumb orientation",
+      "img (and its grid): unit spacing",
+      "img (and its grid): origin at 0",
+      "img (and its grid): qform and sform codes 1",
+      "img (and its grid): millimetres",
+      "img: content ramp -> constant"
+    ],
+    "signature": [
+      "stdout identical"
+    ]
+  },
+  "id": "cog-nan-sign-mm",
+  "implementations": [
+    "replica"
+  ],
+  "reason": "",
+  "recipe": {
+    "extra": {
+      "program": "fslstats"
+    },
+    "features": {
+      "-K": false,
+      "-json": false,
+      "-t": false,
+      "4D": false,
+      "content": "ramp",
+      "dtype": "float32",
+      "extreme": false,
+      "form": false,
+      "kind": "general",
+      "one slice": false,
+      "option0": "-E",
+      "option1": "-V",
+      "option2": "-c",
+      "option3": "-e",
+      "options": 4,
+      "orientation": "oblique",
+      "origin0": -7.5,
+      "origin1": 48.25,
+      "origin2": -42.0,
+      "qfac": 1,
+      "qform_code": 0,
+      "ramp0": -2,
+      "ramp1": -2,
+      "ramp2": -1,
+      "range": "plain",
+      "sform": "same",
+      "sform_code": 0,
+      "shape": "18x12x24",
+      "size0": 18,
+      "size1": 12,
+      "size2": 24,
+      "spacing0": 1.0,
+      "spacing1": 1.5,
+      "spacing2": 0.5,
+      "specials": 4,
+      "suffix": ".nii",
+      "units": "unknown"
+    },
+    "groups": [
+      {
+        "args": [
+          "{in:img}"
+        ],
+        "name": "input",
+        "optional": false
+      },
+      {
+        "args": [
+          "-E"
+        ],
+        "name": "-E",
+        "optional": true
+      },
+      {
+        "args": [
+          "-c"
+        ],
+        "name": "-c",
+        "optional": true
+      }
+    ],
+    "inputs": {
+      "img": {
+        "content": {
+          "seed": 543336998,
+          "type": "constant"
+        },
+        "dtype": "float32",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          18,
+          12,
+          12
+        ],
+        "suffix": ".nii",
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0,
+          "specials": [
+            "nan",
+            "-inf",
+            "-0",
+            "outlier"
+          ]
+        }
+      }
+    },
+    "n": 13220,
+    "options": [
+      "-E",
+      "-V",
+      "-c",
+      "-e",
+      "kind general"
+    ],
+    "seed": "fsl-maths-trial",
+    "tool": "fsl-stats"
+  },
+  "rule": null,
+  "status": "fixed",
+  "suite": "fsl-stats-replica",
+  "tier": "standard",
+  "tool": "fsl-stats"
+}

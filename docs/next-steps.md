@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -538,6 +538,36 @@ The items below keep their history.
    permanent cases). Golden: 6 cases (76 outputs). Memory: fMRIPrep's call 74 MiB against FSL's
    88. Thread test: every parallel path of topup and applytopup. The site page with both
    implementations (the original's verdict on each case from its files against FSL's).
+   **fslmaths and fslstats: the replicas done (2026-11-03, relays 1 to 7 and 6b).**
+   `crates-nc/larmorx-nc-avwutils` (fslmaths' program and both command lines) on `larmorx-nc-core`
+   (fslstats' program, because BET's script runs it, and the shared code): every operation of
+   fslmaths (87 in its usage text and the hidden `-pow`, `-invbin`; every kernel, the separable,
+   direct and FFT convolutions, morphology, subsampling, edges, hole filling, the reductions along
+   each dimension, p-values, ranks, `-roi`, `-bptf`, TFCE and its support, ROC, the tensor's
+   decomposition; every data type in and out) and every option of fslstats (`-t`, `-K`, `-json`),
+   with every message, exit status and failure case; `lx.fsl.fslmaths`, `lx.fsl.fslstats` and typed
+   wrappers of every family, `larmorx fsl fslmaths|fslstats` (replica only until the clean-room
+   originals). `larmorx-nc-core` gained newimage's kernels, filters, connected components and
+   whole-volume statistics (masked and unmasked), fsl-cprob's probability functions (checked
+   against FSL's library: 180,890 arguments, 0 differ), Armadillo 14.2.1's maximum and minimum (one
+   translation for every replica) and its Kiss FFT, nlohmann/json 3.12.0's numbers (1.9 million, 0
+   differ), glibc's `powf` from Arm's routines (10 million, 0 differ), CORE-MATH's double `tan` in
+   `larmorx_core::math`, an unsigned byte type (FSL-154), and a NIfTI reader that streams raw and
+   gzip images (memory at or below FSL's: `-Tstd` of a 63-volume series 37.5 MiB against FSL's 75).
+   Records [fsl-maths-replica](validation/fsl-maths-replica.md): 421 cases, 358 bit-identical (the
+   four combine_masks calls of three oracle runs and the goodvoxels mask's fourteen, fMRIPrep's
+   own outputs the same), 61 rejected by both, 2 expected divergences (GLIBC-07: `-dt double -tan`,
+   an FFT's twiddle factors from glibc's `sincos`); [fsl-stats-replica](validation/fsl-stats-replica.md):
+   208 cases, 172 identical (goodvoxels' four calls, BET's, FSL's own tests), 36 rejected by both.
+   The five FSL replica records re-made from the final commit (the shared reader, the maximum,
+   FSL-187's robust range, the index error's type, calc_cog's order): identical case by case.
+   FSL-151 to FSL-189 and GLIBC-07; FSL-187 reaches BET and FLIRT. One random-testing trial
+   (24 minutes, 183,983 realistic cases, FSL through the oracle cache: one difference, GLIBC-07)
+   and a check run; golden: 31 cases; memory cases for both; no thread test (one thread). Site
+   pages: fMRIPrep's mask combination and goodvoxels mask, one call per operation family on a real
+   series, GLIBC-07 on a real image, every option of fslstats on a real image.
+   `specs/fslmaths.md` and `specs/fslstats.md` for the clean-room originals. The full tier, the
+   data panel and long random testing wait for the final validation phase.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -666,6 +696,39 @@ The items below keep their history.
   a real call needs them. FSL's own thread band on fMRIPrep's real call is large (ds005040 at
   `--nthr=4`: the field up to 3.2 Hz inside the brain, FSL-116; the site's page): a candidate for
   an upstream report (`docs/upstream-reports/`), the user decides.
+- **fslmaths and fslstats: follow-ups** (2026-11-03, the replica part):
+  - **GLIBC-07 by the `cbrtf` route** (for the orchestrator to schedule, a small part as GLIBC-05
+    was): glibc 2.35's double `sin` (0.12 % of image intensities one unit in the last place), `cos`
+    (0.085 %), `tan` (0.21 %), `asin` (0.16 %), `acos` (0.071 %), `atan` (0.083 %) and `sincos`
+    (0.148 % of the FFT's twiddle angles; one build) are IBM's code in glibc (LGPL): a behaviour
+    spec, then a clean-room implementation of glibc's bits in `larmorx_core::math`, for fslmaths'
+    `reproduce` (the record's `fn/double-tan` and the permanent case `fft-twiddles-glibc-sincos`
+    then pass bit for bit). "glibc's bits" means the FMA builds (decided 2026-11-03; the other
+    build differs, a variant to note); `exp`, `log` and `pow` already reproduce them.
+  - **The clean-room originals of fslmaths and fslstats** from `specs/fslmaths.md` and
+    `specs/fslstats.md` (the roadmap's next FSL step, beside the next replica); and BET's and
+    FLIRT's clean-room originals checked for FSL-187's behaviour (a value far above the robust
+    range's histogram counted in its first bin): the corrected last bin by default, FSL's with
+    `reproduce`, as the replicas do.
+  - **goodvoxels with a real ribbon:** the goodvoxels calls ran with a stand-in for the cortical
+    ribbon (the segmentation's grey matter); re-check them once an fMRIPrep oracle run with
+    FreeSurfer's reconstruction exists.
+  - **zstd and bzip2 inputs are decompressed whole** before they are read by the FSL replicas'
+    reader (gzip and raw images stream since 2026-11-03): memory about twice the image for those
+    formats; a streaming decoder when a real call needs it.
+  - **D13 notices in chains:** a correction is named per operation, so a chain whose later
+    operation removes an intermediate correction's effect (a threshold, `-bin`, `-restart`, a
+    reduction) names it without a visible change (the trial's 595 notices, triaged as explained);
+    FSL-151's output rounding is named where both modes store the same value. Precise notices
+    would need the chain's final comparison: decide whether it is worth it.
+  - **Three `validation/tests` depend on the caller's environment:** inside `boxed.sh`, or with
+    `LARMORX_ORACLE_CACHE_MODE` set, three tests of the validation package fail on their own
+    nested box or cache mode (they pass unboxed, without the variable): they should set or clear
+    what they need themselves.
+  - **The probe-only feature `probe-twiddles`** of `larmorx-nc-core` (the FFT's twiddle factors
+    read from a file, `validation/probes/fsl-avwutils-lib/check_fft_case.py`) is never built by
+    the gates: its hand lint is in the probe's README; consider a gate line if the FFT changes
+    again.
 - **Random testing's permanent cases record the machine's paths** (2026-11-03, found at the merge of FAST's
   clean-room original): a case's `found.detail` keeps the harness's traceback, with the checkout's absolute path
   (`validation/difftest/cases/fsl-fast-original/zstd-outputs.json`, replaced by `<workspace>` at the merge). The writer

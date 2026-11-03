@@ -120,6 +120,8 @@ SUITES: dict[str, tuple[str, str]] = {
     "fsl-fast": ("fsl-fast-original", "original"),
     "fsl-topup-replica": ("fsl-topup", "replica"),
     "fsl-topup": ("fsl-topup-original", "original"),
+    "fsl-maths-replica": ("fsl-maths", "replica"),
+    "fsl-stats-replica": ("fsl-stats", "replica"),
 }
 
 

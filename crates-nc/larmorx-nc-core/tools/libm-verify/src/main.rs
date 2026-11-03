@@ -92,6 +92,27 @@ fn cases(n: usize) -> Vec<Case> {
             v.push(("expf", f64::from(fx), 0.0));
         }
         v.push(("expf", f64::from(((r.unit() - 0.9) * 130.0) as f32), 0.0));
+        // powf as FSL's binaries bind it (powf@GLIBC_2.2.5): fslmaths -tfce's heights
+        // powf(h, H) (thresholds accumulated in float steps of max/100, H a float argument),
+        // -tfceS's cluster sizes powf(n, E), and every pair of floats (negative bases, zeros,
+        // subnormals, infinities, NaN, overflow and underflow)
+        let hmax = r.log_uniform(1e-3, 1e4) as f32;
+        let step = hmax / 100.0;
+        let mut h = 0.0f32;
+        for _ in 0..(r.next() % 101) {
+            h += step;
+        }
+        let hp = [0.5f32, 1.0, 1.5, 2.0, 2.5, 3.0][(r.next() % 6) as usize];
+        v.push(("powf", f64::from(h), f64::from(hp)));
+        let n = (r.next() % 200_000 + 1) as f32;
+        let ep = [0.5f32, 0.6667, 1.0, 2.0][(r.next() % 4) as usize];
+        v.push(("powf", f64::from(n), f64::from(ep)));
+        let px = f32::from_bits(r.next() as u32);
+        let py = f32::from_bits(r.next() as u32);
+        v.push(("powf", f64::from(px), f64::from(py)));
+        let py2 = ((r.unit() - 0.5) * 16.0) as f32;
+        v.push(("powf", f64::from(px), f64::from(py2.round())));
+        v.push(("powf", f64::from(px.abs()), f64::from(py2)));
         // x87 operations on doubles of NIfTI matrices' size
         let a = (r.unit() - 0.5) * 8.0;
         let b = (r.unit() - 0.5) * 8.0 + 1e-3;
@@ -112,6 +133,7 @@ fn ours(op: &str, a: f64, b: f64) -> u64 {
         "log" => glibc_pow::log_compat(a).to_bits(),
         "logf" => u64::from(glibc_float::logf_compat(a as f32).to_bits()),
         "expf" => u64::from(glibc_float::expf(a as f32).to_bits()),
+        "powf" => u64::from(glibc_float::powf(a as f32, b as f32).to_bits()),
         "lddiv" => x87::div_to_f64(a, b).to_bits(),
         "ldadd" => x87::add_to_f64(a, b).to_bits(),
         "ldsub" => x87::sub_to_f64(a, b).to_bits(),

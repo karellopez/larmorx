@@ -14,3 +14,8 @@ bzip2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[features]
+# Probes only, never in a release build: the FFT's twiddle factors read from the file
+# LARMORX_PROBE_FFT_TWIDDLES names (Armadillo's own, validation/probes/fsl-avwutils-lib).
+probe-twiddles = []

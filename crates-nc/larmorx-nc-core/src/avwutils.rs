@@ -17,9 +17,10 @@ use std::path::{Path, PathBuf};
 
 use crate::arma::{self, Mat};
 use crate::cnum;
+use crate::filters;
 use crate::nifti::{self, dt};
 use crate::settings::Settings;
-use crate::sse;
+use crate::volops::{Arith, Op};
 use crate::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
 
 /// fslpy's image extensions of `imtest` and `remove_ext`, in its order (fslpy 3.27.0 added the
@@ -509,36 +510,26 @@ fn fslmerge_z_t<T: Elem>(
     save(&out, output, fsl, reproduce_offset)
 }
 
-/// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume: the maximum of the 3x3x3
-/// neighbourhood inside the image (NEWMAT's `Maximum`: the first value, then larger ones; a
-/// NaN is never larger, and a first NaN stays).
+/// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume ([`filters::morphfilter`]): the
+/// maximum of the 3x3x3 neighbourhood inside the image (Armadillo's maximum: NaN values left
+/// out).
 fn dilate_f(v: &Volume) -> Volume {
     let mut r = v.clone();
     let nvox = v.nvoxels() as usize;
-    let (nx, ny, nz) = (v.xsize(), v.ysize(), v.zsize());
-    let nvol = v.data.len() / nvox.max(1);
-    for t in 0..nvol {
-        let base = t * nvox;
-        for z in 0..nz {
-            for y in 0..ny {
-                for x in 0..nx {
-                    let mut best = f64::NEG_INFINITY;
-                    let mut any = false;
-                    for mz in (z - 1).max(0)..=(z + 1).min(nz - 1) {
-                        for my in (y - 1).max(0)..=(y + 1).min(ny - 1) {
-                            for mx in (x - 1).max(0)..=(x + 1).min(nx - 1) {
-                                let val = f64::from(v.data[base + v.idx(mx, my, mz)]);
-                                if !any || val > best {
-                                    best = val;
-                                    any = true;
-                                }
-                            }
-                        }
-                    }
-                    r.data[base + v.idx(x, y, z)] = best as f32;
-                }
-            }
-        }
+    let dims = [v.xsize(), v.ysize(), v.zsize()];
+    let kernel = filters::box_kernel_vox(3, 3, 3);
+    let mut issues = filters::MorphIssues::default();
+    for (t, vol) in r.data.chunks_mut(nvox.max(1)).enumerate() {
+        let src = &v.data[t * nvox..t * nvox + vol.len()];
+        let out = filters::morphfilter(
+            src,
+            dims,
+            &kernel,
+            filters::Morph::Dilate,
+            &mut |x| x as f32,
+            &mut issues,
+        );
+        vol.copy_from_slice(&out);
     }
     r
 }
@@ -570,83 +561,66 @@ pub fn fslmaths_mas(
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     if volume::file_dtype(input, fsl).map_err(failed)? == dt::DOUBLE {
-        fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset, sse::mul_f64)
+        fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset)
     } else {
-        fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset, sse::mul_f32)
+        fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset)
     }
 }
 
-fn fslmaths_mas_t<T: Elem>(
+/// `-mas` with newimage's generic operations ([`crate::volops`]): the 3D input cloned over a
+/// 4D mask's time points, `binarise(0, max() + 1, exclusive)`, `*=` (`samesize(..., SUBSET)`).
+fn fslmaths_mas_t<T: Arith>(
     input: &str,
     mask: &str,
     output: &str,
     fsl: &Settings,
     reproduce_offset: bool,
-    mul: fn(T, T) -> T,
 ) -> Result<(), ToolFailure> {
     let (mut v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
     let (mut m, _, _) = volume::read_volume4d::<T>(mask, fsl).map_err(failed)?;
-    let mut err = String::new();
     if v.tsize() == 1 && v.tsize() < m.tsize() {
         let one = v.data.clone();
         v.data = (0..m.tsize()).flat_map(|_| one.iter().copied()).collect();
         v.dims[3] = m.tsize();
     }
-    // max() + 1 in T: exact in double for a float's maximum, then rounded as float addition
-    let hi = T::from_f64(m.max().to_f64() + 1.0);
-    let (zero, one) = (T::from_f64(0.0), T::from_f64(1.0));
-    for x in m.data.iter_mut() {
-        *x = if *x > zero && *x < hi { one } else { zero };
-    }
-    if v.dimensionality() < m.dimensionality()
-        || v.xsize() != m.xsize()
-        || v.ysize() != m.ysize()
-        || v.zsize() != m.zsize()
-    {
-        err.push_str("Image Exception : #3 :: Attempted to multiply images of different sizes\n");
-        err.push_str("Attempted to multiply images of different sizes\n");
-        return Err(ToolFailure { err, code: 1 });
-    }
-    let n = m.data.len();
-    for (i, x) in v.data.iter_mut().enumerate() {
-        *x = mul(*x, m.data[i % n]);
-    }
+    let hi = T::plus_int(m.max(), 1);
+    m.binarise(T::from_int(0), hi, false, false);
+    v.op_volume(Op::Mul, &m).map_err(failed)?.ok();
     v.display_max = 0.0;
     v.display_min = 0.0;
     save(&v, output, fsl, reproduce_offset)
 }
 
-/// `fslstats <in> -l <lthr> -C`: the centre of gravity in NIfTI voxel coordinates, as it prints
-/// it (fixed, 6 decimals, each followed by a blank): the voxels not above the threshold (or not
-/// below the largest float) multiplied by 0 (SSE's NaNs), newimage's `calc_cog`, and the
-/// coordinates mapped back to the file's voxels. Returns what it prints on standard output and
-/// on standard error: `calc_cog`'s warning when the voxels sum to (nearly) 0, which newimage
-/// writes to `cerr` itself (found by random testing, 2026-10-26: an empty brain under `bet -R`).
+/// `fslstats <in> -l <lthr> -C`: the centre of gravity in NIfTI voxel coordinates, as the
+/// program prints it (fixed, 6 decimals, each followed by a blank; the line's newline left
+/// out), run by [`crate::fslstats`] itself: the voxels not above the threshold (or not below
+/// the largest float) multiplied by 0, newimage's `calc_cog`, the coordinates mapped back to the
+/// file's voxels. Returns what it prints on standard output and on standard error (`calc_cog`'s
+/// warning when the voxels sum to nearly 0: found by random testing, 2026-10-26, an empty brain
+/// under `bet -R`), or its failure.
 pub fn fslstats_cog(
     input: &str,
     lthr: &str,
     fsl: &Settings,
 ) -> Result<(String, String), ToolFailure> {
-    let (mut v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
-    let l = cnum::atof(lthr) as f32;
-    let u = f32::MAX;
-    for x in v.data.iter_mut() {
-        let keep = *x > l && *x < u;
-        *x = sse::mul_f32(*x, if keep { 1.0 } else { 0.0 });
+    let argv: Vec<String> = ["fslstats", input, "-l", lthr, "-C"]
+        .iter()
+        .map(|s| (*s).to_owned())
+        .collect();
+    let run = crate::fslstats::Run {
+        fsl,
+        mode: larmorx_core::defects::UpstreamDefects::Fix,
+    };
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = crate::fslstats::main(&argv, &run, &mut out, &mut err);
+    let mut printed = String::from_utf8_lossy(&out).into_owned();
+    let err = String::from_utf8_lossy(&err).into_owned();
+    if code != 0 {
+        return Err(ToolFailure { err, code });
     }
-    let mut warnings = Vec::new();
-    let c = v.calc_cog(&mut warnings);
-    let m = v.niftivox2newimagevox_mat();
-    let c = arma::solve(&m, &Mat::col(&[c[0], c[1], c[2], 1.0]))
-        .map(|r| [r.get(0), r.get(1), r.get(2)])
-        .unwrap_or([c[0], c[1], c[2]]);
-    let printed = format!(
-        "{} {} {} ",
-        cnum::fmt_f(c[0], 6),
-        cnum::fmt_f(c[1], 6),
-        cnum::fmt_f(c[2], 6)
-    );
-    let err = warnings.iter().map(|w| format!("{w}\n")).collect();
+    if printed.ends_with('\n') {
+        printed.pop();
+    }
     Ok((printed, err))
 }
 

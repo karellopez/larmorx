@@ -26,8 +26,13 @@
 //!   `rms_deviation`, `read_ascii_matrix`).
 //! - [`mesh`]: meshclass (triangulated surfaces, their vertex normals and intensity profiles,
 //!   the self-intersection test, the file formats FSL reads and writes).
+//! - [`filters`]: newimage's kernels (`-kernel`), morphological filters (`morphfilter`,
+//!   `dilall`) and convolutions (`generic_convolve`) for every element type, as fslmaths uses
+//!   them; [`kissfft`]: Armadillo's FFT engine and newimage's 3D FFT convolution.
 //! - [`stats`]: newimage's masked sums and means (in FSL's blocks), percentiles, `threshold`
-//!   and `binarise`, as FAST uses them.
+//!   and `binarise`, as FAST uses them; [`vstats`]: newimage's statistics of all the values of
+//!   a volume (sums, extrema with their indices, mean, variance, percentiles) for every element
+//!   type, as fslmaths and fslstats use them; [`cprob`]: fsl-cprob's probability functions.
 //! - [`splinterpolator`], [`interp_partial`], [`warpfns`]: miscmaths' B-spline interpolator
 //!   (orders 0 to 7, one to five dimensions, first derivatives), newimage's interpolation with
 //!   extrapolation parameters and partial derivatives, fsl-warpfns' resampling through affine
@@ -53,15 +58,20 @@ pub mod bbr;
 pub mod bfmatrix;
 pub mod cnum;
 pub mod costfns;
+pub mod cprob;
 pub mod crand;
 pub mod exception;
 pub mod fdlibm;
+pub mod filters;
+pub mod fslstats;
 pub mod glibc_double;
 pub mod glibc_float;
 pub mod interp;
 pub mod interp_partial;
 pub mod istream;
+pub mod json;
 pub mod kernel;
+pub mod kissfft;
 pub mod lapack;
 pub mod mesh;
 pub mod miscmaths;
@@ -77,7 +87,9 @@ pub mod spmat;
 pub mod sse;
 pub mod stats;
 pub mod stdsort;
+pub mod volops;
 pub mod volume;
+pub mod vstats;
 pub mod warpfns;
 pub mod x87;
 

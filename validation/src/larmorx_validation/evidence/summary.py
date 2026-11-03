@@ -190,6 +190,18 @@ PAGES = [
         [("larmorx-nc replica", "fsl-topup-replica", "experimental", None, None)],
     ),
     (
+        "/tools/fsl-maths/",
+        "fslmaths",
+        "fsl",
+        [("larmorx-nc replica", "fsl-maths-replica", "experimental", None, None)],
+    ),
+    (
+        "/tools/fsl-stats/",
+        "fslstats",
+        "fsl",
+        [("larmorx-nc replica", "fsl-stats-replica", "experimental", None, None)],
+    ),
+    (
         "/tools/resample-series/",
         "One-shot BOLD resampler",
         "larmorx",

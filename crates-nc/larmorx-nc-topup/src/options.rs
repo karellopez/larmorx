@@ -285,15 +285,9 @@ pub struct Clp {
     pub profile: bool,
 }
 
-/// The last directory separator: `/`, as in FSL; on Windows, where FSL does not run, `\` as well
-/// (a Windows path's directories may hold dots, as `C:\Users\...\.tmp1\b02b0` does).
-pub fn last_separator(fullname: &str) -> Option<usize> {
-    if cfg!(windows) {
-        fullname.rfind(['/', '\\'])
-    } else {
-        fullname.rfind('/')
-    }
-}
+/// The last directory separator (`larmorx_nc_core::volume::last_separator`): `/`, as in FSL; on
+/// Windows, where FSL does not run, `\` as well.
+pub use larmorx_nc_core::volume::last_separator;
 
 /// TOPUP's `path`: up to and including the last `/`.
 pub fn path(fullname: &str) -> String {

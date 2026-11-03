@@ -914,11 +914,12 @@ impl<T: SpElem> SpMat<T> {
     }
 }
 
-/// NEWMAT's out-of-range element access (`MultiplyColumns` reading past a vector).
+/// NEWMAT's out-of-range element access (`MultiplyColumns` reading past a vector): Armadillo
+/// 14.2.1's `arma_stop_bounds_error`, a `std::out_of_range`.
 fn index_error() -> FslError {
     FslError {
         printed: Vec::new(),
-        type_name: "std::logic_error",
+        type_name: "std::out_of_range",
         what: "Mat::operator(): index out of bounds".to_owned(),
     }
 }
@@ -1120,6 +1121,11 @@ pub fn bicg<A: LinOp, P: Precond>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_index_out_of_range_is_armadillos_out_of_range() {
+        assert_eq!(index_error().type_name, "std::out_of_range");
+    }
 
     fn small() -> SpMat<f64> {
         // [[4, 1, 0], [1, 3, 0], [0, 0, 2]] as compressed columns.

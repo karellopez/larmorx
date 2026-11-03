@@ -19,6 +19,7 @@ larmorx-nc-bet.workspace = true
 larmorx-nc-flirt.workspace = true
 larmorx-nc-fast.workspace = true
 larmorx-nc-topup.workspace = true
+larmorx-nc-avwutils.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true

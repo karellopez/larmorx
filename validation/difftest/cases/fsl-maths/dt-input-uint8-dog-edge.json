@@ -1,0 +1,238 @@
+{
+  "defect": "FSL-154",
+  "description": "random testing (2026-11-03): -dt input on a uint8 image, -mul and -dog_edge: the default's unsigned template (FSL-154) holds no negative difference of Gaussians where FSL's signed char does; FSL-154 is now named for every image the unsigned template reads",
+  "expect": "pass",
+  "found": {
+    "detail": "D13 fix pass: no defect named: 2 of 60 values, max |diff| 1 changed",
+    "n": 1121,
+    "seed": "check1",
+    "shrink_moves": [
+      "img: axis 1 22 -> 11 voxels",
+      "img: axis 2 17 -> 8 voxels",
+      "img: axis 0 14 -> 7 voxels",
+      "img: axis 1 11 -> 5 voxels",
+      "img: axis 2 8 -> 4 voxels",
+      "img: axis 0 7 -> 3 voxels",
+      "img (and its grid): plumb orientation",
+      "img (and its grid): unit spacing",
+      "img (and its grid): origin at 0",
+      "img (and its grid): qform and sform codes 1",
+      "i1: float32 storage",
+      "i1: content sparse -> blobs"
+    ],
+    "signature": [
+      "DN fix pass"
+    ]
+  },
+  "id": "dt-input-uint8-dog-edge",
+  "implementations": [
+    "replica"
+  ],
+  "reason": "",
+  "recipe": {
+    "extra": {
+      "output_type": "NIFTI",
+      "program": "fslmaths"
+    },
+    "features": {
+      "-dt": true,
+      "-dt value": "input",
+      "-odt": true,
+      "-odt value": "input",
+      "4D": false,
+      "FSLOUTPUTTYPE": "NIFTI",
+      "binary": true,
+      "chain": 2,
+      "content": "sparse",
+      "dog": 1,
+      "dtype": "uint8",
+      "extreme": false,
+      "family": "dog",
+      "image op": "-mul",
+      "kind": "general",
+      "mask": true,
+      "one slice": false,
+      "orientation": "axes",
+      "origin0": -42.0,
+      "origin1": -56.75,
+      "origin2": -17.25,
+      "other orientation": false,
+      "output": "out",
+      "qfac": 1,
+      "qform_code": 1,
+      "range": "plain",
+      "sform": "same",
+      "sform_code": 3,
+      "shape": "14x22x17",
+      "size0": 14,
+      "size1": 22,
+      "size2": 17,
+      "spacing0": 3.0,
+      "spacing1": 1.5,
+      "spacing2": 2.0,
+      "sparse": 0.05,
+      "specials": false,
+      "suffix": ".nii",
+      "units": "mm"
+    },
+    "groups": [
+      {
+        "args": [
+          "-dt",
+          "input"
+        ],
+        "name": "-dt",
+        "optional": false
+      },
+      {
+        "args": [
+          "{in:img}"
+        ],
+        "name": "input",
+        "optional": false
+      },
+      {
+        "args": [
+          "-mul",
+          "{in:i1}"
+        ],
+        "name": "-mul",
+        "optional": true
+      },
+      {
+        "args": [
+          "-dog_edge",
+          "0.5",
+          "0.8"
+        ],
+        "name": "-dog_edge",
+        "optional": true
+      },
+      {
+        "args": [
+          "out"
+        ],
+        "name": "output",
+        "optional": false
+      },
+      {
+        "args": [
+          "-odt",
+          "input"
+        ],
+        "name": "-odt",
+        "optional": false
+      }
+    ],
+    "inputs": {
+      "i1": {
+        "content": {
+          "axes": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "centre": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "n": 1,
+          "seed": 10672364,
+          "size": 12.0,
+          "type": "blobs"
+        },
+        "dtype": "float32",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          3,
+          5,
+          4
+        ],
+        "suffix": ".nii",
+        "values": {
+          "binarize": true
+        }
+      },
+      "img": {
+        "content": {
+          "seed": 178775094,
+          "type": "constant"
+        },
+        "dtype": "uint8",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          3,
+          5,
+          4
+        ],
+        "suffix": ".nii",
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0
+        }
+      }
+    },
+    "n": 1121,
+    "options": [
+      "-dog_edge",
+      "-dt input",
+      "-mul",
+      "FSLOUTPUTTYPE=NIFTI",
+      "kind general"
+    ],
+    "seed": "check1",
+    "tool": "fsl-maths"
+  },
+  "rule": null,
+  "status": "fixed",
+  "suite": "fsl-maths-replica",
+  "tier": "standard",
+  "tool": "fsl-maths"
+}

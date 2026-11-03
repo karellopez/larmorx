@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 86 cases, 494 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 117 cases, 661 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -182,6 +182,25 @@ What the coverage test enumerates:
   topup logs again from 5c26745 (d9fed9c, the relative paths): 7 cases and 54 outputs added, every
   other checksum unchanged (the core's additions for topup, and its `dgemm` reordered to OpenBLAS's
   four partial sums, changed no golden output); the topup cases take about 3 s together.
+- **fslmaths and fslstats, the replicas** (2026-11-03, 31 cases in
+  `crates-nc/larmorx-nc-cli/tests/golden.rs`, one per operation family, on new inputs of
+  `write_bet_inputs` (`mask8`, `labels`, `sparse`, `i8`, `zmap`, `zmap2`, `truth`, `kern`, an 8 × 8 ×
+  6 × 6 `tensor`)): fslmaths' `combine_masks` call, the binary operations, the thresholds, the
+  functions in float and in double (GLIBC-07: the default and `.reproduce`), masks, seeded noise,
+  kernels and filters with the direct sums and the FFT, the other spatial operations, the
+  reductions along each dimension, the statistical transforms, `-roi` and `-bptf`, TFCE, `-roc`,
+  `-tensor_decomp`, the data types (FSL-157 and FSL-151, default and `.reproduce`), FSL-160 (both
+  modes) and FSL-162; fslstats with every option in one call, `-t` with `-K`, `-json`, FSL-182
+  (both modes); the refusals FSL-161 and FSL-186 by their status. fslmaths' and fslstats'
+  printed output is a golden file too (`PRINTING`). `lx.fsl.fslmaths`, `lx.fsl.fslstats` and their
+  typed wrappers are replica-only functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`)
+  until the clean-room originals. `larmorx-nc`'s checksums recorded on 2026-11-03 from b19b5b9
+  (committed as 3f06ecb): 31 cases and 167 outputs added, every other checksum unchanged (the
+  core's streaming NIfTI reader, Armadillo 14.2.1's maximum, FSL-187's robust range, the index
+  error's type and calc_cog's order changed no golden output); the check passes after recording;
+  the cases add about 1 to 2 s to the debug golden run. The main package's checksums were
+  re-recorded from f56c282 with the parity smoke tier's marker (2,731 passed): only the header
+  changed.
 - **topup and applytopup, the clean-room original** (2026-11-03, six cases in
   `tests/golden/registry.py`, on `blip_pair`, a generated head of 16 × 16 × 8 voxels of 3 mm moved
   one voxel either way along y (seeded integers, no transcendental functions), its volumes `blip_up`

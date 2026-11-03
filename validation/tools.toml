@@ -187,6 +187,23 @@ page = "/tools/fsl-topup/"
 use = ["larmorx fsl topup", "larmorx fsl applytopup", "lx.fsl.topup", "lx.fsl.applytopup"]
 how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods)"
 validation = "original: [{fsl-topup.pass} of {fsl-topup.compared}](record:fsl-topup) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-topup.fmriprep} oracle runs: ds001600 within FSL's own thread band in every metric, ds005040 in every one but the field's correlation, 0.999958 against FSL's own 0.999966), {fsl-topup.both} more rejected by both alike, {fsl-topup.expected} expected divergences, each with its reason (estimated movements that do not converge, where FSL's rotation derivatives are not its cost's; FSL-133's lines; FSL-143's diverging iterations, reproduced; inputs refused for FSL-124 and FSL-134); replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"
+[[tool]]
+id = "fsl-maths"
+title = "fslmaths (image arithmetic, thresholds, filters, reductions, statistics, TFCE)"
+eco = "fsl"
+page = "/tools/fsl-maths/"
+use = ["larmorx fsl fslmaths", "lx.fsl.fslmaths", "lx.fsl.smooth", "lx.fsl.threshold"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every operation, option, data type, message and failure case); the clean-room original is to be written from `specs/fslmaths.md`"
+validation = "replica: [{fsl-maths-replica.pass} of {fsl-maths-replica.compared}](record:fsl-maths-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-maths-replica.fmriprep} calls (combine_masks on three oracle runs, the goodvoxels mask's fourteen), every operation in every data type; {fsl-maths-replica.both} more rejected by both alike; {fsl-maths-replica.expected} one unit in the last place where FSL's glibc 2.35 is not correctly rounded and the replica is (GLIBC-07: `-dt double -tan`, an FFT's twiddle factors)"
+
+[[tool]]
+id = "fsl-stats"
+title = "fslstats (image statistics: means, extremes, percentiles, histograms, per volume and label, JSON)"
+eco = "fsl"
+page = "/tools/fsl-stats/"
+use = ["larmorx fsl fslstats", "lx.fsl.fslstats", "lx.fsl.image_mean", "lx.fsl.image_std"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, `-t`, `-K` and `-json`, every message and failure case; BET's replica runs it); the clean-room original is to be written from `specs/fslstats.md`"
+validation = "replica: [{fsl-stats-replica.pass} of {fsl-stats-replica.compared}](record:fsl-stats-replica) compared cases printing FSL 6.0.7.23's text byte for byte (with its messages and exit status): fMRIPrep's {fsl-stats-replica.fmriprep} goodvoxels calls, BET's call, FSL's own tests, every option; {fsl-stats-replica.both} more rejected by both alike"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -435,3 +452,14 @@ id = "fsl-topup-replica"
 larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup` and `larmorx fsl applytopup` (the replicas, FSL Licence)"
 reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5); fMRIPrep's calls also against fMRIPrep's own outputs"
 status = "`experimental` ({fsl-topup-replica.pass} of {fsl-topup-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-topup-replica.fmriprep} calls included; {fsl-topup-replica.both} rejected by both, with the same messages and status; {fsl-topup-replica.expected} expected divergences: refused in both modes, FSL-124 and FSL-134)"
+[[record]]
+id = "fsl-maths-replica"
+larmorx = "`larmorx-nc fsl fslmaths`; `lx.fsl.fslmaths` and its typed wrappers, `larmorx fsl fslmaths` (the replica, FSL Licence)"
+reference = "fslmaths (FSL 6.0.7.23, fsl-avwutils 2209.6); fMRIPrep's combine_masks calls also against fMRIPrep's own outputs"
+status = "`experimental` ({fsl-maths-replica.pass} of {fsl-maths-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-maths-replica.fmriprep} calls included; {fsl-maths-replica.both} rejected by both, with the same messages and status; {fsl-maths-replica.expected} expected divergences: GLIBC-07)"
+
+[[record]]
+id = "fsl-stats-replica"
+larmorx = "`larmorx-nc fsl fslstats`; `lx.fsl.fslstats` and its typed wrappers, `larmorx fsl fslstats` (the replica, FSL Licence)"
+reference = "fslstats (FSL 6.0.7.23, fsl-avwutils 2209.6); FSL's own tests' expected outputs"
+status = "`experimental` ({fsl-stats-replica.pass} of {fsl-stats-replica.compared} compared cases identical, fMRIPrep's {fsl-stats-replica.fmriprep} calls included; {fsl-stats-replica.both} rejected by both, with the same messages and status)"

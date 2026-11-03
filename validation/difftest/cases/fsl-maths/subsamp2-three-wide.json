@@ -1,0 +1,154 @@
+{
+  "defect": "FSL-75",
+  "description": "random testing (2026-11-03): -subsamp2 of a 3 x 1 x 2 image (a 6-voxel axis halved twice): the background value's buffer is too small (FSL-75), fslmaths writes past it and aborts (double free or corruption); the replica names FSL-75 (the value is never used)",
+  "expect": "pass",
+  "found": {
+    "detail": "exit status (fslmaths is killed; the replica exits 1): fslmaths signal 6, replica 0; stderr identical: line 1: FSL 'double free or corruption (out)', replica '<end>'; files written: only FSL [], only the replica ['out.nii.gz']",
+    "n": 1606,
+    "seed": "check1",
+    "shrink_moves": [
+      "img: axis 1 10 -> 5 voxels",
+      "img: axis 2 8 -> 4 voxels",
+      "img: axis 0 6 -> 3 voxels",
+      "dropped -subsamp2 (-subsamp2)",
+      "img: axis 1 5 -> 2 voxels",
+      "img: axis 2 4 -> 2 voxels",
+      "img: axis 1 2 -> 1 voxels",
+      "img (and its grid): plumb orientation",
+      "img (and its grid): unit spacing",
+      "img (and its grid): origin at 0",
+      "img (and its grid): qform and sform codes 1",
+      "img: content sparse -> constant"
+    ],
+    "signature": [
+      "exit status (fslmaths is killed; the replica exits N)",
+      "files written",
+      "stderr identical"
+    ]
+  },
+  "id": "subsamp2-three-wide",
+  "implementations": [
+    "replica"
+  ],
+  "reason": "",
+  "recipe": {
+    "extra": {
+      "output_type": "NIFTI2_GZ",
+      "program": "fslmaths"
+    },
+    "features": {
+      "-dt": false,
+      "-odt": false,
+      "4D": false,
+      "FSLOUTPUTTYPE": "NIFTI2_GZ",
+      "chain": 2,
+      "content": "sparse",
+      "dtype": "float32",
+      "extreme": false,
+      "family": "subsample",
+      "kind": "general",
+      "one slice": false,
+      "orientation": "axes",
+      "origin0": -25.75,
+      "origin1": 43.0,
+      "origin2": -45.75,
+      "output": "out",
+      "qfac": 1,
+      "qform_code": 1,
+      "range": "plain",
+      "sform": "same",
+      "sform_code": 3,
+      "shape": "6x10x8",
+      "size0": 6,
+      "size1": 10,
+      "size2": 8,
+      "spacing0": 1.5,
+      "spacing1": 0.8,
+      "spacing2": 4.0,
+      "sparse": 0.001,
+      "specials": false,
+      "subsample": "-subsamp2",
+      "suffix": ".nii.gz",
+      "units": "mm"
+    },
+    "groups": [
+      {
+        "args": [
+          "{in:img}"
+        ],
+        "name": "input",
+        "optional": false
+      },
+      {
+        "args": [
+          "-subsamp2"
+        ],
+        "name": "-subsamp2",
+        "optional": true
+      },
+      {
+        "args": [
+          "out"
+        ],
+        "name": "output",
+        "optional": false
+      }
+    ],
+    "inputs": {
+      "img": {
+        "content": {
+          "seed": 1332418170,
+          "type": "constant"
+        },
+        "dtype": "float32",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          3,
+          1,
+          2
+        ],
+        "suffix": ".nii.gz",
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0
+        }
+      }
+    },
+    "n": 1606,
+    "options": [
+      "-subsamp2",
+      "FSLOUTPUTTYPE=NIFTI2_GZ",
+      "kind general"
+    ],
+    "seed": "check1",
+    "tool": "fsl-maths"
+  },
+  "rule": null,
+  "status": "fixed",
+  "suite": "fsl-maths-replica",
+  "tier": "standard",
+  "tool": "fsl-maths"
+}

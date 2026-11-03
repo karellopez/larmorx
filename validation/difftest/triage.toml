@@ -1414,3 +1414,65 @@ signature = ["--fout (Hz): correlation inside the brain", "--fout (Hz): |d| insi
 status = "open"
 explanation = "quadratic splines with an even knot spacing (knots on voxels): the Levenberg-Marquardt Hessian's regulariser part differs from FSL's by up to 3.4 % while the first gradient and cost agree; no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36); a question for the specification"
 link = "docs/findings/fsl-topup-original.md"
+
+# fslmaths' and fslstats' replicas: the check run (oracles/difftest/2026-11-03-fsl-maths-check, seed check1,
+# one minute, 5,186 cases) and the short trial of 2026-11-03 (seed fsl-maths-trial, 24 min, 13 jobs, 183,983
+# realistic cases, the oracle cache in use mode; oracles/difftest/2026-11-03-fsl-maths-replica)
+# The FFT entry comes first of fslmaths' "every file bit-identical" ones: the site's panel gives a
+# night's difference the first entry whose checks equal its own (the trial's is the FFT case).
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "register"
+defect = "GLIBC-07"
+explanation = "-recip -kernel gauss 2.25 -fmeanu of a 30 x 1 x 3 float image (the trial, one case of 114,906; 5,263 with -fmean or -fmeanu): an FFT convolution (transforms of 60 and 26 points), 1 of 90 voxels one unit in the last place. FSL's library takes each Kiss FFT twiddle factor from glibc's cexp, hence sincos (IBM's code, LGPL; one build on x86-64), which is not always correctly rounded (60 points: sin(8 k) and sin(57 k)); the replica computes the factors correctly rounded in both modes (GLIBC-07). Given Armadillo's own factors the replica's engine is Armadillo's bit for bit on every length 1 to 256 (0 of 197,376 values) and this case is FSL's bit for bit (validation/probes/fsl-avwutils-lib: check_fft.py, check_fft_case.py). The first reading had compared glibc's separate cos and sin, an FMA build on this CPU that agrees with the correctly rounded value there. Not met by fMRIPrep's calls."
+link = "validation/difftest/cases/fsl-maths/fft-twiddles-glibc-sincos.json"
+
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "-edge of a double series (the check run): edge_strengthen's pow(x, 2.0) is x * x in FSL's build (GCC folds it into the correctly rounded square); the replica squared with glibc's pow, which differs in the last place for some doubles (2 of 4,608 voxels); now multiplies (validation/investigations/fsl-maths/edge_pow_probe.py)"
+link = "validation/difftest/cases/fsl-maths/edge-double-square.json"
+
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["exit status (fslmaths is killed; the replica exits N)", "files written", "stderr identical"]
+status = "fixed"
+explanation = "-subsamp2 of an image 3 voxels wide (a 6-voxel axis halved twice; the check run): subsample_by_2 first fills its volume with the background value, whose border buffer is too small for that size (FSL-75): fslmaths writes past it and aborts with double free or corruption; the replica now names FSL-75 in both modes (the value is never used, so the result is the same; a 1 x 1 x 1 image is refused by reproduce)"
+link = "validation/difftest/cases/fsl-maths/subsamp2-three-wide.json"
+
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["D13 fix pass"]
+status = "fixed"
+explanation = "-dt input on a uint8 image with -mul and -dog_edge (the check run): the default's unsigned template (FSL-154's correction) holds no negative difference of Gaussians where FSL's signed char does, and FSL-154 was named only for values from 128 to 255 read; now named for every image the unsigned template reads"
+link = "validation/difftest/cases/fsl-maths/dt-input-uint8-dog-edge.json"
+
+[[difference]]
+tool = "fsl-stats"
+implementation = "replica"
+signature = ["stdout identical"]
+status = "fixed"
+explanation = "-c and -C (BET's -l <t> -C among them) of an image holding NaN and infinities (the trial, 8 cases): the centre of gravity printed nan where FSL prints -nan and the reverse; FSL's build adds each block's partial sums into the totals with the partial sum as addsd's destination (libfsl-newimage.so's calc_cog), which the replica now follows"
+link = "validation/difftest/cases/fsl-stats/cog-nan-sign-voxels.json"
+
+[[difference]]
+tool = "fsl-stats"
+implementation = "replica"
+signature = ["D13: FSL crashes; the default refuses or corrects, naming the defect"]
+status = "fixed"
+explanation = "-json -E -k <mask> -X of a 1 x 1 x 1 x 2 image (the trial): with -json the notices wait for the output, so -X's refusal (FSL-184) dropped -E's correction's notice (FSL-185); the notices of the options before an error are now printed"
+link = "validation/difftest/cases/fsl-stats/json-notices-before-refusal.json"
+
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["notice"]
+status = "explained"
+explanation = "595 notices without a visible change in the trial (FSL-151 328, GLIBC-07 73, FSL-154 with others 61, FSL-164 49, FSL-152 36, FSL-168 22, FSL-167 9, FSL-153 7, FSL-169 5, FSL-170 3, FSL-163 1): a correction named for an intermediate result of a chain whose effect a later operation removes (-restart, a threshold, -bin, a reduction), and FSL-151's output rounding of values both modes store alike; D13's notice is per operation"
+link = "oracles/difftest/2026-11-03-fsl-maths-replica/report.md"

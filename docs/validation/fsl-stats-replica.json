@@ -1,0 +1,3350 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "6342d2742e0e",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "ended by a signal, SIGFPE (never stored)": 3,
+   "ended by a signal, SIGSEGV (never stored)": 2
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 5,
+  "saved_seconds": 2.5,
+  "served": 203
+ },
+ "reference": "fslstats from FSL 6.0.7.23 (fsl-avwutils 2209.6, fsl-newimage 2601.0, fsl-armawrap 0.7.0, nlohmann/json 3.12.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths)",
+ "results": [
+  {
+   "case": "fmriprep-goodvoxels/ds005040-sub-002-noreconall/cov_ribbon_mean",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep-goodvoxels/ds005040-sub-002-noreconall/cov_ribbon_std",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep-goodvoxels/ds005040-sub-002-noreconall/mod_ribbon_mean",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep-goodvoxels/ds005040-sub-002-noreconall/mod_ribbon_std",
+   "category": "fmriprep",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.102,
+   "status": "pass"
+  },
+  {
+   "case": "bet/ds005040-sub-002-noreconall/T1w",
+   "category": "bet",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "seconds": 1.231,
+   "status": "pass"
+  },
+  {
+   "case": "cli/usage",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "fslstats exits 1; the same from the replica. ",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.072,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/usage-one",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. ",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/usage-K",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. ",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/usage-t",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. ",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/missing",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "fslstats exits 255; the same from the replica. Image Exception : #63 :: No image files match: missing Image Exception : #22 :: Failed to read volume missing.nii.gz Error : No image files match: missing Failed to read volume missing.nii.gz Error : ",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/unknown",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Unrecognised option: -q",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-l",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -l",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-u",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -u",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-k",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -k",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-d",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -d",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-p",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -p",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-P",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify an argument to -P",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-h",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify the number of bins",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/no-arg-H",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify the number of bins",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/H-no-min",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify the histogram minimum intensity",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/H-no-max",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 2; the same from the replica. Must specify the histogram maximum intensity",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/p-above",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. Percentile must be between 0 and 100",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/P-below",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. Percentile must be between 0 and 100",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/h-zero",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. Must specify at least 1 bin",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/h-fraction",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. Must specify at least 1 bin",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/h-text",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 1; the same from the replica. Must specify at least 1 bin",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/K-4d",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Index mask must be 3D",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/K-size",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 255; the same from the replica. Image Exception : #3 :: Attempted to multiply images of different sizes Attempted to multiply images of different sizes",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/K-none",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "cli/k-size",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Mask and image must be the same size",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/k-tsize",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Mask and image must be the same size",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/k-missing",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits 255; the same from the replica. Image Exception : #63 :: No image files match: nomask Image Exception : #22 :: Failed to read volume nomask.nii.gz Error : No image files match: nomask Failed to read volume nomask.nii.gz Error : No i",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/d-size",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Image used with -d must be the same size as the base image",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/d-tsize",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Image must be the same size as the base image",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "cli/json-twice",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "cli/json-empty",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "cli/json-repeat",
+   "category": "cli",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-r",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-r",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-R",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-R",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-e",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-e",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-E",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-E",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-v",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-v",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-V",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-V",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-m",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-m",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-M",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-M",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-s",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-s",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-S",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-S",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-w",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-w",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-x",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-x",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-X",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-X",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-c",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-c",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-C",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-C",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/-D",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-D",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neuro-w",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neuro-x",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neuro-X",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neuro-C",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neuro-c",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/p",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/p0",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/p100",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/P",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/h",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/H",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-h",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/a",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/n",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "opt/inf",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "opt/4d",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "order/M-l-M",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "order/thresholds",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "order/mask",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "order/mask-then-l",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "order/l-then-mask",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "order/u-only",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "order/d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "order/k3-4d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "order/k4-4d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "order/k4s-4d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "order/d3-4d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "order/d4s-4d",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "order/empty-mask",
+   "category": "order",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "ts/t",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "ts/t-k3",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "ts/t-K",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "ts/K",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "ts/K-4d",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "ts/K-u",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "ts/json-t-K",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "ts/json-K",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "ts/K-json",
+   "category": "ts",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "types/u8",
+   "category": "types",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "types/i16",
+   "category": "types",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "types/i16s",
+   "category": "types",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "types/f64",
+   "category": "types",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "types/noform",
+   "category": "types",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "opt/json-nan",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-R",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-x",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-X",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-r",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-e",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-E",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-m",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-M",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-p",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-P",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-h",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-H",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan2-p",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan2-R",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-n",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "d13/nan-k",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "d13/const01-s",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "d13/one-s",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "d13/S",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "d13/t-k4",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Mask and image must be the same size",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/t-d3",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 255; the same from the replica. Image Exception : #61 :: Invalid t index in [] operator Invalid t index in [] operator",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/t-d4",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits 3; the same from the replica. Image must be the same size as the base image",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/x-empty",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits -11; the same from the replica. calculateExtrema: mask is empty",
+   "seconds": 0.135,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/X-empty",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits -11; the same from the replica. calculateExtrema: mask is empty",
+   "seconds": 0.15,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/e-const",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits -8; the same from the replica. ",
+   "seconds": 0.149,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/E-const",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "fslstats exits -8; the same from the replica. ",
+   "seconds": 0.154,
+   "status": "both-error"
+  },
+  {
+   "case": "d13/h-const",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "d13/H-equal",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.05,
+   "status": "pass"
+  },
+  {
+   "case": "d13/H-reversed",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "d13/H-far",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "d13/e-far",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "d13/w-zeros4",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "d13/w-zeros3",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "d13/json-v-big",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.217,
+   "status": "pass"
+  },
+  {
+   "case": "d13/json-v-replaced",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.744,
+   "status": "pass"
+  },
+  {
+   "case": "d13/v-big",
+   "category": "d13",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.221,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/robust/-r",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/robust/-r",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/notRobust/-R",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/notRobust/-R",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/entropy/-e",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/entropy/-e",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/entropyNonzero/-E",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/entropyNonzero/-E",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/volume/-v",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/volume/-v",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/volumeNonzero/-V",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/volumeNonzero/-V",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/mean/-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/mean/-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/mean/-m_-a",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/mean/-m_-a",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/mean/-m_-a_-n",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/mean/-m_-a_-n",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/meanNonzero/-M",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/meanNonzero/-M",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/stdev/-s",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/stdev/-s",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/stdevNonzero/-S",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/stdevNonzero/-S",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/roi/-w",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/roi/-w",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/maxCoord/-x",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/maxCoord/-x",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/minCoord/-X",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/minCoord/-X",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/cogMM/-c",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/cogMM/-c",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/cogVox/-C",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/cogVox/-C",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/percentile/-p_50",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/percentile/-p_50",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/percentileNonzero/-P_50",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/percentileNonzero/-P_50",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/meanHistCog/-m_-h_10_-c",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/meanHistCog/-m_-h_10_-c",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/meanHist/-m_-h_10",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/meanHist/-m_-h_10",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/hist/-h_10",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.006,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/hist/-h_10",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/histLimits/-H_10_0_1",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/histLimits/-H_10_0_1",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/threshold/-l_0.25_-u_0.75_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.011,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/threshold/-l_0.25_-u_0.75_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/diff/-d_imageForDiff.nii.gz_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/diff/-d_imageForDiff.nii.gz_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.011,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/preopIndexMaskMean/-K_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/preopIndexMaskMean/-K_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/preopIndexMaskMeanTimeSeries/-t_-K_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/preopIndexMaskMeanTimeSeries/-t_-K_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/preopMeanTimeSeries/-t_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "fsltest/json/preopMeanTimeSeries/-t_-m",
+   "category": "fsltest",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.012,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/cog-nan-sign-mm",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.077,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/cog-nan-sign-voxels",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.07,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/json-notices-before-refusal",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "fslstats exits -8; the same from the replica. findHistogram: mask is empty",
+   "seconds": 0.113,
+   "status": "both-error"
+  }
+ ],
+ "suite": "fsl-stats-replica",
+ "summary": {
+  "both-error": 36,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 172,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

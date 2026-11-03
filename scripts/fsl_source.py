@@ -49,6 +49,7 @@ VERSIONS = {
     "fsl-fast4": "2111.3",
     "fsl-basisfield": "2203.4",
     "fsl-topup": "2203.5",
+    "fsl-cprob": "2111.0",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -85,6 +86,10 @@ FILES = [
     ("fsl-newimage", "fmribmain.h"),
     ("fsl-armawrap", "armawrap/function_svd.hpp"),
     ("fsl-armawrap", "armawrap/function_eigenvalues.hpp"),
+    # fslmaths' filters (2026-11-03): armawrap's FFT, sort and reductions
+    ("fsl-armawrap", "armawrap/function_fft.hpp"),
+    ("fsl-armawrap", "armawrap/function_sort.hpp"),
+    ("fsl-armawrap", "armawrap/functions_base.hpp"),
     ("fsl-warpfns", "warpfns.h"),
     ("fsl-newimage", "newimage.h"),
     ("fsl-newimage", "newimage.cc"),
@@ -94,6 +99,10 @@ FILES = [
     ("fsl-newimage", "generalio.cc"),
     ("fsl-newimage", "costfns.h"),
     ("fsl-newimage", "costfns.cc"),
+    ("fsl-newimage", "imfft.h"),
+    ("fsl-newimage", "imfft.cc"),
+    ("fsl-newimage", "complexvolume.h"),
+    ("fsl-newimage", "complexvolume.cc"),
     ("fsl-miscmaths", "miscmaths.h"),
     ("fsl-miscmaths", "miscmaths.cc"),
     ("fsl-miscmaths", "optimise.h"),
@@ -194,6 +203,17 @@ FILES = [
     ("fsl-topup", "applytopup.cpp"),
     ("fsl-topup", "displacement_vector.h"),
     ("fsl-topup", "displacement_vector.cpp"),
+    # fslmaths (2026-11-03): fsl-cprob's random numbers and normal quantiles
+    ("fsl-cprob", "drand.cc"),
+    ("fsl-cprob", "ndtri.cc"),
+    ("fsl-cprob", "polevl.cc"),
+    ("fsl-cprob", "mtherr.cc"),
+    ("fsl-cprob", "const.cc"),
+    ("fsl-cprob", "mconf.h"),
+    ("fsl-cprob", "cprob.h"),
+    # fslmaths (2026-11-03, sub-task 3): the normal distribution function (-ztop)
+    ("fsl-cprob", "ndtr.cc"),
+    ("fsl-cprob", "expx2.cc"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

@@ -13,8 +13,8 @@ corrected, never deleted.
 > mcflirt" were written from AFNI's MCW (GPL) and FSL's (non-commercial) source, through
 > [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md); the section "Restricted: AFNI 3dAutomask and
 > 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md); the section
-> "Restricted: FSL BET, FLIRT, FAST and topup" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
-> [fsl-fast.md](fsl-fast.md) and [fsl-topup.md](fsl-topup.md). **Clean-room implementers must not read those sections.** The
+> "Restricted: FSL BET, FLIRT, FAST, topup, fslmaths and fslstats" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
+> [fsl-fast.md](fsl-fast.md), [fsl-topup.md](fsl-topup.md) and [fsl-maths.md](fsl-maths.md). **Clean-room implementers must not read those sections.** The
 > section "FSL: black-box findings" was found by running FSL's programs: anyone may read it. The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
@@ -247,6 +247,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
 | GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in both implementations (2026-10-30: the clean-room original, then the replica, whose last-bit warning is gone) | – |
 | GLIBC-06 | glibc 2.35 | `tanh` (double) not correctly rounded: one unit (rarely two) in the last place on 21.3 % of 805 million random arguments and on 22,506 of CORE-MATH's 62,880 worst cases; FSL's `bet2` takes its smoothness weight from it at every vertex of every iteration, and the reruns of a surface whose first pass self-intersects amplify that last bit into another surface and mask (`specs/bet.md` §4.5, §8.1) | d | every BET run's surface (measured on the standard tier's 13 real images: the same outputs on 9; other masks on the three rerun cases, Dice 0.9959, 0.9848, 0.9920, and ds000005's BOLD first volume, 0.9966) | glibc's bits in both modes for now (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to glibc 2.35's on 12.9 billion arguments); the correctly rounded `larmorx_core::math::tanh` (CORE-MATH) ported and verified, its notice wired (2026-10-30, BET's clean-room part 2a). BET's default keeps glibc's bits (the user, 2026-10-31, rule C: the correctly rounded surface is another surface, not a more accurate one, and its exact notice would make a run 1.9 times slower); the correctly rounded `tanh` on request | – (decided 2026-10-31: glibc's bits kept by default) |
+| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) for `exp`, `log` and `pow` (Arm's Optimized Routines, the code glibc ships), named where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` and `sincos` are IBM's Accurate Mathematical Library in glibc (LGPL, never translated): correctly rounded in both modes, the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; fslmaths' replica 2026-11-03 | reproduce (the six IBM functions and `sincos`: by the `cbrtf` route, GLIBC-05, when scheduled) |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -343,7 +344,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-72 † | flirt (schedule) | `read` or `readparams` of a file with a word that is not a number: the program never finishes (it adds rows for ever) | a | none | refused in both modes (2026-11-01); FLIRT's clean-room original: refused in both modes (2026-11-02) | – |
 | FSL-73 † | flirt | `-pedir` without a field map read (no `-fieldmap`; or `-applyxfm`, which never reads it): the empty field map is interpolated | a | none | refused in both modes (2026-11-01) | – |
 | FSL-74 † | flirt | the usage text lists `-displayinit` (the option is `-printinit`) and leaves `woods` (accepted) out of `-cost` | f | none | the same text (FSL's messages kept) | – |
-| FSL-75 † | the background value (the 10th percentile of the 2-voxel border), used by FLIRT's pyramid levels, its padding without `-setbackground` and the sinc fallback, and by mcflirt's padding and pyramid | the percentile is taken from the first `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` border values (`e` = min(2, n−1)), too few when the volume is 3 voxels wide along x (and 2 or more along y or z) or along y (2 or more along z, x not 2 or 4): the other border values are written past the end of FSL's memory (heap corruption: FSL aborts later, segfaults, or finishes, depending on the heap's layout), and the percentile is of the values that fit; at 1 × 1 × 1 there is no value and an arbitrary one is read | a | none (fMRIPrep's levels are far larger); FLIRT's pyramid meets it on images of 5 or 6 voxels along x or y, or a 3-voxel level of a small field of view (a 25 × 30 × 27 image at 0.5 × 1.2 × 1 mm reaches 3 × 3 × 3) | rule A: the percentile of the whole border by default, the values that fit FSL's buffer with `reproduce` (FSL's result where it survives), named in both modes; a single voxel refused in both modes (rule B); traced with a hardware watchpoint (2026-11-01). applyxfm4D's (a volume 3 voxels wide) and mcflirt's replicas the same since 2026-11-01 (part 3: mcflirt's pads with the whole border by default, FSL's values with `reproduce`, named; FSL aborts with a double free on such a series); FLIRT's clean-room original: the same (the whole border by default, FSL's buffer with `reproduce`, a single voxel refused in both modes, also a 1 x 1 x 1 level of the pyramid), named (2026-11-02) | – |
+| FSL-75 † | the background value (the 10th percentile of the 2-voxel border), used by FLIRT's pyramid levels, its padding without `-setbackground` and the sinc fallback, and by mcflirt's padding and pyramid; computed (never used) by fslmaths' `-subsamp2` and `-subsamp2offc` | the percentile is taken from the first `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` border values (`e` = min(2, n−1)), too few when the volume is 3 voxels wide along x (and 2 or more along y or z) or along y (2 or more along z, x not 2 or 4): the other border values are written past the end of FSL's memory (heap corruption: FSL aborts later, segfaults, or finishes, depending on the heap's layout), and the percentile is of the values that fit; at 1 × 1 × 1 there is no value and an arbitrary one is read | a | none (fMRIPrep's levels are far larger); FLIRT's pyramid meets it on images of 5 or 6 voxels along x or y, or a 3-voxel level of a small field of view (a 25 × 30 × 27 image at 0.5 × 1.2 × 1 mm reaches 3 × 3 × 3) | rule A: the percentile of the whole border by default, the values that fit FSL's buffer with `reproduce` (FSL's result where it survives), named in both modes; a single voxel refused in both modes (rule B); traced with a hardware watchpoint (2026-11-01). applyxfm4D's (a volume 3 voxels wide) and mcflirt's replicas the same since 2026-11-01 (part 3: mcflirt's pads with the whole border by default, FSL's values with `reproduce`, named; FSL aborts with a double free on such a series); FLIRT's clean-room original: the same (the whole border by default, FSL's buffer with `reproduce`, a single voxel refused in both modes, also a 1 x 1 x 1 level of the pyramid), named (2026-11-02); fslmaths' replica: `-subsamp2` and `-subsamp2offc` of an image 3 voxels wide name FSL-75 in both modes (fslmaths may abort there with glibc's double free or corruption; the value is never used, so the output is the same), a 1 × 1 × 1 image refused by `reproduce` (2026-11-03, random testing's permanent case `subsamp2-three-wide`) | – |
 | FSL-76 † | makerot | the axis is divided by the square root of its length (`ax / sqrt(norm2(ax))`, `norm2` being the length): for an axis that is not of unit length the rotation is by the angle times the square root of the length (30 degrees about 0,0,4 give 60; the help calls the axis "unnormalised") | a | none (fMRIPrep does not run makerot) | rule A: divided by its length by default, FSL's with `reproduce`, named where the matrix changes (2026-11-01) | – |
 | FSL-77 † | makerot | `axis.value()[0..2]` and `centre.value()[0..2]` are read whatever the vectors' sizes: fewer than three values read past the vector (its buffer: the default's zeros, or the values an earlier occurrence of the option left: `-a 1,2,3 -a 7` is 7,2,3), more are ignored | a | none | rule B: refused by default (a message naming FSL-77); FSL's reading with `reproduce`, named (2026-11-01) | – |
 | FSL-78 † | midtrans | every error (a singular `AAᵀ` in the Procrustes average, a singular input matrix, the determinant of a non-square matrix, an image that cannot be read) prints its message and exits with status 0, nothing written | e | none (fMRIPrep does not run midtrans) | rule B: exit status 1 by default with FSL's message, 0 with `reproduce`, named in both (2026-11-01) | – |
@@ -390,17 +391,56 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-144 | applytopup (`--method=jac`, a phase encoding along z) | a phase-encoding vector with a z component (which topup refuses: it estimates no field along z) has that component left out of the displacement: an image encoded along z is written uncorrected, silently | c | none (fMRIPrep corrects with its own resampler) | rule B: refused by default in the clean-room original, named; FSL's output with `reproduce` (2026-11-03, `at/jac-z`); the replica gives FSL's output in both modes | replica |
 | FSL-145 | topup (`--splineorder=2`) | an axis shorter than two knot spacings gets two quadratic B-spline coefficients (every other axis ceil((2n + k − 4) / 2k) + 2): the field's support ends inside the axis and it is forced towards 0 at its far end | c | none (fMRIPrep's configuration uses cubic splines) | rule A: the general count by default in the clean-room original, named; FSL's two with `reproduce` (2026-11-03, found by random testing: `difftest/fsl145-short-axis`); the replica lays FSL's two in both modes | replica |
 | FSL-146 | topup (volumes encoded along different axes: AP, PA, LR, RL) | the cost's gradient leaves out of each axis' Jacobian term the volumes not encoded along that axis, so it is not the cost's gradient: the minimisers step in a wrong direction (a first Levenberg-Marquardt step can raise the cost) and stop where the false gradient vanishes | c | rare (sdcflows' PEPOLAR estimation from field maps along two axes; none in the oracle runs) | rule A, measured: the cost's own gradient by default in the clean-room original, named (its final cost as low as FSL's or lower in 86 to 89 % of random testing's differing four-volume cases); FSL's with `reproduce` (2026-11-03, found by random testing: `difftest/fsl146-mixed-axes`); the replica keeps FSL's in both modes | replica |
+| FSL-151 † | fslmaths (integer types: `-dt char`, `short`, `int`, `-odt`, `-rem`) | a value converted to an integer type outside its range, or NaN, wraps around or becomes the most negative integer (`-odt short` writes 40000 as −25536, `-odt char` 256 as 0 and −1 as 255) | c | none (fMRIPrep's calls compute and write float) | rule A: clamped to the type's range, NaN as 0, named; x86-64's values with `reproduce`; fslmaths' replica 2026-11-03 (`dt/odt-char`, `dt/odt-int`, `dt/odt-nan`, `dt/int-overflow`, `dt/int-exp`) | – |
+| FSL-152 † | fslmaths (`-thr`, `-uthr` and their percentage forms, `-bin`, `-binv`, `-mas`) | the other side of the range is bounded by the image's maximum plus 1 (minimum minus 1), which wraps around under `-dt char` and `int` and rounds back to the maximum from 2^24 (and stays infinite): the largest (or smallest) voxels are zeroed | c | none (masks of 0 and 1, float) | rule A: that side bounds nothing, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/bin-large`, `d13/bin-char`, `d13/thr-inf`, `d13/uthr-char`) | – |
+| FSL-153 † | fslmaths (thresholds, `-bin`, `-mas`, `-range`, the robust range, `-Tmax`, `-Tmin`, `-Tmaxn` and their X, Y, Z forms, `-tfce`, `-roc`) | a NaN first voxel makes the image's minimum and maximum NaN (every voxel thresholded away, a NaN display range, no TFCE threshold, no ROC threshold); NaN voxels count in the robust range's lowest bin; along a dimension a NaN first value makes the maximum and minimum NaN and the maximum's index 0 | c | none (fMRIPrep's images hold no NaN) | rule A: NaN values left out, named where the output changes; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/nan-*`, `d13/Tmax-nan`, `d13/Tmin-nan`, `d13/Tmaxn-nan`, `d13/tfce-nan`, `d13/roc-nan`) | – |
+| FSL-154 † | fslmaths (`-dt char`, `-dt input` on uint8 images) | the values 128 to 255 are computed as negative (signed bytes): thresholds, comparisons, divisions and conversions to other types treat them as negative | c | none | rule A: unsigned bytes for a uint8 image, named for every image the unsigned type reads; FSL's signed bytes with `reproduce`; fslmaths' replica 2026-11-03 (`dt/char`, `dt/input-char`, `d13/char-uint8-thr`, `d13/input-uint8-div`) | – |
+| FSL-155 † | fslmaths (`-dt input`) | an image stored as int8, uint16, uint32, int64, uint64 or float128: nothing computed, no output written, exit status 0, silently | c | none | rule A: computed in the closest type (as `-odt input` names it), named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`dt/input-uint16`, `dt/input-int8`) | – |
+| FSL-156 † | fslmaths (`-rem`, `-div` under an integer `-dt`, `-grid`) | an integer division by zero (`-rem` by a number or a voxel whose integer part is 0, `-div` by such a number under `-dt char`, `short` or `int`, `-grid` with a spacing of 0, the most negative int divided by −1): a floating-point exception, no output | a | none | refused in both modes (rule B); fslmaths' replica 2026-11-03 (`d13/rem-zero`, `d13/rem-half`, `d13/rem-image-half`, `d13/div-int-half`, `d13/grid-zero`) | – |
+| FSL-157 † | fslmaths (`-odt input` on int8 and uint16 images) | the result is truncated toward zero instead of rounded as the other integer outputs are, and an int8 output is written as uint8 (a negative value becomes another) | c | none | rule A: rounded, int8 written as int8, named; FSL's with `reproduce`; uint16 written as int32 as FSL does (rule C); fslmaths' replica 2026-11-03 (`d13/odt-input-int8`, `d13/odt-input-uint16-round`, `dt/odt-input-uint16`) | – |
+| FSL-158 † | fslmaths | an operation with more arguments than remain before the output name reads past the end of the command line: a crash, the environment's strings read as arguments, or an abort | a | none | refused in both modes; the abort FSL defines (a null argument) reproduced; fslmaths' replica 2026-11-03 (`cli/dt-no-input`, `d13/grid-null`) | – |
+| FSL-159 † | fslmaths (`-div`, `-rem`, `-max`, `-min` with an image) | an image of another size than the input is not refused: `-div` and `-rem` read the image's own corner of the same voxel indices, `-max` and `-min` read misplaced values, or past the image's end when it is smaller | c, a | none (combine_masks' two masks share a grid) | rule B: refused as the other operations refuse it, named; FSL's with `reproduce` where it reads inside the image, refused beyond; fslmaths' replica 2026-11-03 (`d13/div-other`, `d13/rem-other`, `d13/max-other`, `d13/min-small`) | – |
+| FSL-160 † | fslmaths (`-s 0`, `-kernel gauss 0`, `-fmean`, `-fmeanu`) | a Gaussian kernel of zero width divides 0 by 0 at its centre: the convolutions make every voxel NaN instead of leaving the image as it is | c | none (goodvoxels' `-s 5`) | rule A: the unit impulse in the convolutions, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/s-zero`, `d13/gauss-zero`) | – |
+| FSL-161 † | fslmaths (`-kernel`, `-s`, `-dog_edge`) | a kernel without voxels (a size of 0 or below, a negative sigma or radius, an unknown kernel type) is used anyway: the morphological filters leave the image, `-fmean` and `-fmeanu` make it NaN or 0, `-s` 0, with `ERROR:: Empty mask image` | c | none | rule B: an error, named; FSL's filtering with `reproduce`; fslmaths' replica 2026-11-03 (`d13/kernel-*`, `d13/gauss-negative`, `d13/s-negative`, `d13/dog-negative`) | – |
+| FSL-162 † | fslmaths (`-fmedian`, `-dilD`, `-rank`, `-ranknorm`) | a NaN under the kernel (or in a voxel's series) stops the program (an uncaught exception: `sort(): detected NaN`), no output | a | none measured (goodvoxels' `-dilD` on ds005040: no NaN) | rule A: NaN values left out of the median, mode and ranks, named; FSL's exception with `reproduce`; fslmaths' replica 2026-11-03 (`d13/fmedian-nan`, `d13/dilD-nan`, `d13/rank-nan`, `d13/ranknorm-nan`) | – |
+| FSL-163 † | fslmaths (`-subsamp2`, `-subsamp2offc` of a 4D image) | an uncaught exception (3D only method called by higher-dimensional volume), or for `-subsamp2offc` of even sizes the first volume only | a | none | rule A: every volume subsampled, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/subsamp2-4d`, `d13/subsamp2offc-4d-odd`, `d13/subsamp2offc-4d-even`) | – |
+| FSL-164 † | fslmaths (`-dog_edge` of a 4D image) | the first volume alone is filtered; the other volumes' zero crossings come from their unfiltered values | c | none | rule A: every volume filtered, named where it changes a voxel; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/dog-4d`) | – |
+| FSL-165 † | fslmaths (`-fillh`, `-fillh26`) | an image with a size of 1 along an axis (a single slice) crashes (an integer division by zero in the edge test) | a | none | rule A: filled in its plane, named; refused with `reproduce`; fslmaths' replica 2026-11-03 (`d13/fillh-2d`) | – |
+| FSL-166 † | fslmaths (`-tensor_decomp`) | a voxel whose tensor holds NaN or infinity stops the program (an uncaught index exception), no output | a | none | rule A: that voxel 0 in every output, named; FSL's exception with `reproduce`; fslmaths' replica 2026-11-03 (`d13/tensor-nan`) | – |
+| FSL-167 † | fslmaths (`-Tstd`, `-Xstd`, `-Ystd`, `-Zstd`, `-ranknorm`) | the variance is taken without the clamp at 0 and the guard for one value that the masked variance has: a nearly constant series gives NaN, a dimension of size 1 (`-Tstd` of a 3D image) NaN instead of 0 | c | goodvoxels' `-Tstd` (the same values on ds005040) | rule A: the masked form, named where it differs; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/Tstd-3d`, `d13/Tstd-negative`, `d13/ranknorm-negative`, `d13/ranknorm-3d`) | – |
+| FSL-168 † | fslmaths (`-Tmedian`, `-Tperc` and their X, Y, Z forms) | values holding NaN are sorted with a comparison NaN breaks: the value taken is arbitrary (deterministic for one build), and the sort can read and write outside the values | c | none | rule A: NaN values left out, named; FSL's sequence with `reproduce`, refused where it leaves the values; fslmaths' replica 2026-11-03 (`d13/Tmedian-nan`, `d13/Tperc-nan`) | – |
+| FSL-169 † | fslmaths (`-pval`, `-pval0`, `-cpval`) | a NaN statistic gets a p-value (the smallest from `-pval`, 0 from `-cpval`), a NaN permutation value counts as smaller, `-cpval`'s permutation maximum is the maximum after its last NaN | c | none | rule A: NaN p-values for NaN statistics, NaN permutation values left out, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/pval-nan`, `d13/pval0-nan`, `d13/cpval-nan`) | – |
+| FSL-170 † | fslmaths (`-ztop`) | an infinite z gives NaN instead of 0 (for +inf) or 1 (for −inf) | c | none | rule A: 0 or 1, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/ztop-inf`) | – |
+| FSL-171 † | fslmaths (`-bptf`) | a sigma whose filter half-width is not a valid int (+inf, or above about 3.6 × 10^8 volumes for the high-pass, 5.4 × 10^7 for the low-pass): a crash, or an uncaught exception (`std::bad_array_new_length`) | a, c | none (fMRIPrep's confounds filter elsewhere) | rule B: an error, named; FSL's exception with `reproduce`, refused where FSL crashes; fslmaths' replica 2026-11-03 (`d13/bptf-*`) | – |
+| FSL-172 † | fslmaths (`-ptoz`) | a p-value below about 1.1 × 10^−16 gives an infinite z and prints `ndtri domain error` per voxel, instead of its z (about 8.2 or more) | c | none | rule A: the p-value's z, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/ptoz-tiny`) | – |
+| FSL-173 † | fslmaths (`-tfce`) | its two loops over the voxels above the lowest threshold read one element past the list (the value never changes the result; the read may fall outside the program's memory when the list fills its allocation) | a | none | the bound tested first in both modes: no effect, never named (2026-11-03) | – |
+| FSL-174 † | fslmaths (`-tfce`, `-tfceS`, `-tfce_delta`, `-tfce_minT`) | a threshold step that cannot advance (below the float threshold's precision, NaN, negative for `-tfceS`): `-tfce` never ends (or gives zeros for NaN), `-tfceS` stops with an uncaught exception once its arrays are full | a, c | none | rule B: an error, named; with `reproduce` `-tfce`'s endless loop refused, `-tfceS`'s exception reproduced; fslmaths' replica 2026-11-03 (`d13/tfce-stall`, `d13/tfce-delta-nan`, `d13/tfceS-stall`, `d13/tfceS-negative-delta`) | – |
+| FSL-175 † | fslmaths (`-tfce` with the automatic step) | an image whose maximum is 0 or below stops with `tfce requires a positive deltaT input`, where no voxel is above the lowest threshold and the enhancement is 0 everywhere | c | none | rule A: zeros, named; FSL's error with `reproduce`; fslmaths' replica 2026-11-03 (`d13/tfce-zero`, `d13/tfce-negative`) | – |
+| FSL-176 † | fslmaths (`-tfce`, `-tfceS`) | any connectivity is accepted: `-tfce` joins the neighbours of the largest of 6, 18, 26 not above it (none below 6), `-tfceS` none at all unless exactly 6, 18 or 26 | c | none | rule B: an error unless 6, 18 or 26, named; FSL's with `reproduce`; fslmaths' replica 2026-11-03 (`d13/tfce-conn7`, `d13/tfceS-conn7`) | – |
+| FSL-177 † | fslmaths (`-tfceS`) | its arrays of thresholds are sized without the lowest threshold and the float sums' rounding: a negative `-tfce_minT` or one more step stops the program (an uncaught exception), and arrays without an element, or a volume without any cluster, divide by zero | a | none | rule A: arrays as long as the thresholds taken, named; FSL's exception with `reproduce`, the division refused; fslmaths' replica 2026-11-03 (`d13/tfceS-minT`) | – |
+| FSL-178 † | fslmaths (`-tfceS`) | a voxel outside the image is read at its offset from the image's start (another voxel), or outside the image's memory | a | none | rule B: an error, named; FSL's result with `reproduce` where the offset lies inside the volume, refused beyond; fslmaths' replica 2026-11-03 (`d13/tfceS-outside`, `d13/tfceS-far`) | – |
+| FSL-179 † | fslmaths (`-roc` with a noise image) | a noise image of another size than the input is indexed with the input's sizes: volumes missed (their raw values then set the thresholds' range) or reached twice, and a smaller one read and written outside its memory | a, c | none | rule B: an error, named; FSL's result with `reproduce` where every offset is inside the noise image, refused beyond; fslmaths' replica 2026-11-03 (`d13/roc-noise-larger`, `d13/roc-noise-smaller`) | – |
+| FSL-180 † | fslmaths (`-roc`) | a truth image without true voxels (or, without a noise image, without zero voxels) divides 0 by 0 for the rates, writes them as NaN to the curve and stops in its quartiles' sort (an uncaught exception) | c | none | rule B: an error before the curve, named; FSL's curve and exception with `reproduce`; fslmaths' replica 2026-11-03 (`d13/roc-no-true`, `d13/roc-no-noise`) | – |
+| FSL-181 † | fslstats (`-R`, `-x`, `-X`, `-p`, `-P`, `-r`, `-h`, `-H`, `-e`, `-E`) | NaN values among the voxels counted: a NaN first value makes `-R` NaN (and `-x`, `-X` the first voxel); the percentiles sort values holding NaN with a comparison NaN breaks (an arbitrary value, the sort can step outside the values); the histograms and the robust range count NaN in their first bin | c | none (fMRIPrep's and BET's images hold no NaN) | rule A: NaN values left out, named when the printed output changes; FSL's values with `reproduce` (the sort replayed, refused where it leaves the values); fslstats' replica 2026-11-03 (`d13/nan-*`, `d13/nan2-*`) | – |
+| FSL-182 † | fslstats (`-s`, `-S` without a mask) | `-s` takes the variance without the clamp at 0 and the guard for one value (NaN for a single voxel or a nearly constant image); `-S` squares each value in single precision and does not clamp (a constant image's standard deviation a few parts in ten thousand instead of 0) | c | goodvoxels' two `-S` calls (the same printed values on ds005040) | rule A: the masked forms, named when the printed value changes (on ds005040's BOLD mean `-S` prints 29842.182847, the masked form 29842.182845, as `-s`); FSL's with `reproduce`; fslstats' replica 2026-11-03 (`d13/const01-s`, `d13/one-s`, `d13/S`) | – |
+| FSL-183 † | fslstats (`-t` with `-k` or `-d`) | the time point's volume of a 4D mask or difference image is picked but never used: a 4D mask is refused, a 3D difference image stops at the second time point, a 4D one at the first | c | none | rule A: the time point's volume, named; FSL's errors with `reproduce`; fslstats' replica 2026-11-03 (`d13/t-k4`, `d13/t-d3`, `d13/t-d4`) | – |
+| FSL-184 † | fslstats (`-x`, `-X`) | a mask or thresholds that select no voxel: the coordinates of an empty list are read, fslstats crashes | a | none | refused in both modes (rule B); fslstats' replica 2026-11-03 (`d13/x-empty`, `d13/X-empty`) | – |
+| FSL-185 † | fslstats (`-e`, `-E`) | an image whose robust range is empty (constant after the thresholds and masks) crashes (an integer division by zero) instead of giving the entropy 0 | a | none | rule A: the entropy 0, named; refused with `reproduce`; fslstats' replica 2026-11-03 (`d13/e-const`, `d13/E-const`) | – |
+| FSL-186 † | fslstats (`-H`) | a maximum not above the minimum prints no histogram, without a message | c | none | rule B: an error, named; FSL's empty output with `reproduce`; fslstats' replica 2026-11-03 (`d13/H-equal`, `d13/H-reversed`) | – |
+| FSL-187 † | fslstats (`-H`, `-e`, `-E`, `-r`), fslmaths (`-thrp`, `-thrP`, `-uthrp`, `-uthrP`), bet2, flirt (the robust range and the histograms) | a value more than about two billion bin widths above a histogram's range is counted in its first bin instead of its last (its bin number does not fit in an int): the histograms, and the robust range's 2 % and 98 % limits when most values are packed far below one value above them | c | none (measured, rule D: none of fMRIPrep's 66 `bet` and `flirt -bbr` inputs of the oracle runs, BET's 13 real images, or the FLIRT and FAST replica suites' inputs reaches it; the smallest trigger 99 values on [0, 1) and one at 10^12) | rule A: the last bin, named where the result changes (fslstats' printed numbers, fslmaths' thresholded voxels, bet2's and flirt's limits); FSL's bins with `reproduce`; fslmaths' and fslstats' replica 2026-11-03 (`d13/H-far`, `d13/e-far`, `d13/thrp-far`, `d13/uthrP-far`), the BET and FLIRT replicas the same (their records unchanged) | – |
+| FSL-188 † | fslstats (`-w` of a 4D image) | without nonzero voxels the time range is a first volume of tsize − 1 with a size of 2 − tsize (negative from three volumes), while x, y and z cover the whole image | c | none | rule A: the whole time range, named; FSL's with `reproduce`; fslstats' replica 2026-11-03 (`d13/w-zeros4`, `d13/w-zeros3`) | – |
+| FSL-189 † | fslstats (`-json` with `-v`, `-V`) | the voxel counts are written in single precision: above 16,777,216 voxels the count is rounded | c | none | rule A: the exact count, named when it survives into the JSON; FSL's with `reproduce`; fslstats' replica 2026-11-03 (`d13/json-v-big`, `d13/json-v-replaced`) | – |
 
-**Counts** (339 entries, recounted from the table on 2026-11-03, after topup's clean-room original (FSL-144 to FSL-146)
+**Counts** (379 entries, recounted from the table on 2026-11-03, after fslmaths' and fslstats' replica (FSL-151 to FSL-189, GLIBC-07)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 76 | |
+| (a) crash, undefined behaviour, out of bounds | 90 | |
 | (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 154 | 10 |
-| (d) imprecision | 23 | |
+| (c) deterministic bug that changes results | 179 | 10 |
+| (d) imprecision | 24 | |
 | (e) command-line or parsing quirk | 58 | |
 | (f) documentation or message only | 13 | |
 | explained, not a defect | 2 | |
@@ -408,8 +448,8 @@ entries, decided, count as (c)):
 The gap column today (2026-11-03): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
 kept, rule C); one rule 8.
 
-Eight entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134 and
-FSL-135 (a), FSL-08 (e). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
+Twelve entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
+FSL-135 and FSL-159 (a), FSL-08 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
 column (2026-10-12, after completing 3dTshift, part 2b, and AFNI-26's switch): no **yes**, no
 **replica** and no **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18,
 -19, -22 and -23, closed by the clean-room original that day, and AFNI-26, added the same day
@@ -590,6 +630,23 @@ without movements, a `_movpar.txt` of 4 × 4 matrices ignored by `jac` and used 
 `vb` methods' printed counts of the first collection only, their first estimate from the
 one-dimensional prior, their sum of the collections' restorations and their masking at the end.
 No new **decide** entry.
+**2026-11-03, the fslmaths and fslstats replica:** FSL-151 to FSL-189 added (the part's range
+FSL-151 to FSL-190; FSL-190 unused) and GLIBC-07 (class d): FSL-151 to FSL-155, FSL-157, FSL-160,
+FSL-162 to FSL-170, FSL-172, FSL-175, FSL-177, FSL-181 to FSL-183, FSL-185, FSL-188 and FSL-189
+(rule A), FSL-159, FSL-161, FSL-171, FSL-174, FSL-176, FSL-178 to FSL-180 and FSL-186 (rule B),
+FSL-156, FSL-158 and FSL-184 (crashes refused in both modes; FSL-158's defined abort reproduced),
+FSL-173 (a read past a list that never changes the result: tested first in both modes, never
+named), FSL-187 (rule D measured, then A; it reaches the robust range shared with BET and FLIRT,
+whose records stayed identical), each with its `reproduce` switch where FSL's behaviour is
+defined. FSL-75 (FLIRT's) reaches fslmaths' `-subsamp2` too. GLIBC-07: glibc 2.35's double
+functions and `sincos` are not correctly rounded; correctly rounded by default, glibc's bits (the
+FMA build's) with `reproduce` for `exp`, `log` and `pow`, correctly rounded in both modes for IBM's
+six functions and `sincos` (gap: **reproduce**, by the `cbrtf` route when scheduled). Kept as FSL's
+(rule C): uint16 written as int32 by `-odt input` (its values all fit), `-w`'s 3D answer, `-inm`
+of an image of zeros (FSL's error and NaN), the off-centre kernel warnings, a `-kernel file` with
+an infinite value (Armadillo's exception, both modes), `-Tar1`'s integer truncation, `-bptf`'s
+weights' integer wrap beyond 46,341 volumes. The count paragraph above is the orchestrator's to
+redo (`scripts/orchestration/register_counts.py`). No new **decide** entry.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -3544,6 +3601,36 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **larmorx:** exact (`larmorx_core::math::powi`).
 - **D13 / gap:** not D13.
 
+### GLIBC-07 The double-precision `sin` ... `pow`, and `sincos` — (d)
+- **What:** glibc 2.35's double `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and
+  `pow` are not correctly rounded: on image intensities (2^26 random arguments each) one unit in
+  the last place on `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 % and `acos` 0.071 %
+  (on [−1, 1]), `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 % of them; no result
+  rounded to float differs. Nor is `sincos` (0.148 % of the angles on [−2π, 2π]), which `cexp`
+  takes: FSL's Armadillo builds each Kiss FFT twiddle factor with it, so 80 of the transform
+  lengths 1 to 256 hold a factor one unit away from the exact one. Each of the nine functions has
+  an FMA build that glibc chooses at run time on x86-64 CPUs with FMA (every one since 2013, the
+  oracle machines too), and the two builds differ from each other (0.04 to 0.07 % for `sin` and
+  `cos`): FSL's own double results depend on the CPU; `sincos` has one build. "glibc's bits"
+  means the FMA build's (the orchestrator's decision, 2026-11-03); the other build is a variant
+  to note, not a target.
+- **Evidence:** `validation/probes/glibc-double-maths` (glibc's functions called as black boxes;
+  both builds' counts in its README); `validation/probes/fsl-avwutils-lib` ("The FFT": FSL's own
+  factors given to the replica's engine reproduce Armadillo's transforms on every length 1 to
+  256, 0 of 197,376 values differ, and the trial's case end to end); on a real image (fslmaths
+  `-dt double` on FSL's mean of ds005040's BOLD series, the site's page): `sin` 211, `cos` 84,
+  `tan` 313, `asin` 209, `acos` 20, `atan` 200 of 136,400 values one unit from FSL's; `exp` 110
+  and `log` 15 values corrected by the default mode.
+- **fMRIPrep:** none (its fslmaths calls compute in float; its `-s` convolves by separable sums).
+- **larmorx:** correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` ported
+  2026-11-03); `reproduce` gives glibc's bits for `exp`, `log` and `pow` (Arm's Optimized
+  Routines, the code glibc ships; `larmorx_nc_core::glibc_double`), named where they change a
+  voxel; the six IBM functions and `sincos` (LGPL) are correctly rounded in both modes: the
+  record's `fn/double-tan` and random testing's permanent case `fft-twiddles-glibc-sincos` are
+  expected divergences.
+- **D13 / gap:** **reproduce** for the six IBM functions and `sincos`: glibc's bits by the
+  `cbrtf` route (GLIBC-05: a behaviour spec, then a clean-room implementation), when scheduled.
+
 ### ANTSPY-01 `ants.apply_transforms` inverts unasked — (c?)
 - **What:** when given exactly two transforms, the first a `.mat` and the second not,
   `whichtoinvert` defaults to `(True, False)`: the affine is inverted without being asked.
@@ -4595,7 +4682,7 @@ follow-up "FSL-111 in the replica").
 - **D13 / gap:** done (2026-10-26): both modes name FSL-22 where NaN border voxels make the
   order undefined (mcflirt's final resampling and `-meanvol`).
 
-## Restricted: FSL BET, FLIRT, FAST and topup (source-derived)
+## Restricted: FSL BET, FLIRT, FAST, topup, fslmaths and fslstats (source-derived)
 
 > **Clean-room implementers: do not read this section.** Written from FSL 6.0.7.17's source
 > (FSL Licence) through [fsl-bet.md](fsl-bet.md), which has the `file:line` references
@@ -4995,3 +5082,35 @@ block `Lijk[1][0]` has off-diagonals `1*sf1` where AᵀA has `2*sf1`
 (`validation/investigations/fsl-topup/vb_prior.py` measured the eigenvalues and the restorations).
 Cases: the record's `opt/`, `cfg/`, `err/`, `thr/` and `at/` categories (`fsl-topup-replica`); the
 library entries: the probes `validation/probes/fsl-warpfns/`, `fsl-miscmaths/`.
+
+### FSL-151 to FSL-189: fslmaths and fslstats (FSL 6.0.7.23, fsl-avwutils 2209.6) †
+
+Found while translating fslmaths and fslstats and the FSL libraries they use for the replica
+(2026-11-03; `docs/findings/fsl-maths.md`, restricted, has the source lines, the causes and FSL's
+runs). FSL-151: `(T) atof`, `-rem`'s `(int)` casts, `MISCMATHS::round` before an integer output
+and the output's cast (x86-64's `cvttss2si` gives `INT_MIN`). FSL-152: the `max() + 1` and
+`min() - 1` bounds of the thresholds and binarisations ("needed to binarise max() value + 1 due
+to potential issue with exclusive binarise"). FSL-153: newimage's `calculateExtrema` starts from
+the first value; `(int) NaN` is `INT_MIN`, clamped to bin 0. FSL-154: `volume<char>` is signed on
+x86-64. FSL-155: no branch of `main` takes those datatypes. FSL-156: SIGFPE of integer `/` and
+`%`. FSL-157: rounding only below `DT_FLOAT`; int8 in `char`'s files. FSL-158: `argv[argc]` and
+beyond. FSL-159: `temp(x, y, z, t2)` and `value(x, y, z, t % tsize)` with the second image's
+strides. FSL-160: `gaussian_kernel3D`'s `2 sigma^2` in float. FSL-161: kernels of no voxels used
+as given. FSL-162 and FSL-168: Armadillo's `sort` (`detected NaN`) and `std::sort` with `<`.
+FSL-163: newimage's `3D only method`. FSL-164: the volume-0 filter. FSL-165: `x % maxx`.
+FSL-166: armawrap's index check. FSL-167: `variance()` without `variance(mask)`'s `Max(0, ...)`
+and `n / Max(1, n - 1)`. FSL-169: `v0 <= NaN` and `MAX` with NaN. FSL-170: `ndtr(±inf)`. FSL-171:
+`(int)(hp * 3)` of +inf and `new double[2m + 1]`. FSL-172: `ndtri(1 - p)`. FSL-173 to FSL-177:
+`tfce`'s list reads and step loop, `tfce_support`'s `thrNum` and armawrap's `(i - 1) / Ncols()`.
+FSL-178: `value(Xoi, Yoi, Zoi)` unchecked. FSL-179: `-roc`'s loops with the input's sizes.
+FSL-180: `truecount` 0 and `SortAscending` of NaN. FSL-181 to FSL-189: fslstats' first-value
+extremes, `calc_percentiles`' sort, `imageHistogram`'s clamp after `(int)`, `variance()` and
+`nonzerostddev`'s float squares, `mask[timepoint]` and `image2[timepoint]` unused,
+`calculateExtrema`'s early return, `hist(1)` of the unsized histogram, the unsized `-H`, `-w`'s
+time fallback and `static_cast<float>(nvox)` ("to maintain types in list"); FSL-187 reaches
+`find_thresholds` itself (the robust range of fslstats, fslmaths, bet2 and FLIRT), measured on 272
+images first (`crates-nc/larmorx-nc-core/tests/robust_range_probe.rs`,
+`validation/investigations/fsl-maths/robust_range_inputs.py`). Cases: the records' `d13/`
+categories (`fsl-maths-replica`, `fsl-stats-replica`); the library checks: the probes
+`validation/probes/fsl-avwutils-lib/` (Armadillo's max and min, fsl-cprob, the FFT),
+`validation/probes/nlohmann-to-chars/`, `validation/probes/glibc-double-maths/`.

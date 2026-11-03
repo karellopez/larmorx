@@ -217,6 +217,16 @@ pub struct Bet2Result {
     pub passes: i32,
 }
 
+/// `robustmin()`, `robustmax()` of `image`: corrected by default (FSL-187, named where the
+/// limits differ), FSL's with `reproduce`.
+fn robust_limits(image: &Volume<f32>, notices: &mut Notices) -> (f32, f32) {
+    let r = image.robust_limits();
+    if let Some(d) = r.notice("bet2's robust limits") {
+        notices.add(&defects::FSL_187, d);
+    }
+    r.pick(notices.reproduce())
+}
+
 /// `adjust_initial_mesh`: the thresholds, the radius, the centre of gravity, the median
 /// intensity inside the initial sphere; the mesh moved and scaled there. When no voxel lies
 /// strictly between the robust limits inside the sphere (a constant or binary image), fsl-bet2
@@ -234,12 +244,13 @@ pub fn adjust_initial_mesh(
     zpara: f64,
     warn: &mut String,
     fill_undefined: bool,
+    notices: &mut Notices,
 ) -> Result<(BetParameters, bool), usize> {
     let mut bp = BetParameters::default();
     let (mx, mn) = image.extrema();
     bp.min = f64::from(mn);
     bp.max = f64::from(mx);
-    let (t2f, t98f) = image.robust_limits();
+    let (t2f, t98f) = robust_limits(image, notices);
     let (t2, t98) = (f64::from(t2f), f64::from(t98f));
     // NaN or infinite voxels reach these sums: SSE's NaNs (larmorx_nc_core::sse)
     let t = (S64(t2) + 0.1 * (S64(t98) - t2)).0;
@@ -1236,7 +1247,7 @@ fn main_inner(
                 return 1;
             }
             // the thresholds of -t and -s from the input: robustmax, robustmin
-            let (t2f, t98f) = input.robust_limits();
+            let (t2f, t98f) = robust_limits(&input, notices);
             let (t2, t98) = (f64::from(t2f), f64::from(t98f));
             res.params.t98 = t98;
             res.params.t2 = t2;
@@ -1417,6 +1428,7 @@ pub fn compute(
         zarg,
         &mut warn,
         notices.reproduce() && fill,
+        notices,
     ) {
         Ok((bp, filled)) => {
             let _ = err.write_all(warn.as_bytes());

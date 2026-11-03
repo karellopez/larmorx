@@ -1825,3 +1825,27 @@ together at the end.
 - **The orchestrator's judgment:** keep it (the user may decide otherwise). The same tests and checks at a
   lower cost per piece of work, two parts finishing together, and no loss of exactness. Unchanged: at most
   two agents, by role; a stop after each part.
+
+## 2026-11-03: glibc's double functions in the FSL replicas (GLIBC-07), and FSL-187 (orchestrator, by the rules and the cbrtf precedent)
+- **What came up:** fslmaths' and fslstats' replica met glibc 2.35's double-precision maths functions,
+  which are not correctly rounded everywhere: `tan` in the record (`fn/double-tan`), and `sincos` through
+  Armadillo's Kiss FFT, whose twiddle factors come from glibc's `cexp` (random testing: 1 of 90 voxels
+  one bit off in `-kernel gauss 2.25 -fmeanu`; with Armadillo's own factors 0 of 197,376 transform values
+  differ). Measured on about 10^8 arguments each: 0.02 to 0.21 % of results differ from the correctly
+  rounded value per function (0.148 % for `sincos` on twiddle angles), none after rounding to float.
+- **Decided as for `cbrtf` (2026-10-30), not as BET's `tanh` (2026-10-31, rule C: BET amplifies the last
+  bit):** a pointwise function is correctly rounded by default (`larmorx_core::math`, CORE-MATH's `tan`
+  ported); `reproduce` gives glibc's bits where permissive code has them (`exp`, `log`, `pow`: Arm's
+  Optimized Routines, as glibc 2.35 ships them); glibc's own code for the six IBM functions (`sin`, `cos`,
+  `tan`, `asin`, `acos`, `atan`, dbl-64, LGPL) and `sincos` is never copied or translated, so those stay
+  correctly rounded in both modes for now, each such case an expected divergence in the record, and
+  their exact bits wait for the cbrtf route (a behaviour spec, then a clean-room implementation in
+  `larmorx_core::math`: a small part to schedule, the user to be asked then). One register entry,
+  GLIBC-07 (class d).
+- **"glibc's bits" means the FMA build:** glibc 2.35 picks its FMA builds of these functions at run
+  time on every x86-64 CPU since 2013, and the oracle machines run them; the other build is a variant
+  noted in the findings, not a target.
+- **FSL-187** (the robust range's histogram, shared by fslstats, fslmaths, BET and FLIRT): measured first
+  (rule D: no fMRIPrep input reaches it), then corrected by default (rule A) with `reproduce` giving
+  FSL's result; BET's and FLIRT's replica records stayed identical. Their clean-room originals are to be
+  checked for the same behaviour (next-steps).

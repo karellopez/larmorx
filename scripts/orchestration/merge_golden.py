@@ -22,7 +22,10 @@ def main():
     base_doc, ours, theirs = show(base), show("HEAD"), show("MERGE_HEAD")
     src = Path("scripts/record_golden.py").read_text()
     ns = {}
-    exec("import json\n" + src[src.index("def _one") : src.index("def record(")], ns)
+    # record_golden.py's own preamble for the slice: postponed annotations (a `-> Path` would be
+    # evaluated otherwise) and the names its helpers use
+    head = "from __future__ import annotations\nimport json\nfrom pathlib import Path\n"
+    exec(head + src[src.index("def _one") : src.index("def record(")], ns)
     merged, conflicts = {}, []
     for k in sorted(set(base_doc["cases"]) | set(ours["cases"]) | set(theirs["cases"])):
         b, o, t = base_doc["cases"].get(k), ours["cases"].get(k), theirs["cases"].get(k)

@@ -194,6 +194,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-nc-avwutils"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
+ "tempfile",
+]
+
+[[package]]
 name = "larmorx-nc-bet"
 version = "0.0.1"
 dependencies = [
@@ -209,6 +218,7 @@ dependencies = [
  "bzip2",
  "flate2",
  "larmorx-core",
+ "larmorx-nc-avwutils",
  "larmorx-nc-bet",
  "larmorx-nc-core",
  "larmorx-nc-fast",

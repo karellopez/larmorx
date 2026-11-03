@@ -334,6 +334,8 @@ defects! {
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,
         "tanh (double precision) is not correctly rounded: about one argument in five gets a result one unit in the last place from the exact value, and FSL's bet2 takes its surface's smoothness weight from it at every step, so where such a last bit survives (most of all where a self-intersecting surface is rerun, which amplifies it) the surface and the brain mask are other than the exact tanh gives";
+    GLIBC_07 = "GLIBC-07", "glibc 2.35", true,
+        "the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow are not correctly rounded: on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value, so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values); nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place";
     AFNI_01 = "AFNI-01", "AFNI", true,
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
@@ -469,7 +471,7 @@ defects! {
     FSL_77 = "FSL-77", "makerot", true,
         "an axis or centre of fewer than three values reads past the vector's values (what its buffer still holds: the default's zeros or an earlier value of the same option), and values beyond the third are ignored";
     FSL_75 = "FSL-75", "flirt", true,
-        "the background value (the 10th percentile of the 2-voxel border) sizes its buffer too small for a volume 3 voxels wide along x (2 or more along y or z) or along y (2 or more along z, x not 2 or 4), as FLIRT's pyramid levels can be: it writes the rest past the buffer (heap corruption: FLIRT may abort or crash later, or finish) and takes the percentile of the values that fit; a 1 x 1 x 1 volume reads an empty buffer";
+        "the background value (the 10th percentile of the 2-voxel border) sizes its buffer too small for a volume 3 voxels wide along x (2 or more along y or z) or along y (2 or more along z, x not 2 or 4), as FLIRT's pyramid levels can be: it writes the rest past the buffer (heap corruption: FLIRT may abort or crash later, or finish) and takes the percentile of the values that fit; a 1 x 1 x 1 volume reads an empty buffer; fslmaths' -subsamp2 and -subsamp2offc compute the same value for such sizes (an image 3 voxels wide, as halving a 6-voxel axis makes it), which they never use: fslmaths may abort with glibc's double free or corruption";
     FSL_90 = "FSL-90", "flirt", true,
         "with -anglerep quaternion the search's starting points, which hold Euler angles, are composed as quaternions: the three angles are read as a quaternion's vector part, so a starting point whose angles' squares sum above 1 loses its rotation (FLIRT prints Parameters do not form a valid axis - greater than unity) and the others start from another rotation than the search found";
     FSL_91 = "FSL-91", "flirt", true,
@@ -538,6 +540,84 @@ defects! {
         "with --splineorder=2, an axis shorter than two knot spacings gets two B-spline coefficients (every other axis ceil((2n + k - 4) / (2k)) + 2, which would be four): the field's support ends inside the axis, so the field is forced towards 0 at its far end (exactly 0 from 1.5 spacings on) whatever the images show";
     FSL_146 = "FSL-146", "topup", true,
         "with volumes whose phase encodings run along different axes (for example AP, PA, LR and RL), the cost's gradient leaves out of each axis' Jacobian term the volumes not encoded along that axis (their share of the mean prediction's derivative): the gradient is not the cost's, so the minimisers step in a wrong direction (a first Levenberg-Marquardt step can raise the cost) and end where this false gradient vanishes rather than at the cost's minimum";
+    FSL_151 = "FSL-151", "fslmaths", true,
+        "a value converted to an integer type outside its range, or NaN, wraps around or becomes the most negative integer: values of an integer output type (-odt char, short, int), -rem's integer remainder, numbers and results under -dt char, short or int";
+    FSL_152 = "FSL-152", "fslmaths", true,
+        "-thr, -thrp, -thrP, -uthr, -uthrp, -uthrP, -bin, -binv and -mas bound their range by the image's maximum plus 1 (or minimum minus 1), which wraps around under -dt char and int and rounds back to the maximum for values from 2^24 (and infinity): the largest (or smallest) voxels are zeroed";
+    FSL_153 = "FSL-153", "fslmaths", true,
+        "a NaN first voxel makes the image's minimum and maximum NaN: -thr, -uthr, -bin, -binv and -mas then zero every voxel, and -range writes a NaN display range; NaN voxels also count in the lowest bin of the robust range of -thrp, -thrP, -uthrp and -uthrP; along a dimension (-Tmax, -Tmin, -Tmaxn and their X, Y and Z forms) a NaN first value makes the maximum and minimum NaN and the index of the maximum 0, while NaN values elsewhere are left out";
+    FSL_154 = "FSL-154", "fslmaths", true,
+        "-dt char and -dt input on a uint8 image compute in signed 8-bit values, so the voxels from 128 to 255 are read as negative: -thr, -bin, the comparisons, divisions and conversions to other types treat them as negative (additions keep the right low byte)";
+    FSL_155 = "FSL-155", "fslmaths", true,
+        "-dt input on an image stored as int8, uint16, uint32, int64, uint64 or float128 computes nothing, writes no output and exits with status 0";
+    FSL_156 = "FSL-156", "fslmaths", true,
+        "an integer division by zero crashes fslmaths (a floating-point exception): -rem by a number or an image value whose integer part is 0, -div by such a number under -dt char, short or int, -grid with a spacing of 0, and the most negative int divided by -1 under -dt int";
+    FSL_157 = "FSL-157", "fslmaths", true,
+        "-odt input on an int8 or uint16 image truncates the result toward zero instead of rounding it as the other integer outputs are, and writes an int8 output as uint8: a negative value becomes another (its byte read as unsigned)";
+    FSL_158 = "FSL-158", "fslmaths", true,
+        "an operation that takes more arguments than remain before the output name reads past the end of the command line: it crashes, or reads the environment";
+    FSL_159 = "FSL-159", "fslmaths", true,
+        "-div, -rem, -max and -min with an image of another size are not refused: -div and -rem take the values of the image's own corner of the same voxel indices (0 outside it), -max and -min read the second image's values at misplaced positions, or past its end when it is smaller";
+    FSL_160 = "FSL-160", "fslmaths", true,
+        "a Gaussian kernel of zero width (-s 0, -kernel gauss 0, or a sigma so small that twice its square is 0 in single precision) divides 0 by 0 at its centre: -s, -fmean and -fmeanu then make every voxel NaN instead of leaving the image as it is";
+    FSL_161 = "FSL-161", "fslmaths", true,
+        "-kernel and -s accept a kernel without voxels (a size of 0 or below along an axis, a negative sigma or radius, or an unknown kernel type) and filter with it: the dilations, erosions and median leave the image as it is, -fmean and -fmeanu make it NaN or 0, -s makes it 0, with the message ERROR:: Empty mask image";
+    FSL_162 = "FSL-162", "fslmaths", true,
+        "-fmedian, and -dilD at a zero voxel, stop the program (an uncaught exception: sort(): detected NaN) when a NaN lies under the kernel, instead of filtering the other values; -rank and -ranknorm stop it the same way at a voxel whose time series holds a NaN, instead of ranking the other values";
+    FSL_163 = "FSL-163", "fslmaths", true,
+        "-subsamp2 and -subsamp2offc of a 4D image stop the program (an uncaught exception: 3D only method called by higher-dimensional volume), except -subsamp2offc of even sizes, which keeps the first volume only";
+    FSL_164 = "FSL-164", "fslmaths", true,
+        "-dog_edge of a 4D image filters the first volume only: the zero crossings of the other volumes are taken from their unfiltered values";
+    FSL_165 = "FSL-165", "fslmaths", true,
+        "-fillh and -fillh26 of an image with a size of 1 along an axis (a single slice) crash (an integer division by zero in the test for the image's edge)";
+    FSL_166 = "FSL-166", "fslmaths", true,
+        "-tensor_decomp stops the program (an uncaught exception: Mat::operator(): index out of bounds) at a voxel whose tensor holds a NaN or an infinite value, instead of leaving that voxel at 0";
+    FSL_167 = "FSL-167", "fslmaths", true,
+        "the standard deviation along a dimension (-Tstd, -Xstd, -Ystd, -Zstd) and -ranknorm's take the variance as (n / (n - 1)) (mean of squares - squared mean) without the clamp at 0 and the guard for one value that the masked variance has: a nearly constant series whose variance rounds below 0 gives NaN, and a dimension of size 1 (-Tstd of a 3D image) gives NaN instead of 0";
+    FSL_168 = "FSL-168", "fslmaths", true,
+        "the percentiles along a dimension (-Tmedian, -Tperc and their X, Y and Z forms) sort values holding NaN with a comparison NaN breaks: the order is not sorted, so the value taken is arbitrary, and the sort can read and write outside the values (a crash)";
+    FSL_169 = "FSL-169", "fslmaths", true,
+        "-pval, -pval0 and -cpval with NaN statistics: a NaN statistic gets a p-value (the smallest, 1/T, from -pval; 0 from -cpval), a NaN permutation value counts as smaller than the statistic, and -cpval's maximum of each permutation volume is the maximum of the voxels after its last NaN in storage order";
+    FSL_170 = "FSL-170", "fslmaths", true,
+        "-ztop of an infinite z gives NaN instead of 0 (for +inf) or 1 (for -inf)";
+    FSL_171 = "FSL-171", "fslmaths", true,
+        "-bptf with a sigma whose filter half-width is not a valid int (+inf, or a sigma above about 3.6e8 volumes for the high-pass, 5.4e7 for the low-pass): either filter crashes or stops the program (an uncaught exception: std::bad_array_new_length)";
+    FSL_172 = "FSL-172", "fslmaths", true,
+        "-ptoz of a p-value so small that 1 - p rounds to 1 (below about 1.1e-16) gives an infinite z and prints ndtri domain error for each such voxel, instead of the z of that p-value";
+    FSL_173 = "FSL-173", "fslmaths", true,
+        "-tfce reads one element past the end of its list of voxels above the lowest threshold in both of its loops over that list (each tests the element before the bound); the element read never changes the result, but the read may fall outside the program's memory when the list fills its allocation to the end of a page";
+    FSL_174 = "FSL-174", "fslmaths", true,
+        "-tfce and -tfceS with a threshold step that cannot advance the thresholds (a step below the precision of the float threshold it is added to, a NaN step, and for -tfceS a negative one): -tfce never ends, or with a NaN step returns zeros; -tfceS stops (an uncaught exception: std::out_of_range) once its arrays are full";
+    FSL_175 = "FSL-175", "fslmaths", true,
+        "-tfce of a volume whose maximum is 0 or below (an all-zero statistic image, for example) stops with tfce requires a positive deltaT input when the step is automatic, where no voxel is above the lowest threshold and the enhancement is 0 everywhere";
+    FSL_176 = "FSL-176", "fslmaths", true,
+        "-tfce and -tfceS accept any connectivity: -tfce joins the neighbours of the largest of 6, 18 and 26 not above it (none below 6), -tfceS none at all unless it is exactly 6, 18 or 26";
+    FSL_177 = "FSL-177", "fslmaths", true,
+        "-tfceS sizes its arrays of cluster sizes and thresholds from the voxel's value over the step, leaving out the lowest threshold (-tfce_minT) and the rounding of the accumulated float thresholds: with a negative lowest threshold, or one step more than planned, the program stops (an uncaught exception: std::out_of_range), and where the arrays have no element (the voxel's value over the step below 0) or the voxel's volume has no cluster at all it divides by zero (SIGFPE)";
+    FSL_178 = "FSL-178", "fslmaths", true,
+        "-tfceS with a voxel outside the image reads the image and the cluster labels at the voxel's offset from their start (another voxel, or memory outside the image)";
+    FSL_179 = "FSL-179", "fslmaths", true,
+        "-roc with a noise image of another size than the input indexes the noise image with the input's sizes: its log transform misses volumes (whose raw values then set the thresholds' range) or reaches voxels twice, and a smaller noise image is read and written outside its memory";
+    FSL_180 = "FSL-180", "fslmaths", true,
+        "-roc with a truth image without true voxels (or, without a noise image, without zero voxels) divides 0 by 0 for the true (false) positive rates, writes them as NaN to the curve and stops in its quartiles' sort (an uncaught exception: sort(): detected NaN)";
+    FSL_181 = "FSL-181", "fslstats", true,
+        "NaN values among the voxels counted: -R takes the minimum and maximum from the first value, so a NaN first value makes both NaN (and -x and -X give the first voxel's coordinates); -p and -P sort values holding NaN with a comparison NaN breaks, so the value taken is arbitrary and the sort can read and write outside the values (a crash); -r, -h, -H, -e and -E count NaN values in the lowest bin of their histograms";
+    FSL_182 = "FSL-182", "fslstats", true,
+        "without a mask, -s takes the variance as (n / (n - 1)) (mean of squares - squared mean) without the clamp at 0 and the guard for one value that the masked variance has (a constant image whose variance rounds below 0 gives NaN, a single voxel NaN), and -S squares each nonzero value in single precision before adding it and does not clamp at 0: a nearly constant image gets a standard deviation of a few parts in ten thousand of its values instead of 0, and a variance rounded below 0 gives NaN";
+    FSL_183 = "FSL-183", "fslstats", true,
+        "with -t, a 4D -k mask is refused (Mask and image must be the same size) and a -d image stops fslstats at the second time point when it is 3D (an uncaught index error: Invalid t index) or at the first when it is 4D (Image must be the same size as the base image): the volume for the time point is picked but never used";
+    FSL_184 = "FSL-184", "fslstats", true,
+        "-x and -X with a mask (or thresholds) that selects no voxel read the coordinates of an empty list: fslstats crashes";
+    FSL_185 = "FSL-185", "fslstats", true,
+        "-e and -E of an image whose robust range is empty (a constant image, after the thresholds and masks) crash fslstats (an integer division by zero indexing the empty histogram) instead of giving the entropy 0";
+    FSL_186 = "FSL-186", "fslstats", true,
+        "-H with a maximum that is not above the minimum prints no histogram, without a message";
+    FSL_187 = "FSL-187", "FSL", true,
+        "a value more than about two billion bin widths above a histogram's range is counted in its first bin instead of its last (its bin number does not fit in an int): in fslstats' histograms (-H, -e, -E), and in the robust range of fslstats (-r, -e, -E), fslmaths (-thrp, -thrP, -uthrp, -uthrP), bet2 and flirt, whose 2 % and 98 % limits move when most values are packed far below one value above them";
+    FSL_188 = "FSL-188", "fslstats", true,
+        "-w of a 4D image without nonzero voxels gives the time range as a first volume of tsize - 1 with a size of 2 - tsize (negative for three or more volumes), while the x, y and z ranges cover the whole image";
+    FSL_189 = "FSL-189", "fslstats", true,
+        "with -json, -v and -V write the number of voxels in single precision: above 16,777,216 voxels (a 4D series, a large 3D image) the count is rounded";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

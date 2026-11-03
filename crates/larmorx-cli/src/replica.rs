@@ -263,6 +263,20 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
+    // FSL's fslmaths and fslstats (2026-11-03): the replicas only; the clean-room originals are
+    // to be written from specs/fslmaths.md and specs/fslstats.md.
+    Replica {
+        family: "fsl",
+        tool: "fslmaths",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "fslstats",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -710,7 +724,10 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(replica_only("fsl").count(), 0);
+        assert_eq!(
+            replica_only("fsl").collect::<Vec<_>>(),
+            ["fslmaths", "fslstats"]
+        );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

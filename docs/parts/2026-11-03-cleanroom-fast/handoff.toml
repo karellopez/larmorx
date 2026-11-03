@@ -1,0 +1,297 @@
+# FAST's clean-room original (relays 1 to 5, 2026-11-03): the exact changes to the shared documents.
+# Check: python -P scripts/orchestration/apply_handoff.py <scratch>/HANDOFF.toml --site <site> --check
+# Afterwards: python -m larmorx_validation tables; register_counts.py; re-read every file touched.
+
+# ------------------------------------------------------------------ validation/tools.toml
+
+[[op]]
+do = "block"
+kind = "tool"
+id = "fsl-fast"
+text = '''
+[[tool]]
+id = "fsl-fast"
+title = "FAST (tissue segmentation: classes, partial volumes, bias field)"
+eco = "fsl"
+page = "/tools/fsl-fast/"
+use = ["larmorx fsl fast", "lx.fsl.fast"]
+how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case, one channel or any number of them, FSL's tissue priors registered by FLIRT's clean-room original in the same process; fMRIPrep's call 9 to 11 times FSL's speed on one thread, 47 to 67 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental`"
+validation = "original: [{fsl-fast.pass} of {fsl-fast.compared}](record:fsl-fast) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-fast.fmriprep} oracle runs bit for bit what FSL computes with correctly rounded maths, every single-channel case FSL's values or FSL's with correctly rounded maths, several channels within FSL's own difference between the two but for a few partial volumes one fraction step away), {fsl-fast.both} more rejected by both alike, {fsl-fast.expected} where FSL reads past the smaller of channels of different sizes (FSL-104, refused); the {fsl-fast.fail} it misses is in its record (five channels with nearly singular covariances, decided by the matrix arithmetic's last bits); replica: [{fsl-fast-replica.pass} of {fsl-fast-replica.compared}](record:fsl-fast-replica) compared cases bit-identical to FSL 6.0.7.23 (every image written, the printed messages, the exit status): fMRIPrep's call on {fsl-fast-replica.fmriprep} oracle runs (an adult, a 3.5-year-old, a glioma), every option, one to eight channels, FSL's tissue priors registered by FLIRT's replica, the image types, 2D images; {fsl-fast-replica.both} more rejected by both alike; {fsl-fast-replica.expected} where FSL reads and writes past the smaller of channels of different sizes (FSL-104, refused)"
+'''
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = 'status = "`experimental` (part 3: {fsl-flirt-replica.pass} of'
+text = '''
+
+[[record]]
+id = "fsl-fast"
+larmorx = "`lx.fsl.fast(implementation=\"original\")`, `larmorx fsl fast` (clean-room, `crates/larmorx-fsl`)"
+reference = "fast (FSL 6.0.7.23, fsl-fast4 2111.3), with correctly rounded maths (the CORE-MATH preload) where a check fails against FSL as built; the replica suite's cases and the original's own permanent cases"
+status = "`experimental` ({fsl-fast.pass} of {fsl-fast.compared} compared cases within thresholds, fMRIPrep's {fsl-fast.fmriprep} calls included; {fsl-fast.fail} misses them (listed in the record, explained in docs/findings/fsl-fast-original.md); {fsl-fast.both} rejected by both, with the same messages and status; {fsl-fast.expected} expected divergence: channels of different sizes, refused in both modes, FSL-104)"'''
+
+# ---------------------------------------- docs/findings/upstream-defects.md (summary rows only)
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "memory never written (D13, 2026-10-11): 0 in both modes, named in both; FAST's replica 2026-11-02 | – |"
+new = "memory never written (D13, 2026-10-11): 0 in both modes, named in both; FAST's replica 2026-11-02, its clean-room original 2026-11-03 | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(the field 1, each channel's own image), named in both; FAST's replica 2026-11-02 | – |"
+new = "(the field 1, each channel's own image), named in both; FAST's replica 2026-11-02, its clean-room original 2026-11-03 | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(`multi/s2-outputs`: 2,345,041 values change; `multi/s2-manualseg-cycle`: 1,127,023) | – |"
+new = "(`multi/s2-outputs`: 2,345,041 values change; `multi/s2-manualseg-cycle`: 1,127,023); its clean-room original 2026-11-03 (2,345,055 and 1,127,078) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "FAST's arithmetic (and its aborts) with `reproduce`, named; FAST's replica 2026-11-02 | – |"
+new = "FAST's arithmetic (and its aborts) with `reproduce`, named; FAST's replica 2026-11-02, its clean-room original 2026-11-03 (`larmorx: error: fast: ...`; with several channels and a NaN `-H`, `reproduce` takes 0 for the smoothness FAST estimates from memory it never wrote, named) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "FAST's abort with `reproduce`, named; FAST's replica 2026-11-02 | – |"
+new = "FAST's abort with `reproduce`, named; FAST's replica 2026-11-02, its clean-room original 2026-11-03 | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(random testing's trial: three permanent cases) | – |"
+new = "(random testing's trial: three permanent cases); its clean-room original 2026-11-03 (its trial: `-v`'s line before the crash, a permanent case) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(their expansion is not reproduced); FAST's replica 2026-11-02 | – |"
+new = "(their expansion is not reproduced); FAST's replica 2026-11-02, its clean-room original 2026-11-03 (FLIRT's clean-room original in the same process) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(`opt/big`: 14,975 values change) | – |"
+new = "(`opt/big`: 14,975 values change); its clean-room original 2026-11-03 (10,439) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "(FAST corrupts its heap); FAST's replica 2026-11-02 | – |"
+new = "(FAST corrupts its heap); FAST's replica 2026-11-02, its clean-room original 2026-11-03 | – |"
+
+# ------------------------------------------------------------ docs/api/upstream-defects.md
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| FSL-96 | fast | the replica `larmorx-nc fsl fast` (`larmorx fsl fast`, `lx.fsl.fast`) |"
+new = "| FSL-96 | fast | both: the replica `larmorx-nc fsl fast` and the clean-room original (`larmorx fsl fast`, `lx.fsl.fast`; `implementation=\"original\"` or `LARMORX_IMPLEMENTATION=original`, and `\"auto\"` without `larmorx-nc`), each in its own way where noted |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| each name whole, FLIRT's replica in the same process, named; `reproduce` splits the names at blanks |"
+new = "| each name whole, FLIRT's replica (the clean-room original: FLIRT's clean-room original) in the same process, named; `reproduce` splits the names at blanks |"
+
+# ------------------------------------------------------------------ docs/validation/golden.md
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''  library's `expf`, `log` and `rand`, FSL's masked sums and percentiles, LAPACK up to 8 × 8, changed no
+  golden output).
+'''
+new = '''  library's `expf`, `log` and `rand`, FSL's masked sums and percentiles, LAPACK up to 8 × 8, changed no
+  golden output).
+- **FAST, the clean-room original** (2026-11-03, seven cases in `tests/golden/registry.py`, on a
+  generated three-tissue brain `tissue_brain`, its second channel `tissue_brain2`, a copy with one
+  white-matter voxel at 2^24 `tissue_brain_bright`, generated tissue priors and the identity matrix):
+  `cli.fsl.fast` (fMRIPrep's call `-I 0 -N -p -g -S 1`, its partial volumes' likelihoods through the
+  batched `exp`, `larmorx_core::math::exp_in_place`: AVX2 and FMA on Linux x64, the portable path on
+  aarch64, so this case checks that both give `exp`'s bits; the usage and exit status without
+  arguments), `cli.fsl.fast.bias` (`-t 1 -n 3 -B -b -v -o`, its standard output kept),
+  `cli.fsl.fast.multi` (two channels, `-B -b -p`), `cli.fsl.fast.priors` (`-a` with `-A` and `-P`,
+  FLIRT's clean-room original in the same process), `cli.fsl.fast.reproduce` (FSL-103 in both modes,
+  FSL-99's refusal of a NaN `-H` by its status), `py.fsl.fast` (`lx.fsl.fast(implementation="original")`
+  on in-memory images, every output, and a single slice for the 2D neighbourhood), and
+  `cli.fsl.flirt.analyze` (the ANALYZE reader BET's, FLIRT's and FAST's originals share: a big-endian
+  int16 pair whose scale field FSL does not apply and whose voxel sizes' negative product FSL reads
+  radiologically, through FLIRT's `-applyxfm` with the identity; the pair written byte by byte by the
+  test, no committed file). `lx.fsl.fast` left `REPLICA_ONLY_FUNCTIONS`. Recorded from f0dd88b
+  (committed with the record as e9024ec), the parity smoke tier's marker of the same commit and build
+  reused (2,692 passed): 7 cases added, every other checksum unchanged; each case runs in 0.02 to
+  0.15 s.
+'''
+
+# -------------------------------------------------------------------------- docs/next-steps.md
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "FAST (the replica done 2026-11-02; the clean-room original next)"
+new = "FAST (the replica done 2026-11-02, the clean-room original 2026-11-03)"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''   validation phase. **Next: the clean-room original** (another agent, from `specs/fast.md`, built
+   for speed).
+'''
+new = '''   validation phase.
+   **FAST: the clean-room original done (2026-11-03, relays 1 to 5).** `crates/larmorx-fsl`, module
+   `fast` (Apache-2.0, from `specs/fast.md`, the paper and black-box runs only): every option, message,
+   exit status and failure case; one channel and any number (`-S 9` and more too: rules A-D, nothing
+   to refuse; the replica refuses them), larmorx's own LU for the covariances; the priors registered
+   by FLIRT's clean-room original in the same process; FSL-96 to FSL-104 in both modes; `exp` and
+   `log` correctly rounded. `lx.fsl.fast(implementation="original")`, `"auto"` without `larmorx-nc`.
+   Record [fsl-fast](validation/fsl-fast.md): 87 cases, 60 of 61 compared within `specs/fast.md`
+   §11's thresholds (fMRIPrep's call on ds000005, ds000228 and ds005003 bit-identical to FSL run with
+   correctly rounded maths; of the 60, 13 bit-identical to FSL, 36 to FSL with correctly rounded
+   maths, 10 within FSL's own difference between the two, 1 a few partial volumes beyond it, each one
+   fraction step away: the site's classification), 25 rejected by both, 1 expected divergence
+   (FSL-104), 1 explained failure (`multi/s5`: nearly singular 5 × 5 covariances). Built for speed:
+   the MRF and mixel sweeps as a pipeline of planes with the serial result, FSL's blocked sums in
+   parallel in their order, a batched `exp` with the scalar bits (`larmorx_core::math::exp_in_place`,
+   new, randomized check of 2^32 values: 0 differences); fMRIPrep's call 2.4 to 5.2 s on one thread
+   (9 to 11 times FSL), 0.4 to 0.9 s on 14 (47 to 67 times), the same bits at any thread count
+   ([benchmark](benchmarks/fsl-fast.md), informal). One random-testing trial (25 minutes, 9,005
+   realistic cases, FSL through the oracle cache: 8,823 agree; 182 triaged: 153 the suite's reader,
+   13 a NaN bias field outside the mask and 12 messages fixed, 3 explained, 1 open, four permanent
+   cases). Golden: 7 cases. Memory: fMRIPrep's call 152 MiB against FSL's 707. Thread test: four
+   programs. The shared ANALYZE reader (BET's, FLIRT's and FAST's originals: the scale field not
+   applied, negative voxel-size products radiological) and FLIRT's `-applyxfm` TR (FSL's: the
+   input's `|pixdim[4]|`) changed: BET's and FLIRT's records re-made, identical case by case. The
+   site page with both implementations. FSL-136 to FSL-140 unused (no new defect).
+'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  them (its thresholds need not OpenBLAS's bits): a decision for its part (`specs/fast.md` §9.3).\n"
+new = '''  them (its thresholds need not OpenBLAS's bits): a decision for its part (`specs/fast.md` §9.3).
+  Decided (2026-11-03, rules A-D: the input makes sense, FSL segments it): the clean-room original
+  segments any number of channels with its own LU.
+- **FAST's clean-room original: two speed steps left** (2026-11-03, `docs/benchmarks/fsl-fast.md`):
+  a batched `expf` for the initialisation's single-precision likelihoods (19 × 3 per voxel, about
+  0.2 s of 0.89 s on one thread on ds005003) and the MRF update's three `exp` per voxel batched inside
+  the serial sweep (about 6 % of the sweeps); each must keep the scalar functions' bits (a randomized
+  check like `exp_in_place`'s).
+- **FAST's single-channel variance (rule D, 2026-11-03)**: `σ² = Σ p y y / Σ p - μ²` in the log
+  domain cancels most digits, which makes FSL's own last-bit band wide on small classes and small
+  images (`_mixeltype` Dice 0.998 on ds005003 between FSL and FSL with correctly rounded maths);
+  measure whether a two-pass or double-precision variance changes the segmentation beyond that band
+  before deciding A or C (`docs/findings/fsl-fast-original.md`, "FSL's own last-bit band").
+- **FAST's spec questions** (2026-11-03): the clean-room relays' questions on `specs/fast.md`
+  (§4.4's second moment in double, §4.5's normalised taps in double and the field outside the mask,
+  §4.8's ICM type, §4.10's total after each sweep, §5.2's products in double, §5.6's weights in
+  single, §10's exact parallel order, FLIRT §9.3's TR, and the rest: the part's handoff) for a spec
+  writer, as FLIRT's spec answers were.
+- **FAST's degenerate multi-channel statistics** (2026-11-03, random testing 1840, open): with two
+  channels and four classes whose statistics degenerate, FSL prints `MEAN -nan` from the second bias
+  iteration where the clean-room original prints `MEAN 1` (a class weight of 0); the images agree.
+  How FSL's posteriors become NaN after a NaN covariance is a spec question.
+'''
+
+# ----------------------------------------------------------------- validation/difftest/triage.toml
+
+[[op]]
+do = "append"
+file = "validation/difftest/triage.toml"
+text = '''
+# FAST's clean-room original: the short trial of 2026-11-03 (seed cleanroom-fast, 25 min, 3 jobs,
+# 9,005 realistic cases, the oracle cache in use mode; oracles/difftest/2026-11-03-cleanroom-fast)
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["exception"]
+status = "harness"
+explanation = "153 cases: the original's suite read images with nibabel, which needs backports.zstd for FSL 6.0.7.23's NIFTI_ZST outputs (152), and refused a NIfTI-2 header whose quaternion's squares sum to a little more than 1 (1, FSL's own output). The suite now reads zstd and bzip2 images through the shared stream reader and such headers without nibabel's affine; all 153 agree on replay."
+link = "validation/difftest/cases/fsl-fast-original/zstd-outputs.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Bias field and restored image: relative difference (pN.N)"]
+status = "fixed"
+explanation = "13 cases (14 on replay), each with a class of NaN variance: the mask's mean of the bias field is NaN, so FSL's b - mean and b · M make the field NaN over the whole image, _restore and _bias NaN outside the mask too; the original wrote the input and 1 there. Fixed: the field outside the mask is (0 - mean) · 0, as specs/fast.md §4.5 computes it; all 14 agree."
+link = "validation/difftest/cases/fsl-fast-original/bias-nan-outside-mask.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Standard output (numbers to N significant digits)"]
+status = "fixed"
+explanation = "13 cases with -v and several channels: (1) a singular covariance in the k-means initialisation, where FAST aborts without printing that iteration's 'KMeans Iteration k' line (9 cases; the original now prints it once the covariances are inverted); (2) FSL-101 reproduced with -v, where FAST prints 'Beginning prior-based initialisation' before it crashes (3 cases; the original now prints it before its refusal); 12 agree. Open: one case (cleanroom-fast 1840, -n 4 with two channels) whose statistics degenerate: FSL prints MEAN -nan from the second bias iteration on where the original prints MEAN 1 (a class weight sum of 0); its images agree within the thresholds. Reported with its reproducer (spec question: how FSL's posteriors become NaN after a NaN covariance)."
+link = "validation/difftest/cases/fsl-fast-original/singular-kmeans-line.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Exit status", "Files written", "Standard error (the original's own lines left out)"]
+status = "explained"
+explanation = "1 case (two channels, -n 4, one slice): a class covariance that is singular in exact arithmetic; the original's LU finds an exactly zero pivot and aborts as FAST does on a singular matrix (inv(): matrix is singular), FSL's arithmetic leaves a pivot of rounding size and it finishes. Which of the two a rank-deficient covariance gives is decided by the last bits of the matrix arithmetic, which specs/fast.md §8.6 does not ask the original to follow (the replica follows OpenBLAS)."
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Partial volumes (_pve_n): mean and pN.N differences, totals", "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels"]
+status = "explained"
+explanation = "2 cases (cleanroom-fast 2215 and 2311): several channels of which two are noise-free, so each class's covariance is ill-conditioned; the partial volumes (and one class's Dice of _pveseg, 0.99891) move with the matrix arithmetic's last bits, as the standard tier's multi/s5 (the original against itself with one rounding change moves as far: validation/investigations/cleanroom-fast/self_band.py). Following LAPACK and OpenBLAS bit for bit is the replica's job (specs/fast.md §8.6)."
+'''
+
+# ------------------------------------------------------------------ docs/validation/difftest.md
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "| `fsl-fast` | `parity.fsl_fast_replica`"
+text = "| `fsl-fast-original` | `parity.fsl_fast` (the replica's draws, `difftest/tools/fsl_fast_original.py`; its `Run` payloads and treatment of FSL's never-written voxels; the permanent cases in `validation/difftest/cases/fsl-fast-original/`) | clean-room original vs fast | the same as `fsl-fast` (since 2026-11-03; its trial with `LARMORX_DIFFTEST_CACHE_MODE=use`) |"
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "- so the cache grows only by the findings, a few per night at most; nothing is ever deleted."
+text = '''- **a part's short trial** may run the originals through the cache in `use` mode instead
+  (`LARMORX_DIFFTEST_CACHE_MODE=use`, `runner.explore_mode`; `off` stays the default for nights):
+  its original runs are stored, so its replays, re-checks and permanent cases are served and no
+  original result is computed twice (every FSL run of a part through the cache, the briefs since
+  2026-11-02; FAST's clean-room trial of 2026-11-03 was the first: 9,005 cases, a few hundred MB).'''
+
+# ----------------------------------------------------------------------------- the site's files
+
+[[op]]
+do = "edit"
+file = "site:site.yml"
+old = "summary: \"Tissue segmentation (fast): classes, partial volumes, the bias field, one to eight channels, FSL's tissue priors; an exact replica in larmorx-nc; the clean-room original planned.\" }"
+new = "summary: \"Tissue segmentation (fast): classes, partial volumes, the bias field, several channels, FSL's tissue priors; a clean-room original, fMRIPrep's call bit for bit FSL's with correctly rounded maths and up to 67 times faster, and an exact replica in larmorx-nc.\" }"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "[its page](/tools/fsl-fast/); FAST's clean-room original beside topup's replica next |"
+new = "[its page](/tools/fsl-fast/); FAST's clean-room original complete (2026-11-03): every option, any number of channels, 60 of 61 compared cases within its thresholds, fMRIPrep's call on three oracle runs bit for bit what FSL computes with correctly rounded maths, 9 to 11 times faster than FSL on one thread and 47 to 67 times on 14; topup's replica under way |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "**Last updated: 2026-11-02.**"
+new = "**Last updated: 2026-11-03.**"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''| Completed | Step |
+|---|---|
+'''
+new = '''| Completed | Step |
+|---|---|
+| 2026-11-03 | **FAST's clean-room original.** FSL's tissue segmentation written in LARMORX itself (Apache-2.0) from its behavioural specification, the paper and black-box runs of FSL's program, without FSL's code: every option, message and failure case, one channel or any number, FSL's tissue priors registered by FLIRT's clean-room original; 60 of 61 compared cases within its thresholds, fMRIPrep's call on three oracle runs bit for bit what FSL computes with correctly rounded maths; built for speed (parallel sweeps with the serial result, a vectorised `exp` with the same bits): 2.4 to 5.2 s on one thread against FSL's 22 to 60 s, under a second on 14; [the page](/tools/fsl-fast/) |
+'''

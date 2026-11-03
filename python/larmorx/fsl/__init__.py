@@ -16,9 +16,10 @@ the original. ``flirt``, ``convert_xfm`` and FLIRT's other programs (``avscale``
 programs ``img2imgcoord``, ``std2imgcoord`` and ``img2stdcoord``, ``rmsdiff``, ``makerot``,
 ``midtrans``, ``pointflirt``, ``applyxfm4d``) and scripts (``pairreg``, ``extracttxt``,
 ``aff2rigid``) have both too (the originals written from ``specs/flirt.md``, since 2026-11-02).
-``fast`` (FSL's tissue segmentation, since 2026-11-02), ``topup`` and ``applytopup`` (the
-susceptibility field from reversed phase encodings and its correction, since 2026-11-03) have
-their replicas only.
+``fast`` (FSL's tissue segmentation) has its replica (since 2026-11-02) and its clean-room
+original (since 2026-11-03, written from ``specs/fast.md``; one channel so far). ``topup`` and
+``applytopup`` (the susceptibility field from reversed phase encodings and its correction, since
+2026-11-03) have their replicas only.
 """
 
 from larmorx.fsl.bet import (

@@ -1,18 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
-"""FAST's evidence (the larmorx-nc replica, FSL Licence; the clean-room original is still to be
-written): fMRIPrep's tissue segmentation call (``anat_fit_wf/fast``: ``fast -I 0 -N -p -g -S 1
+"""FAST's evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
+Apache-2.0): fMRIPrep's tissue segmentation call (``anat_fit_wf/fast``: ``fast -I 0 -N -p -g -S 1
 <T1w brain>``) on three oracle runs (an adult, and the data panel's 3.5-year-old and glioma
-patient), the bias field FAST estimates by default, FSL's tissue priors (``-a``, where the
-replica's default corrects FSL-09 inside FLIRT's resampling of the priors) and a three-channel
-segmentation, by FSL 6.0.7.23 and by the replica in its ``reproduce`` and default modes (and at
-one thread); every file FAST writes, the tissue volumes the partial-volume maps give, fMRIPrep's
-own outputs, and every case of the record with its verdict.
+patient), the bias field FAST estimates by default, FSL's tissue priors (``-a``, where both
+implementations' default corrects FSL-09 inside FLIRT's resampling of the priors) and a
+three-channel segmentation, by FSL 6.0.7.23 (as built, and with correctly rounded maths: the
+original's own last-bit band), by the replica in its ``reproduce`` and default modes (and at one
+thread) and by the clean-room original in its ``reproduce`` and default modes at 14 threads and
+one; every file FAST writes, the tissue volumes the partial-volume maps give, fMRIPrep's own
+outputs, every case of both records with its verdict (the original's classified against FSL with
+correctly rounded maths), and the benchmark.
 
-Every run of FSL is a run of the parity record (``parity.fsl_fast_replica``), with the same
-arguments, environment and inputs, through the oracle-output cache (``use`` mode): the page
-computes no original result of its own. The replica runs as a separate program; nothing here
-imports it. Everything shown lies inside the brain: fMRIPrep's skull-stripped T1w (dilated by
-two voxels), or the template's brain mask: no face can show.
+Every run of FSL goes through the oracle-output cache (``use`` mode) with the parity suites'
+keys (``parity.fsl_fast_replica``), so the runs the records made are served; FSL with the
+CORE-MATH preload is the clean-room suite's band run (``parity.fsl_fast``). The replica runs as a
+separate program; nothing here imports it. Everything shown lies inside the brain: fMRIPrep's
+skull-stripped T1w (dilated by two voxels), or the template's brain mask: no face can show.
 """
 
 from __future__ import annotations
@@ -57,6 +60,22 @@ PANELS = [
     ("replica", "larmorx", "larmorx-nc replica", "reproduce mode, 4 threads"),
     ("replica-1", "larmorx", "larmorx-nc replica", "reproduce mode, 1 thread"),
     ("replica-fix", "larmorx", "larmorx-nc replica", "default mode (D13 corrections), 4 threads"),
+]  # fmt: skip
+#: The clean-room original's record, and its runs: label, D13 mode, threads (its result is the
+#: same at any thread count: docs/benchmarks/fsl-fast.md).
+RECORD_ORIG = "fsl-fast"
+ORIGINAL_RUNS = [("original", "reproduce", 14), ("original-1", "reproduce", 1),
+                 ("original-fix", "fix", 14)]  # fmt: skip
+#: The panels of the original's entries: FSL with correctly rounded maths first (the closest
+#: reference of the original), then the original's runs.
+ORIGINAL_PANELS = [
+    ("fsl-cr", "original", "FSL 6.0.7.23, correctly rounded maths",
+     "the same program with CORE-MATH's exp, log, expf and logf preloaded, through the oracle "
+     "cache"),
+    ("original", "larmorx", "LARMORX clean-room original", "reproduce mode, 14 threads"),
+    ("original-1", "larmorx", "LARMORX clean-room original", "reproduce mode, 1 thread"),
+    ("original-fix", "larmorx", "LARMORX clean-room original",
+     "default mode (D13 corrections), 14 threads"),
 ]  # fmt: skip
 #: The tissues of a three-class T1-weighted segmentation (``-t 1``: classes by intensity).
 TISSUES = ("CSF", "grey matter", "white matter")
@@ -323,6 +342,305 @@ def named_entry(ctx: core.Context) -> fcache.Entry:
     )
 
 
+# ------------------------------------------------------------------ the clean-room original
+
+
+def _orig():
+    from larmorx_validation.parity import fsl_fast as orig
+
+    return orig
+
+
+def versions_original() -> dict[str, str]:
+    """FSL's version, the original's and the CORE-MATH preload's (by its content)."""
+    import larmorx
+    from larmorx_validation.figures.core import sha256
+
+    lib = _orig().crmath_preload()
+    return {
+        "fsl": _fsl_version(),
+        "larmorx": f"larmorx {larmorx.__version__} (the clean-room original, crate larmorx-fsl, "
+        "Apache-2.0)",
+        "core-math": "CORE-MATH's correctly rounded exp, log, expf, logf (the workspace's "
+        f"preload, sha256 {sha256(lib)[:16]})"
+        if lib
+        else "CORE-MATH preload not found",
+    }
+
+
+def _fsl_version() -> str:
+    from larmorx_validation.parity import fsl_versions
+    from larmorx_validation.parity.fsl_flirt_replica import fsldir
+
+    return (
+        f"FSL {fsl_versions.version_of(fsldir())} (fsl-fast4 2111.3; ~/fsl-6.0.7.23, never on "
+        "the PATH)"
+    )
+
+
+def _original_run(
+    e: fcache.Entry, label: str, args: list[str], put_inputs, settings: dict, mode: str, n: int
+) -> None:
+    """The clean-room original on ``args`` in ``<entry>/<label>`` (it writes its outputs where
+    FSL does: its working directory), as its record runs it; the inputs removed after."""
+    import time
+
+    from larmorx_validation.parity import defects
+
+    orig = _orig()
+    cwd = e.dir / label
+    cwd.mkdir(exist_ok=True)
+    put_inputs(cwd)
+    given = list(cwd.iterdir())
+    e.ctx.log(f"  {e.tool}/{e.case}: {label}")
+    t0 = time.perf_counter()
+    p = orig.run_original(args, cwd=cwd, settings=settings, mode=mode, threads=n)
+    seconds = round(time.perf_counter() - t0, 2)
+    for f in given:
+        f.unlink()
+    env = {defects.ENV: mode, "OMP_NUM_THREADS": str(n), "LARMORX_IMPLEMENTATION": "original"}
+    run = fcache.Run(label, [*orig.original_command(), "fsl", "fast", *args], env)
+    run.exit, run.seconds, run.stderr_tail = p.code, seconds, p.stderr[-2000:]
+    e.runs.append(run)
+    (e.dir / f"{label}.log").write_text(
+        f"$ {shlex.join(run.argv)}\n# env: {env}\n# exit {p.code}, {seconds} s\n--- stdout\n"
+        f"{p.stdout}\n--- stderr\n{p.stderr}",
+        encoding="utf-8",
+    )
+    e.extra.setdefault("named", {})[label] = defects.notices_in(p.stderr)
+    if p.code != 0:
+        raise RuntimeError(f"{label}: the original exited {p.code}: {p.stderr[-800:]}")
+
+
+def _source(source: str):
+    """``(args, put_inputs, settings, never, inputs)`` of an fMRIPrep run or a record case."""
+    fs = _suite()
+    if source.startswith("ds"):
+        node = _node(source)
+        args = fs.fmriprep_args(node)
+        src = fs.fmriprep_input(source, str(node))
+        if src is None:
+            raise FileNotFoundError(f"the input of fMRIPrep's FAST node of {source}")
+
+        def put(d: Path) -> None:
+            shutil.copy(src, d / args[-1])
+
+        return args, put, {}, "", {"T1w brain (fMRIPrep's)": src}
+    run = _real_run(source)
+    ins = {a[1:]: fs.inputs() / a[1:] for a in run.args if a.startswith("@")}
+    args = [Path(a[1:]).name if a.startswith("@") else a for a in run.args]
+
+    def put_real(d: Path) -> None:
+        fs._prepare(run, d)
+
+    return args, put_real, dict(run.settings), run.never, ins
+
+
+def _compute_original(source: str):
+    def compute(e: fcache.Entry) -> None:
+        args, put, settings, never, ins = _source(source)
+        for label, path in ins.items():
+            e.input(label, path)
+        lib = _orig().crmath_preload()
+        if lib is None:
+            raise FileNotFoundError("the CORE-MATH preload (oracles/core-math-preload)")
+        # FSL with correctly rounded maths: the clean-room suite's band run (served when the
+        # record made it), the original's closest reference
+        _oracle(e, "fsl-cr", args, put, {**settings, "LD_PRELOAD": str(lib)}, never=never)
+        for label, mode, n in ORIGINAL_RUNS:
+            _original_run(e, label, args, put, settings, mode, n)
+        what = (
+            "fMRIPrep 25.2.6's FAST node of " if source.startswith("ds") else "The record's case "
+        )
+        e.finish(
+            versions=versions_original(),
+            command="fast " + " ".join(args),
+            settings=f"{what}{source}: FSL 6.0.7.23 with the CORE-MATH preload through the "
+            "oracle-output cache "
+            "(the clean-room suite's band run) and LARMORX's clean-room original as its record "
+            "runs it (reproduce mode at 14 and 1 threads, the default mode at 14); FSL as built "
+            "and the replica are the replica entry's runs of the same call",
+        )
+
+    return compute
+
+
+def original_entry(ctx: core.Context, source: str) -> fcache.Entry:
+    """The clean-room original's runs, and FSL's with correctly rounded maths, of an fMRIPrep
+    run's call (``source`` a run) or a record case (``source`` a case)."""
+    name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        f"original-{name}",
+        f"{source}: FSL 6.0.7.23 with correctly rounded maths (from the oracle cache) and "
+        "LARMORX's clean-room original, reproduce and default modes",
+        _compute_original(source),
+    )
+
+
+def case_table_original() -> dict[str, tuple[str, object]]:
+    """Every case of the clean-room original's suite (``parity.fsl_fast``: the replica suite's
+    cases and the original's own permanent cases): id -> (description, its ``Run``; None for
+    fMRIPrep's calls)."""
+    from larmorx_validation.difftest import permanent
+
+    s = _orig().suite()
+    permanent.attach(s)
+    out: dict[str, tuple[str, object]] = {}
+    for c in s.cases("full"):
+        kind, payload = c.payload
+        run = (
+            None
+            if kind == "fmriprep"
+            else payload
+            if kind == "direct"
+            else _suite()._all_cases()[payload][2]
+        )
+        out.setdefault(c.id, (c.description, run))
+    return out
+
+
+def _values(path: Path) -> np.ndarray:
+    return np.asarray(_orig()._load(path)[1])
+
+
+def _differ(a: np.ndarray, b: np.ndarray) -> tuple[int, float]:
+    """How many values differ (NaN equal to NaN) and the largest finite |a − b|."""
+    if a.shape != b.shape:
+        return int(max(a.size, b.size)), float("inf")
+    x, y = a.astype(np.float64), b.astype(np.float64)
+    same = (x == y) | (np.isnan(x) & np.isnan(y))
+    n = int(np.count_nonzero(~same))
+    d = np.abs(x - y)[~same]
+    d = d[np.isfinite(d)]
+    return n, float(d.max()) if d.size else (float("inf") if n else 0.0)
+
+
+def _compare_dirs(fsl: Path, ours: Path, cr: Path, before: set[str]) -> dict[str, dict]:
+    """Every image FSL wrote (``fsl``) against the original's (``ours``) and FSL's with
+    correctly rounded maths (``cr``): per file, (values that differ, largest |Δ|) of original −
+    FSL, FSL with CR − FSL, original − FSL with CR."""
+    from larmorx_validation.parity.fsl_mcflirt_replica import _files, _is_image
+
+    out = {}
+    fa, fb, fc = _files(fsl, set()), _files(ours, set()), _files(cr, set())
+    for key in sorted(set(fa) - before):
+        if not _is_image(key) or key not in fb or key not in fc:
+            continue
+        if key.endswith(".img") or ".img." in key:
+            continue  # an ANALYZE pair is read through its .hdr
+        a, b, c = _values(fa[key]), _values(fb[key]), _values(fc[key])
+        out[key] = {"kind": _orig()._kind(key), "orig_fsl": _differ(b, a),
+                    "cr_fsl": _differ(c, a), "orig_cr": _differ(b, c), "values": int(a.size)}  # fmt: skip
+    return out
+
+
+def _classify_case(r: dict, payloads: dict, nodes: dict, lib: Path) -> tuple[str, dict]:
+    """One case of the original's record: its default mode (exit status, the entries named)
+    and, for a case that passed, every file of FSL, FSL with correctly rounded maths and the
+    original (reproduce mode) compared, with the suite's own treatment of the memory FSL never
+    writes (FSL-96, FSL-97)."""
+    from larmorx_validation.parity.harness import CheckList
+
+    fs, orig = _suite(), _orig()
+    case = r["case"]
+    if case.startswith("fmriprep/"):
+        node = nodes[case]
+        args0 = fs.fmriprep_args(node)
+        src = fs.fmriprep_input(case.split("/")[1], str(node))
+
+        def prepare(d: Path) -> list[str]:
+            shutil.copy(src, d / args0[-1])
+            return args0
+
+        settings: dict[str, str | None] = {}
+        never, unwritten, no_bias = "", (), False
+    else:
+        kind, payload = payloads[case]
+        run = payload if kind == "direct" else fs._all_cases()[payload][2]
+
+        def prepare(d: Path) -> list[str]:
+            return fs._prepare(run, d)
+
+        settings = dict(run.settings)
+        never, unwritten, no_bias = run.never, run.unwritten, run.no_bias_field
+    out: dict = {}
+    with tempfile.TemporaryDirectory(prefix="lx-fast-ev-orig_") as t:
+        t = Path(t)
+        a, b, c, f = (t / x for x in ("fsl", "orig", "cr", "fix"))
+        for x in (a, b, c, f):
+            x.mkdir()
+        args = prepare(f)
+        p = orig.run_original(args, cwd=f, settings=settings, mode="fix", threads=4)
+        from larmorx_validation.parity import defects
+
+        out["default"] = {"exit": p.code, "named": defects.notices_in(p.stderr)}
+        if r["status"] != "pass":
+            return case, out
+        for x in (a, b, c):
+            prepare(x)
+        before = set(_files_of(a))
+        pa = fs.oracle_run(args, cwd=a, settings=settings, never=never)
+        pc = fs.oracle_run(args, cwd=c, settings={**settings, "LD_PRELOAD": str(lib)}, never=never)
+        po = orig.run_original(args, cwd=b, settings=settings, mode="reproduce", threads=4)
+        for d in (a, c):
+            if unwritten:
+                fs._clear_unwritten(CheckList(), d, unwritten)
+            if no_bias:
+                fs._undefined_bias_field(CheckList(), d, args)
+        out["served"] = {"fsl": bool(pa.cached), "fsl-cr": bool(pc.cached)}
+        out["exit"] = [pa.returncode, pc.returncode, po.code]
+        out["files"] = _compare_dirs(a, b, c, before)
+    return case, out
+
+
+def _files_of(d: Path) -> list[str]:
+    from larmorx_validation.parity.fsl_mcflirt_replica import _files
+
+    return list(_files(d, set()))
+
+
+def _compute_cases_original(e: fcache.Entry) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from larmorx_validation.difftest import permanent
+
+    rec = records.load(e.ctx.repo, RECORD_ORIG)
+    s = _orig().suite()
+    permanent.attach(s)
+    payloads = {c.id: c.payload for c in s.cases("full")}
+    nodes = {f"fmriprep/{r}": n for r, n in _suite().fmriprep_calls()}
+    lib = _orig().crmath_preload()
+    if lib is None:
+        raise FileNotFoundError("the CORE-MATH preload (oracles/core-math-preload)")
+    jobs = int(os.environ.get("LARMORX_EVIDENCE_JOBS", "3"))
+    with ThreadPoolExecutor(jobs) as pool:
+        done = dict(pool.map(lambda r: _classify_case(r, payloads, nodes, lib), rec.results))
+    e.finish(
+        versions=versions_original(),
+        cases={k: done[k] for k in sorted(done)},
+        settings="Every case of the clean-room original's record (fsl-fast), in fresh "
+        "directories with the case's inputs: the original's default mode (4 threads: its exit "
+        "status and the register entries its notices name); for each case that passed, FSL "
+        "6.0.7.23 as built and with the CORE-MATH preload through the oracle-output cache (the "
+        "record's runs served, the never-cached policies rerun) and the original in reproduce "
+        "mode, every image compared value by value (FSL's memory it never writes, FSL-96 and "
+        "FSL-97, treated as the record treats it)",
+    )
+
+
+def cases_original_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        "cases-original",
+        "Every case of the clean-room original's record: its default mode, and each passing "
+        "case's files against FSL and FSL with correctly rounded maths",
+        _compute_cases_original,
+    )
+
+
 # ------------------------------------------------------------------------- the files
 
 
@@ -389,9 +707,17 @@ def _same_file(a: Path, b: Path) -> tuple[bool, bool]:
     return x[off:] == y[off:], hx == hy
 
 
-def _files_table(tid: str, files: dict[str, Path], run_dir, labels: dict[str, str]) -> dict:
+def _files_table(
+    tid: str,
+    files: dict[str, Path],
+    run_dir,
+    labels: dict[str, str],
+    counted: dict[str, tuple[Path, Path]] | None = None,
+) -> dict:
     """Every image FAST wrote, FSL's against each run: the data and the header (``descrip``,
-    FSL's build string, aside), byte for byte."""
+    FSL's build string, aside), byte for byte; ``counted`` (column -> (run directory, reference
+    directory), the clean-room original's columns): the values of the run's file that differ
+    from the reference's when the data are not the same."""
     import nibabel as nib
 
     rows = []
@@ -403,16 +729,32 @@ def _files_table(tid: str, files: dict[str, Path], run_dir, labels: dict[str, st
             data, head = _same_file(f, run_dir(pid) / f.name)
             cells.append(common.cell("identical" if data and head else
                                      "data identical" if data else "differs"))  # fmt: skip
+        for run_d, ref_d in (counted or {}).values():
+            data, head = _same_file(ref_d / f.name, run_d / f.name)
+            if data:
+                cells.append(common.cell("identical" if head else "data identical"))
+            else:
+                n, _m = _differ(_values(run_d / f.name), _values(ref_d / f.name))
+                cells.append(common.cell(f"{n:,} values differ"))
         rows.append({"head": f"`{f.name}`", "cells": cells})
+    note = (
+        "Each file decompressed and compared byte for byte with FSL's: *identical*, the header "
+        "(its `descrip`, FSL's build string, aside) and every value; *data identical*, every "
+        "value but not the header; *differs*, values that differ (see the comparisons above)."
+    )
+    if counted:
+        note += (
+            " For the clean-room original, where the values are not the same, how many of the "
+            "file's values differ: from FSL's file, and in the last column from the file of FSL "
+            "with correctly rounded maths (the record holds them to specs/fast.md §11's "
+            "thresholds, not to FSL's bytes)."
+        )
     return common.table(
         tid,
         "Every image FAST writes, against FSL 6.0.7.23's",
-        ["File", "Type", "Voxels", *labels.values()],
+        ["File", "Type", "Voxels", *labels.values(), *(counted or {})],
         rows,
-        note="Each file decompressed and compared byte for byte with FSL's: *identical*, the "
-        "header (its `descrip`, FSL's build string, aside) and every value; *data identical*, "
-        "every value but not the header; *differs*, values that differ (see the comparisons "
-        "above).",
+        note=note,
     )
 
 
@@ -423,8 +765,10 @@ def _volumes_table(tid: str, pve: dict[str, dict[str, np.ndarray]], vox_ml: floa
     for head, maps in pve.items():
         vals = [float(np.sum(maps[f"pve_{k}"], dtype=np.float64)) * vox_ml for k in range(3)]
         ref = ref or vals
+        rel = max(abs(v - r) / abs(r) if r else 0.0 for v, r in zip(vals, ref, strict=True))
+        same = "the same" if vals == ref else f"differs (at most {100 * rel:.2g} %)"
         rows.append({"head": head, "cells": [common.cell(v, "sig6") for v in vals]
-                     + [common.cell("the same" if vals == ref else "differs")]})  # fmt: skip
+                     + [common.cell(same)]})  # fmt: skip
     return common.table(
         tid,
         "The tissue volumes of the partial-volume maps (ml)",
@@ -516,11 +860,203 @@ def _fix_same(named: list[str]) -> str:
     )
 
 
+def _diffs_original(own: bool) -> list[dict]:
+    d = common.d
+    out = [
+        d("original-fsl", "original", "fsl", "main", "clean-room original − FSL 6.0.7.23",
+          common.ROLE_LX),
+        d("original-cr", "original", "fsl-cr", "main",
+          "clean-room original − FSL, correctly rounded maths", common.ROLE_LX),
+        d("original1-original", "original-1", "original", "check",
+          "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
+        d("ofix-original", "original-fix", "original", "check",
+          "clean-room original, default − reproduce mode", common.ROLE_SELF),
+        d("cr-fsl", "fsl-cr", "fsl", "variability",
+          "FSL, correctly rounded maths − FSL as built", common.ROLE_ORIG),
+    ]  # fmt: skip
+    if own:
+        out.insert(2, d("original-own", "original", "own", "fmriprep",
+                        "clean-room original − fMRIPrep's own output", common.ROLE_FMRIPREP))  # fmt: skip
+    return out
+
+
+def _beyond(x: dict, y: dict) -> list[str]:
+    """The outputs where comparison ``x`` differs in more values, or by more, than ``y``."""
+    out = []
+    for o, m in x["metrics"].items():
+        n = y["metrics"].get(o)
+        if n is not None and (m["differ"] > n["differ"] or m["max_abs"] > n["max_abs"]):
+            out.append(o)
+    return out
+
+
+def _counts(x: dict, outputs: list[str], labels: dict[str, str], y: dict | None = None) -> str:
+    """The differences of comparison ``x`` in ``outputs`` (and of ``y``, the yardstick)."""
+    parts = []
+    for o in outputs[:3]:
+        m = x["metrics"][o]
+        t = f"{labels.get(o, o)}: {m['differ']:,} values differ (at most {m['max_abs']:.3g})"
+        if y is not None and o in y["metrics"]:
+            n = y["metrics"][o]
+            t += f", FSL's own {n['differ']:,} (at most {n['max_abs']:.3g})"
+        parts.append(t)
+    more = len(outputs) - 3
+    return "; ".join(parts) + (f"; {more} more" if more > 0 else "")
+
+
+FINDINGS = "docs/findings/fsl-fast-original.md"
+REGISTER = "docs/findings/upstream-defects.md"
+#: The corrections the clean-room original's default mode names, as it makes them.
+ORIGINAL_FIX = {
+    "FSL-09": "FSL-09, corrected by default with a notice: FAST registers FSL's tissue priors "
+    "(8-bit integers) onto the image with FLIRT, which writes its resampled values in that "
+    "integer type truncated toward zero; the clean-room original's default (FLIRT's clean-room "
+    "original, run in the same process) rounds them to the nearest integer, so the priors FAST "
+    "starts from, and its result, differ. Its reproduce mode follows FSL (the rows above).",
+    "FSL-98": "FSL-98, corrected by default with a notice: with several channels, sorting the "
+    "classes gives each class another class's covariance and posteriors when the classes move "
+    "in a cycle; the default gives each class its own.",
+    "FSL-103": "FSL-103, corrected by default with a notice: the brain mask leaves out the voxels "
+    "equal to the maximum when it is 2^24 or more.",
+}
+
+
+def _verdicts_original(
+    diffs: list[dict], same: dict[str, bool], what: str, oinfo: dict, labels: dict[str, str]
+):
+    """The clean-room original's comparisons: verdicts from the metrics, against FSL as built,
+    FSL with correctly rounded maths and FSL's own last-bit band (``cr-fsl``)."""
+    by = {x["id"]: x for x in diffs}
+    named = [n for n in oinfo.get("named", {}).get("original-fix", []) if n.startswith("FSL-")]
+    shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
+    band = by["cr-fsl"]
+    for x in diffs:
+        i = x["id"]
+        x["links"] = []
+        if x["kind"] == "variability":
+            x["verdict"] = None
+            x["reason"] = (
+                f"FSL's result on {what} does not move when exp, log, expf and logf are "
+                "correctly rounded."
+                if same[i]
+                else "The yardstick: FSL against itself with CORE-MATH's correctly rounded exp, "
+                "log, expf and logf preloaded into the same unmodified program, so how far FSL's "
+                "result moves when only those functions' last bits change. FAST's single-channel "
+                "variance in the log domain cancels most digits, so such a change moves a few "
+                "voxels of the smallest classes and mixel types."
+            )
+            x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
+        elif same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = {
+                "original-fsl": f"The same values, every one, in every image FAST writes on "
+                f"{what}.",
+                "original-cr": "With correctly rounded maths FSL computes exactly the clean-room "
+                f"original's values in every image FAST writes on {what}: the original follows "
+                "FAST's arithmetic, with correctly rounded exp and log.",
+                "original1-original": "The thread count changes nothing: the clean-room "
+                "original's parallel sweeps (a pipeline of planes in the serial order), blocked "
+                "sums and sorts give its one-thread result bit for bit at any thread count.",
+                "ofix-original": _fix_same(named),
+            }.get(i, "The same values, every one.")
+        elif i == "ofix-original" and shown:
+            x["verdict"] = "d13"
+            x["reason"] = " ".join(
+                ORIGINAL_FIX.get(n, f"{n}, corrected by default.") for n in shown
+            )
+            x["links"] += [{"label": n, "href": REGISTER} for n in shown]
+        elif i == "original-own" and not same.get("replica-own"):
+            x["verdict"] = "open"
+            x["reason"] = "fMRIPrep's own output is not FSL's here (see the replica's row)."
+        elif i in ("original-fsl", "original-own"):
+            pre = (
+                "fMRIPrep's own files are FSL's (the replica's row): "
+                if i == "original-own"
+                else ""
+            )
+            beyond = _beyond(by["original-fsl"], band)
+            if same["original-cr"]:
+                x["verdict"] = "identical-cr"
+                x["reason"] = pre + (
+                    "With CORE-MATH's correctly rounded exp, log, expf and logf preloaded into the "
+                    "same unmodified FSL, FSL gives the clean-room original's values in every image "
+                    f"FAST writes on {what}: the differences from FSL as built come from glibc's "
+                    "last bits in those functions alone."
+                )
+            elif not beyond:
+                x["verdict"] = "within-variability"
+                diff_out = [
+                    o for o, m in by["original-fsl"]["metrics"].items() if not m["identical"]
+                ]
+                x["reason"] = pre + (
+                    "In every output the clean-room original differs from FSL in no more values, "
+                    "and by no more, than FSL itself does when only its maths functions' last "
+                    "bits change (FSL with correctly rounded maths − FSL, the yardstick row): "
+                    + _counts(by["original-fsl"], diff_out, labels, band)
+                    + "."
+                )
+                x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
+            elif not _beyond(by["original-cr"], band):
+                x["verdict"] = "within-variability"
+                near = [o for o, m in by["original-cr"]["metrics"].items() if not m["identical"]]
+                x["reason"] = pre + (
+                    "In every output the clean-room original is no further from FSL with "
+                    "correctly rounded maths than FSL as built is (the yardstick row): FSL's own "
+                    "last-bit band. Against FSL with correctly rounded maths: "
+                    + _counts(by["original-cr"], near, labels, band)
+                    + "; the partial volumes that differ are each one fraction step (0.01) away, "
+                    "near ties decided by last bits."
+                    if near
+                    else ""
+                )
+                x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
+            else:
+                x["verdict"] = "open"
+                x["reason"] = pre + (
+                    "Within the record's thresholds (specs/fast.md §11), but in "
+                    f"{len(beyond)} output(s) the clean-room original differs from FSL, and from "
+                    "FSL with correctly rounded maths, more than the two differ from each other: "
+                    + _counts(by["original-fsl"], beyond, labels, band)
+                    + ". FAST's single-channel variance in the log domain cancels most digits, "
+                    "so a last-bit change of a posterior moves a few voxels of the smallest "
+                    "classes; it can still be improved."
+                )
+                x["links"].append({"label": "findings", "href": FINDINGS})
+        elif i == "original-cr":
+            beyond = _beyond(x, band)
+            diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
+            if not beyond:
+                x["verdict"] = "within-variability"
+                x["reason"] = (
+                    "Not the same bits as FSL with correctly rounded maths, but no further from it, "
+                    "in any output, than FSL as built is (the yardstick row): "
+                    + _counts(x, diff_out, labels, band)
+                    + "."
+                )
+            else:
+                x["verdict"] = "open"
+                x["reason"] = (
+                    "Further from FSL with correctly rounded maths than FSL as built is, in "
+                    f"{len(beyond)} output(s): " + _counts(x, beyond, labels, band) + "."
+                )
+            x["links"].append({"label": "findings", "href": FINDINGS})
+        else:
+            x["verdict"] = "open"
+            x["reason"] = "Not accounted for by the other runs of this example (see the record)."
+
+
 def _note(n: int, extra: str = "") -> str:
     return (
         f"Δ is A − B, computed in float64 over all {n:,} voxels of the outputs, not only those "
         "shown. The record's threshold: every file FSL writes bit-identical (images "
-        "decompressed, `descrip` left out), with FSL's exit status and messages." + extra
+        "decompressed, `descrip` left out), with FSL's exit status and messages."
+        + extra
+        + " The clean-room original's record (fsl-fast) holds it to specs/fast.md §11's "
+        "thresholds instead: FSL's exit status, files and messages (numbers to 4 significant "
+        "digits); the label images per-class Dice ≥ 0.999 with ≥ 99.9 % of the mask's voxels "
+        "identical; the partial volumes' mean |Δ| ≤ 0.001, 99.9th percentile ≤ 0.02, totals "
+        "within 0.1 %; the probabilities' mean |Δ| ≤ 0.001; the bias field and corrected image "
+        "within 1e-4 relative at the 99.9th percentile."
     )
 
 
@@ -528,9 +1064,19 @@ def _load(run_dir: Path, files: dict[str, Path]) -> dict[str, np.ndarray]:
     return {k: common.load(str(run_dir / f.name)) for k, f in files.items()}
 
 
-def _programs(info: dict) -> str:
+def _programs(info: dict, oinfo: dict | None = None) -> str:
     vers = info.get("versions", {})
     served = info.get("oracle_cache", {})
+    extra = ""
+    if oinfo is not None:
+        ov = oinfo.get("versions", {})
+        cr = oinfo.get("oracle_cache", {}).get("fsl-cr")
+        extra = (
+            f"; the same FSL with {ov.get('core-math', 'CORE-MATH')} ("
+            + ("served from the oracle cache" if cr == "served" else "run through the oracle cache")
+            + f"); {ov.get('larmorx', '?')}, from larmorx at commit "
+            f"`{oinfo['larmorx_commit'][:12]}`"
+        )
     return (
         f"{vers.get('fsl', '?')} ("
         + (
@@ -539,8 +1085,48 @@ def _programs(info: dict) -> str:
             else "run for this page through the oracle cache"
         )
         + f"); {vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
-        f"`{info['larmorx_commit'][:12]}`"
+        f"`{info['larmorx_commit'][:12]}`" + extra
     )
+
+
+def _differs_at(ex, a: str, b: str, out: str, at: list[int]) -> bool:
+    """Whether panels ``a`` and ``b`` differ in ``out`` at the display voxel ``at``."""
+    va, vb = ex.values(ex.key(a, out)), ex.values(ex.key(b, out))
+    return bool(va[tuple(at)] != vb[tuple(at)])
+
+
+def _priors_same(pri: list[Path], run_dir: Path) -> str:
+    """How a run's registered priors compare with FSL's."""
+    res = [_same_file(p, run_dir / p.name) for p in pri if (run_dir / p.name).is_file()]
+    if len(res) != len(pri):
+        return "not all written"
+    if all(d and h for d, h in res):
+        return "FSL's bytes"
+    if all(d for d, _h in res):
+        return "FSL's values"
+    n = sum(_differ(_values(p), _values(run_dir / p.name))[0] for p in pri)
+    return f"{n:,} values other than FSL's (FSL-09: rounded)"
+
+
+def _panel_order() -> list[tuple[str, str, str, str]]:
+    """FSL, FSL with correctly rounded maths, the replica's runs, the original's."""
+    return [PANELS[0], ORIGINAL_PANELS[0], *PANELS[1:], *ORIGINAL_PANELS[1:]]
+
+
+def _counted(e: fcache.Entry, o: fcache.Entry) -> dict[str, tuple[Path, Path]]:
+    """The files table's columns of the clean-room original."""
+    return {
+        "original (reproduce)": (o.dir / "original", e.dir / "fsl"),
+        "original (default)": (o.dir / "original-fix", e.dir / "fsl"),
+        "original − FSL, correctly rounded maths": (o.dir / "original", o.dir / "fsl-cr"),
+    }
+
+
+def _provenance(info: dict, e: fcache.Entry, oinfo: dict, o: fcache.Entry, data: list) -> list:
+    """Both entries' provenance: the replica's and the original's runs."""
+    first = common.provenance(info, f"{TOOL}/{e.case}", data)
+    second = common.provenance(oinfo, f"{TOOL}/{o.case}", data)
+    return first + [line for line in second if line.startswith("Runs:")]
 
 
 def _default_view(ex, view: str, a: str, b: str, out: str) -> list[int]:
@@ -558,6 +1144,8 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
 
     e = fmriprep_entry(ctx, run)
     info = e.info()
+    o = original_entry(ctx, run)
+    oinfo = o.info()
     node = _node(run)
     src = e.dir / "fsl"
     name = info["input"]
@@ -574,17 +1162,31 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
                      "FAST's input in fMRIPrep: the T1w, denoised, N4-corrected and "
                      "skull-stripped (float32)", {"all": t1}))  # fmt: skip
     arrays = {pid: _load(e.dir / pid, files) for pid, *_ in PANELS}
-    for pid, role, label, sub in PANELS:
+    arrays.update({pid: _load(o.dir / pid, files) for pid, *_ in ORIGINAL_PANELS})
+    for pid, role, label, sub in _panel_order():
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
     own_files = {k: node / f.name for k, f in files.items() if (node / f.name).is_file()}
     own = {k: common.load(str(p)) for k, p in own_files.items()}
-    diffs = _diffs(True)
+    rdiffs, odiffs = _diffs(True), _diffs_original(True)
+    diffs = rdiffs + odiffs
     outputs = _outputs(files)
     common.compare_all(ex, diffs, outputs, full={"own": own})
     same = common.identical(diffs)
-    _verdicts(diffs, same, "this call", info, bias=False)
-    at = _default_view(ex, view, "fsl", "replica", "pve_1")
-    where = "the brain's centre"
+    _verdicts(rdiffs, same, "this call", info, bias=False)
+    _verdicts_original(odiffs, same, "this call", oinfo, {x["id"]: x["label"] for x in outputs})
+    if view == "slices":
+        # the three slices stay where they were before the original joined the example
+        at = _default_view(ex, view, "fsl", "replica", "pve_1")
+        where = "the brain's centre"
+    else:
+        at = _default_view(ex, view, "fsl", "original", "pve_1")
+        where = (
+            "the voxel of the slice with the most brain where the clean-room original's grey "
+            "matter differs most from FSL's"
+            if _differs_at(ex, "fsl", "original", "pve_1", at)
+            else "the brain's centre (no voxel of the slice with the most brain differs between "
+            "FSL and the clean-room original)"
+        )
     if run in VIEW_AT:
         at = grid.display_index(VIEW_AT[run])
         where = "the tumour"
@@ -592,15 +1194,20 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         "output": "pve_1",
         "plane": "axial",
         "voxel": at,
-        "panels": ["t1w", "fsl", "replica", "replica-fix"],
-        "diffs": ["replica-fsl", "fix-replica"],
-        "compare": {"a": "fsl", "b": "replica"},
+        "panels": ["t1w", "fsl", "replica", "original"],
+        "diffs": ["replica-fsl", "original-fsl"],
+        "compare": {"a": "fsl", "b": "original"},
     }
+    agree = (
+        "the replica agrees with FSL everywhere; the clean-room original's differences are "
+        "sought in them"
+        if view == "slices"
+        else "the replica agrees with FSL everywhere"
+    )
     out = common.finish(
         ctx, ex, diffs, copy.deepcopy(outputs), default=default, window_panel="fsl",
-        caption=(f"the three slices through {where} are stored at full resolution (the "
-                 "outputs agree everywhere)." if view == "slices"
-                 else f"the crosshair at {where} (the outputs agree everywhere)."),
+        caption=(f"the three slices through {where} are stored at full resolution ({agree})."
+                 if view == "slices" else f"the crosshair at {where} ({agree})."),
     )  # fmt: skip
     vox_ml = float(np.prod(img.header.get_zooms()[:3])) / 1000.0
     pve = {
@@ -608,6 +1215,9 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         "replica (reproduce)": arrays["replica"],
         "replica (default)": arrays["replica-fix"],
         "fMRIPrep's own (its image's FSL)": own,
+        "FSL 6.0.7.23, correctly rounded maths": arrays["fsl-cr"],
+        "clean-room original (reproduce)": arrays["original"],
+        "clean-room original (default)": arrays["original-fix"],
     }
     run_dirs = {"replica": e.dir / "replica", "replica-fix": e.dir / "replica-fix"}
     tables = [
@@ -616,6 +1226,7 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
             files,
             lambda pid: run_dirs[pid],
             {"replica": "replica (reproduce)", "replica-fix": "replica (default)"},
+            _counted(e, o),
         ),
         _volumes_table(
             f"{ex_id}-volumes",
@@ -624,7 +1235,8 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
             "Each partial-volume map summed over every voxel in float64, times the voxel's "
             f"volume ({vox_ml * 1000:.4g} mm³); fMRIPrep's own maps are the node's outputs in "
             "the run's working directory (FSL in fMRIPrep 25.2.6's image). *the same*: the "
-            "three volumes equal FSL's to the last digit of float64.",
+            "three volumes equal FSL's to the last digit of float64; otherwise the largest "
+            "relative difference of the three.",
         ),
     ]
     n_vox = int(np.prod(img.shape[:3]))
@@ -640,8 +1252,10 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         "summary": (
             f"The FAST node fMRIPrep 25.2.6 ran on {words}: `fast -I 0 -N -p -g -S 1 <T1w "
             "brain>` (no bias field: fMRIPrep corrected it with N4 before; the posterior "
-            "probabilities and the binary class images written too), given to FSL 6.0.7.23 and "
-            "to the larmorx-nc replica in its reproduce and default modes and at one thread. "
+            "probabilities and the binary class images written too), given to FSL 6.0.7.23 (as built, "
+            "and with correctly rounded maths), to the larmorx-nc replica in its reproduce and "
+            "default modes and at one thread, and to LARMORX's clean-room original in its "
+            "reproduce and default modes at 14 threads and at one. "
             "Choose the output above the panels: the segmentation, the three partial-volume "
             "maps fMRIPrep keeps, the probabilities, the mixel types, the binary classes. "
             "Below the viewer, every file FAST writes and the tissue volumes the maps give, "
@@ -662,7 +1276,7 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
             },
             {"label": "Node", "text": f"fMRIPrep 25.2.6, `{info.get('node', '')}`"},
             {"label": "Command", "text": "`fast -I 0 -N -p -g -S 1 " + name + "`"},
-            {"label": "Programs", "text": _programs(info)},
+            {"label": "Programs", "text": _programs(info, oinfo)},
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
         ],
         **out,
@@ -671,10 +1285,11 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
             ["main", "LARMORX against FSL"],
             ["check", "LARMORX against itself: threads and modes"],
             ["fmriprep", "LARMORX against fMRIPrep's own output"],
+            ["variability", "FSL against itself: the yardstick"],
         ],
         "tables": tables,
         "metrics_note": _note(n_vox),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "provenance": _provenance(info, e, oinfo, o, [data]),
     }
 
 
@@ -685,8 +1300,9 @@ REAL_TEXT = {
         "The record's case `opt/bias-outputs`: FAST's default segmentation, which estimates "
         "a smooth bias field along with the classes and divides it out at each iteration "
         "(`-b` writes the field, `-B` the corrected image, `-g` the binary classes), on "
-        "ds000005's skull-stripped T1w at half resolution, by FSL 6.0.7.23 and the replica in "
-        "its reproduce and default modes; choose the bias field above the panels.",
+        "ds000005's skull-stripped T1w at half resolution, by FSL 6.0.7.23 (as built and with "
+        "correctly rounded maths), the replica and the clean-room original, each in its "
+        "reproduce and default modes; choose the bias field above the panels.",
     ),
     "priors": (
         "FSL's tissue priors (-a), and a correction by default",
@@ -696,7 +1312,8 @@ REAL_TEXT = {
         "its brain mask; `-v` prints every step. FSL 6.0.7.23 and the replica's reproduce mode "
         "give the same bytes; the replica's default corrects FSL-09 in FLIRT's resampling of "
         "the priors, and so starts from other priors: the difference *replica, default − "
-        "reproduce mode* shows what that changes.",
+        "reproduce mode* shows what that changes. The clean-room original registers the priors "
+        "with FLIRT's clean-room original in the same process, in both modes the same way.",
     ),
     "multi-channel": (
         "Three channels: T1w, T2w and BOLD reference",
@@ -704,8 +1321,10 @@ REAL_TEXT = {
         "(MNI152NLin2009cAsym's 2 mm T1w, T2w and BOLD reference inside its brain mask; the "
         "last image named, the T1w, is channel 1, which names the outputs and orders the "
         "classes), each class a Gaussian in three dimensions with its 3 × 3 covariance, a bias "
-        "field per channel (`-b`, `-B`); by FSL 6.0.7.23 and the replica in its reproduce and "
-        "default modes.",
+        "field per channel (`-b`, `-B`); by FSL 6.0.7.23 (as built and with correctly rounded "
+        "maths), the replica and the clean-room original, each in its reproduce and default "
+        "modes. The matrix arithmetic need not follow LAPACK's bits in the clean-room original "
+        "(specs/fast.md §8.6): its own LU decomposition.",
     ),
 }
 #: The derived inputs' labels.
@@ -728,6 +1347,8 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
     case = REAL[ex_id]
     e = real_entry(ctx, case)
     info = e.info()
+    o = original_entry(ctx, case)
+    oinfo = o.info()
     run = _real_run(case)
     fs = _suite()
     images = [a[1:] for a in run.args if a.startswith("@") and a.endswith(".nii.gz")]
@@ -748,33 +1369,51 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
             sub = f"channel {k + 1}; {sub}"
         ex.add(exm.Panel(f"in{k + 1}", "input", label, sub, {"all": chans[n]}))
     arrays = {pid: _load(e.dir / pid, files) for pid, *_ in PANELS}
-    for pid, role, label, sub in PANELS:
+    arrays.update({pid: _load(o.dir / pid, files) for pid, *_ in ORIGINAL_PANELS})
+    for pid, role, label, sub in _panel_order():
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
-    diffs = _diffs(False)
+    rdiffs, odiffs = _diffs(False), _diffs_original(False)
+    diffs = rdiffs + odiffs
     outputs = _outputs(files, channels if len(images) > 1 else None)
     common.compare_all(ex, diffs, outputs)
     same = common.identical(diffs)
     bias = "-N" not in run.args
-    _verdicts(diffs, same, "this case", info, bias=bias)
+    _verdicts(rdiffs, same, "this case", info, bias=bias)
+    _verdicts_original(odiffs, same, "this case", oinfo, {x["id"]: x["label"] for x in outputs})
     if ex_id == "priors":
         out_id, a, b = "pve_1", "replica-fix", "replica"
-        panels = ["in1", "fsl", "replica", "replica-fix"]
-        cap = "the crosshair where the default mode's grey matter differs most from FSL's."
+        panels = ["in1", "fsl", "replica", "replica-fix", "original-fix"]
+        cap = (
+            "the crosshair where the replica's default grey matter differs most from FSL's "
+            "(the clean-room original's default makes the same correction)."
+        )
+        shown_diffs = ["replica-fsl", "fix-replica", "ofix-original"]
     elif ex_id == "bias-field":
-        out_id, a, b = "bias", "fsl", "replica"
-        panels = ["in1", "fsl", "replica"]
-        cap = "the crosshair at the brain's centre (the outputs agree everywhere)."
+        out_id, a, b = "bias", "fsl", "original"
+        panels = ["in1", "fsl", "replica", "original"]
+        what_differs = "bias field"
+        shown_diffs = ["replica-fsl", "original-fsl"]
     else:
-        out_id, a, b = "seg", "fsl", "replica"
-        panels = ["in1", "in2", "in3", "fsl", "replica"]
-        cap = "the crosshair at the brain's centre (the outputs agree everywhere)."
+        out_id, a, b = "seg", "fsl", "original"
+        panels = ["in1", "in2", "in3", "fsl", "replica", "original"]
+        what_differs = "classes"
+        shown_diffs = ["replica-fsl", "original-fsl"]
     at = _default_view(ex, "volume", a, b, out_id)
+    if ex_id != "priors":
+        cap = (
+            f"the crosshair where the clean-room original's {what_differs} differs most from "
+            "FSL's in the slice with the most brain (the replica agrees everywhere)."
+            if _differs_at(ex, a, b, out_id, at)
+            else "the crosshair at the brain's centre: no voxel of the slice with the most brain "
+            f"differs in the {what_differs} between FSL and the clean-room original (the "
+            "replica agrees everywhere)."
+        )
     default = {
         "output": out_id,
         "plane": "axial",
         "voxel": at,
         "panels": panels,
-        "diffs": ["replica-fsl", "fix-replica"],
+        "diffs": shown_diffs,
         "compare": {"a": a, "b": b},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(outputs), default=default,
@@ -786,6 +1425,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
             files,
             lambda pid: run_dirs[pid],
             {"replica": "replica (reproduce)", "replica-fix": "replica (default)"},
+            _counted(e, o),
         )
     ]
     facts_extra = []
@@ -801,6 +1441,11 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
                 + ("bytes" if ok else "other bytes")
                 + "; its default mode "
                 + ("the same values" if fix_same else "other values (FSL-09: rounded)")
+                + "; the clean-room original's (FLIRT's clean-room original in the same "
+                "process): reproduce mode "
+                + _priors_same(pri, o.dir / "original")
+                + ", default mode "
+                + _priors_same(pri, o.dir / "original-fix")
                 + "; FSL's priors are not shown (FSL's data, FSL's licence)",
             }
         )
@@ -826,9 +1471,9 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         "summary": summary,
         "facts": [
             {"label": "Data", "text": data_text},
-            {"label": "Case", "text": f"`{case}` of the record (`{RECORD}`)"},
+            {"label": "Case", "text": f"`{case}` of both records (`{RECORD}`, `{RECORD_ORIG}`)"},
             {"label": "Command", "text": "`" + info["command"] + "`"},
-            {"label": "Programs", "text": _programs(info)},
+            {"label": "Programs", "text": _programs(info, oinfo)},
             *facts_extra,
             {"label": "Grid", "text": common.describe_grid(first, grid.shape)},
         ],
@@ -837,10 +1482,11 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         "groups": [
             ["main", "LARMORX against FSL"],
             ["check", "LARMORX against itself: threads and modes"],
+            ["variability", "FSL against itself: the yardstick"],
         ],
         "tables": tables,
         "metrics_note": _note(n_vox),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", data),
+        "provenance": _provenance(info, e, oinfo, o, data),
     }
 
 
@@ -960,6 +1606,236 @@ def cases(rec, examples: dict[str, str], default: dict[str, dict]) -> list[dict]
     return out
 
 
+def _worst(files: dict[str, dict], key: str) -> str:
+    """The file whose comparison ``key`` differs in the most values, with its count."""
+    k, x = max(files.items(), key=lambda kv: kv[1][key][0])
+    return f"`{k}`: {x[key][0]:,} of {x['values']:,} values (at most {x[key][1]:.3g})"
+
+
+def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
+    """A case's verdict for the clean-room original: the record holds it to specs/fast.md
+    §11's thresholds; a passing case is classified from its files against FSL as built, FSL with
+    correctly rounded maths and FSL's own difference between the two (``c``: the case in the
+    ``cases-original`` entry, with the original's default mode on it)."""
+    dm = c.get("default", {})
+    named, code = dm.get("named", []), dm.get("exit")
+    v = common.outcome_verdict(r)
+    if v is not None:
+        verdict, why = v
+        if verdict == "both-reject" and named:
+            why += (
+                f" The clean-room original's default mode finishes instead (exit status 0), "
+                f"naming {', '.join(named)}."
+                if code == 0
+                else f" The clean-room original's default mode ends with exit status {code}, "
+                f"naming {', '.join(named)}."
+            )
+        if r["case"] == "multi/s5":
+            why = (
+                "Outside §11's thresholds, explained: five channels of which the first is nearly "
+                "a combination of the last two, so each class's 5 × 5 covariance is nearly "
+                "singular and its inverse amplifies the matrix arithmetic's last bits; the "
+                "original against itself with one rounding changed in the covariance's products "
+                "moves further (_mixeltype Dice 0.865) than it lands from FSL (0.907), and FSL "
+                "with correctly rounded maths stays at FSL's (0.99993). Following LAPACK's and "
+                "OpenBLAS's operation order is the replica's job (specs/fast.md §8.6). " + why
+            )
+        return verdict, common.clip(why, 700)
+    files = c.get("files") or {}
+    rep = {**r.get("reported", {}), **r.get("measured", {})}
+    notes = []
+    fix = rep.get("D13 fix pass")
+    shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
+    if isinstance(fix, int) and fix:
+        notes.append(
+            f"in its default mode the clean-room original corrects {', '.join(shown or named)} "
+            f"and names it: {fix:,} values change"
+        )
+    elif named and code not in (0, None):
+        notes.append(
+            f"its default mode refuses the call (exit {code}), naming {', '.join(named)}: an "
+            "argument without meaning, which FSL uses as given"
+        )
+    elif named:
+        notes.append(f"its default mode names {', '.join(named)}, with the same values")
+    tail = ("; " + "; ".join(notes)) if notes else ""
+    if not files:
+        return "open", common.clip(
+            "Within the record's thresholds (specs/fast.md §11); no image to classify" + tail, 700
+        )
+    n = len(files)
+    of = {k: x for k, x in files.items() if x["orig_fsl"][0]}
+    oc = {k: x for k, x in files.items() if x["orig_cr"][0]}
+    beyond = {
+        k: x
+        for k, x in files.items()
+        if x["orig_fsl"][0] > x["cr_fsl"][0] or x["orig_fsl"][1] > x["cr_fsl"][1]
+    }
+    # the original's distance from FSL with correctly rounded maths against FSL's own
+    beyond_cr = {
+        k: x
+        for k, x in files.items()
+        if x["orig_cr"][0] > x["cr_fsl"][0] or x["orig_cr"][1] > x["cr_fsl"][1]
+    }
+    if not of:
+        return "bit-identical", common.clip(
+            f"Every value of all {n} images FSL writes, with FSL's exit status and messages (the "
+            "record checks the headers' grid, forms and data types)" + tail,
+            700,
+        )
+    if not oc:
+        return "identical-cr", common.clip(
+            "FSL with correctly rounded maths (CORE-MATH's exp, log, expf, logf preloaded into "
+            f"the same program) gives the clean-room original's values in all {n} images; FSL "
+            f"as built differs in {len(of)} (most: {_worst(of, 'orig_fsl')}), within the "
+            "record's thresholds" + tail,
+            700,
+        )
+    near = _near_cr(oc, "multi" in r["case"])
+    if not beyond:
+        return "within-variability", common.clip(
+            f"In each of the {n} images the clean-room original differs from FSL in no more "
+            "values, and by no more, than FSL with correctly rounded maths does (FSL's own "
+            f"last-bit band): most {_worst(of, 'orig_fsl')}, FSL's own in that file "
+            f"{_band_of(of)}; {near}" + tail,
+            700,
+        )
+    if not beyond_cr:
+        return "within-variability", common.clip(
+            f"In each of the {n} images the clean-room original is no further from FSL with "
+            "correctly rounded maths than FSL as built is (FSL's own last-bit band): "
+            f"{near}; against FSL as built most {_worst(of, 'orig_fsl')}" + tail,
+            700,
+        )
+    return "open", common.clip(
+        f"Within the record's thresholds (specs/fast.md §11), but in {len(beyond)} of {n} "
+        "images the clean-room original differs from FSL, and from FSL with correctly rounded "
+        "maths, more than the two differ from each other: most "
+        f"{_worst(beyond, 'orig_fsl')} against FSL as built, FSL's own in that file "
+        f"{_band_of(beyond)}; {near}" + tail,
+        700,
+    )
+
+
+def _near_cr(oc: dict[str, dict], multi: bool) -> str:
+    """What the original's differences from FSL with correctly rounded maths are."""
+    total = sum(x["orig_cr"][0] for x in oc.values())
+    text = (
+        f"it equals FSL with correctly rounded maths but in {total:,} values of {len(oc)} image(s)"
+    )
+    if all(x["kind"] == "pve" and x["orig_cr"][1] <= 0.0100001 for x in oc.values()):
+        text += (
+            ", each a partial volume one fraction step (0.01) away: near ties between "
+            "neighbouring fractions, decided by last bits"
+            + (
+                " (with several channels the clean-room original's own matrix arithmetic, not "
+                "LAPACK's: specs/fast.md §8.6)"
+                if multi
+                else ""
+            )
+        )
+    return text
+
+
+def _band_of(files: dict[str, dict]) -> str:
+    _k, x = max(files.items(), key=lambda kv: kv[1]["orig_fsl"][0])
+    return f"{x['cr_fsl'][0]:,} values (at most {x['cr_fsl'][1]:.3g})"
+
+
+def add_original(cs: list[dict], rec, examples: dict[str, str], classified: dict) -> None:
+    """The clean-room original's results joined to the cases (a case of its own where the
+    replica's record has none: its permanent cases)."""
+    defs = case_table_original()
+    by = {c["id"]: c for c in cs}
+    for r in rec.results:
+        v, why = case_verdict_original(r, classified.get(r["case"], {}))
+        result = {
+            "outcome": r["status"],
+            "verdict": v,
+            "checks": f"{r['checks_passed']}/{r['checks_total']}",
+            "reason": why,
+        }
+        if r["case"] in by:
+            by[r["case"]]["results"]["original"] = result
+            continue
+        cs.append(
+            {
+                "id": r["case"],
+                "category": r["category"],
+                "description": defs.get(r["case"], ("", None))[0],
+                "command": command(r["case"], defs),
+                "results": {"original": result},
+                **({"example": examples[r["case"]]} if r["case"] in examples else {}),
+            }
+        )
+
+
+#: The benchmark's series (``docs/benchmarks/fsl-fast.json``, from
+#: ``validation/investigations/cleanroom-fast/bench.py``): FSL and the replica single-threaded.
+SPEED_SERIES = [
+    {"id": "FSL 6.0.7.23|1 thread", "label": "FSL 6.0.7.23 (single-threaded)", "mark": "original"},
+    {"id": "replica (larmorx-nc)|1 thread", "label": "replica (single-threaded)", "mark": "replica"},
+    {"id": "original (larmorx)|1 thread", "label": "clean-room original, 1 thread",
+     "mark": "larmorx"},
+    {"id": "original (larmorx)|14 threads", "label": "clean-room original, 14 threads",
+     "mark": "larmorx-open"},
+]  # fmt: skip
+
+
+def speed(ctx: core.Context) -> tuple[list[dict], dict | None]:
+    """The speed chart from the benchmark report (one run each, informal: its own format)."""
+    import hashlib
+    import json
+    import types
+
+    p = ctx.repo / "docs" / "benchmarks" / f"{TOOL}.json"
+    if not p.is_file():
+        return [], None
+    data = json.loads(p.read_text(encoding="utf-8"))
+    md = p.with_suffix(".md").read_text(encoding="utf-8")
+    m = re.search(r"the main machine: ([^,]+),\s+(\d+)\s+cores\s+/\s+(\d+)\s+threads", md)
+    cpu, cpus = (m.group(1), int(m.group(3))) if m else ("?", "?")
+    results, labels = [], {}
+    words = {run: w for _i, run, _v, w in FMRIPREP}
+    for row in data["rows"]:
+        run = row["run"]
+        labels[run] = f"{words.get(run, run)}: {row['voxels']:,} voxels in the mask"
+        results.append({"tool": "FSL 6.0.7.23", "operation": "1 thread", "input": run,
+                        "median": row["fsl_seconds"]})  # fmt: skip
+        results.append({"tool": "replica (larmorx-nc)", "operation": "1 thread", "input": run,
+                        "median": row["replica_seconds"]})  # fmt: skip
+        for t, sec in row["original_seconds"].items():
+            op = "1 thread" if t == "1" else f"{t} threads"
+            results.append({"tool": "original (larmorx)", "operation": op, "input": run,
+                            "median": sec})  # fmt: skip
+    bench = types.SimpleNamespace(
+        results=results, data={"environment": {"cpu": cpu, "logical_cpus": cpus}}
+    )
+    chart = common.speed(
+        bench,
+        SPEED_SERIES,
+        labels,
+        title="Seconds for fMRIPrep's whole call (read the T1w brain, segment, write its twelve "
+        "images), one run each, log scale; the factor is the clean-room original's speed-up "
+        "over FSL at one thread",
+        base=(SPEED_SERIES[0]["id"], SPEED_SERIES[2]["id"]),
+        note="From the benchmark report `docs/benchmarks/fsl-fast.json` ({cpu}, {cpus} logical "
+        "CPUs, shared with other work: informal, one run each). FSL's time is its run "
+        "the oracle cache stored, not re-run; the replica's images are FSL's byte for byte, the "
+        "clean-room original's within its record's thresholds and the same at any thread count.",
+        inputs=[run for _i, run, _v, _w in FMRIPREP],
+    )
+    source = [
+        {
+            "path": p.relative_to(ctx.repo).as_posix(),
+            "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+            "larmorx_commit": data.get("commit"),
+            "cpu": cpu,
+        }
+    ]
+    return source, chart
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     examples = {
@@ -968,17 +1844,24 @@ def export(ctx: core.Context) -> dict:
     }
     ne = named_entry(ctx)
     cs = cases(rec, examples, ne.info().get("default_mode", {}))
+    rec_orig = records.load(ctx.repo, RECORD_ORIG)
+    co = cases_original_entry(ctx)
+    add_original(cs, rec_orig, examples, co.info().get("cases", {}))
     entries = [fmriprep_entry(ctx, run) for _i, run, _v, _w in FMRIPREP]
     entries += [real_entry(ctx, case) for case in REAL.values()]
     entries.append(ne)
+    entries += [original_entry(ctx, run) for _i, run, _v, _w in FMRIPREP]
+    entries += [original_entry(ctx, case) for case in REAL.values()]
+    entries.append(co)
+    bench, chart = speed(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "FAST",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
-            "benchmarks": [],
+            "records": rec.source() + rec_orig.source(),
+            "benchmarks": bench,
             "cache": [fcache.provenance(x) for x in entries],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -991,9 +1874,18 @@ def export(ctx: core.Context) -> dict:
                 f"docs/validation/{RECORD}.md",
                 "experimental",
             ),
+            common.implementation(
+                cs,
+                "original",
+                "LARMORX clean-room original, against FSL 6.0.7.23 (standard tier)",
+                "original",
+                f"docs/validation/{RECORD_ORIG}.md",
+                "experimental",
+            ),
         ],
         "cases": cs,
         "cases_total": len(cs),
+        "speed": chart,
         "examples": [_example_fmriprep(ctx, *FMRIPREP[0])]
         + [_example_real(ctx, ex_id) for ex_id in REAL]
         + [_example_fmriprep(ctx, *x) for x in FMRIPREP[1:]],
@@ -1009,3 +1901,8 @@ if __name__ == "__main__":  # compute the cache entries only
     for case in REAL.values():
         print("done", real_entry(c, case).dir)
     print("done", named_entry(c).dir)
+    for _i, run, _v, _w in FMRIPREP:
+        print("done", original_entry(c, run).dir, flush=True)
+    for case in REAL.values():
+        print("done", original_entry(c, case).dir, flush=True)
+    print("done", cases_original_entry(c).dir, flush=True)

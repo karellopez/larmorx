@@ -25,6 +25,8 @@ pub enum Given {
     Flag,
     Numbers(Vec<f64>),
     Text(String),
+    /// A text option of several values (FAST's `-A <prior1> <prior2> <prior3>`).
+    Words(Vec<String>),
 }
 
 /// The occurrences of the options, in order.
@@ -290,6 +292,16 @@ pub fn parse_all(
                     return Err(ParseError(format!(
                         "{shown}: Missing non-optional argument!"
                     )));
+                }
+                if !s.numeric && s.values > 1 {
+                    if rest.len() < s.values {
+                        return Err(ParseError(format!(
+                            "{shown}: Missing non-optional argument!"
+                        )));
+                    }
+                    given.set(k, Given::Words(rest[..s.values].to_vec()));
+                    i += s.values;
+                    continue;
                 }
                 if !s.numeric {
                     given.set(k, Given::Text(rest[0].clone()));

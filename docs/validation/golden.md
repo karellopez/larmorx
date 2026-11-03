@@ -146,6 +146,24 @@ What the coverage test enumerates:
   cases and 124 outputs added; every other checksum unchanged (the core's additions for FAST: the C
   library's `expf`, `log` and `rand`, FSL's masked sums and percentiles, LAPACK up to 8 × 8, changed no
   golden output).
+- **FAST, the clean-room original** (2026-11-03, seven cases in `tests/golden/registry.py`, on a
+  generated three-tissue brain `tissue_brain`, its second channel `tissue_brain2`, a copy with one
+  white-matter voxel at 2^24 `tissue_brain_bright`, generated tissue priors and the identity matrix):
+  `cli.fsl.fast` (fMRIPrep's call `-I 0 -N -p -g -S 1`, its partial volumes' likelihoods through the
+  batched `exp`, `larmorx_core::math::exp_in_place`: AVX2 and FMA on Linux x64, the portable path on
+  aarch64, so this case checks that both give `exp`'s bits; the usage and exit status without
+  arguments), `cli.fsl.fast.bias` (`-t 1 -n 3 -B -b -v -o`, its standard output kept),
+  `cli.fsl.fast.multi` (two channels, `-B -b -p`), `cli.fsl.fast.priors` (`-a` with `-A` and `-P`,
+  FLIRT's clean-room original in the same process), `cli.fsl.fast.reproduce` (FSL-103 in both modes,
+  FSL-99's refusal of a NaN `-H` by its status), `py.fsl.fast` (`lx.fsl.fast(implementation="original")`
+  on in-memory images, every output, and a single slice for the 2D neighbourhood), and
+  `cli.fsl.flirt.analyze` (the ANALYZE reader BET's, FLIRT's and FAST's originals share: a big-endian
+  int16 pair whose scale field FSL does not apply and whose voxel sizes' negative product FSL reads
+  radiologically, through FLIRT's `-applyxfm` with the identity; the pair written byte by byte by the
+  test, no committed file). `lx.fsl.fast` left `REPLICA_ONLY_FUNCTIONS`. Recorded from f0dd88b
+  (committed with the record as e9024ec), the parity smoke tier's marker of the same commit and build
+  reused (2,692 passed): 7 cases added, every other checksum unchanged; each case runs in 0.02 to
+  0.15 s.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

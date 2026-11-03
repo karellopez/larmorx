@@ -1249,3 +1249,43 @@ signature = ["stdout identical", "stderr identical"]
 status = "fixed"
 explanation = "FSL-101 on an image whose brain mask is empty (the trial of 2026-11-02, two findings): FAST runs on, as no voxel reads the priors it never allocated (every class statistic NaN, 'Empty mask image'); the replica's reproduce refused (now runs on as FAST does)"
 link = "validation/difftest/cases/fsl-fast/fsl101-empty-mask-runs-on.json"
+
+# FAST's clean-room original: the short trial of 2026-11-03 (seed cleanroom-fast, 25 min, 3 jobs,
+# 9,005 realistic cases, the oracle cache in use mode; oracles/difftest/2026-11-03-cleanroom-fast)
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["exception"]
+status = "harness"
+explanation = "153 cases: the original's suite read images with nibabel, which needs backports.zstd for FSL 6.0.7.23's NIFTI_ZST outputs (152), and refused a NIfTI-2 header whose quaternion's squares sum to a little more than 1 (1, FSL's own output). The suite now reads zstd and bzip2 images through the shared stream reader and such headers without nibabel's affine; all 153 agree on replay."
+link = "validation/difftest/cases/fsl-fast-original/zstd-outputs.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Bias field and restored image: relative difference (pN.N)"]
+status = "fixed"
+explanation = "13 cases (14 on replay), each with a class of NaN variance: the mask's mean of the bias field is NaN, so FSL's b - mean and b · M make the field NaN over the whole image, _restore and _bias NaN outside the mask too; the original wrote the input and 1 there. Fixed: the field outside the mask is (0 - mean) · 0, as specs/fast.md §4.5 computes it; all 14 agree."
+link = "validation/difftest/cases/fsl-fast-original/bias-nan-outside-mask.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Standard output (numbers to N significant digits)"]
+status = "fixed"
+explanation = "13 cases with -v and several channels: (1) a singular covariance in the k-means initialisation, where FAST aborts without printing that iteration's 'KMeans Iteration k' line (9 cases; the original now prints it once the covariances are inverted); (2) FSL-101 reproduced with -v, where FAST prints 'Beginning prior-based initialisation' before it crashes (3 cases; the original now prints it before its refusal); 12 agree. Open: one case (cleanroom-fast 1840, -n 4 with two channels) whose statistics degenerate: FSL prints MEAN -nan from the second bias iteration on where the original prints MEAN 1 (a class weight sum of 0); its images agree within the thresholds. Reported with its reproducer (spec question: how FSL's posteriors become NaN after a NaN covariance)."
+link = "validation/difftest/cases/fsl-fast-original/singular-kmeans-line.json"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Exit status", "Files written", "Standard error (the original's own lines left out)"]
+status = "explained"
+explanation = "1 case (two channels, -n 4, one slice): a class covariance that is singular in exact arithmetic; the original's LU finds an exactly zero pivot and aborts as FAST does on a singular matrix (inv(): matrix is singular), FSL's arithmetic leaves a pivot of rounding size and it finishes. Which of the two a rank-deficient covariance gives is decided by the last bits of the matrix arithmetic, which specs/fast.md §8.6 does not ask the original to follow (the replica follows OpenBLAS)."
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Partial volumes (_pve_n): mean and pN.N differences, totals", "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels"]
+status = "explained"
+explanation = "2 cases (cleanroom-fast 2215 and 2311): several channels of which two are noise-free, so each class's covariance is ill-conditioned; the partial volumes (and one class's Dice of _pveseg, 0.99891) move with the matrix arithmetic's last bits, as the standard tier's multi/s5 (the original against itself with one rounding change moves as far: validation/investigations/cleanroom-fast/self_band.py). Following LAPACK and OpenBLAS bit for bit is the replica's job (specs/fast.md §8.6)."

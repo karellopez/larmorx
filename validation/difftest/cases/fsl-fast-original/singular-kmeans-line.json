@@ -1,0 +1,264 @@
+{
+ "defect": null,
+ "description": "-v with several channels and a singular covariance: FSL aborts without the iteration's 'KMeans Iteration' line",
+ "expect": "pass",
+ "found": {
+  "detail": "Standard output (numbers to 4 significant digits): 8 lines, the original 9",
+  "n": 550,
+  "seed": "cleanroom-fast",
+  "shrink_moves": [
+   "dropped -o (-o fast)",
+   "dropped -g (-g)",
+   "dropped -W (-W 20)",
+   "dropped -f (-f 0.1)",
+   "ch1: axis 1 16 -> 8 voxels",
+   "ch1: axis 2 16 -> 8 voxels",
+   "ch1: axis 0 12 -> 6 voxels",
+   "ch1: axis 1 8 -> 4 voxels",
+   "dropped -n (-n 4)",
+   "ch1: axis 2 8 -> 4 voxels",
+   "ch1: axis 1 4 -> 2 voxels",
+   "ch1 (and its grid): plumb orientation",
+   "ch1: axis 1 2 -> 1 voxels",
+   "ch1 (and its grid): origin at 0",
+   "ch1: axis 2 4 -> 2 voxels",
+   "ch1: axis 0 6 -> 3 voxels",
+   "ch1: axis 2 2 -> 1 voxels",
+   "ch1 (and its grid): unit spacing",
+   "ch1 (and its grid): qform and sform codes 1",
+   "ch1: content head -> ramp",
+   "ch2: float32 storage",
+   "ch2: content head -> ramp"
+  ],
+  "signature": [
+   "Standard output (numbers to N significant digits)"
+  ]
+ },
+ "id": "singular-kmeans-line",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 2,
+   "classes": 4,
+   "nobias": false,
+   "output_type": "NIFTI_PAIR",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": false,
+   "-H": false,
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-R": false,
+   "-S long": false,
+   "-W": true,
+   "-W long": false,
+   "-W value": "20",
+   "-a": false,
+   "-b": false,
+   "-f": true,
+   "-f long": false,
+   "-f value": "0.1",
+   "-g": true,
+   "-g long": false,
+   "-l": false,
+   "-n": true,
+   "-n long": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-t 1": false,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "axis0": 1.2,
+   "axis1": 1.05,
+   "axis2": 0.9,
+   "basename": "fast",
+   "bias0": -0.0075,
+   "bias1": -0.01,
+   "bias2": 0.01,
+   "bias3": 0.0075,
+   "brain centre0": -0.04,
+   "brain centre1": -0.08,
+   "brain centre2": -0.06,
+   "brain fraction": 0.45,
+   "centre0": -4.0,
+   "centre1": -2.0,
+   "centre2": -3.5,
+   "channels": 2,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": false,
+   "field of view": 24.0,
+   "isotropic": false,
+   "kind": "multi",
+   "n": "4",
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": -19.25,
+   "origin1": 11.5,
+   "origin2": -32.0,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "12x16x16",
+   "size": 27.0,
+   "spacing0": 2.5,
+   "spacing1": 1.5,
+   "spacing2": 1.5,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "tissues2": "t2",
+   "units": "mm",
+   "whole head": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   },
+   {
+    "args": [
+     "-S",
+     "2"
+    ],
+    "name": "-S",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:ch2}",
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "seed": 385195344,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ch2": {
+    "content": {
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "seed": 1649863384,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 550,
+  "options": [
+   "-S",
+   "-W",
+   "-f",
+   "-g",
+   "-n",
+   "-o",
+   "-v",
+   "2 channels",
+   "FSLOUTPUTTYPE=NIFTI_PAIR"
+  ],
+  "seed": "cleanroom-fast",
+  "tool": "fsl-fast-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast",
+ "tier": "standard",
+ "tool": "fsl-fast-original"
+}

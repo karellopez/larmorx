@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02; the clean-room original next), topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -454,8 +454,31 @@ The items below keep their history.
    field, the priors with FSL-09's correction, three channels). `specs/fast.md` for the clean-room
    original (its §9.2 lists the rule-D candidates, §9.3 what is not replicated). The full tier
    (fMRIPrep's call on every oracle run), the data panel and long random testing wait for the final
-   validation phase. **Next: the clean-room original** (another agent, from `specs/fast.md`, built
-   for speed).
+   validation phase.
+   **FAST: the clean-room original done (2026-11-03, relays 1 to 5).** `crates/larmorx-fsl`, module
+   `fast` (Apache-2.0, from `specs/fast.md`, the paper and black-box runs only): every option, message,
+   exit status and failure case; one channel and any number (`-S 9` and more too: rules A-D, nothing
+   to refuse; the replica refuses them), larmorx's own LU for the covariances; the priors registered
+   by FLIRT's clean-room original in the same process; FSL-96 to FSL-104 in both modes; `exp` and
+   `log` correctly rounded. `lx.fsl.fast(implementation="original")`, `"auto"` without `larmorx-nc`.
+   Record [fsl-fast](validation/fsl-fast.md): 87 cases, 60 of 61 compared within `specs/fast.md`
+   §11's thresholds (fMRIPrep's call on ds000005, ds000228 and ds005003 bit-identical to FSL run with
+   correctly rounded maths; of the 60, 13 bit-identical to FSL, 36 to FSL with correctly rounded
+   maths, 10 within FSL's own difference between the two, 1 a few partial volumes beyond it, each one
+   fraction step away: the site's classification), 25 rejected by both, 1 expected divergence
+   (FSL-104), 1 explained failure (`multi/s5`: nearly singular 5 × 5 covariances). Built for speed:
+   the MRF and mixel sweeps as a pipeline of planes with the serial result, FSL's blocked sums in
+   parallel in their order, a batched `exp` with the scalar bits (`larmorx_core::math::exp_in_place`,
+   new, randomized check of 2^32 values: 0 differences); fMRIPrep's call 2.4 to 5.2 s on one thread
+   (9 to 11 times FSL), 0.4 to 0.9 s on 14 (47 to 67 times), the same bits at any thread count
+   ([benchmark](benchmarks/fsl-fast.md), informal). One random-testing trial (25 minutes, 9,005
+   realistic cases, FSL through the oracle cache: 8,823 agree; 182 triaged: 153 the suite's reader,
+   13 a NaN bias field outside the mask and 12 messages fixed, 3 explained, 1 open, four permanent
+   cases). Golden: 7 cases. Memory: fMRIPrep's call 152 MiB against FSL's 707. Thread test: four
+   programs. The shared ANALYZE reader (BET's, FLIRT's and FAST's originals: the scale field not
+   applied, negative voxel-size products radiological) and FLIRT's `-applyxfm` TR (FSL's: the
+   input's `|pixdim[4]|`) changed: BET's and FLIRT's records re-made, identical case by case. The
+   site page with both implementations. FSL-136 to FSL-140 unused (no new defect).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -547,12 +570,37 @@ The items below keep their history.
 - **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
   bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
   should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does).
+- **Random testing's permanent cases record the machine's paths** (2026-11-03, found at the merge of FAST's
+  clean-room original): a case's `found.detail` keeps the harness's traceback, with the checkout's absolute path
+  (`validation/difftest/cases/fsl-fast-original/zstd-outputs.json`, replaced by `<workspace>` at the merge). The writer
+  should replace the workspace and the home directory by `<workspace>` and `~` itself; the existing cases checked once.
 - **FAST's `-S 9` and more** (2026-11-02, the orchestrator's decision): refused in both modes with a
   message (`larmorx-nc: error: fast: -S <n>: more than 8 channels are not replicated ...`, exit 1).
   Replicating them needs OpenBLAS's aligned `iamax` path (9 to 16 channels: chosen by the column's
   16-byte alignment, which follows from Armadillo's buffers), its 8-way `ddot`/`daxpy` kernels beyond
   16 and LAPACK's blocked LU beyond 19; practically unused. The clean-room original may segment
   them (its thresholds need not OpenBLAS's bits): a decision for its part (`specs/fast.md` §9.3).
+  Decided (2026-11-03, rules A-D: the input makes sense, FSL segments it): the clean-room original
+  segments any number of channels with its own LU.
+- **FAST's clean-room original: two speed steps left** (2026-11-03, `docs/benchmarks/fsl-fast.md`):
+  a batched `expf` for the initialisation's single-precision likelihoods (19 × 3 per voxel, about
+  0.2 s of 0.89 s on one thread on ds005003) and the MRF update's three `exp` per voxel batched inside
+  the serial sweep (about 6 % of the sweeps); each must keep the scalar functions' bits (a randomized
+  check like `exp_in_place`'s).
+- **FAST's single-channel variance (rule D, 2026-11-03)**: `σ² = Σ p y y / Σ p - μ²` in the log
+  domain cancels most digits, which makes FSL's own last-bit band wide on small classes and small
+  images (`_mixeltype` Dice 0.998 on ds005003 between FSL and FSL with correctly rounded maths);
+  measure whether a two-pass or double-precision variance changes the segmentation beyond that band
+  before deciding A or C (`docs/findings/fsl-fast-original.md`, "FSL's own last-bit band").
+- **FAST's spec questions** (2026-11-03): the clean-room relays' questions on `specs/fast.md`
+  (§4.4's second moment in double, §4.5's normalised taps in double and the field outside the mask,
+  §4.8's ICM type, §4.10's total after each sweep, §5.2's products in double, §5.6's weights in
+  single, §10's exact parallel order, FLIRT §9.3's TR, and the rest: the part's handoff) for a spec
+  writer, as FLIRT's spec answers were.
+- **FAST's degenerate multi-channel statistics** (2026-11-03, random testing 1840, open): with two
+  channels and four classes whose statistics degenerate, FSL prints `MEAN -nan` from the second bias
+  iteration where the clean-room original prints `MEAN 1` (a class weight of 0); the images agree.
+  How FSL's posteriors become NaN after a NaN covariance is a spec question.
 - **FAST's multi-channel initialisation and bias field: measure, then decide (rule D)** (2026-11-02):
   the k-means starts each channel's class means from that channel's own ascending percentiles and
   assigns voxels by the square of the summed differences, so channels of opposite contrast can start

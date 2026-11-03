@@ -38,7 +38,7 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's programs are `larmorx_fsl::cli`; `fsl fast`, `topup` and `applytopup` have their
+/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup` and `applytopup` have their
 /// replicas only; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
@@ -422,17 +422,21 @@ mod tests {
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["fast", "topup", "applytopup"]
+            ["topup", "applytopup"]
         );
-        // every FSL tool but mcflirt (`mri hmc`) and fast, topup and applytopup (the replicas
-        // only) is larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 3], larmorx_fsl::cli::TOOLS);
+        // every FSL tool but mcflirt (`mri hmc`) and topup and applytopup (the replicas only) is
+        // larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
         };
-        // fast has no original yet: `original` is an error that says so.
-        for tool in ["fast", "topup", "applytopup"] {
+        // fast runs its clean-room original (2026-11-03): no arguments, the usage (exit 1)
+        let (code, _, err) = run_options(&["lx", "fsl", "fast"], &original);
+        assert_eq!(code, 1);
+        assert!(err.contains("\nFAST \nCopyright(c) 2004-2012"), "{err}");
+        // topup and applytopup have no original yet: `original` is an error that says so.
+        for tool in ["topup", "applytopup"] {
             let (code, _, err) = run_options(&["lx", "fsl", tool], &original);
             assert_ne!(code, 0);
             assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");

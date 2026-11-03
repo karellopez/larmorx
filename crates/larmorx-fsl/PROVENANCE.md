@@ -184,3 +184,41 @@ opened). Its only inputs were:
 | `cli::common::header_image` | the qform as FSL holds it (`bet::quatern`) | §4.1, §15.2 |
 | `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
 | `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |
+
+## FAST (`fast`; relays 1 to 4, 2026-11-03)
+
+`fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command
+line, messages and outputs) was
+written by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
+`crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
+`crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings (`docs/findings/fsl-fast.md`,
+`fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the register's
+sections marked †), `docs/parts/`, the replica parts' and spec writers' investigations,
+`validation/probes/`, `validation/difftest/triage.toml`, the replica authors' permanent cases or
+the history of replica and spec-writer commits. Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/fast.md`](../../specs/fast.md) (FSL 6.0.7.23, FAST4 2111.3) | the behaviour: the command line, the images, the mask and log image, the initialisation, the MRF, the bias field, the class order, the partial volumes, the members, the messages, the numeric conventions, the defects |
+| Y. Zhang, M. Brady, S. Smith, "Segmentation of brain MR images through a hidden Markov random field model and the expectation-maximization algorithm", IEEE TMI 20(1):45-57, 2001; FSL's FAST documentation | the method |
+| P. Selinger, "The GLIBC pseudo-random number generator" (2007), and glibc 2.35's `rand` run as a black box (ctypes) | `fast::rng` |
+| Black-box runs of FSL 6.0.7.23's `fast` (through the oracle cache; as built and with the CORE-MATH preload): [`validation/investigations/cleanroom-fast/`](../../validation/investigations/cleanroom-fast/README.md) | the observations of [`docs/findings/fsl-fast-original.md`](../../docs/findings/fsl-fast-original.md): the variance's double second moment, `MRFWeightsTotal` after each sweep, the mixel sweep keeping a type, the initial type 0, the usage's and errors' text, FSL-100 with `-A`, `_restore` at NaN voxels; the bias kernel's double taps; the multi-channel weights, assignment and bias arithmetic; FSL's ANALYZE reading (no scale field, radiological storage for negative voxel sizes); `-H nan`'s estimate; the empty mask's messages |
+| Black-box runs of FSL 6.0.7.23's `flirt` (through the oracle cache: `analyze_scale.py`, `applyxfm_tr.py`) | FSL's reading of its standard priors (ANALYZE); `-applyxfm`'s TR (FLIRT's findings) |
+| The defect register's summary rows of FSL-96 to FSL-104 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options, fmt}` (FSL's image names, reading and writing, the option parser, `%g`), `larmorx_core` (correctly rounded `exp`, `log`, `expf`, `logf`, thread pools, D13) | images, options, numbers, threads |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `fast::grid` | the mask's voxels in storage order, the 18 weighted neighbours and their weights (a padded map, compact per-voxel arrays, each row's range); the in-place sweeps' pipeline of planes (`Grid::gauss_seidel`: row `(y, z)` after plane `z-1`'s row `y+1`, the serial result on any thread count) | §4.2, §10; larmorx's own design |
+| `fast::stats` | FSL's blocked sums (block by block in parallel, the blocks' sums in order: the same bits), the percentiles, the class means and variances (the second moment in double: observed), the negative log Gaussian | §4.4, §8.2, §8.3, §10; findings |
+| `fast::rng` | glibc's `rand` after `srand(-1)` | §8.1; Selinger; black-box |
+| `fast::bias` | the kernels and the separable convolution (lines and slices in parallel) | §4.5, §8.5 |
+| `fast::single` | the negative values, the mask (FSL-103), the log image, the initialisation, the MRF iterations (`MRFWeightsTotal` after each sweep), the bias field, the class order, the hard segmentation, the members, the volumes, `-v`'s messages | §4.1, §4.3, §4.5-§4.10; findings |
+| `fast::pve` | the mixel types, their likelihoods over the fractions, the sweep of iterated conditional modes (a type kept when none wins), the fractions, `_pveseg` | §4.8, §8.7; findings |
+| `fast::multi` | several channels: the mask, the log images, the kernels and MRF weights, the initialisation, the members, the means and covariances (larmorx's own LU, any size), the likelihood, the bias fields, the MRF sweeps, the class order (FSL-98), the partial volumes in the log domain | §5, §8.6, §8.7; findings |
+| `cli::fast` | the command line, the usage and its errors, the exit statuses, the outputs and their order, the channels, the priors (FLIRT's `-applyxfm` in process), FSL-96 to FSL-104 | §2, §3, §6, §7, §9; findings |
+| `bet::image` (`read_analyze`) | an ANALYZE 7.5 image's scale field not applied; stored voxel sizes of negative product read radiologically | findings (black-box) |
+| `cli::options` (`Given::Words`) | an option of several text values (`-A`) | §2.2 |
+| `larmorx_core::math::exp_in_place` (relay 3) | the correctly rounded `exp`'s fast path four values at a time (vectorised with AVX2 and FMA through the core's audited dispatch), `exp` itself for the values it leaves: `exp`'s bits for every value; used by the partial volumes' likelihoods and the multi-channel initialisation | §10; CORE-MATH's `exp` (MIT, the core's port) |
+| `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
+| `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |

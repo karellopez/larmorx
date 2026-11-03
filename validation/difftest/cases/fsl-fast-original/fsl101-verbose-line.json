@@ -1,0 +1,252 @@
+{
+ "defect": null,
+ "description": "FSL-101 reproduced with -v: 'Beginning prior-based initialisation' before FAST crashes",
+ "expect": "pass",
+ "found": {
+  "detail": "Standard output (numbers to 4 significant digits): 10 lines, the original 9",
+  "n": 8527,
+  "seed": "cleanroom-fast",
+  "shrink_moves": [],
+  "signature": [
+   "Standard output (numbers to N significant digits)"
+  ]
+ },
+ "id": "fsl101-verbose-line",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 1,
+   "classes": 2,
+   "nobias": false,
+   "output_type": "ANALYZE",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": true,
+   "-H": false,
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-P": false,
+   "-R": false,
+   "-S 1": false,
+   "-W": false,
+   "-a": true,
+   "-b": false,
+   "-f": false,
+   "-g": true,
+   "-g long": false,
+   "-l": true,
+   "-l long": false,
+   "-l value": "10",
+   "-n": true,
+   "-n long": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-t 1": false,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 0.9,
+   "axis1": 1.05,
+   "axis2": 0.95,
+   "basename": "t1_brain",
+   "bias0": -0.005,
+   "bias1": 0.005,
+   "bias2": 0.0025,
+   "bias3": -0.005,
+   "brain centre0": -0.02,
+   "brain centre1": 0.02,
+   "brain centre2": -0.06,
+   "brain fraction": 0.45,
+   "centre0": -3.0,
+   "centre1": -5.5,
+   "centre2": 3.5,
+   "content": "head",
+   "dtype": "uint8",
+   "extreme": false,
+   "field of view": 48.0,
+   "isotropic": false,
+   "kind": "single",
+   "n": "2",
+   "noise": 1.0,
+   "orientation": "axes",
+   "origin0": 56.25,
+   "origin1": -53.25,
+   "origin2": -22.0,
+   "prior scale": 0.30714285714285716,
+   "prior shift0": 0.0,
+   "prior shift1": 0.0,
+   "prior shift2": 1.5,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "19x19x19",
+   "size": 16.5,
+   "spacing0": 2.5,
+   "spacing1": 1.5,
+   "spacing2": 1.5,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "units": "mm",
+   "whole head": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-n",
+     "2"
+    ],
+    "name": "-n",
+    "optional": true
+   },
+   {
+    "args": [
+     "-l",
+     "10"
+    ],
+    "name": "-l",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-B"
+    ],
+    "name": "-B",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   },
+   {
+    "args": [
+     "-a",
+     "{in:mat}"
+    ],
+    "name": "-a",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "t1_brain"
+    ],
+    "name": "-o",
+    "optional": true
+   },
+   {
+    "args": [
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      0.9,
+      1.05,
+      0.95
+     ],
+     "bias": [
+      -0.0025,
+      0.0025,
+      0.00125,
+      -0.00016666666666666666
+     ],
+     "brain": true,
+     "centre": [
+      -1.0,
+      1.0,
+      -3.0
+     ],
+     "noise": 1.0,
+     "seed": 849362334,
+     "size": 21.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      22.5,
+      -22.5,
+      22.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      -1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     19,
+     19,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mat": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.307143 0 0 -5.142857\n0 0.307143 0 -10.671429\n0 0 0.307143 -3.642857\n0 0 0 1\n"
+   }
+  },
+  "n": 8527,
+  "options": [
+   "-B",
+   "-a",
+   "-g",
+   "-l",
+   "-n",
+   "-o",
+   "-v",
+   "FSLOUTPUTTYPE=ANALYZE"
+  ],
+  "seed": "cleanroom-fast",
+  "tool": "fsl-fast-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast",
+ "tier": "standard",
+ "tool": "fsl-fast-original"
+}

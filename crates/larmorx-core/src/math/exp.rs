@@ -25,6 +25,11 @@
 //!   loop would spin forever) returns its input `f`; the tests run every database entry.
 //! - Hex float literals are written as `f64` bit patterns, generated from the C source and
 //!   checked against it; each table line carries the original literals as a comment.
+//! - Added (not in the C file): [`exp_in_place`], larmorx's batched form for speed: the fast
+//!   path's operations four values at a time without branches (so that they vectorise), `t`'s
+//!   integer read from the bits of `t + 1.5 · 2^52` (exact for these `|t| < 2^23`), and [`exp`]
+//!   itself for every value outside the fast path or failing its rounding test: each result
+//!   has [`exp`]'s bits (tested).
 
 // Copyright (c) 2022-2025 Alexei Sibidanov.
 //
@@ -524,9 +529,70 @@ pub fn exp(x: f64) -> f64 {
     fh
 }
 
+/// `0x1.8p52`: added to an integral `f64` below 2^51 in magnitude, its integer is in the low
+/// bits of the sum's bit pattern (exactly).
+const MAGIC: f64 = fb(0x4338000000000000);
+
+/// [`exp`]'s fast path for four values at once, written lane by lane (no branches) so that it
+/// vectorises: the same operations in the same order as [`exp`]'s, so each lane's result has
+/// its bits. A lane is `false` in the second array when [`exp`] itself must give it: `x` outside
+/// the fast path's range (`|x| <= 0x1p-54`, overflow, underflow, a subnormal result, NaN) or the
+/// rounding test fails (its accurate path).
+#[inline(always)]
+fn fast4(x: [f64; 4]) -> ([f64; 4], [bool; 4]) {
+    let mut out = [0f64; 4];
+    let mut ok = [false; 4];
+    for l in 0..4 {
+        let ix = x[l].to_bits();
+        let aix = ix & (u64::MAX >> 1);
+        let inside =
+            aix > 0x3c90000000000000 && aix < 0x40862e42fefa39f0 && ix <= 0xc086232bdd7abcd2;
+        // a lane outside computes on 1.0 instead (its result is not used)
+        let xl = if inside { x[l] } else { 1.0 };
+        let t = (xl * S).round_ties_even();
+        // |t| < 2^23 here: its integer from the bits of t + 1.5 · 2^52 (`t as i64` exactly)
+        let jt = ((t + MAGIC).to_bits() as i64).wrapping_sub(MAGIC.to_bits() as i64);
+        let i0 = ((jt >> 6) & 0x3f) as usize;
+        let i1 = (jt & 0x3f) as usize;
+        let ie = jt >> 12;
+        let (t0h, t0l) = (T0[i0][1], T0[i0][0]);
+        let (t1h, t1l) = (T1[i1][1], T1[i1][0]);
+        let (th, tl) = muldd(t0h, t0l, t1h, t1l);
+        let dx = (xl - L2H * t) + L2L * t;
+        let dx2 = dx * dx;
+        let p = (CH_FAST[0] + dx * CH_FAST[1]) + dx2 * (CH_FAST[2] + dx * CH_FAST[3]);
+        let fh = th;
+        let tx = th * dx;
+        let fl = tl + tx * p;
+        let eps = 1.64e-19;
+        let ub = fh + (fl + eps);
+        let lb = fh + (fl - eps);
+        ok[l] = inside && ub == lb;
+        out[l] = as_ldexp(lb, ie);
+    }
+    (out, ok)
+}
+
+/// [`exp`] of every value of `x`, in place, with exactly [`exp`]'s bits: four values at a time
+/// through [`fast4`], [`exp`] itself for the lanes it leaves and the last `len % 4` values.
+#[inline(always)]
+pub fn exp_in_place(x: &mut [f64]) {
+    let (chunks, rest) = x.as_chunks_mut::<4>();
+    for c in chunks {
+        let v = *c;
+        let (r, ok) = fast4(v);
+        for l in 0..4 {
+            c[l] = if ok[l] { r[l] } else { exp(v[l]) };
+        }
+    }
+    for v in rest {
+        *v = exp(*v);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{DB, exp};
+    use super::{DB, exp, exp_in_place};
 
     fn check(cases: &[(u64, u64)]) {
         for &(x, y) in cases {
@@ -549,6 +615,62 @@ mod tests {
         assert!(exp(f64::NAN).is_nan());
         assert!(exp(-f64::NAN).is_nan());
         assert!(exp(f64::from_bits(0x7ff0000000000001)).is_nan()); // signalling NaN
+    }
+
+    /// [`exp_in_place`] gives [`exp`]'s bits for every value (both builds: the baseline here,
+    /// the AVX2 one through `math::exp_in_place` in `math`'s tests): each range of the fast
+    /// path and its boundaries, the database's inputs (their rounding test fails), special
+    /// values and a sweep of bit patterns.
+    #[test]
+    fn in_place_is_exp() {
+        let mut v: Vec<f64> = Vec::new();
+        let mut z = 0x9e3779b97f4a7c15u64;
+        for _ in 0..400_000 {
+            z ^= z << 13;
+            z ^= z >> 7;
+            z ^= z << 17;
+            // uniform in [-760, 760], uniform bit patterns, and small magnitudes
+            v.push((z >> 11) as f64 / (1u64 << 53) as f64 * 1520.0 - 760.0);
+            v.push(f64::from_bits(z));
+            v.push(f64::from_bits(
+                (z & 0x800f_ffff_ffff_ffff)
+                    | (0x3c00_0000_0000_0000 + ((z >> 52) & 0x3ff) * (1 << 52) / 4),
+            ));
+        }
+        for &b in &[
+            0x3c90000000000000u64,
+            0x40862e42fefa39f0,
+            0xc086232bdd7abcd2,
+            0x40874910d52d3052,
+        ] {
+            for d in -3i64..=3 {
+                for sign in [0u64, 1 << 63] {
+                    v.push(f64::from_bits((b as i64 + d) as u64 ^ sign));
+                }
+            }
+        }
+        v.extend(DB.iter().map(|&x| f64::from_bits(x)));
+        v.extend([
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            -f64::NAN,
+            1e-300,
+            -1e-300,
+        ]);
+        for off in 0..4 {
+            let mut got = v[off..].to_vec();
+            exp_in_place(&mut got);
+            for (k, (&x, &y)) in v[off..].iter().zip(&got).enumerate() {
+                let e = exp(x);
+                assert!(
+                    e.to_bits() == y.to_bits() || (e.is_nan() && y.is_nan()),
+                    "{k}: exp({x:e}) = {e:e}, in place {y:e}"
+                );
+            }
+        }
     }
 
     /// Expected values are e^x rounded to nearest (mpmath, 300 bits, rounding certified).
@@ -704,5 +826,209 @@ mod tests {
         for (&x, &y) in DB.iter().zip(EXPECTED.iter()) {
             check(&[(x, y)]);
         }
+    }
+
+    /// The randomized check of the batch against the scalar function (the orchestrator's
+    /// request, 2026-11-03; `validation/investigations/cleanroom-fast/README.md` has the
+    /// command and the counts): 2^32 values by default (`LARMORX_EXP_CHECK_N` sets another
+    /// count, `LARMORX_EXP_CHECK_THREADS` the threads, 14 by default), each through both
+    /// builds of the batch (the baseline [`exp_in_place`] here, the dispatched
+    /// `math::exp_in_place`, AVX2 and FMA on such a CPU) and compared bit for bit, NaN payloads
+    /// included, with the scalar [`exp`] and the dispatched `math::exp`. The values are mixed in
+    /// every buffer (each lane meets every kind): uniform bit patterns over all 2^64 and over
+    /// the finite ones, uniform values over the fast path's range and beyond its thresholds,
+    /// the range FAST's likelihoods use, every binade from 2^-64 to 2^10, the values within
+    /// 2^20 ulps of each branch threshold (`|x| = 2^-54`, overflow, the subnormal results,
+    /// underflow, infinity; both signs), the values next to the rounding of `x · S` to the
+    /// table's index (`(k + ½) / S` and its neighbours) and next to the database's inputs (the
+    /// accurate path), subnormal inputs, ±0, ±inf and NaNs of random payloads.
+    #[test]
+    #[ignore = "2^32 values, about 30 s on 14 threads: cargo test --release -p larmorx-core \
+                exp_in_place_randomized -- --ignored --nocapture"]
+    fn exp_in_place_randomized() {
+        use super::{S, fast4};
+        const KINDS: [&str; 9] = [
+            "uniform bit patterns (all 2^64)",
+            "uniform finite bit patterns",
+            "uniform in [-746, 710]",
+            "uniform in [-60, 1] (FAST's likelihoods)",
+            "every binade 2^-64..2^10, both signs",
+            "within 2^20 ulps of a branch threshold",
+            "next to (k + 1/2) / S (the index's rounding)",
+            "within 2^12 ulps of a database input",
+            "subnormal inputs, +-0, +-inf, NaNs",
+        ];
+        // which kind each 1/16 of the draws is
+        const SLOT: [usize; 16] = [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6, 7, 8];
+        const THRESHOLDS: [u64; 5] = [
+            0x3c90000000000000, // |x| = 2^-54: 1 + x
+            0x40862e42fefa39f0, // overflow (and the special values' branch)
+            0x4086232bdd7abcd2, // the subnormal results (negative x)
+            0x40874910d52d3052, // underflow (negative x)
+            0x7ff0000000000000, // infinity, NaN
+        ];
+        fn draw(s: &mut u64) -> u64 {
+            *s ^= *s << 13;
+            *s ^= *s >> 7;
+            *s ^= *s << 17;
+            s.wrapping_mul(0x2545_f491_4f6c_dd1d)
+        }
+        fn unit(r: u64) -> f64 {
+            (r >> 11) as f64 / (1u64 << 53) as f64
+        }
+        fn value(s: &mut u64) -> (usize, f64) {
+            let r = draw(s);
+            let kind = SLOT[(r >> 60) as usize];
+            let q = draw(s);
+            let x = match kind {
+                0 => f64::from_bits(q),
+                1 => {
+                    let mut b = q;
+                    while (b >> 52) & 0x7ff == 0x7ff {
+                        b = draw(s);
+                    }
+                    f64::from_bits(b)
+                }
+                2 => unit(q) * 1456.0 - 746.0,
+                3 => unit(q) * 61.0 - 60.0,
+                4 => {
+                    let e = 0x3bf + (q >> 54) % (0x409 - 0x3bf + 1);
+                    f64::from_bits((q & 0x800f_ffff_ffff_ffff) | (e << 52))
+                }
+                5 => {
+                    let b = THRESHOLDS[(q % 5) as usize];
+                    let d = ((q >> 8) & 0x1f_ffff) as i64 - 0x10_0000;
+                    let sign = (q >> 63) << 63;
+                    f64::from_bits((b as i64 + d) as u64 | sign)
+                }
+                6 => {
+                    let k = ((q >> 8) % 8_600_000) as f64 - 4_400_000.0;
+                    let c = (k + 0.5) / S;
+                    let d = ((q >> 40) & 0xf) as i64 - 8;
+                    f64::from_bits((c.to_bits() as i64 + d) as u64)
+                }
+                7 => {
+                    let b = DB[(q % DB.len() as u64) as usize];
+                    let d = ((q >> 8) & 0x1fff) as i64 - 0x1000;
+                    f64::from_bits((b as i64 + d) as u64)
+                }
+                _ => match q % 8 {
+                    0 => 0.0,
+                    1 => -0.0,
+                    2 => f64::INFINITY,
+                    3 => f64::NEG_INFINITY,
+                    4 | 5 => f64::from_bits((q >> 12) & 0x000f_ffff_ffff_ffff | (q << 63)),
+                    _ => {
+                        // a NaN: any nonzero payload, either sign, quiet or signalling
+                        let m = (q >> 12) & 0x000f_ffff_ffff_ffff;
+                        f64::from_bits(0x7ff0_0000_0000_0000 | m.max(1) | ((q >> 2) << 63))
+                    }
+                },
+            };
+            (kind, x)
+        }
+        let n: u64 = std::env::var("LARMORX_EXP_CHECK_N")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1 << 32);
+        let threads: u64 = std::env::var("LARMORX_EXP_CHECK_THREADS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(14);
+        const LEN: usize = 4093; // not a multiple of 4: the scalar tail runs too
+        let start = std::time::Instant::now();
+        // per thread: the values of each kind, the lanes kept and sent on, the values, the
+        // differences
+        type Counts = ([u64; 9], u64, u64, u64, Vec<String>);
+        let results: Vec<Counts> = std::thread::scope(|sc| {
+            let handles: Vec<_> = (0..threads)
+                .map(|t| {
+                    sc.spawn(move || {
+                        let mut s =
+                            0x9e37_79b9_7f4a_7c15u64 ^ (t + 1).wrapping_mul(0xd1b5_4a32_d192_ed03);
+                        let count = n / threads + u64::from(t < n % threads);
+                        let (mut per_kind, mut fast, mut accurate, mut done) = ([0u64; 9], 0, 0, 0);
+                        let mut bad = Vec::new();
+                        let (mut v, mut kinds) = (vec![0f64; LEN], vec![0usize; LEN]);
+                        while done < count {
+                            let len = LEN.min((count - done) as usize);
+                            for i in 0..len {
+                                (kinds[i], v[i]) = value(&mut s);
+                                per_kind[kinds[i]] += 1;
+                            }
+                            let mut base = v[..len].to_vec();
+                            let mut disp = v[..len].to_vec();
+                            exp_in_place(&mut base);
+                            crate::math::exp_in_place(&mut disp);
+                            for chunk in v[..len].as_chunks::<4>().0 {
+                                let (_, ok) = fast4(*chunk);
+                                for (l, &o) in ok.iter().enumerate() {
+                                    let x = chunk[l].to_bits();
+                                    let a = x & (u64::MAX >> 1);
+                                    let inside = a > 0x3c90000000000000
+                                        && a < 0x40862e42fefa39f0
+                                        && x <= 0xc086232bdd7abcd2;
+                                    fast += u64::from(o);
+                                    accurate += u64::from(inside && !o);
+                                }
+                            }
+                            for i in 0..len {
+                                let e = exp(v[i]).to_bits();
+                                let ed = crate::math::exp(v[i]).to_bits();
+                                let (b, d) = (base[i].to_bits(), disp[i].to_bits());
+                                if e != b || e != d || e != ed {
+                                    bad.push(format!(
+                                        "{} {:#018x}: exp {e:#018x}, math::exp {ed:#018x}, \
+                                         baseline batch {b:#018x}, dispatched batch {d:#018x}",
+                                        KINDS[kinds[i]],
+                                        v[i].to_bits()
+                                    ));
+                                }
+                            }
+                            done += len as u64;
+                        }
+                        (per_kind, fast, accurate, done, bad)
+                    })
+                })
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        let (mut per_kind, mut fast, mut accurate, mut total) = ([0u64; 9], 0, 0, 0);
+        let mut bad = Vec::new();
+        for (k, f, a, d, b) in results {
+            for (p, q) in per_kind.iter_mut().zip(k) {
+                *p += q;
+            }
+            (fast, accurate, total) = (fast + f, accurate + a, total + d);
+            bad.extend(b);
+        }
+        let avx2 = {
+            #[cfg(target_arch = "x86_64")]
+            {
+                std::arch::is_x86_feature_detected!("avx2")
+                    && std::arch::is_x86_feature_detected!("fma")
+            }
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                false
+            }
+        };
+        println!(
+            "exp_in_place against exp: {total} values, {threads} threads, {:.1} s; the \
+             dispatched batch on AVX2 and FMA: {avx2}",
+            start.elapsed().as_secs_f64()
+        );
+        for (name, c) in KINDS.iter().zip(per_kind) {
+            println!("  {c:>12}  {name}");
+        }
+        println!(
+            "  lanes of the 4-wide path: {fast} kept, {accurate} sent to the accurate path by \
+             the rounding test; differences: {}",
+            bad.len()
+        );
+        for b in bad.iter().take(20) {
+            println!("  DIFFERENCE {b}");
+        }
+        assert!(bad.is_empty(), "{} differences", bad.len());
     }
 }

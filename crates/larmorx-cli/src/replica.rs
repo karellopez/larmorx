@@ -241,13 +241,13 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's FAST (2026-11-02): the replica only; the clean-room original is to be written from
-    // specs/fast.md.
+    // FSL's FAST (2026-11-02): the replica, and since 2026-11-03 the clean-room original
+    // (`larmorx_fsl::cli`, written from specs/fast.md).
     Replica {
         family: "fsl",
         tool: "fast",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     // FSL's topup and applytopup (2026-11-03): the replicas only; the clean-room originals are to
     // be written from specs/topup.md.
@@ -712,7 +712,7 @@ mod tests {
         assert_eq!(replica_only("ants").count(), 0);
         assert_eq!(
             replica_only("fsl").collect::<Vec<_>>(),
-            ["fast", "topup", "applytopup"]
+            ["topup", "applytopup"]
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");

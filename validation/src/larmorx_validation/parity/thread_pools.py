@@ -391,6 +391,18 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
         out.append(Program(f"fsl {name} (clean-room original)", (*fl, *a), bet))
     out.append(Program("fsl pairreg (clean-room original)",
                        (*fl, "pairreg", f, m, f, m, o + "_opair.mat"), pair))  # fmt: skip
+    # FAST's clean-room original (2026-11-03): fMRIPrep's call (the PVE's batched exp, -p, -g),
+    # the default with both bias outputs and -v (the bias field's convolutions, the MRF's
+    # pipelined sweeps, the mixel ICM, the blocked sums), two channels (their statistics and
+    # bias fields), and the priors registered by FLIRT's original in process (-a, -A, -P).
+    pri = [x["prior01"], x["prior02"], x["prior03"]]
+    for name, a in (
+        ("fast fMRIPrep's call", ["fast", "-I", "0", "-N", "-p", "-g", "-S", "1", "-o", o + "_ofastfp", t1]),
+        ("fast", ["fast", "-b", "-B", "-v", "-o", o + "_ofast", t1]),
+        ("fast two channels", ["fast", "-S", "2", "-b", "-B", "-p", "-o", o + "_ofast2", f, t1]),
+        ("fast priors", ["fast", "-a", str(mat), "-A", *pri, "-P", "-o", o + "_ofastpri", t1]),
+    ):  # fmt: skip
+        out.append(Program(f"fsl {name} (clean-room original)", (*fl, *a), bet))
     if nc:
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],

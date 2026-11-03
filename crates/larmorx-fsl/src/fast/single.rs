@@ -51,6 +51,13 @@ pub struct Params {
     pub verbose: bool,
     /// Keep the member probabilities for `-p`.
     pub probabilities: bool,
+    /// `-a`'s registered priors (CSF, grey, white matter) over the whole image (§6), when they
+    /// are used: the initialisation is theirs.
+    pub priors: Option<[Vec<f32>; 3]>,
+    /// `-P`: the priors weight every MRF update.
+    pub priors_throughout: bool,
+    /// Several channels: FSL-98's pairing of the sorted classes (`reproduce`).
+    pub fsl98_pairing: bool,
 }
 
 impl Default for Params {
@@ -70,6 +77,9 @@ impl Default for Params {
             manual: None,
             verbose: false,
             probabilities: false,
+            priors: None,
+            priors_throughout: false,
+            fsl98_pairing: false,
         }
     }
 }
@@ -81,6 +91,12 @@ pub enum Stop {
     KMeans,
     /// The image is too large for larmorx's indices.
     TooLarge,
+    /// Several channels: a class's covariance is singular (FAST aborts: `inv(): matrix is
+    /// singular`).
+    Singular,
+    /// Several channels of different sizes: the percentile of a second channel (FSL-104's
+    /// reproduction: FAST aborts).
+    Sizes,
 }
 
 /// What a segmentation computed, per mask voxel (the classes in their final order).
@@ -97,6 +113,10 @@ pub struct Single {
     pub bias: Option<Vec<f32>>,
     /// The tissue volumes (mm³) `-v` prints.
     pub volumes: Vec<f64>,
+    /// How many of FSL's masked sums ran over an empty mask (each prints `ERROR:: Empty mask
+    /// image`, §8.3): 4 per class for each class statistics, 1 per bias field estimate, 1 per
+    /// class for the tissue volumes (observed).
+    pub empty_sums: usize,
 }
 
 /// §4.1's rule for negative values, in place: when the minimum is below 0, the minimum is
@@ -177,6 +197,27 @@ pub fn members(post: &[f32], n: usize, nm: usize) -> Vec<f32> {
     q
 }
 
+/// The priors of every mask voxel (§6.6): `(π_csf, π_gm, π_wm) / s` for three classes,
+/// `(π_csf, π_gm + π_wm) / s` for two, `s = π_csf + π_gm + π_wm` (single); `1/n` each where `s ≤
+/// 0`.
+pub fn prior_rows(grid: &Grid, priors: &[Vec<f32>; 3], n: usize) -> Vec<f32> {
+    let mut out = vec![0f32; grid.len() * n];
+    let even = 1.0f32 / n as f32;
+    for (row, &idx) in out.chunks_exact_mut(n.max(1)).zip(&grid.index) {
+        let i = idx as usize;
+        let (a, b, c) = (priors[0][i], priors[1][i], priors[2][i]);
+        let s = a + b + c;
+        if s <= 0.0 {
+            row.fill(even);
+        } else if n == 3 {
+            row.copy_from_slice(&[a / s, b / s, c / s]);
+        } else if n == 2 {
+            row.copy_from_slice(&[a / s, (b + c) / s]);
+        }
+    }
+    out
+}
+
 /// The MRF sweeps' state: the posteriors (`n` per mask voxel, then a row of zeros for the
 /// neighbours outside the mask).
 struct Mrf<'a> {
@@ -194,6 +235,7 @@ impl Mrf<'_> {
         classes: &[Gauss],
         beta: f32,
         rng: &mut GlibcRand,
+        priors: Option<&[f32]>,
         out: &mut dyn Write,
         verbose: bool,
     ) {
@@ -238,7 +280,10 @@ impl Mrf<'_> {
                 }
                 let mut s = 0f64;
                 for c in 0..n {
-                    let v = math::exp(b * u[c] - neg_g[i * n + c]) as f32;
+                    let mut v = math::exp(b * u[c] - neg_g[i * n + c]) as f32;
+                    if let Some(pr) = priors {
+                        v *= pr[i * n + c];
+                    }
                     e[c] = v;
                     s += f64::from(v);
                 }
@@ -354,17 +399,74 @@ pub fn segment(
     in_mask: impl Fn(usize) -> bool,
     p: &Params,
     out: &mut dyn Write,
+    err: &mut dyn Write,
 ) -> Result<Single, Stop> {
     let grid = Grid::new(shape, voxel, in_mask).ok_or(Stop::TooLarge)?;
     let n = p.n_classes;
     let nm = grid.len();
     let len = stats::block_len(grid.voxels());
     let y: Vec<f32> = grid.index.iter().map(|&i| log1(data[i as usize])).collect();
-    // §4.3: the initial means (log domain)
+    // FSL's masked sums over an empty mask (each prints a message)
+    let mut sums = 0usize;
+    let mut post = vec![0f32; (nm + 1) * n];
+    let stats_now: Vec<(f32, f32)>;
+    let mut init_members: Option<Vec<f32>> = None;
+    let pri = p.priors.as_ref().map(|pr| prior_rows(&grid, pr, n));
+    if let Some(pr) = &pri {
+        // §6.6: the initialisation from the priors, no iterations
+        if p.verbose {
+            let _ = writeln!(out, "Beginning prior-based initialisation");
+        }
+        post[..nm * n].copy_from_slice(pr);
+        stats_now = stats::class_stats(&post[..nm * n], &y, n, len);
+        sums += 4 * n;
+    } else {
+        stats_now = initialise(
+            p,
+            &y,
+            n,
+            nm,
+            len,
+            &mut post,
+            &mut init_members,
+            &mut sums,
+            out,
+        )?;
+    }
+    finish(
+        p,
+        grid,
+        y,
+        len,
+        post,
+        stats_now,
+        init_members,
+        pri,
+        sums,
+        voxel,
+        out,
+        err,
+    )
+}
+
+/// §4.3: the initial means, the hard assignment and the initialisation iterations; the class
+/// statistics of the last.
+#[allow(clippy::too_many_arguments)]
+fn initialise(
+    p: &Params,
+    y: &[f32],
+    n: usize,
+    nm: usize,
+    len: usize,
+    post: &mut [f32],
+    init_members: &mut Option<Vec<f32>>,
+    sums: &mut usize,
+    out: &mut dyn Write,
+) -> Result<Vec<(f32, f32)>, Stop> {
     let means: Vec<f32> = match &p.manual {
         Some(s) if s.len() == n => s.iter().map(|&v| math::logf(v)).collect(),
         _ => {
-            let sorted = stats::sorted(y.clone());
+            let sorted = stats::sorted(y.to_vec());
             let step = 1.0 / (n as f32 + 1.0);
             (1..=n)
                 .map(|c| stats::percentile_of_sorted(&sorted, c as f32 * step))
@@ -385,7 +487,6 @@ pub fn segment(
     }
     let mut stats_now: Vec<(f32, f32)> = means.iter().map(|&m| (m, 0.0)).collect();
     // hard assignment to the nearest mean
-    let mut post = vec![0f32; (nm + 1) * n];
     post[..nm * n]
         .par_chunks_mut(n)
         .zip(y.par_iter())
@@ -402,15 +503,15 @@ pub fn segment(
         });
     // the initialisation iterations: -O plus -W of them
     let init = (p.fixed_iterations + p.init_iterations).max(0);
-    let mut init_members: Option<Vec<f32>> = None;
     for it in 0..init {
         if p.verbose {
             let _ = writeln!(out, "KMeans Iteration {it}");
         }
         if !p.pve && p.probabilities && it == init - 1 {
-            init_members = Some(members(&post, n, nm));
+            *init_members = Some(members(post, n, nm));
         }
-        stats_now = stats::class_stats(&post[..nm * n], &y, n, len);
+        stats_now = stats::class_stats(&post[..nm * n], y, n, len);
+        *sums += 4 * n;
         let gs = gaussians(&stats_now);
         post[..nm * n]
             .par_chunks_mut(n)
@@ -429,7 +530,27 @@ pub fn segment(
                 }
             });
     }
-    // §4.6: the main loop
+    Ok(stats_now)
+}
+
+/// §4.6 to §4.9: the main loop, the class order, the hard segmentation, the partial volumes.
+#[allow(clippy::too_many_arguments)]
+fn finish(
+    p: &Params,
+    grid: Grid,
+    y: Vec<f32>,
+    len: usize,
+    post: Vec<f32>,
+    mut stats_now: Vec<(f32, f32)>,
+    init_members: Option<Vec<f32>>,
+    pri: Option<Vec<f32>>,
+    mut sums: usize,
+    voxel: [f32; 3],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<Single, Stop> {
+    let n = p.n_classes;
+    let nm = grid.len();
     let kernels = kernels(p.lowpass, voxel);
     let mut bias: Option<Vec<f32>> = None;
     let mut yb = y.clone();
@@ -442,6 +563,7 @@ pub fn segment(
     };
     if !p.no_bias {
         bias = Some(estimate(&post, &stats_now, &mut yb));
+        sums += 1;
     }
     for &(m, v) in &stats_now {
         if m.is_nan() || v.is_nan() {
@@ -455,6 +577,7 @@ pub fn segment(
         weights: grid.weights.map(f64::from),
     };
     let mut rng = GlibcRand::new(FAST_SEED);
+    let pr = pri.as_deref().filter(|_| p.priors_throughout);
     let mut beta = p.f_hard;
     for it in 0..p.bias_iterations.max(0) {
         if p.verbose {
@@ -464,14 +587,24 @@ pub fn segment(
                 p.bias_iterations
             );
         }
-        mrf.iterate(&yb, &gaussians(&stats_now), beta, &mut rng, out, p.verbose);
+        mrf.iterate(
+            &yb,
+            &gaussians(&stats_now),
+            beta,
+            &mut rng,
+            pr,
+            out,
+            p.verbose,
+        );
         if p.verbose {
             class_line(out, &stats_now);
         }
         if !p.no_bias {
             bias = Some(estimate(&mrf.post, &stats_now, &mut yb));
+            sums += 1;
         }
         stats_now = stats::class_stats(&mrf.post[..nm * n], &yb, n, len);
+        sums += 4 * n;
     }
     for it in 0..p.fixed_iterations.max(0) {
         if p.verbose {
@@ -481,15 +614,41 @@ pub fn segment(
                 p.fixed_iterations
             );
         }
-        mrf.iterate(&yb, &gaussians(&stats_now), beta, &mut rng, out, p.verbose);
+        mrf.iterate(
+            &yb,
+            &gaussians(&stats_now),
+            beta,
+            &mut rng,
+            pr,
+            out,
+            p.verbose,
+        );
         if p.verbose {
             class_line(out, &stats_now);
         }
-        beta = p.hyper;
+        beta = if p.hyper.is_nan() {
+            // FSL-99 (reproduce): a NaN -H passes FAST's check for a negative value and β is
+            // estimated against a table of zeros (observed: the lines below, then β = 0)
+            let total = mrf.weights_total() as f32;
+            let _ = writeln!(
+                out,
+                " TOTAL {} RHS {}",
+                g(f64::from(total)),
+                "0 ".repeat(15)
+            );
+            for k in 1..=14 {
+                let v = g(f64::from(k as f32 * 0.05));
+                let _ = writeln!(err, "{v} {v}");
+            }
+            0.0
+        } else {
+            p.hyper
+        };
         if p.verbose {
             let _ = writeln!(out, " BETA {}", g(f64::from(beta)));
         }
         stats_now = stats::class_stats(&mrf.post[..nm * n], &yb, n, len);
+        sums += 4 * n;
     }
     let post = mrf.post;
     // §4.7: the classes sorted by their means (descending for -t 2)
@@ -534,11 +693,13 @@ pub fn segment(
         let q = members(&sorted_post, n, nm);
         let x: Vec<f32> = yb.par_iter().map(|&v| math::expf(v)).collect();
         let r = pve::estimate(&grid, &sorted_post, &x, n, p.mixel, len);
+        sums += 5 * n;
         let volumes: Vec<f64> = (0..n)
             .map(|c| stats::sum((0..nm).map(|i| f64::from(r.frac[i * n + c])), len) * vox)
             .collect();
         (p.probabilities.then_some(q), Some(r), volumes)
     } else {
+        sums += n;
         let volumes: Vec<f64> = (0..n)
             .map(|c| stats::sum((0..nm).map(|i| f64::from(sorted_post[i * n + c])), len) * vox)
             .collect();
@@ -560,5 +721,6 @@ pub fn segment(
         pve,
         bias,
         volumes,
+        empty_sums: if nm == 0 { sums } else { 0 },
     })
 }

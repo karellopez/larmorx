@@ -54,12 +54,6 @@ from larmorx_validation.parity.harness import (
 )
 
 SUITE = "fsl-fast"
-#: What the original does not have yet (its next relays): the cases using them are skipped.
-PENDING: dict[str, str] = {
-    "multi": "several channels (-S 2 to 8)",
-    "priors": "the tissue priors (-a, -A, -P)",
-}
-
 _NUMBER = re.compile(r"[-+]?(?:nan|inf|(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)")
 #: The thresholds of §11.
 DICE, SAME = 0.999, 0.999
@@ -390,31 +384,6 @@ def fix_pass(
         )
 
 
-#: Single cases waiting for a later step of the original.
-PENDING_CASES: dict[str, str] = {
-    "err/H-nan": "FSL-99's arithmetic with reproduce for a NaN -H (FAST's table of zeros)",
-}
-
-
-def _pending(name: str, args: list[str]) -> str | None:
-    if name in PENDING_CASES:
-        return PENDING_CASES[name]
-    if name.startswith("multi/") or name.startswith("priors/"):
-        return PENDING[name.split("/")[0]]
-    words = list(args)
-    if "-S" in words:
-        k = words.index("-S")
-        if k + 1 < len(words) and words[k + 1] not in ("1",):
-            try:
-                if int(words[k + 1], 0) > 1:
-                    return PENDING["multi"]
-            except ValueError:
-                pass
-    if "-a" in words:
-        return PENDING["priors"]
-    return None
-
-
 def _band_of(stack: contextlib.ExitStack, prepare, args, settings, never: str, unwritten=()):
     """The band's run (:func:`compare`), made only when a check needs it: FSL with the CORE-MATH
     preload through the oracle cache (the preload's content is part of the key)."""
@@ -438,9 +407,6 @@ def _refusal(stderr: str) -> str:
 
 
 def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
-    pending = _pending(name, list(run.args))
-    if pending:
-        raise Outcome(SKIPPED, f"not in the clean-room original yet: {pending}")
     settings = dict(run.settings)
     if run.refused:
         # FSL reads or writes outside its memory: the original refuses in both modes
@@ -469,6 +435,9 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         if run.unwritten:
             rep._clear_unwritten(checks, a, run.unwritten)
+        if run.no_bias_field:
+            # FSL-97: FSL's files hold memory it never wrote; the defined result instead
+            rep._undefined_bias_field(checks, a, args)
         band = _band_of(
             stack, lambda t: rep._prepare(run, t), args, settings, run.never, run.unwritten
         )
@@ -567,7 +536,6 @@ def suite() -> Suite:
         notes=(
             "The cases are the replica suite's (`fsl-fast-replica`); FSL's runs are served from "
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run. Cases of what the "
-            "original does not have yet (several channels, the priors) are skipped."
+            "mode (D13) and its default `fix` pass against the reproduced run."
         ),
     )

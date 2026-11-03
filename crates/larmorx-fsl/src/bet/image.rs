@@ -402,7 +402,7 @@ fn write_pieces(
 }
 
 /// An ANALYZE 7.5 pair (a 348-byte header without NIfTI's magic), as FSL reads it (§3.1;
-/// observed): radiological storage, no scaling unless its slope field asks for it, and on
+/// observed): radiological storage, no scaling (its scale field is not applied), and on
 /// output a qform and sform (code 2) of the voxel sizes with the origin from the header's
 /// `originator` (`-(origin - 1) d`). `None` when `files` is not ANALYZE.
 fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageError> {
@@ -437,6 +437,16 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
         }
     };
     let origin = [i16_at(253), i16_at(255), i16_at(257)];
+    // the stored voxel sizes' signs (the header's own, before NIfTI's load fixes)
+    let f32_at = |k: usize| {
+        let b = [raw[k], raw[k + 1], raw[k + 2], raw[k + 3]];
+        if le {
+            f32::from_le_bytes(b)
+        } else {
+            f32::from_be_bytes(b)
+        }
+    };
+    let radiological = f32_at(80) * f32_at(84) * f32_at(88) < 0.0;
     let mut block = raw[..348].to_vec();
     block[344..348].copy_from_slice(b"ni1\0");
     // the NIfTI fields ANALYZE's history overlaps: no transforms
@@ -489,22 +499,25 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
             _ => 0.0,
         }
     };
-    let slope = h.scl_slope;
-    let scale = (slope != 0.0 && slope.is_finite() && slope != 1.0).then_some(slope as f32);
-    let values: Vec<f32> = (0..n)
-        .map(|k| match scale {
-            Some(s) => value(k) * s,
-            None => value(k),
-        })
-        .collect();
+    // FSL 6.0.7.23 does not apply the header's scale field (SPM's `funused1`, where NIfTI keeps
+    // `scl_slope`): FLIRT's output of FSL's standard CSF prior (uint8, a scale of 1/255) holds
+    // 0 to 217 with `-datatype float`, not 0 to 0.85 (observed, 2026-11-03:
+    // validation/investigations/cleanroom-fast/analyze_scale.py)
+    let values: Vec<f32> = (0..n).map(value).collect();
     let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
     let per = dims.iter().product::<usize>().max(1);
     let voxel = larmorx_mri::hmc::image::voxel_size(&h).map(f64::from);
     // FSL gives an ANALYZE input a transform of positive determinant (below), so it works on
-    // it with x reversed, as on any neurologically stored image (observed)
+    // it with x reversed, as on any neurologically stored image (observed); one whose stored
+    // voxel sizes have a negative product (FSL's standard tissue priors: -2, 2, 2) it works on
+    // as stored, radiologically (observed, 2026-11-03: FLIRT's -applyxfm of FSL's standard CSF
+    // prior, which FAST's -a runs, samples it without the reversal)
     let vols: Vec<Vol> = values
         .chunks_exact(per)
-        .map(|c| flip_x(&Vol::new(dims, voxel, c.to_vec())))
+        .map(|c| {
+            let v = Vol::new(dims, voxel, c.to_vec());
+            if radiological { v } else { flip_x(&v) }
+        })
         .collect();
     // the output geometry FSL gives an ANALYZE input (observed)
     let d = voxel;
@@ -518,7 +531,22 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
     h.qoffset_y = off[1];
     h.qoffset_z = off[2];
     h.pixdim[0] = 1.0;
-    h.srow_x = [d[0], 0.0, 0.0, off[0]];
+    if radiological {
+        // the transform of the storage as it is: x decreasing (its header, unobserved, written
+        // consistently with that)
+        h.pixdim[0] = -1.0;
+        h.quatern_c = 1.0;
+        h.qoffset_x = -off[0];
+        for k in 1..4 {
+            h.pixdim[k] = h.pixdim[k].abs();
+        }
+    }
+    h.srow_x = [
+        if radiological { -d[0] } else { d[0] },
+        0.0,
+        0.0,
+        if radiological { -off[0] } else { off[0] },
+    ];
     h.srow_y = [0.0, d[1], 0.0, off[1]];
     h.srow_z = [0.0, 0.0, d[2], off[2]];
     h.scl_slope = 1.0;
@@ -534,7 +562,7 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
         Input {
             vol: first,
             header: h,
-            flipped: true,
+            flipped: !radiological,
             volumes,
         },
     )))

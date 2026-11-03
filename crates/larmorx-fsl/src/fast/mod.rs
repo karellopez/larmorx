@@ -6,7 +6,8 @@
 //! FSL's program (see `PROVENANCE.md`).
 //!
 //! - [`single`]: one channel (§4): the mask, the log image, the initialisation, the MRF
-//!   iterations, the bias field, the class order and the hard segmentation;
+//!   iterations, the bias field, the class order and the hard segmentation; the priors (§6);
+//! - [`multi`]: several channels (§5);
 //! - [`pve`]: the partial volumes (§4.8);
 //! - [`bias`]: the bias field's kernels and separable smoothing (§4.5, §8.5);
 //! - [`grid`]: the mask's voxels and their MRF neighbourhood (§4.2);
@@ -18,6 +19,7 @@
 
 pub mod bias;
 pub mod grid;
+pub mod multi;
 pub mod pve;
 pub mod rng;
 pub mod single;

@@ -119,7 +119,46 @@ pub fn estimate(
                 row[n + t] = s;
             }
         });
-    // the initial types: the largest likelihood (§4.8.6)
+    let types = icm(grid, &like, n, &pairs, mixel_weight);
+    // the fractions (§4.8.8)
+    let mut frac = vec![0f32; nm * n];
+    frac.par_chunks_mut(n)
+        .zip(types.par_iter())
+        .zip(x.par_iter())
+        .for_each(|((f, &t), &xi)| {
+            let t = t as usize;
+            if t < n {
+                f[t] = 1.0;
+                return;
+            }
+            let (a, b) = pairs[t - n];
+            let (mut best, mut low) = (None, 1e13f32);
+            for m in &tables[t - n] {
+                let d = xi - m.gauss.mean;
+                let e = (d * d / m.gauss.var + m.log_var) / 2.0;
+                if e < low {
+                    low = e;
+                    best = Some(m);
+                }
+            }
+            let (da, db) = best.map_or((0.0, 1.0), |m| (m.delta, m.rest));
+            f[a] = da;
+            f[b] = db;
+        });
+    let seg = pveseg(&frac, n);
+    Pve {
+        frac,
+        seg,
+        mixel: types,
+    }
+}
+
+/// The mixel types (§4.8.6, §4.8.7): each mask voxel's type of largest likelihood (`like`, `nt =
+/// n + pairs.len()` per voxel; the first on a tie, from -1), then one sweep of iterated
+/// conditional modes in storage order, in place, with the mixel MRF of weight `r` (`-R`).
+pub fn icm(grid: &Grid, like: &[f32], n: usize, pairs: &[(usize, usize)], r: f32) -> Vec<u8> {
+    let nm = grid.len();
+    let nt = n + pairs.len();
     const NONE: u8 = u8::MAX;
     let mut types = vec![NONE; nm + 1];
     types[..nm]
@@ -146,8 +185,6 @@ pub fn estimate(
             };
         }
     }
-    // one sweep of iterated conditional modes, in storage order, in place (§4.8.7)
-    let r = mixel_weight;
     let mut k = vec![0f32; nt];
     for i in 0..nm {
         let nb = grid.neighbours(i);
@@ -170,33 +207,16 @@ pub fn estimate(
         }
     }
     types.truncate(nm);
-    // the fractions (§4.8.8)
-    let mut frac = vec![0f32; nm * n];
-    frac.par_chunks_mut(n)
-        .zip(types.par_iter())
-        .zip(x.par_iter())
-        .for_each(|((f, &t), &xi)| {
-            let t = t as usize;
-            if t < n {
-                f[t] = 1.0;
-                return;
-            }
-            let (a, b) = pairs[t - n];
-            let (mut best, mut low) = (None, 1e13f32);
-            for m in &tables[t - n] {
-                let d = xi - m.gauss.mean;
-                let e = (d * d / m.gauss.var + m.log_var) / 2.0;
-                if e < low {
-                    low = e;
-                    best = Some(m);
-                }
-            }
-            let (da, db) = best.map_or((0.0, 1.0), |m| (m.delta, m.rest));
-            f[a] = da;
-            f[b] = db;
-        });
-    let seg = frac
-        .par_chunks(n)
+    types
+}
+
+/// `_pveseg` (§4.8.9): each voxel's class of largest partial volume (1..n, the first on a tie,
+/// from `-1e-10`), 0 where none is above it.
+pub fn pveseg(frac: &[f32], n: usize) -> Vec<u8> {
+    if n == 0 {
+        return Vec::new();
+    }
+    frac.par_chunks(n)
         .map(|row| {
             let k = argmax(row.iter().copied(), -1e-10);
             if row.iter().any(|&v| v > -1e-10) {
@@ -205,17 +225,12 @@ pub fn estimate(
                 0
             }
         })
-        .collect();
-    Pve {
-        frac,
-        seg,
-        mixel: types,
-    }
+        .collect()
 }
 
 /// The index of the first value strictly above every earlier one and `start` (0 when none).
 #[inline]
-fn argmax(values: impl Iterator<Item = f32>, start: f32) -> usize {
+pub fn argmax(values: impl Iterator<Item = f32>, start: f32) -> usize {
     let (mut best, mut high) = (0usize, start);
     for (k, v) in values.enumerate() {
         if v > high {

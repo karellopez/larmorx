@@ -9,7 +9,8 @@ tool of FAST's clean-room original (relay 1, 2026-11-02): the messages and exit 
         err/zeros err/constant "args:-v -o seg @const.nii.gz" [--max 600]
 
 A word ``args:<command line>`` is a command line (``@name`` a derived input of the suite);
-``env:NAME=value`` before it sets a variable (``env:NAME=`` unsets it). Run it inside
+``env:NAME=value`` before it sets a variable (``env:NAME=`` unsets it), ``never:<why>`` keeps
+FSL's run of the next command line out of the cache (memory FSL never writes). Run it inside
 scripts/orchestration/boxed.sh.
 """
 
@@ -29,13 +30,17 @@ def main() -> None:
     ap.add_argument("--max", type=int, default=600)
     a = ap.parse_args()
     settings: dict[str, str | None] = {}
+    never = ""
     for item in a.items:
+        if item.startswith("never:"):
+            never = item[6:]
+            continue
         if item.startswith("env:"):
             k, _, v = item[4:].partition("=")
             settings[k] = v if v else None
             continue
         if item.startswith("args:"):
-            run = rep.Run(tuple(shlex.split(item[5:])), tuple(settings.items()))
+            run = rep.Run(tuple(shlex.split(item[5:])), tuple(settings.items()), never=never)
             name = item[5:]
         else:
             run = rep._all_cases()[item][2]
@@ -44,7 +49,7 @@ def main() -> None:
             d = Path(t)
             args = rep._prepare(run, d)
             before = {p.name for p in d.iterdir()}
-            p = rep.run_oracle(args, cwd=d, settings=dict(run.settings))
+            p = rep.run_oracle(args, cwd=d, settings=dict(run.settings), never=run.never)
             files = sorted(q.name for q in d.iterdir() if q.name not in before)
 
         def esc(s: str, d: Path = d) -> str:
@@ -56,6 +61,7 @@ def main() -> None:
         print(f"   stderr: {esc(p.stderr)}")
         print(f"   files: {' '.join(files)}")
         settings = {}
+        never = ""
 
 
 if __name__ == "__main__":

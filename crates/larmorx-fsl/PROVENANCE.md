@@ -203,14 +203,14 @@ the history of replica and spec-writer commits. Its only inputs were:
 | Y. Zhang, M. Brady, S. Smith, "Segmentation of brain MR images through a hidden Markov random field model and the expectation-maximization algorithm", IEEE TMI 20(1):45-57, 2001; FSL's FAST documentation | the method |
 | P. Selinger, "The GLIBC pseudo-random number generator" (2007), and glibc 2.35's `rand` run as a black box (ctypes) | `fast::rng` |
 | Black-box runs of FSL 6.0.7.23's `fast` (through the oracle cache; as built and with the CORE-MATH preload): [`validation/investigations/cleanroom-fast/`](../../validation/investigations/cleanroom-fast/README.md) | the observations of [`docs/findings/fsl-fast-original.md`](../../docs/findings/fsl-fast-original.md): the variance's double second moment, `MRFWeightsTotal` after each sweep, the mixel sweep keeping a type, the initial type 0, the usage's and errors' text, FSL-100 with `-A`, `_restore` at NaN voxels; the bias kernel's double taps; the multi-channel weights, assignment and bias arithmetic; FSL's ANALYZE reading (no scale field, radiological storage for negative voxel sizes); `-H nan`'s estimate; the empty mask's messages |
-| Black-box runs of FSL 6.0.7.23's `flirt` (through the oracle cache: `analyze_scale.py`) | FSL's reading of its standard priors (ANALYZE) |
+| Black-box runs of FSL 6.0.7.23's `flirt` (through the oracle cache: `analyze_scale.py`, `applyxfm_tr.py`) | FSL's reading of its standard priors (ANALYZE); `-applyxfm`'s TR (FLIRT's findings) |
 | The defect register's summary rows of FSL-96 to FSL-104 (`larmorx_core::defects`) | the defects' names in the notices |
 | larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options, fmt}` (FSL's image names, reading and writing, the option parser, `%g`), `larmorx_core` (correctly rounded `exp`, `log`, `expf`, `logf`, thread pools, D13) | images, options, numbers, threads |
 
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|
-| `fast::grid` | the mask's voxels in storage order, the 18 weighted neighbours and their weights (a padded map, compact per-voxel arrays) | §4.2 |
-| `fast::stats` | FSL's blocked sums, the percentiles, the class means and variances (the second moment in double: observed), the negative log Gaussian | §4.4, §8.2, §8.3; findings |
+| `fast::grid` | the mask's voxels in storage order, the 18 weighted neighbours and their weights (a padded map, compact per-voxel arrays, each row's range); the in-place sweeps' pipeline of planes (`Grid::gauss_seidel`: row `(y, z)` after plane `z-1`'s row `y+1`, the serial result on any thread count) | §4.2, §10; larmorx's own design |
+| `fast::stats` | FSL's blocked sums (block by block in parallel, the blocks' sums in order: the same bits), the percentiles, the class means and variances (the second moment in double: observed), the negative log Gaussian | §4.4, §8.2, §8.3, §10; findings |
 | `fast::rng` | glibc's `rand` after `srand(-1)` | §8.1; Selinger; black-box |
 | `fast::bias` | the kernels and the separable convolution (lines and slices in parallel) | §4.5, §8.5 |
 | `fast::single` | the negative values, the mask (FSL-103), the log image, the initialisation, the MRF iterations (`MRFWeightsTotal` after each sweep), the bias field, the class order, the hard segmentation, the members, the volumes, `-v`'s messages | §4.1, §4.3, §4.5-§4.10; findings |
@@ -219,3 +219,5 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `cli::fast` | the command line, the usage and its errors, the exit statuses, the outputs and their order, the channels, the priors (FLIRT's `-applyxfm` in process), FSL-96 to FSL-104 | §2, §3, §6, §7, §9; findings |
 | `bet::image` (`read_analyze`) | an ANALYZE 7.5 image's scale field not applied; stored voxel sizes of negative product read radiologically | findings (black-box) |
 | `cli::options` (`Given::Words`) | an option of several text values (`-A`) | §2.2 |
+| `larmorx_core::math::exp_in_place` (relay 3) | the correctly rounded `exp`'s fast path four values at a time (vectorised with AVX2 and FMA through the core's audited dispatch), `exp` itself for the values it leaves: `exp`'s bits for every value; used by the partial volumes' likelihoods and the multi-channel initialisation | §10; CORE-MATH's `exp` (MIT, the core's port) |
+| `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |

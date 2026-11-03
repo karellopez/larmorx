@@ -82,7 +82,7 @@ larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz   # channel 1 
 | `priors_throughout` | `-P` | `False` | use the priors in every iteration (needs `priors_matrix`) |
 | `fsldir` | `FSLDIR` | | the FSL installation whose `data/standard/tissuepriors` the standard priors come from (needed only for `priors_matrix` without `priors`) |
 | `verbose` | `-v` | `False` | FAST's diagnostic messages (in `FastResult.stdout`) |
-| `n_threads` | `OMP_NUM_THREADS` | 1 | threads of the bias field's convolutions (0: all); the results do not depend on it |
+| `n_threads` | `OMP_NUM_THREADS` | 1 | threads (0: all); the results do not depend on it (the original's: the same bits on any count) |
 | `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` (the original: any number of channels) |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
@@ -135,9 +135,13 @@ modes (with `reproduce`: FAST's estimate of β for a NaN `-H`, FSL-98's pairing,
 on an empty mask and its aborts, FSL-102's shell splitting, FSL-104's corner reads and abort). It is compared with FSL by its own parity suite (`fsl-fast`,
 the replica suite's cases, `specs/fast.md` §11's thresholds); the observations of FSL's behaviour
 that the spec does not state are in [the findings](../findings/fsl-fast-original.md). Built for
-speed: every per-voxel quantity is kept for the brain mask's voxels only, the steps where voxels
-are independent run in parallel (`n_threads`), the MRF sweeps keep FAST's order; fMRIPrep's call
-on a 1 mm T1w brain takes about 5 s (FSL about 25 s).
+speed (`specs/fast.md` §10; [the benchmark](../benchmarks/fsl-fast.md)): every per-voxel quantity
+is kept for the brain mask's voxels only; the steps where voxels are independent run in parallel
+(`n_threads`); the MRF sweeps and the mixel sweep keep FAST's in-place order and run as a pipeline
+of planes with exactly the serial result; FSL's blocked sums run block by block, their order
+kept; the partial volumes' `exp` runs four values at a time (vectorised, the same bits). The
+results are the same bits on any thread count. fMRIPrep's call on the standard tier's three T1w
+brains: 2.4 to 5.2 s on one thread, 0.4 to 0.9 s on 14 (FSL 22 to 60 s, the replica 15 to 31 s).
 
 More than 8 channels: the original segments them (rules A-D: FSL segments them too, and the
 original's thresholds do not need OpenBLAS's bits, so there is nothing to refuse); the replica
@@ -146,8 +150,8 @@ refuses them. Channels that are nearly a combination of others (an ill-condition
 original lands as far from FSL as from itself with one rounding changed (the findings, "Five
 channels").
 
-Not in the original yet (its next steps): the speed work (§10), the golden cases, the record,
-the benchmark and its random testing.
+Not in the original yet (its next steps): the golden cases, the record and its random
+testing.
 
 ## Not yet
 

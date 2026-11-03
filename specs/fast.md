@@ -30,7 +30,7 @@ the bits", following it keeps the original closest to FSL.
 
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-96 to
-FSL-104 (§9). Where FSL leaves memory unwritten (FSL-96, FSL-97, part of FSL-99) the default and
+FSL-104, FSL-202 and FSL-203 (§9; the last two: spec writer, 2026-11-03). Where FSL leaves memory unwritten (FSL-96, FSL-97, part of FSL-99) the default and
 `reproduce` both write a defined value (0, or "no bias field") and name the defect; where FSL
 reads or writes outside its images or crashes (FSL-101, FSL-104) the default refuses or takes the
 defined path, with a clear message. Questionable behaviours kept as FSL's (rule C, or waiting for a
@@ -189,6 +189,17 @@ The voxel sizes `dx, dy, dz` are the absolute header sizes, as single-precision 
 (one slice) is segmented as a volume of one slice: the neighbours above and below are outside the
 image (§4.2).
 
+(spec writer, 2026-11-03; the clean-room question of relay 2, confirmed: the implementer's
+observation was right) **ANALYZE 7.5 images** (FSL's standard priors, §6, are such pairs): FSL's
+image layer reads no scale field from an ANALYZE header (the `funused1` field, where NIfTI keeps
+`scl_slope`, is ignored: the stored values are used as they are), and builds the image's matrix
+from the stored voxel sizes **with their signs** and the `originator` field (diagonal `pixdim[1..3]`,
+offset `−(origin − 1) · pixdim` per axis); the radiological decision of the paragraph above is
+then that matrix's determinant: a positive product of the three stored voxel sizes is mirrored
+along x when read, a negative one (FSL's priors: `-2 2 2`) is used as stored. The voxel sizes are
+then the absolute values (a stored 0 is read as 1, as for NIfTI). The same holds for every FSL
+program reading an ANALYZE image (BET, FLIRT).
+
 ### 3.2 Writing
 
 Each output is written in the type `FSLOUTPUTTYPE` names, with the messages and the exit status 1
@@ -228,10 +239,27 @@ With `-a` FLIRT's three registered priors stay beside them: `<out>_csf_stdspace`
 1. **Negative values.** If the image's minimum is below 0: when the 2nd percentile of all voxels
    (§8.3, no mask) is below 0, the minimum is subtracted from every voxel; otherwise every value
    below 0 (or above the maximum) is set to 0. This image (call it `I`) is what `-B` corrects.
+   (spec writer, 2026-11-03) Precisely, the second branch sets to 0 every value that is not
+   within `[0, max]` by both comparisons, so **NaN voxels become 0 too**; the first branch leaves
+   them NaN (NaN minus the minimum), and an image without a negative value keeps them NaN
+   **(observed:** the same five NaN voxels give `_restore` 0 in an image with one negative
+   value whose 2nd percentile is not negative, NaN in the image without it; `_bias` 1 in both**)**.
 2. **The mask** `M`: the voxels with `0 < I < max(I) + 1`, the bound computed in single
    precision. So every voxel above 0, except the voxels equal to the maximum when the maximum is
    2^24 or more (`max + 1` rounds to `max`): FSL-103 (§9). NaN voxels and, when an infinite
    value is present, the infinite ones are outside the mask.
+   (spec writer, 2026-11-03) **The extrema** (the minimum and maximum of step 1, `max(I)` here,
+   and the same in §5's negative-value rule) are FSL's image layer's: they start at the first
+   voxel's value (storage order in the radiological frame, §3.1), then each value strictly above
+   the running maximum replaces it, else each value strictly below the running minimum replaces
+   that; a NaN never replaces either. So NaN voxels are skipped, **except a NaN first voxel**:
+   both extrema are then NaN, step 1 is skipped (NaN is not below 0), and `max + 1` is NaN, so
+   the mask is empty, every initial mean is 0 (§4.3's percentiles of an empty mask) and FAST
+   stops with the k-means exception (exit 255), or with `-s` segments an empty mask (§8.3's
+   messages) **(observed:** a T1w whose background is NaN, and the same T1w with only its first
+   voxel NaN: `-v` prints `1 0`, `2 0`, `3 0` and `Exception: Not enough classes detected to init
+   KMeans`, exit 255**)**: FSL-203 (§9). Several channels' mask (§5.1) has no upper bound, so
+   there only step 1 is skipped.
 3. **The log image** `y = log(I + 1)` (double-precision `log` of `I + 1.0`, rounded to single) for
    `I > 0`, `y = 0` elsewhere (NaN voxels included). The whole algorithm works on `y`; the bias
    field is additive in `y` (multiplicative in `I`).
@@ -286,6 +314,41 @@ where `p_c y` and `(p_c y) y` are single-precision products, each sum is a doubl
 FSL's blocks (§8.3), the quotients are rounded to single precision, and `μ_c²` is rounded to
 single precision before the double-precision subtraction. A class with no weight gives NaN.
 
+(spec writer, 2026-11-03; the clean-room question of relay 1: the implementer's observation was
+right) Exactly: the mean's quotient is rounded to single precision; **the second moment's quotient
+`Σ p_c y y / Σ p_c` stays in double**; `μ_c²` is the single-precision square of the
+single-precision mean; the double difference is rounded to single. Each statistic uses four
+masked sums per class (two for the mean, two for the variance: `Σ p_c` is summed twice).
+
+**FSL-202 (§9).** The variance in the log domain cancels most digits: `μ_c²` is about 40 to 50
+on a T1w (about 300 above 2^24), `σ²_c` 0.002 to 0.2, and the single-precision `μ_c` and `μ_c²`
+carry rounding errors of up to about 5e-6 (3e-5 above 2^24): the computed variance is off by up
+to about 0.3 % of itself (a few % above 2^24) on the classes of small variance (white matter)
+**(observed:** the last iteration's white-matter standard deviation 38.6653 where the exact
+weighted variance gives 38.6909, 6.6e-4 relative**)**. The default computes `σ²_c = Σ p_c y y / Σ
+p_c - μ²` with `μ` the **double-precision** quotient (before its rounding) and its square in
+double, the difference rounded to single (the mean `μ_c` itself still rounded to single for every
+other use); `reproduce` is FSL's arithmetic above. The same in the partial volumes' statistics of
+§4.8.3. A two-pass form (`Σ p_c (y - μ)² / Σ p_c` in double) gives the same outputs on six of
+the seven measured cases and differs by one or two voxels' class on the seventh (ds005003).
+
+(spec writer, 2026-11-03, measured: whether the correction helps, rule D, then A) Against a
+**reference of the intended maths**, the class statistics computed in double throughout (double
+products and sums, the weighted mean in double and the variance about it in two passes, each
+rounded once to single where FAST keeps them; everything else as FSL), on the same seven cases
+(fMRIPrep's three calls among them): FSL's labels end 1 to 844 voxels (`_seg` plus `_mixeltype`)
+from the reference's (fMRIPrep's calls: ds000005 54 plus 112, ds000228 66 plus 89, ds005003 391
+plus 453; values above 2^24 137 plus 346) and its partial volumes up to a whole fraction (1.0)
+away; the default's labels end 0 voxels from it on six cases and 1 on ds005003, its partial
+volumes within one step (0.01) at 0 to 92 voxels. The default is also **far more stable**: its own
+band (the C library's `exp`, `log`, `expf`, `logf` against correctly rounded ones, the
+perturbation of §11's band) is 0 label voxels on all seven cases (partial volumes one step at 1 to
+37 voxels), where FSL's is 3 to 807 label voxels (partial volumes up to 1.0); the reference's is 0
+on every output. **Most of FSL's own last-bit band is this cancellation** amplifying the last bits
+of the class statistics. The `-v` lines show the same: the half-resolution T1w's last class line,
+standard deviations FSL 226.856, 109.413, 38.6653; the default and the reference both 226.863,
+109.422, 38.6909 **(observed)**.
+
 ### 4.5 The bias field
 
 Smoothing kernels: along x a Gaussian of `σ_x = 0.51 · l / dx` voxels (`l` the `-l` value; the
@@ -293,6 +356,9 @@ product and quotient in double precision, rounded to single), radius `2 · trunc
 has `2 r + 1` taps), and likewise along y and z. The taps are `exp(-j² / (2σ²))` for `j = -r..r`
 (double `exp`, rounded to single), divided by their single-precision sum (the division as a
 multiplication by the double-precision inverse of the sum); `σ ≤ 1e-6` gives the unit impulse.
+(spec writer, 2026-11-03; the clean-room question of relay 2: the implementer's observation was
+right) The normalised taps are **double-precision values** (each single-precision tap times the
+double inverse of the single sum, not rounded again), and §8.5's products use them as such.
 
 Each estimate of the field (when `-N` is not given):
 1. for each mask voxel, `W = Σ_c p_c / σ²_c` and `R = Σ_c (p_c / σ²_c)(y - μ_c)` (single
@@ -301,6 +367,10 @@ Each estimate of the field (when `-N` is not given):
    image zero outside;
 3. `b = R_s / W_s` inside the mask, 0 outside; then `b ← b - mean_M(b)` (the mask's mean, §8.3,
    rounded to single), and `b ← b · M` (0 outside the mask);
+   (spec writer, 2026-11-03; the clean-room question of relay 4: right) the last two steps run
+   over the whole image, so outside the mask `b = (0 - mean) · 0`: a signed zero, and **NaN
+   everywhere when the mask's mean of the field is NaN** (a class of NaN variance), which makes
+   `_restore` and `_bias` NaN outside the mask as well;
 4. the corrected log image `y_b = y - b`, which the next steps use instead of `y`.
 
 Without a bias field (`-N`) `b = 0` and `y_b = y`. The written correction is `exp(-b)` (single
@@ -360,14 +430,17 @@ are all 0 gets class 1, one whose posteriors are all NaN gets 0; 0 outside the m
    0.01`, with `μ_δ = δ μ_a + (1 - δ) μ_b` and `σ²_δ = δ² σ²_a + (1 - δ)² σ²_b` in single
    precision, each term added to the single-precision running sum in double precision.
 6. **Initial mixel type**: the type of largest likelihood (the first on a tie; the running maximum
-   starts at -1).
+   starts at -1). (spec writer, 2026-11-03; relay 1's question: right) A voxel whose every
+   likelihood is NaN (none above -1) gets type 0.
 7. **One sweep of iterated conditional modes**, in storage order, in place: for each mask voxel
    and each type `t`, `K_t = Σ_u k(t, type(u))` over its neighbours `u` in the mask (§4.2's order
    and weights `w`, single precision), with `k = +2w` when the neighbour's type is `t`, `+w` when
    the two are compatible (a pure class and a mixed type that contains it, either way round), `-w`
    otherwise (two different pure classes, two different mixed types). The new type maximises
    `L_t · exp(R · K_t)` (`R` the `-R` value; `R · K_t` and `exp` in single precision), the first
-   on a tie, the maximum starting at -1.
+   on a tie, the maximum starting at -1. (spec writer, 2026-11-03; relay 1's question: right)
+   When no value exceeds -1 (every value NaN, e.g. with `-R nan`), the voxel **keeps its current
+   type** (the initial one, or the one this sweep gave it: the sweep is in place).
 8. **Fractions**: a pure type `t` gives the partial volume 1 to class `t + 1` and 0 to the others.
    A mixed type (a, b): over the fractions `δ` (§8.7, steps of `1/100`) the one of least energy
    `E(δ) = ((x - μ_δ)² / σ²_δ + log σ²_δ) / 2` (single precision, `logf`; the first strictly
@@ -392,7 +465,8 @@ writes 0).
 ### 4.10 Messages with `-v` (standard output)
 
 In order, numbers in C++'s default stream format (6 significant digits, `%g`-like: `1.35391e+06`,
-`nan`):
+`nan`; (spec writer, 2026-11-03) a NaN whose sign bit is set prints `-nan`, as the NaN an
+invalid operation such as `0/0` or `0 · NaN` produces on x86-64 does):
 - `Starting Single Image Segmentation`;
 - `T1-weighted image` (`-t` other than 2 and 3), `T2-weighted image`, `PD-weighted image`;
 - `Imagesize : <nx> x <ny> x <nz>`, `Pixelsize : <dx> x <dy> x <dz>`, an empty line;
@@ -402,7 +476,9 @@ In order, numbers in C++'s default stream format (6 significant digits, `%g`-lik
 - per main-loop iteration: `Tanaka Iteration <i> bias field <I>` (the `-I` loop) or `Tanaka
   Iteration <i> hyperparameter <O>` (the `-O` loop); after each of the five sweeps
   `Tanaka-inner-loop-iteration=<k> MRFWeightsTotal=<T> beta=<β>`, with `T = Σ_M Σ_c U_c p_c`
-  (double sum, rounded to single); after the sweeps one line of ` CLASS <c> MEAN <e^μ_c> STDDEV
+  (double sum, rounded to single; (spec writer, 2026-11-03; relay 1's question: right) computed
+  after the sweep, over the posteriors and MRF sums as they stand at its end, the voxels in
+  storage order and the classes inner); after the sweeps one line of ` CLASS <c> MEAN <e^μ_c> STDDEV
   <(e^(μ_c + σ_c) - e^(μ_c - σ_c)) / 2>` for every class (single-precision `exp` and `sqrt`),
   then a newline; in the `-O` loop also ` BETA <β>`;
 - ` Starting Partial Volume Estimation ` and a newline;
@@ -431,9 +507,18 @@ Each channel gets §4.1's negative-value rule. What differs from §4:
 2. **Hard assignment** by the smallest `D_c = Σ_i Σ_j (y_i - μ_ci)(y_j - μ_cj)` (single
    precision, `i` outer, `j` inner): **the square of the sum of the differences, not the sum of
    their squares** (two channels' differences of opposite sign cancel); first class on a tie.
+   (spec writer, 2026-11-03; relay 2's question: the implementer's observation was right) Each
+   product is a double-precision product of the two double differences (`y_i` single, `μ_ci`
+   double), added to the single-precision running sum `D_c` (the sum rounded to single after each
+   addition); the running minimum starts at 1e31 and a class wins when its `D_c` is strictly
+   smaller.
 3. `-W` iterations (not `-O + -W`): members (§5.5), means and covariances (§5.3), the
    likelihoods `exp(-G_c)` (§5.4) normalised over the classes (0 outside the mask or where their
    sum is not above 0), which become the posteriors and the likelihoods.
+   (spec writer, 2026-11-03; relay 4's question: right) Each iteration's `KMeans Iteration <k>`
+   line (`-v`) is written after the iteration's means, covariances and **inverses** (§5.3) and
+   before its likelihoods, so a singular covariance aborts the iteration before its line. These
+   lines are not flushed (§7: at an abort every one of them written so far is lost too).
 4. Then members, means and covariances once more, the likelihoods again as posteriors, members,
    and the hard segmentation.
 
@@ -450,6 +535,25 @@ in single precision, accumulated in double; `Σ q_c` accumulated in **single** p
 is 0 the mean stays 0); `C_c(i, j) = Σ q_c (y_i - μ_ci)(y_j - μ_cj) / Σ q_c` (double products and
 sums, the weights' sum single). Each class's inverse covariance is computed then (§8.6); a singular
 covariance aborts (`inv(): matrix is singular`, exit 134).
+
+(spec writer, 2026-11-03; relay 4's question, random testing's case 1840: the mechanism) **A class
+left without weight** (`Σ q_c = 0`): its means stay the plain sums `Σ q_c y_i`, i.e. 0, and its
+covariance is `0 / 0`, **NaN in every entry**; its inverse and determinant are NaN without an
+error (the singular check does not see a NaN). From then on:
+- its `G_c` (§5.4) is NaN at every mask voxel, so each voxel's sum of likelihoods (§5.2's
+  initialisation) or of new posteriors (§5.6's sweeps) is NaN, not above 0, and **every class's
+  posterior is 0** at every voxel; the members (§5.5) are all 0;
+- the next statistics give every class means 0 and NaN covariances (`-v`: every class `MEAN 1
+  STDDEV -nan`);
+- with the bias field, the weights `q_c / C_c(i,i) = 0 / NaN` are NaN (also where `q_c = 0`), so
+  `W` and `R` are NaN over the whole mask, the smoothing spreads them, and the field and the
+  corrected images are NaN inside the mask (0 outside, §5.6); the next statistics' sums `Σ 0 ·
+  NaN` make **every mean NaN** (`-v`: `MEAN -nan` from the next iteration on); without the bias
+  field (`-N`) the means stay 0 to the end;
+- the hard segmentation puts every mask voxel in class 1 (every `w_c p_c` is 0, above `-1e-10`).
+**(observed:** case 1840, two channels, four classes, `-v`: every class `MEAN 1 STDDEV -nan` in
+the first main-loop iteration, `MEAN -nan` from the second; with `-N` added, `MEAN 1` to the
+end; exit 0 in both**)**.
 
 ### 5.4 The class likelihood
 
@@ -468,7 +572,11 @@ segmentation takes the largest `w_c p_c` (first on a tie, from `-1e-10`).
 
 - **Bias field** per channel `i`: `W_i = Σ_c q_c / C_c(i,i)` and `R_i = Σ_c (q_c / C_c(i,i))
   (y_bi - μ_ci)` with the **currently corrected** `y_bi` (not the uncorrected `y_i` as in §4.5),
-  single-precision accumulation; both smoothed (§8.5); where outside the mask or `W_s = 0`: `R_s =
+  single-precision accumulation; both smoothed (§8.5); (spec writer, 2026-11-03; relay 2's
+  question: the implementer's observation was right) exactly, `t = q_c / C_c(i,i)` is the double
+  quotient **rounded to single**, `W_i` adds the `t` in single precision, and `R_i` adds each
+  `t · (y_bi - μ_ci)` (a double product: `y_bi` single, `μ_ci` double) to its single-precision
+  running value in double, rounded to single after each addition; where outside the mask or `W_s = 0`: `R_s =
   0`, `W_s = 1`; `b_i = R_s / W_s`, 0 outside the mask, **no mean subtracted**; `y_bi = y_i - b_i`.
   So each estimate replaces, not refines, the previous field (§9.2).
 - **MRF iterations**: no random restart: five in-place sweeps from the current posteriors, `p_c ←
@@ -488,7 +596,9 @@ segmentation takes the largest `w_c p_c` (first on a tie, from `-1e-10`).
   e^(μ-σ))/2> ...` (double precision) and a newline; ` BETA <β>`; `Partial Volume Estimation `
   and a newline; `\n tissue <c> <V_c>`, `\n total tissue <ΣV>\n` (sums of `pve_c` over the mask in
   double, times the single-precision voxel sizes); `Beginning prior-based initialisation` with
-  priors.
+  priors. (spec writer, 2026-11-03; relay 2's question: right) The tissue volumes are printed
+  only with the partial volumes: with `--nopve` several channels print none (one channel prints
+  its posteriors' volumes, §4.8).
 
 ### 5.7 The class order
 
@@ -513,6 +623,18 @@ As §4.8 with these differences:
   `exp(-G')·step` summed as §4.8;
 - the fraction's energy `E = dᵀ C⁻¹ d + log(det C)` (the quadratic form by solving `C z = d`,
   `logf` of the single-precision determinant), minimised as §4.8.8;
+- (spec writer, 2026-11-03; relay 5's question: the implementer's observation was incomplete)
+  **near ties**, here and in §4.8.8: the energy has one minimum over `δ` on real statistics, so
+  two neighbouring fractions tie when the minimum lies near their midpoint; any change in the last
+  bits of the class statistics (means, covariances or variances) moves such a voxel's fraction by
+  **exactly one step** (0.01 to one class, 0.01 back to the other), and the number of voxels that
+  move grows in proportion to how far the statistics differ (about 1e-4 of the mixed voxels per
+  relative change of 1e-7). The matrix arithmetic of the energy itself hardly ever decides: another
+  evaluation of the same energy (an explicit inverse instead of a solve) moved none of 200,000
+  modelled voxels. So an original whose statistics differ from FSL's in their last bits (§8.6's
+  kernels, or correctly rounded functions, propagated through the iterations) is expected to have
+  a few partial volumes one step away, never more on a single-minimum energy; §11's 99.9th
+  percentile of 0.02 allows it;
 - `n = 1`: every partial volume 0 and `_pveseg` 1 in the mask.
 
 ## 6. Priors (`-a`, `-A`, `-P`)
@@ -520,7 +642,11 @@ As §4.8 with these differences:
 1. **The prior names**: `-A`'s three names, else FSL's standard priors
    `$FSLDIR/data/standard/tissuepriors/avg152T1_csf`, `_gray`, `_white` (uint8 ANALYZE 7.5 images
    of 91 × 109 × 91 voxels of 2 mm in FSL 6.0.7.23). FAST reads `FSLDIR` here whether or not `-a` is given;
-   unset, FAST aborts (FSL-100). `-A` or `-P` without `-a` has no effect.
+   unset, FAST aborts (FSL-100). `-A` or `-P` without `-a` has no effect. (spec writer,
+   2026-11-03; relay 1's question: right) Precisely, `FSLDIR` is read for these names only when
+   `-A` is not given: with `-A` (with or without `-a`) an unset `FSLDIR` does not abort here (with
+   `-a` it then reaches FLIRT's command, FSL-102). The names are prepared after the image is read
+   and `-v`'s image lines are printed, before the segmentation.
 2. With `-a` and `-n` other than 2 or 3: `Apriori can only be used for 2 or 3-class segmentation`
    on standard error, and the segmentation runs without priors **(observed)**.
 3. Each prior must exist as an image; a missing one prints `prior image <name> is not found!
@@ -529,6 +655,11 @@ As §4.8 with these differences:
    <out>_{csf,gm,wm}_stdspace -applyxfm -init <matrix>` (CSF, then grey, then white; the input's
    name as given on the command line; FLIRT's defaults: trilinear interpolation, the output in the
    prior's data type: `specs/flirt.md`, `-applyxfm`). FAST runs them through the shell (FSL-102).
+   (spec writer, 2026-11-03; relay 2's question: the implementer's observation was right) The
+   registered priors' headers are FLIRT's `-applyxfm` outputs (`specs/flirt.md` §9.3): the
+   reference's grid and `pixdim[5..7]`, and **the prior's TR as FLIRT reads it**: `|pixdim[4]|`,
+   1 when the prior has a time axis (`dim[0]` 4 or more) and a TR of 0; so a 3D NIfTI prior
+   with `pixdim[4] = 0` gives 0, FSL's standard priors (ANALYZE, `dim[0] = 4`, TR 0) give 1.
    With `-v` each command is printed first, as `<FSLDIR>/bin/flirt -ref ...`. The registered
    priors are written in `FSLOUTPUTTYPE` and stay. larmorx runs its FLIRT in-process, with
    FLIRT's own defaults (so FLIRT's FSL-09 correction applies to integer priors: rounded, not
@@ -562,6 +693,25 @@ As §4.8 with these differences:
 | `Warning: An input intended to be a single 3D volume has multiple timepoints...` | stderr | continues |
 | larmorx's refusals, `larmorx: error: fast: ...` (§9) | stderr | 1 |
 | larmorx's notices, `larmorx: upstream defect FSL-<n> (fast) corrected: ...` | stderr | — |
+
+(spec writer, 2026-11-03; relay 4's question on the k-means line, answered here) **Standard output
+at an abort.** FAST writes standard output through the C library's buffer; when it is not a
+terminal (a file or a pipe, as in every parity run) the buffer is written out when FAST ends
+normally (exit 0, 1 or 255), but **not when it aborts** (exit 134, or a crash): what was written
+since the last flush is lost. The lines that flush (with everything before them) are:
+`Starting Single Image Segmentation` / `Starting Multi Image Segmentation`, the image-type line,
+`Imagesize`, `Pixelsize` and its empty line, the FLIRT command lines, `Beginning prior-based
+initialisation`, the initial means' lines (`<c> <μ>`, `<i> <c> <μ>`), `MeaNsK variance nan`, the
+k-means exception's line, `Tanaka Iteration ...`, `Tanaka-inner-loop-iteration=...`, the newline
+that ends the class lines (one channel) and each ` CHANNEL ...` line (several), ` BETA <β>`, and
+`-H nan`'s ` TOTAL ... RHS ...` line. Not flushed: `KMeans Iteration <k>`, the partial-volume
+heading (` Starting Partial Volume Estimation `, `Partial Volume Estimation `), the tissue
+volumes. So at an abort FSL's standard output ends at the last flushed line **(observed:** `-v -n
+0` aborts in the partial volumes, exit 134: standard output ends with ` BETA 0.1`, without the
+partial-volume heading written before the abort; several channels with a singular covariance in
+the k-means: it ends with the initial means' lines**)**. An original that aborts where FAST does
+prints only up to that line (larmorx exits 1 there: the same rule, as the parity runs see FSL).
+Standard error is not buffered.
 
 ## 8. Numeric conventions that decide the bits
 
@@ -613,7 +763,14 @@ A voxel is in a mask when its mask value is above 0.5. **Sums** are FSL's blocke
 values, in storage order, as doubles, accumulated into a partial sum that is added to the total
 and reset after every `N + 1` values, `N = max(trunc(sqrt(V)), 10000)` with `V` the volume's
 voxel count; the result the total plus the last partial sum. An empty mask prints `ERROR:: Empty
-mask image` on standard error and gives 0 (a quotient 0/0 is then NaN). The **mean** is that sum
+mask image` on standard error and gives 0 (a quotient 0/0 is then NaN).
+(spec writer, 2026-11-03; relay 2's question: the implementer's count was right) One message per
+such sum, and only the single channel uses these sums: **4 per class** for each class statistics
+(§4.4: the initialisation's `-O + -W` iterations, each main-loop iteration's, and the partial
+volumes' statistics of §4.8.3), **1 per bias-field estimate** (the field's mask mean, §4.5: the
+first estimate and one per `-I` iteration, none with `-N`), and **1 per class** for the tissue
+volumes (§4.8.10, or the posteriors' with `--nopve`). Several channels sum with their own loops
+and print none; nor do the percentiles (§8.3: 0 over an empty mask, silently). The **mean** is that sum
 divided by the voxel count (at least 1). The **percentile** `p` of a volume over a mask: the masked
 values sorted ascending (NaN values last), the one at index `trunc((float) count · p)` (single
 precision), at most `count - 1`; 0 when nothing is masked.
@@ -651,7 +808,7 @@ single. In both cases `1 - δ` is single precision.
 
 ## 9. Defects (D13): what the default does
 
-### 9.1 The register's entries (FSL-96 to FSL-104)
+### 9.1 The register's entries (FSL-96 to FSL-104, FSL-202, FSL-203)
 
 | ID | Behaviour of FSL | Default (`fix`) | `reproduce` |
 |---|---|---|---|
@@ -664,9 +821,22 @@ single. In both cases `1 - δ` is single precision.
 | FSL-102 | `-a`'s FLIRT runs go through the shell with the names unquoted: blanks split names, special characters are interpreted; FSLDIR unset with `-A`: the command starts with `(null)`, a shell syntax error | each name one argument, no FSLDIR needed for FLIRT; named when a name has a blank or special character, or FSLDIR is unset | splits at blanks as the shell does; prints `sh: 1: Syntax error: word unexpected` for FSLDIR unset; refuses names with the shell's special characters (their expansion is not reproduced) |
 | FSL-103 | the mask leaves out the voxels equal to the maximum when it is 2^24 or more (§4.1) | keeps them (mask: above 0 and finite); named when it changed the mask | FSL's mask; named |
 | FSL-104 | channels of different sizes: FAST reads every channel over channel 1's grid, past the end of smaller ones; when channel 1 fits inside every other one it reads their corners and aborts at the first percentile of another channel (`mask and vol have different sizes in calc_percentiles`) unless `-s` gives every mean | refuses: `-S <n>: the channels' images differ in size ...` | reproduces the corner reads and the abort where channel 1 fits inside the others and no `-s` gives every mean; refuses otherwise |
+| FSL-202 | (spec writer, 2026-11-03) one channel: the class variance `Σ p y y / Σ p - μ²` takes `μ²` as the single-precision square of the single-precision mean, which cancels most digits in the log domain: the variances of small-variance classes are off by up to about 0.3 % (a few % above 2^24), §4.4; the labels end up to 844 voxels from those of the exactly computed statistics (fMRIPrep's call on ds000005: 166), and most of FSL's own last-bit band is this cancellation (measured, spec writer, 2026-11-03) | `μ²` from the double-precision mean, in double (§4.4), in the class statistics and the partial volumes' statistics; named when a class's variance differs from FSL's arithmetic (nearly every run). Measured: 0 or 1 label voxel from the exactly computed statistics on seven of seven cases, and a band of 0 label voxels (§4.4) | FSL's arithmetic (§4.4); named |
+| FSL-203 | (spec writer, 2026-11-03) a NaN first voxel (§4.1's extrema): the minimum and maximum are NaN, so the negative-value rule is skipped and, with one channel, the mask is empty: FAST stops with the k-means exception (exit 255), or with `-s` segments an empty mask **(observed)** | the extrema over the voxels that are not NaN (the negative-value rule as §4.1 says; one channel's mask as FSL-103's default, above 0 and finite); named when the first voxel of an input (any channel) is NaN | FSL's extrema and mask; named |
 
 Each correction that changed a result is named on standard error (`larmorx: upstream defect
 FSL-<n> (fast) corrected: ...`) and in Python as an `UpstreamDefectWarning`.
+
+(spec writer, 2026-11-03; relay 2's question: the implementer's observation was right) **FSL-99's
+`-H nan` with `reproduce`, exactly.** One channel: in each `-O` iteration, after the sweeps and
+the class line, FAST writes ` TOTAL <T> RHS ` (`T` the `MRFWeightsTotal` of the posteriors as
+they stand, §4.10, single precision) followed by the table's 15 values `0`, each followed by a
+blank, and a newline, on standard output (also without `-v`); then 14 lines `<b> <b>` on
+standard error, `b` = 0.05 added 14 times in single precision and printed as §4.10 (`0.05`,
+`0.1`, ..., `0.7`); β is the value `b` of the first table entry `k = 1..14` with `|T - rhs_k| <
+|T - rhs_0|` strictly, the best so far (β 0 when none: the table of zeros gives 0); ` BETA 0`
+follows with `-v`. Several channels print none of these lines; their table is memory FAST never
+writes, so β is not defined (larmorx takes the table as zeros: β 0, and names FSL-99).
 
 ### 9.2 Kept as FSL's (not registered)
 
@@ -714,6 +884,18 @@ What can run in parallel deterministically:
   voxel on its already-updated neighbours); a red-black or Jacobi sweep converges to similar but
   not identical posteriors, acceptable only if it stays within §11's thresholds on the whole
   validation set;
+  (spec writer, 2026-11-03; relay 3's question: the implementer's observation was right) **an
+  exact parallel order.** A voxel reads its 26 neighbours (§4.2): the ones earlier in storage
+  order must already hold their new values, the later ones their old values. Any order that keeps
+  this for every voxel gives the serial sweep's bits. With a row `(y, z)` (all x, computed in x
+  order) as the unit, that means: row `(y, z)` starts after rows `(y - 1, z)` and `(y + 1, z -
+  1)` have finished (and so every row they waited for), and finishes before rows `(y + 1, z)` and
+  `(y - 1, z + 1)` start. **A pipeline of planes** does it: row `(y, z)` at step `y + 2z`, plane
+  `z` two rows behind plane `z - 1`, every row of one step at once (rows `(y, z)` and `(y + 2, z -
+  1)` share no neighbour), so up to `min(n_z, n_y / 2)` rows run in parallel; a lag of one row is
+  not enough (row `(y, z)` would read row `(y + 1, z - 1)` before its update). The same holds for
+  the mixel-type sweep (§4.8.7). One channel's random posteriors at the start of each MRF
+  iteration (§4.6) come first, in storage order;
 - the partial-volume integral over 101 fractions has a closed form neither in FSL nor here; it
   can be vectorised across voxels (the same `μ_δ`, `σ²_δ` for every voxel of a type).
 
@@ -739,6 +921,25 @@ stored FSL runs):
   - `_prob_<i>`: mean absolute difference ≤ 1e-3;
   - `_bias`, `_restore`: relative difference ≤ 1e-4 at the 99.9th percentile;
   - the final class means and variances (`-v`): relative difference ≤ 1e-5.
+  (spec writer, 2026-11-03; relay 5's question: the implementer's observation was right) The
+  numbers above are **narrower than FSL's own band on small classes and small images**: FSL
+  against FSL with correctly rounded `exp`, `log`, `expf`, `logf` (measured 2026-11-03): smallest
+  per-class Dice of `_mixeltype` 0.99998 (ds000005), 0.99976 (ds000228), **0.99800** (ds005003,
+  its rarest mixel type, about 8,700 voxels), 0.99988 (the half-resolution T1w), 0.99970 (the
+  bias-field case), **0.99761** (a 2D slice; `_seg` 0.99914), **0.99886** (values above 2^24);
+  partial volumes there move by one step (99.9th percentile 0.01). Where a check fails against
+  FSL, the original's allowance is that band: the suite compares it with FSL with correctly
+  rounded maths on the same case, and passes it when it is within the band's own values there,
+  saying so in the record. With FSL-202's default (§4.4) the variance is exact, which moves the
+  segmentations by up to about the band on ordinary images and more where FSL's error is large
+  (`_mixeltype` 112 voxels on ds000005 against the band's 7; values above 2^24 346 against 29,
+  partial volumes' 99.9th percentile 0.34): §11's thresholds compare `reproduce` with FSL.
+  (spec writer, 2026-11-03) Most of that band is FSL-202 itself (§4.4): with the corrected
+  variance the same perturbation moves 0 label voxels on all seven cases (partial volumes one step
+  at 1 to 37 voxels). So the band is the allowance of `reproduce` only; the default is compared
+  with the replica's default (the same corrected variance), and there the band of a last-bit
+  change is that narrow one: a difference wider than it is the original's to explain, not the
+  band's.
   The thresholds are first checked against the band of a last-bit change: the replica with
   correctly rounded `exp`, `log`, `expf` and `logf` (instead of glibc's) on the standard tier,
   against FSL; the band measured there is the original's allowance where it is wider than the
@@ -748,3 +949,36 @@ stored FSL runs):
   partial-volume maps on ds000005 (the replica's record).
 - **Speed**: against FSL and the replica on fMRIPrep's three standard-tier calls (single thread
   and all cores), reported, not gated.
+
+## 12. The clean-room questions of 2026-11-03 (spec writer)
+
+The questions FAST's clean-room implementer could not settle from black-box runs (its relays 1 to
+5), each answered in the section named; "right", "incomplete" or "wrong" judges the implementer's
+own observation. The models behind the answers are in
+`validation/investigations/spec-answers-3/` (README: what each shows, the numbers), written from
+this spec's text alone and checked against FSL's runs through the oracle cache.
+
+| # | Question | Answered in | Observation | Confidence, check |
+|---|---|---|---|---|
+| 1 | the variance's second-moment quotient stays in double | §4.4 | right | high: the implementer's `variance_model.py` gives FSL's `-v` lines exactly with this reading |
+| 2 | `MRFWeightsTotal` after each sweep, over the posteriors as they stand | §4.10 | right | high |
+| 3 | the ICM keeps a voxel's type when no value exceeds -1; the initial type 0 when no likelihood does | §4.8.6, §4.8.7 | right | high (`-R nan`: 99.96 % of the mask as the rule says) |
+| 4 | FSL-100 with `-A` (FSLDIR unset does not abort) | §6.1 | right | high |
+| 5 | `_restore` holds 0 at NaN voxels | §4.1.1 | incomplete: 0 only when the negative-value rule's second branch runs (a negative value, 2nd percentile not negative); NaN otherwise | high: `fast_probes.py` `nan-noneg`, `nan-neg`: the model predicts FSL's 10 of 10 voxels |
+| 6 | the register candidate: the single-precision variance in the log domain (rule D) | §4.4, §9.1 | right: a defect, **FSL-202**, rule A after the measurements | high: `variance_measure.py` (how far the exact variance moves the outputs; seven cases, see §11) and `variance_reference.py` (spec writer, 2026-11-03: the corrected variance closer to the exactly computed statistics than FSL's on seven of seven cases, its last-bit band 0 label voxels against FSL's 3 to 807; §4.4) |
+| 7 | the bias kernel's normalised taps are double values | §4.5 | right | high: the implementer's `conv_model.py` 100 % of the voxels |
+| 8 | several channels' initial assignment: products in double, summed in single | §5.2.2 | right | high |
+| 9 | several channels' bias weights `q / C(i,i)` rounded to single; no tissue volumes with `--nopve` | §5.6 | right | high |
+| 10 | ANALYZE: no scale field; negative voxel sizes not mirrored | §3.1 (and `specs/flirt.md` §4.1) | right | high: the implementer's `analyze_scale.py` |
+| 11 | FLIRT `-applyxfm`'s `pixdim[4]` in the registered priors | §6.4, `specs/flirt.md` §9.3 | right | high: the implementer's `applyxfm_tr.py` table |
+| 12 | how often `ERROR:: Empty mask image` is printed | §8.3 | right (and several channels print none) | high: the implementer's nine runs fit the count |
+| 13 | FSL-99's `-H nan`: the ` TOTAL ... RHS` line, the stderr pairs, β with several channels | §9.1 | right | high |
+| 14 | an exact parallel order of the Gauss-Seidel sweeps (a pipeline of planes) | §10 | right | high: `sweep_schedule_model.py`, lag 2 bit-identical on 6 of 6 grids, lag 1 on 0 |
+| 15 | FLIRT's TR as read (the absolute `pixdim[4]`, 1 for a time axis with TR 0); `-verbose 2`'s `Resampled volume` | `specs/flirt.md` §4.1, §9.3 | right; the verbose line prints the TR written | high (the verbose line for a 3D input: from the program's order, not observed) |
+| 16 | the field outside the mask `(0 - mean) · 0` (NaN when the mean is NaN) | §4.5.3 | right | high |
+| 17 | the k-means line after the iteration's inverses (absent at a singular abort) | §5.2.3, §7 | right, and incomplete: at any abort every unflushed line written before is lost too | high: `fast_probes.py` `n0-verbose` (the unflushed heading missing, exit 134) |
+| 18 | FSL-101 with `-v`: the line before the crash | §9.1 (already) | right (the line flushes) | high |
+| 19 | how FSL's statistics become NaN after a NaN covariance (case 1840) | §5.3 | the mechanism: a class without weight zeroes every posterior; the bias weights `0 / NaN` make the field and then every mean NaN | high: `fast_probes.py` `nan-stats` (`MEAN 1`, then `-nan`), `nan-stats-N` (`MEAN 1` to the end) |
+| 20 | the partial volumes' near ties: one step of 0.01 expected? | §5.8 | incomplete: one step, yes; the statistics' last bits decide, not the energy's own arithmetic | medium-high: `pv_ties_model.py` (every move one step; another evaluation of the energy moves 0 of 200,000) |
+| 21 | §11's thresholds narrower than FSL's band on small classes and images | §11 | right | high: the band measured on seven cases |
+| — | (found here) a NaN first voxel empties one channel's mask | §4.1.2, §9.1 | — | high: `fast_probes.py` `nan-background`, `nan-first`: **FSL-203**, rule A |

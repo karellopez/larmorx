@@ -307,9 +307,17 @@ fn applytopup(clp: &Clp, run: &Run, con: &Console) -> R<u8> {
     {
         return Err(apply_error("Invalid entry in --inindex list").into());
     }
-    let topupfile = TopupFileReader::read(&clp.topup, fsl, &mut lines);
+    let topupfile = TopupFileReader::read(&clp.topup, fsl, !con.reproduce(), &mut lines);
     print_lines(con, &mut lines);
     let mut topupfile = topupfile?;
+    if topupfile.fsl145 {
+        con.notice(
+            &defects::FSL_145,
+            "a coefficient file laid with the quadratic B-splines' full count on an axis shorter \
+             than two knot spacings (topup's default) read as laid (applytopup refuses it as \
+             internally inconsistent)",
+        );
+    }
     let s0 = &scans[0];
     let mut mask = Volume::<i8>::new(s0.xsize(), s0.ysize(), s0.zsize(), 1);
     mask.copy_properties(s0);
@@ -325,6 +333,7 @@ fn applytopup(clp: &Clp, run: &Run, con: &Console) -> R<u8> {
     };
     let mut ovol = match clp.method.as_str() {
         "jac" => {
+            fsl144_check(con, &datafile, &inindices, &infnames)?;
             shape_check(con, field_shape, image_shape, false)?;
             jac_resample(&ctx, &mut topupfile, &mut mask, &mut scans)?
         }
@@ -457,6 +466,49 @@ impl Ctx<'_, '_> {
 fn field_shape(t: &mut TopupFileReader) -> R<[i64; 3]> {
     let f = t.field_as_volume()?;
     Ok([f.xsize(), f.ysize(), f.zsize()])
+}
+
+/// FSL-144 (rule B): `--method=jac` leaves a phase encoding's z component out of the
+/// displacement (topup refuses such an acquisition: it estimates no field for one), so an image
+/// encoded along z is written uncorrected. Refused by default; reproduced, FSL's output.
+fn fsl144_check(con: &Console, datafile: &Datafile, inindices: &[u32], names: &[String]) -> R<()> {
+    let Some((k, &row)) = inindices
+        .iter()
+        .enumerate()
+        .find(|&(_, &i)| datafile.pv[i as usize - 1][2] != 0.0)
+    else {
+        return Ok(());
+    };
+    let pe = datafile.pv[row as usize - 1];
+    if con.reproduce() {
+        con.notice(
+            &defects::FSL_144,
+            &format!(
+                "--method=jac: the z component of image {}'s phase encoding left out, as \
+                 applytopup's (the image displaced along x and y only)",
+                k + 1
+            ),
+        );
+        return Ok(());
+    }
+    con.notice(
+        &defects::FSL_144,
+        &format!(
+            "--method=jac: image {} has a phase encoding with a z component: refused (FSL leaves \
+             the component out silently)",
+            k + 1
+        ),
+    );
+    Err(End::Refuse(format!(
+        "--method=jac: image {} ({}) has a phase encoding with a z component (row {row} of \
+         --datain: {} {} {}); topup estimates no field for such an acquisition (its --datain \
+         refuses one), and applytopup would leave the component out silently (FSL-144)",
+        k + 1,
+        names.get(k).map_or("", String::as_str),
+        pe[0],
+        pe[1],
+        pe[2]
+    )))
 }
 
 /// FSL-134: a field whose grid is not the images'.

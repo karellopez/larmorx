@@ -179,3 +179,127 @@ decided by the rules A-D (user, 2026-10-23):
   resampled values by default; FSL-68 for a matrix FLIRT cannot read.
 - NaN bit patterns: the single channel's arithmetic is plain IEEE (SSE on x86-64); on aarch64 a NaN
   output could carry another payload (the golden cases avoid NaN outputs).
+
+## The spec answers of 2026-11-03 (spec writer, relay 2 of the spec-answers part)
+
+The clean-room implementer's questions (`specs/fast.md` §12), checked against FSL 6.0.7.23's
+source (*read*) and, where cheap, FSL as a black box through the oracle cache (*verified*:
+`validation/investigations/spec-answers-3/`):
+
+- **`MeansVariances`** (*read*, *verified*): `m_mean[c] = meanP[c].sum(m_mask) /
+  probability[c].sum(m_mask)` (double quotient into a `float`), `m_variance[c] =
+  varianceP[c].sum(m_mask) / probability[c].sum(m_mask) - m_mean[c]*m_mean[c]`: the second
+  quotient stays double, `m_mean[c]*m_mean[c]` is a float product. Four `calculateSums` per class
+  (each prints `ERROR:: Empty mask image` when `n + nn == 0`). FSL-202 below.
+- **`gaussian_kernel1D`** (*read*): `float val`, `float sum`, the taps stored in a NEWMAT
+  `ColumnVector` (double), `kern *= (1.0/sum)` in double, never rounded to float again;
+  `convolve_separable` copies them into `volume<double>` kernels.
+- **`MRFWeightsTotal`** is called inside the `cout` of the verbose line after each of the five
+  sweeps (*read*). **`ICMPV`**: `float max=-1; if (max < prob) { hardPV = type; ... }`: no
+  assignment when every `prob` is NaN, so the in-place `hardPV` keeps its value; the initial loop
+  likewise from `hardPV = 0` (*read*).
+- **`prior_registration`** calls `getenv("FSLDIR")` for the names only under
+  `alternatePriors.unset()`; the FLIRT command's `sprintf` calls it again (`(null)`) (*read*).
+- **The negative-value rule** (`segmentSingleChannel`, `segmentMultiChannel`):
+  `inputImage.threshold(0, max, inclusive)` is newimage's `threshold`, which zeroes every value
+  for which `v >= lower && v <= upper` is false, NaN included (*read*, *verified*: `nan-neg`).
+  `min()`/`max()` are `calculateExtrema`, seeded with the first element (`vector<T>
+  extrema(2, *it)`), so a NaN first element makes both NaN (no later comparison succeeds): then
+  `m_mask.binarise(0, m_mask.max() + 1, exclusive)` gives an empty mask and the percentiles
+  (`percentile_vec` on an empty histogram: 0) give equal means, `kmeansexc` (*read*, *verified*:
+  `nan-background`, `nan-first`). FSL-203 below. The replica's default (FSL-103's mask, `v > 0 &&
+  v.is_finite()`) already segments such an image, but names nothing and still skips the
+  negative-value rule (`clear_negative` uses `min()`): sub-task 4 of the part adds FSL-203.
+- **`BiasRemoval`** (single channel): `divide(p_resmean, p_meaninvcov, m_mask)` (0 outside the
+  mask), `m_BiasField -= m_BiasField.mean(m_mask)`, `m_BiasField *= m_mask` over the whole
+  volume: `(0 - mean) * 0` outside (*read*).
+- **Several channels** (*read*): `WeightedKMeans`'s `sum += (m_Mricopy[n] - m_mean(c,n)) *
+  (m_Mricopy[m] - m_mean(c,m))` with `float sum` and a NEWMAT (double) `m_mean`; `mresmatrix`'s
+  `float tempM = members / m_co_variance[c](ch,ch)` (double quotient into a float),
+  `m_meaninvcov += tempM` (float), `m_resmean += tempM * (m_Mri - m_mean)` (double product,
+  float accumulator); `Volumesquant` (the tissue volumes and their verbose lines) runs only under
+  `iterationspve > 0`; `TanakaHyper` prints nothing and reads `rhs = new float[100]`, never
+  written. The k-means loop: `UpdateMembers; MeansVariances (… m_inv_co_variance[c] =
+  m_co_variance[c].i()); cout << "KMeans Iteration " << k << "\n"; Initclass`.
+- **A class without weight** (*read*, *verified*: `nan-stats`, `nan-stats-N`, case 1840):
+  `MeansVariances` divides the mean only `if (normtemp[c] != 0.0)` (the mean stays the sum, 0),
+  `covariancematrix` ends with `cov /= tot` (0/0: NaN); armawrap's `.i()` on a NaN matrix does
+  not throw (LAPACK's `dgetrf` reports no zero pivot for NaN); `logGaussian` is NaN, `Initclass`'s
+  and `TanakaIterations`'s `if (tot > 0)` / `if (sum > 0.0f)` fail, every `m_post` 0; then
+  `mresmatrix`'s `0 / NaN` makes `m_meaninvcov` and `m_resmean` NaN in the mask, `p_bias` NaN,
+  `m_Mri` NaN, and `m_mean(c, i) += 0 * NaN` NaN for every class.
+- **Standard output at an abort** (*read*, *verified*: `n0-verbose`): FAST's `cout` lines end
+  either with `endl` (a flush) or with `"\n"` (`KMeans Iteration`, the partial-volume headings,
+  `printVolumeTotals`/`Volumesquant`); libstdc++'s `cout` synchronised with stdio writes into
+  glibc's `stdout` buffer, fully buffered on a pipe or a file; `abort()` (an uncaught exception's
+  `std::terminate`) does not flush it, and a SIGSEGV loses it too. The list of flushing lines is
+  in `specs/fast.md` §7.
+- **ANALYZE reading** (newimage `read_volumeROI`, newnifti) (*read*): for `isAnalyze()` the
+  sform is set from the raw `pixdim[1..3]` (signed) and `legacyFields.origin()`, the qform
+  copied from it, both codes `NIFTI_XFORM_ALIGNED_ANAT`; then `pixdim[i] = pixdim[i] == 0 ? 1 :
+  fabs(pixdim[i])` for `i = 1..dim[0]`; the ANALYZE header's `funused1` goes into
+  `legacyFields` only, `sclSlope` stays 1 (`NiftiHeader::initialise`), so
+  `ConvertAndScaleNewNiftiBuffer` never scales; `left_right_order` from the sform's determinant
+  decides the x reversal.
+- **The TR** (*read*): `set_volume_properties` → `setdims(..., pixdim[4], ...)` → `settdim(tr) {
+  p_TR = fabs(tr); }`, after the read loop above has turned a 0 into 1 for `dim[0] >= 4`; FLIRT's
+  `-applyxfm` path: `outputvol.settdim(testvol.tdim())` before `save_volume_dtype`, then with
+  verbose ≥ 2 `print_volume_info(outputvol, "Resampled volume")` (Size, Dims with the TR, ROI
+  Size, the min and max).
+- **Several channels' fraction search** (`PVestimation`, *read*): `float step`, `for (float
+  delta = 0; delta <= 1.0; delta += step)`, `val = PVEnergy(...)` a float (`(rowval * sigma.i() *
+  tempval).AsScalar() + log(detsigma)`, `log(float)` = `logf`), `if (min > val)`.
+
+### FSL-202 and FSL-203 (drafts for the register's restricted section)
+
+- **FSL-202** (class c, rule D measured, then A): `MeansVariances`'s `m_mean[c]*m_mean[c]` is the
+  float square of the float-rounded mean, subtracted from the double second moment: catastrophic
+  cancellation in the log domain (`μ² ≈ 40`–`50`, `σ² ≈ 0.002`–`0.2`; `μ² ≈ 300` above 2^24).
+  Measured (`variance_measure.py`, seven cases): the exact variance moves `_mixeltype` by 2 to 453
+  voxels (FSL's band 2 to 450), up to 16 times the band (ds000005: 112 against 7) and 12 times
+  above 2^24 (346 against 29, partial volumes' p99.9 0.34 against 0.01). Replica default: `mu =
+  s_mp / s_p` in double, `variance = s_mpm / s_p2 - mu * mu` (the `double` variant of
+  `crates-nc/larmorx-nc-fast/dev-patches/variance_variant.patch`), named when a class's variance
+  differs from FSL's; `reproduce` as now.
+  Measured whether it helps (spec writer, relay 2b, `variance_reference.py`; the hooks
+  `crates-nc/larmorx-nc-fast/dev-patches/fsl202_reference.patch`, a superset of
+  `variance_variant.patch`: `LXNC_FAST_VARIANCE=reference` replaces `MeansVariances`'s statistics
+  by double products and sums, the double mean and the two-pass variance about it, each rounded
+  once to float into `m_mean`/`m_variance`; `LXNC_CRMATH=1` routes the core's `exp`, `log`,
+  `expf`, `logf` (`glibc_double`, `glibc_float`, so `gaussian_kernel_1d` too) to
+  `larmorx_core::math`'s correctly rounded functions). Sanity: FSL's variance with `LXNC_CRMATH`
+  equals FSL under the CORE-MATH preload bit for bit on seven of seven cases, so the hook is the
+  preload's perturbation. Per case, labels (`_seg` + `_mixeltype` voxels) from the reference,
+  FSL / the `double` default; then the band (C library against correctly rounded maths), FSL /
+  `double`: ds000005 166 / 0, band 11 / 0; ds000228 155 / 0, band 235 / 0; ds005003 844 / 1,
+  band 807 / 0; the half-resolution T1w (`-v`) 7 / 0, band 7 / 0; the bias-field case 10 / 0,
+  band 19 / 0; the 2D slice 1 / 0, band 3 / 0; values above 2^24 483 / 0, band 46 / 0. Partial
+  volumes: FSL's up to 1.0 from the reference (p99.9 0.34 above 2^24), the default's within 0.01
+  at 0 to 92 voxels; the default's band 0.01 at 1 to 37 voxels; the reference's band 0 on every
+  output. FSL with correctly rounded maths is as far from the reference as FSL (ds000005 169,
+  ds005003 187). So most of FSL's own last-bit band is this cancellation (a one-ulp change of the
+  float mean moves `m_mean[c]*m_mean[c]` by about 1e-5, 0.3 % of a white-matter variance).
+  Decided: rule A stays (closer on 7 of 7, fMRIPrep's three calls included; band no wider on 7
+  of 7). Every number: `validation/investigations/spec-answers-3/README.md`.
+- **FSL-203** (class c, rule A): `calculateExtrema` seeds both extrema with the first element; a
+  NaN there makes `min()` and `max()` NaN: the negative-value rule is skipped (both channels'
+  paths) and the single channel's `m_mask.binarise(0, max + 1, exclusive)` is empty: `kmeansexc`
+  (exit 255), or with `-s` an empty-mask run. Replica default: the extrema over the non-NaN
+  values in `clear_negative`, the mask as FSL-103's default; named when an input's first voxel is
+  NaN; `reproduce` as now. (`calculateExtrema` is newimage's: every FSL tool's `min()`/`max()`
+  shares it; BET's, FLIRT's and fslmaths' replicas follow it as FSL does; whether a NaN first
+  voxel changes their results is not checked here.)
+
+### The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-202** (`mriseg.rs`, `means_variances`): both variances computed; the default stores
+  `(s_mpm / s_p2 - mu * mu) as f32` with `mu = s_mp / s_p` in double, `reproduce` FSL's
+  `(s_mpm / s_p2 - (double)(m_mean * m_mean))`; `Segmentation::fsl202_differs` is set when any
+  call's two values differ in their bits (NaN equal to NaN), and `fast.rs` names FSL-202 after
+  `main` (in both modes). The suite's fix pass lists FSL-202 among the entries that may be named
+  without a visible change (a variance's last bits that the outputs round back).
+- **FSL-203** (`fast.rs`, `clear_negative`): when the first voxel is NaN, the default takes the
+  extrema over the values that are not NaN (FSL's `calculateExtrema` order otherwise); one channel
+  names FSL-203 whenever the first voxel is NaN (FSL's mask is then empty), several channels only
+  when a value that is not NaN is negative (their mask has no upper bound). The one-channel mask
+  is FSL-103's default already (above 0 and finite).

@@ -51,6 +51,7 @@ FMRIPREP = [
 #: The record's other cases shown as examples: example id -> case.
 REAL = {
     "membrane": "opt/membrane-lm",
+    "movements": "opt/levels",
     "lsr": "at/lsr-y",
     "jac": "at/jac-y",
     "vb3d": "at/vb3d-y",
@@ -264,6 +265,32 @@ def _real_run(case: str):
     return _suite()._all_cases()[case][2]
 
 
+def _real_source(case: str):
+    """``(args, put_inputs, settings, program)`` of the record's case ``case``, as the record
+    runs it."""
+    fs = _suite()
+    run = _real_run(case)
+    node = fs._source_node()
+    with tempfile.TemporaryDirectory(prefix="lx-nc-topup-ev-args_") as t:
+        args = fs._prepare(run, Path(t), node)
+
+    def put(d: Path) -> None:
+        fs._prepare(run, d, node)
+
+    return args, put, dict(run.settings), run.program
+
+
+def _fmriprep_source(run: str):
+    """``(args, put_inputs)`` of fMRIPrep's topup call of ``run``, as the record runs it."""
+    fs = _suite()
+    node = _node(run)
+
+    def put(d: Path) -> None:
+        fs._prepare_fmriprep(node, d)
+
+    return fs.fmriprep_args(node), put
+
+
 def _compute_real(case: str):
     def compute(e: fcache.Entry) -> None:
         fs = _suite()
@@ -351,15 +378,42 @@ def _compute_named(e: fcache.Entry) -> None:
     )
 
 
+def refresh_replica(ctx: core.Context, why: str) -> None:
+    """After a change of the replica's default mode: its default-mode runs of every example's
+    entry already computed made again (in their working directories, with their inputs; an
+    entry not computed yet is computed whole by the export), and its default mode on every case
+    of the record computed again (the named entry); FSL's runs and the reproduce mode's are
+    kept (the record shows the reproduce mode unchanged)."""
+    fctx = ctx.figures_context()
+    label, mode, extra = REPLICA_RUNS[2]
+    sources = []
+    for _i, run, _f in FMRIPREP:
+        args, put = _fmriprep_source(run)
+        sources.append((f"fmriprep-{run}", [*args, *extra], put, {}, "topup"))
+    for case in REAL.values():
+        args, put, settings, program = _real_source(case)
+        sources.append((case.replace("/", "-"), args, put, settings, program))
+    for name, args, put, settings, program in sources:
+        e = fcache.Entry(fctx, TOOL, name, "")
+        if not e.done:
+            continue
+        info = e.info()
+        for f in (e.dir / label).iterdir():  # the outputs being made again
+            f.unlink()
+        _replica(e, label, mode, args, put, settings, program)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(fctx, TOOL, "cases-default-mode", NAMED_TEXT, _compute_named)
+
+
+NAMED_TEXT = (
+    "The replica's default mode on every case of the record: its exit status and the entries "
+    "it names"
+)
+
+
 def named_entry(ctx: core.Context) -> fcache.Entry:
-    return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-default-mode",
-        "The replica's default mode on every case of the record: its exit status and the "
-        "entries it names",
-        _compute_named,
-    )
+    return fcache.entry(ctx.figures_context(), TOOL, "cases-default-mode", NAMED_TEXT,
+                        _compute_named)  # fmt: skip
 
 
 # ------------------------------------------------------------------ the clean-room original
@@ -765,9 +819,13 @@ def _outputs_of(run_dir: Path, shape: tuple[int, ...], pe: list[str]) -> dict[st
                         f"Displacement along {axis}: volume {k} ({pe[k - 1]})",
                         "mm",
                     )
-        elif name.startswith("jac") and m:
+        elif m and (name.startswith("jac") or m.group(1) == "j") and a.ndim == 3:  # --jacout
             k = int(m.group(2))
             out[f"jac-{k}"] = (p.name, None, f"Jacobian: volume {k} ({pe[k - 1]})", "")
+        elif name.endswith("_fieldmap_rads"):  # --featout's field, in radians per second
+            out["feat-rads"] = (p.name, None, "--featout: field (rad/s)", "rad/s")
+        elif name.endswith("_fieldmap_mag"):  # --featout's magnitude image
+            out["feat-mag"] = (p.name, None, "--featout: magnitude", "")
         elif a.ndim == 4 and a.shape[3] == len(pe):
             for k in range(a.shape[3]):
                 out[f"corrected-{k + 1}"] = (p.name, k, f"Corrected: volume {k + 1} ({pe[k]})",
@@ -901,6 +959,31 @@ FIX_REASONS = {
     "precision it builds is not positive definite and the iterations diverge (FSL's output "
     "here spans about ±4 × 10¹⁰ for an input of 0 to 1.1 × 10⁵); the default gives the "
     "prior its full weight, and the restoration stays in the input's range, as vb2D's does.",
+    "FSL-144": "FSL-144, corrected by default with a notice: applytopup --method=jac with a "
+    "phase encoding along z, which topup does not estimate, leaves the image uncorrected "
+    "without a word; the default refuses the call with the reason. The reproduce mode gives "
+    "FSL's bytes.",
+    "FSL-145": "FSL-145, corrected by default with a notice: with --splineorder=2, an axis "
+    "shorter than two knot spacings gets two coefficients, or one, which force the field "
+    "towards 0 at its far end; the default lays the general count. The reproduce mode gives "
+    "FSL's bytes.",
+    "FSL-146": "FSL-146, corrected by default with a notice: with volumes encoded along "
+    "different axes, FSL's gradient leaves out of each axis' term the volumes not encoded "
+    "along it, so it is not the cost's gradient; the default minimises with the cost's own "
+    "gradient. The reproduce mode gives FSL's bytes.",
+    "FSL-201": "FSL-201, corrected by default with a notice (since 2026-11-03): with the "
+    "movements estimated, FSL's derivatives of the cost with respect to the rotations are "
+    "forward differences (steps of 10⁻⁵ rad) of rotation matrices built from a "
+    "single-precision angle, cosine and sine, so the rounding divided by the step makes its "
+    "gradient and its Gauss-Newton Hessian of the movements other than the cost's (their "
+    "rotation entries 0.25 to 39 % off on ds005040's pair at half resolution) and the "
+    "minimisers end elsewhere than the cost's minimum; the default computes the exact "
+    "derivatives. Measured on 22 runs that estimate the movements, the default's final cost "
+    "was lower or equal in 18 (the other four, runs cut short, 0.004 to 0.13 % higher), lower "
+    "in all 8 random cases whose volumes moved (by 0.01 to 44 %), and 38 % lower after 60 "
+    "iterations of scaled conjugate gradients on the half-resolution pair, where FSL's stall; "
+    "fMRIPrep's calls estimate no movements and stay the same. The reproduce mode gives FSL's "
+    "bytes.",
 }
 
 
@@ -1065,6 +1148,8 @@ ORIGINAL_FIX = {
     .replace("the replica gives", "the original gives")
     for k, v in FIX_REASONS.items()
 }
+# the clean-room original computes the exact rotation derivatives in both modes (no notice)
+ORIGINAL_FIX.pop("FSL-201")
 ORIGINAL_FIX["FSL-145"] = (
     "FSL-145, corrected by default with a notice: with --splineorder=2, an axis shorter than two "
     "knot spacings gets two coefficients, which force the field towards 0 at its far end; the "
@@ -1415,6 +1500,20 @@ REAL_TEXT = {
         "and gradient), and so takes other steps: the difference *replica, default − "
         "reproduce mode* shows what that changes in the field.",
     ),
+    "movements": (
+        "Movements estimated, and a correction by default",
+        "The record's case `opt/levels`: two levels on the half-resolution pair of ds005040, "
+        "the first at subsampling 2 by Levenberg-Marquardt with the movements estimated (the "
+        "second volume's rigid-body movement against the first; fMRIPrep's configuration "
+        "estimates none, FSL's own b02b0.cnf does in its first five levels), the second at full "
+        "resolution by scaled conjugate gradients; every output written. FSL 6.0.7.23 and the "
+        "replica's reproduce mode give the same bytes; since 2026-11-03 the replica's default "
+        "corrects FSL-201 (FSL's rotation derivatives are not its cost's) and so takes other "
+        "steps: the difference *replica, default − reproduce mode* shows what that changes, and "
+        "the movement table below the viewer the movements each run estimated. The clean-room "
+        "original computes the cost's own derivatives in both modes, so its record holds this "
+        "case as an expected divergence from FSL.",
+    ),
     "lsr": (
         "applytopup: least-squares restoration of the pair (the default method)",
         "The record's case `at/lsr-y`: applytopup's default method combines the two images of "
@@ -1444,6 +1543,50 @@ REAL_TEXT = {
         "to read FSL's output.",
     ),
 }
+
+
+def _movements_table(tid: str, runs: dict[str, Path], second: str, name: str) -> dict:
+    """The movements each run estimated (``--out``'s ``_movpar.txt``: per volume, the
+    translations in mm and the rotations in radians), every moving volume, against FSL's (the
+    first run) and against the run ``second`` (``name`` in the columns' labels)."""
+
+    def read(d: Path) -> np.ndarray | None:
+        f = next(iter(sorted(d.glob("*_movpar.txt"))), None)
+        if f is None:
+            return None
+        return np.array([[float(v) for v in ln.split()] for ln in
+                         f.read_text(encoding="utf-8").splitlines() if ln.strip()])  # fmt: skip
+
+    ref, ref2 = read(next(iter(runs.values()))), read(runs[second])
+    rows = []
+    for head, d in runs.items():
+        m = read(d)
+        if m is None:
+            continue
+        for k in range(1, m.shape[0]):
+            diffs = [float(np.max(np.abs(m[k, a:b] - r[k, a:b])))
+                     for r in (ref, ref2) for a, b in ((0, 3), (3, 6))]  # fmt: skip
+            rows.append({
+                "head": head if m.shape[0] == 2 else f"{head}, volume {k + 1}",
+                "cells": [*(common.cell(float(v), "sig6") for v in m[k, :6]),
+                          *(common.cell(x, "sig") for x in diffs)],
+            })  # fmt: skip
+    return common.table(
+        tid,
+        "The movements estimated: the moving volume against the first",
+        ["Run", *[{"label": f"{a} (mm)", "num": True} for a in ("x", "y", "z")],
+         *[{"label": f"rotation {a} (rad)", "num": True} for a in ("x", "y", "z")],
+         {"label": "|Δ| translation vs FSL", "num": True},
+         {"label": "|Δ| rotation vs FSL", "num": True},
+         {"label": f"|Δ| translation vs {name}", "num": True},
+         {"label": f"|Δ| rotation vs {name}", "num": True}],
+        rows,
+        note="Each run's `--out` movement file (`_movpar.txt`: one line per volume, the first "
+        "volume the reference), as written; the last four columns the largest difference of "
+        f"the translations (mm) and of the rotations (rad) from FSL's and from {name}'s.",
+    )  # fmt: skip
+
+
 #: The derived inputs' labels: file name -> (label, sub).
 INPUT_TEXT = {
     "half.nii.gz": "ds005040 pair, half resolution",
@@ -1507,6 +1650,23 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
     same = common.identical(diffs)
     _verdicts(rdiffs, same, info, run.program)
     _verdicts_original(odiffs, same, c, oinfo, "this case")
+    # a case the original's record does not pass (an expected divergence): the record's verdict
+    row = next((r for r in records.load(ctx.repo, RECORD_ORIG).results if r["case"] == case), None)
+    held = common.outcome_verdict(row) if row is not None else None
+    if held is not None:
+        for x in odiffs:
+            if x["id"] == "original-fsl":
+                x["verdict"], x["reason"] = held
+                x["links"] = [{"label": "record", "href": f"docs/validation/{RECORD_ORIG}.md"},
+                              {"label": "findings", "href": FINDINGS}]  # fmt: skip
+                if "FSL-201" in (info.get("named", {}).get("replica-fix") or []):
+                    x["reason"] = common.clip(
+                        x["reason"].rstrip(".") + ". Since 2026-11-03 the specification states "
+                        "what FSL computes (FSL-201, specs/topup.md §4.6): the original's "
+                        "derivatives are the cost's, as the replica's default mode now computes "
+                        "them; its reproduce mode is to follow FSL's.",
+                        700,
+                    )
     out_id = next(iter(outs))
     at, _k = common.largest_in_slice(ex, "replica-fix", "replica", out_id, "axial")
     default = {
@@ -1530,11 +1690,20 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
     counted = {"original (reproduce)": o.dir / "original",
                "original (default)": o.dir / "original-fix"}  # fmt: skip
     tables = [_files_table(f"{ex_id}-files", e.dir / "fsl", cols, "", counted)]
+    if ex_id == "movements":
+        runs = {"FSL 6.0.7.23": e.dir / "fsl", **cols, **counted}
+        tables.append(
+            _movements_table(
+                f"{ex_id}-movements", runs, "replica (default)", "the replica's default"
+            )
+        )
     title, summary = REAL_TEXT[ex_id]
     summary += (
         " LARMORX's clean-room original runs the same call in its reproduce mode (at 14 threads "
-        "and at one) and its default mode, which makes the same correction."
-    )
+        "and at one) and its default mode"
+        + (", the same derivatives in both." if ex_id == "movements" else
+           ", which makes the same correction.")
+    )  # fmt: skip
     data = common.DS005040
     return {
         "id": ex_id,
@@ -1914,14 +2083,16 @@ def trial(ctx: core.Context) -> tuple[dict, dict]:
 TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
     "explained: finding 14 (FSL's movement derivatives)": (
         "explained: FSL's movement derivatives are not its cost's (findings 14; the record's "
-        "expected divergences), in cases that estimate the movements", None, 6),
+        "expected divergences), in cases that estimate the movements; registered since "
+        "2026-11-03 as FSL-201 (rule A), the exact derivatives the default of both "
+        "implementations, the original's reproduce mode to follow FSL's", None, 6),
     "FSL-146 (rule A; reproduce agrees) and, with movements, finding 14": (
         "a defect of FSL, registered: FSL-146, volumes encoded along different axes (rule A: "
         "corrected by default; the reproduce mode now gives FSL's path), with movements also "
         "findings 14", "d13", 10280),
     "explained: FSL-133 (lines whose length does not divide 2^32)": (
         "explained: FSL-133, applytopup's lines whose length does not divide 2^32 (FSL's wrap, "
-        "not reproduced)", None, 5),
+        "not reproduced; the specification states it since 2026-11-03)", None, 5),
     "larmorx mistake, fixed: the quadratic B-splines' count": (
         "a LARMORX mistake, fixed: the quadratic B-splines' count (a permanent case; FSL-145 "
         "found with it)", None, 11095),
@@ -1937,8 +2108,9 @@ TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
         "explained: FSL-143, vb3D's and vb4D's indefinite prior (reproduced: its divergence "
         "amplifies last bits)", None, 275),
     "open: quadratic splines' regulariser Hessian (k even)": (
-        "open: the quadratic splines' regulariser Hessian at an even knot spacing (a question "
-        "for the specification)", "open", 10753),
+        "open: the quadratic splines' regulariser Hessian at an even knot spacing (the "
+        "specification's answer of 2026-11-03, §4.6, for the original's next part)", "open",
+        10753),
     "harness, fixed: --trace with -v": (
         "the suite's own mistake, fixed: --trace with -v", None, 1142),
     "explained: --debug's attempt files (the minimisation's path)": (
@@ -1946,7 +2118,8 @@ TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
         "makes: the minimisation's path)", None, 2150),
     "open: applytopup lsr on lines that divide 2^32": (
         "open: applytopup --method=lsr on lines whose length divides 2^32 (99th percentile "
-        "1.4e-3 to 0.13; a question for the specification)", "open", 8089),
+        "1.4e-3 to 0.13; the specification's answer of 2026-11-03, §7.4, for the original's next "
+        "part)", "open", 8089),
     "explained: integer outputs (float values a rounding apart land on neighbouring integers)": (
         "explained: integer outputs (values a rounding apart land on neighbouring integers)",
         None, 7321),
@@ -2109,6 +2282,9 @@ if __name__ == "__main__":  # compute the cache entries only:
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     what = sys.argv[1:] or ["all"]
+    if what[0] == "refresh":  # refresh_replica, the reason given
+        refresh_replica(c, " ".join(what[1:]))
+        sys.exit(0)
     if what[0] in ("fmriprep", "all"):
         for _i, run, _f in FMRIPREP:
             if len(what) < 2 or what[1] == run:

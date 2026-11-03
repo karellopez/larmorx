@@ -1,0 +1,5 @@
+# FLIRT part 2's question 20 (relay 3a, 2026-11-03): `-anglerep quaternion -dof 6` at -verbose 7
+# (every evaluation's parameters printed; FSL-90's messages on standard error), the suite's
+# real/anglerep-quaternion-dof6 images. Read by flirt_models.py (`quat-messages`).
+flirt -in @epi.nii -ref @t1.nii -anglerep quaternion -dof 6 -omat out.mat -verbose 7
+flirt -in @epi.nii -ref @t1.nii -anglerep quaternion -omat out.mat -verbose 7

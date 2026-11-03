@@ -1849,3 +1849,25 @@ together at the end.
   (rule D: no fMRIPrep input reaches it), then corrected by default (rule A) with `reproduce` giving
   FSL's result; BET's and FLIRT's replica records stayed identical. Their clean-room originals are to be
   checked for the same behaviour (next-steps).
+
+## 2026-11-03: The spec answers for topup, FAST and FLIRT (the user chose the part; the decisions by the rules)
+- **The part:** a spec writer answered every question topup's, FAST's and FLIRT's clean-room implementers had left
+  open (topup 9, FAST 21, FLIRT part 2's 38), each answer in its spec section and checked by a model written from the
+  new spec text alone against FSL's numbers; the replicas took the corrections the register had decided (FSL-111,
+  FSL-144, FSL-145, FSL-146) and the new ones below.
+- **FSL-201, topup's rotation derivatives (rule D, then A):** FSL differentiates single-precision rotation matrices by
+  a forward difference, 0.4 to 39 % off the exact derivative; with the exact one the final cost is lower or equal in
+  18 of 22 runs that estimate movements (4 runs stopped early end 0.004 to 0.13 % higher), lower in all 8 random cases
+  whose volumes moved. fMRIPrep's calls estimate no movements: unchanged.
+- **FSL-202, FAST's single-channel variance (rule D, then A; the orchestrator held the first proposal until the gain
+  was measured):** FSL squares a single-precision mean in the log domain and loses most of the variance's digits. The
+  corrected variance is equal (or within one voxel) to a reference computed in double throughout on 7 of 7 cases, and
+  its own last-bit band is 0 where FSL's reaches hundreds of voxels; most of FSL's own band is this cancellation.
+  **fMRIPrep users' FAST outputs change by default** toward the exact statistics (ds000005: 54 `_seg` and 112
+  `_mixeltype` voxels; ds000228: 66 and 89; ds005003: 392 and 453); `reproduce` gives FSL's. `specs/fast.md` §11:
+  FSL's band is the allowance of `reproduce` only.
+- **FSL-203** (FAST, a NaN first voxel: FSL exits 255; rule A) and **FSL-204** (pointflirt without points crashes;
+  refused in both modes).
+- **Open for the user:** whether glibc's exact single-precision functions (Arm's and fdlibm's permissive code, now in
+  the FSL replica core) may be copied into `larmorx_core::math` for the clean-room originals' `reproduce` (rule 1:
+  moving code from a replica crate needs the user), asked together with GLIBC-07's cbrtf route.

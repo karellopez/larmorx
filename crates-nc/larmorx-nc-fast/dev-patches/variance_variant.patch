@@ -1,0 +1,31 @@
+diff --git a/crates-nc/larmorx-nc-fast/src/mriseg.rs b/crates-nc/larmorx-nc-fast/src/mriseg.rs
+index a200b8a..75c226e 100644
+--- a/crates-nc/larmorx-nc-fast/src/mriseg.rs
++++ b/crates-nc/larmorx-nc-fast/src/mriseg.rs
+@@ -541,6 +541,26 @@ impl Segmentation {
+             let (s_mpm, e3) = stats::masked_sum_by(nvox, |k| (p[k] * mri[k]) * mri[k], mask);
+             let (s_p2, e4) = stats::masked_sum(p, mask);
+             self.variance[c] = (s_mpm / s_p2 - f64::from(self.mean[c] * self.mean[c])) as f32;
++            // spec-answers-3 measurement hook (never committed): LXNC_FAST_VARIANCE
++            match std::env::var("LXNC_FAST_VARIANCE").as_deref() {
++                Ok("double") => {
++                    let mu = s_mp / s_p;
++                    self.variance[c] = (s_mpm / s_p2 - mu * mu) as f32;
++                }
++                Ok("twopass") => {
++                    let mu = s_mp / s_p;
++                    let (mut num, mut den) = (0f64, 0f64);
++                    for k in 0..nvox {
++                        if self.mask[k] > 0.5 {
++                            let d = f64::from(mri[k]) - mu;
++                            num += f64::from(p[k]) * d * d;
++                            den += f64::from(p[k]);
++                        }
++                    }
++                    self.variance[c] = (num / den) as f32;
++                }
++                _ => {}
++            }
+             for e in [e1, e2, e3, e4] {
+                 if e {
+                     let _ = writeln!(io.err, "{EMPTY_MASK}");

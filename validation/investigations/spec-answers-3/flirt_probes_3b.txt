@@ -1,0 +1,5 @@
+# FLIRT part 2's question 23 (relay 3b, 2026-11-03): the suite's real/cost-leastsq at -verbose 7.
+# Its first leastsq evaluation is the 4 mm stage's first free optimisation's start (printed cost
+# 585823680.000000), where the clean-room trace parted; the costs before it are the search's
+# corratio. Run by cleanroom-flirt/programs2_fsl.py (FSL through the cache).
+flirt -in @epi.nii -ref @t1.nii -cost leastsq -omat out.mat -verbose 7

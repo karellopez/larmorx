@@ -1181,7 +1181,7 @@ tool = "fsl-flirt-original"
 implementation = "original"
 signature = ["out.nii.gz: the same values within Ne-N of the image's range", "out.nii: the same values within Ne-N of the image's range"]
 status = "open"
-explanation = "From the same matrix, the windowed sinc and the spline of float images differ from FSL's in their last bits (1.6 % of real/interp-sinc's voxels; applyxfm4D's float spline 1.7 to 23 % of the voxels' last bit in five trial findings): how FSL rounds its kernels' weights is an open question of the specification (part 2's spec question 22)."
+explanation = "From the same matrix, the windowed sinc and the spline of float images differ from FSL's in their last bits (1.6 % of real/interp-sinc's voxels; applyxfm4D's float spline 1.7 to 23 % of the voxels' last bit in five trial findings): how FSL rounds its kernels' weights was part 2's spec question 22, answered (spec writer, 2026-11-03, specs/flirt.md §9.2, §15.7, §12): the sinc's weights were right, its last bits are the table's sine, the C library's single-precision sinf (reproduce needs it; the default keeps the correctly rounded sine: explained); applyxfm4D's spline is §9.3's with double images read and filtered in double, which the original is to follow in its next part."
 link = "docs/findings/fsl-flirt-original.md"
 
 [[difference]]
@@ -1189,7 +1189,7 @@ tool = "fsl-flirt-original"
 implementation = "original"
 signature = ["global_refweightN.nii.gz: the same header, values within Ne-N of the image's range", "global_refweightN.nii: the same header, values within Ne-N of the image's range", "global_refweightN.hdr: the same header, values within Ne-N of the image's range", "global_refweightN.nii.zst: the same header, values within Ne-N of the image's range", "refvol_N.nii.gz: the same header, values within Ne-N of the image's range", "refvol.nii.gz: the same header, values within Ne-N of the image's range", "refvol_N.nii: the same header, values within Ne-N of the image's range", "refvol.nii: the same header, values within Ne-N of the image's range", "refvol_N.hdr: the same header, values within Ne-N of the image's range", "refvol.hdr: the same header, values within Ne-N of the image's range", "testvol.nii.gz: the same header, values within Ne-N of the image's range", "testvol.nii: the same header, values within Ne-N of the image's range", "testvol.hdr: the same header, values within Ne-N of the image's range", "testweight.nii.gz: the same header, values within Ne-N of the image's range", "testweight.nii: the same header, values within Ne-N of the image's range", "out.mat: the matrices"]
 status = "open"
-explanation = "-debug's volumes on the trial's oblique and anisotropic images: global_refweight1's voxel size and the pyramid levels' qoffset and srow differ from FSL's (the record's -debug cases give FSL's headers); with BBR and no boundary point FSL writes debug and out images where the original stops after its set-up lines. 114 findings, replayed with the final build (#170, #2424): still differ. Spec questions 18 and 38 of part 2's handoff."
+explanation = "-debug's volumes on the trial's oblique and anisotropic images: global_refweight1's voxel size and the pyramid levels' qoffset and srow differ from FSL's (the record's -debug cases give FSL's headers); with BBR and no boundary point FSL writes debug and out images where the original stops after its set-up lines. 114 findings, replayed with the final build (#170, #2424): still differ. Spec questions 18 and 38 of part 2's handoff, answered (spec writer, 2026-11-03, specs/flirt.md §9.4): the levels compose only their set forms, a neurological reference's forms are swapped back with the level's grid, global_refweight1's pixdim[4..7] are 1; with BBR and no boundary point the costs are NaN, nothing moves, and FSL writes the -init matrix, the debug images and -out: for the original's next part."
 link = "docs/findings/fsl-flirt-original.md"
 
 [[difference]]
@@ -1273,7 +1273,7 @@ tool = "fsl-fast-original"
 implementation = "original"
 signature = ["Standard output (numbers to N significant digits)"]
 status = "fixed"
-explanation = "13 cases with -v and several channels: (1) a singular covariance in the k-means initialisation, where FAST aborts without printing that iteration's 'KMeans Iteration k' line (9 cases; the original now prints it once the covariances are inverted); (2) FSL-101 reproduced with -v, where FAST prints 'Beginning prior-based initialisation' before it crashes (3 cases; the original now prints it before its refusal); 12 agree. Open: one case (cleanroom-fast 1840, -n 4 with two channels) whose statistics degenerate: FSL prints MEAN -nan from the second bias iteration on where the original prints MEAN 1 (a class weight sum of 0); its images agree within the thresholds. Reported with its reproducer (spec question: how FSL's posteriors become NaN after a NaN covariance)."
+explanation = "13 cases with -v and several channels: (1) a singular covariance in the k-means initialisation, where FAST aborts without printing that iteration's 'KMeans Iteration k' line (9 cases; the original now prints it once the covariances are inverted); (2) FSL-101 reproduced with -v, where FAST prints 'Beginning prior-based initialisation' before it crashes (3 cases; the original now prints it before its refusal); 12 agree. Open: one case (cleanroom-fast 1840, -n 4 with two channels) whose statistics degenerate: FSL prints MEAN -nan from the second bias iteration on where the original prints MEAN 1 (a class weight sum of 0); its images agree within the thresholds. Reported with its reproducer; the spec question (how FSL's posteriors become NaN after a NaN covariance) answered (spec writer, 2026-11-03, specs/fast.md §5.3): a class without weight zeroes every posterior, the bias weights 0 / NaN make the field and then every mean NaN: for the original's next part."
 link = "validation/difftest/cases/fsl-fast-original/singular-kmeans-line.json"
 
 [[difference]]
@@ -1337,7 +1337,7 @@ tool = "fsl-topup-original"
 implementation = "original"
 signature = ["corrected (applytopup's output): relative difference inside the brain, Nth percentile", "hifi (applytopup's output): relative difference inside the brain, Nth percentile", "vb: the printed phi, lambda and their ratio"]
 status = "explained"
-explanation = "FSL-133: applytopup's lines whose length does not divide 2^32 wrap in FSL as the black-box runs do not determine; the original restores them circularly in both modes (484 cases, reproducer topup-trial-00005; findings 21, 36)"
+explanation = "FSL-133: applytopup's lines whose length does not divide 2^32 wrap in FSL as the black-box runs do not determine; the original restores them circularly in both modes (484 cases, reproducer topup-trial-00005; findings 21, 36). The specification states FSL's read since 2026-11-03 (specs/topup.md §7.4, §10.1): the original's reproduce mode is to follow it in its next part"
 link = "docs/findings/fsl-topup-original.md"
 defect = "FSL-133"
 
@@ -1346,7 +1346,7 @@ tool = "fsl-topup-original"
 implementation = "original"
 signature = ["hifi (applytopup's output): relative difference inside the brain, Nth percentile", "hifi (applytopup's output): mean |d| / mean intensity inside the brain"]
 status = "open"
-explanation = "applytopup --method=lsr on lines whose length divides 2^32 (16-voxel lines): the restored image's 99th percentile 1.4e-3 to 0.13 apart (8 cases, reproducer topup-trial-08089); a question for the specification (findings 36)"
+explanation = "applytopup --method=lsr on lines whose length divides 2^32 (16-voxel lines): the restored image's 99th percentile 1.4e-3 to 0.13 apart (8 cases, reproducer topup-trial-08089; findings 36). Answered (spec writer, 2026-11-03, specs/topup.md §7.4): the lines are not the cause; the mapping folds and FSL builds the restoration's matrices row by row by its walk along the line: for the original's next part"
 link = "docs/findings/fsl-topup-original.md"
 
 [[difference]]
@@ -1378,8 +1378,9 @@ tool = "fsl-topup-original"
 implementation = "original"
 signature = ["topup_movpar.txt: rotations", "topup_movpar.txt: translations", "corrected: relative difference inside the brain, Nth percentile", "corrected_mean: relative difference inside the brain, Nth percentile"]
 status = "explained"
-explanation = "FSL's rotation derivatives of the movements are not its cost's (the original's are): in cases that estimate the movements the two minimisations end apart (4,462 cases, reproducer topup-trial-00006; findings 14, 36; the record's expected divergences; a question for the specification)"
+explanation = "FSL's rotation derivatives of the movements are not its cost's (the original's are): in cases that estimate the movements the two minimisations end apart (4,462 cases, reproducer topup-trial-00006; findings 14, 36; the record's expected divergences). Registered 2026-11-03 as FSL-201 (rule A, specs/topup.md §4.6): the exact derivatives by default in both implementations, FSL's forward difference with reproduce in the replica; the original's reproduce mode is to follow §4.6 in its next part"
 link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-201"
 
 [[difference]]
 tool = "fsl-topup-original"
@@ -1412,7 +1413,7 @@ tool = "fsl-topup-original"
 implementation = "original"
 signature = ["--fout (Hz): correlation inside the brain", "--fout (Hz): |d| inside the brain, Nth percentile", "--fout (Hz): |d| inside the brain, mean", "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile"]
 status = "open"
-explanation = "quadratic splines with an even knot spacing (knots on voxels): the Levenberg-Marquardt Hessian's regulariser part differs from FSL's by up to 3.4 % while the first gradient and cost agree; no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36); a question for the specification"
+explanation = "quadratic splines with an even knot spacing (knots on voxels): the Levenberg-Marquardt Hessian's regulariser part differs from FSL's by up to 3.4 % while the first gradient and cost agree; no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36). Answered (spec writer, 2026-11-03, specs/topup.md §4.6): FSL samples each basis function only at the offsets inside its open support, so at an even spacing the inner knots take the mean of the one-sided second derivatives and the outer knots none: for the original's next part"
 link = "docs/findings/fsl-topup-original.md"
 
 # fslmaths' and fslstats' replicas: the check run (oracles/difftest/2026-11-03-fsl-maths-check, seed check1,

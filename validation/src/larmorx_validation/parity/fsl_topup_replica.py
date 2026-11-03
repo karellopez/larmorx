@@ -354,8 +354,12 @@ class Run:
 
 #: The entries the ``fix`` pass may name without a visible change: applytopup's FSL-132 (the
 #: first volume's interpolation) and FSL-133 (the lines' wrap) change values that the
-#: restoration and the output's single precision can round back to the same numbers.
-SILENT: tuple[str, ...] = ("FSL-132", "FSL-133")
+#: restoration and the output's single precision can round back to the same numbers; topup's
+#: FSL-201 (the movements' derivatives, named whenever they are computed) changes nothing when
+#: the minimiser takes no step (``opt/defaults``, ``cfg/directory``: every attempt of FSL's
+#: defaults on the half-resolution pair raises the cost, so the field and the movements stay 0
+#: in both modes, 2026-11-03).
+SILENT: tuple[str, ...] = ("FSL-132", "FSL-133", "FSL-201")
 #: How a profile's durations are masked.
 _DURATION = re.compile(r"Duration: \S+")
 #: The profile's name after ``--out``'s base name (``"_" + __FILE__ + "_" + __func__ + ".txt"``).
@@ -809,6 +813,37 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         "--fout=f",
     )
     add("opt/splineorder-2", "--splineorder=2", *HALF, *SHORT, "--splineorder=2", "--fout=f")
+    # FSL-145 (2026-11-03): quadratic B-splines on an axis shorter than two knot spacings (z: 20
+    # voxels of 6.6 mm at a spacing of 12; FSL lays 2 coefficients, the default 4), and one
+    # shorter than one spacing at --subsamp=2 (z: 10 voxels at 11: FSL's single coefficient,
+    # whose refit stops FSL while it prepares; the default runs)
+    add(
+        "opt/fsl145-short-axis",
+        "--splineorder=2 with z shorter than two knot spacings (FSL-145: 2 coefficients)",
+        *HALF,
+        "--warpres=80",
+        "--fwhm=8",
+        "--miter=3",
+        "--lambda=0.005",
+        "--estmov=0",
+        "--splineorder=2",
+        "--fout=f",
+    )
+    add(
+        "opt/fsl145-one-coefficient",
+        "--splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one "
+        "coefficient, whose refit stops FSL; the default runs)",
+        *HALF,
+        "--warpres=140",
+        "--subsamp=2",
+        "--fwhm=8",
+        "--miter=1",
+        "--lambda=0.005",
+        "--estmov=0",
+        "--splineorder=2",
+        "--fout=f",
+        fix_finishes="FSL-145",
+    )
     add(
         "opt/scale",
         "--scale=1: each volume scaled to the mean",
@@ -884,6 +919,17 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         "--rbmout=r",
         "--jacout=j",
         "--dfout=d",
+    )
+    add(
+        "opt/fsl146-four-axes",
+        "four volumes along y and x without the movements (FSL-146: each axis' Jacobian term "
+        "of the gradient over the volumes encoded along it only)",
+        "--imain=@four.nii.gz",
+        "--datain=@acq_four.txt",
+        "--out=o",
+        *SHORT,
+        "--estmov=0",
+        "--fout=f",
     )
     add(
         "opt/oblique-phase-encoding",
@@ -1749,7 +1795,18 @@ def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
         out,
         jac,
     )
-    add("jac-z", "phase encoding along z", *up, "--datain=@acq_z.txt", tu, out, jac)
+    add(
+        "jac-z",
+        "phase encoding along z (FSL-144: FSL leaves the z component out silently; the default "
+        "refuses)",
+        *up,
+        "--datain=@acq_z.txt",
+        tu,
+        out,
+        jac,
+        fix=False,
+        fix_refuses="FSL-144",
+    )
     for dtn in ("preserve", "char", "short", "int", "float", "double"):
         add(f"datatype-{dtn}", f"--datatype={dtn}", *up, acq, tu, out, jac, f"--datatype={dtn}")
     add(

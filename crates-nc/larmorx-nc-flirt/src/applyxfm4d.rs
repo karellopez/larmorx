@@ -24,6 +24,9 @@
 //! - FSL-80: newimage's sinc-kernel cache holds kernels of different widths the same, so
 //!   `-3D`'s rectangular kernel of width 9 is replaced by the default blackman kernel of width
 //!   7 defined just before it; the rectangular kernel by default, FSL's with `reproduce`.
+//! - FSL-111: a uint8 image is read into FSL's `char` image, signed on x86-64 (its values 128
+//!   to 255 as v - 256); read and written as stored by default (FSL's signed reading resampled
+//!   beside it for the notice), FSL's with `reproduce`.
 //! - FSL-79: spline interpolation of an integer image stores its spline coefficients in the
 //!   image's type (`(T)(c + 0.5)`: rounded half up, and toward zero below -0.5) and converts each
 //!   interpolated value to the type (truncated toward zero) before the output's cast; the float
@@ -445,6 +448,8 @@ fn to_type<T: Elem>(v: &Volume, conv: Conversion) -> Vec<T> {
 /// is 0.
 fn round_clamp<T: Elem>(x: f32) -> f64 {
     let (lo, hi) = match T::DTYPE {
+        // FSL-111 corrected: a uint8 image held as unsigned bytes
+        dt::UNSIGNED_CHAR if is_u8::<T>() => (0.0, 255.0),
         dt::UNSIGNED_CHAR => (-128.0, 127.0),
         dt::SIGNED_SHORT => (-32768.0, 32767.0),
         _ => (-2147483648.0, 2147483647.0),
@@ -456,6 +461,71 @@ fn round_clamp<T: Elem>(x: f32) -> f64 {
     }
 }
 
+/// Whether `T` is the unsigned byte (FSL-111 corrected: a uint8 image read as stored; FSL's
+/// `char` template is signed on x86-64).
+fn is_u8<T: Elem>() -> bool {
+    std::any::TypeId::of::<T>() == std::any::TypeId::of::<u8>()
+}
+
+/// Whether FSL's cast and FSL-09's rounding give different values of `U` (outside the voxels
+/// the mask sets).
+fn fsl09_changes<U: Elem>(v: &Volume, outside: &[usize]) -> bool {
+    let a: Vec<U> = to_type::<U>(v, Conversion::X86Cast);
+    let b: Vec<U> = to_type::<U>(v, Conversion::RoundClamp);
+    let mut masked = vec![false; a.len()];
+    for &i in outside {
+        masked[i] = true;
+    }
+    a.iter()
+        .zip(&b)
+        .zip(&masked)
+        .any(|((x, y), &m)| !m && x.to_f64().to_bits() != y.to_f64().to_bits())
+}
+
+/// FSL-111: what FSL writes for a uint8 volume (`vin_t`, read as stored; `vin` its float copy
+/// with the interpolation set) resampled through `aff` onto `like`'s grid, with the default's
+/// other corrections: the signed bytes FSL's `char` template reads, resampled as the default
+/// resamples an int8 image (its other defects named as they are there), written as their
+/// bytes. Returns the bytes and whether FSL-09's rounding changed one.
+#[allow(clippy::too_many_arguments)]
+fn signed_bytes<T: Elem>(
+    r: &mut Run,
+    vin: &Volume,
+    vin_t: &Volume<T>,
+    like: &Volume,
+    aff: &Mat,
+    spline: bool,
+    conv: Conversion,
+) -> Result<(Vec<u8>, bool), End> {
+    let signed = Volume::<i8>::copyconvert(vin_t);
+    let mut sin = Volume::<f32>::copyconvert(&signed);
+    sin.extrap = vin.extrap;
+    sin.interp = vin.interp;
+    sin.kernel = vin.kernel.clone();
+    let d64 = data64_of(&signed, false, spline);
+    let mut out = like.clone();
+    let (padval, outside) = r.transform(
+        &sin,
+        &signed,
+        d64.as_deref(),
+        false,
+        &mut out,
+        aff,
+        Some(SaveType::Char),
+    )?;
+    let fsl09 = fsl09_changes::<i8>(&out, &outside);
+    let mut typed = to_type::<i8>(&out, conv);
+    for i in outside {
+        typed[i] = padval;
+    }
+    Ok((typed.iter().map(|&v| v as u8).collect(), fsl09))
+}
+
+/// The bytes of a uint8 result (FSL-111's comparison).
+fn bytes_of<T: Elem>(v: &[T]) -> Vec<u8> {
+    v.iter().map(|&x| x.to_f64() as u8).collect()
+}
+
 fn typed_main<T: Elem>(
     o: &Opts,
     settings: &Settings,
@@ -465,7 +535,14 @@ fn typed_main<T: Elem>(
     out: &mut String,
 ) -> Result<(), End> {
     let double = T::DTYPE == dt::DOUBLE;
-    let spline_int = integer.is_some() && o.interp == Interp::Spline;
+    // FSL-111 corrected (`fix` only): a uint8 image read as stored, resampled with the float
+    // spline coefficients (FSL-79's correction) and written with its rounding to 0..255;
+    // FSL's signed reading resampled beside it, volume by volume, for the notice (and for
+    // the other corrections' notices, as an int8 image names them)
+    let unsigned = is_u8::<T>();
+    let mut fsl111 = false;
+    let integer_t = if unsigned { None } else { integer };
+    let spline_int = integer_t.is_some() && o.interp == Interp::Spline;
     let method = match o.interp {
         Interp::Nearest => Interpolation::NearestNeighbour,
         Interp::Trilinear => Interpolation::Trilinear,
@@ -487,23 +564,12 @@ fn typed_main<T: Elem>(
         Conversion::X86Cast
     };
     let mut fsl09 = false;
+    let mut fsl09_shadow = false;
     // FSL-09 named where the conversion changes a written voxel (not those the mask sets to the
     // background value afterwards)
     let mut check09 = |v: &Volume, outside: &[usize]| {
-        if integer.is_some() && !fsl09 {
-            let a: Vec<T> = to_type::<T>(v, Conversion::X86Cast);
-            let b: Vec<T> = to_type::<T>(v, Conversion::RoundClamp);
-            let mut masked = vec![false; a.len()];
-            for &i in outside {
-                masked[i] = true;
-            }
-            if a.iter()
-                .zip(&b)
-                .zip(&masked)
-                .any(|((x, y), &m)| !m && x.to_f64().to_bits() != y.to_f64().to_bits())
-            {
-                fsl09 = true;
-            }
+        if integer_t.is_some() && !fsl09 && fsl09_changes::<T>(v, outside) {
+            fsl09 = true;
         }
     };
     let result: Volume<T> = if o.fourd {
@@ -558,6 +624,19 @@ fn typed_main<T: Elem>(
             vin.interp = method;
             vin.kernel = sinc.clone();
             let d64 = data64_of(&vin_t, double, spline_int);
+            let shadow = if unsigned {
+                Some(signed_bytes(
+                    r,
+                    &vin,
+                    &vin_t,
+                    &dummy,
+                    &affmat,
+                    o.interp == Interp::Spline,
+                    conv,
+                )?)
+            } else {
+                None
+            };
             let (padval, outside) = r.transform(
                 &vin,
                 &vin_t,
@@ -565,7 +644,7 @@ fn typed_main<T: Elem>(
                 double,
                 &mut dummy,
                 &affmat,
-                integer,
+                integer_t,
             )?;
             drop(vin_t);
             check09(&dummy, &outside);
@@ -574,6 +653,10 @@ fn typed_main<T: Elem>(
             // affine_transform_mask writes the background value in the type
             for i in outside {
                 typed.data[i] = padval;
+            }
+            if let Some((fsl_bytes, f09)) = shadow {
+                fsl09_shadow |= f09;
+                fsl111 |= bytes_of(&typed.data) != fsl_bytes;
             }
             if first {
                 outvol.copy_properties(&typed);
@@ -623,6 +706,19 @@ fn typed_main<T: Elem>(
         }
         let affmat = read_matrix(&o.transname, r.err)?;
         let before = alt_in.as_ref().map(|_| outvol.clone());
+        let shadow = if unsigned {
+            Some(signed_bytes(
+                r,
+                &invol,
+                &in_t,
+                &outvol,
+                &affmat,
+                o.interp == Interp::Spline,
+                conv,
+            )?)
+        } else {
+            None
+        };
         let (padval, outside) = r.transform(
             &invol,
             &in_t,
@@ -630,7 +726,7 @@ fn typed_main<T: Elem>(
             double,
             &mut outvol,
             &affmat,
-            integer,
+            integer_t,
         )?;
         if let (Some(alt_in), Some(mut other)) = (alt_in, before) {
             // FSL-80 named only where the kernel changes the result
@@ -641,7 +737,7 @@ fn typed_main<T: Elem>(
                 double,
                 &mut other,
                 &affmat,
-                integer,
+                integer_t,
             )?;
             if typed_differs::<T>(&other, &outvol, &outside) {
                 r.notice(
@@ -665,9 +761,21 @@ fn typed_main<T: Elem>(
         for i in outside {
             typed.data[i] = padval;
         }
+        if let Some((fsl_bytes, f09)) = shadow {
+            fsl09_shadow |= f09;
+            fsl111 |= bytes_of(&typed.data) != fsl_bytes;
+        }
         typed
     };
-    if fsl09 {
+    if fsl111 {
+        r.notice(
+            &defects::FSL_111,
+            "the uint8 image's values 128 to 255 read and written as stored (applyxfm4D reads \
+             them into a signed char image, as v - 256)"
+                .to_owned(),
+        );
+    }
+    if fsl09 || fsl09_shadow {
         r.notice(
             &defects::FSL_09,
             if r.mode.fix() {
@@ -749,6 +857,10 @@ fn body(args: &[String], settings: &Settings, out: &mut String, r: &mut Run) -> 
     };
     let int8 = file_type == dt::INT8;
     match t {
+        // FSL-111: a uint8 image read as stored by default (FSL's signed char with reproduce)
+        dt::UNSIGNED_CHAR if !int8 && r.mode.fix() => {
+            typed_main::<u8>(&o, settings, Some(SaveType::Char), false, r, out)
+        }
         dt::UNSIGNED_CHAR => typed_main::<i8>(&o, settings, Some(SaveType::Char), int8, r, out),
         dt::SIGNED_SHORT => typed_main::<i16>(&o, settings, Some(SaveType::Short), false, r, out),
         dt::SIGNED_INT => typed_main::<i32>(&o, settings, Some(SaveType::Int), false, r, out),

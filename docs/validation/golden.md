@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 117 cases, 661 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 121 cases, 679 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -218,6 +218,20 @@ What the coverage test enumerates:
   empty). Recorded from a49e214 (committed as d898df9), the parity smoke tier's marker of the same
   commit and build reused (2,714 passed): 6 cases and 76 outputs added, every other checksum
   unchanged; each case runs in 0.01 to 0.04 s.
+- **The spec answers' switches in the FSL replicas** (2026-11-03, four cases added in
+  `crates-nc/larmorx-nc-cli/tests/golden.rs`): `applyxfm4D.uint8` (FSL-111: a uint8 image read as
+  stored by default), `fast.fsl203` (FSL-203: an input whose first voxel is NaN segmented by
+  default, FSL-202 named with it), `topup.fsl146` (FSL-146: four volumes along y and x, the cost's
+  own gradient by default) and `applytopup.jac-quadratic` (FSL-145: `--method=jac` reading
+  `topup.float-membrane`'s coefficients of the general quadratic count, which FSL's applytopup
+  would refuse as inconsistent). `larmorx-nc`'s checksums recorded on 2026-11-03 from c7ac893
+  (committed as fabf9c2; its code is that of 53796ce, whose replica records and parity smoke tier
+  passed): the four cases and 18 outputs added; the defaults that move on purpose: FSL-201
+  (`topup.two-levels`, `topup.float-membrane` and the applytopup cases that read their
+  coefficients, `applytopup.lsr`, `applytopup.jac-trilinear-short`, `applytopup.vb3d`), FSL-202
+  (`fast.fmriprep`, `fast.bias`, `fast.fsl103` and the statistics `fast.t2-n2-nopve-verbose`
+  prints) and FSL-145 (`topup.float-membrane`); every other checksum unchanged. The main
+  package's checksums are unchanged (only `larmorx_core::defects`' texts changed there).
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

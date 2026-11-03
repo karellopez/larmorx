@@ -517,7 +517,7 @@ defects! {
     FSL_124 = "FSL-124", "topup", true,
         "a negative --warpres gives a knot spacing of about four billion voxels (a negative number converted to unsigned): the spline field's kernels need more memory than any machine has, so topup is killed or stops with an allocation failure";
     FSL_125 = "FSL-125", "topup", true,
-        "a negative --fwhm is accepted and smooths the images with a kernel of that negative width, an arbitrary filter";
+        "a negative --fwhm is accepted and acts as no smoothing (a kernel of a width that is not positive is the identity), which is not what a smoothing width asks for";
     FSL_126 = "FSL-126", "topup", true,
         "a negative --lambda is accepted: the regularisation rewards a rough field, so the minimisation drives the field to large values and the cost below zero";
     FSL_132 = "FSL-132", "applytopup", true,
@@ -525,7 +525,7 @@ defects! {
     FSL_133 = "FSL-133", "applytopup", true,
         "--method=lsr reads the field's displacement just before a line's first voxel from the wrong place when the line's length (the image's size along the phase encoding) does not divide 2^32 (30, 96, 100, ... voxels; powers of two are right): the line is not wrapped around circularly, so the first rows of each line's restoration matrix use the displacement of a voxel in the middle of the line instead of its last voxel";
     FSL_134 = "FSL-134", "applytopup", true,
-        "a --topup field other than topup's coefficients on the images' grid: with a field image (topup's --fout or another field map in Hz) --method=jac computes the Jacobian determinant with the y displacements in units of the x voxel size (wrong when the phase encoding is along y and the voxels are not square in x and y); and a field on another grid is not refused: with --method=jac a field with as many voxels as the images but another shape is laid on the images' grid as it is stored, one with another number of voxels stops applytopup with an internal message; with --method=lsr the field's lines are read past their end";
+        "a --topup field other than topup's coefficients on the images' grid: with a field image (topup's --fout or another field map in Hz) --method=jac computes the Jacobian determinant with the y displacements in units of the x voxel size (wrong when the phase encoding is along y and the voxels are not square in x and y); and a field on another grid is not refused: with --method=jac a field with as many voxels as the images but another shape is laid on the images' grid as it is stored (its displacement, and its Jacobian determinant at the same voxel indices, 0 beyond the field's own grid), one with another number of voxels stops applytopup with an internal message; with --method=lsr the field's lines are read past their end";
     FSL_135 = "FSL-135", "applytopup", true,
         "an unknown --method writes no output and exits with status 0 without a message; --method=lsr (and the undocumented vb2D, vb3D and vb4D) with a --topup that gives no movement parameters (a field image, or coefficients without their _movpar.txt) aborts with an internal index error";
     FSL_141 = "FSL-141", "applytopup", true,
@@ -537,7 +537,7 @@ defects! {
     FSL_144 = "FSL-144", "applytopup", true,
         "--method=jac with a phase encoding that has a z component (an acquisition row whose third element is not 0, which topup refuses: it estimates no field for one) silently leaves that component out: the image is displaced along x and y only, so an image encoded along z alone is written uncorrected";
     FSL_145 = "FSL-145", "topup", true,
-        "with --splineorder=2, an axis shorter than two knot spacings gets two B-spline coefficients (every other axis ceil((2n + k - 4) / (2k)) + 2, which would be four): the field's support ends inside the axis, so the field is forced towards 0 at its far end (exactly 0 from 1.5 spacings on) whatever the images show";
+        "with --splineorder=2, an axis of n voxels shorter than one knot spacing k gets one B-spline coefficient, and one shorter than two spacings two when k is 3 voxels or more, where the general count is ceil((2n + k - 4) / (2k)) + 2 (every other axis): the field's support ends inside the axis, so the field is forced towards 0 at its far end (exactly 0 from 1.5 spacings on) whatever the images show, and a level that refits a field of a single coefficient along an axis stops topup with an internal index error";
     FSL_146 = "FSL-146", "topup", true,
         "with volumes whose phase encodings run along different axes (for example AP, PA, LR and RL), the cost's gradient leaves out of each axis' Jacobian term the volumes not encoded along that axis (their share of the mean prediction's derivative): the gradient is not the cost's, so the minimisers step in a wrong direction (a first Levenberg-Marquardt step can raise the cost) and end where this false gradient vanishes rather than at the cost's minimum";
     FSL_151 = "FSL-151", "fslmaths", true,
@@ -618,6 +618,14 @@ defects! {
         "-w of a 4D image without nonzero voxels gives the time range as a first volume of tsize - 1 with a size of 2 - tsize (negative for three or more volumes), while the x, y and z ranges cover the whole image";
     FSL_189 = "FSL-189", "fslstats", true,
         "with -json, -v and -V write the number of voxels in single precision: above 16,777,216 voxels (a 4D series, a large 3D image) the count is rounded";
+    FSL_201 = "FSL-201", "topup", true,
+        "with --estmov=1, the derivatives of the predicted volumes with respect to the rotations are forward differences (a step of 1e-5 rad) of rotation matrices built with a single-precision angle, cosine and sine and an axis entry slightly different from 1: their rounding, divided by the small step, adds a false scaling along the rotation's axis and errors of about 1 % to the matrix' derivative, so the gradient and the Gauss-Newton Hessian of the movements are not the cost's (the rotations' entries 0.4 to 40 % off on real images) and the minimisers end where this false gradient vanishes rather than at the cost's minimum";
+    FSL_202 = "FSL-202", "fast", true,
+        "with one channel, each class's variance (in the log domain) subtracts the single-precision square of the single-precision mean from the mean of the squares: the two nearly cancel, so the variances of classes with a small spread (white matter) are off by up to about 0.3 % (a few % for intensities above 2^24), which moves the labels and partial volumes (up to hundreds of voxels from those of the exactly computed statistics)";
+    FSL_203 = "FSL-203", "fast", true,
+        "an input whose first voxel is NaN has a NaN minimum and maximum (they start from the first voxel and NaN never replaces them): the negative values are not cleared and, with one channel, the brain mask (every voxel between 0 and the maximum + 1) is empty, so FAST stops with an exception (exit 255) or segments nothing";
+    FSL_204 = "FSL-204", "pointflirt", true,
+        "with two coordinate files that are both empty or missing (no points), pointflirt crashes (a segmentation fault) after its messages instead of saying that there are no points to fit";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

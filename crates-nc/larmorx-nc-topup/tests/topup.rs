@@ -188,7 +188,17 @@ fn movements_estimated() {
         ],
         d,
     );
-    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    // the movements' derivatives: FSL's forward differences, named (FSL-201)
+    assert_eq!(
+        (code, err.as_str()),
+        (
+            0,
+            "larmorx-nc: upstream defect FSL-201 (topup) reproduced: FSL's movement derivatives: \
+             forward differences of its single-precision rotation matrices \
+             [LARMORX_UPSTREAM_DEFECTS=fix corrects it]\n"
+        ),
+        "{out}"
+    );
     assert!(
         out.contains("WARNING, it is generally NOT a good idea to include movements"),
         "{out}"

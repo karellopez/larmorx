@@ -810,6 +810,24 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-09"],
         output_type: "NIFTI",
     },
+    // FSL-111 (2026-11-03): a uint8 image read as stored by default (FSL's signed char)
+    BetCase {
+        id: "applyxfm4D.uint8",
+        tool: "fsl applyxfm4D",
+        args: &[
+            "{brain8}",
+            "{t2}",
+            "out",
+            "{init}",
+            "-singlematrix",
+            "-interp",
+            "trilinear",
+        ],
+        mode: "fix",
+        // the uint8 output rounded (FSL-09, the FSL replicas' default)
+        named: &["FSL-09", "FSL-111"],
+        output_type: "NIFTI",
+    },
     BetCase {
         id: "pairreg.heads",
         tool: "fsl pairreg",
@@ -955,7 +973,7 @@ const BET_CASES: &[BetCase] = &[
             "-o", "out", "-I", "0", "-N", "-p", "-g", "-S", "1", "{brain}",
         ],
         mode: "fix",
-        named: &["FSL-96"],
+        named: &["FSL-202", "FSL-96"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -965,7 +983,7 @@ const BET_CASES: &[BetCase] = &[
             "-o", "out", "-b", "-B", "-I", "2", "-O", "2", "-l", "15", "{brain}",
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -975,7 +993,7 @@ const BET_CASES: &[BetCase] = &[
             "-o", "out", "-t", "2", "-n", "2", "--nopve", "-v", "-H", "0.2", "{brain}",
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -985,7 +1003,7 @@ const BET_CASES: &[BetCase] = &[
             "-o", "out", "-n", "4", "-s", "{means4}", "-R", "0.5", "-W", "5", "-N", "{brain}",
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1006,7 +1024,7 @@ const BET_CASES: &[BetCase] = &[
         ],
         mode: "fix",
         // FLIRT's registered priors of the int16 images, rounded (FSL-09, FLIRT's default)
-        named: &["FSL-09"],
+        named: &["FSL-09", "FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1014,7 +1032,7 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl fast",
         args: &["-o", "out", "-N", "--nopve", "{brain}"],
         mode: "fix",
-        named: &["FSL-100"],
+        named: &["FSL-100", "FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1022,7 +1040,7 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl fast",
         args: &["-o", "out", "-N", "--nopve", "{big}"],
         mode: "fix",
-        named: &["FSL-103"],
+        named: &["FSL-103", "FSL-202"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1030,7 +1048,17 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl fast",
         args: &["-o", "out", "-N", "--nopve", "{big}"],
         mode: "reproduce",
-        named: &["FSL-103"],
+        named: &["FSL-103", "FSL-202"],
+        output_type: "NIFTI",
+    },
+    // FSL-203 (2026-11-03): a NaN first voxel, segmented by default (FSL's extrema NaN: an
+    // empty mask, exit 255)
+    BetCase {
+        id: "fast.fsl203",
+        tool: "fsl fast",
+        args: &["-o", "out", "-N", "--nopve", "{nanfirst}"],
+        mode: "fix",
+        named: &["FSL-202", "FSL-203"],
         output_type: "NIFTI",
     },
     // topup and applytopup (2026-11-03), on the T2-like head (every second voxel) displaced by
@@ -1061,7 +1089,7 @@ const BET_CASES: &[BetCase] = &[
             "--dfout=warpfield",
         ],
         mode: "fix",
-        named: &[],
+        named: &["FSL-201"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1086,7 +1114,7 @@ const BET_CASES: &[BetCase] = &[
             "-v",
         ],
         mode: "fix",
-        named: &["FSL-117"],
+        named: &["FSL-117", "FSL-145", "FSL-201"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1109,7 +1137,27 @@ const BET_CASES: &[BetCase] = &[
             "--regrid=0",
         ],
         mode: "reproduce",
-        named: &["FSL-117"],
+        named: &["FSL-117", "FSL-145", "FSL-201"],
+        output_type: "NIFTI",
+    },
+    // FSL-146 (2026-11-03): four volumes along y and x, the cost's own gradient by default
+    BetCase {
+        id: "topup.fsl146",
+        tool: "fsl topup",
+        args: &[
+            "--imain={pe4}",
+            "--datain={acq4}",
+            "--out=tu",
+            "--logout=tu.log",
+            "--warpres=20",
+            "--fwhm=8",
+            "--miter=2",
+            "--lambda=0.005",
+            "--estmov=0",
+            "--fout=field",
+        ],
+        mode: "fix",
+        named: &["FSL-146"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1142,6 +1190,23 @@ const BET_CASES: &[BetCase] = &[
         mode: "fix",
         // the 16-bit output rounded (FSL-09, the FSL replicas' default)
         named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    // FSL-145 (2026-11-03): the quadratic coefficients topup's default lays with their full
+    // count on a short axis, which FSL's applytopup refuses as inconsistent: read as laid
+    BetCase {
+        id: "applytopup.jac-quadratic",
+        tool: "fsl applytopup",
+        args: &[
+            "--imain={pe_up}",
+            "--inindex=1",
+            "--datain={acq}",
+            "--topup=@topup.float-membrane",
+            "--out=hifi",
+            "--method=jac",
+        ],
+        mode: "fix",
+        named: &["FSL-132", "FSL-145"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -2082,6 +2147,35 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     )
     .unwrap();
     paths.insert("short", p);
+    // the spec answers' switches (2026-11-03): the pair and its copies displaced along x (+x,
+    // -x: four volumes along two axes, FSL-146) with their encodings; the brain as uint8 (its
+    // levels scaled to about 0..255: half of the values above 127, FSL-111); the brain as
+    // float32 with its first voxel NaN in either storage order (FSL-203)
+    let xshifted = |di: i64| -> Vec<i64> {
+        let mut v = Vec::with_capacity((sx * sy * sz) as usize);
+        for k in 0..sz {
+            for j in 0..sy {
+                for i in 0..sx {
+                    let is = (i - di).clamp(0, sx - 1);
+                    v.push(t2[((2 * k * ny + 2 * j) * nx + 2 * is) as usize]);
+                }
+            }
+        }
+        v
+    };
+    let four: Vec<i64> = up
+        .iter()
+        .chain(&dn)
+        .copied()
+        .chain(xshifted(1))
+        .chain(xshifted(-1))
+        .collect();
+    let p = dir.join("pe4.nii");
+    std::fs::write(&p, bet_nifti(&[sx, sy, sz, 4], 16, 32, &f32_bytes(&four))).unwrap();
+    paths.insert("pe4", p);
+    let p = dir.join("acq4.txt");
+    std::fs::write(&p, "0 1 0 0.05\n0 -1 0 0.05\n1 0 0 0.05\n-1 0 0 0.05\n").unwrap();
+    paths.insert("acq4", p);
     let mat = "0.5 0 0 72\n0 0.5 0 112\n0 0 0.5 62\n0 0 0 1\n";
     let p = dir.join("t1_to_std.mat");
     std::fs::write(&p, mat).unwrap();
@@ -2145,6 +2239,20 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     };
     let mask8: Vec<i64> = brain.iter().map(|&v| i64::from(v > 0)).collect();
     add("mask8", &[nx, ny, nz], 2, 8, u8_bytes(&mask8));
+    let brain8: Vec<i64> = brain
+        .iter()
+        .map(|&v| (v * 255 / 900).clamp(0, 255))
+        .collect();
+    add("brain8", &[nx, ny, nz], 2, 8, u8_bytes(&brain8));
+    let mut nanfirst: Vec<u8> = brain
+        .iter()
+        .flat_map(|&x| (x as f32).to_le_bytes())
+        .collect();
+    for i in [0, nx - 1] {
+        let o = 4 * i as usize;
+        nanfirst[o..o + 4].copy_from_slice(&f32::NAN.to_le_bytes());
+    }
+    add("nanfirst", &[nx, ny, nz], 16, 32, nanfirst);
     let mut labels = Vec::with_capacity(brain.len());
     for k in 0..nz {
         for j in 0..ny {

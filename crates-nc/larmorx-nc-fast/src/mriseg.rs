@@ -103,6 +103,8 @@ pub struct Segmentation {
     /// FSL-103: the voxels of the image's maximum FAST's mask leaves out (when the maximum
     /// plus 1 rounds to the maximum in `float`, at 2^24 and above): kept in by default.
     pub max_left_out: usize,
+    /// FSL-202: a class variance differed from FSL's arithmetic (in either mode).
+    pub fsl202_differs: bool,
     /// FSL-96: whether `members` was ever written (FAST writes it in the k-means iterations and
     /// before the partial volumes only: with priors and `--nopve`, or no k-means iteration and
     /// `--nopve`, `-p` saves memory it never wrote, in the mask too).
@@ -191,6 +193,7 @@ impl Segmentation {
             pve_segment: vec![0; pve],
             hard_pv: Vec::new(),
             max_left_out,
+            fsl202_differs: false,
             members_written: false,
             pv_prob: Vec::new(),
             mean: Vec::new(),
@@ -540,7 +543,16 @@ impl Segmentation {
             self.mean[c] = (s_mp / s_p) as f32;
             let (s_mpm, e3) = stats::masked_sum_by(nvox, |k| (p[k] * mri[k]) * mri[k], mask);
             let (s_p2, e4) = stats::masked_sum(p, mask);
-            self.variance[c] = (s_mpm / s_p2 - f64::from(self.mean[c] * self.mean[c])) as f32;
+            let fsl = (s_mpm / s_p2 - f64::from(self.mean[c] * self.mean[c])) as f32;
+            // FSL-202 corrected: the mean's square from the double-precision quotient, in
+            // double (FSL's single-precision square of the single-precision mean cancels most
+            // of the log-domain variance's digits)
+            let mu = s_mp / s_p;
+            let fixed = (s_mpm / s_p2 - mu * mu) as f32;
+            if fsl.to_bits() != fixed.to_bits() && !(fsl.is_nan() && fixed.is_nan()) {
+                self.fsl202_differs = true;
+            }
+            self.variance[c] = if self.p.mode.fix() { fixed } else { fsl };
             for e in [e1, e2, e3, e4] {
                 if e {
                     let _ = writeln!(io.err, "{EMPTY_MASK}");

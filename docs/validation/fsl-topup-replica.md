@@ -1,12 +1,12 @@
 # Parity: topup and applytopup replicas (bit-exact, FSL Licence)
 
-**All cases agree.** 173 cases on the `standard` tier: 104 pass, 66 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 176 cases on the `standard` tier: 106 pass, 67 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl topup` and `fsl applytopup` (crate larmorx-nc-topup, translated from FSL 6.0.7.23's source)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5, fsl-basisfield 2203.4, fsl-warpfns 2501.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, OpenBLAS 0.3.33 on one thread; the conda build at `~/fsl-6.0.7.23`, as built)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup-replica --tier standard`
-- **Original programs:** 173 runs: 152 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 176 runs: 155 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -27,7 +27,7 @@
 | debug | 5 | 5 | 0 | 0 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
 | fmriprep | 2 | 2 | 0 | 0 | 0 |
-| opt | 34 | 32 | 1 | 1 | 0 |
+| opt | 37 | 34 | 2 | 1 | 0 |
 | thr | 3 | 3 | 0 | 0 | 0 |
 
 ## Expected divergences
@@ -42,6 +42,7 @@
 
 | Case | What it tests | Errors |
 |---|---|---|
+| `opt/fsl145-one-coefficient` | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; the default runs) | topup exits 1; the same from the replica. Error occurred when preparing to run topup Exception thrown with message: Mat::operator(): index out of bounds |
 | `opt/z-phase-encoding` | phase encoding along z | topup exits 1; the same from the replica. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupScan::TopupScan: third element … |
 | `cfg/not-found` | a configuration that does not exist | topup exits 1; the same from the replica. Cannot find config-file nothere |
 | `cfg/not-found-path` | a configuration with a path that does not exist | topup exits 1; the same from the replica. Cannot find config-file ./nothere |
@@ -113,7 +114,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (24cf764e6292) |
+| larmorx | 0.0.1 (53796ce0a606) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -143,6 +144,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `opt/membrane-lm` | pass | 6/6 | --regmod=membrane_energy with Levenberg-Marquardt (the energy's Hessian) |
 | `opt/membrane-scg` | pass | 6/6 | --regmod=membrane_energy with scaled conjugate gradients (the energy's gradient) |
 | `opt/splineorder-2` | pass | 6/6 | --splineorder=2 |
+| `opt/fsl145-short-axis` | pass | 6/6 | --splineorder=2 with z shorter than two knot spacings (FSL-145: 2 coefficients) |
+| `opt/fsl145-one-coefficient` | both-error | 6/6 | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; t… |
 | `opt/scale` | pass | 6/6 | --scale=1: each volume scaled to the mean |
 | `opt/ssqlambda-0` | pass | 6/6 | --ssqlambda=0: lambda as given |
 | `opt/regrid-0` | pass | 6/6 | --regrid=0: the image's own grid, two levels |
@@ -152,6 +155,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `opt/datain-transposed` | pass | 6/6 | an acquisition-parameter file of four rows |
 | `opt/x-phase-encoding` | pass | 6/6 | phase encoding along x (the translation along x left out), the movements |
 | `opt/four-volumes` | pass | 6/6 | four volumes along x and y: six movement parameters for each moving scan |
+| `opt/fsl146-four-axes` | pass | 6/6 | four volumes along y and x without the movements (FSL-146: each axis' Jacobian term of the gradient over the volumes en… |
 | `opt/oblique-phase-encoding` | pass | 6/6 | a phase-encoding vector along x and y (the Jacobian of both displacements) |
 | `opt/readout-times` | pass | 6/6 | different read-out times |
 | `opt/zero-readout` | pass | 6/6 | one read-out time of 0 (a synthesised undistorted image) |
@@ -265,7 +269,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `at/jac-field-aniso` | pass | 6/6 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
 | `at/jac-no-movpar` | pass | 6/6 | coefficients without their _movpar.txt (no movements) |
 | `at/jac-oblique` | pass | 6/6 | a phase-encoding vector along x and y |
-| `at/jac-z` | pass | 6/6 | phase encoding along z |
+| `at/jac-z` | pass | 6/6 | phase encoding along z (FSL-144: FSL leaves the z component out silently; the default refuses) |
 | `at/datatype-preserve` | pass | 6/6 | --datatype=preserve |
 | `at/datatype-char` | pass | 6/6 | --datatype=char |
 | `at/datatype-short` | pass | 6/6 | --datatype=short |

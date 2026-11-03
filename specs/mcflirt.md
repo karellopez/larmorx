@@ -331,10 +331,20 @@ FSL-mm):
 ### 6.1 Sampling
 
 - The centre of rotation `c` is the **intensity-weighted centre of the test volume**, in
-  FSL-mm: `c = d ⊙ Σ (v − v_min)·idx / Σ (v − v_min)`, with `v_min` the volume's minimum, sums
-  over all voxels in double precision. **(observed** for the `.par` centre, which follows the
-  same rule for the reference, §10.3: subtracting the minimum matters when the background is
-  not 0.**)** If the denominator is below 1e−5 it is replaced by 1.
+  FSL-mm: `c = d ⊙ Σ (v − v_min)·idx / Σ (v − v_min)`, with `v_min` the volume's minimum.
+  **(observed** for the `.par` centre, which follows the same rule for the reference, §10.3:
+  subtracting the minimum matters when the background is not 0.**)** (spec writer, 2026-11-03;
+  FLIRT part 2's question 25: the earlier "sums over all voxels in double precision" was
+  incomplete) **Exactly as every centre of mass of FLIRT** (`specs/flirt.md` §8.1 step 3), both
+  mcflirt's centres (the rotations' centre of the test volume and the reference's for the `.par`
+  file) included: `v − v_min` computed in single precision, then converted to double; double
+  running sums `Σ(v − v_min)·i` per axis and `Σ(v − v_min)` over the voxels in z, y, x order,
+  flushed into the totals after every `max(1000, trunc(√N)) + 1` voxels (`N` the voxel count; each
+  block's sums restart at 0 and are added to the totals, the last block's at the end); each voxel
+  coordinate is its total over the total, then times the voxel size (in double). If the total is
+  below 1e−5 in magnitude it counts as 1, with `WARNING::in calculating COG, total = 0.0` on
+  standard error. The blocks and the single-precision subtraction change only the centre's last
+  bits (and so, at most, the last printed digits of the `.par` file and of the matrices).
 - The voxel-to-voxel map is `B = Dv⁻¹ · M⁻¹ · Dg` (`Dv = diag(d, 1)`, `Dg = diag(s, s, s, 1)`),
   computed in double, then each entry rounded to float32: `p = B·(x, y, z, 1)` is the test
   voxel position of reference grid point `(x, y, z)`.

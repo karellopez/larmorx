@@ -112,7 +112,7 @@ impl<'a, 'w> TopupCf<'a, 'w> {
             f64::from(scans.zdim()),
         ];
         let ksp = knot_spacing(warpres, &vxs);
-        let field = SplineField::new(&size, &vxs, &ksp, sporder as i32, nthr)?;
+        let field = SplineField::new_counted(&size, &vxs, &ksp, sporder as i32, nthr, mode.fix())?;
         let mut cf = TopupCf {
             sm,
             field,
@@ -225,7 +225,15 @@ impl<'a, 'w> TopupCf<'a, 'w> {
         let size = self.sm.image_size(self.con, SizeType::Target)?;
         let vxs = self.sm.image_vxs(self.con, SizeType::Target)?;
         let ksp = knot_spacing(self.wr, &vxs);
-        let f = SplineField::new(&size, &vxs, &ksp, self.field.order() as i32, self.nthr)?;
+        let f = SplineField::new_counted(
+            &size,
+            &vxs,
+            &ksp,
+            self.field.order() as i32,
+            self.nthr,
+            self.mode.fix(),
+        )?;
+        self.note_fsl145(&f);
         let v = vol::grid(
             i64::from(size[0]),
             i64::from(size[1]),
@@ -233,6 +241,53 @@ impl<'a, 'w> TopupCf<'a, 'w> {
             [vxs[0] as f32, vxs[1] as f32, vxs[2] as f32],
         );
         Ok((f, v))
+    }
+
+    /// FSL-145: names a field (a level's or the output's) whose quadratic B-splines FSL lays
+    /// with fewer coefficients (an axis shorter than two knot spacings, or than one when the
+    /// spacing is 2: FSL's count does not grow there).
+    fn note_fsl145(&self, f: &SplineField) {
+        let [fsl, general] = f.coef_sizes_fsl_and_general();
+        if fsl == general {
+            return;
+        }
+        let g = |c: [u32; 3]| format!("{} x {} x {}", c[0], c[1], c[2]);
+        let detail = if self.mode.fix() {
+            format!(
+                "quadratic B-splines on an axis shorter than two knot spacings laid with their \
+                 full count, {} coefficients (FSL lays {}: its field is forced towards 0 at the \
+                 axis' far end)",
+                g(general),
+                g(fsl)
+            )
+        } else {
+            format!(
+                "quadratic B-splines on an axis shorter than two knot spacings laid with FSL's {} \
+                 coefficients (the full count is {}){}",
+                g(fsl),
+                g(general),
+                if fsl.contains(&1) {
+                    "; a refit to a single coefficient stops topup, as FSL's"
+                } else {
+                    ""
+                }
+            )
+        };
+        self.con.notice(&defects::FSL_145, &detail);
+    }
+
+    /// FSL-146: volumes displaced along an axis and others not.
+    fn note_fsl146(&self) {
+        self.con.notice(
+            &defects::FSL_146,
+            if self.mode.fix() {
+                "volumes encoded along different axes: the cost's own gradient (FSL's leaves out \
+                 of each axis' Jacobian term the volumes not encoded along it)"
+            } else {
+                "volumes encoded along different axes: each axis' Jacobian term of the gradient \
+                 over the volumes encoded along it only, as FSL's"
+            },
+        );
     }
 
     /// `SubSample(ss)`: the scans subsampled, the field fitted on the new grid from its values
@@ -747,6 +802,7 @@ impl NonlinCf for TopupCf<'_, '_> {
         if p.len() != self.npar() {
             return Err(topup_error("Topup_CF::cf: wrong size parameter vector p"));
         }
+        self.note_fsl145(&self.field);
         self.set_field_params(p)?;
         self.set_movement_params(p)?;
         let (mean, _, _, _, mask) = self.sm.means(self.con, &mut self.field, 2)?;
@@ -831,6 +887,13 @@ impl NonlinCf for TopupCf<'_, '_> {
             if self.sm.has_beta_of(self.con, i)? {
                 let b = vol::sub(&mean_beta, &self.sm.get_beta(self.con, i, &mut self.field)?)?;
                 vol::add_assign(abf1.as_mut().expect("beta"), &vol::mul(&b, &diff)?)?;
+            } else if hb {
+                // FSL-146: a volume not displaced along x (its beta 0) still has the mean's
+                // share, (mean_beta - 0) * diff, in the cost's gradient; FSL leaves it out.
+                self.note_fsl146();
+                if !self.mode.reproduce() {
+                    vol::add_assign(abf1.as_mut().expect("beta"), &vol::mul(&mean_beta, &diff)?)?;
+                }
             }
             if self.sm.has_gamma_of(self.con, i)? {
                 let c = vol::sub(
@@ -838,6 +901,15 @@ impl NonlinCf for TopupCf<'_, '_> {
                     &self.sm.get_gamma(self.con, i, &mut self.field)?,
                 )?;
                 vol::add_assign(abf2.as_mut().expect("gamma"), &vol::mul(&c, &diff)?)?;
+            } else if hg {
+                // FSL-146, along y.
+                self.note_fsl146();
+                if !self.mode.reproduce() {
+                    vol::add_assign(
+                        abf2.as_mut().expect("gamma"),
+                        &vol::mul(&mean_gamma, &diff)?,
+                    )?;
+                }
             }
         }
         let den = f64::from(n.wrapping_mul(m.wrapping_sub(1)));

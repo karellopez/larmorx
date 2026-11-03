@@ -1,0 +1,69 @@
+diff --git a/crates-nc/larmorx-nc-core/src/fdlibm.rs b/crates-nc/larmorx-nc-core/src/fdlibm.rs
+index 4bd6dcb..fbb2911 100644
+--- a/crates-nc/larmorx-nc-core/src/fdlibm.rs
++++ b/crates-nc/larmorx-nc-core/src/fdlibm.rs
+@@ -33,6 +33,9 @@ pub use double::{expm1, tanh};
+ 
+ /// glibc's `atan2f(y, x)` (`__ieee754_atan2f`).
+ pub fn atan2f(y: f32, x: f32) -> f32 {
++    if crate::dev_crtrig_is("atan") {
++        return larmorx_core::math::atan2(f64::from(y), f64::from(x)) as f32;
++    }
+     const TINY: f32 = 1.0e-30;
+     const PI_O_4: f32 = f32::from_bits(0x3f49_0fdb);
+     const PI_O_2: f32 = f32::from_bits(0x3fc9_0fdb);
+diff --git a/crates-nc/larmorx-nc-core/src/glibc_float.rs b/crates-nc/larmorx-nc-core/src/glibc_float.rs
+index bf61fa7..a4b3552 100644
+--- a/crates-nc/larmorx-nc-core/src/glibc_float.rs
++++ b/crates-nc/larmorx-nc-core/src/glibc_float.rs
+@@ -171,6 +171,9 @@ fn math_invalidf(x: f32) -> f32 {
+ /// glibc's `sinf` (x86-64, FMA build).
+ #[must_use]
+ pub fn sinf(y: f32) -> f32 {
++    if crate::dev_crtrig() {
++        return larmorx_core::math::sinf(y);
++    }
+     let x = f64::from(y);
+     let top = abstop12(y);
+     if top < PIO4_TOP12 {
+@@ -203,6 +206,9 @@ pub fn sinf(y: f32) -> f32 {
+ /// glibc's `cosf` (x86-64, FMA build).
+ #[must_use]
+ pub fn cosf(y: f32) -> f32 {
++    if crate::dev_crtrig() {
++        return larmorx_core::math::cosf(y);
++    }
+     let x = f64::from(y);
+     let top = abstop12(y);
+     if top < PIO4_TOP12 {
+@@ -235,6 +241,9 @@ pub fn cosf(y: f32) -> f32 {
+ /// glibc's `sincosf` (x86-64, FMA build): `(sin y, cos y)`.
+ #[must_use]
+ pub fn sincosf(y: f32) -> (f32, f32) {
++    if crate::dev_crtrig() {
++        return (larmorx_core::math::sinf(y), larmorx_core::math::cosf(y));
++    }
+     let x = f64::from(y);
+     let top = abstop12(y);
+     if top < PIO4_TOP12 {
+diff --git a/crates-nc/larmorx-nc-core/src/lib.rs b/crates-nc/larmorx-nc-core/src/lib.rs
+index fe65a84..ae20dbc 100644
+--- a/crates-nc/larmorx-nc-core/src/lib.rs
++++ b/crates-nc/larmorx-nc-core/src/lib.rs
+@@ -95,3 +95,16 @@ pub mod x87;
+ 
+ /// The version of the FSL release these translations follow.
+ pub const FSL_VERSION: &str = "6.0.7.23";
++
++/// Development hook (never committed in the source; `dev-patches/crtrig_variant.patch`):
++/// `LXNC_CRTRIG` set makes `sinf`, `cosf`, `sincosf` and `atan2f` the correctly rounded ones.
++pub fn dev_crtrig() -> bool {
++    dev_crtrig_is("sin")
++}
++
++/// `LXNC_CRTRIG` = `all`, `sin` (`sinf`, `cosf`, `sincosf`) or `atan` (`atan2f`).
++pub fn dev_crtrig_is(which: &str) -> bool {
++    static F: std::sync::OnceLock<String> = std::sync::OnceLock::new();
++    let v = F.get_or_init(|| std::env::var("LXNC_CRTRIG").unwrap_or_default());
++    v == "all" || v == which
++}

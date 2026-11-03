@@ -544,3 +544,140 @@ cache), the replica's in both modes `replica_runs.py`.
 - The coordinate programs' `-warp` (FNIRT's warp fields): refused until FSL's warp-field libraries
   are ported (`docs/next-steps.md`).
 - `standard_space_roi`, `flirt_average`, `epi_reg` (scripts of FSL's other programs).
+
+## The spec answers of 2026-11-03 (part 2's questions 1 to 20, from the source)
+
+Source facts behind `specs/flirt.md` §14's table of 2026-11-03 (FSL 6.0.7.23; the models in
+`validation/investigations/spec-answers-3/flirt_models.py`):
+
+- **makerot** calls miscmaths' `make_rot(ax*theta*M_PI/180, ctr, mat)` with the whole scaled axis:
+  `float theta = norm2(angl)`, `axis = angl/theta` (not renormalised), `x2 = (-axis(2), axis(1), 0)`
+  or `(1,0,0)` when `norm2(x2) <= 0`, `x3 = cross(x1,x2)/norm2`, `basischange * rotcore *
+  basischange.t()` with `cos(theta)`/`sin(theta)` of the float. The options are `Option<float>` and
+  `Option<std::vector<float>>`, so the angle, axis and centre are floats; FSL-76 is `ax /
+  sqrt(norm2(ax))`. FLIRT's own compositions use the same `make_rot` per axis (§3).
+- **avscale**: `decompose_aff(params, affmat, cor, rotmat2euler)`, `construct_rotmat_euler(params, 6,
+  rotmat)` (no centre: about the origin), `ans = affmat.i() * rotmat * skew * scale` (Armadillo's
+  four-factor chain evaluates `((A*B)*C)*D` for equal sizes), `newxfm = rotmat * skew * scale` with
+  `scale(2,2) = 1.0/params(8)`.
+- **The matrix reader** (miscmaths `read_ascii_matrix`): `skip_alpha` finds the first line whose
+  first token passes `isNumber` (`strtod` to the token's end); the columns are the token count of
+  that line plus a blank, minus 1; the rows the count of such lines from there; each row read by
+  `istringstream >> double` with a throw only on `eof()` (a failed stream leaves `newnum` as it is,
+  so the last value repeats; libstdc++'s `__convert_to_v` gives 0 and failbit for a partial parse,
+  `numeric_limits::max()` and failbit for `±HUGE_VAL`).
+- **Coordinate programs**: `parse_command_line` treats any `-` word that is not a no-argument
+  option as needing one (`if (n+1>=argc) { "Lacking argument"; break; }`); the interactive refusal's
+  text hard-codes the program name; std2imgcoord has no `isatty` test and its `oldstd == stdcoord`
+  (initially 0 with a fourth component 0 against 1) only on standard input. `-warp` goes through
+  `FnirtFileReader::Read` (`common_read`: `read_volume4D`, `tsize() != 3` throws), caught by
+  `catch(...)`.
+- **midtrans**: `if (fabs(trans.Determinant()) < 1e-6)` (false for NaN and inf);
+  `ColumnVector temp_orig(4)` (Armadillo zero-initialises) printed whole without a template,
+  replaced by `cog()`'s 3-vector with one; `Pxx_av` printed in `avg_affine_with_procrustes`' stage
+  1.
+- **pointflirt**: `if (x.Nrows() > x.Ncols()) { x = x.t(); y = y.t(); }`; with two 0 × 0 matrices
+  `n = 0` passes the count test and the later submatrix copies of the empty products crash
+  (FSL-204).
+- **applyxfm4D**: `call_fmrib_main(dtype(iname), ...)` reads the input's header first;
+  `affine_transform(invol[m], dummy, affmat, 0, true)` directly (no `filter_image` blur).
+- **flirt**: `search_cost` lowers `verbose` by 2 and restores it; `optimise_strategy3` lowers it by 2
+  again from the restored value for the free optimisations (so the same lowered level);
+  `safe_save_volume` saves only when `!nosave` (`-debugsave`), `costs` at the lowered `verbose>=4`
+  after the fine grid and again at `>=3` after the threshold step; `Previous scale used` inside
+  `usrsetscale`'s new-pair branch; `set_param_tols` (all 12 `tolerance(i)`) is called by
+  `set_perturbations` (measurecost, optimise), `search_cost` and both optimise strategies;
+  `measure_cost` calls `costfn(Matrix)`, which prints nothing. In `optimise_strategy3`, `premat`
+  is the matrix after `vector2affine(params_8, dof, matresult)`, before `optimise_strategy1`
+  decomposes it (`affmat2vector`) and `optimise()` composes it again for `Starting with :` and the
+  evaluations. `construct_rotmat_quat` returns the identity before adding any translation when `w2
+  < 0`; `compose_aff` then applies the scale (n > 6).
+- **-debug**: `setcostfntype`'s five lines; `set_bbr_seg` returns 1 without boundary points
+  (`no_coords = 0`, so `is_bbr_set()` is false and the post line prints 0); the final call runs
+  `measurecost 12 U:1 ... rel 8`.
+- **-2D**: no `mode2D` condition on the sform messages; `double_end_slices` (one-slice images)
+  builds a new volume without the forms.
+- **Questions 21 to 37 (part, relay 3b's first half)**: the weight product in `costfns.cc`
+  (`weight=wval*refweight(x,y,z); weight*=o1/smoothx; ...; if (weight<0.0) weight=0.0;`);
+  `calc_cog` (newimage) is the one centre of mass for FLIRT and mcflirt (`Costfn`'s `testCog`,
+  mcflirt's `refvol.cog`), blocks of `nlim = max(1000, (int64)sqrt(nvoxels))` flushed when `n >
+  nlim`; `raw_affine_transform` completes `vout`'s forms (sform from qform, qform from sform,
+  both from `vin.sform_mat()` (else qform) `* iaffbig`); `-applyxfm` resamples into a
+  `ShadowVolume` of the 4D output, whose header the completion does not reach; `call_fmrib_main`
+  maps uint8 to `fmrib_main<char>`; `measure_cost` and `optimise_strategy1` print `Erroneous dof`,
+  `optimise_strategy0` does not; nearest neighbour is `MISCMATHS::round` then `operator()(ix,iy,iz,
+  ep)` with `extraslice`'s `-1`/`size()` clamp; Armadillo 14.2.1's `inv()` (`op_inv_gen_full::
+  apply_direct`) fails only on `getrf`/`trtri` `info != 0` or a zero diagonal (no rcond test in the
+  default path; the symmetric path needs 100 rows); `inv(A)*v` is Armadillo's `solve` (`dgesv`).
+  BBR: `costfn()` calls `setcostfntype(currentcostfn)` before every evaluation, which calls
+  `set_bbr_seg` again while `is_bbr_set()` (`no_coords > 0`) is false.
+
+## The spec answers of 2026-11-03 (part 2's questions 22 to 25 and 38, from the source)
+
+Relay 3b of the spec answers (`validation/investigations/spec-answers-3/flirt_models_3b.py`,
+README "FLIRT, questions 22 to 25 and 38"); FSL 6.0.7.23's source:
+
+- **Q22, the sinc's sine.** `kernel.cc`'s `sincfn(float x)` computes `sin(y)/y` with `float y =
+  M_PI*x`: C++'s `sin(float)` is `sinf`, glibc 2.35's (`__sinf_fma` on this CPU), the code the nc
+  core already carries (`glibc_float::sinf`, Arm v19.11). The FLIRT replica is FSL's (it calls it);
+  the clean-room original calls a correctly rounded `sinf`, which accounts exactly for its 32,052
+  voxels on `real/interp-sinc` and for its applyxfm4D sinc differences on float images.
+- **Q22, the spline.** `volume<T>::splineinterpolate` → `Splinterpolator<T>` (`splinterpolator.h`:
+  `calc_coef` copies the data as `T`, `deconv_along` per non-singleton axis, `SplineColumn::Deconv`
+  in double, `Set` back to `T`; `value_at` sums `coef·w_x·wgt2` in double with `wgt2 = (w_z)·w_y`),
+  `static_cast<T>` then `static_cast<float>`; `extraslice` maps to `Constant` (edge coefficient
+  repeated). So `volume<double>` (applyxfm4D's double images) filters in double and rounds the value
+  to float; `volume<float>` stores each pass in float. applyxfm4D's 4D path interpolates
+  `invol[m]`, a `ShadowVolume` whose interpolation settings delegate to the owner; no difference
+  from FLIRT's `-applyxfm` path but the type.
+- **Q23, `leastsq`.** `costfns.cc`'s `p_leastsquares`, `p_leastsquares_smoothed` and
+  `p_leastsquares_fully_weighted`: `sum`/`num` per row, `sumA`/`numA` per slice, `sumB`/`numB`
+  total (all `float`; the unsmoothed count a `long int`), `sum += weight*(valx-valy)*(valx-valy)`
+  (left to right), the weighted form's `weight = wval*refweight(x,y,z)` then the edge factors
+  (`weight *= o1/smoothx`, ...), `lsq = sum/num` when `num > 1`, else `(Max(max,max) − Min(min,
+  min))²`; chosen by `Costfn::cost` (`LeastSq`: smoothed when `smoothsize > 0`, the fully weighted
+  form whenever weights are given).
+- **Q24, the ties.** miscmaths' line search compares with `<` and `>` only; with every cost equal or
+  NaN no step is accepted. Where the clean-room original leaves FSL's trace on the FSL-91 and FSL-92
+  cases is `rotmat2euler`'s `atan2f` (the nc core's `fdlibm::atan2f`, glibc's
+  `__ieee754_atan2f`): measured with a development hook on the replica
+  (`crates-nc/larmorx-nc-flirt/dev-patches/crtrig_variant.patch`, `LXNC_CRTRIG=sin|atan|all`, never
+  committed in the source): with a correctly rounded `atan2f` the replica leaves FSL's trace at the
+  same line as the original (66,128 of `real/weights-empty-refweight`'s) and then follows the
+  original for 21,353 more lines; with correctly rounded `sinf`/`cosf` only it stays FSL's. On
+  `real/dof6` the correctly rounded `sinf`/`cosf` (`make_rot`'s `sincosf`) part at line 4,656 (the
+  original's 3,983rd evaluation), `atan2f` alone at 4,814. The skew's print-only sign three lines
+  before (FSL `-0.000000`, the original `0.000000`, `decompose_aff`'s `c = dot(y0,z)/sz` near 0) is
+  not from these functions (the hooked replica keeps FSL's sign): the original's composition or
+  decomposition arithmetic differs from `compose_aff`/`decompose_aff`'s somewhere.
+- **Q25, mcflirt's centres.** mcflirt's centres are `volume<T>::cog("scaled_mm")` → `calc_cog`
+  (`newimage.cc`): `val = (double)(vol(x,y,z) - vmin)` (the subtraction in `T`), `nlim =
+  max(1000, (int64_t)sqrt(nvoxels))`, the flush when `++n > nlim`, `WARNING::in calculating COG,
+  total = 0.0` below 1e-5; then `sampling_mat() * v`. Both the cost function's `testCog` (the
+  rotations' centre, `Costfn`'s constructor) and `refvol.cog` (`mcflirt.cc`'s `.par`
+  decompositions) use it.
+- **Q38, the levels.** `flirt.cc`'s pyramid: `resample_refvol(refvol, min_sampling)` →
+  `filter_resamp_blur` → `isotropic_resample` (`iso2aniso = diag(step)`, set forms only), then
+  `refvol_2 = subsample_by_2(refvol)` when `min_sampling < 1.9` (else a copy), `refvol_4` from
+  `refvol_2` below 3.9, `refvol_8` from `refvol_4` below 7.9 (`subsample_by_2`: sizes `(n+1)/2`,
+  `setdims(2·d)`, `sub2mat = diag(2,2,2,1)` centred, set forms only; `copyproperties` keeps the
+  unset ones); the debug saves follow (`save_volume(refvol_8, "refvol_8")`, ...). Without weights
+  `global_refweight` is an empty `volume<float>`, filtered to the 1 × 1 × 1 zero volume whose
+  `pixdim[4..7]` are newimage's defaults, 1. BBR without boundary points: `costfn()` re-runs
+  `set_bbr_seg` before each evaluation, the cost is NaN, `optimise` keeps the start, the final
+  matrix is the `-init` one, `final_transform` resamples with it (`affine_transform`; `bbr_resamp`
+  only with a field map); the debug call's `bbr` evaluation writes `debugvol` (zeros).
+
+## The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-111** (`applyxfm4d.rs`): a `DT_UNSIGNED_CHAR` file (not int8) is templated on `u8` in the
+  default mode (`typed_main::<u8>`): read as stored, resampled with float spline coefficients (no
+  FSL-79 comparison in that type), FSL-09's rounding clamped to 0..255. Beside it, volume by
+  volume (`signed_bytes`), the signed reading FSL's `char` template makes is resampled as the
+  default resamples an int8 image (its FSL-79 and FSL-09 notices kept); FSL-111 is named when the
+  bytes written differ. `reproduce` keeps the `i8` template (FSL's). The cost: twice the
+  resampling for uint8 inputs in the default mode only.
+- **FSL-204** (`pointflirt.rs`, `procrustes`): `n == 0` with both matrices 0 x 0 (after the
+  `--vox` and `-v` steps, whose lines FSL prints first) is refused in both modes (`End::Refuse`,
+  `larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1), where
+  FSL's later submatrix copies of the empty products crash (signal 11).

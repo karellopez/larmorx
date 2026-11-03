@@ -28,6 +28,9 @@ const EXAMPLES: &str = "pointflirt -i <invol coords>  -r <refvol coords> -o <out
 
 enum End {
     Exit(u8),
+    /// The replica's refusal of what crashes FSL (`larmorx-nc: error: pointflirt: ...`, exit
+    /// 1).
+    Refuse(String),
     Terminate {
         printed: String,
         type_name: &'static str,
@@ -207,6 +210,14 @@ fn procrustes(
             print_mat(&y)
         ));
     }
+    if n == 0 && x.rows() == 0 && y.rows() == 0 {
+        // FSL-204 (rule B, both modes): two empty matrices (both files empty or missing) pass
+        // the count test; the submatrix copies of their empty products then crash FSL
+        // (signal 11), after its lines above. Never reproduced.
+        return Err(End::Refuse(
+            "pointflirt: no points in the coordinate files (FSL-204)".to_owned(),
+        ));
+    }
     if x.rows() != 3 || y.rows() != 3 {
         // The 12 x 12 system's blocks need three coordinates per point. FSL reads its
         // submatrices of x·yᵀ unchecked (past their elements when there are fewer than three
@@ -339,6 +350,10 @@ pub fn run(
     let code = match body(args, settings, &mut o, &mut e) {
         Ok(()) => 0,
         Err(End::Exit(c)) => c,
+        Err(End::Refuse(what)) => {
+            e.push_str(&format!("{PREFIX}: error: {what}\n"));
+            1
+        }
         Err(End::Terminate {
             printed,
             type_name,

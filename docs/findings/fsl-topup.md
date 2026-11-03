@@ -196,6 +196,137 @@ and FSL-141 to FSL-143 with their measurements; the behaviour and what larmorx d
   where AᵀA has `2*sf1`; measurement `validation/investigations/fsl-topup/vb_prior.py` (8 × 6 × 5
   grid: smallest eigenvalue -2.7 against +0.40).
 
+## The spec answers of 2026-11-03 (spec writer; topup's clean-room questions)
+
+What the clean-room original's questions (`specs/topup.md` §13) needed from the source, with the
+routines named (the spec states the behaviour only). Models: `validation/investigations/spec-answers-3/`.
+
+- **FSL-201, the movement derivatives** (*read*, *verified* by `rotation_model.py`, *measured* by
+  `measure_fsl201.py`). `TopupScan::GetMovementDerivative` builds `T1 = S⁻¹ mp_to_matrix(_mp)⁻¹ S`
+  and `T2` with `p(i+1) += tiny` (`tiny` 1e-4 translations, 1e-5 rotations), `S` the fresh target
+  volume's `sampling_mat()`, and per voxel `float(sf[0]*(y2(1)-y1(1))*_derivs(i,j,k,0) + ...)`,
+  then `rval /= tiny; rval *= GetJacobian(field)`: a forward difference of the positions.
+  `mp_to_matrix` is `MovePar2Matrix(mp, *_subsamp)` → `MISCMATHS::construct_rotmat_euler` →
+  three `make_rot` calls, each with **`float theta = norm2(angl)`**, `axis = angl/theta` (so the
+  axis is not a unit vector: `q = r/fl(|r|)`), `rotcore(1,1) = cos(theta)` with `theta` a float
+  (`std::cos(float)`: single-precision cosine and sine), `basischange * rotcore *
+  basischange.t()` giving the axis entry `q²`. The rounding divided by 1e-5 is the defect;
+  `TopupCF::grad` (`sum_of_prod(diff, deriv, mask)`), `TopupCF::hess`'s `interaction` block and
+  `movement_hessian` all use it. The replica's default (`scan.rs`, `exact_movement_derivative`)
+  differentiates `Rᵀ (y − c − t) + c` analytically with `larmorx_core::math::{sin, cos}`;
+  `reproduce` keeps FSL's difference. `GetNumericalMovementDerivative` (debugging only, never
+  called) differences the images instead.
+- **The refit's penalty** (*read*, *verified* by `refit_model.py`). `splinefield::Set` calls
+  `get_coefs_one_dim` per axis: `M = (AS.t()*AS).i()*A.t()` with `AS = A & 0.005*S` and
+  `get_s_matrix(isz, csz)`, whose only non-zero rows are row 1 `(2, −1, 0, …, −1)` and row
+  `isz` `(−1, 0, …, −1, 2)`: the two wrap-around second differences (the clean-room
+  implementer's finding 11, right). It looks like an incomplete periodic second-difference
+  matrix (`DispVec::GetS_Matrix` fills every row), but its effect is a small regularisation of
+  the end coefficients: kept (rule C, `specs/topup.md` §10.2).
+- **When the field is refitted** (*read*). `TopupCF::SubSample(ss)` when `ss != _sm.SubSampling()`:
+  the field evaluated at `(step−1)/2 + j·step` into a `volume<float>`, `new_field.Set(vol)` with
+  `ksp = round(_wr / vxs)` (`MISCMATHS::round`: half away from zero; 1 when 0), `_wr` still the
+  previous level's; `TopupCF::SetWarpResolution(wr)` when `wr != _wr` (doubles compared), even if
+  the new `ksp` equals the old: `_field.AsVolume(vol)` (float) and `new_field.Set(vol)`. topup's
+  level loop calls `SubSample`, `Smooth`, `SetWarpResolution`, `SetMovementsFixed`,
+  `SetRegularisation` in that order; after the last level `Smooth(0.0); SubSample(1)` only when
+  its subsampling is above 1 (the clean-room implementer's finding 12, right).
+- **FSL-133 and the folded lines** (*read*, *verified* by `lsr_model.py` on FSL's probe runs).
+  `DispVec::GetK_Matrix` fills `K` row by row from `get_non_zero_entries_of_row(i)`: `i1 =
+  _ca.Find(i-0.5)`, `i2 = _ca.Find(i+0.5)`, the crossings' fractions `x1`, `x2`, the entries
+  by the cases `i1 == i2`, `i2-i1 == 1`, `> 1`, columns by `IndexInRange` (circular, right).
+  `CircularArray::Find` walks from `ceil(x)` (up while `x > (*this)[i]`, down while `x <
+  (*this)[i-1]`); `operator[](int i)` returns `i + _sf*_v[i % _n]` with `_n` unsigned, so a
+  negative `i` reads `_v[(i + 2³²) mod n]` (FSL-133). Under a folded mapping `Find` stops at
+  the first crossing of its walk: `K` is then not the overlap of every folded part (rule C).
+  `lsr_resample` uses `GetS_Matrix(false)` (the unwrapped second differences).
+- **The axis entry on `--rbmout`** (*read*). `TopupCF::WriteRigidBodyMatrices` writes
+  `mp_to_matrix(_mp)` about the full-resolution regridded image's centre: the diagonal's 5e-8 the
+  clean-room implementer saw (finding 13) is `q²`.
+- **The quadratic bending energy** (*read*, *verified* by `bending_model.py` against FSL's
+  `--debug=3` Hessians of reproducer 10753). `splinefield::BendEnergy`/`BendEnergyGrad`
+  (`calculate_bender_AtAb` → `calculate_AtAb`) and `BendEnergyHess` (`calculate_memen_bender_H`)
+  both use `Memen_H_Helper`: `Spline3D::MulByOther` of two differentiated splines summed over a
+  "really large FOV" (`1000 * ksp`), so `R` is translation-invariant, edges ignored; cost,
+  gradient and Hessian share it. The 1-D kernel `Spline1D::spline_kernel` samples
+  `kernel_value((i - coa) / ksp)` at `spline_size()` points (`(order+1)*ksp - 1`, or
+  `(order+1)*ksp` for an even order with an odd spacing): the outer knots of an even-spacing
+  quadratic (`|x| = 1.5 ksp`) are outside the array, the inner ones (`|x| = 0.5 ksp`) take
+  `kernel_value`'s "smack on inner discontinuity" value `-0.5 / ksp²`. The membrane energy's
+  cost and gradient (`calculate_memen_AtAb`) never divide by `vxs` (per voxel); its Hessian does
+  (FSL-117).
+- **The quadratic count** (*read*, *verified* by `quad_count.py`). `Spline1D::NCoef`: `nc = isz
+  / ksp + order/2; while (OffsetIntoField(nc) - KernelSize()/2 < isz-1) nc++;` with
+  `OffsetIntoField` an `int` and `KernelSize()` unsigned: the subtraction wraps when
+  `(nc-1)*ksp < KernelSize()/2`, so the loop does not run (FSL-145): 1 coefficient when `isz <
+  ksp`, 2 when `ksp <= isz < 2 ksp`. With one coefficient, `SubSample`/`SetWarpResolution`'s
+  refit indexes the penalty rows at `C - 2 = -1`: Armadillo's `Mat::operator(): index out of
+  bounds`, caught as "Error occurred when preparing to run ...". `OffsetIntoField(c) = (c -
+  order/2) * ksp` (both orders: `order/2 = 1`), `c` for `ksp == 1`.
+- **The image spline's prefilter** (*read*, *verified* by `short_axis_model.py`).
+  `Splinterpolator::SplineColumn::Deconv` with `init_fwd_sweep`/`init_bwd_sweep` and `prec =
+  1e-8`: `n = (unsigned)(log(prec)/log(|z|) + 1.5)` = 15, capped at the column size; periodic:
+  `iv = c[0] + Σ_{i=1}^{n-1} z^i c[sz - i]` and `(z c[sz-1] + Σ_{i=1}^{n-1} z^{i+1} c[i-1]) /
+  (z^{n+1} - 1)`; `Mirror`/`Constant`/`Zeros` share the mirrored start (a field image's
+  `volume_deffield_2_jacobian`: newimage's default `zeropad` → `Zeros`, coefficients beyond the
+  image 0). Singleton dimensions are not deconvolved (`calc_coef`). topup's images are
+  `periodic` along every axis (`TopupScan` constructor: `setextrapolationmethod(periodic)`,
+  validity per the phase encoding); applytopup's scans the same.
+- **FSL-134's other shape** (*read*, *verified* by `other_shape_model.py`). `jac_resample`:
+  `df[0] = topupfile.FieldAsVolume()` assigns through a `ShadowVolume`, `volume::copydata`
+  (same `nElements`, storage order; another count: `Attempted to copydata with non-matching
+  sizes`); `deffield2jacobian(xcomp, ycomp, zcomp, jac)` loops over the splinefield's
+  `FieldSz_*` writing `jac(i,j,k)`: out-of-bounds writes go to the zero-pad extrapolation value
+  (`extrapolate` returns `extrapparams::extrapval`, reset each call; `jac` copies `tmp`'s
+  `zeropad`), so nothing past the array is written. The field-image branch (`catch
+  TopupFileIOException`) scales `ycomp` by `ovol.xdim()` (FSL-134) and
+  `volume_deffield_2_jacobian` constructs its size-mismatch `ApplyTopupException` without
+  throwing it.
+- **FSL-146** (*read*). `TopupCF::grad`: `if (_sm.HasBeta(i)) *(abf[1]) += (mean_beta -
+  _sm.GetBeta(i,_field)) * diff;` (and `HasGamma(i)` for `abf[2]`): per-scan tests, while
+  `TopupScanManager::update` builds `_mean_beta` over every scan (`GetBeta` is 0 without an x
+  component) and `TopupCF::hess` (and the movement-field `interaction`) test the manager's
+  `HasBeta()` (any scan), so every scan enters the Hessian.
+- **Smaller confirmations** (*read*). The mask's frame in `TopupScan::update` (z always; the y
+  rows for an x encoding, the x columns for a y encoding; none oblique); the displacement uses
+  `_orig->xdim()`/`ydim()` at every level; the outputs' `Smooth(0.0)` / `SubSample(1)` only when
+  the last level's subsampling exceeds 1 (`topup.cpp`); `Lambda()` = `_lssd * _lambda` with
+  `_lssd` set by the last `cf()`; `levmar`'s `SolveForx` failure (`DiagPrecond`: "Cannot
+  condition singular matrix") is an unsuccessful attempt without a cost evaluation;
+  `gaussian_kernel1D` returns the identity for `sigma <= 1e-6` (FSL-125); `--estmov`'s default
+  `vector<int>(1, 100)`; `TopupFileIOException` prefixes `TopupFileIO::`; the configuration
+  reader's `std::exception` is printed as `"\n" << e.what()` (FSL-121's empty line);
+  `TopupCF::WriteMaskedDiff` fills a volume of `ImageSize(SizeType::Subsampled)` at the target
+  grid's indices; `row_col_is_alright` skips a line with any masked-out voxel and
+  `zero_out_rows_cols` zeroes it after every collection; `vb_resample_3D`'s order (`Lii` start
+  at `k_0 θ_0 = l_0 τ_0 = 1`, `φ`, `tau_update` with the previous `Lambda`, `mu_update` in
+  storage order).
+
+### The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-144** (`applytopup.rs`, `fsl144_check`): `--method=jac` with any `--inindex` row whose
+  third element is not 0 is refused by default before the field is read (`Refuse`, exit 1);
+  `reproduce` names it and runs FSL's `jac_resample` (z displacement 0).
+- **FSL-145** (`larmorx-nc-core` basisfield): `Spline1D` carries `general` (default `false`, FSL's
+  `NCoef`); `ncoef_general` evaluates `NCoef`'s test `OffsetIntoField(nc) - KernelSize()/2 <
+  isz-1` in signed arithmetic. FSL's unsigned test wraps only when the starting count `isz/ksp +
+  1` gives `(isz/ksp) * ksp < KernelSize()/2`: every `isz < 2 ksp` for `ksp >= 3`, but only
+  `isz = 1` for `ksp = 2` (`KernelSize()/2 = 2`): axes of 2 and 3 voxels at spacing 2 get the
+  general count (checked on FSL: `quad_count.py`'s spacing-2 probes). `SplineField::new_counted`
+  passes the flag to every `Spline3D` it builds (`spline3`), so `JtJ`, `Jte`, the energies and
+  their Hessians count as the field does; topup's `TopupCF` builds its fields with
+  `mode.fix()` and names FSL-145 (`note_fsl145`) when a level's (`cf`) or a new grid's
+  (`new_field`) counts differ. `get_coefs_one_dim` with `csz < 2` throws FSL's
+  `std::out_of_range` (`Mat::operator(): index out of bounds`, `get_s_matrix`'s `S(1,2)`), which
+  topup reports as FSL does (`Error occurred when preparing to run topup`); the replica's text
+  before (`fewer than 2 coefficients`) was not FSL's. applytopup's `read_coef_file` accepts, by
+  default, a file of the general count when FSL's does not fit (`TopupFileReader::fsl145`).
+- **FSL-146** (`costfn.rs`, `grad`): for a scan without `HasBeta(i)` (or `HasGamma(i)`) while the
+  manager has betas, the default adds `mean_beta * diff` to `abf[1]` (`mean_gamma * diff` to
+  `abf[2]`), the cost's own term; `reproduce` skips it as `TopupCF::grad` does. Named whenever
+  such a scan enters the gradient.
+- **FSL-201**: relay 1a's switch, unchanged.
+
 ## Kept as FSL's (not registered)
 
 As `specs/topup.md` §10.2 lists (rule C): `--iout`'s `_mean` naming, the silent log, `--rbmout`'s

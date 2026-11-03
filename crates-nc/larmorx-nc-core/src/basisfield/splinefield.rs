@@ -104,6 +104,9 @@ pub struct SplineField {
     sp: Spline3D,
     dsp: [Spline3D; 3],
     nthr: u32,
+    /// larmorx (FSL-145 corrected): quadratic B-splines laid with their full count on every
+    /// axis ([`SplineField::new_counted`]); `false` is FSL's layout.
+    general: bool,
 }
 
 impl SplineField {
@@ -116,6 +119,21 @@ impl SplineField {
         ksp: &[u32],
         order: i32,
         nthr: u32,
+    ) -> Result<SplineField, FslError> {
+        SplineField::new_counted(psz, pvxs, ksp, order, nthr, false)
+    }
+
+    /// [`SplineField::new`] with the quadratic B-splines' coefficient count corrected on axes
+    /// shorter than two knot spacings (`general`, FSL-145: FSL's count does not grow there) or
+    /// FSL's (`false`). Every spline the field builds for its products, gradients and Hessians
+    /// counts the same way.
+    pub fn new_counted(
+        psz: &[u32],
+        pvxs: &[f64],
+        ksp: &[u32],
+        order: i32,
+        nthr: u32,
+        general: bool,
     ) -> Result<SplineField, FslError> {
         // basisfield::basisfield
         if psz.is_empty() || psz.len() > 3 {
@@ -147,7 +165,7 @@ impl SplineField {
         }
         let k3 = [ksp[0], ksp[1], ksp[2]];
         // `_sp(order, ksp)`: Spline1D refuses an order other than 2 or 3 first.
-        let sp = Spline3D::new(order as u32, k3, [0, 0, 0])?;
+        let sp = Spline3D::new(order as u32, k3, [0, 0, 0])?.with_general_count(general);
         if !(2..=3).contains(&order) {
             return Err(basisfield_error(
                 "splinefield::splinefield: Only quadratic and cubic splines implemented yet",
@@ -159,9 +177,9 @@ impl SplineField {
             ));
         }
         let dsp = [
-            Spline3D::new(order as u32, k3, [1, 0, 0])?,
-            Spline3D::new(order as u32, k3, [0, 1, 0])?,
-            Spline3D::new(order as u32, k3, [0, 0, 1])?,
+            Spline3D::new(order as u32, k3, [1, 0, 0])?.with_general_count(general),
+            Spline3D::new(order as u32, k3, [0, 1, 0])?.with_general_count(general),
+            Spline3D::new(order as u32, k3, [0, 0, 1])?.with_general_count(general),
         ];
         let mut f = SplineField {
             ndim,
@@ -173,9 +191,39 @@ impl SplineField {
             sp,
             dsp,
             nthr,
+            general,
         };
         f.coef = vec![0.0; f.coef_sz() as usize];
         Ok(f)
+    }
+
+    /// `Spline3D(order, ksp, deriv)` counting coefficients as this field does (FSL-145).
+    fn spline3(&self, order: u32, ksp: [u32; 3], deriv: [u32; 3]) -> Result<Spline3D, FslError> {
+        Ok(Spline3D::new(order, ksp, deriv)?.with_general_count(self.general))
+    }
+
+    /// Whether the quadratic coefficient count is the corrected one (FSL-145).
+    pub fn general_count(&self) -> bool {
+        self.general
+    }
+
+    /// The coefficients per direction FSL lays (`[0]`) and the corrected count (`[1]`): they
+    /// differ only for quadratic B-splines on an axis shorter than two knot spacings (one when
+    /// the spacing is 2), FSL-145.
+    pub fn coef_sizes_fsl_and_general(&self) -> [[u32; 3]; 2] {
+        let n = |general: bool| {
+            let mut c = [1u32; 3];
+            for (d, cd) in c.iter_mut().enumerate().take(self.ndim as usize) {
+                let s = self.sp.dim(d);
+                *cd = if general {
+                    s.ncoef_general(self.sz[d])
+                } else {
+                    s.ncoef_fsl(self.sz[d])
+                };
+            }
+            c
+        };
+        [n(false), n(true)]
     }
 
     pub fn ndim(&self) -> u32 {
@@ -312,7 +360,7 @@ impl SplineField {
         if fi != FieldIndex::Field {
             deriv[fi as usize - 1] = 1;
         }
-        Spline3D::new(self.sp.order(), self.sp.knot_spacings(), deriv)
+        self.spline3(self.sp.order(), self.sp.knot_spacings(), deriv)
     }
 
     /// `Peek(double x, double y, double z, fi)`: the field (or a derivative) at a point given
@@ -517,7 +565,7 @@ impl SplineField {
             "splinefield::Jte: Image-Field dimensionality mismatch",
         )?;
         let prodima = hadamard(ima1, ima2, mask, self.field_sz() as usize);
-        let spline = Spline3D::new(
+        let spline = self.spline3(
             self.sp.order(),
             self.sp.knot_spacings(),
             [deriv[0], deriv[1], deriv[2]],
@@ -566,7 +614,7 @@ impl SplineField {
                 .collect(),
             None => ima.data[..n].to_vec(),
         };
-        let spline = Spline3D::new(
+        let spline = self.spline3(
             self.sp.order(),
             self.sp.knot_spacings(),
             [deriv[0], deriv[1], deriv[2]],
@@ -616,7 +664,7 @@ impl SplineField {
         if deriv == [0, 0, 0] {
             Ok(make_fully_symmetric_jtj(&self.sp, csz, &prodima, self.sz))
         } else {
-            let sp = Spline3D::new(
+            let sp = self.spline3(
                 self.sp.order(),
                 self.sp.knot_spacings(),
                 [deriv[0], deriv[1], deriv[2]],
@@ -663,8 +711,8 @@ impl SplineField {
         let prodima = hadamard(ima1, ima2, mask, self.field_sz() as usize);
         let csz = self.coef_size();
         let k = self.sp.knot_spacings();
-        let sp1 = Spline3D::new(self.sp.order(), k, [deriv1[0], deriv1[1], deriv1[2]])?;
-        let sp2 = Spline3D::new(self.sp.order(), k, [deriv2[0], deriv2[1], deriv2[2]])?;
+        let sp1 = self.spline3(self.sp.order(), k, [deriv1[0], deriv1[1], deriv1[2]])?;
+        let sp2 = self.spline3(self.sp.order(), k, [deriv2[0], deriv2[1], deriv2[2]])?;
         Ok(make_asymmetric_jtj(&sp1, csz, &sp2, csz, &prodima, self.sz))
     }
 
@@ -710,12 +758,12 @@ impl SplineField {
     pub fn mem_energy_grad(&self) -> Result<Vec<f64>, FslError> {
         let lksp = self.ksp();
         let ord = self.order();
-        let sp1 = Spline3D::new(ord, lksp, [1, 0, 0])?;
+        let sp1 = self.spline3(ord, lksp, [1, 0, 0])?;
         let mut sum = MemenHelper::new(&sp1)?;
         for d in 1..3 {
             let mut deriv = [0u32; 3];
             deriv[d] = 1;
-            let sp2 = Spline3D::new(ord, lksp, deriv)?;
+            let sp2 = self.spline3(ord, lksp, deriv)?;
             sum.add(&MemenHelper::new(&sp2)?)?;
         }
         let mut grad = calculate_atab(&self.coef, self.sz, self.coef_size(), &sp1, &sum);
@@ -728,7 +776,7 @@ impl SplineField {
     pub fn bend_energy_grad(&self) -> Result<Vec<f64>, FslError> {
         let lksp = self.ksp();
         let ord = self.order();
-        let sp = Spline3D::new(ord, lksp, [0, 0, 0])?;
+        let sp = self.spline3(ord, lksp, [0, 0, 0])?;
         let mut sum = MemenHelper::new(&sp)?;
         sum.scale(0.0);
         for d1 in 0..3 {
@@ -736,7 +784,7 @@ impl SplineField {
                 let mut deriv = [0u32; 3];
                 deriv[d1] += 1;
                 deriv[d2] += 1;
-                let mut spd = Spline3D::new(ord, lksp, deriv)?;
+                let mut spd = self.spline3(ord, lksp, deriv)?;
                 spd.divide(self.vxs[d1] * self.vxs[d2])?;
                 let mut h = MemenHelper::new(&spd)?;
                 if d1 != d2 {
@@ -794,7 +842,7 @@ impl SplineField {
                 for d in 0..3 {
                     let mut deriv = [0u32; 3];
                     deriv[d] = 1;
-                    let mut spd = Spline3D::new(ord, lksp, deriv)?;
+                    let mut spd = self.spline3(ord, lksp, deriv)?;
                     if et == EnergyType::MemEn {
                         spd.divide(vxs[d])?;
                     }
@@ -809,7 +857,7 @@ impl SplineField {
                         let mut deriv = [0u32; 3];
                         deriv[d1] += 1;
                         deriv[d2] += 1;
-                        let mut spd = Spline3D::new(ord, lksp, deriv)?;
+                        let mut spd = self.spline3(ord, lksp, deriv)?;
                         spd.divide(vxs[d1] * vxs[d2])?;
                         let mut h = MemenHelper::new(&spd)?;
                         h.scale(if d1 == d2 { 2.0 } else { 4.0 });
@@ -818,7 +866,7 @@ impl SplineField {
                 }
             }
         }
-        let sp = Spline3D::new(ord, lksp, [0, 0, 0])?;
+        let sp = self.spline3(ord, lksp, [0, 0, 0])?;
         let ncoef = csz[0] * csz[1] * csz[2];
         let mut irp = Vec::with_capacity(sp.nz_max(isz) as usize);
         let mut val = Vec::with_capacity(irp.capacity());
@@ -1365,11 +1413,14 @@ fn get_coefs_one_dim(
     };
     let isz = inv.sz[dim];
     if csz < 2 {
-        // get_s_matrix writes column 2 (FSL: outside a one-column matrix); never met (a spline
-        // field has at least 3 coefficients per direction).
-        return Err(basisfield_error(
-            "splinefield::get_coefs_one_dim: fewer than 2 coefficients",
-        ));
+        // get_s_matrix writes column 2, outside a one-column matrix: armawrap's bounds check
+        // throws (Armadillo 14.2.1's `arma_stop_bounds_error`). Met by FSL's quadratic count on
+        // an axis shorter than one knot spacing (FSL-145) and by `k = 1` on a one-voxel axis.
+        return Err(FslError {
+            printed: Vec::new(),
+            type_name: "std::out_of_range",
+            what: "Mat::operator(): index out of bounds".to_owned(),
+        });
     }
     let sp = Spline1D::new(order, ksp, 0)?;
     let a = get_a_matrix(&sp, isz, csz);

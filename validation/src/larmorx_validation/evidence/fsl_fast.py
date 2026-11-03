@@ -136,9 +136,16 @@ def _oracle(
     e.extra.setdefault("oracle_cache", {})[label] = "served" if p.cached else "ran"
 
 
-def _replica(e: fcache.Entry, args: list[str], put_inputs, settings: dict[str, str | None]) -> None:
-    """The replica on ``args``, once per :data:`REPLICA_RUNS`, each in ``<entry>/<label>`` (it
-    writes its outputs where FSL does: its working directory); the inputs removed after."""
+def _replica(
+    e: fcache.Entry,
+    args: list[str],
+    put_inputs,
+    settings: dict[str, str | None],
+    runs: list[tuple[str, str, str]] = REPLICA_RUNS,
+) -> None:
+    """The replica on ``args``, once per run of ``runs`` (default :data:`REPLICA_RUNS`), each in
+    ``<entry>/<label>`` (it writes its outputs where FSL does: its working directory); the inputs
+    removed after."""
     from larmorx_validation.parity.fsl_flirt_replica import _environment
 
     fs = _suite()
@@ -147,7 +154,7 @@ def _replica(e: fcache.Entry, args: list[str], put_inputs, settings: dict[str, s
         raise FileNotFoundError("the larmorx-nc replica is not built")
     env = _environment(settings)
     unset = tuple(k for k in os.environ if k.upper().startswith(("FSL", "LARMORX_", "OMP_")))
-    for label, mode, threads in REPLICA_RUNS:
+    for label, mode, threads in runs:
         cwd = e.dir / label
         cwd.mkdir(exist_ok=True)
         put_inputs(cwd)
@@ -183,19 +190,26 @@ def _node(run: str) -> Path:
     return nodes[0]
 
 
+def _fmriprep_source(run: str):
+    """``(args, put_inputs, input)`` of fMRIPrep's FAST call of ``run``, as the record runs it."""
+    fs = _suite()
+    node = _node(run)
+    args = fs.fmriprep_args(node)
+    src = fs.fmriprep_input(run, str(node))
+    if src is None:
+        raise FileNotFoundError(f"the input of fMRIPrep's FAST node of {run}")
+
+    def put(d: Path) -> None:
+        shutil.copy(src, d / args[-1])
+
+    return args, put, src
+
+
 def _compute_fmriprep(run: str):
     def compute(e: fcache.Entry) -> None:
-        fs = _suite()
         node = _node(run)
-        args = fs.fmriprep_args(node)
-        src = fs.fmriprep_input(run, str(node))
-        if src is None:
-            raise FileNotFoundError(f"the input of fMRIPrep's FAST node of {run}")
+        args, put, src = _fmriprep_source(run)
         e.input("T1w brain (fMRIPrep's)", src)
-
-        def put(d: Path) -> None:
-            shutil.copy(src, d / args[-1])
-
         _oracle(e, "fsl", args, put, {})
         _replica(e, args, put, {})
         e.finish(
@@ -249,6 +263,19 @@ def case_table() -> dict[str, tuple[str, object]]:
     return out
 
 
+def _real_source(case: str):
+    """``(args, put_inputs, settings)`` of the record's case ``case``, as the record runs it."""
+    fs = _suite()
+    run = _real_run(case)
+    # the arguments as the record's case gives them (an input by its file name)
+    args = [Path(a[1:]).name if a.startswith("@") else a for a in run.args]
+
+    def put(d: Path) -> None:
+        fs._prepare(run, d)
+
+    return args, put, dict(run.settings)
+
+
 def _compute_real(case: str):
     def compute(e: fcache.Entry) -> None:
         fs = _suite()
@@ -256,13 +283,7 @@ def _compute_real(case: str):
         for a in run.args:
             if a.startswith("@"):
                 e.input(a[1:], fs.inputs() / a[1:])
-        # the arguments as the record's case gives them (an input by its file name)
-        args = [Path(a[1:]).name if a.startswith("@") else a for a in run.args]
-
-        def put(d: Path) -> None:
-            fs._prepare(run, d)
-
-        settings = dict(run.settings)
+        args, put, settings = _real_source(case)
         _oracle(e, "fsl", args, put, settings, never=run.never)
         _replica(e, args, put, settings)
         e.finish(
@@ -331,15 +352,38 @@ def _compute_named(e: fcache.Entry) -> None:
     )
 
 
+NAMED_TEXT = (
+    "The replica's default mode on every case of the record: its exit status and the entries "
+    "it names"
+)
+
+
 def named_entry(ctx: core.Context) -> fcache.Entry:
-    return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-default-mode",
-        "The replica's default mode on every case of the record: its exit status and the "
-        "entries it names",
-        _compute_named,
-    )
+    return fcache.entry(ctx.figures_context(), TOOL, "cases-default-mode", NAMED_TEXT,
+                        _compute_named)  # fmt: skip
+
+
+def refresh_replica(ctx: core.Context, why: str) -> None:
+    """After a change of the replica's default mode: its default-mode runs of every example's
+    entry made again (in their working directories, with their inputs), and its default mode on
+    every case of the record computed again (the named entry); FSL's runs and the reproduce
+    mode's are kept (the record shows the reproduce mode unchanged)."""
+    fix = [r for r in REPLICA_RUNS if r[1] == "fix"]
+    sources = [(fmriprep_entry(ctx, run), _fmriprep_source(run)[:2], {})
+               for _i, run, _v, _w in FMRIPREP]  # fmt: skip
+    for case in REAL.values():
+        args, put, settings = _real_source(case)
+        sources.append((real_entry(ctx, case), (args, put), settings))
+    for e, (args, put), settings in sources:
+        info = e.info()
+        e.runs, e.extra = [], {}
+        for label, _m, _t in fix:  # the outputs being made again (the run writes the same files)
+            for f in (e.dir / label).iterdir():
+                f.unlink()
+        _replica(e, args, put, settings, runs=fix)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(ctx.figures_context(), TOOL, "cases-default-mode", NAMED_TEXT,
+                     _compute_named)  # fmt: skip
 
 
 # ------------------------------------------------------------------ the clean-room original
@@ -831,6 +875,7 @@ def _verdicts(diffs: list[dict], same: dict[str, bool], what: str, info: dict, b
                 "when the classes move in a cycle; the default gives each class its own.",
                 "FSL-103": "FSL-103, corrected by default with a notice: the brain mask leaves "
                 "out the voxels equal to the maximum when it is 2^24 or more.",
+                **REPLICA_FIX,
             }
             x["reason"] = " ".join(reasons.get(n, f"{n}, corrected by default.") for n in fix_named
                                    if n not in ("FSL-96", "FSL-97"))  # fmt: skip
@@ -839,6 +884,25 @@ def _verdicts(diffs: list[dict], same: dict[str, bool], what: str, info: dict, b
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example (see the record)."
+
+
+#: The corrections of 2026-11-03 the replica's default mode names (the spec answers' part).
+REPLICA_FIX = {
+    "FSL-202": "FSL-202, corrected by default with a notice (since 2026-11-03): with one "
+    "channel, FAST takes each class's variance in the logarithm of the intensities as the mean "
+    "of the squares minus the square of the mean, that square of a single-precision mean "
+    "rounded to single precision, so most of its digits cancel; the default squares the mean "
+    "of a double-precision quotient in double precision. Measured on seven cases, fMRIPrep's "
+    "three calls among them, the default's segmentation and mixel types lie 0 or 1 voxel from "
+    "FAST computed with its class statistics in double precision throughout, where FSL's lie 1 "
+    "to 844 voxels from it, and its own last-bit band is 0 voxels where FSL's reaches 3 to 807: "
+    "most of FSL's own band is this cancellation. The reproduce mode gives FSL's bytes (the "
+    "row above).",
+    "FSL-203": "FSL-203, corrected by default with a notice (since 2026-11-03): when the "
+    "image's first voxel is NaN, FAST's intensity extrema become NaN, its rule for negative "
+    "values is skipped and its brain mask is empty, so it stops with exit status 255; the "
+    "default takes the extrema over the values that are numbers.",
+}
 
 
 def _fix_same(named: list[str]) -> str:
@@ -1892,10 +1956,15 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only
+if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica)
+    import sys
+
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if sys.argv[1:2] == ["refresh"]:
+        refresh_replica(c, " ".join(sys.argv[2:]))
+        sys.exit(0)
     for _i, run, _v, _w in FMRIPREP:
         print("done", fmriprep_entry(c, run).dir)
     for case in REAL.values():

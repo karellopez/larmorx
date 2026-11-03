@@ -693,7 +693,10 @@ fn segment_single_channel(
     let input_name = args[args.len() - 1].clone();
     let outname = output_name(a, &input_name);
     let mut input: Volume = read_image(&input_name, run, io);
-    clear_negative(&mut input);
+    // one channel: a NaN first voxel empties FSL's mask (its maximum NaN)
+    if clear_negative(&mut input, run.mode.fix()).0 {
+        fsl203_notice(notices, &input_name);
+    }
     if a.verbose {
         let kind = match a.typeofimage {
             2 => "T2-weighted image",
@@ -784,7 +787,20 @@ fn segment_single_channel(
     } else {
         priors.volumes.as_ref().map(|[c, g, w]| [c, g, w])
     };
-    match mri.main(pr, io) {
+    let result = mri.main(pr, io);
+    if mri.fsl202_differs {
+        notices.add(
+            &defects::FSL_202,
+            if notices.fix() {
+                "the class variances with the mean's square in double precision (FSL squares the \
+                 single-precision mean: its log-domain variances lose most of their digits)"
+            } else {
+                "the class variances with the single-precision mean's square, as FSL's (most of \
+                 their digits cancelled in the log domain)"
+            },
+        );
+    }
+    match result {
         Ok(0) => {}
         // TanakaMain's 1: main returns -1
         Ok(_) => return 255,
@@ -872,21 +888,69 @@ fn unwritten_notice(outside: usize, notices: &mut Notices) {
 
 /// The negative values of an input, as `segment*Channel` treats them: when the 2nd percentile
 /// is negative the minimum is subtracted, otherwise the negative values are set to 0.
-fn clear_negative(input: &mut Volume) {
-    if input.min() < 0.0 {
+///
+/// FSL-203: FSL's extrema start from the first voxel, and a NaN never replaces them, so a NaN
+/// first voxel makes the minimum and maximum NaN and the rule is skipped. The default (`fix`)
+/// takes them over the voxels that are not NaN. Returns whether the first voxel is NaN and
+/// whether the rule then applies to the values that are not NaN (a negative one: the two modes
+/// differ there).
+fn clear_negative(input: &mut Volume, fix: bool) -> (bool, bool) {
+    let nan_first = input.data.first().is_some_and(|v| v.is_nan());
+    let not_nan = nan_first.then(|| extrema_not_nan(&input.data));
+    let rule_differs = not_nan.is_some_and(|(_, mn)| mn < 0.0);
+    let (mx, mn) = match not_nan {
+        Some(e) if fix => e,
+        _ => input.extrema(),
+    };
+    if mn < 0.0 {
         let (p02, _) = input
             .percentile_masked(0.02, None)
             .unwrap_or_else(|e| exception::throw(e));
         if p02 < 0.0 {
-            let m = input.min();
             for v in &mut input.data {
-                *v -= m;
+                *v -= mn;
             }
         } else {
-            let mx = input.max();
             input.threshold_inclusive(0.0, mx);
         }
     }
+    (nan_first, rule_differs)
+}
+
+/// `(max, min)` as FSL's extrema find them (the first value seeds them; a larger value replaces
+/// the maximum, else a smaller one the minimum) over the values that are not NaN; NaN when every
+/// value is (larmorx, FSL-203).
+fn extrema_not_nan(data: &[f32]) -> (f32, f32) {
+    let mut it = data.iter().copied().filter(|v| !v.is_nan());
+    let Some(first) = it.next() else {
+        return (f32::NAN, f32::NAN);
+    };
+    let (mut mx, mut mn) = (first, first);
+    for v in it {
+        if v > mx {
+            mx = v;
+        } else if v < mn {
+            mn = v;
+        }
+    }
+    (mx, mn)
+}
+
+/// FSL-203's notice: an input whose first voxel is NaN.
+fn fsl203_notice(notices: &mut Notices, name: &str) {
+    let detail = if notices.fix() {
+        format!(
+            "{name}'s first voxel is NaN: its minimum and maximum taken over the voxels that are \
+             not NaN (FSL's are NaN: its negative values kept and, with one channel, its mask \
+             empty)"
+        )
+    } else {
+        format!(
+            "{name}'s first voxel is NaN: its minimum and maximum NaN, as FSL's (its negative \
+             values kept and, with one channel, its mask empty)"
+        )
+    };
+    notices.add(&defects::FSL_203, detail);
 }
 
 /// `segmentMultiChannel(argc, argv)`: `-S n` reads the last `n` words of the command line,
@@ -924,7 +988,11 @@ fn segment_multi_channel(
             );
         };
         let mut image: Volume = read_image(name, run, io);
-        clear_negative(&mut image);
+        // several channels: their mask has no upper bound, so only the negative values' rule
+        // differs
+        if clear_negative(&mut image, run.mode.fix()).1 {
+            fsl203_notice(notices, name);
+        }
         image.display_max = 0.0;
         image.display_min = 0.0;
         images.push(image);

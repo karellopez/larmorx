@@ -128,6 +128,15 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
   whole.
 - **FSL-103**: the mask leaves out the voxels of the image's maximum at 2^24 and above; corrected.
 - **FSL-104**: channels of different sizes are read past their ends; refused.
+- **FSL-202**: with one channel, each class's variance subtracts the single-precision square of
+  the single-precision mean, which cancels most of its digits in the log domain (up to about
+  0.3 % off on white matter): the mean's square in double precision by default (the replica since
+  2026-11-03; the clean-room original follows in a later part). fMRIPrep's FAST call is affected:
+  its default labels move towards those of the exactly computed statistics (ds000005: 54 `_seg`
+  and 112 `_mixeltype` voxels); `reproduce` gives FSL's.
+- **FSL-203**: an input whose first voxel is NaN has NaN extrema: FAST keeps its negative values
+  and, with one channel, its mask is empty (exit 255): the extrema of the values that are not NaN
+  by default (the replica since 2026-11-03).
 
 ## The clean-room original
 

@@ -1,0 +1,471 @@
+# The spec answers for topup, FAST and FLIRT (relays 1 to 5, 2026-11-03): the exact changes to the
+# shared documents. Apply from the merged checkout:
+#   python -P scripts/orchestration/apply_handoff.py <this> --site <site checkout> [--check]
+# The reasons: HANDOFF.md beside this file. Every text the clean-room implementers read (the
+# register's summary rows and gap lists, docs/api/, next-steps, triage, the site) describes
+# behaviour only; FSL's routine names are only in the register's restricted section (†).
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: the gap legend ("original" given its new meaning)
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """**original** = corrected by default in both 3dTshift implementations, but the
+clean-room original's `reproduce` did not give AFNI's result yet (none left since 2026-10-12:
+completing 3dTshift, part 2b, then AFNI-26's switch the same day);"""
+new = """**original** = corrected by default in the replica, the clean-room original's correction still
+to do (since 2026-11-03; until 2026-10-12 it meant a clean-room original of 3dTshift whose
+`reproduce` did not give AFNI's result yet: none left since completing 3dTshift, part 2b, then
+AFNI-26's switch the same day);"""
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: the summary rows corrected (FSL-111, FSL-125, FSL-134, FSL-144
+# to FSL-146) and the four new rows (FSL-201 to FSL-204)
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """| rule A: read as stored by default in the clean-room original, FSL's reading with `reproduce`, named where a written value changes (2026-11-02); the replica reads them as FSL does in both modes | replica |"""
+new = """| rule A: read as stored by default in both implementations, FSL's reading with `reproduce`, named where a written value changes (the clean-room original 2026-11-02; the replica 2026-11-03, `programs/applyxfm4D-uint8`, `programs/applyxfm4D-uint8-3d-spline`: its default compares both readings and names FSL-111 where the bytes written differ, its `reproduce` reads as FSL without a notice) | – |"""
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """| FSL-125 † | topup (`--fwhm`) | a negative smoothing width is accepted and smooths with a negative-width kernel (results differ from the positive width's) |"""
+new = """| FSL-125 † | topup (`--fwhm`) | a negative smoothing width is accepted and acts as no smoothing (a kernel of a width that is not positive is the identity), silently (results differ from the positive width's) |"""
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """a field on another grid is not refused (`jac` lays it out as stored or copies it into the image's grid, `lsr` reads its lines past their end) | c, a |"""
+new = """a field on another grid is not refused (`jac` lays a field of the images' voxel count in another shape as stored, its Jacobian taken at the field's own indices and 0 beyond the field's grid, or copies it into the image's grid; `lsr` reads its lines past their end) | c, a |"""
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """| rule B: refused by default in the clean-room original, named; FSL's output with `reproduce` (2026-11-03, `at/jac-z`); the replica gives FSL's output in both modes | replica |"""
+new = """| rule B: refused by default in both implementations, named; FSL's output with `reproduce` (2026-11-03, `at/jac-z` of both records: the clean-room original, then the replica) | – |"""
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """| FSL-145 | topup (`--splineorder=2`) | an axis shorter than two knot spacings gets two quadratic B-spline coefficients (every other axis ceil((2n + k − 4) / 2k) + 2): the field's support ends inside the axis and it is forced towards 0 at its far end | c | none (fMRIPrep's configuration uses cubic splines) | rule A: the general count by default in the clean-room original, named; FSL's two with `reproduce` (2026-11-03, found by random testing: `difftest/fsl145-short-axis`); the replica lays FSL's two in both modes | replica |"""
+new = """| FSL-145 | topup (`--splineorder=2`) | an axis shorter than two knot spacings gets two quadratic B-spline coefficients, and one when it is shorter than one spacing (at a spacing of 2 only an axis of one voxel is short: axes of 2 and 3 voxels get the general count; every other axis ceil((2n + k − 4) / 2k) + 2): the field's support ends inside the axis and it is forced towards 0 at its far end; a level that refits a field of one coefficient stops topup (`Error occurred when preparing to run topup`, `Mat::operator(): index out of bounds`) | c | none (fMRIPrep's configuration uses cubic splines) | rule A: the general count by default in both implementations, named; FSL's count with `reproduce` (the clean-room original 2026-11-03, found by random testing: `difftest/fsl145-short-axis`; the replica the same day: `opt/fsl145-short-axis`, `opt/fsl145-one-coefficient` with FSL's error); applytopup reads a coefficient file of either count by default; the clean-room original's `reproduce` lays two where FSL lays one and where FSL lays the general count at a spacing of 2, and runs where FSL stops (`specs/topup.md` §4.2) | reproduce |"""
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """FSL's with `reproduce` (2026-11-03, found by random testing: `difftest/fsl146-mixed-axes`); the replica keeps FSL's in both modes | replica |"""
+new = """FSL's with `reproduce` (2026-11-03, found by random testing: `difftest/fsl146-mixed-axes`); the replica the same since 2026-11-03 (`opt/fsl146-four-axes`) | – |"""
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-189 † |"
+text = """| FSL-201 † | topup (`--estmov=1`) | with the movements estimated, the derivatives of the cost with respect to the rotations are forward differences (steps of 10⁻⁵ rad) of rotation matrices built from a single-precision angle, cosine and sine (their axis entry slightly different from 1): the rounding divided by the step makes the gradient and the Gauss-Newton Hessian of the movements other than the cost's (their rotation entries 0.25 to 39 % off on ds005040's pair at half resolution), so the minimisers end elsewhere than the cost's minimum | c | none (sdcflows' `b02b0.cnf` estimates no movements; FSL's own `b02b0.cnf` estimates them in its first five levels) | rule D measured, then A: the exact derivatives by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (the 37 cases of its record that estimate the movements); measured on 22 runs that estimate them: the exact derivatives' final cost lower or equal in 18, 0.004 to 0.13 % higher in 4 runs cut short, lower in 8 of 8 random cases whose volumes moved (0.01 to 44 %), 38 % lower after 60 iterations of scaled conjugate gradients on the half-resolution pair; fMRIPrep's two calls unchanged (`validation/investigations/spec-answers-3/measure_fsl201.py`); the clean-room original computes the exact derivatives in both modes | reproduce |
+| FSL-202 † | fast (one channel) | each class's variance in the logarithm of the intensities is the mean of the squares minus the square of the mean, that square of a single-precision mean rounded to single precision: most digits cancel (the squared means about 40 to 300, the variances 0.002 to 0.2), so the statistics, and through them the classes and the partial volumes, move with the mean's last bit; most of FAST's own last-bit band (the C library against correctly rounded maths) is this cancellation | c | fMRIPrep's FAST call: its default outputs change toward the exactly computed statistics (ds000005 `_seg` 54 and `_mixeltype` 112 voxels, ds000228 66 and 89, ds005003 391 and 453); `reproduce` unchanged | rule D measured, then A: the mean's square taken in double precision by default, named; FSL's with `reproduce`; FAST's replica 2026-11-03 (every single-channel case of its record, fMRIPrep's three calls included); measured on seven cases (`variance_measure.py`, `variance_reference.py`): the default 0 or 1 label voxel from FAST computed with its class statistics in double precision throughout where FSL's is 1 to 844, its own last-bit band 0 voxels where FSL's is 3 to 807 | original |
+| FSL-203 † | fast | an image whose first voxel is NaN: the intensity extrema, seeded with the first voxel, become NaN, so the rule for negative values is skipped and one channel's brain mask is empty: FAST stops with exit status 255 (with `-s`, runs on an empty mask) | c | none (fMRIPrep's T1w brains have a background of 0) | rule A: the extrema over the values that are numbers by default, named when an input's first voxel is NaN; FSL's with `reproduce`; FAST's replica 2026-11-03 (`opt/nan-first`) | original |
+| FSL-204 † | pointflirt | two coordinate files that hold no point (empty or missing): pointflirt crashes (segmentation fault) after its messages | a | none | refused in both modes after FSL's lines (`pointflirt: no points in the coordinate files (FSL-204)`, exit status 1); FLIRT's replica 2026-11-03 (`programs/pointflirt-no-points`) | original |"""
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: the history paragraph
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "redo (`scripts/orchestration/register_counts.py`). No new **decide** entry."
+text = """**2026-11-03, the spec answers for topup, FAST and FLIRT (the spec writer):** FSL-201 (topup's
+rotation derivatives with the movements estimated: rule D measured, then A), FSL-202 (FAST's
+single-channel variance: rule D measured, then A; it changes the default outputs of fMRIPrep's
+FAST call, toward the exactly computed statistics), FSL-203 (FAST and a NaN first voxel: rule A)
+and FSL-204 (pointflirt without points crashes: refused in both modes) added, each in its replica
+with its `reproduce` switch where FSL's behaviour is defined, and in `specs/topup.md`,
+`specs/fast.md` and `specs/flirt.md` for the clean-room originals (gap **original** or
+**reproduce** until their next parts). FSL-111, FSL-144, FSL-145 and FSL-146 corrected by default
+in the replicas too (gap –; FSL-145's `reproduce` in the clean-room original to complete);
+FSL-125's and FSL-134's behaviour and FSL-145's count stated precisely. Kept as FSL's (rule C):
+topup's refit penalty between levels (the two wrap-around second differences, weight 0.005) and
+applytopup `lsr`'s matrices on folded lines. FSL-205 to FSL-210 unused. The count paragraph above
+is the orchestrator's to redo (`scripts/orchestration/register_counts.py`). No new **decide**
+entry."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: FSL-111's black-box section
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """FSL with `reproduce`, naming FSL-111 where a written value changes (2026-11-02, rule A); the replica
+reads them as FSL in both modes. **D13 gap:** the replica's default and its notice (next-steps
+follow-up "FSL-111 in the replica")."""
+new = """FSL with `reproduce`, naming FSL-111 where a written value changes (2026-11-02, rule A); the replica
+the same since 2026-11-03 (`programs/applyxfm4D-uint8`, `programs/applyxfm4D-uint8-3d-spline`: its
+default resamples both readings and names FSL-111 where the bytes written differ; its `reproduce`
+reads as FSL, without a notice). **D13 gap:** none."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: the restricted section (†), at the end of the restricted FSL
+# section, which ends the file
+
+[[op]]
+do = "append"
+file = "docs/findings/upstream-defects.md"
+text = """### FSL-201 to FSL-204, and the source of FSL-144 to FSL-146: the spec answers for topup, FAST and FLIRT (FSL 6.0.7.23) †
+
+Found or explained answering the clean-room originals' questions (2026-11-03; the restricted
+findings `docs/findings/fsl-topup.md`, `fsl-fast.md` and `fsl-flirt.md`, "The spec answers of
+2026-11-03", have the source lines; the models and measurements are in
+`validation/investigations/spec-answers-3/`). FSL-201: `TopupScan::GetMovementDerivative` takes
+a forward difference of the sampling positions (`tiny` 1e-4 for the translations, 1e-5 for the
+rotations) through `MovePar2Matrix` → `construct_rotmat_euler` → `make_rot`, whose `float theta
+= norm2(angl)` makes the angle, its cosine and sine single-precision values and the axis entry
+`q²` not 1; the rounding divided by the step is the defect, and `TopupCF::grad`,
+`TopupCF::hess`'s interaction block and the movement Hessian all use it (`rotation_model.py`
+gives the rotation entries of FSL's three gradients of `debug/movements` to 2e-5 to 1.5e-4;
+`measure_fsl201.py` measured the final costs); the replica's default differentiates `Rᵀ(y − c −
+t) + c` analytically with correctly rounded `sin` and `cos`. FSL-202: `MeansVariances`'
+`m_mean[c]*m_mean[c]` is the float square of the float mean, subtracted from the double second
+moment (`variance_measure.py`, `variance_reference.py`; the measurement hooks in
+`crates-nc/larmorx-nc-fast/dev-patches/`); the replica's default stores `(s_mpm / s_p2 − μ·μ)`
+with `μ = s_mp / s_p` in double. FSL-203: newimage's `calculateExtrema` seeds both extrema with
+the first element (every FSL tool's `min()` and `max()` share it; whether a NaN first voxel
+changes BET's, FLIRT's or fslmaths' results is not checked). FSL-204: pointflirt's count test
+passes two 0 × 0 matrices and the later submatrix copies of the empty products crash. The source
+of three black-box entries (their behaviour: the summary's rows): FSL-144, `jac_resample` leaves
+the z displacement 0; FSL-145, `Spline1D::NCoef`'s loop test subtracts the unsigned
+`KernelSize()/2` from the signed offset, so the loop does not run when `(nc − 1)·ksp <
+KernelSize()/2` (one coefficient when the axis is shorter than one spacing, two when shorter than
+two at spacings of 3 and more, at a spacing of 2 only an axis of one voxel), and a refit of a
+single coefficient indexes the penalty's rows at −1 (Armadillo's `Mat::operator(): index out of
+bounds`); FSL-146, `TopupCF::grad` tests `_sm.HasBeta(i)` (and `HasGamma(i)`) per scan where the
+Hessian tests the manager's `HasBeta()` (any scan). FSL-125 and FSL-134 refined:
+`gaussian_kernel1D` returns the identity for a width of at most 1e-6 (a negative `--fwhm`
+smooths nothing); `jac_resample` assigns a field of another shape through a ShadowVolume in
+storage order and writes its Jacobian at the field's own indices (writes outside the image go to
+the zero-pad extrapolation value). Cases: the replicas' records `fsl-topup-replica` (the 37
+cases that estimate the movements; `at/jac-z`, `opt/fsl145-short-axis`,
+`opt/fsl145-one-coefficient`, `opt/fsl146-four-axes`), `fsl-fast-replica` (every single-channel
+case; `opt/nan-first`) and `fsl-flirt-replica` (`programs/applyxfm4D-uint8`,
+`programs/applyxfm4D-uint8-3d-spline`, `programs/pointflirt-no-points`)."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/api/upstream-defects.md: the users' table
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = """| FSL-111 | applyxfm4D | the clean-room original `larmorx fsl applyxfm4D` (`lx.fsl.applyxfm4d`, `implementation="original"`); the replica reads as FSL in both modes |"""
+new = """| FSL-111 | applyxfm4D | both: the replica `larmorx-nc fsl applyxfm4D` and the clean-room original (`larmorx fsl applyxfm4D`, `lx.fsl.applyxfm4d`; the replica names it in its default mode only) |"""
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = """| FSL-144 | applytopup | the clean-room original `larmorx fsl applytopup` (`lx.fsl.applytopup`, `implementation="original"`); the replica gives FSL's output in both modes |"""
+new = """| FSL-144 | applytopup | both: the replica `larmorx-nc fsl applytopup` and the clean-room original (`larmorx fsl applytopup`, `lx.fsl.applytopup`) |"""
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = """| FSL-145 | topup | the clean-room original `larmorx fsl topup` (`lx.fsl.topup`, `implementation="original"`); the replica lays FSL's two in both modes | `--splineorder=2` lays two coefficients on an axis shorter than two knot spacings: the field is forced towards 0 at its far end | the general count, named; `reproduce` FSL's two |"""
+new = """| FSL-145 | topup | both: the replica `larmorx-nc fsl topup` and the clean-room original (`larmorx fsl topup`, `lx.fsl.topup`) | `--splineorder=2` lays two coefficients on an axis shorter than two knot spacings (one when shorter than one spacing): the field is forced towards 0 at its far end | the general count, named; `reproduce` FSL's count (the replica: exactly, with FSL's error when a level refits a single coefficient; the clean-room original: two) |"""
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = """| FSL-146 | topup | the clean-room original; the replica keeps FSL's gradient in both modes |"""
+new = """| FSL-146 | topup | both, as FSL-145 |"""
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-189 |"
+text = """| FSL-201 | topup | the replica `larmorx-nc fsl topup` (`larmorx fsl topup`, `lx.fsl.topup`); the clean-room original computes the exact derivatives in both modes | with `--estmov=1`, the rotation derivatives of the movements are not the cost's (forward differences of single-precision rotation matrices): the minimisers end elsewhere than the cost's minimum | the exact derivatives, named; `reproduce` FSL's |
+| FSL-202 | fast | the replica `larmorx-nc fsl fast` (`larmorx fsl fast`, `lx.fsl.fast`); the clean-room original to follow | one channel: each class's variance loses most of its digits (the square of a single-precision mean); fMRIPrep's call's outputs move with it | the mean's square in double precision, named; `reproduce` FSL's |
+| FSL-203 | fast | the same | an input whose first voxel is NaN: the mask is empty and FAST stops (exit status 255) | the extrema over the values that are numbers, named; `reproduce` FSL's stop |
+| FSL-204 | pointflirt | the replica `larmorx-nc fsl pointflirt` (`larmorx fsl pointflirt`, `lx.fsl.pointflirt`); the clean-room original to follow | two coordinate files without points: pointflirt crashes | an error in both modes (exit status 1) |"""
+
+# ---------------------------------------------------------------------------------------------
+# docs/validation/golden.md: larmorx-nc's four new cases and the defaults that moved on purpose
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = """[`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 117 cases, 661 outputs |"""
+new = """[`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 121 cases, 679 outputs |"""
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "  unchanged; each case runs in 0.01 to 0.04 s."
+text = """- **The spec answers' switches in the FSL replicas** (2026-11-03, four cases added in
+  `crates-nc/larmorx-nc-cli/tests/golden.rs`): `applyxfm4D.uint8` (FSL-111: a uint8 image read as
+  stored by default), `fast.fsl203` (FSL-203: an input whose first voxel is NaN segmented by
+  default, FSL-202 named with it), `topup.fsl146` (FSL-146: four volumes along y and x, the cost's
+  own gradient by default) and `applytopup.jac-quadratic` (FSL-145: `--method=jac` reading
+  `topup.float-membrane`'s coefficients of the general quadratic count, which FSL's applytopup
+  would refuse as inconsistent). `larmorx-nc`'s checksums recorded on 2026-11-03 from c7ac893
+  (committed as fabf9c2; its code is that of 53796ce, whose replica records and parity smoke tier
+  passed): the four cases and 18 outputs added; the defaults that move on purpose: FSL-201
+  (`topup.two-levels`, `topup.float-membrane` and the applytopup cases that read their
+  coefficients, `applytopup.lsr`, `applytopup.jac-trilinear-short`, `applytopup.vb3d`), FSL-202
+  (`fast.fmriprep`, `fast.bias`, `fast.fsl103` and the statistics `fast.t2-n2-nopve-verbose`
+  prints) and FSL-145 (`topup.float-membrane`); every other checksum unchanged. The main
+  package's checksums are unchanged (only `larmorx_core::defects`' texts changed there)."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/next-steps.md: the replicas' switches done, the spec questions answered, the clean-room
+# originals' follow-ups the answers open
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """- **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
+  bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
+  should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does)."""
+new = """- **FSL-111 in the replica: done** (2026-11-03, the spec answers part): `larmorx-nc fsl applyxfm4D`
+  reads a uint8 image as stored by default and names FSL-111 where the bytes written differ (its
+  default resamples both readings to compare them); `reproduce` reads it as FSL, without a notice
+  (`programs/applyxfm4D-uint8`, `programs/applyxfm4D-uint8-3d-spline`; golden `applyxfm4D.uint8`)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """- **FSL-144, FSL-145 and FSL-146 in topup's replica** (2026-11-03): the clean-room original's
+  defaults refuse `applytopup --method=jac` with a z phase encoding (FSL-144, rule B), lay the
+  general quadratic B-spline count on axes shorter than two knot spacings (FSL-145, rule A) and
+  minimise with the cost's own gradient on volumes encoded along different axes (FSL-146, rule A);
+  the replica keeps FSL's behaviour in both modes. By D13 its default should do the same and name
+  them, `reproduce` FSL's (as FSL-111)."""
+new = """- **FSL-144, FSL-145 and FSL-146 in topup's replica: done** (2026-11-03, the spec answers part):
+  its defaults refuse `applytopup --method=jac` with a z phase encoding (FSL-144), lay the general
+  quadratic B-spline count on short axes (FSL-145; applytopup reads a coefficient file of either
+  count) and minimise with the cost's own gradient on volumes encoded along different axes
+  (FSL-146), each named, `reproduce` FSL's: FSL's count exactly (one coefficient when the axis is
+  shorter than one spacing; `specs/topup.md` §4.2) and FSL's error when a level refits a single
+  coefficient (`at/jac-z`, `opt/fsl145-short-axis`, `opt/fsl145-one-coefficient`,
+  `opt/fsl146-four-axes`; golden `topup.fsl146`, `applytopup.jac-quadratic`)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """- **topup's spec questions** (2026-11-03, the clean-room part's handoff, `docs/parts/`): FSL's
+  rotation derivatives of the movements (findings 14: a defect or a deliberate approximation?),
+  the refit's penalty between levels, FSL-133's wrap and FSL-134's laying of a field in another
+  shape, the quadratic splines' bending energy at an even knot spacing (47 random cases open),
+  `lsr` on lines whose length divides 2^32 (8 random cases open), FSL's resampling along axes of 8
+  voxels or fewer, and the conventions the original follows as measured: for a spec writer's
+  answers part on the replica side, as FLIRT's (2026-11-02)."""
+new = """- **topup's spec questions: answered** (spec writer, 2026-11-03; `specs/topup.md`, lines marked
+  "(spec writer, 2026-11-03)"; §13's table "The clean-room questions of 2026-11-03" names each
+  answer's section, whether the implementer's observation was right, and the model, written from
+  the spec's text alone, that gives FSL's numbers: `validation/investigations/spec-answers-3/`).
+  FSL's rotation derivatives (§4.3, §4.6, §4.7: forward differences of single-precision rotation
+  matrices; **FSL-201**, rule A after measurement: the exact derivatives by default, FSL's with
+  `reproduce`, in the replica since 2026-11-03), the refit between levels (§4.4: the two
+  wrap-around second differences, weight 0.005, at every `--warpres` change; kept, rule C), the
+  quadratic bending energy at an even knot spacing (§4.6), `lsr`'s matrices built row by row and
+  its folded lines (§7.4; kept, rule C), FSL-133's read at the wrap-around (§7.4, §10.1), FSL-134's
+  field in another shape (§7.3), the resampling of axes shorter than 15 voxels (§4.5, §9.4: the
+  prefilter's truncated periodic start), FSL-145's single coefficient (§4.2), FSL-146's mechanism
+  (§4.6); every convention the original measured confirmed (§13 row 8). **For topup's clean-room
+  original (its next part), what the answers let it close:** (1) FSL-201: `reproduce` with §4.6's
+  forward difference and the default's notice: the record's 9 expected divergences of finding 14
+  (`opt/levels`, `opt/scg-movements`, `opt/four-volumes`, `opt/zero-readout`, `cfg/b02b0`,
+  `cfg/b02b0_2`, `cfg/b02b0_4`, `cfg/b02b0_7T`, `difftest/fsl145-short-axis`) and the trial's
+  4,462 cases, in `reproduce`; (2) §4.6's sampling of the bending energy: the 47 quadratic-spline
+  random cases (reproducer 10753); (3) §7.4's matrices row by row: the 8 `lsr` cases on lines whose
+  length divides 2^32 (reproducer 8089); (4) FSL-133 with `reproduce`: `at/lsr-long`,
+  `at/vb2d-long`, `at/vb3d-long`, `at/vb4d-long` and the trial's 484 cases; (5) FSL-134's other
+  shape with `reproduce`: `at/jac-other-shape` (refused today in both modes; a parity case once
+  reproduced); (6) §4.5's prefilter on short axes: the short-axis random cases (case 7283) and
+  the vb transients on small images; (7) FSL-145's `reproduce` exactly: one coefficient when the
+  axis is shorter than one spacing, the general count at a spacing of 2 for axes of 2 and 3
+  voxels, FSL's error when a level refits a single coefficient, and applytopup reading a
+  coefficient file of either count by default, as the replica's; (8) to check: whether its
+  FSL-146 trigger leaves out a volume encoded along an axis whose read-out time is 0 (FSL's
+  gradient leaves out only the volumes whose encoding along the axis is 0)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """- **FAST's single-channel variance (rule D, 2026-11-03)**: `σ² = Σ p y y / Σ p - μ²` in the log
+  domain cancels most digits, which makes FSL's own last-bit band wide on small classes and small
+  images (`_mixeltype` Dice 0.998 on ds005003 between FSL and FSL with correctly rounded maths);
+  measure whether a two-pass or double-precision variance changes the segmentation beyond that band
+  before deciding A or C (`docs/findings/fsl-fast-original.md`, "FSL's own last-bit band")."""
+new = """- **FAST's single-channel variance: decided, FSL-202** (2026-11-03, the spec answers part: rule D
+  measured, then A; `specs/fast.md` §4.4, §9.1, §11): the default squares the mean of a
+  double-precision quotient in double precision; on seven cases (fMRIPrep's three calls among them)
+  it lies 0 or 1 label voxel from FAST computed with its class statistics in double precision
+  throughout, where FSL's lies 1 to 844, and its own last-bit band is 0 voxels where FSL's is 3 to
+  807 (most of FSL's band is this cancellation). In the replica since 2026-11-03 (`reproduce`
+  FSL's); it changes the default outputs of fMRIPrep's FAST call (ds000005 `_seg` 54 and
+  `_mixeltype` 112 voxels). The clean-room original follows in its next part (below)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """- **FAST's spec questions** (2026-11-03): the clean-room relays' questions on `specs/fast.md`
+  (§4.4's second moment in double, §4.5's normalised taps in double and the field outside the mask,
+  §4.8's ICM type, §4.10's total after each sweep, §5.2's products in double, §5.6's weights in
+  single, §10's exact parallel order, FLIRT §9.3's TR, and the rest: the part's handoff) for a spec
+  writer, as FLIRT's spec answers were."""
+new = """- **FAST's spec questions: answered** (spec writer, 2026-11-03; `specs/fast.md`, lines marked
+  "(spec writer, 2026-11-03)"; §12's table names each answer's section, whether the observation was
+  right, and its model, `validation/investigations/spec-answers-3/`): the 21 questions and one
+  found, FSL-203 (a NaN first voxel empties the mask: rule A, in the replica since 2026-11-03).
+  **For FAST's clean-room original (its next part), what the answers let it close:** (1) FSL-202
+  and FSL-203 by default, named, `reproduce` FSL's; its record then holds the default to the
+  replica's default (a narrow band) and `reproduce` to FSL (FSL's band, as now: §11); (2) §4.1.1:
+  `_restore` is NaN at NaN voxels unless the rule for negative values takes its second branch
+  (the original writes 0 always); (3) §7: an abort loses the standard-output lines not yet flushed
+  (earlier iterations' k-means lines; the partial-volume heading with `-n 0`): the `-v` cases that
+  abort, and the trial's singular k-means case, print no k-means line before the abort; (4) §5.3:
+  case 1840's `MEAN -nan` (a class without weight zeroes every posterior; the bias weights 0 / NaN
+  make the field and then every mean NaN); (5) §10's pipeline of planes with a lag of 2 is FSL's
+  in-place order exactly (the original's already; confirmed); (6) §5.8: several channels' one-step
+  near ties of the partial volumes are decided by the statistics' last bits: expected, the
+  thresholds unchanged (§11); the noise-free and rank-deficient random cases stay explained
+  (§8.6), `multi/s5` stays (ill-conditioned)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """  iteration where the clean-room original prints `MEAN 1` (a class weight of 0); the images agree.
+  How FSL's posteriors become NaN after a NaN covariance is a spec question."""
+new = """  iteration where the clean-room original prints `MEAN 1` (a class weight of 0); the images agree.
+  Answered (spec writer, 2026-11-03, `specs/fast.md` §5.3): a class without weight zeroes every
+  posterior, the bias weights 0 / NaN make the field and then every mean NaN; for the clean-room
+  original's next part (above)."""
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "  in one of twelve sampled cases; the 8 cases its record misses."
+text = """- **FLIRT's part 2 spec questions: answered** (spec writer, 2026-11-03; `specs/flirt.md`, lines
+  marked "(spec writer, 2026-11-03 ...)"; §14's table "The clean-room questions of 2026-11-03" names
+  the section of each of the 38 (3 superseded by 27, 15 settled before, 29 answered by 30) and
+  whether the observation was right; models: `validation/investigations/spec-answers-3/flirt_models.py`
+  and `flirt_models_3b.py`, every FSL run through the oracle cache). FSL-204 found (pointflirt
+  without points crashes FSL: refused in both modes, rule B; in the replica since 2026-11-03).
+  **For FLIRT's clean-room original (its next part), what the answers let it close:** (1) §2.3:
+  the free optimisations print at the search's lowered verbose level (not lowered again); (2) §8.1
+  step 9: an invalid quaternion start keeps only its scale (no translations: FSL-90's
+  `reproduce`), and FSL-90's message prints at every invalid composition, evaluations included;
+  (3) §15.1: avscale's check residual signs come from §12's inverse; (4) §15.5: midtrans uses a
+  transform whose determinant is not finite (NaN rows, exit status 0); (5) §15.6: FSL-204; a `nan`
+  word in a coordinate file reads 0; (6) §15.2: `-warp` accepts exactly three volumes, other
+  images get FSL's message and exit status 1; (7) §12: with `reproduce`, NaN and infinite matrices
+  are inverted and FLIRT goes on (trial #2905, #704, #8361); (8) §15.8: pairreg's schedules carried
+  by the original (no `FSLDIR`); (9) §2.3, §9.4: `-debug`'s lines and volumes (the levels compose
+  only their set forms, a neurological reference's forms are swapped back with the level's grid,
+  `global_refweight1`'s `pixdim[4..7]` are 1; BBR without boundary points: NaN costs that move
+  nothing, the `-init` matrix written, the debug images and `-out` written; one-slice images lose
+  their forms): the triage entry's 114 findings and #2424; (10) §9.2, §12: `reproduce`'s windowed
+  sinc and the registrations' paths need the C library's single-precision `sinf`, `cosf` and
+  `atan2f` (the default keeps the correctly rounded functions, rule 5): `real/interp-sinc`,
+  applyxfm4D's float sinc findings, and the trace partings of `real/dof6`-like registrations
+  (`cost-normmi`, `weights-normcorr`, `weights-normmi`, `weights-woods`) then close (how the crate
+  gets those functions: the next item); (11) §15.7: applyxfm4D's spline is §9.3's (double images
+  read and filtered in double, each value rounded to single): 5,177 of 13,315 voxels of five trial
+  findings differ today; (12) §6.2: `leastsq`'s three-level sums (`real/cost-leastsq`); (13) §8.2:
+  equal and NaN costs move nothing under §7.2's strict comparisons: FSL-91's and FSL-92's
+  `reproduce` runs (`real/weights-empty-refweight`, `real/weights-empty-inweight`,
+  `edge/one-voxel-input`) follow FSL's trace once `atan2f` is the C library's and the sign of a
+  near-zero skew (printed `-0.000000` by FSL, `0.000000` by the original, in one trace) is found
+  in the original's own composition and decomposition.
+- **The C library's single-precision `sinf`, `cosf` and `atan2f` for the clean-room originals'
+  `reproduce`** (2026-11-03, the spec answers; for the orchestrator and the user: moving code out
+  of a replica crate needs the user's decision): FLIRT's clean-room original computes correctly
+  rounded functions in both modes (rule 5), FSL's FLIRT glibc's (`sinf` and `cosf` are Arm's
+  Optimized Routines v19.11, MIT; `atan2f` is fdlibm's, under Sun's permissive notice). With them
+  the original's `reproduce` closes the FLIRT cases of item (10) above (`real/dof6`'s trace parts
+  from FSL's at its 3,983rd evaluation by `sinf`/`cosf`, at line 4,814 by `atan2f`). The ways:
+  a shared module in `larmorx-core` (the implementer may not read the AFNI replica's copy of
+  Arm's `sinf`/`cosf`), or each from a behaviour spec, implemented clean-room (the `cbrtf` and
+  GLIBC-07 route).
+- **`lx.mri.hmc`'s centres of mass, blocked as mcflirt's** (2026-11-03, `specs/mcflirt.md` §6.1,
+  spec writer): both of mcflirt's centres are FLIRT's blocked sums (`specs/flirt.md` §8.1 step 3:
+  `v − v_min` in single precision, double running sums over the voxels in z, y, x order flushed into
+  the totals after every max(1000, ⌊√N⌋) + 1 voxels; a denominator below 1e-5 in magnitude counts
+  1, with `WARNING::in calculating COG, total = 0.0` on standard error). For the clean-room
+  `lx.mri.hmc` (`crates/larmorx-mri`) in a later part: follow it and measure the centre's last bits
+  and the `.par` and matrices' last digits on its record."""
+
+# ---------------------------------------------------------------------------------------------
+# specs/bet.md §3.1 (not this part's spec): the ANALYZE reading FAST's answer found, for every FSL
+# program
+
+[[op]]
+do = "edit"
+file = "specs/bet.md"
+old = """- (spec writer, 2026-10-30) **ANALYZE 7.5 inputs (observed)**: FSL works on them with x reversed
+  (as on a neurologically stored image) and writes"""
+new = """- (spec writer, 2026-10-30) **ANALYZE 7.5 inputs (observed)**: FSL works on them with x reversed
+  (as on a neurologically stored image) when the product of the three stored voxel sizes is
+  positive, as stored when it is negative (spec writer, 2026-11-03: `specs/fast.md` §3.1, the
+  same image layer; no scale field is applied either, the stored values are used as they are),
+  and writes"""
+
+# ---------------------------------------------------------------------------------------------
+# validation/difftest/triage.toml: the clean-room originals' entries the answers explain
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """how FSL rounds its kernels' weights is an open question of the specification (part 2's spec question 22)."""
+new = """how FSL rounds its kernels' weights was part 2's spec question 22, answered (spec writer, 2026-11-03, specs/flirt.md §9.2, §15.7, §12): the sinc's weights were right, its last bits are the table's sine, the C library's single-precision sinf (reproduce needs it; the default keeps the correctly rounded sine: explained); applyxfm4D's spline is §9.3's with double images read and filtered in double, which the original is to follow in its next part."""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """114 findings, replayed with the final build (#170, #2424): still differ. Spec questions 18 and 38 of part 2's handoff."""
+new = """114 findings, replayed with the final build (#170, #2424): still differ. Spec questions 18 and 38 of part 2's handoff, answered (spec writer, 2026-11-03, specs/flirt.md §9.4): the levels compose only their set forms, a neurological reference's forms are swapped back with the level's grid, global_refweight1's pixdim[4..7] are 1; with BBR and no boundary point the costs are NaN, nothing moves, and FSL writes the -init matrix, the debug images and -out: for the original's next part."""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """Reported with its reproducer (spec question: how FSL's posteriors become NaN after a NaN covariance)."""
+new = """Reported with its reproducer; the spec question (how FSL's posteriors become NaN after a NaN covariance) answered (spec writer, 2026-11-03, specs/fast.md §5.3): a class without weight zeroes every posterior, the bias weights 0 / NaN make the field and then every mean NaN: for the original's next part."""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """explanation = "FSL-133: applytopup's lines whose length does not divide 2^32 wrap in FSL as the black-box runs do not determine; the original restores them circularly in both modes (484 cases, reproducer topup-trial-00005; findings 21, 36)\""""
+new = """explanation = "FSL-133: applytopup's lines whose length does not divide 2^32 wrap in FSL as the black-box runs do not determine; the original restores them circularly in both modes (484 cases, reproducer topup-trial-00005; findings 21, 36). The specification states FSL's read since 2026-11-03 (specs/topup.md §7.4, §10.1): the original's reproduce mode is to follow it in its next part\""""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """explanation = "applytopup --method=lsr on lines whose length divides 2^32 (16-voxel lines): the restored image's 99th percentile 1.4e-3 to 0.13 apart (8 cases, reproducer topup-trial-08089); a question for the specification (findings 36)\""""
+new = """explanation = "applytopup --method=lsr on lines whose length divides 2^32 (16-voxel lines): the restored image's 99th percentile 1.4e-3 to 0.13 apart (8 cases, reproducer topup-trial-08089; findings 36). Answered (spec writer, 2026-11-03, specs/topup.md §7.4): the lines are not the cause; the mapping folds and FSL builds the restoration's matrices row by row by its walk along the line: for the original's next part\""""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """explanation = "FSL's rotation derivatives of the movements are not its cost's (the original's are): in cases that estimate the movements the two minimisations end apart (4,462 cases, reproducer topup-trial-00006; findings 14, 36; the record's expected divergences; a question for the specification)"
+link = "docs/findings/fsl-topup-original.md\""""
+new = """explanation = "FSL's rotation derivatives of the movements are not its cost's (the original's are): in cases that estimate the movements the two minimisations end apart (4,462 cases, reproducer topup-trial-00006; findings 14, 36; the record's expected divergences). Registered 2026-11-03 as FSL-201 (rule A, specs/topup.md §4.6): the exact derivatives by default in both implementations, FSL's forward difference with reproduce in the replica; the original's reproduce mode is to follow §4.6 in its next part"
+link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-201\""""
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = """no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36); a question for the specification\""""
+new = """no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36). Answered (spec writer, 2026-11-03, specs/topup.md §4.6): FSL samples each basis function only at the offsets inside its open support, so at an even spacing the inner knots take the mean of the one-sided second derivatives and the outer knots none: for the original's next part\""""
+
+# ---------------------------------------------------------------------------------------------
+# The site's Roadmap page (the orchestrator updates it at each merge; the row proposed)
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = """| Completed | Step |
+|---|---|
+"""
+new = """| Completed | Step |
+|---|---|
+| 2026-11-03 | **The specifications' answers for topup, FAST and FLIRT.** The questions the three clean-room originals left for their specifications (topup's 9, FAST's 21, FLIRT's part 2's 38) answered from FSL's source, each precision answer checked by a model written from the specification's text alone that gives FSL's numbers; four defects of FSL found or explained, corrected by default in the replicas with FSL's behaviour on request: topup's rotation derivatives of the movements (FSL-201), FAST's single-channel variance, whose cancellation is most of FAST's own last-bit band (FSL-202: the default outputs of fMRIPrep's FAST call move toward the exactly computed statistics), FAST's NaN first voxel (FSL-203) and pointflirt without points (FSL-204); the replicas gained the clean-room originals' FSL-111 and FSL-144 to FSL-146 too; [FAST](/tools/fsl-fast/) · [topup](/tools/fsl-topup/) |
+"""

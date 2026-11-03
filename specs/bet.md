@@ -148,7 +148,10 @@ All three take FSL's image names: a file name with or without its extension (§3
 - Options given in voxels (`bet2 -c`) are voxel indices of the file as stored; they are converted
   to the radiological frame (`i` becomes `nx - 1 - i` when the file was mirrored).
 - (spec writer, 2026-10-30) **ANALYZE 7.5 inputs (observed)**: FSL works on them with x reversed
-  (as on a neurologically stored image) and writes the outputs with a qform and an sform of code
+  (as on a neurologically stored image) when the product of the three stored voxel sizes is
+  positive, as stored when it is negative (spec writer, 2026-11-03: `specs/fast.md` §3.1, the
+  same image layer; no scale field is applied either, the stored values are used as they are),
+  and writes the outputs with a qform and an sform of code
   2, the voxel sizes on the diagonal and the offset `−(origin − 1)·d` per axis, `origin` being
   the header's `originator` field (an origin of 0 gives `+d`): the outputs line up with the input
   voxel for voxel.

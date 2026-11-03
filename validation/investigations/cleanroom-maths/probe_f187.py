@@ -16,7 +16,9 @@ suite's 7 x 6 x 5 image of values in [0, 1) with one at 1e12 (its ``d13/e-far``)
   ``mutualinfo``), with and without the far value, by FSL and by FLIRT's original in both
   modes: the cost at the identity, whose histograms' bins the images' robust ranges may set.
 
-Run (in a memory box): ``python -P probe_f187.py <dir> <larmorx binary>``.
+Run (in a memory box): ``python -P probe_f187.py <dir> <larmorx binary>``. Since relay 5 the
+originals' ``reproduce`` gives FSL's first bin (findings 22 of
+``docs/findings/fsl-maths-original.md``): its lines show FSL's numbers in that mode.
 """
 
 from __future__ import annotations

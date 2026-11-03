@@ -33,7 +33,7 @@ fn main() {
                 tanh,
                 ..Deformation::default()
             };
-            let found = bet::find_surface(vol, None, None, &opts, threads);
+            let found = bet::find_surface(vol, None, None, &opts, UpstreamDefects::Fix, threads);
             let mask = bet::pooled(threads, || {
                 bet::brain_mask(
                     &found.mesh,

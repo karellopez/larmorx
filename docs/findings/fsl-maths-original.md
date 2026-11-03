@@ -311,3 +311,16 @@ So neither original shows FSL-187's behaviour by default (BET's thresholds are t
 range; FLIRT's costs move only where the far value is), but neither has its `reproduce`
 switch (FSL's first bin) or its notice, which the register's row asks of both: a D13 gap,
 reported for the orchestrator (no record input reaches FSL-187: the register's measurement).
+
+**Closed in relay 5 (the orchestrator's decision, 2026-11-03).** BET's and FLIRT's originals now
+share one robust range (`bet::params::robust_range_in`) in either mode: a bin at or beyond 2^31
+goes into the last bin by default (unchanged) and into the first with `reproduce`; with the
+correction FSL's range is computed beside it only where such a value occurred, and the notice
+(`FSL-187 ... corrected`) names both ranges where they differ: bet2's `thresh2`/`thresh98`
+(both robust-range calls: the surface's and `--binaryMask`'s threshold), FLIRT's clamping
+range of the reference and of the input. `probe_f187.py` again: with `reproduce` BET's
+original prints FSL's `thresh2 0.00745139 thresh 0.102904 thresh98 0.961979`, and FLIRT's costs
+with the far value are FSL's to every printed digit (`normmi` -1.3816, `mutualinfo` -1.75546,
+`corratio` 0.0981845); the defaults are as before. FLIRT's mutual-information bins are taken
+over each image's own minimum and maximum after the clamping, so no value is far above their
+range: the clamping range is FLIRT's only FSL-187 path.

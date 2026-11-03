@@ -27,7 +27,7 @@ def _show(d: Path, full: bool) -> None:
         if ".nii" in p.name or p.name.endswith((".hdr", ".hdr.gz")):
             try:
                 im = nib.load(str(p))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"  {p.name}: {e}")
                 continue
             a = np.asarray(im.dataobj)

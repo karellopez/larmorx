@@ -81,14 +81,16 @@ def _fsl(d: Path, words: list[str], inp: str) -> Path:
     return d / f"{words[-1]}.nii.gz"
 
 
+_ENV = {"FSLOUTPUTTYPE": "NIFTI_GZ", "OMP_NUM_THREADS": "1", "LARMORX_IMPLEMENTATION": "original"}
+
+
 def _ours(d: Path, exe: str, words: list[str]) -> Path:
     subprocess.run(
         [exe, "fsl", "fslmaths", *words],
         cwd=d,
         check=False,
         capture_output=True,
-        env={"FSLOUTPUTTYPE": "NIFTI_GZ", "OMP_NUM_THREADS": "1",
-             "LARMORX_IMPLEMENTATION": "original"},  # fmt: skip
+        env=_ENV,
     )
     return d / f"{words[-1]}.nii.gz"
 

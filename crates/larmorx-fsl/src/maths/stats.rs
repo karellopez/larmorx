@@ -206,8 +206,10 @@ pub fn ptoz<T: Num>(img: &mut Img<T>, notices: &mut Notices, out: &mut dyn std::
     let fix = notices.fix();
     let p = voxelwise(&mut img.data, fix, |v| {
         if v.is_nan() {
-            // FSL's -ptoz of NaN is the default NaN (black-box runs: findings 16)
-            return (num::default_nan(), num::default_nan(), 0);
+            // FSL's -ptoz of NaN is that NaN quieted with its sign flipped: 0x7fc00000 gives the
+            // default NaN, the default NaN 0x7fc00000 (black-box runs: findings 16 and 30)
+            let q = -f64::from_bits(v.to_bits() | (1 << 51));
+            return (q, q, 0);
         }
         if v <= 0.0 || v >= 1.0 {
             return (0.0, 0.0, 0);

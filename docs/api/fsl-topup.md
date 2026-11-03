@@ -13,11 +13,12 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 `crates-nc/larmorx-nc-topup`, under the FSL Licence's terms; translated from FSL's source with
 the B-spline fields, sparse matrices, non-linear optimisers and warps of FSL's libraries in
 `larmorx-nc-core`: [PROVENANCE](../../crates-nc/larmorx-nc-topup/PROVENANCE.md)), done
-(2026-11-03), and the clean-room **original** in the main package (Apache-2.0), to be written
-from [`specs/topup.md`](../../specs/topup.md). Until then both functions run the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
-command line chooses alike (`LARMORX_IMPLEMENTATION`).
+(2026-11-03), and the clean-room **original** in the main package (Apache-2.0, crate
+`larmorx-fsl`, module `topup`), written from [`specs/topup.md`](../../specs/topup.md) without
+FSL's source (2026-11-03). `implementation="auto"` (the default) runs the replica when
+`larmorx-nc` is installed (`pip install larmorx-nc`) and the original otherwise; `"replica"`
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`); `"original"` always runs the original.
+The command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-topup-replica`, record [fsl-topup-replica](../validation/fsl-topup-replica.md), 2026-11-03:
@@ -30,6 +31,18 @@ oblique phase encodings, four volumes, a zero read-out time, `--debug`, `--trace
 `--profile`), every message, exit status and failure case, and applytopup's every method
 (`lsr`, `jac`, `vb2D`, `vb3D`, `vb4D`; lines of 30, 32 and 96 voxels), data type and failure,
 each compared file by file with FSL's.
+
+The original against FSL 6.0.7.23 (the parity suite `fsl-topup`, record
+[fsl-topup](../validation/fsl-topup.md), 2026-11-03, §12's thresholds): 180 cases of the
+standard tier (the replica suite's cases, fMRIPrep's two calls and 7 permanent cases of random
+testing), 92 within the thresholds, 66 rejected by both alike, 22 expected divergences (each
+with its reason in the record: 9 cases whose movements are estimated and not converged, where
+FSL's rotation derivatives are not its cost's; FSL-133's lines, which the original restores
+correctly; FSL-143's diverging iterations; vb2D's transients; FSL-126's negative weight, with
+which both minimisations diverge; the inputs refused for FSL-124 and FSL-134), 0 failures. fMRIPrep's calls: ds001600 within the thresholds, ds005040 within FSL's
+own band of a last-bit change (the field's p99 0.61 Hz against FSL at `--nthr=4`'s 0.64). Random
+testing's trial (14,400 cases, the replica trial's draws) is triaged case by case in
+[the findings](../findings/fsl-topup-original.md) (finding 36).
 
 ## Quick start
 
@@ -91,7 +104,7 @@ larmorx fsl applytopup --imain=dwi_up,dwi_dn --inindex=1,2 --datain=acqparams.tx
 | `jacobians` | `--jacout` | `False` | each volume's Jacobian determinant |
 | `verbose` | `-v` | `False` | the cost of every evaluation (in `TopupResult.stdout`) |
 | `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116) |
-| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"` (`"original"`: not yet) |
+| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
 `None` (the default of every estimation setting) leaves the option out, so the configuration
@@ -122,6 +135,29 @@ It returns an `ApplytopupResult`: `corrected` (an `lx.Image`) and `stdout` (the 
 iterations). FSL's settings are the call's (CLAUDE.md rule 6): the outputs are NIfTI-1 read
 back, and no FSL variable of the process reaches the program.
 
+## The clean-room original
+
+Every option, message, exit status and failure case of both programs (the spec's §2 to §10):
+the configuration files, both minimisers per level, both regularisers, both spline orders, the
+precisions and interpolations, the movements, every output, `--debug`, `--trace` and
+`--profile`; applytopup's `jac`, `lsr`, `vb2D`, `vb3D` and `vb4D`. Its results never depend on
+the thread count (`n_threads`, `--nthr`: deterministic sums), and correctly rounded `sin`,
+`cos` and `exp` give the same bits on every platform. Built for speed (§11; the benchmark
+[fsl-topup](../benchmarks/fsl-topup.md), informal, one run each):
+
+| Call | FSL (1 thread) | replica | original, 1 thread | original, 14 threads |
+|---|---|---|---|---|
+| fMRIPrep's topup, ds005040 | 32.6 s | 29.7 s | 2.8 s | 0.8 s |
+| fMRIPrep's topup, ds001600 | 77.4 s | 71.4 s | 7.7 s | 2.0 s |
+| applytopup `lsr`, ds005040's pair | 0.42 s | 3.47 s | 0.13 s | 0.04 s |
+
+Where the spec leaves a convention open, the original follows FSL's as measured: an oblique
+phase encoding wraps along no axis; the scaled conjugate gradients' second gradient keeps the
+current point's regulariser weight; `--debug`'s images are written in FSL's order. It differs
+from FSL by design where FSL's derivatives of the movements are not its cost's (the original's
+are exact: estimated movements that have not converged end elsewhere) and where FSL-133 makes
+FSL's restoration wrong.
+
 ## Upstream defects (D13)
 
 topup's and applytopup's defects are corrected by default and reproduced with
@@ -149,10 +185,19 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   aborts: refused clearly.
 - **FSL-141** to **FSL-143**: the vb methods' counts in 32-bit integers, `vb3D`/`vb4D`'s count of
   data points and their prior across slices (indefinite: FSL's iterations diverge): corrected.
+- **FSL-144**: `--method=jac` with a phase encoding along z (which topup does not estimate)
+  leaves the image uncorrected silently: refused (the original).
+- **FSL-145**: `--splineorder=2` lays two coefficients on an axis shorter than two knot
+  spacings, so the field is forced towards 0 at its far end: the full count by default (the
+  original).
+- **FSL-146**: with volumes encoded along different axes (AP, PA, LR, RL) the gradient is not
+  the cost's: corrected, the cost's own (the original).
 
 ## Not yet
 
-- The clean-room originals (`implementation="original"`), from `specs/topup.md`.
+- The original: two open differences of random testing (finding 36): the regulariser's
+  Levenberg-Marquardt Hessian of quadratic B-splines at an even knot spacing (47 trial cases),
+  and 8 `lsr` cases on lines that divide 2^32.
 - applytopup's restorations of lines of fewer than 8 or more than 256 voxels along the phase
   encoding, and band systems that need LAPACK's blocked band factorisation, are refused in both
   modes with a clear message (`larmorx-nc: ... not replicated`): FSL's arithmetic there follows

@@ -360,7 +360,9 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
                     ),
                     UpstreamDefects::Reproduce => {
                         print_notices(err, &[n]);
-                        let _ = writeln!(err, "basic_string: construction from null is not valid");
+                        // FSL's stream: an empty line, then the C++ library's message
+                        let _ =
+                            writeln!(err, "\nbasic_string: construction from null is not valid");
                         1
                     }
                 };

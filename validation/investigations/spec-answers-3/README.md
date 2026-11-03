@@ -243,3 +243,29 @@ FSL-91 and FSL-92 traces and the `leastsq` schedule new and stored, the rest ser
 - **Question 25, mcflirt's centres** (`specs/mcflirt.md` §6.1): from the source (the same function
   of FSL's image library as FLIRT's centres, which the earlier models reproduce); no mcflirt run
   shows the centre's last bits directly (the `.par` file prints six decimals), so no model here.
+
+## The site after the replicas' switches (relay 5, 2026-11-03)
+
+The documentation site's FAST, topup and FLIRT pages were re-exported from clean commits of this
+branch, so they never show a default the replicas no longer give (FSL-201's and FSL-202's defaults
+changed the replica's default-mode panels). The replica's default-mode runs of each example's
+figures-cache entry are made again, in their working directories, and its default mode on every
+case of the record computed again (the reproduce mode's and FSL's runs are kept):
+
+```bash
+python -P -m larmorx_validation.evidence.fsl_fast refresh "<why>"    # FAST's six examples, 87 cases
+python -P -m larmorx_validation.evidence.fsl_topup refresh "<why>"   # topup's examples, 176 cases
+python -P -m larmorx_validation evidence fsl-fast --site <site>      # then the exports
+python -P -m larmorx_validation evidence fsl-topup --site <site>
+python -P -m larmorx_validation evidence fsl-flirt --site <site>
+```
+
+What moved, as the exports measured it (the replica's default against its reproduce mode, which
+is FSL's bytes): fMRIPrep's FAST call on ds000005, 54 voxels of `_seg` and 112 of `_mixeltype`
+(ds000228 66 and 89, ds005003 392 and 453; FSL-202), the half-resolution bias-field case 2 and 8,
+the priors case 250 and 678 (FSL-09 and FSL-202 together); three channels unchanged. topup's
+membrane case names FSL-117 and FSL-201 (it estimates the movements); a new example, the record's
+`opt/levels` (FSL-201 alone): the replica's default and the clean-room original estimate the
+second volume's movement within 3.7e-6 mm and 1.9e-7 rad of each other, FSL's 3.1e-4 mm and
+8.4e-5 rad from the replica's default (the example's movement table). fMRIPrep's two topup calls
+estimate no movements: unchanged.

@@ -222,45 +222,6 @@ pub fn spherical_kernel(radius: f32, xdim: f32, ydim: f32, zdim: f32) -> Kern {
 // ------------------------------------------------------------------------------------------------
 // Armadillo's reductions and sort of a column vector
 
-/// `Mat::max()` (`op_max::direct_max`): two running maxima from `-inf` over the even and odd
-/// elements (a NaN never replaces one), then `(i > j) ? i : j`.
-pub fn arma_max(x: &[f64]) -> f64 {
-    let (mut mi, mut mj) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
-    let mut i = 0;
-    while i + 1 < x.len() {
-        if x[i] > mi {
-            mi = x[i];
-        }
-        if x[i + 1] > mj {
-            mj = x[i + 1];
-        }
-        i += 2;
-    }
-    if i < x.len() && x[i] > mi {
-        mi = x[i];
-    }
-    if mi > mj { mi } else { mj }
-}
-
-/// `Mat::min()` (`op_min::direct_min`): as [`arma_max`] from `+inf`.
-pub fn arma_min(x: &[f64]) -> f64 {
-    let (mut mi, mut mj) = (f64::INFINITY, f64::INFINITY);
-    let mut i = 0;
-    while i + 1 < x.len() {
-        if x[i] < mi {
-            mi = x[i];
-        }
-        if x[i + 1] < mj {
-            mj = x[i + 1];
-        }
-        i += 2;
-    }
-    if i < x.len() && x[i] < mi {
-        mi = x[i];
-    }
-    if mi < mj { mi } else { mj }
-}
-
 /// `sort(X, "ascend")` / `"descend"` of a column vector: libstdc++'s `std::sort` with `a < b`
 /// (or `a > b`). Armadillo refuses a vector holding a NaN (`sort(): detected NaN`, a
 /// `std::logic_error`): `false` then, the vector untouched.
@@ -411,10 +372,10 @@ pub fn morphfilter<T: Arith>(
                             conv(vals[((n + 2) / 2).max(1) - 1])
                         }
                     }
-                    Morph::Dilate => conv(arma_max(&vals)),
-                    Morph::Erode => conv(arma_min(&vals)),
+                    Morph::Dilate => conv(arma::direct_max(&vals)),
+                    Morph::Erode => conv(arma::direct_min(&vals)),
                     Morph::ErodeS => {
-                        if T::nonzero(s0) && arma_min(&vals) == 0.0 {
+                        if T::nonzero(s0) && arma::direct_min(&vals) == 0.0 {
                             T::from_int(0)
                         } else {
                             s0
@@ -1380,15 +1341,6 @@ pub fn masked_mean<T: Arith>(values: &[T], mask: &[T]) -> (f64, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn arma_max_two_partials_keep_their_zeros() {
-        // (i > j) ? i : j with +0 in the even partial and -0 in the odd one gives -0
-        assert!(arma_max(&[0.0, -0.0]).is_sign_negative());
-        assert_eq!(arma_max(&[f64::NAN, 3.0, 1.0]), 3.0);
-        assert_eq!(arma_max(&[f64::NAN]), f64::NEG_INFINITY);
-        assert_eq!(arma_min(&[2.0, f64::NAN, -1.0]), -1.0);
-    }
 
     #[test]
     fn kernels_have_fsl_sizes() {

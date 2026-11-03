@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23: fsl-cprob 2111.0 (drand.cc, ndtri.cc, polevl.cc,
-// mtherr.cc, const.cc), FSL's copy of Stephen L. Moshier's Cephes Math Library (Copyright 1984,
+// Translated to Rust from FSL 6.0.7.23: fsl-cprob 2111.0 (drand.cc, ndtri.cc, ndtr.cc,
+// expx2.cc, polevl.cc, mtherr.cc, const.cc), FSL's copy of Stephen L. Moshier's Cephes Math Library (Copyright 1984,
 // 1987, 1989, 1995 by Stephen L. Moshier), compiled with `UNK` (the decimal constants, no bit
 // patterns). Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals.
 // Distributed under the FSL Licence (see LICENSE).
@@ -11,11 +11,14 @@
 //!   process.
 //! - [`ndtri`]: the inverse of the standard normal distribution function, with Cephes' error
 //!   report ([`mtherr`]: printed on standard output) outside `(0, 1)`.
+//! - [`ndtr`]: the standard normal distribution function (`erf` near 0, else the exponentially
+//!   scaled `erfc` times `expx2`'s accurate `exp(-x^2/2)`), with [`erf`] and [`erfc`].
 
 // Cephes' decimal constants are kept as written (the compiler rounds them as FSL's did).
 #![allow(clippy::excessive_precision, clippy::unreadable_literal)]
 
 use crate::glibc_double;
+use crate::sse;
 
 /// Cephes' `MAXNUM` (2^1024 (1 - MACHEP)).
 pub const MAXNUM: f64 = 1.797_693_134_862_315_708_15E308;
@@ -175,7 +178,7 @@ const P2: [f64; 9] = [
 ];
 const Q2: [f64; 8] = [
     6.024_270_393_647_420_142_55E0,
-    3.679_835_638_561_604_594_03E0,
+    3.679_835_638_561_608_594_03E0,
     1.377_020_994_890_813_302_71E0,
     2.162_369_935_944_966_358_90E-1,
     1.342_040_060_885_431_890_37E-2,
@@ -221,6 +224,163 @@ pub fn ndtri(y0: f64) -> (f64, Option<String>) {
     (x, None)
 }
 
+/// Cephes' `MAXLOG` with `DENORMAL` (log(MAXNUM)).
+pub const MAXLOG: f64 = 7.097_827_128_933_839_967_32E2;
+/// Cephes' `SQRTH` (sqrt(2)/2).
+pub const SQRTH: f64 = 7.071_067_811_865_475_244_01E-1;
+/// Cephes' error code `UNDERFLOW`.
+pub const UNDERFLOW: i32 = 4;
+
+// ndtr.cc's coefficients (`UNK`)
+const EP: [f64; 9] = [
+    2.461_969_814_735_305_125_24E-10,
+    5.641_895_648_310_688_219_77E-1,
+    7.463_210_564_422_699_126_87E0,
+    4.863_719_709_856_813_666_14E1,
+    1.965_208_329_560_770_982_42E2,
+    5.264_451_949_954_773_586_31E2,
+    9.345_285_271_719_576_075_40E2,
+    1.027_551_886_895_157_102_72E3,
+    5.575_353_353_693_993_275_26E2,
+];
+const EQ: [f64; 8] = [
+    1.322_819_511_547_449_925_08E1,
+    8.670_721_408_859_897_423_29E1,
+    3.549_377_788_878_198_910_62E2,
+    9.757_085_017_432_054_897_53E2,
+    1.823_909_166_879_097_362_89E3,
+    2.246_337_608_187_109_817_92E3,
+    1.656_663_091_941_613_501_82E3,
+    5.575_353_408_177_276_755_46E2,
+];
+const ER: [f64; 6] = [
+    5.641_895_835_477_550_739_84E-1,
+    1.275_366_707_599_781_044_16E0,
+    5.019_050_422_511_804_774_14E0,
+    6.160_210_979_930_535_851_95E0,
+    7.409_742_699_504_489_391_60E0,
+    2.978_866_653_721_002_406_70E0,
+];
+const ES: [f64; 6] = [
+    2.260_528_632_201_172_765_90E0,
+    9.396_035_249_380_014_346_73E0,
+    1.204_895_398_080_966_566_05E1,
+    1.708_144_507_475_658_972_22E1,
+    9.608_968_090_632_858_781_98E0,
+    3.369_076_451_000_815_160_50E0,
+];
+const ET: [f64; 5] = [
+    9.604_973_739_870_516_387_49E0,
+    9.002_601_972_038_426_892_17E1,
+    2.232_005_345_946_843_192_26E3,
+    7.003_325_141_128_050_754_73E3,
+    5.559_230_130_103_949_627_68E4,
+];
+const EU: [f64; 5] = [
+    3.356_171_416_475_030_996_47E1,
+    5.213_579_497_801_526_797_95E2,
+    4.594_323_829_709_801_279_87E3,
+    2.262_900_006_138_909_342_46E4,
+    4.926_739_426_086_359_210_86E4,
+];
+
+/// `ndtr(a)`: the standard normal distribution function, `USE_EXPXSQ` (ndtr.cc): `x = a SQRTH`;
+/// `|x| < 1` gives `0.5 + 0.5 erf(x)`, else `0.5 erfce(|x|) sqrt(expx2(a, -1))`, subtracted
+/// from 1 for `x > 0`. Never reports an error. An infinite `a` gives NaN (`inf / inf` in
+/// `erfce`, `inf - inf` in `expx2`; a positive NaN, as FSL's build gives it).
+pub fn ndtr(a: f64) -> f64 {
+    let x = a * SQRTH;
+    let z = x.abs();
+    if z < 1.0 {
+        return 0.5 + 0.5 * erf(x).0;
+    }
+    let mut y = 0.5 * erfce(z);
+    let z = expx2(a, -1);
+    // `y * sqrt(z)`: FSL's build multiplies into the square root's register (`mulsd`), so
+    // when both are NaN (an infinite `a`) the square root's NaN is the one passed on
+    y = sse::mul_f64(z.sqrt(), y);
+    if x > 0.0 {
+        y = 1.0 - y;
+    }
+    y
+}
+
+/// `erfc(a)`: the complementary error function (ndtr.cc), and what `mtherr` printed (an
+/// underflow: 2 for negative `a`, else 0).
+pub fn erfc(a: f64) -> (f64, Option<String>) {
+    let x = if a < 0.0 { -a } else { a };
+    if x < 1.0 {
+        let (e, msg) = erf(a);
+        return (1.0 - e, msg);
+    }
+    let z = -a * a;
+    let under = || {
+        let r = if a < 0.0 { 2.0 } else { 0.0 };
+        (r, Some(mtherr("erfc", UNDERFLOW)))
+    };
+    if z < -MAXLOG {
+        return under();
+    }
+    let z = expx2(a, -1);
+    let (p, q) = if x < 8.0 {
+        (polevl(x, &EP), p1evl(x, &EQ))
+    } else {
+        (polevl(x, &ER), p1evl(x, &ES))
+    };
+    let mut y = (z * p) / q;
+    if a < 0.0 {
+        y = 2.0 - y;
+    }
+    if y == 0.0 {
+        return under();
+    }
+    (y, None)
+}
+
+/// `erfce(x)`: `exp(x^2) erfc(x)` for `x > 1` (ndtr.cc's static helper).
+fn erfce(x: f64) -> f64 {
+    let (p, q) = if x < 8.0 {
+        (polevl(x, &EP), p1evl(x, &EQ))
+    } else {
+        (polevl(x, &ER), p1evl(x, &ES))
+    };
+    p / q
+}
+
+/// `erf(x)`: the error function (ndtr.cc); `|x| > 1` gives `1 - erfc(x)` (with its report).
+pub fn erf(x: f64) -> (f64, Option<String>) {
+    if x.abs() > 1.0 {
+        let (c, msg) = erfc(x);
+        return (1.0 - c, msg);
+    }
+    let z = x * x;
+    (x * polevl(z, &ET) / p1evl(z, &EU), None)
+}
+
+/// `expx2(x, sign)`: `exp(sign x^2)` with `x` split into a multiple of 1/128 and a small
+/// residual (expx2.cc, `M` = 128), each square's part through glibc's `exp`; `+inf` beyond
+/// `MAXLOG`.
+pub fn expx2(x: f64, sign: i32) -> f64 {
+    const M: f64 = 128.0;
+    const MINV: f64 = 0.0078125;
+    let mut x = x.abs();
+    if sign < 0 {
+        x = -x;
+    }
+    let m = MINV * (M * x + 0.5).floor();
+    let f = x - m;
+    let mut u = m * m;
+    let mut u1 = 2.0 * m * f + f * f;
+    if sign < 0 {
+        u = -u;
+        u1 = -u1;
+    }
+    if (u + u1) > MAXLOG {
+        return f64::INFINITY;
+    }
+    glibc_double::exp(u) * glibc_double::exp(u1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +400,17 @@ mod tests {
         assert!((ndtri(0.975).0 - 1.959_963_984_540_054).abs() < 1e-14);
         assert!((ndtri(1e-10).0 + 6.361_340_902_404_056).abs() < 1e-12);
         assert_eq!(ndtri(0.0), (-MAXNUM, Some("\nndtri domain error\n".into())));
+    }
+
+    #[test]
+    fn ndtr_values() {
+        assert_eq!(ndtr(0.0), 0.5);
+        assert!((ndtr(1.959_963_984_540_054) - 0.975).abs() < 1e-15);
+        assert!((ndtr(-6.361_340_902_404_056) - 1e-10).abs() < 1e-22);
+        assert_eq!(ndtr(-40.0), 0.0);
+        assert_eq!(ndtr(40.0), 1.0);
+        assert!(ndtr(f64::NAN).is_nan());
+        assert_eq!(erfc(30.0), (0.0, Some("\nerfc underflow error\n".into())));
+        assert_eq!(erfc(-30.0).0, 2.0);
     }
 }

@@ -279,10 +279,17 @@ newimage operations (`larmorx-nc-core`'s `volops`, `cprob`, `filters`, `kissfft`
 - **Not defects.** The off-centre warnings (FSL's messages, both modes); `-inm` of an image of
   zeros (FSL prints its error and writes NaN); `-kernel file` with a `+inf` value (Armadillo's
   exception, both modes).
-- **A note for the core (not changed here).** `arma::direct_max` in `arma.rs` takes one running
-  maximum; Armadillo 14.2.1's takes two (even and odd elements), which differs only in the sign
-  of a zero maximum (`[+0, -0]`). `filters::arma_max`/`arma_min` follow 14.2.1; the other
-  replicas' callers of `arma::direct_max` were left as they are.
+- **Armadillo's maximum, one translation (sub-task 3).** `arma::direct_max` in `arma.rs` took one
+  running maximum; Armadillo 14.2.1's `op_max::direct_max` takes two (even and odd elements),
+  which differs only in the sign of a zero maximum (`[+0, -0]` gives `-0`). The core's
+  `arma::direct_max` and the new `arma::direct_min` now follow 14.2.1, and `morphfilter` calls
+  them (relay 2's separate `filters::arma_max`/`arma_min` removed). Checked against Armadillo
+  14.2.1's own `max()`/`min()` (`arma::max(vec)` and `Mat::max()`) on 534 vectors with signed
+  zeros, NaN, infinities and ties: 0 of 2,136 lines differ (`validation/probes/fsl-avwutils-lib`).
+  The other callers go through `Mat::max_abs` (`MaximumAbsoluteValue()`: FLIRT's parameter test,
+  `run.rs`; mcflirt's, `run.rs`; warpfns' identity tests, `warpfns.rs`, which applywarp, topup and
+  applytopup reach): the maximum of absolute values, whose zeros are all `+0`, so their results
+  cannot move (sub-task 6's re-made records check it).
 
 ## Known differences
 

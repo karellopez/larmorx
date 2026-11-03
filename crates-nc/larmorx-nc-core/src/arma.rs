@@ -287,16 +287,53 @@ impl Mat {
     }
 }
 
-/// Armadillo's `op_max::direct_max`: starting from `-inf`, each element strictly greater than
-/// the current maximum replaces it (so NaN elements never do).
+/// Armadillo 14.2.1's `op_max::direct_max(X, n_elem)` (`max()` of a dense vector or matrix):
+/// two running maxima from `priv::most_neg` (`-inf`), one over the even and one over the odd
+/// elements, each replaced only by a strictly greater element (so NaN elements never replace
+/// one), then `(max_i > max_j) ? max_i : max_j`. The two partials decide only the sign of a
+/// zero maximum (`+0` among the even elements and `-0` among the odd ones give `-0`); every
+/// other result is any running maximum's. All NaN (or empty) gives `-inf`.
 pub fn direct_max(x: &[f64]) -> f64 {
-    let mut max_val = f64::NEG_INFINITY;
-    for &v in x {
-        if v > max_val {
-            max_val = v;
+    let (mut max_i, mut max_j) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    let n = x.len();
+    let (mut i, mut j) = (0, 1);
+    while j < n {
+        if x[i] > max_i {
+            max_i = x[i];
         }
+        if x[j] > max_j {
+            max_j = x[j];
+        }
+        i += 2;
+        j += 2;
     }
-    max_val
+    if i < n && x[i] > max_i {
+        max_i = x[i];
+    }
+    if max_i > max_j { max_i } else { max_j }
+}
+
+/// Armadillo 14.2.1's `op_min::direct_min(X, n_elem)` (`min()`): as [`direct_max`] from
+/// `priv::most_pos` (`+inf`) with strictly smaller elements, then
+/// `(min_i < min_j) ? min_i : min_j`.
+pub fn direct_min(x: &[f64]) -> f64 {
+    let (mut min_i, mut min_j) = (f64::INFINITY, f64::INFINITY);
+    let n = x.len();
+    let (mut i, mut j) = (0, 1);
+    while j < n {
+        if x[i] < min_i {
+            min_i = x[i];
+        }
+        if x[j] < min_j {
+            min_j = x[j];
+        }
+        i += 2;
+        j += 2;
+    }
+    if i < n && x[i] < min_i {
+        min_i = x[i];
+    }
+    if min_i < min_j { min_i } else { min_j }
 }
 
 /// Armadillo's `accu()` of a dense expression (`accu_proxy_linear`): two interleaved partial
@@ -1776,6 +1813,15 @@ mod tests {
         );
         assert_eq!(direct_max(&[f64::NAN, 1.0, 2.0]), 2.0);
         assert_eq!(direct_max(&[f64::NAN]), f64::NEG_INFINITY);
+        assert_eq!(direct_max(&[]), f64::NEG_INFINITY);
+        // the two partials: +0 (even) and -0 (odd) give the odd one's -0; the reverse +0
+        assert!(direct_max(&[0.0, -0.0]).is_sign_negative());
+        assert!(direct_max(&[-0.0, 0.0]).is_sign_positive());
+        assert!(direct_max(&[0.0, -0.0, -1.0]).is_sign_negative());
+        assert!(direct_min(&[-0.0, 0.0]).is_sign_positive());
+        assert!(direct_min(&[0.0, -0.0]).is_sign_negative());
+        assert_eq!(direct_min(&[2.0, f64::NAN, -1.0]), -1.0);
+        assert_eq!(direct_min(&[f64::NAN]), f64::INFINITY);
         let m = Mat::from_rows(2, 2, &[1.0, 2.0, 3.0, 4.0]);
         assert_eq!(trace(&m), 5.0);
         assert_eq!(trace_at_b(&m, &m), (1.0 + 9.0) + (4.0 + 16.0));

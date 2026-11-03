@@ -211,6 +211,9 @@ FILES = [
     ("fsl-cprob", "const.cc"),
     ("fsl-cprob", "mconf.h"),
     ("fsl-cprob", "cprob.h"),
+    # fslmaths (2026-11-03, sub-task 3): the normal distribution function (-ztop)
+    ("fsl-cprob", "ndtr.cc"),
+    ("fsl-cprob", "expx2.cc"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

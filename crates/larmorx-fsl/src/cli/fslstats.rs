@@ -1105,11 +1105,16 @@ fn print_histogram(
             name_histogram_defects(notices, o, nan_changes && nan_only != rep, nan_only != h);
         }
     }
-    // an empty mask: FSL's message, then its histogram of zeros (random testing, findings 28)
+    // an empty mask: FSL's message, then its histogram of zeros, or none when the range is
+    // empty too (random testing, findings 28)
     let h = match h {
         Hist::Empty => {
             let _ = writeln!(err, "{HISTOGRAM_EMPTY}");
-            Hist::Counts(vec![0; c.nbins])
+            if ours.1 <= ours.0 {
+                Hist::None
+            } else {
+                Hist::Counts(vec![0; c.nbins])
+            }
         }
         other => other,
     };

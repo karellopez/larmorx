@@ -43,6 +43,9 @@ pub struct Img<T> {
     pub flipped: bool,
     /// Its display range: the file's as read, `(0, 0)` once an operation changed it.
     pub cal: (f64, f64),
+    /// The header's quaternion is the one to write as it is (a subsampling computed it from
+    /// FSL's product of matrices), not converted to its matrix and back.
+    pub own_quaternion: bool,
 }
 
 impl<T> Img<T> {
@@ -578,7 +581,7 @@ pub fn write<T>(
         defects: mode,
         n_threads,
         descrip: DESCRIP,
-        rewrite_quaternion: true,
+        rewrite_quaternion: !img.own_quaternion,
     };
     match bimage::write(&name, version, &o, values) {
         Ok(ns) => {

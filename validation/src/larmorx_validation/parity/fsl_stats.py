@@ -224,6 +224,9 @@ def _bounded_words(args: list[str], n_words: int) -> list[bool] | None:
         k += 1 + n_args
     if out and n_words % len(out) == 0:
         return out * (n_words // len(out))
+    if 0 < n_words < len(out):
+        # an output cut short (FSL's crash after its first options: the words printed so far)
+        return out[:n_words]
     return None
 
 

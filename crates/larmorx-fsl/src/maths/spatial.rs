@@ -34,6 +34,22 @@ fn subsample_header<T>(img: &mut Img<T>, offc: bool, nx_new: usize) {
     for a in 1..4 {
         h.pixdim[a] = f64::from((h.pixdim[a] * 2.0) as f32);
     }
+    if h.qform_code > 0 {
+        // a set qform's rotation and scale as FSL's product of matrices gives it: its zero
+        // entries +0 (a qfac of -1 negates a column of the quaternion's matrix, and the
+        // product's sums turn those -0 into +0), then the quaternion of that matrix (random
+        // testing: FSL's quatern_c is -0 after a subsampling of such an image; findings 24)
+        use crate::bet::quatern::{mat_to_quatern, quatern_to_mat};
+        let pd = [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]];
+        let m = quatern_to_mat(h.quatern_b, h.quatern_c, h.quatern_d, pd)
+            .map(|row| row.map(|v| if v == 0.0 { 0.0 } else { v }));
+        let ([b, c, d], qfac) = mat_to_quatern(&m);
+        h.quatern_b = b;
+        h.quatern_c = c;
+        h.quatern_d = d;
+        h.pixdim[0] = qfac;
+        img.own_quaternion = true;
+    }
 }
 
 /// One volume subsampled: `0.125 c + 0.0625 F + 0.0312 E + 0.0156 K` at old voxel `2i`

@@ -946,6 +946,7 @@ pub fn fmean<T: Num>(
             header: img.header.clone(),
             flipped: img.flipped,
             cal: img.cal,
+            own_quaternion: img.own_quaternion,
         };
         changed |= convolve_in_place(&mut ones, &kn, op, notices, err, nt.saturating_sub(1));
         let den = ones.data;
@@ -1041,6 +1042,7 @@ pub(crate) mod tests {
             header,
             flipped: false,
             cal: (0.0, 0.0),
+            own_quaternion: false,
         }
     }
 

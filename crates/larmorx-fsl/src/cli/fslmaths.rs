@@ -378,6 +378,7 @@ fn typed<T: Num>(s: &mut Stored, notices: &mut Notices) -> Img<T> {
         header: s.header.clone(),
         flipped: s.flipped,
         cal,
+        own_quaternion: false,
     }
 }
 
@@ -953,6 +954,7 @@ fn tensor_step<T: Num>(
             header: st.img.header.clone(),
             flipped: st.img.flipped,
             cal: cal.unwrap_or_else(|| extremes(data)),
+            own_quaternion: st.img.own_quaternion,
         };
         let spec = WriteSpec {
             out: OutType::Float,

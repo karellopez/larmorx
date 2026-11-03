@@ -9,6 +9,8 @@
 //! where each voxel is independent of the others.
 
 use std::io::Write;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::Relaxed;
 
 use larmorx_core::math;
 use rayon::prelude::*;
@@ -227,6 +229,105 @@ struct Mrf<'a> {
     weights: [f64; 18],
 }
 
+/// Posteriors as the in-place sweeps share them between threads (the bits of each `f32`).
+pub(crate) fn to_cells(v: Vec<f32>) -> Vec<AtomicU32> {
+    v.into_iter().map(|x| AtomicU32::new(x.to_bits())).collect()
+}
+
+pub(crate) fn from_cells(v: Vec<AtomicU32>) -> Vec<f32> {
+    v.into_iter()
+        .map(|x| f32::from_bits(x.into_inner()))
+        .collect()
+}
+
+#[inline(always)]
+pub(crate) fn cell(v: &[AtomicU32], i: usize) -> f32 {
+    f32::from_bits(v[i].load(Relaxed))
+}
+
+/// One voxel's MRF update (§4.6): `U_c = Σ_k w_k p_kc` (double, the neighbours in §4.2's
+/// order), `e_c = f32(exp(β U_c - G_c))` (times `π_c` with `-P`), `p_c = e_c / Σ e` (double,
+/// rounded), 0 where the sum is not above 0; `u` and `e` hold `n` values.
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+fn mrf_voxel(
+    grid: &Grid,
+    w: &[f64; 18],
+    cells: &[AtomicU32],
+    neg_g: &[f64],
+    b: f64,
+    priors: Option<&[f32]>,
+    i: usize,
+    u: &mut [f64],
+    e: &mut [f32],
+) {
+    let n = u.len();
+    let nb = grid.neighbours(i);
+    u.fill(0.0);
+    for (k, &j) in nb.iter().enumerate() {
+        let wk = w[k];
+        for (c, uc) in u.iter_mut().enumerate() {
+            *uc += wk * f64::from(cell(cells, j * n + c));
+        }
+    }
+    let mut s = 0f64;
+    for c in 0..n {
+        let mut v = math::exp(b * u[c] - neg_g[i * n + c]) as f32;
+        if let Some(pr) = priors {
+            v *= pr[i * n + c];
+        }
+        e[c] = v;
+        s += f64::from(v);
+    }
+    for c in 0..n {
+        let p = if s > 0.0 {
+            (f64::from(e[c]) / s) as f32
+        } else {
+            0.0
+        };
+        cells[i * n + c].store(p.to_bits(), Relaxed);
+    }
+}
+
+/// One in-place sweep (§4.6) over the mask in storage order ([`Grid::gauss_seidel`]); the
+/// usual class counts with their scratch on the stack (the same operations).
+fn mrf_sweep(
+    grid: &Grid,
+    w: &[f64; 18],
+    cells: &[AtomicU32],
+    neg_g: &[f64],
+    b: f64,
+    priors: Option<&[f32]>,
+    n: usize,
+) {
+    fn fixed<const N: usize>(
+        grid: &Grid,
+        w: &[f64; 18],
+        cells: &[AtomicU32],
+        neg_g: &[f64],
+        b: f64,
+        priors: Option<&[f32]>,
+    ) {
+        grid.gauss_seidel(|r| {
+            let (mut u, mut e) = ([0f64; N], [0f32; N]);
+            for i in r {
+                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e);
+            }
+        });
+    }
+    match n {
+        2 => fixed::<2>(grid, w, cells, neg_g, b, priors),
+        3 => fixed::<3>(grid, w, cells, neg_g, b, priors),
+        4 => fixed::<4>(grid, w, cells, neg_g, b, priors),
+        _ => grid.gauss_seidel(|r| {
+            let (mut u, mut e) = (vec![0f64; n], vec![0f32; n]);
+            for i in r {
+                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e);
+            }
+        }),
+    }
+}
+
 impl Mrf<'_> {
     /// One MRF iteration (§4.6): random posteriors, then five sweeps in storage order, in place.
     #[allow(clippy::too_many_arguments)]
@@ -242,11 +343,15 @@ impl Mrf<'_> {
     ) {
         let n = self.n;
         let nm = self.grid.len();
-        // the random posteriors: the sequence in order, voxel by voxel, class by class
-        for row in self.post[..nm * n].chunks_exact_mut(n) {
+        // the random posteriors: the sequence in order, voxel by voxel, class by class (drawn
+        // serially), each voxel's normalisation in parallel
+        for p in self.post[..nm * n].iter_mut() {
+            *p = rng.next_value() as f32;
+        }
+        self.post[..nm * n].par_chunks_mut(n).for_each(|row| {
             let mut s = 0f32;
             for p in row.iter_mut() {
-                *p = rng.next_value() as f32 / 2_147_483_647f32;
+                *p /= 2_147_483_647f32;
                 s += *p;
             }
             if s > 0.0 {
@@ -254,7 +359,7 @@ impl Mrf<'_> {
                     *p /= s;
                 }
             }
-        }
+        });
         // -G for each voxel and class: fixed through the sweeps
         let mut neg_g = vec![0f64; nm * n];
         neg_g
@@ -266,66 +371,49 @@ impl Mrf<'_> {
                 }
             });
         let b = f64::from(beta);
-        let mut u = vec![0f64; n];
-        let mut e = vec![0f32; n];
+        let cells = to_cells(std::mem::take(&mut self.post));
         for sweep in 0..5 {
-            for i in 0..nm {
-                let nb = self.grid.neighbours(i);
-                u.fill(0.0);
-                for (k, &j) in nb.iter().enumerate() {
-                    let w = self.weights[k];
-                    let row = &self.post[j * n..j * n + n];
-                    for (uc, &p) in u.iter_mut().zip(row) {
-                        *uc += w * f64::from(p);
-                    }
-                }
-                let mut s = 0f64;
-                for c in 0..n {
-                    let mut v = math::exp(b * u[c] - neg_g[i * n + c]) as f32;
-                    if let Some(pr) = priors {
-                        v *= pr[i * n + c];
-                    }
-                    e[c] = v;
-                    s += f64::from(v);
-                }
-                let row = &mut self.post[i * n..i * n + n];
-                for c in 0..n {
-                    row[c] = if s > 0.0 {
-                        (f64::from(e[c]) / s) as f32
-                    } else {
-                        0.0
-                    };
-                }
-            }
+            mrf_sweep(self.grid, &self.weights, &cells, &neg_g, b, priors, n);
             if verbose {
+                let total = weights_total(self.grid, &self.weights, n, |k| cell(&cells, k));
                 let _ = writeln!(
                     out,
                     "Tanaka-inner-loop-iteration={sweep} MRFWeightsTotal={} beta={}",
-                    g(f64::from(self.weights_total() as f32)),
+                    g(f64::from(total as f32)),
                     g(f64::from(beta))
                 );
             }
         }
+        self.post = from_cells(cells);
     }
 
-    /// `-v`'s `MRFWeightsTotal` after a sweep: `Σ_M Σ_c U_c p_c` over the posteriors as they
-    /// stand (observed: the first sweep's total is already near the last's, so it is not
-    /// accumulated during the sweep, whose neighbours ahead still hold random values).
     fn weights_total(&self) -> f64 {
-        let n = self.n;
-        let mut total = 0f64;
-        for i in 0..self.grid.len() {
-            let nb = self.grid.neighbours(i);
-            for c in 0..n {
-                let mut u = 0f64;
-                for (k, &j) in nb.iter().enumerate() {
-                    u += self.weights[k] * f64::from(self.post[j * n + c]);
-                }
-                total += u * f64::from(self.post[i * n + c]);
-            }
-        }
-        total
+        weights_total(self.grid, &self.weights, self.n, |k| self.post[k])
     }
+}
+
+/// `-v`'s `MRFWeightsTotal` after a sweep: `Σ_M Σ_c U_c p_c` over the posteriors as they stand
+/// (`post(k)`, serial; observed: the first sweep's total is already near the last's, so it is
+/// not accumulated during the sweep, whose neighbours ahead still hold random values).
+fn weights_total(grid: &Grid, w: &[f64; 18], n: usize, post: impl Fn(usize) -> f32) -> f64 {
+    let mut total = 0f64;
+    for i in 0..grid.len() {
+        let nb = grid.neighbours(i);
+        for c in 0..n {
+            let mut u = 0f64;
+            for (k, &j) in nb.iter().enumerate() {
+                u += w[k] * f64::from(post(j * n + c));
+            }
+            total += u * f64::from(post(i * n + c));
+        }
+    }
+    total
+}
+
+/// Runs `f` on a pool of `threads` threads (tests).
+#[cfg(test)]
+pub(crate) fn with_pool<R: Send>(threads: usize, f: impl FnOnce() -> R + Send) -> R {
+    larmorx_core::parallel::with_threads(threads, f).unwrap()
 }
 
 /// The classes' Gaussians from their statistics.
@@ -360,29 +448,32 @@ fn bias_field(
     len: usize,
 ) -> Vec<f32> {
     let n = s.len();
-    let v = grid.voxels();
-    let mut w = vec![0f32; v];
-    let mut r = vec![0f32; v];
-    for (i, &idx) in grid.index.iter().enumerate() {
-        let (mut ws, mut rs) = (0f32, 0f32);
-        for (c, &(m, var)) in s.iter().enumerate() {
-            let wc = post[i * n + c] / var;
-            ws += wc;
-            rs += wc * (y[i] - m);
-        }
-        w[idx as usize] = ws;
-        r[idx as usize] = rs;
-    }
+    // each mask voxel's weight and residual (in parallel), then over the image
+    let wr: Vec<(f32, f32)> = (0..grid.len())
+        .into_par_iter()
+        .map(|i| {
+            let (mut ws, mut rs) = (0f32, 0f32);
+            for (c, &(m, var)) in s.iter().enumerate() {
+                let wc = post[i * n + c] / var;
+                ws += wc;
+                rs += wc * (y[i] - m);
+            }
+            (ws, rs)
+        })
+        .collect();
+    let w = grid.expand(|i| wr[i].0, 0.0);
+    let r = grid.expand(|i| wr[i].1, 0.0);
+    drop(wr);
     let k = [&kernels[0][..], &kernels[1][..], &kernels[2][..]];
     let w = bias::smooth(w, grid.shape, k);
     let r = bias::smooth(r, grid.shape, k);
     let mut b: Vec<f32> = grid
         .index
-        .iter()
+        .par_iter()
         .map(|&idx| r[idx as usize] / w[idx as usize])
         .collect();
-    let mean = (stats::sum(b.iter().map(|&x| f64::from(x)), len) / (b.len().max(1) as f64)) as f32;
-    b.iter_mut().for_each(|x| *x -= mean);
+    let mean = (stats::sum_par(b.len(), len, |i| f64::from(b[i])) / (b.len().max(1) as f64)) as f32;
+    b.par_iter_mut().for_each(|x| *x -= mean);
     b
 }
 
@@ -557,9 +648,10 @@ fn finish(
     let mut yb = y.clone();
     let estimate = |post: &[f32], s: &[(f32, f32)], yb: &mut Vec<f32>| -> Vec<f32> {
         let b = bias_field(&grid, post, &y, s, &kernels, len);
-        for ((v, &y0), &bi) in yb.iter_mut().zip(&y).zip(&b) {
-            *v = y0 - bi;
-        }
+        yb.par_iter_mut()
+            .zip(y.par_iter())
+            .zip(b.par_iter())
+            .for_each(|((v, &y0), &bi)| *v = y0 - bi);
         b
     };
     if !p.no_bias {
@@ -696,13 +788,13 @@ fn finish(
         let r = pve::estimate(&grid, &sorted_post, &x, n, p.mixel, len);
         sums += 5 * n;
         let volumes: Vec<f64> = (0..n)
-            .map(|c| stats::sum((0..nm).map(|i| f64::from(r.frac[i * n + c])), len) * vox)
+            .map(|c| stats::sum_par(nm, len, |i| f64::from(r.frac[i * n + c])) * vox)
             .collect();
         (p.probabilities.then_some(q), Some(r), volumes)
     } else {
         sums += n;
         let volumes: Vec<f64> = (0..n)
-            .map(|c| stats::sum((0..nm).map(|i| f64::from(sorted_post[i * n + c])), len) * vox)
+            .map(|c| stats::sum_par(nm, len, |i| f64::from(sorted_post[i * n + c])) * vox)
             .collect();
         (init_members, None, volumes)
     };

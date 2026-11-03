@@ -5,6 +5,12 @@
 //! number, voxels outside the mask (and the padding) the number of an extra row of zeros. So a
 //! neighbour's posteriors are read without a bounds check or a mask test: a neighbour outside the
 //! image or the mask contributes `w · 0 = 0`, exactly what leaving it out gives.
+//!
+//! The in-place sweeps (FAST's MRF sweeps and the mixel ICM, Gauss-Seidel in storage order)
+//! run on several threads with exactly the serial result ([`Grid::gauss_seidel`], §10).
+
+use std::ops::Range;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// The 18 neighbours with a weight (the 6 face and 12 edge neighbours of the 3 × 3 × 3 block),
 /// in §4.2's order: z offset outermost, then y, then x; the 8 corners and the voxel itself have
@@ -45,6 +51,9 @@ pub struct Grid {
     pub padded: Vec<u32>,
     /// The image index of each mask voxel.
     pub index: Vec<u32>,
+    /// The mask numbers of each image row `r = z · ny + y` (x along the row):
+    /// `row_start[r]..row_start[r + 1]`.
+    pub row_start: Vec<u32>,
     /// The padded-grid offsets of [`NEIGHBOURS`].
     pub offsets: [isize; 18],
     /// Their weights (§4.2: the inverse distance in mm, double precision rounded to single).
@@ -81,8 +90,10 @@ impl Grid {
         }
         let mut padded = Vec::new();
         let mut index = Vec::new();
+        let mut row_start = Vec::with_capacity(ny * nz + 1);
         for z in 0..nz {
             for y in 0..ny {
+                row_start.push(padded.len() as u32);
                 let row = (z * ny + y) * nx;
                 let prow = ((z + 1) * py + y + 1) * px + 1;
                 for x in 0..nx {
@@ -93,6 +104,7 @@ impl Grid {
                 }
             }
         }
+        row_start.push(padded.len() as u32);
         let n = padded.len() as u32;
         let mut map = vec![n; total];
         for (k, &p) in padded.iter().enumerate() {
@@ -112,6 +124,7 @@ impl Grid {
             map,
             padded,
             index,
+            row_start,
             offsets,
             weights,
         })
@@ -141,6 +154,65 @@ impl Grid {
             out[k] = self.map[(p + self.offsets[k]) as usize] as usize;
         }
         out
+    }
+
+    /// Runs one in-place sweep over the mask voxels in storage order (Gauss-Seidel: each voxel
+    /// reads its earlier neighbours' new values and its later neighbours' old ones):
+    /// `update(range)` updates the mask voxels `range` of one image row, in order.
+    ///
+    /// On several threads (the current rayon pool's) the planes run as a pipeline with exactly
+    /// the serial result: a voxel's earlier neighbours are in the rows `(y-1..=y+1, z-1)` and
+    /// `(y-1, z)`, its later ones in `(y+1, z)` and `(y-1..=y+1, z+1)`, so row `(y, z)` starts
+    /// once plane `z-1` has finished row `y+1` (its own plane's rows run in order). The later
+    /// neighbours' rows wait for this one in the same way, so they still hold their old values
+    /// when it reads them. Planes are taken in increasing order by as many tasks as threads; a
+    /// task only waits for a plane another running task holds, so the sweep always progresses.
+    /// `update` must write only its own row's values (atomics, read and written `Relaxed`: the
+    /// row counters' release and acquire order them).
+    pub fn gauss_seidel(&self, update: impl Fn(Range<usize>) + Sync) {
+        let [_, ny, nz] = self.shape;
+        let workers = rayon::current_num_threads().min(nz);
+        if workers <= 1 || self.len() < 4096 {
+            update(0..self.len());
+            return;
+        }
+        let rows = |z: usize, y: usize| {
+            let r = z * ny + y;
+            self.row_start[r] as usize..self.row_start[r + 1] as usize
+        };
+        let done: Vec<AtomicUsize> = (0..nz).map(|_| AtomicUsize::new(0)).collect();
+        let next = AtomicUsize::new(0);
+        rayon::scope(|s| {
+            for _ in 0..workers {
+                s.spawn(|_| {
+                    loop {
+                        let z = next.fetch_add(1, Ordering::Relaxed);
+                        if z >= nz {
+                            break;
+                        }
+                        for y in 0..ny {
+                            if z > 0 {
+                                let need = (y + 2).min(ny);
+                                let mut spins = 0u32;
+                                while done[z - 1].load(Ordering::Acquire) < need {
+                                    if spins < 128 {
+                                        spins += 1;
+                                        std::hint::spin_loop();
+                                    } else {
+                                        std::thread::yield_now();
+                                    }
+                                }
+                            }
+                            let r = rows(z, y);
+                            if !r.is_empty() {
+                                update(r);
+                            }
+                            done[z].store(y + 1, Ordering::Release);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     /// A per-voxel quantity over the whole image: `compact[i]` at mask voxel `i`, `outside`
@@ -176,5 +248,40 @@ mod tests {
         );
         // a voxel at the image's edge: its outside neighbours read the row of zeros
         assert!(g.neighbours(0).contains(&26));
+    }
+
+    #[test]
+    fn pipelined_sweeps_are_serial_sweeps() {
+        use std::sync::atomic::AtomicU32;
+        // an irregular mask (whole rows, single voxels and empty planes) and a nonlinear
+        // in-place update: the pipeline on 2, 5 and 9 threads gives the serial sweep's bits
+        let shape = [21, 26, 17];
+        let mask = |i: usize| (i * 7919 + i / 21 * 13) % 11 > 2 && i / (21 * 26) != 5;
+        let g = Grid::new(shape, [1.0, 1.2, 0.9], mask).unwrap();
+        assert!(g.len() >= 4096);
+        let sweep = |threads: usize| -> Vec<u32> {
+            let v: Vec<AtomicU32> = (0..=g.len())
+                .map(|i| AtomicU32::new(if i < g.len() { (i % 97) as f32 } else { 0.0 }.to_bits()))
+                .collect();
+            crate::fast::single::with_pool(threads, || {
+                for _ in 0..3 {
+                    g.gauss_seidel(|r| {
+                        for i in r {
+                            let mut u = 0f32;
+                            for (k, &j) in g.neighbours(i).iter().enumerate() {
+                                u += g.weights[k] * f32::from_bits(v[j].load(Ordering::Relaxed));
+                            }
+                            let x = (u * 0.37 + 1.0).sqrt() + (u / 7.0).fract();
+                            v[i].store(x.to_bits(), Ordering::Relaxed);
+                        }
+                    });
+                }
+            });
+            v.into_iter().map(AtomicU32::into_inner).collect()
+        };
+        let serial = sweep(1);
+        for t in [2, 5, 9] {
+            assert_eq!(sweep(t), serial, "{t} threads");
+        }
     }
 }

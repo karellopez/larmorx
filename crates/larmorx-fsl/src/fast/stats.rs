@@ -3,6 +3,7 @@
 //! (§4.4) and the negative log Gaussian (§8.2).
 
 use larmorx_core::math;
+use rayon::prelude::*;
 
 /// π in single precision (`3.14159265` read as a float), as FAST's Gaussian uses it.
 pub const PI_F32: f32 = std::f32::consts::PI;
@@ -58,6 +59,49 @@ pub fn sum(values: impl IntoIterator<Item = f64>, len: usize) -> f64 {
     s.value()
 }
 
+/// `width` blocked sums over `count` values at once, each value `i` added by `add(i, parts)`
+/// (one value into each of the `width` partial sums, in order): FSL's blocks run in parallel,
+/// each in order from 0, and their partial sums are added in block order, the last (partial)
+/// block's last, so the result has exactly [`Blocked`]'s bits whatever the thread count.
+pub fn blocked_sums(
+    count: usize,
+    len: usize,
+    width: usize,
+    add: impl Fn(usize, &mut [f64]) + Sync,
+) -> Vec<f64> {
+    let len = len.max(1);
+    let parts: Vec<Vec<f64>> = (0..count.div_ceil(len))
+        .into_par_iter()
+        .map(|b| {
+            let mut part = vec![0f64; width];
+            for i in b * len..((b + 1) * len).min(count) {
+                add(i, &mut part);
+            }
+            part
+        })
+        .collect();
+    let full = count / len;
+    (0..width)
+        .map(|k| {
+            let mut total = 0f64;
+            for p in &parts[..full] {
+                total += p[k];
+            }
+            let last = if !count.is_multiple_of(len) {
+                parts[full][k]
+            } else {
+                0.0
+            };
+            total + last
+        })
+        .collect()
+}
+
+/// The blocked sum of `value(i)` for `i < count` ([`blocked_sums`]).
+pub fn sum_par(count: usize, len: usize, value: impl Fn(usize) -> f64 + Sync) -> f64 {
+    blocked_sums(count, len, 1, |i, p| p[0] += value(i))[0]
+}
+
 /// FSL's order for a percentile: ascending, NaN last.
 fn nan_last(a: &f32, b: &f32) -> std::cmp::Ordering {
     match (a.is_nan(), b.is_nan()) {
@@ -68,9 +112,10 @@ fn nan_last(a: &f32, b: &f32) -> std::cmp::Ordering {
     }
 }
 
-/// The values sorted as a percentile sorts them.
+/// The values sorted as a percentile sorts them (in parallel; values that compare equal are
+/// ordered by their bits, so the order is unique whatever the thread count).
 pub fn sorted(mut values: Vec<f32>) -> Vec<f32> {
-    values.sort_unstable_by(nan_last);
+    values.par_sort_unstable_by(|a, b| nan_last(a, b).then_with(|| a.to_bits().cmp(&b.to_bits())));
     values
 }
 
@@ -130,25 +175,26 @@ impl Gauss {
 /// `y` over the mask (§4.4): `μ = Σ p y / Σ p` rounded to single, `σ² = Σ p y y / Σ p - μ²`
 /// with the quotient in double and `μ²` in single, rounded to single.
 pub fn class_stats(post: &[f32], y: &[f32], n: usize, len: usize) -> Vec<(f32, f32)> {
-    let mut sums = vec![[Blocked::new(len); 3]; n];
-    for (i, &yi) in y.iter().enumerate() {
-        let row = &post[i * n..i * n + n];
-        for (c, &p) in row.iter().enumerate() {
+    // Σ p, Σ p y, Σ p y y of each class, FSL's blocked sums (in parallel, [`blocked_sums`])
+    let sums = blocked_sums(y.len(), len, 3 * n, |i, part| {
+        let yi = y[i];
+        for (c, &p) in post[i * n..i * n + n].iter().enumerate() {
             let py = p * yi;
             let pyy = py * yi;
-            let s = &mut sums[c];
-            s[0].add(f64::from(p));
-            s[1].add(f64::from(py));
-            s[2].add(f64::from(pyy));
+            part[3 * c] += f64::from(p);
+            part[3 * c + 1] += f64::from(py);
+            part[3 * c + 2] += f64::from(pyy);
         }
-    }
-    sums.iter()
+    });
+    sums.as_chunks::<3>()
+        .0
+        .iter()
         .map(|s| {
-            let w = s[0].value();
-            let mean = (s[1].value() / w) as f32;
+            let w = s[0];
+            let mean = (s[1] / w) as f32;
             // the second moment stays in double (observed against FSL with correctly rounded
             // maths, 2026-11-03: the spec's single-precision quotient gives other variances)
-            let var = (s[2].value() / w - f64::from(mean * mean)) as f32;
+            let var = (s[2] / w - f64::from(mean * mean)) as f32;
             (mean, var)
         })
         .collect()
@@ -167,6 +213,14 @@ mod tests {
             b.add(v);
         }
         assert_eq!(b.value(), 10.0);
+        // the parallel blocks give the serial bits, whatever the count's remainder
+        let vals: Vec<f64> = (0..10_007).map(|i| 1.0 / (1.0 + i as f64 * 0.37)).collect();
+        for (count, len) in [(10_007, 7), (10_000, 100), (9, 10), (0, 3), (5, 1)] {
+            let serial = sum(vals[..count].iter().copied(), len);
+            let par = larmorx_core::parallel::with_threads(4, || sum_par(count, len, |i| vals[i]))
+                .unwrap();
+            assert_eq!(serial.to_bits(), par.to_bits(), "{count} {len}");
+        }
         let v = [3.0, f32::NAN, 1.0, 2.0];
         let s = sorted(v.to_vec());
         assert_eq!(&s[..3], &[1.0, 2.0, 3.0]);

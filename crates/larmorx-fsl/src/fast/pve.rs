@@ -7,6 +7,9 @@
 //! Gaussian's normalisation) is computed once, not per voxel; the per-voxel work (likelihoods,
 //! fractions) runs in parallel, the sweep in storage order.
 
+use std::sync::atomic::AtomicU8;
+use std::sync::atomic::Ordering::Relaxed;
+
 use larmorx_core::math;
 use rayon::prelude::*;
 
@@ -155,8 +158,14 @@ pub fn estimate(
 
 /// The mixel types (§4.8.6, §4.8.7): each mask voxel's type of largest likelihood (`like`, `nt =
 /// n + pairs.len()` per voxel; the first on a tie, from -1), then one sweep of iterated
-/// conditional modes in storage order, in place, with the mixel MRF of weight `r` (`-R`).
-pub fn icm(grid: &Grid, like: &[f32], n: usize, pairs: &[(usize, usize)], r: f32) -> Vec<u8> {
+/// conditional modes in storage order, in place, with the mixel MRF of weight `r_weight` (`-R`).
+pub fn icm(
+    grid: &Grid,
+    like: &[f32],
+    n: usize,
+    pairs: &[(usize, usize)],
+    r_weight: f32,
+) -> Vec<u8> {
     let nm = grid.len();
     let nt = n + pairs.len();
     const NONE: u8 = u8::MAX;
@@ -185,27 +194,33 @@ pub fn icm(grid: &Grid, like: &[f32], n: usize, pairs: &[(usize, usize)], r: f32
             };
         }
     }
-    let mut k = vec![0f32; nt];
-    for i in 0..nm {
-        let nb = grid.neighbours(i);
-        k.fill(0.0);
-        for (q, &j) in nb.iter().enumerate() {
-            let w = grid.weights[q];
-            let u = types[j] as usize;
-            for (t, kt) in k.iter_mut().enumerate() {
-                *kt += w * factor[t][u];
+    // the sweep in storage order, in place, on the pipeline of [`Grid::gauss_seidel`]
+    let cells: Vec<AtomicU8> = types.into_iter().map(AtomicU8::new).collect();
+    grid.gauss_seidel(|r| {
+        let mut k = vec![0f32; nt];
+        for i in r {
+            let nb = grid.neighbours(i);
+            k.fill(0.0);
+            for (q, &j) in nb.iter().enumerate() {
+                let w = grid.weights[q];
+                let u = cells[j].load(Relaxed) as usize;
+                for (t, kt) in k.iter_mut().enumerate() {
+                    *kt += w * factor[t][u];
+                }
             }
-        }
-        let row = &like[i * nt..(i + 1) * nt];
-        let mut high = -1f32;
-        for (t, (&l, &kt)) in row.iter().zip(&k).enumerate() {
-            let v = l * math::expf(r * kt);
-            if v > high {
-                high = v;
-                types[i] = t as u8;
+            let row = &like[i * nt..(i + 1) * nt];
+            let (mut high, mut best) = (-1f32, cells[i].load(Relaxed));
+            for (t, (&l, &kt)) in row.iter().zip(&k).enumerate() {
+                let v = l * math::expf(r_weight * kt);
+                if v > high {
+                    high = v;
+                    best = t as u8;
+                }
             }
+            cells[i].store(best, Relaxed);
         }
-    }
+    });
+    let mut types: Vec<u8> = cells.into_iter().map(AtomicU8::into_inner).collect();
     types.truncate(nm);
     types
 }

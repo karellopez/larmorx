@@ -16,7 +16,7 @@ use larmorx_mri::hmc::files;
 
 use super::Settings;
 use super::bet2::{FSLOUTPUTTYPE_UNSET, resolve_image};
-use super::common::{image_exception, print_notices, read_rows};
+use super::common::{image_exception, name_start, print_notices, read_rows};
 use super::fmt::g;
 use super::options::atof;
 use super::topup_debug::{DebugOut, Printer};
@@ -292,7 +292,7 @@ fn find_config(settings: &Settings, name: &str) -> Result<Option<std::path::Path
             return Ok(Some(q));
         }
     }
-    let has_dir = name.contains('/');
+    let has_dir = name_start(name) > 0;
     if !has_dir {
         let Some(fsldir) = settings.get("FSLDIR") else {
             return Err(());
@@ -974,9 +974,10 @@ fn gcd(a: usize, b: usize) -> usize {
     if b == 0 { a } else { gcd(b, a % b) }
 }
 
-/// `--imain`'s path and name before the first `.` of its name.
+/// `--imain`'s path and name before the first `.` of its name (its name: after the last
+/// directory separator, [`name_start`]).
 fn default_stem(imain: &str) -> String {
-    let cut = imain.rfind('/').map_or(0, |i| i + 1);
+    let cut = name_start(imain);
     match imain[cut..].find('.') {
         Some(i) => imain[..cut + i].to_owned(),
         None => imain.to_owned(),
@@ -1479,5 +1480,32 @@ mod tests {
         assert_eq!(default_stem("dir.x/half.nii.gz"), "dir.x/half");
         assert_eq!(read_int(" 12x"), Some(12));
         assert_eq!(read_int("x"), None);
+    }
+
+    /// File names under a folder whose name holds a dot, with the platform's own separators
+    /// (`\` on Windows, as GitHub's runners give `C:\Users\RUNNER~1\...`): `--imain`'s
+    /// default stem and a configuration named without `.cnf` (docs/api/fsl-topup.md, "File
+    /// names on Windows"); on Linux and macOS `\` stays an ordinary character.
+    #[test]
+    fn file_names_under_a_folder_with_a_dot() {
+        let dir = std::env::temp_dir().join(format!("lx.topup.{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let imain = dir.join("half.nii.gz");
+        let stem = default_stem(imain.to_str().unwrap());
+        assert_eq!(stem, dir.join("half").to_str().unwrap());
+        let cnf = dir.join("b02b0.cnf");
+        std::fs::write(&cnf, "--warpres=20\n").unwrap();
+        let settings = Settings::default();
+        let named = dir.join("b02b0");
+        let found = find_config(&settings, named.to_str().unwrap());
+        assert_eq!(found, Ok(Some(cnf.clone())));
+        // a name with a directory is never looked for in $FSLDIR
+        assert_eq!(
+            find_config(&settings, dir.join("none").to_str().unwrap()),
+            Ok(None)
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+        let backslash = default_stem("a.b\\half.nii.gz");
+        assert_eq!(backslash, if cfg!(windows) { "a.b\\half" } else { "a" });
     }
 }

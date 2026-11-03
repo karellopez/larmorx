@@ -15,7 +15,7 @@ use larmorx_mri::hmc::files;
 
 use super::Settings;
 use super::bet2::{FSLOUTPUTTYPE_UNSET, resolve_image};
-use super::common::{abort, image_exception, print_notices, read_rows};
+use super::common::{abort, image_exception, name_start, print_notices, read_rows};
 use super::fmt;
 use super::options::atof;
 use crate::bet::image::{self, Output, Values};
@@ -132,11 +132,10 @@ fn parse(args: &[String]) -> Result<std::collections::BTreeMap<&'static str, Str
     Ok(given)
 }
 
-/// Whether the name has an extension (a `.` after its last directory separator; a backslash
-/// separates directories as `/` does).
+/// Whether the name has an extension (a `.` after its last directory separator,
+/// [`name_start`]: `\` one on Windows only).
 fn has_extension(name: &str) -> bool {
-    let cut = name.rfind(['/', '\\']).map_or(0, |i| i + 1);
-    name[cut..].contains('.')
+    name[name_start(name)..].contains('.')
 }
 
 /// The "No image files match" text of a missing image, else the reader's.
@@ -942,5 +941,22 @@ fn write_output(
             notices,
             &format!("{name} cannot be written ({e})"),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `--topup`'s base name under a folder whose name holds a dot, with the platform's own
+    /// separators (docs/api/fsl-topup.md, "File names on Windows"): no extension; `\` a
+    /// separator on Windows only.
+    #[test]
+    fn extensions_under_a_folder_with_a_dot() {
+        let dir = std::env::temp_dir().join("lx.applytopup").join("my_topup");
+        assert!(!has_extension(dir.to_str().unwrap()));
+        assert!(has_extension(dir.with_extension("nii").to_str().unwrap()));
+        assert!(!has_extension("a.b/my_topup"));
+        assert_eq!(has_extension("a.b\\my_topup"), !cfg!(windows));
     }
 }

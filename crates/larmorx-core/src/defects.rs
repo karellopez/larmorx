@@ -618,6 +618,8 @@ defects! {
         "-w of a 4D image without nonzero voxels gives the time range as a first volume of tsize - 1 with a size of 2 - tsize (negative for three or more volumes), while the x, y and z ranges cover the whole image";
     FSL_189 = "FSL-189", "fslstats", true,
         "with -json, -v and -V write the number of voxels in single precision: above 16,777,216 voxels (a 4D series, a large 3D image) the count is rounded";
+    FSL_201 = "FSL-201", "topup", true,
+        "with --estmov=1, the derivatives of the predicted volumes with respect to the rotations are forward differences (a step of 1e-5 rad) of rotation matrices built with a single-precision angle, cosine and sine and an axis entry slightly different from 1: their rounding, divided by the small step, adds a false scaling along the rotation's axis and errors of about 1 % to the matrix' derivative, so the gradient and the Gauss-Newton Hessian of the movements are not the cost's (the rotations' entries 0.4 to 40 % off on real images) and the minimisers end where this false gradient vanishes rather than at the cost's minimum";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

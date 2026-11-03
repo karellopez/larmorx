@@ -11,6 +11,7 @@
 //! FSL holds the stages as shared pointers, a stage that changes nothing pointing to the
 //! previous one; here a stage that is `None` is the previous one.
 
+use larmorx_core::defects;
 use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::basisfield::{FieldIndex, SplineField};
 use larmorx_nc_core::interp_partial::{ExtrapParams, Interpolator};
@@ -338,6 +339,46 @@ impl Scan {
         );
         let sdim = self.image_vxs(con, SizeType::Subsampled)?;
         let sf: [f64; 3] = [0, 1, 2].map(|k| idim[k] / sdim[k]);
+        if !con.reproduce() {
+            // FSL-201 corrected: the sampling positions' exact derivative (the movement
+            // matrices' derivatives in double precision) instead of FSL's forward difference
+            // of matrices built with single-precision angles, cosines and sines.
+            con.notice(
+                &defects::FSL_201,
+                "the movements' derivatives exact (FSL's forward differences of its single-precision rotation matrices are not its cost's)",
+            );
+            let s = rval.sampling_mat();
+            let dmat = exact_movement_derivative(&self.mp, &self.subsamp_centre(), i);
+            let n = rval.nvoxels() as usize;
+            let d = &self.derivs.data;
+            let (nx, ny, nz) = (rval.xsize(), rval.ysize(), rval.zsize());
+            // In the target grid's voxels: S⁻¹ (dM⁻¹/dp) S x.
+            let sd = [s.at(0, 0), s.at(1, 1), s.at(2, 2)];
+            for k in 0..nz {
+                for j in 0..ny {
+                    for ii in 0..nx {
+                        let x = [ii as f64 * sd[0], j as f64 * sd[1], k as f64 * sd[2]];
+                        let dy: [f64; 3] = [0, 1, 2].map(|r| {
+                            (dmat[r][0] * x[0] + dmat[r][1] * x[1] + dmat[r][2] * x[2] + dmat[r][3])
+                                / sd[r]
+                        });
+                        let idx = rval.idx(ii, j, k);
+                        let v = sf[0] * dy[0] * f64::from(d[idx])
+                            + sf[1] * dy[1] * f64::from(d[n + idx])
+                            + sf[2] * dy[2] * f64::from(d[2 * n + idx]);
+                        rval.data[idx] = v as f32;
+                    }
+                }
+            }
+            let jac = self.get_jacobian(con, field)?;
+            vol::mul_assign(&mut rval, &jac)?;
+            con.trace(self.tp, "Leaving TopupScan::GetMovementDerivative");
+            return Ok(rval);
+        }
+        con.notice(
+            &defects::FSL_201,
+            "FSL's movement derivatives: forward differences of its single-precision rotation matrices",
+        );
         let tiny = if i > 2 { 1e-5 } else { 1e-4 };
         let mut p = self.mp;
         p[i] += tiny;
@@ -569,6 +610,18 @@ impl Scan {
         m
     }
 
+    /// The centre `MovePar2Matrix` rotates about: `((n - 1) · voxel size) / 2` of the
+    /// subsampled scan, the product in single precision (larmorx, for FSL-201's correction).
+    fn subsamp_centre(&self) -> [f64; 3] {
+        let v = self.subsamp();
+        let c = |n: i64, d: f32| f64::from((n - 1) as f32 * d) / 2.0;
+        [
+            c(v.xsize(), v.xdim()),
+            c(v.ysize(), v.ydim()),
+            c(v.zsize(), v.zdim()),
+        ]
+    }
+
     /// `GetRigidBodyMatrix()`.
     pub fn rigid_body_matrix(&self, con: &Console) -> Mat {
         self.mp_to_matrix(con, &self.mp)
@@ -661,6 +714,57 @@ impl Scan {
         con.trace(self.tp, "Leaving TopupScan::update");
         Ok(())
     }
+}
+
+/// FSL-201's correction (larmorx; not FSL's code): the derivative of the inverse movement
+/// matrix `M⁻¹(y) = Rᵀ (y − c − t) + c` (`R = Rx Ry Rz`, the rotations' cosines and sines in
+/// double precision, correctly rounded) with respect to movement parameter `i` (0..2 the
+/// translations in mm, 3..5 the rotations in radians), as the three rows of a 3 × 4 affine
+/// matrix acting on positions in mm.
+fn exact_movement_derivative(mp: &[f64; 6], c: &[f64; 3], i: usize) -> [[f64; 4]; 3] {
+    let elem = |axis: usize, r: f64, deriv: bool| -> [[f64; 3]; 3] {
+        let (s, co) = (larmorx_core::math::sin(r), larmorx_core::math::cos(r));
+        // value: (c, s); derivative: (-s, c), the axis entry 1 or 0
+        let (a, b, e) = if deriv { (-s, co, 0.0) } else { (co, s, 1.0) };
+        match axis {
+            0 => [[e, 0.0, 0.0], [0.0, a, b], [0.0, -b, a]],
+            1 => [[a, 0.0, -b], [0.0, e, 0.0], [b, 0.0, a]],
+            _ => [[a, b, 0.0], [-b, a, 0.0], [0.0, 0.0, e]],
+        }
+    };
+    let mul = |p: &[[f64; 3]; 3], q: &[[f64; 3]; 3]| -> [[f64; 3]; 3] {
+        let mut o = [[0.0; 3]; 3];
+        for (r, row) in o.iter_mut().enumerate() {
+            for (k, v) in row.iter_mut().enumerate() {
+                *v = p[r][0] * q[0][k] + p[r][1] * q[1][k] + p[r][2] * q[2][k];
+            }
+        }
+        o
+    };
+    let factors = |d: Option<usize>| -> [[f64; 3]; 3] {
+        let e: Vec<[[f64; 3]; 3]> = (0..3).map(|a| elem(a, mp[3 + a], d == Some(a))).collect();
+        mul(&mul(&e[0], &e[1]), &e[2])
+    };
+    let mut out = [[0.0; 4]; 3];
+    if i < 3 {
+        // d/dt_i of Rᵀ (y − c − t) + c: −Rᵀ e_i, a constant
+        let r = factors(None);
+        for (row, o) in out.iter_mut().enumerate() {
+            o[3] = -r[i][row];
+        }
+    } else {
+        // d/dr of Rᵀ (y − c − t) + c: (dR/dr)ᵀ (y − c − t)
+        let dr = factors(Some(i - 3));
+        for (row, o) in out.iter_mut().enumerate() {
+            let mut tr = 0.0;
+            for k in 0..3 {
+                o[k] = dr[k][row];
+                tr -= dr[k][row] * (c[k] + mp[k]);
+            }
+            o[3] = tr;
+        }
+    }
+    out
 }
 
 /// Armadillo's error for a singular matrix in `inv(A) * B`.

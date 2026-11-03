@@ -312,6 +312,33 @@ opposite sign of the first one gets five parameters (the translation along the p
 is not estimable and stays 0) **(observed)**. Movements of the subsampled images are applied in
 their own grid.
 
+**The movement matrix** (spec writer, 2026-11-03). For the parameters `(t_x, t_y, t_z, r_x,
+r_y, r_z)` the matrix is `M y = R (y − c) + c + t` (positions `y` in mm), `R = R_x R_y R_z`
+with
+`R_x = [[1, 0, 0], [0, cos, sin], [0, −sin, cos]]`,
+`R_y = [[cos, 0, −sin], [0, 1, 0], [sin, 0, cos]]`,
+`R_z = [[cos, sin, 0], [−sin, cos, 0], [0, 0, 1]]` (each of its own angle), and `c` the centre
+of the image the level interpolates: `((n − 1) · v) / 2` per axis of the level's subsampled
+(and regridded) image, the product `(n − 1) · v` in single precision (spec writer, 2026-11-03).
+A volume is sampled at `M⁻¹` applied to the target voxel's position in mm, `Rᵀ (y − c − t) +
+c`, plus the field's displacement taken at the unmoved voxel; the Jacobian is not changed by the
+movement (the clean-room implementer's finding 13 confirmed: right) (spec writer, 2026-11-03).
+FSL builds each of the three elementary rotations from its angle `r` as follows, and these are
+the bits its matrices hold (spec writer, 2026-11-03):
+- `θ` = `|r|` rounded to single precision; when `θ < 1e-8` the elementary rotation is the
+  identity;
+- its cosine and sine are the single-precision cosine and sine of `θ` (rounded to single), the
+  sine with the sign of `r`;
+- its entry on the rotation's own axis (the `1` above) is `q²` with `q = r / θ` (the double
+  angle over its single-precision rounding), which differs from 1 by up to about 1.2e-7;
+- the elementary matrix about `c` is `[E, (I − E) c]`, the three multiplied in the order x, y,
+  z, then `t` added to the last column.
+The written matrices (`--rbmout`, §6) are these (about the full-resolution regridded image's
+centre, within 5e-7 mm of the input's): the 5e-8 the implementer saw on their diagonal is the
+axis entry `q²` (spec writer, 2026-11-03). The original may build the rotations in double
+precision with the axis entry 1 (the difference is below 1e-7 in every entry) except where
+FSL-201's `reproduce` needs FSL's matrices (§4.6).
+
 ### 4.4 Grids: regridding, subsampling, smoothing
 
 - **Regridding** (`--regrid=1`): the input is resampled once onto a grid of `n + s_max` voxels
@@ -336,10 +363,35 @@ their own grid.
   is sampled at the centres of the new grid's voxels, `(step - 1)/2 + j · step` in the old
   grid's voxels, `step = new s / old s`, and refitted with the *previous* level's knot spacing),
   the smoothing changes, the knot spacing changes (the field sampled at the voxels and refitted),
-  the movements fixed or estimated, the weight set **(observed)**.
-- **Refitting** a field to a sampled volume: per axis, the coefficients minimising the squared
-  error plus `0.005²` times the squared second differences of the coefficients (a small
-  curvature regularisation), applied one axis at a time.
+  the movements fixed or estimated, the weight set **(observed)**. Precisely (spec writer,
+  2026-11-03):
+  - a **change of subsampling** (the level's `--subsamp` differs from the previous level's):
+    the field (the previous level's spline) is evaluated at those centres into a
+    single-precision volume of the new target grid, and refitted (below) with the knot spacing
+    the *previous* level's `--warpres` gives on the new grid's voxels: `k = round(previous
+    warpres / new voxel size)` per axis, rounded half away from zero, 1 when that is 0 (probe
+    H: 20 mm on 6 mm voxels, 3);
+  - a **change of `--warpres`** (the level's value differs from the previous level's as a
+    number, **even when the knot spacing it gives is the same**, probes E and G): the field
+    is evaluated at the voxels of the level's target grid into a single-precision volume and
+    refitted with the level's own knot spacing. A level with the same `--warpres` and the same
+    subsampling keeps the field's coefficients unchanged (probe A);
+  - at level 1 the field (0) is made on the input's grid with level 1's `--warpres` and then
+    subsampled as above (it stays 0); after the last level, when it was subsampled, the
+    smoothing is removed and the field subsampled to 1 the same way (§6).
+- **Refitting** a field to a sampled volume (spec writer, 2026-11-03; the clean-room
+  implementer's finding 11 confirmed: right): along x, then along y of the result, then along
+  z, each line of `N` samples `y` (the voxels) gets the `C` coefficients
+  `c = (BᵀB + 0.005² SᵀS)⁻¹ Bᵀ y`, `B` the `N × C` matrix of the B-spline basis functions
+  (§4.2's layout) at the voxels, `S` a matrix with **only two non-zero rows**, the two second
+  differences of the coefficients that wrap around the ends of the line:
+  `c[C−1] − 2 c[0] + c[1]` and `c[C−2] − 2 c[C−1] + c[0]` (the interior second differences
+  take no part). The penalty is small; it acts on the end coefficients, which the samples
+  constrain weakly, and couples the two ends, so a refit changes a field even when the old
+  field lies in the new basis' span (probe G: 0.0014 Hz rms at the same knot spacing). The
+  product and the solve are in double precision (FSL's arithmetic: §9.1). This regularisation
+  is FSL's design, kept as FSL's (rule C, §10.2): it makes the small systems well posed and
+  its effect is far below §12's thresholds.
 
 ### 4.5 Interpolation
 

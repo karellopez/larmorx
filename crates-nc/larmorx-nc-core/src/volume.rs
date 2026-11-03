@@ -1205,15 +1205,30 @@ pub fn return_validimagefilename(filename: &str) -> Result<String, FslError> {
     Ok(validname)
 }
 
+/// The last directory separator of a file name: `/`, as in FSL; on Windows, where FSL does not
+/// run, `\` as well (a Windows path's directories may hold dots, as `C:\Users\...\.tmp1\b02b0`
+/// does, which FSL's name parsing at the last `/` would read as an extension). The one helper
+/// the FSL replicas parse a name's directory with (topup's `path`, `filename` and `extension`,
+/// [`find_pathname`]).
+pub fn last_separator(fullname: &str) -> Option<usize> {
+    if cfg!(windows) {
+        fullname.rfind(['/', '\\'])
+    } else {
+        fullname.rfind('/')
+    }
+}
+
 /// `find_pathname(filename)`: everything up to and including the last `/` (unchanged when there
-/// is none; the first character is never removed).
+/// is none; the first character is never removed). On Windows `\` separates as well
+/// ([`last_separator`]).
 pub fn find_pathname(filename: &str) -> String {
     let b = filename.as_bytes();
     if b.is_empty() {
         return String::new();
     }
+    let sep = |c: u8| c == b'/' || (cfg!(windows) && c == b'\\');
     let mut indx = b.len() - 1;
-    while b[indx] != b'/' && indx != 0 {
+    while !sep(b[indx]) && indx != 0 {
         indx -= 1;
     }
     if indx < b.len() - 1 {
@@ -2148,6 +2163,15 @@ mod tests {
         assert_eq!(make_basename("x.nii.gz_meanvol"), "x.nii.gz_meanvol");
         assert_eq!(make_basename("plain"), "plain");
         assert_eq!(find_pathname("/a/b/c.nii"), "/a/b/");
+        // a directory whose name holds a dot (a temporary folder's)
+        assert_eq!(find_pathname("/t/.tmp1/c.nii"), "/t/.tmp1/");
+        assert_eq!(last_separator("/t/.tmp1/c"), Some(8));
+        if cfg!(windows) {
+            assert_eq!(find_pathname(r"C:\t\.tmp1\c.nii"), r"C:\t\.tmp1\");
+            assert_eq!(last_separator(r"C:\t\.tmp1\c"), Some(9));
+        } else {
+            assert_eq!(last_separator(r"C:\t\.tmp1\c"), None);
+        }
         // No '/': everything after the first character is erased (FSL's loop stops at 0).
         assert_eq!(find_pathname("c.nii"), "c");
         assert_eq!(find_pathname(""), "");

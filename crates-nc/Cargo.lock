@@ -214,6 +214,7 @@ dependencies = [
  "larmorx-nc-fast",
  "larmorx-nc-flirt",
  "larmorx-nc-mcflirt",
+ "larmorx-nc-topup",
  "ruzstd",
  "sha2",
  "tempfile",
@@ -256,6 +257,15 @@ dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
  "rayon",
+ "tempfile",
+]
+
+[[package]]
+name = "larmorx-nc-topup"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
  "tempfile",
 ]
 

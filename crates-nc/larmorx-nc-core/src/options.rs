@@ -21,7 +21,15 @@
 //!   one), each piece read with `atof` (no check: `x` is 0), the vector cleared first: its old
 //!   buffer is kept, so reading past the new values reads what an earlier value (or the default)
 //!   left there ([`OptState::floats_buffer`]);
-//! - `usage()` prints the title, the example and every visible option to standard error.
+//! - a `std::vector<int>` option's value is split alike, each piece read with `atoi`;
+//! - `usage()` prints the title, the example and every visible option to standard error;
+//! - `parse_config_file` (topup, FNIRT) reads a file word by word: a word starting with `#`
+//!   discards the rest of its line, one starting with `--` is a long option, any other word is
+//!   an option whose value is the rest of its line; an option already set is left as it is
+//!   (overwrite mode `Ignore`); a line of 1023 characters or more ends the reading (`getline`'s
+//!   failure);
+//! - `operator<<(ostream, option)` ([`Opt::print`]) writes `# <help>` and `--key=value` (the log
+//!   files topup writes).
 
 use crate::cnum;
 
@@ -41,6 +49,7 @@ pub enum Kind {
     Int,
     Str,
     FloatVec,
+    IntVec,
 }
 
 /// An option's value.
@@ -52,6 +61,8 @@ pub enum Value {
     Str(String),
     /// `std::vector<float>`: its values.
     FloatVec(Vec<f32>),
+    /// `std::vector<int>`: its values.
+    IntVec(Vec<i32>),
 }
 
 /// One option: its keys (`-v,--verbose`), default, help text, and argument requirements.
@@ -73,6 +84,7 @@ impl Opt {
             Value::Int(_) => Kind::Int,
             Value::Str(_) => Kind::Str,
             Value::FloatVec(_) => Kind::FloatVec,
+            Value::IntVec(_) => Kind::IntVec,
         }
     }
 
@@ -90,6 +102,51 @@ impl Opt {
 
     fn has_arg(&self) -> bool {
         self.flag != ArgFlag::NoArgument
+    }
+
+    /// The first key of the short (`-x`) or long (`--x`) form (`short_form`, `long_form`).
+    fn form(&self, long: bool) -> &str {
+        self.key
+            .split(',')
+            .find(|k| k.starts_with("--") == long)
+            .unwrap_or("")
+    }
+
+    /// `operator<<(ostream, option)` (`Option<T>::print`): `# <help>`, a newline, then
+    /// `config_key()` and `value_string()`: `--key=value` (`-k value` without a long form); a
+    /// `bool` option its key when set, nothing otherwise. Values as `ostream` writes them
+    /// (floats `%g` with 6 digits, vectors joined by `,`).
+    pub fn print(&self, st: &OptState) -> String {
+        let mut s = format!("# {}\n", self.help);
+        if self.kind() == Kind::Bool {
+            if st.set {
+                let k = self.form(true);
+                s.push_str(if k.is_empty() { self.form(false) } else { k });
+            }
+            return s;
+        }
+        let long = self.form(true);
+        if long.is_empty() {
+            s.push_str(self.form(false));
+            s.push(' ');
+        } else {
+            s.push_str(long);
+            s.push('=');
+        }
+        let g = |v: f32| cnum::fmt_g(f64::from(v), 6);
+        match &st.value {
+            Value::Bool(_) => {}
+            Value::Float(v) => s.push_str(&g(*v)),
+            Value::Int(v) => s.push_str(&v.to_string()),
+            Value::Str(v) => s.push_str(v),
+            Value::FloatVec(v) => {
+                s.push_str(&v.iter().map(|&x| g(x)).collect::<Vec<_>>().join(","));
+            }
+            Value::IntVec(v) => {
+                s.push_str(&v.iter().map(i32::to_string).collect::<Vec<_>>().join(","));
+            }
+        }
+        s
     }
 
     /// `BaseOption::usage`.
@@ -155,6 +212,14 @@ impl OptState {
         (self.buffer.len() >= n).then(|| self.buffer[..n].to_vec())
     }
 
+    /// A `std::vector<int>` option's values.
+    pub fn ints(&self) -> &[i32] {
+        match &self.value {
+            Value::IntVec(v) => v,
+            _ => &[],
+        }
+    }
+
     /// `value(n)` of a multi-value option.
     pub fn float_at(&self, n: usize) -> f32 {
         match self.values.get(n) {
@@ -189,7 +254,87 @@ fn string_to_t(kind: Kind, s: &str) -> (Value, bool) {
             }
             (Value::FloatVec(v), true)
         }
+        Kind::IntVec => {
+            // string_to_T(vector<int>&, s): the same split, atoi each piece
+            let delin = if s.contains(':') { ':' } else { ',' };
+            let mut rest = format!("{s}{delin}");
+            let mut v = Vec::new();
+            while !rest.is_empty() {
+                let p = rest.find(delin).unwrap_or(rest.len());
+                v.push(cnum::atoi(&rest[..p]));
+                rest = rest[(p + 1).min(rest.len())..].to_owned();
+            }
+            (Value::IntVec(v), true)
+        }
     }
+}
+
+/// An `ifstream` read as `parse_config_file` reads it: words (`cf >> optstr`) and the rest of
+/// a line (`cf.getline(buffer, 1024)`), with the stream's end-of-file and failure states.
+struct ConfigReader<'a> {
+    b: &'a [u8],
+    pos: usize,
+    eof: bool,
+    fail: bool,
+}
+
+impl ConfigReader<'_> {
+    /// `cf >> optstr`: `None` once the stream has failed (or stood at its end).
+    fn word(&mut self) -> Option<String> {
+        if self.fail || self.eof {
+            self.fail = true;
+            return None;
+        }
+        while self.pos < self.b.len() && is_space(self.b[self.pos]) {
+            self.pos += 1;
+        }
+        if self.pos == self.b.len() {
+            self.eof = true;
+            self.fail = true;
+            return None;
+        }
+        let start = self.pos;
+        while self.pos < self.b.len() && !is_space(self.b[self.pos]) {
+            self.pos += 1;
+        }
+        if self.pos == self.b.len() {
+            self.eof = true;
+        }
+        Some(String::from_utf8_lossy(&self.b[start..self.pos]).into_owned())
+    }
+
+    /// `cf.getline(buffer, 1024)`: the line's rest up to its newline (taken, not kept), at most
+    /// 1023 characters (more fail the stream), cut at a NUL as `string(buffer)` cuts it.
+    fn getline(&mut self) -> String {
+        if self.fail || self.eof {
+            self.fail = true;
+            return String::new();
+        }
+        let start = self.pos;
+        let mut n = 0;
+        while n + 1 < 1024 && self.pos < self.b.len() && self.b[self.pos] != b'\n' {
+            self.pos += 1;
+            n += 1;
+        }
+        let line = &self.b[start..self.pos];
+        if self.pos == self.b.len() {
+            self.eof = true;
+            if n == 0 {
+                self.fail = true;
+            }
+        } else if self.b[self.pos] == b'\n' {
+            self.pos += 1;
+        } else {
+            self.fail = true;
+        }
+        let line = line.split(|&c| c == 0).next().unwrap_or(&[]);
+        String::from_utf8_lossy(line).into_owned()
+    }
+}
+
+/// `isspace` in the C locale.
+fn is_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
 }
 
 /// `OptionParser`.
@@ -404,6 +549,56 @@ impl OptionParser {
             states,
             stop: optpos,
         })
+    }
+
+    /// `parse_config_file(filename)` after the command line (`parsed`): the options the file
+    /// names, those already set left as they are; `Err` is the exception's text (an option that
+    /// does not exist, a value that cannot be set, or a file that cannot be opened). A
+    /// directory opens and reads as an empty file, as `ifstream` reads it.
+    pub fn parse_config_file(&self, parsed: &mut Parsed, filename: &str) -> Result<(), String> {
+        let path = std::path::Path::new(filename);
+        let bytes = if path.is_dir() {
+            Vec::new()
+        } else {
+            std::fs::read(path).map_err(|_| format!("{filename}: Couldn't open the file!"))?
+        };
+        let mut cf = ConfigReader {
+            b: &bytes,
+            pos: 0,
+            eof: false,
+            fail: false,
+        };
+        while let Some(optstr) = cf.word() {
+            if optstr.starts_with('#') {
+                cf.getline();
+            } else if optstr.starts_with("--") {
+                let name = optstr.split('=').next().unwrap_or("");
+                self.parse_option_ignore(&mut parsed.states, name, |p, st| {
+                    p.parse_long_option(st, &optstr)
+                })?;
+            } else {
+                let buffer = cf.getline();
+                self.parse_option_ignore(&mut parsed.states, &optstr, |p, st| {
+                    p.parse_option(st, &optstr, &buffer, &[], 0)
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    /// `parse_option` in overwrite mode `Ignore`: an option that does not exist is an error,
+    /// one already set is skipped, any other is parsed by `parse`.
+    fn parse_option_ignore(
+        &self,
+        states: &mut [OptState],
+        name: &str,
+        parse: impl FnOnce(&Self, &mut [OptState]) -> Result<usize, String>,
+    ) -> Result<(), String> {
+        match self.opts.iter().position(|o| o.matches(name)) {
+            None => Err(format!("{name}: Option doesn't exist!")),
+            Some(i) if states[i].set => Ok(()),
+            Some(_) => parse(self, states).map(|_| ()),
+        }
     }
 
     /// `check_compulsory_arguments(true)`: the text it prints for the compulsory options that

@@ -1,0 +1,52 @@
+# FLIRT part 2's spec answers (relay 3a, 2026-11-03): FSL 6.0.7.23's black-box runs, one per
+# line, through the oracle cache (the runner: validation/investigations/cleanroom-flirt/
+# programs2_fsl.py; `file:name=text` words are written into the run directory first, `@name`
+# names an input of the fsl-flirt-replica suite). Read by flirt_models.py.
+#
+# Q1 makerot (§15.4): -o writes 10 significant digits
+makerot -t 30 -o r.mat
+makerot -t 30 -a 0,0,4 -c 10,20,30 -o r.mat
+makerot -t 47.3 -a 1,2,3 -c 12.5,-7.25,40 -o r.mat
+makerot -t -123.4 -a 0.3,-0.8,0.1 -c 1.1,2.2,3.3 -o r.mat
+makerot -t 90 -a 1,0,0 -c 0,50,0 -o r.mat
+makerot -t 200 -a 1e-30,0,1 -o r.mat
+makerot -t 5.75e-7 -o r.mat
+makerot -t 5.7e-7 -c 3,4,5 -o r.mat
+makerot -t 33 -a 1,1,1 --cov=@epi.nii -o r.mat
+makerot -t 179.9 -a 0,1,0 -c 91,109,91 -o r.mat
+makerot -t 0.37 -a -2,0.5,7 -c -30,12,8 -o r.mat
+# Q2 avscale (§15.1): the check matrix and the inverted eddy matrix
+avscale --inverteddies 'file:m.mat=-1.1 0.1 0 3\n0.05 0.9 0.2 -1\n0 -0.1 1.2 2\n0 0 0 1\n' m.mat
+avscale --inverteddies 'file:m.mat=1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n' m.mat
+avscale --allparams 'file:m.mat=0.97 -0.08 0.02 -1.5\n0.07 1.01 -0.02 4\n-0.03 0.02 0.99 -3\n0 0 0 1\n' m.mat
+# Q8 matrix files (§2.2): convert_xfm -omat writes the matrix as read
+convert_xfm -omat o.mat 'file:m.mat=1 inf 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 0\n0 0 inf 1\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 1e400 5\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=0x10 1 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=# comment\n.x\n1 0 0 2.5e\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 1e-400 0 7\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=nan 2 3 4\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 0\n0 1 nan\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=-.5e+1 +2 .25 1.\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 0\nabc 1 2 3\n0 1 0 0\n1e5x 0 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 2 3 4\n5 6 7 8 9\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 0\n0 1 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 0 junk\n0 1 0 0\n0 0 1 0\n0 0 0 1\n' m.mat
+convert_xfm -omat o.mat 'file:m.mat=1 0 0 1e308x\n0 1 0 2.5e-3\n0 0 1 0\n0 0 0 1' m.mat
+# Q6 coordinates (§15.2): the identity mapping, so each triple read is printed as read
+img2imgcoord -src @epi.nii -dest @epi.nii 'file:c.txt=1 2 3\n4 5 6 7 8 9\n10 11\n12 13 14\n' c.txt
+img2imgcoord -src @epi.nii -dest @epi.nii 'file:c.txt=1 2 3\n4 5 nan\n7 8 9\n' c.txt
+img2imgcoord -src @epi.nii -dest @epi.nii 'file:c.txt=1 2 3 1e400 5 6 7 8 9\n' c.txt
+img2imgcoord -src @epi.nii -dest @epi.nii 'file:c.txt=1 2 3 4 5 1e-400 7 8 9\n' c.txt
+img2imgcoord -src @epi.nii -dest @epi.nii 'file:c.txt=0x10 2 3\n' c.txt
+# Q7 -warp of a readable image that is not a 3-volume field (4 volumes)
+img2imgcoord -v -src @epi.nii -dest @epi.nii -warp @bold4.nii 'file:c.txt=1 2 3\n' c.txt
+# Q9 midtrans: determinants that are not finite
+midtrans 'file:a.mat=1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n' 'file:i4.mat=1e200 0 0 0\n0 1e200 0 0\n0 0 1 0\n0 0 0 1\n' a.mat i4.mat
+midtrans 'file:a.mat=1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n' 'file:i5.mat=1e300 1e300 0 0\n1e300 1e300 0 0\n0 0 1e300 0\n0 0 0 1e300\n' a.mat i5.mat
+midtrans -v 'file:a.mat=1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n' 'file:i2.mat=1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1e300\n' a.mat i2.mat
+# Q10 pointflirt: `nan` reads 0 (the same output as with 0); both files missing
+pointflirt 'file:n.txt=1 2 nan\n4 5 6\n7 8 9\n1 1 1\n' 'file:m.txt=1 2 3\n4 5 6\n7 8 9\n1 1 1\n' -i n.txt -r m.txt
+pointflirt 'file:n.txt=1 2 0\n4 5 6\n7 8 9\n1 1 1\n' 'file:m.txt=1 2 3\n4 5 6\n7 8 9\n1 1 1\n' -i n.txt -r m.txt
+pointflirt -i none1.txt -r none2.txt

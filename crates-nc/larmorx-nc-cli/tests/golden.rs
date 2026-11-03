@@ -1995,12 +1995,28 @@ fn mismatch_dir() -> PathBuf {
 
 /// `arg` with every `{name}` replaced by the path of the generated input `name`.
 fn fill(arg: &str, inputs: &BTreeMap<&'static str, PathBuf>) -> String {
+    fill_with(arg, |name| inputs[name].display().to_string())
+}
+
+/// `arg` with every `{name}` replaced by the generated input's path relative to a case's run
+/// directory (`../<inputs' directory>/<file>`, with `/` on every platform): topup's log
+/// records its options as given, so no temporary or platform path enters an output.
+fn fill_relative(arg: &str, inputs: &BTreeMap<&'static str, PathBuf>) -> String {
+    fill_with(arg, |name| {
+        let p = &inputs[name];
+        let dir = p.parent().and_then(Path::file_name).unwrap();
+        let file = p.file_name().unwrap();
+        format!("../{}/{}", dir.to_string_lossy(), file.to_string_lossy())
+    })
+}
+
+fn fill_with(arg: &str, path: impl Fn(&str) -> String) -> String {
     let mut out = String::new();
     let mut rest = arg;
     while let Some(open) = rest.find('{') {
         let close = open + rest[open..].find('}').expect("a closing brace");
         out.push_str(&rest[..open]);
-        out.push_str(&inputs[&rest[open + 1..close]].display().to_string());
+        out.push_str(&path(&rest[open + 1..close]));
         rest = &rest[close + 1..];
     }
     out.push_str(rest);
@@ -2207,8 +2223,9 @@ fn golden() {
                 a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
                     .display()
                     .to_string(),
-                // `{name}` inside an argument (topup's `--imain={pe}`, applytopup's lists)
-                a if a.contains('{') => fill(a, &bet_inputs),
+                // `{name}` inside an argument (topup's `--imain={pe}`, applytopup's lists), as a
+                // path relative to the run directory (topup's log records it)
+                a if a.contains('{') => fill_relative(a, &bet_inputs),
                 other => other.to_owned(),
             })
             .collect();

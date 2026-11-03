@@ -26,7 +26,17 @@ reductions along T, X, Y, Z, `-roi`, `-bptf`, `-ztop`, `-ptoz`, `-pval`, `-pval0
 `-rank`, `-ranknorm`, `-randn`, TFCE (`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta`) and
 `-tensor_decomp` (relay 3; its eigenvectors' signs are its own: each one's largest component
 positive, where FSL's are LAPACK's) and `-roc` (relay 4): every operation of the usage text and
-the hidden ones. Where FSL convolves a large kernel by
+the hidden ones. Random testing (relay 6) corrected the geometry of a new grid along x
+(`-subsamp2`, `-subsamp2offc` and the reductions along X of an image FSL holds mirrored, or with
+a matrix unset), the morphological filters with a kernel image (FSL's off-centre warning goes by
+the kernel's sizes; a kernel without a value at or above 0.5 leaves every voxel as it is,
+silently), TFCE's checks in FSL's order, `-edge`'s and the subsampling's sums under the integer
+types (C's promoted arithmetic: they do not wrap), `-roc`'s false-positive candidates (the
+mask's voxels below the true voxels' bound) and `-ptoz`'s NaN (its sign flipped, as FSL's), and
+names FSL-154 for every uint8 image computed unsigned, FSL-157 for every int8 image written with
+`-odt input`, FSL-165 for `-fillh` and `-fillh26` of every image with an axis of size 1, and
+FSL-75 (below) in both modes ([findings](../findings/fsl-maths-original.md) 24 to 30). Where FSL
+convolves a large kernel by
 its FFT, the original computes the convolution by the direct sum (faster than FSL's FFT on
 every kernel the benchmarks measured), in the direct sum's
 orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
@@ -241,6 +251,11 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   at every size (kernels that are not point-symmetric, or of an even size, only).
 - **FSL-187** (shared with fslstats, BET and FLIRT): the robust range counts a value far above a
   histogram's range in its first bin: the last (none of fMRIPrep's inputs reaches it, measured).
+- **FSL-75** (shared with FLIRT and mcflirt): `-subsamp2` and `-subsamp2offc` compute a background
+  value they never use, which for some sizes (3 voxels along x and 2 or more along y or z, ...)
+  corrupts FSL's memory: FSL then aborts (`double free or corruption`), crashes or finishes after
+  writing its output, depending on its heap. No output voxel depends on it: the original names it
+  in both modes and writes the output.
 - **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle
   factors, are not correctly rounded (above).
 

@@ -930,6 +930,17 @@ def suite() -> Suite:
                 "eigenvalues are distinct by more than 1e-4 relative; -roc's printed area and "
                 "quartiles within 1e-5 absolute, its curve's numbers to 5 significant digits",
             ),
+            (
+                "TFCE",
+                "-tfce's values within 1e-5 of FSL's largest enhancement, the NaN and infinite "
+                "voxels identical (§21); -tfceS bit for bit",
+            ),
+            (
+                "FSL-75's heap corruption",
+                "where FSL ended by a signal (-subsamp2's unused background value corrupts its "
+                "heap for some sizes) and the original finished naming FSL-75: the outputs "
+                "compared, the exit status and glibc's message not",
+            ),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
         ],
         cases=cases,
@@ -940,7 +951,29 @@ def suite() -> Suite:
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
             "mode (D13) and its default `fix` pass against the reproduced run. The goodvoxels "
             "chain's ribbon is a stand-in: the segmentation's grey matter (the no-reconall runs "
-            "have no FreeSurfer ribbon)."
+            "have no FreeSurfer ribbon).\n\n"
+            "Random testing (one trial, 2026-11-03, "
+            "`<workspace>/oracles/difftest/2026-11-03-fsl-maths-original`: 20 minutes on 13 "
+            "workers, realistic cases only, FSL through the oracle cache): 150,000 chains of "
+            "fslmaths operations, 143,191 identical, 804 differing only by a named correction, "
+            "6,005 differing. Each of these re-run with the final build and triaged by category "
+            "(`validation/investigations/cleanroom-maths/trial_triage.json`, one reproducer per "
+            "category): 4,623 larmorx mistakes fixed (findings 24 to 30 of "
+            "`docs/findings/fsl-maths-original.md`; their 17 permanent cases in "
+            "`validation/difftest/cases/fsl-maths-original/`) and 58 chains those fixes reach; 96 "
+            "corrections of the suite's checks; 1,178 explained (-tensor_decomp of degenerate "
+            "tensors, the header's offsets after a grid change within 6 units in the last place, "
+            "-subsamp2's last bits under the floating types, the last bits of Φ and Φ⁻¹ in "
+            "-ztop, -ptoz and double -randn, -dog_edge's crossings at exact ties, sums cancelling "
+            "to near 0, signed zeros); 33 expected (-subsamp2offc's means, as this suite's two "
+            "cases); 7 registered (FSL-75: FSL's heap corruption ends it before it writes; the "
+            "original names it); **10 open**: 8 display ranges (`cal_min`, `cal_max`) after "
+            "-range that differ in their last bits (4 under `-dt double`, 1 under `-dt input`, 2 "
+            "after a sum; e.g. `fsl-maths-trial-41014-original`) or where FSL writes "
+            "-2147483648 and the original NaN (`fsl-maths-trial-100080-original`), and 2 of "
+            "-roc's curve numbers 5e-7 and 2.4e-7 from FSL's, beyond half a unit of the 5th "
+            "digit (`fsl-maths-trial-54988-original`, `fsl-maths-trial-76339-original`); the "
+            "findings' files are in the trial's `findings/fsl-maths-original/`."
         ),
     )
 

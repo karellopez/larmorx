@@ -571,7 +571,19 @@ def suite() -> Suite:
             "original is compared in `reproduce` mode (D13) and its default `fix` pass against "
             "the reproduced run. The goodvoxels calls run on FSL's own chain of fslmaths "
             "outputs (the ribbon a stand-in: the segmentation's grey matter, as the no-reconall "
-            "oracle runs have no FreeSurfer ribbon)."
+            "oracle runs have no FreeSurfer ribbon).\n\n"
+            "Random testing (the trial of fslmaths' original, 2026-11-03, "
+            "`<workspace>/oracles/difftest/2026-11-03-fsl-maths-original`: realistic cases only, "
+            "FSL through the oracle cache): 150,000 fslstats option lists, 149,214 identical, 7 "
+            "differing only by a named correction, 779 differing. Each of these re-run with the "
+            "final build and triaged by category "
+            "(`validation/investigations/cleanroom-maths/trial_triage.json`): 545 larmorx "
+            "mistakes fixed (findings 28 of `docs/findings/fsl-maths-original.md`: the "
+            "histograms without a histogram; 4 permanent cases in "
+            "`validation/difftest/cases/fsl-stats-original/`); 74 corrections of the suite's "
+            "checks (§10's bound over a histogram's lines and an output cut short); 160 "
+            "explained (129: -c and -C of images holding NaN and infinities, the NaN's sign; 31: "
+            "the last printed digit at §10's bound); none open."
         ),
     )
 

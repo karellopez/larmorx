@@ -23,7 +23,11 @@ documentation and black-box runs of FSL's program:
 option, preoption (`-t`, `-K`, `-json`), message, exit status and failure case, the defects
 FSL-181 to FSL-189 (relay 4 of its part; its suite `fsl-stats`: fMRIPrep's four goodvoxels
 calls and BET's call among its 158 cases, every one identical to FSL or failing alike, BET's
-`-C` within §10's bound: its x one unit in the sixth decimal off). `implementation="auto"` (the
+`-C` within §10's bound: its x one unit in the sixth decimal off). Random testing (relay 6)
+corrected its histograms without a histogram: with an empty mask `-h` and `-H` print
+`findHistogram: mask is empty` and then the histogram of zeros (the JSON holds the zeros), and
+without a histogram at all (a constant image's `-h`, FSL-186's `-H`) the text holds nothing and
+the JSON an empty list ([findings](../findings/fsl-maths-original.md) 28). `implementation="auto"` (the
 default) runs the replica when `larmorx-nc` is installed, the original otherwise; `"replica"`
 needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the original in this
 process on `n_threads` threads (its results the same at any count; a failure raises

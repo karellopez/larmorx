@@ -9,7 +9,8 @@ replica suite's runner, so a run made once is served after), and print what it w
 |---|---|
 | `probe_thresholds.py` | the thresholds' far side per computing type (FSL-152: `-thr`/`-uthr` inclusive, `-bin` exclusive, `short` wrapping too), `-save`'s type and display range, `-div`/`-rem`/`-max`/`-min` with an image of other sizes (FSL-159) (findings 1 to 3) |
 | `show_fsl.py <case> ...` | FSL's exit status, standard output and error on cases of the replica suite (`fsl-maths-replica`), by name: the messages of findings 4 |
-| `fsl_outputs.py <outdir> <case or args:...> ...` | FSL's output files, kept for analysis, for cases of the replica suite or ad-hoc command lines with its own inputs (an impulse, a ramp with a NaN or an infinity, asymmetric kernels): the Gaussian kernel's normalising sum, the FFT path's orientation and NaN, the subsampling's last bits (findings 7-9, 13) |
+| `fsl_outputs.py <outdir> <case or args:...> ...` | FSL's output files, kept for analysis, for cases of the replica suite or ad-hoc command lines with its own inputs (an impulse, a ramp with a NaN or an infinity, asymmetric kernels): the Gaussian kernel's normalising sum, the FFT path's orientation and NaN, the subsampling's last bits (findings 7-9, 13, 14); `impulse<n>` an impulse of n³ voxels |
+| `fit_orientation.py <dir>` | where FSL lands an asymmetric kernel on an impulse, as stored (its FFT path) or mirrored (its direct sum), for the same kernel on images of two sizes: FSL-192 (findings 14; the probes' command lines in its docstring) |
 
 Run from the repository with the validation package on the path, inside a memory box:
 

@@ -10,7 +10,8 @@ Run (in a memory box): ``python -P fsl_outputs.py <outdir> <case or 'args:...'> 
 - ``args:<name>:<arg> <arg> ...``: fslmaths' arguments, ``@name`` naming a replica-suite input
   (copied into the run directory) or ``@probe:<recipe>`` one of this script's own inputs
   (``impulse``: a 15 × 15 × 15 float image of zeros with 1 at its centre, voxel sizes 2, 2.5,
-  3; ``ramp``: a 16 × 13 × 11 float image ``x + 20 y + 400 z`` with the same voxel sizes
+  3; ``impulse<n>``: the same of ``n`` voxels per axis; ``ramp``: a 16 × 13 × 11 float image
+  ``x + 20 y + 400 z`` with the same voxel sizes
   (``rampnan``, ``rampinf``: its first voxel NaN or +inf);
   ``asym``: a 13 × 11 × 9 asymmetric kernel file of values in [0, 1); ``asym<nx>x<ny>x<nz>``: an
   asymmetric kernel of those sizes, values ``1 + x + 3 y + 7 z``), each written once with fixed
@@ -35,6 +36,11 @@ def _probe_input(name: str, d: Path) -> str:
     if name == "impulse":
         a = np.zeros((15, 15, 15), dtype=np.float32)
         a[7, 7, 7] = 1.0
+    elif name.startswith("impulse") and name[7:].isdigit():
+        # impulse<n>: an n x n x n impulse (n odd), the 1 at its centre
+        n = int(name[7:])
+        a = np.zeros((n, n, n), dtype=np.float32)
+        a[n // 2, n // 2, n // 2] = 1.0
     elif name in ("ramp", "rampnan", "rampinf"):
         x, y, z = np.meshgrid(np.arange(16), np.arange(13), np.arange(11), indexing="ij")
         a = (x + 20 * y + 400 * z).astype(np.float32)

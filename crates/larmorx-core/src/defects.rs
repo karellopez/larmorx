@@ -620,6 +620,8 @@ defects! {
         "with -json, -v and -V write the number of voxels in single precision: above 16,777,216 voxels (a 4D series, a large 3D image) the count is rounded";
     FSL_191 = "FSL-191", "fslmaths", true,
         "-fmean and -fmeanu with a kernel large enough for FSL's FFT convolution (nvox * nker > 44 * 2 nvox * log2(2 nvox)) make every voxel of a volume NaN when one of its voxels is NaN or infinite, where the direct sum FSL uses for smaller kernels leaves NaN only within the kernel's reach of that voxel";
+    FSL_192 = "FSL-192", "fslmaths", true,
+        "-fmean and -fmeanu with a kernel large enough for FSL's FFT convolution (nvox * nker > 44 * 2 nvox * log2(2 nvox)) apply the kernel mirrored along every axis (a true convolution), where the direct sum FSL uses for smaller kernels or larger images applies it as stored (a correlation): for a kernel that is not point-symmetric, or of an even size, the result depends on the kernel's and the image's sizes";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

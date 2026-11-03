@@ -91,10 +91,12 @@ the 15 × 15 × 15 impulse: on the direct path (`6 × 4 × 2`) kernel voxel `i` 
 `14 × 12 × 10`) at `7 − c + i` (a true convolution: the image at `x + c − i`), `c = (n − 1) / 2`
 in both. For a symmetric kernel of even size the two windows are one voxel apart
 (`conv/fft-even`, `-kernel boxv 12 -fmeanu`: `[x − 6, x + 5]` where the direct sum takes
-`[x − 5, x + 6]`). The original computes the direct sum in both cases, with the flipped kernel
-where FSL would take its FFT (§10.2's criterion; no off-centre warning there, as in FSL); its
-results are within 2.6e-6 of FSL's largest magnitude (the record's expected divergences: the
-FFT's rounding is relative to the image's largest values, not to each voxel's last place).
+`[x − 5, x + 6]`). The original computes the direct sum in both cases; with `reproduce` it takes
+the flipped kernel where FSL would take its FFT (§10.2's criterion; no off-centre warning there,
+as in FSL), and its results are then within 2.6e-6 of FSL's largest magnitude (the record's
+expected divergences: the FFT's rounding is relative to the image's largest values, not to each
+voxel's last place). The default keeps the direct sum's orientation at every size: FSL-192
+(finding 14).
 
 ## 9. FSL-191: a NaN on the FFT path makes the whole volume NaN, relay 2
 
@@ -139,3 +141,26 @@ computing type, the weights in double); its results are within 1.1e-7 of FSL's l
 (the record's expected divergences: up to 32 units in the last place at voxels whose value
 cancels to near 0). Under the integer types the results are bit for bit (`sub/subsamp2-short`,
 `sub/subsamp2offc-int`).
+
+## 14. FSL-192: the kernel's orientation depends on the kernel's and the image's sizes, relay 3
+
+The same kernel and the same operation on two images that differ only in size
+(`fsl_outputs.py`, then `fit_orientation.py`): `-kernel file @probe:asym13x11x9 -fmeanu` of an
+impulse of 23 × 23 × 23 voxels (12,167 voxels: §10.2's criterion takes the FFT) lands the
+normalised kernel as stored (a convolution: largest relative error 1.1e-7 as stored, 0.99
+mirrored), and of an impulse of 25 × 25 × 25 voxels (15,625: the direct sum) mirrored along every
+axis (a correlation: 3.8e-8 mirrored, 0.99 as stored); `-fmean` the same (the direct path
+2.6e-7 mirrored; the FFT path 0.083 as stored against 1.1 mirrored, its division by the
+convolution of ones changing the values near the image's edges). An even kernel (`asym14x12x10`) on the 15³ impulse
+(FFT) and on a 67³ one (300,763 voxels: the direct sum, with the off-centre warning): as stored
+(1.5e-7) and mirrored (4.9e-8), and its centre moves by one voxel along each axis. So for a kernel
+that is not point-symmetric, or of an even size, fslmaths' result changes with the image's size
+and the kernel's (FSL's internal switch between its two convolutions), not with the operation
+asked for. The input makes sense and the result depends on an internal switch: **rule A**. The
+default applies the kernel in the direct sum's orientation at every size, named where the two
+orientations' results differ (the default computes both on that path to know); `reproduce`
+mirrors it where FSL takes its FFT. Symmetric kernels of odd sizes (every `-kernel` type but an
+even `box`/`boxv`/`boxv3` and asymmetric files) are not affected. fMRIPrep's calls do not reach
+it (goodvoxels' `-s 5` is separable). New register entry FSL-192 (the handoff); the suite's cases
+`orig/fft-asym` (the default's fix pass names it) and `orig/direct-asym` (the direct path's
+orientation, bit for bit).

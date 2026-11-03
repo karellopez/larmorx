@@ -452,17 +452,20 @@ def _agree_on_errors(checks: CheckList, oracle: rep.Completed) -> None:
 
 def own_inputs() -> Path:
     """The original's own synthetic inputs, made once (fixed bytes): ``ramp16`` (16 x 13 x 11,
-    ``x + 20 y + 400 z``), ``rampnan`` (its first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel,
+    ``x + 20 y + 400 z``), ``ramp25`` (25 x 25 x 25, ``x + 30 y + 900 z``), ``rampnan`` (its first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel,
     ``1 + x + 3 y + 7 z``); voxel sizes 2, 2.5, 3."""
     ws = rep.workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v1.done"
+    marker = base / "v2.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
     x, y, z = np.meshgrid(np.arange(16), np.arange(13), np.arange(11), indexing="ij")
     ramp = (x + 20 * y + 400 * z).astype(np.float32)
     rep._save(base / "ramp16.nii.gz", ramp, dtype=np.float32, affine=rep._affine(ramp.shape))
+    x, y, z = np.meshgrid(np.arange(25), np.arange(25), np.arange(25), indexing="ij")
+    ramp25 = (x + 30 * y + 900 * z).astype(np.float32)
+    rep._save(base / "ramp25.nii.gz", ramp25, dtype=np.float32, affine=rep._affine(ramp25.shape))
     nan = ramp.copy()
     nan[0, 0, 0] = np.nan
     rep._save(base / "rampnan.nii.gz", nan, dtype=np.float32, affine=rep._affine(nan.shape))
@@ -494,9 +497,16 @@ def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
     return {
         "orig/fft-asym": (
             T,
-            "-kernel file (asymmetric, 13 x 11 x 9) -fmeanu of a 16 x 13 x 11 image (FSL's FFT "
-            "path: a true convolution, the kernel flipped)",
+            "FSL-192: -kernel file (asymmetric, 13 x 11 x 9) -fmeanu of a 16 x 13 x 11 image "
+            "(FSL's FFT path: a true convolution, the kernel mirrored; the default keeps the "
+            "direct sum's orientation)",
             rep._r("@orig:ramp16", "-kernel", "file", "@orig:asym", "-fmeanu", "out"),
+        ),
+        "orig/direct-asym": (
+            T,
+            "the same kernel -fmeanu of a 25 x 25 x 25 image (FSL's direct sum: a correlation, "
+            "the kernel as stored; FSL-192's reference orientation)",
+            rep._r("@orig:ramp25", "-kernel", "file", "@orig:asym", "-fmeanu", "out"),
         ),
         "orig/fft-nan-local": (
             T,

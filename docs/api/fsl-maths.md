@@ -228,6 +228,10 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 - **FSL-191** (the clean-room original's black-box runs): with a kernel large enough for FSL's
   FFT convolution, `-fmean` and `-fmeanu` make the whole volume NaN when one voxel is NaN or
   infinite: NaN only within the kernel's reach, as FSL's direct sum for smaller kernels gives.
+- **FSL-192** (the clean-room original's black-box runs): with a kernel large enough for FSL's
+  FFT convolution, `-fmean` and `-fmeanu` apply the kernel mirrored along every axis, where FSL's
+  direct sum (smaller kernels, larger images) applies it as stored: the direct sum's orientation
+  at every size (kernels that are not point-symmetric, or of an even size, only).
 - **FSL-187** (shared with fslstats, BET and FLIRT): the robust range counts a value far above a
   histogram's range in its first bin: the last (none of fMRIPrep's inputs reaches it, measured).
 - **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle

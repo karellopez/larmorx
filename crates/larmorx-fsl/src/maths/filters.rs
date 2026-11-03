@@ -629,11 +629,32 @@ fn flipped(k: &Kernel) -> Kernel {
     f
 }
 
+/// Whether mirroring `k` along every axis (about its centre `(n − 1) / 2`, the mirrored
+/// kernel's centre `n − 1 − (n − 1) / 2`) leaves its application unchanged: every size odd and
+/// every value equal to its mirror's, bit for bit.
+fn point_symmetric(k: &Kernel) -> bool {
+    let [nx, ny, nz] = k.size();
+    if k.dims.iter().any(|&d| d > 0 && d % 2 == 0) {
+        return false;
+    }
+    (0..nz).all(|z| {
+        (0..ny).all(|y| {
+            (0..nx).all(|x| {
+                k.at(x, y, z).to_bits() == k.at(nx - 1 - x, ny - 1 - y, nz - 1 - z).to_bits()
+            })
+        })
+    })
+}
+
 /// The convolution of every volume with `k` (outside the image: 0). Where FSL takes the direct
 /// sum: a correlation with the kernel's centre and the warning per volume when a size is even.
-/// Where FSL takes its FFT (§10.2): the true convolution (the flipped kernel), no warning, and
-/// FSL-191: a volume holding a NaN or infinite voxel is NaN throughout in FSL, which the
-/// default corrects (the direct sum keeps the NaN within the kernel's reach).
+/// Where FSL takes its FFT (§10.2), no warning, and two defects of that path:
+/// - FSL-192: FSL's FFT is a true convolution (the kernel mirrored), so the kernel's orientation
+///   depends on the kernel's and the image's sizes; the default keeps the direct sum's
+///   orientation at every size, `reproduce` mirrors the kernel there (named where the two
+///   results differ, which the default computes to know);
+/// - FSL-191: a volume holding a NaN or infinite voxel is NaN throughout in FSL, which the
+///   default corrects (the direct sum keeps the NaN within the kernel's reach).
 fn convolve_all<T: Num>(
     img: &Img<T>,
     k: &Kernel,
@@ -645,14 +666,17 @@ fn convolve_all<T: Num>(
     let (dims, per) = grid(img);
     let fft = fsl_uses_fft(per, k.data.len());
     let warn = k.dims.iter().any(|d| d % 2 == 0) && !fft;
-    let (kk, centre) = if fft {
-        (flipped(k), k.dims.map(|n| n - 1 - (n - 1) / 2))
-    } else {
-        (k.clone(), k.centre())
+    // FSL-192: the mirrored kernel and its centre, where FSL's FFT would mirror it
+    let mirror = (fft && !k.is_empty() && !point_symmetric(k))
+        .then(|| (flipped(k), k.dims.map(|n| n - 1 - (n - 1) / 2)));
+    let (kk, centre) = match (&mirror, fix) {
+        (Some((m, c)), false) => (m.clone(), *c),
+        _ => (k.clone(), k.centre()),
     };
     let mut out = Vec::with_capacity(img.data.len());
     let mut changed = false;
     let mut poisoned = false;
+    let mut mirrored = false;
     for t in 0..img.dims[3] {
         if warn {
             let _ = writeln!(err, "{OFF_CENTRE_CONV}");
@@ -672,6 +696,13 @@ fn convolve_all<T: Num>(
             continue;
         }
         let (o, ch) = direct_volume(vol, dims, &kk, centre, fix);
+        if let Some((m, c)) = &mirror {
+            // named where FSL's mirrored kernel gives another result (reproduce: it is that)
+            mirrored |= !fix || {
+                let (r, _) = direct_volume(vol, dims, m, *c, fix);
+                o.par_iter().zip(r.par_iter()).any(|(a, b)| !a.same(*b))
+            };
+        }
         if bad {
             // named where the local result differs from FSL's NaN volume
             let nan = vol
@@ -683,6 +714,20 @@ fn convolve_all<T: Num>(
         }
         changed |= ch;
         out.extend_from_slice(&o);
+    }
+    if mirrored {
+        let detail = match notices.mode() {
+            UpstreamDefects::Fix => format!(
+                "{op} with a kernel FSL convolves by its FFT: the kernel applied as stored, as \
+                 FSL's direct sum applies it for smaller kernels (FSL's FFT mirrors it along \
+                 every axis)"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "{op} with a kernel FSL convolves by its FFT: the kernel mirrored along every \
+                 axis, as FSL's FFT applies it"
+            ),
+        };
+        notices.add(&defects::FSL_192, detail);
     }
     if poisoned {
         let detail = match notices.mode() {
@@ -920,24 +965,43 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_fft_path_flips_the_kernel_and_fsl_191() {
-        // 16 voxels in a row and a kernel of 15: FSL's FFT path, a true convolution
-        let n = 16;
-        let mut data: Vec<f32> = vec![0.0; n];
-        data[8] = 1.0;
-        let big = Kernel::from_values([15, 1, 1], (1..=15).map(|v| v as f32).collect());
-        let im = img([n, 1, 1, 1], data);
+    fn fsl_192_the_fft_path_mirrors_the_kernel_and_fsl_191() {
+        // a 64 x 64 impulse and a 41 x 41 kernel: FSL's FFT path, a true convolution
+        let (n, m) = (64, 41);
+        let mut data: Vec<f32> = vec![0.0; n * n];
+        data[32 + n * 32] = 1.0;
+        let values = (0..m * m)
+            .map(|v| (1 + v % m + m * (v / m)) as f32)
+            .collect();
+        let big = Kernel::from_values([m, m, 1], values);
+        let im = img([n, n, 1, 1], data);
         let mut err = Vec::new();
-        let mut ns = notices(UpstreamDefects::Fix);
-        let (fft, _) = convolve_all(&im, &big, "-fmeanu", &mut ns, &mut err);
-        let (_, per) = grid(&im);
-        if fsl_uses_fft(per, 15) {
-            // the impulse at 8 gives kernel voxel i at 8 - 7 + i
-            assert_eq!(fft[1], 1.0);
-        } else {
-            // the correlation: kernel voxel i at 8 + 7 - i
-            assert_eq!(fft[15], 1.0);
-        }
+        assert!(fsl_uses_fft(n * n, m * m));
+        let at = |x: usize, y: usize| x + n * y;
+        // reproduce: kernel voxel (i, j) at (32 - 20 + i, 32 - 20 + j) (FSL's FFT)
+        let mut rep = notices(UpstreamDefects::Reproduce);
+        let (o, _) = convolve_all(&im, &big, "-fmeanu", &mut rep, &mut err);
+        assert!(o[at(12, 12)] == 1.0 && o[at(52, 52)] == 1681.0);
+        // the default: the correlation of FSL's direct sum, at (32 + 20 - i, 32 + 20 - j)
+        let mut fix = notices(UpstreamDefects::Fix);
+        let (o, _) = convolve_all(&im, &big, "-fmeanu", &mut fix, &mut err);
+        assert!(o[at(52, 52)] == 1.0 && o[at(12, 12)] == 1681.0);
+        assert!(fix.contains(&defects::FSL_192) && rep.contains(&defects::FSL_192));
+        // a point-symmetric kernel: the same either way, not named
+        let mut fix = notices(UpstreamDefects::Fix);
+        convolve_all(
+            &im,
+            &Kernel::ones([m as i64, m as i64, 1], false),
+            "-fmeanu",
+            &mut fix,
+            &mut err,
+        );
+        assert!(!fix.contains(&defects::FSL_192));
+        // an image the orientation does not change (zeros): not named in the default
+        let zeros = img([n, n, 1, 1], vec![0.0; n * n]);
+        let mut fix = notices(UpstreamDefects::Fix);
+        convolve_all(&zeros, &big, "-fmeanu", &mut fix, &mut err);
+        assert!(!fix.contains(&defects::FSL_192));
         // FSL-191: a NaN on the FFT path poisons the volume only with reproduce
         let w = 64 * 64;
         let mut data = vec![1.0f32; w];

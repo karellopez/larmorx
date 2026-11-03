@@ -33,7 +33,7 @@ def main(finding: str, which: str = "shrunk") -> None:
             p = d / (name + inputs.suffix_of(spec))
             inputs.materialize(spec, p)
             names[name] = p.name
-        words = core.substitute(core.arguments(r), lambda n: names[n])
+        words = core.substitute(core.arguments(r), names.__getitem__)
         if who == "fsl":
             p = fm.oracle_run(words, cwd=d, settings=settings)
         else:

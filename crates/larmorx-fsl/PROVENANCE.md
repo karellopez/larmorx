@@ -223,10 +223,12 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
 | `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |
 
-## topup (`topup`; relays 1 and 2, 2026-11-03)
+## topup and applytopup (`topup`; relays 1 to 3, 2026-11-03)
 
 `topup` (the estimation of the susceptibility-induced field from reversed phase-encoding images:
-its command line, configuration files, levels, field, cost, minimisers and outputs) was written
+its command line, configuration files, levels, field, cost, minimisers and outputs) and
+`applytopup` (the correction with that field: Jacobian modulation and least-squares
+restoration, its command line and messages; relay 3) were written
 by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
 `crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
 `crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings (`docs/findings/fsl-topup.md`,
@@ -238,9 +240,9 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | Input | What it gave |
 |---|---|
 | [`specs/topup.md`](../../specs/topup.md) (FSL 6.0.7.23, fsl-topup 2203.5) | the behaviour: the command line, the configuration files, the acquisition parameters, the levels, the field's basis, the model, the cost, the minimisers, the outputs, the messages, the numeric conventions, the defects |
-| J. L. R. Andersson, S. Skare, J. Ashburner, NeuroImage 20(2):870-888, 2003; S. M. Smith et al., NeuroImage 23:S208-S219, 2004; FSL's TopupUsersGuide; M. F. Møller, "A scaled conjugate gradient algorithm for fast supervised learning", Neural Networks 6:525-533, 1993 (in C. M. Bishop's formulation) | the model, Levenberg-Marquardt and the scaled conjugate gradients |
-| Black-box runs of FSL 6.0.7.23's `topup` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-topup/`](../../validation/investigations/cleanroom-topup/README.md), with `-v` and `--debug`) | the observations of [`docs/findings/fsl-topup-original.md`](../../docs/findings/fsl-topup-original.md): the periodic interpolation along every axis, the mask, the coefficients' layout, the gradient's and the Gauss-Newton Hessian's factors, the regulariser (a sum at the integer points of the support), the conjugate-gradient solve of the Levenberg-Marquardt step, the scaled conjugate gradients' parameters, the level transitions, the outputs' headers and values |
-| The defect register's summary rows of FSL-116 to FSL-126 (`larmorx_core::defects`) | the defects' names in the notices |
+| J. L. R. Andersson, S. Skare, J. Ashburner, NeuroImage 20(2):870-888, 2003; S. M. Smith et al., NeuroImage 23:S208-S219, 2004; FSL's TopupUsersGuide and ApplytopupUsersGuide; M. F. Møller, "A scaled conjugate gradient algorithm for fast supervised learning", Neural Networks 6:525-533, 1993 (in C. M. Bishop's formulation) | the model, Levenberg-Marquardt and the scaled conjugate gradients |
+| Black-box runs of FSL 6.0.7.23's `topup` and `applytopup` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-topup/`](../../validation/investigations/cleanroom-topup/README.md), with `-v` and `--debug`) | the observations of [`docs/findings/fsl-topup-original.md`](../../docs/findings/fsl-topup-original.md): the periodic interpolation along every axis, the mask, the coefficients' layout, the gradient's and the Gauss-Newton Hessian's factors, the regulariser (a sum at the integer points of the support), the conjugate-gradient solve of the Levenberg-Marquardt step, the scaled conjugate gradients' parameters, the level transitions, the outputs' headers and values; applytopup's sampling, mask, Jacobians, restoration matrices, movements as matrices (findings 17 to 22) |
+| The defect register's summary rows of FSL-116 to FSL-126 and FSL-132 to FSL-135 (`larmorx_core::defects`) | the defects' names in the notices |
 | larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options, fmt}` (FSL's image names, reading and writing, the matrix reader, `%g`), `larmorx_core` (thread pools, D13) | images, options, numbers, threads |
 
 | larmorx | Behaviour reproduced | Source |
@@ -254,3 +256,5 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | `topup` (`estimate`) | the levels, the transitions between them, the full-resolution predictions | §2.4, §4.4, §6; findings |
 | `cli::topup` | the command line, the usage and its errors, the configuration files, the checks of the settings, the log, the outputs and their order, FSL-117 to FSL-126 | §2, §3, §5, §6, §8, §10; findings |
 | `cli::topup_debug` | `-v`, `--debug`'s files, `--trace`'s stages, `--profile`'s file | §2.2, §5; findings 9, 16 |
+| `topup::apply` | applytopup's corrections: the field of the coefficients or of a field image (its mirrored spline's derivatives), the movements (parameters about the field's centre, or matrices), the sampling and its mask, `--method=jac`, the collections, the resampling matrices and the regularised line solves of `--method=lsr` (dense Cholesky), FSL-132 and FSL-134's Jacobian | §7, §9.4, §10; Andersson et al. 2003; findings 17 to 22 |
+| `cli::applytopup` | the command line (long and short options), the usage and the compulsory options' block, the checks in FSL's order with FSL's aborts (exit 1), `--topup`'s files, `--datatype` (FSL-09), the output, FSL-132 to FSL-135 | §7, §8, §10; findings 17 to 22 |

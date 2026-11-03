@@ -49,3 +49,23 @@ negative `--lambda` (finding 16); `mine.py` takes `LXD=reproduce` for the origin
 
 Example: `TOPUP_RUNS=<scratch>/runs python -P fsl_case.py case debug/one-level $TOPUP_RUNS/fsl-debug1`
 then `python -I proto3.py $TOPUP_RUNS/fsl-debug1`.
+
+### applytopup (relay 3, findings 17 to 22)
+
+| Script | What it shows |
+|---|---|
+| `at_case.py` | FSL's applytopup runs through the oracle cache (use mode): every `at/` case of the replica suite (`cases <outdir>`) or given arguments in a prepared directory (`args <outdir> <source> -- ...`) |
+| `at_field.py` | the field and its derivatives of a `_fieldcoef` image on its grid (the helper of the others) |
+| `at_jac_first_volume.py` | `jac-y`: FSL's first volume of the first image is trilinear whatever `--interp` says (FSL-132; p50 1e-7 against 0.016 for splines) |
+| `at_jac.py` | the `jac` model on every `jac` case (sampling, movements about the field's centre, the mask, the Jacobian; finding 17) |
+| `at_jac_pair.py` | `jac-pair`: the movement's sampling `R^T (x - c - t) + c` and the mask's axes (finding 17) |
+| `at_jac_field.py`, `at_jac_field_scale.py` | a field image's Jacobian (mirrored spline, zero beyond the image) and FSL-134's scale by the field's voxel sizes (`probe134`; finding 18) |
+| `at_lsr.py`, `at_lsr_where.py` | the least-squares restoration on every `lsr` case, and where it differs from FSL along the lines (findings 19, 21) |
+| `wrap_probe.py`, `at_wrap_compare.py` | synthetic lines of 30 or 32 voxels with one bright voxel, FSL's restoration against the model (findings 19, 21) |
+| `at_wrap_variants.py`, `at_wrap_fit.py` | FSL-133 hypotheses on the 30-voxel probes (the register's unsigned wrap, fitted wrap values): none reproduces FSL (finding 21) |
+| `at_other_shape.py`, `at_other_shape2.py` | `jac-other-shape`: a field laid on a grid of another shape; no layout tried gives FSL's output (finding 22) |
+
+Example: `python -P at_case.py cases <scratch>/at` (every case; FSL served by the cache), then
+`python -P at_jac.py <scratch>/at/jac-pair` or `python -P at_lsr.py <scratch>/at/lsr-y`; the
+probes: `python -P wrap_probe.py <dir> 2 0 2 6 30`, then `at_case.py args <dir> - --
+--imain=pu.nii.gz,pd.nii.gz --inindex=1,2 --datain=acqw.txt --topup=tu --out=hifi`.

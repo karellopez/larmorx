@@ -169,6 +169,68 @@ is a question for the spec writer (the part's handoff).
       on the level's; `--trace` lists FSL's internal routines (2814 lines for two levels), the
       original its own stages.
 
+17. **applytopup's sampling and mask** (`--method=jac`; FSL's outputs of the replica suite's
+    `at/` cases, served by the oracle cache; `at_jac.py`, `at_jac_pair.py` and
+    `at_jac_first_volume.py` in `validation/investigations/cleanroom-topup/`, the same model in `crates/larmorx-fsl/src/topup/apply.rs`): image `i`
+    is sampled at `M⁻¹ x + h(x) t (px, py, 0)` voxels (`M` the movement of its `--inindex`
+    row about the field's centre `(n - 1) · voxel / 2`, as topup's `--rbmout`), the
+    interpolation periodic along every axis (cubic B-splines; trilinear with `--interp`), times
+    `J = 1 + t (px ∂h/∂x + py ∂h/∂y)` per voxel from the coefficients' own derivatives, the
+    images averaged volume by volume. A voxel is 0 unless every image's position lies in `[0,
+    n - 1]` along every axis but the phase encoding's when the encoding is along x or y alone
+    (`jac-pair`: the 1629 zeros exactly), along every axis when it is oblique (`jac-oblique`:
+    the 1932 zeros exactly). A phase encoding along z moves nothing (`jac-z`: the output is the
+    input, rule C: the spec's `d = h t (px dx, py dy, 0)`). Relative differences p50 1e-7 to
+    4e-7, p99 below 4e-5 (single precision in FSL); every `jac` case of the suite passes.
+
+18. **A field image's Jacobian** (`jac-field`, `jac-field-aniso`; `at_jac_field.py`): the cubic
+    spline of `h` with mirrored ends (`c[-1] = c[1]`), its derivative evaluated at the voxels
+    with the coefficients beyond the image taken as 0 along every axis (to 3e-6 in `J`; a
+    periodic or mirrored evaluation is 0.1 off at the edges). FSL-134's Jacobian scaling uses
+    the **field image's** voxel sizes: a field of 6 x 6 mm on an image of 6 x 4 mm is not
+    affected (`jac-field-aniso`), a field image whose header says 6 x 4 mm gets its y term
+    times 6/4 (probe `probe134`, a new FSL run through the cache, `at_jac_field_scale.py`: `J = 1 + t py (vx/vy) ∂h/∂y`
+    to 4e-6, the unscaled one 0.13 off).
+
+19. **lsr's matrices** (§7.4; `at_lsr.py`, the 32-voxel probes through the cache, `at_wrap_compare.py`): the
+    matrices `K` of §7.4 with `φ` linear between the voxels and the line periodic, `S`'s rows
+    as the spec gives them, `f = (KᵀK + 0.01 SᵀS)⁻¹ Kᵀ y`, give FSL's restorations of lines of
+    32 voxels to 1e-4 at the 99th percentile (`lsr-y`, `-x`, `-4d`, `-three`, `-trilinear`,
+    `-zero-field`, `short-options`) and a single 1000 at the first, the last or a middle voxel
+    of a line to 4 decimals (`wrap_probe.py` with 32 voxels: no line couples to another). The
+    moved images (§7.4's first step) are valid along the axes other than their phase
+    encoding's; a line with an invalid voxel is 0 in **every** collection's output, so a voxel
+    whose x line is skipped is 0 even where its y line was restored (`lsr-four`: FSL's output
+    is 0 everywhere; with only the skipped line's own voxels zeroed, 160 voxels differ).
+
+20. **Movements as matrices** (`probe_mat`: the `y` source's movements written as their
+    `--rbmout` matrices, 4 columns and 8 rows): `lsr` gives FSL's output with the movement
+    parameters to 1.2e-6 (relative), so a matrix `M` moves its image by sampling at `M⁻¹ x`,
+    as the parameters do; the original's output agrees with FSL's to 1.2e-5 at the 99th
+    percentile.
+
+21. **FSL-133 is not reproduced.** For lines of 30 voxels (`lsr-crop`, the probes of
+    `wrap_probe.py` with a single 1000 at voxel 0, 1, 15 or 29 of a 30-voxel line) FSL's
+    restoration differs from the circular wrap at the line's ends only (16.7 of 650 next to the
+    1000 at voxel 0, 19.7 at voxel 29, 0 at voxel 15), and for lines of 96 (`lsr-long`) at
+    the first three voxels only. The register's description (the displacement just before a
+    line's first voxel read from the middle of the line, `(2³² - 1) mod n`: voxel 15 of 30,
+    63 of 96) was tried: reading that voxel's field for `φ(-1)` (and for the observed row of
+    a wrapped contribution) does not give FSL's numbers (`at_wrap_variants.py`), nor does any single
+    value of `φ(-1)` or `φ(n)` fitted to the probes (`at_wrap_fit.py`: 36 and 19 left). The
+    original wraps circularly in both modes (exact where FSL's wrap is circular, lines of 32)
+    and says so in `reproduce` mode; `lsr-long` stays outside §12 (p99 relative 0.015) as an
+    expected divergence; `lsr-crop`'s differences lie outside the brain. Spec question:
+    what exactly FSL reads at the wrap-around.
+
+22. **A field of the images' voxel count in another shape** (`jac-other-shape`: the `y`
+    coefficients, 32 x 32 x 20, on an image of 64 x 16 x 20): FSL writes 0 at every voxel with
+    x ≥ 32 and, elsewhere, values that neither the field laid as stored onto the image's grid
+    nor the field evaluated at the image's own voxels give (p50 0.015 to 0.047, `at_other_shape.py`,
+    `at_other_shape2.py`). The original refuses it in both modes (FSL-134's default refuses other
+    grids anyway); a field with another voxel count gives FSL's message in `reproduce` mode
+    (`Attempted to copydata with non-matching sizes`). Spec question.
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

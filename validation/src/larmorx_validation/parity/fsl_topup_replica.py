@@ -336,6 +336,9 @@ class Run:
     #: than the machine holds: FSL is not run (its run was measured once; the reason).
     refused: str = ""
     refused_reason: str = ""
+    #: Files a refused case may write before its refusal: what FSL's command line writes before
+    #: the point FSL fails at (topup's log, written when the options are read).
+    refused_writes: tuple[str, ...] = ()
     #: Seconds before FSL's run is stopped.
     timeout: int = 36000
     #: The program: ``topup`` or ``applytopup``.
@@ -500,11 +503,16 @@ def _refused_case(run: Run, node: Path | None, checks: CheckList) -> None:
             refusal = next(
                 (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
             )
-            written = sorted(q.name for q in b.iterdir() if q.name not in before)
+            written = sorted(
+                q.name
+                for q in b.iterdir()
+                if q.name not in before and q.name not in run.refused_writes
+            )
             checks(
                 f"the replica refuses ({mode})",
                 r.code == 1 and run.refused in refusal and not written,
-                detail=f"exit {r.code}: {refusal[:200]}",
+                detail=f"exit {r.code}: {refusal[:200]}"
+                + (f"; wrote {', '.join(written)}" if written else ""),
             )
     if all(c.passed for c in checks.checks):
         raise Outcome(EXPECTED, f"{run.refused}: refused; FSL is not run: {run.refused_reason}")
@@ -1034,6 +1042,9 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         "--fout=f",
         refused="FSL-124",
         refused_reason="its knot spacing of about 4e9 voxels needs more memory than the machine holds (2026-11-03: killed in a 24 GiB memory box)",
+        # the log of the options, which FSL's command line writes before it runs (as in every
+        # err/ case, where FSL's files are compared)
+        refused_writes=("half.topup_log",),
     )
     return c
 

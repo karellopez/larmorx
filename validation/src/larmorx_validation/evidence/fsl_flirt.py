@@ -1211,7 +1211,7 @@ def command(case: str) -> str:
 
 
 #: The register entries the replica corrects by default in FLIRT's runs.
-CORRECTED = frozenset({"FSL-09", "FSL-14", "FSL-68"})
+CORRECTED = frozenset({"FSL-09", "FSL-14", "FSL-68", "FSL-111"})
 
 
 def case_verdict(r: dict, desc: str) -> tuple[str, str]:

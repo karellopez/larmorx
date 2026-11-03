@@ -155,28 +155,40 @@ pub fn taps(x: f64, n: usize, deriv: bool) -> ([usize; 4], [f64; 4]) {
 /// and `t` of the two neighbours in the middle slots (the derivative `-1`, `1`).
 #[inline]
 pub fn taps_of(x: f64, n: usize, deriv: bool, linear: bool) -> ([usize; 4], [f64; 4]) {
+    let (idx, w, d) = taps_both(x, n, linear);
+    (idx, if deriv { d } else { w })
+}
+
+/// The four indices of [`taps_of`] with both the values' and the first derivative's weights,
+/// computed once (the same arithmetic: the indices `(floor(x) - 1 + j) mod n`, the weights of
+/// `t - (j - 1)`).
+#[inline]
+pub fn taps_both(x: f64, n: usize, linear: bool) -> ([usize; 4], [f64; 4], [f64; 4]) {
     let f = x.floor();
     let t = x - f;
-    let i0 = f as i64 - 1;
+    let i0 = (f as i64).wrapping_sub(1);
     let nn = n as i64;
-    let mut idx = [0usize; 4];
+    let idx = if i0 >= 0 && i0 <= nn - 4 {
+        let b = i0 as usize;
+        [b, b + 1, b + 2, b + 3]
+    } else {
+        std::array::from_fn(|j| i0.wrapping_add(j as i64).rem_euclid(nn) as usize)
+    };
     let mut w = [0.0; 4];
-    for j in 0..4 {
-        idx[j] = (i0 + j as i64).rem_euclid(nn) as usize;
-        if linear {
-            w[j] = match (j, deriv) {
-                (1, false) => 1.0 - t,
-                (2, false) => t,
-                (1, true) => -1.0,
-                (2, true) => 1.0,
-                _ => 0.0,
-            };
-        } else {
+    let mut d = [0.0; 4];
+    if linear {
+        w[1] = 1.0 - t;
+        w[2] = t;
+        d[1] = -1.0;
+        d[2] = 1.0;
+    } else {
+        for j in 0..4 {
             let u = t - (j as f64 - 1.0);
-            w[j] = if deriv { b3d1(u) } else { b3(u) };
+            w[j] = b3(u);
+            d[j] = b3d1(u);
         }
     }
-    (idx, w)
+    (idx, w, d)
 }
 
 /// The operator sampling one axis' periodic spline at `xs`.
@@ -415,24 +427,12 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64) -> LevelImages {
 pub fn interp(c: &Grid, p: [f64; 3], want: [bool; 3]) -> (f64, [f64; 3]) {
     let [nx, ny, nz] = c.dims;
     let l = c.linear;
-    let (ix, wx) = taps_of(p[0], nx, false, l);
-    let (iy, wy) = taps_of(p[1], ny, false, l);
-    let (iz, wz) = taps_of(p[2], nz, false, l);
-    let dx = if want[0] {
-        taps_of(p[0], nx, true, l).1
-    } else {
-        [0.0; 4]
-    };
-    let dy = if want[1] {
-        taps_of(p[1], ny, true, l).1
-    } else {
-        [0.0; 4]
-    };
-    let dz = if want[2] {
-        taps_of(p[2], nz, true, l).1
-    } else {
-        [0.0; 4]
-    };
+    let (ix, wx, dx) = taps_both(p[0], nx, l);
+    let (iy, wy, dy) = taps_both(p[1], ny, l);
+    let (iz, wz, dz) = taps_both(p[2], nz, l);
+    let dx = if want[0] { dx } else { [0.0; 4] };
+    let dy = if want[1] { dy } else { [0.0; 4] };
+    let dz = if want[2] { dz } else { [0.0; 4] };
     let mut v = 0.0;
     let mut d = [0.0; 3];
     let (lo, hi) = if l { (1, 3) } else { (0, 4) };

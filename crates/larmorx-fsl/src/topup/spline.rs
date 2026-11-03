@@ -326,6 +326,28 @@ impl Op1 {
     }
 }
 
+impl Op1 {
+    /// `out += scale · (the operator along z of data)`, `data` of `dims` and `out` of the
+    /// result's size: each value the z row's sum in slot order, then scaled and added (as
+    /// [`Op1::apply_axis`] followed by `out[i] += scale · r[i]`), without the full-size result.
+    pub fn accumulate_z(&self, data: &[f64], dims: [usize; 3], out: &mut [f64], scale: f64) {
+        assert_eq!(dims[2], self.inp, "operator and axis lengths differ");
+        let plane = dims[0] * dims[1];
+        let width = self.width;
+        out.par_chunks_mut(plane).enumerate().for_each(|(r, o)| {
+            let mut t = vec![0.0; plane];
+            for j in 0..width {
+                let w = self.w[r * width + j];
+                if w != 0.0 {
+                    let i = self.idx[r * width + j];
+                    axpy(&mut t, w, &data[i * plane..(i + 1) * plane]);
+                }
+            }
+            axpy(o, scale, &t);
+        });
+    }
+}
+
 /// `y += w x`, element by element (each `y[i] + w · x[i]` rounded as written).
 #[inline]
 pub fn axpy(y: &mut [f64], w: f64, x: &[f64]) {

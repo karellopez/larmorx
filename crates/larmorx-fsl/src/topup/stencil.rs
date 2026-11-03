@@ -286,11 +286,139 @@ impl Hessian {
     }
 }
 
+/// The damped coefficients' block laid out by offset for the solver (§11): `data[d · n + k]` is
+/// row `k`'s entry at offset `d` (the layout of [`Stencil`] transposed), so a product runs over
+/// whole lines of rows at once (contiguous, vectorised). Each row's sum keeps the stencil's
+/// order (offsets `dz`, `dy`, `dx` ascending); the entries a row skips there are outside the
+/// grid, or zero, and a zero entry adds `±0` to a sum that is never `-0`, so every value is the
+/// same.
+struct ByOffset {
+    dims: [usize; 3],
+    data: Vec<f64>,
+}
+
+impl ByOffset {
+    /// `h` with its diagonal multiplied by `1 + damping` (as [`Stencil::damped`]).
+    fn damped(h: &Stencil, damping: f64) -> ByOffset {
+        let n = h.n();
+        let mut data = vec![0.0; 343 * n];
+        data.par_chunks_mut(n).enumerate().for_each(|(d, col)| {
+            for (k, v) in col.iter_mut().enumerate() {
+                *v = h.data[k * 343 + d];
+            }
+            if d == CENTRE {
+                for v in col.iter_mut() {
+                    *v *= 1.0 + damping;
+                }
+            }
+        });
+        ByOffset { dims: h.dims, data }
+    }
+
+    fn diagonal(&self) -> Vec<f64> {
+        let n = self.dims.iter().product::<usize>();
+        self.data[CENTRE * n..(CENTRE + 1) * n].to_vec()
+    }
+
+    /// `y = H x`, line by line of rows.
+    fn mul(&self, x: &[f64], y: &mut [f64]) {
+        let [cx, cy, cz] = self.dims;
+        let n = cx * cy * cz;
+        y.par_chunks_mut(cx).enumerate().for_each(|(line, out)| {
+            let (ky, kz) = (line % cy, line / cy);
+            out.fill(0.0);
+            for dz in 0..7 {
+                let lz = kz as isize + dz as isize - 3;
+                if lz < 0 || lz as usize >= cz {
+                    continue;
+                }
+                for dy in 0..7 {
+                    let ly = ky as isize + dy as isize - 3;
+                    if ly < 0 || ly as usize >= cy {
+                        continue;
+                    }
+                    let base = (lz as usize * cy + ly as usize) * cx;
+                    let off = (dz * 7 + dy) * 7;
+                    for dx in 0..7 {
+                        // the rows kx whose column kx + dx - 3 lies in the grid
+                        let lo = 3usize.saturating_sub(dx);
+                        let hi = (cx + 3).saturating_sub(dx).min(cx);
+                        if lo >= hi {
+                            continue;
+                        }
+                        let v = &self.data[(off + dx) * n + line * cx..][lo..hi];
+                        let xs = &x[base + lo + dx - 3..base + hi + dx - 3];
+                        for ((o, a), b) in out[lo..hi].iter_mut().zip(v).zip(xs) {
+                            *o += a * b;
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/// `y = H x` of the damped Hessian ([`Hessian::mul`]'s arithmetic, the coefficients' block from
+/// [`ByOffset`]).
+fn damped_mul(cc: &ByOffset, cm: &[Vec<f64>], mm: &[f64], x: &[f64], y: &mut [f64]) {
+    let nc = x.len() - cm.len();
+    let nm = cm.len();
+    cc.mul(&x[..nc], &mut y[..nc]);
+    if nm == 0 {
+        return;
+    }
+    let (xc, xm) = x.split_at(nc);
+    {
+        let yc = &mut y[..nc];
+        for (p, col) in cm.iter().enumerate() {
+            let w = xm[p];
+            if w != 0.0 {
+                for (o, v) in yc.iter_mut().zip(col) {
+                    *o += w * v;
+                }
+            }
+        }
+    }
+    for p in 0..nm {
+        let mut s = dot(&cm[p], xc);
+        for q in 0..nm {
+            s += mm[p * nm + q] * xm[q];
+        }
+        y[nc + p] = s;
+    }
+}
+
+/// Solves `(H + damping · diag(H)) x = b`, i.e. [`pcg`] on [`Hessian::damped`], with the
+/// coefficients' block laid out for fast products (the same arithmetic, the same result).
+pub fn pcg_damped(h: &Hessian, damping: f64, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
+    let cc = ByOffset::damped(&h.cc, damping);
+    let nm = h.cm.len();
+    let mut mm = h.mm.clone();
+    for p in 0..nm {
+        mm[p * nm + p] *= 1.0 + damping;
+    }
+    let mut diag = cc.diagonal();
+    diag.extend((0..nm).map(|p| mm[p * nm + p]));
+    solve(&diag, b, tol, max_iter, |x, y| {
+        damped_mul(&cc, &h.cm, &mm, x, y)
+    })
+}
+
 /// Solves `H x = b` by conjugate gradients preconditioned with the diagonal, from `x = 0`, until
 /// `|r| / |b| < tol` or `max_iter` iterations (§4.7).
 pub fn pcg(h: &Hessian, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
+    solve(&h.diagonal(), b, tol, max_iter, |x, y| h.mul(x, y))
+}
+
+/// The preconditioned conjugate gradients with the matrix' diagonal `diag` and product `mul`.
+fn solve(
+    diag: &[f64],
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+    mul: impl Fn(&[f64], &mut [f64]),
+) -> Vec<f64> {
     let n = b.len();
-    let diag = h.diagonal();
     let minv: Vec<f64> = diag
         .iter()
         .map(|&d| if d != 0.0 { 1.0 / d } else { 1.0 })
@@ -306,7 +434,7 @@ pub fn pcg(h: &Hessian, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
     let mut rz = dot(&r, &z);
     let mut ap = vec![0.0; n];
     for _ in 0..max_iter {
-        h.mul(&p, &mut ap);
+        mul(&p, &mut ap);
         let pap = dot(&p, &ap);
         if pap == 0.0 || !pap.is_finite() {
             break;

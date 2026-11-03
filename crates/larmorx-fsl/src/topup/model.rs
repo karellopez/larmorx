@@ -10,7 +10,7 @@
 
 use rayon::prelude::*;
 
-use super::images::{Grid, LevelImages, interp, sample_op_of, taps_of};
+use super::images::{Grid, LevelImages, interp, sample_op_of, taps_both};
 use super::movement::{Motion, free_parameters};
 use super::spline::{Axis, Op1, apply3, band_op, gram};
 use super::stencil::{Hessian, Stencil};
@@ -69,22 +69,21 @@ impl Regulariser {
         }
     }
 
-    /// `R c`.
+    /// `R c`: the terms in order, each `w · Z(Y(X c))` (the passes x, y, z) added to the sum;
+    /// the terms' x passes computed once per derivative order.
     pub fn apply(&self, c: &[f64]) -> Vec<f64> {
+        let dims = self.dims;
         let mut out = vec![0.0; c.len()];
-        for (ds, w) in terms(self.model) {
-            let (r, _) = apply3(
-                c,
-                self.dims,
-                [
-                    Some(&self.ops[0][ds[0]]),
-                    Some(&self.ops[1][ds[1]]),
-                    Some(&self.ops[2][ds[2]]),
-                ],
-            );
-            for (o, v) in out.iter_mut().zip(&r) {
-                *o += w * v;
+        let mut xs: [Option<Vec<f64>>; 3] = [None, None, None];
+        for (ds, _) in terms(self.model) {
+            if xs[ds[0]].is_none() {
+                xs[ds[0]] = Some(self.ops[0][ds[0]].apply_axis(c, dims, 0).0);
             }
+        }
+        for (ds, w) in terms(self.model) {
+            let x = xs[ds[0]].as_ref().expect("computed above");
+            let (y, _) = self.ops[1][ds[1]].apply_axis(x, dims, 1);
+            self.ops[2][ds[2]].accumulate_z(&y, dims, &mut out, *w);
         }
         out
     }
@@ -224,6 +223,57 @@ impl Eval {
             .iter()
             .map(|m| m.map_or([0.0; 6], |m| m.p))
             .collect()
+    }
+}
+
+/// One slice of a volume's predictions in [`Level::eval`], written in place.
+struct Slices<'a> {
+    u: &'a mut [f64],
+    j: &'a mut [f64],
+    f: &'a mut [f64],
+    fd: [Option<&'a mut [f64]>; 3],
+    fm: Option<[&'a mut [f64]; 3]>,
+    mask: &'a mut [bool],
+}
+
+impl<'a> Slices<'a> {
+    /// The arrays cut into slices of `plane` values.
+    fn split(
+        plane: usize,
+        u: &'a mut [f64],
+        j: &'a mut [f64],
+        f: &'a mut [f64],
+        fd: &'a mut [Option<Vec<f64>>; 3],
+        fm: &'a mut Option<[Vec<f64>; 3]>,
+        mask: &'a mut [bool],
+    ) -> Vec<Slices<'a>> {
+        let mut uc = u.chunks_mut(plane);
+        let mut jc = j.chunks_mut(plane);
+        let mut fc = f.chunks_mut(plane);
+        let mut mc = mask.chunks_mut(plane);
+        let mut dc = fd
+            .each_mut()
+            .map(|o| o.as_mut().map(|v| v.chunks_mut(plane)));
+        let mut mmc = fm
+            .as_mut()
+            .map(|a| a.each_mut().map(|v| v.chunks_mut(plane)));
+        let mut out = Vec::new();
+        while let (Some(u), Some(j), Some(f), Some(mask)) =
+            (uc.next(), jc.next(), fc.next(), mc.next())
+        {
+            out.push(Slices {
+                u,
+                j,
+                f,
+                fd: dc.each_mut().map(|o| o.as_mut().and_then(Iterator::next)),
+                fm: mmc.as_mut().map(|a| {
+                    a.each_mut()
+                        .map(|c| c.next().expect("as many slices as the others"))
+                }),
+                mask,
+            });
+        }
+        out
     }
 }
 
@@ -399,6 +449,31 @@ impl Level {
         .0
     }
 
+    /// The field and its derivatives along the displaced axes (per level voxel), as
+    /// [`Level::field`] gives them, the passes they share computed once.
+    fn fields(&self, c: &[f64]) -> (Vec<f64>, [Option<Vec<f64>>; 3]) {
+        let c = &c[..self.n_coef()];
+        let dims = self.coef_dims();
+        let b = &self.basis;
+        let (x0, d1) = b[0][0].apply_axis(c, dims, 0);
+        let (y0, d2) = b[1][0].apply_axis(&x0, d1, 1);
+        let h = b[2][0].apply_axis(&y0, d2, 2).0;
+        let mut dh: [Option<Vec<f64>>; 3] = [None, None, None];
+        if self.pe_axes[0] {
+            let (x1, d1) = b[0][1].apply_axis(c, dims, 0);
+            let (y, d2) = b[1][0].apply_axis(&x1, d1, 1);
+            dh[0] = Some(b[2][0].apply_axis(&y, d2, 2).0);
+        }
+        if self.pe_axes[1] {
+            let (y, d2) = b[1][1].apply_axis(&x0, d1, 1);
+            dh[1] = Some(b[2][0].apply_axis(&y, d2, 2).0);
+        }
+        if self.pe_axes[2] {
+            dh[2] = Some(b[2][1].apply_axis(&y0, d2, 2).0);
+        }
+        (h, dh)
+    }
+
     /// `Σ_x w(x) φ(x)` for each coefficient, `φ` the basis (derivative along `deriv`).
     fn project(&self, w: &[f64], deriv: Option<usize>) -> Vec<f64> {
         let ops: [&Op1; 3] =
@@ -425,9 +500,7 @@ impl Level {
             .zip(&mov)
             .map(|(m, p)| m.map(|_| Motion::new(*p, self.centre)))
             .collect();
-        let h = self.field(c, None);
-        let dh: [Option<Vec<f64>>; 3] =
-            std::array::from_fn(|a| self.pe_axes[a].then(|| self.field(c, Some(a))));
+        let (h, dh) = self.fields(c);
         let [nx, ny, _] = self.nt;
         let nvox = h.len();
         let m = self.e.len();
@@ -437,6 +510,7 @@ impl Level {
         let mut fdv = Vec::with_capacity(m);
         let mut fmv = Vec::with_capacity(m);
         let mut mask = vec![true; nvox];
+        let plane = nx * ny;
         for (i, ev) in self.e.iter().enumerate() {
             let mut ui = vec![0.0; nvox];
             let mut ji = vec![0.0; nvox];
@@ -449,14 +523,20 @@ impl Level {
             let motion = motions[i].filter(|m| !m.is_identity());
             let want: [bool; 3] = std::array::from_fn(|a| est || ev[a] != 0.0);
             let e_mm: [f64; 3] = std::array::from_fn(|a| ev[a] * self.vt[a]);
-            // per voxel, in parallel (each value independent)
-            type Row = (f64, f64, f64, [f64; 3], [f64; 3], bool);
-            let results: Vec<Row> = (0..nvox)
-                .into_par_iter()
-                .map(|v| {
-                    let x = v % nx;
-                    let y = (v / nx) % ny;
-                    let z = v / (nx * ny);
+            let line = match (&self.samplers[i], est, motion) {
+                (Sampler::Line { axis, lines }, false, None) => Some((*axis, lines)),
+                _ => None,
+            };
+            // per voxel (each value independent), slice by slice, written in place
+            let slices = Slices::split(
+                plane, &mut ui, &mut ji, &mut fi, &mut fdi, &mut fmi, &mut mask,
+            );
+            slices.into_par_iter().enumerate().for_each(|(z, mut o)| {
+                for (k, (y, x)) in (0..plane / nx.max(1))
+                    .flat_map(|y| (0..nx).map(move |x| (y, x)))
+                    .enumerate()
+                {
+                    let v = z * plane + k;
                     let hv = h[v];
                     let mut jv = 1.0;
                     for a in 0..3 {
@@ -464,16 +544,11 @@ impl Level {
                             jv += ev[a] * d[v];
                         }
                     }
-                    let line = match (&self.samplers[i], est, motion) {
-                        (Sampler::Line { axis, lines }, false, None) => Some((*axis, lines)),
-                        _ => None,
-                    };
                     let (f, d, dm, valid) = if let Some((a, lines)) = line {
                         let p = [x as f64, y as f64, z as f64][a] + hv * ev[a];
                         let pos = p * self.scale[a];
                         let n = lines.dims[a];
-                        let (idx, w) = taps_of(pos, n, false, lines.linear);
-                        let (_, dw) = taps_of(pos, n, true, lines.linear);
+                        let (idx, w, dw) = taps_both(pos, n, lines.linear);
                         let stride = [1, lines.dims[0], lines.dims[0] * lines.dims[1]][a];
                         let mut base_p = [x, y, z];
                         base_p[a] = 0;
@@ -519,27 +594,24 @@ impl Level {
                             valid,
                         )
                     };
-                    (jv * f, jv, f, d, dm, valid)
-                })
-                .collect();
-            for (v, (uv, jv, f, d, dm, valid)) in results.into_iter().enumerate() {
-                ui[v] = uv;
-                ji[v] = jv;
-                fi[v] = f;
-                for a in 0..3 {
-                    if let Some(arr) = &mut fdi[a] {
-                        arr[v] = d[a];
-                    }
-                }
-                if let Some(fm) = &mut fmi {
+                    o.u[k] = jv * f;
+                    o.j[k] = jv;
+                    o.f[k] = f;
                     for a in 0..3 {
-                        fm[a][v] = dm[a];
+                        if let Some(arr) = &mut o.fd[a] {
+                            arr[k] = d[a];
+                        }
+                    }
+                    if let Some(fm) = &mut o.fm {
+                        for a in 0..3 {
+                            fm[a][k] = dm[a];
+                        }
+                    }
+                    if !valid {
+                        o.mask[k] = false;
                     }
                 }
-                if !valid {
-                    mask[v] = false;
-                }
-            }
+            });
             u.push(ui);
             jac.push(ji);
             fv.push(fi);

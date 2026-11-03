@@ -334,3 +334,17 @@ and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row
 | `maths::regions` | `-bptf`: the windows' sums that do not depend on the voxel once per `t`, the others for blocks of 64 voxels in the series' order, in waves written back in place (no copy of the image); a series holding a NaN filtered again on its own | the original's own design; the same bits |
 | `maths::image`, `cli::fslmaths` | the input's values moved, not copied, where they already have the computing type (mirrored in place); the output's values moved to the writer where writing converts nothing: one copy of the image held, as FSL holds | the memory rule (CLAUDE.md) |
 | `bet::params`, `bet` (`find_surface`), `cli::bet2`, `flirt::engine` (`clamp_range`) | FSL-187's `reproduce` switch in BET's and FLIRT's robust range (a value whose bin does not fit in an `int` counted in the first bin) and its notice where the correction moves the range; the defaults unchanged | the register's FSL-187 row; findings 22 of `docs/findings/fsl-maths-original.md` |
+
+### Random testing's corrections (relay 6 of fslmaths' and fslstats' part, 2026-11-03)
+
+| Module | What changed | From |
+|---|---|---|
+| `maths::image` (`regrid_x`), `maths::spatial` (`subsample_header`), `maths::reduce` | the geometry of a new grid along x: set matrices through the held (mirrored) frame and the operation, unset ones through the mirroring; a subsampled set qform's quaternion from the product of matrices (its zeros +0) | black-box runs: `probe_geometry.py`, the trial's findings (findings 24 of `docs/findings/fsl-maths-original.md`) |
+| `maths::spatial` | FSL-75 named in `-subsamp2` (the unused background value's buffer, by the register's row); the subsampling's sums in double; `-edge`'s differences as C's `int`; FSL-165 on every image with an axis of size 1 | the register's FSL-75 row; findings 24, 27, 29 |
+| `maths::filters` | the off-centre warning by the kernel's sizes; no empty-mask message for a kernel without a value at or above 0.5 | `probe_kernel_file.py` (findings 25) |
+| `maths::tfce` | the step tested before the sizes; a double image's TFCE in single precision | findings 26 |
+| `maths::roc` | the false-positive candidates below the true voxels' bound | findings 29 |
+| `maths::stats` | `-ptoz` of NaN: the NaN's sign flipped; `-ztop` of NaN: the positive NaN | findings 30 |
+| `cli::fslmaths` | FSL-157 named for every int8 `-odt input`, FSL-154 for every uint8 image computed unsigned | findings 29; the register's rows |
+| `cli::fslstats` | the histogram of an empty mask (zeros, or none with an empty range) and the JSON's empty list without a histogram | findings 28 |
+| `cli::common` (`name_start`), `cli::topup`, `cli::applytopup` | topup's and applytopup's file names split at `/`, and at `\` on Windows only | `docs/api/fsl-topup.md`, "File names on Windows" |

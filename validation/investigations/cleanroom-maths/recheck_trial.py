@@ -7,7 +7,8 @@ by verdict and by the remaining differences' signatures and operations (the tria
 ``docs/validation/fsl-maths.md``).
 
 Run inside a memory box (each replay holds at most about 1 GiB):
-``python -P recheck_trial.py <night> <out.jsonl> [--jobs 8]``, with ``LARMORX_MATHS_BIN`` the
+``python -P recheck_trial.py <night> <out.jsonl> [--jobs 8] [--merge <earlier.jsonl>]`` (with
+``--merge``, only the findings that still differ there are replayed), with ``LARMORX_MATHS_BIN`` the
 build and ``LARMORX_DIFFTEST_CACHE_MODE=use``.
 """
 
@@ -57,10 +58,25 @@ def main(argv: list[str]) -> int:
     night, out = Path(argv[0]), Path(argv[1])
     jobs = int(argv[argv.index("--jobs") + 1]) if "--jobs" in argv else 8
     files = sorted((night / "findings").rglob("*.json"))
+    merged: dict[str, dict] = {}
+    if "--merge" in argv:
+        # replay only the findings that still differ in an earlier re-check, keep the others
+        old = Path(argv[argv.index("--merge") + 1])
+        for line in old.read_text(encoding="utf-8").splitlines():
+            r = json.loads(line)
+            merged[f"{r['tool']}/{r['finding']}"] = r
+        files = [
+            f
+            for f in files
+            if merged.get(f"{f.parent.name}/{f.name}", {}).get("verdict") not in ("agree", "notice")
+        ]
     rows = []
-    with cf.ThreadPoolExecutor(jobs) as ex, out.open("w", encoding="utf-8") as fh:
+    with cf.ThreadPoolExecutor(jobs) as ex:
         for r in ex.map(_replay, files):
-            rows.append(r)
+            merged[f"{r['tool']}/{r['finding']}"] = r
+    rows = [merged[k] for k in sorted(merged)]
+    with out.open("w", encoding="utf-8") as fh:
+        for r in rows:
             fh.write(json.dumps(r) + "\n")
     by = collections.Counter((r["tool"], r["verdict"]) for r in rows)
     print(f"{len(rows)} findings replayed")

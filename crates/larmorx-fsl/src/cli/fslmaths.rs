@@ -280,6 +280,8 @@ fn run(
         && matches!(effective, DataType::I8 | DataType::U16)
         && !kind.is_int();
     let round = !(fsl157 && mode.reproduce());
+    // FSL-157's output type (int8 written as uint8) whatever the computing type
+    let int8_odt_input = odt.as_deref() == Some("input") && effective == DataType::I8;
     let ctx = Ctx {
         settings,
         words: &words,
@@ -288,6 +290,7 @@ fn run(
         out_t,
         round,
         fsl157,
+        int8_odt_input,
         stored_type: stored.stored,
     };
     let stored = std::sync::Mutex::new(stored);
@@ -327,6 +330,7 @@ struct Ctx<'a> {
     out_t: OutType,
     round: bool,
     fsl157: bool,
+    int8_odt_input: bool,
     stored_type: DataType,
 }
 
@@ -429,7 +433,24 @@ fn chain<T: Num>(
     if st.range
         && let Some((lo, hi)) = range_of(&st.img.data, notices)
     {
-        st.img.cal = (lo, hi);
+        // an integer output's range is of its rounded values (rounded half away from zero, or
+        // truncated where FSL-157 truncates), not wrapped to the type (random testing,
+        // findings 29: -odt char gives -131 for -130.5)
+        let to_int = |v: f64| {
+            let r = if !ctx.round {
+                v.trunc()
+            } else if v > 0.0 {
+                (v + 0.5).trunc()
+            } else {
+                (v - 0.5).trunc()
+            };
+            r + 0.0 // -0 as +0
+        };
+        st.img.cal = if ctx.out_t.is_int() {
+            (to_int(lo), to_int(hi))
+        } else {
+            (lo, hi)
+        };
     }
     let spec = WriteSpec {
         out: ctx.out_t,
@@ -438,7 +459,7 @@ fn chain<T: Num>(
     };
     // FSL-157 decided from the values before they move to the writer (named after FSL-151)
     let mut n157 = Notices::new(notices.mode());
-    if ctx.fsl157 {
+    if ctx.fsl157 || ctx.int8_odt_input {
         note157(ctx, &st.img, &mut n157);
     }
     let (values, changed) = match image::identity_values(&mut st.img, spec) {

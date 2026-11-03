@@ -1,18 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
-"""FAST's evidence (the larmorx-nc replica, FSL Licence; the clean-room original is still to be
-written): fMRIPrep's tissue segmentation call (``anat_fit_wf/fast``: ``fast -I 0 -N -p -g -S 1
+"""FAST's evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
+Apache-2.0): fMRIPrep's tissue segmentation call (``anat_fit_wf/fast``: ``fast -I 0 -N -p -g -S 1
 <T1w brain>``) on three oracle runs (an adult, and the data panel's 3.5-year-old and glioma
-patient), the bias field FAST estimates by default, FSL's tissue priors (``-a``, where the
-replica's default corrects FSL-09 inside FLIRT's resampling of the priors) and a three-channel
-segmentation, by FSL 6.0.7.23 and by the replica in its ``reproduce`` and default modes (and at
-one thread); every file FAST writes, the tissue volumes the partial-volume maps give, fMRIPrep's
-own outputs, and every case of the record with its verdict.
+patient), the bias field FAST estimates by default, FSL's tissue priors (``-a``, where both
+implementations' default corrects FSL-09 inside FLIRT's resampling of the priors) and a
+three-channel segmentation, by FSL 6.0.7.23 (as built, and with correctly rounded maths: the
+original's own last-bit band), by the replica in its ``reproduce`` and default modes (and at one
+thread) and by the clean-room original in its ``reproduce`` and default modes at 14 threads and
+one; every file FAST writes, the tissue volumes the partial-volume maps give, fMRIPrep's own
+outputs, every case of both records with its verdict (the original's classified against FSL with
+correctly rounded maths), and the benchmark.
 
-Every run of FSL is a run of the parity record (``parity.fsl_fast_replica``), with the same
-arguments, environment and inputs, through the oracle-output cache (``use`` mode): the page
-computes no original result of its own. The replica runs as a separate program; nothing here
-imports it. Everything shown lies inside the brain: fMRIPrep's skull-stripped T1w (dilated by
-two voxels), or the template's brain mask: no face can show.
+Every run of FSL goes through the oracle-output cache (``use`` mode) with the parity suites'
+keys (``parity.fsl_fast_replica``), so the runs the records made are served; FSL with the
+CORE-MATH preload is the clean-room suite's band run (``parity.fsl_fast``). The replica runs as a
+separate program; nothing here imports it. Everything shown lies inside the brain: fMRIPrep's
+skull-stripped T1w (dilated by two voxels), or the template's brain mask: no face can show.
 """
 
 from __future__ import annotations
@@ -57,6 +60,22 @@ PANELS = [
     ("replica", "larmorx", "larmorx-nc replica", "reproduce mode, 4 threads"),
     ("replica-1", "larmorx", "larmorx-nc replica", "reproduce mode, 1 thread"),
     ("replica-fix", "larmorx", "larmorx-nc replica", "default mode (D13 corrections), 4 threads"),
+]  # fmt: skip
+#: The clean-room original's record, and its runs: label, D13 mode, threads (its result is the
+#: same at any thread count: docs/benchmarks/fsl-fast.md).
+RECORD_ORIG = "fsl-fast"
+ORIGINAL_RUNS = [("original", "reproduce", 14), ("original-1", "reproduce", 1),
+                 ("original-fix", "fix", 14)]  # fmt: skip
+#: The panels of the original's entries: FSL with correctly rounded maths first (the closest
+#: reference of the original), then the original's runs.
+ORIGINAL_PANELS = [
+    ("fsl-cr", "original", "FSL 6.0.7.23, correctly rounded maths",
+     "the same program with CORE-MATH's exp, log, expf and logf preloaded, through the oracle "
+     "cache"),
+    ("original", "larmorx", "LARMORX clean-room original", "reproduce mode, 14 threads"),
+    ("original-1", "larmorx", "LARMORX clean-room original", "reproduce mode, 1 thread"),
+    ("original-fix", "larmorx", "LARMORX clean-room original",
+     "default mode (D13 corrections), 14 threads"),
 ]  # fmt: skip
 #: The tissues of a three-class T1-weighted segmentation (``-t 1``: classes by intensity).
 TISSUES = ("CSF", "grey matter", "white matter")
@@ -320,6 +339,305 @@ def named_entry(ctx: core.Context) -> fcache.Entry:
         "The replica's default mode on every case of the record: its exit status and the "
         "entries it names",
         _compute_named,
+    )
+
+
+# ------------------------------------------------------------------ the clean-room original
+
+
+def _orig():
+    from larmorx_validation.parity import fsl_fast as orig
+
+    return orig
+
+
+def versions_original() -> dict[str, str]:
+    """FSL's version, the original's and the CORE-MATH preload's (by its content)."""
+    import larmorx
+    from larmorx_validation.figures.core import sha256
+
+    lib = _orig().crmath_preload()
+    return {
+        "fsl": _fsl_version(),
+        "larmorx": f"larmorx {larmorx.__version__} (the clean-room original, crate larmorx-fsl, "
+        "Apache-2.0)",
+        "core-math": "CORE-MATH's correctly rounded exp, log, expf, logf (the workspace's "
+        f"preload, sha256 {sha256(lib)[:16]})"
+        if lib
+        else "CORE-MATH preload not found",
+    }
+
+
+def _fsl_version() -> str:
+    from larmorx_validation.parity import fsl_versions
+    from larmorx_validation.parity.fsl_flirt_replica import fsldir
+
+    return (
+        f"FSL {fsl_versions.version_of(fsldir())} (fsl-fast4 2111.3; ~/fsl-6.0.7.23, never on "
+        "the PATH)"
+    )
+
+
+def _original_run(
+    e: fcache.Entry, label: str, args: list[str], put_inputs, settings: dict, mode: str, n: int
+) -> None:
+    """The clean-room original on ``args`` in ``<entry>/<label>`` (it writes its outputs where
+    FSL does: its working directory), as its record runs it; the inputs removed after."""
+    import time
+
+    from larmorx_validation.parity import defects
+
+    orig = _orig()
+    cwd = e.dir / label
+    cwd.mkdir(exist_ok=True)
+    put_inputs(cwd)
+    given = list(cwd.iterdir())
+    e.ctx.log(f"  {e.tool}/{e.case}: {label}")
+    t0 = time.perf_counter()
+    p = orig.run_original(args, cwd=cwd, settings=settings, mode=mode, threads=n)
+    seconds = round(time.perf_counter() - t0, 2)
+    for f in given:
+        f.unlink()
+    env = {defects.ENV: mode, "OMP_NUM_THREADS": str(n), "LARMORX_IMPLEMENTATION": "original"}
+    run = fcache.Run(label, [*orig.original_command(), "fsl", "fast", *args], env)
+    run.exit, run.seconds, run.stderr_tail = p.code, seconds, p.stderr[-2000:]
+    e.runs.append(run)
+    (e.dir / f"{label}.log").write_text(
+        f"$ {shlex.join(run.argv)}\n# env: {env}\n# exit {p.code}, {seconds} s\n--- stdout\n"
+        f"{p.stdout}\n--- stderr\n{p.stderr}",
+        encoding="utf-8",
+    )
+    e.extra.setdefault("named", {})[label] = defects.notices_in(p.stderr)
+    if p.code != 0:
+        raise RuntimeError(f"{label}: the original exited {p.code}: {p.stderr[-800:]}")
+
+
+def _source(source: str):
+    """``(args, put_inputs, settings, never, inputs)`` of an fMRIPrep run or a record case."""
+    fs = _suite()
+    if source.startswith("ds"):
+        node = _node(source)
+        args = fs.fmriprep_args(node)
+        src = fs.fmriprep_input(source, str(node))
+        if src is None:
+            raise FileNotFoundError(f"the input of fMRIPrep's FAST node of {source}")
+
+        def put(d: Path) -> None:
+            shutil.copy(src, d / args[-1])
+
+        return args, put, {}, "", {"T1w brain (fMRIPrep's)": src}
+    run = _real_run(source)
+    ins = {a[1:]: fs.inputs() / a[1:] for a in run.args if a.startswith("@")}
+    args = [Path(a[1:]).name if a.startswith("@") else a for a in run.args]
+
+    def put_real(d: Path) -> None:
+        fs._prepare(run, d)
+
+    return args, put_real, dict(run.settings), run.never, ins
+
+
+def _compute_original(source: str):
+    def compute(e: fcache.Entry) -> None:
+        args, put, settings, never, ins = _source(source)
+        for label, path in ins.items():
+            e.input(label, path)
+        lib = _orig().crmath_preload()
+        if lib is None:
+            raise FileNotFoundError("the CORE-MATH preload (oracles/core-math-preload)")
+        # FSL with correctly rounded maths: the clean-room suite's band run (served when the
+        # record made it), the original's closest reference
+        _oracle(e, "fsl-cr", args, put, {**settings, "LD_PRELOAD": str(lib)}, never=never)
+        for label, mode, n in ORIGINAL_RUNS:
+            _original_run(e, label, args, put, settings, mode, n)
+        what = (
+            "fMRIPrep 25.2.6's FAST node of " if source.startswith("ds") else "The record's case "
+        )
+        e.finish(
+            versions=versions_original(),
+            command="fast " + " ".join(args),
+            settings=f"{what}{source}: FSL 6.0.7.23 with the CORE-MATH preload through the "
+            "oracle-output cache "
+            "(the clean-room suite's band run) and LARMORX's clean-room original as its record "
+            "runs it (reproduce mode at 14 and 1 threads, the default mode at 14); FSL as built "
+            "and the replica are the replica entry's runs of the same call",
+        )
+
+    return compute
+
+
+def original_entry(ctx: core.Context, source: str) -> fcache.Entry:
+    """The clean-room original's runs, and FSL's with correctly rounded maths, of an fMRIPrep
+    run's call (``source`` a run) or a record case (``source`` a case)."""
+    name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        f"original-{name}",
+        f"{source}: FSL 6.0.7.23 with correctly rounded maths (from the oracle cache) and "
+        "LARMORX's clean-room original, reproduce and default modes",
+        _compute_original(source),
+    )
+
+
+def case_table_original() -> dict[str, tuple[str, object]]:
+    """Every case of the clean-room original's suite (``parity.fsl_fast``: the replica suite's
+    cases and the original's own permanent cases): id -> (description, its ``Run``; None for
+    fMRIPrep's calls)."""
+    from larmorx_validation.difftest import permanent
+
+    s = _orig().suite()
+    permanent.attach(s)
+    out: dict[str, tuple[str, object]] = {}
+    for c in s.cases("full"):
+        kind, payload = c.payload
+        run = (
+            None
+            if kind == "fmriprep"
+            else payload
+            if kind == "direct"
+            else _suite()._all_cases()[payload][2]
+        )
+        out.setdefault(c.id, (c.description, run))
+    return out
+
+
+def _values(path: Path) -> np.ndarray:
+    return np.asarray(_orig()._load(path)[1])
+
+
+def _differ(a: np.ndarray, b: np.ndarray) -> tuple[int, float]:
+    """How many values differ (NaN equal to NaN) and the largest finite |a − b|."""
+    if a.shape != b.shape:
+        return int(max(a.size, b.size)), float("inf")
+    x, y = a.astype(np.float64), b.astype(np.float64)
+    same = (x == y) | (np.isnan(x) & np.isnan(y))
+    n = int(np.count_nonzero(~same))
+    d = np.abs(x - y)[~same]
+    d = d[np.isfinite(d)]
+    return n, float(d.max()) if d.size else (float("inf") if n else 0.0)
+
+
+def _compare_dirs(fsl: Path, ours: Path, cr: Path, before: set[str]) -> dict[str, dict]:
+    """Every image FSL wrote (``fsl``) against the original's (``ours``) and FSL's with
+    correctly rounded maths (``cr``): per file, (values that differ, largest |Δ|) of original −
+    FSL, FSL with CR − FSL, original − FSL with CR."""
+    from larmorx_validation.parity.fsl_mcflirt_replica import _files, _is_image
+
+    out = {}
+    fa, fb, fc = _files(fsl, set()), _files(ours, set()), _files(cr, set())
+    for key in sorted(set(fa) - before):
+        if not _is_image(key) or key not in fb or key not in fc:
+            continue
+        if key.endswith(".img") or ".img." in key:
+            continue  # an ANALYZE pair is read through its .hdr
+        a, b, c = _values(fa[key]), _values(fb[key]), _values(fc[key])
+        out[key] = {"kind": _orig()._kind(key), "orig_fsl": _differ(b, a),
+                    "cr_fsl": _differ(c, a), "orig_cr": _differ(b, c), "values": int(a.size)}  # fmt: skip
+    return out
+
+
+def _classify_case(r: dict, payloads: dict, nodes: dict, lib: Path) -> tuple[str, dict]:
+    """One case of the original's record: its default mode (exit status, the entries named)
+    and, for a case that passed, every file of FSL, FSL with correctly rounded maths and the
+    original (reproduce mode) compared, with the suite's own treatment of the memory FSL never
+    writes (FSL-96, FSL-97)."""
+    from larmorx_validation.parity.harness import CheckList
+
+    fs, orig = _suite(), _orig()
+    case = r["case"]
+    if case.startswith("fmriprep/"):
+        node = nodes[case]
+        args0 = fs.fmriprep_args(node)
+        src = fs.fmriprep_input(case.split("/")[1], str(node))
+
+        def prepare(d: Path) -> list[str]:
+            shutil.copy(src, d / args0[-1])
+            return args0
+
+        settings: dict[str, str | None] = {}
+        never, unwritten, no_bias = "", (), False
+    else:
+        kind, payload = payloads[case]
+        run = payload if kind == "direct" else fs._all_cases()[payload][2]
+
+        def prepare(d: Path) -> list[str]:
+            return fs._prepare(run, d)
+
+        settings = dict(run.settings)
+        never, unwritten, no_bias = run.never, run.unwritten, run.no_bias_field
+    out: dict = {}
+    with tempfile.TemporaryDirectory(prefix="lx-fast-ev-orig_") as t:
+        t = Path(t)
+        a, b, c, f = (t / x for x in ("fsl", "orig", "cr", "fix"))
+        for x in (a, b, c, f):
+            x.mkdir()
+        args = prepare(f)
+        p = orig.run_original(args, cwd=f, settings=settings, mode="fix", threads=4)
+        from larmorx_validation.parity import defects
+
+        out["default"] = {"exit": p.code, "named": defects.notices_in(p.stderr)}
+        if r["status"] != "pass":
+            return case, out
+        for x in (a, b, c):
+            prepare(x)
+        before = set(_files_of(a))
+        pa = fs.oracle_run(args, cwd=a, settings=settings, never=never)
+        pc = fs.oracle_run(args, cwd=c, settings={**settings, "LD_PRELOAD": str(lib)}, never=never)
+        po = orig.run_original(args, cwd=b, settings=settings, mode="reproduce", threads=4)
+        for d in (a, c):
+            if unwritten:
+                fs._clear_unwritten(CheckList(), d, unwritten)
+            if no_bias:
+                fs._undefined_bias_field(CheckList(), d, args)
+        out["served"] = {"fsl": bool(pa.cached), "fsl-cr": bool(pc.cached)}
+        out["exit"] = [pa.returncode, pc.returncode, po.code]
+        out["files"] = _compare_dirs(a, b, c, before)
+    return case, out
+
+
+def _files_of(d: Path) -> list[str]:
+    from larmorx_validation.parity.fsl_mcflirt_replica import _files
+
+    return list(_files(d, set()))
+
+
+def _compute_cases_original(e: fcache.Entry) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from larmorx_validation.difftest import permanent
+
+    rec = records.load(e.ctx.repo, RECORD_ORIG)
+    s = _orig().suite()
+    permanent.attach(s)
+    payloads = {c.id: c.payload for c in s.cases("full")}
+    nodes = {f"fmriprep/{r}": n for r, n in _suite().fmriprep_calls()}
+    lib = _orig().crmath_preload()
+    if lib is None:
+        raise FileNotFoundError("the CORE-MATH preload (oracles/core-math-preload)")
+    jobs = int(os.environ.get("LARMORX_EVIDENCE_JOBS", "3"))
+    with ThreadPoolExecutor(jobs) as pool:
+        done = dict(pool.map(lambda r: _classify_case(r, payloads, nodes, lib), rec.results))
+    e.finish(
+        versions=versions_original(),
+        cases={k: done[k] for k in sorted(done)},
+        settings="Every case of the clean-room original's record (fsl-fast), in fresh "
+        "directories with the case's inputs: the original's default mode (4 threads: its exit "
+        "status and the register entries its notices name); for each case that passed, FSL "
+        "6.0.7.23 as built and with the CORE-MATH preload through the oracle-output cache (the "
+        "record's runs served, the never-cached policies rerun) and the original in reproduce "
+        "mode, every image compared value by value (FSL's memory it never writes, FSL-96 and "
+        "FSL-97, treated as the record treats it)",
+    )
+
+
+def cases_original_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        "cases-original",
+        "Every case of the clean-room original's record: its default mode, and each passing "
+        "case's files against FSL and FSL with correctly rounded maths",
+        _compute_cases_original,
     )
 
 
@@ -1009,3 +1327,8 @@ if __name__ == "__main__":  # compute the cache entries only
     for case in REAL.values():
         print("done", real_entry(c, case).dir)
     print("done", named_entry(c).dir)
+    for _i, run, _v, _w in FMRIPREP:
+        print("done", original_entry(c, run).dir, flush=True)
+    for case in REAL.values():
+        print("done", original_entry(c, case).dir, flush=True)
+    print("done", cases_original_entry(c).dir, flush=True)

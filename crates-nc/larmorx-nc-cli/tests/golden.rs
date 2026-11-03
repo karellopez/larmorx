@@ -1462,7 +1462,8 @@ const BET_CASES: &[BetCase] = &[
             "-dt", "char", "{mask8}", "-add", "100", "out", "-odt", "input",
         ],
         mode: "fix",
-        named: &[],
+        // FSL-154: the default's unsigned template, named for every image it reads
+        named: &["FSL-154"],
         output_type: "NIFTI",
     },
     BetCase {

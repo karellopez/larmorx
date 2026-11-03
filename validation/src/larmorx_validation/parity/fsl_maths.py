@@ -5,9 +5,10 @@ Apache-2.0, written from ``specs/fslmaths.md``) with FSL 6.0.7.23's ``fslmaths``
 The cases are the replica suite's (``fsl_maths_replica``: fMRIPrep's combine_masks calls on the
 oracle runs, the goodvoxels chain on ds005040's BOLD series, every operation once per data type
 and code path, the messages and failures, the defects in both modes), run here against the
-original. Every FSL run goes through the oracle-output cache with the replica suite's keys and
-policy, so the runs that suite made are served from it. The operations the original does not
-take yet (it refuses them, naming them) are skipped.
+original, and the original's own cases (``orig/``: paths the replica suite's inputs do not
+reach, on inputs of :func:`own_inputs`). Every FSL run goes through the oracle-output cache with
+the replica suite's keys and policy, so the runs that suite made are served from it. The
+operations the original does not take yet (it refuses them, naming them) are skipped.
 
 What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 
@@ -18,7 +19,9 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
   operation is exactly defined by the computing type's arithmetic (§5-§8: every case of this
   suite but the double-precision functions), and for the double-precision functions every
   voxel within the case's units in the last place of FSL's (GLIBC-07: glibc's functions are not
-  correctly rounded everywhere, the original's are), the fraction that differs reported;
+  correctly rounded everywhere, the original's are), the fraction that differs reported; the
+  sums (``_SUM_OPS``) under the floating types by §21's sums' metric (an expected divergence
+  where only its share of voxels within 4 units in the last place falls short);
   other files byte for byte;
 - the D13 fix pass: a defect named exactly when the default's outputs differ from
   ``reproduce``.
@@ -27,6 +30,7 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -328,10 +332,11 @@ def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: 
     )
     if ok and share < SUM_SHARE:
         return (
-            f"{name}: the order of FSL's sums (its FFT, or its subsampling arithmetic): max |diff| "
+            f"{name}: FSL's order of sums (its FFT, or its subsampling arithmetic): max |diff| "
             f"{worst / scale:.2g} of max |FSL| (bound {SUM_RELATIVE:g}); {share:.1%} of the "
-            f"voxels within {SUM_ULPS} ulp (spec {SUM_SHARE:.0%}), max {int(ulp.max())} ulp, at "
-            "voxels whose value cancels to near 0"
+            f"voxels within {SUM_ULPS} ulp (spec {SUM_SHARE:.0%}), max {int(ulp.max())} ulp: "
+            "FSL's rounding is relative to the image's largest values (its FFT) or to the summed "
+            "terms (values that cancel to near 0), not to each voxel's own last place"
         )
     return ""
 
@@ -404,6 +409,67 @@ def _agree_on_errors(checks: CheckList, oracle: rep.Completed) -> None:
         )
 
 
+# ------------------------------------------------------------------------------------------------
+# The original's own cases (paths the replica suite's inputs do not reach)
+
+
+def own_inputs() -> Path:
+    """The original's own synthetic inputs, made once (fixed bytes): ``ramp16`` (16 x 13 x 11,
+    ``x + 20 y + 400 z``), ``rampnan`` (its first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel,
+    ``1 + x + 3 y + 7 z``); voxel sizes 2, 2.5, 3."""
+    ws = rep.workspace()
+    base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
+    marker = base / "v1.done"
+    if marker.exists():
+        return base
+    base.mkdir(parents=True, exist_ok=True)
+    x, y, z = np.meshgrid(np.arange(16), np.arange(13), np.arange(11), indexing="ij")
+    ramp = (x + 20 * y + 400 * z).astype(np.float32)
+    rep._save(base / "ramp16.nii.gz", ramp, dtype=np.float32, affine=rep._affine(ramp.shape))
+    nan = ramp.copy()
+    nan[0, 0, 0] = np.nan
+    rep._save(base / "rampnan.nii.gz", nan, dtype=np.float32, affine=rep._affine(nan.shape))
+    x, y, z = np.meshgrid(np.arange(13), np.arange(11), np.arange(9), indexing="ij")
+    asym = (1 + x + 3 * y + 7 * z).astype(np.float32)
+    rep._save(base / "asym.nii.gz", asym, dtype=np.float32, affine=rep._affine(asym.shape))
+    marker.write_text("1\n", encoding="utf-8")
+    return base
+
+
+def _prepare(run: rep.Run, tmp: Path) -> list[str]:
+    """The run's arguments in ``tmp``: ``@orig:<name>`` one of :func:`own_inputs`, the rest as
+    the replica suite prepares them."""
+    if not any(a.startswith("@orig:") for a in run.args):
+        return rep._prepare(run, tmp)
+    out: list[str] = []
+    for a in run.args:
+        if a.startswith("@orig:"):
+            src = own_inputs() / f"{a[len('@orig:') :]}.nii.gz"
+            shutil.copy(src, tmp / src.name)
+            out.append(src.name)
+        else:
+            out.extend(rep._prepare(rep._r(a), tmp))
+    return out
+
+
+def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
+    T = "standard"
+    return {
+        "orig/fft-asym": (
+            T,
+            "-kernel file (asymmetric, 13 x 11 x 9) -fmeanu of a 16 x 13 x 11 image (FSL's FFT "
+            "path: a true convolution, the kernel flipped)",
+            rep._r("@orig:ramp16", "-kernel", "file", "@orig:asym", "-fmeanu", "out"),
+        ),
+        "orig/fft-nan-local": (
+            T,
+            "FSL-191: -kernel boxv 11 -fmeanu (FSL's FFT path) of an image with one NaN voxel "
+            "beyond the kernel's reach of most voxels",
+            rep._r("@orig:rampnan", "-kernel", "boxv", "11", "-fmeanu", "out", fixed="FSL-191"),
+        ),
+    }
+
+
 def _expected(checks: CheckList, expected: list[str]) -> None:
     if expected and all(c.passed for c in checks.checks):
         raise Outcome(EXPECTED, "; ".join(expected))
@@ -419,7 +485,7 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         for mode in (defects.REPRODUCE, defects.FIX):
             with tempfile.TemporaryDirectory(prefix="lx-maths-") as b_:
                 b = Path(b_)
-                args = rep._prepare(run, b)
+                args = _prepare(run, b)
                 r = run_original(args, cwd=b, settings=settings, mode=mode)
                 if _not_yet(r):
                     raise Outcome(SKIPPED, _not_yet(r))
@@ -434,8 +500,8 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         tempfile.TemporaryDirectory(prefix="lx-maths-") as b_,
     ):
         a, b = Path(a_), Path(b_)
-        args = rep._prepare(run, a)
-        rep._prepare(run, b)
+        args = _prepare(run, a)
+        _prepare(run, b)
         before = set(_files(b, set()))
         ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         if _not_yet(ours):
@@ -443,13 +509,13 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         oracle = rep.run_oracle(args, cwd=a, settings=settings)
         expected = compare(checks, oracle, ours, a, b, before, args)
         if run.fix and ours.code == 0:
-            fix_pass(checks, lambda t: rep._prepare(run, t), args, settings, b, ours, before)
+            fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours, before)
     _agree_on_errors(checks, oracle)
     _expected(checks, expected)
     if run.fixed:
         with tempfile.TemporaryDirectory(prefix="lx-maths-") as c_:
             c = Path(c_)
-            args = rep._prepare(run, c)
+            args = _prepare(run, c)
             r = run_original(args, cwd=c, settings=settings, mode=defects.FIX)
             checks(
                 f"{run.fixed}: the default gives an output and names the defect",
@@ -515,7 +581,13 @@ def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
 
 
 def cases(tier: str) -> list[Case]:
-    return list(rep.cases(tier))
+    from larmorx_validation.parity.harness import in_tier
+
+    out = list(rep.cases(tier))
+    for name, (t, desc, _run) in _own_cases().items():
+        if in_tier(t, tier):
+            out.append(Case(name, "orig", desc, ("own", name)))
+    return out
 
 
 def run_case(case: Case, checks: CheckList) -> None:
@@ -526,6 +598,8 @@ def run_case(case: Case, checks: CheckList) -> None:
         _goodvoxels_case(payload, checks)
     elif kind == "direct":
         _run_case(payload, checks)
+    elif kind == "own":
+        _run_case(_own_cases()[payload][2], checks)
     else:
         _run_case(rep._cases()[payload][2], checks)
 

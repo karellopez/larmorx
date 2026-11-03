@@ -809,7 +809,7 @@ fn note_zero_width(notices: &mut Notices, op: &str, k: &Kernel) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -829,5 +829,141 @@ mod tests {
     fn fsl_takes_the_fft_for_large_kernels() {
         assert!(fsl_uses_fft(210, 1287));
         assert!(!fsl_uses_fft(210, 175));
+        assert!(!fsl_uses_fft(2288, 960));
+        assert!(fsl_uses_fft(2288, 1287));
+    }
+
+    pub(crate) fn img(dims: [usize; 4], data: Vec<f32>) -> Img<f32> {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{NiftiHeader, NiftiVersion};
+        let header = NiftiHeader::new(NiftiVersion::V1, &dims[..3], DataType::F32).unwrap();
+        Img {
+            dims,
+            data,
+            header,
+            flipped: false,
+            cal: (0.0, 0.0),
+        }
+    }
+
+    fn notices(mode: UpstreamDefects) -> Notices {
+        Notices::new(mode)
+    }
+
+    #[test]
+    fn the_window_counts_nan_and_overflows_past_its_count() {
+        // a kernel value of exactly 0.5 counts but never enters; NaN counts; +inf enters only
+        let k = Kernel::from_values([3, 1, 1], vec![0.5, f32::NAN, f32::INFINITY]);
+        let w = window(&k);
+        assert_eq!((w.offs.len(), w.count), (1, 2));
+        let k = Kernel::from_values([3, 1, 1], vec![1.0, 1.0, f32::INFINITY]);
+        let mut im = img([5, 1, 1, 1], vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let mut err = Vec::new();
+        let r = morph(
+            &mut im,
+            &k,
+            Morph::DilF,
+            "-dilF",
+            &mut notices(UpstreamDefects::Fix),
+            &mut err,
+        );
+        assert!(matches!(r, Err(Stop::Exception(ref t)) if t.contains("std::out_of_range")));
+        // an even extent warns once per volume
+        let k = Kernel::ones([2, 1, 1], true);
+        let mut im = img([3, 1, 1, 2], vec![1.0, 5.0, 2.0, 0.0, 0.0, 7.0]);
+        let mut err = Vec::new();
+        morph(
+            &mut im,
+            &k,
+            Morph::DilF,
+            "-dilF",
+            &mut notices(UpstreamDefects::Fix),
+            &mut err,
+        )
+        .unwrap();
+        assert_eq!(im.data, vec![5.0, 5.0, 2.0, 0.0, 7.0, 7.0]);
+        assert_eq!(
+            String::from_utf8(err)
+                .unwrap()
+                .matches(OFF_CENTRE_MORPH)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn fsl_162_in_both_modes() {
+        let k = Kernel::ones([3, 1, 1], false);
+        let data = vec![1.0, f32::NAN, 3.0, 4.0];
+        let mut im = img([4, 1, 1, 1], data.clone());
+        let mut err = Vec::new();
+        let mut rep = notices(UpstreamDefects::Reproduce);
+        let r = morph(&mut im, &k, Morph::Median, "-fmedian", &mut rep, &mut err);
+        assert!(matches!(r, Err(Stop::Exception(ref t)) if t.contains("sort(): detected NaN")));
+        let mut im = img([4, 1, 1, 1], data);
+        let mut fix = notices(UpstreamDefects::Fix);
+        morph(&mut im, &k, Morph::Median, "-fmedian", &mut fix, &mut err).unwrap();
+        // windows without the NaN: [1] -> 1, [3] -> 3, [3, 4] -> upper median 4
+        assert_eq!(im.data[0], 1.0);
+        assert!(im.data[1] == 3.0 && im.data[2] == 4.0 && im.data[3] == 4.0);
+        assert!(fix.contains(&defects::FSL_162));
+    }
+
+    #[test]
+    fn dilall_fills_in_queue_order() {
+        let mut im = img([4, 1, 1, 1], vec![0.0, 2.0, 0.0, 0.0]);
+        dilall(&mut im, &mut notices(UpstreamDefects::Fix));
+        assert_eq!(im.data, vec![2.0, 2.0, 2.0, 2.0]);
+        let mut im = img([3, 1, 1, 1], vec![1.0, 0.0, 4.0]);
+        dilall(&mut im, &mut notices(UpstreamDefects::Fix));
+        assert_eq!(im.data, vec![1.0, 2.5, 4.0]);
+    }
+
+    #[test]
+    fn the_fft_path_flips_the_kernel_and_fsl_191() {
+        // 16 voxels in a row and a kernel of 15: FSL's FFT path, a true convolution
+        let n = 16;
+        let mut data: Vec<f32> = vec![0.0; n];
+        data[8] = 1.0;
+        let big = Kernel::from_values([15, 1, 1], (1..=15).map(|v| v as f32).collect());
+        let im = img([n, 1, 1, 1], data);
+        let mut err = Vec::new();
+        let mut ns = notices(UpstreamDefects::Fix);
+        let (fft, _) = convolve_all(&im, &big, "-fmeanu", &mut ns, &mut err);
+        let (_, per) = grid(&im);
+        if fsl_uses_fft(per, 15) {
+            // the impulse at 8 gives kernel voxel i at 8 - 7 + i
+            assert_eq!(fft[1], 1.0);
+        } else {
+            // the correlation: kernel voxel i at 8 + 7 - i
+            assert_eq!(fft[15], 1.0);
+        }
+        // FSL-191: a NaN on the FFT path poisons the volume only with reproduce
+        let w = 64 * 64;
+        let mut data = vec![1.0f32; w];
+        data[0] = f32::NAN;
+        let im = img([64, 64, 1, 1], data);
+        let k = Kernel::ones([41, 41, 1], false);
+        assert!(fsl_uses_fft(w, 41 * 41));
+        let mut rep = notices(UpstreamDefects::Reproduce);
+        let (o, _) = convolve_all(&im, &k, "-fmeanu", &mut rep, &mut err);
+        assert!(o.iter().all(|v| v.is_nan()));
+        let mut fix = notices(UpstreamDefects::Fix);
+        let (o, _) = convolve_all(&im, &k, "-fmeanu", &mut fix, &mut err);
+        assert!(o[w - 1] == 441.0 && o[0].is_nan());
+        assert!(fix.contains(&defects::FSL_191) && rep.contains(&defects::FSL_191));
+    }
+
+    #[test]
+    fn nan_from_numbers_is_x86_64s_default() {
+        let n = num::nan32(
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::INFINITY + f32::NEG_INFINITY,
+        );
+        assert_eq!(n.to_bits(), num::DEFAULT_NAN_32);
+        let q = f32::from_bits(0x7fa0_0001);
+        assert_eq!(num::nan32(1.0, q, 1.0 + q).to_bits(), 0x7fe0_0001);
+        assert_eq!(0.0f32.mul(f32::INFINITY).to_bits(), num::DEFAULT_NAN_32);
     }
 }

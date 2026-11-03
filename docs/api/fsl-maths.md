@@ -19,9 +19,13 @@ clean-room **original** in the main package (Apache-2.0, `crates/larmorx-fsl`'s 
 written from [`specs/fslmaths.md`](../../specs/fslmaths.md), FSL's documentation and black-box
 runs of FSL's program: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in progress since
 2026-11-03: it takes the command line, every data type, the binary operations, thresholds,
-masks, voxelwise functions, `-rand`, `-seed`, `-index` and `-grid` (relay 1); the kernels and
-filters, the reductions, the statistics and `-randn` come with its next relays and are refused
-until then (`... is not implemented yet in the clean-room original`). `implementation="auto"`
+masks, voxelwise functions, `-rand`, `-seed`, `-index` and `-grid` (relay 1), the kernels, the
+morphological filters, `-dilall`, the convolutions (`-s`, `-fmean`, `-fmeanu`), `-subsamp2`,
+`-subsamp2offc`, `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm` and `-ing` (relay 2); the
+reductions, the statistics and `-randn` come with its next relays and are refused until then
+(`... is not implemented yet in the clean-room original`). Where FSL convolves a large kernel by
+its FFT, the original computes the same true convolution by the direct sum (within 2.6e-6 of
+FSL's largest value on the record's cases). `implementation="auto"`
 (the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
 `"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
 original in this process on `n_threads` threads (its results the same at any count). The
@@ -221,6 +225,9 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   support's arrays and a voxel outside the image: corrected or refused.
 - **FSL-179**, **FSL-180**: `-roc` with a noise image of another size, or without true or noise
   voxels: errors.
+- **FSL-191** (the clean-room original's black-box runs): with a kernel large enough for FSL's
+  FFT convolution, `-fmean` and `-fmeanu` make the whole volume NaN when one voxel is NaN or
+  infinite: NaN only within the kernel's reach, as FSL's direct sum for smaller kernels gives.
 - **FSL-187** (shared with fslstats, BET and FLIRT): the robust range counts a value far above a
   histogram's range in its first bin: the last (none of fMRIPrep's inputs reaches it, measured).
 - **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle
@@ -228,8 +235,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original's kernels and filters, reductions, statistics and `-randn`, its speed
-  work, golden cases and record (its next relays).
+- The clean-room original's reductions, statistics and `-randn`, its speed work (an FFT for
+  large kernels among it), golden cases and record (its next relays).
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).
 - The goodvoxels mask with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

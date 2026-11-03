@@ -583,3 +583,59 @@ fn note_far152<T: Num>(notices: &mut Notices, vals: &[T], what: &str) {
 fn far_upper<T: Num>(vals: &[T]) -> T {
     ops::extremes(vals, false).map_or(T::zero(), |(_, hi)| hi.add(T::one()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::maths::filters::tests::img;
+
+    #[test]
+    fn holes_inside_are_filled_and_fsl_165() {
+        let mut data = vec![1.0f32; 27];
+        data[13] = 0.0; // the centre: a hole
+        data[0] = 0.0; // a corner: touches the faces
+        let mut im = img([3, 3, 3, 1], data);
+        fill_holes(&mut im, false, &mut Notices::new(UpstreamDefects::Fix)).unwrap();
+        assert_eq!((im.data[13], im.data[0]), (1.0, 0.0));
+        // a single slice: refused with reproduce, filled in its plane by default
+        let mut data = vec![1.0f32; 9];
+        data[4] = 0.0;
+        let mut im = img([3, 3, 1, 1], data.clone());
+        let r = fill_holes(
+            &mut im,
+            false,
+            &mut Notices::new(UpstreamDefects::Reproduce),
+        );
+        assert!(matches!(r, Err(Stop::Refuse(_))));
+        let mut im = img([3, 3, 1, 1], data);
+        let mut ns = Notices::new(UpstreamDefects::Fix);
+        fill_holes(&mut im, false, &mut ns).unwrap();
+        assert_eq!(im.data[4], 1.0);
+        assert!(ns.contains(&defects::FSL_165));
+    }
+
+    #[test]
+    fn an_empty_mask_divides_by_zero() {
+        let mut im = img([2, 1, 1, 1], vec![0.0, -3.0]);
+        let mut err = Vec::new();
+        normalise(
+            &mut im,
+            100.0,
+            false,
+            &mut Notices::new(UpstreamDefects::Fix),
+            &mut err,
+        );
+        assert_eq!(im.data[0].to_bits(), num::DEFAULT_NAN_32);
+        assert_eq!(im.data[1], f32::NEG_INFINITY);
+        assert_eq!(String::from_utf8(err).unwrap(), format!("{EMPTY_MASK}\n"));
+    }
+
+    #[test]
+    fn subsampling_halves_the_grid() {
+        let data: Vec<f32> = (0..8).map(|v| v as f32).collect();
+        let mut im = img([2, 2, 2, 1], data);
+        subsample(&mut im, true, &mut Notices::new(UpstreamDefects::Fix)).unwrap();
+        assert_eq!((im.dims, im.data.clone()), ([1, 1, 1, 1], vec![3.5]));
+        assert_eq!(im.header.pixdim[1], 2.0);
+    }
+}

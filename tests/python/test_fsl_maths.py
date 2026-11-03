@@ -129,6 +129,49 @@ def test_without_the_replica(scripts, tmp_path):
         lx.fsl.image_mean(image())
 
 
+def test_the_originals_filters(scripts):
+    # sub-task 2's operations through the typed wrappers and fslmaths' clean-room original
+    data, affine = image(shape=(6, 5, 4))
+    orig = {"implementation": "original"}
+    r = lx.fsl.spatial_filter((data, affine), "dilF", **orig)
+    padded = np.pad(data, 1, constant_values=-np.inf)
+    want = np.max(
+        [
+            padded[a : a + 6, b : b + 5, c : c + 4]
+            for a in range(3)
+            for b in range(3)
+            for c in range(3)
+        ],
+        axis=0,
+    )
+    assert np.array_equal(np.asarray(r.data), want)
+    e = lx.fsl.spatial_filter((data, affine), "eroF", kernel=("boxv3", 1, 1, 3), **orig)
+    assert np.array_equal(
+        np.asarray(e.data)[:, :, 1:3], np.minimum(data[:, :, :2], data[:, :, 1:3])
+    )
+    s = lx.fsl.smooth((data, affine), 2.0, n_threads=2, **orig)
+    assert np.asarray(s.data).shape == data.shape and np.all(np.isfinite(np.asarray(s.data)))
+    sub = lx.fsl.subsample2((data, affine), **orig)
+    assert np.asarray(sub.data).shape == (3, 3, 2)
+    cube = np.ones((5, 5, 5), np.uint8)
+    cube[2, 2, 2] = 0
+    cube[0, 0, 0] = 0
+    f = np.asarray(lx.fsl.unary((cube, affine), "fillh", **orig).data)
+    assert (f[2, 2, 2], f[0, 0, 0]) == (1, 0)
+    n = np.asarray(lx.fsl.normalise_intensity((data + 1, affine), 100.0, **orig).data)
+    assert abs(float(n.mean()) - 100.0) < 1e-3
+    d = np.asarray(lx.fsl.dog_edge((data, affine), 1.0, 1.6, **orig).data)
+    assert set(np.unique(d)) <= {0.0, 1.0}
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-160"):
+        z = lx.fsl.smooth((data, affine), 0.0, **orig)
+    assert np.array_equal(np.asarray(z.data), data)
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-161"),
+        pytest.raises(RuntimeError, match="FSL-161"),
+    ):
+        lx.fsl.spatial_filter((data, affine), "dilM", kernel=("boxv", 0), **orig)
+
+
 def test_the_generic_fslmaths(scripts, monkeypatch, tmp_path):
     program = stub(scripts)
     monkeypatch.setenv("FSLOUTPUTTYPE", "NIFTI_PAIR")  # must not reach the replica

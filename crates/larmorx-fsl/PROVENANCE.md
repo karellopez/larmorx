@@ -266,8 +266,8 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 ## fslmaths (`maths`, `cli::fslmaths`; relay 1, 2026-11-03)
 
 `fslmaths` (FSL's image calculator: its command line, computing types, binary operations,
-thresholds, masks, voxelwise functions, random numbers, index and grid; the next relays add the
-kernels and filters, the reductions and the statistics) was written by a clean-room implementer
+thresholds, masks, voxelwise functions, random numbers, index and grid; relay 2 its kernels and
+spatial filters; the next relays add the reductions and the statistics) was written by a clean-room implementer
 who never opened FSL's source code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy),
 the replica crates (`crates-nc/`, `crates/larmorx-afni-replica`, `crates-gpl/`), Armadillo's,
 nlohmann's or glibc's sources, the restricted findings (`docs/findings/fsl-maths.md`,
@@ -280,8 +280,8 @@ authors' permanent cases or the history of replica and spec-writer commits. Its 
 |---|---|
 | [`specs/fslmaths.md`](../../specs/fslmaths.md) (FSL 6.0.7.23, fsl-avwutils 2209.6) and `specs/bet.md` §3, §4.2 | the behaviour: the command line, the usage text, the data types, C's arithmetic, every operation, the robust range, the messages, the numeric conventions, the defects |
 | B. A. Wichmann and I. D. Hill, Applied Statistics 31(2):188-190, 1982 (AS 183) | `-rand`'s generator |
-| Black-box runs of FSL 6.0.7.23's `fslmaths` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md)) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md): the thresholds' far side (inclusive for `-thr`/`-uthr`, exclusive for `-bin`; `short` wraps too), `-save`'s type and display range, the layouts of an image of other sizes (FSL-159), the input's and an operand's messages |
-| The defect register's summary rows of FSL-151 to FSL-159, FSL-187 and GLIBC-07 (`larmorx_core::defects`) | the defects' names in the notices |
+| Black-box runs of FSL 6.0.7.23's `fslmaths` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md)) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md): the thresholds' far side (inclusive for `-thr`/`-uthr`, exclusive for `-bin`; `short` wraps too), `-save`'s type and display range, the layouts of an image of other sizes (FSL-159), the input's and an operand's messages; relay 2: the kernel's count, the convolutions' messages and normalising sum, the FFT path's orientation and NaN (FSL-191), `-edge`'s denominator, `-dog_edge` under integer types, the empty mask of `-inm`, the subsampling's last bits |
+| The defect register's summary rows of FSL-151 to FSL-166, FSL-187 and GLIBC-07 (`larmorx_core::defects`) | the defects' names in the notices; FSL-191 is the original's own (finding 9) |
 | larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options}` (FSL's image names, reading and writing, `strtod`), `fast::rng` (glibc's `rand`, for `-seed`), `flirt::mat::atoi`, `larmorx_mri::hmc::image` (the stored values), `larmorx_core` (correctly rounded maths, thread pools, D13) | images, numbers, threads |
 
 | larmorx | Behaviour reproduced | Source |
@@ -290,3 +290,6 @@ authors' permanent cases or the history of replica and spec-writer commits. Its 
 | `maths::image` | the input and the operands read in the computing type (scaling, the radiological frame), the output's rounding and conversion, FSL-157, `-save`'s type, the header | §3; findings |
 | `maths::ops` | the binary operations with numbers and images and their layouts (FSL-159), the thresholds and their far side (FSL-152, FSL-153), `-bin`, `-binv`, `-invbin`, the robust range (FSL-153, FSL-187) and the percentage thresholds, the voxelwise functions (correctly rounded: GLIBC-07), Wichmann-Hill and `-seed`, `-index`, `-grid` | §5-§8; AS 183; findings |
 | `cli::fslmaths` | the command line, the usage text, `-dt`/`-odt` and the computing type (FSL-154, FSL-155), the chain, the messages and exit statuses, FSL-156 and FSL-158's refusals, the orientation warning and the sizes' rule, the display range | §2, §3, §17, §19; findings |
+| `maths::kernel` (relay 2) | the current kernel and `-kernel`'s types (`3D`, `2D`, `box`, `boxv`, `boxv3`, `gauss`, `sphere`, `file`, unknown), their sizes and values in single precision, the separable flag, FSL-160's zero-width Gaussian | §9; findings 6, 7 |
+| `maths::filters` (relay 2) | the morphological filters' window, count and overflow (Armadillo's bounds error as FSL prints it), the two-partial extremes and sums, the mode and the median (FSL-162), `-dilall`'s queue, the separable filter, the direct sum, FSL's FFT criterion and its orientation (computed by the direct sum), FSL-161's refusals, FSL-191, the warnings | §10.1, §10.2, §18, §19; findings 5-9 |
+| `maths::spatial` (relay 2) | `-subsamp2` and `-subsamp2offc` (the grid and geometry, FSL-163), `-edge`, `-dog_edge` (FSL-161, FSL-164), `-fillh`, `-fillh26` (FSL-165), `-inm`, `-ing` (the block sums, FSL-152, FSL-153 for the mask, the empty mask) | §10.3-§10.7, §18, §19; findings 10-13 |

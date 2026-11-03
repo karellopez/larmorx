@@ -3,10 +3,11 @@
 // LICENSE).
 //! The replica's side of `validation/probes/fsl-miscmaths/lapack_probe.c`: for every case file
 //! `*.case` under `LP_PROBE_ROOT`, writes `<case>.replica` with the lines the probe prints from
-//! FSL's OpenBLAS (`dgesv`, `dsyrk('U', 'T')`), from `larmorx_nc_core::lapack::blocked` and
-//! `arma::syrk_t`. Run with `--ignored`.
+//! FSL's OpenBLAS (`dgesv`, `dsyrk('U', 'T')`, `dgemm`), from `larmorx_nc_core::lapack::blocked`,
+//! `arma::syrk_t` and `lapack::blas::dgemm`. Run with `--ignored`.
 
 use larmorx_nc_core::arma::{Mat, syrk_t};
+use larmorx_nc_core::lapack::blas::{MatRef, dgemm};
 use larmorx_nc_core::lapack::blocked::gesv_any;
 use std::fmt::Write as _;
 
@@ -56,6 +57,30 @@ fn lapack_probe() {
                 for &v in &f64s(&b, 12 + 8 * n * n, n * nrhs) {
                     pd(&mut out, "x", v);
                 }
+            }
+        } else if h[0] == 2 {
+            let (m, n) = (h[1] as usize, h[2] as usize);
+            let k = u32::from_le_bytes(b[12..16].try_into().unwrap()) as usize;
+            let a = f64s(&b, 16, m * k);
+            let bb = f64s(&b, 16 + 8 * m * k, k * n);
+            let mut c = vec![0.0; m * n];
+            dgemm(
+                false,
+                false,
+                m,
+                n,
+                k,
+                1.0,
+                &a,
+                MatRef { off: 0, ld: m },
+                &bb,
+                MatRef { off: 0, ld: k },
+                0.0,
+                &mut c,
+                MatRef { off: 0, ld: m },
+            );
+            for &v in &c {
+                pd(&mut out, "c", v);
             }
         } else {
             let (k, n) = (h[1] as usize, h[2] as usize);

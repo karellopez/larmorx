@@ -3,7 +3,8 @@
 
 Generates the cases (seeded): ``dgesv`` of general, nearly singular-pivot, exactly singular and
 spline-normal-equation systems of 9 to 120 unknowns with 2 to 70 right-hand sides, and
-``dsyrk('U', 'T')`` with inner dimensions from 49 to 700 (one, a halved and several blocks);
+``dsyrk('U', 'T')`` with inner dimensions from 49 to 700 (one, a halved and several blocks) and
+``dgemm('N', 'N')`` with odd and even column counts and more than 512 rows;
 runs ``lapack_probe`` (built by ``build.sh``) on each and the replica's side (the ignored test
 ``lapack_probe`` of ``crates-nc/larmorx-nc-core``), and counts the differing lines. See
 README.md. Run inside a memory box (``scripts/orchestration/boxed.sh``).
@@ -101,6 +102,24 @@ def main() -> int:
     ]:
         syrk_case(work / f"syrk_k{k}_n{n}.case", rng.normal(0, 1, (k, n)))
         names.append(f"syrk_k{k}_n{n}")
+    # dgemm('N', 'N'): odd and even column counts, row blocks beyond GEMM_P (512).
+    for m, n, k in [
+        (7, 5, 9),
+        (12, 9, 30),
+        (5, 1, 20),
+        (17, 13, 300),
+        (600, 3, 10),
+        (4, 7, 8),
+        (9, 25, 16),
+        (1100, 5, 12),
+    ]:
+        name = f"gemm_m{m}_n{n}_k{k}"
+        (work / f"{name}.case").write_bytes(
+            struct.pack("<IIII", 2, m, n, k)
+            + np.asarray(rng.normal(0, 1, (m, k)), "<f8").T.copy().tobytes()
+            + np.asarray(rng.normal(0, 1, (k, n)), "<f8").T.copy().tobytes()
+        )
+        names.append(name)
     env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OPENBLAS_CORETYPE="Haswell")
     for name in names:
         with open(work / f"{name}.fsl", "w") as out:

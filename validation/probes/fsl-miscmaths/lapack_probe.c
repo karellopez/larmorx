@@ -5,13 +5,16 @@
 // (crates-nc/larmorx-nc-core/tests/lapack_probe.rs) prints them. See README.md.
 //
 // Usage: lapack_probe <case file>
-// The case file: u32 kind (0 gesv, 1 syrk); gesv: u32 n, u32 nrhs, A (n*n f64, column-major),
-// B (n*nrhs f64); syrk: u32 k, u32 n, A (k*n f64).
+// The case file: u32 kind (0 gesv, 1 syrk, 2 gemm); gesv: u32 n, u32 nrhs, A (n*n f64,
+// column-major), B (n*nrhs f64); syrk: u32 k, u32 n, A (k*n f64); gemm: u32 m, u32 n, u32 k,
+// A (m*k f64), B (k*n f64): C = A*B.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 extern void dgesv_(int* n, int* nrhs, double* a, int* lda, int* ipiv, double* b, int* ldb, int* info);
+extern void dgemm_(const char* ta, const char* tb, int* m, int* n, int* k, double* alpha,
+                   double* a, int* lda, double* b, int* ldb, double* beta, double* c, int* ldc);
 extern void dsyrk_(const char* uplo, const char* trans, int* n, int* k, double* alpha, double* a,
                    int* lda, double* beta, double* c, int* ldc);
 
@@ -40,6 +43,19 @@ int main(int argc, char* argv[])
     for (int i = 0; i < n; i++) printf("ipiv %d\n", ipiv[i]);
     for (int i = 0; i < n * n; i++) pd("lu", a[i]);
     for (int i = 0; i < n * nrhs; i++) pd("x", b[i]);
+  } else if (kind == 2) {
+    int m = (int)p, n = (int)q, k;
+    unsigned int kk;
+    if (fread(&kk, 4, 1, f) != 1) return 2;
+    k = (int)kk;
+    double alpha = 1.0, beta = 0.0;
+    double* a = malloc(sizeof(double) * m * k);
+    double* b = malloc(sizeof(double) * k * n);
+    double* c = calloc((size_t)m * n, sizeof(double));
+    if (fread(a, 8, (size_t)m * k, f) != (size_t)m * k) return 2;
+    if (fread(b, 8, (size_t)k * n, f) != (size_t)k * n) return 2;
+    dgemm_("N", "N", &m, &n, &k, &alpha, a, &m, b, &k, &beta, c, &m);
+    for (int i = 0; i < m * n; i++) pd("c", c[i]);
   } else {
     int k = (int)p, n = (int)q;
     double alpha = 1.0, beta = 0.0;

@@ -682,6 +682,8 @@ pub fn dsyr2_u(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
 const GEMM_Q: usize = 256;
 /// `GEMM_UNROLL_M` for Haswell's double precision.
 const GEMM_UNROLL_M: usize = 4;
+/// `GEMM_P` for Haswell's double precision: the rows of one block.
+const GEMM_P: usize = 512;
 
 /// `DGEMM` (`interface/gemm.c`, `driver/level3/level3.c`, Haswell `dgemm_kernel_4x8_haswell.S`):
 /// `C = beta·C + alpha·op(A)·op(B)` for `op(A)` of `m × k`, `op(B)` of `k × n`.
@@ -691,7 +693,8 @@ const GEMM_UNROLL_M: usize = 4;
 /// when `k` or `alpha` is 0; then the inner dimension in blocks (`GEMM_Q`, the level-3 driver's
 /// split of a remainder between `Q` and `2Q`), each element's block total accumulated by
 /// `vmulpd` then `vfmadd231pd` in the order of `k` (one accumulator per element in every tile
-/// shape), then added as `C + acc·alpha`.
+/// shape but the 4-row, 1-column tile of an odd last column, which keeps four partial sums:
+/// [`super::blocked::ksum`]), then added as `C + acc·alpha`.
 #[allow(clippy::too_many_arguments)]
 pub fn dgemm(
     ta: bool,
@@ -732,15 +735,27 @@ pub fn dgemm(
         } else if min_l > GEMM_Q {
             min_l = (min_l / 2).div_ceil(GEMM_UNROLL_M) * GEMM_UNROLL_M;
         }
-        for j in 0..n {
-            for i in 0..m {
-                let mut acc = ael(i, ls) * bel(ls, j);
-                for l in ls + 1..ls + min_l {
-                    acc = fma(ael(i, l), bel(l, j), acc);
-                }
-                let p = cm.at(i, j);
-                c[p] += acc * alpha;
+        // The rows in chunks of GEMM_P (level3.c's rule), each element summed as its tile of
+        // the kernel sums it (`blocked::tile_sum`: one accumulator, but four partial sums in
+        // the 4-row, 1-column tile of an odd last column).
+        let mut is = 0;
+        while is < m {
+            let mut min_i = m - is;
+            if min_i >= GEMM_P * 2 {
+                min_i = GEMM_P;
+            } else if min_i > GEMM_P {
+                min_i = (min_i / 2).div_ceil(GEMM_UNROLL_M) * GEMM_UNROLL_M;
             }
+            for j in 0..n {
+                for i in is..is + min_i {
+                    let kind = super::blocked::tile_sum(i - is, j, min_i, n, min_l);
+                    let acc =
+                        super::blocked::ksum(kind, min_l, |l| (ael(i, ls + l), bel(ls + l, j)));
+                    let p = cm.at(i, j);
+                    c[p] += acc * alpha;
+                }
+            }
+            is += min_i;
         }
         ls += min_l;
     }

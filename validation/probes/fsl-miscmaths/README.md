@@ -53,15 +53,18 @@ scripts/orchestration/boxed.sh 4 python -P validation/probes/fsl-miscmaths/check
     --probe <scratch>/lapack_probe --work <scratch>/lpprobe
 ```
 
-Result on 2026-11-03: 128 cases (527,035 lines), 0 lines differ. The first version, which summed
+Result on 2026-11-03: 136 cases (534,957 lines: 64 `dgesv`, 8 `dsyrk`, 8 `dgemm`), 0 lines differ. The first version, which summed
 every element of the GEMM kernel in one accumulator, differed in every system whose trailing
 block or right-hand sides had an odd number of columns: OpenBLAS's Haswell kernel
 (`dgemm_kernel_4x8_haswell.S`) sums an element of its 4-row, 1-column tile in four partial
 sums (the products of each group of 8 by their index modulo 4, then the rest into the first,
-added as `(s0 + s1) + (s2 + s3)`); every other tile uses one accumulator. The core's older
-`lapack::blas::dgemm` (FLIRT's and FAST's larger products) models every tile with one
-accumulator: it differs from FSL's for an odd number of columns with at least 4 rows and 8 or
-more products (not met by those replicas' records; noted for the orchestrator).
+added as `(s0 + s1) + (s2 + s3)`); every other tile uses one accumulator. The core's
+`lapack::blas::dgemm` (FLIRT's and FAST's larger products, since FLIRT's part 3) had modelled
+every tile with one accumulator, so it differed from FSL's in the last column of an odd number of
+columns, in rows of 4-row tiles, with 8 or more products: on the probe's 8 `dgemm` cases it
+differed in 1 to 746 elements each. Relay 2 corrected it (`lapack::blas::dgemm` now sums by
+tile, as `lapack::blocked` does; the 8 cases agree); the mcflirt, BET, FLIRT and FAST records are
+re-made in sub-task 6 to show that they did not meet the case.
 
 Facts it found (for the topup replica's findings, restricted):
 

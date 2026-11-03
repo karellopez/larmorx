@@ -21,9 +21,11 @@ fn mul(a: &Mat3, b: &Mat3) -> Mat3 {
 
 /// The three elementary rotations and their derivatives.
 fn elementary(r: [f64; 3]) -> ([Mat3; 3], [Mat3; 3]) {
-    let (sx, cx) = r[0].sin_cos();
-    let (sy, cy) = r[1].sin_cos();
-    let (sz, cz) = r[2].sin_cos();
+    // correctly rounded (rule 5): the same bits on every platform
+    let sc = |a: f64| (larmorx_core::math::sin(a), larmorx_core::math::cos(a));
+    let (sx, cx) = sc(r[0]);
+    let (sy, cy) = sc(r[1]);
+    let (sz, cz) = sc(r[2]);
     let rx = [[1.0, 0.0, 0.0], [0.0, cx, sx], [0.0, -sx, cx]];
     let ry = [[cy, 0.0, -sy], [0.0, 1.0, 0.0], [sy, 0.0, cy]];
     let rz = [[cz, sz, 0.0], [-sz, cz, 0.0], [0.0, 0.0, 1.0]];

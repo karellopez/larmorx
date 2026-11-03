@@ -226,7 +226,7 @@ pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
         let r = r.max(0);
         let mut k: Vec<f64> = (-r..=r)
             .map(|j| {
-                let v = (-((j * j) as f64) / (2.0 * sv * sv)).exp();
+                let v = larmorx_core::math::exp(-((j * j) as f64) / (2.0 * sv * sv));
                 f64::from(v as f32)
             })
             .collect();

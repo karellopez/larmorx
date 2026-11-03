@@ -431,9 +431,17 @@ fn run(
                 let k = c.input.vol.voxel.map(|v| v.round().max(1.0) as usize);
                 let voxel = [h.intent_p1, h.intent_p2, h.intent_p3].map(f64::abs);
                 let order = if h.intent_code == 2017 { 2 } else { 3 };
-                let Some(field) =
-                    apply::coefficient_field(&as_stored(&c), c.input.vol.shape, n, k, order)
-                else {
+                // on the call's thread pool (its lines' prefilters run in parallel)
+                let coefficients = as_stored(&c);
+                let shape = c.input.vol.shape;
+                let evaluated = larmorx_core::parallel::with_threads(settings.threads(), || {
+                    apply::coefficient_field(&coefficients, shape, n, k, order)
+                });
+                let field = match evaluated {
+                    Ok(f) => f,
+                    Err(e) => return Err(refuse(err, notices, &e.to_string())),
+                };
+                let Some(field) = field else {
                     return Err(reader_fail(
                         err,
                         notices,
@@ -470,8 +478,16 @@ fn run(
                 Ok(f) => {
                     let n = f.input.vol.shape;
                     let h: Vec<f64> = f.volumes[0].iter().map(|&x| f64::from(x)).collect();
+                    // on the call's thread pool (its lines' prefilters run in parallel)
+                    let field =
+                        match larmorx_core::parallel::with_threads(settings.threads(), || {
+                            apply::image_field(h, n)
+                        }) {
+                            Ok(field) => field,
+                            Err(e) => return Err(refuse(err, notices, &e.to_string())),
+                        };
                     Topup::FieldImage {
-                        field: apply::image_field(h, n),
+                        field,
                         voxel: f.input.vol.voxel,
                     }
                 }

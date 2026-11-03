@@ -91,6 +91,8 @@ BRAIN = 0.1
 NOT_YET = "is not implemented yet in the clean-room original"
 #: FSL's thread count for its own band on fMRIPrep's calls (the evidence's runs, cached).
 BAND_THREADS = 4
+#: The original's thread count in the cases (random testing sets its worker's).
+LX_THREADS = 4
 #: Cases whose metrics are expected outside the thresholds, and why (their exit status, files,
 #: messages and headers are still compared): the original's movement derivatives are the exact
 #: derivatives of the cost, FSL's rotation derivatives are not (findings 14), so where the
@@ -184,12 +186,12 @@ def run_original(
     cwd: Path,
     settings: dict[str, str | None],
     mode: str,
-    threads: int = 4,
+    threads: int | None = None,
     program: str = PROGRAM,
 ) -> rep.Completed:
     env = rep._environment(settings)
     env[defects.ENV] = mode
-    env["OMP_NUM_THREADS"] = str(threads)
+    env["OMP_NUM_THREADS"] = str(threads or LX_THREADS)
     env["LARMORX_IMPLEMENTATION"] = "original"
     for k, v in os.environ.items():
         if k in ("PYTHONPATH", "VIRTUAL_ENV"):
@@ -1044,6 +1046,36 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             fix_pass(checks, lambda t: rep._prepare_fmriprep(node, t), args, {}, b, ours)
 
 
+def difftest_case(payload: tuple[rep.Run, rep.Run | None], checks: CheckList) -> None:
+    """A random case (``difftest/tools/fsl_topup_original.py``, the replica's draw) or a
+    permanent case it found: ``(topup, None)`` compares a topup run as every case does;
+    ``(topup, applytopup)`` takes FSL's topup run of the case's own pair (through the oracle
+    cache; its ``--out`` is ``rep.DIFFTEST_SOURCE``) and compares applytopup on its coefficients
+    and movements, as the replica suite's :func:`~.fsl_topup_replica.difftest_case` does."""
+    topup, at = payload
+    if at is None:
+        _run_case(topup, checks)
+        return
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-topup-dts_") as s_,
+        tempfile.TemporaryDirectory(prefix="lx-topup-dtsrc_") as src_,
+    ):
+        s, src = Path(s_), Path(src_)
+        r = rep._oracle(topup, rep._prepare(topup, s, None), s, dict(topup.settings))
+        if r.code != 0:
+            tail = " ".join(r.stderr.split())[-200:]
+            raise Outcome(SKIPPED, f"FSL's topup (applytopup's source) exits {r.code}: {tail}")
+        found = False
+        for f in sorted(s.iterdir()):
+            for stem in ("_fieldcoef", "_movpar.txt"):
+                if f.name.startswith(rep.DIFFTEST_SOURCE + stem):
+                    shutil.copy(f, src / f.name)
+                    found = found or stem == "_fieldcoef"
+        if not found:
+            raise Outcome(SKIPPED, "FSL's topup (applytopup's source) wrote no coefficients")
+        _run_case(dataclasses.replace(at, source_dir=str(src)), checks)
+
+
 def cases(tier: str) -> list[Case]:
     return list(rep.cases(tier))
 
@@ -1053,7 +1085,7 @@ def run_case(case: Case, checks: CheckList) -> None:
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
     elif kind == "difftest":
-        raise Outcome(SKIPPED, "random testing of the original: its own descriptor (sub-task 5)")
+        difftest_case(payload, checks)
     else:
         _run_case(rep._all_cases()[payload][2], checks, payload)
         _expected_divergence(checks, payload)

@@ -148,7 +148,7 @@ impl Axis {
         let k = self.k as f64;
         let u = (x - self.offset()) / k;
         let i0 = u.floor() as isize - 1;
-        let scale = k.powi(d as i32);
+        let scale = ipow(k, d as u32);
         let mut w = [0.0; 4];
         for (j, wj) in w.iter_mut().enumerate() {
             let t = u - (i0 + j as isize) as f64;
@@ -479,6 +479,23 @@ fn solve_spd(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     x
 }
 
+/// `x^n` by squaring and multiplying, the order of the C runtime's `__powidf2` (which `powi`
+/// calls, with a precision Rust leaves unspecified): written out, so the bits are the same on
+/// every platform.
+fn ipow(mut x: f64, mut n: u32) -> f64 {
+    let mut r = 1.0;
+    loop {
+        if n & 1 == 1 {
+            r *= x;
+        }
+        n /= 2;
+        if n == 0 {
+            return r;
+        }
+        x *= x;
+    }
+}
+
 /// The 1D Gram matrix of the basis' `d`-th derivatives (per mm: `voxel` mm per voxel) summed at
 /// the integer voxel positions covering every coefficient's support (§4.6; observed: the
 /// regularisation `-v` prints is this sum, not the integral), banded (`|i - j| ≤ 3`).
@@ -487,7 +504,7 @@ pub fn gram(axis: Axis, d: usize, voxel: f64) -> Vec<[f64; 7]> {
     let k = axis.k as f64;
     let lo = (axis.offset() - 2.0 * k).floor() as isize;
     let hi = (axis.offset() + (nc as f64 - 1.0) * k + 2.0 * k).ceil() as isize;
-    let scale = voxel.powi(-(2 * d as i32));
+    let scale = 1.0 / ipow(voxel, 2 * d as u32);
     let mut g = vec![[0.0; 7]; nc];
     for x in lo..=hi {
         let (i0, w) = axis.weights(x as f64, d);

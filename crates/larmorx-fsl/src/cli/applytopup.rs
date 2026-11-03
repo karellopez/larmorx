@@ -427,7 +427,7 @@ fn run(
                 let n =
                     [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| v.round().max(1.0) as usize);
                 let k = c.input.vol.voxel.map(|v| v.round().max(1.0) as usize);
-                let voxel = [h.intent_p1, h.intent_p2, h.intent_p3].map(|v| f64::from(v).abs());
+                let voxel = [h.intent_p1, h.intent_p2, h.intent_p3].map(f64::abs);
                 let order = if h.intent_code == 2017 { 2 } else { 3 };
                 let Some(field) =
                     apply::coefficient_field(&as_stored(&c), c.input.vol.shape, n, k, order)
@@ -447,7 +447,7 @@ fn run(
                             .collect(),
                     )
                 } else if !rows.is_empty()
-                    && rows.len() % 4 == 0
+                    && rows.len().is_multiple_of(4)
                     && rows.iter().all(|r| r.len() == 4)
                 {
                     Movements::Matrices(

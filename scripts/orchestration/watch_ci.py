@@ -1,11 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
 # Waits for the CI run of a pushed commit and prints each job's result. Usage: watch_ci.py <sha>
 import json
+import pathlib
+import subprocess
 import sys
 import time
 import urllib.request
 
-sha = sys.argv[1]
+# the full SHA of a commit this repository holds: a mistyped prefix (2026-11-03: `3a15db3a` for
+# 3a15db38) matched no run, and the watcher waited for hours without a word
+try:
+    sha = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{sys.argv[1]}^{{commit}}"],
+        cwd=pathlib.Path(__file__).resolve().parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+except subprocess.CalledProcessError:
+    print(f"not a commit of this repository: {sys.argv[1]}")
+    sys.exit(2)
 API = "https://api.github.com/repos/karellopez/larmorx/actions"
 
 

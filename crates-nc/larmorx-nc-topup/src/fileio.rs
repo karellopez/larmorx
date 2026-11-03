@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23 (fsl-topup 2203.6: topup_file_io.{h,cpp},
+// Translated to Rust from FSL 6.0.7.23 (fsl-topup 2203.5: topup_file_io.{h,cpp},
 // topup_matrices.{h,cpp}; fsl-miscmaths 2412.6: write_ascii_matrix). Copyright (C) 2012
 // University of Oxford (Jesper Andersson). Rust translation Copyright 2026 Karel Lopez Vilaret;
 // modified from the originals. Distributed under the FSL Licence (see LICENSE).

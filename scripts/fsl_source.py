@@ -48,6 +48,7 @@ VERSIONS = {
     "fsl-armawrap": "0.7.0",
     "fsl-fast4": "2111.3",
     "fsl-basisfield": "2203.4",
+    "fsl-topup": "2203.5",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -175,6 +176,16 @@ FILES = [
     ("fsl-warpfns", "warpfns.cc"),
     ("fsl-warpfns", "fnirt_file_reader.h"),
     ("fsl-warpfns", "fnirt_file_reader.cpp"),
+    # topup (2026-11-03): the program
+    ("fsl-topup", "topup.cpp"),
+    ("fsl-topup", "topupfns.h"),
+    ("fsl-topup", "topupfns.cpp"),
+    ("fsl-topup", "topup_costfunctions.h"),
+    ("fsl-topup", "topup_costfunctions.cpp"),
+    ("fsl-topup", "topup_file_io.h"),
+    ("fsl-topup", "topup_file_io.cpp"),
+    ("fsl-topup", "topup_matrices.h"),
+    ("fsl-topup", "topup_matrices.cpp"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

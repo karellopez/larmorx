@@ -814,4 +814,81 @@ mod tests {
             .unwrap();
         assert!(p.check_compulsory(&r).is_none());
     }
+
+    #[test]
+    fn int_vectors_config_files_and_print() {
+        let opt = |key, default, help| Opt {
+            key,
+            default,
+            help,
+            compulsory: false,
+            flag: ArgFlag::Requires(1),
+            visible: true,
+        };
+        let p = OptionParser::new(
+            "T",
+            "ex",
+            vec![
+                opt("--miter", Value::IntVec(vec![5]), "\titerations"),
+                opt("--lambda", Value::FloatVec(vec![0.0]), "weights"),
+                opt("--regmod", Value::Str("b".into()), "model"),
+                opt("--n", Value::Int(1), "n"),
+                Opt {
+                    key: "-v,--verbose",
+                    default: Value::Bool(false),
+                    help: "verbose",
+                    compulsory: false,
+                    flag: ArgFlag::NoArgument,
+                    visible: true,
+                },
+            ],
+        );
+        let argv = |a: &[&str]| {
+            let mut v = vec!["prog".to_owned()];
+            v.extend(a.iter().map(|s| s.to_string()));
+            v
+        };
+        let mut r = p
+            .parse_command_line(&argv(&["--miter=3,x,", "--n=7"]), 0, false)
+            .ok()
+            .unwrap();
+        assert_eq!(r.get(&p, "--miter").ints(), [3, 0, 0]);
+        let dir = tempfile::tempdir().unwrap();
+        let cnf = dir.path().join("c.cnf");
+        std::fs::write(
+            &cnf,
+            "# a comment\n--miter=5,5\n--lambda=0.0000005,1e-11\n  --n=2\n-v\n--regmod=m",
+        )
+        .unwrap();
+        p.parse_config_file(&mut r, cnf.to_str().unwrap()).unwrap();
+        // the command line's values are kept (overwrite mode Ignore)
+        assert_eq!(r.get(&p, "--miter").ints(), [3, 0, 0]);
+        assert_eq!(r.get(&p, "--n").int(), 7);
+        assert_eq!(r.get(&p, "--lambda").floats(), [5e-7f32, 1e-11]);
+        assert!(r.get(&p, "-v,--verbose").bool());
+        assert_eq!(r.get(&p, "--regmod").str(), "m");
+        let print = |k: &str| {
+            let i = p.opts.iter().position(|o| o.key == k).unwrap();
+            p.opts[i].print(&r.states[i])
+        };
+        assert_eq!(print("--miter"), "# \titerations\n--miter=3,0,0");
+        assert_eq!(print("--lambda"), "# weights\n--lambda=5e-07,1e-11");
+        assert_eq!(print("-v,--verbose"), "# verbose\n--verbose");
+        // an unknown option, a file that cannot be opened, a line of 1024 characters
+        std::fs::write(&cnf, "--nope=1\n").unwrap();
+        assert_eq!(
+            p.parse_config_file(&mut r, cnf.to_str().unwrap()),
+            Err("--nope: Option doesn't exist!".to_owned())
+        );
+        let missing = dir.path().join("none.cnf");
+        let m = missing.to_str().unwrap();
+        assert_eq!(
+            p.parse_config_file(&mut r, m),
+            Err(format!("{m}: Couldn't open the file!"))
+        );
+        let mut r = p.parse_command_line(&argv(&[]), 0, false).ok().unwrap();
+        std::fs::write(&cnf, format!("# {}\n--n=4\n", "x".repeat(1100))).unwrap();
+        p.parse_config_file(&mut r, cnf.to_str().unwrap()).unwrap();
+        assert_eq!(r.get(&p, "--n").int(), 1);
+    }
 }

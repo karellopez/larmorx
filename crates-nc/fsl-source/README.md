@@ -26,10 +26,11 @@ them again.
 | fsl-znzlib | 2511.3 | https://git.fmrib.ox.ac.uk/fsl/znzlib | `znzlib.{h,cpp}`, `raw_plugin.{h,cpp}`, `gzip_plugin.{h,cpp}`, `zlib_wrapper.h`, `zstd_reader.{h,cpp}`, `zstd_writer.{h,cpp}`, `bzip2_plugin.{h,cpp}` (2111.0's `znzlib.c` is gone: znzlib is C++ since 2511) |
 | fsl-bet2 | 2111.9 | https://git.fmrib.ox.ac.uk/fsl/bet2 | `bet` (the script), `bet2.cpp`, `betsurf.{h,cpp}` (`robustfov`, the Tcl GUI and `bet4animal` are not translated) |
 | fsl-meshclass | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/meshclass | `meshclass.h`, `point.{h,cpp}`, `mpoint.{h,cpp}`, `triangle.{h,cpp}`, `mesh.{h,cpp}`, `pt_special.{h,cpp}`, `selfintersection.cpp`, `profile.{h,cpp}` |
-| fsl-utils | 2412.6 | https://git.fmrib.ox.ac.uk/fsl/utils | `options.{h,cc}`, `parse.cc`, `usage.cc`, `functions.cc`, `matches.cc` |
+| fsl-utils | 2412.6 | https://git.fmrib.ox.ac.uk/fsl/utils | `options.{h,cc}`, `parse.cc` (with topup: `parse_config_file`), `usage.cc`, `functions.cc` (with topup: `std::vector<int>` options, an option's `print`), `matches.cc`, `check.cc` |
 | fsl-fast4 | 2111.3 | https://git.fmrib.ox.ac.uk/fsl/fast4 | `fast_two.cc`, `mriseg_two.{h,cc}`, `multi_mriseg_two.{h,cc}` (the Tcl GUI and the lesion tools are not translated) |
 | fsl-basisfield | 2203.4 | https://git.fmrib.ox.ac.uk/fsl/basisfield | `basisfield.{h,cpp}`, `splinefield.{h,cpp}`, `fsl_splines.h` (topup's spline fields; `dctfield` and the older `splines.{h,c}` are not translated) |
 | fsl-warpfns | 2501.0 | https://git.fmrib.ox.ac.uk/fsl/warpfns | `warpfns.h` (FLIRT's `applyxfm4D`; topup's resampling: `raw_general_transform` and its wrappers), `warpfns.cc` (`rows_per_thread`), `fnirt_file_reader.{h,cpp}` (`deffield2jacobian`; the file reader itself, `fnirt_file_writer` and `point_list` are not translated) |
+| fsl-topup | 2203.5 | https://git.fmrib.ox.ac.uk/fsl/topup | `topup.cpp`, `topupfns.{h,cpp}`, `topup_costfunctions.{h,cpp}`, `topup_file_io.{h,cpp}`, `topup_matrices.{h,cpp}` (`applytopup.{h,cpp}` and `displacement_vector.{h,cpp}` with applytopup's sub-task) |
 | fsl-avwutils | 2209.6 | https://git.fmrib.ox.ac.uk/fsl/avwutils | `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` (what the `bet` script runs of them) |
 
 FSL is Copyright (C) 1999-2023 University of Oxford; the files carry their own notices

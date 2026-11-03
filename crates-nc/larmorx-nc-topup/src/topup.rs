@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23 (fsl-topup 2203.6: topup.cpp). Copyright (C) 2012
+// Translated to Rust from FSL 6.0.7.23 (fsl-topup 2203.5: topup.cpp). Copyright (C) 2012
 // University of Oxford (Jesper Andersson). Rust translation Copyright 2026 Karel Lopez Vilaret;
 // modified from the originals. Distributed under the FSL Licence (see LICENSE).
 //! topup's `main`: the input scaled to a mean of 100 (all scans together, or each with

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Copyright 2026 Karel Lopez Vilaret.
-//! A bit-exact replica of FSL's topup (FSL 6.0.7.23: fsl-topup 2203.6), the estimation of the
+//! A bit-exact replica of FSL's topup (FSL 6.0.7.23: fsl-topup 2203.5), the estimation of the
 //! susceptibility-induced off-resonance field from images acquired with reversed
 //! phase-encoding directions, translated from FSL's source under the FSL Licence's terms
 //! (non-commercial; the licence and FSL's original source travel with it: `crates-nc/LICENSE`,

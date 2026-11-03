@@ -562,6 +562,15 @@ refused.
 
 ### 6.5 The boundary-based cost (`bbr`)
 
+(spec writer, 2026-11-03; question 28 of part 2: right, confirmed) **Without boundary voxels**:
+FLIRT sets the current pair's cost before every cost evaluation and whenever a pair is made or
+`setoption costfunction` names a cost; each time the cost is `bbr` and the pair's boundary is not
+set, it builds the boundary, and finding no boundary point prints `ERROR::set_bbr_seg: could not
+find any boundary points!` and leaves it unset. So the error is printed at each pair's set-up
+with the cost (a `setscale` that makes a new pair), at `setoption costfunction bbr`, and before
+each evaluation, which then prints `WARNING:: Found NaN in BBR cost (2)` (its `Σ w12 = 0`); the
+counts follow from the schedule (the implementer's counts on five schedules are FSL's).
+
 **The boundary points**, computed the first time the cost is BBR for a pair (and again for later
 pairs):
 - *From `-wmseg`*: a voxel `(x, y, z)` of the segmentation is a boundary voxel when its value is
@@ -1184,8 +1193,9 @@ information, describing the pair's input **before** the scale takes the input ag
 bbr` on a pair without it), five lines on standard error around the boundary's set-up: `Setting
 bbr seg 1`, `Cost is set to <the cost's number>`, `Cost == BBR is 1`, `Result (pre) of is_bbr_set
 is 0`, then, after the set-up (§6.5), `Result (post) of is_bbr_set is 1`, or `... is 0` after
-§6.5's error line when no boundary point was found (the boundary then counts as not set: §6.5's
-error and warning at each evaluation). **The final call** measures the first row of `U` (when `U` is empty it
+§6.5's error line when no boundary point was found: the boundary then counts as not set, and
+FLIRT sets the pair's cost again before **every** cost evaluation, so the set-up, its error line
+and these five lines come again at each evaluation (before its NaN warning, §6.5). **The final call** measures the first row of `U` (when `U` is empty it
 measures nothing and appends nothing); then, with an empty `U`, FLIRT prints `Failed to calculate
 any transformation matrix` (§9.1) as without `-debug`.
 
@@ -1629,8 +1639,12 @@ to the previous one compares the three values exactly (`1 2 3` then `1 2 3.00000
 and only on standard input; it never applies to the first triple (the previous one starts as a
 value no triple can equal), and a triple that ends the input so is not printed.
 
-The mapping (`V` an image's millimetre matrix: its sform if set, else its qform, else its voxel
-sizes; `S` its voxel-size diagonal; `N` its NIfTI-to-newimage voxel matrix: the identity, or for an
+The mapping ((spec writer, 2026-11-03; questions 27 and 34 of part 2: right, confirmed) `V` an
+image's millimetre matrix: its sform if set, else its qform, both as FSL holds them after §4.1's
+reading (the qform from its quaternion by §4.1's conversion, single-precision elements; swapped
+for a neurological file), else its voxel sizes as a diagonal, **x not reversed**, for every image
+alike, the source, the destination and a `-std` image (such a `-std` image also gets the warning
+below; part 2's first reading `F·S` was wrong); `S` its voxel-size diagonal; `N` its NIfTI-to-newimage voxel matrix: the identity, or for an
 image stored neurologically `S⁻¹·F·S` with `F` the reversal of x about the field of view (`x' =
 (nx − 1)·dx − x`, the field of view in single precision), evaluated as a solve; every `A⁻¹·v` is an
 LU solve of `A` against `v`, every `A·v` a 4 × 4 times 4-vector product): through the matrix `M`

@@ -1,13 +1,16 @@
-# fslmaths (FSL 6.0.7.23): findings from the source
+# fslmaths and fslstats (FSL 6.0.7.23): findings from the source
 
 **Restricted (source-derived):** written by the replica author from FSL's source
-(`fsl-avwutils 2209.6 fslmaths.cc`, `fsl-newimage 2601.0`, `fsl-miscmaths 2412.6`, `fsl-cprob
-2111.0`). A clean-room implementer does not read this file; the behaviour it describes for them
-is in `specs/fslmaths.md` (to come) and the register's summary rows.
+(`fsl-avwutils 2209.6 fslmaths.cc` and `fslstats.cc`, `fsl-newimage 2601.0`, `fsl-miscmaths
+2412.6`, `fsl-cprob 2111.0`, `fsl-armawrap 0.7.0`, nlohmann/json 3.12.0). A clean-room implementer
+does not read this file; the behaviour it describes for them is in `specs/fslmaths.md` and
+`specs/fslstats.md` (to come) and the register's summary rows.
 
 The replica is `crates-nc/larmorx-nc-avwutils` (`larmorx-nc fsl fslmaths`), on the shared core's
 newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`, `kissfft`). Its parity suite is
-`fsl-maths-replica` (`validation/src/larmorx_validation/parity/fsl_maths_replica.py`).
+`fsl-maths-replica` (`validation/src/larmorx_validation/parity/fsl_maths_replica.py`). fslstats is
+`larmorx_nc_core::fslstats` (in the core, because BET's script runs it: `fslstats -l 0.001 -C`),
+`larmorx-nc fsl fslstats`; its suite is `fsl-stats-replica` (`fsl_stats_replica.py`).
 
 ## How fslmaths computes (what decides the bits)
 
@@ -332,7 +335,99 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
 - Suite: 48 cases (`tfce/`, `tfceS/`, `roc/`, the new `d13/` ones): 36 identical, 12 both-error
   (FSL's own errors and stops, and the D13 cases where FSL stops), 0 fail.
 
-## Defects (FSL-151 to FSL-180; the register's rows through the handoff)
+## fslstats (sub-task 4)
+
+How `fslstats.cc` computes, and what decides the bits:
+
+- **Preoptions.** While more than two arguments remain and the first is `-t`, `-K` or `-json`,
+  it is consumed (`-K` with its mask's name); then fewer than three arguments print the usage on
+  standard output with status 1 (`fslstats -K m`, `fslstats -t img` included). Everything in
+  `fmrib_main_float` runs inside `try`: any `std::exception` prints its `what()` (after the
+  lines `imthrow` printed itself) and the program returns -1 (status 255); `exit(1|2|3)` and
+  `return 3` end it with the options' own messages. The usage text has FSL's spelling
+  ("seperate").
+- **The image.** Read as `volume<float>` (any type, scaled, swapped to radiological order).
+  Without `-t` and `-K` it is read straight into `vol`; with either, into `inputMaster`, and
+  each pass of the loops (time points, then labels 1 to the index mask's maximum, read as
+  `volume<int>`) starts from `inputMaster[t]` (`-t`), and with `-K` `vol = indexMaster * mask`
+  (newimage's `operator*`: a copy of the operand of higher dimensionality, multiplied in place by
+  the other, cycled). The label's mask is the index mask converted to float and binarised
+  `(index - 1, index + 1)` exclusive; `mask.max() < 1` prints `missing label: <n> in mask` on
+  standard output (also with `-json`, before the JSON) and skips the label (no line, no JSON
+  entry); a 4D index mask stops at the first label with `Index mask must be 3D` (return 3),
+  checked only when a label is processed (an index mask without positive labels prints nothing,
+  and `-json` prints its empty `indices`).
+- **State.** Each pass starts with no mask (`mask.nvoxels() == 0`: the masked statistics then
+  cover every voxel), thresholds `-FLT_MAX` and `FLT_MAX`. `-l` and `-u` replace the masks by
+  `binarise(vol, lthr, uthr, exclusive)` (so the infinities and `FLT_MAX` itself are left out)
+  and `masknz = binarise(vol, 0, 0, inclusive, invert) * mask` (NaN counts as nonzero), then
+  multiply `vol` by the mask (NaN times 0 stays NaN in `vol`). `-k` reads the mask, refuses
+  other x, y, z sizes or more volumes (`Mask and image must be the same size`, 3), repeats its
+  last volume up to the image's, binarises it at 0.5 (inclusive, up to `FLT_MAX`), and replaces
+  both masks the same way: an option replaces the masks of the options before it, in either
+  order (`-k m -l 3`: the threshold's mask covers the zeros outside `m`). `-d` subtracts an image
+  (x, y, z checked: `Image used with -d must be the same size as the base image`; more volumes:
+  `Image must be the same size as the base image`; fewer: the last repeated). `-a` is `(float)
+  fabs((double) v)` (a NaN keeps its payload, sign cleared); `-n` sets every non-finite value to
+  0 (the masks are not recomputed).
+- **The statistics.** `-m`, `-s` with a mask: newimage's `mean(mask)` and `stddev(mask)`
+  (`calculateSums`' blocks of `max(sqrt(N), 10000) + 1` values, `N` the image's number of values;
+  the variance `max(0, n/max(1, n-1) (S2/n - m^2))`; an empty mask prints `ERROR:: Empty mask
+  image` once and gives 0); without one, `mean()` and `stddev()` (`(n/(n-1))(S2/n - m^2)`, no
+  clamp: FSL-182). `-M`, `-S` use `masknz`, and without one the "speedup" functions
+  `nonzeromean` (a plain double sum of the nonzero values: NaN included) and `nonzerostddev`
+  (`(double)((*it) * (*it))`: the square in float; `(S2 - n m m)/(n - 1)`, 0 for one value:
+  FSL-182). `-v` is `(long) mask.sum()` (times the image's volumes for a 3D mask) or every
+  voxel, `-V` `(long) masknz.sum()` (never multiplied) or the nonzero count; the volume is
+  `nvox * xdim * ydim * zdim` in float. `-D` (hidden) is `vol.sum()`.
+- **Order statistics.** `-R` is `vol.min(mask)`, `vol.max(mask)` (`calculateExtrema`: from the
+  first masked value, each larger a new maximum, else each smaller a new minimum; an empty mask
+  prints `calculateExtrema: mask is empty` twice and gives 0 0). `-x` and `-X` take the
+  coordinates of the maximum and minimum (`ptrToCoord`; through `niftivox2newimagevox_mat().i()`,
+  which Armadillo evaluates as `solve`, and `MISCMATHS::round`). `-r` is
+  `robustlimits(mask)` (`find_thresholds`; an all-zero mask prints `WARNING:: Empty mask image in
+  calc_robustlimits` and gives 0 0). `-p n` and `-P n` (`(float)((float) n / 100.0)`; n outside
+  [0, 100] is refused before, a NaN n passes and takes the first sorted value) are
+  `percentile(p, mask)`: the masked values (mask above 0.5, cycled) sorted by `std::sort`, the
+  value at `(unsigned)((float) count * p)`, at most `count - 1`, 0 for none.
+- **Histograms.** `-h n` is `histogram(nbins, vol.min(), vol.max(), mask)`: the range of the
+  whole image (zeros outside the mask included), the masked values counted;
+  `nbins = (int)(float) atof(n)` (0.5 and text give 0: `Must specify at least 1 bin`, 1).
+  `-H n lo hi` uses its own range. `imageHistogram`: `findHistogram: mask is empty` for an empty
+  mask; `max <= min` returns before sizing the histogram, which stays empty (nothing printed);
+  each value's bin `max(0, min((int)(fA v + fB), nbins - 1))`. A `ColumnVector` prints as
+  armawrap's `doPrint`: each value fixed with 6 decimals, a blank and a newline, then the
+  option's blank. `-e` and `-E` (masks made from the thresholds when there are none) count the
+  masked (`-E`: nonzero masked) values in 1000 bins between `robustmin()` and `robustmax()` of the
+  whole current image (unmasked), and print `-Σ (h/n) log(h/n) / log(1000)` (glibc's `log`;
+  `hist.Sum()` exact for counts).
+- **Centre of gravity.** `-c` and `-C`: newimage's `calc_cog` of the first volume (values minus
+  the minimum of the whole image; `WARNING::in calculating COG, total = 0.0` when the sum is
+  nearly 0), through `newimagevox2mm_mat()` (sform, else qform, else the voxel sizes) or the
+  inverse of `niftivox2newimagevox_mat()`.
+- **Output.** `cout` fixed, precision 6, left-adjusted: each number followed by a blank, counts
+  and coordinates as integers, a newline after each label (also after an option list that
+  printed nothing). With `-json`, `idx[option] = value` (`std::map`: keys in byte order, a
+  repeated option keeps its last value), `{"volumes": [{"indices": [...]}, ...]}` dumped with
+  `dump(4)` and a newline at the end. nlohmann writes doubles by Grisu2 (`to_chars`: a short
+  round-tripping decimal, `1e+20`, `1.5e-05`, `2000.0`; `null` for NaN and infinities);
+  `-r`, `-R`, `-p`, `-v` values are floats widened to double; `-x`, `-X`, `-w` integers; `-c`,
+  `-C`, `-h`, `-H` arrays of doubles. `larmorx_nc_core::json` translates the formatting:
+  `validation/probes/nlohmann-to-chars` (nlohmann's own text of 1,897,170 doubles: 0 differ).
+- **fMRIPrep's calls.** The goodvoxels mask's four calls (`-M` and `-S` of `cov_ribbon` and
+  `cov_norm_modulate_ribbon`) take the "speedup" paths (no mask): bit-identical on ds005040's
+  chain (the ribbon a stand-in: the segmentation's grey matter). BET's `-l 0.001 -C` runs this
+  program (`avwutils::fslstats_cog`): BET's replica smoke tier unchanged (27 pass, 24
+  both-error, 3 expected divergences, as before).
+- **Not defects (documented).** `-h` of a constant image prints no histogram (no range to divide;
+  rule C: kept); `-k` and the thresholds replacing each other's masks in the order given (the
+  usage says the options apply in order and `-k` "overrides" the thresholds; rule C), also with
+  `-K`, where a threshold that admits 0 brings in the zeros outside the label; `-M` without a mask
+  adds in order where `mean(masknz)` adds in blocks (the last bits can differ; both are sums of the
+  same values); `-v`'s volume in float (FSL's type); an index-mask label above 2^24 (float
+  rounding of `index ± 1`: unrealistic); `-a` on NaN clears its sign.
+
+## Defects (FSL-151 to FSL-189; the register's rows through the handoff)
 
 - **FSL-151 (c; rule A): undefined or wrapping conversions to integers.** `(T) atof` of a number
   beyond `T` under `-dt char|short|int`, `-rem`'s `(int)` casts of out-of-range or NaN values,
@@ -544,6 +639,57 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   written; the area's text on stdout is never flushed). Corrected: an error before the curve;
   `reproduce`: FSL's curve and exception. Cases: `d13/roc-no-true`, `d13/roc-no-noise`.
 
+- **FSL-181 (c; rule A): NaN values in fslstats' order statistics.** `-R` (and `-x`, `-X`)
+  start from the first masked value: a NaN there makes the minimum and maximum NaN and both
+  coordinates the first voxel's; `-p` and `-P` sort values holding NaN with `operator<` (no
+  order: the value taken depends on libstdc++'s sequence, and the sort can step outside the
+  vector); `-r`, `-h`, `-H`, `-e`, `-E` count NaN values in their histograms' first bin
+  (`(int) NaN` is `INT_MIN`) and `-h` takes a NaN range from a NaN first voxel. Corrected: NaN
+  values left out (the extremes, percentiles, robust range and histograms of the other values),
+  named when the printed output changes; `reproduce`: FSL's values, libstdc++'s sort replayed
+  move for move and refused where it leaves the vector. `-m`, `-s`, `-M`, `-S` with NaN stay NaN
+  (the mean of values holding NaN; `-n` is FSL's way out). Cases: `d13/nan-*`, `d13/nan2-*`.
+- **FSL-182 (c; rule A): `-s` and `-S` without a mask.** `-s` uses `variance()` (no clamp at 0, NaN
+  for one value: `one.nii.gz` gives `-nan`, and a constant 0.1 image `-nan` too, FSL-167's form in fslstats), `-S` `nonzerostddev`, which
+  squares in float and does not clamp (a constant 0.1 image gives 0.000020 instead of 0).
+  Corrected: the masked forms (`variance(mask)` over every value, or over the nonzero values),
+  named when the printed value changes (fMRIPrep's goodvoxels `-S` calls print the same).
+  Cases: `d13/const01-s`, `d13/one-s`, `d13/S`.
+- **FSL-183 (c; rule A): `-t` with a 4D `-k` or `-d` image.** The code picks the time point's
+  volume (`mask2 = mask[timepoint]`, `image3 = image2[timepoint]`) and never uses it: a 4D mask is
+  refused (status 3), a 3D `-d` image stops at the second time point (`Invalid t index in []
+  operator`, status 255: `image2[timepoint]` of a 3D image), a 4D one at the first (status 3).
+  Corrected: the time point's volume (the last one beyond the image's volumes); `reproduce`:
+  FSL's errors. Cases: `d13/t-k4`, `d13/t-d3`, `d13/t-d4`.
+- **FSL-184 (a): `-x`, `-X` of an empty mask.** `calculateExtrema` returns before filling the
+  coordinates, and `iCoords[7]` (or `[0]`) of the empty vector reads from address 0: SIGSEGV.
+  Refused in both modes (rule B: no voxel has a maximum). Cases: `d13/x-empty`, `d13/X-empty`.
+- **FSL-185 (a; rule A): `-e`, `-E` of an image whose robust range is empty.** `imageHistogram`
+  returns before sizing the histogram; `hist(1)` of the empty `ColumnVector` divides by its 0
+  columns (armawrap's `lookup1D`): SIGFPE. Corrected: the entropy of values that all share one
+  bin, 0; `reproduce`: refused. Cases: `d13/e-const`, `d13/E-const`.
+- **FSL-186 (c; rule B): `-H` with a maximum not above its minimum** prints nothing (the unsized
+  histogram) without a message. Corrected: an error (status 1); `reproduce`: FSL's empty output.
+  Cases: `d13/H-equal`, `d13/H-reversed`.
+- **FSL-187 (c; rule A): histogram bins beyond `int`.** `(int)(fA v + fB)` of a value more than
+  about 2^31 bins above the range is `INT_MIN`: the value counts in the first bin, not the last.
+  Reached by `-H` (values above its limits) and `-e`, `-E` (values above the robust range).
+  Corrected: the bin clamped (the last), named when a value moves. `find_thresholds` (the robust
+  range of `-r`, fslmaths' `-thrp`/`-thrP`, BET, FAST) meets the same conversion when its last
+  passes narrow the range far below an outlier; left as FSL's there (it is shared with the other
+  replicas: rule D, to measure on real images before changing their defaults). Cases:
+  `d13/H-far`, `d13/e-far`.
+- **FSL-188 (c; rule A): `-w` of a 4D image without nonzero voxels.** x, y and z fall back to the
+  whole image (the minima start at the far end and are swapped back), but the time range is
+  `tsize - 1` and `2 - tsize` (negative from three volumes). Corrected: the whole time range,
+  as for x, y and z (the 3D answer, which scripts crop with, is kept: rule C). Cases:
+  `d13/w-zeros4`, `d13/w-zeros3`.
+- **FSL-189 (c; rule A): `-json`'s voxel counts in single precision** (`static_cast<float>(nvox)`
+  "to maintain types in list"): above 2^24 voxels the count is rounded (16,842,495 is written
+  16842496.0). Corrected: the exact count (still written as a double); named only when the value
+  survives into the JSON (a later option of the same name replaces it). Cases:
+  `d13/json-v-big`, `d13/json-v-replaced`.
+
 ## Known differences
 
 - **`-tan` in double** (`fn/double-tan`): glibc 2.35's `tan` (IBM's code) is not correctly
@@ -555,4 +701,5 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
 
 ## Not yet translated (later sub-tasks of the part)
 
-Every fslmaths operation is translated (sub-task 3b, 2026-11-03); fslstats follows (sub-task 4).
+Every fslmaths operation (sub-task 3b, 2026-11-03) and every fslstats option (sub-task 4) is
+translated.

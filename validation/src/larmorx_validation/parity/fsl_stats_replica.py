@@ -66,7 +66,7 @@ PROGRAM = "fslstats"
 FMRIPREP_RUNS = "oracles/fmriprep-25.2.6"
 #: The oracle run whose anatomical image BET's call runs on.
 BET_RUN = "ds005040-sub-002-noreconall"
-_MARKER = "v1.done"
+_MARKER = "v2.done"
 
 
 def fsl_tests() -> Path:
@@ -171,6 +171,7 @@ def _make_inputs(d: Path) -> None:
     big = np.zeros((257, 257, 255), np.uint8)
     big[100:110, 100:110, 100:110] = 1
     _save(d / "bigcount.nii.gz", big, dtype=np.uint8)
+    _save(d / "anf.nii.gz", a, dtype=np.float32, noform=True)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -573,6 +574,16 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
             "-v",
             "-r",
         )
+    add(
+        "types/noform",
+        "an image without sform or qform: -c, -C, -x, -w",
+        "@anf",
+        "-c",
+        "-C",
+        "-x",
+        "-w",
+    )
+    add("opt/json-nan", "-json of NaN results (null)", "-json", "@nan", "-m", "-s", "-n", "-m")
     # D13
     for o in ("-R", "-x", "-X", "-r", "-e", "-E", "-m", "-M"):
         add(f"d13/nan{o}", f"FSL-181: a NaN first value, {o}", "@nan", o)

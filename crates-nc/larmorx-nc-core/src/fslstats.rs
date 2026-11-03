@@ -491,7 +491,8 @@ fn arg<'a>(ctx: &mut Ctx, argv: &'a [String], narg: &mut usize, msg: &str) -> Re
 /// mode's output.
 fn pick(ctx: &mut Ctx, json: bool, fsl: Out, fixed: Out, d: &'static Defect, what: &str) -> Out {
     let differ = if json {
-        fsl.json != fixed.json
+        // as printed: NaN and the infinities are all `null`
+        fsl.json.dump(4) != fixed.json.dump(4)
     } else {
         fsl.text != fixed.text
     };

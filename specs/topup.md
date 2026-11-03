@@ -35,7 +35,7 @@ below "decides the bits", following it keeps the original closest to FSL.
 
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-116 to
-FSL-135 and FSL-141 to FSL-143 (§10). Questionable behaviours kept as FSL's (rule C) are listed
+FSL-135, FSL-141 to FSL-143 and FSL-201 (§10; spec writer, 2026-11-03). Questionable behaviours kept as FSL's (rule C) are listed
 in §10.2.
 
 ---
@@ -417,6 +417,41 @@ image derivative times `t_i p_i`, plus the intensity times the derivative of the
 respect to the coefficients), with respect to the movements through the moved positions; all in
 double precision from single-precision images.
 
+**The derivatives with respect to the movements** (spec writer, 2026-11-03; the clean-room
+implementer's finding 14 is right that FSL's are not its cost's; this is what FSL computes). The
+movement part of the gradient is `−(2 / (n (m − 1))) Σ_masked (ū − u_s) ∂u_s/∂p_k` for each
+estimated parameter `p_k` of volume `s` (the exact form: the mean's derivative cancels), the
+products of single-precision values summed in double precision in storage order. FSL's
+`∂u_s/∂p_k` is a **forward difference of the sampling positions**, not of the images:
+- `P(p)` = the position at which volume `s` is sampled, `M(p)⁻¹` (§4.3, the matrices as FSL
+  builds them, inverted in double precision) applied to the target voxel's position, computed
+  in the target grid's voxels (`S⁻¹ M⁻¹ S x`, `S` the diagonal of the target voxel sizes in
+  single precision, `x` the voxel indices);
+- `ΔP = P(p + δ_k e_k) − P(p)` with `δ_k = 1e-4` for the translations (mm) and `1e-5` for the
+  rotations (rad), the field's displacement left out (it does not depend on the movement);
+- per voxel, `Σ_a σ_a ΔP_a ∂f/∂a` in double precision (`∂f/∂a` the interpolated image's
+  derivative along axis `a` per voxel of the image it interpolates, at the current sampling
+  position; `σ_a` the target voxel size over that image's voxel size), rounded to single
+  precision; the volume of these values divided by `δ_k` (rounded to single precision) and
+  multiplied by the Jacobian `J_s`.
+For the translations this is the exact derivative (the matrices are linear in `t`; what
+rounding leaves is below 1e-7 relative). For the rotations it is not: the two matrices'
+single-precision angles, cosines and sines and their axis entries `q²` (§4.3) round
+differently, and divided by the step of 1e-5 their rounding adds a false scaling along the
+rotation's axis to the matrix' derivative (at a zero angle exactly `(1/q² − 1)/δ ≈ −5.05e-3`
+times the offset from the centre along that axis, `q = 1e-5 / fl(1e-5)`, `fl` the rounding to
+single precision) and, at other angles, errors of up to about 1 % in its other entries. On real
+images the rotations' gradient entries are 0.4 to 40 % off the cost's derivative
+(`debug/movements`, first gradient: FSL's −298.408, 54.3635, 14.3918 against the exact
+−297.187, 62.4356, 16.0642; a model of this text gives FSL's rotation entries to 2e-5
+relative, and those of FSL's next two gradients to 1.5e-4) **(observed)**. The same derivatives fill the Gauss-Newton Hessian's
+movement block and its coupling with the field (§4.7), so both minimisers end where this
+gradient vanishes rather than at the cost's minimum. This is **FSL-201** (§10, rule A): the
+default uses the exact derivative of the sampling position, `∂P/∂t_k = −Rᵀ e_k`, `∂P/∂r_k =
+(∂R/∂r_k)ᵀ (y − c − t)` (`R` of §4.3 with the cosines and sines in double precision, in mm,
+converted to the image's voxels), and names FSL-201 on every run that estimates the movements;
+`reproduce` computes FSL's forward difference as stated (spec writer, 2026-11-03).
+
 ### 4.7 The minimisers
 
 Per level, from the previous level's result (the field's coefficients and the movements), for at
@@ -426,7 +461,9 @@ most `--miter` successful iterations:
   coefficients' overlaps), with the movement block dense, in double or, with `--numprec=float`,
   single precision; the damping multiplies the diagonal by `(1 + λ_LM)` (λ_LM starts at 0.1,
   divided by 10 after a step that lowers the cost, multiplied by 10 after one that does not,
-  the step retried with the same Hessian; the level ends when `λ_LM` exceeds 1e20); the step
+  the step retried with the same Hessian; the level ends when `λ_LM` exceeds 1e20; the
+  movement rows and columns of `JᵀJ`, and the field-movement block, are the sums of products
+  of §4.6's movement derivatives, FSL-201's in `reproduce` mode, spec writer, 2026-11-03); the step
   solves `H δ = -g` by conjugate gradients with the Hessian's diagonal as preconditioner (at most
   500 iterations, relative tolerance 1e-3); it ends early when two successive costs agree
   within `2|a - b| ≤ 1e-8 (|a| + |b| + ε)`.
@@ -668,6 +705,7 @@ is banded, e.g. a zero field). The vb methods' traces and solves follow Armadill
 | FSL-141 | `vb*`: the Gamma shapes' counts in 32-bit integers wrap beyond 2³¹ values | 64-bit counts | the wrapped values |
 | FSL-142 | `vb3D`/`vb4D` count `2 m` data points per line whatever the collection holds (`vb2D` counts every image) | the collection's count; named | FSL's |
 | FSL-143 | `vb3D`/`vb4D`'s prior couples neighbouring slices with half the weight of the in-slice coupling: the precision is indefinite and the iterations diverge (an output of ±3.9e10 for an input of 0 to 1.1e5) | the consistent coupling; named on every `vb3D`/`vb4D` run | FSL's |
+| FSL-201 | with the movements estimated, the derivatives with respect to the rotations are forward differences (1e-5 rad) of rotation matrices built in single precision (§4.3, §4.6): the gradient and the Gauss-Newton Hessian of the movements are not the cost's, the minimisers end elsewhere (spec writer, 2026-11-03) | the exact derivatives (§4.6); named on every run that estimates the movements. Measured (rule D → A; the replica, `reproduce` identical to FSL on every run): fMRIPrep's two calls (no movements) unchanged; the final cost lower or equal in 18 of 22 runs with the movements (8 of 8 random-testing cases with movements between the volumes, 0.01 to 44 % lower; 60 SCG iterations on the half-resolution pair 38 % lower, where FSL's SCG stalls); 0.004 to 0.13 % higher in 4 runs whose minimisations are cut short (FSL's `b02b0`, `_2`, `_4` with one iteration per level; ds001600 with FSL's `b02b0.cnf`); movements up to 0.35 rad apart | FSL's forward difference |
 
 FSL-127 to FSL-131 are defects of FSL's libraries that no path of topup or applytopup reaches
 (register only). Each correction that changed a result is named on standard error
@@ -683,6 +721,8 @@ rules (§2.6); z phase encoding refused by FSL's own message; applytopup's `-v` 
 `--invert` unknown, `--inindex`'s `atoi`, `jac` without movements for a field image, the vb
 methods' printed collection-1 count, the first VB estimate's line prior, `vb2D`'s lower-case
 `relative`; the integer halving of the vb counts (rule C: 0.5 in thousands).
+The refit's penalty of only the two wrap-around second differences of the coefficients (§4.4:
+a small regularisation of the end coefficients, FSL's design; spec writer, 2026-11-03).
 
 ### 10.3 Not replicated
 
@@ -750,3 +790,22 @@ with `implementation="original"` and the oracle cache's stored FSL runs):
   bits run after run); at other thread counts it varies (§9.3): that spread is reported.
 - **Speed**: against FSL and the replica on fMRIPrep's two calls (single thread and all cores),
   reported, not gated.
+
+## 13. The clean-room questions of 2026-11-03
+
+The clean-room original's questions (its part's handoff, "Spec questions"; its findings in
+`docs/findings/fsl-topup-original.md`), answered by the spec writer in the sections named; each
+precision answer is checked by a model written from this spec's text
+(`validation/investigations/spec-answers-3/`, its README) (spec writer, 2026-11-03).
+
+| # | Question | Answered in | The implementer's observation | Confidence, check |
+|---|---|---|---|---|
+| 1 | FSL's rotation derivatives of the movements (finding 14) | §4.3, §4.6, §4.7, §10.1 (FSL-201) | right (not the cost's); the cause: forward differences of single-precision rotation matrices | high: `rotation_model.py` gives the rotation entries of FSL's three gradients to 2e-5 to 1.5e-4; FSL-201 decided by rule A after measurement |
+| 2 | the refit between levels: the penalty's rows and weight; the refit when `--warpres` changes at the same spacing; the intermediate spacing (finding 11, probes A to H) | §4.4, §10.2 | right on all three | high: `refit_model.py` gives FSL's level-2 start fields of probes D to H to 7e-7 Hz rms; the other penalties miss by 1e-3 to 3e-2 |
+| 3 | the quadratic splines' bending energy where a knot falls on a voxel (finding 36, reproducer 10753) | (to be answered) | | |
+| 4 | applytopup `lsr` on lines whose length divides 2³² (reproducer 8089) | (to be answered) | | |
+| 5 | FSL-133: what FSL reads at the wrap-around of lines whose length does not divide 2³² (finding 21, probe133) | (to be answered) | | |
+| 6 | FSL-134: a field of the images' voxel count in another shape (finding 22, probe134); the field image's Jacobian scale (finding 18) | (to be answered) | | |
+| 7 | the resampling of images with an axis of 8 voxels or fewer (finding 27) | (to be answered) | | |
+| 8 | the conventions the original follows as measured (the handoff's list: findings 1, 2, 3, 5, 7, 12, 13, 15, 16, 23 to 25, 29, 30, 32 to 34, FSL-121, FSL-125, FSL-143, the log, the messages, `--debug`, `--trace`, applytopup's mask and movements) | (to be answered; finding 13 confirmed in §4.3, finding 12 in §4.4) | | |
+| 9 | FSL-146's mechanism (finding 35), for the register | (to be answered) | | |

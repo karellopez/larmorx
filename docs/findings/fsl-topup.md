@@ -196,6 +196,45 @@ and FSL-141 to FSL-143 with their measurements; the behaviour and what larmorx d
   where AᵀA has `2*sf1`; measurement `validation/investigations/fsl-topup/vb_prior.py` (8 × 6 × 5
   grid: smallest eigenvalue -2.7 against +0.40).
 
+## The spec answers of 2026-11-03 (spec writer; topup's clean-room questions)
+
+What the clean-room original's questions (`specs/topup.md` §13) needed from the source, with the
+routines named (the spec states the behaviour only). Models: `validation/investigations/spec-answers-3/`.
+
+- **FSL-201, the movement derivatives** (*read*, *verified* by `rotation_model.py`, *measured* by
+  `measure_fsl201.py`). `TopupScan::GetMovementDerivative` builds `T1 = S⁻¹ mp_to_matrix(_mp)⁻¹ S`
+  and `T2` with `p(i+1) += tiny` (`tiny` 1e-4 translations, 1e-5 rotations), `S` the fresh target
+  volume's `sampling_mat()`, and per voxel `float(sf[0]*(y2(1)-y1(1))*_derivs(i,j,k,0) + ...)`,
+  then `rval /= tiny; rval *= GetJacobian(field)`: a forward difference of the positions.
+  `mp_to_matrix` is `MovePar2Matrix(mp, *_subsamp)` → `MISCMATHS::construct_rotmat_euler` →
+  three `make_rot` calls, each with **`float theta = norm2(angl)`**, `axis = angl/theta` (so the
+  axis is not a unit vector: `q = r/fl(|r|)`), `rotcore(1,1) = cos(theta)` with `theta` a float
+  (`std::cos(float)`: single-precision cosine and sine), `basischange * rotcore *
+  basischange.t()` giving the axis entry `q²`. The rounding divided by 1e-5 is the defect;
+  `TopupCF::grad` (`sum_of_prod(diff, deriv, mask)`), `TopupCF::hess`'s `interaction` block and
+  `movement_hessian` all use it. The replica's default (`scan.rs`, `exact_movement_derivative`)
+  differentiates `Rᵀ (y − c − t) + c` analytically with `larmorx_core::math::{sin, cos}`;
+  `reproduce` keeps FSL's difference. `GetNumericalMovementDerivative` (debugging only, never
+  called) differences the images instead.
+- **The refit's penalty** (*read*, *verified* by `refit_model.py`). `splinefield::Set` calls
+  `get_coefs_one_dim` per axis: `M = (AS.t()*AS).i()*A.t()` with `AS = A & 0.005*S` and
+  `get_s_matrix(isz, csz)`, whose only non-zero rows are row 1 `(2, −1, 0, …, −1)` and row
+  `isz` `(−1, 0, …, −1, 2)`: the two wrap-around second differences (the clean-room
+  implementer's finding 11, right). It looks like an incomplete periodic second-difference
+  matrix (`DispVec::GetS_Matrix` fills every row), but its effect is a small regularisation of
+  the end coefficients: kept (rule C, `specs/topup.md` §10.2).
+- **When the field is refitted** (*read*). `TopupCF::SubSample(ss)` when `ss != _sm.SubSampling()`:
+  the field evaluated at `(step−1)/2 + j·step` into a `volume<float>`, `new_field.Set(vol)` with
+  `ksp = round(_wr / vxs)` (`MISCMATHS::round`: half away from zero; 1 when 0), `_wr` still the
+  previous level's; `TopupCF::SetWarpResolution(wr)` when `wr != _wr` (doubles compared), even if
+  the new `ksp` equals the old: `_field.AsVolume(vol)` (float) and `new_field.Set(vol)`. topup's
+  level loop calls `SubSample`, `Smooth`, `SetWarpResolution`, `SetMovementsFixed`,
+  `SetRegularisation` in that order; after the last level `Smooth(0.0); SubSample(1)` only when
+  its subsampling is above 1 (the clean-room implementer's finding 12, right).
+- **The axis entry on `--rbmout`** (*read*). `TopupCF::WriteRigidBodyMatrices` writes
+  `mp_to_matrix(_mp)` about the full-resolution regridded image's centre: the diagonal's 5e-8 the
+  clean-room implementer saw (finding 13) is `q²`.
+
 ## Kept as FSL's (not registered)
 
 As `specs/topup.md` §10.2 lists (rule C): `--iout`'s `_mean` naming, the silent log, `--rbmout`'s

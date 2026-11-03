@@ -1372,10 +1372,10 @@ pub fn print_expr(m: &Mat) -> String {
 ///
 /// Armadillo's symmetric path (`dsytrf`/`dsytri`, [`lapack::sytrf::inv_sym`]) needs at least
 /// 100 rows (`sym_helper::is_approx_sym(A, 100)`). Ported: every path up to 8 × 8, general
-/// (neither diagonal nor triangular) matrices of 9 to 64 rows by OpenBLAS's blocked LU and
-/// `dgetri`'s unblocked code ([`lapack::blocked::getrf_any`], [`lapack::blocked::getri_any`]),
-/// and symmetric ones from 100 rows (applytopup's `--method=vb2D` and `vb3D`); general matrices
-/// of 65 rows or more (`dgetri`'s blocked code) and triangular matrices beyond 8 × 8 panic. FSL 6.0.7.17's Armadillo 10.5.1 computed these with its closed-form cofactor inverse
+/// (neither diagonal nor triangular) matrices of 9 to 256 rows by OpenBLAS's blocked LU and
+/// `dgetri` (unblocked up to 64 rows, blocked beyond: [`lapack::blocked::getrf_any`],
+/// [`lapack::blocked::getri_any`]), and symmetric ones from 100 rows (applytopup's
+/// `--method=vb2D` and `vb3D`); larger matrices and triangular ones beyond 8 × 8 panic. FSL 6.0.7.17's Armadillo 10.5.1 computed these with its closed-form cofactor inverse
 /// ([`armadillo_10_5_1::inv`]).
 pub fn inv(x: &Mat) -> Result<Mat, Singular> {
     assert_eq!(x.rows, x.cols, "inv(): given matrix must be square sized");
@@ -1421,8 +1421,8 @@ pub fn inv(x: &Mat) -> Result<Mat, Singular> {
             return Ok(Mat::from_col_major(n, n, &f));
         }
         assert!(
-            n <= lapack::blocked::GETRI_MAX_N,
-            "inv(): LAPACK's dgetri is ported up to 64 x 64 (its blocked code is not)"
+            n <= 256,
+            "inv(): LAPACK's dgetri is ported up to 256 x 256 (OpenBLAS's GEMM_Q)"
         );
         let mut ipiv = vec![0i32; n];
         if lapack::blocked::getrf_any(&mut out.data, n, n, n, &mut ipiv) != 0 {

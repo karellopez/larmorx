@@ -254,7 +254,7 @@ def main() -> int:
         a = rng1.normal(0, 1, (n, n)) + n * np.eye(n)
         gesv_case(work / f"one_n{n}_dd.case", a, rng1.normal(0, 1, (n, 1)))
         names.append(f"one_n{n}_dd")
-    for n in (9, 15, 16, 17, 31, 32, 33, 48, 63, 64):
+    for n in (9, 15, 16, 17, 31, 32, 33, 48, 63, 64, 65, 70, 96, 99, 128, 129, 200):
         for kind, a in (
             ("g", rng1.normal(0, 1, (n, n))),
             ("spd", spline_normal(2 * n, n, rng1) + 0.01 * np.eye(n)),

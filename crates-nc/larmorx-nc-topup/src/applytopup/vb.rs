@@ -24,7 +24,6 @@ use larmorx_core::defects;
 use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::cnum::fmt_g;
 use larmorx_nc_core::lapack::blas::{self, MatRef};
-use larmorx_nc_core::lapack::blocked::GETRI_MAX_N;
 use larmorx_nc_core::miscmaths::{INV_ERROR, SOLVE_ERROR};
 use larmorx_nc_core::spmat::SpMat;
 use larmorx_nc_core::volume::{FslError, Volume};
@@ -72,18 +71,10 @@ fn trace_solve(a: &SpMat<f64>, b: &SpMat<f64>) -> Result<f64, FslError> {
 }
 
 /// `k * A.AsNEWMAT().i() * x`: the explicit inverse (`inv()`) times `x` by `dgemv` with
-/// `alpha = k`. Armadillo inverts a general matrix of 65 to 99 rows (or of 100 rows or more that
-/// is not symmetric) by LAPACK's blocked `dgetri`, which is not replicated yet: refused.
+/// `alpha = k`.
 fn scaled_inverse_times(a: &SpMat<f64>, x: &[f64], k: f64) -> R<Vec<f64>> {
     let d = a.as_dense();
     let n = d.rows();
-    if n > GETRI_MAX_N && !(n >= 100 && arma::is_approx_sym(&d)) {
-        return Err(End::Refuse(format!(
-            "lines of {n} voxels along the phase encoding: the first estimate's explicit \
-             inverse of a general matrix of more than {GETRI_MAX_N} rows (LAPACK's blocked \
-             dgetri) is not replicated yet"
-        )));
-    }
     let ai = arma::inv(&d).map_err(|_| runtime_error(INV_ERROR))?;
     let mut y = vec![0.0; n];
     let am = MatRef { off: 0, ld: n };

@@ -99,11 +99,12 @@ contracted C loop (`y = fma(t, α, y)`) where the unit increment's assembly roun
 which OpenBLAS solves by `TRSV_NLU` and `TRSV_NUN` (blocks of `DTB_ENTRIES` = 64 rows: `daxpy`
 inside a block, `dgemv('N')` below or above it); Armadillo's `inv()` of a general matrix is
 `dgetrf` then `dgetri` with `lwork = max(16, n)` and, beyond 16 rows, `dgetri`'s workspace query
-(`N · 64`: its unblocked code up to 64 rows, after OpenBLAS's `dtrtri`, whose `trti2_U` runs
-`TRMV_NUN` and `DSCAL` per column). `check_lapack.py`'s `one_*` cases (one column, 9 to 256 rows,
-general and diagonally dominant) and `inv_*` cases (kind 5 of `lapack_probe.c`: 9 to 64 rows,
-general and spline normal matrices) compare them with `larmorx_nc_core::lapack::blocked`'s
-`gesv_one` and `getri_any`; from 100 rows Armadillo inverts a symmetric matrix by `dsytrf('L')`
+(`N · 64`: its unblocked code up to 64 rows, its blocked code with `DGEMM` and
+`DTRSM('R', 'L', 'N', 'U')` beyond, after OpenBLAS's `dtrtri`, whose `trti2_U` runs `TRMV_NUN`
+and `DSCAL` per column). `check_lapack.py`'s `one_*` cases (one column, 9 to 256 rows, general
+and diagonally dominant) and `inv_*` cases (kind 5 of `lapack_probe.c`: 9 to 200 rows, general
+and spline normal matrices) compare them with `larmorx_nc_core::lapack::blocked`'s
+`gesv_one` and `getri_any` (`trsm_rt_unit`: the generic `trsm_kernel_RT`); from 100 rows Armadillo inverts a symmetric matrix by `dsytrf('L')`
 (its solve's workspace), `dsytri('L')` and `symmatl`: the `isym_*` cases (kind 6: 100 to 256
 rows, spline normal and indefinite matrices, 1 × 1 and 2 × 2 pivots) compare them with
 `lapack::sytrf::inv_sym` (`sytri_l`, and `lapack::blas::dsymv_l`: OpenBLAS's Haswell `dsymv_L`
@@ -114,7 +115,7 @@ scripts/orchestration/boxed.sh 8 python -P validation/probes/fsl-miscmaths/check
     --probe <scratch>/lapack_probe --work <scratch>/lpvb --only one_,inv_,isym_
 ```
 
-Result on 2026-11-03: 62 cases (712,836 lines), 0 lines differ (the workspace size of every
+Result on 2026-11-03: 76 cases (915,212 lines), 0 lines differ (the workspace size of every
 query included). `dsytri` is reference Fortran; OpenBLAS's `dsymv_L.c` C loops are not
 contracted into fused multiply-adds (disassembled), its 4 × 4 assembly kernel fuses.
 

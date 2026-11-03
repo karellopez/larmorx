@@ -669,37 +669,115 @@ pub fn gesv_one(a: &mut [f64], n: usize, ipiv: &mut [i32], b: &mut [f64]) -> i32
     info
 }
 
-/// The largest matrix [`getri_any`] inverts: `dgetri`'s unblocked code (`NB` = 64 is at least
-/// `N`) and OpenBLAS's `dtrti2` (`trtri_U_single` up to `DTB_ENTRIES` rows).
+/// The largest matrix [`getri_any`] inverts by `dgetri`'s unblocked code (`NB` = 64 is at least
+/// `N`); beyond it the blocked code, up to `GEMM_Q` rows.
 pub const GETRI_MAX_N: usize = 64;
 
-/// `TRMV_NUN` (`driver/level2/trmv_U.c`, one block: `m` < `DTB_ENTRIES`) of the column `x` of
-/// length `m`: `x = U x` for the leading `m × m` upper triangle of `a`, each element's multiple
-/// of its column added to the elements above it (`DAXPY_K`), then the element times its
-/// diagonal.
-fn trmv_nun_block(a: &[f64], lda: usize, m: usize, x: &mut [f64]) {
-    for i in 0..m {
-        if i > 0 {
-            let xi = x[i];
-            super::blas::axpy_k(xi, &a[i * lda..i * lda + i], 1, &mut x[..i], 1);
+/// `TRMV_NUN` (`driver/level2/trmv_U.c`) of the column `x` of length `m`: `x = U x` for the
+/// leading `m × m` upper triangle of `a`, in blocks of `DTB_ENTRIES` rows from the top: the
+/// rows above a block updated by `GEMV_N` with the block's elements, then inside the block each
+/// element's multiple of its column added to the elements above it (`DAXPY_K`) and the element
+/// times its diagonal.
+fn trmv_nun(a: &[f64], lda: usize, m: usize, x: &mut [f64]) {
+    let mut is = 0;
+    while is < m {
+        let min_i = (m - is).min(DTB_ENTRIES);
+        if is > 0 {
+            let xs = x[is..is + min_i].to_vec();
+            let am = MatRef {
+                off: is * lda,
+                ld: lda,
+            };
+            gemv_n_kernel(is, min_i, 1.0, a, am, &xs, &mut x[..is]);
         }
-        x[i] = crate::sse::mul_f64(x[i], a[i * lda + i]);
+        for i in 0..min_i {
+            let c = (is + i) * lda + is;
+            if i > 0 {
+                let xi = x[is + i];
+                super::blas::axpy_k(xi, &a[c..c + i], 1, &mut x[is..is + i], 1);
+            }
+            x[is + i] = crate::sse::mul_f64(x[is + i], a[c + i]);
+        }
+        is += DTB_ENTRIES;
+    }
+}
+
+/// `trsm_kernel_RT` (`kernel/generic/trsm_kernel_RT.c`, offset 0) with a unit lower triangle,
+/// as `TRSM_RNLU` (`driver/level3/trsm_R.c`) calls it for at most `GEMM_P` rows and `GEMM_Q`
+/// columns: `X = B L⁻¹` for the `m × n` block of `b` (leading dimension `ldb`, from column `bc`),
+/// `L` the `n × n` block of `l` at `(lr, 0)` (leading dimension `ldl`). The columns from the
+/// right: the remainder's blocks of 1, 2 and 4 by the bits of `n mod 8`, then blocks of
+/// `GEMM_UNROLL_N` (8); for each, the rows in blocks of 4 from the top then 2 and 1: the
+/// solved columns to the right subtracted by the GEMM kernel (`c + acc·(−1)`), then inside the
+/// block, from its last column, each element times the packed 1 and its multiple of `L`
+/// subtracted from the block's earlier columns (`c −= x·l`, two roundings).
+#[allow(clippy::too_many_arguments)]
+fn trsm_rt_unit(
+    l: &[f64],
+    ldl: usize,
+    lr: usize,
+    m: usize,
+    n: usize,
+    b: &mut [f64],
+    ldb: usize,
+    bc: usize,
+) {
+    let lat = |r: usize, c: usize| l[c * ldl + lr + r];
+    let mut blocks = Vec::new();
+    let mut right = n;
+    for w in [1usize, 2, 4] {
+        if n & w != 0 {
+            right -= w;
+            blocks.push((right, w));
+        }
+    }
+    while right > 0 {
+        right -= GEMM_UNROLL_N;
+        blocks.push((right, GEMM_UNROLL_N));
+    }
+    let at = |r: usize, c: usize| (bc + c) * ldb + r;
+    for (c0, width) in blocks {
+        let kk = c0 + width;
+        for (r0, rows) in lt_blocks(m) {
+            if n > kk {
+                let kind = trsm_ksum(rows, width, n - kk);
+                for c in c0..kk {
+                    for r in r0..r0 + rows {
+                        let acc = ksum(kind, n - kk, |q| (b[at(r, kk + q)], lat(kk + q, c)));
+                        b[at(r, c)] += -acc;
+                    }
+                }
+            }
+            for i in (c0..kk).rev() {
+                for r in r0..r0 + rows {
+                    let aa = b[at(r, i)] * 1.0;
+                    b[at(r, i)] = aa;
+                    for k in c0..i {
+                        b[at(r, k)] -= aa * lat(i, k);
+                    }
+                }
+            }
+        }
     }
 }
 
 /// `dgetri` (reference LAPACK 3.12.0, `SRC/dgetri.f`) after [`getrf_any`] of an `n × n` matrix,
-/// `n` ≤ [`GETRI_MAX_N`] (the unblocked code, whatever work space Armadillo gives it): `dtrtri`
-/// of U (`interface/lapack/trtri.c`: `info` from a zero on the diagonal, else `trti2_U`: for
-/// each column the diagonal's reciprocal, the column times the inverted part ([`TRMV_NUN`]),
-/// then scaled by minus the reciprocal, `DSCAL_K`); then from the last column to the first, the
-/// part of L below the diagonal moved out and the column updated by `DGEMV('N')` with
-/// `alpha = −1` and `beta = 1`; then the column interchanges in reverse order. Returns `info`.
+/// `n` ≤ `GEMM_Q`, with the work space Armadillo gives it (`max(16, n)`, beyond 16 rows its
+/// query's `N · 64`): `dtrtri` of U (`interface/lapack/trtri.c`: `info` from a zero on the
+/// diagonal, else `trti2_U`: for each column the diagonal's reciprocal, the column times the
+/// inverted part ([`TRMV_NUN`]), then scaled by minus the reciprocal, `DSCAL_K`); then up to
+/// [`GETRI_MAX_N`] rows the unblocked code (from the last column to the first, the part of L
+/// below the diagonal moved out and the column updated by `DGEMV('N')` with `alpha = −1` and
+/// `beta = 1`), beyond it the blocked code (`NB` = 64 columns at a time from the last block:
+/// their part of L moved into the work space, the block updated by `DGEMM('N', 'N')` with
+/// `alpha = −1` and `beta = 1` from the columns after it, then `DTRSM('R', 'L', 'N', 'U')`
+/// ([`trsm_rt_unit`])); then the column interchanges in reverse order. Returns `info`.
 ///
-/// [`TRMV_NUN`]: trmv_nun_block
+/// [`TRMV_NUN`]: trmv_nun
 pub fn getri_any(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
     assert!(
-        n <= GETRI_MAX_N && a.len() >= n * n,
-        "getri_any: dgetri's blocked code (more than {GETRI_MAX_N} rows) is not ported"
+        n <= GEMM_Q && a.len() >= n * n,
+        "getri_any: more than {GEMM_Q} rows is not ported"
     );
     // dtrtri's check (AMIN_K, IAMIN_K on the diagonal): after a successful dgetrf no pivot is
     // zero; a NaN on the diagonal is not modelled
@@ -710,7 +788,7 @@ pub fn getri_any(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
         let ajj = crate::sse::div_f64(1.0, a[j * n + j]);
         a[j * n + j] = ajj;
         let mut x = a[j * n..j * n + j].to_vec();
-        trmv_nun_block(a, n, j, &mut x);
+        trmv_nun(a, n, j, &mut x);
         for v in x.iter_mut() {
             *v = if ajj == 0.0 {
                 0.0
@@ -720,21 +798,65 @@ pub fn getri_any(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
         }
         a[j * n..j * n + j].copy_from_slice(&x);
     }
-    let mut work = vec![0.0f64; n];
-    for j in (0..n).rev() {
-        for i in j + 1..n {
-            work[i] = a[j * n + i];
-            a[j * n + i] = 0.0;
+    if n <= GETRI_MAX_N {
+        let mut work = vec![0.0f64; n];
+        for j in (0..n).rev() {
+            for i in j + 1..n {
+                work[i] = a[j * n + i];
+                a[j * n + i] = 0.0;
+            }
+            if j + 1 < n {
+                let x = work[j + 1..n].to_vec();
+                let mut y = a[j * n..j * n + n].to_vec();
+                let am = MatRef {
+                    off: (j + 1) * n,
+                    ld: n,
+                };
+                dgemv_n(n, n - j - 1, -1.0, a, am, &x, 1, 1.0, &mut y);
+                a[j * n..j * n + n].copy_from_slice(&y);
+            }
         }
-        if j + 1 < n {
-            let x = work[j + 1..n].to_vec();
-            let mut y = a[j * n..j * n + n].to_vec();
-            let am = MatRef {
-                off: (j + 1) * n,
-                ld: n,
-            };
-            dgemv_n(n, n - j - 1, -1.0, a, am, &x, 1, 1.0, &mut y);
-            a[j * n..j * n + n].copy_from_slice(&y);
+    } else {
+        const NB: usize = 64;
+        let ldw = n;
+        let mut work = vec![0.0f64; n * NB];
+        let nn = (n - 1) / NB * NB; // 0-based first column of the last block
+        let mut j = nn as i64;
+        while j >= 0 {
+            let j0 = j as usize;
+            let jb = NB.min(n - j0);
+            for jj in j0..j0 + jb {
+                for i in jj + 1..n {
+                    work[i + (jj - j0) * ldw] = a[jj * n + i];
+                    a[jj * n + i] = 0.0;
+                }
+            }
+            if j0 + jb < n {
+                let src = a.to_vec();
+                super::blas::dgemm(
+                    false,
+                    false,
+                    n,
+                    jb,
+                    n - j0 - jb,
+                    -1.0,
+                    &src,
+                    MatRef {
+                        off: (j0 + jb) * n,
+                        ld: n,
+                    },
+                    &work,
+                    MatRef {
+                        off: j0 + jb,
+                        ld: ldw,
+                    },
+                    1.0,
+                    a,
+                    MatRef { off: j0 * n, ld: n },
+                );
+            }
+            trsm_rt_unit(&work, ldw, j0, n, jb, a, n, j0);
+            j -= NB as i64;
         }
     }
     for j in (0..n.saturating_sub(1)).rev() {

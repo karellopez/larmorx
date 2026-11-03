@@ -83,8 +83,5 @@ what it translates.
 - applytopup: lines of fewer than 8 or more than 256 voxels along the phase encoding, a line whose
   band triangle has 32 or more subdiagonals or would pivot in LAPACK's band factorization, or
   whose condition estimate could fall below machine precision (Armadillo then switches to an
-  approximate solution) are refused with `--method=lsr` (not replicated yet); with
-  `--method=vb2D` and `vb3D` also lines of 65 to 99 voxels (and from 100 a first-estimate matrix
-  that is not symmetric): the first estimate's explicit inverse of a general matrix of more than
-  64 rows is LAPACK's blocked `dgetri` (`DGEMM`, `DTRSM('R', 'L', 'N', 'U')`), not replicated
-  yet.
+  approximate solution) are refused with `--method=lsr` (not replicated yet); the vb methods
+  refuse lines of fewer than 8 or more than 256 voxels.

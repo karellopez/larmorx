@@ -24,13 +24,16 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-stats-replica`, record [fsl-stats-replica](../validation/fsl-stats-replica.md), standard
-tier, 2026-11-03: 170 of 170 compared cases identical, their standard output, standard error and
-exit status; 35 more rejected by both alike): fMRIPrep's four goodvoxels calls (`-M` and `-S` of
+tier, 2026-11-03: 172 of 172 compared cases identical, their standard output, standard error and
+exit status; 36 more rejected by both alike; random testing's permanent cases among them): fMRIPrep's four goodvoxels calls (`-M` and `-S` of
 the ribbon's coefficient of variation, before and after its modulation) on ds005040's chain (the
 ribbon a stand-in: the segmentation's grey matter, as the no-reconall oracle runs have no
 FreeSurfer ribbon), BET's `-l 0.001 -C` on ds005040's T1w, the option lists of FSL's own test
 script against its expected outputs, and every option, preoption (`-t`, `-K`, `-json`), order,
-data type, message, exit status and failure case.
+data type, message, exit status and failure case. Random testing (2026-11-03, 24 minutes: 69,077
+realistic option lists, the preoptions and fMRIPrep's and BET's forms among them): every one
+identical after two fixes (the centre of gravity's NaN signs, and `-json`'s notices before an
+error).
 
 ## Quick start
 

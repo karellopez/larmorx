@@ -23,16 +23,20 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-maths-replica`, record [fsl-maths-replica](../validation/fsl-maths-replica.md), standard
-tier, 2026-11-03: 356 of 357 compared cases bit-identical, the other, `fn/double-tan`, differing
+tier, 2026-11-03: 358 of 359 compared cases bit-identical, the other, `fn/double-tan`, differing
 in the last place of 3 of its 210 double-precision values as glibc's `tan` does (GLIBC-07, below);
-60 more rejected by both alike): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
+61 more rejected by both alike; random testing's permanent cases among them): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
 bit-identical on three oracle runs (ds000005, ds005040 in two kinds, ds003592), fMRIPrep's 14
 goodvoxels calls bit-identical in their workflow's order on ds005040's BOLD series (the ribbon a
 stand-in: the segmentation's grey matter, as the no-reconall oracle runs have no FreeSurfer
 ribbon), and every operation of the usage text (and the hidden `-pow`, `-invbin`, `-tfce_minT`,
 `-tfce_delta`) in every data type, 3D and 4D, odd sizes and voxel sizes, the FFT path of the
 convolutions, every message, exit status and failure case, each output compared with FSL's file
-by file (data and header).
+by file (data and header). Random testing (2026-11-03, 24 minutes: 114,906 realistic chains of
+one to four operations on drawn images of every stored type): every one identical after three
+fixes, but one, an FFT convolution of a 30 x 1 x 3 image one unit in the last place in 1 of 90
+voxels (the FFT engine for transform lengths such as 15, 30 and 60: open), and 595 notices of a
+correction whose effect a later operation of the chain removed.
 
 ## Quick start
 

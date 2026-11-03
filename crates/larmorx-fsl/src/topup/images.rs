@@ -17,6 +17,8 @@ use super::spline::{Op1, apply3, b3, b3d1};
 pub struct Grid {
     pub dims: [usize; 3],
     pub data: Vec<f64>,
+    /// Samples for trilinear interpolation (`--interp=linear`), else cubic spline coefficients.
+    pub linear: bool,
 }
 
 impl Grid {
@@ -138,6 +140,7 @@ pub fn prefilter(g: &Grid) -> Grid {
     Grid {
         dims: g.dims,
         data: d,
+        linear: false,
     }
 }
 
@@ -145,6 +148,13 @@ pub fn prefilter(g: &Grid) -> Grid {
 /// four indices (wrapped) and the values (`deriv`: the first derivative's).
 #[inline]
 pub fn taps(x: f64, n: usize, deriv: bool) -> ([usize; 4], [f64; 4]) {
+    taps_of(x, n, deriv, false)
+}
+
+/// [`taps`] for the cubic spline, or (`linear`) for trilinear interpolation: the weights `1 - t`
+/// and `t` of the two neighbours in the middle slots (the derivative `-1`, `1`).
+#[inline]
+pub fn taps_of(x: f64, n: usize, deriv: bool, linear: bool) -> ([usize; 4], [f64; 4]) {
     let f = x.floor();
     let t = x - f;
     let i0 = f as i64 - 1;
@@ -153,17 +163,32 @@ pub fn taps(x: f64, n: usize, deriv: bool) -> ([usize; 4], [f64; 4]) {
     let mut w = [0.0; 4];
     for j in 0..4 {
         idx[j] = (i0 + j as i64).rem_euclid(nn) as usize;
-        let u = t - (j as f64 - 1.0);
-        w[j] = if deriv { b3d1(u) } else { b3(u) };
+        if linear {
+            w[j] = match (j, deriv) {
+                (1, false) => 1.0 - t,
+                (2, false) => t,
+                (1, true) => -1.0,
+                (2, true) => 1.0,
+                _ => 0.0,
+            };
+        } else {
+            let u = t - (j as f64 - 1.0);
+            w[j] = if deriv { b3d1(u) } else { b3(u) };
+        }
     }
     (idx, w)
 }
 
 /// The operator sampling one axis' periodic spline at `xs`.
 pub fn sample_op(xs: &[f64], n: usize, deriv: bool) -> Op1 {
+    sample_op_of(xs, n, deriv, false)
+}
+
+/// [`sample_op`] for the cubic spline or (`linear`) trilinear interpolation.
+pub fn sample_op_of(xs: &[f64], n: usize, deriv: bool, linear: bool) -> Op1 {
     let mut op = Op1::new(xs.len(), n, 4);
     for (r, &x) in xs.iter().enumerate() {
-        let (idx, w) = taps(x, n, deriv);
+        let (idx, w) = taps_of(x, n, deriv, linear);
         // indices may repeat when n < 4: accumulate into distinct slots
         for j in 0..4 {
             op.set(r, j, idx[j], w[j]);
@@ -175,7 +200,9 @@ pub fn sample_op(xs: &[f64], n: usize, deriv: bool) -> Op1 {
 /// The Gaussian smoothing of a volume (§4.4): FWHM `fwhm` mm, voxel sizes `voxel`, separable,
 /// periodic.
 pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
-    if !(fwhm > 0.0) {
+    // FWHM 0 is no smoothing; a negative one (FSL-125 reproduced) smooths with that width's
+    // kernel as FSL forms it
+    if fwhm == 0.0 || !fwhm.is_finite() {
         return g.clone();
     }
     let sigma = fwhm / (8.0 * std::f64::consts::LN_2).sqrt();
@@ -210,7 +237,11 @@ pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
         g.dims,
         [ops[0].as_ref(), ops[1].as_ref(), ops[2].as_ref()],
     );
-    Grid { dims, data }
+    Grid {
+        dims,
+        data,
+        linear: g.linear,
+    }
 }
 
 /// The `s × s × s` block means (sizes divisible by `s`).
@@ -240,7 +271,11 @@ pub fn subsample(g: &Grid, s: usize) -> Grid {
                 }
             }
         });
-    Grid { dims: o, data: out }
+    Grid {
+        dims: o,
+        data: out,
+        linear: g.linear,
+    }
 }
 
 /// The volumes after the intensity scaling and the regridding (§4.1, §4.4), once per run.
@@ -275,6 +310,7 @@ pub fn prepare(
     voxel: [f64; 3],
     each: bool,
     extra: Option<usize>,
+    linear: bool,
 ) -> Prepared {
     let means: Vec<f64> = vols.iter().map(|v| mean(v)).collect();
     let g = means.iter().sum::<f64>() / means.len().max(1) as f64;
@@ -301,16 +337,22 @@ pub fn prepare(
             let grid = Grid {
                 dims,
                 data: v.iter().map(|&x| f64::from(x) * f).collect(),
+                linear,
             };
             match extra {
                 Some(_) => {
-                    let c = prefilter(&grid);
+                    // the regridding interpolates as the levels do (§4.4)
+                    let c = if linear {
+                        grid.clone()
+                    } else {
+                        prefilter(&grid)
+                    };
                     let ops: Vec<Op1> = (0..3)
                         .map(|a| {
                             let xs: Vec<f64> = (0..reg_dims[a])
                                 .map(|j| j as f64 * (reg_voxel[a] / voxel[a]))
                                 .collect();
-                            sample_op(&xs, dims[a], false)
+                            sample_op_of(&xs, dims[a], false, linear)
                         })
                         .collect();
                     let (data, d) = apply3(
@@ -318,7 +360,11 @@ pub fn prepare(
                         c.dims,
                         [Some(&ops[0]), Some(&ops[1]), Some(&ops[2])],
                     );
-                    Grid { dims: d, data }
+                    Grid {
+                        dims: d,
+                        data,
+                        linear,
+                    }
                 }
                 None => grid,
             }
@@ -351,7 +397,10 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64) -> LevelImages {
     let coef: Vec<Grid> = p
         .volumes
         .iter()
-        .map(|v| prefilter(&smooth(&subsample(v, s), fwhm, voxel)))
+        .map(|v| {
+            let g = smooth(&subsample(v, s), fwhm, voxel);
+            if g.linear { g } else { prefilter(&g) }
+        })
         .collect();
     LevelImages {
         dims: coef[0].dims,
@@ -365,33 +414,35 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64) -> LevelImages {
 #[inline]
 pub fn interp(c: &Grid, p: [f64; 3], want: [bool; 3]) -> (f64, [f64; 3]) {
     let [nx, ny, nz] = c.dims;
-    let (ix, wx) = taps(p[0], nx, false);
-    let (iy, wy) = taps(p[1], ny, false);
-    let (iz, wz) = taps(p[2], nz, false);
+    let l = c.linear;
+    let (ix, wx) = taps_of(p[0], nx, false, l);
+    let (iy, wy) = taps_of(p[1], ny, false, l);
+    let (iz, wz) = taps_of(p[2], nz, false, l);
     let dx = if want[0] {
-        taps(p[0], nx, true).1
+        taps_of(p[0], nx, true, l).1
     } else {
         [0.0; 4]
     };
     let dy = if want[1] {
-        taps(p[1], ny, true).1
+        taps_of(p[1], ny, true, l).1
     } else {
         [0.0; 4]
     };
     let dz = if want[2] {
-        taps(p[2], nz, true).1
+        taps_of(p[2], nz, true, l).1
     } else {
         [0.0; 4]
     };
     let mut v = 0.0;
     let mut d = [0.0; 3];
-    for c3 in 0..4 {
+    let (lo, hi) = if l { (1, 3) } else { (0, 4) };
+    for c3 in lo..hi {
         let zoff = iz[c3] * nx * ny;
-        for b in 0..4 {
+        for b in lo..hi {
             let yoff = zoff + iy[b] * nx;
             let mut sx = 0.0;
             let mut sdx = 0.0;
-            for a in 0..4 {
+            for a in lo..hi {
                 let val = c.data[yoff + ix[a]];
                 sx += wx[a] * val;
                 sdx += dx[a] * val;

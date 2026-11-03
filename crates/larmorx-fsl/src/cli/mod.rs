@@ -28,6 +28,7 @@ pub mod pairreg;
 pub mod pointflirt;
 pub mod rmsdiff;
 pub mod topup;
+pub mod topup_debug;
 
 use std::collections::BTreeMap;
 use std::io::Write;

@@ -28,6 +28,7 @@ pub use model::{RegMod, Scan};
 use images::{LevelImages, Prepared};
 use model::{Eval, Level};
 use spline::{Axis, Op1, apply3, refit_op};
+use stencil::Hessian;
 
 /// The minimiser of a level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,8 +58,17 @@ pub struct Params {
     /// Each volume scaled to a mean of 100 by itself (`--scale=1`).
     pub scale: bool,
     pub regrid: bool,
+    /// The voxels the regridding adds per axis (FSL: the largest subsampling; FSL-118's
+    /// correction: their least common multiple).
+    pub extra: usize,
     /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
     pub single: bool,
+    /// FSL-117 reproduced: the membrane energy's Levenberg-Marquardt Hessian per mm.
+    pub membrane_hessian_mm: bool,
+    /// Trilinear interpolation of the images (`--interp=linear`).
+    pub linear: bool,
+    /// The field's B-spline order (`--splineorder`: 3 or 2).
+    pub order: u8,
 }
 
 /// The knot spacing (voxels) for a resolution of `warpres` mm on voxels of `voxel` mm (§4.2).
@@ -116,21 +126,45 @@ impl Field {
                 .map(|j| (step - 1.0) / 2.0 + j as f64 * step)
                 .collect()
         });
-        self.resample(xs, std::array::from_fn(|a| Axis::new(n[a], k[a])))
+        self.resample(xs, std::array::from_fn(|a| self.axes[a].like(n[a], k[a])))
     }
 
     /// The field with knot spacing `k` on the same grid (sampled at the voxels and refitted).
     pub fn respace(&self, k: [usize; 3]) -> Field {
         let n = self.axes.map(|a| a.n);
         let xs = std::array::from_fn(|a| (0..n[a]).map(|j| j as f64).collect());
-        self.resample(xs, std::array::from_fn(|a| Axis::new(n[a], k[a])))
+        self.resample(xs, std::array::from_fn(|a| self.axes[a].like(n[a], k[a])))
     }
 }
 
-/// What the estimation reports as it goes: every cost evaluation and each new level.
+/// What the estimation reports as it goes: every cost evaluation (with its level, iteration and
+/// attempt, as FSL's `--debug` files number them), gradient and Hessian, and each new level.
 pub trait Progress {
-    fn evaluated(&mut self, level: &Level, e: &Eval);
+    fn evaluated(&mut self, index: usize, level: &Level, e: &Eval, iter: usize, attempt: usize);
     fn next_level(&mut self, index: usize);
+    fn gradient(&mut self, _index: usize, _level: &Level, _e: &Eval, _g: &[f64], _iter: usize) {}
+    fn hessian(&mut self, _index: usize, _level: &Level, _e: &Eval, _h: &Hessian, _iter: usize) {}
+    /// A level begins (`index` from 0) or ends.
+    fn level_started(&mut self, _index: usize) {}
+    fn level_finished(&mut self, _index: usize) {}
+}
+
+/// A level's [`minimise::Report`] forwarding to the run's [`Progress`].
+struct LevelReport<'a> {
+    progress: &'a mut dyn Progress,
+    index: usize,
+}
+
+impl minimise::Report for LevelReport<'_> {
+    fn evaluated(&mut self, level: &Level, e: &Eval, iter: usize, attempt: usize) {
+        self.progress.evaluated(self.index, level, e, iter, attempt);
+    }
+    fn gradient(&mut self, level: &Level, e: &Eval, g: &[f64], iter: usize) {
+        self.progress.gradient(self.index, level, e, g, iter);
+    }
+    fn hessian(&mut self, level: &Level, e: &Eval, h: &Hessian, iter: usize) {
+        self.progress.hessian(self.index, level, e, h, iter);
+    }
 }
 
 /// The result: the field on the input's grid and the prepared volumes.
@@ -156,14 +190,14 @@ pub fn estimate(
     scans: &[Scan],
     params: &Params,
     progress: &mut dyn Progress,
-) -> Estimate {
-    let smax = params.levels.iter().map(|l| l.subsamp).max().unwrap_or(1);
+) -> Result<Estimate, LevelError> {
     let prepared = images::prepare(
         volumes,
         dims,
         voxel,
         params.scale,
-        params.regrid.then_some(smax),
+        params.regrid.then_some(params.extra),
+        params.linear,
     );
     let mut field: Option<Field> = None;
     let mut prev: Option<LevelSpec> = None;
@@ -171,6 +205,10 @@ pub fn estimate(
     let mut mov = vec![[0.0; 6]; scans.len()];
     for (l, spec) in params.levels.iter().enumerate() {
         let s = spec.subsamp.max(1);
+        if prepared.reg_dims.iter().any(|&n| n % s != 0) {
+            // FSL-118 reproduced: the regridded grid does not divide by this level's subsampling
+            return Err(LevelError::Subsampling(l + 1));
+        }
         let nt = dims.map(|n| (n / s).max(1));
         let vt = voxel.map(|v| v * s as f64);
         let k = knot_spacing(spec.warpres, vt);
@@ -189,7 +227,9 @@ pub fn estimate(
                 }
                 f
             }
-            _ => Field::zeros(std::array::from_fn(|a| Axis::new(nt[a], k[a]))),
+            _ => Field::zeros(std::array::from_fn(|a| {
+                Axis::of_order(nt[a], k[a], params.order)
+            })),
         };
         let imgs = match &cached {
             Some((cs, cf, im)) if *cs == s && cf.to_bits() == spec.fwhm.to_bits() => im.clone(),
@@ -204,7 +244,7 @@ pub fn estimate(
             dims,
             voxel,
             s,
-            f.axes.map(|a| a.k),
+            f.axes,
             scans,
             spec.lambda,
             params.ssqlambda,
@@ -213,7 +253,12 @@ pub fn estimate(
             spec.estmov,
         );
         level.single = params.single;
-        let mut rep = |lv: &Level, e: &Eval| progress.evaluated(lv, e);
+        level.membrane_hessian_mm = params.membrane_hessian_mm;
+        progress.level_started(l);
+        let mut rep = LevelReport {
+            progress: &mut *progress,
+            index: l,
+        };
         let theta = level.start(std::mem::take(&mut f.coef));
         let theta = match spec.minmet {
             Minimiser::LevenbergMarquardt => {
@@ -225,6 +270,7 @@ pub fn estimate(
         };
         mov = level.movements(&theta);
         f.coef = theta[..level.n_coef()].to_vec();
+        progress.level_finished(l);
         field = Some(f);
         prev = Some(*spec);
     }
@@ -237,13 +283,20 @@ pub fn estimate(
             f = f.respace(k);
         }
     }
-    Estimate {
+    Ok(Estimate {
         field: f,
         prepared,
         warpres_last: last.warpres,
         movements: mov,
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
-    }
+    })
+}
+
+/// Why a level could not run.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LevelError {
+    /// The level (1-based) whose subsampling does not divide the regridded grid (FSL-118).
+    Subsampling(usize),
 }
 
 /// The predictions at full resolution (§6): the regridded volumes (smoothed as the last level's
@@ -256,7 +309,7 @@ pub fn full_resolution(est: &Estimate, scans: &[Scan], regmod: RegMod) -> (Level
         p.dims,
         p.voxel,
         1,
-        est.field.axes.map(|a| a.k),
+        est.field.axes,
         scans,
         0.0,
         false,

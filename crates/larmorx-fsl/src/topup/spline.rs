@@ -63,16 +63,69 @@ pub fn b3n(t: f64, d: usize) -> f64 {
     }
 }
 
-/// One axis of a field: `n` voxels, knot spacing `k` voxels.
+/// The `d`-th derivative of the quadratic B-spline (support `|t| < 1.5`; `--splineorder=2`).
+pub fn b2n(t: f64, d: usize) -> f64 {
+    let a = t.abs();
+    match d {
+        0 => {
+            if a < 0.5 {
+                0.75 - a * a
+            } else if a < 1.5 {
+                0.5 * (1.5 - a) * (1.5 - a)
+            } else {
+                0.0
+            }
+        }
+        1 => {
+            let v = if a < 0.5 {
+                -2.0 * a
+            } else if a < 1.5 {
+                -(1.5 - a)
+            } else {
+                0.0
+            };
+            if t < 0.0 { -v } else { v }
+        }
+        _ => {
+            if a < 0.5 {
+                -2.0
+            } else if a < 1.5 {
+                1.0
+            } else {
+                0.0
+            }
+        }
+    }
+}
+
+/// One axis of a field: `n` voxels, knot spacing `k` voxels, B-splines of order `order` (3:
+/// cubic, 2: quadratic).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Axis {
     pub n: usize,
     pub k: usize,
+    pub order: u8,
 }
 
 impl Axis {
     pub fn new(n: usize, k: usize) -> Axis {
-        Axis { n, k: k.max(1) }
+        Axis::of_order(n, k, 3)
+    }
+
+    /// The axis with B-splines of `order` (observed, `opt/splineorder-2`: the quadratic layout
+    /// is the cubic one, coefficient `i` centred at `(i - 1) k`, as many coefficients; FSL's
+    /// `_fieldcoef` gives its `--fout` to 2.5e-6 Hz this way).
+    pub fn of_order(n: usize, k: usize, order: u8) -> Axis {
+        Axis {
+            n,
+            k: k.max(1),
+            order,
+        }
+    }
+
+    /// The same order on another grid or spacing.
+    pub fn like(&self, n: usize, k: usize) -> Axis {
+        Axis::of_order(n, k, self.order)
     }
 
     /// The number of coefficients.
@@ -98,7 +151,12 @@ impl Axis {
         let scale = k.powi(d as i32);
         let mut w = [0.0; 4];
         for (j, wj) in w.iter_mut().enumerate() {
-            *wj = b3n(u - (i0 + j as isize) as f64, d) / scale;
+            let t = u - (i0 + j as isize) as f64;
+            *wj = if self.order == 2 {
+                b2n(t, d)
+            } else {
+                b3n(t, d)
+            } / scale;
         }
         (i0, w)
     }

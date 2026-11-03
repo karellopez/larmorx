@@ -299,13 +299,21 @@ def _b3(t: np.ndarray) -> np.ndarray:
     return np.where(a < 1, 2 / 3 - a**2 + a**3 / 2, np.where(a < 2, (2 - a) ** 3 / 6, 0.0))
 
 
+def _b2(t: np.ndarray) -> np.ndarray:
+    a = np.abs(t)
+    return np.where(a < 0.5, 0.75 - a**2, np.where(a < 1.5, 0.5 * (1.5 - a) ** 2, 0.0))
+
+
 def field_of_coefficients(img) -> np.ndarray | None:
-    """The field (Hz) a cubic ``_fieldcoef`` image defines on the input's grid (its knot
-    spacings are its voxel sizes, the field's size its qform's translation; coefficient ``i``
-    centred at voxel ``(i - 1) k``, or ``i`` with ``k = 1``); ``None`` for another layout."""
+    """The field (Hz) a cubic (intent 2016) or quadratic (2017) ``_fieldcoef`` image defines on
+    the input's grid (its knot spacings are its voxel sizes, the field's size its qform's
+    translation; coefficient ``i`` centred at voxel ``(i - 1) k``, or ``i`` with ``k = 1``, for
+    both orders: observed); ``None`` for another layout."""
     h = img.header
-    if int(h["intent_code"]) != 2016:
+    code = int(h["intent_code"])
+    if code not in (2016, 2017):
         return None
+    basis = _b3 if code == 2016 else _b2
     k = [round(float(v)) for v in h.get_zooms()[:3]]
     q = img.get_qform()
     n = [round(float(v)) for v in q[:3, 3]]
@@ -322,7 +330,7 @@ def field_of_coefficients(img) -> np.ndarray | None:
                 return None
             centres = (np.arange(nc) - 1.0) * k[a]
         x = np.arange(n[a], dtype=float)
-        mats.append(_b3((x[:, None] - centres[None, :]) / k[a]))
+        mats.append(basis((x[:, None] - centres[None, :]) / k[a]))
     out = c
     for a in range(3):
         out = np.moveaxis(np.tensordot(mats[a], np.moveaxis(out, a, 0), axes=(1, 0)), 0, a)
@@ -504,7 +512,9 @@ def measures(
             continue
         stem = _stem(name)
         if name.startswith("TopupDebug") or name.endswith(rep.PROFILE_SUFFIX):
-            continue  # the debug and profile files: their names only (sub-task 2)
+            # the debug files hold each implementation's own intermediate values (the names
+            # are compared); the profile's durations are the clock's
+            continue
         if _is_image(name):
             ia, ib = _load(pa), _load(pb)
             why = _header_difference(ia, ib)
@@ -616,10 +626,21 @@ def compare(
     if banded is not None:
         bm, _ = measures(a, banded[1], args, fa, mask)
         band_values = {m.name: m.value for m in bm}
+    want_out, got_out = oracle.stdout, ours.stdout
+    if "--trace" in args:
+        # --trace names each implementation's own stages (FSL's internal routines, the
+        # original's): the other lines are compared, the original's stages checked as pairs
+        want_out, _ = _split_trace(want_out)
+        got_out, stages = _split_trace(got_out)
+        checks(
+            "--trace: the original's stages, each entered and left",
+            bool(stages) and _balanced(stages),
+            detail=f"{len(stages)} lines",
+        )
     compare_stdout(
         checks,
-        oracle.stdout.replace(str(a), "{cwd}"),
-        ours.stdout.replace(str(b), "{cwd}"),
+        want_out.replace(str(a), "{cwd}"),
+        got_out.replace(str(b), "{cwd}"),
         None if banded is None else banded[0].stdout,
     )
     for c in exact:
@@ -641,6 +662,29 @@ def compare(
                 detail=detail,
             )
         )
+
+
+def _split_trace(text: str) -> tuple[str, list[str]]:
+    """``--trace``'s lines (``Entering``/``Leaving`` a stage, FSL's update notes) taken out."""
+    keep, stages = [], []
+    for ln in text.split("\n"):
+        if ln.startswith(("Entering ", "Leaving ")) or "Things not up to date" in ln:
+            stages.append(ln)
+        else:
+            keep.append(ln)
+    return "\n".join(keep), stages
+
+
+def _balanced(stages: list[str]) -> bool:
+    open_: list[str] = []
+    for ln in stages:
+        kind, _, name = ln.partition(" ")
+        if kind == "Entering":
+            open_.append(name)
+        elif kind == "Leaving":
+            if not open_ or open_.pop() != name:
+                return False
+    return not open_
 
 
 def _final_cost_ok(want: str, got: str) -> bool:

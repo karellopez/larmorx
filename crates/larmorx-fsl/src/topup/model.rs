@@ -10,7 +10,7 @@
 
 use rayon::prelude::*;
 
-use super::images::{Grid, LevelImages, interp, sample_op, taps};
+use super::images::{Grid, LevelImages, interp, sample_op_of, taps_of};
 use super::movement::{Motion, free_parameters};
 use super::spline::{Axis, Op1, apply3, band_op, gram};
 use super::stencil::{Hessian, Stencil};
@@ -180,6 +180,10 @@ pub struct Level {
     pub lambda: f64,
     pub ssq: bool,
     pub reg: Regulariser,
+    /// The membrane energy per mm (FSL-117: FSL's Levenberg-Marquardt Hessian of it).
+    reg_mm: Option<Regulariser>,
+    /// FSL-117 reproduced: Levenberg-Marquardt's Hessian of the membrane energy per mm.
+    pub membrane_hessian_mm: bool,
     /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
     pub single: bool,
 }
@@ -232,7 +236,8 @@ fn inside_static(p: [usize; 3], nt: [usize; 3], e: [f64; 3]) -> bool {
 
 impl Level {
     /// The level: `images` the volumes subsampled by `s` and smoothed, `input_voxel` the input's
-    /// voxel sizes, `k` the knot spacings, `movements` each volume's movement at the start and
+    /// voxel sizes, `field` the field's axes (its knot spacings and order), `movements` each
+    /// volume's movement at the start and
     /// `estimate` whether they are estimated (§4.3).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -240,7 +245,7 @@ impl Level {
         input_dims: [usize; 3],
         input_voxel: [f64; 3],
         s: usize,
-        k: [usize; 3],
+        field: [Axis; 3],
         scans: &[Scan],
         lambda: f64,
         ssq: bool,
@@ -250,7 +255,7 @@ impl Level {
     ) -> Level {
         let nt = input_dims.map(|n| (n / s).max(1));
         let vt = input_voxel.map(|v| v * s as f64);
-        let axes = std::array::from_fn(|a| Axis::new(nt[a], k[a]));
+        let axes: [Axis; 3] = std::array::from_fn(|a| field[a].like(nt[a], field[a].k));
         let basis: [[Op1; 2]; 3] = std::array::from_fn(|a| {
             let ax: Axis = axes[a];
             [ax.at_voxels(0), ax.at_voxels(1)]
@@ -295,7 +300,7 @@ impl Level {
                     let ops: [Option<Op1>; 3] = std::array::from_fn(|a| {
                         (a != axis).then(|| {
                             let xs: Vec<f64> = (0..nt[a]).map(|j| j as f64 * scale[a]).collect();
-                            sample_op(&xs, c.dims[a], false)
+                            sample_op_of(&xs, c.dims[a], false, c.linear)
                         })
                     });
                     let (data, dims) = apply3(
@@ -305,14 +310,24 @@ impl Level {
                     );
                     Sampler::Line {
                         axis,
-                        lines: Grid { dims, data },
+                        lines: Grid {
+                            dims,
+                            data,
+                            linear: c.linear,
+                        },
                     }
                 } else {
                     Sampler::Full
                 }
             })
             .collect();
-        let reg = Regulariser::new(regmod, axes, vt);
+        // the membrane energy's cost and gradient measure its derivatives per voxel, the bending
+        // energy's per mm (FSL-117; observed: -v's Reg)
+        let reg = match regmod {
+            RegMod::Membrane => Regulariser::new(regmod, axes, [1.0; 3]),
+            RegMod::Bending => Regulariser::new(regmod, axes, vt),
+        };
+        let reg_mm = (regmod == RegMod::Membrane).then(|| Regulariser::new(regmod, axes, vt));
         Level {
             nt,
             vt,
@@ -331,6 +346,8 @@ impl Level {
             lambda,
             ssq,
             reg,
+            reg_mm,
+            membrane_hessian_mm: false,
             single: false,
         }
     }
@@ -455,8 +472,8 @@ impl Level {
                         let p = [x as f64, y as f64, z as f64][a] + hv * ev[a];
                         let pos = p * self.scale[a];
                         let n = lines.dims[a];
-                        let (idx, w) = taps(pos, n, false);
-                        let (_, dw) = taps(pos, n, true);
+                        let (idx, w) = taps_of(pos, n, false, lines.linear);
+                        let (_, dw) = taps_of(pos, n, true, lines.linear);
                         let stride = [1, lines.dims[0], lines.dims[0] * lines.dims[1]][a];
                         let mut base_p = [x, y, z];
                         base_p[a] = 0;
@@ -705,6 +722,37 @@ impl Level {
         g
     }
 
+    /// The Gauss-Newton Hessian's voxel weights for `--debug=2` (findings 6): for the basis
+    /// types `B`, `∂_x B`, `∂_y B`, the upper triangle (00, 01, 02, 11, 12, 22) of `Σ_i (c_ip -
+    /// c̄_p)(c_iq - c̄_q)`, unmasked.
+    pub fn voxel_weights(&self, ev: &Eval) -> [Vec<f64>; 6] {
+        let nvox = ev.h.len();
+        let m = self.e.len();
+        let rows: Vec<[f64; 6]> = (0..nvox)
+            .into_par_iter()
+            .map(|v| {
+                let comps: Vec<[f64; 3]> = (0..m)
+                    .map(|i| {
+                        let (a, b) = self.alpha_beta(ev, i, v);
+                        [a, b[0], b[1]]
+                    })
+                    .collect();
+                let mean: [f64; 3] =
+                    std::array::from_fn(|j| comps.iter().map(|c| c[j]).sum::<f64>() / m as f64);
+                let mut w = [0.0; 6];
+                for c in &comps {
+                    let d: [f64; 3] = std::array::from_fn(|j| c[j] - mean[j]);
+                    let pairs = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)];
+                    for (k, (p, q)) in pairs.iter().enumerate() {
+                        w[k] += d[*p] * d[*q];
+                    }
+                }
+                w
+            })
+            .collect();
+        std::array::from_fn(|k| rows.iter().map(|r| r[k]).collect())
+    }
+
     /// The Gauss-Newton Hessian of the cost at the evaluated point, with the regulariser's.
     pub fn hessian(&self, ev: &Eval) -> Hessian {
         let nvox = ev.h.len();
@@ -762,7 +810,11 @@ impl Level {
             }
         }
         if self.lambda != 0.0 {
-            self.reg.add_to(&mut h, 2.0 * ev.lambda_eff(self));
+            let reg = match (&self.reg_mm, self.membrane_hessian_mm) {
+                (Some(r), true) => r,
+                _ => &self.reg,
+            };
+            reg.add_to(&mut h, 2.0 * ev.lambda_eff(self));
         }
         let nm = self.free.len();
         let mut cm = Vec::with_capacity(nm);

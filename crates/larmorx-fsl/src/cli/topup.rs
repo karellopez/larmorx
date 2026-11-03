@@ -19,8 +19,9 @@ use super::bet2::{FSLOUTPUTTYPE_UNSET, resolve_image};
 use super::common::{image_exception, print_notices, read_rows};
 use super::fmt::g;
 use super::options::atof;
+use super::topup_debug::{DebugOut, Printer};
 use crate::bet::image::{self, Output, Values};
-use crate::topup::{self, LevelSpec, Minimiser, Params, Progress, RegMod, Scan};
+use crate::topup::{self, LevelSpec, Minimiser, Params, RegMod, Scan};
 
 /// The usage text (standard error, before every option or setting error).
 pub const USAGE: &str = "\nPart of FSL (ID: 2412.6-dirty)\ntopup\n\nUsage: \ntopup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results\n\n\nCompulsory arguments (You MUST set one or more of):\n\t--imain\t\tname of 4D file with images\n\nOptional arguments (You may optionally specify one or more of):\n\t--datain\tname of text file with PE directions/times\n\t--acqp\t\talternative way to specify text file with PE directions/times\n\t--out\t\tbase-name of output files (spline coefficients (Hz) and movement parameters)\n\t--fout\t\tname of image file with field (Hz)\n\t--iout\t\tname of 4D image file with unwarped images\n\t--featout\t\tbase-name of output for export to FEAT\n\t--logout\tName of log-file\n\t--warpres\t(approximate) resolution (in mm) of warp basis for the different sub-sampling levels, default 10\n\t--subsamp\tsub-sampling scheme, default 1\n\t--fwhm\t\tFWHM (in mm) of gaussian smoothing kernel, default 8\n\t--config\tName of config file specifying command line arguments\n\t--miter\t\tMax # of non-linear iterations, default 5\n\t--lambda\tWeight of regularisation, default depending on --ssqlambda and --regmod switches. See user documetation.\n\t--ssqlambda\tIf set (=1), lambda is weighted by current ssq, default 1\n\t--regmod\tModel for regularisation of warp-field [membrane_energy bending_energy], default bending_energy\n\t--estmov\tEstimate movements if set, default 1 (true)\n\t--minmet\tMinimisation method 0=Levenberg-Marquardt, 1=Scaled Conjugate Gradient, default 0 (LM)\n\t--splineorder\tOrder of spline, 2->Qadratic spline, 3->Cubic spline. Default=3\n\t--numprec\tPrecision for representing Hessian, double or float. Default double\n\t--interp\tImage interpolation model, linear or spline. Default spline\n\t--scale\t\tIf set (=1), the images are individually scaled to a common mean, default 0 (false)\n\t--regrid\t\tIf set (=1), the calculations are done in a different grid, default 1 (true)\n\t--nthr\t\tNumber of threads to use (cannot be greater than numbers of hardware cores), default 1\n\t-h,--help\tdisplay help info\n\t-v,--verbose\tPrint diagonostic information while running\n\t-h,--help\tdisplay help info\n\n\n";
@@ -465,13 +466,6 @@ fn run(
             );
             return 1;
         }
-        if level > 0 {
-            return refuse(
-                err,
-                notices,
-                "--debug is not implemented yet in the clean-room original",
-            );
-        }
     }
     if s.scans.iter().any(|sc| sc.pe[2] != 0.0) {
         print_notices(err, notices);
@@ -481,15 +475,48 @@ fn run(
         );
         return 1;
     }
-    for flag in ["trace", "profile"] {
-        if given.has(flag) {
+    // FSL-124: a knot spacing that rounds below 0 wraps to about 4.29e9 voxels in FSL (refused
+    // in both modes: FSL exhausts the memory)
+    let voxel = s.input.vol.voxel;
+    for spec in &s.params.levels {
+        if (0..3).any(|a| (spec.warpres / (voxel[a] * spec.subsamp as f64)).round() < 0.0) {
+            let n = Notice::new(
+                &defects::FSL_124,
+                mode,
+                "a negative --warpres: FSL's knot spacing wraps to about 4.29e9 voxels",
+            );
+            let mut all = std::mem::take(notices);
+            all.push(n);
             return refuse(
                 err,
-                notices,
-                &format!("--{flag} is not implemented yet in the clean-room original"),
+                &all,
+                &format!(
+                    "--warpres={}: a negative knot spacing (FSL-124: FSL's spacing wraps to about 4.29e9 voxels and exhausts the memory)",
+                    given.get("warpres").unwrap_or_default()
+                ),
             );
         }
     }
+    // --profile's file, opened before the estimation (observed: FSL's message on standard
+    // output when it cannot be, exit 1, the log written)
+    let profile_name = given
+        .has("profile")
+        .then(|| format!("{}{}", s.out, super::topup_debug::PROFILE_SUFFIX));
+    if let Some(name) = &profile_name
+        && std::fs::write(settings.path(name), "").is_err()
+    {
+        print_notices(err, notices);
+        let _ = writeln!(
+            out,
+            "TOPUP::: Topup failed with message FSLProfiler::FSLProfiler::FSLProfiler: Unable to open logfile {name}"
+        );
+        return 1;
+    }
+    let debug_level = given.get("debug").map_or(0, atoi).clamp(0, 3) as u8;
+    let output_type = settings
+        .get("FSLOUTPUTTYPE")
+        .filter(|t| image::OUTPUT_TYPES.contains(t))
+        .map(str::to_owned);
     let dims = s.input.vol.shape;
     let voxel = s.input.vol.voxel;
     // on the call's thread pool; the streams buffered there and copied after
@@ -497,48 +524,50 @@ fn run(
     let mut ebuf: Vec<u8> = Vec::new();
     let mut ns = std::mem::take(notices);
     let pooled = larmorx_core::parallel::with_threads(s.n_threads, || {
-        let est = {
+        let t0 = std::time::Instant::now();
+        let (est, durations) = {
             let mut progress = Printer {
                 out: &mut obuf,
                 verbose: s.verbose,
+                trace: given.has("trace"),
+                debug: (debug_level > 0).then(|| DebugOut {
+                    settings,
+                    header: &s.input.header,
+                    flipped: s.input.flipped,
+                    output_type: output_type.clone(),
+                    mode,
+                    n_threads: s.n_threads,
+                    level: debug_level,
+                }),
+                started: profile_name.is_some().then(std::time::Instant::now),
+                durations: Vec::new(),
             };
-            topup::estimate(&s.volumes, dims, voxel, &s.scans, &s.params, &mut progress)
+            progress.stage("estimate", true);
+            let est = topup::estimate(&s.volumes, dims, voxel, &s.scans, &s.params, &mut progress);
+            progress.stage("estimate", false);
+            (est, progress.durations)
         };
-        write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
+        if let Some(name) = &profile_name {
+            let text = super::topup_debug::profile_text(&durations, t0.elapsed().as_secs_f64());
+            let _ = std::fs::write(settings.path(name), text);
+        }
+        match est {
+            Ok(est) => write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf),
+            Err(topup::LevelError::Subsampling(l)) => {
+                print_notices(&mut ebuf, &ns);
+                let _ = writeln!(
+                    ebuf,
+                    "Error occurred when preparing to run level {l} of topup\nException thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor"
+                );
+                1
+            }
+        }
     });
     let _ = out.write_all(&obuf);
     let _ = err.write_all(&ebuf);
     match pooled {
         Ok(code) => code,
         Err(e) => refuse(err, &ns, &e.to_string()),
-    }
-}
-
-/// `-v`'s lines.
-struct Printer<'a> {
-    out: &'a mut Vec<u8>,
-    verbose: bool,
-}
-
-impl Progress for Printer<'_> {
-    fn evaluated(&mut self, _level: &topup::model::Level, e: &topup::model::Eval) {
-        if self.verbose {
-            let reg = e.cost - e.ssd;
-            let _ = writeln!(
-                self.out,
-                "SSD = {}\tn = {}\tReg = {}\tCost = {}",
-                g(e.ssd),
-                e.n_mask,
-                g(reg),
-                g(e.cost)
-            );
-        }
-    }
-
-    fn next_level(&mut self, _index: usize) {
-        if self.verbose {
-            let _ = writeln!(self.out, "***Going to next resolution level***");
-        }
     }
 }
 
@@ -735,43 +764,74 @@ fn settle(
             &clp("Only quadratic or cubic splines allowed."),
         ));
     }
-    // what this original does not do yet
-    let not_yet = |what: &str| format!("{what} is not implemented yet in the clean-room original");
-    if splineorder == 2 {
-        return Err(refuse(err, notices, &not_yet("--splineorder=2")));
-    }
-    for (name, v) in [
-        ("numprec", "float"),
-        ("interp", "linear"),
-        ("regmod", "membrane_energy"),
-    ] {
-        if given.get(name) == Some(v) {
-            return Err(refuse(err, notices, &not_yet(&format!("--{name}={v}"))));
+    // the negative values (FSL-123, FSL-125, FSL-126; FSL-124 after the log, in `run`)
+    let negative: [(&str, &'static defects::Defect, bool, &str); 3] = [
+        (
+            "miter",
+            &defects::FSL_123,
+            (0..n_levels).any(|l| ati(&miter, l) < 0),
+            "a negative number of iterations (FSL runs no iteration at that level, silently)",
+        ),
+        (
+            "fwhm",
+            &defects::FSL_125,
+            (0..n_levels).any(|l| at(&fwhm, l) < 0.0),
+            "a negative smoothing width (FSL smooths with a kernel of that negative width)",
+        ),
+        (
+            "lambda",
+            &defects::FSL_126,
+            (0..n_levels).any(|l| at(&lambda, l) < 0.0),
+            "a negative regularisation weight (FSL's regularisation then rewards a rough field)",
+        ),
+    ];
+    for (name, entry, bad, why) in negative {
+        if !bad {
+            continue;
+        }
+        let n = Notice::new(
+            entry,
+            mode,
+            &format!("--{name}={}: {why}", given.get(name).unwrap_or_default()),
+        );
+        match mode {
+            UpstreamDefects::Fix => {
+                return Err(refuse(
+                    err,
+                    &[n],
+                    &format!(
+                        "--{name}={}: {why} ({})",
+                        given.get(name).unwrap_or_default(),
+                        entry.id
+                    ),
+                ));
+            }
+            UpstreamDefects::Reproduce => notices.push(n),
         }
     }
-    for l in 0..n_levels {
-        if ati(&miter, l) < 0
-            || at(&warpres, l) <= 0.0
-            || at(&fwhm, l) < 0.0
-            || at(&lambda, l) < 0.0
-        {
-            return Err(refuse(
-                err,
-                notices,
-                &not_yet("a negative --miter, --warpres, --fwhm or --lambda"),
-            ));
-        }
-    }
-    let smax = (0..n_levels).map(|l| ati(&subsamp, l)).max().unwrap_or(1);
-    if given.get("regrid").map_or(1, atoi) != 0
-        && (0..n_levels).any(|l| smax % ati(&subsamp, l) != 0)
-    {
-        return Err(refuse(
-            err,
-            notices,
-            &not_yet("subsamplings whose largest the others do not divide (FSL-118)"),
+    // FSL-118: the regridded grid grows by the largest subsampling, which the others must divide
+    let subs: Vec<usize> = (0..n_levels).map(|l| ati(&subsamp, l) as usize).collect();
+    let smax = subs.iter().copied().max().unwrap_or(1);
+    let lcm = subs.iter().fold(1usize, |a, &b| a / gcd(a, b) * b);
+    let regrid = given.get("regrid").map_or(1, atoi) != 0;
+    if regrid && lcm != smax {
+        notices.push(Notice::new(
+            &defects::FSL_118,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => {
+                    "the grid grows by the subsamplings' least common multiple (FSL's largest subsampling does not divide the others: FSL stops with \"invalid subsampling factor\")"
+                }
+                UpstreamDefects::Reproduce => {
+                    "the grid grows by the largest subsampling, which the others do not divide: topup stops at that level, as FSL does"
+                }
+            },
         ));
     }
+    let extra = match mode {
+        UpstreamDefects::Fix => lcm,
+        UpstreamDefects::Reproduce => smax,
+    };
     let scg_movements = (0..n_levels)
         .filter(|&l| ati(&estmov, l) != 0 && ati(&minmet, l) == 1)
         .count();
@@ -799,9 +859,33 @@ fn settle(
             RegMod::Bending
         },
         scale: given.get("scale").map_or(0, atoi) != 0,
-        regrid: given.get("regrid").map_or(1, atoi) != 0,
+        regrid,
+        extra,
         single: given.get("numprec") == Some("float"),
+        membrane_hessian_mm: mode == UpstreamDefects::Reproduce,
+        linear: given.get("interp") == Some("linear"),
+        order: if splineorder == 2 { 2 } else { 3 },
     };
+    // FSL-117: named on every Levenberg-Marquardt level with the membrane energy and λ ≠ 0
+    if params.regmod == RegMod::Membrane
+        && params
+            .levels
+            .iter()
+            .any(|l| l.minmet == Minimiser::LevenbergMarquardt && l.lambda != 0.0)
+    {
+        notices.push(Notice::new(
+            &defects::FSL_117,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => {
+                    "Levenberg-Marquardt's Hessian of the membrane energy in the cost's units (voxels; FSL's in mm)"
+                }
+                UpstreamDefects::Reproduce => {
+                    "Levenberg-Marquardt's Hessian of the membrane energy in mm, as FSL's (its cost in voxels)"
+                }
+            },
+        ));
+    }
     let scans: Vec<Scan> = acq
         .iter()
         .map(|r| Scan {
@@ -846,6 +930,10 @@ fn settle(
         n_threads,
         scg_movements,
     })
+}
+
+fn gcd(a: usize, b: usize) -> usize {
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 /// `--imain`'s path and name before the first `.` of its name.
@@ -1046,7 +1134,7 @@ fn write_outputs(
     let f = &est.field;
     let cdims = f.coef_dims();
     let mut ch = input.header.clone();
-    ch.intent_code = 2016;
+    ch.intent_code = if f.axes[0].order == 2 { 2017 } else { 2016 };
     ch.intent_p1 = s.input.vol.voxel[0];
     ch.intent_p2 = s.input.vol.voxel[1];
     ch.intent_p3 = s.input.vol.voxel[2];

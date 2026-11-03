@@ -10,17 +10,14 @@
 //! textbook algorithm (Møller 1993, in Bishop's formulation) with `σ = 0.01` and `λ₁ = 0.1`.
 
 use super::model::{Eval, Level, dot};
-use super::stencil::pcg;
+use super::stencil::{Hessian, pcg};
 
-/// What a minimiser reports: each cost evaluation.
+/// What a minimiser reports: each cost evaluation (numbered as FSL's `--debug` files are: the
+/// iteration and the attempt within it), each gradient and each Hessian (observed, findings 9).
 pub trait Report {
-    fn evaluated(&mut self, level: &Level, e: &Eval);
-}
-
-impl<F: FnMut(&Level, &Eval)> Report for F {
-    fn evaluated(&mut self, level: &Level, e: &Eval) {
-        self(level, e)
-    }
+    fn evaluated(&mut self, level: &Level, e: &Eval, iter: usize, attempt: usize);
+    fn gradient(&mut self, _level: &Level, _e: &Eval, _g: &[f64], _iter: usize) {}
+    fn hessian(&mut self, _level: &Level, _e: &Eval, _h: &Hessian, _iter: usize) {}
 }
 
 const CG_TOLERANCE: f64 = 1e-3;
@@ -35,15 +32,19 @@ pub fn levenberg_marquardt(
     report: &mut dyn Report,
 ) -> Vec<f64> {
     let mut ev = level.eval(&c);
-    report.evaluated(level, &ev);
+    report.evaluated(level, &ev, 0, 1);
     if miter == 0 {
         return c;
     }
+    let mut iter = 1;
+    let mut attempt = 0;
     let mut g = level.gradient(&ev, &c);
+    report.gradient(level, &ev, &g, iter);
     let mut h = level.hessian(&ev);
     if level.single {
         h.to_single();
     }
+    report.hessian(level, &ev, &h, iter);
     let mut damping = 0.1;
     let mut accepted = 0;
     loop {
@@ -59,7 +60,8 @@ pub fn levenberg_marquardt(
         let step = pcg(&hd, &b, CG_TOLERANCE, CG_MAX_ITER);
         let trial: Vec<f64> = c.iter().zip(&step).map(|(a, s)| a + s).collect();
         let et = level.eval(&trial);
-        report.evaluated(level, &et);
+        attempt += 1;
+        report.evaluated(level, &et, iter, attempt);
         if et.cost < ev.cost {
             let converged = 2.0 * (et.cost - ev.cost).abs()
                 <= 1e-8 * (et.cost.abs() + ev.cost.abs() + f64::EPSILON);
@@ -67,14 +69,18 @@ pub fn levenberg_marquardt(
             ev = et;
             damping /= 10.0;
             accepted += 1;
+            iter += 1;
+            attempt = 0;
             if converged || accepted >= miter {
                 break;
             }
             g = level.gradient(&ev, &c);
+            report.gradient(level, &ev, &g, iter);
             h = level.hessian(&ev);
             if level.single {
                 h.to_single();
             }
+            report.hessian(level, &ev, &h, iter);
         } else {
             damping *= 10.0;
             if damping > 1e20 {
@@ -97,12 +103,16 @@ pub fn scaled_conjugate_gradients(
     const BETA_MAX: f64 = 1e100;
     let n = x.len();
     let ev = level.eval(&x);
-    report.evaluated(level, &ev);
+    report.evaluated(level, &ev, 0, 1);
     if miter == 0 {
         return x;
     }
+    // FSL's numbering: a counter of the gradients; an evaluation takes the counter's value
+    let mut counter = 1;
+    let (mut last, mut attempt) = (0, 1);
     let mut fold = ev.cost;
     let mut gnew = level.gradient(&ev, &x);
+    report.gradient(level, &ev, &gnew, counter);
     let mut gold;
     let mut d: Vec<f64> = gnew.iter().map(|v| -v).collect();
     let mut success = true;
@@ -125,6 +135,8 @@ pub fn scaled_conjugate_gradients(
             let xp: Vec<f64> = x.iter().zip(&d).map(|(a, b)| a + sigma * b).collect();
             let ep = level.eval(&xp);
             let gplus = level.gradient(&ep, &xp);
+            counter += 1;
+            report.gradient(level, &ep, &gplus, counter);
             let diff: Vec<f64> = gplus.iter().zip(&gnew).map(|(a, b)| a - b).collect();
             gamma = dot(&d, &diff) / sigma;
         }
@@ -136,7 +148,9 @@ pub fn scaled_conjugate_gradients(
         let alpha = -mu / delta;
         let xnew: Vec<f64> = x.iter().zip(&d).map(|(a, b)| a + alpha * b).collect();
         let en = level.eval(&xnew);
-        report.evaluated(level, &en);
+        attempt = if counter == last { attempt + 1 } else { 1 };
+        last = counter;
+        report.evaluated(level, &en, counter, attempt);
         let fnew = en.cost;
         let ratio = 2.0 * (fnew - fold) / (alpha * mu);
         if ratio >= 0.0 && fnew.is_finite() {
@@ -147,6 +161,8 @@ pub fn scaled_conjugate_gradients(
             fold = fnew;
             gold = std::mem::take(&mut gnew);
             gnew = level.gradient(&en, &x);
+            counter += 1;
+            report.gradient(level, &en, &gnew, counter);
             // the relative gradient test
             let scale = fnew.abs().max(1.0);
             let test = gnew

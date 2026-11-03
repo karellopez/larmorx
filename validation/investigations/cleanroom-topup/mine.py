@@ -39,7 +39,7 @@ env = {
     "FSLDIR": os.environ.get("FSLDIR", os.path.expanduser("~/fsl-6.0.7.23")),
     "LARMORX_IMPLEMENTATION": "original",
     "OMP_NUM_THREADS": threads,
-    "LARMORX_UPSTREAM_DEFECTS": "fix",
+    "LARMORX_UPSTREAM_DEFECTS": os.environ.get("LXD", "reproduce"),
 }
 t0 = time.time()
 p = subprocess.run(

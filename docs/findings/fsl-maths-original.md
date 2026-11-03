@@ -185,3 +185,20 @@ default NaN. `stat/ptoz`: FSL's `-ptoz` of a NaN voxel (the input's `0x7fc00000`
 NaN (`0xffc00000`), not the input's NaN passed on. The original gives those bits (the spec does
 not say which NaN).
 
+## 17. TFCE: `E` and `H` in single precision; `-tfceS`'s output without a threshold reached, relay 3
+
+`fsl_outputs.py` kept FSL's outputs of the replica suite's `tfce/` and `tfceS/` cases; a numpy model
+(`fit_tfce.py`: `scipy.ndimage.label` per threshold) gives every `-tfce` output bit for bit (6 cases) only when
+`E` is held in single precision (`pow(s, (double) E)`, with `E = 0.66` in `tfce/delta`: 91 of
+the 720 voxels differ with `E` in double) and `powf(h, H)` is correctly rounded on these
+thresholds. For `-tfceS`: when the sum never reaches `T` (`tfceS/not-reached`), the output keeps
+the voxel's cluster at the lowest threshold `h₀` (391 voxels); when no threshold is taken (a
+voxel at or below `h₀`: `tfceS/low-voxel`) it keeps the voxels outside every cluster at `h₀`
+(the 308 negative voxels: the label 0 of FSL's labelling), with the message in both cases.
+FSL-178 with `reproduce` (`d13/tfceS-outside`, x = 10 of 10): FSL takes the value at the voxel's
+offset from the volume's start (the next row's first voxel, 0.276), but the voxel belongs to no
+cluster at any threshold: the sum stays 0, the message is printed and the output keeps the
+voxels outside every cluster at `h₀`, as for a voxel below `h₀` (the original reproduces that;
+other offsets inside the volume are untested). A negative `-tfce_delta` with `-tfceS`
+(`d13/tfceS-negative-delta`) ends FSL by SIGFPE (FSL-174: refused in both modes).
+

@@ -7,9 +7,9 @@
 //! [`Chain`]). The operations of this file are §5-§8's (the binary operations, thresholds,
 //! masks, voxelwise functions, random numbers, the index and the grid) and the chain's own
 //! (`-seed`, `-restart`, `-save`, `-range`), the kernels and spatial filters (§9, §10), the
-//! reductions (§11), the statistical transforms (§12), `-roi` and `-bptf` (§13); the rest of
-//! the usage text (TFCE, `-roc`, `-tensor_decomp`) is refused as not yet implemented until the
-//! next part of the original adds it.
+//! reductions (§11), the statistical transforms (§12), `-roi` and `-bptf` (§13), TFCE (§14);
+//! the rest of the usage text (`-roc`, `-tensor_decomp`) is refused as not yet implemented until
+//! the next part of the original adds it.
 
 use std::io::Write;
 
@@ -28,7 +28,7 @@ use crate::maths::num::{Kind, Num};
 use crate::maths::ops::{self, Binary, Layout, Stop, Unary, WichmannHill};
 use crate::maths::reduce::{self, Stat};
 use crate::maths::stats::{self, PvalKind};
-use crate::maths::{regions, spatial};
+use crate::maths::{regions, spatial, tfce};
 
 /// The usage text (§2.5), exactly as FSL prints it on standard output.
 pub const USAGE: &str = include_str!("fslmaths_usage.txt");
@@ -40,14 +40,7 @@ pub const NOT_YET: &str = "is not implemented yet in the clean-room original";
 const DATATYPES: [&str; 6] = ["char", "short", "int", "float", "double", "input"];
 
 /// The operations of the usage text the next parts of the original add.
-const LATER: &[&str] = &[
-    "-tfce",
-    "-tfceS",
-    "-tfce_minT",
-    "-tfce_delta",
-    "-tensor_decomp",
-    "-roc",
-];
+const LATER: &[&str] = &["-tensor_decomp", "-roc"];
 
 /// How a run ends early: its exit status (the messages are printed).
 struct Exit(u8);
@@ -394,6 +387,8 @@ struct State<T> {
     range: bool,
     /// The current kernel (§9; `-restart` keeps it).
     kernel: Kernel,
+    /// `-tfce_minT` and `-tfce_delta` (§14).
+    tfce: tfce::Settings,
 }
 
 fn chain<T: Num>(
@@ -410,6 +405,7 @@ fn chain<T: Num>(
         rng: WichmannHill::default(),
         range: false,
         kernel: Kernel::default(),
+        tfce: tfce::Settings::default(),
     };
     let mut i = ctx.first + 1;
     let mut ran = false;
@@ -754,6 +750,35 @@ fn step<T: Num>(
             let lp = strtod(l).0;
             regions::bptf(&mut st.img, hp, lp, notices).map_err(|s| refuse_stop(err, s))?;
             Ok(2)
+        }
+        "-tfce_minT" | "-tfce_delta" => {
+            let v = strtod(arg(1).unwrap_or("")).0 as f32;
+            if op == "-tfce_minT" {
+                st.tfce.min_t = v;
+            } else {
+                st.tfce.delta = v;
+            }
+            Ok(1)
+        }
+        "-tfce" | "-tfceS" => {
+            let k = if op == "-tfce" { 3 } else { 7 };
+            let mut a: Vec<&str> = Vec::with_capacity(k);
+            for j in 1..=k {
+                let Some(w) = arg(j) else {
+                    return Err(past_end(notices, err, op, false));
+                };
+                a.push(w);
+            }
+            let num = |w: &str| strtod(w).0 as f32;
+            let (h, e, c) = (num(a[0]), num(a[1]), atoi(a[2]));
+            let r = if op == "-tfce" {
+                tfce::tfce(&mut st.img, h, e, c, st.tfce, notices, out)
+            } else {
+                let at = [atoi(a[3]), atoi(a[4]), atoi(a[5])];
+                tfce::tfce_support(&mut st.img, h, e, c, at, num(a[6]), st.tfce, notices, out)
+            };
+            r.map_err(|s| refuse_stop(err, s))?;
+            Ok(k)
         }
         _ if Morph::of(op).is_some() => {
             let f = Morph::of(op).unwrap_or(Morph::DilF);

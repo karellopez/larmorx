@@ -12,6 +12,7 @@ replica suite's runner, so a run made once is served after), and print what it w
 | `fsl_outputs.py <outdir> <case or args:...> ...` | FSL's output files, kept for analysis, for cases of the replica suite or ad-hoc command lines with its own inputs (an impulse, a ramp with a NaN or an infinity, asymmetric kernels): the Gaussian kernel's normalising sum, the FFT path's orientation and NaN, the subsampling's last bits (findings 7-9, 13, 14); `impulse<n>` an impulse of n³ voxels |
 | `fit_orientation.py <dir>` | where FSL lands an asymmetric kernel on an impulse, as stored (its FFT path) or mirrored (its direct sum), for the same kernel on images of two sizes: FSL-192 (findings 14; the probes' command lines in its docstring) |
 | `fit_bptf.py <dir>` | `-bptf`'s arithmetic on FSL's double outputs: the spec's form against FSL's order of the high-pass products (findings 15; the probes' command lines in its docstring) |
+| `fit_tfce.py <dir>` | TFCE's arithmetic (`E` in single precision) and `-tfceS`'s output with and without a threshold reached, on FSL's outputs of the replica suite's TFCE cases (findings 17) |
 
 Run from the repository with the validation package on the path, inside a memory box:
 

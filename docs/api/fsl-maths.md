@@ -23,8 +23,8 @@ masks, voxelwise functions, `-rand`, `-seed`, `-index` and `-grid` (relay 1), th
 morphological filters, `-dilall`, the convolutions (`-s`, `-fmean`, `-fmeanu`), `-subsamp2`,
 `-subsamp2offc`, `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm` and `-ing` (relay 2), the
 reductions along T, X, Y, Z, `-roi`, `-bptf`, `-ztop`, `-ptoz`, `-pval`, `-pval0`, `-cpval`,
-`-rank`, `-ranknorm` and `-randn` (relay 3); TFCE (`-tfce`, `-tfceS`, `-tfce_minT`,
-`-tfce_delta`), `-roc` and `-tensor_decomp` come with its next relay and are refused until then
+`-rank`, `-ranknorm`, `-randn` and TFCE (`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta`)
+(relay 3); `-roc` and `-tensor_decomp` come with its next relay and are refused until then
 (`... is not implemented yet in the clean-room original`). Where FSL convolves a large kernel by
 its FFT, the original computes the convolution by the direct sum, in the direct sum's
 orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
@@ -242,7 +242,7 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original's TFCE, `-roc` and `-tensor_decomp`, its speed work (an FFT for
+- The clean-room original's `-roc` and `-tensor_decomp`, its speed work (an FFT for
   large kernels among it), golden cases and record (its next relays).
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).

@@ -437,6 +437,8 @@ const PRINTING: &[&str] = &[
     "fsl fast",
     "fsl topup",
     "fsl applytopup",
+    "fsl fslmaths",
+    "fsl fslstats",
 ];
 
 /// FAST's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
@@ -470,6 +472,24 @@ const TOPUP_REFUSALS: &[(&str, &[&str], &str)] = &[(
     ],
     "FSL-126",
 )];
+
+/// fslmaths' and fslstats' refusals (rule B, 2026-11-03): `(id, tool, arguments, the defect
+/// named)`, refused by default with exit status 1 and nothing written: a kernel without voxels
+/// (FSL-161), a histogram whose maximum is not above its minimum (FSL-186).
+const AVW_REFUSALS: &[(&str, &str, &[&str], &str)] = &[
+    (
+        "fslmaths.fsl161.empty-kernel",
+        "fsl fslmaths",
+        &["{t2}", "-kernel", "boxv", "0", "-dilM", "out"],
+        "FSL-161",
+    ),
+    (
+        "fslstats.fsl186.histogram",
+        "fsl fslstats",
+        &["{t2}", "-H", "4", "5", "5"],
+        "FSL-186",
+    ),
+];
 
 /// FLIRT's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
 /// default with exit status 1 and nothing written (recorded by their status).
@@ -1139,6 +1159,406 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-132", "FSL-143"],
         output_type: "NIFTI",
     },
+    // fslmaths and fslstats (2026-11-03), one case per operation family: on the head's images
+    // (`{t1}` int16, `{t2}` float32, `{4d}` int16, 4 volumes; `{mask}` float32, `{mask8}` its
+    // uint8 brain mask; `{labels}` labels 1 and 3, 2 missing; `{sparse}` one voxel in nine;
+    // `{i8}` int8), a z-like map and its partner (`{zmap}`, `{zmap2}`, 16 x 16 x 12), a truth
+    // for -roc (`{truth}`), a kernel file (`{kern}`) and a tensor of six volumes on 8 x 8 x 6
+    // (`{tensor}`): niworkflows' combination of two masks; the binary operations with numbers
+    // and images (a 3D image cloned over the 4D one; an integer output); the thresholds; the
+    // maths functions (float, and double); masks; the seeded noise; the kernels and filters
+    // (the direct sums and the FFT); the other spatial operations; the reductions along each
+    // dimension; the statistical transforms; -roi and -bptf; TFCE; -roc (its curves and printed
+    // areas); -tensor_decomp; the data types (char, int, int8 with -odt input: FSL-157 corrected
+    // and reproduced, written by FSL as uint8 with its values wrapped, FSL-151; a compressed output); the double functions (GLIBC-07: glibc's bits of exp
+    // and log in reproduce); FSL-160 corrected and reproduced, FSL-162 corrected. fslstats (its
+    // printed numbers): every option in one call, -t with -K, -json (FSL-182), FSL-182 corrected
+    // and reproduced. Intermediate images are kept with -save (written in the run directory).
+    BetCase {
+        id: "fslmaths.combine-masks",
+        tool: "fsl fslmaths",
+        args: &["{mask8}", "-mul", "{mask}", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.arithmetic",
+        tool: "fsl fslmaths",
+        args: &[
+            "{4d}", "-add", "{t2}", "-sub", "10", "-mul", "0.5", "-div", "{t2}", "-rem", "3",
+            "-max", "0.25", "-min", "{t2}", "-mas", "{mask}", "out", "-odt", "short",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.thresholds",
+        tool: "fsl fslmaths",
+        args: &[
+            "{t2}", "-thrp", "10", "-uthrP", "95", "-thr", "20", "-uthr", "1400", "-thrP", "5",
+            "-uthrp", "90", "-bin", "out", "-odt", "char",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.unary",
+        tool: "fsl fslmaths",
+        args: &[
+            "{t2}", "-div", "1000", "-asin", "-nanm", "-save", "nanmask", "-restart", "{t2}",
+            "-div", "1000", "-asin", "-nan", "-add", "0.5", "-log", "-exp", "-sqrt", "-recip",
+            "-sqr", "-pow", "0.5", "-sin", "-asin", "-cos", "-acos", "-tan", "-atan", "-abs",
+            "-range", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.unary-double",
+        tool: "fsl fslmaths",
+        args: &[
+            "-dt", "double", "{t2}", "-div", "1700", "-asin", "-exp", "-log", "-sin", "-tan",
+            "-acos", "-atan", "-cos", "out", "-odt", "double",
+        ],
+        mode: "fix",
+        named: &["GLIBC-07"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.unary-double.reproduce",
+        tool: "fsl fslmaths",
+        args: &[
+            "-dt", "double", "{t2}", "-div", "1700", "-asin", "-exp", "-log", "-sin", "-tan",
+            "-acos", "-atan", "-cos", "out", "-odt", "double",
+        ],
+        mode: "reproduce",
+        named: &["GLIBC-07"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.masks",
+        tool: "fsl fslmaths",
+        args: &[
+            "{mask}", "-binv", "-fillh", "-save", "filled", "-restart", "{mask}", "-fillh26",
+            "-index", "-save", "index", "-restart", "{t2}", "-edge", "-grid", "500", "4", "-binv",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.random",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-seed", "42", "-rand", "-randn", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.filters",
+        tool: "fsl fslmaths",
+        args: &[
+            "{t2}", "-kernel", "gauss", "3", "-fmean", "-save", "fmean", "-kernel", "boxv", "3",
+            "-dilM", "-save", "dilm", "-kernel", "sphere", "5", "-ero", "-save", "ero", "-kernel",
+            "2D", "-fmedian", "-save", "fmedian", "-kernel", "box", "6", "-dilD", "-save", "dild",
+            "-kernel", "boxv3", "3", "3", "1", "-dilF", "-eroF", "-save", "dilf", "-kernel",
+            "file", "{kern}", "-fmeanu", "-save", "file", "-kernel", "3D", "-s", "2", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.filters-fft",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-kernel", "boxv", "13", "-fmeanu", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.spatial",
+        tool: "fsl fslmaths",
+        args: &[
+            "{sparse}",
+            "-dilall",
+            "-save",
+            "dilall",
+            "-restart",
+            "{t2}",
+            "-subsamp2",
+            "-save",
+            "sub",
+            "-restart",
+            "{t2}",
+            "-subsamp2offc",
+            "-save",
+            "suboffc",
+            "-restart",
+            "{t2}",
+            "-dog_edge",
+            "1",
+            "1.6",
+            "-save",
+            "dog",
+            "-restart",
+            "{4d}",
+            "-inm",
+            "1000",
+            "-save",
+            "inm",
+            "-restart",
+            "{4d}",
+            "-ing",
+            "1000",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.dimensions",
+        tool: "fsl fslmaths",
+        args: &[
+            "{4d}", "-Tmean", "-save", "tmean", "-restart", "{4d}", "-Tstd", "-save", "tstd",
+            "-restart", "{4d}", "-Tmax", "-save", "tmax", "-restart", "{4d}", "-Tmaxn", "-save",
+            "tmaxn", "-restart", "{4d}", "-Tmin", "-save", "tmin", "-restart", "{4d}", "-Tmedian",
+            "-save", "tmedian", "-restart", "{4d}", "-Tperc", "30", "-save", "tperc", "-restart",
+            "{4d}", "-Tar1", "-save", "tar1", "-restart", "{4d}", "-Xmax", "-save", "xmax",
+            "-restart", "{4d}", "-Ymean", "-save", "ymean", "-restart", "{4d}", "-Zstd", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.statistics",
+        tool: "fsl fslmaths",
+        args: &[
+            "{4d}",
+            "-pval",
+            "-save",
+            "pval",
+            "-restart",
+            "{4d}",
+            "-pval0",
+            "-save",
+            "pval0",
+            "-restart",
+            "{4d}",
+            "-cpval",
+            "-save",
+            "cpval",
+            "-restart",
+            "{4d}",
+            "-rank",
+            "-save",
+            "rank",
+            "-restart",
+            "{4d}",
+            "-ranknorm",
+            "-save",
+            "ranknorm",
+            "-restart",
+            "{zmap}",
+            "-ztop",
+            "-save",
+            "ztop",
+            "-ptoz",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.roi-bptf",
+        tool: "fsl fslmaths",
+        args: &[
+            "{4d}", "-roi", "2", "20", "1", "-1", "3", "10", "1", "2", "-save", "roi", "-restart",
+            "{4d}", "-bptf", "1.5", "0.8", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.tfce",
+        tool: "fsl fslmaths",
+        args: &[
+            "{zmap}",
+            "-tfce",
+            "2",
+            "0.5",
+            "6",
+            "-save",
+            "tfce",
+            "-restart",
+            "{zmap}",
+            "-tfce_minT",
+            "0.5",
+            "-tfce_delta",
+            "0.2",
+            "-tfce",
+            "2",
+            "0.5",
+            "26",
+            "-save",
+            "tfce26",
+            "-restart",
+            "{zmap}",
+            "-tfceS",
+            "2",
+            "0.5",
+            "18",
+            "8",
+            "8",
+            "6",
+            "5",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.roc",
+        tool: "fsl fslmaths",
+        args: &[
+            "{zmap}",
+            "-roc",
+            "-0.05",
+            "curve.txt",
+            "{truth}",
+            "-roc",
+            "0.05",
+            "curve_fwe.txt",
+            "{zmap2}",
+            "{truth}",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.tensor",
+        tool: "fsl fslmaths",
+        args: &["{tensor}", "-tensor_decomp", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.char",
+        tool: "fsl fslmaths",
+        args: &[
+            "-dt", "char", "{mask8}", "-add", "100", "out", "-odt", "input",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.int",
+        tool: "fsl fslmaths",
+        args: &["-dt", "int", "{t1}", "-div", "3", "out", "-odt", "int"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_GZ",
+    },
+    BetCase {
+        id: "fslmaths.int8",
+        tool: "fsl fslmaths",
+        args: &["{i8}", "-mul", "3", "-div", "4", "out", "-odt", "input"],
+        mode: "fix",
+        named: &["FSL-157"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.int8.reproduce",
+        tool: "fsl fslmaths",
+        args: &["{i8}", "-mul", "3", "-div", "4", "out", "-odt", "input"],
+        mode: "reproduce",
+        named: &["FSL-151", "FSL-157"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.fsl160",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-kernel", "gauss", "0", "-fmean", "out"],
+        mode: "fix",
+        named: &["FSL-160"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.fsl160.reproduce",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-kernel", "gauss", "0", "-fmean", "out"],
+        mode: "reproduce",
+        named: &["FSL-160"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.fsl162",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-div", "1000", "-asin", "-fmedian", "out"],
+        mode: "fix",
+        named: &["FSL-162"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslstats.options",
+        tool: "fsl fslstats",
+        args: &[
+            "{t2}", "-r", "-R", "-e", "-E", "-v", "-V", "-m", "-M", "-s", "-S", "-w", "-x", "-X",
+            "-c", "-C", "-p", "30", "-P", "70", "-h", "8", "-H", "6", "0", "1000", "-l", "50",
+            "-M", "-u", "900", "-S", "-a", "-n", "-k", "{mask}", "-m", "-d", "{t1}", "-m", "-D",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslstats.timeseries-labels",
+        tool: "fsl fslstats",
+        args: &["-t", "-K", "{labels}", "{4d}", "-M", "-R", "-C", "-w"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslstats.json",
+        tool: "fsl fslstats",
+        args: &[
+            "-json", "-t", "{4d}", "-m", "-S", "-r", "-h", "4", "-x", "-v",
+        ],
+        mode: "fix",
+        named: &["FSL-182"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslstats.fsl182",
+        tool: "fsl fslstats",
+        args: &["{one}", "-s", "-S"],
+        mode: "fix",
+        named: &["FSL-182"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslstats.fsl182.reproduce",
+        tool: "fsl fslstats",
+        args: &["{one}", "-s", "-S"],
+        mode: "reproduce",
+        named: &["FSL-182"],
+        output_type: "NIFTI",
+    },
 ];
 
 // ------------------------------------------------------------------------------------------------
@@ -1710,6 +2130,84 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         .collect();
     std::fs::write(&p, text).unwrap();
     paths.insert("txt", p);
+    // fslmaths' and fslstats' inputs (2026-11-03): the brain's mask as uint8; labels 1 (left
+    // half) and 3 (right half) inside it, 2 missing (int16); the T2-like head where one voxel in
+    // nine is kept (-dilall); int8 values; a z-like map and its noise-only partner on 16 x 16 x 12
+    // (tenths of integers, in [-4, 4] and [-3, 3]) and their truth (the map's positive half,
+    // -1 in one corner: left out); a 3 x 3 x 3 kernel; a positive definite tensor of six volumes
+    // (xx xy xz yy yz zz) on 8 x 8 x 6
+    let u8_bytes = |v: &[i64]| -> Vec<u8> { v.iter().map(|&x| x as u8).collect() };
+    let mut add = |name: &'static str, dims: &[i64], datatype: i16, bitpix: i16, data: Vec<u8>| {
+        let p = dir.join(format!("{name}.nii"));
+        std::fs::write(&p, bet_nifti(dims, datatype, bitpix, &data)).unwrap();
+        paths.insert(name, p);
+    };
+    let mask8: Vec<i64> = brain.iter().map(|&v| i64::from(v > 0)).collect();
+    add("mask8", &[nx, ny, nz], 2, 8, u8_bytes(&mask8));
+    let mut labels = Vec::with_capacity(brain.len());
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let v = brain[((k * ny + j) * nx + i) as usize];
+                labels.push(if v == 0 {
+                    0
+                } else if i < nx / 2 {
+                    1
+                } else {
+                    3
+                });
+            }
+        }
+    }
+    add("labels", &[nx, ny, nz], 4, 16, i16_bytes(&labels));
+    let sparse: Vec<i64> = t2
+        .iter()
+        .enumerate()
+        .map(|(n, &v)| if n % 9 == 0 { v } else { 0 })
+        .collect();
+    add("sparse", &[nx, ny, nz], 16, 32, f32_bytes(&sparse));
+    let i8v: Vec<i64> = (0..(nx * ny * nz)).map(|n| (n * 37) % 200 - 100).collect();
+    add("i8", &[nx, ny, nz], 256, 8, u8_bytes(&i8v));
+    let tenths = |v: &[i64]| -> Vec<u8> {
+        v.iter()
+            .flat_map(|&x| (x as f32 / 10.0).to_le_bytes())
+            .collect()
+    };
+    let (zx, zy, zz) = (16i64, 16i64, 12i64);
+    let mut zmap = Vec::new();
+    let mut zmap2 = Vec::new();
+    let mut truth = Vec::new();
+    for k in 0..zz {
+        for j in 0..zy {
+            for i in 0..zx {
+                zmap.push((i * 7 + j * 3 + k * 5) % 81 - 40);
+                zmap2.push((i * 5 + j * 11 + k * 3) % 61 - 30);
+                truth.push(if i < 2 && j < 2 {
+                    -1
+                } else {
+                    i64::from(i >= zx / 2)
+                });
+            }
+        }
+    }
+    add("zmap", &[zx, zy, zz], 16, 32, tenths(&zmap));
+    add("zmap2", &[zx, zy, zz], 16, 32, tenths(&zmap2));
+    add("truth", &[zx, zy, zz], 16, 32, f32_bytes(&truth));
+    let kern: Vec<i64> = (1..=27).collect();
+    add("kern", &[3, 3, 3], 16, 32, f32_bytes(&kern));
+    let (tx, ty, tz) = (8i64, 8i64, 6i64);
+    let mut tensor = Vec::new();
+    for c in 0..6i64 {
+        for n in 0..(tx * ty * tz) {
+            tensor.push(match c {
+                0 => 30 + n % 5,
+                3 => 20 + n % 7,
+                5 => 10 + n % 3,
+                _ => (n * (c + 3)) % 7 - 3,
+            });
+        }
+    }
+    add("tensor", &[tx, ty, tz, 6], 16, 32, tenths(&tensor));
     paths
 }
 
@@ -2256,7 +2754,8 @@ fn golden() {
             TOPUP_REFUSALS
                 .iter()
                 .map(|&(id, a, e)| (id, "fsl topup", a, e)),
-        );
+        )
+        .chain(AVW_REFUSALS.iter().copied());
     for (id, tool, case_args, entry) in refusals {
         let run = dir.path().join(id);
         std::fs::create_dir(&run).unwrap();

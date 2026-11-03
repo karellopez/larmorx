@@ -7,8 +7,8 @@ D13 modes; its output bit-identical to ANTs' in ``reproduce`` (N4BiasFieldCorrec
 DenoiseImage's to ANTs with correctly rounded maths preloaded, the build their records compare
 with; ``validation/investigations/difftest/memory_pair.py`` measures any call by hand). FSL's
 BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's, FAST's,
-topup's and applytopup's (``FLIRT_CASES``, ``FAST_CASES``, ``TOPUP_CASES``), and their clean-room
-originals (``ORIGINAL_*_CASES``).
+topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES``,
+``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -88,12 +88,20 @@ CORRECTLY_ROUNDED = {"N4BiasFieldCorrection", "DenoiseImage"}
 
 
 def _peak(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> tuple[int, float]:
+    code, mib, _ = _peak_run(cmd, env, cwd)
+    return code, mib
+
+
+def _peak_run(
+    cmd: list[str], env: dict[str, str], cwd: Path | None = None
+) -> tuple[int, float, str]:
+    """``cmd``'s exit status, peak (MiB) and standard output."""
     p = subprocess.run(
         ["/usr/bin/time", "-v", *cmd], capture_output=True, text=True, env=env, cwd=cwd, check=False
     )
     m = re.search(r"Maximum resident set size \(kbytes\): (\d+)", p.stderr)
     assert m, p.stderr[-400:]
-    return p.returncode, int(m.group(1)) / 1024
+    return p.returncode, int(m.group(1)) / 1024, p.stdout
 
 
 def _emptier(d: Path):
@@ -113,6 +121,14 @@ def _original_peak(
     (the median of the peaks its entry keeps for this machine; its outputs replayed), or run
     under ``/usr/bin/time``, the first time three times (``reset`` empties its output place before
     each repeat, so each run starts alike), a run the cache never stores once."""
+    code, mib, _ = _original_run(cmd, env, family, reset, cwd)
+    return code, mib
+
+
+def _original_run(
+    cmd: list[str], env: dict[str, str], family: str, reset, cwd: Path | None = None
+) -> tuple[int, float, str]:
+    """:func:`_original_peak` with the original's standard output."""
     policy = oracle_cache.Policy(threads=1, family=family)
     peaks = []
     for n in range(3):
@@ -122,11 +138,11 @@ def _original_peak(
             cmd, env=env, cwd=cwd, policy=policy, runner="memory-peak", peak=True
         )
         if done.cached:
-            return done.returncode, done.peak_mib
+            return done.returncode, done.peak_mib, done.stdout
         peaks.append(done.peak_mib)
         if done.returncode != 0 or done.peaks_kept in (0, 3):
             break
-    return done.returncode, statistics.median(peaks)
+    return done.returncode, statistics.median(peaks), done.stdout
 
 
 def entry_peak(env: dict[str, str], cwd: Path | None = None) -> float:
@@ -507,6 +523,87 @@ def test_topup_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
         )
         if mode == "reproduce":
             assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
+
+
+#: FSL's fslmaths and fslstats (FSL 6.0.7.23) against ``python -m larmorx fsl fslmaths`` and
+#: ``fslstats`` (the ``larmorx-nc`` replicas, 2026-11-03): niworkflows' combination of two masks on
+#: ds005040 (``{mask_a}``, ``{mask_b}``: its first combine_masks call), fMRIPrep's goodvoxels
+#: steps on ds005040's 63-volume BOLD series in T1w space (``{bold}``: -Tstd; ``{norm}``,
+#: ``{smooth}``: the smoothing, division and modal dilation; ``{cov_ribbon}``: the ribbon's
+#: nonzero mean; the series' per-volume statistics), and filters on a head of 160 x 192 x 160
+#: voxels (``{head}``). The outputs (and fslstats' printed numbers) bit-identical in
+#: ``reproduce``.
+AVW_CASES = [
+    ("combine-masks", "fslmaths", "{mask_a} -mul {mask_b} out"),
+    ("tstd", "fslmaths", "{bold} -Tstd out"),
+    ("smooth-dild", "fslmaths", "{norm} -s 5 -div {smooth} -dilD out"),
+    ("filters", "fslmaths", "{head} -s 2 -kernel boxv 3 -dilM -thrp 10 -bin out -odt char"),
+    ("ribbon-mean", "fslstats", "{cov_ribbon} -M"),
+    ("series", "fslstats", "-t {bold} -M -S -r"),
+]
+
+
+def _avw_inputs(tmp: Path, fm, fb) -> dict[str, Path] | None:
+    calls = [node for run, node in fm.fmriprep_calls() if run == fm.GOODVOXELS_RUN]
+    chain = fm._goodvoxels_chain(fm.GOODVOXELS_RUN)
+    if not calls or chain is None:
+        return None
+    words = fm.fmriprep_args(fm.GOODVOXELS_RUN, calls[0])
+    head, _ = fb._head(fb.T1_LEVELS, 1, shape=(160, 192, 160))
+    return {
+        "mask_a": Path(words[0]),
+        "mask_b": Path(words[2]),
+        "bold": chain / "stdev_volume" / "bold.nii.gz",
+        "norm": chain / "cov_ribbon_norm_smooth" / "cov_ribbon_norm.nii.gz",
+        "smooth": chain / "cov_ribbon_norm_smooth" / "smooth_norm.nii.gz",
+        "cov_ribbon": chain / "cov_ribbon" / "cov_ribbon.nii.gz",
+        "head": fb._save(head.astype(np.float32), tmp / "head.nii.gz"),
+    }
+
+
+@pytest.mark.parametrize(("name", "program", "args"), AVW_CASES)
+def test_avwutils_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, args):
+    fm = pytest.importorskip("larmorx_validation.parity.fsl_maths_replica")
+    fb = pytest.importorskip("larmorx_validation.parity.fsl_bet")
+    if fm.replica_binary() is None:
+        pytest.skip("the larmorx-nc program is not built (crates-nc)")
+    if not (fm.fsldir() / "bin" / program).is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    paths = _avw_inputs(tmp_path, fm, fb)
+    if paths is None:
+        pytest.skip("the ds005040 fMRIPrep oracle run was not found")
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**fm._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib, fsl_out = _original_run(
+        [str(fm.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(fm.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib, out = _peak_run(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir
+        )
+        assert code == 0
+        print(
+            f"{program} {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{program} {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
+            assert out == fsl_out, f"{program} {name}"
 
 
 #: FAST's clean-room original (``crates/larmorx-fsl``, 2026-11-03) on the same calls, at one

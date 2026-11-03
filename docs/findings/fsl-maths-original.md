@@ -202,3 +202,18 @@ voxels outside every cluster at `h₀`, as for a voxel below `h₀` (the origina
 other offsets inside the volume are untested). A negative `-tfce_delta` with `-tfceS`
 (`d13/tfceS-negative-delta`) ends FSL by SIGFPE (FSL-174: refused in both modes).
 
+## 18. `-tensor_decomp`'s eigenvectors and names, relay 3
+
+`fsl_outputs.py` kept FSL's outputs of `tensor/decomp`, `tensor/double`, `tensor/chain`: with
+the eigenvalues of each voxel's tensor (as single precision) computed in double to the double's
+precision and rounded, `L1`, `L2`, `L3`, `FA`, `MD` and `MO` are FSL's bit for bit (the spec's
+single-precision formulas, left to right). The eigenvectors agree up to their sign only: of the 58
+voxels with a positive largest eigenvalue, 24 of `V1` have the opposite sign to numpy's LAPACK
+solver's, and no component's sign (x, y or z) nor the triad's handedness is fixed in FSL's (each
+near half the voxels): the original makes each vector's largest component positive and the
+record compares them up to their sign (§21). With an output name that holds its extension
+(`out.nii.gz`), the nine images are `out.nii.gz_L1.nii.gz` ... (the name as given, then `_L1`
+and the extension), and the display ranges are `0` to the image's maximum for `L1`-`L3` and `MD`
+(their extremes, the zeros of the voxels without a positive eigenvalue included), `0 1` for `FA`,
+`-1 1` for `MO` and the vectors.
+

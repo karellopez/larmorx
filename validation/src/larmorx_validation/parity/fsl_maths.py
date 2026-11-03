@@ -294,7 +294,9 @@ def compare(
             d = _ulps(x.ravel(), y.ravel())
             differ = int(np.count_nonzero(d))
             worst = int(d.max()) if d.size else 0
-            if differ and any(a in _SUM_OPS for a in args):
+            if differ and "-tensor_decomp" in args:
+                _tensor_check(checks, name, fa, fb, x, y)
+            elif differ and any(a in _SUM_OPS for a in args):
                 _sum_check(checks, name, x.ravel(), y.ravel(), d)
             elif ulps and x.dtype == np.float64:
                 checks(
@@ -359,6 +361,70 @@ def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: 
         value=f"{share:.1%}",
         threshold=f">= {SUM_SHARE:.0%}",
         detail=f"max {int(ulp.max())} ulp",
+    )
+
+
+#: §21's -tensor_decomp metric: eigenvalues, FA, MD within 1e-5 relative, MO 1e-4 absolute,
+#: eigenvectors up to their sign (|cos| >= 0.9999) where the eigenvalues are distinct by more
+#: than 1e-4 relative.
+TENSOR_RELATIVE, TENSOR_MO, TENSOR_COS, TENSOR_DISTINCT = 1e-5, 1e-4, 0.9999, 1e-4
+
+
+def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.ndarray) -> None:
+    """§21's metric for -tensor_decomp's outputs (FSL's eigenvectors' signs are LAPACK's)."""
+    import nibabel as nib
+
+    x64, y64 = x.astype(np.float64), y.astype(np.float64)
+    stem = name
+    for ext in (".nii.gz", ".nii", ".hdr.gz", ".hdr"):
+        stem = stem.removesuffix(ext)
+    kind = stem.rsplit("_", 1)[-1] if "_" in stem else "FA"
+    if kind in ("V1", "V2", "V3"):
+        k = int(kind[1]) - 1
+        lam = [
+            np.asarray(nib.load(str(fa[name.replace(f"_{kind}", f"_L{j}")])).dataobj).astype(
+                np.float64
+            )
+            for j in (1, 2, 3)
+        ]
+        distinct = np.ones(lam[0].shape, bool)
+        for j in (k - 1, k + 1):
+            if 0 <= j < 3:
+                gap = np.abs(lam[k] - lam[j])
+                distinct &= gap > TENSOR_DISTINCT * np.maximum(np.abs(lam[k]), np.abs(lam[j]))
+        cos = np.abs(np.sum(x64 * y64, axis=-1))
+        zero = (np.abs(x64).sum(axis=-1) == 0) & (np.abs(y64).sum(axis=-1) == 0)
+        ok = zero | ~distinct | (cos >= TENSOR_COS)
+        checks(
+            f"{name}: eigenvectors up to their sign",
+            bool(ok.all()),
+            metric="min |cos| where the eigenvalues are distinct",
+            value=f"{float(cos[distinct & ~zero].min()) if (distinct & ~zero).any() else 1.0:.6f}",
+            threshold=f">= {TENSOR_COS}",
+            detail=f"{int((~ok).sum())} voxels outside; {int((~distinct).sum())} not distinct",
+        )
+        return
+    d = np.abs(x64 - y64)
+    if kind == "MO":
+        worst = float(d.max())
+        checks(
+            f"{name}: values (the mode)",
+            worst <= TENSOR_MO,
+            metric="max |diff|",
+            value=f"{worst:.3g}",
+            threshold=f"<= {TENSOR_MO:g}",
+        )
+        return
+    rel = d / np.maximum(np.maximum(np.abs(x64), np.abs(y64)), np.finfo(np.float64).tiny)
+    rel[d == 0] = 0.0
+    worst = float(rel.max())
+    checks(
+        f"{name}: values (relative)",
+        worst <= TENSOR_RELATIVE,
+        metric="max |diff| / |FSL|",
+        value=f"{worst:.3g}",
+        threshold=f"<= {TENSOR_RELATIVE:g}",
+        detail=f"{int(np.count_nonzero(d))} of {d.size} voxels differ",
     )
 
 
@@ -669,7 +735,10 @@ def suite() -> Suite:
                 "-dilall, -edge, -subsamp2, -subsamp2offc, -inm, -ing, means, standard "
                 "deviations, ar1, -ranknorm, -bptf, -ztop, -ptoz) in floating types: the largest "
                 "difference at most 1e-5 of FSL's largest magnitude and 99 % of the voxels within "
-                "4 units in the last place, the NaN and infinite voxels identical (§21)",
+                "4 units in the last place, the NaN and infinite voxels identical (§21); "
+                "-tensor_decomp's eigenvalues, FA and MD within 1e-5 relative, its mode 1e-4 "
+                "absolute, its eigenvectors up to their sign (|cos| >= 0.9999) where the "
+                "eigenvalues are distinct by more than 1e-4 relative",
             ),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
         ],

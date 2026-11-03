@@ -14,7 +14,8 @@
 //! - [`reduce`]: the reductions along a dimension (§11);
 //! - [`stats`]: the statistical transforms and `-randn` (§12, §8.2);
 //! - [`regions`]: `-roi` and `-bptf` (§13);
-//! - [`tfce`]: threshold-free cluster enhancement (§14).
+//! - [`tfce`]: threshold-free cluster enhancement (§14);
+//! - [`tensor`]: `-tensor_decomp` (§16).
 //!
 //! The command line (`larmorx fsl fslmaths`) is [`crate::cli::fslmaths`].
 
@@ -27,4 +28,5 @@ pub mod reduce;
 pub mod regions;
 pub mod spatial;
 pub mod stats;
+pub mod tensor;
 pub mod tfce;

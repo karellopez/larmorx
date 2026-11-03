@@ -28,7 +28,7 @@ use crate::maths::num::{Kind, Num};
 use crate::maths::ops::{self, Binary, Layout, Stop, Unary, WichmannHill};
 use crate::maths::reduce::{self, Stat};
 use crate::maths::stats::{self, PvalKind};
-use crate::maths::{regions, spatial, tfce};
+use crate::maths::{regions, spatial, tensor, tfce};
 
 /// The usage text (§2.5), exactly as FSL prints it on standard output.
 pub const USAGE: &str = include_str!("fslmaths_usage.txt");
@@ -40,7 +40,7 @@ pub const NOT_YET: &str = "is not implemented yet in the clean-room original";
 const DATATYPES: [&str; 6] = ["char", "short", "int", "float", "double", "input"];
 
 /// The operations of the usage text the next parts of the original add.
-const LATER: &[&str] = &["-tensor_decomp", "-roc"];
+const LATER: &[&str] = &["-roc"];
 
 /// How a run ends early: its exit status (the messages are printed).
 struct Exit(u8);
@@ -780,6 +780,10 @@ fn step<T: Num>(
             r.map_err(|s| refuse_stop(err, s))?;
             Ok(k)
         }
+        "-tensor_decomp" => {
+            tensor_step(ctx, st, notices, out, err)?;
+            Ok(0)
+        }
         _ if Morph::of(op).is_some() => {
             let f = Morph::of(op).unwrap_or(Morph::DilF);
             filters::morph(&mut st.img, &st.kernel, f, op, notices, err)
@@ -799,6 +803,57 @@ fn step<T: Num>(
             Err(Exit(1))
         }
     }
+}
+
+/// `-tensor_decomp` (§16): the nine images written at once under the output's name with
+/// `_L1` ... `_V3` appended (single precision), then the chain goes on with the FA image.
+fn tensor_step<T: Num>(
+    ctx: &Ctx<'_>,
+    st: &mut State<T>,
+    notices: &mut Notices,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), Exit> {
+    if st.img.dims[3] != 6 {
+        let _ = writeln!(out, "{}", tensor::NOT_A_TENSOR);
+        return Err(Exit(1));
+    }
+    let d = tensor::decompose(&st.img, notices).map_err(|s| refuse_stop(err, s))?;
+    let [nx, ny, nz, _] = st.img.dims;
+    let base = ctx.words[ctx.words.len() - 1].clone();
+    let extremes = |v: &[f32]| {
+        ops::extremes(v, false).map_or((0.0, 0.0), |(a, b)| (f64::from(a), f64::from(b)))
+    };
+    let parts: [(&str, &Vec<f32>, usize, Option<(f64, f64)>); 9] = [
+        ("L1", &d.l1, 1, None),
+        ("L2", &d.l2, 1, None),
+        ("L3", &d.l3, 1, None),
+        ("FA", &d.fa, 1, Some((0.0, 1.0))),
+        ("MD", &d.md, 1, None),
+        ("MO", &d.mo, 1, Some((-1.0, 1.0))),
+        ("V1", &d.v1, 3, Some((-1.0, 1.0))),
+        ("V2", &d.v2, 3, Some((-1.0, 1.0))),
+        ("V3", &d.v3, 3, Some((-1.0, 1.0))),
+    ];
+    for (suffix, data, nt, cal) in parts {
+        let img = Img {
+            dims: [nx, ny, nz, nt],
+            data: data.clone(),
+            header: st.img.header.clone(),
+            flipped: st.img.flipped,
+            cal: cal.unwrap_or_else(|| extremes(data)),
+        };
+        let spec = WriteSpec {
+            out: OutType::Float,
+            round: true,
+            fix: notices.fix(),
+        };
+        let (values, _) = image::output_values(&img, spec);
+        write_image(ctx, &img, &format!("{base}_{suffix}"), values, notices, err)?;
+    }
+    st.img.data = d.fa.iter().map(|&v| T::from_f64_c(f64::from(v))).collect();
+    st.img.dims = [nx, ny, nz, 1];
+    Ok(())
 }
 
 /// A reduction (§11): the word's second character an upper-case letter (`T`, `X`, `Y`, `Z`:

@@ -1,0 +1,413 @@
+{
+ "defect": "FSL-146",
+ "description": "FSL-146: volumes encoded along y and x (FSL's gradient leaves the volumes not encoded along an axis out of its Jacobian term; reproduce agrees with FSL; the drawn case)",
+ "expect": "pass",
+ "found": {
+  "detail": "--fout (Hz): correlation inside the brain: ; --fout (Hz): correlation inside the brain: ",
+  "n": 10280,
+  "seed": "topup-trial",
+  "shrink_moves": [],
+  "signature": [
+   "--fout (Hz): correlation inside the brain"
+  ]
+ },
+ "id": "fsl146-mixed-axes",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR",
+   "program": "topup",
+   "volumes": 4
+  },
+  "features": {
+   "--acqp": false,
+   "--debug": false,
+   "--dfout": false,
+   "--estmov one value": false,
+   "--featout": false,
+   "--fout": true,
+   "--interp": false,
+   "--iout": false,
+   "--jacout": false,
+   "--logout": false,
+   "--nthr": false,
+   "--numprec": false,
+   "--out": true,
+   "--rbmout": false,
+   "--regmod": true,
+   "--regmod value": "membrane_energy",
+   "--regrid": false,
+   "--scale": false,
+   "--splineorder": false,
+   "--ssqlambda": false,
+   "--trace": false,
+   "-v": false,
+   "FSL's configuration": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "acquisition transposed": false,
+   "basename": "o",
+   "bias0": 0.004,
+   "bias1": 0.0,
+   "bias2": 0.002,
+   "config file": false,
+   "dtype": "uint16",
+   "estmov0": false,
+   "extreme": false,
+   "field Hz": 50.0,
+   "field centre0": 0.3,
+   "field centre1": 0.4,
+   "field centre2": -0.1,
+   "field gradient0": 4.0,
+   "field gradient1": -8.0,
+   "field gradient2": 0.0,
+   "field width": 0.8,
+   "fwhm0": 8,
+   "fwhm1": 2,
+   "fwhm2": 3,
+   "head axis0": 1.0,
+   "head axis1": 1.0,
+   "head axis2": 1.15,
+   "head centre0": 0.0,
+   "head centre1": 0.0,
+   "head centre2": -0.06,
+   "head fraction": 0.4,
+   "in-plane gradient only": false,
+   "in-plane voxel": 2.5,
+   "inter": 10.0,
+   "kind": "topup",
+   "lambda0": "5e-05",
+   "lambda1": "5e-06",
+   "lambda2": "5e-06",
+   "largest subsampling": 2,
+   "levels": 3,
+   "miter0": 2,
+   "miter1": 3,
+   "miter2": 2,
+   "movements": true,
+   "noise": 4.0,
+   "nx": 24,
+   "ny": 24,
+   "nz": 16,
+   "orientation": "oblique",
+   "origin0": -10.5,
+   "origin1": -7.75,
+   "origin2": -29.75,
+   "phase encodings": "four",
+   "qfac": 1,
+   "qform_code": 1,
+   "read-out time": 0.045,
+   "read-out times differ": false,
+   "reversed first": true,
+   "rot10": 0,
+   "rot11": 1,
+   "rot12": 1,
+   "rot1n": 90,
+   "rot20": 1,
+   "rot21": 1,
+   "rot22": 1,
+   "rot2n": 85,
+   "rot30": -1,
+   "rot31": -1,
+   "rot32": -1,
+   "rot3n": 113,
+   "scaled": true,
+   "scg throughout": false,
+   "scg1": true,
+   "scg2": false,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "24x24x16",
+   "shift10": 0.0,
+   "shift11": -1.0,
+   "shift12": 1.5,
+   "shift20": -1.5,
+   "shift21": -1.0,
+   "shift22": -1.0,
+   "shift30": -1.5,
+   "shift31": -0.75,
+   "shift32": 0.0,
+   "slice thickness": 2.5,
+   "slope": 0.5,
+   "spacing0": 2.5,
+   "spacing1": 0.8,
+   "spacing2": 0.5,
+   "subsamp drops0": true,
+   "suffix": ".nii.gz",
+   "units": "unknown",
+   "warpres pool": 5
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--datain={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=o"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--warpres=20,14,12"
+    ],
+    "name": "--warpres",
+    "optional": true
+   },
+   {
+    "args": [
+     "--subsamp=2,1,1"
+    ],
+    "name": "--subsamp",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fwhm=8,3,2"
+    ],
+    "name": "--fwhm",
+    "optional": true
+   },
+   {
+    "args": [
+     "--miter=2,3,2"
+    ],
+    "name": "--miter",
+    "optional": true
+   },
+   {
+    "args": [
+     "--lambda=5e-05,5e-06,5e-06"
+    ],
+    "name": "--lambda",
+    "optional": true
+   },
+   {
+    "args": [
+     "--estmov=0,0,0"
+    ],
+    "name": "--estmov",
+    "optional": true
+   },
+   {
+    "args": [
+     "--minmet=0,1,0"
+    ],
+    "name": "--minmet",
+    "optional": true
+   },
+   {
+    "args": [
+     "--regmod=membrane_energy"
+    ],
+    "name": "--regmod",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fout=field"
+    ],
+    "name": "--fout",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 -1 0 0.04500000\n0 1 0 0.04500000\n-1 0 0 0.04500000\n1 0 0 0.04500000\n"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.15
+     ],
+     "bias": [
+      0.004,
+      0.0,
+      0.002,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      -2.5
+     ],
+     "noise": 4.0,
+     "seed": 1101128277,
+     "size": 16.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      0.3,
+      0.4,
+      -0.1
+     ],
+     "gradient": [
+      4.0,
+      -8.0,
+      0.0
+     ],
+     "hz": 50.0,
+     "volumes": [
+      [
+       1,
+       -0.045
+      ],
+      [
+       1,
+       0.045
+      ],
+      [
+       0,
+       -0.045
+      ],
+      [
+       0,
+       0.045
+      ]
+     ],
+     "width": 0.8
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -27.75,
+      -23.25,
+      -26.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      29,
+      1,
+      -3,
+      -2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "unknown"
+    },
+    "motion": [
+     {
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "quaternion": [
+       90,
+       0,
+       1,
+       1
+      ],
+      "translation": [
+       0.0,
+       -1.0,
+       1.5
+      ]
+     },
+     {
+      "quaternion": [
+       85,
+       1,
+       1,
+       1
+      ],
+      "translation": [
+       -1.5,
+       -1.0,
+       -1.0
+      ]
+     },
+     {
+      "quaternion": [
+       113,
+       -1,
+       -1,
+       -1
+      ],
+      "translation": [
+       -1.5,
+       -0.75,
+       0.0
+      ]
+     }
+    ],
+    "scaling": {
+     "inter": 10.0,
+     "slope": 0.5
+    },
+    "shape": [
+     24,
+     24,
+     16,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 6.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 10280,
+  "options": [
+   "--datain",
+   "--estmov",
+   "--fout",
+   "--fwhm",
+   "--lambda",
+   "--minmet",
+   "--miter",
+   "--regmod",
+   "--subsamp",
+   "--warpres",
+   "3 levels",
+   "FSLOUTPUTTYPE=NIFTI_PAIR"
+  ],
+  "seed": "topup-trial",
+  "tool": "fsl-topup-original"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

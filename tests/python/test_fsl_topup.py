@@ -3,9 +3,9 @@
 (written by the test, as in ``test_fsl_fast.py``) they pass topup's and applytopup's options, the
 acquisition parameters, FSL's settings and D13's choice, and read the outputs back; a
 :class:`TopupResult` given to ``applytopup`` is written back as topup's files; without the
-program they refuse clearly (no clean-room original yet). The replicas themselves are checked
-by their golden tests (``crates-nc/larmorx-nc-cli/tests/golden.rs``) and by the parity suite
-against FSL."""
+program both run their clean-room originals in this process. The
+replicas themselves are checked by their golden tests (``crates-nc/larmorx-nc-cli/tests/
+golden.rs``) and by the parity suite against FSL, topup's original by its suite ``fsl-topup``."""
 
 from __future__ import annotations
 
@@ -111,14 +111,75 @@ def pair(tmp_path: Path) -> Path:
 ACQ = [[0, 1, 0, 0.05], [0, -1, 0, 0.05]]
 
 
+def smooth_pair(tmp_path: Path) -> Path:
+    """Two volumes of one blob, shifted by a voxel along y against each other (positive values:
+    topup's validity mask needs no zeros), 12 x 10 x 6 voxels of 2 mm."""
+    x, y, z = np.meshgrid(np.arange(12), np.arange(10), np.arange(6), indexing="ij")
+    vols = [
+        100.0 + 50.0 * np.exp(-((x - 5.5) ** 2 + (y - c) ** 2 + (z - 2.5) ** 2) / 8.0)
+        for c in (4.0, 5.0)
+    ]
+    path = tmp_path / "with space" / "blob.nii"
+    path.parent.mkdir(exist_ok=True)
+    lx.save((np.stack(vols, axis=3).astype(np.float32), np.diag([2.0, 2.0, 2.0, 1.0])), path)
+    return path
+
+
 def test_without_the_replica(scripts, tmp_path):
-    path = pair(tmp_path)
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl topup"):
-        lx.fsl.topup(path, ACQ)
-    with pytest.raises(NotImplementedError, match="larmorx-nc"):
-        lx.fsl.topup(path, ACQ, implementation="original")
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl applytopup"):
-        lx.fsl.applytopup(path, ACQ, [1], "base")
+    """Without ``larmorx-nc``, ``auto`` runs topup's and applytopup's clean-room originals (in
+    this process) and ``replica`` refuses."""
+    path = smooth_pair(tmp_path)
+    kw: dict = dict(
+        warpres=8.0,
+        subsamp=1,
+        fwhm=0.0,
+        miter=2,
+        lambda_=0.005,
+        estmov=False,
+        minmet="LM",
+        corrected=True,
+        jacobians=True,
+        displacement_fields=True,
+        rigid_body_matrices=True,
+        verbose=True,
+    )
+    r = lx.fsl.topup(path, ACQ, **kw)
+    assert r.coefficients.implementation == _replica.ORIGINAL
+    assert r.field is not None and np.asarray(r.field.data).shape == (12, 10, 6)
+    assert r.corrected is not None and np.asarray(r.corrected.data).shape == (12, 10, 6, 2)
+    assert r.jacobians is not None and len(r.jacobians) == 2
+    assert r.displacement_fields is not None and len(r.displacement_fields) == 2
+    assert r.rigid_body_matrices is not None and np.allclose(r.rigid_body_matrices[0], np.eye(4))
+    assert np.array_equal(r.movement_parameters, np.zeros((2, 6)))
+    assert "--warpres=8" in r.log and r.stdout.startswith("SSD = ")
+    costs = [float(ln.rsplit("=", 1)[1]) for ln in r.stdout.splitlines() if "Cost" in ln]
+    assert len(costs) >= 2 and costs[-1] < costs[0]
+    o = lx.fsl.topup(path, ACQ, implementation="original", n_threads=3, **kw)
+    assert np.array_equal(np.asarray(o.field.data), np.asarray(r.field.data))
+    assert o.stdout == r.stdout
+    with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
+        lx.fsl.topup(path, ACQ, implementation="replica")
+    # a failure of the original: topup's message in the error
+    with pytest.raises(RuntimeError, match=r"clean-room original.*exit code 1"):
+        lx.fsl.topup(path, [[0, 1, 0, 0.05]], **kw)
+    # applytopup with the result: least-squares restoration of the pair, Jacobian modulation
+    pair_imgs = [path, path]
+    a = lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r)
+    assert a.corrected.implementation == _replica.ORIGINAL
+    assert np.asarray(a.corrected.data).shape == (12, 10, 6, 2)
+    j = lx.fsl.applytopup(path, ACQ, [1], r, method="jac", implementation="original")
+    assert np.asarray(j.corrected.data).shape == (12, 10, 6, 2)
+    assert np.isfinite(np.asarray(j.corrected.data)).all()
+    with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
+        lx.fsl.applytopup(path, ACQ, [1], r, implementation="replica")
+    # the undocumented variational-Bayes restoration: its iterations on standard output
+    v = lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r, method="vb2D")
+    assert v.stdout.startswith("NCollections = 1\nNScans = 2\nslice = 0\nrelative lambda = 1,")
+    assert np.asarray(v.corrected.data).shape == (12, 10, 6, 2)
+    assert np.isfinite(np.asarray(v.corrected.data)).all()
+    # FSL-144: jac with a phase encoding along z (which topup refuses) is refused by default
+    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean-room original\).*FSL-144"):
+        lx.fsl.applytopup(path, [[0, 0, 1, 0.05]], [1], r, method="jac")
 
 
 def test_fmripreps_call(scripts, monkeypatch, tmp_path):

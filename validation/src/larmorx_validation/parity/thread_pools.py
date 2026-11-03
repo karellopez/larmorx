@@ -144,13 +144,16 @@ def inputs(d: Path) -> dict[str, str]:
     # field in Hz (a gentle gradient along y)
     pair = np.stack([np.roll(img, 1, axis=1), np.roll(img, -1, axis=1)], -1)
     save("pair.nii.gz", pair.astype(np.float32), zooms=(2.0, 2.0, 2.0, 1.0))
+    # its two volumes, for applytopup's restorations
+    save("blipup.nii.gz", pair[..., 0].astype(np.float32))
+    save("blipdn.nii.gz", pair[..., 1].astype(np.float32))
     save("hz.nii.gz", (5.0 + 0.2 * j).astype(np.float32))
     return out
 
 
 #: The inputs :func:`inputs` writes.
 INPUTS = ("fixed", "moving", "mask", "labels", "prior01", "prior02", "prior03", "series", "t1",
-          "warp", "pair", "hz")  # fmt: skip
+          "warp", "pair", "hz", "blipup", "blipdn")  # fmt: skip
 
 
 def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Program]:
@@ -403,6 +406,41 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
         ("fast priors", ["fast", "-a", str(mat), "-A", *pri, "-P", "-o", o + "_ofastpri", t1]),
     ):  # fmt: skip
         out.append(Program(f"fsl {name} (clean-room original)", (*fl, *a), bet))
+    # topup's clean-room original (2026-11-03): two levels (Levenberg-Marquardt with the
+    # movements, then the scaled conjugate gradients: the transforms' lines and planes, the
+    # pool's fills, the Hessian's and the solver's lines) with every output; the membrane
+    # energy in single precision with quadratic splines, trilinear interpolation, scaling and no
+    # regridding; applytopup's least squares, Jacobian modulation (a field image) and the three
+    # variational-Bayes restorations (the lines' factors in batches)
+    acq_o = _flirt_text(d, make, "acq", "0 1 0 0.05\n0 -1 0 0.05\n")
+    tu_o = ["--imain=" + x["pair"], f"--datain={acq_o}"]
+    quick = ["--warpres=20", "--subsamp=2", "--fwhm=8", "--miter=2", "--lambda=0.005"]
+    if make:
+        # applytopup's source: the original's own quick estimation, before any probe
+        subprocess.run([*lx, "fsl", "topup", *tu_o, f"--out={o}_otusrc", *quick],
+                       env=dict(bet), cwd=d, check=True, capture_output=True)  # fmt: skip
+    for name, a in (
+        ("topup", [*tu_o, f"--out={o}_otu", "--warpres=20,16", "--subsamp=2,1", "--fwhm=8,4",
+                   "--miter=2,1", "--lambda=0.005,0.0005", "--estmov=1,0", "--minmet=0,1",
+                   f"--iout={o}_otui", f"--fout={o}_otuf", f"--jacout={o}_otuj",
+                   f"--dfout={o}_otud", f"--rbmout={o}_otur", f"--logout={o}_otu.log"]),
+        ("topup membrane", [*tu_o, f"--out={o}_otum", *quick, "--regmod=membrane_energy",
+                            "--numprec=float", "--interp=linear", "--splineorder=2",
+                            "--scale=1", "--regrid=0"]),
+        ("applytopup lsr", [f"--imain={x['blipup']},{x['blipdn']}", "--inindex=1,2",
+                            f"--datain={acq_o}", f"--topup={o}_otusrc", f"--out={o}_olsr"]),
+        ("applytopup jac", [f"--imain={t1}", "--inindex=1", f"--datain={acq_o}",
+                            f"--topup={x['hz'][: -len('.nii.gz')]}", "--method=jac",
+                            f"--out={o}_ojac"]),
+        *(
+            (f"applytopup {m}", [f"--imain={x['blipup']},{x['blipdn']}", "--inindex=1,2",
+                                 f"--datain={acq_o}", f"--topup={o}_otusrc", f"--method={m}",
+                                 f"--out={o}_o{m}"])
+            for m in ("vb2D", "vb3D", "vb4D")
+        ),
+    ):  # fmt: skip
+        prog = name.split()[0]
+        out.append(Program(f"fsl {name} (clean-room original)", (*fl, prog, *a), bet))
     if nc:
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],

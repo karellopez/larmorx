@@ -1,0 +1,59 @@
+{
+ "tool": "fsl topup and applytopup (clean-room original)",
+ "commit": "11f3cb0",
+ "machine": "x86_64",
+ "load_average_before": 5.1,
+ "threads": [
+  1,
+  14
+ ],
+ "fsl_threads": 14,
+ "fsl_runs_timed": 5,
+ "environment": "FSL's clean environment (FSL off the PATH, FSLOUTPUTTYPE=NIFTI_GZ, OPENBLAS_CORETYPE=Haswell); OMP_NUM_THREADS for the original, --nthr for FSL",
+ "rows": [
+  {
+   "call": "fmriprep/ds005040-sub-002-noreconall",
+   "program": "topup",
+   "fsl_seconds": {
+    "1": 32.63,
+    "14": 12.32
+   },
+   "replica_seconds": 29.69,
+   "replica_bit_identical": true,
+   "original_seconds": {
+    "1": 2.83,
+    "14": 0.8
+   },
+   "original_same_bits_at_every_thread_count": true
+  },
+  {
+   "call": "fmriprep/ds001600-sub-1-noreconall",
+   "program": "topup",
+   "fsl_seconds": {
+    "1": 77.35,
+    "14": 27.38
+   },
+   "replica_seconds": 71.35,
+   "replica_bit_identical": true,
+   "original_seconds": {
+    "1": 7.7,
+    "14": 1.98
+   },
+   "original_same_bits_at_every_thread_count": true
+  },
+  {
+   "call": "applytopup/lsr ds005040",
+   "program": "applytopup",
+   "fsl_seconds": {
+    "1": 0.42
+   },
+   "replica_seconds": 3.47,
+   "replica_bit_identical": true,
+   "original_seconds": {
+    "1": 0.13,
+    "14": 0.04
+   },
+   "original_same_bits_at_every_thread_count": true
+  }
+ ]
+}

@@ -14,6 +14,10 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [ants-n4](ants-n4.md) | N4BiasFieldCorrection (ANTs 2.6.5 binary) on fMRIPrep's, sMRIPrep's and sdcflows' command lines |
 | [ants-denoise](ants-denoise.md) | DenoiseImage (ANTs 2.6.5 binary) on sMRIPrep's command line and the same options on other images |
 | [mri-hmc](mri-hmc.md) | mcflirt (FSL 6.0.7.17 binary) |
+| [fsl-bet](fsl-bet.md) | bet, bet2 and betsurf (FSL 6.0.7.23) and BET's replica, against BET's clean-room original at 1 and 24 threads (`validation/investigations/cleanroom-bet/bench.py`) |
+| [fsl-flirt](fsl-flirt.md) | flirt (FSL 6.0.7.23) and FLIRT's replica, against FLIRT's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-flirt/bench.py`) |
+| [fsl-fast](fsl-fast.md) | fast (FSL 6.0.7.23) and FAST's replica, against FAST's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-fast/bench.py`) |
+| [fsl-topup](fsl-topup.md) | topup and applytopup (FSL 6.0.7.23, at one thread and `--nthr=14`) and their replicas, against topup's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-topup/bench.py`) |
 | [ants-ai](ants-ai.md) | antsAI and antsAffineInitializer (ANTs 2.6.5 binaries with CORE-MATH): time, CPU time and peak memory, larmorx in both D13 modes at 1 and 8 threads |
 
 Reproduce a report (build larmorx in release mode first):

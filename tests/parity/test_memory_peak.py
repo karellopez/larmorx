@@ -557,6 +557,60 @@ def test_fast_original_needs_no_more_memory_than_fsl(tmp_path, name, args):
         assert sorted(p.name for p in f_dir.iterdir()) == sorted(p.name for p in r_dir.iterdir())
 
 
+#: topup's and applytopup's clean-room original (``crates/larmorx-fsl``, 2026-11-03) on the same
+#: calls, at one thread: its outputs are FSL's within the thresholds of its record
+#: (``docs/validation/fsl-topup.md``), its memory similar to FSL's.
+ORIGINAL_TOPUP_CASES = list(TOPUP_CASES)
+
+
+@pytest.mark.parametrize(("name", "program", "args"), ORIGINAL_TOPUP_CASES)
+def test_topup_original_needs_no_more_memory_than_fsl(tmp_path, name, program, args):
+    ft = pytest.importorskip("larmorx_validation.parity.fsl_topup_replica")
+    if not (ft.fsldir() / "bin" / program).is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    if ft._source_node() is None:
+        pytest.skip("the ds005040 fMRIPrep oracle run was not found")
+    derived = ft.inputs()
+    ft.applytopup_inputs()
+    paths = {
+        "cnf": ft.workspace() / ft.SDCFLOWS_CONFIG,
+        "acq": derived / "acq.txt",
+        "pair": derived / "pair.nii.gz",
+        "half_up": derived / "half_up.nii.gz",
+        "half_dn": derived / "half_dn.nii.gz",
+        "tu": ft.topup_outputs("y") / "tu",
+    }
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**ft._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak(
+        [str(ft.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_IMPLEMENTATION": "original",
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
+            f"entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{program} {name} original ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        assert sorted(p.name for p in f_dir.iterdir()) == sorted(p.name for p in r_dir.iterdir())
+
+
 #: FLIRT's clean-room original (``crates/larmorx-fsl``, 2026-11-02) on the same calls (FLIRT's
 #: other programs since part 2): its matrices and images are FSL's within the thresholds of its
 #: record (``docs/validation/fsl-flirt.md``), its memory similar to FSL's.

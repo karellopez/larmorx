@@ -1,0 +1,241 @@
+{
+ "defect": null,
+ "description": "outputs named by a configuration file (FSL's test_acqp names --fout and --iout): the suite compares them under their configured names",
+ "expect": "pass",
+ "found": {
+  "detail": "field_test.nii.gz: values identical: ; iout_test.nii.gz: values identical: ; iout_test_mean.nii.gz: values identical: ",
+  "n": 12,
+  "seed": "topup-trial",
+  "shrink_moves": [
+   "dropped -v (-v)",
+   "dropped --logout (--logout=topup.log)",
+   "dropped --iout (--iout=corrected)",
+   "pair: axis 0 24 -> 12 voxels",
+   "pair: axis 1 16 -> 8 voxels",
+   "pair: axis 2 16 -> 8 voxels",
+   "pair: axis 0 12 -> 6 voxels",
+   "pair (and its grid): plumb orientation",
+   "pair (and its grid): unit spacing",
+   "pair (and its grid): origin at 0",
+   "pair (and its grid): qform and sform codes 1",
+   "pair (and its grid): millimetres",
+   "pair: content head -> constant"
+  ],
+  "signature": [
+   "field_test.nii.gz: values identical"
+  ]
+ },
+ "id": "configuration-outputs",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 4
+  },
+  "features": {
+   "--acqp": false,
+   "--debug": false,
+   "--dfout": false,
+   "--featout": false,
+   "--fout": false,
+   "--iout": true,
+   "--jacout": false,
+   "--logout": true,
+   "--out": true,
+   "--rbmout": false,
+   "--trace": false,
+   "-v": true,
+   "FSL configuration": "test_acqp",
+   "FSL's configuration": true,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": false,
+   "basename": "my_topup",
+   "bias0": -0.004,
+   "bias1": 0.004,
+   "bias2": 0.002,
+   "dtype": "float32",
+   "extreme": false,
+   "field Hz": 120.0,
+   "field centre0": 0.1,
+   "field centre1": 0.2,
+   "field centre2": -0.4,
+   "field gradient0": 6.0,
+   "field gradient1": 6.0,
+   "field gradient2": 8.0,
+   "field width": 0.45,
+   "head axis0": 0.9,
+   "head axis1": 1.1,
+   "head axis2": 0.95,
+   "head centre0": -0.06,
+   "head centre1": 0.0,
+   "head centre2": 0.02,
+   "head fraction": 0.44,
+   "in-plane gradient only": true,
+   "in-plane voxel": 2.0,
+   "kind": "topup",
+   "movements": false,
+   "noise": 1.0,
+   "nx": 24,
+   "ny": 16,
+   "nz": 16,
+   "orientation": "axes",
+   "origin0": -39.25,
+   "origin1": 13.0,
+   "origin2": -20.25,
+   "phase encodings": "four",
+   "qfac": -1,
+   "qform_code": 2,
+   "read-out time": 0.015,
+   "read-out times differ": false,
+   "reversed first": false,
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "24x16x16",
+   "slice thickness": 2.0,
+   "spacing0": 1.0,
+   "spacing1": 0.5,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "units": "unknown",
+   "verbose spelling": "-v"
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--datain={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=my_topup"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--config=test_acqp",
+     "--miter=1"
+    ],
+    "name": "config",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 1 0 0.01500000\n0 -1 0 0.01500000\n1 0 0 0.01500000\n-1 0 0 0.01500000\n"
+   },
+   "pair": {
+    "content": {
+     "seed": 1337371686,
+     "type": "constant"
+    },
+    "distortion": {
+     "centre": [
+      0.1,
+      0.2,
+      -0.4
+     ],
+     "gradient": [
+      6.0,
+      6.0,
+      0.0
+     ],
+     "hz": 78.0,
+     "volumes": [
+      [
+       1,
+       0.015
+      ],
+      [
+       1,
+       -0.015
+      ],
+      [
+       0,
+       0.015
+      ],
+      [
+       0,
+       -0.015
+      ]
+     ],
+     "width": 0.45
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     6,
+     8,
+     8,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 6.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 12,
+  "options": [
+   "--config=test_acqp",
+   "--datain",
+   "--iout",
+   "--logout",
+   "--miter",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "topup-trial",
+  "tool": "fsl-topup-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

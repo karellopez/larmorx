@@ -185,8 +185,8 @@ title = "topup and applytopup (the susceptibility field from reversed phase enco
 eco = "fsl"
 page = "/tools/fsl-topup/"
 use = ["larmorx fsl topup", "larmorx fsl applytopup", "lx.fsl.topup", "lx.fsl.applytopup"]
-how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included); the clean-room original is to be written from `specs/topup.md`"
-validation = "replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"
+how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods)"
+validation = "original: [{fsl-topup.pass} of {fsl-topup.compared}](record:fsl-topup) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-topup.fmriprep} oracle runs: ds001600 within FSL's own thread band in every metric, ds005040 in every one but the field's correlation, 0.999958 against FSL's own 0.999966), {fsl-topup.both} more rejected by both alike, {fsl-topup.expected} expected divergences, each with its reason (estimated movements that do not converge, where FSL's rotation derivatives are not its cost's; FSL-133's lines; FSL-143's diverging iterations, reproduced; inputs refused for FSL-124 and FSL-134); replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -424,8 +424,14 @@ id = "fsl-fast-replica"
 larmorx = "`larmorx-nc fsl fast`; `lx.fsl.fast`, `larmorx fsl fast` (the replica, FSL Licence)"
 reference = "fast (FSL 6.0.7.23, fsl-fast4 2111.3); fMRIPrep's calls also against fMRIPrep's own outputs"
 status = "`experimental` ({fsl-fast-replica.pass} of {fsl-fast-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-fast-replica.fmriprep} calls included; {fsl-fast-replica.both} rejected by both, with the same messages and status; {fsl-fast-replica.expected} expected divergence: channels of different sizes, refused in both modes, FSL-104)"
+
+[[record]]
+id = "fsl-topup"
+larmorx = "`lx.fsl.topup(implementation=\"original\")`, `lx.fsl.applytopup(implementation=\"original\")`, `larmorx fsl topup` and `larmorx fsl applytopup` (clean-room, `crates/larmorx-fsl`)"
+reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5), with FSL's own thread band (FSL at --nthr=4, from the oracle cache) where a metric is beyond its threshold; the replica suite's cases and the original's own permanent cases"
+status = "`experimental` ({fsl-topup.pass} of {fsl-topup.compared} compared cases within thresholds, fMRIPrep's {fsl-topup.fmriprep} calls included; {fsl-topup.both} rejected by both, with the same messages and status; {fsl-topup.expected} expected divergences, each with its reason in the record: estimated movements that do not converge (FSL's rotation derivatives, a question for the specification), FSL-133, FSL-143, vb2D's transients, FSL-126, and inputs refused for FSL-124 and FSL-134)"
 [[record]]
 id = "fsl-topup-replica"
-larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup|applytopup` (the replicas, FSL Licence)"
+larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup` and `larmorx fsl applytopup` (the replicas, FSL Licence)"
 reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5); fMRIPrep's calls also against fMRIPrep's own outputs"
 status = "`experimental` ({fsl-topup-replica.pass} of {fsl-topup-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-topup-replica.fmriprep} calls included; {fsl-topup-replica.both} rejected by both, with the same messages and status; {fsl-topup-replica.expected} expected divergences: refused in both modes, FSL-124 and FSL-134)"

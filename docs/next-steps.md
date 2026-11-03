@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica done 2026-11-03; item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -484,7 +484,7 @@ The items below keep their history.
    both minimisers in double and single precision, both regularisers, the movements, regridding,
    FSL's configurations, `--debug`, `--trace`, `--profile`; applytopup's `jac`, `lsr` and the
    undocumented `vb2D`, `vb3D`, `vb4D`); `lx.fsl.topup`, `lx.fsl.applytopup` and `larmorx fsl
-   topup|applytopup` (replica only until the clean-room original). `larmorx-nc-core` gained FSL's
+   topup|applytopup` (the replica when `larmorx-nc` is installed, the clean-room original otherwise: below). `larmorx-nc-core` gained FSL's
    libraries for the FNIRT family too: the B-spline fields (fsl-basisfield) with their bending- and
    membrane-energy regularisers, the sparse matrices, conjugate gradients and the non-linear
    optimisers (fsl-miscmaths), the spline interpolator with derivatives and the warps
@@ -504,6 +504,40 @@ The items below keep their history.
    (behaviour, maths, messages, the D13 table, "Built for speed", the validation plan). The full
    tier, the data panel's other PEPOLAR runs and long random testing wait for the final validation
    phase.
+   **topup: the clean-room original done (2026-11-03, relays 1 to 6).** `crates/larmorx-fsl`, module
+   `topup`: `topup` and `applytopup` written from `specs/topup.md`, the papers, FSL's user guides
+   and black-box runs, every option, message, exit status and failure case of both programs
+   (applytopup's `vb2D`, `vb3D`, `vb4D` included); FSL-116 to FSL-135 and FSL-141 to FSL-143 as
+   the replica corrects them, `reproduce` FSL's where its behaviour is defined and known from
+   black-box runs (FSL-133's wrap and FSL-134's field in another shape are not: restored
+   circularly and refused in both modes); `sin`, `cos`, `exp` correctly rounded.
+   `lx.fsl.topup|applytopup(implementation="original")`, `"auto"` without `larmorx-nc`. Record
+   [fsl-topup](validation/fsl-topup.md): 180 cases (the replica suite's 173 and 7 permanent cases of
+   random testing), 92 of 92 compared within `specs/topup.md` §12's thresholds (fMRIPrep's call on
+   ds001600 within FSL's own thread band in every metric; on ds005040 the metrics beyond the
+   thresholds, the 99th percentiles of the field, the corrected images, the Jacobians and the
+   displacements, within FSL's band at `--nthr=4`, and the field's correlation 0.999958 against
+   FSL's own 0.999966; of the 92, 9 bit-identical to FSL, 2 within FSL's own thread band in every
+   metric, 81 within the thresholds without a band of FSL's on them or beyond the near-zero band of
+   the thread settings that leave FSL unchanged: the site's classification), 66 rejected by both,
+   22 expected divergences (9 estimated movements that do not converge: FSL's rotation derivatives
+   are not its cost's, findings 14, a spec question; 4 FSL-133's lines; 3 FSL-143's divergence;
+   vb2D's transients; FSL-126; 4 refused for FSL-124 and FSL-134). New defects: FSL-144 (`jac`
+   with a z phase encoding left uncorrected: rule B), FSL-145 (two quadratic coefficients on a
+   short axis: rule A), FSL-146 (mixed phase-encoding axes: FSL's gradient is not the cost's, rule
+   A); FSL-147 to FSL-150 unused. Built for speed: the spline field's products along whole lines
+   and planes, Levenberg-Marquardt's steps by preconditioned conjugate gradients on the Hessian
+   stored by its diagonals, an array pool, deterministic parallel loops; fMRIPrep's call 2.8 and
+   7.7 s on one thread (10 to 12 times FSL), 0.8 and 2.0 s on 14 (39 to 41 times), the same bits
+   at any thread count; applytopup `lsr` 0.13 s against FSL's 0.42
+   ([benchmark](benchmarks/fsl-topup.md), informal). One random-testing trial (11 minutes, 14,400
+   realistic cases, the replica trial's draws, FSL through the oracle cache: 7,401 agree; the
+   6,999 others triaged by category, findings 36: 4,462 finding 14, 895 FSL-146, 484 FSL-133, 429
+   the quadratic count (fixed), 385 the suite's own mistakes (fixed), 216 the SCG weight (fixed)
+   and ill-determined paths, 51 FSL-143, 22 other explained, 55 open in two categories; seven
+   permanent cases). Golden: 6 cases (76 outputs). Memory: fMRIPrep's call 74 MiB against FSL's
+   88. Thread test: every parallel path of topup and applytopup. The site page with both
+   implementations (the original's verdict on each case from its files against FSL's).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -595,6 +629,36 @@ The items below keep their history.
 - **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
   bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
   should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does).
+- **FSL-144, FSL-145 and FSL-146 in topup's replica** (2026-11-03): the clean-room original's
+  defaults refuse `applytopup --method=jac` with a z phase encoding (FSL-144, rule B), lay the
+  general quadratic B-spline count on axes shorter than two knot spacings (FSL-145, rule A) and
+  minimise with the cost's own gradient on volumes encoded along different axes (FSL-146, rule A);
+  the replica keeps FSL's behaviour in both modes. By D13 its default should do the same and name
+  them, `reproduce` FSL's (as FSL-111).
+- **topup's spec questions** (2026-11-03, the clean-room part's handoff, `docs/parts/`): FSL's
+  rotation derivatives of the movements (findings 14: a defect or a deliberate approximation?),
+  the refit's penalty between levels, FSL-133's wrap and FSL-134's laying of a field in another
+  shape, the quadratic splines' bending energy at an even knot spacing (47 random cases open),
+  `lsr` on lines whose length divides 2^32 (8 random cases open), FSL's resampling along axes of 8
+  voxels or fewer, and the conventions the original follows as measured: for a spec writer's
+  answers part on the replica side, as FLIRT's (2026-11-02).
+- **topup's replica: applytopup's `lsr` is 8 times slower than FSL** (3.47 s against 0.42 s on
+  ds005040's pair, its files FSL's byte for byte; `docs/benchmarks/fsl-topup.md`).
+- **topup's clean-room original: FSL's own band on every case** (the final validation phase): of
+  its record's 92 passing cases, 81 are open on the site because only fMRIPrep's calls and the
+  thread cases have a band of FSL's; FSL's run with its read-out times changed in their last bit
+  (the suite's `_random_band`, through the oracle cache: about 80 runs of seconds) would classify
+  them. Its record's notes still say that options the original does not take are skipped (0 are):
+  the suite's text, to correct when the record is next made.
+- **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge): the replica
+  treats `\` as a directory separator on Windows only (ccd50d0, `docs/api/fsl-topup.md`); the original
+  splits `--imain`'s default output stem and the configuration's "has a directory" test at `/` only, and
+  applytopup's "has an extension" test treats `\` as a separator on Linux and macOS too, where FSL does
+  not. The golden and Rust tests name files relative to the case's directory, so CI does not meet it.
+  For a clean-room agent (the next clean-room part): one rule for both programs, as the replica's, with
+  a test under a temporary folder whose name holds a dot.
+- **The site's speed charts: FSL's dots hidden under the replica's** (FLIRT's and topup's pages, where
+  the replica runs at FSL's speed): a legibility fix in the chart's drawing (offset or outline).
 - **topup's replica: what is not replicated yet** (2026-11-03): applytopup's restorations of lines
   of fewer than 8 or more than 256 voxels along the phase encoding, and band systems that need
   LAPACK's blocked band factorisation, are refused in both modes with a message (FSL's arithmetic

@@ -387,8 +387,11 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-141 † | applytopup (`--method=vb2D`, `vb3D`, `vb4D`, undocumented) | the counts of values in the noise prior's shapes are computed in 32-bit signed integers: beyond 2^31 values (very large `vb4D` inputs) they wrap (undefined behaviour) to wrong, even negative, counts | a | none | 64-bit counts by default, named when they differ; the wrapped values with `reproduce`; topup's replica 2026-11-03 (no case: it needs more than 2^31 values) | – |
 | FSL-142 † | applytopup (`vb3D`, `vb4D`) | the noise prior counts two data points per line whatever the collection holds (`vb2D` counts every image's): with three or more images along one phase-encoding axis it has too few | c | none | rule A: every image's points by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/vb3d-three`) | – |
 | FSL-143 † | applytopup (`vb3D`, `vb4D`) | the smoothness prior couples neighbouring slices with half the weight of the second-difference operator it is built from (the in-slice coupling has its full weight): the assembled precision is not positive definite (an 8 × 6 × 5 grid: smallest eigenvalue −2.7, +0.40 corrected) and the iterations diverge (`at/vb3d-y`: −3.85 × 10^10 to 3.53 × 10^10 for an input of 0 to 1.09 × 10^5) | c | none | rule A, measured: the full weight by default (−1.68 × 10^4 to 1.18 × 10^5, mean 2.13 × 10^4, as `vb2D`'s), named on every such run; FSL's with `reproduce`; topup's replica 2026-11-03 (every `at/vb3d-*` and `at/vb4d-*` case: 18,852 values change on `at/vb3d-y`) | – |
+| FSL-144 | applytopup (`--method=jac`, a phase encoding along z) | a phase-encoding vector with a z component (which topup refuses: it estimates no field along z) has that component left out of the displacement: an image encoded along z is written uncorrected, silently | c | none (fMRIPrep corrects with its own resampler) | rule B: refused by default in the clean-room original, named; FSL's output with `reproduce` (2026-11-03, `at/jac-z`); the replica gives FSL's output in both modes | replica |
+| FSL-145 | topup (`--splineorder=2`) | an axis shorter than two knot spacings gets two quadratic B-spline coefficients (every other axis ceil((2n + k − 4) / 2k) + 2): the field's support ends inside the axis and it is forced towards 0 at its far end | c | none (fMRIPrep's configuration uses cubic splines) | rule A: the general count by default in the clean-room original, named; FSL's two with `reproduce` (2026-11-03, found by random testing: `difftest/fsl145-short-axis`); the replica lays FSL's two in both modes | replica |
+| FSL-146 | topup (volumes encoded along different axes: AP, PA, LR, RL) | the cost's gradient leaves out of each axis' Jacobian term the volumes not encoded along that axis, so it is not the cost's gradient: the minimisers step in a wrong direction (a first Levenberg-Marquardt step can raise the cost) and stop where the false gradient vanishes | c | rare (sdcflows' PEPOLAR estimation from field maps along two axes; none in the oracle runs) | rule A, measured: the cost's own gradient by default in the clean-room original, named (its final cost as low as FSL's or lower in 86 to 89 % of random testing's differing four-volume cases); FSL's with `reproduce` (2026-11-03, found by random testing: `difftest/fsl146-mixed-axes`); the replica keeps FSL's in both modes | replica |
 
-**Counts** (336 entries, recounted from the table on 2026-11-03, after topup's replica (FSL-116 to FSL-135, FSL-141 to FSL-143)
+**Counts** (339 entries, recounted from the table on 2026-11-03, after topup's clean-room original (FSL-144 to FSL-146)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
@@ -396,7 +399,7 @@ entries, decided, count as (c)):
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 76 | |
 | (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 151 | 10 |
+| (c) deterministic bug that changes results | 154 | 10 |
 | (d) imprecision | 23 | |
 | (e) command-line or parsing quirk | 58 | |
 | (f) documentation or message only | 13 | |

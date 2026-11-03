@@ -1,0 +1,560 @@
+// SPDX-License-Identifier: Apache-2.0
+//! The Levenberg-Marquardt Hessian as a 3D stencil (`specs/topup.md` §4.7, §11): the cubic
+//! basis functions of coefficients more than three knots apart do not overlap, so each row has
+//! at most 7 × 7 × 7 entries, stored densely by offset. Its assembly contracts the voxel
+//! weights one axis at a time (each axis' basis products once), its products and the
+//! preconditioned conjugate-gradient solve run row by row; every sum has a fixed order, so the
+//! results do not depend on the thread count.
+
+use rayon::prelude::*;
+
+use super::model::dot;
+use super::pool::Pool;
+use super::spline::Op1;
+
+/// A matrix on a grid of coefficients: row `k`, offsets `d ∈ [-3, 3]³` (index
+/// `((dz + 3) · 7 + dy + 3) · 7 + dx + 3`).
+#[derive(Clone, Debug)]
+pub struct Stencil {
+    pub dims: [usize; 3],
+    pub data: Vec<f64>,
+}
+
+pub const CENTRE: usize = 171;
+
+impl Stencil {
+    pub fn zeros(dims: [usize; 3]) -> Stencil {
+        Stencil::zeros_in(dims, &Pool::default())
+    }
+
+    /// [`Stencil::zeros`] with its array from `pool`.
+    pub fn zeros_in(dims: [usize; 3], pool: &Pool) -> Stencil {
+        Stencil {
+            dims,
+            data: pool.zeros(dims[0] * dims[1] * dims[2] * 343),
+        }
+    }
+
+    pub fn n(&self) -> usize {
+        self.dims[0] * self.dims[1] * self.dims[2]
+    }
+
+    pub fn diagonal(&self) -> Vec<f64> {
+        (0..self.n()).map(|k| self.data[k * 343 + CENTRE]).collect()
+    }
+
+    /// Adds `Σ_x w(x) φp(x; k) φq(x; k + d)` (`φ` products of the per-axis operators `ops_p`,
+    /// `ops_q`, rows the voxels of the grid `grid`, columns the coefficients).
+    pub fn add_weighted(
+        &mut self,
+        w: &[f64],
+        grid: [usize; 3],
+        ops_p: [&Op1; 3],
+        ops_q: [&Op1; 3],
+    ) {
+        self.add_weighted_in(w, grid, ops_p, ops_q, &Pool::default());
+    }
+
+    /// [`Stencil::add_weighted`] with its intermediate arrays from `pool`.
+    pub fn add_weighted_in(
+        &mut self,
+        w: &[f64],
+        grid: [usize; 3],
+        ops_p: [&Op1; 3],
+        ops_q: [&Op1; 3],
+        pool: &Pool,
+    ) {
+        let [nx, ny, nz] = grid;
+        let [cx, cy, cz] = self.dims;
+        // stage x: T1[z][y][kx][dx]
+        let mut t1 = pool.zeros(nz * ny * cx * 7);
+        t1.par_chunks_mut(ny * cx * 7)
+            .enumerate()
+            .for_each(|(z, slab)| {
+                let (op, oq) = (ops_p[0], ops_q[0]);
+                for y in 0..ny {
+                    let row = &mut slab[y * cx * 7..(y + 1) * cx * 7];
+                    for x in 0..nx {
+                        let wv = w[(z * ny + y) * nx + x];
+                        if wv == 0.0 {
+                            continue;
+                        }
+                        for s in 0..op.width {
+                            let ps = op.w[x * op.width + s];
+                            if ps == 0.0 {
+                                continue;
+                            }
+                            let kx = op.idx[x * op.width + s];
+                            for t in 0..oq.width {
+                                let qt = oq.w[x * oq.width + t];
+                                if qt == 0.0 {
+                                    continue;
+                                }
+                                let lx = oq.idx[x * oq.width + t] as isize;
+                                let d = lx - kx as isize + 3;
+                                if (0..7).contains(&d) {
+                                    row[kx * 7 + d as usize] += wv * ps * qt;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        // stage y: T2[z][ky][dy][kx][dx]
+        let blk = cx * 7;
+        let mut t2 = pool.zeros(nz * cy * 7 * blk);
+        t2.par_chunks_mut(cy * 7 * blk)
+            .enumerate()
+            .for_each(|(z, slab)| {
+                let (op, oq) = (ops_p[1], ops_q[1]);
+                for y in 0..ny {
+                    let src = &t1[(z * ny + y) * blk..(z * ny + y + 1) * blk];
+                    for s in 0..op.width {
+                        let ps = op.w[y * op.width + s];
+                        if ps == 0.0 {
+                            continue;
+                        }
+                        let ky = op.idx[y * op.width + s];
+                        for t in 0..oq.width {
+                            let qt = oq.w[y * oq.width + t];
+                            if qt == 0.0 {
+                                continue;
+                            }
+                            let d = oq.idx[y * oq.width + t] as isize - ky as isize + 3;
+                            if !(0..7).contains(&d) {
+                                continue;
+                            }
+                            let f = ps * qt;
+                            let dst = &mut slab
+                                [(ky * 7 + d as usize) * blk..(ky * 7 + d as usize + 1) * blk];
+                            for (o, v) in dst.iter_mut().zip(src) {
+                                *o += f * v;
+                            }
+                        }
+                    }
+                }
+            });
+        // stage z: H[kz][ky][kx][dz][dy][dx]; per kz, its voxels' contributions in z order
+        let (op, oq) = (ops_p[2], ops_q[2]);
+        let mut per_k: Vec<Vec<(usize, f64, usize, f64)>> = vec![Vec::new(); cz];
+        for z in 0..nz {
+            for s in 0..op.width {
+                let ps = op.w[z * op.width + s];
+                if ps == 0.0 {
+                    continue;
+                }
+                let kz = op.idx[z * op.width + s];
+                for t in 0..oq.width {
+                    let qt = oq.w[z * oq.width + t];
+                    if qt == 0.0 {
+                        continue;
+                    }
+                    let d = oq.idx[z * oq.width + t] as isize - kz as isize + 3;
+                    if (0..7).contains(&d) {
+                        per_k[kz].push((z, ps, d as usize, qt));
+                    }
+                }
+            }
+        }
+        let zblk = cy * 7 * blk;
+        self.data
+            .par_chunks_mut(cy * cx * 343)
+            .enumerate()
+            .for_each(|(kz, slab)| {
+                for &(z, ps, dz, qt) in &per_k[kz] {
+                    let f = ps * qt;
+                    let src = &t2[z * zblk..(z + 1) * zblk];
+                    for ky in 0..cy {
+                        for dy in 0..7 {
+                            let s2 = &src[(ky * 7 + dy) * blk..(ky * 7 + dy + 1) * blk];
+                            for kx in 0..cx {
+                                let row = &mut slab[(ky * cx + kx) * 343..(ky * cx + kx + 1) * 343];
+                                let off = (dz * 7 + dy) * 7;
+                                for dx in 0..7 {
+                                    row[off + dx] += f * s2[kx * 7 + dx];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        pool.give(t1);
+        pool.give(t2);
+    }
+
+    /// `y = H x`.
+    pub fn mul(&self, x: &[f64], y: &mut [f64]) {
+        let [cx, cy, cz] = self.dims;
+        y.par_chunks_mut(cx * cy).enumerate().for_each(|(kz, out)| {
+            for ky in 0..cy {
+                for kx in 0..cx {
+                    let row = &self.data[((kz * cy + ky) * cx + kx) * 343..][..343];
+                    let mut s = 0.0;
+                    for dz in 0..7 {
+                        let lz = kz as isize + dz as isize - 3;
+                        if lz < 0 || lz as usize >= cz {
+                            continue;
+                        }
+                        for dy in 0..7 {
+                            let ly = ky as isize + dy as isize - 3;
+                            if ly < 0 || ly as usize >= cy {
+                                continue;
+                            }
+                            let base = (lz as usize * cy + ly as usize) * cx;
+                            let off = (dz * 7 + dy) * 7;
+                            for dx in 0..7 {
+                                let lx = kx as isize + dx as isize - 3;
+                                if lx < 0 || lx as usize >= cx {
+                                    continue;
+                                }
+                                let v = row[off + dx];
+                                if v != 0.0 {
+                                    s += v * x[base + lx as usize];
+                                }
+                            }
+                        }
+                    }
+                    out[ky * cx + kx] = s;
+                }
+            }
+        });
+    }
+
+    /// The diagonal multiplied by `1 + damping`.
+    pub fn damped(&self, damping: f64) -> Stencil {
+        let mut h = self.clone();
+        for k in 0..h.n() {
+            h.data[k * 343 + CENTRE] *= 1.0 + damping;
+        }
+        h
+    }
+}
+
+/// The Levenberg-Marquardt Hessian of a level (§4.7): the coefficients' block as a stencil, the
+/// movements' coupling to the coefficients (one dense column per free movement parameter) and
+/// the movements' dense block.
+#[derive(Clone, Debug)]
+pub struct Hessian {
+    pub cc: Stencil,
+    /// `cm[p]`: the column of movement parameter `p` against every coefficient.
+    pub cm: Vec<Vec<f64>>,
+    /// The movements' block, `nm × nm` by rows.
+    pub mm: Vec<f64>,
+}
+
+impl Hessian {
+    pub fn n(&self) -> usize {
+        self.cc.n() + self.cm.len()
+    }
+
+    pub fn diagonal(&self) -> Vec<f64> {
+        let nm = self.cm.len();
+        let mut d = self.cc.diagonal();
+        d.extend((0..nm).map(|p| self.mm[p * nm + p]));
+        d
+    }
+
+    /// `y = H x`.
+    pub fn mul(&self, x: &[f64], y: &mut [f64]) {
+        let nc = self.cc.n();
+        let nm = self.cm.len();
+        self.cc.mul(&x[..nc], &mut y[..nc]);
+        if nm == 0 {
+            return;
+        }
+        let (xc, xm) = x.split_at(nc);
+        {
+            let yc = &mut y[..nc];
+            for (p, col) in self.cm.iter().enumerate() {
+                let w = xm[p];
+                if w != 0.0 {
+                    for (o, v) in yc.iter_mut().zip(col) {
+                        *o += w * v;
+                    }
+                }
+            }
+        }
+        for p in 0..nm {
+            let mut s = dot(&self.cm[p], xc);
+            for q in 0..nm {
+                s += self.mm[p * nm + q] * xm[q];
+            }
+            y[nc + p] = s;
+        }
+    }
+
+    /// The diagonal multiplied by `1 + damping`.
+    pub fn damped(&self, damping: f64) -> Hessian {
+        let nm = self.cm.len();
+        let mut h = Hessian {
+            cc: self.cc.damped(damping),
+            cm: self.cm.clone(),
+            mm: self.mm.clone(),
+        };
+        for p in 0..nm {
+            h.mm[p * nm + p] *= 1.0 + damping;
+        }
+        h
+    }
+
+    /// Every entry rounded to single precision (`--numprec=float`, §4.7).
+    pub fn to_single(&mut self) {
+        let r = |v: &mut f64| *v = f64::from(*v as f32);
+        self.cc.data.iter_mut().for_each(r);
+        self.cm.iter_mut().flatten().for_each(r);
+        self.mm.iter_mut().for_each(r);
+    }
+}
+
+/// The damped coefficients' block laid out by offset for the solver (§11): `data[d · n + k]` is
+/// row `k`'s entry at offset `d` (the layout of [`Stencil`] transposed), so a product runs over
+/// whole lines of rows at once (contiguous, vectorised). Each row's sum keeps the stencil's
+/// order (offsets `dz`, `dy`, `dx` ascending); the entries a row skips there are outside the
+/// grid, or zero, and a zero entry adds `±0` to a sum that is never `-0`, so every value is the
+/// same.
+struct ByOffset {
+    dims: [usize; 3],
+    data: Vec<f64>,
+}
+
+impl ByOffset {
+    /// `h` with its diagonal multiplied by `1 + damping` (as [`Stencil::damped`]).
+    fn damped(h: &Stencil, damping: f64, pool: &Pool) -> ByOffset {
+        let n = h.n();
+        let mut data = pool.zeros(343 * n);
+        // eight offsets at a time: each row's eight entries are one cache line of the stencil
+        const D: usize = 8;
+        data.par_chunks_mut(D * n)
+            .enumerate()
+            .for_each(|(b, cols)| {
+                let d0 = b * D;
+                let nd = cols.len() / n.max(1);
+                for k in 0..n {
+                    let row = &h.data[k * 343 + d0..k * 343 + d0 + nd];
+                    for (j, &v) in row.iter().enumerate() {
+                        cols[j * n + k] = v;
+                    }
+                }
+                if (d0..d0 + nd).contains(&CENTRE) {
+                    for v in &mut cols[(CENTRE - d0) * n..(CENTRE - d0 + 1) * n] {
+                        *v *= 1.0 + damping;
+                    }
+                }
+            });
+        ByOffset { dims: h.dims, data }
+    }
+
+    fn diagonal(&self) -> Vec<f64> {
+        let n = self.dims.iter().product::<usize>();
+        self.data[CENTRE * n..(CENTRE + 1) * n].to_vec()
+    }
+
+    /// `y = H x`, line by line of rows.
+    fn mul(&self, x: &[f64], y: &mut [f64]) {
+        let [cx, cy, cz] = self.dims;
+        let n = cx * cy * cz;
+        y.par_chunks_mut(cx).enumerate().for_each(|(line, out)| {
+            let (ky, kz) = (line % cy, line / cy);
+            out.fill(0.0);
+            for dz in 0..7 {
+                let lz = kz as isize + dz as isize - 3;
+                if lz < 0 || lz as usize >= cz {
+                    continue;
+                }
+                for dy in 0..7 {
+                    let ly = ky as isize + dy as isize - 3;
+                    if ly < 0 || ly as usize >= cy {
+                        continue;
+                    }
+                    let base = (lz as usize * cy + ly as usize) * cx;
+                    let off = (dz * 7 + dy) * 7;
+                    for dx in 0..7 {
+                        // the rows kx whose column kx + dx - 3 lies in the grid
+                        let lo = 3usize.saturating_sub(dx);
+                        let hi = (cx + 3).saturating_sub(dx).min(cx);
+                        if lo >= hi {
+                            continue;
+                        }
+                        let v = &self.data[(off + dx) * n + line * cx..][lo..hi];
+                        let xs = &x[base + lo + dx - 3..base + hi + dx - 3];
+                        for ((o, a), b) in out[lo..hi].iter_mut().zip(v).zip(xs) {
+                            *o += a * b;
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/// `y = H x` of the damped Hessian ([`Hessian::mul`]'s arithmetic, the coefficients' block from
+/// [`ByOffset`]).
+fn damped_mul(cc: &ByOffset, cm: &[Vec<f64>], mm: &[f64], x: &[f64], y: &mut [f64]) {
+    let nc = x.len() - cm.len();
+    let nm = cm.len();
+    cc.mul(&x[..nc], &mut y[..nc]);
+    if nm == 0 {
+        return;
+    }
+    let (xc, xm) = x.split_at(nc);
+    {
+        let yc = &mut y[..nc];
+        for (p, col) in cm.iter().enumerate() {
+            let w = xm[p];
+            if w != 0.0 {
+                for (o, v) in yc.iter_mut().zip(col) {
+                    *o += w * v;
+                }
+            }
+        }
+    }
+    for p in 0..nm {
+        let mut s = dot(&cm[p], xc);
+        for q in 0..nm {
+            s += mm[p * nm + q] * xm[q];
+        }
+        y[nc + p] = s;
+    }
+}
+
+/// Solves `(H + damping · diag(H)) x = b`, i.e. [`pcg`] on [`Hessian::damped`], with the
+/// coefficients' block laid out for fast products (the same arithmetic, the same result).
+pub fn pcg_damped(
+    h: &Hessian,
+    damping: f64,
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+    pool: &Pool,
+) -> Vec<f64> {
+    let cc = ByOffset::damped(&h.cc, damping, pool);
+    let nm = h.cm.len();
+    let mut mm = h.mm.clone();
+    for p in 0..nm {
+        mm[p * nm + p] *= 1.0 + damping;
+    }
+    let mut diag = cc.diagonal();
+    diag.extend((0..nm).map(|p| mm[p * nm + p]));
+    let x = solve(&diag, b, tol, max_iter, |x, y| {
+        damped_mul(&cc, &h.cm, &mm, x, y)
+    });
+    pool.give(cc.data);
+    x
+}
+
+/// Solves `H x = b` by conjugate gradients preconditioned with the diagonal, from `x = 0`, until
+/// `|r| / |b| < tol` or `max_iter` iterations (§4.7).
+pub fn pcg(h: &Hessian, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
+    solve(&h.diagonal(), b, tol, max_iter, |x, y| h.mul(x, y))
+}
+
+/// The preconditioned conjugate gradients with the matrix' diagonal `diag` and product `mul`.
+fn solve(
+    diag: &[f64],
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+    mul: impl Fn(&[f64], &mut [f64]),
+) -> Vec<f64> {
+    let n = b.len();
+    let minv: Vec<f64> = diag
+        .iter()
+        .map(|&d| if d != 0.0 { 1.0 / d } else { 1.0 })
+        .collect();
+    let mut x = vec![0.0; n];
+    let mut r = b.to_vec();
+    let nb = dot(b, b).sqrt();
+    if nb == 0.0 {
+        return x;
+    }
+    let mut z: Vec<f64> = r.iter().zip(&minv).map(|(a, m)| a * m).collect();
+    let mut p = z.clone();
+    let mut rz = dot(&r, &z);
+    let mut ap = vec![0.0; n];
+    for _ in 0..max_iter {
+        mul(&p, &mut ap);
+        let pap = dot(&p, &ap);
+        if pap == 0.0 || !pap.is_finite() {
+            break;
+        }
+        let alpha = rz / pap;
+        for i in 0..n {
+            x[i] += alpha * p[i];
+            r[i] -= alpha * ap[i];
+        }
+        if dot(&r, &r).sqrt() / nb < tol {
+            break;
+        }
+        for i in 0..n {
+            z[i] = r[i] * minv[i];
+        }
+        let rz2 = dot(&r, &z);
+        let beta = rz2 / rz;
+        rz = rz2;
+        for i in 0..n {
+            p[i] = z[i] + beta * p[i];
+        }
+    }
+    x
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::topup::spline::Axis;
+
+    #[test]
+    fn assembly_matches_a_direct_sum() {
+        let grid = [6usize, 5, 4];
+        let axes = [Axis::new(6, 2), Axis::new(5, 1), Axis::new(4, 2)];
+        let ops: [Op1; 3] = std::array::from_fn(|a| axes[a].at_voxels(0));
+        let opd: [Op1; 3] = std::array::from_fn(|a| axes[a].at_voxels(usize::from(a == 1)));
+        let w: Vec<f64> = (0..grid.iter().product::<usize>())
+            .map(|i| ((i * 37) % 11) as f64 - 4.0)
+            .collect();
+        let dims = axes.map(|a| a.ncoef());
+        let mut h = Stencil::zeros(dims);
+        h.add_weighted(
+            &w,
+            grid,
+            [&ops[0], &ops[1], &ops[2]],
+            [&opd[0], &opd[1], &opd[2]],
+        );
+        // direct: build dense φ matrices
+        let nc: usize = dims.iter().product();
+        let phi = |o: &[Op1; 3], v: usize, k: usize| -> f64 {
+            let p = [
+                v % grid[0],
+                (v / grid[0]) % grid[1],
+                v / (grid[0] * grid[1]),
+            ];
+            let q = [
+                k % dims[0],
+                (k / dims[0]) % dims[1],
+                k / (dims[0] * dims[1]),
+            ];
+            (0..3)
+                .map(|a| {
+                    let op = &o[a];
+                    (0..op.width)
+                        .filter(|&s| op.idx[p[a] * op.width + s] == q[a])
+                        .map(|s| op.w[p[a] * op.width + s])
+                        .sum::<f64>()
+                })
+                .product()
+        };
+        let x: Vec<f64> = (0..nc).map(|i| (i as f64 * 0.37).cos()).collect();
+        let mut y = vec![0.0; nc];
+        h.mul(&x, &mut y);
+        for k in 0..nc {
+            let mut s = 0.0;
+            for l in 0..nc {
+                let hkl: f64 = (0..w.len())
+                    .map(|v| w[v] * phi(&ops, v, k) * phi(&opd, v, l))
+                    .sum();
+                s += hkl * x[l];
+            }
+            assert!((s - y[k]).abs() < 1e-9, "row {k}: {s} vs {}", y[k]);
+        }
+    }
+}

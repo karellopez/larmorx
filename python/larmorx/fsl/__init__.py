@@ -19,7 +19,8 @@ programs ``img2imgcoord``, ``std2imgcoord`` and ``img2stdcoord``, ``rmsdiff``, `
 ``fast`` (FSL's tissue segmentation) has its replica (since 2026-11-02) and its clean-room
 original (since 2026-11-03, written from ``specs/fast.md``; one channel so far). ``topup`` and
 ``applytopup`` (the susceptibility field from reversed phase encodings and its correction, since
-2026-11-03) have their replicas only.
+2026-11-03) have their replicas and their clean-room originals (written from ``specs/topup.md``;
+applytopup's without the undocumented ``vb`` methods so far).
 """
 
 from larmorx.fsl.bet import (

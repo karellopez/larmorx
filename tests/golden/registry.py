@@ -381,6 +381,42 @@ def tissue_brain_bright() -> lx.Image:
     return _frozen(anat().with_data(v))
 
 
+#: topup's pair: 16 x 16 x 8 voxels of 3 mm, two volumes.
+SHAPE_PAIR = (16, 16, 8)
+
+
+def _blip(seed: int, shift: int) -> np.ndarray:
+    """A head (200 inside, 100 more in its core, integer noise 0-19) moved ``shift`` voxels
+    along y, as a phase encoding along y displaces it."""
+    s = (SHAPE_PAIR[1], SHAPE_PAIR[0], SHAPE_PAIR[2])
+    v = 200 * ellipsoid(s, 8, 10, shift).astype(np.int64)
+    v = v + 100 * ellipsoid(s, 4, 10, shift).astype(np.int64) + ints(seed, s, 0, 20)
+    return np.swapaxes(v, 0, 1).astype(np.float32)
+
+
+@functools.cache
+def blip(direction: str) -> lx.Image:
+    """One volume of topup's pair: ``"up"`` (moved +1 voxel along y) or ``"down"`` (-1)."""
+    v = _blip(61, 1) if direction == "up" else _blip(62, -1)
+    aff = affine(SHAPE_PAIR, (3.0, 3.0, 3.0), oblique=False)
+    return _frozen(lx.Image(np.asfortranarray(v), aff))
+
+
+@functools.cache
+def blip_pair() -> lx.Image:
+    """topup's input: the two volumes of :func:`blip` (phase encodings +y and -y)."""
+    v = np.stack([blip("up").data, blip("down").data], axis=-1)
+    return _frozen(blip("up").with_data(np.asfortranarray(v)))
+
+
+@functools.cache
+def blip_series() -> lx.Image:
+    """applytopup's 4D input: three volumes of ``blip("up")``, the later ones brighter."""
+    up = blip("up").data
+    v = np.stack([up, up + 10, up + 20], axis=-1)
+    return _frozen(blip("up").with_data(np.asfortranarray(v)))
+
+
 def _write_analyze(path: Path) -> None:
     """A big-endian int16 ANALYZE 7.5 pair (12 x 10 x 8) whose voxel sizes' product is negative
     (-2, 2, 2: FSL reads it radiologically, without the x reversal) and whose scale field
@@ -604,6 +640,10 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "tissue_brain.nii": lambda p: lx.save(tissue_brain(), p),
     "tissue_brain2.nii": lambda p: lx.save(tissue_brain2(), p),
     "tissue_brain_bright.nii": lambda p: lx.save(tissue_brain_bright(), p),
+    "blip_pair.nii": lambda p: lx.save(blip_pair(), p),
+    "blip_up.nii": lambda p: lx.save(blip("up"), p),
+    "blip_down.nii": lambda p: lx.save(blip("down"), p),
+    "blip_series.nii": lambda p: lx.save(blip_series(), p),
     "analyze_scaled.hdr": _write_analyze,
     "identity.mat": lambda p: p.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),
     "series.nii": _write_scaled_series,
@@ -1006,12 +1046,9 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
-#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below); topup and applytopup
-#: (2026-11-03) have their replicas only, until their clean-room originals are written.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.topup": "fsl topup",
-    "lx.fsl.applytopup": "fsl applytopup",
-}
+#: and since 2026-11-03 FAST, topup and applytopup have theirs (``lx.fsl.fast``'s,
+#: ``lx.fsl.topup``'s and ``lx.fsl.applytopup``'s cases below).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -4707,6 +4744,158 @@ def _(ctx: Context) -> dict[str, Any]:
         "plane_seg": flat.segmentation.data,
         **{f"plane_pve_{i}": im.data for i, im in enumerate(flat.partial_volumes)},
     }
+
+
+#: topup's quick estimation: two levels (Levenberg-Marquardt with the movements, then the scaled
+#: conjugate gradients), bending energy, cubic splines, the images scaled.
+_TOPUP_CONFIG = (
+    "# two quick levels\n--warpres=20,16\n--subsamp=2,1\n--fwhm=8,4\n--miter=3,2\n"
+    "--lambda=0.005,0.0005\n--ssqlambda=1\n--regmod=bending_energy\n--estmov=1,0\n--minmet=0,1\n"
+    "--splineorder=3\n--numprec=double\n--interp=spline\n--scale=1\n"
+)
+#: The pair's phase encodings (+y, -y) and read-out times.
+_TOPUP_ACQ = "0 1 0 0.05\n0 -1 0 0.05\n"
+
+
+def _topup_files(ctx: Context) -> None:
+    """topup's and applytopup's inputs in the case's directory, by their bare names (topup's
+    log records its options as given, so the calls name them relative to the directory)."""
+    for name in ("blip_pair.nii", "blip_up.nii", "blip_down.nii", "blip_series.nii"):
+        shutil.copy(ctx.file(name), ctx.dir / name)
+    (ctx.dir / "acq.txt").write_text(_TOPUP_ACQ, encoding="utf-8", newline="\n")
+    (ctx.dir / "quick.cnf").write_text(_TOPUP_CONFIG, encoding="utf-8", newline="\n")
+
+
+def _in_dir(ctx: Context, call: Callable[[], Any]) -> Any:
+    """``call()`` with the case's directory as the working directory."""
+    here = os.getcwd()
+    os.chdir(ctx.dir)
+    try:
+        return call()
+    finally:
+        os.chdir(here)
+
+
+def _topup(ctx: Context, tool: str, *argv: str, upstream_defects: str = "fix") -> str:
+    """``larmorx fsl <tool> <argv...>`` (topup's or applytopup's clean-room original) in the
+    case's directory; its standard output."""
+    return _in_dir(ctx, lambda: _fsl(ctx, tool, *argv, upstream_defects=upstream_defects))
+
+
+def _written(ctx: Context, *bases: str) -> dict[str, Any]:
+    """Every file written under the names ``<base>*`` (NIfTI images by header and data, the
+    others by bytes; the names are the keys, so the set of files written is checked too)."""
+    out: dict[str, Any] = {}
+    for base in bases:
+        for p in sorted(ctx.dir.glob(f"{base}*")):
+            out[p.name] = Nifti(os.fspath(p)) if ".nii" in p.name else File(os.fspath(p))
+    return out
+
+
+@case("cli.fsl.topup", covers=("cli:fsl topup",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl topup`` as fMRIPrep calls it (a configuration file and every output:
+    ``--iout``, ``--fout``, ``--jacout``, ``--logout``, ``--rbmout``, ``--dfout``) with two quick
+    levels: the subsampled level's Levenberg-Marquardt with the movements, the full level's
+    scaled conjugate gradients, the refit between them; the usage text and exit status without
+    arguments."""
+    _topup_files(ctx)
+    _topup(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", "--config=quick.cnf", "--out=tu", "--iout=corrected", "--fout=field", "--jacout=jac", "--logout=tu.log", "--rbmout=xfm", "--dfout=warpfield")  # fmt: skip
+    usage = _in_dir(ctx, lambda: _fsl_status(ctx, "topup"))
+    return {
+        **_written(ctx, "tu", "corrected", "field", "jac", "xfm", "warpfield"),
+        **_status_outputs("usage", usage),
+    }
+
+
+@case("cli.fsl.topup.options")
+def _(ctx: Context) -> dict[str, Any]:
+    """topup's other paths: the membrane energy, quadratic splines, single precision, trilinear
+    interpolation, no regridding, ``--acqp``, ``--featout`` and ``-v``'s costs; reproduced
+    (FSL-117: Levenberg-Marquardt's Hessian of the membrane energy in FSL's units) and by default
+    (the corrected Hessian, named on standard error)."""
+    _topup_files(ctx)
+    words = ["--imain=blip_pair.nii", "--acqp=acq.txt", "--warpres=16", "--fwhm=4", "--miter=2",
+             "--lambda=0.01", "--ssqlambda=0", "--regmod=membrane_energy", "--splineorder=2",
+             "--numprec=float", "--interp=linear", "--regrid=0", "--scale=0", "-v"]  # fmt: skip
+    rep = _topup(ctx, "topup", *words, "--out=rep", "--featout=repfeat", "--fout=repfield", upstream_defects=REPRODUCE)  # fmt: skip
+    fix = _in_dir(ctx, lambda: _fsl_status(ctx, "topup", *words, "--out=fix", "--fout=fixfield"))
+    return {
+        **_written(ctx, "rep", "fix"),
+        "reproduce:stdout": rep,
+        **_status_outputs("fix", fix),
+    }
+
+
+def _topup_quick(ctx: Context) -> None:
+    """A one-level topup of the pair (``tu_fieldcoef``, ``tu_movpar.txt``) for applytopup."""
+    _topup_files(ctx)
+    _topup(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", "--out=tu", "--warpres=20", "--subsamp=2", "--fwhm=8", "--miter=3", "--lambda=0.005")  # fmt: skip
+
+
+@case("cli.fsl.applytopup", covers=("cli:fsl applytopup",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl applytopup``: the least-squares restoration of the pair (the default
+    method, long names), the Jacobian modulation of one image with trilinear interpolation into
+    shorts (short names), and of a 4D series with splines, reproduced (FSL-132: FSL's first
+    volume trilinear) and by default; the usage text and exit status without arguments."""
+    _topup_quick(ctx)
+    at = ("--datain=acq.txt", "--topup=tu")
+    _topup(ctx, "applytopup", "--imain=blip_up.nii,blip_down.nii", "--inindex=1,2", *at, "--out=lsr")  # fmt: skip
+    _topup(ctx, "applytopup", "-i", "blip_up.nii", "-x", "1", "-a", "acq.txt", "-t", "tu", "-o", "jac", "-m", "jac", "-n", "trilinear", "-d", "short", "-v")  # fmt: skip
+    _topup(ctx, "applytopup", "--imain=blip_series.nii", "--inindex=1", *at, "--method=jac", "--out=rep", upstream_defects=REPRODUCE)  # fmt: skip
+    fix = _in_dir(ctx, lambda: _fsl_status(ctx, "applytopup", "--imain=blip_series.nii", "--inindex=1", *at, "--method=jac", "--out=fix"))  # fmt: skip
+    usage = _in_dir(ctx, lambda: _fsl_status(ctx, "applytopup"))
+    return {
+        **_written(ctx, "lsr", "jac", "rep", "fix"),
+        **_status_outputs("fix", fix),
+        **_status_outputs("usage", usage),
+    }
+
+
+@case("cli.fsl.applytopup.vb")
+def _(ctx: Context) -> dict[str, Any]:
+    """applytopup's variational-Bayes restorations of the pair: across each slice (``vb2D``),
+    the volume (``vb3D``) and every volume (``vb4D``), their iterations on standard output."""
+    _topup_quick(ctx)
+    out: dict[str, Any] = {}
+    for method in ("vb2D", "vb3D", "vb4D"):
+        o = method.lower()
+        out[f"{o}:stdout"] = _topup(ctx, "applytopup", "--imain=blip_up.nii,blip_down.nii", "--inindex=1,2", "--datain=acq.txt", "--topup=tu", f"--method={method}", f"--out={o}")  # fmt: skip
+        out.update(_written(ctx, o))
+    return out
+
+
+@case("py.fsl.topup", covers=("lx.fsl.topup",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.topup`` with the clean-room original on an in-memory pair: one quick level, the
+    field, the corrected images and their mean, the Jacobians and the matrices."""
+    acq = [[0, 1, 0, 0.05], [0, -1, 0, 0.05]]
+    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, corrected=True, jacobians=True, rigid_body_matrices=True, implementation="original")  # fmt: skip
+    assert r.field and r.corrected and r.corrected_mean and r.jacobians and r.rigid_body_matrices
+    return {
+        "coefficients": r.coefficients.data,
+        "movement_parameters": r.movement_parameters,
+        "field": r.field.data,
+        "corrected": r.corrected.data,
+        "corrected_mean": r.corrected_mean.data,
+        **{f"jac_{i}": im.data for i, im in enumerate(r.jacobians)},
+        **{f"matrix_{i}": m for i, m in enumerate(r.rigid_body_matrices)},
+        "stdout": r.stdout,
+    }
+
+
+@case("py.fsl.applytopup", covers=("lx.fsl.applytopup",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.applytopup`` with the clean-room original: the pair restored by least squares
+    with ``lx.fsl.topup``'s result, and one image by Jacobian modulation."""
+    acq = [[0, 1, 0, 0.05], [0, -1, 0, 0.05]]
+    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, implementation="original")  # fmt: skip
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # FSL-132's correction (the first volume's splines)
+        lsr = lx.fsl.applytopup([blip("up"), blip("down")], acq, [1, 2], r, implementation="original")  # fmt: skip
+        jac = lx.fsl.applytopup(blip("up"), acq, [1], r, method="jac", implementation="original")
+    return {"lsr": lsr.corrected.data, "jac": jac.corrected.data}
 
 
 @case("cli.fsl.flirt.analyze")

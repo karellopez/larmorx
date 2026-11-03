@@ -189,7 +189,8 @@ opened). Its only inputs were:
 
 `fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command
 line, messages and outputs) was
-written by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
+written (relay 4: the speed work of §11, every output bit-identical to relay 3b's at 1, 7 and 14 threads,
+[`docs/benchmarks/fsl-topup.md`](../../docs/benchmarks/fsl-topup.md)) by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
 `crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
 `crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings (`docs/findings/fsl-fast.md`,
 `fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the register's
@@ -222,3 +223,42 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `larmorx_core::math::exp_in_place` (relay 3) | the correctly rounded `exp`'s fast path four values at a time (vectorised with AVX2 and FMA through the core's audited dispatch), `exp` itself for the values it leaves: `exp`'s bits for every value; used by the partial volumes' likelihoods and the multi-channel initialisation | §10; CORE-MATH's `exp` (MIT, the core's port) |
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
 | `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |
+
+## topup and applytopup (`topup`; relays 1 to 4, 2026-11-03)
+
+`topup` (the estimation of the susceptibility-induced field from reversed phase-encoding images:
+its command line, configuration files, levels, field, cost, minimisers and outputs) and
+`applytopup` (the correction with that field: Jacobian modulation and least-squares
+restoration, its command line and messages; relay 3) were written
+by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
+`crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
+`crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings (`docs/findings/fsl-topup.md`,
+`fsl-fast.md`, `fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the
+register's sections marked †), `docs/parts/`, the replica parts' and spec writers'
+investigations, `validation/probes/`, `validation/difftest/triage.toml`, the replica authors'
+permanent cases or the history of replica and spec-writer commits. Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/topup.md`](../../specs/topup.md) (FSL 6.0.7.23, fsl-topup 2203.5) | the behaviour: the command line, the configuration files, the acquisition parameters, the levels, the field's basis, the model, the cost, the minimisers, the outputs, the messages, the numeric conventions, the defects |
+| J. L. R. Andersson, S. Skare, J. Ashburner, NeuroImage 20(2):870-888, 2003; S. M. Smith et al., NeuroImage 23:S208-S219, 2004; FSL's TopupUsersGuide and ApplytopupUsersGuide; M. F. Møller, "A scaled conjugate gradient algorithm for fast supervised learning", Neural Networks 6:525-533, 1993 (in C. M. Bishop's formulation) | the model, Levenberg-Marquardt and the scaled conjugate gradients |
+| Black-box runs of FSL 6.0.7.23's `topup` and `applytopup` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-topup/`](../../validation/investigations/cleanroom-topup/README.md), with `-v` and `--debug`) | the observations of [`docs/findings/fsl-topup-original.md`](../../docs/findings/fsl-topup-original.md): the periodic interpolation along every axis, the mask, the coefficients' layout, the gradient's and the Gauss-Newton Hessian's factors, the regulariser (a sum at the integer points of the support), the conjugate-gradient solve of the Levenberg-Marquardt step, the scaled conjugate gradients' parameters, the level transitions, the outputs' headers and values; applytopup's sampling, mask, Jacobians, restoration matrices, movements as matrices (findings 17 to 22); the vb methods' iterations, prior, counts, invalid voxels and mask, FSL-144 (findings 23 to 28) |
+| The defect register's summary rows of FSL-116 to FSL-126 and FSL-132 to FSL-135 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options, fmt}` (FSL's image names, reading and writing, the matrix reader, `%g`), `larmorx_core` (thread pools, D13) | images, options, numbers, threads |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `topup::images` | the intensity scaling, the regridding (periodic cubic spline, or trilinear with `--interp=linear`), the subsampling, the Gaussian smoothing (none for a negative width: FSL-125 reproduced), each level's periodic cubic spline coefficients (cyclic tridiagonal solve) and their interpolation | §4.1, §4.4, §4.5; findings |
+| `topup::spline` | the cubic and quadratic B-spline bases and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (penalty: the two second differences that wrap around the ends), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
+| `topup::model` | one level's predictions (a line sampler when the displacement is along one axis and nothing moves), the movements' sampling, the mask, the cost, its gradient (the movements' exact derivatives) and the Gauss-Newton Hessian (its voxel weights, the movements' dense blocks), the bending and membrane energies (FSL-117) | §4.3, §4.6; findings |
+| `topup::stencil` | the Hessian as a 7 × 7 × 7 stencil per coefficient, assembled by contracting one axis at a time, with the movements' columns and block; its product, single precision (`--numprec=float`) and the preconditioned conjugate-gradient solve | §4.7, §11; larmorx's own design |
+| `topup::pool` | none (larmorx's own speed work, relay 4): the level's large arrays kept for reuse at their exact length, so the evaluations do not touch new memory; no behaviour | §11; [`docs/benchmarks/fsl-topup.md`](../../docs/benchmarks/fsl-topup.md) |
+| `topup::movement` | the rigid-body matrices (the Euler order and signs, the centres), their derivatives, the free parameters | §4.3, §6; findings 13 |
+| `topup::minimise` | Levenberg-Marquardt (damping, retries, the early end, the end on a free parameter) and the scaled conjugate gradients, with `--debug`'s numbering | §4.7; Møller; findings |
+| `topup` (`estimate`) | the levels, the transitions between them, the full-resolution predictions | §2.4, §4.4, §6; findings |
+| `cli::topup` | the command line, the usage and its errors, the configuration files, the checks of the settings, the log, the outputs and their order, FSL-117 to FSL-126 | §2, §3, §5, §6, §8, §10; findings |
+| `cli::topup_debug` | `-v`, `--debug`'s files, `--trace`'s stages, `--profile`'s file | §2.2, §5; findings 9, 16 |
+| `topup::apply` | applytopup's corrections: the field of the coefficients or of a field image (its mirrored spline's derivatives), the movements (parameters about the field's centre, or matrices), the sampling and its mask, `--method=jac`, the collections, the resampling matrices and the regularised line solves of `--method=lsr` (dense Cholesky), FSL-132 and FSL-134's Jacobian | §7, §9.4, §10; Andersson et al. 2003; findings 17 to 22 |
+| `topup::vb` | the undocumented `--method=vb2D`, `vb3D`, `vb4D`: the mean-field variational-Bayes restoration (Gamma priors on the noise and smoothness precisions, the squared-second-difference prior weighted by the voxel sizes, Gauss-Seidel over the lines, its printed iterations), FSL-141 to FSL-143 | §7.5, §10; findings 23 to 27 |
+| `cli::applytopup` | the command line (long and short options), the usage and the compulsory options' block, the checks in FSL's order with FSL's aborts (exit 1), `--topup`'s files, `--datatype` (FSL-09), the output, FSL-132 to FSL-135 and FSL-141 to FSL-144 | §7, §8, §10; findings 17 to 28 |
+| `topup::model`, `topup::minimise`, `cli::topup_debug` (relay 5b: random testing) | FSL-146's reproduce (each axis' Jacobian term over the volumes displaced along it), the mask of an oblique phase encoding (no axis wraps), the scaled conjugate gradients' second gradient with the current point's regulariser weight, `--debug`'s images in FSL's order | findings 32 to 35 (black-box: `first_step.py`) |

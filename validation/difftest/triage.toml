@@ -7,8 +7,8 @@
 # status: fixed (larmorx was wrong; fixed, with a unit test and a permanent case), register (a
 # defect of the original, in docs/findings/upstream-defects.md, decided by rules A-D), open (a
 # clean-room original's difference, reported for its agent with a black-box reproducer),
-# harness (the comparison's own mistake, corrected in the harness), unclear (for the
-# orchestrator). link: a repository path (a permanent case, a finding) or a site path.
+# harness (the comparison's own mistake, corrected in the harness), explained (an expected
+# difference, measured and explained: no mistake and no defect), unclear (for the orchestrator). link: a repository path (a permanent case, a finding) or a site path.
 
 # ---------------------------------------------------------------- the trial runs (2026-10-25)
 
@@ -1289,3 +1289,128 @@ implementation = "original"
 signature = ["Partial volumes (_pve_n): mean and pN.N differences, totals", "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels"]
 status = "explained"
 explanation = "2 cases (cleanroom-fast 2215 and 2311): several channels of which two are noise-free, so each class's covariance is ill-conditioned; the partial volumes (and one class's Dice of _pveseg, 0.99891) move with the matrix arithmetic's last bits, as the standard tier's multi/s5 (the original against itself with one rounding change moves as far: validation/investigations/cleanroom-fast/self_band.py). Following LAPACK and OpenBLAS bit for bit is the replica's job (specs/fast.md §8.6)."
+
+# topup's clean-room original: its trial of 2026-11-03 (oracles/difftest/2026-11-03-topup-original), each category of findings 36
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["exception"]
+status = "harness"
+explanation = "an acquisition file of four rows and one column per volume (read transposed by FSL) was read as rows by the suite: 276 cases ended in an exception; the suite reads it transposed (findings 31, 36)"
+link = "validation/difftest/cases/fsl-topup-original/acquisition-transposed.json"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["field_test.nii.gz: values identical", "iout_test.nii.gz: values identical", "iout_test_mean.nii.gz: values identical"]
+status = "harness"
+explanation = "outputs named by a configuration file (FSL's test_acqp names --fout=field_test and --iout=iout_test) were compared as exact files: 62 cases; the suite compares them as the outputs they are (findings 31, 36)"
+link = "validation/difftest/cases/fsl-topup-original/configuration-outputs.json"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["Standard output (numbers to N significant digits)"]
+status = "harness"
+explanation = "--trace with -v: FSL prints a stage's Entering line inside a cost line; the suite takes the stages out before comparing (47 cases; findings 31, 36)"
+link = "validation/difftest/cases/fsl-topup-original/trace-verbose.json"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["Files written"]
+status = "explained"
+explanation = "--debug's attempt files: how many Levenberg-Marquardt attempts a level makes follows the minimisation's path (17 cases, reproducer topup-trial-02150; findings 36)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["vb: the printed phi, lambda and their ratio", "corrected (applytopup's output): mean |d| / mean intensity inside the brain", "corrected (applytopup's output): relative difference inside the brain, Nth percentile"]
+status = "explained"
+explanation = "FSL-143 reproduced: vb3D's and vb4D's indefinite prior makes the iterations diverge, which amplifies the moved images' last bits (51 cases, reproducer topup-trial-00275; findings 26, 36)"
+link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-143"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["corrected (applytopup's output): relative difference inside the brain, Nth percentile", "hifi (applytopup's output): relative difference inside the brain, Nth percentile", "vb: the printed phi, lambda and their ratio"]
+status = "explained"
+explanation = "FSL-133: applytopup's lines whose length does not divide 2^32 wrap in FSL as the black-box runs do not determine; the original restores them circularly in both modes (484 cases, reproducer topup-trial-00005; findings 21, 36)"
+link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-133"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["hifi (applytopup's output): relative difference inside the brain, Nth percentile", "hifi (applytopup's output): mean |d| / mean intensity inside the brain"]
+status = "open"
+explanation = "applytopup --method=lsr on lines whose length divides 2^32 (16-voxel lines): the restored image's 99th percentile 1.4e-3 to 0.13 apart (8 cases, reproducer topup-trial-08089); a question for the specification (findings 36)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["vb: the printed phi, lambda and their ratio"]
+status = "explained"
+explanation = "vb2D's transients: the printed phi and lambda of slices with few voxels in the brain part in the 4th digit during the iterations and meet again (1 case, reproducer topup-trial-13346; as the record's at/vb2d-aniso)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["corrected (applytopup's output): mean |d| / mean intensity inside the brain", "hifi (applytopup's output): mean |d| / mean intensity inside the brain"]
+status = "explained"
+explanation = "integer outputs (char, short): values a rounding apart land on neighbouring integers (4 cases, reproducer topup-trial-07321; findings 36)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["-v: the final cost"]
+status = "fixed"
+explanation = "the scaled conjugate gradients' second gradient took the regulariser weight of x + sigma d; FSL keeps the current point's: fixed (findings 34); the rest of the 216 cases are other paths of fits the data hardly determine, some just past a threshold (reproducer topup-trial-12118; findings 36)"
+link = "validation/difftest/cases/fsl-topup-original/scg-regulariser-weight.json"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["topup_movpar.txt: rotations", "topup_movpar.txt: translations", "corrected: relative difference inside the brain, Nth percentile", "corrected_mean: relative difference inside the brain, Nth percentile"]
+status = "explained"
+explanation = "FSL's rotation derivatives of the movements are not its cost's (the original's are): in cases that estimate the movements the two minimisations end apart (4,462 cases, reproducer topup-trial-00006; findings 14, 36; the record's expected divergences; a question for the specification)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["_fieldcoef (its field, Hz): correlation inside the brain", "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile", "_fieldcoef (its field, Hz): |d| inside the brain, mean", "--fout (Hz): correlation inside the brain"]
+status = "register"
+explanation = "FSL-146 (rule A): with volumes encoded along different axes FSL's gradient is not its cost's; the original's reproduce mode now follows FSL's, its default the cost's own gradient (895 cases, with movements also findings 14; reproducer topup-trial-10280; findings 35, 36)"
+link = "validation/difftest/cases/fsl-topup-original/fsl146-mixed-axes.json"
+defect = "FSL-146"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["topup_fieldcoef.nii.gz: header", "o_fieldcoef.nii.gz: header", "my_topup_fieldcoef.nii.gz: header"]
+status = "fixed"
+explanation = "a LARMORX mistake: the quadratic B-splines' count was the cubic one; FSL's ceil((2n + k - 4) / 2k) + 2 now (429 cases, reproducer topup-trial-11095; findings 29, 36); with it FSL-145 was found"
+link = "validation/difftest/cases/fsl-topup-original/quadratic-count.json"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["--fout (Hz): correlation inside the brain", "--fout (Hz): |d| inside the brain, Nth percentile", "--fout (Hz): |d| inside the brain, mean", "o_fieldcoef.nii.gz: header", "o_movpar.txt: rotations", "o_movpar.txt: translations"]
+status = "register"
+explanation = "FSL-145 (rule A): with --splineorder=2 an axis shorter than two knot spacings gets two coefficients; the original's reproduce mode lays FSL's two, its default the general count (findings 30)"
+link = "validation/difftest/cases/fsl-topup-original/fsl145-short-axis.json"
+defect = "FSL-145"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["--fout (Hz): correlation inside the brain", "--fout (Hz): |d| inside the brain, Nth percentile", "--fout (Hz): |d| inside the brain, mean", "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile"]
+status = "open"
+explanation = "quadratic splines with an even knot spacing (knots on voxels): the Levenberg-Marquardt Hessian's regulariser part differs from FSL's by up to 3.4 % while the first gradient and cost agree; no knot convention tried reproduces it (47 cases, reproducer topup-trial-10753; findings 36); a question for the specification"
+link = "docs/findings/fsl-topup-original.md"

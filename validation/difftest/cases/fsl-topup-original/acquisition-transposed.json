@@ -1,0 +1,379 @@
+{
+ "defect": null,
+ "description": "an acquisition file of four rows and one column per volume (read transposed): the suite's own reading fixed (the drawn case)",
+ "expect": "pass",
+ "found": {
+  "detail": "<checkout>/validation/src/larmorx_validation/parity/fsl_topup.py\", line 972, in _run_case\n    compare(checks, oracle, ours, a, b, args, before, band, program=prog)\n  File \"<checkout>/validation/src/larmorx_validation/parity/fsl_topup.py\", line 764, in compare\n    got, exact = measures(a, b, args, fa, mask, program)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nIndexError: index 3 is out of bounds for axis 0 with size 2\n",
+  "n": 27,
+  "seed": "topup-trial",
+  "shrink_moves": [
+   "dropped --logout (--logout=topup.log)",
+   "dropped --regrid (--regrid=0)",
+   "dropped --interp (--interp=linear)",
+   "dropped --minmet (--minmet=0,0)",
+   "dropped --estmov (--estmov=1,1)",
+   "dropped --lambda (--lambda=0.005,5e-06)",
+   "dropped --miter (--miter=1,1)",
+   "dropped --fwhm (--fwhm=0,0)",
+   "dropped --subsamp (--subsamp=2,1)",
+   "dropped --warpres (--warpres=20,14)",
+   "pair: axis 0 20 -> 10 voxels",
+   "pair: axis 1 20 -> 10 voxels",
+   "pair: axis 2 16 -> 8 voxels",
+   "pair: axis 0 10 -> 5 voxels",
+   "pair: axis 1 10 -> 5 voxels",
+   "pair: axis 2 8 -> 4 voxels",
+   "pair: axis 0 5 -> 2 voxels",
+   "pair: axis 1 5 -> 2 voxels",
+   "pair: axis 2 4 -> 2 voxels",
+   "pair: axis 0 2 -> 1 voxels",
+   "pair: axis 1 2 -> 1 voxels",
+   "pair: axis 2 2 -> 1 voxels",
+   "pair (and its grid): plumb orientation",
+   "pair (and its grid): unit spacing",
+   "pair (and its grid): origin at 0",
+   "pair (and its grid): sform = qform",
+   "pair (and its grid): qform and sform codes 1",
+   "pair: float32 storage"
+  ],
+  "signature": [
+   "exception"
+  ]
+ },
+ "id": "acquisition-transposed",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 2
+  },
+  "features": {
+   "--acqp": false,
+   "--debug": false,
+   "--dfout": false,
+   "--estmov one value": false,
+   "--featout": false,
+   "--fout": false,
+   "--fwhm one value": false,
+   "--interp": true,
+   "--interp value": "linear",
+   "--iout": false,
+   "--jacout": true,
+   "--logout": true,
+   "--minmet one value": false,
+   "--miter one value": false,
+   "--nthr": false,
+   "--numprec": false,
+   "--out": true,
+   "--rbmout": false,
+   "--regmod": false,
+   "--regrid": true,
+   "--regrid value": "0",
+   "--scale": false,
+   "--splineorder": false,
+   "--ssqlambda": false,
+   "--trace": false,
+   "-v": false,
+   "FSL's configuration": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": true,
+   "basename": "o",
+   "bias0": -0.004,
+   "bias1": 0.0,
+   "bias2": 0.002,
+   "config file": false,
+   "dtype": "int16",
+   "estmov0": true,
+   "estmov1": true,
+   "extreme": false,
+   "field Hz": 25.0,
+   "field centre0": -0.2,
+   "field centre1": -0.4,
+   "field centre2": 0.1,
+   "field gradient0": -8.0,
+   "field gradient1": -2.0,
+   "field gradient2": -2.0,
+   "field width": 0.8,
+   "fwhm0": 0,
+   "fwhm1": 0,
+   "head axis0": 1.1,
+   "head axis1": 0.85,
+   "head axis2": 1.1,
+   "head centre0": -0.06,
+   "head centre1": 0.04,
+   "head centre2": 0.02,
+   "head fraction": 0.44,
+   "in-plane gradient only": false,
+   "in-plane voxel": 2.5,
+   "kind": "topup",
+   "lambda0": "0.005",
+   "lambda1": "5e-06",
+   "largest subsampling": 2,
+   "levels": 2,
+   "miter0": 1,
+   "miter1": 1,
+   "movements": false,
+   "noise": 2.0,
+   "nx": 20,
+   "ny": 20,
+   "nz": 16,
+   "orientation": "oblique",
+   "origin0": 27.75,
+   "origin1": -40.5,
+   "origin2": 32.5,
+   "phase encodings": "y pair",
+   "qfac": 1,
+   "qform_code": 1,
+   "read-out time": 0.01,
+   "read-out times differ": false,
+   "reversed first": false,
+   "scaled": false,
+   "scg throughout": false,
+   "scg1": false,
+   "sform": "other",
+   "sform_code": 3,
+   "shape": "20x20x16",
+   "shear0": 0.025,
+   "shear1": 0.05,
+   "shear2": -0.05,
+   "slice thickness": 4.0,
+   "spacing0": 1.5,
+   "spacing1": 2.0,
+   "spacing2": 1.2,
+   "subsamp drops0": true,
+   "suffix": ".nii.gz",
+   "units": "mm",
+   "warpres pool": 4
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--datain={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=o"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--warpres=20,14"
+    ],
+    "name": "--warpres",
+    "optional": true
+   },
+   {
+    "args": [
+     "--subsamp=2,1"
+    ],
+    "name": "--subsamp",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fwhm=0,0"
+    ],
+    "name": "--fwhm",
+    "optional": true
+   },
+   {
+    "args": [
+     "--miter=1,1"
+    ],
+    "name": "--miter",
+    "optional": true
+   },
+   {
+    "args": [
+     "--lambda=0.005,5e-06"
+    ],
+    "name": "--lambda",
+    "optional": true
+   },
+   {
+    "args": [
+     "--estmov=1,1"
+    ],
+    "name": "--estmov",
+    "optional": true
+   },
+   {
+    "args": [
+     "--minmet=0,0"
+    ],
+    "name": "--minmet",
+    "optional": true
+   },
+   {
+    "args": [
+     "--interp=linear"
+    ],
+    "name": "--interp",
+    "optional": true
+   },
+   {
+    "args": [
+     "--regrid=0"
+    ],
+    "name": "--regrid",
+    "optional": true
+   },
+   {
+    "args": [
+     "--jacout=jac"
+    ],
+    "name": "--jacout",
+    "optional": true
+   },
+   {
+    "args": [
+     "--logout=topup.log"
+    ],
+    "name": "--logout",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 0\n1 -1\n0 0\n0.01 0.01\n"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      1.1,
+      0.85,
+      1.1
+     ],
+     "bias": [
+      -0.004,
+      0.0,
+      0.002,
+      0.0
+     ],
+     "centre": [
+      -3.0,
+      2.0,
+      1.0
+     ],
+     "noise": 2.0,
+     "seed": 464161296,
+     "size": 22.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      -0.2,
+      -0.4,
+      0.1
+     ],
+     "gradient": [
+      -8.0,
+      -2.0,
+      -2.0
+     ],
+     "hz": 25.0,
+     "volumes": [
+      [
+       1,
+       0.01
+      ],
+      [
+       1,
+       -0.01
+      ]
+     ],
+     "width": 0.8
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -11.5,
+      -21.0,
+      -38.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      13,
+      0,
+      -3,
+      -1
+     ],
+     "sform": "other",
+     "sform_code": 3,
+     "shear": [
+      0.025,
+      0.05,
+      -0.05
+     ],
+     "spacing": [
+      2.5,
+      2.5,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     20,
+     16,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 6.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 27,
+  "options": [
+   "--datain",
+   "--estmov",
+   "--fwhm",
+   "--interp",
+   "--jacout",
+   "--lambda",
+   "--logout",
+   "--minmet",
+   "--miter",
+   "--regrid",
+   "--subsamp",
+   "--warpres",
+   "2 levels",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "topup-trial",
+  "tool": "fsl-topup-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

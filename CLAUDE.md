@@ -38,9 +38,9 @@ the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (
 **Next** (the order: [docs/next-steps.md](docs/next-steps.md), "The order from here"; the earlier
 steps: [docs/status.md](docs/status.md)): ports first, with smart testing per part, the very extensive
 testing in one final validation phase (user, 2026-10-28). FLIRT's clean-room original and FAST's
-replica (2026-11-02), FAST's clean-room original and topup's replica (2026-11-03) complete; now
-topup's clean-room original beside `fslmaths` and `fslstats`'s replica (two agents by role,
-2026-11-02); then field maps, templates, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+replica (2026-11-02), FAST's clean-room original and topup's replica, topup's clean-room original
+(2026-11-03) complete; now `fslmaths` and `fslstats`'s replica (finishing), then their clean-room
+originals beside the next replica (two agents by role, 2026-11-02); then BET's `-S`/`-B`/`-A`/`-A2`, field maps, templates, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.

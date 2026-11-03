@@ -176,12 +176,29 @@ What the coverage test enumerates:
   missing directory, which topup skips) by its status. The runner fills `{name}` inside an argument with the input's path
   relative to the case's directory (`../bet-inputs/<file>`: topup's log records its options as
   given, so the same text on every platform), and `--topup=@<case>` copies an earlier case's
-  coefficients and movements in. `lx.fsl.topup` and `lx.fsl.applytopup` are replica-only functions
-  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until topup's clean-room original.
+  coefficients and movements in. `lx.fsl.topup` and `lx.fsl.applytopup` were replica-only functions
+  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until topup's clean-room original (below).
   `larmorx-nc`'s checksums recorded on 2026-11-03 from 79dbdf0 (committed as a0e6ccf), then the three
   topup logs again from 5c26745 (d9fed9c, the relative paths): 7 cases and 54 outputs added, every
   other checksum unchanged (the core's additions for topup, and its `dgemm` reordered to OpenBLAS's
   four partial sums, changed no golden output); the topup cases take about 3 s together.
+- **topup and applytopup, the clean-room original** (2026-11-03, six cases in
+  `tests/golden/registry.py`, on `blip_pair`, a generated head of 16 × 16 × 8 voxels of 3 mm moved
+  one voxel either way along y (seeded integers, no transcendental functions), its volumes `blip_up`
+  and `blip_down`, a three-volume series `blip_series`, an acquisition file and a two-level
+  configuration `quick.cnf` written by the test): `cli.fsl.topup` (fMRIPrep's call with a
+  configuration file and every output: Levenberg-Marquardt with the movements, then scaled
+  conjugate gradients; the usage and exit status without arguments), `cli.fsl.topup.options`
+  (membrane energy, quadratic splines, single precision, linear interpolation, no regridding,
+  `--acqp`, `--featout`, `-v`; FSL-117 and FSL-145 in both modes), `cli.fsl.applytopup` (`lsr`;
+  `jac` with the short names, trilinear interpolation and a 16-bit output; FSL-132 in both modes on
+  the series; the usage), `cli.fsl.applytopup.vb` (`vb2D`, `vb3D`, `vb4D`, their iterations on
+  standard output), `py.fsl.topup` and `py.fsl.applytopup` (`implementation="original"` on
+  in-memory images). The inputs are named relative to the case's directory (topup's log records its
+  options as given). `lx.fsl.topup` and `lx.fsl.applytopup` left `REPLICA_ONLY_FUNCTIONS` (now
+  empty). Recorded from a49e214 (committed as d898df9), the parity smoke tier's marker of the same
+  commit and build reused (2,714 passed): 6 cases and 76 outputs added, every other checksum
+  unchanged; each case runs in 0.01 to 0.04 s.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

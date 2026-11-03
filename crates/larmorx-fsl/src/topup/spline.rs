@@ -281,18 +281,20 @@ impl Op1 {
                 // blocks of lines, transposed so that a row's weights apply to the block's
                 // lines at once
                 const LINES: usize = 64;
-                out.par_chunks_mut(ox * LINES)
-                    .enumerate()
-                    .for_each(|(b, o)| {
+                out.par_chunks_mut(ox * LINES).enumerate().for_each_init(
+                    || (Vec::new(), Vec::new()),
+                    |(tin, tout), (b, o)| {
                         let nl = o.len() / ox;
                         let src = &data[b * LINES * nx..(b * LINES + nl) * nx];
-                        let mut tin = vec![0.0; nx * nl];
+                        tin.clear();
+                        tin.resize(nx * nl, 0.0);
                         for (l, line) in src.chunks(nx).enumerate() {
                             for (x, &v) in line.iter().enumerate() {
                                 tin[x * nl + l] = v;
                             }
                         }
-                        let mut tout = vec![0.0; ox * nl];
+                        tout.clear();
+                        tout.resize(ox * nl, 0.0);
                         for (r, orow) in tout.chunks_mut(nl).enumerate() {
                             for j in 0..width {
                                 let w = self.w[r * width + j];
@@ -307,7 +309,8 @@ impl Op1 {
                                 *v = tout[r * nl + l];
                             }
                         }
-                    });
+                    },
+                );
             }
             1 => {
                 out.par_chunks_mut(ox * oy).enumerate().for_each(|(z, o)| {
@@ -348,17 +351,20 @@ impl Op1 {
         assert_eq!(dims[2], self.inp, "operator and axis lengths differ");
         let plane = dims[0] * dims[1];
         let width = self.width;
-        out.par_chunks_mut(plane).enumerate().for_each(|(r, o)| {
-            let mut t = vec![0.0; plane];
-            for j in 0..width {
-                let w = self.w[r * width + j];
-                if w != 0.0 {
-                    let i = self.idx[r * width + j];
-                    axpy(&mut t, w, &data[i * plane..(i + 1) * plane]);
+        out.par_chunks_mut(plane)
+            .enumerate()
+            .for_each_init(Vec::new, |t, (r, o)| {
+                t.clear();
+                t.resize(plane, 0.0);
+                for j in 0..width {
+                    let w = self.w[r * width + j];
+                    if w != 0.0 {
+                        let i = self.idx[r * width + j];
+                        axpy(t, w, &data[i * plane..(i + 1) * plane]);
+                    }
                 }
-            }
-            axpy(o, scale, &t);
-        });
+                axpy(o, scale, t);
+            });
     }
 }
 

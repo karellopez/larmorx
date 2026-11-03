@@ -322,16 +322,25 @@ impl ByOffset {
     fn damped(h: &Stencil, damping: f64, pool: &Pool) -> ByOffset {
         let n = h.n();
         let mut data = pool.zeros(343 * n);
-        data.par_chunks_mut(n).enumerate().for_each(|(d, col)| {
-            for (k, v) in col.iter_mut().enumerate() {
-                *v = h.data[k * 343 + d];
-            }
-            if d == CENTRE {
-                for v in col.iter_mut() {
-                    *v *= 1.0 + damping;
+        // eight offsets at a time: each row's eight entries are one cache line of the stencil
+        const D: usize = 8;
+        data.par_chunks_mut(D * n)
+            .enumerate()
+            .for_each(|(b, cols)| {
+                let d0 = b * D;
+                let nd = cols.len() / n.max(1);
+                for k in 0..n {
+                    let row = &h.data[k * 343 + d0..k * 343 + d0 + nd];
+                    for (j, &v) in row.iter().enumerate() {
+                        cols[j * n + k] = v;
+                    }
                 }
-            }
-        });
+                if (d0..d0 + nd).contains(&CENTRE) {
+                    for v in &mut cols[(CENTRE - d0) * n..(CENTRE - d0 + 1) * n] {
+                        *v *= 1.0 + damping;
+                    }
+                }
+            });
         ByOffset { dims: h.dims, data }
     }
 

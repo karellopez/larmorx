@@ -575,15 +575,16 @@ impl Level {
         let mut mask = vec![true; nvox];
         let plane = nx * ny;
         for (i, ev) in self.e.iter().enumerate() {
+            // every value of these is written below, slice by slice
             let pool = &self.pool;
-            let mut ui = pool.zeros(nvox);
-            let mut ji = pool.zeros(nvox);
-            let mut fi = pool.zeros(nvox);
+            let mut ui = pool.take(nvox);
+            let mut ji = pool.take(nvox);
+            let mut fi = pool.take(nvox);
             let mut fdi: [Option<Vec<f64>>; 3] =
-                std::array::from_fn(|a| (ev[a] != 0.0).then(|| pool.zeros(nvox)));
+                std::array::from_fn(|a| (ev[a] != 0.0).then(|| pool.take(nvox)));
             let est = self.estimated[i];
             let mut fmi: Option<[Vec<f64>; 3]> =
-                est.then(|| std::array::from_fn(|_| pool.zeros(nvox)));
+                est.then(|| std::array::from_fn(|_| pool.take(nvox)));
             let motion = motions[i].filter(|m| !m.is_identity());
             let want: [bool; 3] = std::array::from_fn(|a| est || ev[a] != 0.0);
             let e_mm: [f64; 3] = std::array::from_fn(|a| ev[a] * self.vt[a]);
@@ -595,7 +596,54 @@ impl Level {
             let slices = Slices::split(
                 plane, &mut ui, &mut ji, &mut fi, &mut fdi, &mut fmi, &mut mask,
             );
+            // the Jacobian's terms, in axis order
+            let jterms: Vec<(f64, &[f64])> = (0..3)
+                .filter_map(|b| dh[b].as_deref().map(|d| (ev[b], d)))
+                .collect();
             slices.into_par_iter().enumerate().for_each(|(z, mut o)| {
+                if let Some((a, lines)) = line {
+                    // displaced along axis `a` alone: the spline's line through the voxel (the
+                    // general branch below, with its invariants taken out of the loop)
+                    let n = lines.dims[a];
+                    let stride = [1, lines.dims[0], lines.dims[0] * lines.dims[1]][a];
+                    let (sa, ea) = (self.scale[a], ev[a]);
+                    let ny = plane / nx.max(1);
+                    let mut fd_a = o.fd[a].take();
+                    for y in 0..ny {
+                        for x in 0..nx {
+                            let k = y * nx + x;
+                            let v = z * plane + k;
+                            let hv = h[v];
+                            let mut jv = 1.0;
+                            for (e, d) in &jterms {
+                                jv += e * d[v];
+                            }
+                            let p = [x, y, z][a] as f64 + hv * ea;
+                            let (idx, w, dw) = taps_both(p * sa, n, lines.linear);
+                            let mut base_p = [x, y, z];
+                            base_p[a] = 0;
+                            let base =
+                                (base_p[2] * lines.dims[1] + base_p[1]) * lines.dims[0] + base_p[0];
+                            let mut f = 0.0;
+                            let mut df = 0.0;
+                            for j in 0..4 {
+                                let val = lines.data[base + idx[j] * stride];
+                                f += w[j] * val;
+                                df += dw[j] * val;
+                            }
+                            o.u[k] = jv * f;
+                            o.j[k] = jv;
+                            o.f[k] = f;
+                            if let Some(arr) = &mut fd_a {
+                                arr[k] = df * sa;
+                            }
+                            if !inside_static([x, y, z], self.nt, *ev) {
+                                o.mask[k] = false;
+                            }
+                        }
+                    }
+                    return;
+                }
                 for (k, (y, x)) in (0..plane / nx.max(1))
                     .flat_map(|y| (0..nx).map(move |x| (y, x)))
                     .enumerate()

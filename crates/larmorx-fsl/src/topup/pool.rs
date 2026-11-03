@@ -45,6 +45,18 @@ impl Pool {
         vec![0.0; n]
     }
 
+    /// An array of `n` values whose contents are left as they are: for a caller that writes
+    /// every value before reading any.
+    pub fn take(&self, n: usize) -> Vec<f64> {
+        if n >= Self::MIN {
+            let mut f = self.free.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(i) = f.iter().rposition(|v| v.len() == n) {
+                return f.swap_remove(i);
+            }
+        }
+        vec![0.0; n]
+    }
+
     /// Gives `v` back for reuse.
     pub fn give(&self, v: Vec<f64>) {
         if v.len() >= Self::MIN {

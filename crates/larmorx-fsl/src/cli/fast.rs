@@ -1030,7 +1030,11 @@ fn write_outputs(
             members: s.members.as_deref(),
             pve: s.pve.as_ref(),
             bias: s.bias.as_ref().map(|b| vec![&b[..]]),
-            bias_outside: if s.bias.is_some() { s.bias_outside } else { 0.0 },
+            bias_outside: if s.bias.is_some() {
+                s.bias_outside
+            } else {
+                0.0
+            },
         },
         Outputs::Multi(m) => Parts {
             grid: &m.grid,

@@ -6,7 +6,7 @@
 is in `specs/fslmaths.md` (to come) and the register's summary rows.
 
 The replica is `crates-nc/larmorx-nc-avwutils` (`larmorx-nc fsl fslmaths`), on the shared core's
-newimage operations (`larmorx-nc-core`'s `volops`, `cprob`, `filters`, `kissfft`). Its parity suite is
+newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`, `kissfft`). Its parity suite is
 `fsl-maths-replica` (`validation/src/larmorx_validation/parity/fsl_maths_replica.py`).
 
 ## How fslmaths computes (what decides the bits)
@@ -187,7 +187,76 @@ newimage operations (`larmorx-nc-core`'s `volops`, `cprob`, `filters`, `kissfft`
   their extremes for L and MD, 1 0 for FA, 1 -1 for MO and V), and the pipeline goes on with the
   FA image (3D).
 
-## Defects (FSL-151 to FSL-166; the register's rows through the handoff)
+## Along dimensions, statistics and the goodvoxels mask (sub-task 3)
+
+- **Reductions along a dimension** (`inputParser`'s first branch: any argument whose second
+  character is a capital, `isupper` in the C locale). `-T`, `-Z`, `-Y`, `-X` set that axis's
+  offset to its size; any other capital (`-Smean`) reduces nothing (a column of one value per
+  voxel). The image is `reinitialize`d with the axis of size 1 (`size / offset`) and
+  `copyproperties` of the input (pixdims, the display range, the transforms: `pixdim[4]` keeps
+  the TR when `-T` reduces t), then for each output voxel (t, z, y, x order) a
+  `volume<T>(nsize, 1, 1)` holds the values along the axis and the name after the letter picks:
+  `max`/`min` (`calculateExtrema`: from the first value, `>` then `else if <`), `mean`
+  (`(T)(sum / max(1, n))`, `calculateSums`: doubles, blocks of `max(sqrt(n), 10000) + 1`
+  values), `std` (`(T) sqrt(variance())`, the unmasked `(n / (n - 1)) (sumsq / n - mean^2)`),
+  `maxn` (`max(mask, coords)`: the index of the first maximum, as `int64` into `T`), `median`
+  (`percentile(0.5)`), `perc <p>` (`percentile((float)(atof / 100.0))`: newimage throws
+  `Percentiles must be in the range [0.0,1.0]`, #4, at the first voxel outside [0, 1]; a NaN
+  passes and gives the first bin; the argument is the next one even when it is the output name,
+  which then is missing), `ar1` (the column demeaned in `T` by `(T) mean`, `sumsquares`, then
+  `out += (T)(c[k] * c[k-1] / sumsq)` in `T`, with the product in C's type: `float` for float,
+  `int` for char, short and int). An unknown name prints `Error unknown Dimensionality
+  operation: <arg>` and returns 1 (no output). `percentile` is `percentile_vec`: the values
+  sorted by `std::sort` (`operator<`), the value at `(unsigned int)((float) n * p)` (GCC: a 64-bit
+  `cvttss2si`, the low 32 bits), at most `n - 1`.
+- **-pval, -pval0, -cpval.** The image reduced to its first volume; `pval` is a `float` counting
+  `v0 <= v_t` over t >= 1 from 1, divided by T (`-pval0`: zero first values give 0, zero values
+  are left out of the count and of the divisor `cnt`). `-cpval`: `max_dist` a `volume<float>` of
+  T values started at the image's `min()` (as float), `MAX(max_dist, v)` over every voxel of
+  volume t (in the common type: double for a double image, else float, stored as float), then
+  `cpval` counts `v0 <= max_dist[t]` (common type again: an int image's `v0` as float) over T.
+- **-ztop, -ptoz.** `(T)(1 - ndtr((double) v))`; `(T)((v <= 0 || v >= 1) ? 0 : ndtri(1 - v))`.
+  fsl-cprob's `ndtr` is Cephes' with `USE_EXPXSQ` (`erf` for `|x| < 1`, else `erfce(|x|)` times
+  `sqrt(expx2(a, -1))`, `expx2` splitting `x` at multiples of 1/128, glibc's `exp`); the build
+  multiplies `y * sqrt(z)` into the square root's register (`mulsd`), so `ndtr(±inf)` (NaN from
+  `inf / inf` and `inf - inf`) passes on the square root's positive NaN. Checked bit for bit
+  against `libfsl-cprob.so` (`validation/probes/fsl-avwutils-lib`: 180,890 arguments, 0 of
+  936,094 lines differ), which also found a digit of relay 1's `ndtri` `Q2[1]` mistyped (16 of
+  30,000 tail arguments one bit off; fixed: it reached `-randn` and `-ptoz` in the far tails only).
+- **-rank, -ranknorm.** Per voxel a `ColumnVector` (double) of the series, `SortAscending`
+  (armawrap: `arma::sort`, which throws `sort(): detected NaN`), then the "unsort": for each k
+  whose value differs from the sorted one, every later sorted value equal to it swaps its rank
+  and sorted value with k's (the loop does not stop at the first: ties get distinct ranks in
+  this order). `-ranknorm`: `rank = (rank - 0.5) / n`, then `(T)(mean + ndtri(rank) * stddev)`
+  of a `volume<double>` of the series (the unmasked variance).
+- **-roi.** Eight `atoi`s (`x1 = xmin + xsize - 1`; `x1 == x0 - 2`, a size of -1, means the
+  axis's last voxel); x, y, z through `niftivox2newimagevox_mat()` and `MISCMATHS::round`, then
+  put in order (t is not mapped); voxels outside zeroed. The arguments are read even past the
+  output name (`roi/into-output`: the output is then missing; `roi/null`: a null pointer).
+- **-bptf** (`bandpass_temporal_filter`). Half-widths `(int)(hp * 3)` and `(int)(lp * 20) + 2`;
+  a sigma at or below 0, or NaN (the `> 0` tests are false), skips its filter. High-pass: at
+  each t the Gaussian-weighted least-squares line over the window (`A`, `B`, `C`, `D`, `N` in
+  this order), `c = (B C - A D) / (C N - A A)`, `c0 + x - c` (c0 the first c), then demeaned;
+  a zero denominator (a 3D image) keeps the value, then demeaning makes it 0. Low-pass: weights
+  normalised by their total over all `2m + 1` offsets, then each output `total / sum` of the
+  weights inside the series. The weights' `t * t` is an `int` (it wraps beyond 46,340, which
+  only series longer than 46,341 volumes would use). The replica computes the weights the
+  series reach only (FSL allocates `2m + 1`), the low-pass total over all of them in FSL's order.
+- **fMRIPrep's goodvoxels mask** (`init_goodvoxels_bold_mask_wf`, `--project-goodvoxels`; not in
+  the oracle runs): the suite builds its 14 fslmaths calls and 4 fslstats calls from the
+  workflow's code (nipype's argument formats: `-Tstd`, `-Tmean`, `-div <image>`, `-mas`,
+  `fslstats -M`/`-S` parsed as `float`, `-div %.8f`, `-bin -s 5`, `-s 5 -div <image> -dilD`,
+  `-thr %.10f` of `mean + 0.5 std`, `-bin -sub <image> -mul -1`) on ds005040's BOLD series in
+  T1w space (50 x 62 x 44 x 63), with a stand-in ribbon (the segmentation's grey matter at each
+  BOLD voxel's centre: the no-reconall runs have no FreeSurfer ribbon); each call runs on FSL's
+  outputs of the earlier calls (`oracles/inputs/fsl-maths-replica/goodvoxels/`). All 14 calls:
+  every file bit-identical, both modes. fslstats' four calls are compared in sub-task 4.
+- **Not defects.** `-Tar1` under `-dt int` multiplies in 32-bit `int` (signed overflow, which
+  x86-64 wraps), but a wrapped product is, like the right one, below half the sum of squares in
+  magnitude, so every term truncates to 0 either way (`dim/Tar1-int-large`); `-bptf nan nan`
+  skips both filters; `-Tmean` of a series holding NaN is NaN.
+
+## Defects (FSL-151 to FSL-172; the register's rows through the handoff)
 
 - **FSL-151 (c; rule A): undefined or wrapping conversions to integers.** `(T) atof` of a number
   beyond `T` under `-dt char|short|int`, `-rem`'s `(int)` casts of out-of-range or NaN values,
@@ -291,6 +360,51 @@ newimage operations (`larmorx-nc-core`'s `volops`, `cprob`, `filters`, `kissfft`
   applytopup reach): the maximum of absolute values, whose zeros are all `+0`, so their results
   cannot move (sub-task 6's re-made records check it).
 
+- **FSL-153, extended (sub-task 3): a NaN first value along a dimension.** `-Tmax`, `-Tmin`,
+  `-Tmaxn` (and X, Y, Z) use `calculateExtrema` of the column: a NaN first value keeps the
+  maximum and minimum NaN and the index 0, while NaN values later are left out. Corrected as
+  FSL-153: NaN values left out (all NaN: NaN, index 0). Cases: `d13/Tmax-nan`, `d13/Tmin-nan`,
+  `d13/Tmaxn-nan`.
+- **FSL-162, extended: `-rank` and `-ranknorm` of a series holding NaN** stop at that voxel
+  (armawrap's `SortAscending` is `arma::sort`: `sort(): detected NaN`). Corrected (rule A): the
+  NaN values keep their NaN and the others are ranked among themselves (`-ranknorm`: their own
+  count, mean and standard deviation). Cases: `d13/rank-nan`, `d13/ranknorm-nan` (`fixed`).
+- **FSL-167 (c; rule A): the unmasked variance.** `newimage.h`'s `variance()` is `(n / (n - 1))
+  (sumsquares() / n - mean() mean())` with neither the masked `variance(mask)`'s clamp
+  (`Max(0, ...)`) nor its `n / Max(1, n - 1)`: a nearly constant series whose variance rounds
+  below 0 (48 float values of 445631.21875, one of them the next float: -6.2e-5) gives `std`
+  NaN, and one value (`-Tstd` of a 3D image) gives `inf * 0`, NaN. Reaches `-Tstd`, `-Xstd`,
+  `-Ystd`, `-Zstd` and `-ranknorm`. Corrected: the masked form (0 for one value, never below 0),
+  named only where the two forms differ. Cases: `d13/Tstd-3d`, `d13/Tstd-negative`,
+  `d13/ranknorm-negative`, `d13/ranknorm-3d`.
+- **FSL-168 (c; rule A): percentiles of values holding NaN.** `std::sort` with `operator<` and
+  NaN is no strict weak order: the values are not sorted, so the median or percentile taken is
+  arbitrary (deterministic: libstdc++'s sequence, which the replica follows), and the unguarded
+  loops can step outside the vector (the replica then refuses in both modes). Corrected: NaN
+  values left out (all NaN: NaN). Cases: `d13/Tmedian-nan`, `d13/Tperc-nan`. fslstats' `-p`/`-P`
+  use the same `calc_percentiles` (sub-task 4).
+- **FSL-169 (c; rule A): NaN statistics in `-pval`, `-pval0`, `-cpval`.** A NaN statistic gets
+  p = 1/T from `-pval` (the smallest) and 0 from `-cpval`; a NaN permutation value counts as
+  smaller (`v0 <= NaN` is false); `-cpval`'s `MAX(m, NaN)` is NaN and `MAX(NaN, v)` is v, so a
+  permutation's maximum is that of the voxels after its last NaN. Corrected: a NaN statistic's
+  p-value is NaN, NaN permutation values are left out (of the count and the divisor; of the
+  maximum, which starts from the minimum of the values that are not NaN). Cases:
+  `d13/pval-nan`, `d13/pval0-nan`, `d13/cpval-nan`.
+- **FSL-170 (c; rule A): `-ztop` of an infinite z** is NaN (`ndtr(±inf)` is NaN). Corrected: 0
+  for +inf, 1 for -inf. Case: `d13/ztop-inf`.
+- **FSL-171 (a/c; rule B): `-bptf` with a sigma beyond int's range.** `(int)(hp * 3)` or
+  `(int)(lp * 20) + 2` of `+inf` or a huge sigma is `INT_MIN` (or near it): FSL moves the weights'
+  pointer outside its array and crashes (SIGSEGV, measured for the low-pass: `d13/bptf-lp-huge`;
+  the high-pass's weight loop writes outside its array: `d13/bptf-hp-inf`, FSL not run);
+  a half-width from 2^30 makes `2m + 1` wrap negative and `new double[]` throws
+  `std::bad_array_new_length` (`d13/bptf-hp-length`, `d13/bptf-lp-length`, reproduced). Corrected
+  (a sigma of hundreds of millions of volumes has no meaning): an error naming FSL-171 (exit 1);
+  `reproduce`: the exception, or a refusal where FSL crashes (`d13/bptf-hp-inf`: FSL not run).
+- **FSL-172 (c; rule A): `-ptoz` of tiny p-values.** `ndtri(1 - p)`: below about 1.1e-16 `1 - p`
+  rounds to 1, so `ndtri` prints `ndtri domain error` (stdout) and returns `MAXNUM` (inf as a
+  float) for each such voxel, where the z of p is about 8.2 or more. Corrected: `-ndtri(p)`
+  there (no message). Case: `d13/ptoz-tiny`.
+
 ## Known differences
 
 - **`-tan` in double** (`fn/double-tan`): glibc 2.35's `tan` (IBM's code) is not correctly
@@ -302,6 +416,5 @@ newimage operations (`larmorx-nc-core`'s `volops`, `cprob`, `filters`, `kissfft`
 
 ## Not yet translated (later sub-tasks of the part)
 
-The dimension reductions (`-T*`, `-X*`, `-Y*`, `-Z*`), `-roi`, `-bptf`, the statistics (`-pval*`,
-`-cpval`, `-ztop`, `-ptoz`, `-rank*`, `-tfce*`, `-roc`): the replica refuses them with a message
-until they are translated.
+`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta` and `-roc`: the replica refuses them with a
+message until they are translated (sub-task 3b).

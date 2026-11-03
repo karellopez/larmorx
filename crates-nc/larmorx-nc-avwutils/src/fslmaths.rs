@@ -20,12 +20,15 @@
 //!   (`-s`, `-fmean`, `-fmeanu`: separable, direct or by the FFT), `-subsamp2`, `-subsamp2offc`,
 //!   `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm`, `-ing`, `-tensor_decomp`
 //!   (`larmorx_nc_core::filters`, `kissfft`).
+//! - **Along dimensions and statistics** (`stats`): `-T`, `-X`, `-Y`, `-Z` reductions, `-pval`,
+//!   `-pval0`, `-cpval`, `-ztop`, `-ptoz`, `-rank`, `-ranknorm`, `-roi`, `-bptf`.
 //! - **D13.** FSL-151 (conversions to integers), FSL-152 (the `max() + 1` bound), FSL-153 (a
 //!   NaN first voxel), FSL-155 (`-dt input` of a type without its own), FSL-156 (integer
 //!   division traps), FSL-158 (arguments read past the command line), FSL-159 (images of
 //!   another size), FSL-160 (a zero-width Gaussian), FSL-161 (a kernel without voxels), FSL-162
 //!   (a NaN in a sorted window), FSL-163 (4D subsampling), FSL-164 (4D `-dog_edge`), FSL-165
-//!   (`-fillh` of one slice), FSL-166 (a non-finite tensor): corrected by default, reproduced
+//!   (`-fillh` of one slice), FSL-166 (a non-finite tensor), FSL-167 to FSL-172 (`stats`'
+//!   defects): corrected by default, reproduced
 //!   with `LARMORX_UPSTREAM_DEFECTS=reproduce` (crashes are refused in both modes).
 
 use std::io::Write;

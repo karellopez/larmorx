@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Translated to Rust from FSL 6.0.7.23: fsl-newimage 2601.0 (newimagefns.cc: box_kernel,
 // gaussian_kernel3D, spherical_kernel, fsllog2; newimagefns.h: morphfilter, dilateval,
-// ext_edge, dilall, convolve, convolve with a mask, efficient_convolve, generic_convolve), with
+// ext_edge, dilall, convolve, convolve with a mask, efficient_convolve, generic_convolve,
+// bandpass_temporal_filter), with
 // Armadillo 14.2.1's `max`, `min` and `sort` of a column vector as fsl-armawrap 0.7.0 calls them.
 // Copyright (C) 1999-2018 University of Oxford (Mark Jenkinson, Matthew Webster et al.); Armadillo
 // Copyright 2008-2016 Conrad Sanderson and National ICT Australia (Apache-2.0). Rust translation
@@ -19,6 +20,8 @@
 //! - [`generic_convolve`]: separable (along x, then y, then z, renormalised by the kernel's
 //!   overlap with the image) or not (the kernel normalised to sum 1, the direct sum or the FFT,
 //!   then optionally renormalised by the convolution of a volume of ones).
+//! - [`bandpass_temporal_filter`]: fslmaths' `-bptf`, with the checks of its half-widths
+//!   ([`bptf_half_widths`], [`bptf_stop`]).
 //!
 //! Conversions to the element type (`(T) x` of a `double` or a `float`) go through the caller's
 //! function, so that fslmaths' D13 handling of undefined conversions (FSL-151) applies.
@@ -1324,8 +1327,9 @@ pub enum BptfStop {
     /// `std::bad_array_new_length`.
     BadLength,
     /// A half-width below 0 (`(int)` of an infinite sigma, or of one beyond int's range, is the
-    /// most negative int): the weights' pointer is moved outside its array and FSL crashes
-    /// (a segmentation fault, measured for both filters).
+    /// most negative int): the weights' pointer is moved outside its array and FSL crashes (a
+    /// segmentation fault, measured for the low-pass; the high-pass's weight loop then writes
+    /// outside its array).
     Crash,
 }
 

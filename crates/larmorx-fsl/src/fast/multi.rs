@@ -318,7 +318,9 @@ fn sweeps(grid: &Grid, post: &mut [f32], gs: &[f32], beta: f32, priors: Option<&
 
 /// One estimate of every channel's bias field (§5.6) from the members `q` and the currently
 /// corrected channels `yb`: `W_i = Σ_c q_c / C_c(i,i)`, `R_i = Σ_c (q_c / C_c(i,i))(y_bi - μ_ci)`
-/// (single accumulation), both smoothed; `b_i = R_s / W_s`, 0 where `W_s` is 0.
+/// (the weights `q_c / C_c(i,i)` in single precision, `W` summed in single, each product of
+/// `R` in double rounded to single as it is added), both smoothed; `b_i = R_s / W_s`, 0 where
+/// `W_s` is 0.
 fn bias_fields(
     grid: &Grid,
     q: &[f32],
@@ -337,9 +339,13 @@ fn bias_fields(
             for (m, &idx) in grid.index.iter().enumerate() {
                 let (mut ws, mut rs) = (0f32, 0f32);
                 for (c, cl) in classes.iter().enumerate() {
-                    let t = f64::from(q[m * n + c]) / cl.cov[i * s + i];
-                    ws = (f64::from(ws) + t) as f32;
-                    rs = (f64::from(rs) + t * (f64::from(yb[m * s + i]) - cl.mean[i])) as f32;
+                    // the weight in single precision (the double quotient rounded), summed in
+                    // single; the residual's product with it in double, rounded at each sum
+                    // (observed: bit-identical to FSL's field with a one-tap kernel)
+                    let t = (f64::from(q[m * n + c]) / cl.cov[i * s + i]) as f32;
+                    ws += t;
+                    rs = (f64::from(rs) + f64::from(t) * (f64::from(yb[m * s + i]) - cl.mean[i]))
+                        as f32;
                 }
                 w[idx as usize] = ws;
                 r[idx as usize] = rs;

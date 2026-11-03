@@ -85,7 +85,7 @@ def run_original(
     env["OMP_NUM_THREADS"] = str(threads)
     env["LARMORX_IMPLEMENTATION"] = "original"
     for k, v in os.environ.items():
-        if k in ("PYTHONPATH", "VIRTUAL_ENV"):
+        if k in ("PYTHONPATH", "VIRTUAL_ENV") or k.startswith("LXM_"):
             env[k] = v
     p = subprocess.run(
         [*original_command(), "fsl", "fast", *args],

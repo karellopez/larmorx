@@ -21,7 +21,10 @@ cases:
 - **opt**, **cfg**, **err**, **thr**: every option of topup, FSL's configurations, the messages
   and failures, the thread counts, on the half-resolution pair;
 - **at**: applytopup (``larmorx-nc fsl applytopup``) on topup's own outputs (FSL's, from the
-  cache): least-squares restoration and Jacobian modulation, every option, message and failure.
+  cache): least-squares restoration and Jacobian modulation, every option, message and failure;
+- **difftest**: random cases of differential random testing
+  (``larmorx_validation.difftest.tools.fsl_topup``) and the permanent cases it found: a topup
+  run, or applytopup on FSL's topup run of the case's own pair (:func:`difftest_case`).
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status, standard
 output and error (the run directory and FSL's program path replaced, the replica's
@@ -33,6 +36,7 @@ rule. Every original run goes through the oracle-output cache (:func:`oracle_run
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -341,6 +345,8 @@ class Run:
     source: str = ""
     #: Files of :attr:`source` left out.
     drop: tuple[str, ...] = ()
+    #: A directory whose ``tu_*`` files are copied in (a random case's topup outputs: FSL's).
+    source_dir: str = ""
 
 
 #: The entries the ``fix`` pass may name without a visible change: applytopup's FSL-132 (the
@@ -353,36 +359,57 @@ _DURATION = re.compile(r"Duration: \S+")
 PROFILE_SUFFIX = ".topup_profile_topup.cpp_main.txt"
 
 
+def _input_file(name: str, d: Path) -> str:
+    """Input ``name`` copied into ``d``: a derived input (:func:`inputs`), or ``dt:<key>``, a
+    random case's (differential random testing), built from its recipe; its file name."""
+    if name.startswith("dt:"):
+        from larmorx_validation.difftest import inputs as dt_inputs
+
+        src = dt_inputs.path(name)
+    else:
+        src = inputs() / name
+    if not (d / src.name).exists():
+        shutil.copy(src, d / src.name)
+    return src.name
+
+
+def _resolve(word: str, d: Path) -> str:
+    """An argument's ``@name`` inputs (in a comma-separated list too: applytopup's --imain)
+    copied into ``d`` and named by their file names."""
+    if "@" not in word:
+        return word
+    key, sep, value = word.partition("=")
+    if not (sep and value.startswith("@")):
+        key, sep, value = "", "", word
+    if not value.startswith("@"):
+        return word
+    parts = [
+        _input_file(part[1:], d) if part.startswith("@") else part for part in value.split(",")
+    ]
+    return f"{key}{sep}{','.join(parts)}"
+
+
 def _prepare(run: Run, d: Path, node: Path | None) -> list[str]:
     """``run``'s inputs in ``d``; its arguments as the programs get them."""
     if any("{" in a for a in run.args) and (node is None or not _prepare_fmriprep(node, d)):
         raise Outcome("skipped", f"{SOURCE_RUN}'s topup inputs are not available")
-    if run.program == "applytopup":
+    if run.program == "applytopup" and not run.source_dir:
         applytopup_inputs()
     out = []
     for a in run.args:
-        if node is not None:
+        if node is not None and "{" in a:
             names = {k: v for k, _, v in (x.partition("=") for x in fmriprep_args(node))}
             a = a.format(imain=names["--imain"], datain=names["--datain"])
-        key, sep, value = a.partition("=")
-        if sep and value.startswith("@"):
-            # a comma-separated list (applytopup's --imain): each @name copied
-            parts = []
-            for part in value.split(","):
-                if part.startswith("@"):
-                    shutil.copy(inputs() / part[1:], d / part[1:])
-                    part = part[1:]
-                parts.append(part)
-            a = f"{key}={','.join(parts)}"
-        elif a.startswith("@"):
-            shutil.copy(inputs() / a[1:], d / a[1:])
-            a = a[1:]
-        out.append(a)
+        out.append(_resolve(a, d))
     for f in run.files:
         shutil.copy(inputs() / f, d / f)
     if run.source:
         src = topup_outputs(run.source)
         for f in sorted(src.iterdir()):
+            if f.name.startswith("tu_") and f.name not in run.drop:
+                shutil.copy(f, d / f.name)
+    if run.source_dir:
+        for f in sorted(Path(run.source_dir).iterdir()):
             if f.name.startswith("tu_") and f.name not in run.drop:
                 shutil.copy(f, d / f.name)
     return out
@@ -1946,10 +1973,47 @@ def cases(tier: str) -> list[Case]:
     return out
 
 
+#: The base name of a random case's topup run whose outputs applytopup applies.
+DIFFTEST_SOURCE = "tu"
+
+
+def difftest_case(payload: tuple[Run, Run | None], checks: CheckList) -> None:
+    """A random case of differential random testing (``difftest/tools/fsl_topup.py``) or a
+    permanent case it found: ``(topup, None)`` compares a topup run as every case does;
+    ``(topup, applytopup)`` runs FSL's topup once (through the oracle cache; its ``--out`` is
+    :data:`DIFFTEST_SOURCE`) and compares applytopup on its coefficients and movements."""
+    topup, at = payload
+    if at is None:
+        _run_case(topup, checks)
+        return
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-nc-topup-dts-") as s_,
+        tempfile.TemporaryDirectory(prefix="lx-nc-topup-dtsrc-") as src_,
+    ):
+        s, src = Path(s_), Path(src_)
+        r = _oracle(topup, _prepare(topup, s, None), s, dict(topup.settings))
+        if r.code != 0:
+            raise Outcome(
+                "skipped",
+                f"FSL's topup (applytopup's source) exits {r.code}: {' '.join(r.stderr.split())[-200:]}",
+            )
+        found = False
+        for f in sorted(s.iterdir()):
+            for stem in ("_fieldcoef", "_movpar.txt"):
+                if f.name.startswith(DIFFTEST_SOURCE + stem):
+                    shutil.copy(f, src / f.name)
+                    found = found or stem == "_fieldcoef"
+        if not found:
+            raise Outcome("skipped", "FSL's topup (applytopup's source) wrote no coefficients")
+        _run_case(dataclasses.replace(at, source_dir=str(src)), checks)
+
+
 def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
+    elif kind == "difftest":
+        difftest_case(payload, checks)
     else:
         _run_case(_all_cases()[payload][2], checks)
 

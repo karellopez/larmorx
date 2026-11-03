@@ -26,6 +26,9 @@ An **image spec** (a JSON object) names everything a NIfTI file holds:
   values (NaN, infinities, signed zeros, outliers);
 - ``dtype`` and ``scaling`` (``scl_slope``/``scl_inter``, a negative slope included);
 - ``timing`` (4D): the TR and its unit, the slice code, duration and range;
+- ``motion`` (4D): a rigid motion per volume; ``distortion``: a susceptibility distortion per
+  volume along its phase-encoding axis (an off-resonance field of a bump and a gradient, the
+  intensity times the displacement's Jacobian: reversed phase-encoding pairs, topup's input);
 - ``header``: other fields (``descrip``, ``intent_code``, ``cal_min``/``cal_max``,
   ``toffset``) and the file form (``.nii``, ``.nii.gz``, ``.hdr``/``.img``, byte order,
   NIfTI-2).
@@ -661,9 +664,14 @@ def image_data(spec: dict) -> np.ndarray:
     out = []
     for t in range(vols):
         p = points
+        jac = None
+        if (dist := spec.get("distortion")) is not None:
+            p, jac = distort_points(points, affine, dist, t)
         if (m := spec.get("motion")) and t < len(m):
-            p = move_points(points, m[t])
+            p = move_points(p, m[t])
         x = render(spec["content"], p, volume=t)
+        if jac is not None:
+            x = x * jac
         if (sig := spec.get("signal")) is not None:
             x = x * (1.0 + _triangle(t, sig))
         out.append(x)
@@ -678,6 +686,38 @@ def _triangle(t: int, signal: dict) -> float:
     period = signal.get("period", 4)
     phase = (t % period) / period
     return signal.get("amplitude", 0.05) * (4.0 * abs(phase - 0.5) - 1.0)
+
+
+def distort_points(
+    points: np.ndarray, affine: np.ndarray, dist: dict, t: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Volume ``t``'s sampling points under a susceptibility distortion, and the intensity's
+    factor (the displacement's Jacobian, at least 0.1). ``dist``: an off-resonance field in Hz,
+    ``hz * b**2`` with ``b = max(0, 1 - |u - centre|**2 / width**2)`` plus ``gradient . u``, of
+    the normalised voxel coordinates ``u`` (as :func:`field_data`'s); ``volumes[t]`` = (the
+    phase-encoding voxel axis, the phase encoding's sign times the read-out time in s): volume
+    ``t`` samples the object ``field * scale`` voxels along that axis (``volumes``' last entry
+    for later volumes). Plain arithmetic only."""
+    vols = dist["volumes"]
+    axis, scale = vols[min(t, len(vols) - 1)]
+    axis = int(axis)
+    spatial = list(points.shape[1:4])
+    idx = np.indices(spatial, dtype=np.float64)
+    half = [max(1.0, n / 2) for n in spatial]
+    u = [(idx[k] - (spatial[k] - 1) / 2) / half[k] for k in range(3)]
+    c = dist["centre"]
+    w2 = float(dist["width"]) ** 2
+    q = sum((u[k] - c[k]) * (u[k] - c[k]) for k in range(3)) / w2
+    b = np.maximum(0.0, 1.0 - q)
+    g = dist["gradient"]
+    hz = float(dist["hz"])
+    field = hz * b * b + sum(g[k] * u[k] for k in range(3))
+    # the field's derivative along the axis, per voxel
+    slope = (hz * 2.0 * b * (-2.0 * (u[axis] - c[axis]) / w2) + g[axis]) / half[axis]
+    disp = float(scale) * field
+    jac = np.maximum(0.1, 1.0 + float(scale) * slope)
+    step = np.asarray(affine[:3, axis], dtype=np.float64).reshape(3, 1, 1, 1)
+    return points + disp[None] * step, jac
 
 
 def move_points(points: np.ndarray, motion: dict) -> np.ndarray:

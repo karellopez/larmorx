@@ -753,6 +753,30 @@ How `fslstats.cc` computes, and what decides the bits:
   would need the `cbrtf` route (a behaviour spec, then a clean-room implementation): for the
   orchestrator to schedule. The replica's earlier `tan` (the `libm` crate, FreeBSD's) is gone.
 
+## Memory (sub-task 5b)
+
+`tests/parity/test_memory_peak.py`'s `AVW_CASES` (FSL's peak from the oracle cache, the
+replica through `python -m larmorx fsl ...`, both D13 modes; outputs and printed numbers
+identical in `reproduce`) first found the replica above FSL on 4D gzip inputs: `-Tstd` of
+ds005040's 63-volume BOLD series 116 MiB against FSL's 75, `fslstats -t` of it 69 against 43.
+The cause was in `larmorx-nc-core`'s reader, shared by every FSL replica: the whole compressed
+file was read, then decompressed, then copied out of the file's bytes, then converted to `T`
+(up to three full copies at once). FSL's `znzread` streams the decompression into its buffer.
+Fixed (2026-11-03): raw and gzip files are read as a stream (`nifti::Source`), `load_header`
+reads the header's bytes only, and the data are converted to `T` piece by piece as they are
+read (`open_image`, `ImageData::read`): an image is held once, in `T`. zstd and bzip2 files are
+still decompressed whole first (FSL 6.0.7.23's new formats; fMRIPrep writes neither). Same
+values and messages: the reader's paths have suite cases (`io/`: a gzip stream and a raw file
+cut inside the data, a header claiming 10^9 voxels with 64 bytes of data, data after a gap at
+`vox_offset` 1024, raw and gzip: identical to FSL), a datatype FSL does not read stays its error
+after the read (mcflirt's `rgb-input`), and fslmaths' and fslstats' standard tiers, the mcflirt,
+FLIRT, FAST, topup and BET replicas' smoke tiers gave their earlier results. After it (MiB,
+larmorx / FSL / the Python entry point's own cost): combine_masks 13.5 / 11.4 / 13.8, -Tstd
+37.5 / 74.9 / 14.0, goodvoxels' `-s 5 -div -dilD` 13.5 / 11.9 / 13.8, filters on 160 x 192 x
+160 60.5 / 65.5 / 13.2, `fslstats -M` 13.5 / 9.8 / 13.5, `fslstats -t -M -S -r` 37.4 / 42.8 /
+13.8; BET's calls fell too (`bet -F` of a 30-volume series 113 against FSL's 217). The replica
+runs on one thread: no thread test.
+
 ## Not yet translated (later sub-tasks of the part)
 
 Every fslmaths operation (sub-task 3b, 2026-11-03) and every fslstats option (sub-task 4) is

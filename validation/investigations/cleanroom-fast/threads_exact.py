@@ -37,6 +37,8 @@ CASES = {
     "s2-outputs": "-S 2 -B -b -g -p -v -o seg @mni_t1.nii.gz @mni_t2.nii.gz",
     "s2-n4": "-S 2 -n 4 -g -o seg @mni_t2.nii.gz @mni_t1.nii.gz",
     "s3": "-S 3 -B -b -o seg @mni_bold.nii.gz @mni_t2.nii.gz @mni_t1.nii.gz",
+    "s5-n5": "-S 5 -n 5 -P -v -o seg @mni_sum.nii.gz @mni_ratio.nii.gz @mni_bold.nii.gz @mni_t2.nii.gz @mni_t1.nii.gz",
+    "s2-priors": "-S 2 -A @tpl_csf.nii.gz @tpl_gm.nii.gz @tpl_wm.nii.gz -a @ident.mat -P -o seg @mni_t2.nii.gz @mni_t1.nii.gz",
     "priors-P": "-A @tpl_csf.nii.gz @tpl_gm.nii.gz @tpl_wm.nii.gz -a @ident.mat -P -o seg @mni_t1.nii.gz",
 }
 

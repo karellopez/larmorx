@@ -12,6 +12,8 @@
 //! original does not follow OpenBLAS's kernels (§8.6), so `-S 9` and more are segmented too.
 
 use std::io::Write;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::Relaxed;
 
 use larmorx_core::math;
 use rayon::prelude::*;
@@ -19,7 +21,7 @@ use rayon::prelude::*;
 use super::bias;
 use super::grid::{Grid, NEIGHBOURS};
 use super::pve::{self, Pve};
-use super::single::{Params, Stop, log1, prior_rows};
+use super::single::{Params, Stop, cell, from_cells, log1, prior_rows, to_cells};
 use super::stats::{self, PI_F32};
 use crate::cli::fmt::g;
 
@@ -174,40 +176,67 @@ pub fn members(post: &[f32], n: usize, nm: usize) -> Vec<f32> {
 
 /// The classes' statistics from the members `q` and the channels `y` (§5.3): `Σ q` in single,
 /// the products `q y` in single summed in double; the covariances in double; a singular one
-/// stops (FAST aborts).
+/// stops (FAST aborts). Every sum runs over the voxels in order; the sums are independent of
+/// each other, so they run in parallel (one task each), with the serial bits.
 pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class>, Stop> {
     let nm = y.len().checked_div(s).unwrap_or(0);
-    (0..n)
-        .map(|c| {
-            let mut sw = 0f32;
-            let mut sy = vec![0f64; s];
-            for v in 0..nm {
-                let qc = q[v * n + c];
-                sw += qc;
-                for i in 0..s {
-                    sy[i] += f64::from(qc * y[v * s + i]);
+    // Σ q_c (single) and Σ q_c y_ci (double) of each class
+    let first: Vec<f64> = (0..n * (1 + s))
+        .into_par_iter()
+        .map(|k| {
+            let (c, which) = (k / (1 + s), k % (1 + s));
+            if which == 0 {
+                let mut sw = 0f32;
+                for v in 0..nm {
+                    sw += q[v * n + c];
                 }
+                f64::from(sw)
+            } else {
+                let i = which - 1;
+                let mut t = 0f64;
+                for v in 0..nm {
+                    t += f64::from(q[v * n + c] * y[v * s + i]);
+                }
+                t
             }
-            let mean: Vec<f64> = sy
-                .iter()
-                .map(|&t| if sw == 0.0 { 0.0 } else { t / f64::from(sw) })
-                .collect();
-            let mut cov = vec![0f64; s * s];
-            let mut d = vec![0f64; s];
+        })
+        .collect();
+    let means: Vec<Vec<f64>> = (0..n)
+        .map(|c| {
+            let sw = first[c * (1 + s)];
+            (0..s)
+                .map(|i| {
+                    let t = first[c * (1 + s) + 1 + i];
+                    if sw == 0.0 { 0.0 } else { t / sw }
+                })
+                .collect()
+        })
+        .collect();
+    // Σ q_c (y_ci - μ_ci)(y_cj - μ_cj) of each class and pair (double)
+    let second: Vec<f64> = (0..n * s * s)
+        .into_par_iter()
+        .map(|k| {
+            let (c, i, j) = (k / (s * s), k / s % s, k % s);
+            let (mi, mj) = (means[c][i], means[c][j]);
+            let mut t = 0f64;
             for v in 0..nm {
                 let qc = f64::from(q[v * n + c]);
-                for i in 0..s {
-                    d[i] = f64::from(y[v * s + i]) - mean[i];
-                }
-                for i in 0..s {
-                    for j in 0..s {
-                        cov[i * s + j] += qc * d[i] * d[j];
-                    }
-                }
+                let di = f64::from(y[v * s + i]) - mi;
+                let dj = f64::from(y[v * s + j]) - mj;
+                t += qc * di * dj;
             }
-            for v in cov.iter_mut() {
-                *v /= f64::from(sw);
-            }
+            t
+        })
+        .collect();
+    means
+        .into_iter()
+        .enumerate()
+        .map(|(c, mean)| {
+            let sw = first[c * (1 + s)];
+            let cov: Vec<f64> = second[c * s * s..(c + 1) * s * s]
+                .iter()
+                .map(|&v| v / sw)
+                .collect();
             let (det, inv) = invert(&cov, s).ok_or(Stop::Singular)?;
             Ok(Class {
                 mean,
@@ -282,38 +311,87 @@ pub fn kernels(lowpass: f32, voxel: [f32; 3]) -> [Vec<f64>; 3] {
     voxel.map(|d| bias::kernel((lowpass / d).sqrt()))
 }
 
-/// Five in-place MRF sweeps in storage order (§5.6): `p_c ← expf(β U_c - G_c)` (single, `U_c`
-/// summed in double and rounded to single; with `-P` times `π_c`), normalised by their single
-/// sum, 0 where it is not above 0.
-fn sweeps(grid: &Grid, post: &mut [f32], gs: &[f32], beta: f32, priors: Option<&[f32]>, n: usize) {
-    let w: [f64; 18] = grid.weights.map(f64::from);
-    let mut u = vec![0f64; n];
-    let mut e = vec![0f32; n];
-    for _ in 0..5 {
-        for i in 0..grid.len() {
-            let nb = grid.neighbours(i);
-            u.fill(0.0);
-            for (k, &j) in nb.iter().enumerate() {
-                let row = &post[j * n..j * n + n];
-                for (uc, &p) in u.iter_mut().zip(row) {
-                    *uc += w[k] * f64::from(p);
-                }
-            }
-            let mut t = 0f32;
-            for c in 0..n {
-                let mut v = math::expf(beta * (u[c] as f32) - gs[i * n + c]);
-                if let Some(pr) = priors {
-                    v *= pr[i * n + c];
-                }
-                e[c] = v;
-                t += v;
-            }
-            let row = &mut post[i * n..i * n + n];
-            for c in 0..n {
-                row[c] = if t > 0.0 { e[c] / t } else { 0.0 };
-            }
+/// One voxel's update of the multi-channel MRF (§5.6): `p_c ← expf(β U_c - G_c)` (single,
+/// `U_c` summed in double and rounded to single; with `-P` times `π_c`), normalised by their
+/// single sum, 0 where it is not above 0; `u` and `e` hold `n` values.
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+fn sweep_voxel(
+    grid: &Grid,
+    w: &[f64; 18],
+    cells: &[AtomicU32],
+    gs: &[f32],
+    beta: f32,
+    priors: Option<&[f32]>,
+    i: usize,
+    u: &mut [f64],
+    e: &mut [f32],
+) {
+    let n = u.len();
+    let nb = grid.neighbours(i);
+    u.fill(0.0);
+    for (k, &j) in nb.iter().enumerate() {
+        for (c, uc) in u.iter_mut().enumerate() {
+            *uc += w[k] * f64::from(cell(cells, j * n + c));
         }
     }
+    let mut t = 0f32;
+    for c in 0..n {
+        let mut v = math::expf(beta * (u[c] as f32) - gs[i * n + c]);
+        if let Some(pr) = priors {
+            v *= pr[i * n + c];
+        }
+        e[c] = v;
+        t += v;
+    }
+    for c in 0..n {
+        let p = if t > 0.0 { e[c] / t } else { 0.0 };
+        cells[i * n + c].store(p.to_bits(), Relaxed);
+    }
+}
+
+/// Five in-place MRF sweeps in storage order (§5.6), each on the pipeline of
+/// [`Grid::gauss_seidel`] (the serial bits); the usual class counts with their scratch on the
+/// stack.
+fn sweeps(
+    grid: &Grid,
+    post: &mut Vec<f32>,
+    gs: &[f32],
+    beta: f32,
+    priors: Option<&[f32]>,
+    n: usize,
+) {
+    fn fixed<const N: usize>(
+        grid: &Grid,
+        w: &[f64; 18],
+        cells: &[AtomicU32],
+        gs: &[f32],
+        beta: f32,
+        priors: Option<&[f32]>,
+    ) {
+        grid.gauss_seidel(|r| {
+            let (mut u, mut e) = ([0f64; N], [0f32; N]);
+            for i in r {
+                sweep_voxel(grid, w, cells, gs, beta, priors, i, &mut u, &mut e);
+            }
+        });
+    }
+    let w: [f64; 18] = grid.weights.map(f64::from);
+    let cells = to_cells(std::mem::take(post));
+    for _ in 0..5 {
+        match n {
+            2 => fixed::<2>(grid, &w, &cells, gs, beta, priors),
+            3 => fixed::<3>(grid, &w, &cells, gs, beta, priors),
+            4 => fixed::<4>(grid, &w, &cells, gs, beta, priors),
+            _ => grid.gauss_seidel(|r| {
+                let (mut u, mut e) = (vec![0f64; n], vec![0f32; n]);
+                for i in r {
+                    sweep_voxel(grid, &w, &cells, gs, beta, priors, i, &mut u, &mut e);
+                }
+            }),
+        }
+    }
+    *post = from_cells(cells);
 }
 
 /// One estimate of every channel's bias field (§5.6) from the members `q` and the currently
@@ -333,27 +411,31 @@ fn bias_fields(
     let ks = [&k[0][..], &k[1][..], &k[2][..]];
     (0..s)
         .map(|i| {
-            let v = grid.voxels();
-            let mut w = vec![0f32; v];
-            let mut r = vec![0f32; v];
-            for (m, &idx) in grid.index.iter().enumerate() {
-                let (mut ws, mut rs) = (0f32, 0f32);
-                for (c, cl) in classes.iter().enumerate() {
-                    // the weight in single precision (the double quotient rounded), summed in
-                    // single; the residual's product with it in double, rounded at each sum
-                    // (observed: bit-identical to FSL's field with a one-tap kernel)
-                    let t = (f64::from(q[m * n + c]) / cl.cov[i * s + i]) as f32;
-                    ws += t;
-                    rs = (f64::from(rs) + f64::from(t) * (f64::from(yb[m * s + i]) - cl.mean[i]))
-                        as f32;
-                }
-                w[idx as usize] = ws;
-                r[idx as usize] = rs;
-            }
+            // each mask voxel's weight and residual (in parallel), then over the image
+            let wr: Vec<(f32, f32)> = (0..grid.len())
+                .into_par_iter()
+                .map(|m| {
+                    let (mut ws, mut rs) = (0f32, 0f32);
+                    for (c, cl) in classes.iter().enumerate() {
+                        // the weight in single precision (the double quotient rounded), summed
+                        // in single; the residual's product with it in double, rounded at each
+                        // sum (observed: bit-identical to FSL's field with a one-tap kernel)
+                        let t = (f64::from(q[m * n + c]) / cl.cov[i * s + i]) as f32;
+                        ws += t;
+                        rs = (f64::from(rs)
+                            + f64::from(t) * (f64::from(yb[m * s + i]) - cl.mean[i]))
+                            as f32;
+                    }
+                    (ws, rs)
+                })
+                .collect();
+            let w = grid.expand(|m| wr[m].0, 0.0);
+            let r = grid.expand(|m| wr[m].1, 0.0);
+            drop(wr);
             let w = bias::smooth(w, grid.shape, ks);
             let r = bias::smooth(r, grid.shape, ks);
             grid.index
-                .iter()
+                .par_iter()
                 .map(|&idx| {
                     let ws = w[idx as usize];
                     if ws == 0.0 { 0.0 } else { r[idx as usize] / ws }

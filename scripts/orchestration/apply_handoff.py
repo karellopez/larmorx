@@ -36,6 +36,7 @@ all of them apply:
 """
 
 import argparse
+import json
 import sys
 import tomllib
 from pathlib import Path
@@ -87,6 +88,21 @@ def apply(op: str, spec: dict, text: str) -> str:
     raise ValueError(f"unknown operation {op!r}")
 
 
+def parse(path: Path, text: str) -> None:
+    """Parses a TOML, JSON or YAML file's new text (YAML when PyYAML is installed); raises if it fails."""
+    if path.suffix == ".toml":
+        tomllib.loads(text)
+    elif path.suffix == ".json":
+        json.loads(text)
+    elif path.suffix in (".yml", ".yaml"):
+        try:
+            import yaml
+        except ImportError:
+            print(f"note  {path.name}: PyYAML not installed, not parsed")
+            return
+        yaml.safe_load(text)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("handoff")
@@ -110,6 +126,14 @@ def main() -> int:
         except (ValueError, KeyError, OSError) as e:
             failed += 1
             print(f"FAIL  [{n}] {op:6s} {name}: {e}")
+    # every changed data file must still parse (2026-11-03: a status.yml value that began with a
+    # backtick broke the site's build, and with it the Pages deploy)
+    for path, text in pending.items():
+        try:
+            parse(path, text)
+        except Exception as e:  # any parser's error
+            failed += 1
+            print(f"FAIL  {path.name} no longer parses: {e}")
     if failed:
         print(f"{failed} of {len(ops)} operation(s) do not apply: nothing written")
         return 1

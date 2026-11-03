@@ -2235,7 +2235,7 @@ mod tests {
         assert_eq!(last_separator("/t/.tmp1/c"), Some(8));
         if cfg!(windows) {
             assert_eq!(find_pathname(r"C:\t\.tmp1\c.nii"), r"C:\t\.tmp1\");
-            assert_eq!(last_separator(r"C:\t\.tmp1\c"), Some(9));
+            assert_eq!(last_separator(r"C:\t\.tmp1\c"), Some(10));
         } else {
             assert_eq!(last_separator(r"C:\t\.tmp1\c"), None);
         }

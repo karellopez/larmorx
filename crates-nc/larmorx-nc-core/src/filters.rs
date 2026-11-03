@@ -171,7 +171,9 @@ pub fn gaussian_kernel3d_mm(
                 let v = if zero_width && impulse {
                     if x == 0 && y == 0 && z == 0 { 1.0 } else { 0.0 }
                 } else {
-                    glibc_float::expf(-num / den)
+                    // the centre's 0 / 0 is SSE's default NaN, on ARM too (its own NaN has the
+                    // sign bit clear: the golden case of FSL-160's reproduce failed on ARM)
+                    glibc_float::expf(sse::div_f32(-num, den))
                 };
                 let (ix, iy, iz) = (
                     i64::from(x + sx / 2),
@@ -1532,7 +1534,9 @@ mod tests {
         assert_eq!(g.kernel.at(2, 2, 2), 1.0);
         assert!(!g.zero_width);
         let z = gaussian_kernel3d_mm(0.0, 2.0, 2.0, 2.0, 4.0, false);
-        assert!(z.zero_width && z.kernel.at(0, 0, 0).is_nan());
+        // FSL's centre: SSE's default NaN (sign bit set), on every platform
+        assert!(z.zero_width);
+        assert_eq!(z.kernel.at(0, 0, 0).to_bits(), 0xffc0_0000);
         let zi = gaussian_kernel3d_mm(0.0, 2.0, 2.0, 2.0, 4.0, true);
         assert_eq!(zi.kernel.data, vec![1.0]);
         let s = spherical_kernel(2.0, 2.0, 2.0, 2.0);

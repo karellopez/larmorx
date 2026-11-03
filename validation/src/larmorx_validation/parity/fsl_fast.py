@@ -85,6 +85,7 @@ def run_original(
     env["OMP_NUM_THREADS"] = str(threads)
     env["LARMORX_IMPLEMENTATION"] = "original"
     for k, v in os.environ.items():
+        # LXM_*: the development switches of validation/investigations/cleanroom-fast/*.patch
         if k in ("PYTHONPATH", "VIRTUAL_ENV") or k.startswith("LXM_"):
             env[k] = v
     p = subprocess.run(

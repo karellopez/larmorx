@@ -467,6 +467,67 @@ pub fn save_type(kind: Kind) -> OutType {
     }
 }
 
+/// The geometry of a new grid along x (`-subsamp2`, `-subsamp2offc`, the reductions along X;
+/// findings 24): `nx_new` voxels along x, and `map` the operation's map of a new voxel to the
+/// old in the frame the image is held in (`None`: the identity, a reduction). As FSL's outputs
+/// show: a matrix that is set (its code above 0) maps through the held frame and the operation,
+/// `M · F(n) · S · F(n')`, one that is unset through the mirroring only, `M · F(n) · F(n')`
+/// (`F(n)` mirrors x over `n` voxels for an image held mirrored, else the identity); the
+/// matrices as the header holds them in single precision (the qform's from its quaternion,
+/// rounded), the products in double. Only the translation changes (the linear part is the
+/// operation's scaling, which the voxel sizes carry); NIfTI-1 stores the offsets rounded.
+pub fn regrid_x<T>(img: &mut Img<T>, nx_new: usize, map: Option<[[f64; 4]; 3]>) {
+    let n = img.dims[0] as f64;
+    let n2 = nx_new as f64;
+    // F(n) · S · F(n') applied to a voxel (x', y', z') of the new grid: the old voxel
+    let along = |m: Option<[[f64; 4]; 3]>| -> [[f64; 4]; 3] {
+        let s = m.unwrap_or([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ]);
+        if !img.flipped {
+            return s;
+        }
+        // x_r' = n' − 1 − x', x_r = s00 x_r' + s03, x = n − 1 − x_r
+        let mut a = s;
+        a[0][0] = s[0][0];
+        a[0][3] = n - 1.0 - (s[0][0] * (n2 - 1.0) + s[0][3]);
+        a
+    };
+    let h = &mut img.header;
+    let single = h.version == larmorx_io::nifti::NiftiVersion::V1;
+    let round = |x: f64| if single { f64::from(x as f32) } else { x };
+    // the new translation of a matrix (rows `m`, its translation `t`) under `a`
+    let moved = |m: [[f64; 3]; 3], t: [f64; 3], a: [[f64; 4]; 3]| -> [f64; 3] {
+        [0, 1, 2].map(|r| (0..3).fold(0.0, |acc, k| acc + round(m[r][k]) * a[k][3]) + round(t[r]))
+    };
+    let set_s = h.sform_code > 0;
+    let a = along(if set_s { map } else { None });
+    let rows = [h.srow_x, h.srow_y, h.srow_z];
+    let lin = rows.map(|r| [r[0], r[1], r[2]]);
+    let t = moved(lin, rows.map(|r| r[3]), a);
+    for (row, v) in [&mut h.srow_x, &mut h.srow_y, &mut h.srow_z]
+        .into_iter()
+        .zip(t)
+    {
+        let scale = [a[0][0], a[1][1], a[2][2]];
+        for k in 0..3 {
+            row[k] *= scale[k];
+        }
+        row[3] = v;
+    }
+    if let Ok(q) = h.qform() {
+        let a = along(if h.qform_code > 0 { map } else { None });
+        let r = *q.rows();
+        let lin = [0, 1, 2].map(|i| [r[i][0], r[i][1], r[i][2]]);
+        let t = moved(lin, [r[0][3], r[1][3], r[2][3]], a);
+        h.qoffset_x = t[0];
+        h.qoffset_y = t[1];
+        h.qoffset_z = t[2];
+    }
+}
+
 /// Why an image could not be written.
 pub enum WriteError {
     /// `FSLOUTPUTTYPE` unset or unknown: FSL's message.

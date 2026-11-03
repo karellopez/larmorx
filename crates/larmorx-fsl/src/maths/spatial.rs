@@ -19,39 +19,18 @@ use super::ops::{self, Stop};
 // ------------------------------------------------------------------------------------------
 // -subsamp2, -subsamp2offc (§10.3)
 
-/// The new grid's geometry: voxel sizes doubled, the sform and qform (those set) scaled by 2
-/// along each axis, their origin moved to the new first voxel (`offc`: the centre of its
-/// 2 × 2 × 2 block), in the file's own frame.
+/// The new grid's geometry: voxel sizes doubled, the matrices as [`super::image::regrid_x`]
+/// maps them (a new voxel `i'` at old voxel `2 i'`, `offc`: `2 i' + ½`, in the frame the image
+/// is held in; findings 24).
 fn subsample_header<T>(img: &mut Img<T>, offc: bool, nx_new: usize) {
-    let h = &mut img.header;
-    let nx = img.dims[0] as f64;
     let half = if offc { 0.5 } else { 0.0 };
-    // the file voxel the new first voxel sits on (x mirrored in memory for a positive
-    // determinant: the new first file voxel is the old radiological frame's last block)
-    let sx = if img.flipped {
-        nx + 1.0 - 2.0 * nx_new as f64 - half
-    } else {
-        half
-    };
-    let shift = [sx, half, half];
-    if h.sform_code > 0 {
-        for row in [&mut h.srow_x, &mut h.srow_y, &mut h.srow_z] {
-            let t: f64 = (0..3).map(|a| shift[a] * row[a]).sum();
-            for v in row.iter_mut().take(3) {
-                *v *= 2.0;
-            }
-            row[3] += t;
-        }
-    }
-    if h.qform_code > 0
-        && let Ok(q) = h.qform()
-    {
-        let m = *q.rows();
-        let t: [f64; 3] = [0, 1, 2].map(|r| (0..3).map(|a| shift[a] * m[r][a]).sum());
-        h.qoffset_x += t[0];
-        h.qoffset_y += t[1];
-        h.qoffset_z += t[2];
-    }
+    let map = [
+        [2.0, 0.0, 0.0, half],
+        [0.0, 2.0, 0.0, half],
+        [0.0, 0.0, 2.0, half],
+    ];
+    super::image::regrid_x(img, nx_new, Some(map));
+    let h = &mut img.header;
     for a in 1..4 {
         h.pixdim[a] = f64::from((h.pixdim[a] * 2.0) as f32);
     }
@@ -126,6 +105,37 @@ fn subsample_volume<T: Num>(
     (out, changed)
 }
 
+/// FSL-75 (the register's row): FSL computes the background value of the volume it subsamples
+/// (the 10th percentile of its 2-voxel border) and never uses it; for some sizes its buffer for
+/// the border values is too small and it writes past it (heap corruption: FSL aborts, crashes
+/// or finishes, depending on its heap). Named in both modes where that happens; no output voxel
+/// depends on it.
+fn note_75(notices: &mut Notices, op: &str, dims: [usize; 3]) {
+    let [x, y, z] = dims.map(|n| n as i64);
+    let [ex, ey, ez] = [x, y, z].map(|n| 2.min(n - 1).max(0));
+    let (ix, iy) = ((x - 2 * ex).max(0), (y - 2 * ey).max(0));
+    let values = 2 * ez * ix * iy + 2 * ey * ix * z + 2 * ex * y * z;
+    let buffer = 2 * (x - 2 * ex) * (y - 2 * ey) * ez + 2 * (x - 2 * ex) * z * ey + 2 * y * z * ex;
+    if x * y * z > 1 && buffer >= values {
+        return;
+    }
+    let what = if x * y * z <= 1 {
+        "no border value: FSL reads one from outside its values".to_owned()
+    } else {
+        format!(
+            "FSL writes {values} border values into a buffer of {} (its heap corrupted: FSL may abort or crash)",
+            buffer.max(0)
+        )
+    };
+    notices.add(
+        &defects::FSL_75,
+        format!(
+            "{op}: the background value of a {x} x {y} x {z} image, which FSL computes and never \
+             uses: {what}; no output voxel depends on it"
+        ),
+    );
+}
+
 /// `-subsamp2` (`offc` false) and `-subsamp2offc`; FSL-163 for a 4D image.
 pub fn subsample<T: Num>(img: &mut Img<T>, offc: bool, notices: &mut Notices) -> Result<(), Stop> {
     let [nx, ny, nz, nt] = img.dims;
@@ -161,6 +171,7 @@ pub fn subsample<T: Num>(img: &mut Img<T>, offc: bool, notices: &mut Notices) ->
         }
     }
     let dims = [nx, ny, nz];
+    note_75(notices, op, dims);
     let out_dims = dims.map(|n| n.div_ceil(2));
     let per = nx * ny * nz;
     let mut data = Vec::with_capacity(out_dims.iter().product::<usize>() * volumes);

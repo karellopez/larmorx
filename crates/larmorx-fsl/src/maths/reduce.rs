@@ -435,6 +435,10 @@ pub fn reduce<T: Num>(
         );
     }
     super::ops::note151(notices, found.fsl151, "a reduction's results");
+    if axis == Some(0) {
+        // the X reductions' one voxel is the held frame's first (findings 24)
+        super::image::regrid_x(img, 1, None);
+    }
     img.data = data;
     img.dims = out_dims;
     Ok(())

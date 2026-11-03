@@ -31,6 +31,7 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -257,10 +258,17 @@ def compare(
     before: set[str],
     args: list[str],
 ) -> None:
-    """Compares the original's run with FSL's (§21's metrics as checks)."""
+    """Compares the original's run with FSL's (§21's metrics as checks). FSL-75's heap
+    corruption (``-subsamp2``'s unused background value; the original names it in both modes):
+    FSL aborts, crashes or finishes after writing its outputs, depending on its heap, so where
+    FSL ended by a signal and the original finished naming FSL-75, the exit status and glibc's
+    message are not compared (the outputs are)."""
 
-    ok_exit = oracle.code == ours.code or (
-        oracle.code != 0 and ours.code != 0 and (oracle.code < 0 or oracle.code > 128)
+    heap75 = _heap75(oracle, ours)
+    ok_exit = (
+        heap75
+        or oracle.code == ours.code
+        or (oracle.code != 0 and ours.code != 0 and (oracle.code < 0 or oracle.code > 128))
     )
     checks(
         "exit status",
@@ -280,6 +288,8 @@ def compare(
             detail="" if so == su else _first_diff(so, su),
         )
     eo, eu = _own(oracle.stderr, a), _own(ours.stderr, b)
+    if heap75:
+        eo = _HEAP_MESSAGE.sub("", eo)
     checks(
         "standard error",
         eo == eu,
@@ -587,7 +597,29 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
         )
 
 
-def _agree_on_errors(checks: CheckList, oracle: rep.Completed) -> None:
+#: glibc's messages when it finds the heap corrupted (FSL-75), and the line they end.
+_HEAP_MESSAGE = re.compile(
+    r"^(?:double free or corruption|free\(\)|malloc\(\)|realloc\(\)|corrupted |munmap_chunk\(\))"
+    r".*\n?",
+    re.MULTILINE,
+)
+
+
+def _heap75(oracle: rep.Completed, ours: rep.Completed | None) -> bool:
+    """FSL ended by a signal where the original finished naming FSL-75 (:func:`compare`)."""
+    return (
+        ours is not None
+        and oracle.code < 0
+        and ours.code == 0
+        and "upstream defect FSL-75" in ours.stderr
+    )
+
+
+def _agree_on_errors(
+    checks: CheckList, oracle: rep.Completed, ours: rep.Completed | None = None
+) -> None:
+    if _heap75(oracle, ours):
+        return
     if oracle.code != 0 and all(c.passed for c in checks.checks):
         text = " ".join(oracle.stderr.split())[:160]
         raise Outcome(
@@ -741,7 +773,7 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         compare(checks, oracle, ours, a, b, before, args)
         if run.fix and ours.code == 0:
             fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours, before)
-    _agree_on_errors(checks, oracle)
+    _agree_on_errors(checks, oracle, ours)
     if run.fixed:
         with tempfile.TemporaryDirectory(prefix="lx-maths-") as c_:
             c = Path(c_)

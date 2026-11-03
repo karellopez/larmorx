@@ -1,4 +1,4 @@
-# FAST's clean-room original: development probes (relays 1 to 3, 2026-11-03)
+# FAST's clean-room original: development probes (relays 1 to 4, 2026-11-03)
 
 The tools behind [`docs/findings/fsl-fast-original.md`](../../../docs/findings/fsl-fast-original.md)
 and the original's suite (`validation/src/larmorx_validation/parity/fsl_fast.py`). They run FSL
@@ -27,6 +27,8 @@ original (`LARMORX_FAST_BIN`, a `larmorx` binary, else `python -m larmorx`); eac
 | `bench.py` | the benchmark report `docs/benchmarks/fsl-fast.md`: fMRIPrep's call on the standard tier's three oracle runs, FSL (its time from the oracle cache's stored run: never run again), the replica (checked byte for byte against FSL) and the original on each thread count | `LARMORX_FAST_BIN=target/release/larmorx boxed.sh 8 python -P bench.py --threads 1 14 --json docs/benchmarks/fsl-fast.json` (`LARMORX_NC_BIN` the replica's binary) |
 | `applyxfm_tr.py` | the TR FLIRT's `-applyxfm` writes (relay 3; FLIRT's findings, "`-applyxfm`'s TR"): FSL (through the oracle cache) and larmorx's FLIRT on inputs of each format, `dim[0]` and TR; prints each output's `pixdim[4..7]` | `LARMORX_FLIRT_BIN=target/release/larmorx boxed.sh 8 python -P applyxfm_tr.py` |
 | `applyxfm_tr_inputs.py` | the images of FLIRT's `-applyxfm` TR probe (relay 3; FLIRT's findings, "`-applyxfm`'s TR"): a 3D and a 4D input with their own `pixdim[4]`, a reference with another, the identity | `python -I applyxfm_tr_inputs.py <dir>`, then `validation/investigations/cleanroom-flirt/probe.py <out> --args "-in @@<dir>/in.nii.gz -ref @@<dir>/ref.nii.gz -applyxfm -init @@<dir>/ident.mat -out out.nii.gz"` (`LARMORX_FLIRT_BIN` a `larmorx` binary) |
+| `replay_findings.py` | relay 4: every finding of a random-testing trial replayed (`difftest --replay`, FSL's runs served by the oracle cache), at most 8 at a time, memory findings skipped; one line per finding (the findings' "Random testing" section) | `LARMORX_FAST_BIN=target/release/larmorx boxed.sh 24 python -P replay_findings.py <trial>/findings/fsl-fast-original [--only 161,441]` |
+| `probe.py --finding`, `--diff` | relay 4: a finding's shrunk (or, with `--drawn`, drawn) recipe run by FSL (through the cache, its `never` policy kept) and the original into kept directories; `--diff` prints the streams' differences, each image's agreement shows the voxels that differ outside the mask | `probe.py <out> --finding <finding .json> --diff` |
 | `variance_model.py` | numpy models of the initialisation's class statistics against FSL's printed lines: the arithmetic of the variance (the findings' "The class variances") | `python -I variance_model.py <workspace>/oracles/inputs/fsl-fast-replica/t1_half.nii.gz` |
 
 glibc's `rand` (the MRF's random posteriors, `specs/fast.md` §8.1) was checked through ctypes

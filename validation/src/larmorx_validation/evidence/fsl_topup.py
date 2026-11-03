@@ -1927,8 +1927,8 @@ TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
         "the suite's own mistake, fixed: an acquisition file of four rows", None, 27),
     "fixed in part (the SCG weight) / explained: the path of ill-determined fits": (
         "in part a LARMORX convention, fixed (the scaled conjugate gradients' weight, a "
-        "permanent case); the rest explained: another path of an ill-determined fit, its cost as "
-        "low as FSL's", None, 12118),
+        "permanent case); the rest explained: other paths of fits the data hardly determine, "
+        "some just past a threshold", None, 12118),
     "harness, fixed: outputs named by a configuration file": (
         "the suite's own mistake, fixed: outputs named by a configuration file", None, 12),
     "explained: FSL-143 (vb3D/vb4D's indefinite prior, reproduced; its divergence)": (

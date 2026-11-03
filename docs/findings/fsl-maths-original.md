@@ -421,9 +421,13 @@ constant image's `-h`, FSL-186's `-H`), the text holds nothing and the JSON an e
   promoted `int` differences, not wrapped to the type (the outputs of a char image of values
   above 127 match only so).
 - `-subsamp2` and `-subsamp2offc`: the neighbours' sums are not in the computing type (a char
-  image's sums do not wrap). The original's sums in double give FSL's bits for `-subsamp2` in
-  every type (the suite's `sub/subsamp2`, `-noform`, `-nan` are now identical: findings 13's
-  open question for them answered); `-subsamp2offc`'s 2 × 2 × 2 means still part in the last
+  image's sums do not wrap). The original's sums in double give FSL's bits for `-subsamp2`
+  under the integer types; under the floating types the suite's `sub/subsamp2`, `-noform` and
+  `-nan` now meet §21's sums' metric (100 % of their voxels within 4 units in the last place, the
+  largest difference 4.3e-8 to 5.2e-8 of FSL's largest value: the record `fsl-maths`), so they
+  are no longer expected divergences, but their last bits are not FSL's (findings 13's question
+  stays open for them; corrected by relay 6b from the record: relay 6 wrote "now identical");
+  `-subsamp2offc`'s 2 × 2 × 2 means still part in the last
   bits (no order of a single or double sum of the eight values gives FSL's on the suite's case:
   `sub/subsamp2offc`, `-double` stay expected divergences).
 - `-roc`'s false-positive candidates without a noise image are the mask's voxels **below the true

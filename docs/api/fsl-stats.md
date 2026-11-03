@@ -46,6 +46,19 @@ realistic option lists, the preoptions and fMRIPrep's and BET's forms among them
 identical after two fixes (the centre of gravity's NaN signs, and `-json`'s notices before an
 error).
 
+The original against FSL 6.0.7.23 (the parity suite `fsl-stats`, record
+[fsl-stats](../validation/fsl-stats.md), standard tier, 2026-11-03, §10's thresholds): 162 cases
+(the replica suite's but its `fsltest/` ones, BET's call, the original's own `orig/` cases and 4
+permanent cases of random testing), 126 within the thresholds, 36 rejected by both alike, 0
+failures. 125 of the 126 identical to FSL's (standard output, standard error, exit status),
+fMRIPrep's four goodvoxels calls on ds005040's chain among them (the ribbon a stand-in, as
+above); BET's `-l 0.001 -C` on ds005040's T1w within §10's bound (its x 6.1e-8 relative from
+FSL's). Random testing's trial (2026-11-03, beside fslmaths': 150,000 realistic option lists):
+149,214 identical, 7 differing only by a named correction; of the 779 others, 545 fixed by the
+part's correction (above), 74 by corrections of the suite's checks, 160 explained (`-c` and
+`-C` of images holding NaN and infinities: the NaN's sign; the last printed digit at §10's
+bound), none open.
+
 ## Quick start
 
 ```python
@@ -158,7 +171,7 @@ on standard error (`larmorx-nc: upstream defect FSL-<n> (fslstats) corrected: ..
 
 ## Not yet
 
-- The clean-room original's golden cases and record (its next relays); its speed: the
+- The clean-room original's spec questions (its findings). Its speed: the
   [benchmarks](../benchmarks/fsl-maths.md) (BET's call and a 63-volume `-t -M -S -r`).
 - zstd and bzip2 inputs are decompressed whole before they are read (about twice the memory of
   gzip ones; fMRIPrep writes neither).

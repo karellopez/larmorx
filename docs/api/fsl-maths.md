@@ -66,6 +66,28 @@ voxels (the FFT's twiddle factors, which FSL takes from glibc's `sincos`: GLIBC-
 FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of a correction
 whose effect a later operation of the chain removed.
 
+The original against FSL 6.0.7.23 (the parity suite `fsl-maths`, record
+[fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-03, §21's thresholds): 442 cases
+(the replica suite's cases, the original's own `orig/` cases and 17 permanent cases of random
+testing), 372 within the thresholds, 63 rejected by both alike, 7 expected divergences, 0
+failures. Of the 372, 358 identical to FSL's outputs (data, header, messages, exit status):
+fMRIPrep's mask combination on its three oracle runs and its 14 goodvoxels calls on ds005040
+among them (the `-s 5` at 3 × 3 × 3.3 mm too; the ribbon a stand-in, as above); 3 of
+`-tensor_decomp` identical but for the eigenvectors' signs (the original's own convention,
+compared up to the sign); 11 within the thresholds: 9 sums (FSL's FFT path on two kernels,
+`-subsamp2` under the floating types, the double `-ztop` and `-ranknorm`) at most 2.4e-7 of
+FSL's largest value, `fn/double-tan` one unit in the last place in its double values (glibc's
+`tan`, GLIBC-07), one `-roc` area 1e-7 from FSL's. The 7 expected divergences (FSL's FFT
+convolution against the original's direct sum on 5 kernels, `-subsamp2offc`'s means on 2 cases)
+stay inside the sums' bound (at most 2.6e-6 of FSL's largest value) and miss only its share of
+voxels within 4 units in the last place (spec questions 13 and 14), each with its reason in the
+record. Random testing's trial (2026-11-03, 20 minutes: 150,000 realistic chains): 143,191
+identical, 804 differing only by a named correction; of the 6,005 others, 4,681 fixed by the
+part's corrections (above), 96 by corrections of the suite's checks, 1,178 explained, 33
+expected (`-subsamp2offc`), 7 FSL-75's heap corruption in FSL, and 10 open (8 display ranges
+after `-range` in their last bits, 2 `-roc` curve numbers 2.4e-7 and 5e-7 from FSL's: the
+record's notes name their reproducers).
+
 ## Quick start
 
 ```python
@@ -261,7 +283,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original's golden cases and record (its next relays). Its speed: the
+- The clean-room original's 10 open differences of random testing (the record's notes) and
+  the spec questions of its findings. Its speed: the
   [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 42 times faster than FSL on one thread, up to
   356 times on 14; the direct sum outruns FSL's FFT on every kernel measured, so the original
   has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)

@@ -678,6 +678,8 @@ impl<'a, 'w> TopupCf<'a, 'w> {
         let n1 = self.sm.n_movement_parameters_for(s1)?;
         let n2 = self.sm.n_movement_parameters_for(s2)?;
         let mut rval = Mat::zeros(n1, n2);
+        // the derivatives' 4D image is sized by the target grid (traced)
+        self.sm.image_size(self.con, SizeType::Target)?;
         let mut d1 = Vec::with_capacity(n1);
         for d in 0..n1 {
             d1.push(

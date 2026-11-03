@@ -30,7 +30,7 @@ what it translates.
 
 | Rust module | FSL file | Functions, classes |
 |---|---|---|
-| `topup` | fsl-topup `topup.cpp` | `main`: the input read and scaled to a mean of 100 (`--scale`), the first level, the further levels, the outputs, every message and exit status |
+| `topup` | fsl-topup `topup.cpp` | `main`: the input read and scaled to a mean of 100 (`--scale`), the first level, the further levels, the outputs, every message and exit status; `--profile`'s entries (`FSLProfiler`, the core's `profiler`: `<out>.topup_profile_topup.cpp_main.txt`) |
 | `options` | fsl-topup `topupfns.{h,cpp}` | `parse_topup_command_line` (the options in FSL's order, `-h,--help` twice; the configuration file after the command line; the usage; the log file of the parsed settings), `topup_clp` (every check, the per-level settings, `Regridding`, the output names), `existing_conf_file`, `check_exist`, `path`, `filename`, `extension` |
 | `costfn` | fsl-topup `topup_costfunctions.{h,cpp}` | `TopupCF`: `cf`, `grad`, `hess` (the movement tiles of `TiledMatrix`, the interaction block), `SubSample`, `SetWarpResolution`, `SetRegridding`, `Smooth`, `FieldEnergy`, `FieldEnergyGrad`, `FieldEnergyHess`, `set_field_params`, `set_movement_params`, `sum_of_prod`, `movement_hessian`, `field_factory`, every `Write*` (coefficients, field, unwarped and mean unwarped images, Jacobians, displacement fields, movement parameters, rigid-body matrices, and `--debug`'s files); not translated: `numerical_gradient`, `numerical_hessian` (never called; their callers are commented out in FSL's source) |
 | `scan` | fsl-topup `topup_costfunctions.{h,cpp}` | `TopupScan` (`update`, `GetResampled`, `GetMask`, `GetAlpha`, `GetBeta`, `GetGamma`, `GetMovementDerivative`, `GetJacobian`, `GetDisplacementField`, `ReGrid`, `SubSample`, `Smooth`, `SetMovementParameters`, `SetInterpolationModel`, `ImageSize`, `ImageVxs`, `mp_to_matrix`), `TopupScanManager` (the scans' mean, alpha, beta and gamma, the common mask, the movement parameters each scan estimates); not translated: `GetNumericalMovementDerivative` (never called) |
@@ -43,14 +43,25 @@ what it translates.
 - The scans' stages (original, regridded, subsampled, smoothed) are optional copies, `None`
   standing for FSL's shared pointer to the previous stage.
 - The sparse Hessians are built with one thread for their products (`SPMAT_THREADS`): FSL's
-  single-thread result. FSL's product of a sparse matrix and a vector sums per-thread partial
-  vectors when its thread count is above one (`--nthr`, or `FSL_NUM_THREADS` for the matrices
-  built at one thread), which changes its last bits; that dependence is measured and decided in
-  the next part (D13: the replica gives the one-thread result).
+  single-thread result at any `--nthr` and `FSL_NUM_THREADS` (D13 class (b), FSL-116). FSL's
+  product of a sparse matrix and a vector sums per-thread partial vectors when its thread count
+  is above one (`--nthr`, or `FSL_NUM_THREADS` for the matrices built at one thread): measured on
+  the half-resolution pair, `--nthr=4` moves FSL's field by up to 0.032 Hz and its corrected
+  images by up to 88 (of about 20,000), `FSL_NUM_THREADS=4` at `--nthr=1` the field by up to
+  3.8e-6 Hz; OpenBLAS's own threads (`FSL_SKIP_GLOBAL=1`) changed nothing on two cases.
+- D13 (`LARMORX_UPSTREAM_DEFECTS`): FSL-117 (the membrane energy's Hessian in the cost's units:
+  `costfn::field_energy_hess`), FSL-118 (the grid grown by the subsamplings' least common
+  multiple: `topup::regridding`), FSL-119 (the field's intent parameters: `fileio::field_volume`),
+  FSL-120 (the `--acqp` file named: `options`), FSL-121 (FSLDIR unset: `options::parse`), FSL-122
+  (configuration lines of any length: `options::parse`), FSL-123, FSL-125, FSL-126 (negative
+  `--miter`, `--fwhm`, `--lambda` refused: `topup::meaningless_settings`), FSL-124 (a negative
+  `--warpres`, refused in both modes where FSL's knot spacing wraps: `costfn::knot_spacing`);
+  `reproduce` gives FSL's behaviour for each (FSL-124: a refusal there too).
+- With `--trace`, `TopupScanManager::update` is traced once per getter FSL calls (`GetMean`,
+  `GetMask`, ...), as FSL's are.
 - `TopupScanManager::_it` is never initialised in FSL; the replica starts it unset, so the first
   `SetInterpolationModel` always sets the scans' method, which every value FSL's memory could
   hold leads to as well.
 - An `FSLOUTPUTTYPE` FSL cannot write ends the program at the first image written, as
   newimage's `exit()` does (unwinding to `main`).
-- Not yet translated (the next sub-tasks): `--profile`'s timing file (the option is parsed),
-  `applytopup`.
+- Not yet translated (the next sub-task): `applytopup`.

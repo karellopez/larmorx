@@ -147,6 +147,9 @@ FILES = [
     ("fsl-utils", "functions.cc"),
     ("fsl-utils", "matches.cc"),
     ("fsl-utils", "check.cc"),
+    # topup's --profile (2026-11-03)
+    ("fsl-utils", "FSLProfiler.h"),
+    ("fsl-utils", "FSLProfiler.cpp"),
     ("fsl-avwutils", "fslstats.cc"),
     ("fsl-avwutils", "fslroi.cc"),
     ("fsl-avwutils", "fslmerge.cc"),

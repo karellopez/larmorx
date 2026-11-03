@@ -361,14 +361,14 @@ fn typed<T: Num>(s: &mut Stored, notices: &mut Notices) -> Img<T> {
     } else if changed {
         image::fsl151(notices, "the image's values in the computing type");
     }
-    if T::KIND == Kind::UChar
-        && s.stored == DataType::U8
-        && data.iter().any(|&v| v.to_f64() >= 128.0)
-    {
+    if T::KIND == Kind::UChar && s.stored == DataType::U8 {
+        // named for every image the unsigned type reads (the register's row): its arithmetic
+        // wraps at 0 and 255 where FSL's signed bytes wrap at -128 and 127, values from 128 or
+        // not (random testing: `-dt char` of zeros `-sub 1`)
         notices.add(
             &defects::FSL_154,
             "the uint8 image's char computing type is unsigned: its values from 128 to 255 stay \
-             positive (FSL reads them as negative)",
+             positive and its arithmetic wraps at 0 and 255 (FSL reads signed bytes)",
         );
     }
     let cal = (s.header.cal_min, s.header.cal_max);

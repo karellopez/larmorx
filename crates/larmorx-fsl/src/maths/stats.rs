@@ -181,7 +181,9 @@ pub fn ztop<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
     let fix = notices.fix();
     let p = voxelwise(&mut img.data, fix, |v| {
         let def = 1.0 - ndtr(v);
-        let def = if v.is_nan() { num::quiet(v) } else { def };
+        // a NaN z gives the positive NaN whatever its sign (random testing: the default NaN of
+        // -inm's empty mask gives 0x7fc00000; findings 30)
+        let def = if v.is_nan() { f64::NAN } else { def };
         // FSL's NaN for an infinite z is positive (black-box runs: findings 16)
         let rep = if v.is_infinite() { f64::NAN } else { def };
         (rep, def, 0)

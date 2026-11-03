@@ -19,7 +19,7 @@ use larmorx_core::math;
 
 use super::filters::abort_lines;
 use super::image::Img;
-use super::num::{self, Kind, Num};
+use super::num::{self, Num};
 use super::ops::Stop;
 
 /// `-tfce_minT` and `-tfce_delta` (single precision; 0 at the start).
@@ -106,7 +106,9 @@ pub fn tfce<T: Num>(
     let small = nx < 3 || ny < 3 || nz < 3;
     let per = nx * ny * nz;
     let offs = offsets(c);
-    let double = T::KIND == Kind::Double;
+    // FSL's TFCE in single precision for a double image too: its maximum, steps and
+    // thresholds are the float image's (random testing: a float64 image's -tfce is FSL's float
+    // result bit for bit; findings 26)
     let mut result = Vec::with_capacity(img.data.len());
     let (mut n153, mut n175) = (false, false);
     for t in 0..nt {
@@ -115,7 +117,8 @@ pub fn tfce<T: Num>(
         let ok_m = maximum(vol, true);
         let m = if fix { ok_m } else { rep_m };
         n153 |= !rep_m.same(ok_m);
-        let m64 = m.to_f64();
+        // the maximum as the float image's (a double image's rounded to single precision)
+        let m64 = num::to_f64(num::to_f32(m.to_f64()));
         let auto = set.delta == 0.0;
         let delta = if auto {
             num::to_f32(m64 / 100.0)
@@ -143,22 +146,12 @@ pub fn tfce<T: Num>(
                 "-tfce: the threshold step is NaN (FSL-174)".to_owned(),
             ));
         }
-        let steps = if double {
-            m64 / f64::from(delta)
-        } else {
-            f64::from(num::to_f32(m64) / delta)
-        };
+        let steps = f64::from(num::to_f32(m64) / delta);
         if steps > 10000.0 {
             let _ = writeln!(out, "{MANY_STEPS}");
         }
         // the thresholds h0, h0 + δ, ... while h < M + δ (single-precision sums)
-        let below = |h: f32| -> bool {
-            if double {
-                f64::from(h) < m64 + f64::from(delta)
-            } else {
-                h < num::to_f32(m64) + delta
-            }
-        };
+        let below = |h: f32| -> bool { h < num::to_f32(m64) + delta };
         let mut hs = Vec::new();
         let mut h = set.min_t;
         while below(h) {

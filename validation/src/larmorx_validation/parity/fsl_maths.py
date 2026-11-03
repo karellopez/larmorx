@@ -210,7 +210,19 @@ def _load(path: Path):
             cls = nib.Nifti2Image if raw[:4] == (540).to_bytes(4, "little") else nib.Nifti1Image
             return cls.from_bytes(raw)
         raise ValueError(f"{path.name}: a zstd-compressed image pair is not read here")
-    return nib.load(str(path))
+    try:
+        return nib.load(str(path))
+    except ValueError as e:
+        if "w2 should be positive" not in str(e):
+            raise
+        # a NIfTI-2 quaternion whose double components exceed 1 by float rounding (FSL writes
+        # the float quaternion's doubles): nibabel's float tolerance for it, as NIfTI-1 has
+        old = nib.Nifti2Header.quaternion_threshold
+        nib.Nifti2Header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+        try:
+            return nib.load(str(path))
+        finally:
+            nib.Nifti2Header.quaternion_threshold = old
 
 
 def _header_block(img) -> bytes:

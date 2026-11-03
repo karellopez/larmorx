@@ -115,9 +115,14 @@ impl DebugOut<'_> {
         h.intent_p2 = 0.0;
         h.intent_p3 = 0.0;
         h.pixdim = [1.0, voxel[0], voxel[1], voxel[2], 1.0, 1.0, 1.0, 1.0];
+        // FSL writes the debug images as it holds them, in its radiological order: with no
+        // qform or sform the image is not flipped back (observed: an input stored
+        // neurologically gets FSL's debug fields mirrored along x against its storage, findings
+        // 33)
+        let _ = self.flipped;
         let o = Output {
             template: &h,
-            flipped: self.flipped,
+            flipped: false,
             shape,
             volumes,
             cal: None,

@@ -7,7 +7,9 @@
 //! diagonal preconditioner, `|r| / |b| < 1e-3`) of the damped system, and FSL's fields after
 //! the first step agree with it to 6e-5 Hz; the scaled conjugate gradients take one cost and two
 //! gradients per accepted iteration, and their cost sequence is reproduced to 5 digits by the
-//! textbook algorithm (Møller 1993, in Bishop's formulation) with `σ = 0.01` and `λ₁ = 0.1`.
+//! textbook algorithm (Møller 1993, in Bishop's formulation) with `σ = 0.01` and `λ₁ = 0.1`;
+//! the gradient at `x + σd` takes the regulariser's weight of the current point (FSL evaluates
+//! no cost there).
 
 use super::model::{Eval, Level, dot};
 use super::stencil::{Hessian, pcg_damped};
@@ -112,6 +114,7 @@ pub fn scaled_conjugate_gradients(
     let mut counter = 1;
     let (mut last, mut attempt) = (0, 1);
     let mut fold = ev.cost;
+    let mut cur_ssd = ev.ssd;
     let mut gnew = level.gradient(&ev, &x);
     report.gradient(level, &ev, &gnew, counter);
     let mut d: Vec<f64> = gnew.iter().map(|v| -v).collect();
@@ -142,7 +145,11 @@ pub fn scaled_conjugate_gradients(
             for ((o, a), b) in xp.iter_mut().zip(&x).zip(&d) {
                 *o = a + sigma * b;
             }
-            let ep = level.eval(&xp);
+            let mut ep = level.eval(&xp);
+            // the regulariser's weight λ' = λ · SSD (`--ssqlambda=1`) of the current point: FSL
+            // evaluates no cost at x + σd, so its λ' stays the last cost's (observed: the first
+            // step of a level whose start has Reg > 0, findings 34)
+            ep.ssd = cur_ssd;
             let gplus = level.gradient(&ep, &xp);
             counter += 1;
             report.gradient(level, &ep, &gplus, counter);
@@ -174,6 +181,7 @@ pub fn scaled_conjugate_gradients(
             accepted += 1;
             std::mem::swap(&mut x, &mut xnew);
             fold = fnew;
+            cur_ssd = en.ssd;
             let gold = std::mem::take(&mut gnew);
             gnew = level.gradient(&en, &x);
             counter += 1;

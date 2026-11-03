@@ -87,6 +87,8 @@ def main():
                     else defects.REPRODUCE,
                     threads=1,
                 )
+            (d / "STDOUT.txt").write_text(p.stdout)
+            (d / "STDERR.txt").write_text(p.stderr)
             c[who] = costs(p.stdout)
             f = d / GRAD
             g[who] = np.loadtxt(f) if f.exists() else None

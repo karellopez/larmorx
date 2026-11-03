@@ -27,8 +27,8 @@ EXACT = ("Exit status", "Files written", "Standard error", "Standard output", "h
 
 
 def group_of(doc: dict) -> str:
-    """The finding's group: the kind, the movements, the splines' order, its first exact
-    failure (or "metrics")."""
+    """The finding's group: the kind, the movements, the splines' order, phase encodings along
+    two axes (FSL-146), its first exact failure (or "metrics")."""
     r = doc["recipe"]
     f, o = r["features"], r["options"]
     kind = f.get("kind", "?")
@@ -44,6 +44,8 @@ def group_of(doc: dict) -> str:
             parts.append("quadratic")
         if f.get("FSL's configuration"):
             parts.append("FSL's configuration")
+        if f.get("phase encodings") == "four":
+            parts.append("mixed axes")
     else:
         parts.append(str(f.get("--method")))
     exact = [

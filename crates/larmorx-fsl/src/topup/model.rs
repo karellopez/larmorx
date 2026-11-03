@@ -849,6 +849,12 @@ impl Level {
     pub fn gradient(&self, ev: &Eval, c: &[f64]) -> Vec<f64> {
         let nvox = ev.h.len();
         let m = self.e.len();
+        // FSL-146 reproduced on the axes along which some volumes are displaced and others not
+        // (elsewhere its term is 0 but for rounding, which would change the default's bits)
+        let fsl146: [bool; 3] = std::array::from_fn(|a| {
+            self.fsl146 && self.e.iter().any(|e| e[a] != 0.0) && !self.e.iter().all(|e| e[a] != 0.0)
+        });
+        let fsl146_any = fsl146.iter().any(|&b| b);
         let mut wa = self.pool.zeros(nvox);
         let mut wb: [Vec<f64>; 3] = std::array::from_fn(|a| {
             if self.pe_axes[a] {
@@ -895,21 +901,23 @@ impl Level {
                             for a in 0..3 {
                                 sb[a] += r * beta[a];
                             }
-                            if self.fsl146 {
+                            if fsl146_any {
                                 for a in 0..3 {
-                                    if self.e[i][a] != 0.0 {
+                                    if fsl146[a] && self.e[i][a] != 0.0 {
                                         rs[a] += r;
                                         bs[a] += beta[a];
                                     }
                                 }
                             }
                         }
-                        if self.fsl146 {
+                        if fsl146_any {
                             // FSL's sum over the displaced volumes of (ū - u_i)(∂u_i - ∂ū)
                             // along a: the volumes not displaced along a leave out their
                             // (ū - u_j)(-∂ū) (observed: first_step.py)
                             for a in 0..3 {
-                                sb[a] -= bs[a] / m as f64 * rs[a];
+                                if fsl146[a] {
+                                    sb[a] -= bs[a] / m as f64 * rs[a];
+                                }
                             }
                         }
                         *out = sa;

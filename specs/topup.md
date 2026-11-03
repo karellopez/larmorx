@@ -326,16 +326,20 @@ their own grid.
   interpolation reads the subsampled regridded image (positions scaled between the two)
   **(observed)**.
 - **Smoothing**: each subsampled image is convolved with a Gaussian of standard deviation
-  `fwhm / sqrt(8 ln 2)` mm (FSL's separable kernel, truncated as its `smooth` truncates it); FWHM
-  0 is no smoothing.
+  `σ = fwhm / sqrt(8 ln 2)` mm, separably along x, then y, then z: along each axis `σ_v = σ /
+  voxel size` voxels, a kernel of `2r + 1` taps, `r = 2 · trunc(σ_v - 0.001) + 3`, the values
+  `exp(-j² / (2 σ_v²))` (double `exp`, each rounded to single precision, summed in single
+  precision) scaled by the inverse of their sum; each output voxel the single-precision sum, in
+  kernel order, of the double products; voxels beyond the grid taken periodically (the image
+  wraps along every axis); FWHM 0 is no smoothing.
 - At the start of each level after the first, in this order: the subsampling changes (the field
   is sampled at the centres of the new grid's voxels, `(step - 1)/2 + j · step` in the old
   grid's voxels, `step = new s / old s`, and refitted with the *previous* level's knot spacing),
   the smoothing changes, the knot spacing changes (the field sampled at the voxels and refitted),
   the movements fixed or estimated, the weight set **(observed)**.
 - **Refitting** a field to a sampled volume: per axis, the coefficients minimising the squared
-  error plus `0.005²` times the squared second differences of the coefficients (FSL's spline
-  field "Set": a small curvature regularisation), applied one axis at a time.
+  error plus `0.005²` times the squared second differences of the coefficients (a small
+  curvature regularisation), applied one axis at a time.
 
 ### 4.5 Interpolation
 

@@ -1000,10 +1000,11 @@ def _metric_words(c: dict, names: list[str] | None = None, n: int = 3) -> str:
     ms, band = c.get("metrics", {}), c.get("band") or {}
     parts = []
     for k in (names if names is not None else _ranked(c))[:n]:
-        v, t, _hib = ms[k]
-        s = f"{k} {v:.3g} (§12: {t:.3g}"
+        v, t, hib = ms[k]
+        f = ".6g" if hib else ".3g"  # a correlation near 1: its digits
+        s = f"{k} {v:{f}} (§12: {t:.3g}"
         if k in band:
-            s += f"; FSL's own {band[k]:.3g}"
+            s += f"; FSL's own {band[k]:{f}}"
         parts.append(s + ")")
     return "; ".join(parts)
 
@@ -1095,7 +1096,9 @@ def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: 
         elif i == "original-own":
             if same.get("replica-own"):
                 x["verdict"] = verdict
-                x["reason"] = "fMRIPrep's own files are FSL's (the replica's row): " + why
+                x["reason"] = "fMRIPrep's own files are FSL's (the replica's row): " + (
+                    why[:1].lower() + why[1:]
+                )
             else:
                 x["verdict"] = "open"
                 x["reason"] = "fMRIPrep's own output is not FSL's here (see the replica's row)."
@@ -1138,9 +1141,10 @@ def _band_table_original(tid: str, c: dict) -> dict:
             if (v >= t if hib else v <= t)
             else "beyond both"
         )
+        f = "sig6" if hib else "sig"  # a correlation near 1: its digits
         rows.append({
             "head": k,
-            "cells": [common.cell(v, "sig"), common.cell(b, "sig"), common.cell(t, "sig"),
+            "cells": [common.cell(v, f), common.cell(b, f), common.cell(t, "sig"),
                       common.cell(where)],
         })  # fmt: skip
     return common.table(

@@ -1,0 +1,30 @@
+@f3 -kernel gauss 0 -fmean out
+@f3 -s 0 out
+@f3 -kernel boxv 0 -dilF out
+@f3 -kernel foo 3 -fmean out
+@f3 -kernel foo 3 -dilM out
+@f3 -kernel boxv -3 -dilF out
+@nan3 -fmedian out
+@nan3 -dilD out
+@nan3 -dilF out
+@nan3 -eroF out
+@nan3 -dilM out
+@nan3 -ero out
+@f3 -kernel boxv 2 -dilF out
+@f3 -kernel sphere 12 -fmean out
+-dt int @s3 -kernel sphere 5 -fmean out
+-dt int @s3 -kernel boxv 3 -fmean out
+@m3 -dilall out
+@f3 -kernel 2D -fmedian out
+@f3 -kernel gauss -1 -fmean out
+@f3 -kernel box 1 -dilF out
+@f4 -subsamp2 out
+@f4 -subsamp2offc out
+@f4 -dog_edge 1 1.6 out
+@f3 -dog_edge -1 -2 out
+@f4 -edge out
+@blob3 -fillh out
+@f4 -inm 100 out
+@sparse3 -inm 100 out
+@sparse3 -mul 0 -inm 100 out
+@f4 -ing 100 out

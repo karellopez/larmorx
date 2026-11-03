@@ -13,3 +13,10 @@ oracle-output cache, and every run goes in a memory box
   the inputs of `fn/double-tan`: 3 of 210 values are not (2026-11-03), so neither a correctly
   rounded `tan` nor `libm`'s (11 of 210 off by one ulp) reproduces FSL in `double`; the float
   path (`fn/tan`) is identical.
+- `probe_fsl.py <file>` with `probe_filters.txt`: FSL's behaviour on the edge cases of the
+  kernels and spatial filters (2026-11-03): `-s 0` and `-kernel gauss 0` make every voxel NaN
+  (FSL-160); kernels without voxels or of an unknown type filter with an empty kernel and print
+  `ERROR:: Empty mask image` (FSL-161); `-fmedian` with NaN voxels stops with `sort(): detected
+  NaN` (FSL-162); `-dilF` and `-eroF` leave NaN voxels out; `-subsamp2` of a 4D image stops with
+  `3D only method called by higher-dimensional volume.` (FSL-163); `-dt int ... -kernel sphere 5
+  -fmean` traps (FSL-156); `-inm` of an image of zeros prints its error and writes NaN.

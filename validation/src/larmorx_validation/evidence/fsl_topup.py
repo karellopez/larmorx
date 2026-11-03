@@ -1515,7 +1515,9 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
         "voxel": at,
         "panels": [*[p.id for p in ex.panels if p.role == "input"][:3], "fsl", "original",
                    "replica-fix"],
-        "diffs": ["replica-fsl", "original-fsl", "fix-replica"],
+        # the comparisons as before the original joined: its difference from FSL (larger than
+        # the correction's) would set their shared scale and hide the correction
+        "diffs": ["replica-fsl", "fix-replica"],
         "compare": {"a": "replica-fix", "b": "replica"},
     }  # fmt: skip
     out = common.finish(

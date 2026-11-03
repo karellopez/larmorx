@@ -588,6 +588,24 @@ defects! {
         "-roc with a noise image of another size than the input indexes the noise image with the input's sizes: its log transform misses volumes (whose raw values then set the thresholds' range) or reaches voxels twice, and a smaller noise image is read and written outside its memory";
     FSL_180 = "FSL-180", "fslmaths", true,
         "-roc with a truth image without true voxels (or, without a noise image, without zero voxels) divides 0 by 0 for the true (false) positive rates, writes them as NaN to the curve and stops in its quartiles' sort (an uncaught exception: sort(): detected NaN)";
+    FSL_181 = "FSL-181", "fslstats", true,
+        "NaN values among the voxels counted: -R takes the minimum and maximum from the first value, so a NaN first value makes both NaN (and -x and -X give the first voxel's coordinates); -p and -P sort values holding NaN with a comparison NaN breaks, so the value taken is arbitrary and the sort can read and write outside the values (a crash); -r, -h, -H, -e and -E count NaN values in the lowest bin of their histograms";
+    FSL_182 = "FSL-182", "fslstats", true,
+        "without a mask, -s takes the variance as (n / (n - 1)) (mean of squares - squared mean) without the clamp at 0 and the guard for one value that the masked variance has (a constant image whose variance rounds below 0 gives NaN, a single voxel NaN), and -S squares each nonzero value in single precision before adding it and does not clamp at 0: a nearly constant image gets a standard deviation of a few parts in ten thousand of its values instead of 0, and a variance rounded below 0 gives NaN";
+    FSL_183 = "FSL-183", "fslstats", true,
+        "with -t, a 4D -k mask is refused (Mask and image must be the same size) and a -d image stops fslstats at the second time point when it is 3D (an uncaught index error: Invalid t index) or at the first when it is 4D (Image must be the same size as the base image): the volume for the time point is picked but never used";
+    FSL_184 = "FSL-184", "fslstats", true,
+        "-x and -X with a mask (or thresholds) that selects no voxel read the coordinates of an empty list: fslstats crashes";
+    FSL_185 = "FSL-185", "fslstats", true,
+        "-e and -E of an image whose robust range is empty (a constant image, after the thresholds and masks) crash fslstats (an integer division by zero indexing the empty histogram) instead of giving the entropy 0";
+    FSL_186 = "FSL-186", "fslstats", true,
+        "-H with a maximum that is not above the minimum prints no histogram, without a message";
+    FSL_187 = "FSL-187", "fslstats", true,
+        "the histograms of -H, -e and -E put a value more than about two billion bin widths above the histogram's range in the first bin instead of the last (its bin number does not fit in an int)";
+    FSL_188 = "FSL-188", "fslstats", true,
+        "-w of a 4D image without nonzero voxels gives the time range as a first volume of tsize - 1 with a size of 2 - tsize (negative for three or more volumes), while the x, y and z ranges cover the whole image";
+    FSL_189 = "FSL-189", "fslstats", true,
+        "with -json, -v and -V write the number of voxels in single precision: above 16,777,216 voxels (a 4D series, a large 3D image) the count is rounded";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

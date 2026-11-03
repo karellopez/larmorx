@@ -35,7 +35,7 @@ below "decides the bits", following it keeps the original closest to FSL.
 
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-116 to
-FSL-135, FSL-141 to FSL-143 and FSL-201 (§10; spec writer, 2026-11-03). Questionable behaviours kept as FSL's (rule C) are listed
+FSL-135, FSL-141 to FSL-146 and FSL-201 (§10; spec writer, 2026-11-03). Questionable behaviours kept as FSL's (rule C) are listed
 in §10.2.
 
 ---
@@ -214,7 +214,9 @@ with `--ssqlambda=1 --regmod=bending_energy --estmov=0 --splineorder=3 --numprec
   set.`); the acquisition file cannot be read or has neither 4 columns nor 4 rows
   (`TopupDatafileReader:: error reading file <name>`, from the matrix reader's own message
   lines); a phase-encoding vector whose length differs from 1 by more than 0.01
-  (`TopupDatafileReader:: phase-encode vectors must be unity length`); fewer or more rows than
+  (`TopupDatafileReader:: phase-encode vectors must be unity length`; these two messages of the
+  acquisition file's reader are printed with the prefix `TopupFileIO::` in place of
+  `Topup::topup_clp::topup_clp: `, the clean-room implementer's observation confirmed (spec writer, 2026-11-03)); fewer or more rows than
   volumes (`Mismatch between <imain> and <datain>`, FSL-120); a read-out time outside
   0.01-0.2 s, except one row whose time is below 1e-6 (the last such row is excused: `Unrealistic
   read-out time, should be in range 0.01-0.2 s`); the per-level lists (§2.4); a subsampling below
@@ -240,7 +242,8 @@ prints them with 6 significant digits), in this order: `--imain`, `--datain`, `-
 (even when not set: an empty value), `--fout`, `--iout`, `--featout` (only when set), then
 `--warpres`, `--subsamp`, `--fwhm`, `--miter`, `--lambda`, `--ssqlambda`, `--estmov`, `--minmet`,
 `--regmod`, `--splineorder`, `--numprec`, `--interp`, `--scale`, `--regrid`, `--nthr` (the values
-in force: the command line's, the configuration's, or the defaults) **(observed)**. The help
+in force: the command line's, the configuration's, or the defaults) **(observed)**; `--estmov`
+not given is written `--estmov=100` (the default's stored value, which counts as estimating) (spec writer, 2026-11-03). The help
 texts are the usage text's, each keeping its leading tab. A log that cannot be written is skipped
 silently (rule C, §10.2).
 
@@ -282,11 +285,27 @@ magnitude) are multiplied back by `g / 100` (§6).
 The field `h(x)` (Hz) is a tensor-product B-spline of order `--splineorder` (cubic by default)
 on the working grid (§4.4), with knot spacing `k_d = round(warpres / voxel size_d)` voxels along
 each axis (1 when that rounds to 0), the voxel sizes those of the level's target grid (below).
-Its coefficients cover the grid with the knots placed as FSL's spline fields place them, centred
-on the grid: for `n` voxels and spacing `k`, `n` coefficients when `k = 1`, else `ceil((n + 1) /
-k) + 2` for cubic splines and, for quadratic ones, `floor(n / k) + 1` increased until the last
-basis function reaches the last voxel **(observed:** the `_fieldcoef` sizes of every suite
-case**)**. The field starts at 0. At each change of
+Its coefficients are laid along each axis of `n` voxels at knot spacing `k` as follows (spec
+writer, 2026-11-03: the layout is not centred on the grid; the clean-room implementer's findings
+3, 29 and 30 right):
+- coefficient `i` (from 0) is the basis function centred at voxel `(i − 1) k` when `k > 1`, at
+  voxel `i` when `k = 1`, for both orders;
+- `k = 1`: `n` coefficients;
+- cubic: `ceil((n + 1) / k) + 2` coefficients;
+- quadratic: start from `floor(n / k) + 1` and add one while the last basis function's sampled
+  extent ends before the last voxel, `(nc − 1) k − floor(K / 2) < n − 1`, with `K` the number of
+  integer voxel offsets at which a basis function is sampled (`3k − 1` for even `k`, `3k` for
+  odd `k`, §4.6); this gives `ceil((2n + k − 4) / (2k)) + 2` whenever `n ≥ 2k`. On a shorter
+  axis FSL does not add (its test wraps around: FSL-145, §10.1): **2** coefficients when `k ≤ n
+  < 2k`, **1** when `n < k` (`quad_count.py`: FSL lays 2 x 1 x 2 on 24 x 16 x 14 voxels at
+  spacings 20, 20, 13, and 1 x 1 x 1 at 40, 40, 25) **(observed)**. A level that must refit
+  (§4.4) a field with a single coefficient along an axis stops FSL while it prepares that level
+  (`Error occurred when preparing to run topup`, or `... level <l> of topup`, with `Exception
+  thrown with message: Mat::operator(): index out of bounds`, exit 1: the refit's two
+  wrap-around rows need two coefficients) **(observed:** `--warpres=50` and `100` at
+  `--subsamp=2`**)**. The default lays the general count on every axis (FSL-145), so it has no
+  such failure.
+The field starts at 0. At each change of
 grid or knot spacing the current field is sampled on the new grid and refitted (§4.4).
 
 ### 4.3 The model of one volume
@@ -295,16 +314,24 @@ For volume `i` at a level, with its phase encoding `p_i`, read-out time `t_i`, r
 movement `M_i` (six parameters: three translations in mm and three rotations in radians, as an
 Euler matrix about the centre of the field of view, `((n-1)·voxel size)/2` per axis; volume 1's
 is always the identity) and the field `h`:
-- the displacement field `d_i(x) = h(x) · t_i · (px_i · dx, py_i · dy, 0)` mm;
+- the displacement field `d_i(x) = h(x) · t_i · (px_i · dx, py_i · dy, 0)` mm, `dx`, `dy` the
+  input's voxel sizes at every level (so `h t p / s` voxels of a level subsampled by `s`: the
+  clean-room implementer's finding 4 right) (spec writer, 2026-11-03);
 - the predicted undistorted volume `u_i(x) = J_i(x) · f_i(M_i · x + d_i(x))`: the smoothed,
   subsampled input (§4.4) interpolated (§4.5) at the moved and displaced position, times the
   Jacobian determinant `J_i` of the displacement (`1 + ∂d/∂y`-like: the determinant of `I +
   ∇d_i` in voxel units; along one axis `1 + t_i p_i ∂h/∂axis` computed from the spline's
   derivative, with the same field scaled; along both, the three-component determinant);
-- a validity mask: 1 where the interpolation stayed inside the image along the axes other than
-  the phase encoding (the phase-encoding axis wraps: the image is periodic along it), 0 else;
-  the first and last slices (z) are always 0, and the first and last rows along the phase
-  encoding are 0 when the encoding is along one axis.
+- a validity mask (spec writer, 2026-11-03): a voxel is valid when, for the volume's sampling position
+  (moved and displaced), every axis other than the phase-encoding axis lies within `[0, n − 1]`
+  of the image interpolated (to 1e-8 voxel); the phase-encoding axis wraps (the image is periodic
+  along it) when the encoding is along x alone or y alone; an oblique encoding (both x and y
+  components) wraps along no axis, every axis is checked. Then a frame is set to 0: the first and
+  last slices (z) always, and, when the encoding is along one axis, the first and last rows along
+  the **other** in-plane axis (encoding along y: the first and last voxels along x; along x: the
+  first and last along y); none when it is oblique. (The clean-room implementer's findings 2 and
+  32 right; the earlier text's "along the phase encoding" was wrong.) The common mask is the
+  product over the volumes.
 
 The movements are estimated (`--estmov=1`) for every volume after the first, six parameters
 each; when the phase encodings use only one axis, the first volume whose encoding has the
@@ -358,7 +385,9 @@ FSL-201's `reproduce` needs FSL's matrices (§4.6).
   `exp(-j² / (2 σ_v²))` (double `exp`, each rounded to single precision, summed in single
   precision) scaled by the inverse of their sum; each output voxel the single-precision sum, in
   kernel order, of the double products; voxels beyond the grid taken periodically (the image
-  wraps along every axis); FWHM 0 is no smoothing.
+  wraps along every axis); FWHM 0 is no smoothing, and so is a negative FWHM (a kernel whose
+  width is not positive is the identity: FSL-125, §10.1; the clean-room implementer's
+  observation right) (spec writer, 2026-11-03).
 - At the start of each level after the first, in this order: the subsampling changes (the field
   is sampled at the centres of the new grid's voxels, `(step - 1)/2 + j · step` in the old
   grid's voxels, `step = new s / old s`, and refitted with the *previous* level's knot spacing),
@@ -396,10 +425,32 @@ FSL-201's `reproduce` needs FSL's matrices (§4.6).
 ### 4.5 Interpolation
 
 `--interp=spline` (default): cubic B-spline interpolation of the image (its coefficients from
-the smoothed image with periodic extrapolation along the phase encoding), the partial derivatives
-along x, y and z from the same spline; `--interp=linear`: trilinear interpolation and its
-derivatives. Outside the image the phase-encoding axis wraps periodically; the other axes mark
-the voxel invalid (§4.3).
+the smoothed image), the partial derivatives along x, y and z from the same spline;
+`--interp=linear`: trilinear interpolation and its derivatives (the difference of the two
+neighbours). Both are **periodic along every axis**, for the regridding and every level (the
+values beyond the grid are those of the image repeated); which axes mark a voxel invalid is
+§4.3's rule (spec writer, 2026-11-03; the clean-room implementer's finding 1 right).
+
+**The spline's coefficients** (spec writer, 2026-11-03): along each axis of more than one voxel, in the order
+x, y, z, each line of `N` values `f` is filtered by the cubic B-spline's recursive prefilter
+(pole `z = √3 − 2`, gain 6) whose two initial values are **truncated** periodic sums of `n =
+min(N, 15)` terms (15 = `trunc(ln 1e-8 / ln |z| + 1.5)`):
+- forward: `c⁺[0] = Σ_{i=0}^{n−1} z^i f[(−i) mod N]`, then `c⁺[i] = f[i] + z c⁺[i − 1]`;
+- backward: `c⁻[N − 1] = (z c⁺[N − 1] + Σ_{i=1}^{n−1} z^{i+1} c⁺[i − 1]) / (z^{n+1} − 1)`, then
+  `c⁻[i] = z (c⁻[i + 1] − c⁺[i])`;
+- the coefficients are `6 c⁻`, held in single precision after each axis (the sums in double).
+For `N ≥ 15` these are the exact periodic coefficients to about 1e-9 relative. On shorter lines
+they are not (the missing factor `1 / (1 − z^N)` and the backward divisor): the spline does not
+pass through the samples, by about `|z|^N` of the values (0.5 % for 4 voxels, 2.7e-5 for 8,
+2e-6 for 10). The value at a sampling position is the usual sum of the 4 × 4 × 4 coefficients
+around it with the cubic B-spline weights in double precision (periodic indices), rounded to
+single precision. This is FSL's, kept in both modes: it decides the predictions on tiny levels
+(e.g. 4 × 4 × 4 voxels) and applytopup's resampling of small images (§9.4); the clean-room
+implementer's finding 27 ("an axis of 4 voxels or fewer is not interpolated at its own grid
+points ... 2e-5 at the ends of 8-voxel lines") is this, for every axis shorter than 15 voxels
+(`short_axis_model.py`: FSL's resampling at the grid points of images of 8 x 8 x 4, 1 x 8 x 1,
+4 x 4 x 4, 2 x 6 x 3, 8 x 8 x 8, 12 x 14 x 10 and 16 x 16 x 16 voxels to 9e-5 of values up to
+999, where it departs from the samples by up to 65) **(observed)**.
 
 ### 4.6 The cost
 
@@ -408,14 +459,56 @@ volume `ū = (1/m) Σ u_i` and the regulariser `E(h)`:
 
 `C = (1 / (n (m - 1))) Σ_i Σ_masked (ū - u_i)² + λ' · E(h)`
 
-where `λ' = λ · SSD` with `--ssqlambda=1` (SSD the current first term) and `λ' = λ` otherwise.
-`E` is the bending energy (the integral of the squared second derivatives, all six of them, in
-mm) or, with `--regmod=membrane_energy`, the membrane energy (squared first derivatives).
+where `λ' = λ · SSD` with `--ssqlambda=1` and `λ' = λ` otherwise; the `SSD` is the first term
+of the **last cost evaluated** (the scaled conjugate gradients' second gradient of an iteration,
+at `x + σ d`, where no cost is evaluated, keeps the current point's: the clean-room
+implementer's finding 34 right) (spec writer, 2026-11-03).
+`E` is the bending energy or, with `--regmod=membrane_energy`, the membrane energy, each a
+**sum at the integer voxel positions**, not an integral (spec writer, 2026-11-03): `E = cᵀ R c` with `c` the
+coefficients and `R` translation-invariant (it ignores the image's edges: every basis function
+counted over its whole support, also beyond the image). For two coefficients whose basis
+functions are `(Δx, Δy, Δz)` knots apart,
+`R = Σ_terms w Π_{a ∈ x,y,z} S_a(Δ_a; m_a)`,
+`S_a(Δ; m) = Σ_{x ∈ ℤ} b_a^{(m)}(x) b_a^{(m)}(x − Δ k_a) / v_a^{2m}`,
+with `b_a^{(m)}` the 1-D basis function's `m`-th derivative per voxel sampled at the integer
+voxel offsets `x` from its centre, `v_a` the level's voxel size (mm), and the terms:
+- bending energy: the three squared second derivatives (`m = 2` along one axis, weight 1) and
+  the three mixed ones (`m = 1` along two axes, weight 2);
+- membrane energy: the three squared first derivatives (`m = 1` along one axis, weight 1), **per
+  voxel** (`v_a = 1`) in the cost and the gradient (FSL-117 concerns its Hessian, §4.7).
+The basis functions are sampled at the offsets `|x| < (order + 1) k / 2` only (the open
+support: `4k − 1` offsets for the cubic, `3k − 1` for the quadratic at an even `k`, `3k` at an
+odd `k`). Where a quadratic basis function's second derivative jumps on a sampled offset (an even
+`k`: the inner knots at `|x| = k / 2`) the value is the mean of its one-sided values, `−1 /
+(2 k²)` (per voxel²); the outer knots `|x| = 3k / 2` are not sampled (their mean, `+1 / (2 k²)`,
+takes no part). The cubic's derivatives are continuous at its knots. The gradient of `λ' E` is
+`2 λ' R c` and its Hessian `2 λ' R` (FSL-117 apart). (`bending_model.py`: FSL's regulariser
+Hessian of reproducer 10753, quadratic at knot spacings 4, 4, 3, measured from two
+Levenberg-Marquardt Hessians at different `λ`, to 8.6e-7 relative (p50; largest 2.7e-5, the
+debug file's digits); the mean at both knots misses by 4.8 % (p50), the inner or outer piece by
+20 % and 1.4 %, the exact integrals by 17 %) **(observed)**. The clean-room implementer's
+finding 7 (a sum at integer points) is right; the quadratic case of finding 36 is this sampling.
 Movements are not regularised. The gradient with respect to the field's coefficients is the
 chain rule through the interpolated derivatives along the phase encoding and the Jacobian (the
 image derivative times `t_i p_i`, plus the intensity times the derivative of the Jacobian with
 respect to the coefficients), with respect to the movements through the moved positions; all in
-double precision from single-precision images.
+double precision from single-precision images. The gradient's factor is `2 / (n (m − 1))` for
+any number of volumes `m` (the clean-room implementer's finding 5 right) (spec writer, 2026-11-03).
+
+**FSL's field gradient with volumes encoded along different axes** (spec writer, 2026-11-03) (FSL-146). Write
+`u_i = J_i f_i` and, per in-plane axis `a`, `β_ia = t_i p_ia f_i` (the volume's intensity times
+its displacement per Hz along `a`, 0 for a volume with `p_ia = 0`), `β̄_a = (1/m) Σ_k β_ka` (the
+mean over **all** volumes). The cost's gradient with respect to the coefficients has, besides the
+term through the image derivatives, per axis `a` the Jacobian term `Σ_i (ū − u_i)(β̄_a − β_ia)`
+(per voxel; its basis functions' derivatives along `a`). FSL sums that Jacobian term only over
+the volumes encoded along `a` (`p_ia ≠ 0`): the volumes not displaced along `a` leave out their
+`(ū − u_j) β̄_a`. When every volume is encoded along the same axis (or each axis' volumes are all
+of them) nothing is left out; when some volumes are encoded along x and others along y the
+gradient is not the cost's (the clean-room implementer's finding 35 right in every detail). The
+Gauss-Newton Hessian sums over every volume (it is the cost's), so the minimisers' steps follow
+a false gradient (a first Levenberg-Marquardt step can raise the cost). The default uses the
+cost's own gradient and names FSL-146 whenever some axis has displaced and undisplaced volumes;
+`reproduce` leaves the terms out as FSL does (§10.1).
 
 **The derivatives with respect to the movements** (spec writer, 2026-11-03; the clean-room
 implementer's finding 14 is right that FSL's are not its cost's; this is what FSL computes). The
@@ -466,7 +559,11 @@ most `--miter` successful iterations:
   of §4.6's movement derivatives, FSL-201's in `reproduce` mode, spec writer, 2026-11-03); the step
   solves `H δ = -g` by conjugate gradients with the Hessian's diagonal as preconditioner (at most
   500 iterations, relative tolerance 1e-3); it ends early when two successive costs agree
-  within `2|a - b| ≤ 1e-8 (|a| + |b| + ε)`.
+  within `2|a - b| ≤ 1e-8 (|a| + |b| + ε)`. A diagonal entry exactly 0 (a coefficient whose
+  basis function covers no masked voxel, with `λ = 0`) makes the solve fail: the attempt counts
+  as unsuccessful **without a cost evaluation**, `λ_LM` is multiplied by 10 and the same
+  (still singular) system tried again, until `λ_LM` exceeds 1e20: the level ends without a step
+  (`-v` shows the level's first cost only; the clean-room implementer's finding 15 right) (spec writer, 2026-11-03).
 - **Scaled conjugate gradients** (`--minmet=1`): Møller's method (σ = 0.01, λ starting at 0.1,
   multiplied by 4 when the comparison ratio is below 0.25 and halved above 0.75, restarted every
   number-of-parameters iterations, Polak-Ribière's β), on the gradient only; it ends early when
@@ -487,7 +584,16 @@ exit 1.
   `TopupDebugJacobians`, `TopupDebugField`, `TopupDebugMovementParameters...txt` (level 2 adds
   `TopupDebugMask`, `TopupDebugMaskedDiff`), named with the level, iteration and attempt; the
   gradients (`TopupDebugGradient_...txt`, with and without the regulariser) and, at level 3,
-  the Hessian's weight images **(observed)**.
+  the Hessian's weight images and `TopupDebugHess...txt` (the Hessian's non-zero entries as
+  one-based `row column value` lines, column by column, the last diagonal entry written once
+  more at the end, as 0 when written already) **(observed)**. The debug images are written in
+  the order FSL holds the data (§3.1: an image stored neurologically appears mirrored along x)
+  with no qform or sform; `TopupDebugMaskedDiff` has the size of the level's subsampled,
+  regridded image (e.g. 33 × 33 × 21 for a 32 × 32 × 20 pair regridded at subsampling 1), its
+  voxels of the target grid's indices filled and the rest 0 (spec writer, 2026-11-03; the
+  clean-room implementer's findings 16 and 33 right). With `--trace` and `-v`, a stage's line can
+  fall inside a cost line (`SSD = ...` is printed in pieces around the regulariser's
+  evaluation) **(observed)**.
 - Errors after the parse: `Error occurred when reading --imain file <name>` / `Exception thrown
   with message: <text>`; `Error occurred when preparing to run topup`; `Error occurred when
   preparing to run level <l> of topup`; `Error occured while writing output from topup` (FSL's
@@ -499,7 +605,10 @@ exit 1.
 ## 6. topup's outputs
 
 After the last level, if it was subsampled, the smoothing and subsampling are removed (the
-field kept) so the outputs are on the full grid. Then, in this order:
+field kept) so the outputs are on the full grid; a last level **without** subsampling keeps its
+smoothing, so `--iout`, its mean and `--featout`'s magnitude are the predictions from the
+smoothed images (the clean-room implementer's finding 12 right; fMRIPrep's calls end with FWHM
+0, where both agree) (spec writer, 2026-11-03). Then, in this order:
 
 | File | When | Content |
 |---|---|---|
@@ -578,7 +687,9 @@ exits with status 1`, exit 1 **(observed)**. In order:
   map); neither: `Unable to read file <name>`. A missing `_movpar.txt` prints `Could not open
   matrix file <name>_movpar.txt` and gives no movements (identity); a movement file of six
   columns gives each row's matrix about the field's centre, one of four columns and 4k rows gives
-  the matrices themselves (used by `lsr` and the `vb` methods, not by `jac`) **(observed)**. The
+  the matrices themselves (used by `lsr` and the `vb` methods, not by `jac`) **(observed)**. A
+  matrix `M` (given, or built from a row's six parameters as topup's `--rbmout`, §4.3) moves
+  its image by sampling it at `M⁻¹ x` (the clean-room implementer's finding 20 right) (spec writer, 2026-11-03). The
   coefficients' field size comes from the qform's translation and its voxel sizes from the
   intent parameters, the knot spacing from the voxel sizes rounded.
 
@@ -591,7 +702,40 @@ movements or for a field image) and interpolated at `x + d` (`--interp`, cubic s
 3 by default; periodic along its phase encoding as in §4.5), each volume of a 4D image alike;
 times the Jacobian determinant of `d` (from the spline field's derivatives; for a field image,
 from the cubic-spline derivatives of the displacement images, zero outside the image: FSL-134); the corrected images averaged
-over the inputs (volume by volume) **(observed)**.
+over the inputs (volume by volume) **(observed)**. Precisely (spec writer, 2026-11-03):
+- the sampling position of output voxel `x` is `M⁻¹ x + d(x)` (voxels), interpolated periodically
+  along every axis (§4.5's coefficients); it is valid when every axis other than the phase
+  encoding's lies within `[0, n − 1]` (encoding along x alone or y alone), every axis for an
+  oblique encoding; an output voxel is 0 unless valid for every image and volume (the clean-room
+  implementer's finding 17 right). The displacement's z component is always 0: an encoding along
+  z leaves the image uncorrected (FSL-144);
+- the Jacobian of a **coefficient field**: `1 + t (px ∂h/∂x · dx / fx + py ∂h/∂y · dy / fy)`
+  per voxel, the derivatives per voxel of the field's grid from the spline, `dx`, `dy` the
+  image's voxel sizes and `fx`, `fy` the field's (its intent parameters);
+- the Jacobian of a **field image** (no coefficients): the image `h` scaled to displacements
+  (`px t dx · h` and `py t dx · h` mm: the y one with the **x** voxel size, FSL-134; the default
+  uses `dy`) and divided by the field image's own voxel sizes along x and y, then the cubic-spline
+  derivatives of each at the voxels, the spline's coefficients made with the mirrored start of
+  §4.5's prefilter (forward initial value `Σ_{i=0}^{n−1} z^i f[i]`, the backward one `−z / (1 −
+  z²) (2 c⁺[N − 1] − f[N − 1])`) and the coefficients beyond the image taken as 0; `J` is the
+  determinant of `I` plus these derivatives. So the y term is `py t (dx / fy) ∂h/∂y` (the
+  clean-room implementer's finding 18 right: `vx / vy` with `vx` the image's and `vy` the field
+  image's);
+- **a field of the images' voxel count in another shape** (FSL-134; `reproduce`): the field
+  evaluated on its own grid (a coefficient field: the grid its header gives) is laid onto the
+  image's grid **in storage order** (x fastest: the image voxel of linear index `L` takes the
+  field's voxel of linear index `L`), and this laid field gives the displacement; the Jacobian
+  is computed on the field's own grid and written into the image's grid at the **same indices**
+  `(x, y, z)`: field voxels outside the image's grid are dropped, image voxels outside the
+  field's grid keep a Jacobian of 0, so the output is 0 there (`other_shape_model.py`: FSL's
+  output of the replica suite's `at/jac-other-shape`, a 32 × 32 × 20 field on a 64 × 16 × 20
+  image, to 1.1e-5 relative at the 99th percentile (largest 0.1 of 1.1e5), its 10,784 zeros
+  exactly; the field laid for the Jacobian too, or evaluated at the image's voxels, miss by 21 %
+  and 118 % at the 99th percentile; the case's single image is resampled trilinearly, FSL-132)
+  **(observed)**. A field image of another shape is laid the same way for the displacement and
+  its Jacobian evaluated at the image's voxels (the field image's values beyond its own grid
+  are 0). A field of another voxel count stops FSL: `Attempted to copydata with non-matching
+  sizes` (FSL's image library), exit 1.
 
 ### 7.4 `--method=lsr` (least-squares restoration)
 
@@ -638,8 +782,12 @@ skipped and written 0 in every collection's output):
   reading the folded lines by up to 383 of 686**)**. The random-testing cases of lines that
   divide 2³² which the original missed (reproducer 8089: 16 voxels along x, a field with a
   gradient along the line) are this fold; the original's matrices, built column by column with
-  every folded part counted, differed there (confidence: high for the construction, medium
-  for 8089 itself, which the model did not re-run) (spec writer, 2026-11-03).
+  every folded part counted, differed there (spec writer, 2026-11-03). **(observed:**
+  `lsr_8089.py` on reproducer 8089 itself (images of 16 × 24 × 14 × 2 moved by topup's
+  movements, `-n trilinear`; FSL's moved images from `jac` runs with a zero field): this text's
+  matrices give FSL's output to 5.6e-7 relative (p50) and 3.2e-5 (p99), every zero line the
+  same; the overlap reading misses by 0.131 at the 99th percentile, the original's 0.1337; the
+  replica in `reproduce` mode equals FSL bit for bit**)** (spec writer, 2026-11-03).
 - `S` the second-difference matrix of the line (rows `(-1, 2, -1)`, the first and last rows
   `(1, -1)` and `(-1, 1)`);
 - the restored line `f = (KᵀK + 0.01 SᵀS)⁻¹ Kᵀ y`, `y` the collection's observed lines stacked,
@@ -663,6 +811,19 @@ iteration `Relative lambda = <x>, phi = <φ>, lambda = <λ>`, `Updating phi`, `U
 `Updating image` (`vb3D`) or `Updating images` (`vb4D`); numbers with 6 significant digits. The
 defects FSL-141 to FSL-143 (§10) concern these methods. A method name other than the five
 (FSL-135) and a `lsr`/`vb` run without movements (FSL-135) are refused by default.
+The clean-room implementer's findings 23 to 25 describe FSL's iterations exactly (spec writer,
+2026-11-03: confirmed): per collection and block, the first estimate of each line `f_l = (Σ_a
+K_aᵀK_a + P)⁻¹ Σ_a K_aᵀy_a` with `P` the line's circulant `(1, −4, 6, −4, 1)` at `φ = λ = 1`;
+then each iteration prints, updates `φ` (`(1e-10 + N_φ/2) / (1e-10 + (Σ|y − K f|² + Σ_l tr(K_lᵀK_l
+Σ_l)) / 2)`, the data-point count `N_φ` and the halving in integers: FSL-141, FSL-142), then
+`λ` with the line covariances `Σ_l` of the previous image update (not the new `φ`), then the
+lines one after the other in storage order, each from the lines already updated (Gauss-Seidel:
+`Σ_l = (φ K_lᵀK_l + λ Q_ll)⁻¹`); `Q = DᵀD` with `D` the weighted second differences (weights
+`v_pe / v_d`), truncated at the image's edges and periodic along the phase encoding, `vb4D`
+without coupling between volumes; FSL-143 the coupling of a voxel with its neighbours one step
+along the phase encoding in the neighbouring slices at `w_pe w_z`, half of `DᵀD`'s; the moved
+images' values outside the movements' mask enter the restoration, and the output is 0 at every
+invalid voxel, voxel by voxel.
 
 ### 7.6 The output
 
@@ -705,7 +866,9 @@ is FSL's one-thread result; larmorx gives it at any thread count.
 
 ### 9.4 applytopup
 
-The restorations' matrices are dense per line (`KᵀK` is not banded in general: the line wraps),
+The images' resampling by the movements and by `jac` uses §4.5's spline coefficients (periodic
+along every axis; the truncated prefilter on axes shorter than 15 voxels) or trilinear
+interpolation (spec writer, 2026-11-03). The restorations' matrices are dense per line (`KᵀK` is not banded in general: the line wraps),
 solved by LU factorisation with the explicit inverse applied to `Kᵀy` (FSL's arithmetic: OpenBLAS
 0.3.33's LU with partial pivoting and Armadillo's band and triangular shortcuts where the matrix
 is banded, e.g. a zero field). The vb methods' traces and solves follow Armadillo's evaluation of
@@ -722,19 +885,22 @@ is banded, e.g. a zero field). The vb methods' traces and solves follow Armadill
 | FSL-118 | `--regrid=1` with subsamplings whose largest does not divide the others (3 and 2): `TopupScan::SubSample: invalid subsampling factor` | the grid grows by the subsamplings' least common multiple (identical wherever FSL runs) | FSL's error |
 | FSL-119 | `--fout`/`--featout` field maps get the input's intent parameters shifted by one place (0, p1, p2) | (p1, p2, p3); named when they differ | FSL's |
 | FSL-120 | `--acqp` with a wrong row count: `Mismatch between <imain> and ` (the empty `--datain`) | names the `--acqp` file | FSL's text |
-| FSL-121 | FSLDIR unset and a `--config` name not found locally: `basic_string: construction from null is not valid`, exit 1 | `larmorx-nc: error: topup: --config=<name>: no such file here, and FSLDIR is unset ... (FSL-121)`, exit 1 | FSL's text |
+| FSL-121 | FSLDIR unset and a `--config` name not found locally: `basic_string: construction from null is not valid` (after an empty line, without the usage text; spec writer, 2026-11-03), exit 1 | `larmorx-nc: error: topup: --config=<name>: no such file here, and FSLDIR is unset ... (FSL-121)`, exit 1 | FSL's text |
 | FSL-122 | a configuration line whose text after its first word exceeds 1023 characters ends the reading (the rest of the file ignored silently) | lines of any length; named when a setting followed | FSL's |
 | FSL-123 | a negative `--miter` runs no iteration at that level, silently | refused | FSL's |
 | FSL-124 | a negative `--warpres` whose ratio to the voxel size rounds below 0 gives a knot spacing of about 4.29e9 voxels: memory exhaustion | refused (both modes refuse where FSL's spacing wraps) | refused where it wraps |
-| FSL-125 | a negative `--fwhm` smooths with a negative-width kernel | refused | FSL's |
+| FSL-125 | a negative `--fwhm` is accepted and acts as no smoothing (a kernel of non-positive width is the identity; spec writer, 2026-11-03) | refused | FSL's |
 | FSL-126 | a negative `--lambda` makes the cost negative, the field large | refused | FSL's |
 | FSL-132 | applytopup: the first volume of the first image is resampled trilinearly whatever `--interp` says (the default spline) | every volume with the method asked for; named | that volume trilinear |
 | FSL-133 | applytopup `lsr`/`vb`: a line's wrap-around reads the wrong voxel for line lengths that do not divide 2³² (30, 96, 100, ...): the mapping at an index `k < 0` takes the field of voxel `(k + 2³²) mod n` instead of `n + k` (§7.4; spec writer, 2026-11-03) | the circular wrap; named when a read differs | FSL's |
-| FSL-134 | applytopup with a field image: `jac` scales the y displacement by the x voxel size; a field on another grid than the images is not refused (laid as stored, or read past its lines with `lsr`) | the y voxel size; other grids refused | FSL's (`lsr` with another grid refused in both modes) |
+| FSL-134 | applytopup with a field image: `jac`'s Jacobian takes the y displacement in units of the x voxel size (the displacement itself uses the y voxel size); a field on another grid than the images is not refused (of the same voxel count: laid as stored for the displacement, its Jacobian at the same indices, §7.3; read past its lines with `lsr`) (spec writer, 2026-11-03) | the y voxel size; other grids refused | FSL's (`lsr` with another grid refused in both modes) |
 | FSL-135 | applytopup: an unknown `--method` writes nothing and exits 0; `lsr`/`vb` without movements abort (`TopupFileReader::MoveMatrix: Index i out of bound`) | clear refusals | FSL's |
 | FSL-141 | `vb*`: the Gamma shapes' counts in 32-bit integers wrap beyond 2³¹ values | 64-bit counts | the wrapped values |
 | FSL-142 | `vb3D`/`vb4D` count `2 m` data points per line whatever the collection holds (`vb2D` counts every image) | the collection's count; named | FSL's |
 | FSL-143 | `vb3D`/`vb4D`'s prior couples neighbouring slices with half the weight of the in-slice coupling: the precision is indefinite and the iterations diverge (an output of ±3.9e10 for an input of 0 to 1.1e5) | the consistent coupling; named on every `vb3D`/`vb4D` run | FSL's |
+| FSL-144 | applytopup `--method=jac` with a phase encoding along z (which topup refuses: it estimates no field for it): the displacement's z component is left out, the image written uncorrected, silently (§7.3; spec writer, 2026-11-03) | refused (rule B), named | FSL's output |
+| FSL-145 | `--splineorder=2` on an axis shorter than two knot spacings: 2 coefficients when `k ≤ n < 2k`, 1 when `n < k`, where every other axis gets `ceil((2n + k − 4) / (2k)) + 2` (§4.2): the field is forced towards 0 at the axis' far end (exactly 0 from `1.5 k` on), and a level that refits a single coefficient stops FSL (`Mat::operator(): index out of bounds`) (spec writer, 2026-11-03) | the general count on every axis (rule A); named when one of the levels' grids or the output's has such an axis | FSL's counts (and its error) |
+| FSL-146 | volumes encoded along different axes (AP, PA, LR, RL): the field gradient's Jacobian term along each axis leaves out the volumes not encoded along it (§4.6), so it is not the cost's gradient and the minimisers stop where it vanishes (spec writer, 2026-11-03) | the cost's gradient (rule A); named whenever some axis has displaced and undisplaced volumes. Measured by the clean-room original: the final cost lower or equal in 86 % (with movements) and 89 % (without) of random testing's differing four-volume cases | FSL's |
 | FSL-201 | with the movements estimated, the derivatives with respect to the rotations are forward differences (1e-5 rad) of rotation matrices built in single precision (§4.3, §4.6): the gradient and the Gauss-Newton Hessian of the movements are not the cost's, the minimisers end elsewhere (spec writer, 2026-11-03) | the exact derivatives (§4.6); named on every run that estimates the movements. Measured (rule D → A; the replica, `reproduce` identical to FSL on every run): fMRIPrep's two calls (no movements) unchanged; the final cost lower or equal in 18 of 22 runs with the movements (8 of 8 random-testing cases with movements between the volumes, 0.01 to 44 % lower; 60 SCG iterations on the half-resolution pair 38 % lower, where FSL's SCG stalls); 0.004 to 0.13 % higher in 4 runs whose minimisations are cut short (FSL's `b02b0`, `_2`, `_4` with one iteration per level; ds001600 with FSL's `b02b0.cnf`); movements up to 0.35 rad apart | FSL's forward difference |
 
 FSL-127 to FSL-131 are defects of FSL's libraries that no path of topup or applytopup reaches
@@ -834,10 +1000,10 @@ precision answer is checked by a model written from this spec's text
 |---|---|---|---|---|
 | 1 | FSL's rotation derivatives of the movements (finding 14) | §4.3, §4.6, §4.7, §10.1 (FSL-201) | right (not the cost's); the cause: forward differences of single-precision rotation matrices | high: `rotation_model.py` gives the rotation entries of FSL's three gradients to 2e-5 to 1.5e-4; FSL-201 decided by rule A after measurement |
 | 2 | the refit between levels: the penalty's rows and weight; the refit when `--warpres` changes at the same spacing; the intermediate spacing (finding 11, probes A to H) | §4.4, §10.2 | right on all three | high: `refit_model.py` gives FSL's level-2 start fields of probes D to H to 7e-7 Hz rms; the other penalties miss by 1e-3 to 3e-2 |
-| 3 | the quadratic splines' bending energy where a knot falls on a voxel (finding 36, reproducer 10753) | (to be answered) | | |
-| 4 | applytopup `lsr` on lines whose length divides 2³² (reproducer 8089) | §7.4, §10.2 | the lines are not the cause: the mapping folds (across the wrap-around) and FSL builds the matrices row by row by its walk, the original column by column | high for the construction (`lsr_model.py`: FSL's folded probe lines to 3e-5, the overlap reading off by up to 383 of 686); medium for 8089 itself (not re-run) |
+| 3 | the quadratic splines' bending energy where a knot falls on a voxel (finding 36, reproducer 10753) | §4.6 | incomplete: `E` a sum at integer points (finding 7) is right; FSL samples each basis function only at the offsets inside its open support, so at an even knot spacing the inner knots take the mean of the one-sided second derivatives and the outer knots none (the "average" tried took the mean at both) | high: `bending_model.py` gives FSL's regulariser Hessian of 10753 (from two Hessians at different `λ`) to 8.6e-7 (p50), 2.7e-5 (largest); the other readings 1.4 to 20 % off |
+| 4 | applytopup `lsr` on lines whose length divides 2³² (reproducer 8089) | §7.4, §10.2 | the lines are not the cause: the mapping folds (across the wrap-around) and FSL builds the matrices row by row by its walk, the original column by column | high: `lsr_model.py` gives FSL's folded probe lines to 3e-5 (the overlap reading off by up to 383 of 686); `lsr_8089.py` gives FSL's output of 8089 itself to 3.2e-5 at the 99th percentile (the overlap reading 0.131, the original's 0.1337); the replica's `reproduce` equals FSL bit for bit (spec writer, 2026-11-03) |
 | 5 | FSL-133: what FSL reads at the wrap-around of lines whose length does not divide 2³² (finding 21, probe133) | §7.4, §10.1 | incomplete: the register's `(2³² − 1) mod n` is right for `φ(−1)` (voxel 15 of 30), but FSL's matrices are built row by row, so the misread position enters the rows near the line's start, not the columns the implementer's column-wise model gave it | high: `lsr_model.py` gives FSL's restorations of probe133's 30- and 32-voxel lines to 2.6e-5 |
-| 6 | FSL-134: a field of the images' voxel count in another shape (finding 22, probe134); the field image's Jacobian scale (finding 18) | (to be answered) | | |
-| 7 | the resampling of images with an axis of 8 voxels or fewer (finding 27) | (to be answered) | | |
-| 8 | the conventions the original follows as measured (the handoff's list: findings 1, 2, 3, 5, 7, 12, 13, 15, 16, 23 to 25, 29, 30, 32 to 34, FSL-121, FSL-125, FSL-143, the log, the messages, `--debug`, `--trace`, applytopup's mask and movements) | (to be answered; finding 13 confirmed in §4.3, finding 12 in §4.4) | | |
-| 9 | FSL-146's mechanism (finding 35), for the register | (to be answered) | | |
+| 6 | FSL-134: a field of the images' voxel count in another shape (finding 22, probe134); the field image's Jacobian scale (finding 18) | §7.3, §10.1 | incomplete: the displacement is the field laid as stored (tried), but the Jacobian is the field's own, written at the same indices (0 beyond the field's grid), and the case's single image is resampled trilinearly (FSL-132), which hid the layout; finding 18 right (the image's x voxel size over the field image's y voxel size) | high: `other_shape_model.py` gives FSL's `at/jac-other-shape` to 1.1e-5 at the 99th percentile, its 10,784 zeros exactly |
+| 7 | the resampling of images with an axis of 8 voxels or fewer (finding 27) | §4.5, §9.4 | right, now explained: the spline prefilter's initial values are periodic sums truncated at 15 terms, without the closed form's normalisation; every axis shorter than 15 voxels is affected, by about `0.268^N` (also topup's own levels and regridding) | high: `short_axis_model.py` gives FSL's resampling of 7 probe images (1 × 8 × 1 to 16 × 16 × 16) to 9e-5 of values up to 999, where FSL departs from the samples by up to 65 |
+| 8 | the conventions the original follows as measured (the handoff's list: findings 1, 2, 3, 5, 7, 12, 13, 15, 16, 23 to 25, 29, 30, 32 to 34, FSL-121, FSL-125, FSL-143, the log, the messages, `--debug`, `--trace`, applytopup's mask and movements) | §2.6, §2.7, §4.2 to §4.7, §5, §6, §7.2 to §7.5, §9.4, §10.1 | right in every item (findings 1 to 5, 7, 12, 13, 15 to 20, 23 to 25, 29, 32 to 34; FSL-121's leading empty line; FSL-125 acting as no smoothing; FSL-143's entries; the log's `--estmov=100`; the acquisition reader's `TopupFileIO::` prefix; FSL-118's first-level message; `--debug`'s and `--trace`'s details; applytopup's mask, the zero z displacement, `M⁻¹ x`, the skipped lines); one addition: FSL-145 lays **1** coefficient when `n < k` (2 when `k ≤ n < 2k`), and a refit of a single coefficient stops FSL | high (checked against the behaviour FSL's programs define); the counts by `quad_count.py` (FSL's `_fieldcoef` of 2 x 1 x 2 and 1 x 1 x 1, the refit's error at `--subsamp=2`) |
+| 9 | FSL-146's mechanism (finding 35), for the register | §4.6, §10.1 | right in every detail (the volumes not displaced along an axis leave out their Jacobian term; the Gauss-Newton Hessian keeps every volume) | high: the clean-room original's `reproduce`, which implements this text, follows FSL's costs on trial case 3693 to 6 digits and its first gradients to 1e-4 of 17 to 28 on every volume subset (finding 35) |

@@ -532,6 +532,20 @@ defects! {
         "the undocumented --method=vb3D and vb4D count two images' data points for the noise prior whatever the number of images restored together: with three or more images of one phase-encoding axis the noise precision is estimated from too few data points (vb2D counts them right)";
     FSL_143 = "FSL-143", "applytopup", true,
         "the undocumented --method=vb3D and vb4D regularise with a smoothness prior whose coupling between a voxel and the voxels next to its neighbours in the adjacent slices (one step along the phase encoding and one slice away) is half what the squared second-difference operator it is built from gives (the coupling within a slice is right)";
+    FSL_151 = "FSL-151", "fslmaths", true,
+        "a value converted to an integer type outside its range, or NaN, wraps around or becomes the most negative integer: values of an integer output type (-odt char, short, int), -rem's integer remainder, numbers and results under -dt char, short or int";
+    FSL_152 = "FSL-152", "fslmaths", true,
+        "-thr, -thrp, -thrP, -uthr, -uthrp, -uthrP, -bin, -binv and -mas bound their range by the image's maximum plus 1 (or minimum minus 1), which wraps around under -dt char and int and rounds back to the maximum for values from 2^24 (and infinity): the largest (or smallest) voxels are zeroed";
+    FSL_153 = "FSL-153", "fslmaths", true,
+        "a NaN first voxel makes the image's minimum and maximum NaN: -thr, -uthr, -bin, -binv and -mas then zero every voxel, and -range writes a NaN display range; NaN voxels also count in the lowest bin of the robust range of -thrp, -thrP, -uthrp and -uthrP";
+    FSL_155 = "FSL-155", "fslmaths", true,
+        "-dt input on an image stored as int8, uint16, uint32, int64, uint64 or float128 computes nothing, writes no output and exits with status 0";
+    FSL_156 = "FSL-156", "fslmaths", true,
+        "an integer division by zero crashes fslmaths (a floating-point exception): -rem by a number or an image value whose integer part is 0, -div by such a number under -dt char, short or int, -grid with a spacing of 0, and the most negative int divided by -1 under -dt int";
+    FSL_158 = "FSL-158", "fslmaths", true,
+        "an operation that takes more arguments than remain before the output name reads past the end of the command line: it crashes, or reads the environment";
+    FSL_159 = "FSL-159", "fslmaths", true,
+        "-div, -rem, -max and -min with an image of another size are not refused: -div and -rem take the values of the image's own corner of the same voxel indices (0 outside it), -max and -min read the second image's values at misplaced positions, or past its end when it is smaller";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

@@ -49,6 +49,7 @@ VERSIONS = {
     "fsl-fast4": "2111.3",
     "fsl-basisfield": "2203.4",
     "fsl-topup": "2203.5",
+    "fsl-cprob": "2111.0",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -194,6 +195,14 @@ FILES = [
     ("fsl-topup", "applytopup.cpp"),
     ("fsl-topup", "displacement_vector.h"),
     ("fsl-topup", "displacement_vector.cpp"),
+    # fslmaths (2026-11-03): fsl-cprob's random numbers and normal quantiles
+    ("fsl-cprob", "drand.cc"),
+    ("fsl-cprob", "ndtri.cc"),
+    ("fsl-cprob", "polevl.cc"),
+    ("fsl-cprob", "mtherr.cc"),
+    ("fsl-cprob", "const.cc"),
+    ("fsl-cprob", "mconf.h"),
+    ("fsl-cprob", "cprob.h"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

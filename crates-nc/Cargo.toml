@@ -19,6 +19,7 @@ members = [
     "larmorx-nc-flirt",
     "larmorx-nc-fast",
     "larmorx-nc-topup",
+    "larmorx-nc-avwutils",
     "larmorx-nc-core/tools/libm-verify",
     "larmorx-nc-cli",
 ]
@@ -38,6 +39,7 @@ larmorx-nc-bet = { path = "larmorx-nc-bet", version = "0.0.1" }
 larmorx-nc-flirt = { path = "larmorx-nc-flirt", version = "0.0.1" }
 larmorx-nc-fast = { path = "larmorx-nc-fast", version = "0.0.1" }
 larmorx-nc-topup = { path = "larmorx-nc-topup", version = "0.0.1" }
+larmorx-nc-avwutils = { path = "larmorx-nc-avwutils", version = "0.0.1" }
 # zlib-rs: the pure-Rust zlib implementation (no C zlib), as the root workspace.
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 # znzlib 2511.3 (FSL 6.0.7.23) also reads and writes zstd and bzip2: ruzstd (pure-Rust zstd) and
@@ -45,6 +47,8 @@ flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", 
 ruzstd = "0.9.1"
 bzip2 = "0.6.1"
 rayon = "1.12.0"
+# libm: the root workspace's (pure Rust); fslmaths' `tan` until glibc's is ported.
+libm = "0.2.16"
 thiserror = "2.0.21"
 tempfile = "3.27.0"
 # Test-only: SHA-256 for the golden tests (larmorx-nc-cli/tests/golden.rs).
@@ -70,4 +74,7 @@ opt-level = 1
 opt-level = 1
 
 [profile.dev.package.larmorx-nc-topup]
+opt-level = 1
+
+[profile.dev.package.larmorx-nc-avwutils]
 opt-level = 1

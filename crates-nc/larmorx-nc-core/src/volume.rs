@@ -1066,9 +1066,11 @@ impl Volume {
     }
 
     /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
-    /// `find_thresholds` without a mask).
+    /// `find_thresholds` without a mask: [`crate::volops::find_thresholds`]). The limits are
+    /// computed with SSE's NaNs (an infinite voxel makes `0 * inf`: x86-64's default NaN on
+    /// every platform).
     pub fn robust_limits(&self) -> (f32, f32) {
-        find_thresholds(self)
+        crate::volops::find_thresholds(self, None).unwrap_or((0.0, 0.0))
     }
 }
 
@@ -1082,80 +1084,6 @@ fn sort_nan_last<T: Elem>(v: &mut [T]) {
     });
 }
 
-/// `find_thresholds` without a mask, for `float` volumes: from a 1000-bin histogram between
-/// the extremes, the bins holding 2% and 98% of the voxels, refined over at most 10 passes
-/// while the range they span is under a tenth of the histogram's. The limits are computed with
-/// SSE's NaNs (an infinite voxel makes `0 * inf`: x86-64's default NaN on every platform).
-fn find_thresholds(vol: &Volume) -> (f32, f32) {
-    use sse::{S32, S64};
-    // max - min in float, as a double
-    let range = |max: f32, min: f32| S64(f64::from((S32(max) - min).0));
-    const BINS: i32 = 1000;
-    const MAX_PASSES: i32 = 10;
-    let mut hist = vec![0f64; BINS as usize];
-    let (mut top_bin, mut bottom_bin) = (0i32, 0i32);
-    let mut pass = 1;
-    let mut lowest_bin = 0i32;
-    let mut highest_bin = BINS - 1;
-    let (mut thresh98, mut thresh2) = (0f32, 0f32);
-    let (vmax, vmin) = vol.extrema();
-    let (mut min, mut max) = (vmin, vmax);
-    while pass == 1 || f64::from(thresh98 - thresh2) < f64::from(max - min) / 10.0 {
-        if pass > 1 {
-            bottom_bin = (bottom_bin - 1).max(0);
-            top_bin = (top_bin + 1).min(BINS - 1);
-            let tmpmin = (f64::from(min)
-                + (S64(f64::from(bottom_bin)) / f64::from(BINS)) * range(max, min))
-            .0 as f32;
-            max = (f64::from(min)
-                + (S64(f64::from(top_bin + 1)) / f64::from(BINS)) * range(max, min))
-            .0 as f32;
-            min = tmpmin;
-        }
-        if pass == MAX_PASSES || min == max {
-            min = vmin;
-            max = vmax;
-        }
-        let mut validsize = image_histogram(vol, BINS, min, max, &mut hist);
-        if validsize < 1 {
-            return (min, max);
-        }
-        if pass == MAX_PASSES {
-            validsize -= i64::from(round_f64(hist[lowest_bin as usize]))
-                + i64::from(round_f64(hist[highest_bin as usize]));
-            lowest_bin += 1;
-            highest_bin -= 1;
-        }
-        if validsize < 0 {
-            thresh2 = min;
-            thresh98 = min;
-            break;
-        }
-        let fa = range(max, min) / f64::from(BINS);
-        let mut count: i32 = 0;
-        bottom_bin = lowest_bin;
-        while i64::from(count) < validsize / 50 {
-            count += round_f64(hist[bottom_bin as usize]);
-            bottom_bin += 1;
-        }
-        bottom_bin -= 1;
-        thresh2 = (S32(min) + (f64::from(bottom_bin) * fa).0 as f32).0;
-        count = 0;
-        top_bin = highest_bin;
-        while i64::from(count) < validsize / 50 {
-            count += round_f64(hist[top_bin as usize]);
-            top_bin -= 1;
-        }
-        top_bin += 1;
-        thresh98 = (S32(min) + (f64::from(top_bin + 1) * fa).0 as f32).0;
-        if pass == MAX_PASSES {
-            break;
-        }
-        pass += 1;
-    }
-    (thresh2, thresh98)
-}
-
 /// `MISCMATHS::round(double x)`: `(int)(x + 0.5)` above 0, `(int)(x - 0.5)` otherwise
 /// (truncated as x86-64 does).
 pub fn round_f64(x: f64) -> i32 {
@@ -1164,29 +1092,6 @@ pub fn round_f64(x: f64) -> i32 {
     } else {
         cnum::f64_to_i32(x - 0.5)
     }
-}
-
-/// `imageHistogram` without a mask: every value counted in
-/// `hist[max(0, min((int)(fA*v + fB), bins-1))]`; the number of values, or -1 when the range is
-/// empty.
-fn image_histogram(vol: &Volume, bins: i32, min: f32, max: f32, hist: &mut [f64]) -> i64 {
-    if max <= min {
-        return -1;
-    }
-    for h in hist.iter_mut() {
-        *h = 0.0;
-    }
-    let fa = f64::from(bins) / f64::from(max - min);
-    let fb = (f64::from(bins) * f64::from(-min)) / f64::from(max - min);
-    let mut n = 0i64;
-    for &v in &vol.data {
-        let b = cnum::f64_to_i32(fa * f64::from(v) + fb)
-            .min(bins - 1)
-            .max(0);
-        hist[b as usize] += 1.0;
-        n += 1;
-    }
-    n
 }
 
 /// `periodicclamp` (miscmaths.cc).

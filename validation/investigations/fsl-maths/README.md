@@ -20,3 +20,9 @@ oracle-output cache, and every run goes in a memory box
   NaN` (FSL-162); `-dilF` and `-eroF` leave NaN voxels out; `-subsamp2` of a 4D image stops with
   `3D only method called by higher-dimensional volume.` (FSL-163); `-dt int ... -kernel sphere 5
   -fmean` traps (FSL-156); `-inm` of an image of zeros prints its error and writes NaN.
+- `arm_glibc_powf.py <work dir>`: whether glibc 2.35's `powf` tables (`__powf_log2_data`,
+  `__exp2f_data`) are Arm's Optimized Routines v19.11 (MIT), the code `glibc_float::powf` is
+  translated from, and where the C library's `powf` starts (`objdump -d` there shows the nine
+  multiply-adds of the FMA build): both tables found as one block each in Ubuntu 22.04's
+  libm.so.6 (2026-11-03). The function itself: `crates-nc/larmorx-nc-core/tools/libm-verify`
+  (0 of 10 million differ from `powf@GLIBC_2.2.5`).

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND MIT
 // Translated to Rust from Arm's Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c,
-// cosf.c, sincosf_data.c, logf.c, logf_data.c, expf.c, exp2f_data.c), Copyright (c) 2017-2018, Arm Limited,
+// cosf.c, sincosf_data.c, logf.c, logf_data.c, expf.c, exp2f_data.c, powf.c,
+// powf_log2_data.c), Copyright (c) 2017-2018, Arm Limited,
 // SPDX-License-Identifier: MIT (the notice is in LICENSES/MIT-arm-optimized-routines.txt).
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals.
 // Distributed as part of larmorx-nc under the FSL Licence (see LICENSE) and the MIT terms.
-//! The single-precision `sinf`, `cosf`, `sincosf`, `logf` and `expf` that FSL's Linux binaries
-//! call: glibc 2.35's, as its x86-64 build selects them on a CPU with FMA (`__sinf_fma`,
+//! The single-precision `sinf`, `cosf`, `sincosf`, `logf`, `expf` and `powf` that FSL's Linux
+//! binaries call: glibc 2.35's, as its x86-64 build selects them on a CPU with FMA (`__sinf_fma`,
 //! `__cosf_fma`, `__sincosf_fma`, `__logf_fma`, `__expf_fma`, compiled with `-mfma -mavx2`).
 //!
 //! glibc took these functions from Arm's Optimized Routines (2018) and kept their arithmetic;

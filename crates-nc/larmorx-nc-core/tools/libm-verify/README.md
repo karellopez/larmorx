@@ -32,3 +32,13 @@ range. Result on 2026-11-02 (4 million per family): 0 of 16 million `log`, 0 of 
 and 0 of 8 million `expf` differ (the earlier families unchanged: 0 differ).
 `glibc-float-verify expf` compares `expf` on all 2^32 inputs (Rust's `f32::exp`, the C library's
 `expf@@GLIBC_2.27`, which gives the same values as the wrapper): 0 differ.
+
+Since 2026-11-03 (fslmaths' `-tfce`, `-tfceS`) it also checks `powf` as FSL's binaries bind it
+(`powf@GLIBC_2.2.5`): TFCE's heights `powf(h, H)` (thresholds accumulated in float steps of
+`max / 100`, `H` from 0.5 to 3), cluster sizes `powf(n, E)`, and every pair of floats (negative
+bases, zeros, subnormals, infinities, NaN, overflow and underflow). `glibc_reference.c` now names
+the `GLIBC_2.2.5` symbols itself (`.symver`), so any compiler binds the wrappers (FSL's conda
+compiler on this machine bound `exp@GLIBC_2.29`, `powf@GLIBC_2.27`, ... without it; `nm -D
+glibc_reference` shows the versions). Result on 2026-11-03 (2 million per family): 0 of 10
+million `powf`, and 0 of every earlier family (`pow`, `exp`, `log`, `logf`, `expf`, `tanh`, the
+x87 operations) differ.

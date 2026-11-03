@@ -256,7 +256,83 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   magnitude, so every term truncates to 0 either way (`dim/Tar1-int-large`); `-bptf nan nan`
   skips both filters; `-Tmean` of a series holding NaN is NaN.
 
-## Defects (FSL-151 to FSL-172; the register's rows through the handoff)
+## Threshold-free cluster enhancement and ROC (sub-task 3b)
+
+- **-tfce H E connectivity** (`newimagefns.h`'s fast `tfce`; `-tfce_minT` and `-tfce_delta` set
+  two `float`s, both 0 at the start, kept for the rest of the chain). Each volume on its own
+  (`ShadowVolume`). `maxT = (float) max()` (`calculateExtrema`: FSL-153's NaN first voxel);
+  `deltaT = maxT / 100.0` (double, stored as float) when the step is 0; `deltaT <= 0` throws
+  `Error: tfce requires a positive deltaT input.`, a size below 3 along any axis `Error: tfce
+  currently requires an input with at least 3 voxels extent into each dimension.` (both
+  `std::runtime_error`, which is `NEWMAT::Exception` in armawrap, so fslmaths' `catch` takes
+  them: `ERROR: TFCE failed, please check your file for valid sizes and voxel values.` and the
+  text glued to it, a blank line, `Exiting`, exit status 1, no output); `max() / deltaT > 10000`
+  (in `T`'s arithmetic: double for a double image, else float) prints `Warning: tfce has detected
+  a large number of integral steps. This operation may require a great deal of time to
+  complete.` on stdout. The interior voxels (1 to size - 2 on each axis) whose `(float)` value is
+  above `minT` are sorted by value (`std::sort` of `VecSort`, `double` keys); for `curThr` from
+  `minT` while `curThr < maxT + deltaT` (`float` sums), the voxels up to `curThr` leave the list,
+  the rest are flood-filled into clusters (`std::queue`; a neighbour joins when `NumConn >=
+  edsta`: 6 for a face, 18 for an edge, 26 for a corner, 100 for the centre), and each voxel adds
+  `pow(size, E) * HH` (`ClusterSizesI = pow(ClusterSizes, E) * HH`: Armadillo's `eop_pow`,
+  glibc's double `pow`, then the product with `HH`) to its `float` enhancement (`float +=
+  double`), with `HH = powf(curThr, H)` (the C++ `pow(float, float)`: `powf@GLIBC_2.2.5`, read
+  in the binary's calls). Edge voxels stay 0; the result is `(T)` of the enhancement. A voxel's
+  enhancement depends only on the sizes of the clusters it belongs to, threshold by threshold,
+  so neither the order of equal values in the sort nor the clusters' numbering changes a bit.
+  A negative `minT` with a non-integer `H` gives `powf` of negative heights: NaN enhancements
+  (`tfce/negative-minT`, reproduced); an infinite maximum gives one threshold at `minT` (zeros
+  for `H > 0`, `tfce/inf`).
+- **-tfceS H E connectivity X Y Z tfce_thresh** (`tfce_support`). X, Y, Z through
+  `niftivox2newimagevox_mat()` and `MISCMATHS::round` (as `-roi`). Each volume: `maxT` the
+  voxel's value; the step `maxT / 100` (float by int) and `thrNum = 101`, or the given step and
+  `thrNum = (int)(maxT / deltaT) + 1`; for `thresh` from `minT` while below `maxT` (float sums),
+  the enhancement image (a float copy, restricted to the voxel's cluster at each step) is
+  binarised at `[thresh, FLT_MAX]`, labelled by `connected_components` (back-connectivity 6, 18,
+  26; none for any other number) and the voxel's cluster size and `thresh` stored in
+  `Clusters(thrCntr + 1)`, `Thresholds(thrCntr + 1)` (armawrap's checked indexing). Then from the
+  highest threshold down `summ += powf(size, E) * powf(thresh, H)` (floats) until it reaches
+  `tfce_thresh` (`it doesn't reach to specified threshold` on stdout otherwise); the output keeps
+  the input's values (as float, then `(T)`) of the voxel's cluster at the threshold reached
+  (`VolLabl(Xoi, Yoi, Zoi)`: `operator()`, so outside the image the zero padding). An infinite
+  voxel is in no cluster (`binarise`'s upper bound is `FLT_MAX`): `ClusterSizes(0)` throws
+  `std::out_of_range` (`Mat::operator(): index out of bounds`), not caught (`tfceS/inf`, both
+  modes: FSL's own stop). For a double image the output is rounded to float (FSL's copy).
+- **-roc AROC-thresh outfile [noise4D] truth** (`fslmaths.cc`). A negative threshold means no
+  noise image (its magnitude used). `minval = (float) min()` of the input, then `std::min` with
+  the noise image's; the noise image (read as float) and the input are log transformed as
+  `log(v - minval + 1)` (the noise: `logf`; the input: `logf` for float and the integer types,
+  `log` for double, both the `GLIBC_2.2.5` wrappers), the noise over the input's loops with its
+  own strides (FSL-179). `delta = maxlogval / 1000` (1 if 0; `maxlogval` the larger of both
+  images' maxima); the truth (3D, `read_volume`) binarised at `[max * 0.05, FLT_MAX]` (the bound
+  computed in double, stored as float) after a mask of `[-0.001, FLT_MAX]` is taken (no noise
+  image: the false positives come from the truth's zero voxels, negative ones left out:
+  `invtruth = ((truth * -1) + 1) * mask`). `border` is 0, so every voxel counts. For `thresh` from
+  `maxlogval + delta` down by `delta` while `thresh > 0` and `FP < AROC-thresh`: per volume the
+  counts at or above `thresh` (float sums), `TP = count / truecount` and the voxelwise FP rate
+  (float divisions, stored as double), `FPfwe` the volumes with any false positive; `TP` is
+  miscmaths' `mean` of the volumes' rates (`sum of x / N`), `FP` `FPfwe / T` (noise image) or the
+  mean FP rate; the area grows by the trapezoid (`float`), the straddling step by its partial
+  trapezoid (mixed float and double, as C++ promotes), and each volume's area (`arocT`, double)
+  likewise. The curve file (`ofstream`, precision 6): per threshold `FP TP sd(FP) sd(TP)
+  exp(thresh) - 1 + minval` (noise image; `sqrt(var)`, miscmaths' `var` with `N - 1`), else per
+  volume `FP TP exp(thresh) - 1 + minval` (`expf`). Finally the area over the threshold and the
+  first and third quartiles of `arocT` (miscmaths' `quantile`: `percentile` by `interp1` over
+  `[0; 100 (i - 0.5) / n; 100]`, in float) over the threshold, on stdout. `-roc 0` prints
+  `-nan -nan -nan` (0 / 0; not a defect: the input has no meaning and FSL's answer is defined);
+  a truth image of another size than the input stops in `TPim *= truth` (newimage's exception,
+  both modes, the curve file left empty).
+- **glibc's `powf`.** `-tfce` and `-tfceS` call `powf@GLIBC_2.2.5` (the SVID wrapper, whose
+  replacements are the function's own values), which is Arm's Optimized Routines `powf.c` (MIT,
+  0.82 ulp: not correctly rounded) in glibc 2.35's FMA build: translated into
+  `larmorx-nc-core`'s `glibc_float::powf` from Arm's files, its nine multiply-adds read from
+  `__powf_fma`'s machine code, its tables found in `libm.so.6`
+  (`validation/investigations/fsl-maths/arm_glibc_powf.py`); `tools/libm-verify`: 0 of 10 million
+  differ. `-roc`'s `log`, `logf` and `expf` were already the core's.
+- Suite: 48 cases (`tfce/`, `tfceS/`, `roc/`, the new `d13/` ones): 36 identical, 12 both-error
+  (FSL's own errors and stops, and the D13 cases where FSL stops), 0 fail.
+
+## Defects (FSL-151 to FSL-180; the register's rows through the handoff)
 
 - **FSL-151 (c; rule A): undefined or wrapping conversions to integers.** `(T) atof` of a number
   beyond `T` under `-dt char|short|int`, `-rem`'s `(int)` casts of out-of-range or NaN values,
@@ -405,6 +481,69 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   float) for each such voxel, where the z of p is about 8.2 or more. Corrected: `-ndtri(p)`
   there (no message). Case: `d13/ptoz-tiny`.
 
+- **FSL-153, extended (sub-task 3b): a NaN first voxel in `-tfce` and `-roc`.** `-tfce`'s
+  `maxT` from `max()`: NaN, so no threshold runs and the volume is zeros; `-roc`'s `min()` of the
+  input and the noise image and `max()` of the log images and of the truth: NaN, so no threshold
+  runs (`0 0 0`) or the truth has no true voxel. Corrected as FSL-153 (the NaN values left out),
+  named where the output differs. Cases: `d13/tfce-nan`, `d13/roc-nan`.
+- **FSL-173 (a; no change): `tfce` reads one element past its sorted list.** Both loops over the
+  list (`while ((VecSortI[FldCntr].Sv <= curThr) && (FldCntr < sizeC))` and the `>` one) read the
+  element before testing the bound, so at the end of the list they read `VecSortI[sizeC]`. The
+  value cannot change the result (the bound test that follows ends the loop either way), and the
+  vector's capacity usually holds that element (`resize` down keeps it; a zero from the
+  value-initialised allocation); only when the list fills its allocation, which can end on a
+  page's last byte, may the read fall outside the program's memory. larmorx tests the bound
+  first in both modes: nothing to reproduce, never named.
+- **FSL-174 (a/c; rule B): a threshold step that cannot advance.** `-tfce`'s loop `curThr +=
+  deltaT` with a step below half an ulp of `curThr` (`-tfce_minT -1e9`, or a tiny `-tfce_delta`
+  with large values) never ends; a NaN `-tfce_delta` makes `curThr < maxT + NaN` false at once
+  (zeros); `-tfceS` with a negative or NaN step, or a step that stalls, runs until its arrays are
+  full and stops (`std::out_of_range`; SIGFPE for arrays without an element: FSL-177). Corrected:
+  an error naming FSL-174 (the step has no meaning for the image); `reproduce`: `-tfce`'s endless
+  loop refused (FSL never ends), `-tfceS`'s stop reproduced. larmorx simulates the `float`
+  thresholds first (at most about 2^32 additions) to find a stall before computing. Cases:
+  `d13/tfce-stall` (FSL not run), `d13/tfce-delta-nan`, `d13/tfceS-stall`,
+  `d13/tfceS-negative-delta`.
+- **FSL-175 (c; rule A): `-tfce` of an image without positive values.** With the automatic step
+  `deltaT = maxT / 100` is 0 or negative for a volume whose maximum is 0 or below (an empty
+  statistic image), and tfce throws `requires a positive deltaT input` (exit 1, no output), where
+  no voxel is above `minT` and the enhancement is 0 everywhere (FSL itself gives zeros with a
+  given positive step). Corrected: zeros when the maximum is at or below `minT` (other cases
+  with `minT` below a maximum at or below 0 keep FSL's error). Cases: `d13/tfce-zero`,
+  `d13/tfce-negative` (`fixed`).
+- **FSL-176 (c; rule B): connectivities other than 6, 18 and 26.** `-tfce`'s `NumConn >= edsta`
+  joins the neighbour classes up to the number given (7 acts as 6, 25 as 18, 5 or 0 joins
+  nothing: every voxel its own cluster), while `-tfceS`'s `connected_components` joins none at
+  all unless the number is exactly 6, 18 or 26: the same number means different clusters in the
+  two operations. Corrected: an error unless 6, 18 or 26; `reproduce`: FSL's. Cases:
+  `d13/tfce-conn7`, `d13/tfceS-conn7`.
+- **FSL-177 (a; rule A): `-tfceS`'s arrays.** `Clusters` and `Thresholds` get `thrNum` elements,
+  `(int)(maxT / deltaT) + 1` (or 101 with the automatic step), but the loop starts at `minT`: a
+  negative `-tfce_minT` (or the float sums' rounding, one step more) writes past them
+  (`std::out_of_range`, an abort, no output). With no element (`thrNum <= 0`) armawrap's 1D
+  index `(i - 1) / Ncols()` divides by zero (SIGFPE), as `ClusterSizes(0)` does in a volume
+  without any cluster. Corrected: the arrays as long as the thresholds taken; `reproduce`: FSL's
+  exception, the division refused. Case: `d13/tfceS-minT` (`fixed`).
+- **FSL-178 (a; rule B): `-tfceS` at a voxel outside the image.** `value(Xoi, Yoi, Zoi)` is
+  unchecked: FSL reads the voxel at that offset from the volume's start (x = size wraps to the
+  next row) and labels it, then the final `VolLabl(Xoi, Yoi, Zoi)` is the zero padding (the
+  output keeps the voxels outside every cluster); farther away it reads outside the image.
+  Corrected: an error; `reproduce`: FSL's result where the offset is inside the volume
+  (`d13/tfceS-outside`, bit-identical), refused beyond (`d13/tfceS-far`, FSL not run).
+- **FSL-179 (a/c; rule B): `-roc` with a noise image of another size.** The log transform and the
+  counts loop over the input's sizes with the noise image's strides: more volumes are left raw
+  (their values, around 100, then set `maxlogval` and so every threshold), other sizes misplace
+  or repeat voxels, and a smaller image is read and written outside its memory. Corrected: an
+  error; `reproduce`: FSL's result where every offset is inside the noise image
+  (`d13/roc-noise-larger`, bit-identical), refused beyond (`d13/roc-noise-smaller`, FSL not
+  run).
+- **FSL-180 (c; rule B): `-roc` without true or noise voxels.** A truth image with nothing at or
+  above 5 % of its maximum (all negative) gives `truecount` 0, and without a noise image a truth
+  without zero voxels gives `invtruecount` 0: the rates are 0 / 0 (NaN), written to the curve,
+  and the quartiles' `SortAscending` throws `sort(): detected NaN` (an abort after the curve is
+  written; the area's text on stdout is never flushed). Corrected: an error before the curve;
+  `reproduce`: FSL's curve and exception. Cases: `d13/roc-no-true`, `d13/roc-no-noise`.
+
 ## Known differences
 
 - **`-tan` in double** (`fn/double-tan`): glibc 2.35's `tan` (IBM's code) is not correctly
@@ -416,5 +555,4 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
 
 ## Not yet translated (later sub-tasks of the part)
 
-`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta` and `-roc`: the replica refuses them with a
-message until they are translated (sub-task 3b).
+Every fslmaths operation is translated (sub-task 3b, 2026-11-03); fslstats follows (sub-task 4).

@@ -31,18 +31,21 @@ what it translates.
 
 | Rust module | FSL file | Functions |
 |---|---|---|
-| `fslmaths` | fsl-avwutils `fslmaths.cc` | `main` (the input's type, `-dt`/`-datatype` with `input`, `-odt`/`-output_datatype`, the messages and statuses), `inputParser` (the loop and its operations: `-add`, `-sub`, `-mul`, `-div`, `-rem`, `-mas`, `-max`, `-min` with a number or an image; `-thr`, `-thrp`, `-thrP`, `-uthr`, `-uthrp`, `-uthrP`; `-exp`, `-log`, `-sin`, `-cos`, `-tan`, `-asin`, `-acos`, `-atan`, `-sqr`, `-sqrt`, `-recip`, `-abs`, `-bin`, `-binv`, `-nan`, `-nanm`, `-index`, `-grid`, `-rand`, `-randn`, `-seed`, `-range`, `-save`, `-restart`, the undocumented `-pow` and `-invbin`; the kernel state and `-kernel` (3D, 2D, box, boxv, boxv3, gauss, sphere, file), `-s`, `-fmean`, `-fmeanu`, `-dilM`, `-dilD`, `-dilF`, `-ero`, `-eroF`, `-fmedian`, `-dilall`, `-subsamp2`, `-subsamp2offc`, `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm`, `-ing`, `-tensor_decomp` (on `larmorx-nc-core`'s `filters` and `kissfft`); the output's rounding and `save_volume_dtype`), `loadNewImage`, `check_for_output_name`; not translated yet (refused): `-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta`, `-roc` |
+| `fslmaths` | fsl-avwutils `fslmaths.cc` | `main` (the input's type, `-dt`/`-datatype` with `input`, `-odt`/`-output_datatype`, the messages and statuses), `inputParser` (the loop and its operations: `-add`, `-sub`, `-mul`, `-div`, `-rem`, `-mas`, `-max`, `-min` with a number or an image; `-thr`, `-thrp`, `-thrP`, `-uthr`, `-uthrp`, `-uthrP`; `-exp`, `-log`, `-sin`, `-cos`, `-tan`, `-asin`, `-acos`, `-atan`, `-sqr`, `-sqrt`, `-recip`, `-abs`, `-bin`, `-binv`, `-nan`, `-nanm`, `-index`, `-grid`, `-rand`, `-randn`, `-seed`, `-range`, `-save`, `-restart`, the undocumented `-pow` and `-invbin`; the kernel state and `-kernel` (3D, 2D, box, boxv, boxv3, gauss, sphere, file), `-s`, `-fmean`, `-fmeanu`, `-dilM`, `-dilD`, `-dilF`, `-ero`, `-eroF`, `-fmedian`, `-dilall`, `-subsamp2`, `-subsamp2offc`, `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm`, `-ing`, `-tensor_decomp` (on `larmorx-nc-core`'s `filters` and `kissfft`); the output's rounding and `save_volume_dtype`), `loadNewImage`, `check_for_output_name`; `-tfce_minT`, `-tfce_delta` |
 | `fslmaths::stats` | fsl-avwutils `fslmaths.cc` | `inputParser`'s dimensionality reduction (`-T`, `-X`, `-Y`, `-Z` and any other capital with `max`, `min`, `mean`, `std`, `maxn`, `median`, `perc`, `ar1`; its message), `-pval`, `-pval0`, `-cpval`, `-ztop`, `-ptoz`, `-rank`, `-ranknorm`, `-roi`, `-bptf` (on `larmorx-nc-core`'s `vstats`, `cprob` and `filters::bandpass_temporal_filter`) |
+| `fslmaths::tfce` | fsl-avwutils `fslmaths.cc`; fsl-newimage 2601.0 `newimagefns.h` | `-tfce` (its `catch` and message), `-tfceS` (the voxel through `niftivox2newimagevox_mat`), `-roc` (the log transforms, the true and false positive rates, the curve file, the area and its quartiles); `tfce` (the sorted interior voxels, the flood fill per threshold, `edsta`'s connectivity classes, `powf(h, H)` and `pow(size, E)`), `tfce_support` (`connected_components` per threshold, the arrays `Clusters`/`Thresholds`, the sum from the top) (on `larmorx-nc-core`'s `filters::connected_components`, `glibc_float::powf`, `miscmaths::mean_col`, `var_col`, `quantile_col`) |
 | `usage` | fsl-avwutils `fslmaths.cc` | `printUsage`'s text |
 | `cli` | – | the command line as `larmorx-nc fsl fslmaths` runs it |
 
 ## Changes from the originals
 
 - **D13** (`docs/api/upstream-defects.md`): the defects FSL-151 to FSL-153, FSL-155, FSL-156
-  and FSL-158 to FSL-172 (`docs/findings/fsl-maths.md`) are corrected by default and
-  reproduced with `LARMORX_UPSTREAM_DEFECTS=reproduce`; FSL's crashes (FSL-156, FSL-158, and
-  FSL-159's read past a smaller image) are refused in both modes with a message, exit status 1.
-- **Maths:** `exp`, `log` and `pow` are glibc 2.35's as the core translates them; `sin`, `cos`,
+  and FSL-158 to FSL-180 (`docs/findings/fsl-maths.md`) are corrected by default and
+  reproduced with `LARMORX_UPSTREAM_DEFECTS=reproduce`; FSL's crashes and hangs (FSL-156, FSL-158,
+  FSL-159's read past a smaller image, FSL-174's endless `-tfce`, FSL-177's division by zero,
+  FSL-178's and FSL-179's memory outside the images) are refused in both modes with a message, exit status 1.
+- **Maths:** `exp`, `log`, `pow`, `expf`, `logf` and `powf` are glibc 2.35's as the core translates them
+  (`powf` for `-tfce` and `-tfceS`, from Arm's Optimized Routines: 0 of 10 million differ); `sin`, `cos`,
   `asin`, `acos` and `atan` are larmorx-core's correctly rounded ones (glibc's results on every
   case compared); `tan` is the `libm` crate's (FreeBSD's msun) until glibc's is ported: in
   `double` it differs from glibc's in the last bit of some values (`docs/findings/fsl-maths.md`).

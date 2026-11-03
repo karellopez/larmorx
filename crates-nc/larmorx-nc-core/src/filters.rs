@@ -623,11 +623,10 @@ pub fn uses_fft(nvox: i64, nker: i64) -> bool {
     osum > offt * 44.0
 }
 
-/// Why [`generic_convolve`] stopped: the FFT's path (not translated yet), or an integer
-/// division by zero in the renormalisation (FSL's trap).
+/// Why [`generic_convolve`] stopped: an integer division by zero in the renormalisation (FSL's
+/// trap), or an exception.
 #[derive(Debug)]
 pub enum ConvStop {
-    Fft,
     Trap,
     Exception(FslError),
 }
@@ -703,7 +702,8 @@ fn convolve_masked_axis<T: Arith>(
 ///   `double` kernels, every volume convolved along x, then every volume along y, then z
 ///   ([`convolve_masked_axis`]).
 /// - Not separable: the kernel divided (in `float`) by its sum when that is not 0, each volume
-///   convolved by efficient_convolve (the direct sum, [`convolve_plain`], or the FFT), then,
+///   convolved by efficient_convolve (the direct sum, [`convolve_plain`], or, for a large kernel,
+///   the FFT, [`crate::kissfft::fft_convolve`], which prints no warning), then,
 ///   when renormalising, divided by the same convolution of a volume of ones (an integer
 ///   division by zero is FSL's trap).
 ///
@@ -760,16 +760,21 @@ pub fn generic_convolve<T: Arith>(
             *v = sse::div_f32(*v, d);
         }
     }
-    if uses_fft(nvox as i64, norm_kernel.nvoxels()) {
-        return Err(ConvStop::Fft);
-    }
-    let warn = norm_kernel.off_centre_by_size();
+    let fft = uses_fft(nvox as i64, norm_kernel.nvoxels());
+    let warn = !fft && norm_kernel.off_centre_by_size();
+    let efficient = |v: &Volume<T>, conv: &mut dyn FnMut(f64) -> T| -> Volume<T> {
+        if fft {
+            crate::kissfft::fft_convolve(v, norm_kernel.dims, &norm_kernel.data, &mut |x| conv(x))
+        } else {
+            convolve_plain(v, &norm_kernel, &mut |x| conv(x))
+        }
+    };
     for t in 0..nt {
         if warn {
             msgs.push(OFF_CENTRE_CONVOLUTION.to_owned());
         }
         let v = src.sub_volume(t as i64).map_err(ConvStop::Exception)?;
-        let r = convolve_plain(&v, &norm_kernel, conv);
+        let r = efficient(&v, conv);
         result.data[t * nvox..(t + 1) * nvox].copy_from_slice(&r.data);
     }
     if renormalise {
@@ -780,7 +785,7 @@ pub fn generic_convolve<T: Arith>(
                 msgs.push(OFF_CENTRE_CONVOLUTION.to_owned());
             }
             let v = unitary.sub_volume(t as i64).map_err(ConvStop::Exception)?;
-            let r = convolve_plain(&v, &norm_kernel, conv);
+            let r = efficient(&v, conv);
             unitary.data[t * nvox..(t + 1) * nvox].copy_from_slice(&r.data);
         }
         match result.op_volume(Op::Div, &unitary) {

@@ -10,9 +10,14 @@ cases:
   -mul <mask b> <out>`` in every BOLD reference's brain mask) on the oracle runs, the masks read
   from the runs' working directories;
 - **cli**, **dt**, **op**, **thr**, **fn**, **d13**: the command line, the data types, the binary
-  operations, the thresholds, the voxelwise operations and the defects (FSL-151 to FSL-159) on
-  small synthetic images made once (``oracles/inputs/fsl-maths-replica/``, seeded, every
-  NIfTI type and header the cases need).
+  operations, the thresholds, the voxelwise operations and the defects (FSL-151 to FSL-166);
+- **morph**, **dilall**, **conv**, **sub**, **edge**, **dog**, **fillh**, **norm**, **tensor**:
+  the kernels and spatial filters (every ``-kernel`` type, the dilations, erosions, median,
+  convolutions by the direct sum and the FFT, subsampling, edges, hole filling, mean
+  normalisation, tensor decomposition), one case per path;
+
+all on small synthetic images made once (``oracles/inputs/fsl-maths-replica/``, seeded, every
+NIfTI type and header the cases need).
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status, standard
 output and error (the run directory and FSL's program path replaced, the replica's
@@ -20,7 +25,8 @@ output and error (the run directory and FSL's program path replaced, the replica
 decompressed, ``descrip`` left out). A second pass runs the default ``fix`` mode and checks D13's
 rule. Every FSL run goes through the oracle-output cache (fslmaths is single-threaded and
 deterministic: its random numbers start from a fixed state); cases where FSL reads memory it
-never wrote (``undefined``) do not run FSL: the replica must refuse in both modes.
+never wrote (``undefined``) do not run FSL: the replica must refuse in both modes; where FSL
+stops on a defect the default corrects (``fixed``), the default must give an output and name it.
 """
 
 from __future__ import annotations
@@ -918,6 +924,46 @@ def _filter_cases() -> dict[str, tuple[str, str, Run]]:
             T,
             "-kernel boxv 3 -fmean under -dt int (separable)",
             _r("-dt", "int", "@s3", "-kernel", "boxv", "3", "-fmean", "out"),
+        ),
+        "conv/fft-sphere": (
+            T,
+            "-kernel sphere 12 -fmean (the FFT path: radices 2, 3, 11, 13)",
+            _r(F3, "-kernel", "sphere", "12", "-fmean", "out"),
+        ),
+        "conv/fft-box": (
+            T,
+            "-kernel box 24 -fmeanu (the FFT path)",
+            _r(F3, "-kernel", "box", "24", "-fmeanu", "out"),
+        ),
+        "conv/fft-even": (
+            T,
+            "-kernel boxv 12 -fmeanu (the FFT path, an even kernel: radix 4)",
+            _r(F3, "-kernel", "boxv", "12", "-fmeanu", "out"),
+        ),
+        "conv/fft-odd": (
+            T,
+            "-kernel sphere 10 -fmean of an odd, anisotropic image (the FFT path: radix 5)",
+            _r("@odd3", "-kernel", "sphere", "10", "-fmean", "out"),
+        ),
+        "conv/fft-double": (
+            T,
+            "-kernel sphere 12 -fmean of a double image (the FFT path)",
+            _r("@d3", "-kernel", "sphere", "12", "-fmean", "out"),
+        ),
+        "conv/fft-4d": (
+            T,
+            "-kernel sphere 12 -fmeanu of a 4D image (the FFT path)",
+            _r("@f4", "-kernel", "sphere", "12", "-fmeanu", "out"),
+        ),
+        "conv/fft-int": (
+            T,
+            "-kernel sphere 12 -fmeanu under -dt int (the FFT path)",
+            _r("-dt", "int", "@s3", "-kernel", "sphere", "12", "-fmeanu", "out"),
+        ),
+        "conv/fft-nan": (
+            T,
+            "-kernel sphere 12 -fmeanu with NaN voxels (the FFT path)",
+            _r("@nan3", "-kernel", "sphere", "12", "-fmeanu", "out"),
         ),
         "conv/kernel-no-output": (
             T,

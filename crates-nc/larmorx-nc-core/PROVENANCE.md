@@ -47,6 +47,8 @@ the joined version.
 | `stats` | newimage's masked sums and means in FSL's blocks (`masked_sum`, `masked_sum_by`, `masked_count`, `Volume::sum_masked`, `mean_masked`), `percentile_masked`, `threshold_inclusive`, `binarise_exclusive` (FAST) |
 | `volops` | newimage's arithmetic for every element type (`Arith`: C's promotions, wrapping, SSE's NaNs, integer division traps), `Volume::op_scalar`, `op_volume` (`samesize(..., SUBSET)`, cyclic sources), `binarise`, `threshold`, `extrema_masked`, `extrema_without_nan`, `no_mask_voxels`, `robust_limits_masked`, `find_thresholds` (any type, with or without a mask; `Volume::robust_limits` uses it), `newimagevox2mm_mat`, `samesize_subset`, `abs_value` (fslmaths) |
 | `cprob` | fsl-cprob's `drand`/`sdrand` (`Drand`), `ndtri`, `mtherr` (fslmaths) |
+| `filters` | newimage's kernels and filters for every element type (fslmaths): `Kern` (a `volume<float>` kernel with FSL's sizes, empty loops for sizes of 0 or below), `box_kernel_vox`, `box_kernel_mm`, `gaussian_kernel3d_mm` (FSL-160's zero width reported), `spherical_kernel`, `gaussian_kernel2d`; `morphfilter` (`Morph`: dilateM, dilateD, dilate, erodeS, erode, median; `MorphIssues`: a NaN in a sorted vector, a vector overflow) with `morph_messages`; `dilall`; `generic_convolve` (separable with renormalisation, or the normalised kernel by the direct sum or the FFT, renormalised by a volume of ones; `ConvStop`), `convolve_plain`, `uses_fft`, `fsllog2`; `subsample_by_2` (any type, any volume of a 4D image), `subsample_reads_outside`; `edge_strengthen`; `log_edge_detect`; `connected_components`, `back_connectivity`; `fill_holes`, `fill_holes_traps`; `masked_mean`; Armadillo's `arma_max`, `arma_min` (two partial extrema), `arma_sort` (NaN refused), `sort_nan_error` |
+| `kissfft` | Armadillo's Kiss FFT engine (`KissFft`: radices 2, 3, 4, 5 and the generic butterfly), newimage's `fft3`/`ifft3` of `float` volumes (`fft3`), efficient_convolve's FFT path (`fft_convolve`) |
 | `istream`, `stdsort` | libstdc++'s formatted input (`>>`, `getline`), `std::sort` and `std::nth_element` |
 
 ## Licences of the translated sources
@@ -61,8 +63,11 @@ the joined version.
 - **fslpy 3.27.0** (`avwutils.rs`: the file-name rules of `imtest`, `remove_ext`, `imglob`, which
   FSL's scripts run): Apache-2.0, Copyright 2016-2024 University of Oxford (Paul McCarthy).
 - **Armadillo 14.2.1** as bundled by **fsl-armawrap 0.7.0**, and **Armadillo 10.5.1** as bundled
-  by **fsl-armawrap 0.6.0** (`arma.rs`): Apache-2.0 (`../LICENSES/Apache-2.0.txt`; notices in
-  `../NOTICE`).
+  by **fsl-armawrap 0.6.0** (`arma.rs`; `filters.rs`: `max`, `min`, `sort` of a column):
+  Apache-2.0 (`../LICENSES/Apache-2.0.txt`; notices in `../NOTICE`).
+- **Kiss FFT** as Armadillo 14.2.1 includes it (`kissfft.rs`: `fft_engine_kissfft.hpp`):
+  BSD-3-Clause, "Copyright (c) 2003-2010 Mark Borgerding, all rights reserved"; its conditions
+  and disclaimer in the file's header (Armadillo's file, Apache-2.0 AND BSD-3-Clause).
 - **OpenBLAS 0.3.33** (BSD-3-Clause) and the **reference LAPACK 3.12.0** it bundles (modified BSD)
   (`lapack.rs`): their notices in the file and in `../NOTICE`.
 - **fdlibm**, as the GNU C Library 2.35 ships `atan2f`, `atanf`, `tanh` and `expm1` (`fdlibm.rs`):
@@ -128,6 +133,8 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `stats` | fsl-newimage 2601.0 `newimage.h` (`maskedIterator`), `newimage.cc` | `calculateSums` (its blocks of `max(sqrt(n), 10000) + 1` values), `sum`, `sum(mask)`, `mean(mask)`, `percentile` (`calc_percentiles`, `percentile_vec`), `threshold`, `binarise`, `maskThreshold` (FAST) |
 | `volops` | fsl-newimage 2601.0 `newimage.h` (`samesize`, `no_mask_voxels`, `maskedIterator`, `cyclicIterator`, `smallestPositiveT`), `newimage.cc` (`operator+=`, `-=`, `*=`, `/=` with a number and a volume, `binarise`, `threshold`, `calculateExtrema`, `imageHistogram`, `find_thresholds`, `calc_robustlimits`, `robustmin`, `robustmax`, `newimagevox2mm_mat`), `newimagefns.h` (`abs`) | every element type (`char`, `short`, `int`, `float`, `double`); the float-only `find_thresholds` of FSL 6.0.7.17's translation replaced by it (identical on 400 random images, `robust_limits`) |
 | `cprob` | fsl-cprob 2111.0 `drand.cc`, `ndtri.cc`, `polevl.cc`, `mtherr.cc`, `const.cc` (Cephes, `UNK` constants) | `drand`, `sdrand`, `ranwh`, `ndtri`, `polevl`, `p1evl`, `mtherr` (its default handler's text), `MAXNUM` |
+| `filters` | fsl-newimage 2601.0 `newimagefns.cc` (`box_kernel` (both), `gaussian_kernel2D`, `gaussian_kernel3D` (millimetres), `spherical_kernel`, `fsllog2`, `subsample_by_2`, `backConnectivity`, `relabel_components_uniquely`, `get_parent_label`, `addpair2set`), `newimagefns.h` (`morphfilter`, `dilateval`, `ext_edge`, `dilall`, `fill_holes`, `convolve` (plain and with a mask), `efficient_convolve`, `generic_convolve`, `edge_strengthen`, `log_edge_detect`, `nonunique_component_labels`, `connected_components`), `newimage.h` (`getneighbours`), `newimage.cc` (`calculateSums`, `mean(mask)`); fsl-armawrap 0.7.0 `function_sort.hpp`, `functions_base.hpp`; Armadillo 14.2.1 `op_max_meat.hpp`, `op_min_meat.hpp` (`direct_max`, `direct_min`), `op_sort_meat.hpp` (`op_sort_vec::apply`: the NaN check, `arma_lt_comparator`, `arma_gt_comparator`) | the functions named |
+| `kissfft` | Armadillo 14.2.1 `fft_engine_kissfft.hpp` (Kiss FFT, BSD-3-Clause), `op_fft_meat.hpp` (`op_fft_cx::apply_noalias`, the inverse's scaling); fsl-armawrap 0.7.0 `function_fft.hpp` (`FFT`, `FFTI`); fsl-newimage 2601.0 `imfft.cc` (`fft`, `ifft`), `complexvolume.cc` (`operator*=`), `newimagefns.h` (`efficient_convolve`'s FFT path, `insertpart`, `extractpart`) | `fft_engine_kissfft` (`calc_radix`, the twiddle factors, `butterfly_2` to `_5`, `butterfly_N`, `run`), `fft3`, `ifft3`, the FFT convolution |
 | `cnum` | (glibc behaviour) | `strtod`, `strtof`, `strtol`, `atof`, `atoi`, `printf`'s `%g`, `%f`, `%e`; x86-64's conversions |
 | `x87` | (x87 behaviour) | `long double` sums, products and quotients rounded to 64 bits, then stored (`tools/libm-verify`: 0 of 5 million differ from the x87 unit) |
 | `stdsort` | (libstdc++ behaviour; the SGI STL, under the HP/SGI notice) | `std::sort` (`sort_by`; `sort_checked`, `sort_f32_checked`, `sort_f64_checked` for values that may be NaN), `std::nth_element` on doubles |

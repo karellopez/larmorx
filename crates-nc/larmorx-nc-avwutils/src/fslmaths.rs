@@ -15,11 +15,18 @@
 //!   a 4D one's time points), the thresholds (absolute, of the robust range, of the positive
 //!   voxels' robust range), the voxelwise functions, the random numbers (`-seed`, `-rand`,
 //!   `-randn`), `-save`, `-restart`, `-range` and the undocumented `-pow` and `-invbin`.
+//! - **Kernels and spatial filters.** `-kernel` (3D, 2D, box, boxv, boxv3, gauss, sphere,
+//!   file), the dilations, erosions and median (`morphfilter`), `-dilall`, the convolutions
+//!   (`-s`, `-fmean`, `-fmeanu`: separable, direct or by the FFT), `-subsamp2`, `-subsamp2offc`,
+//!   `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm`, `-ing`, `-tensor_decomp`
+//!   (`larmorx_nc_core::filters`, `kissfft`).
 //! - **D13.** FSL-151 (conversions to integers), FSL-152 (the `max() + 1` bound), FSL-153 (a
 //!   NaN first voxel), FSL-155 (`-dt input` of a type without its own), FSL-156 (integer
 //!   division traps), FSL-158 (arguments read past the command line), FSL-159 (images of
-//!   another size): corrected by default, reproduced with `LARMORX_UPSTREAM_DEFECTS=reproduce`
-//!   (crashes are refused in both modes).
+//!   another size), FSL-160 (a zero-width Gaussian), FSL-161 (a kernel without voxels), FSL-162
+//!   (a NaN in a sorted window), FSL-163 (4D subsampling), FSL-164 (4D `-dog_edge`), FSL-165
+//!   (`-fillh` of one slice), FSL-166 (a non-finite tensor): corrected by default, reproduced
+//!   with `LARMORX_UPSTREAM_DEFECTS=reproduce` (crashes are refused in both modes).
 
 use std::io::Write;
 
@@ -1209,7 +1216,6 @@ fn convolve<T: Arith>(
             *input = v;
             Ok(())
         }
-        Err(ConvStop::Fft) => Err(not_yet(ctx, &format!("{op} by the FFT (a large kernel)"))),
         Err(ConvStop::Trap) => Err(trap(ctx, op)),
         Err(ConvStop::Exception(e)) => Err(Stop::Exception(e)),
     }

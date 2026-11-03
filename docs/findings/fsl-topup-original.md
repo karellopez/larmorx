@@ -231,6 +231,76 @@ is a question for the spec writer (the part's handoff).
     grids anyway); a field with another voxel count gives FSL's message in `reproduce` mode
     (`Attempted to copydata with non-matching sizes`). Spec question.
 
+23. **The vb methods' iterations** (§7.5; probes `p1` to `q9` of `vb_probe.py`, tiny images of
+    1 x 8 x 1 to 8 x 8 x 4 voxels through the cache, FSL's own resampled inputs taken from
+    zero-field `jac` runs, `vbeff.sh`; the models `vbm.py`, `vbg.py`, compared by `vbt.py`): per collection and block, the first estimate per line
+    `f_l = (Σ_a K_aᵀK_a + P)⁻¹ Σ_a K_aᵀ y_a` with `P` the circulant `(1, -4, 6, -4, 1)` (the
+    line periodic) and `Σ_l` that inverse (`φ = λ = 1`, printed first); then each iteration
+    prints `λ/φ, φ, λ`, sets `φ = (1e-10 + N_φ/2) / (1e-10 + (Σ|y_a - K_a f|² + Σ_l tr(K_lᵀK_l
+    Σ_l)) / 2)`, then `λ = (1e-10 + N_λ/2) / (1e-10 + (fᵀQf + Σ_l tr(Q_ll Σ_l)) / 2)` (the new
+    `φ` is not used by `λ`), then updates the lines one after the other in storage order
+    (Gauss-Seidel: `Σ_l = (φ K_lᵀK_l + λ Q_ll)⁻¹`, `f_l = Σ_l (φ K_lᵀy_l - λ Σ_{m≠l} Q_lm
+    f_m)`, each line using the lines already updated). A joint solve or a Jacobi sweep is
+    0.4 to 8 % off (`vb5.py`). Blocks: `vb2D` each slice of each volume (slices outer, the
+    `slice = s` line once per slice, then per volume 50 iterations and the final line);
+    `vb3D` each volume (20); `vb4D` every volume at once (20; no coupling between volumes,
+    `p6`). `N_λ` the block's voxels; `N_φ` every image's data points for `vb2D`, two per voxel
+    for `vb3D` and `vb4D` whatever the collection holds (`q8`, three images: FSL-142); integer
+    halves. Two collections: x's first, each with its own iterations, the restorations added
+    (`q9`). With FSL's resampled inputs the model gives FSL's printed values to their six
+    digits and its outputs to 1e-7 (single precision), and so does the original
+    (`vbmkeff.py` and `vbmine.sh`: 18 probes, printed values equal or in the last digit, outputs
+    1.2e-7).
+
+24. **The vb prior** (`vbfit.py`, `vbfit2.py`: the stencil fitted to converged outputs, `Q f = (φ/λ) Σ_a
+    K_aᵀ (y_a - K_a f)`): `Q = DᵀD`, `D = Σ_d w_d Δ_d` the second differences along the slice's
+    axes (`vb2D`: centre 20, axial -8, diagonal 2, distance two 1 for unit weights) or the
+    volume's (`vb3D`, `vb4D`: 42, -12, 2, 1), truncated at the image's edges (rows centred
+    outside the image too: the centre is 20 or 42 at every voxel) and periodic along the phase
+    encoding; `w_d = v_pe / v_d` (voxels of 2 x 3 x 4 mm: weights 1.5, 1, 0.75 along y, `p10`;
+    1, 2/3, 1/2 along x, `p12`: every coefficient to 4 digits). FSL-143: the coupling of a voxel
+    with the voxels one step along the phase encoding in the next and previous slices is `w_pe
+    w_z`, half of `DᵀD`'s `2 w_pe w_z` (`p3`, `p4`: 1 instead of 2 along y; `q5`: along x), the
+    rest as `DᵀD` (`z2` = 1, `p4`); the precision is then indefinite (its symbol is negative at
+    zero frequency), `λ` turns negative in the first iterations on real images and `φ` and `λ`
+    fall towards 1e-23 to 1e-206. The replica's default (the `larmorx-nc` program as a black box) is `DᵀD` itself
+    (fitted: 2), which converges; the original's default is the same.
+
+25. **vb's invalid voxels and its mask** (`p14`, `p16`: 8 x 8 x 8, the second image moved by half
+    a voxel along x or z): no line is skipped; the moved images' values at the voxels outside
+    the movements' mask enter the restoration, interpolated periodically (`vbskip3.py`, `vbext.py`: the
+    periodic spline 4e-5 off in the printed values, mirrored, reflected, nearest or zero
+    coefficients 0.2 to 3 off); the output is 0 at every invalid voxel, voxel by voxel
+    (`at/vb2d-y`: 62 lines partly 0), not by whole lines as `lsr`'s.
+
+26. **vb against FSL and the replica** (the suite's 18 `at/vb*` cases, real images of 32 x 32 x
+    20): 8 pass, 2 both-error (FSL's own messages), 8 expected divergences: the three `*-long`
+    (FSL-133, lines of 96), `vb3d-aniso`, `vb4d-four` and `vb3d-three` (FSL-143's divergence
+    amplifies the moved images' last differences: printed values up to 2 % apart at 1e-23 to
+    1e-206, `vb3d-three`'s image 1.4e-3 at p99 in slices 4 to 6; `vb4d-four`'s output is
+    infinite at every brain voxel in FSL and in the original's `reproduce` run, the ratio of two
+    underflowing precisions), `vb2d-aniso` (the printed values of the top slices part in the 4th
+    digit during the iterations, 8e-4, and meet again: final values within 1e-5, image 1e-5).
+    The original's default against the replica's default (`vbfixcmp.sh`, `vbfixcmp.py`: 12 cases): images within
+    1.8e-5 at p99 (mean 1e-6), printed values within 1.2e-5 (`vb3D`, `vb4D`) and 8.4e-4
+    (`vb2D`'s transients), so the 4-digit differences of `vb2d-aniso` are the iterations'
+    sensitivity, not the model.
+
+27. **The moved images** (`p17`, `p18`: 16 x 16 x 16 voxels moved by a translation, or by
+    rotations of 0.05, 0.03 and 0.04 rad, `vbinterp.py`; `vb2d-aniso`'s images with a zero field):
+    FSL's resampling is the periodic cubic B-spline to single precision (3.6e-4 and 8.5e-4 of
+    values about 500; 2e-6 of the largest values of `vb2d-aniso`'s). On tiny images it is not:
+    an image with an axis of 4 voxels or fewer is not interpolated at its own grid points (up
+    to 1 % off on `p4`, 8 x 8 x 4; 2e-5 at the ends of 8-voxel lines, `p1`); no periodic,
+    mirrored or reflected prefilter and evaluation explains it (`vb10.py`). Spec question; it
+    does not reach images of 16 voxels or more per axis.
+
+28. **FSL-144** (the orchestrator's decision, rule B): `jac` with a phase encoding along z
+    leaves the image uncorrected (`jac-z`: the output is the input), and topup refuses such an
+    acquisition (§3.2: `third element of pevec must be zero`), so no field for it exists: the
+    default refuses (exit 1, naming FSL-144), `reproduce` gives FSL's output (the suite's
+    `at/jac-z`: FSL's output in `reproduce` mode, the default's refusal).
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

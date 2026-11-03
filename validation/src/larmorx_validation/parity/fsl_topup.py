@@ -309,7 +309,9 @@ def compare_stdout(checks: CheckList, want: str, got: str, band: str | None = No
                 metric="max relative difference",
                 value=float(f"{worst:.3g}"),
                 threshold="4 significant digits",
-                detail=where if len(vw) == len(vg) else f"FSL {len(vw)} values, the original {len(vg)}",
+                detail=where
+                if len(vw) == len(vg)
+                else f"FSL {len(vw)} values, the original {len(vg)}",
             )
         )
     if not cw:

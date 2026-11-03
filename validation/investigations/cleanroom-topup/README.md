@@ -69,3 +69,22 @@ Example: `python -P at_case.py cases <scratch>/at` (every case; FSL served by th
 `python -P at_jac.py <scratch>/at/jac-pair` or `python -P at_lsr.py <scratch>/at/lsr-y`; the
 probes: `python -P wrap_probe.py <dir> 2 0 2 6 30`, then `at_case.py args <dir> - --
 --imain=pu.nii.gz,pd.nii.gz --inindex=1,2 --datain=acqw.txt --topup=tu --out=hifi`.
+
+### applytopup's vb methods (relay 3b, findings 23 to 28)
+
+Every script reads the probes from `VB_DIR` (a directory of your own, e.g. `<scratch>/vb`); FSL
+runs only through the oracle cache (`at_case.py`, use mode), the replica as a black box
+(`LARMORX_NC_PROGRAM`, the `larmorx-nc` program built from `crates-nc`).
+
+| Script | What it shows |
+|---|---|
+| `vb_probe.py`, `vbprobe.sh` | synthetic probes (sizes, voxel sizes, constant or ramped fields, movements, 1 to 4 images, 4D) and FSL's runs of each method on them: `vbprobe.sh <name> <nx,ny,nz> <hz> "<vb_probe options>" <method>...` |
+| `vbeff.sh`, `vbeff0.sh` | FSL's resampled inputs (zero-field `jac` runs: `(y0 + y_a) / 2`), which the models need on tiny images (finding 27) |
+| `vbm.py`, `vbg.py` | the models: the stencils (`sten_w`, `stencil_Q`), the mean-field Gauss-Seidel VB (`gs_vb`, `vb_block`), the resampling matrices, FSL's inputs (`effective`) |
+| `vbt.py` | the model against FSL's printed values and outputs: `vbt.py p4:vb3D q8:vb3D:count=two ...` (findings 23, 24) |
+| `vb1.py` to `vb4.py`, `vb5.py`, `vb7.py`, `vb9.py` | the first update (the line prior, the traces), joint against Gauss-Seidel against Jacobi, the halved coupling and the distance-two term (findings 23, 24) |
+| `vbfit.py`, `vbfit2.py`, `vb6.py` | the prior's stencil fitted to FSL's and the replica's converged outputs (finding 24) |
+| `vbskip.py`, `vbskip2.py`, `vbskip3.py`, `vbext.py` | invalid voxels: no line skipped, periodic values, the output masked voxel by voxel (finding 25) |
+| `vb8.py`, `vb10.py`, `vb11.py`, `vb12.py`, `vbinterp.py`, `vbl.py` | FSL's resampling of tiny and of 16-voxel images, and `lsr` on the probes (finding 27) |
+| `vbmkeff.py`, `vbmine.sh`, `vbcmp.py` | the original on FSL's resampled inputs against FSL (finding 23) |
+| `vbfixcmp.sh`, `vbfixcmp.py` | the original's default against the replica's default on the suite's `at/` cases (finding 26) |

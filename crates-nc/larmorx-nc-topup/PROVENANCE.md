@@ -85,3 +85,17 @@ what it translates.
   whose condition estimate could fall below machine precision (Armadillo then switches to an
   approximate solution) are refused with `--method=lsr` (not replicated yet); the vb methods
   refuse lines of fewer than 8 or more than 256 voxels.
+
+## The contract (2026-11-03)
+
+- Specification for the clean-room original: `specs/topup.md` (behaviour only, written by the
+  replica's author as the spec writer). Findings from the source: `docs/findings/fsl-topup.md`
+  (restricted). API page: `docs/api/fsl-topup.md`.
+- Python: `lx.fsl.topup` and `lx.fsl.applytopup` (`python/larmorx/fsl/topup.py`, Apache-2.0: they
+  run this crate's program and read its outputs back; nothing of it is imported). Command line:
+  `larmorx fsl topup` and `larmorx fsl applytopup` through the dispatch (`larmorx_cli::replica`,
+  replica only).
+- Golden cases: `crates-nc/larmorx-nc-cli/tests/golden.rs` (`topup.*`, `applytopup.*`,
+  `topup.fsl126.lambda`); memory: `tests/parity/test_memory_peak.py` (`TOPUP_CASES`); threads:
+  `validation/src/larmorx_validation/parity/thread_pools.py` (topup at `--nthr=1`, applytopup's
+  Jacobian modulation).

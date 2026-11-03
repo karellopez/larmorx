@@ -276,7 +276,9 @@ def topup(
         if verbose:
             args.append("-v")
         args.append(f"--nthr={max(n_threads, 1)}")
-        env_fsldir = os.path.abspath(os.fspath(fsldir)) if fsldir is not None else tmp
+        env_fsldir = (
+            os.path.abspath(os.path.expanduser(os.fspath(fsldir))) if fsldir is not None else tmp
+        )
         process = _replica.run(
             selected,
             args,

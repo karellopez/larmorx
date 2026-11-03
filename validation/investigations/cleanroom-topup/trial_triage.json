@@ -1,0 +1,34 @@
+{
+ "counts": {
+  "explained: FSL-133 (lines whose length does not divide 2^32)": 484,
+  "explained: finding 14 (FSL's movement derivatives)": 4462,
+  "harness, fixed: outputs named by a configuration file": 62,
+  "fixed in part (the SCG weight) / explained: the path of ill-determined fits": 216,
+  "harness, fixed: the transposed acquisition file": 276,
+  "FSL-146 (rule A; reproduce agrees) and, with movements, finding 14": 895,
+  "larmorx mistake, fixed: the quadratic B-splines' count": 429,
+  "open: quadratic splines' regulariser Hessian (k even)": 47,
+  "open: applytopup lsr on lines that divide 2^32": 8,
+  "explained: FSL-143 (vb3D/vb4D's indefinite prior, reproduced; its divergence)": 51,
+  "harness, fixed: --trace with -v": 47,
+  "explained: --debug's attempt files (the minimisation's path)": 17,
+  "explained: integer outputs (float values a rounding apart land on neighbouring integers)": 4,
+  "explained: vb2D's transients (the record's at/vb2d-aniso)": 1
+ },
+ "reproducers": {
+  "explained: FSL-133 (lines whose length does not divide 2^32)": "topup-trial-00005-original",
+  "explained: finding 14 (FSL's movement derivatives)": "topup-trial-00006-original",
+  "harness, fixed: outputs named by a configuration file": "topup-trial-00012-original",
+  "fixed in part (the SCG weight) / explained: the path of ill-determined fits": "topup-trial-00018-original",
+  "harness, fixed: the transposed acquisition file": "topup-trial-00027-original",
+  "FSL-146 (rule A; reproduce agrees) and, with movements, finding 14": "topup-trial-00043-original",
+  "larmorx mistake, fixed: the quadratic B-splines' count": "topup-trial-00072-original",
+  "open: quadratic splines' regulariser Hessian (k even)": "topup-trial-00078-original",
+  "open: applytopup lsr on lines that divide 2^32": "topup-trial-00177-original",
+  "explained: FSL-143 (vb3D/vb4D's indefinite prior, reproduced; its divergence)": "topup-trial-00275-original",
+  "harness, fixed: --trace with -v": "topup-trial-01142-original",
+  "explained: --debug's attempt files (the minimisation's path)": "topup-trial-02150-original",
+  "explained: integer outputs (float values a rounding apart land on neighbouring integers)": "topup-trial-05329-original",
+  "explained: vb2D's transients (the record's at/vb2d-aniso)": "topup-trial-13346-original"
+ }
+}

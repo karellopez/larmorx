@@ -121,3 +121,18 @@ inside `scripts/orchestration/boxed.sh`.
 | `triage_counts.py` | every finding of a trial in one category (its recipe and first failed check), with counts and a reproducer each (finding 36's table) |
 
 `recheck.py` gained the group `mixed axes` (four volumes along y and x: FSL-146).
+
+## The site (relay 6)
+
+| File | What it shows |
+|---|---|
+| `trial_triage.json` | `triage_counts.py`'s output on the trial (`triage_counts.py <workspace>/oracles/difftest/2026-11-03-topup-original --json trial_triage.json`): the 6,999 differing cases' counts per category and the lowest finding of each; topup's page reads it for the triage table (`evidence/fsl_topup.py`, `trial_original`) |
+
+The page's evidence: `python -m larmorx_validation evidence fsl-topup --site <site>`
+(`evidence/fsl_topup.py`): the original's entries in the figures cache (`original-<call>`: the
+original in reproduce mode at 14 threads and at one, its default mode at 14; `cases-original`:
+every case of the record run again as the suite runs it, FSL served by the oracle cache, the
+original's files compared with FSL's value by value, the record's metrics and FSL's own thread
+band where the record measures it); `python -m larmorx_validation.evidence.fsl_topup original`
+or `cases-original` computes them alone. Every page counted before and after with
+`../cleanroom-bet/site_inventory.py count <site> <page>` and compared with its `compare`.

@@ -1541,9 +1541,10 @@ REAL_TEXT = {
 }
 
 
-def _movements_table(tid: str, runs: dict[str, Path]) -> dict:
+def _movements_table(tid: str, runs: dict[str, Path], second: str, name: str) -> dict:
     """The movements each run estimated (``--out``'s ``_movpar.txt``: per volume, the
-    translations in mm and the rotations in radians), every moving volume, against FSL's."""
+    translations in mm and the rotations in radians), every moving volume, against FSL's (the
+    first run) and against the run ``second`` (``name`` in the columns' labels)."""
 
     def read(d: Path) -> np.ndarray | None:
         f = next(iter(sorted(d.glob("*_movpar.txt"))), None)
@@ -1552,19 +1553,19 @@ def _movements_table(tid: str, runs: dict[str, Path]) -> dict:
         return np.array([[float(v) for v in ln.split()] for ln in
                          f.read_text(encoding="utf-8").splitlines() if ln.strip()])  # fmt: skip
 
-    ref = read(next(iter(runs.values())))
+    ref, ref2 = read(next(iter(runs.values()))), read(runs[second])
     rows = []
     for head, d in runs.items():
         m = read(d)
         if m is None:
             continue
         for k in range(1, m.shape[0]):
-            dt = float(np.max(np.abs(m[k, :3] - ref[k, :3])))
-            dr = float(np.max(np.abs(m[k, 3:6] - ref[k, 3:6])))
+            diffs = [float(np.max(np.abs(m[k, a:b] - r[k, a:b])))
+                     for r in (ref, ref2) for a, b in ((0, 3), (3, 6))]  # fmt: skip
             rows.append({
                 "head": head if m.shape[0] == 2 else f"{head}, volume {k + 1}",
                 "cells": [*(common.cell(float(v), "sig6") for v in m[k, :6]),
-                          common.cell(dt, "sig"), common.cell(dr, "sig")],
+                          *(common.cell(x, "sig") for x in diffs)],
             })  # fmt: skip
     return common.table(
         tid,
@@ -1572,11 +1573,13 @@ def _movements_table(tid: str, runs: dict[str, Path]) -> dict:
         ["Run", *[{"label": f"{a} (mm)", "num": True} for a in ("x", "y", "z")],
          *[{"label": f"rotation {a} (rad)", "num": True} for a in ("x", "y", "z")],
          {"label": "|Δ| translation vs FSL", "num": True},
-         {"label": "|Δ| rotation vs FSL", "num": True}],
+         {"label": "|Δ| rotation vs FSL", "num": True},
+         {"label": f"|Δ| translation vs {name}", "num": True},
+         {"label": f"|Δ| rotation vs {name}", "num": True}],
         rows,
         note="Each run's `--out` movement file (`_movpar.txt`: one line per volume, the first "
-        "volume the reference), as written; the last two columns the largest difference from "
-        "FSL's translations (mm) and rotations (rad).",
+        "volume the reference), as written; the last four columns the largest difference of "
+        f"the translations (mm) and of the rotations (rad) from FSL's and from {name}'s.",
     )  # fmt: skip
 
 
@@ -1684,8 +1687,12 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
                "original (default)": o.dir / "original-fix"}  # fmt: skip
     tables = [_files_table(f"{ex_id}-files", e.dir / "fsl", cols, "", counted)]
     if ex_id == "movements":
-        tables.append(_movements_table(f"{ex_id}-movements", {
-            "FSL 6.0.7.23": e.dir / "fsl", **cols, **counted}))  # fmt: skip
+        runs = {"FSL 6.0.7.23": e.dir / "fsl", **cols, **counted}
+        tables.append(
+            _movements_table(
+                f"{ex_id}-movements", runs, "replica (default)", "the replica's default"
+            )
+        )
     title, summary = REAL_TEXT[ex_id]
     summary += (
         " LARMORX's clean-room original runs the same call in its reproduce mode (at 14 threads "
@@ -2072,14 +2079,16 @@ def trial(ctx: core.Context) -> tuple[dict, dict]:
 TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
     "explained: finding 14 (FSL's movement derivatives)": (
         "explained: FSL's movement derivatives are not its cost's (findings 14; the record's "
-        "expected divergences), in cases that estimate the movements", None, 6),
+        "expected divergences), in cases that estimate the movements; registered since "
+        "2026-11-03 as FSL-201 (rule A), the exact derivatives the default of both "
+        "implementations, the original's reproduce mode to follow FSL's", None, 6),
     "FSL-146 (rule A; reproduce agrees) and, with movements, finding 14": (
         "a defect of FSL, registered: FSL-146, volumes encoded along different axes (rule A: "
         "corrected by default; the reproduce mode now gives FSL's path), with movements also "
         "findings 14", "d13", 10280),
     "explained: FSL-133 (lines whose length does not divide 2^32)": (
         "explained: FSL-133, applytopup's lines whose length does not divide 2^32 (FSL's wrap, "
-        "not reproduced)", None, 5),
+        "not reproduced; the specification states it since 2026-11-03)", None, 5),
     "larmorx mistake, fixed: the quadratic B-splines' count": (
         "a LARMORX mistake, fixed: the quadratic B-splines' count (a permanent case; FSL-145 "
         "found with it)", None, 11095),
@@ -2095,8 +2104,9 @@ TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
         "explained: FSL-143, vb3D's and vb4D's indefinite prior (reproduced: its divergence "
         "amplifies last bits)", None, 275),
     "open: quadratic splines' regulariser Hessian (k even)": (
-        "open: the quadratic splines' regulariser Hessian at an even knot spacing (a question "
-        "for the specification)", "open", 10753),
+        "open: the quadratic splines' regulariser Hessian at an even knot spacing (the "
+        "specification's answer of 2026-11-03, §4.6, for the original's next part)", "open",
+        10753),
     "harness, fixed: --trace with -v": (
         "the suite's own mistake, fixed: --trace with -v", None, 1142),
     "explained: --debug's attempt files (the minimisation's path)": (
@@ -2104,7 +2114,8 @@ TRIAGE_TEXT: dict[str, tuple[str, str | None, int]] = {
         "makes: the minimisation's path)", None, 2150),
     "open: applytopup lsr on lines that divide 2^32": (
         "open: applytopup --method=lsr on lines whose length divides 2^32 (99th percentile "
-        "1.4e-3 to 0.13; a question for the specification)", "open", 8089),
+        "1.4e-3 to 0.13; the specification's answer of 2026-11-03, §7.4, for the original's next "
+        "part)", "open", 8089),
     "explained: integer outputs (float values a rounding apart land on neighbouring integers)": (
         "explained: integer outputs (values a rounding apart land on neighbouring integers)",
         None, 7321),

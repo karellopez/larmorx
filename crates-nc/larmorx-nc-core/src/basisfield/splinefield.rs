@@ -254,6 +254,16 @@ impl SplineField {
         self.futd[fi as usize]
     }
 
+    /// The field (or a derivative) at every voxel when it is up to date ([`SplineField::update`]
+    /// first): what `Get(fi)` returns then, borrowed without `&mut` (several at once).
+    pub fn field_cache(&self, fi: FieldIndex) -> Option<&[f64]> {
+        if self.futd[fi as usize] {
+            self.field[fi as usize].as_deref()
+        } else {
+            None
+        }
+    }
+
     /// `GetCoef()`.
     pub fn coefs(&self) -> &[f64] {
         &self.coef

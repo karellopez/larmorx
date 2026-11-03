@@ -82,6 +82,43 @@ BRAIN = 0.1
 NOT_YET = "is not implemented yet in the clean-room original"
 #: FSL's thread count for its own band on fMRIPrep's calls (the evidence's runs, cached).
 BAND_THREADS = 4
+#: Cases whose metrics are expected outside the thresholds, and why (their exit status, files,
+#: messages and headers are still compared): the original's movement derivatives are the exact
+#: derivatives of the cost, FSL's rotation derivatives are not (findings 14), so where the
+#: movements are estimated and not converged the two paths part (each case with the movements
+#: off agrees: probes N and O); and FSL-126's negative weight, which makes both minimisations
+#: diverge.
+EXPECTED_DIVERGENCES: dict[str, str] = {
+    **{
+        name: "the movements estimated, not converged: FSL's rotation derivatives are not its "
+        "cost's (findings 14)"
+        for name in (
+            "opt/levels",
+            "opt/scg-movements",
+            "opt/four-volumes",
+            "opt/oblique-phase-encoding",
+            "opt/zero-readout",
+            "cfg/b02b0",
+            "cfg/b02b0_2",
+            "cfg/b02b0_4",
+            "cfg/b02b0_7T",
+        )
+    },
+    "opt/lambda-negative": "FSL-126 reproduced: a negative weight rewards a rough field, both "
+    "minimisations diverge",
+}
+#: The checks of an expected divergence that must still pass (everything but §12's metrics).
+_EXACT_KINDS = (
+    "Exit status",
+    "Files written",
+    "Standard error",
+    "Standard output",
+    "header",
+    "identical",
+    "-v: the same levels",
+    "the default run",
+    "D13 fix pass",
+)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -734,6 +771,19 @@ def _not_yet(ours: rep.Completed) -> str:
     return line if ours.code == 1 and NOT_YET in line else ""
 
 
+def _expected_divergence(checks: CheckList, name: str) -> None:
+    """A case of :data:`EXPECTED_DIVERGENCES` whose only failures are §12's metrics ends as an
+    expected divergence, its failing metrics kept in the report."""
+    reason = EXPECTED_DIVERGENCES.get(name)
+    failed = [c for c in checks.checks if not c.passed]
+    if reason is None or not failed:
+        return
+    if any(any(k in c.name for k in _EXACT_KINDS) for c in failed):
+        return
+    worst = "; ".join(f"{c.name} {c.value} (threshold {c.threshold})" for c in failed[:3])
+    raise Outcome(EXPECTED, f"{reason}. Outside the thresholds: {worst}")
+
+
 def _run_case(run: rep.Run, checks: CheckList) -> None:
     if run.program != PROGRAM:
         raise Outcome(SKIPPED, "applytopup's clean-room original is not written yet (sub-task 3)")
@@ -864,6 +914,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         raise Outcome(SKIPPED, "random testing of the original: its own descriptor (sub-task 5)")
     else:
         _run_case(rep._all_cases()[payload][2], checks)
+        _expected_divergence(checks, payload)
 
 
 def suite() -> Suite:

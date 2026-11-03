@@ -95,6 +95,80 @@ is a question for the spec writer (the part's handoff).
     differs from the unsmoothed ones by 2e-2. With a subsampled last level both are removed;
     fMRIPrep's calls end with a level of FWHM 0, where the two readings agree.
 
+13. **The movements** (`debug/movements`: ds005040's pair, one Levenberg-Marquardt level at
+    subsampling 2 with the movements, `--debug=1 -v`; `opt/four-volumes`: rotations up to
+    0.05 rad):
+    - the rotation is `R = Rx(rx) Ry(ry) Rz(rz)` with `Rx = [[1, 0, 0], [0, c, s], [0, -s, c]]`,
+      `Ry = [[c, 0, -s], [0, 1, 0], [s, 0, c]]`, `Rz = [[c, s, 0], [-s, c, 0], [0, 0, 1]]`: the
+      four-volume case's `--rbmout` matrices to 1.5e-7 (every other order of the three misses
+      by 1e-3 or more);
+    - `--rbmout`'s matrix is `[R | t + c - R c]` with `c = ((n - 1) voxel) / 2` of the input
+      (to 1.4e-5 mm; the remaining 5e-8 on the matrix' diagonal is FSL's, unexplained);
+    - a volume is sampled at `R^T (x - c - t) + c` (the inverse of that matrix) plus the
+      field's displacement, the field taken at the unmoved voxel and the Jacobian unchanged by
+      the movement, **`c` the centre of the image interpolated** (`(n_img - 1) v_img / 2` of
+      the level's subsampled, regridded grid: the spec's "in their own grid"): FSL's corrected
+      volumes at three evaluations agree to 2e-6 relative (the input's centre misses by 1.5e-3,
+      sampling at `M x` instead of `M^-1 x` by 0.14);
+    - five parameters for the reversed scan (`tx, tz, rx, ry, rz`: the gradient files hold
+      4693 coefficients and 5 movement parameters), the movements carried unchanged from level
+      to level and to the outputs;
+    - the mask is unchanged by the movements in every run seen (`-v`'s `n` constant); the
+      original marks a voxel invalid when a moved position leaves the level's grid along an
+      axis the volume is not displaced along (identical for the movements seen).
+    With the exact derivatives (below), the original follows `debug/movements`' `-v` to five
+    digits and its movements to 1.4e-4 mm and 4e-5 rad.
+
+14. **FSL's rotation derivatives are not its cost's.** Its translations' gradient entries agree
+    with the exact derivative to 1e-7 relative, its rotations' do not: at the start of
+    `debug/movements` (zero field, zero movement) `-298.41, 54.36, 14.39` against the exact
+    `-297.19, 62.44, 16.06`, and the same at the next two iterations; on the half-resolution
+    pair 0.6 to 26 % in each of five settings (with and without regridding, subsampling,
+    smoothing), so none of those causes it. Single-voxel probes on the replica as a black box
+    (a residual at one voxel of a linear image, radiological and neurological storage, every
+    edge) give the exact lever arms `x - c` everywhere; with a curved image the rotations'
+    entries differ again, and a translation whose exact derivative is 0 (no variation along z)
+    gets -7e-7: FSL's movement derivatives look numerical (`--trace` names
+    `TopupScan::GetMovementDerivative`), exact for linear images. Rejected: lever arms in the
+    target's, the image's or the input's coordinates and centres, voxel units, per-axis scales,
+    centre shifts, mirrored axes, masks, finite differences of the cost or of the predictions
+    (forward and central, steps 1e-6 to 0.05) and of the images. The original keeps the exact
+    derivative (§4.6); its Levenberg-Marquardt and scaled-conjugate-gradient paths with the
+    movements therefore differ from FSL's where the movements are not converged (the cases
+    `opt/four-volumes`, `opt/scg-movements`; the scripts `m2_model.py` to `m13_fd.py`).
+
+15. **A free parameter ends a Levenberg-Marquardt level.** With `--lambda=0` and a coefficient
+    whose support lies outside the mask (the default `--warpres=10` on the half-resolution
+    pair: knot spacing 2, the last coefficient along x covers only the masked edge), FSL prints
+    the first cost only and writes a zero field and zero movements (`opt/defaults`,
+    `cfg/directory`, `cfg/long-line`'s defaults; the probe `I` with `-v`): the original ends
+    the level without a step when the Hessian has a zero diagonal entry.
+
+16. **Options observed:**
+    - `--interp=linear`: trilinear interpolation of the regridding and of every level (the
+      derivative the difference of the two neighbours), periodic: `-v` identical to six digits,
+      the corrected volumes to 0.06 of 7.6e4 (probe `L`);
+    - `--regmod=membrane_energy`: the cost's and gradient's energy measures the first
+      derivatives per *voxel* (the bending energy's per mm): `-v`'s `Reg` to five digits with
+      scaled conjugate gradients (probe `J`) and Levenberg-Marquardt with FSL's Hessian per mm
+      (probe `K`, FSL-117 reproduced: the field to 1.7e-8 Hz);
+    - `--splineorder=2`: the quadratic B-spline on the cubic layout (coefficient `i` centred
+      at `(i - 1) k`, `ceil((n + 1) / k) + 2` of them for 32 and 20 voxels at spacing 3: the
+      spec's count gives 11, FSL writes 13), intent 2017; FSL's `--fout` from its `_fieldcoef`
+      to 2.5e-6 Hz; the original's field within 0.01 Hz;
+    - the log's `--estmov` is `100` when the option is not given (a list of `1` when given);
+    - FSL-118 at the first level is reported as `Error occurred when preparing to run topup`
+      (probe `M`: `--subsamp=2,3`), at a later level as `... level <l> of topup` after the
+      earlier levels ran (`err/subsamp-mixed`);
+    - a z phase encoding fails after the log is written (`opt/z-phase-encoding`);
+    - `--debug`'s and `--trace`'s outputs: the names of the debug files (level, iteration,
+      attempt; finding 9) and their kinds per level (1: `Field`, `Unwarped`, `Jacobians`,
+      `MovementParameters`, `Gradient_`; 2: `Mask`, `MaskedDiff`, `ABC`, `GradientWithReg_`; 3:
+      `Hess`, sparse triplets by columns with the last diagonal entry always); FSL's `MaskedDiff`
+      is on the regridded image's grid (33 x 33 x 21 for the 32 x 32 x 20 pair), the original's
+      on the level's; `--trace` lists FSL's internal routines (2814 lines for two levels), the
+      original its own stages.
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

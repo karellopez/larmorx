@@ -52,7 +52,7 @@ pub fn levenberg_marquardt(
         // coefficient whose support lies outside the mask) ends the level without a step
         // (observed: FSL's default run on the half-resolution pair prints the first cost only
         // and returns a zero field)
-        if h.diagonal().iter().any(|d| !(*d > 0.0)) {
+        if h.diagonal().iter().any(|d| *d == 0.0 || !d.is_finite()) {
             break;
         }
         let hd = h.damped(damping);

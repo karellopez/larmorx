@@ -169,13 +169,24 @@ impl Progress for Printer<'_> {
     fn evaluated(&mut self, index: usize, level: &Level, e: &Eval, iter: usize, attempt: usize) {
         self.stage("evaluate", true);
         if self.verbose {
-            let reg = e.cost - e.ssd;
+            // λ' E, a negative zero printed as C prints it (observed: `Reg = -0` with a
+            // negative --lambda at a zero field)
+            let reg = if level.lambda != 0.0 {
+                e.lambda_eff(level) * e.energy
+            } else {
+                0.0
+            };
+            let shown = if reg == 0.0 && reg.is_sign_negative() {
+                "-0".to_owned()
+            } else {
+                g(reg)
+            };
             let _ = writeln!(
                 self.out,
                 "SSD = {}\tn = {}\tReg = {}\tCost = {}",
                 g(e.ssd),
                 e.n_mask,
-                g(reg),
+                shown,
                 g(e.cost)
             );
         }

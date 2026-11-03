@@ -555,9 +555,15 @@ fn run(
             Ok(est) => write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf),
             Err(topup::LevelError::Subsampling(l)) => {
                 print_notices(&mut ebuf, &ns);
+                // the first level's preparation is topup's own (observed: --subsamp=2,3)
+                let what = if l == 1 {
+                    "topup".to_owned()
+                } else {
+                    format!("level {l} of topup")
+                };
                 let _ = writeln!(
                     ebuf,
-                    "Error occurred when preparing to run level {l} of topup\nException thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor"
+                    "Error occurred when preparing to run {what}\nException thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor"
                 );
                 1
             }
@@ -792,7 +798,7 @@ fn settle(
         let n = Notice::new(
             entry,
             mode,
-            &format!("--{name}={}: {why}", given.get(name).unwrap_or_default()),
+            format!("--{name}={}: {why}", given.get(name).unwrap_or_default()),
         );
         match mode {
             UpstreamDefects::Fix => {

@@ -200,9 +200,9 @@ pub fn sample_op_of(xs: &[f64], n: usize, deriv: bool, linear: bool) -> Op1 {
 /// The Gaussian smoothing of a volume (§4.4): FWHM `fwhm` mm, voxel sizes `voxel`, separable,
 /// periodic.
 pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
-    // FWHM 0 is no smoothing; a negative one (FSL-125 reproduced) smooths with that width's
-    // kernel as FSL forms it
-    if fwhm == 0.0 || !fwhm.is_finite() {
+    // FWHM 0 is no smoothing; so is a negative one (FSL-125 reproduced; observed: FSL's first
+    // cost with --fwhm=-8 is that of no smoothing, probe P)
+    if !(fwhm > 0.0) || !fwhm.is_finite() {
         return g.clone();
     }
     let sigma = fwhm / (8.0 * std::f64::consts::LN_2).sqrt();

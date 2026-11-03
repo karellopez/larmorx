@@ -1793,7 +1793,7 @@ def speed(ctx: core.Context) -> tuple[list[dict], dict | None]:
         return [], None
     data = json.loads(p.read_text(encoding="utf-8"))
     md = p.with_suffix(".md").read_text(encoding="utf-8")
-    m = re.search(r"the main machine: ([^,]+), (\d+) cores / (\d+) threads", md)
+    m = re.search(r"the main machine: ([^,]+),\s+(\d+)\s+cores\s+/\s+(\d+)\s+threads", md)
     cpu, cpus = (m.group(1), int(m.group(3))) if m else ("?", "?")
     results, labels = [], {}
     words = {run: w for _i, run, _v, w in FMRIPREP}
@@ -1820,7 +1820,7 @@ def speed(ctx: core.Context) -> tuple[list[dict], dict | None]:
         "over FSL at one thread",
         base=(SPEED_SERIES[0]["id"], SPEED_SERIES[2]["id"]),
         note="From the benchmark report `docs/benchmarks/fsl-fast.json` ({cpu}, {cpus} logical "
-        "CPUs, shared with another agent's work: informal, one run each). FSL's time is its run "
+        "CPUs, shared with other work: informal, one run each). FSL's time is its run "
         "the oracle cache stored, not re-run; the replica's images are FSL's byte for byte, the "
         "clean-room original's within its record's thresholds and the same at any thread count.",
         inputs=[run for _i, run, _v, _w in FMRIPREP],

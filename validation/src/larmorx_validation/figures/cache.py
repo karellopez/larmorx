@@ -189,6 +189,52 @@ def rerun(e: Entry, labels: Sequence[str], why: str, cpus: int | None = None) ->
     return info
 
 
+def merge_rerun(e: Entry, info: dict, why: str) -> dict:
+    """Write into the complete entry ``e`` the runs ``e.runs`` that a tool's own code made again
+    (in the working directories it prepares, which :func:`rerun` cannot), in place of the runs
+    of ``info`` (the entry's ``RUN_INFO.json`` before) of the same labels, with each dictionary
+    of ``e.extra`` merged into the old one (e.g. the notices each run named); the larmorx
+    commit of this re-run, and what was run again and why (``rerun``), as :func:`rerun`
+    records them."""
+    previous = info.get("larmorx_commit")
+    new = {r.label: r.__dict__ for r in e.runs}
+    missing = sorted(set(new) - {r["label"] for r in info["runs"]})
+    if missing:
+        raise KeyError(f"{e.tool}/{e.case}: no runs {missing} to replace")
+    info["runs"] = [new.get(r["label"], r) for r in info["runs"]]
+    for k, v in e.extra.items():
+        if isinstance(v, dict) and isinstance(info.get(k), dict):
+            info[k] = {**info[k], **v}
+        else:
+            info[k] = v
+    info["larmorx_commit"] = git_commit(e.ctx.repo)
+    info.setdefault("rerun", []).append(
+        {
+            "computed": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+            "labels": sorted(new),
+            "previous_larmorx_commit": previous,
+            "why": why,
+        }
+    )
+    e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    return info
+
+
+def recompute(
+    ctx: Context, tool: str, case: str, description: str, compute: Callable[[Entry], None]
+) -> Entry:
+    """The cache entry ``tool/case`` computed again by ``compute(entry)`` (an entry whose
+    every run is larmorx's, after a change of larmorx), as :func:`entry` computes a missing
+    one."""
+    e = Entry(ctx, tool, case, description)
+    ctx.log(f"computing {tool}/{case} again into {e.dir}")
+    e.start()
+    compute(e)
+    if not e.done:
+        e.finish()
+    return e
+
+
 def add_runs(e: Entry, runs: Sequence[tuple[str, list[str], dict[str, str]]], why: str) -> dict:
     """Add the runs ``(label, argv, env)`` to the complete entry ``e`` (a new version of an
     original program beside the old one's runs, which stay), keeping everything else:

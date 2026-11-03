@@ -20,8 +20,9 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
   suite but the double-precision functions), and for the double-precision functions every
   voxel within the case's units in the last place of FSL's (GLIBC-07: glibc's functions are not
   correctly rounded everywhere, the original's are), the fraction that differs reported; the
-  sums (``_SUM_OPS``) under the floating types by §21's sums' metric (an expected divergence
-  where only its share of voxels within 4 units in the last place falls short);
+  sums (``_SUM_OPS``) under the floating types by §21's sums' metric, both of its parts as
+  checks (the cases of ``EXPECTED_DIVERGENCES`` may miss its share of voxels within 4 units in
+  the last place only, each with its reason);
   other files byte for byte;
 - the D13 fix pass: a defect named exactly when the default's outputs differ from
   ``reproduce``.
@@ -93,6 +94,36 @@ SUM_RELATIVE = 1e-5
 #: ... and at least this fraction of the voxels within ``SUM_ULPS`` units in the last place.
 SUM_SHARE = 0.99
 SUM_ULPS = 4
+#: The name of the share's check (the one an expected divergence may miss).
+SUM_SHARE_CHECK = "the sums' share of voxels within 4 ulp"
+_FFT = (
+    "FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to "
+    "the image's largest values, not to each voxel's own last place (findings 8; spec "
+    "question 14)"
+)
+_SUBSAMPLING = (
+    "FSL's single-precision subsampling arithmetic, which no simple order of the weighted sum "
+    "gives (findings 13; spec question 13), against the spec's sums: the voxels beyond 4 ulp "
+    "are those whose value cancels to near 0"
+)
+#: Cases expected to miss §21's share of voxels within 4 ulp (only that check), and why: their
+#: largest difference stays inside the bound (1e-5 of FSL's largest magnitude), checked.
+EXPECTED_DIVERGENCES: dict[str, str] = {
+    **dict.fromkeys(
+        ("conv/fft-sphere", "conv/fft-odd", "conv/fft-double", "conv/fft-4d", "orig/fft-asym"),
+        _FFT,
+    ),
+    **dict.fromkeys(
+        (
+            "sub/subsamp2",
+            "sub/subsamp2offc",
+            "sub/subsamp2offc-double",
+            "sub/subsamp2-noform",
+            "sub/subsamp2-nan",
+        ),
+        _SUBSAMPLING,
+    ),
+}
 
 
 # ------------------------------------------------------------------------------------------------
@@ -207,12 +238,9 @@ def compare(
     b: Path,
     before: set[str],
     args: list[str],
-) -> list[str]:
-    """Compares; returns the expected divergences (the sums' share of voxels within 4 units in
-    the last place below 99 % while their largest difference is inside the bound)."""
+) -> None:
+    """Compares the original's run with FSL's (§21's metrics as checks)."""
     import nibabel as nib
-
-    expected: list[str] = []
 
     ok_exit = oracle.code == ours.code or (
         oracle.code != 0 and ours.code != 0 and (oracle.code < 0 or oracle.code > 128)
@@ -267,9 +295,7 @@ def compare(
             differ = int(np.count_nonzero(d))
             worst = int(d.max()) if d.size else 0
             if differ and any(a in _SUM_OPS for a in args):
-                note = _sum_check(checks, name, x.ravel(), y.ravel(), d)
-                if note:
-                    expected.append(note)
+                _sum_check(checks, name, x.ravel(), y.ravel(), d)
             elif ulps and x.dtype == np.float64:
                 checks(
                     f"{name}: values (units in the last place)",
@@ -298,15 +324,13 @@ def compare(
                 threshold=0,
                 detail="" if differ == 0 else _value_diff(x, y),
             )
-    return expected
 
 
-def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: np.ndarray) -> str:
-    """§21's metric for the sums: the non-finite voxels identical and the largest difference at
-    most ``SUM_RELATIVE`` of FSL's largest magnitude (the check), ``SUM_SHARE`` of the voxels
-    within ``SUM_ULPS`` units in the last place (below it: an expected divergence, returned with
-    its numbers: the voxels beyond are those whose value cancels to near 0, where a last-bit
-    difference of the summed terms is many units of the result's last place; §21's band)."""
+def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: np.ndarray) -> None:
+    """§21's metric for the sums, as two checks: the non-finite voxels identical and the largest
+    difference at most ``SUM_RELATIVE`` of FSL's largest magnitude; and at least ``SUM_SHARE`` of
+    the voxels within ``SUM_ULPS`` units in the last place. A case of
+    :data:`EXPECTED_DIVERGENCES` may miss the second only (its reason in the report)."""
     fx, fy = np.isfinite(x), np.isfinite(y)
     same_nonfinite = bool(np.array_equal(fx, fy) and np.array_equal(_bits(x[~fx]), _bits(y[~fy])))
     both = fx & fy
@@ -317,28 +341,41 @@ def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: 
         else 0.0
     )
     share = float(np.count_nonzero(ulp <= SUM_ULPS)) / max(1, ulp.size)
-    ok = same_nonfinite and worst <= SUM_RELATIVE * scale
     checks(
         f"{name}: values within the sums' bound",
-        ok,
+        same_nonfinite and worst <= SUM_RELATIVE * scale,
         metric="max |diff| / max |FSL|",
         value=f"{worst / scale if scale else worst:.3g}",
-        threshold=f"<= {SUM_RELATIVE:g}; >= {SUM_SHARE:.0%} within {SUM_ULPS} ulp",
+        threshold=f"<= {SUM_RELATIVE:g}, the NaN and infinite voxels identical",
         detail=(
-            f"{np.count_nonzero(ulp)} of {ulp.size} voxels differ, {share:.1%} within "
-            f"{SUM_ULPS} ulp, max ulp {int(ulp.max())}"
+            f"{np.count_nonzero(ulp)} of {ulp.size} voxels differ"
             + ("" if same_nonfinite else "; the NaN or infinite voxels differ")
         ),
     )
-    if ok and share < SUM_SHARE:
-        return (
-            f"{name}: FSL's order of sums (its FFT, or its subsampling arithmetic): max |diff| "
-            f"{worst / scale:.2g} of max |FSL| (bound {SUM_RELATIVE:g}); {share:.1%} of the "
-            f"voxels within {SUM_ULPS} ulp (spec {SUM_SHARE:.0%}), max {int(ulp.max())} ulp: "
-            "FSL's rounding is relative to the image's largest values (its FFT) or to the summed "
-            "terms (values that cancel to near 0), not to each voxel's own last place"
-        )
-    return ""
+    checks(
+        f"{name}: {SUM_SHARE_CHECK}",
+        share >= SUM_SHARE,
+        metric=f"voxels within {SUM_ULPS} ulp",
+        value=f"{share:.1%}",
+        threshold=f">= {SUM_SHARE:.0%}",
+        detail=f"max {int(ulp.max())} ulp",
+    )
+
+
+def _expected_divergence(checks: CheckList, name: str) -> None:
+    """A case of :data:`EXPECTED_DIVERGENCES` whose only failures are the sums' share checks
+    ends as an expected divergence, its failing checks' numbers in the reason."""
+    reason = EXPECTED_DIVERGENCES.get(name)
+    failed = [c for c in checks.checks if not c.passed]
+    if reason is None or not failed or any(SUM_SHARE_CHECK not in c.name for c in failed):
+        return
+    worst = "; ".join(f"{c.name} {c.value} (threshold {c.threshold}, {c.detail})" for c in failed)
+    bound = "; ".join(
+        f"max |diff| {c.value} of max |FSL| (bound {SUM_RELATIVE:g})"
+        for c in checks.checks
+        if "values within the sums' bound" in c.name
+    )
+    raise Outcome(EXPECTED, f"{reason}. Inside the bound: {bound}. Outside the threshold: {worst}")
 
 
 def _first_diff(x: str, y: str) -> str:
@@ -470,11 +507,6 @@ def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
     }
 
 
-def _expected(checks: CheckList, expected: list[str]) -> None:
-    if expected and all(c.passed for c in checks.checks):
-        raise Outcome(EXPECTED, "; ".join(expected))
-
-
 # ------------------------------------------------------------------------------------------------
 # Cases
 
@@ -507,11 +539,10 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         if _not_yet(ours):
             raise Outcome(SKIPPED, _not_yet(ours))
         oracle = rep.run_oracle(args, cwd=a, settings=settings)
-        expected = compare(checks, oracle, ours, a, b, before, args)
+        compare(checks, oracle, ours, a, b, before, args)
         if run.fix and ours.code == 0:
             fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours, before)
     _agree_on_errors(checks, oracle)
-    _expected(checks, expected)
     if run.fixed:
         with tempfile.TemporaryDirectory(prefix="lx-maths-") as c_:
             c = Path(c_)
@@ -537,11 +568,10 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
         a, b = Path(a_), Path(b_)
         oracle = rep.run_oracle(args, cwd=a, settings={})
         ours = run_original(args, cwd=b, settings={}, mode=defects.REPRODUCE)
-        expected = compare(checks, oracle, ours, a, b, set(), args)
+        compare(checks, oracle, ours, a, b, set(), args)
         if oracle.code == 0 and ours.code == 0:
             fix_pass(checks, lambda t: None, args, {}, b, ours, set())
     _agree_on_errors(checks, oracle)
-    _expected(checks, expected)
 
 
 def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
@@ -569,7 +599,7 @@ def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
         if _not_yet(ours):
             raise Outcome(SKIPPED, _not_yet(ours))
         oracle = rep.run_oracle(args, cwd=a, settings={})
-        expected = compare(checks, oracle, ours, a, b, before, args)
+        compare(checks, oracle, ours, a, b, before, args)
         if oracle.code == 0 and ours.code == 0:
 
             def prepare(t: Path) -> None:
@@ -577,7 +607,6 @@ def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
 
             fix_pass(checks, prepare, args, {}, b, ours, before)
     _agree_on_errors(checks, oracle)
-    _expected(checks, expected)
 
 
 def cases(tier: str) -> list[Case]:
@@ -602,6 +631,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         _run_case(_own_cases()[payload][2], checks)
     else:
         _run_case(rep._cases()[payload][2], checks)
+    _expected_divergence(checks, case.id)
 
 
 def suite() -> Suite:

@@ -1307,8 +1307,8 @@ def _example_fmriprep(
         "output": first,
         "plane": "axial",
         "voxel": at,
-        "panels": ["in1", "in2", "fsl", "original"],
-        "diffs": ["original-fsl", "fsl4-fsl"],
+        "panels": ["in1", "in2", "fsl", "replica", "original"],
+        "diffs": ["replica-fsl", "original-fsl", "fsl4-fsl"],
         "compare": {"a": "fsl", "b": "original"},
     }
     out = common.finish(
@@ -1513,9 +1513,9 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
         "output": out_id,
         "plane": "axial",
         "voxel": at,
-        "panels": [*[p.id for p in ex.panels if p.role == "input"][:2], "fsl", "original",
+        "panels": [*[p.id for p in ex.panels if p.role == "input"][:3], "fsl", "original",
                    "replica-fix"],
-        "diffs": ["original-fsl", "fix-replica"],
+        "diffs": ["replica-fsl", "original-fsl", "fix-replica"],
         "compare": {"a": "replica-fix", "b": "replica"},
     }  # fmt: skip
     out = common.finish(

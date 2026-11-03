@@ -1445,6 +1445,15 @@ fn read_general<T: Elem>(
     filename: &str,
     settings: &Settings,
 ) -> Result<(Volume<T>, i16, i32), FslError> {
+    read_general_swap(filename, settings, true)
+}
+
+/// [`read_general`], swapped to radiological order only when `swap2radiological`.
+fn read_general_swap<T: Elem>(
+    filename: &str,
+    settings: &Settings,
+    swap2radiological: bool,
+) -> Result<(Volume<T>, i16, i32), FslError> {
     let fail = |what: &str| {
         FslError::imthrow(
             format!("Failed to read volume {filename}\nError : {what}"),
@@ -1534,7 +1543,7 @@ fn read_general<T: Elem>(
     let mut aux = header.aux_file.clone();
     aux.truncate(24);
     v.aux_file = aux;
-    if !v.radiological_file {
+    if swap2radiological && !v.radiological_file {
         v.make_radiological();
     }
     Ok((v, header.datatype, header.units))
@@ -1604,6 +1613,15 @@ pub fn read_volume4d<T: Elem>(
     settings: &Settings,
 ) -> Result<(Volume<T>, i16, i32), FslError> {
     read_general(filename, settings)
+}
+
+/// `read_orig_volume(target, filename)`: the image in its file's storage order (not swapped to
+/// radiological order), with the file's datatype and `xyzt_units`.
+pub fn read_orig_volume<T: Elem>(
+    filename: &str,
+    settings: &Settings,
+) -> Result<(Volume<T>, i16, i32), FslError> {
+    read_general_swap(filename, settings, false)
 }
 
 /// The warning `read_volume` prints for a 4D input it cuts to its first volume.

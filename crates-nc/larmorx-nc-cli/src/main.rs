@@ -54,6 +54,7 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("aff2rigid", larmorx_nc_flirt::aff2rigid),
     ("fast", larmorx_nc_fast::fast),
     ("topup", larmorx_nc_topup::topup),
+    ("applytopup", larmorx_nc_topup::applytopup),
 ];
 
 fn tool_names() -> String {

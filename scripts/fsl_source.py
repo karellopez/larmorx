@@ -189,6 +189,11 @@ FILES = [
     ("fsl-topup", "topup_file_io.cpp"),
     ("fsl-topup", "topup_matrices.h"),
     ("fsl-topup", "topup_matrices.cpp"),
+    # topup (2026-11-03): applytopup
+    ("fsl-topup", "applytopup.h"),
+    ("fsl-topup", "applytopup.cpp"),
+    ("fsl-topup", "displacement_vector.h"),
+    ("fsl-topup", "displacement_vector.cpp"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

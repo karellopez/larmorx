@@ -2,7 +2,7 @@
 // Copyright 2026 Karel Lopez Vilaret.
 //! A bit-exact replica of FSL's topup (FSL 6.0.7.23: fsl-topup 2203.5), the estimation of the
 //! susceptibility-induced off-resonance field from images acquired with reversed
-//! phase-encoding directions, translated from FSL's source under the FSL Licence's terms
+//! phase-encoding directions, and of its companion applytopup, translated from FSL's source under the FSL Licence's terms
 //! (non-commercial; the licence and FSL's original source travel with it: `crates-nc/LICENSE`,
 //! `crates-nc/fsl-source/`). FSL's libraries (newimage, NewNifti, utils, basisfield, warpfns,
 //! miscmaths' sparse matrices and non-linear optimisers) are the shared core's
@@ -12,6 +12,9 @@
 //! (`larmorx-nc fsl topup`) as a separate process (`docs/licensing.md`).
 //!
 //! - [`topup`]: the program (`main`): the input, the resolution levels, the outputs.
+//! - [`applytopup`]: the companion program that applies topup's field (and movements) to
+//!   images: Jacobian modulation or least-squares restoration.
+//! - [`dispvec`]: applytopup's displacement lines and restoration matrices.
 //! - [`options`]: the command line and the configuration files.
 //! - [`costfn`]: the cost function, its gradient and Hessian, and the files it writes.
 //! - [`scan`]: the scans (resampling, derivatives, Jacobians, masks) and their mean.
@@ -27,15 +30,17 @@ use std::io::Write;
 
 use larmorx_core::defects::{Defect, Notices, UpstreamDefects};
 
+pub mod applytopup;
 pub mod cli;
 pub mod costfn;
+pub mod dispvec;
 pub mod fileio;
 pub mod options;
 pub mod scan;
 pub mod topup;
 pub mod vol;
 
-pub use cli::topup;
+pub use cli::{applytopup, topup};
 
 /// The program's two streams (`cout`, `cerr`), shared by every part that prints, with D13's
 /// mode and the notices of the defects met.

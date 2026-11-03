@@ -17,7 +17,11 @@ cases:
   container's FSL) compared too, as a report;
 - **debug**: the same images with one short level and ``--debug`` and ``-v`` (every debug file
   of every cost-function evaluation: the corrected images, Jacobians, fields, masks, masked
-  differences, gradients and the Hessian's weights), without and with the movements.
+  differences, gradients and the Hessian's weights), without and with the movements;
+- **opt**, **cfg**, **err**, **thr**: every option of topup, FSL's configurations, the messages
+  and failures, the thread counts, on the half-resolution pair;
+- **at**: applytopup (``larmorx-nc fsl applytopup``) on topup's own outputs (FSL's, from the
+  cache): least-squares restoration and Jacobian modulation, every option, message and failure.
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status, standard
 output and error (the run directory and FSL's program path replaced, the replica's
@@ -30,6 +34,7 @@ rule. Every original run goes through the oracle-output cache (:func:`oracle_run
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -86,13 +91,14 @@ def oracle_run(
     never: str = "",
     threads: int = 1,
     timeout: int = 36000,
+    program: str = PROGRAM,
 ):
-    """FSL's ``topup`` with ``args`` in ``cwd``, through the oracle-output cache: topup at one
+    """FSL's ``program`` (``topup`` or ``applytopup``) with ``args`` in ``cwd``, through the oracle-output cache: topup at one
     thread is deterministic, so a run is served once it ran (unless ``never`` says why not);
     every file it writes is in ``cwd`` and every file there counts by its content."""
     from larmorx_validation import oracle_cache
 
-    argv = [str(fsldir() / "bin" / PROGRAM), *args]
+    argv = [str(fsldir() / "bin" / program), *args]
     return oracle_cache.run(
         argv,
         env=_environment(settings),
@@ -327,10 +333,19 @@ class Run:
     refused_reason: str = ""
     #: Seconds before FSL's run is stopped.
     timeout: int = 36000
+    #: The program: ``topup`` or ``applytopup``.
+    program: str = PROGRAM
+    #: applytopup's cases: the topup run whose outputs (FSL's, from the cache) are copied in as
+    #: ``tu_fieldcoef.nii.gz``, ``tu_movpar.txt`` and ``tu_field.nii.gz`` (:data:`TOPUP_SOURCES`).
+    source: str = ""
+    #: Files of :attr:`source` left out.
+    drop: tuple[str, ...] = ()
 
 
-#: The entries the ``fix`` pass may name without a visible change.
-SILENT: tuple[str, ...] = ()
+#: The entries the ``fix`` pass may name without a visible change: applytopup's FSL-132 (the
+#: first volume's interpolation) and FSL-133 (the lines' wrap) change values that the
+#: restoration and the output's single precision can round back to the same numbers.
+SILENT: tuple[str, ...] = ("FSL-132", "FSL-133")
 #: How a profile's durations are masked.
 _DURATION = re.compile(r"Duration: \S+")
 #: The profile's name after ``--out``'s base name (``"_" + __FILE__ + "_" + __func__ + ".txt"``).
@@ -341,6 +356,8 @@ def _prepare(run: Run, d: Path, node: Path | None) -> list[str]:
     """``run``'s inputs in ``d``; its arguments as the programs get them."""
     if any("{" in a for a in run.args) and (node is None or not _prepare_fmriprep(node, d)):
         raise Outcome("skipped", f"{SOURCE_RUN}'s topup inputs are not available")
+    if run.program == "applytopup":
+        applytopup_inputs()
     out = []
     for a in run.args:
         if node is not None:
@@ -348,14 +365,25 @@ def _prepare(run: Run, d: Path, node: Path | None) -> list[str]:
             a = a.format(imain=names["--imain"], datain=names["--datain"])
         key, sep, value = a.partition("=")
         if sep and value.startswith("@"):
-            shutil.copy(inputs() / value[1:], d / value[1:])
-            a = f"{key}={value[1:]}"
+            # a comma-separated list (applytopup's --imain): each @name copied
+            parts = []
+            for part in value.split(","):
+                if part.startswith("@"):
+                    shutil.copy(inputs() / part[1:], d / part[1:])
+                    part = part[1:]
+                parts.append(part)
+            a = f"{key}={','.join(parts)}"
         elif a.startswith("@"):
             shutil.copy(inputs() / a[1:], d / a[1:])
             a = a[1:]
         out.append(a)
     for f in run.files:
         shutil.copy(inputs() / f, d / f)
+    if run.source:
+        src = topup_outputs(run.source)
+        for f in sorted(src.iterdir()):
+            if f.name.startswith("tu_") and f.name not in run.drop:
+                shutil.copy(f, d / f.name)
     return out
 
 
@@ -374,7 +402,13 @@ def _mask_profiles(checks: CheckList, a: Path, b: Path) -> None:
 def _oracle(run: Run, args: list[str], d: Path, settings: dict[str, str | None]) -> Completed:
     never = run.never or ("--profile writes the clock's durations" if run.profile else "")
     p = oracle_run(
-        args, cwd=d, settings=settings, never=never, threads=run.threads, timeout=run.timeout
+        args,
+        cwd=d,
+        settings=settings,
+        never=never,
+        threads=run.threads,
+        timeout=run.timeout,
+        program=run.program,
     )
     code = -9 if p.returncode is None else p.returncode
     return Completed(code, p.stdout, p.stderr)
@@ -386,7 +420,7 @@ def _fix_refuses(run: Run, node: Path | None, checks: CheckList) -> None:
     with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
         b = Path(b_)
         args = _prepare(run, b, node)
-        r = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.FIX)
+        r = run_replica(run.program, args, cwd=b, settings=settings, mode=defects.FIX)
         refusal = next(
             (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
         )
@@ -402,7 +436,7 @@ def _fix_finishes(run: Run, node: Path | None, checks: CheckList) -> None:
     with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
         b = Path(b_)
         args = _prepare(run, b, node)
-        r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
+        r = run_replica(run.program, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
         named = defects.notices_in(r.stderr)
         checks(
             f"the default run finishes and names {run.fix_finishes}",
@@ -416,7 +450,7 @@ def _fix_says(run: Run, node: Path | None, checks: CheckList) -> None:
     with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
         b = Path(b_)
         args = _prepare(run, b, node)
-        r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
+        r = run_replica(run.program, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
         named = defects.notices_in(r.stderr)
         checks(
             f"the default run's message ({', '.join(named) or 'nothing named'})",
@@ -433,11 +467,12 @@ def _refused_case(run: Run, node: Path | None, checks: CheckList) -> None:
         with tempfile.TemporaryDirectory(prefix="lx-nc-topup-") as b_:
             b = Path(b_)
             args = _prepare(run, b, node)
-            r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=mode)
+            before = {q.name for q in b.iterdir()}
+            r = run_replica(run.program, args, cwd=b, settings=dict(run.settings), mode=mode)
             refusal = next(
                 (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
             )
-            written = sorted(q.name for q in b.iterdir() if "_fieldcoef" in q.name)
+            written = sorted(q.name for q in b.iterdir() if q.name not in before)
             checks(
                 f"the replica refuses ({mode})",
                 r.code == 1 and run.refused in refusal and not written,
@@ -519,14 +554,14 @@ def _run_case(run: Run, checks: CheckList) -> None:
         args = _prepare(run, a, node)
         _prepare(run, b, node)
         oracle = _oracle(run, args, a, settings)
-        replica = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
+        replica = run_replica(run.program, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         if run.profile:
             _mask_profiles(checks, a, b)
-        compare(checks, PROGRAM, oracle, replica, a, b)
+        compare(checks, run.program, oracle, replica, a, b)
         if run.fix and replica.code == 0 and not run.profile:
             fix_pass(
                 checks,
-                PROGRAM,
+                run.program,
                 lambda t: _prepare(run, t, node),
                 args,
                 settings,
@@ -540,7 +575,7 @@ def _run_case(run: Run, checks: CheckList) -> None:
         _fix_finishes(run, node, checks)
     if run.fix_says:
         _fix_says(run, node, checks)
-    _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
+    _agree_on_errors(checks, run.program, oracle.code, oracle.stderr)
 
 
 def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
@@ -1238,6 +1273,471 @@ def _thread_cases() -> dict[str, tuple[str, str, Run]]:
     return c
 
 
+# ------------------------------------------------------------------------------------------------
+# applytopup
+
+
+#: applytopup's derived inputs' version (made beside the topup cases' own, which they leave
+#: as they are): a new version makes them again.
+AT_VERSION = 2
+#: The topup runs whose outputs applytopup's cases apply (FSL's outputs, served from the
+#: oracle cache; the replica's topup gives the same files bit for bit, as the topup cases
+#: check): a topup case's name, or a run of its own.
+TOPUP_SOURCES: dict[str, str | Run] = {
+    "y": "opt/levels",
+    "x": "opt/x-phase-encoding",
+    "four": "opt/four-volumes",
+    "quad": "opt/splineorder-2",
+    "crop": Run(("--imain=@crop.nii.gz", "--datain=@acq.txt", "--out=o", *SHORT, "--fout=f")),
+}
+
+
+def _atomic_dir(target: Path, make: Any) -> Path:
+    """``target`` made once by ``make(tmp)`` in a private directory renamed into place (the
+    suite's workers may ask at the same time)."""
+    if (target / "DONE").is_file():
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
+    make(tmp)
+    (tmp / "DONE").write_text("made by the fsl-topup-replica suite\n", encoding="utf-8")
+    try:
+        tmp.rename(target)
+    except OSError:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return target
+
+
+def applytopup_inputs() -> Path:
+    """applytopup's images (``oracles/inputs/fsl-topup-replica/applytopup-v2/images/``, linked
+    into the inputs' directory by name): each volume of the half-resolution pair as its own
+    image (``half_up``, ``half_dn``), two volumes of each (``dwi_up``, ``dwi_dn``: the second
+    half the first), the pair along x (``xhalf_up``, ``xhalf_dn``), the cropped pair
+    (``crop_up``, ``crop_dn``: 30 voxels along the phase encoding), the four volumes along y
+    and x (``four_0`` to ``four_3``), 16-bit and 8-bit integers (``half_up_i16``,
+    ``half_up_i8``), the first volume with 4 mm voxels along y (``half_up_aniso``) and in a
+    grid of 64 x 16 x 20 (``half_up_64x16``)."""
+    import nibabel as nib
+
+    base = inputs()
+
+    def make(d: Path) -> None:
+        half = nib.load(str(base / "half.nii.gz"))
+        h = np.asarray(half.dataobj, np.float32)
+        aff = half.affine
+        xh = np.asarray(nib.load(str(base / "xhalf.nii.gz")).dataobj, np.float32)
+        crop = np.asarray(nib.load(str(base / "crop.nii.gz")).dataobj, np.float32)
+        four = np.asarray(nib.load(str(base / "four.nii.gz")).dataobj, np.float32)
+        imgs = {
+            "half_up": h[..., 0],
+            "half_dn": h[..., 1],
+            "dwi_up": np.stack([h[..., 0], h[..., 0] * np.float32(0.5)], axis=3),
+            "dwi_dn": np.stack([h[..., 1], h[..., 1] * np.float32(0.5)], axis=3),
+            "xhalf_up": xh[..., 0],
+            "xhalf_dn": xh[..., 1],
+            "crop_up": crop[..., 0],
+            "crop_dn": crop[..., 1],
+        }
+        for k in range(4):
+            imgs[f"four_{k}"] = four[..., k]
+        for name, data in imgs.items():
+            _save(d / f"{name}.nii.gz", data, aff)
+        _save(d / "half_up_i16.nii.gz", np.round(h[..., 0] * 0.25), aff, np.int16)
+        _save(
+            d / "half_up_i8.nii.gz",
+            np.clip(np.round(h[..., 0] * 0.05), -128, 127),
+            aff,
+            np.int8,
+        )
+        # the first volume's values in a grid of 64 x 16 x 20 (as many voxels, another shape)
+        _save(d / "half_up_64x16.nii.gz", h[..., 0].reshape((64, 16, 20), order="F"), aff)
+        aniso = aff.copy()
+        aniso[:3, 1] = aniso[:3, 1] * (4.0 / 6.0)
+        _save(d / "half_up_aniso.nii.gz", h[..., 0], aniso)
+
+    images = _atomic_dir(base / f"applytopup-v{AT_VERSION}" / "images", make)
+    for f in sorted(images.glob("*.nii.gz")):
+        link = base / f.name
+        if not link.exists():
+            part = base / f".{f.name}.{os.getpid()}"
+            shutil.copy(f, part)
+            os.replace(part, link)
+    return images
+
+
+def topup_outputs(source: str) -> Path:
+    """FSL's topup outputs for :data:`TOPUP_SOURCES` ``source`` (its coefficients, movements
+    and --fout field as ``tu_fieldcoef.nii.gz``, ``tu_movpar.txt``, ``tu_field.nii.gz``),
+    from a run through the oracle cache, kept in ``applytopup-v2/<source>/``."""
+    spec = TOPUP_SOURCES[source]
+    run = _option_cases()[spec][2] if isinstance(spec, str) else spec
+
+    def make(d: Path) -> None:
+        with tempfile.TemporaryDirectory(prefix="lx-nc-topup-src-") as t_:
+            t = Path(t_)
+            args = _prepare(run, t, _source_node())
+            r = _oracle(run, args, t, dict(run.settings))
+            assert r.code == 0, f"topup for {source} exits {r.code}: {r.stderr[-300:]}"
+            for name, new in (
+                ("o_fieldcoef.nii.gz", "tu_fieldcoef.nii.gz"),
+                ("o_movpar.txt", "tu_movpar.txt"),
+                ("f.nii.gz", "tu_field.nii.gz"),
+            ):
+                if (t / name).is_file():
+                    shutil.copy(t / name, d / new)
+
+    return _atomic_dir(inputs() / f"applytopup-v{AT_VERSION}" / source, make)
+
+
+def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
+    """applytopup: least-squares restoration and Jacobian modulation on topup's own outputs,
+    every option, message and failure case, one case per path."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        kw.setdefault("source", "y")
+        c[f"at/{name}"] = (tier, desc, Run(tuple(args), program="applytopup", **kw))
+
+    pair = ("--imain=@half_up.nii.gz,@half_dn.nii.gz", "--inindex=1,2")
+    acq, tu, out = "--datain=@acq.txt", "--topup=tu", "--out=hifi"
+    up = ("--imain=@half_up.nii.gz", "--inindex=1")
+    jac = "--method=jac"
+    add(
+        "lsr-y",
+        "least-squares restoration of the pair along y (the default method, spline "
+        "interpolation, the movements)",
+        *pair,
+        acq,
+        tu,
+        out,
+        tier="smoke",
+    )
+    add(
+        "lsr-4d",
+        "least-squares restoration of two volumes per phase-encoding direction",
+        "--imain=@dwi_up.nii.gz,@dwi_dn.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+    )
+    add(
+        "lsr-x",
+        "least-squares restoration along x",
+        "--imain=@xhalf_up.nii.gz,@xhalf_dn.nii.gz",
+        "--inindex=1,2",
+        "--datain=@acq_x.txt",
+        tu,
+        out,
+        source="x",
+    )
+    add(
+        "lsr-four",
+        "least-squares restoration of two collections (along y and along x)",
+        "--imain=@four_0.nii.gz,@four_1.nii.gz,@four_2.nii.gz,@four_3.nii.gz",
+        "--inindex=1,2,3,4",
+        "--datain=@acq_four.txt",
+        tu,
+        out,
+        source="four",
+    )
+    add(
+        "lsr-three",
+        "least-squares restoration of three images in one collection",
+        "--imain=@half_up.nii.gz,@half_dn.nii.gz,@half_up.nii.gz",
+        "--inindex=1,2,1",
+        acq,
+        tu,
+        out,
+    )
+    add("lsr-trilinear", "--interp=trilinear", *pair, acq, tu, out, "--interp=trilinear")
+    add(
+        "lsr-crop",
+        "least-squares restoration of lines of 30 voxels (a length that does not divide 2^32)",
+        "--imain=@crop_up.nii.gz,@crop_dn.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+        source="crop",
+    )
+    add("jac-y", "Jacobian modulation of one image", *up, acq, tu, out, jac)
+    add("jac-pair", "Jacobian modulation of the pair, averaged", *pair, acq, tu, out, jac)
+    add(
+        "jac-4d",
+        "Jacobian modulation of two volumes",
+        "--imain=@dwi_up.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+    )
+    add(
+        "jac-trilinear",
+        "--method=jac --interp=trilinear",
+        *up,
+        acq,
+        tu,
+        out,
+        jac,
+        "-n",
+        "trilinear",
+    )
+    add(
+        "jac-x",
+        "Jacobian modulation along x",
+        "--imain=@xhalf_dn.nii.gz",
+        "--inindex=2",
+        "--datain=@acq_x.txt",
+        tu,
+        out,
+        jac,
+        source="x",
+    )
+    add("jac-quadratic", "a field of quadratic splines", *up, acq, tu, out, jac, source="quad")
+    add(
+        "jac-field",
+        "--topup naming a field image (topup's --fout): no movements",
+        *up,
+        acq,
+        "--topup=tu_field",
+        out,
+        jac,
+    )
+    add(
+        "jac-field-aniso",
+        "a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements)",
+        "--imain=@half_up_aniso.nii.gz",
+        "--inindex=1",
+        acq,
+        "--topup=tu_field",
+        out,
+        jac,
+    )
+    add(
+        "jac-no-movpar",
+        "coefficients without their _movpar.txt (no movements)",
+        *up,
+        acq,
+        tu,
+        out,
+        jac,
+        drop=("tu_movpar.txt",),
+    )
+    add(
+        "jac-oblique",
+        "a phase-encoding vector along x and y",
+        *up,
+        "--datain=@acq_oblique.txt",
+        tu,
+        out,
+        jac,
+    )
+    add("jac-z", "phase encoding along z", *up, "--datain=@acq_z.txt", tu, out, jac)
+    for dtn in ("preserve", "char", "short", "int", "float", "double"):
+        add(f"datatype-{dtn}", f"--datatype={dtn}", *up, acq, tu, out, jac, f"--datatype={dtn}")
+    add(
+        "datatype-preserve-int16",
+        "--datatype=preserve of a 16-bit image",
+        "--imain=@half_up_i16.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+        "-d",
+        "preserve",
+    )
+    add(
+        "datatype-preserve-int8",
+        "--datatype=preserve of an 8-bit signed image",
+        "--imain=@half_up_i8.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+        "--datatype=preserve",
+    )
+    add(
+        "short-options",
+        "the short options",
+        "-i",
+        "half_up.nii.gz,half_dn.nii.gz",
+        "-x",
+        "1,2",
+        "-a",
+        "acq.txt",
+        "-t",
+        "tu",
+        "-o",
+        "hifi",
+        "-m",
+        "lsr",
+        "-v",
+        files=("half_up.nii.gz", "half_dn.nii.gz", "acq.txt"),
+    )
+    add(
+        "nifti",
+        "FSLOUTPUTTYPE=NIFTI",
+        *up,
+        acq,
+        tu,
+        out,
+        jac,
+        settings=(("FSLOUTPUTTYPE", "NIFTI"),),
+    )
+    # messages and failures
+    add("no-arguments", "no arguments: the compulsory options and the usage")
+    add("help", "-h: the usage", "-h")
+    add("unknown-option", "an unknown option", *pair, acq, tu, out, "--bogus=1")
+    add("invert", "--invert (declared, never added to the parser)", *pair, acq, tu, out, "--invert")
+    add("missing-out", "no --out", *pair, acq, tu)
+    add("interp-unknown", "an unknown --interp", *pair, acq, tu, out, "--interp=cubic")
+    add(
+        "lists-mismatch",
+        "two images and one index",
+        "--imain=@half_up.nii.gz,@half_dn.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+    )
+    add("datatype-unknown", "an unknown --datatype", *up, acq, tu, out, jac, "--datatype=long")
+    add(
+        "datatype-preserve-missing",
+        "--datatype=preserve of an image that does not exist",
+        "--imain=nothere.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        "--datatype=preserve",
+    )
+    add(
+        "imain-missing",
+        "an image that does not exist",
+        "--imain=nothere.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+    )
+    add(
+        "images-mismatch",
+        "images of different sizes",
+        "--imain=@half_up.nii.gz,@crop_dn.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+    )
+    add("datain-missing", "a --datain that does not exist", *pair, "--datain=nothere.txt", tu, out)
+    add(
+        "datain-norm",
+        "a phase-encoding vector not of unit length",
+        *pair,
+        "--datain=@acq_norm.txt",
+        tu,
+        out,
+    )
+    add("inindex-zero", "an index of 0", "--imain=@half_up.nii.gz", "--inindex=0", acq, tu, out)
+    add(
+        "inindex-beyond",
+        "an index beyond --datain's rows",
+        "--imain=@half_up.nii.gz",
+        "--inindex=3",
+        acq,
+        tu,
+        out,
+    )
+    add("topup-extension", "--topup with an extension", *pair, acq, "--topup=tu.nii.gz", out)
+    add("topup-missing", "a --topup that does not exist", *pair, acq, "--topup=nothere", out)
+    add(
+        "lsr-oblique",
+        "--method=lsr with an oblique phase encoding",
+        *pair,
+        "--datain=@acq_oblique.txt",
+        tu,
+        out,
+    )
+    add(
+        "lsr-same",
+        "--method=lsr of two images with the same phase encoding",
+        *pair,
+        "--datain=@acq_same.txt",
+        tu,
+        out,
+    )
+    add("lsr-one", "--method=lsr of one image", *up, acq, tu, out)
+    add(
+        "outputtype-invalid",
+        "FSLOUTPUTTYPE=BOGUS",
+        *up,
+        acq,
+        tu,
+        out,
+        jac,
+        settings=(("FSLOUTPUTTYPE", "BOGUS"),),
+    )
+    # the defects
+    add(
+        "method-unknown",
+        "an unknown --method (FSL-135: FSL writes nothing and exits 0)",
+        *pair,
+        acq,
+        tu,
+        out,
+        "--method=foo",
+        fix_refuses="FSL-135",
+    )
+    add(
+        "lsr-no-movements",
+        "--method=lsr with a field image, which has no movements (FSL-135)",
+        *pair,
+        acq,
+        "--topup=tu_field",
+        out,
+        fix_refuses="FSL-135",
+    )
+    add(
+        "jac-other-grid",
+        "--method=jac with a field on another grid (FSL-134: another number of voxels)",
+        "--imain=@crop_up.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+        fix_refuses="FSL-134",
+    )
+    add(
+        "jac-other-shape",
+        "--method=jac with a field of as many voxels as the images in another shape (FSL-134)",
+        "--imain=@half_up_64x16.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+        fix_refuses="FSL-134",
+    )
+    add(
+        "lsr-other-grid",
+        "--method=lsr with a field on another grid (FSL-134)",
+        "--imain=@crop_up.nii.gz,@crop_dn.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+        refused="FSL-134",
+        refused_reason="FSL reads the field's lines past their end (undefined behaviour)",
+    )
+    return c
+
+
 def _all_cases() -> dict[str, tuple[str, str, Run]]:
     return {
         **_debug_cases(),
@@ -1245,6 +1745,7 @@ def _all_cases() -> dict[str, tuple[str, str, Run]]:
         **_config_cases(),
         **_error_cases(),
         **_thread_cases(),
+        **_applytopup_cases(),
     }
 
 
@@ -1280,8 +1781,8 @@ def run_case(case: Case, checks: CheckList) -> None:
 def suite() -> Suite:
     return Suite(
         name=SUITE,
-        title="topup replica (bit-exact, FSL Licence)",
-        tool="`larmorx-nc fsl topup` (crate larmorx-nc-topup, translated from FSL "
+        title="topup and applytopup replicas (bit-exact, FSL Licence)",
+        tool="`larmorx-nc fsl topup` and `fsl applytopup` (crate larmorx-nc-topup, translated from FSL "
         f"{fsl_versions.NEWEST}'s source)",
         reference=f"topup from FSL {fsl_versions.NEWEST} (fsl-topup 2203.5, fsl-basisfield "
         "2203.4, fsl-warpfns 2501.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils "

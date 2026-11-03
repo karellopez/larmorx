@@ -13,7 +13,7 @@ use larmorx_nc_core::basisfield::{FieldIndex, SplineField};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
 use larmorx_nc_core::nifti;
-use larmorx_nc_core::volume::{FslError, Volume};
+use larmorx_nc_core::volume::{self, FslError, Volume};
 
 use crate::Console;
 
@@ -248,4 +248,248 @@ pub fn field_volume(
         crate::vol::scale(&mut out, sf as f32);
     }
     Ok(out)
+}
+
+/// `(unsigned int) x` for a `double` on x86-64 (`cvttsd2si` to 64 bits, the low 32 kept).
+fn d2u(x: f64) -> u32 {
+    let wide = if x.is_nan() || x >= 9_223_372_036_854_775_808.0 || x < -9_223_372_036_854_775_808.0
+    {
+        i64::MIN
+    } else {
+        x as i64
+    };
+    wide as u32
+}
+
+/// `FieldFileType`: what `--topup` named.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldFileType {
+    /// Spline coefficients (`<base>_fieldcoef`, cubic or quadratic).
+    Spline,
+    /// A field image topup wrote (`--fout`: intent `FSL_TOPUP_FIELD`).
+    Field,
+    /// Any other image, taken as a field in Hz (fugue's, for example).
+    Unknown,
+    Invalid,
+}
+
+/// `TopupFileReader`: the field (spline coefficients, or a field image) and the movements of a
+/// topup run.
+#[derive(Clone, Debug)]
+pub struct TopupFileReader {
+    pub ft: FieldFileType,
+    mp_valid: bool,
+    mp: Vec<[f64; 6]>,
+    moves: Vec<Mat>,
+    coef: Option<SplineField>,
+    vol: Option<Volume>,
+}
+
+impl TopupFileReader {
+    /// `TopupFileReader(fname)`: `<fname>_fieldcoef` and `<fname>_movpar.txt`; if either fails,
+    /// `fname` itself as a field image. A name with an extension is refused. The lines FSL
+    /// prints on the way (a movement file it cannot open, exceptions it catches) go to `cerr`.
+    pub fn read(
+        fname: &str,
+        fsl: &larmorx_nc_core::settings::Settings,
+        cerr: &mut Vec<String>,
+    ) -> Result<TopupFileReader, FslError> {
+        if let Some(dot) = fname.rfind('.') {
+            let refuse = match fname.rfind('/') {
+                None => true,
+                Some(slash) => dot > slash,
+            };
+            if refuse {
+                return Err(fileio_error(&format!(
+                    "TopupFileReader::TopupFileReader: Filename must be given without \
+                     extension, fname={fname}"
+                )));
+            }
+        }
+        let mut r = TopupFileReader {
+            ft: FieldFileType::Invalid,
+            mp_valid: false,
+            mp: Vec::new(),
+            moves: Vec::new(),
+            coef: None,
+            vol: None,
+        };
+        let first = r
+            .common_read(&format!("{fname}_fieldcoef"), fsl, cerr)
+            .and_then(|()| r.read_movements(&format!("{fname}_movpar.txt"), cerr));
+        if let Err(e) = first {
+            // catch (...): what the exception printed stays printed
+            cerr.extend(e.printed);
+            if let Err(e2) = r.common_read(fname, fsl, cerr) {
+                cerr.extend(e2.printed);
+                return Err(fileio_error(&format!(
+                    "TopupFileReader::TopupFileReader: Unable to read file {fname}"
+                )));
+            }
+        }
+        Ok(r)
+    }
+
+    /// `common_read(fname)`: by the image's intent, spline coefficients (read in the file's
+    /// storage order) or a field image.
+    fn common_read(
+        &mut self,
+        fname: &str,
+        fsl: &larmorx_nc_core::settings::Settings,
+        cerr: &mut Vec<String>,
+    ) -> Result<(), FslError> {
+        if volume::return_validimagefilename(fname).is_err() {
+            return Err(fileio_error(&format!(
+                "TOPUP::common_read: Cannot read file {fname}"
+            )));
+        }
+        let hdr = volume::read_volume_hdr_only(fname, fsl)?;
+        match hdr.intent_code {
+            CUBIC_SPLINE_COEFFICIENTS | QUADRATIC_SPLINE_COEFFICIENTS => {
+                let (v, _, _) = volume::read_orig_volume::<f32>(fname, fsl)?;
+                self.coef = Some(read_coef_file(&v)?);
+                self.vol = None;
+                self.ft = FieldFileType::Spline;
+            }
+            code => {
+                let (v, warning) = volume::read_volume::<f32>(fname, fsl)?;
+                if let Some(w) = warning {
+                    cerr.push(w);
+                }
+                self.vol = Some(v);
+                self.coef = None;
+                self.ft = if code == TOPUP_FIELD {
+                    FieldFileType::Field
+                } else {
+                    FieldFileType::Unknown
+                };
+            }
+        }
+        Ok(())
+    }
+
+    /// `ReadMovements(fname)`: six parameters per row (rigid-body matrices about the field's
+    /// centre), or 4 x 4 matrices (four columns, a multiple of four rows: the matrices, but
+    /// not valid movement parameters); anything else reads nothing.
+    fn read_movements(&mut self, fname: &str, cerr: &mut Vec<String>) -> Result<(), FslError> {
+        let vol = if let Some(v) = &self.vol {
+            v.clone()
+        } else if let Some(c) = &self.coef {
+            let fs = c.field_size();
+            let mut t = Volume::new(i64::from(fs[0]), i64::from(fs[1]), i64::from(fs[2]), 1);
+            t.setdims(c.vxs_x() as f32, c.vxs_y() as f32, c.vxs_z() as f32);
+            t
+        } else {
+            return Err(fileio_error(
+                "TopupFileReader::ReadMovements: Attempting to read movement parameters before \
+                 knowing FOV",
+            ));
+        };
+        let tmp = read_matrix(fname, cerr)?;
+        if tmp.cols() == 6 {
+            self.moves.clear();
+            self.mp.clear();
+            for i in 0..tmp.rows() {
+                let p = [
+                    tmp.at(i, 0),
+                    tmp.at(i, 1),
+                    tmp.at(i, 2),
+                    tmp.at(i, 3),
+                    tmp.at(i, 4),
+                    tmp.at(i, 5),
+                ];
+                self.mp.push(p);
+                self.moves.push(movepar2matrix(&p, &vol));
+                self.mp_valid = true;
+            }
+        } else if tmp.cols() == 4 && tmp.rows() % 4 == 0 {
+            self.moves.clear();
+            for i in 0..tmp.rows() / 4 {
+                self.moves.push(tmp.sub(i * 4, i * 4 + 4, 0, 4));
+                self.mp_valid = false;
+            }
+        }
+        Ok(())
+    }
+
+    /// `FieldAsVolume()`: the field (Hz) on its grid (from the coefficients: a new volume of the
+    /// field's size and voxel sizes, no other header property).
+    pub fn field_as_volume(&mut self) -> Result<Volume, FslError> {
+        if self.vol.is_none() {
+            let Some(c) = self.coef.as_mut() else {
+                return Err(fileio_error(
+                    "TopupFileReader::ensure_volume: Attempt to access uninitialised field",
+                ));
+            };
+            let fs = c.field_size();
+            let mut v = Volume::new(i64::from(fs[0]), i64::from(fs[1]), i64::from(fs[2]), 1);
+            v.setdims(c.vxs_x() as f32, c.vxs_y() as f32, c.vxs_z() as f32);
+            c.as_volume(&mut v, FieldIndex::Field)?;
+            self.vol = Some(v);
+        }
+        Ok(self.vol.clone().expect("set"))
+    }
+
+    /// `Field()`: the spline field; a field image is not one (an exception).
+    pub fn field(&self) -> Result<SplineField, FslError> {
+        self.coef.clone().ok_or_else(|| {
+            fileio_error("TopupFileReader::ensure_field: Attempt to access uninitialised field")
+        })
+    }
+
+    /// `MoveMatrix(i)` (1-based).
+    pub fn move_matrix(&self, i: u32) -> Result<Mat, FslError> {
+        if i < 1 || i as usize > self.moves.len() {
+            return Err(fileio_error(
+                "TopupFileReader::MoveMatrix: Index i out of bound",
+            ));
+        }
+        Ok(self.moves[i as usize - 1].clone())
+    }
+
+    /// `MoveParValid()`.
+    pub fn move_par_valid(&self) -> bool {
+        self.mp_valid
+    }
+
+    /// Whether any movement matrix was read.
+    pub fn has_moves(&self) -> bool {
+        !self.moves.is_empty()
+    }
+}
+
+/// `read_coef_file(vcoef)`: the field's size from the qform's translation, its voxel sizes
+/// from the intent parameters, the knot spacings from the voxel sizes (rounded), the order
+/// from the intent.
+fn read_coef_file(v: &Volume) -> Result<SplineField, FslError> {
+    let q = &v.qform;
+    let sz = [d2u(q.at(0, 3)), d2u(q.at(1, 3)), d2u(q.at(2, 3))];
+    let vxs = [
+        f64::from(v.intent_params[0]),
+        f64::from(v.intent_params[1]),
+        f64::from(v.intent_params[2]),
+    ];
+    let order = if v.intent_code == QUADRATIC_SPLINE_COEFFICIENTS {
+        2
+    } else {
+        3
+    };
+    let ksp = [
+        d2u(f64::from(v.xdim()) + 0.5),
+        d2u(f64::from(v.ydim()) + 0.5),
+        d2u(f64::from(v.zdim()) + 0.5),
+    ];
+    let mut field = SplineField::new(&sz, &vxs, &ksp, order, 1)?;
+    let cs = field.coef_size();
+    if i64::from(cs[0]) != v.xsize()
+        || i64::from(cs[1]) != v.ysize()
+        || i64::from(cs[2]) != v.zsize()
+    {
+        return Err(fileio_error(
+            "read_coef_file: Internally inconsistent coef-file",
+        ));
+    }
+    let c: Vec<f64> = v.data.iter().map(|&x| f64::from(x)).collect();
+    field.set_coef(&c)?;
+    Ok(field)
 }

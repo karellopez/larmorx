@@ -196,3 +196,17 @@ fn movements_estimated() {
     let mp = std::fs::read_to_string(d.join("mv_movpar.txt")).unwrap();
     assert_eq!(mp.lines().count(), 2);
 }
+
+/// applytopup without arguments: the compulsory options, the usage, exit 1 (no file is read).
+#[test]
+fn applytopup_messages() {
+    let settings = settings();
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code =
+        larmorx_nc_topup::applytopup(&[], &settings, UpstreamDefects::Fix, 1, &mut out, &mut err);
+    let e = String::from_utf8_lossy(&err);
+    assert_eq!(code, 1);
+    assert!(e.contains("The following COMPULSORY options have not been set:"));
+    assert!(e.contains("applytopup (Version 1.0)"));
+    assert!(out.is_empty());
+}

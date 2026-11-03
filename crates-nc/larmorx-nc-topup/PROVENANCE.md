@@ -36,7 +36,10 @@ what it translates.
 | `scan` | fsl-topup `topup_costfunctions.{h,cpp}` | `TopupScan` (`update`, `GetResampled`, `GetMask`, `GetAlpha`, `GetBeta`, `GetGamma`, `GetMovementDerivative`, `GetJacobian`, `GetDisplacementField`, `ReGrid`, `SubSample`, `Smooth`, `SetMovementParameters`, `SetInterpolationModel`, `ImageSize`, `ImageVxs`, `mp_to_matrix`), `TopupScanManager` (the scans' mean, alpha, beta and gamma, the common mask, the movement parameters each scan estimates); not translated: `GetNumericalMovementDerivative` (never called) |
 | `fileio` | fsl-topup `topup_file_io.{h,cpp}`, `topup_matrices.{h,cpp}`; fsl-miscmaths 2412.6 `miscmaths.cc` | `TopupDatafileReader`, `TopupFileWriter` (coefficients, field, movement parameters), `MovePar2Matrix`, `Matrix2MovePar`; `write_ascii_matrix`, `read_ascii_matrix`'s messages |
 | `vol` | fsl-newimage 2601.0 `newimage.cc` | the arithmetic operators of `volume<float>` as topup uses them (in `float`; scalars converted to `float`), `calculateSums`, `mean` |
-| `cli` | (larmorx) | `fsl topup` for the `larmorx-nc` program |
+| `applytopup` | fsl-topup `applytopup.{h,cpp}` | `main` (the options in FSL's order, the usage, the compulsory options), `applytopup` (the lists, `--datatype`, the reads, the mask, the methods, the output), `jac_resample`, `volume_deffield_2_jacobian`, `resample_using_movement_parameters`, `lsr_resample` (armawrap's `CroutMatrix` inverse: Armadillo's `lu` and two triangular `solve()` calls, OpenBLAS's `dgetrf` and triangular kernels; Armadillo's band detection), `TopupCollections`, `parse_commaseparated_list`, `parse_commaseparated_numbers`, `row_col_is_alright`, `extract_row_col`, `add_to_rows_cols`, `zero_out_rows_cols`; not translated yet: `vb_resample_2D`, `vb_resample_3D`, `vb_resample_4D` and their helpers (`--method=vb2D`, `vb3D`, `vb4D`: undocumented; refused), Armadillo's band solver (`dgbtrf`, `dgbtrs`) for a line whose field is zero at both ends (refused) |
+| `dispvec` | fsl-topup `displacement_vector.{h,cpp}` | `CircularArray` (`operator[]`, `IndexInRange`, `Find`, `set_from_row_or_col`), `DispVec` (`SetFromRow`, `SetFromColumn`, `GetK_Matrix`, `GetS_Matrix`, `get_non_zero_entries_of_row`); not translated: `Inv`, `GetInverseDisplacements`, `GetDisplacements`, `GetSparseK_Matrix`, `RowIsAlright`, `ColumnIsAlright`, `Print` (unused by jac and lsr) |
+| `fileio` (applytopup) | fsl-topup `topup_file_io.{h,cpp}` | `TopupFileReader` (`common_read`, `read_coef_file`, `ReadMovements`, `read_movement`, `FieldAsVolume`, `Field`, `MoveMatrix`, `MoveParValid`) |
+| `cli` | (larmorx) | `fsl topup` and `fsl applytopup` for the `larmorx-nc` program |
 
 ## Changes from the originals
 
@@ -64,4 +67,16 @@ what it translates.
   hold leads to as well.
 - An `FSLOUTPUTTYPE` FSL cannot write ends the program at the first image written, as
   newimage's `exit()` does (unwinding to `main`).
-- Not yet translated (the next sub-task): `applytopup`.
+- applytopup: D13 (`LARMORX_UPSTREAM_DEFECTS`): FSL-132 (the first image's first volume
+  resampled with the interpolation asked for: `applytopup::Ctx::first_volume`; reproduced, with
+  the interpolation it was read with, as newimage's cache of a series' volumes gives FSL),
+  FSL-133 (displacement lines wrapped circularly: `dispvec::CircularArray`), FSL-134 (a field
+  image's Jacobian in the y voxel size; a field on another grid refused: `applytopup`), FSL-135
+  (an unknown `--method` and `--method=lsr` without movements refused); `reproduce` gives FSL's
+  behaviour for each (FSL-134 with `--method=lsr`: a refusal there too, FSL reads past the
+  field). An uncaught exception ends FSL's applytopup with `std::terminate` (SIGABRT): the
+  replica prints the same text and exits with status 1.
+- applytopup: lines of fewer than 8 or more than 256 voxels along the phase encoding, a line whose
+  restoration system Armadillo would solve as a band matrix, or whose condition estimate could
+  fall below machine precision (Armadillo then switches to an approximate solution) are refused
+  with `--method=lsr` (not replicated yet).

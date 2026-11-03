@@ -518,6 +518,14 @@ defects! {
         "a negative --fwhm is accepted and smooths the images with a kernel of that negative width, an arbitrary filter";
     FSL_126 = "FSL-126", "topup", true,
         "a negative --lambda is accepted: the regularisation rewards a rough field, so the minimisation drives the field to large values and the cost below zero";
+    FSL_132 = "FSL-132", "applytopup", true,
+        "--interp=spline (the default) is not applied to the first volume of the first --imain image: that volume is resampled by trilinear interpolation (the image's interpolation as read) and every other volume by splines, so with --method=jac the first image's first volume, and with --method=lsr its movement correction, differ from the method asked for";
+    FSL_133 = "FSL-133", "applytopup", true,
+        "--method=lsr reads the field's displacement just before a line's first voxel from the wrong place when the line's length (the image's size along the phase encoding) does not divide 2^32 (30, 96, 100, ... voxels; powers of two are right): the line is not wrapped around circularly, so the first rows of each line's restoration matrix use the displacement of a voxel in the middle of the line instead of its last voxel";
+    FSL_134 = "FSL-134", "applytopup", true,
+        "a --topup field other than topup's coefficients on the images' grid: with a field image (topup's --fout or another field map in Hz) --method=jac computes the Jacobian determinant with the y displacements in units of the x voxel size (wrong when the phase encoding is along y and the voxels are not square in x and y); and a field on another grid is not refused: with --method=jac a field with as many voxels as the images but another shape is laid on the images' grid as it is stored, one with another number of voxels stops applytopup with an internal message; with --method=lsr the field's lines are read past their end";
+    FSL_135 = "FSL-135", "applytopup", true,
+        "an unknown --method writes no output and exits with status 0 without a message; --method=lsr with a --topup that gives no movement parameters (a field image, or coefficients without their _movpar.txt) aborts with an internal index error";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

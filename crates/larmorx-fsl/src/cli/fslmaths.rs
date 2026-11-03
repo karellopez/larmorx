@@ -451,10 +451,13 @@ fn chain<T: Num>(
     write_image(ctx, &st.img, output, values, notices, err)
 }
 
-/// FSL-157's notice where truncating (or the int8 output's bytes) changes a value.
+/// FSL-157's notice where truncating changes a value, and for every int8 image (FSL writes its
+/// output as uint8: the header's data type changes whatever the values; random testing,
+/// 2026-11-03).
 fn note157<T: Num>(ctx: &Ctx<'_>, img: &Img<T>, notices: &mut Notices) {
     let int8 = ctx.stored_type == DataType::I8;
-    let differs = ops::any(&img.data, |v| {
+    let differs = int8
+        || ops::any(&img.data, |v| {
         let x = v.to_f64();
         let rounded = if x > 0.0 {
             (x + 0.5).trunc()

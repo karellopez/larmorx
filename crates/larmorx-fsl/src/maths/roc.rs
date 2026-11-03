@@ -311,8 +311,11 @@ pub fn roc<T: Num>(
     let true_idx: Vec<usize> = (0..nvox)
         .filter(|&i| inside(truth[i]) && truth[i] >= bound)
         .collect();
+    // the candidates: the mask's voxels that are not true, `(1 − binarised truth) × mask` with
+    // the truth binarised at the true voxels' bound (random testing, 2026-11-03: a truth of
+    // values between 0 and its bound counts them; one of zeros only has no candidate)
     let cand_idx: Vec<usize> = (0..nvox)
-        .filter(|&i| inside(truth[i]) && !(truth[i] > 0.0))
+        .filter(|&i| inside(truth[i]) && !(truth[i] >= bound))
         .collect();
     if fix && (nan_first || lnan || tnan) {
         notices.add(

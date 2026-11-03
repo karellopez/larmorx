@@ -7,6 +7,7 @@ the first two costs. Usage:
   first_step.py <trial dir> <finding number> <out dir> [volume subsets, e.g. 0,1 2,3 0,1,2,3]
 FIRST_STEP_ACQ="r1;r2;..." replaces the acquisition rows (e.g. oblique phase encodings);
 FIRST_STEP_MODE=fix runs the original in its default mode (else reproduce);
+FIRST_STEP_ARGS="--lambda=0 ..." replaces or adds options;
 FIRST_STEP_MITER=own keeps the case's own --miter (every iteration's cost compared);
 LX_PROBE_* variables are passed to the original (a temporary probe build's switches).
 FIRST_STEP_DEBUG=3 asks for the Hessian's weight images too; every debug image both programs
@@ -49,6 +50,10 @@ def main():
     keep = {"--debug", "-v", "--verbose"} | (set() if own else {"--miter"})
     args = [a for a in args if a.split("=")[0] not in keep] + ([] if own else ["--miter=1"])
     args += [f"--debug={os.environ.get('FIRST_STEP_DEBUG', '1')}", "-v"]
+    if os.environ.get("FIRST_STEP_ARGS"):
+        extra = os.environ["FIRST_STEP_ARGS"].split()
+        keys = {e.split("=")[0] for e in extra}
+        args = [a for a in args if a.split("=")[0] not in keys] + extra
     imain = next(a.split("=", 1)[1] for a in args if a.startswith("--imain="))
     acqf = next(a.split("=", 1)[1] for a in args if a.startswith(("--datain=", "--acqp=")))
     img = nib.load(next(src.glob(imain + "*")))

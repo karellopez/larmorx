@@ -1,0 +1,350 @@
+{
+ "defect": null,
+ "description": "scaled conjugate gradients at a level whose start has Reg > 0: the gradient at x + sigma d takes the current point's regulariser weight (FSL evaluates no cost there)",
+ "expect": "pass",
+ "found": {
+  "detail": "corrected: relative difference inside the brain, 99th percentile: ; corrected: mean |d| / mean intensity inside the brain: ; corrected_mean: relative difference inside the brain, 99th percentile: ; corrected_mean: mean |d| / mean intensity inside the brain: ; --fout (Hz): |d| inside the brain, 99th percentile: ; --fout (Hz): |d| inside the brain, mean: ",
+  "n": 12747,
+  "seed": "topup-trial",
+  "shrink_moves": [],
+  "signature": [
+   "--fout (Hz): correlation inside the brain",
+   "--fout (Hz): |d| inside the brain, Nth percentile",
+   "--fout (Hz): |d| inside the brain, mean",
+   "_fieldcoef (its field, Hz): correlation inside the brain",
+   "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile",
+   "_fieldcoef (its field, Hz): |d| inside the brain, mean",
+   "corrected: mean |d| / mean intensity inside the brain",
+   "corrected: relative difference inside the brain, Nth percentile",
+   "corrected_mean: mean |d| / mean intensity inside the brain",
+   "corrected_mean: relative difference inside the brain, Nth percentile",
+   "warpfield_N (mm): |d| inside the brain, Nth percentile",
+   "warpfield_N (mm): |d| inside the brain, mean"
+  ]
+ },
+ "id": "scg-regulariser-weight",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 2
+  },
+  "features": {
+   "--acqp": true,
+   "--debug": false,
+   "--dfout": true,
+   "--estmov one value": true,
+   "--featout": false,
+   "--fout": true,
+   "--interp": false,
+   "--iout": true,
+   "--jacout": false,
+   "--lambda one value": true,
+   "--logout": false,
+   "--nthr": false,
+   "--numprec": false,
+   "--out": true,
+   "--rbmout": false,
+   "--regmod": true,
+   "--regmod value": "membrane_energy",
+   "--regrid": false,
+   "--scale": false,
+   "--splineorder": false,
+   "--ssqlambda": false,
+   "--subsamp one value": true,
+   "--trace": false,
+   "-v": false,
+   "FSL's configuration": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": false,
+   "basename": "my_topup",
+   "bias0": 0.004,
+   "bias1": 0.0,
+   "bias2": -0.002,
+   "config file": false,
+   "dtype": "uint16",
+   "estmov0": false,
+   "extreme": false,
+   "field Hz": 25.0,
+   "field centre0": 0.3,
+   "field centre1": -0.1,
+   "field centre2": 0.1,
+   "field gradient0": 0.0,
+   "field gradient1": -6.0,
+   "field gradient2": 0.0,
+   "field width": 0.45,
+   "fwhm0": 4,
+   "fwhm1": 8,
+   "head axis0": 1.0,
+   "head axis1": 0.9,
+   "head axis2": 0.9,
+   "head centre0": 0.0,
+   "head centre1": 0.0,
+   "head centre2": -0.02,
+   "head fraction": 0.4,
+   "in-plane gradient only": true,
+   "in-plane voxel": 4.0,
+   "kind": "topup",
+   "lambda0": "0.001",
+   "lambda1": "0.001",
+   "largest subsampling": 1,
+   "levels": 2,
+   "miter0": 2,
+   "miter1": 1,
+   "movements": false,
+   "noise": 1.0,
+   "nx": 20,
+   "ny": 24,
+   "nz": 16,
+   "orientation": "axes",
+   "origin0": 40.5,
+   "origin1": -3.75,
+   "origin2": -39.25,
+   "phase encodings": "y pair",
+   "qfac": 1,
+   "qform_code": 1,
+   "read-out time": 0.045,
+   "read-out times differ": false,
+   "reversed first": false,
+   "scaled": false,
+   "scg throughout": false,
+   "scg1": true,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "20x24x16",
+   "slice thickness": 2.5,
+   "spacing0": 1.2,
+   "spacing1": 1.0,
+   "spacing2": 1.2,
+   "subsamp default": false,
+   "suffix": ".nii.gz",
+   "units": "mm",
+   "warpres pool": 5
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--acqp={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=my_topup"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--warpres=20,16"
+    ],
+    "name": "--warpres",
+    "optional": true
+   },
+   {
+    "args": [
+     "--subsamp=1"
+    ],
+    "name": "--subsamp",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fwhm=8,4"
+    ],
+    "name": "--fwhm",
+    "optional": true
+   },
+   {
+    "args": [
+     "--miter=2,1"
+    ],
+    "name": "--miter",
+    "optional": true
+   },
+   {
+    "args": [
+     "--lambda=0.001"
+    ],
+    "name": "--lambda",
+    "optional": true
+   },
+   {
+    "args": [
+     "--estmov=0"
+    ],
+    "name": "--estmov",
+    "optional": true
+   },
+   {
+    "args": [
+     "--minmet=0,1"
+    ],
+    "name": "--minmet",
+    "optional": true
+   },
+   {
+    "args": [
+     "--regmod=membrane_energy"
+    ],
+    "name": "--regmod",
+    "optional": true
+   },
+   {
+    "args": [
+     "--iout=corrected"
+    ],
+    "name": "--iout",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fout=field"
+    ],
+    "name": "--fout",
+    "optional": true
+   },
+   {
+    "args": [
+     "--dfout=warpfield"
+    ],
+    "name": "--dfout",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 1 0 0.04500000\n0 -1 0 0.04500000\n"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      1.0,
+      0.9,
+      0.9
+     ],
+     "bias": [
+      0.004,
+      0.0,
+      -0.002,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "noise": 1.0,
+     "seed": 1803666512,
+     "size": 16.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      0.3,
+      -0.1,
+      0.1
+     ],
+     "gradient": [
+      0.0,
+      -6.0,
+      0.0
+     ],
+     "hz": 25.0,
+     "volumes": [
+      [
+       1,
+       0.045
+      ],
+      [
+       1,
+       -0.045
+      ]
+     ],
+     "width": 0.45
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      38.0,
+      -46.0,
+      18.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      0,
+      0,
+      1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      4.0,
+      4.0,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     24,
+     16,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 6.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 12747,
+  "options": [
+   "--acqp",
+   "--dfout",
+   "--estmov",
+   "--fout",
+   "--fwhm",
+   "--iout",
+   "--lambda",
+   "--minmet",
+   "--miter",
+   "--regmod",
+   "--subsamp",
+   "--warpres",
+   "2 levels",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "topup-trial",
+  "tool": "fsl-topup-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

@@ -18,6 +18,7 @@ the oracle cache: no original result is computed twice, and only the original ru
 
 from __future__ import annotations
 
+import dataclasses
 import os
 
 from larmorx_validation.difftest import gen
@@ -55,6 +56,17 @@ def _run(impl: str):
     return run
 
 
+def _case(recipe: dict, impl: str, *, expect: str = "pass", reason: str = "", **kw):
+    """The replica descriptor's case; a permanent case expected to diverge (``expect``
+    ``divergence``: only §12's metrics may fail, for ``reason``) carries its reason in its
+    payload, which the suite's :func:`~larmorx_validation.parity.fsl_topup.run_case` reads."""
+    c = fsl_topup.case(recipe, impl, **kw)
+    if expect == "divergence":
+        kind, payload = c.payload
+        c = dataclasses.replace(c, payload=(kind, payload, reason or "an expected divergence"))
+    return c
+
+
 def _unavailable() -> str:
     from larmorx_validation.parity import fsl_versions
 
@@ -71,7 +83,7 @@ TOOL = Tool(
     suite="fsl-topup",
     implementations=("original",),
     draw=draw,
-    case=fsl_topup.case,
+    case=_case,
     run=_run,
     exact=lambda impl: False,
     exact_checks=(),

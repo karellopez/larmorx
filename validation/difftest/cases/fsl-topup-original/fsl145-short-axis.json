@@ -1,0 +1,329 @@
+{
+ "defect": "FSL-145",
+ "description": "FSL-145: --splineorder=2 on an axis shorter than two knot spacings (two coefficients; reproduce FSL's, the default the full count)",
+ "expect": "divergence",
+ "found": {
+  "detail": "o_fieldcoef.nii.gz: header: shape (2, 2, 5) / (4, 4, 5); --fout (Hz): |d| inside the brain, 99th percentile: ; --fout (Hz): |d| inside the brain, mean: ; --fout (Hz): correlation inside the brain: ; o_movpar.txt: translations: ; o_movpar.txt: rotations: ",
+  "n": 601,
+  "seed": "topup-trial",
+  "shrink_moves": [],
+  "signature": [
+   "--fout (Hz): correlation inside the brain",
+   "--fout (Hz): |d| inside the brain, Nth percentile",
+   "--fout (Hz): |d| inside the brain, mean",
+   "o_fieldcoef.nii.gz: header",
+   "o_movpar.txt: rotations",
+   "o_movpar.txt: translations"
+  ]
+ },
+ "id": "fsl145-short-axis",
+ "implementations": [
+  "original"
+ ],
+ "reason": "the movements' rotations differ (finding 14: FSL's movement derivatives); the coefficients' layout and every exact check agree",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 3
+  },
+  "features": {
+   "--acqp": false,
+   "--debug": false,
+   "--dfout": false,
+   "--estmov given": true,
+   "--featout": false,
+   "--fout": true,
+   "--fwhm given": true,
+   "--interp": false,
+   "--iout": false,
+   "--jacout": false,
+   "--lambda given": true,
+   "--logout": false,
+   "--minmet given": false,
+   "--nthr": false,
+   "--numprec": false,
+   "--out": true,
+   "--rbmout": false,
+   "--regmod": false,
+   "--regrid": false,
+   "--scale": false,
+   "--splineorder": true,
+   "--splineorder value": "2",
+   "--ssqlambda": false,
+   "--subsamp given": true,
+   "--trace": false,
+   "-v": false,
+   "FSL's configuration": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": false,
+   "basename": "o",
+   "bias0": -0.002,
+   "bias1": 0.004,
+   "bias2": 0.002,
+   "config file": false,
+   "dtype": "float32",
+   "estmov0": true,
+   "extreme": false,
+   "field Hz": 120.0,
+   "field centre0": -0.1,
+   "field centre1": -0.1,
+   "field centre2": 0.3,
+   "field gradient0": -2.0,
+   "field gradient1": -6.0,
+   "field gradient2": -8.0,
+   "field width": 0.6,
+   "fwhm0": 2,
+   "head axis0": 1.0,
+   "head axis1": 1.1,
+   "head axis2": 0.85,
+   "head centre0": -0.06,
+   "head centre1": -0.02,
+   "head centre2": -0.06,
+   "head fraction": 0.36,
+   "in-plane gradient only": true,
+   "in-plane voxel": 2.0,
+   "kind": "topup",
+   "lambda0": "0.005",
+   "largest subsampling": 2,
+   "levels": 1,
+   "miter0": 1,
+   "movements": false,
+   "noise": 4.0,
+   "nx": 16,
+   "ny": 16,
+   "nz": 12,
+   "orientation": "axes",
+   "origin0": 8.5,
+   "origin1": -49.75,
+   "origin2": -49.0,
+   "phase encodings": "three",
+   "qfac": 1,
+   "qform_code": 1,
+   "read-out time": 0.02,
+   "read-out times differ": false,
+   "reversed first": false,
+   "scg throughout": false,
+   "sform": "other",
+   "sform_code": 2,
+   "shape": "16x16x12",
+   "shear0": 0.05,
+   "shear1": 0.05,
+   "shear2": 0.075,
+   "slice thickness": 4.0,
+   "spacing0": 1.5,
+   "spacing1": 1.5,
+   "spacing2": 0.5,
+   "subsamp drops0": true,
+   "suffix": ".nii.gz",
+   "units": "mm",
+   "warpres pool": 3
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--datain={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=o"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--warpres=20"
+    ],
+    "name": "--warpres",
+    "optional": true
+   },
+   {
+    "args": [
+     "--subsamp=2"
+    ],
+    "name": "--subsamp",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fwhm=2"
+    ],
+    "name": "--fwhm",
+    "optional": true
+   },
+   {
+    "args": [
+     "--miter=1"
+    ],
+    "name": "--miter",
+    "optional": true
+   },
+   {
+    "args": [
+     "--lambda=0.005"
+    ],
+    "name": "--lambda",
+    "optional": true
+   },
+   {
+    "args": [
+     "--estmov=1"
+    ],
+    "name": "--estmov",
+    "optional": true
+   },
+   {
+    "args": [
+     "--splineorder=2"
+    ],
+    "name": "--splineorder",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fout=field"
+    ],
+    "name": "--fout",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 1 0 0.02000000\n0 -1 0 0.02000000\n0 1 0 0.02000000\n"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.85
+     ],
+     "bias": [
+      -0.002,
+      0.004,
+      0.002,
+      0.0
+     ],
+     "centre": [
+      -2.0,
+      -0.5,
+      -2.0
+     ],
+     "noise": 4.0,
+     "seed": 306987742,
+     "size": 11.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      -0.1,
+      -0.1,
+      0.3
+     ],
+     "gradient": [
+      -2.0,
+      -6.0,
+      0.0
+     ],
+     "hz": 78.0,
+     "volumes": [
+      [
+       1,
+       0.02
+      ],
+      [
+       1,
+       -0.02
+      ],
+      [
+       1,
+       0.02
+      ]
+     ],
+     "width": 0.6
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      22.0,
+      -15.0,
+      15.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      -1,
+      1
+     ],
+     "sform": "other",
+     "sform_code": 2,
+     "shear": [
+      0.05,
+      0.05,
+      0.075
+     ],
+     "spacing": [
+      2.0,
+      2.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     16,
+     16,
+     12,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 6.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 601,
+  "options": [
+   "--datain",
+   "--estmov",
+   "--fout",
+   "--fwhm",
+   "--lambda",
+   "--miter",
+   "--splineorder",
+   "--subsamp",
+   "--warpres",
+   "1 levels",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "topup-trial",
+  "tool": "fsl-topup-original"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

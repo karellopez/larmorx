@@ -1179,11 +1179,19 @@ def cases(tier: str) -> list[Case]:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
-    kind, payload = case.payload
+    kind, payload, *expected = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
     elif kind == "difftest":
         difftest_case(payload, checks)
+        if expected:
+            # a permanent case expected to diverge: only §12's metrics may fail
+            failed = [c for c in checks.checks if not c.passed]
+            if failed and not any(any(k in c.name for k in _EXACT_KINDS) for c in failed):
+                worst = "; ".join(
+                    f"{c.name} {c.value} (threshold {c.threshold})" for c in failed[:3]
+                )
+                raise Outcome(EXPECTED, f"{expected[0]}. Outside the thresholds: {worst}")
     else:
         _run_case(rep._all_cases()[payload][2], checks, payload)
         _expected_divergence(checks, payload)

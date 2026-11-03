@@ -127,11 +127,14 @@ fn fmriprep_options_on_a_phantom() {
         dir.path(),
         &s,
     );
-    // FSL-96: the probability maps outside the mask, which FAST never writes, are 0
+    // FSL-96: the probability maps outside the mask, which FAST never writes, are 0; FSL-202: the
+    // class variances' arithmetic (FSL's, reproduced)
     assert_eq!((code, out.as_str()), (0, ""));
+    let lines: Vec<&str> = err.lines().collect();
     assert!(
-        err.starts_with("larmorx-nc: upstream defect FSL-96 (fast) reproduced: ")
-            && err.lines().count() == 1,
+        lines.len() == 2
+            && lines[0].starts_with("larmorx-nc: upstream defect FSL-202 (fast) reproduced: ")
+            && lines[1].starts_with("larmorx-nc: upstream defect FSL-96 (fast) reproduced: "),
         "{err}"
     );
     for f in [

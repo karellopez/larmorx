@@ -5,7 +5,7 @@
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
+- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
 - **Original programs:** 314 runs: 300 from the oracle cache, 14 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
@@ -188,7 +188,7 @@ a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact o
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (f22179aa9118) |
+| larmorx | 0.0.1 (f0dd88b671b6) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

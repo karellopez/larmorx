@@ -30,6 +30,8 @@ TOOLS: dict[str, str] = {
     "fsl-flirt": "fsl_flirt",
     "fsl-fast": "fsl_fast",
     "fsl-topup": "fsl_topup",
+    "fsl-maths": "fsl_maths",
+    "fsl-stats": "fsl_stats",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

@@ -6,9 +6,10 @@
 //! current image at once, in the computing type `-dt` sets (the whole chain is generic over it:
 //! [`Chain`]). The operations of this file are §5-§8's (the binary operations, thresholds,
 //! masks, voxelwise functions, random numbers, the index and the grid) and the chain's own
-//! (`-seed`, `-restart`, `-save`, `-range`), the kernels and spatial filters (§9, §10); the rest
-//! of the usage text is refused as not yet implemented until the next parts of the original add
-//! it.
+//! (`-seed`, `-restart`, `-save`, `-range`), the kernels and spatial filters (§9, §10), the
+//! reductions (§11), the statistical transforms (§12), `-roi` and `-bptf` (§13); the rest of
+//! the usage text (TFCE, `-roc`, `-tensor_decomp`) is refused as not yet implemented until the
+//! next part of the original adds it.
 
 use std::io::Write;
 
@@ -25,7 +26,9 @@ use crate::maths::image::{self, Img, OutType, Stored, WriteError, WriteSpec};
 use crate::maths::kernel::Kernel;
 use crate::maths::num::{Kind, Num};
 use crate::maths::ops::{self, Binary, Layout, Stop, Unary, WichmannHill};
-use crate::maths::spatial;
+use crate::maths::reduce::{self, Stat};
+use crate::maths::stats::{self, PvalKind};
+use crate::maths::{regions, spatial};
 
 /// The usage text (§2.5), exactly as FSL prints it on standard output.
 pub const USAGE: &str = include_str!("fslmaths_usage.txt");
@@ -38,21 +41,11 @@ const DATATYPES: [&str; 6] = ["char", "short", "int", "float", "double", "input"
 
 /// The operations of the usage text the next parts of the original add.
 const LATER: &[&str] = &[
-    "-randn",
     "-tfce",
     "-tfceS",
     "-tfce_minT",
     "-tfce_delta",
     "-tensor_decomp",
-    "-pval",
-    "-pval0",
-    "-cpval",
-    "-ztop",
-    "-ptoz",
-    "-rank",
-    "-ranknorm",
-    "-roi",
-    "-bptf",
     "-roc",
 ];
 
@@ -716,15 +709,63 @@ fn step<T: Num>(
             spatial::normalise(&mut st.img, m, op == "-ing", notices, err);
             Ok(1)
         }
+        "-randn" => {
+            stats::randn(&mut st.img, &mut st.rng, notices, out);
+            Ok(0)
+        }
+        "-ztop" => {
+            stats::ztop(&mut st.img, notices);
+            Ok(0)
+        }
+        "-ptoz" => {
+            stats::ptoz(&mut st.img, notices, out);
+            Ok(0)
+        }
+        "-pval" | "-pval0" | "-cpval" => {
+            let kind = match op {
+                "-pval" => PvalKind::Pval,
+                "-pval0" => PvalKind::Pval0,
+                _ => PvalKind::Cpval,
+            };
+            stats::pval(&mut st.img, kind, notices);
+            Ok(0)
+        }
+        "-rank" | "-ranknorm" => {
+            stats::rank(&mut st.img, op == "-ranknorm", notices, out)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(0)
+        }
+        "-roi" => {
+            let mut a = [0i32; 8];
+            for (k, v) in a.iter_mut().enumerate() {
+                let Some(w) = arg(k + 1) else {
+                    return Err(past_end(notices, err, "-roi", false));
+                };
+                *v = atoi(w);
+            }
+            regions::roi(&mut st.img, a);
+            Ok(8)
+        }
+        "-bptf" => {
+            let hp = strtod(arg(1).unwrap_or("")).0;
+            let Some(l) = arg(2) else {
+                return Err(past_end(notices, err, "-bptf", false));
+            };
+            let lp = strtod(l).0;
+            regions::bptf(&mut st.img, hp, lp, notices).map_err(|s| refuse_stop(err, s))?;
+            Ok(2)
+        }
         _ if Morph::of(op).is_some() => {
             let f = Morph::of(op).unwrap_or(Morph::DilF);
             filters::morph(&mut st.img, &st.kernel, f, op, notices, err)
                 .map_err(|s| refuse_stop(err, s))?;
             Ok(0)
         }
+        _ if op.len() >= 2 && op.as_bytes()[1].is_ascii_uppercase() => {
+            reduction_step(ctx, st, i, notices, err)
+        }
         _ => {
-            let reduction = op.len() >= 2 && op.as_bytes()[1].is_ascii_uppercase();
-            if reduction || LATER.contains(&op) {
+            if LATER.contains(&op) {
                 let _ = writeln!(err, "larmorx: error: fslmaths: {op} {NOT_YET}");
                 return Err(Exit(1));
             }
@@ -733,6 +774,40 @@ fn step<T: Num>(
             Err(Exit(1))
         }
     }
+}
+
+/// A reduction (§11): the word's second character an upper-case letter (`T`, `X`, `Y`, `Z`:
+/// the axis; another: none), the rest the statistic; `perc` reads the next argument.
+fn reduction_step<T: Num>(
+    ctx: &Ctx<'_>,
+    st: &mut State<T>,
+    i: usize,
+    notices: &mut Notices,
+    err: &mut dyn Write,
+) -> Result<usize, Exit> {
+    let words = ctx.words;
+    let op = words[i].as_str();
+    let axis = reduce::axis_of(op.as_bytes()[1]);
+    let rest = op.get(2..).unwrap_or("");
+    let Some(mut stat) = Stat::of(rest) else {
+        let _ = writeln!(err, "Error unknown Dimensionality operation: {op}");
+        return Err(Exit(1));
+    };
+    let mut used = 0;
+    if rest == "perc" {
+        let p = strtod(words.get(i + 1).map_or("", String::as_str)).0;
+        let f = (p / 100.0) as f32;
+        if f < 0.0 || f > 1.0 {
+            let what = reduce::PERCENTILE_RANGE;
+            let _ = writeln!(err, "Image Exception : #4 :: {what}");
+            common::abort(err, "fslmaths", "std::runtime_error", what);
+            return Err(Exit(1));
+        }
+        stat = Stat::Perc(f);
+        used = 1;
+    }
+    reduce::reduce(&mut st.img, axis, stat, op, notices).map_err(|s| refuse_stop(err, s))?;
+    Ok(used)
 }
 
 /// `-kernel <type> [arguments]` (§9): the numeric argument is read before the type is looked

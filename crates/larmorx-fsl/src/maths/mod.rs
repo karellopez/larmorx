@@ -10,7 +10,10 @@
 //! - [`kernel`]: the kernels of the spatial filters (§9);
 //! - [`filters`]: the morphological filters, `-dilall` and the convolutions (§10.1, §10.2);
 //! - [`spatial`]: subsampling, edges, the difference of Gaussians, hole filling and the
-//!   intensity normalisations (§10.3-§10.7).
+//!   intensity normalisations (§10.3-§10.7);
+//! - [`reduce`]: the reductions along a dimension (§11);
+//! - [`stats`]: the statistical transforms and `-randn` (§12, §8.2);
+//! - [`regions`]: `-roi` and `-bptf` (§13).
 //!
 //! The command line (`larmorx fsl fslmaths`) is [`crate::cli::fslmaths`].
 
@@ -19,4 +22,7 @@ pub mod image;
 pub mod kernel;
 pub mod num;
 pub mod ops;
+pub mod reduce;
+pub mod regions;
 pub mod spatial;
+pub mod stats;

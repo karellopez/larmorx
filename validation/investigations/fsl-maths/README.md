@@ -87,3 +87,13 @@ measurement on 10^8 arguments per function, and the check of `larmorx_core::math
   (2026-11-03): 38 and 15 citations, none missing. Run from the repository's root:
   `PYTHONPATH=python:validation/src python -P validation/investigations/fsl-maths/spec_cases.py .`
   (it only lists the cases; nothing runs).
+
+## The site's pages (sub-task 7)
+
+- `fft_real_kernels.py "<kernel and filter>" ...`: mean filters on FSL's mean of ds005040's BOLD
+  series in T1w space, FSL (through the cache) against the replica, values that differ. Result
+  (2026-11-03): every separable, direct and FFT filter tried (`-kernel sphere 21` and `27 -fmean`,
+  `sphere 21 -fmeanu` take the FFT) gives FSL's values, every one: GLIBC-07's twiddle factors
+  rarely survive rounding to float (random testing met it once in 5,263 chains with `-fmean` or
+  `-fmeanu`). The pages' evidence itself is `validation/src/larmorx_validation/evidence/fsl_maths.py`
+  and `fsl_stats.py` (`python -m larmorx_validation evidence fsl-maths|fsl-stats --site <site>`).

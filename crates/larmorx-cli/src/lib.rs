@@ -573,10 +573,11 @@ mod tests {
         assert!(err.starts_with("error: unknown command 'spm'"), "{err}");
         assert!(err.contains("Run 'lx --help'"), "{err}");
 
-        let (code, _, err) = run_capture(&["lx", "fsl", "fslmaths"]);
+        // (fslmaths was the example until it was ported, 2026-11-03)
+        let (code, _, err) = run_capture(&["lx", "fsl", "melodic"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(
-            err.starts_with("error: unknown fsl tool 'fslmaths'"),
+            err.starts_with("error: unknown fsl tool 'melodic'"),
             "{err}"
         );
 

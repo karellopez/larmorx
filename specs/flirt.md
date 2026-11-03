@@ -531,6 +531,11 @@ With weighting on, every cost uses the **fully weighted** form: each point's wei
 `wt·wr` (the input weight interpolated trilinearly at the sample with the cost's interpolation
 rule, times the reference weight at the grid point, single precision), then the edge factors of
 `specs/mcflirt.md` §6.3 multiply it, whatever the smoothing (smoothing 0 gives no edge factors).
+(spec writer, 2026-11-03; question 21 of part 2: right, confirmed) Exactly, in single precision:
+`w = w_t·w_r`, then `w = w·f_x`, `w = w·f_y`, `w = w·f_z` in that order (`(((w_t·w_r)·f_x)·f_y)·f_z`),
+each factor present only when the sample lies within the smoothing distance of that axis' low
+edge (`f = o/s`) or else of its high edge (`f = (b − o)/s`), the quotient formed first; a
+negative result is set to 0.
 The sums are those of the smoothed forms. Differences from §6.2:
 - `normcorr`: the cost is `1 − r`, **not** `1 − |r|` (an anticorrelation is not rewarded);
 - `woods`: prints `WARNING: Woods is not implemented with cost function weighting` on standard
@@ -895,7 +900,12 @@ fMRIPrep's log shows as one row of 17 numbers). FSL's other shipped schedules (`
 From a matrix: its 12 parameters (§3, about the pair's centre), the tolerances `t_i·s_req` (default
 0.005, 0.005, 0.005 rad, 0.2, 0.2, 0.2 mm, 0.002 × 3, 0.001 × 3, times the requested scale),
 optimising the first `dof` parameters (dof clamped to 6..12 with `Erroneous dof <d> : using 6
-instead` or `12`). The method is mcflirt's line search (`specs/mcflirt.md` §7.2, §7.3), with these
+instead` or `12`). (spec writer, 2026-11-03; question 33 of part 2: right, confirmed) The message
+is printed (standard error) once for each row an `optimise` optimises outside a parameter subset
+and once for each row a `measurecost` measures (its dof clamped likewise, no optimisation), and
+once for each of the search's free optimisations (§8.1 step 9), after that start's own
+composition and its messages (FSL-90's, composed once, with the dof below 6 as given); an
+optimisation in a parameter subset (§8.3) and the search's grids never print it. The method is mcflirt's line search (`specs/mcflirt.md` §7.2, §7.3), with these
 differences:
 - **Iterations.** Up to `maxit` sweeps (the command's last number; default 4). Each sweep performs
   the line searches along the current directions in order, each with the bound guess `b_k` of
@@ -1054,6 +1064,11 @@ voxels outside the input the value is therefore interpolated with the neighbours
 the edge rule: the extraslice rule by default (one voxel beyond an edge reads the edge voxel,
 further ones the background value), the constant `v` with `-setbackground v`. With a field map
 there is no padding test: every voxel is interpolated (the edge rule outside the input).
+(spec writer, 2026-11-03; question 35 of part 2: right, confirmed) **Nearest neighbour** rounds
+each coordinate first (half away from zero: `(int)(x + 0.5)` for `x > 0`, else `(int)(x − 0.5)`),
+then reads that index through the edge rule: an index of −1 or `n` reads the edge voxel under the
+extraslice rule, any other index outside the background value (`-setbackground`'s `v`); so
+positions 1 to 1.5 voxels outside an edge take the edge's value.
 
 **The windowed sinc exactly** (spec writer, 2026-11-02; question 13, observed with the model: 40000
 of 40000 sampled voxels of `-applyxfm -interp sinc` bit for bit; the two sums in double, the weight
@@ -1314,6 +1329,25 @@ default and with `reproduce`:
   subtraction), a last single column as `y + a_{r,k}·(x_k·(−1))`; with fewer rows, `t` summed from
   0 in order, then `(−1)·t + y`. The kernels' fused multiply-adds occur only with `α = −1`, where
   they give the rounded subtraction above: no FMA changes these inverses.
+- (spec writer, 2026-11-03; questions 36 and 37 of part 2) **The vector solves** (`A⁻¹·v`: the
+  coordinate programs, avscale's translation, midtrans' `x_n`, `pointflirt`'s none) are LAPACK's
+  `dgesv` on OpenBLAS: the **same factorisation** as the inverse (the left-looking LU above, its
+  pivots and its pivot reciprocals), then the row interchanges applied to `v`, the forward
+  substitution with the unit lower triangle and the backward substitution with `U`, each column by
+  column (the entry solved, divided by the diagonal for `U`, then times its column subtracted from
+  the entries still to solve). Whether that subtraction is fused is not visible in any printed
+  output (the coordinate programs print 6 significant digits; no case of the record or the trial
+  differs), so the original may form it either way (right: the original's choice holds).
+  **When an inverse fails** (question 37: the implementer's reading was wrong): FSL's 4 × 4 inverse
+  fails (`inv(): matrix is singular`) **only on an exact zero**: a zero pivot of the LU, a zero on
+  the diagonal of a diagonal or triangular matrix (a 2 × 2 or 3 × 3 whose closed form declines falls
+  through to these). A matrix with NaN or infinite entries factorises without a zero pivot (a NaN
+  is not 0) and its inverse is computed, NaN in the affected entries: FLIRT goes on with NaN
+  matrices and costs. In the trial's cases with −inf or NaN voxels (FSL-14 lets them in with
+  `reproduce`), the centres of mass, and so every composed matrix and every voxel-to-voxel
+  mapping a cost evaluation inverts, are NaN, and FSL ends at the matrix its NaN costs leave (it
+  writes it, status 0); the original, in `reproduce`, inverts such matrices as FSL does (NaN, no
+  stop), and stops only where an exact zero pivot arises.
 - Every cost evaluation's sums are single precision in the visiting order (§6); the line search is
   single precision (`specs/mcflirt.md` §7). BBR's sums are double. (spec writer, 2026-11-02) No
   fused multiply-add in FLIRT's own arithmetic (the costs, the filters, the boundary points, the
@@ -1850,7 +1884,18 @@ conversion; by default as float images. **Double** images: the sinc kernel's sum
 the single-precision running sum, rounding it back to single precision at each step; the voxels
 the padding mask sets (pre-images outside the input) hold the background value **in double
 precision**, while every interpolated voxel (extrapolated ones included) passes through single
-precision. Matrix files that cannot be read: their message and an empty matrix, which stops the
+precision. (spec writer, 2026-11-03; question 30 of part 2: right, confirmed) **The char group is
+signed** (FSL's x86-64 build: the group of uint8 and int8 images is C's plain `char`, signed):
+FSL reads a uint8 value of 128 to 255 as `v − 256` everywhere applyxfm4D uses the values (the
+interpolation, the background value's border percentile, nearest neighbour's copy) and writes
+the result back as a uint8 byte (the signed char's bits: nearest neighbour gives the stored bytes
+back, but the padding voxels get the background value of the signed values). FSL-111: by default
+the original reads uint8 as stored (0 to 255) and names FSL-111 where a written value changes;
+`reproduce` reads it as FSL does. `flirt -applyxfm` reads uint8 as stored (not affected). **FSL-79's
+conversions** (`reproduce`) are x86-64's: a float converted to the type through a 32-bit integer
+(truncation toward zero; a value beyond the 32-bit range gives −2³¹), then its low 8 or 16 bits
+for char and short (wrapped: a char coefficient of 160 reads −96, int16 values near 32767 wrap),
+not kept in the type's range. Matrix files that cannot be read: their message and an empty matrix, which stops the
 run (`matrix multiplication: incompatible matrix dimensions: 0x0 and 4x4`, signal 6; the original
 exits 1 after the text); a missing input: newimage's exception (signal 6). Exit 0.
 

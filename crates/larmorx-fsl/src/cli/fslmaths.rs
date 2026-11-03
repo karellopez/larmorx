@@ -824,7 +824,9 @@ fn tensor_step<T: Num>(
     let extremes = |v: &[f32]| {
         ops::extremes(v, false).map_or((0.0, 0.0), |(a, b)| (f64::from(a), f64::from(b)))
     };
-    let parts: [(&str, &Vec<f32>, usize, Option<(f64, f64)>); 9] = [
+    // (suffix, values, volumes, display range: the values' extremes when None)
+    type Part<'a> = (&'a str, &'a Vec<f32>, usize, Option<(f64, f64)>);
+    let parts: [Part<'_>; 9] = [
         ("L1", &d.l1, 1, None),
         ("L2", &d.l2, 1, None),
         ("L3", &d.l3, 1, None),

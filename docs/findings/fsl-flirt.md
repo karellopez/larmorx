@@ -544,3 +544,56 @@ cache), the replica's in both modes `replica_runs.py`.
 - The coordinate programs' `-warp` (FNIRT's warp fields): refused until FSL's warp-field libraries
   are ported (`docs/next-steps.md`).
 - `standard_space_roi`, `flirt_average`, `epi_reg` (scripts of FSL's other programs).
+
+## The spec answers of 2026-11-03 (part 2's questions 1 to 20, from the source)
+
+Source facts behind `specs/flirt.md` §14's table of 2026-11-03 (FSL 6.0.7.23; the models in
+`validation/investigations/spec-answers-3/flirt_models.py`):
+
+- **makerot** calls miscmaths' `make_rot(ax*theta*M_PI/180, ctr, mat)` with the whole scaled axis:
+  `float theta = norm2(angl)`, `axis = angl/theta` (not renormalised), `x2 = (-axis(2), axis(1), 0)`
+  or `(1,0,0)` when `norm2(x2) <= 0`, `x3 = cross(x1,x2)/norm2`, `basischange * rotcore *
+  basischange.t()` with `cos(theta)`/`sin(theta)` of the float. The options are `Option<float>` and
+  `Option<std::vector<float>>`, so the angle, axis and centre are floats; FSL-76 is `ax /
+  sqrt(norm2(ax))`. FLIRT's own compositions use the same `make_rot` per axis (§3).
+- **avscale**: `decompose_aff(params, affmat, cor, rotmat2euler)`, `construct_rotmat_euler(params, 6,
+  rotmat)` (no centre: about the origin), `ans = affmat.i() * rotmat * skew * scale` (Armadillo's
+  four-factor chain evaluates `((A*B)*C)*D` for equal sizes), `newxfm = rotmat * skew * scale` with
+  `scale(2,2) = 1.0/params(8)`.
+- **The matrix reader** (miscmaths `read_ascii_matrix`): `skip_alpha` finds the first line whose
+  first token passes `isNumber` (`strtod` to the token's end); the columns are the token count of
+  that line plus a blank, minus 1; the rows the count of such lines from there; each row read by
+  `istringstream >> double` with a throw only on `eof()` (a failed stream leaves `newnum` as it is,
+  so the last value repeats; libstdc++'s `__convert_to_v` gives 0 and failbit for a partial parse,
+  `numeric_limits::max()` and failbit for `±HUGE_VAL`).
+- **Coordinate programs**: `parse_command_line` treats any `-` word that is not a no-argument
+  option as needing one (`if (n+1>=argc) { "Lacking argument"; break; }`); the interactive refusal's
+  text hard-codes the program name; std2imgcoord has no `isatty` test and its `oldstd == stdcoord`
+  (initially 0 with a fourth component 0 against 1) only on standard input. `-warp` goes through
+  `FnirtFileReader::Read` (`common_read`: `read_volume4D`, `tsize() != 3` throws), caught by
+  `catch(...)`.
+- **midtrans**: `if (fabs(trans.Determinant()) < 1e-6)` (false for NaN and inf);
+  `ColumnVector temp_orig(4)` (Armadillo zero-initialises) printed whole without a template,
+  replaced by `cog()`'s 3-vector with one; `Pxx_av` printed in `avg_affine_with_procrustes`' stage
+  1.
+- **pointflirt**: `if (x.Nrows() > x.Ncols()) { x = x.t(); y = y.t(); }`; with two 0 × 0 matrices
+  `n = 0` passes the count test and the later submatrix copies of the empty products crash
+  (FSL-204).
+- **applyxfm4D**: `call_fmrib_main(dtype(iname), ...)` reads the input's header first;
+  `affine_transform(invol[m], dummy, affmat, 0, true)` directly (no `filter_image` blur).
+- **flirt**: `search_cost` lowers `verbose` by 2 and restores it; `optimise_strategy3` lowers it by 2
+  again from the restored value for the free optimisations (so the same lowered level);
+  `safe_save_volume` saves only when `!nosave` (`-debugsave`), `costs` at the lowered `verbose>=4`
+  after the fine grid and again at `>=3` after the threshold step; `Previous scale used` inside
+  `usrsetscale`'s new-pair branch; `set_param_tols` (all 12 `tolerance(i)`) is called by
+  `set_perturbations` (measurecost, optimise), `search_cost` and both optimise strategies;
+  `measure_cost` calls `costfn(Matrix)`, which prints nothing. In `optimise_strategy3`, `premat`
+  is the matrix after `vector2affine(params_8, dof, matresult)`, before `optimise_strategy1`
+  decomposes it (`affmat2vector`) and `optimise()` composes it again for `Starting with :` and the
+  evaluations. `construct_rotmat_quat` returns the identity before adding any translation when `w2
+  < 0`; `compose_aff` then applies the scale (n > 6).
+- **-debug**: `setcostfntype`'s five lines; `set_bbr_seg` returns 1 without boundary points
+  (`no_coords = 0`, so `is_bbr_set()` is false and the post line prints 0); the final call runs
+  `measurecost 12 U:1 ... rel 8`.
+- **-2D**: no `mode2D` condition on the sform messages; `double_end_slices` (one-slice images)
+  builds a new volume without the forms.

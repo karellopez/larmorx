@@ -169,7 +169,7 @@ What the models gave (2026-11-03; FSL's runs new, stored in the cache, but for t
 findings, served from it): `makerot` 11 of 11 matrices FSL's to ten significant digits; `avscale`
 16 of 16 printed blocks of the 3 probes and 234 of 234 of the 47 trial findings without a volume
 (the check matrix's `-0.000000` residuals included; the 35 findings with a volume, whose centre is
-the volume's centre of gravity, not modelled); the readers 14 of 14 `convert_xfm -omat` files or
+the volume's centre of gravity, not modelled; `--variant numpy-inverse`, LAPACK's inverse for §12's, parts in 11 of the 250 blocks, the check's signs of zero: only the inverse's exact steps decide them; `plain-rotation` and `right-to-left` change nothing, as avscale's angles are single-precision numbers and the products' orders give the same bits here); the readers 14 of 14 `convert_xfm -omat` files or
 errors and 5 of 5 `img2imgcoord` coordinate lists; FSL-90's messages: with `-dof 6` FSL prints 8,
 the model 4 invalid starts + 4 evaluations whose vector part lies outside the unit ball = 8; with
 12 dof 4 = 4 + 0 (the implementer's "composed twice at dof 6" fits the first count only by

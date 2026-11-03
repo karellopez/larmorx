@@ -22,7 +22,7 @@ script reads):
 
     PYTHONPATH=python:validation/src scripts/orchestration/boxed.sh 4 \\
         python -P validation/investigations/spec-answers-3/flirt_models.py <probes printout> \\
-        [--trace <trace printout>] [--findings <trial findings dir>]
+        [--trace <trace printout>] [--findings <trial findings dir>] [--variant <v>]
 """
 
 from __future__ import annotations
@@ -41,6 +41,10 @@ sys.path.insert(0, str(HERE.parent / "flirt-spec-answers"))
 import matrices_model as mm  # noqa: E402  (§3's composition and decomposition, §12's inverse)
 
 F32 = np.float32
+#: ``--variant``: another reading of §15.1, to show where it parts from FSL: ``plain-rotation``
+#: (each elementary rotation the textbook matrix of single-precision sines and cosines),
+#: ``right-to-left`` (the check as ``M⁻¹·(R·(K·S))``), ``numpy-inverse`` (LAPACK's inverse)
+VARIANT = ""
 
 
 def f32(x: float) -> float:
@@ -137,7 +141,6 @@ def makerot(args: list[str]) -> np.ndarray:
     centre = [f32(float(x)) for x in opts.get("-c", "0,0,0").split(",")]
     if "--cov" in opts:
         import nibabel as nib
-
         from larmorx_validation.parity import fsl_flirt_replica as rep
 
         h = nib.load(str(rep.inputs() / opts["--cov"])).header
@@ -193,7 +196,12 @@ def avscale_lines(mat: np.ndarray, opt: str) -> dict[str, list[str]]:
     sc[0, 0], sc[1, 1], sc[2, 2] = p[6], p[7], p[8]
     sk[0, 1], sk[0, 2], sk[1, 2] = p[9], p[10], p[11]
     if opt == "--inverteddies":
-        out["check"] = fixed(mm.mul(mm.mul(mm.mul(mm.inv(mat), rot), sk), sc))
+        if VARIANT == "right-to-left":
+            out["check"] = fixed(mm.mul(mm.inv(mat), mm.mul(rot, mm.mul(sk, sc))))
+        elif VARIANT == "numpy-inverse":
+            out["check"] = fixed(mm.mul(mm.mul(mm.mul(np.linalg.inv(mat), rot), sk), sc))
+        else:
+            out["check"] = fixed(mm.mul(mm.mul(mm.mul(mm.inv(mat), rot), sk), sc))
         sc2, sk2 = sc.copy(), sk.copy()
         sc2[1, 1] = 1.0 / p[7]
         sk2[0, 1], sk2[1, 2] = -p[9], -p[11]
@@ -400,9 +408,7 @@ def quat_messages(trace: Path) -> None:
                 while k < len(out) and out[k].strip():
                     chosen.append([float(x) for x in out[k].split()])
                     k += 1
-        starts = sum(
-            f32(((1.0 - r[0] * r[0]) - r[1] * r[1]) - r[2] * r[2]) < 0.0 for r in chosen
-        )
+        starts = sum(f32(((1.0 - r[0] * r[0]) - r[1] * r[1]) - r[2] * r[2]) < 0.0 for r in chosen)
         evals = 0
         for ln in out[i0:]:
             m = re.match(r"\d+ : \S+ :: (.*)", ln)
@@ -416,13 +422,20 @@ def quat_messages(trace: Path) -> None:
 
 
 def main() -> None:
+    global VARIANT
     args = sys.argv[1:]
+    if "--variant" in args:
+        VARIANT = args[args.index("--variant") + 1]
+        mm.VARIANT = VARIANT if VARIANT == "plain-rotation" else ""
     printout = Path(args[0])
     bl = blocks(printout.read_text(encoding="utf-8", errors="replace"))
     inputs = probe_inputs(HERE / "flirt_probes.txt")
-    print("makerot: %d of %d matrices equal (10 digits)" % check_makerot(bl))
-    print("avscale: %d of %d printed blocks equal" % check_avscale(bl, inputs))
-    print("readers: %d of %d files/coordinate lists equal" % check_readers(bl, inputs))
+    ok, tot = check_makerot(bl)
+    print(f"makerot: {ok} of {tot} matrices equal (10 digits)")
+    ok, tot = check_avscale(bl, inputs)
+    print(f"avscale: {ok} of {tot} printed blocks equal")
+    ok, tot = check_readers(bl, inputs)
+    print(f"readers: {ok} of {tot} files/coordinate lists equal")
     if "--findings" in args:
         check_avscale_findings(Path(args[args.index("--findings") + 1]))
     if "--trace" in args:

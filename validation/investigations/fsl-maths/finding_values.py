@@ -17,7 +17,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.difftest import core, inputs
 from larmorx_validation.parity import fsl_maths_replica as fm
 

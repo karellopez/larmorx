@@ -156,3 +156,25 @@ What the models gave (2026-11-03):
 - `pv_ties_model.py` (200,000 mixed voxels each): two channels, the statistics changed by 1e-7,
   1e-6, 1e-5: 22, 143, 1,387 voxels move, every one by one step; the energy through the explicit
   2 x 2 inverse instead of a solve: 0 move. One channel: 22, 375, 3,361, every one by one step.
+
+## FLIRT (part 2's questions 1 to 20, relay 3a)
+
+| File | What it shows | How to run |
+|---|---|---|
+| `flirt_probes.txt` | FSL 6.0.7.23's black-box runs behind questions 1, 2, 6 to 10 (`makerot -o`, `avscale --inverteddies`/`--allparams`, `convert_xfm -omat` of odd matrix files, `img2imgcoord` on odd coordinate files, `-warp` of a 4-volume image, `midtrans` with non-finite determinants, `pointflirt` with `nan` and with missing files), one per line in the format of `cleanroom-flirt/programs2_fsl.py` | `cleanroom-flirt/programs2_fsl.py flirt_probes.txt > <probes printout>` (FSL through the cache) |
+| `flirt_probes_trace.txt` | question 20: `-anglerep quaternion` registrations of the suite's pair at `-verbose 7`, with `-dof 6` and with 12 dof | `cleanroom-flirt/programs2_fsl.py flirt_probes_trace.txt > <trace printout>` |
+| `flirt_models.py` | the models from `specs/flirt.md`'s new text: `makerot` (§15.4, §3's elementary rotation of the whole angle vector), `avscale` (§15.1: §3's decomposition and composition about the origin, `((M⁻¹·R)·K)·S` with §12's inverse and products), the readers (§2.2's matrix files, §15.2's triples), FSL-90's message count (§8.1 step 9: one per composition of a vector part outside the unit ball) | `flirt_models.py <probes printout> [--trace <trace printout>] [--findings <trial findings dir>]` (`--findings`: the part-2 trial's avscale findings without a volume, FSL served from the cache) |
+
+What the models gave (2026-11-03; FSL's runs new, stored in the cache, but for the trial's avscale
+findings, served from it): `makerot` 11 of 11 matrices FSL's to ten significant digits; `avscale`
+16 of 16 printed blocks of the 3 probes and 234 of 234 of the 47 trial findings without a volume
+(the check matrix's `-0.000000` residuals included; the 35 findings with a volume, whose centre is
+the volume's centre of gravity, not modelled); the readers 14 of 14 `convert_xfm -omat` files or
+errors and 5 of 5 `img2imgcoord` coordinate lists; FSL-90's messages: with `-dof 6` FSL prints 8,
+the model 4 invalid starts + 4 evaluations whose vector part lies outside the unit ball = 8; with
+12 dof 4 = 4 + 0 (the implementer's "composed twice at dof 6" fits the first count only by
+chance). Black-box answers without a model: `-warp` of a 4-volume image prints `An error occured
+while reading file`, exit 1, after the verbose lines; `midtrans` of a matrix whose determinant
+overflows (`1e200` scales) uses it (NaN rows, exit 0), a singular one is `Could not read matrix`;
+`pointflirt` gives the same bytes for `1 2 nan` and `1 2 0`, and two missing files crash it
+(signal 11: FSL-204).

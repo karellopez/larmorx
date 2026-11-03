@@ -1277,6 +1277,10 @@ default and with `reproduce`:
   `-basescale 0` refused in both modes.
 - Kept (rule C): `pointflirt` reads a file of exactly three points as three coordinates per
   column (a 3 × 3 file is taken as given, not transposed; §15.6); documented.
+- **FSL-204** (`pointflirt` with no points: both coordinate files empty or missing; §15.6) (spec
+  writer, 2026-11-03): FSL crashes (a segmentation fault) after its `Could not open matrix file`
+  lines; refused in both modes with a message naming FSL-204, exit 1 (rule B: no points to fit; a
+  crash is never reproduced), FSL's lines printed first.
 - Undefined behaviour, refused in both modes with a message: `-basescale 0` (FSL-93, §4.2; spec
   writer, 2026-11-02), an uninitialised matrix name (§7.1),
   `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
@@ -1412,6 +1416,36 @@ from this spec's text alone are in `validation/investigations/flirt-spec-answers
 | 23 | (spec writer's lead) `-anglerep quaternion`'s search minima | §8.1 step 9, §11 (FSL-90) | — | high: rule A; measured (FLIRT's matrix 0.37 mm from the Euler registration, the corrected 0.23 mm) |
 | 24 | (spec writer's lead) a header voxel size of 0 | §4.2, §11 (FSL-93) | — | high: FSL still running after 60 minutes; the replica's trace (infinite voxel sizes, a NaN initial matrix, a pyramid level of −2147483648 voxels per axis) |
 | 25 | (spec writer's lead) a zero BBR normal | §6.5 | — | unchanged: stated in §6.5 (NaN points and cost, FSL's warnings); unrealistic on a segmentation, not registered |
+
+### The clean-room questions of 2026-11-03 (spec writer)
+
+The 38 numbered questions of FLIRT's clean-room original, part 2 (its findings:
+`docs/findings/fsl-flirt-original.md`, part 2's sections), answered in the sections named; 3 was
+superseded by 27, 15 settled before (the oracle cache), 29 answered by 30. The models that
+reproduce FSL's outputs from this spec's text alone are in
+`validation/investigations/spec-answers-3/` (`flirt_models.py`, its README's FLIRT section); FSL
+6.0.7.23's runs went through the oracle cache (`flirt_probes.txt`, `flirt_probes_trace.txt`).
+
+| # | Question | Answered in | The observation | Confidence and check |
+|---|---|---|---|---|
+| 1 | makerot's construction (the stale "§8.5's rotation") | §15.4 | right: it is §3's elementary rotation of the whole angle vector (`u` not normalised again, `(1, 0, 0)` for an exactly zero `v`, single-precision `θ`, its cosine and sine, the identity below 1e-8), the axis, centre and angle single-precision values | high: the model gives FSL's ten digits of 11 of 11 `-o` matrices (the default axis, FSL-76's `0,0,4`, oblique axes, `1e-30,0,1`, the 1e-8 limit on both sides, `--cov`) |
+| 2 | avscale's precisions; the check `M⁻¹·R·K·S`'s residual sign | §15.1 | incomplete: the scales and skews single-precision numbers and the translations double are right; the angles are `atan2f`'s single-precision values; `R` is §3's composition about the origin, the check `((M⁻¹·R)·K)·S` with §12's inverse and small products | high: the model gives every printed block (the matrices, scales, skews, mean, check, inverted eddy matrix) of 3 probes and of the 47 avscale findings without a volume of the part-2 trial, 250 of 250, the check's `-0.000000`s included (FSL from the cache) |
+| 4 | the coordinate programs' scan: `-`, an unknown last word, `-flirt` | §15.2 | right (any word starting with `-` that is not a no-value option is taken as needing a value) | high (source; the implementer's black-box runs) |
+| 5 | standard input: the prompt, the refusal, std2imgcoord's repeated triple | §15.2 | right: heading and prompt before the terminal test, the message names the program by its bare name, std2imgcoord reads a terminal, the repeated-triple test exact, never on the first triple | high (source; the implementer's direct runs) |
+| 6 | numbers read as libstdc++ reads doubles | §2.2, §15.2 | right: `nan`, `inf`, out of range end the input (the triple being read not used); also an underflow reads 0 without ending it, `0x10` ends at its `x` | high: the model gives FSL's coordinate lists of 5 of 5 `img2imgcoord` probes |
+| 7 | `-warp` of a readable image that is not a warp field | §15.2 | incomplete: FSL accepts exactly three volumes (by intent code, or as a displacement field of guessed convention); other images: its message, exit 1, after the verbose lines | high (source; observed on a 4-volume image) |
+| 8 | the matrix files' reading | §2.2 | right, now stated exactly: numeric lines by their first word (`strtod`), columns from the first numeric line's words, a failed read repeating the last value along its line, the largest double for an overflow, an underflow not failing, a short line's error | high: the model gives FSL's file or error for 14 of 14 `convert_xfm -omat` probes |
+| 9 | midtrans: `Pxx_av`, the centre's four values, the order, the template's error, a non-finite determinant | §15.5 | right but for the last: a non-finite determinant is not below 1e-6, so FSL uses the transform (NaN rows, exit 0); the "unreadable" cases were `nan`/`inf` words read as 0 by §2.2's reader | high: FSL's runs of a `1e200`-scale matrix (determinant overflow: NaN rows, exit 0) and of a singular one (`Could not read matrix`) |
+| 10 | pointflirt: the transposition, a missing file, a NaN coordinate | §15.6, §11 | transposition and missing file right; the NaN reading wrong: a `nan` word reads 0 (§2.2), and the result is the exact fit of the points as read; both files missing crash FSL (FSL-204, refused) | high: `1 2 nan` and `1 2 0` give the same bytes; two missing files: signal 11 (observed) |
+| 11 | applyxfm4D: no blur, the reference's sform, the read errors, the matrices inverted first, `-v` | §15.7 | right | high (source; the implementer's black-box runs) |
+| 12 | extracttxt's negative relative start | §15.8 | right: the script feeds a negative start to dc as `0 0 k − num +`, so dc never runs short of operands | high (source; the implementer's runs) |
+| 13 | aff2rigid with one argument and with bad matrices | §15.8 | right | high (source) |
+| 14 | pairreg's three schedules | §15.8 | — (asked): stated as behaviour; `pairreg1.sch` is the default schedule's first three steps exactly; the exact lines are FSL's `-v` echo | high (source) |
+| 16 | the verbose levels of the search, `-debugsave`, the subset line, measurecost's silence, `Previous scale used` | §2.3 | right; and §2.3's "2 more during the free optimisation" was the spec's error (the same lowered level); `-debugsave`'s `costs` is written from level 5 (after the threshold step), the other grids from 6 | high (source; the implementer's traces) |
+| 17 | level 2's exact lines, `-noclamp`, `-noresample`, `-2D` | §2.3 | right; `-2D`'s missing sform lines come from its one-slice images (§4.1 step 1 drops their forms), not from `-2D` itself | high (source; the suite's `-2D` images have one slice) |
+| 18 | `-debug`'s volumes and lines | §9.4 | right; with no boundary voxel the post line reads `is_bbr_set is 0` | high (source; the implementer's runs) |
+| 19 | `setoption`'s echo; a short tolerance list | §2.3, §7.3 | right: the next `measurecost`, `optimise`, `search` or optimisation stops with the index error | high (source) |
+| 20 | the free optimisations' start under gimbal lock; FSL-90's messages with `-dof 6` | §8.1 step 9 | the start right (the decomposition composed again; `P` keeps the start composed once); the "composed twice at dof 6" model wrong: the message prints at every invalid composition, the evaluations' included; an invalid start keeps only its scale (no translations: the spec's "translations and scale" was wrong) | high: on the suite's pair FSL's 8 messages with `-dof 6` are 4 invalid starts + 4 evaluations outside the unit ball, its 4 with 12 dof the 4 starts (the model counting the trace, `quat-messages`); the 4 invalid starts' `Starting with :` matrices are the identity |
 
 ## 15. FLIRT's other programs
 

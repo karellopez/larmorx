@@ -357,3 +357,85 @@ images and fMRIPrep's calls, all identical or within the thresholds):
   single-precision squares widened, in double) is not FSL's order or precision exactly (the
   goodvoxels calls, with few nonzero voxels, are identical). A spec question.
 
+
+## 24. The geometry of a new grid along x (`-subsamp2`, `-subsamp2offc`, the X reductions), relay 6
+
+Random testing (the trial of relay 6, `oracles/difftest/2026-11-03-fsl-maths-original`) found the
+original's output headers off by whole voxels after `-subsamp2`, `-subsamp2offc` and the
+reductions along X of an image FSL holds mirrored (a positive determinant), and after either on
+an image with one matrix unset. `probe_geometry.py` (11 header variants: either orientation,
+oblique and sheared, the qform or the sform unset or both; sizes 5 × 4 × 2, 4 × 5 × 3, 7 × 6 × 4;
+`-subsamp2`, `-subsamp2offc`, `-Xmax`, `-Ymax`, `-Zmax`; FSL through the oracle cache) gives
+FSL's rule: a matrix that is set (its code above 0) maps through the frame FSL holds and the
+operation, `M · F(n) · S · F(n')`, one that is unset (code 0) through the mirroring only,
+`M · F(n) · F(n')`, where `F(n)` mirrors x over `n` voxels for an image FSL mirrors (the sform's
+determinant when it is set, else the qform's; neither: not mirrored) and `S` is the operation's
+map of a new voxel to the old (`2 i' (+ ½ for -subsamp2offc)`; the identity for a reduction). The
+matrices enter as the header holds them in single precision (the qform's built from its
+quaternion and rounded), the products in double, the result rounded once. The original's
+`maths::image::regrid_x` does that: 159 of the 165 calls give FSL's header bit for bit, the 6
+others (oblique matrices, a qform offset after `-Xmax` of 7 voxels or an unset sform's offset
+after a subsampling) one unit in the last place of one offset; a bounded search of the rounding
+steps (rounded as read, as changed, as written; unset matrices rounded at read) matched fewer.
+A spec question (31): §3 and §10.3 give neither the unset matrices' update nor the arithmetic.
+
+FSL-75 (the register's row: `-subsamp2`'s background value, computed and never used) corrupts
+FSL's heap for some sizes (3 voxels along x and 2 or more along y or z, ...): FSL then writes its
+output and aborts (`double free or corruption`), crashes or finishes, depending on its heap. The
+original names FSL-75 in both modes there (no output voxel depends on it), and the suite compares
+the outputs of such a case without the exit status and glibc's message.
+
+## 25. The morphological filters with a kernel image, relay 6
+
+`probe_kernel_file.py` (kernels of zeros, of values below 0.5, of 0.5, of even and odd sizes with
+their values above 0.5 in an odd or even extent; images with and without zero voxels; `-dilM`,
+`-dilD`, `-dilF`, `-ero`, `-eroF`, `-fmedian`): FSL's off-centre warning goes by the **kernel's
+sizes** (a 3 × 1 × 1 kernel whose values above 0.5 span 2 voxels: no warning; a 4 × 1 × 1 one
+spanning 1: the warning), and a kernel without a value at or above 0.5 prints **nothing** (each
+voxel stays as it is): `ERROR:: Empty mask image` is FSL-161's, a kernel without voxels. The
+original now does both: 84 of 84 calls identical (streams and outputs).
+
+## 26. TFCE's checks in order, relay 6
+
+`-tfce` of an image with fewer than 3 voxels along an axis and no positive value prints FSL's
+`tfce requires a positive deltaT input`, not the size message: FSL tests each volume's step
+before the sizes. The original tests them in that order (with the default's FSL-175 zeros
+first, as before).
+
+## 27. FSL-165 on any image with an axis of size 1, relay 6
+
+`-fillh` and `-fillh26` crash (SIGFPE) on every image with a size of 1 along an axis, holes or
+not (a 17 × 11 × 1 image of ones): the original's FSL-165 applied only where the image held a
+zero voxel. Now: refused with `reproduce`, named by default for every such image.
+
+## 28. fslstats' histograms without a histogram, relay 6
+
+With an empty mask, `-h` and `-H` print `findHistogram: mask is empty` and then the histogram of
+zeros (`nbins` lines of `0.000000`), and the JSON holds the zeros; without a histogram (a
+constant image's `-h`, FSL-186's `-H`), the text holds nothing and the JSON an empty list
+(`"-h": []`). Relay 4's choices (no counts, no JSON entry) corrected.
+
+## 29. C's arithmetic in the integer computing types, and `-roc`'s candidates, relay 6
+
+- `-edge` under `-dt char` (and the other integer types): the central differences are C's
+  promoted `int` differences, not wrapped to the type (the outputs of a char image of values
+  above 127 match only so).
+- `-subsamp2` and `-subsamp2offc`: the neighbours' sums are not in the computing type (a char
+  image's sums do not wrap). The original's sums in double give FSL's bits for `-subsamp2` in
+  every type (the suite's `sub/subsamp2`, `-noform`, `-nan` are now identical: findings 13's
+  open question for them answered); `-subsamp2offc`'s 2 × 2 × 2 means still part in the last
+  bits (no order of a single or double sum of the eight values gives FSL's on the suite's case:
+  `sub/subsamp2offc`, `-double` stay expected divergences).
+- `-roc`'s false-positive candidates without a noise image are the mask's voxels **below the true
+  voxels' bound** (`(1 − binarised truth) × mask` with the truth binarised at `0.05 × max`), not
+  the truth's zero voxels: a truth of values between 0 and its bound counts them (FSL's rate
+  `2 / 16853` on a truth of 1,438 zeros and 15,415 values in that interval), and a truth of zeros
+  only has none (FSL-180's NaN rates). A spec question (32).
+- `-odt input` on an int8 image: the output's data type changes in every case (FSL writes uint8),
+  so FSL-157 is named for every int8 image, not only where a value changes.
+
+## 30. The NaN of `-ptoz`, relay 6
+
+FSL's `-ptoz` of a NaN voxel is that NaN quieted with its **sign flipped**: the input's
+`0x7fc00000` gives the default NaN `0xffc00000` (findings 16), and the default NaN (from `-inm`
+with an empty mask) gives `0x7fc00000`. The original flips it.

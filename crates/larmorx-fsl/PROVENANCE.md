@@ -189,7 +189,8 @@ opened). Its only inputs were:
 
 `fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command
 line, messages and outputs) was
-written by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
+written (relay 4: the speed work of §11, every output bit-identical to relay 3b's at 1, 7 and 14 threads,
+[`docs/benchmarks/fsl-topup.md`](../../docs/benchmarks/fsl-topup.md)) by a clean-room implementer who never opened FSL's source code (`~/fsl*/src`,
 `crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
 `crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings (`docs/findings/fsl-fast.md`,
 `fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the register's
@@ -223,7 +224,7 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
 | `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |
 
-## topup and applytopup (`topup`; relays 1 to 3b, 2026-11-03)
+## topup and applytopup (`topup`; relays 1 to 4, 2026-11-03)
 
 `topup` (the estimation of the susceptibility-induced field from reversed phase-encoding images:
 its command line, configuration files, levels, field, cost, minimisers and outputs) and
@@ -251,6 +252,7 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | `topup::spline` | the cubic and quadratic B-spline bases and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (penalty: the two second differences that wrap around the ends), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
 | `topup::model` | one level's predictions (a line sampler when the displacement is along one axis and nothing moves), the movements' sampling, the mask, the cost, its gradient (the movements' exact derivatives) and the Gauss-Newton Hessian (its voxel weights, the movements' dense blocks), the bending and membrane energies (FSL-117) | §4.3, §4.6; findings |
 | `topup::stencil` | the Hessian as a 7 × 7 × 7 stencil per coefficient, assembled by contracting one axis at a time, with the movements' columns and block; its product, single precision (`--numprec=float`) and the preconditioned conjugate-gradient solve | §4.7, §11; larmorx's own design |
+| `topup::pool` | none (larmorx's own speed work, relay 4): the level's large arrays kept for reuse at their exact length, so the evaluations do not touch new memory; no behaviour | §11; [`docs/benchmarks/fsl-topup.md`](../../docs/benchmarks/fsl-topup.md) |
 | `topup::movement` | the rigid-body matrices (the Euler order and signs, the centres), their derivatives, the free parameters | §4.3, §6; findings 13 |
 | `topup::minimise` | Levenberg-Marquardt (damping, retries, the early end, the end on a free parameter) and the scaled conjugate gradients, with `--debug`'s numbering | §4.7; Møller; findings |
 | `topup` (`estimate`) | the levels, the transitions between them, the full-resolution predictions | §2.4, §4.4, §6; findings |

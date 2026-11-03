@@ -88,3 +88,14 @@ runs only through the oracle cache (`at_case.py`, use mode), the replica as a bl
 | `vb8.py`, `vb10.py`, `vb11.py`, `vb12.py`, `vbinterp.py`, `vbl.py` | FSL's resampling of tiny and of 16-voxel images, and `lsr` on the probes (finding 27) |
 | `vbmkeff.py`, `vbmine.sh`, `vbcmp.py` | the original on FSL's resampled inputs against FSL (finding 23) |
 | `vbfixcmp.sh`, `vbfixcmp.py` | the original's default against the replica's default on the suite's `at/` cases (finding 26) |
+
+### Speed (relay 4, `docs/benchmarks/fsl-topup.md`)
+
+| Script | What it does |
+|---|---|
+| `speed_identity.py` | the original (`LARMORX_TOPUP_BIN`) on every case of the `fsl-topup` suite (its inputs as the suite prepares them; FSL is not run) in both modes at a given thread count, each output, stdout and stderr hashed: `speed_identity.py run <out.json> <threads> --jobs <n>`, then `speed_identity.py compare a.json b.json` (two builds or two thread counts, bit for bit) |
+| `bench.py` | the benchmark: fMRIPrep's two topup calls and one applytopup `lsr` call with FSL (timed fresh through the oracle cache with a reason never to store: one thread and `--nthr=<all>`), the replica (`LARMORX_NC_BIN`) and the original on each `--threads`; `--json` for the report's data |
+
+Example (in a memory box): `LARMORX_TOPUP_BIN=target/release/larmorx scripts/orchestration/boxed.sh 24
+python -P speed_identity.py run <scratch>/t1.json 1 --jobs 14` (about 20 s), then the same at 7 and
+14 threads (`--jobs 2`, `--jobs 1`) and `compare`.

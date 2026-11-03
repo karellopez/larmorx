@@ -71,10 +71,22 @@ pub struct Params {
     pub membrane_hessian_mm: bool,
     /// FSL-145 reproduced: two quadratic coefficients on an axis shorter than two knot spacings.
     pub fsl145: bool,
+    /// FSL-146 reproduced: each axis' Jacobian term of the gradient over the volumes displaced
+    /// along that axis only.
+    pub fsl146: bool,
     /// Trilinear interpolation of the images (`--interp=linear`).
     pub linear: bool,
     /// The field's B-spline order (`--splineorder`: 3 or 2).
     pub order: u8,
+}
+
+/// Whether the volumes are displaced along different sets of axes (FSL-146: the two modes'
+/// gradients differ): some axis along which one volume is displaced and another is not.
+pub fn meets_fsl146(scans: &[Scan]) -> bool {
+    (0..3).any(|a| {
+        let on = |s: &Scan| s.t * s.pe[a] != 0.0;
+        scans.iter().any(on) && !scans.iter().all(on)
+    })
 }
 
 /// Whether a level's or the output's layout has quadratic B-splines on an axis shorter than two
@@ -283,6 +295,7 @@ pub fn estimate(
         );
         level.single = params.single;
         level.membrane_hessian_mm = params.membrane_hessian_mm;
+        level.fsl146 = params.fsl146;
         progress.level_started(l);
         let mut rep = LevelReport {
             progress: &mut *progress,

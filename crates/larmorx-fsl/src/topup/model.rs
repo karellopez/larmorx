@@ -200,6 +200,9 @@ pub struct Level {
     pub membrane_hessian_mm: bool,
     /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
     pub single: bool,
+    /// FSL-146 reproduced: each axis' Jacobian term of the gradient summed over the volumes
+    /// displaced along that axis only.
+    pub fsl146: bool,
     /// The large arrays kept for reuse by the level's evaluations.
     pool: Pool,
 }
@@ -420,6 +423,7 @@ impl Level {
             reg_mm,
             membrane_hessian_mm: false,
             single: false,
+            fsl146: false,
             pool: Pool::default(),
         }
     }
@@ -592,6 +596,16 @@ impl Level {
                 (Sampler::Line { axis, lines }, false, None) => Some((*axis, lines)),
                 _ => None,
             };
+            // displaced along more than one axis (an oblique phase encoding): no axis wraps; a
+            // sample outside the level image along a displaced axis marks the voxel invalid
+            // (observed: first_step.py, FSL's debug masks; findings 32)
+            let oblique = ev.iter().filter(|x| **x != 0.0).count() > 1;
+            let n_img = self.images.dims;
+            let on_grid = |p: [f64; 3]| {
+                !oblique
+                    || (0..3)
+                        .all(|a| ev[a] == 0.0 || (p[a] >= 0.0 && p[a] <= (n_img[a] - 1) as f64))
+            };
             // per voxel (each value independent), slice by slice, written in place
             let slices = Slices::split(
                 plane, &mut ui, &mut ji, &mut fi, &mut fdi, &mut fmi, &mut mask,
@@ -678,14 +692,14 @@ impl Level {
                         (f, d, [0.0; 3], inside_static([x, y, z], self.nt, *ev))
                     } else {
                         let (p, valid) = match &motion {
-                            None => (
-                                [
+                            None => {
+                                let p = [
                                     (x as f64 + hv * ev[0]) * self.scale[0],
                                     (y as f64 + hv * ev[1]) * self.scale[1],
                                     (z as f64 + hv * ev[2]) * self.scale[2],
-                                ],
-                                inside_static([x, y, z], self.nt, *ev),
-                            ),
+                                ];
+                                (p, inside_static([x, y, z], self.nt, *ev) && on_grid(p))
+                            }
                             Some(mo) => {
                                 let q = mo.apply(self.position(v));
                                 let pm: [f64; 3] = std::array::from_fn(|a| q[a] + hv * e_mm[a]);
@@ -695,7 +709,8 @@ impl Level {
                                         r > 0.0 && r < (self.nt[a] - 1) as f64
                                     }
                                 });
-                                (std::array::from_fn(|a| pm[a] / self.images.voxel[a]), valid)
+                                let p = std::array::from_fn(|a| pm[a] / self.images.voxel[a]);
+                                (p, valid && on_grid(p))
                             }
                         };
                         let (f, d) = interp(&self.images.coef[i], p, want);
@@ -869,12 +884,32 @@ impl Level {
                         let mean = ev.u.iter().map(|ui| ui[v]).sum::<f64>() / m as f64;
                         let mut sa = 0.0;
                         let mut sb = [0.0; 3];
+                        // FSL-146 reproduced: per axis, the residuals and the Jacobian terms
+                        // of the volumes displaced along it
+                        let mut rs = [0.0; 3];
+                        let mut bs = [0.0; 3];
                         for i in 0..m {
                             let r = mean - ev.u[i][v];
                             let (alpha, beta) = self.alpha_beta(ev, i, v);
                             sa += r * alpha;
                             for a in 0..3 {
                                 sb[a] += r * beta[a];
+                            }
+                            if self.fsl146 {
+                                for a in 0..3 {
+                                    if self.e[i][a] != 0.0 {
+                                        rs[a] += r;
+                                        bs[a] += beta[a];
+                                    }
+                                }
+                            }
+                        }
+                        if self.fsl146 {
+                            // FSL's sum over the displaced volumes of (ū - u_i)(∂u_i - ∂ū)
+                            // along a: the volumes not displaced along a leave out their
+                            // (ū - u_j)(-∂ū) (observed: first_step.py)
+                            for a in 0..3 {
+                                sb[a] -= bs[a] / m as f64 * rs[a];
                             }
                         }
                         *out = sa;
@@ -1080,5 +1115,95 @@ impl Level {
             }
         }
         Hessian { cc: h, cm, mm }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::images::{level_images, prepare};
+    use super::*;
+
+    /// Two smooth volumes (plain arithmetic) encoded along y and x, and a small random field.
+    fn level(fsl146: bool) -> (Level, Vec<f64>) {
+        let dims = [12, 10, 4];
+        let voxel = [2.0, 2.0, 3.0];
+        let vol = |sx: f64, sy: f64| -> Vec<f32> {
+            let mut v = Vec::new();
+            for z in 0..dims[2] {
+                for y in 0..dims[1] {
+                    for x in 0..dims[0] {
+                        let (u, w) = (x as f64 - 5.5 + sx, y as f64 - 4.5 + sy);
+                        let r2 = u * u / 20.0 + w * w / 12.0 + (z as f64 - 1.5).powi(2) / 4.0;
+                        v.push((100.0 / (1.0 + r2) + 3.0 * u) as f32);
+                    }
+                }
+            }
+            v
+        };
+        let volumes = vec![vol(0.0, 0.6), vol(0.5, 0.0)];
+        let scans = [
+            Scan {
+                pe: [0.0, 1.0, 0.0],
+                t: 0.05,
+            },
+            Scan {
+                pe: [1.0, 0.0, 0.0],
+                t: 0.05,
+            },
+        ];
+        let p = prepare(&volumes, dims, voxel, false, None, false);
+        let images = level_images(&p, 1, 2.0);
+        let field: [Axis; 3] = std::array::from_fn(|a| Axis::of_order(dims[a], 3, 3));
+        let mut l = Level::new(
+            images,
+            dims,
+            voxel,
+            1,
+            field,
+            &scans,
+            0.0,
+            false,
+            RegMod::Bending,
+            &[],
+            false,
+        );
+        l.fsl146 = fsl146;
+        let mut s = 7u64;
+        let c = (0..l.n_coef())
+            .map(|_| {
+                s = s
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                ((s >> 33) as f64 / (1u64 << 31) as f64 - 0.5) * 4.0
+            })
+            .collect();
+        (l, c)
+    }
+
+    #[test]
+    fn the_gradient_is_the_costs_and_fsl146_is_not() {
+        let (l, c) = level(false);
+        let ev = l.eval(&c);
+        let g = l.gradient(&ev, &c);
+        let (lr, _) = level(true);
+        let gr = lr.gradient(&lr.eval(&c), &c);
+        let mut worst = 0.0f64;
+        let mut worst_fsl = 0.0f64;
+        let scale = g.iter().fold(0.0f64, |m, x| m.max(x.abs()));
+        for k in (0..c.len()).step_by(7) {
+            let eps = 1e-4;
+            let (mut a, mut b) = (c.clone(), c.clone());
+            a[k] += eps;
+            b[k] -= eps;
+            let (ea, eb) = (l.eval(&a), l.eval(&b));
+            assert_eq!(ea.n_mask, eb.n_mask);
+            let fd = (ea.cost - eb.cost) / (2.0 * eps);
+            worst = worst.max((fd - g[k]).abs());
+            worst_fsl = worst_fsl.max((fd - gr[k]).abs());
+        }
+        // the default's gradient is the cost's (central differences, to their own error)
+        assert!(worst < 1e-5 * scale, "default: {worst} of {scale}");
+        // FSL-146's is not: volumes encoded along different axes
+        assert!(worst_fsl > 1e-2 * scale, "FSL-146: {worst_fsl} of {scale}");
     }
 }

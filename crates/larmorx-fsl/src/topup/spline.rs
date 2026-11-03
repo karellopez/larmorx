@@ -598,14 +598,36 @@ mod tests {
         assert_eq!(Axis::new(40, 4).ncoef(), 13);
         assert_eq!(Axis::new(64, 1).ncoef(), 64);
         // quadratic: FSL's counts (n, k, count) of the trial's grids, and FSL-145's two
-        for (n, k, c) in [(12, 2, 8), (24, 2, 14), (10, 3, 6), (12, 3, 6), (20, 3, 9), (24, 3, 10),
-            (12, 4, 5), (14, 4, 6), (20, 4, 7), (10, 5, 5), (14, 5, 5), (20, 5, 7), (12, 6, 5),
-            (20, 6, 6), (24, 6, 7), (14, 7, 5), (20, 7, 6), (24, 7, 6), (16, 8, 5), (24, 10, 5)]
-        {
+        for (n, k, c) in [
+            (12, 2, 8),
+            (24, 2, 14),
+            (10, 3, 6),
+            (12, 3, 6),
+            (20, 3, 9),
+            (24, 3, 10),
+            (12, 4, 5),
+            (14, 4, 6),
+            (20, 4, 7),
+            (10, 5, 5),
+            (14, 5, 5),
+            (20, 5, 7),
+            (12, 6, 5),
+            (20, 6, 6),
+            (24, 6, 7),
+            (14, 7, 5),
+            (20, 7, 6),
+            (24, 7, 6),
+            (16, 8, 5),
+            (24, 10, 5),
+        ] {
             assert_eq!(Axis::of_order(n, k, 2).ncoef(), c, "n {n} k {k}");
         }
         for (n, k) in [(10, 6), (10, 10), (12, 7), (14, 8), (16, 10)] {
-            assert_eq!(Axis::of_order(n, k, 2).with_fsl145(true).ncoef(), 2, "n {n} k {k}");
+            assert_eq!(
+                Axis::of_order(n, k, 2).with_fsl145(true).ncoef(),
+                2,
+                "n {n} k {k}"
+            );
             assert_eq!(Axis::of_order(n, k, 2).ncoef(), 4, "n {n} k {k}");
         }
         assert_eq!(Axis::of_order(10, 6, 3).with_fsl145(true).ncoef(), 4);

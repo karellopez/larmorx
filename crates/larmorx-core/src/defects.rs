@@ -536,6 +536,8 @@ defects! {
         "--method=jac with a phase encoding that has a z component (an acquisition row whose third element is not 0, which topup refuses: it estimates no field for one) silently leaves that component out: the image is displaced along x and y only, so an image encoded along z alone is written uncorrected";
     FSL_145 = "FSL-145", "topup", true,
         "with --splineorder=2, an axis shorter than two knot spacings gets two B-spline coefficients (every other axis ceil((2n + k - 4) / (2k)) + 2, which would be four): the field's support ends inside the axis, so the field is forced towards 0 at its far end (exactly 0 from 1.5 spacings on) whatever the images show";
+    FSL_146 = "FSL-146", "topup", true,
+        "with volumes whose phase encodings run along different axes (for example AP, PA, LR and RL), the cost's gradient leaves out of each axis' Jacobian term the volumes not encoded along that axis (their share of the mean prediction's derivative): the gradient is not the cost's, so the minimisers step in a wrong direction (a first Levenberg-Marquardt step can raise the cost) and end where this false gradient vanishes rather than at the cost's minimum";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

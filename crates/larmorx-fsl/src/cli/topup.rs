@@ -870,6 +870,7 @@ fn settle(
         single: given.get("numprec") == Some("float"),
         membrane_hessian_mm: mode == UpstreamDefects::Reproduce,
         fsl145: mode == UpstreamDefects::Reproduce,
+        fsl146: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
     };
@@ -915,6 +916,21 @@ fn settle(
             t: r[3],
         })
         .collect();
+    // FSL-146: volumes displaced along different axes
+    if topup::meets_fsl146(&scans) {
+        notices.push(Notice::new(
+            &defects::FSL_146,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => {
+                    "volumes encoded along different axes: the cost's own gradient (FSL's leaves out of each axis' Jacobian term the volumes not encoded along it)"
+                }
+                UpstreamDefects::Reproduce => {
+                    "volumes encoded along different axes: each axis' Jacobian term of the gradient over the volumes encoded along it only, as FSL's"
+                }
+            },
+        ));
+    }
     let stem = default_stem(&imain);
     let out = given.get("out").map_or_else(|| stem.clone(), str::to_owned);
     let logout = given

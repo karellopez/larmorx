@@ -69,8 +69,9 @@ SUITE = "fsl-topup-replica"
 PROGRAM = "topup"
 FMRIPREP_RUNS = "oracles/fmriprep-25.2.6"
 #: The fMRIPrep runs of the standard tier: ds005040 (Philips 3 T, a PEPOLAR pair along y,
-#: 64 x 64 x 40 voxels of 3 x 3 x 3.3 mm).
-STANDARD_RUNS = ("ds005040-sub-002-noreconall",)
+#: 64 x 64 x 40 voxels of 3 x 3 x 3.3 mm) and ds001600 (a pair of 80 x 80 x 60 voxels of 3 mm;
+#: its topup call since 2026-11-03): fMRIPrep's two topup calls.
+STANDARD_RUNS = ("ds005040-sub-002-noreconall", "ds001600-sub-1-noreconall")
 #: The run the debug cases' images come from.
 SOURCE_RUN = "ds005040-sub-002-noreconall"
 #: sdcflows' topup configuration, in the workspace's sdcflows clone (2.15.2; byte-identical to
@@ -1289,6 +1290,7 @@ TOPUP_SOURCES: dict[str, str | Run] = {
     "four": "opt/four-volumes",
     "quad": "opt/splineorder-2",
     "crop": Run(("--imain=@crop.nii.gz", "--datain=@acq.txt", "--out=o", *SHORT, "--fout=f")),
+    "long": Run(("--imain=@long.nii.gz", "--datain=@acq.txt", "--out=o", *SHORT, "--fout=f")),
 }
 
 
@@ -1356,13 +1358,40 @@ def applytopup_inputs() -> Path:
         _save(d / "half_up_aniso.nii.gz", h[..., 0], aniso)
 
     images = _atomic_dir(base / f"applytopup-v{AT_VERSION}" / "images", make)
-    for f in sorted(images.glob("*.nii.gz")):
-        link = base / f.name
-        if not link.exists():
-            part = base / f".{f.name}.{os.getpid()}"
-            shutil.copy(f, part)
-            os.replace(part, link)
+    for d in (images, _long_images()):
+        for f in sorted(d.glob("*.nii.gz")):
+            link = base / f.name
+            if not link.exists():
+                part = base / f".{f.name}.{os.getpid()}"
+                shutil.copy(f, part)
+                os.replace(part, link)
     return images
+
+
+def _long_images() -> Path:
+    """The long-line pair (``applytopup-v2/long-images/``): ds005040's pair cropped to
+    12 x 48 x 6 voxels about its centre, each line along the phase encoding (y) doubled by
+    linear interpolation to 96 voxels of 1.5 mm (``long``, and its volumes ``long_up``,
+    ``long_dn``): the restorations' lines of more than 64 voxels end to end (2026-11-03)."""
+    import nibabel as nib
+
+    base = inputs()
+
+    def make(d: Path) -> None:
+        pair = nib.load(str(base / "pair.nii.gz"))
+        p = np.asarray(pair.dataobj, np.float32)[26:38, 8:56, 17:23, :]
+        out = np.empty((12, 96, 6, 2), np.float32)
+        out[:, 0::2] = p
+        following = np.concatenate([p[:, 1:], p[:, -1:]], axis=1)
+        out[:, 1::2] = (p + following) * np.float32(0.5)
+        aff = pair.affine.copy()
+        aff[:3, 3] = aff[:3, 3] + aff[:3, :3] @ np.array([26.0, 8.0, 17.0])
+        aff[:3, 1] = aff[:3, 1] * 0.5
+        _save(d / "long.nii.gz", out, aff)
+        _save(d / "long_up.nii.gz", out[..., 0], aff)
+        _save(d / "long_dn.nii.gz", out[..., 1], aff)
+
+    return _atomic_dir(base / f"applytopup-v{AT_VERSION}" / "long-images", make)
 
 
 def topup_outputs(source: str) -> Path:
@@ -1373,6 +1402,7 @@ def topup_outputs(source: str) -> Path:
         return _zero_source()
     spec = TOPUP_SOURCES[source]
     run = _option_cases()[spec][2] if isinstance(spec, str) else spec
+    applytopup_inputs()
 
     def make(d: Path) -> None:
         with tempfile.TemporaryDirectory(prefix="lx-nc-topup-src-") as t_:
@@ -1497,6 +1527,20 @@ def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
     add("vb2d-y", "--method=vb2D: phi and lambda per slice", *pair, acq, tu, out, "--method=vb2D")
     add("vb3d-y", "--method=vb3D: phi and lambda per volume", *pair, acq, tu, out, "--method=vb3D")
     add("vb4d-y", "--method=vb4D: one phi and lambda", *pair, acq, tu, out, "--method=vb4D")
+    # lines of 96 voxels along the phase encoding (2026-11-03): the restorations' larger
+    # matrices end to end (LAPACK's blocked inverse beyond 64 rows)
+    long_pair = ("--imain=@long_up.nii.gz,@long_dn.nii.gz", "--inindex=1,2")
+    for method in ("lsr", "vb2D", "vb3D", "vb4D"):
+        add(
+            f"{method.lower()}-long",
+            f"--method={method} on lines of 96 voxels along y (the long-line pair)",
+            *long_pair,
+            acq,
+            tu,
+            out,
+            f"--method={method}",
+            source="long",
+        )
     add(
         "vb3d-4d",
         "--method=vb3D of two volumes (each on its own)",

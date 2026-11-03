@@ -16,7 +16,9 @@ the original. ``flirt``, ``convert_xfm`` and FLIRT's other programs (``avscale``
 programs ``img2imgcoord``, ``std2imgcoord`` and ``img2stdcoord``, ``rmsdiff``, ``makerot``,
 ``midtrans``, ``pointflirt``, ``applyxfm4d``) and scripts (``pairreg``, ``extracttxt``,
 ``aff2rigid``) have both too (the originals written from ``specs/flirt.md``, since 2026-11-02).
-``fast`` (FSL's tissue segmentation, since 2026-11-02) has its replica only.
+``fast`` (FSL's tissue segmentation, since 2026-11-02), ``topup`` and ``applytopup`` (the
+susceptibility field from reversed phase encodings and its correction, since 2026-11-03) have
+their replicas only.
 """
 
 from larmorx.fsl.bet import (
@@ -47,17 +49,21 @@ from larmorx.fsl.flirt_tools import (
     rmsdiff,
     std2imgcoord,
 )
+from larmorx.fsl.topup import ApplytopupResult, TopupResult, applytopup, topup
 
 __all__ = [
     "COSTS",
     "VARIATIONS",
+    "ApplytopupResult",
     "AvscaleResult",
     "BetResult",
     "BetsurfResult",
     "FastResult",
     "FlirtResult",
     "Surface",
+    "TopupResult",
     "aff2rigid",
+    "applytopup",
     "applyxfm4d",
     "avscale",
     "bet",
@@ -75,4 +81,5 @@ __all__ = [
     "read_vtk",
     "rmsdiff",
     "std2imgcoord",
+    "topup",
 ]

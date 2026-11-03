@@ -249,6 +249,20 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: false,
     },
+    // FSL's topup and applytopup (2026-11-03): the replicas only; the clean-room originals are to
+    // be written from specs/topup.md.
+    Replica {
+        family: "fsl",
+        tool: "topup",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "applytopup",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -696,7 +710,10 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["fast"]);
+        assert_eq!(
+            replica_only("fsl").collect::<Vec<_>>(),
+            ["fast", "topup", "applytopup"]
+        );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

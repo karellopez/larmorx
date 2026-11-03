@@ -140,12 +140,17 @@ def inputs(d: Path) -> dict[str, str]:
     field[..., 0, 0] = 0.5 * (i / shape[0]) - 0.25
     field[..., 0, 1] = 0.25 * (k / shape[2])
     save("warp.nii.gz", field, intent="vector")
+    # topup's pair (2026-11-03): the head displaced by one voxel along y and back; applytopup's
+    # field in Hz (a gentle gradient along y)
+    pair = np.stack([np.roll(img, 1, axis=1), np.roll(img, -1, axis=1)], -1)
+    save("pair.nii.gz", pair.astype(np.float32), zooms=(2.0, 2.0, 2.0, 1.0))
+    save("hz.nii.gz", (5.0 + 0.2 * j).astype(np.float32))
     return out
 
 
 #: The inputs :func:`inputs` writes.
 INPUTS = ("fixed", "moving", "mask", "labels", "prior01", "prior02", "prior03", "series", "t1",
-          "warp")  # fmt: skip
+          "warp", "pair", "hz")  # fmt: skip
 
 
 def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Program]:
@@ -411,6 +416,18 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
                             str(mat)), omp))  # fmt: skip
         for name, a in fsl.items():
             out.append(Program(f"fsl {name} (replica, larmorx-nc)", (nc, "fsl", name, *a), omp))
+        # topup (2026-11-03): one short level at --nthr=1 (its threads are --nthr's: the
+        # transforms' slices, the Hessians' columns); applytopup's Jacobian modulation with a
+        # field image (the transforms' slices, OMP_NUM_THREADS)
+        acq = _flirt_text(d, make, "acq", "0 1 0 0.05\n0 -1 0 0.05\n")
+        out.append(Program("fsl topup (replica, larmorx-nc)",
+                           (nc, "fsl", "topup", f"--imain={x['pair']}", f"--datain={acq}",
+                            f"--out={o}_tu", f"--logout={o}_tu.log", "--warpres=20", "--miter=2",
+                            "--fwhm=8", f"--fout={o}_tufield"), omp))  # fmt: skip
+        out.append(Program("fsl applytopup jac (replica, larmorx-nc)",
+                           (nc, "fsl", "applytopup", f"--imain={t1}", "--inindex=1",
+                            f"--datain={acq}", f"--topup={x['hz'][: -len('.nii.gz')]}",
+                            "--method=jac", f"--out={o}_hifi"), omp))  # fmt: skip
         # FAST's two channels: each channel's bias field convolved
         out.append(Program("fsl fast two channels (replica, larmorx-nc)",
                            (nc, "fsl", "fast", "-o", o + "_fast2", "-S", "2", "-I", "1", "-O",

@@ -6,8 +6,8 @@ The cases are the replica suite's (``fsl_topup_replica``: fMRIPrep's two field-m
 the debug runs, every option, FSL's configurations, the messages and failures, the thread
 counts, applytopup), run here against the original. Every FSL run goes through the
 oracle-output cache with the replica suite's keys and policies, so the runs that suite made are
-served from it. applytopup's cases wait for applytopup's original (reported as skipped), and so
-do the options the original does not take yet (it refuses them, naming them: skipped).
+served from it. The options the original does not take yet (it refuses them, naming them) are
+skipped.
 
 What is compared (``specs/topup.md`` §12), each output against FSL's:
 
@@ -28,6 +28,9 @@ What is compared (``specs/topup.md`` §12), each output against FSL's:
   most 1e-3 of the mean intensity;
 - the Jacobians and displacement fields (``--jacout``, ``--dfout``): the field's bounds times the
   volume's read-out time (and the voxel size along its phase encoding, in mm);
+- applytopup's output (``--out``): inside the brain (FSL's output above 10 % of its 99th
+  percentile), the relative difference at most 1e-3 at the 99th percentile and the mean absolute
+  difference at most 1e-3 of the mean intensity;
 - the D13 fix pass: a defect named exactly when the default's outputs differ from
   ``reproduce``.
 
@@ -106,6 +109,23 @@ EXPECTED_DIVERGENCES: dict[str, str] = {
     },
     "opt/lambda-negative": "FSL-126 reproduced: a negative weight rewards a rough field, both "
     "minimisations diverge",
+    **{
+        name: "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose "
+        "length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their "
+        "ends, outside the brain) is not known from the spec and the black-box probes (findings "
+        "21); the original wraps circularly in both modes (exact for lines of 32 voxels, where "
+        "FSL's wrap is circular)"
+        for name in ("at/lsr-long",)
+    },
+}
+#: Cases whose FSL behaviour the original does not reproduce and refuses in ``reproduce`` mode
+#: too (its refusal must name the entry), and why.
+ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {
+    "at/jac-other-shape": (
+        "FSL-134",
+        "FSL lays a field of as many voxels as the images in another shape on the images' grid; "
+        "how it does is not known from the spec and the black-box runs (findings 22)",
+    ),
 }
 #: The checks of an expected divergence that must still pass (everything but §12's metrics).
 _EXACT_KINDS = (
@@ -424,11 +444,30 @@ def _mean_stems(iout: str) -> tuple[str, str]:
     return f"{_stem(iout)}_mean", f"{iout}_mean"
 
 
-def brain_mask(a: Path, args: list[str], files: dict[str, Path]) -> np.ndarray | None:
+def _out_option(args: list[str]) -> str | None:
+    """applytopup's ``--out`` (or ``-o``)."""
+    v = _option(args, "--out")
+    if v is None and "-o" in args[:-1]:
+        v = args[args.index("-o") + 1]
+    return v
+
+
+def brain_mask(
+    a: Path, args: list[str], files: dict[str, Path], program: str = PROGRAM
+) -> np.ndarray | None:
     """The brain of §12: FSL's corrected mean above 10 % of its 99th percentile, else the mean
-    of the input's volumes the same way."""
+    of the input's volumes the same way; applytopup's: FSL's output (its mean over volumes)."""
     iout = _option(args, "--iout")
     img = None
+    if program != PROGRAM:
+        out = _out_option(args)
+        for name, p in files.items():
+            if out and _is_image(name) and _stem(name) == _stem(out):
+                x = _data(_load(p))
+                img = x.mean(axis=3) if x.ndim == 4 else x
+        if img is None or img.ndim != 3 or not np.any(img > 0):
+            return None
+        return img > BRAIN * np.percentile(img, 99)
     if iout:
         for name, p in files.items():
             if _stem(name) in _mean_stems(iout):
@@ -521,7 +560,7 @@ def _numbers(p: Path) -> np.ndarray | None:
 
 
 def measures(
-    a: Path, b: Path, args: list[str], files_a: dict[str, Path], mask
+    a: Path, b: Path, args: list[str], files_a: dict[str, Path], mask, program: str = PROGRAM
 ) -> tuple[list[Measure], list[Check]]:
     """§12's metrics of every output of ``b`` against ``a``'s (the same file names), and the
     exact checks (headers, logs, other files)."""
@@ -531,7 +570,8 @@ def measures(
     stems = {k: _stem(v) for k, v in (("fout", _option(args, "--fout")),) if v}
     iout, jac, dfo = (_option(args, f) for f in ("--iout", "--jacout", "--dfout"))
     feat, rbm = _option(args, "--featout"), _option(args, "--rbmout")
-    src = _image_in(a, _option(args, "--imain"))
+    at_out = _out_option(args) if program != PROGRAM else None
+    src = _image_in(a, (_option(args, "--imain") or "").split(",")[0])
     vox = np.asarray(_load(src).header.get_zooms()[:3], float) if src else np.ones(3)
     centre = float(np.linalg.norm(np.asarray(_load(src).shape[:3]) * vox / 2)) if src else 100.0
 
@@ -559,7 +599,12 @@ def measures(
             if why and ia.shape != ib.shape:
                 continue
             da, db = _data(ia), _data(ib)
-            if stem.endswith("_fieldcoef"):
+            if at_out and stem == _stem(at_out) and mask is None:
+                # no brain (FSL's output 0 everywhere: every line skipped): the values exactly
+                exact.append(Check(f"{name}: values identical (no brain)", np.array_equal(da, db)))
+            elif at_out and stem == _stem(at_out):
+                out += _intensity_measures(f"{stem} (applytopup's output)", da, db, mask)
+            elif stem.endswith("_fieldcoef"):
                 fa, fb = field_of_coefficients(ia), field_of_coefficients(ib)
                 if fa is not None and fb is not None:
                     out += _field_measures("_fieldcoef (its field, Hz)", fa, fb, mask)
@@ -629,6 +674,7 @@ def compare(
     args: list[str],
     before: set[str],
     band: Callable[[], tuple[rep.Completed, Path] | None] | None = None,
+    program: str = PROGRAM,
 ) -> None:
     """The original's run (``b``) against FSL's (``a``). ``band()``, when given, returns FSL's
     run at another thread count (its own last-bit band, FSL-116) and its directory: a metric
@@ -645,14 +691,14 @@ def compare(
         detail=f"FSL only {sorted(set(fa) - set(fb))[:4]}, original only "
         f"{sorted(set(fb) - set(fa))[:4]}",
     )
-    prog = str(rep.fsldir() / "bin" / PROGRAM)
+    prog = str(rep.fsldir() / "bin" / program)
     se, why_e = _numbers_close(
-        oracle.stderr.replace(str(a), "{cwd}").replace(prog, PROGRAM),
+        oracle.stderr.replace(str(a), "{cwd}").replace(prog, program),
         _own(ours.stderr.replace(str(b), "{cwd}")),
     )
     checks("Standard error (the original's own lines left out)", se, detail=why_e)
-    mask = brain_mask(a, args, fa)
-    got, exact = measures(a, b, args, fa, mask)
+    mask = brain_mask(a, args, fa, program)
+    got, exact = measures(a, b, args, fa, mask, program)
     banded: tuple[rep.Completed, Path] | None = None
     costs_off = bool(_split_costs(oracle.stdout)[1]) and not _final_cost_ok(
         oracle.stdout, ours.stdout
@@ -661,7 +707,7 @@ def compare(
         banded = band()
     band_values: dict[str, float] = {}
     if banded is not None:
-        bm, _ = measures(a, banded[1], args, fa, mask)
+        bm, _ = measures(a, banded[1], args, fa, mask, program)
         band_values = {m.name: m.value for m in bm}
     want_out, got_out = oracle.stdout, ours.stdout
     if "--trace" in args:
@@ -732,14 +778,20 @@ def _final_cost_ok(want: str, got: str) -> bool:
 
 
 def fix_pass(
-    checks: CheckList, prepare, args: list[str], settings, reproduced_dir: Path, reproduced
+    checks: CheckList,
+    prepare,
+    args: list[str],
+    settings,
+    reproduced_dir: Path,
+    reproduced,
+    program: str = PROGRAM,
 ) -> None:
     """D13: the original's default run against its ``reproduce`` run."""
     with tempfile.TemporaryDirectory(prefix="lx-topup-fix_") as name:
         tmp = Path(name)
         prepare(tmp)
         before = set(_files(tmp, set()))
-        r = run_original(args, cwd=tmp, settings=settings, mode=defects.FIX)
+        r = run_original(args, cwd=tmp, settings=settings, mode=defects.FIX, program=program)
         entries = defects.notices_in(r.stderr)
         others = []
         if r.code != reproduced.code:
@@ -783,17 +835,33 @@ def _expected_divergence(checks: CheckList, name: str) -> None:
     raise Outcome(EXPECTED, f"{reason}. Outside the thresholds: {worst}")
 
 
-def _run_case(run: rep.Run, checks: CheckList) -> None:
-    if run.program != PROGRAM:
-        raise Outcome(SKIPPED, "applytopup's clean-room original is not written yet (sub-task 3)")
+def _run_case(run: rep.Run, checks: CheckList, name: str = "") -> None:
     node = rep._source_node()
     settings = dict(run.settings)
+    prog = run.program
+    if name in ORIGINAL_REFUSES:
+        entry, reason = ORIGINAL_REFUSES[name]
+        for mode in (defects.REPRODUCE, defects.FIX):
+            with tempfile.TemporaryDirectory(prefix="lx-topup_") as b_:
+                b = Path(b_)
+                args = rep._prepare(run, b, node)
+                r = run_original(args, cwd=b, settings=settings, mode=mode, program=prog)
+                checks(
+                    f"the original refuses ({mode}), naming {entry}",
+                    r.code == 1 and entry in _refusal(r.stderr),
+                    detail=f"exit {r.code}: {_refusal(r.stderr)[:160]}",
+                )
+        if all(c.passed for c in checks.checks):
+            raise Outcome(EXPECTED, f"{entry}: refused by the original in both modes: {reason}")
+        return
     if run.refused:
         # FSL needs more memory than the machine holds: the original refuses in both modes
         for mode in (defects.REPRODUCE, defects.FIX):
             with tempfile.TemporaryDirectory(prefix="lx-topup_") as b_:
                 b = Path(b_)
-                r = run_original(rep._prepare(run, b, node), cwd=b, settings=settings, mode=mode)
+                r = run_original(
+                    rep._prepare(run, b, node), cwd=b, settings=settings, mode=mode, program=prog
+                )
                 if _not_yet(r):
                     raise Outcome(SKIPPED, f"the original does not take this yet: {_not_yet(r)}")
                 checks(
@@ -833,19 +901,31 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
             ours_args = args
         rep._prepare(run, b, node)
         before = {p.name for p in b.iterdir()}
-        ours = run_original(ours_args, cwd=b, settings=settings, mode=defects.REPRODUCE)
+        ours = run_original(
+            ours_args, cwd=b, settings=settings, mode=defects.REPRODUCE, program=prog
+        )
         if _not_yet(ours):
             raise Outcome(SKIPPED, f"the original does not take this yet: {_not_yet(ours)}")
-        compare(checks, oracle, ours, a, b, args, before, band)
+        compare(checks, oracle, ours, a, b, args, before, band, program=prog)
         if run.fix and ours.code == 0 and not run.profile:
-            fix_pass(checks, lambda t: rep._prepare(run, t, node), ours_args, settings, b, ours)
+            fix_pass(
+                checks,
+                lambda t: rep._prepare(run, t, node),
+                ours_args,
+                settings,
+                b,
+                ours,
+                program=prog,
+            )
     for attr, how in (("fix_refuses", "refuses"), ("fix_finishes", "finishes")):
         entry = getattr(run, attr)
         if not entry:
             continue
         with tempfile.TemporaryDirectory(prefix="lx-topup-fix_") as b_:
             b = Path(b_)
-            r = run_original(rep._prepare(run, b, node), cwd=b, settings=settings, mode=defects.FIX)
+            r = run_original(
+                rep._prepare(run, b, node), cwd=b, settings=settings, mode=defects.FIX, program=prog
+            )
             named = defects.notices_in(r.stderr) + ([_refusal(r.stderr)] if r.code else [])
             ok = (
                 (r.code == 1 and entry in _refusal(r.stderr))
@@ -856,7 +936,9 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
     if run.fix_says:
         with tempfile.TemporaryDirectory(prefix="lx-topup-fix_") as b_:
             b = Path(b_)
-            r = run_original(rep._prepare(run, b, node), cwd=b, settings=settings, mode=defects.FIX)
+            r = run_original(
+                rep._prepare(run, b, node), cwd=b, settings=settings, mode=defects.FIX, program=prog
+            )
             checks(
                 "the default run's message",
                 run.fix_says in r.stderr,
@@ -864,7 +946,7 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
             )
     if oracle.code != 0 and all(c.passed for c in checks.checks):
         tail = " ".join(oracle.stderr.split())[:200]
-        raise Outcome(BOTH_ERROR, f"topup exits {oracle.code}; the same from the original. {tail}")
+        raise Outcome(BOTH_ERROR, f"{prog} exits {oracle.code}; the same from the original. {tail}")
 
 
 def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
@@ -912,7 +994,7 @@ def run_case(case: Case, checks: CheckList) -> None:
     elif kind == "difftest":
         raise Outcome(SKIPPED, "random testing of the original: its own descriptor (sub-task 5)")
     else:
-        _run_case(rep._all_cases()[payload][2], checks)
+        _run_case(rep._all_cases()[payload][2], checks, payload)
         _expected_divergence(checks, payload)
 
 
@@ -958,8 +1040,7 @@ def suite() -> Suite:
         notes=(
             "The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served from "
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run. applytopup's "
-            "cases and the options the original does not take yet are skipped until its next "
-            "sub-tasks."
+            "mode (D13) and its default `fix` pass against the reproduced run. The options the "
+            "original does not take yet are skipped until its next sub-tasks."
         ),
     )

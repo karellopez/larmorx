@@ -1,0 +1,835 @@
+// SPDX-License-Identifier: Apache-2.0
+//! `larmorx fsl applytopup`: FSL 6.0.7.23's `applytopup` command line (`specs/topup.md` §7,
+//! §8, §10), on the clean-room corrections [`crate::topup::apply`].
+//!
+//! Options are `--name=value` words or short options with their value as the next word (`-v`
+//! and `-h` without one). The checks run in FSL's order; FSL's uncaught errors (its program
+//! aborts with signal 6) print FSL's lines and exit with status 1.
+
+use std::io::Write;
+
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::element::DataType;
+use larmorx_io::nifti::NiftiHeader;
+use larmorx_mri::hmc::files;
+
+use super::Settings;
+use super::bet2::{FSLOUTPUTTYPE_UNSET, resolve_image};
+use super::common::{abort, image_exception, print_notices, read_rows};
+use super::options::atof;
+use crate::bet::image::{self, Output, Values};
+use crate::topup::Scan;
+use crate::topup::apply::{
+    self, Corrected, FieldOnGrid, Image, Interp, LsrError, Sampling, wrap_axis,
+};
+
+/// The usage text (standard error).
+pub const USAGE: &str = "\nPart of FSL (ID: 2412.6-dirty)\napplytopup (Version 1.0)\nCopyright(c) 2009, University of Oxford (Jesper Andersson)\n\nUsage: \napplytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi\napplytopup -in=topdn --topup=mytu --inindex=1 --method=jac --interp=spline --out=hifi\n\n\nCompulsory arguments (You MUST set one or more of):\n\t-i,--imain\tcomma separated list of names of input image (to be corrected)\n\t-a,--datain\tname of text file with PE directions/times\n\t-x,--inindex\tcomma separated list of indicies into --datain of the input image (to be corrected)\n\t-t,--topup\tname of field/movements (from topup)\n\t-o,--out\tbasename for output (warped) image\n\nOptional arguments (You may optionally specify one or more of):\n\t-m,--method\tUse jacobian modulation (jac) or least-squares resampling (lsr), default=lsr.\n\t-n,--interp\tinterpolation method {trilinear,spline}, default=spline\n\t-d,--datatype\tForce output data type [preserve char short int float double].\n\t-v,--verbose\tswitch on diagnostic messages\n\t-h,--help\tdisplay this message\n\n\n";
+
+/// The `descrip` of the image written.
+pub const DESCRIP: &str = "larmorx fsl applytopup";
+
+/// The options: short and long names, whether a value follows, the help line of the
+/// compulsory ones.
+const OPTIONS: &[(&str, &str, bool, Option<&str>)] = &[
+    (
+        "-i",
+        "imain",
+        true,
+        Some("comma separated list of names of input image (to be corrected)"),
+    ),
+    (
+        "-a",
+        "datain",
+        true,
+        Some("name of text file with PE directions/times"),
+    ),
+    (
+        "-x",
+        "inindex",
+        true,
+        Some("comma separated list of indicies into --datain of the input image (to be corrected)"),
+    ),
+    (
+        "-t",
+        "topup",
+        true,
+        Some("name of field/movements (from topup)"),
+    ),
+    (
+        "-o",
+        "out",
+        true,
+        Some("basename for output (warped) image"),
+    ),
+    ("-m", "method", true, None),
+    ("-n", "interp", true, None),
+    ("-d", "datatype", true, None),
+    ("-v", "verbose", false, None),
+    ("-h", "help", false, None),
+];
+
+const APPLYTOPUP: &str = "TOPUP::ApplyTopupException";
+const FILE_IO: &str = "TOPUP::TopupFileIOException";
+const RUNTIME: &str = "std::runtime_error";
+
+/// The original's message for what it does not take yet (the next sub-task of its part).
+pub const NOT_YET: &str = "is not implemented yet in the clean-room original";
+
+fn usage_error(err: &mut dyn Write, message: &str) -> u8 {
+    let _ = err.write_all(USAGE.as_bytes());
+    if !message.is_empty() {
+        let _ = writeln!(err, "\n{message}");
+    }
+    1
+}
+
+/// A refusal of the original, exit status 1.
+fn refuse(err: &mut dyn Write, notices: &[Notice], why: &str) -> u8 {
+    print_notices(err, notices);
+    let _ = writeln!(err, "larmorx: error: applytopup: {why}");
+    1
+}
+
+/// The options given (the last occurrence wins); `Err`: FSL's message after the usage.
+fn parse(args: &[String]) -> Result<std::collections::BTreeMap<&'static str, String>, String> {
+    let mut given = std::collections::BTreeMap::new();
+    let mut it = args.iter();
+    while let Some(word) = it.next() {
+        let (opt, value) = if let Some(rest) = word.strip_prefix("--") {
+            let (name, v) = match rest.split_once('=') {
+                Some((n, v)) => (n, Some(v.to_owned())),
+                None => (rest, None),
+            };
+            let Some(o) = OPTIONS.iter().find(|o| o.1 == name) else {
+                return Err(format!("--{name}: Option doesn't exist!"));
+            };
+            (o, v)
+        } else {
+            let Some(o) = OPTIONS.iter().find(|o| o.0 == word) else {
+                return Err(format!("{word}: Option doesn't exist!"));
+            };
+            let v = if o.2 { it.next().cloned() } else { None };
+            (o, v)
+        };
+        let (short, long, takes, _) = *opt;
+        if takes {
+            let Some(v) = value else {
+                let shown = if word.starts_with("--") {
+                    format!("--{long}")
+                } else {
+                    short.to_owned()
+                };
+                return Err(format!("{shown}: Missing non-optional argument!"));
+            };
+            given.insert(long, v);
+        } else {
+            given.insert(long, String::new());
+        }
+    }
+    Ok(given)
+}
+
+/// Whether the name has an extension (a `.` after its last directory separator; a backslash
+/// separates directories as `/` does).
+fn has_extension(name: &str) -> bool {
+    let cut = name.rfind(['/', '\\']).map_or(0, |i| i + 1);
+    name[cut..].contains('.')
+}
+
+/// The "No image files match" text of a missing image, else the reader's.
+fn missing_text(name: &str, e: &image::ImageError) -> String {
+    let text = e.to_string();
+    if text.starts_with("No image files match") || text.contains("No such file") {
+        format!(
+            "No image files match: {}",
+            files::strip_image_extension(name)
+        )
+    } else {
+        text
+    }
+}
+
+/// An image read: its volumes in FSL's frame and the first volume's header.
+struct Read {
+    volumes: Vec<Vec<f32>>,
+    input: image::Input,
+}
+
+fn read_image(
+    settings: &Settings,
+    name: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<Read, image::ImageError> {
+    let f = resolve_image(settings, name, mode, notices)?;
+    let (vols, input) = image::read(&f, settings.threads())?;
+    Ok(Read {
+        volumes: vols.into_iter().map(|v| v.data).collect(),
+        input,
+    })
+}
+
+/// The data of `r` as stored in its file (FSL's mirroring along x undone): topup's
+/// coefficients are written in its frame, without the mirroring.
+fn as_stored(r: &Read) -> Vec<f64> {
+    let [nx, _, _] = r.input.vol.shape;
+    let v = &r.volumes[0];
+    if !r.input.flipped {
+        return v.iter().map(|&x| f64::from(x)).collect();
+    }
+    v.chunks(nx)
+        .flat_map(|line| line.iter().rev().map(|&x| f64::from(x)))
+        .collect()
+}
+
+/// What `--topup` names (§7.2).
+enum Topup {
+    Coefficients {
+        field: FieldOnGrid,
+        voxel: [f64; 3],
+        movements: Movements,
+    },
+    FieldImage {
+        field: FieldOnGrid,
+        voxel: [f64; 3],
+    },
+}
+
+/// The movements of a topup result.
+enum Movements {
+    None,
+    /// One row of six parameters per acquisition row.
+    Parameters(Vec<[f64; 6]>),
+    /// One 4 × 4 matrix per acquisition row.
+    Matrices(Vec<[[f64; 4]; 4]>),
+}
+
+pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let mode = match settings.defects() {
+        Ok(m) => m,
+        Err(e) => {
+            let _ = writeln!(err, "larmorx fsl applytopup: {e}");
+            return 1;
+        }
+    };
+    let given = match parse(args) {
+        Ok(g) => g,
+        Err(m) => return usage_error(err, &m),
+    };
+    if given.contains_key("help") {
+        return usage_error(err, "");
+    }
+    let missing: Vec<_> = OPTIONS
+        .iter()
+        .filter(|o| o.3.is_some() && !given.contains_key(o.1))
+        .collect();
+    if !missing.is_empty() {
+        let stars = "*".repeat(51);
+        let _ = writeln!(
+            err,
+            "{stars}\nThe following COMPULSORY options have not been set:"
+        );
+        for (short, long, _, help) in missing {
+            let _ = writeln!(err, "\t{short},--{long}\t{}", help.unwrap_or_default());
+        }
+        let _ = writeln!(err, "{stars}");
+        return usage_error(err, "");
+    }
+    let _ = out;
+    let mut notices: Vec<Notice> = Vec::new();
+    match run(&given, settings, mode, &mut notices, err) {
+        Ok(()) => {
+            print_notices(err, &notices);
+            0
+        }
+        Err(code) => code,
+    }
+}
+
+fn run(
+    given: &std::collections::BTreeMap<&'static str, String>,
+    settings: &Settings,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+    err: &mut dyn Write,
+) -> Result<(), u8> {
+    let get = |k: &str| given.get(k).map(String::as_str);
+    let fail = |err: &mut dyn Write, notices: &[Notice], kind: &str, what: &str| -> u8 {
+        print_notices(err, notices);
+        abort(err, "applytopup", kind, what)
+    };
+    // --interp
+    let interp = match get("interp").unwrap_or("spline") {
+        "spline" => Interp::Spline,
+        "trilinear" => Interp::Trilinear,
+        v => {
+            return Err(fail(
+                err,
+                notices,
+                APPLYTOPUP,
+                &format!("ApplyTopup::Unknown interpolation type {v}"),
+            ));
+        }
+    };
+    let names: Vec<String> = get("imain")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::to_owned)
+        .collect();
+    let index: Vec<i64> = get("inindex")
+        .unwrap_or_default()
+        .split(',')
+        .map(|v| {
+            let t = v.trim_start();
+            let end = t
+                .char_indices()
+                .find(|&(i, c)| !(c.is_ascii_digit() || (i == 0 && (c == '+' || c == '-'))))
+                .map_or(t.len(), |(i, _)| i);
+            t[..end].parse::<i64>().unwrap_or(0)
+        })
+        .collect();
+    if names.len() != index.len() {
+        return Err(fail(
+            err,
+            notices,
+            APPLYTOPUP,
+            "ApplyTopup::Mismatched --in and --inindex lists",
+        ));
+    }
+    // --datatype (preserve: the first image's type, read before any image)
+    let datatype = get("datatype");
+    let mut out_type: Option<DataType> = None;
+    match datatype {
+        None | Some("float") => {}
+        Some("char") => out_type = Some(DataType::U8),
+        Some("short") => out_type = Some(DataType::I16),
+        Some("int") => out_type = Some(DataType::I32),
+        Some("double") => out_type = Some(DataType::F64),
+        Some("preserve") => {
+            let name = &names[0];
+            match resolve_image(settings, name, mode, notices)
+                .and_then(|f| image::read(&f, settings.threads()).map(|(_, i)| i.header.clone()))
+            {
+                Ok(h) => {
+                    let (stored, scaled) = crate::flirt::engine::stored_type(&h);
+                    out_type = Some(crate::flirt::engine::grouped_type(stored, scaled, mode));
+                }
+                Err(e) => {
+                    let what = missing_text(name, &e);
+                    let _ = writeln!(err, "Image Exception : #63 :: {what}");
+                    return Err(fail(err, notices, RUNTIME, &what));
+                }
+            }
+        }
+        Some(v) => {
+            return Err(fail(
+                err,
+                notices,
+                APPLYTOPUP,
+                &format!("ApplyTopup::Unknown data type {v}"),
+            ));
+        }
+    }
+    // the images
+    let mut reads: Vec<Read> = Vec::with_capacity(names.len());
+    for name in &names {
+        let r = match read_image(settings, name, mode, notices) {
+            Ok(r) => r,
+            Err(e) => {
+                let (lines, what) = image_exception(name, &e);
+                let _ = err.write_all(lines.as_bytes());
+                return Err(fail(err, notices, RUNTIME, &what));
+            }
+        };
+        if let Some(first) = reads.first()
+            && (first.input.vol.shape != r.input.vol.shape
+                || first.volumes.len() != r.volumes.len())
+        {
+            return Err(fail(
+                err,
+                notices,
+                APPLYTOPUP,
+                &format!("ApplyTopup::Mismatched input files {name} and {}", names[0]),
+            ));
+        }
+        reads.push(r);
+    }
+    // the acquisition parameters (as topup reads them)
+    let acq_name = get("datain").unwrap_or_default().to_owned();
+    let reader = |err: &mut dyn Write, notices: &[Notice], what: &str| {
+        fail(
+            err,
+            notices,
+            FILE_IO,
+            &format!("TopupFileIO::TopupDatafileReader:: {what}"),
+        )
+    };
+    let rows = read_rows(settings, &acq_name, err).unwrap_or_default();
+    let ncols = rows.first().map_or(0, Vec::len);
+    let acq: Vec<[f64; 4]> = if !rows.is_empty() && ncols == 4 && rows.iter().all(|r| r.len() == 4)
+    {
+        rows.iter().map(|r| [r[0], r[1], r[2], r[3]]).collect()
+    } else if rows.len() == 4 && ncols > 0 && rows.iter().all(|r| r.len() == ncols) {
+        (0..ncols)
+            .map(|c| [rows[0][c], rows[1][c], rows[2][c], rows[3][c]])
+            .collect()
+    } else {
+        return Err(reader(
+            err,
+            notices,
+            &format!("error reading file {acq_name}"),
+        ));
+    };
+    if acq
+        .iter()
+        .any(|r| ((r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt() - 1.0).abs() > 0.01)
+    {
+        return Err(reader(
+            err,
+            notices,
+            "phase-encode vectors must be unity length",
+        ));
+    }
+    if index.iter().any(|&i| i < 1 || i as usize > acq.len()) {
+        return Err(fail(
+            err,
+            notices,
+            APPLYTOPUP,
+            "ApplyTopup::Invalid entry in --inindex list",
+        ));
+    }
+    // --topup
+    let tu = get("topup").unwrap_or_default().to_owned();
+    let reader_fail = |err: &mut dyn Write, notices: &[Notice], what: &str| {
+        fail(
+            err,
+            notices,
+            FILE_IO,
+            &format!("TopupFileIO::TopupFileReader::TopupFileReader: {what}"),
+        )
+    };
+    if has_extension(&tu) {
+        return Err(reader_fail(
+            err,
+            notices,
+            &format!("Filename must be given without extension, fname={tu}"),
+        ));
+    }
+    let topup = {
+        let mut scratch = Vec::new();
+        let coef = read_image(settings, &format!("{tu}_fieldcoef"), mode, &mut scratch)
+            .ok()
+            .filter(|r| matches!(r.input.header.intent_code, 2016 | 2017));
+        match coef {
+            Some(c) => {
+                let h = &c.input.header;
+                let n =
+                    [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| v.round().max(1.0) as usize);
+                let k = c.input.vol.voxel.map(|v| v.round().max(1.0) as usize);
+                let voxel = [h.intent_p1, h.intent_p2, h.intent_p3].map(|v| f64::from(v).abs());
+                let order = if h.intent_code == 2017 { 2 } else { 3 };
+                let Some(field) =
+                    apply::coefficient_field(&as_stored(&c), c.input.vol.shape, n, k, order)
+                else {
+                    return Err(reader_fail(
+                        err,
+                        notices,
+                        &format!("Unable to read file {tu}"),
+                    ));
+                };
+                let movpar = format!("{tu}_movpar.txt");
+                let rows = read_rows(settings, &movpar, err).unwrap_or_default();
+                let movements = if !rows.is_empty() && rows.iter().all(|r| r.len() == 6) {
+                    Movements::Parameters(
+                        rows.iter()
+                            .map(|r| [r[0], r[1], r[2], r[3], r[4], r[5]])
+                            .collect(),
+                    )
+                } else if !rows.is_empty()
+                    && rows.len() % 4 == 0
+                    && rows.iter().all(|r| r.len() == 4)
+                {
+                    Movements::Matrices(
+                        rows.chunks(4)
+                            .map(|m| std::array::from_fn(|i| std::array::from_fn(|j| m[i][j])))
+                            .collect(),
+                    )
+                } else {
+                    Movements::None
+                };
+                Topup::Coefficients {
+                    field,
+                    voxel,
+                    movements,
+                }
+            }
+            None => match read_image(settings, &tu, mode, &mut scratch) {
+                Ok(f) => {
+                    let n = f.input.vol.shape;
+                    let h: Vec<f64> = f.volumes[0].iter().map(|&x| f64::from(x)).collect();
+                    Topup::FieldImage {
+                        field: apply::image_field(h, n),
+                        voxel: f.input.vol.voxel,
+                    }
+                }
+                Err(_) => {
+                    return Err(reader_fail(
+                        err,
+                        notices,
+                        &format!("Unable to read file {tu}"),
+                    ));
+                }
+            },
+        }
+    };
+    // the method
+    let method = get("method").unwrap_or("lsr").to_owned();
+    match method.as_str() {
+        "jac" | "lsr" => {}
+        "vb2D" | "vb3D" | "vb4D" => {
+            return Err(refuse(
+                err,
+                notices,
+                &format!("--method={method} {NOT_YET}"),
+            ));
+        }
+        _ => {
+            let n = Notice::new(
+                &defects::FSL_135,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => format!(
+                        "--method={method}: an unknown method is refused (FSL writes nothing and exits with status 0)"
+                    ),
+                    UpstreamDefects::Reproduce => format!(
+                        "--method={method}: an unknown method writes nothing and exits with status 0, as FSL's"
+                    ),
+                },
+            );
+            return match mode {
+                UpstreamDefects::Fix => Err(refuse(
+                    err,
+                    &[n],
+                    &format!(
+                        "--method={method}: not a method (jac, lsr, vb2D, vb3D or vb4D) (FSL-135: FSL writes nothing and exits with status 0)"
+                    ),
+                )),
+                UpstreamDefects::Reproduce => {
+                    notices.push(n);
+                    Ok(())
+                }
+            };
+        }
+    }
+    let lsr = method == "lsr";
+    let first = &reads[0];
+    let dims = first.input.vol.shape;
+    let voxel = first.input.vol.voxel;
+    let (field, field_voxel, movements, field_image) = match topup {
+        Topup::Coefficients {
+            field,
+            voxel,
+            movements,
+        } => (field, voxel, movements, false),
+        Topup::FieldImage { field, voxel } => (field, voxel, Movements::None, true),
+    };
+    // FSL-134: a field on another grid than the images'
+    if field.dims != dims {
+        let same_count = field.dims.iter().product::<usize>() == dims.iter().product::<usize>();
+        let what = format!(
+            "the field's grid {}x{}x{} is not the images' {}x{}x{}",
+            field.dims[0], field.dims[1], field.dims[2], dims[0], dims[1], dims[2]
+        );
+        let n = Notice::new(&defects::FSL_134, mode, what.clone());
+        return Err(match (mode, lsr, same_count) {
+            (UpstreamDefects::Fix, _, _) => refuse(
+                err,
+                &[n],
+                &format!("--topup={tu}: {what} (FSL-134: FSL does not refuse it)"),
+            ),
+            (UpstreamDefects::Reproduce, true, _) => refuse(
+                err,
+                &[n],
+                &format!(
+                    "--topup={tu}: {what}; with --method=lsr FSL reads the field's lines past their end (FSL-134: refused in both modes)"
+                ),
+            ),
+            (UpstreamDefects::Reproduce, false, false) => {
+                print_notices(err, &[n]);
+                let _ = writeln!(
+                    err,
+                    "Image Exception : #2 :: Attempted to copydata with non-matching sizes"
+                );
+                abort(
+                    err,
+                    "applytopup",
+                    RUNTIME,
+                    "Attempted to copydata with non-matching sizes",
+                )
+            }
+            (UpstreamDefects::Reproduce, false, true) => refuse(
+                err,
+                &[n],
+                &format!(
+                    "--topup={tu}: {what}: FSL lays the field on the images' grid as it is stored; not reproduced by the clean-room original (FSL-134)"
+                ),
+            ),
+        });
+    }
+    // the images' movements (about the field's centre)
+    let centre: [f64; 3] =
+        std::array::from_fn(|a| (field.dims[a] as f64 - 1.0) * field_voxel[a] / 2.0);
+    let mut samplings: Vec<Option<Sampling>> = Vec::with_capacity(index.len());
+    for &i in &index {
+        let row = i as usize - 1;
+        let s = match &movements {
+            Movements::Parameters(p) => p.get(row).map(|&p| Sampling::of_movement(p, centre)),
+            Movements::Matrices(m) if lsr => m.get(row).and_then(|&m| Sampling::of_matrix(m)),
+            _ => None,
+        };
+        if lsr && s.is_none() {
+            let n = Notice::new(
+                &defects::FSL_135,
+                mode,
+                "--method=lsr without movement parameters for every image",
+            );
+            return Err(match mode {
+                UpstreamDefects::Fix => refuse(
+                    err,
+                    &[n],
+                    &format!(
+                        "--method=lsr needs topup's movement parameters for every image (--topup={tu} gives none for row {i}; FSL-135: FSL aborts with an internal index error)"
+                    ),
+                ),
+                UpstreamDefects::Reproduce => {
+                    print_notices(err, &[n]);
+                    abort(
+                        err,
+                        "applytopup",
+                        FILE_IO,
+                        "TopupFileIO::TopupFileReader::MoveMatrix: Index i out of bound",
+                    )
+                }
+            });
+        }
+        samplings.push(s);
+    }
+    let images: Vec<Image> = reads
+        .iter()
+        .zip(&index)
+        .zip(&samplings)
+        .map(|((r, &i), s)| {
+            let a = acq[i as usize - 1];
+            Image {
+                volumes: r.volumes.clone(),
+                scan: Scan {
+                    pe: [a[0], a[1], a[2]],
+                    t: a[3],
+                },
+                sampling: *s,
+            }
+        })
+        .collect();
+    let first_input = reads[0].input.clone();
+    drop(reads);
+    // FSL-132: the first volume of the first image (trilinear in FSL)
+    let first_interpolated = !lsr || images[0].sampling.is_some_and(|s| !s.is_identity());
+    if interp == Interp::Spline && first_interpolated {
+        notices.push(Notice::new(
+            &defects::FSL_132,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => "the first volume of the first image is resampled with --interp=spline as every other (FSL's: trilinear)",
+                UpstreamDefects::Reproduce => "the first volume of the first image is resampled trilinearly, as FSL's",
+            },
+        ));
+    }
+    // FSL-134: a field image's Jacobian in units of its x voxel size along y
+    let mut jac_y_scale = 1.0;
+    if field_image
+        && !lsr
+        && images.iter().any(|i| i.scan.pe[1] != 0.0)
+        && field_voxel[0] != field_voxel[1]
+    {
+        notices.push(Notice::new(
+            &defects::FSL_134,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => "the field image's Jacobian per voxel along y (FSL's in units of the x voxel size)",
+                UpstreamDefects::Reproduce => "the field image's Jacobian along y in units of the x voxel size, as FSL's",
+            },
+        ));
+        if mode == UpstreamDefects::Reproduce {
+            jac_y_scale = field_voxel[0] / field_voxel[1];
+        }
+    }
+    let s = apply::Settings {
+        dims,
+        voxel,
+        interp,
+        first_trilinear: mode == UpstreamDefects::Reproduce,
+        jac_y_scale,
+    };
+    let n_threads = settings.threads();
+    let computed: Result<Result<Corrected, LsrError>, _> =
+        larmorx_core::parallel::with_threads(n_threads, || {
+            if lsr {
+                apply::lsr(&s, &images, &field)
+            } else {
+                Ok(apply::jac(&s, &images, &field))
+            }
+        });
+    let corrected = match computed {
+        Ok(Ok(c)) => c,
+        Ok(Err(LsrError::Vector)) => {
+            return Err(fail(
+                err,
+                notices,
+                APPLYTOPUP,
+                "ApplyTopup::Invalid phase-encode vector for least-squares restoration",
+            ));
+        }
+        Ok(Err(LsrError::Combination)) => {
+            return Err(fail(
+                err,
+                notices,
+                APPLYTOPUP,
+                "ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
+            ));
+        }
+        Err(e) => return Err(refuse(err, notices, &e.to_string())),
+    };
+    // FSL-133: the lines' wrap-around (lengths that do not divide 2^32)
+    if lsr {
+        let lengths: std::collections::BTreeSet<usize> = images
+            .iter()
+            .filter_map(|i| wrap_axis(i.scan.pe))
+            .map(|a| dims[a])
+            .filter(|n| !n.is_power_of_two())
+            .collect();
+        for n in lengths {
+            match mode {
+                UpstreamDefects::Fix => defects::push_once(
+                    notices,
+                    Notice::new(
+                        &defects::FSL_133,
+                        mode,
+                        format!(
+                            "the lines of {n} voxels wrap around circularly (FSL reads the displacement before a line's first voxel from the middle of the line)"
+                        ),
+                    ),
+                ),
+                UpstreamDefects::Reproduce => {
+                    let _ = writeln!(
+                        err,
+                        "larmorx fsl applytopup: FSL-133 is not reproduced by the clean-room original: the lines of {n} voxels wrap around circularly (larmorx)"
+                    );
+                }
+            }
+        }
+    }
+    write_output(
+        get("out").unwrap_or_default(),
+        settings,
+        mode,
+        &first_input,
+        &corrected,
+        out_type,
+        notices,
+        err,
+    )
+}
+
+/// `--out`: the first image's header (4D with the images' volume count), display range 0 0,
+/// float32 or `--datatype`'s type (integers converted as FSL-09 says).
+#[allow(clippy::too_many_arguments)]
+fn write_output(
+    out: &str,
+    settings: &Settings,
+    mode: UpstreamDefects,
+    first: &image::Input,
+    corrected: &Corrected,
+    out_type: Option<DataType>,
+    notices: &mut Vec<Notice>,
+    err: &mut dyn Write,
+) -> Result<(), u8> {
+    let ot = match settings.get("FSLOUTPUTTYPE") {
+        None => {
+            print_notices(err, notices);
+            let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
+            return Err(1);
+        }
+        Some(t) if !image::OUTPUT_TYPES.contains(&t) => {
+            print_notices(err, notices);
+            let _ = writeln!(err, "{}", image::unknown_output_type_message(t));
+            return Err(1);
+        }
+        Some(t) => t.to_owned(),
+    };
+    let stem = settings.name(files::strip_image_extension(out));
+    let Some((name, version)) = image::output_file(&stem, &ot) else {
+        return Err(refuse(
+            err,
+            notices,
+            &format!("--out={out}: not an image name"),
+        ));
+    };
+    let extensions = settings
+        .get("FSL_LOAD_NIFTI_EXTENSIONS")
+        .is_some_and(|v| atof(v) != 0.0);
+    let mut header: NiftiHeader = first.header.clone();
+    header.intent_code = 0;
+    let o = Output {
+        template: &header,
+        flipped: first.flipped,
+        shape: first.vol.shape,
+        volumes: corrected.volumes.len(),
+        cal: Some((0.0, 0.0)),
+        extensions,
+        defects: mode,
+        n_threads: settings.threads(),
+        descrip: DESCRIP,
+        rewrite_quaternion: true,
+    };
+    let values: Vec<f32> = corrected.volumes.concat();
+    let t = out_type.unwrap_or(DataType::F32);
+    let v = match larmorx_mri::hmc::image::integer_range(t) {
+        Some((lo, hi)) => {
+            let (data, conv) =
+                larmorx_mri::hmc::image::convert_values(&values, mode, lo, hi, |i| i as f64, |f| f);
+            if conv.rounded + conv.out_of_range > 0 {
+                defects::push_once(
+                    notices,
+                    larmorx_mri::hmc::image::fsl09_notice(
+                        std::path::Path::new(&name),
+                        conv,
+                        t,
+                        mode,
+                    ),
+                );
+            }
+            match t {
+                DataType::U8 => Values::U8(data.iter().map(|&x| x as i64 as u8).collect()),
+                DataType::I8 => Values::I8(data.iter().map(|&x| x as i64 as i8).collect()),
+                DataType::I16 => Values::I16(data.iter().map(|&x| x as i64 as i16).collect()),
+                _ => Values::I32(data.iter().map(|&x| x as i64 as i32).collect()),
+            }
+        }
+        None if t == DataType::F64 => Values::F64(values.iter().map(|&x| f64::from(x)).collect()),
+        None => Values::F32(values),
+    };
+    match image::write(&name, version, &o, v) {
+        Ok(ns) => {
+            for x in ns {
+                defects::push_once(notices, x);
+            }
+            Ok(())
+        }
+        Err(e) => Err(refuse(
+            err,
+            notices,
+            &format!("{name} cannot be written ({e})"),
+        )),
+    }
+}

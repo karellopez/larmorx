@@ -8,6 +8,7 @@
 //! process environment, the Python wrappers give it explicitly (porting guide §9.1).
 
 pub mod aff2rigid;
+pub mod applytopup;
 pub mod applyxfm4d;
 pub mod avscale;
 pub mod bet;
@@ -57,6 +58,7 @@ pub const TOOLS: &[&str] = &[
     "aff2rigid",
     "fast",
     "topup",
+    "applytopup",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -180,6 +182,7 @@ pub fn run_with(
         "aff2rigid" => Some(aff2rigid::main(args, settings, out, err)),
         "fast" => Some(fast::main(args, settings, out, err)),
         "topup" => Some(topup::main(args, settings, out, err)),
+        "applytopup" => Some(applytopup::main(args, settings, out, err)),
         _ => None,
     }
 }

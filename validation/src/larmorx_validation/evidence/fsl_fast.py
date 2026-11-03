@@ -1089,6 +1089,12 @@ def _programs(info: dict, oinfo: dict | None = None) -> str:
     )
 
 
+def _differs_at(ex, a: str, b: str, out: str, at: list[int]) -> bool:
+    """Whether panels ``a`` and ``b`` differ in ``out`` at the display voxel ``at``."""
+    va, vb = ex.values(ex.key(a, out)), ex.values(ex.key(b, out))
+    return bool(va[tuple(at)] != vb[tuple(at)])
+
+
 def _priors_same(pri: list[Path], run_dir: Path) -> str:
     """How a run's registered priors compare with FSL's."""
     res = [_same_file(p, run_dir / p.name) for p in pri if (run_dir / p.name).is_file()]
@@ -1174,7 +1180,13 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         where = "the brain's centre"
     else:
         at = _default_view(ex, view, "fsl", "original", "pve_1")
-        where = "the voxel of the axial slice where the clean-room original differs most"
+        where = (
+            "the voxel of the slice with the most brain where the clean-room original's grey "
+            "matter differs most from FSL's"
+            if _differs_at(ex, "fsl", "original", "pve_1", at)
+            else "the brain's centre (no voxel of the slice with the most brain differs between "
+            "FSL and the clean-room original)"
+        )
     if run in VIEW_AT:
         at = grid.display_index(VIEW_AT[run])
         where = "the tumour"
@@ -1379,20 +1391,23 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
     elif ex_id == "bias-field":
         out_id, a, b = "bias", "fsl", "original"
         panels = ["in1", "fsl", "replica", "original"]
-        cap = (
-            "the crosshair where the clean-room original's bias field differs most from FSL's "
-            "(the replica agrees everywhere)."
-        )
+        what_differs = "bias field"
         shown_diffs = ["replica-fsl", "original-fsl"]
     else:
         out_id, a, b = "seg", "fsl", "original"
         panels = ["in1", "in2", "in3", "fsl", "replica", "original"]
-        cap = (
-            "the crosshair where the clean-room original's classes differ most from FSL's (the "
-            "replica agrees everywhere)."
-        )
+        what_differs = "classes"
         shown_diffs = ["replica-fsl", "original-fsl"]
     at = _default_view(ex, "volume", a, b, out_id)
+    if ex_id != "priors":
+        cap = (
+            f"the crosshair where the clean-room original's {what_differs} differs most from "
+            "FSL's in the slice with the most brain (the replica agrees everywhere)."
+            if _differs_at(ex, a, b, out_id, at)
+            else "the crosshair at the brain's centre: no voxel of the slice with the most brain "
+            f"differs in the {what_differs} between FSL and the clean-room original (the "
+            "replica agrees everywhere)."
+        )
     default = {
         "output": out_id,
         "plane": "axial",

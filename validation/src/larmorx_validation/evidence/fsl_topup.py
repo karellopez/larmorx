@@ -819,9 +819,13 @@ def _outputs_of(run_dir: Path, shape: tuple[int, ...], pe: list[str]) -> dict[st
                         f"Displacement along {axis}: volume {k} ({pe[k - 1]})",
                         "mm",
                     )
-        elif name.startswith("jac") and m:
+        elif m and (name.startswith("jac") or m.group(1) == "j") and a.ndim == 3:  # --jacout
             k = int(m.group(2))
             out[f"jac-{k}"] = (p.name, None, f"Jacobian: volume {k} ({pe[k - 1]})", "")
+        elif name.endswith("_fieldmap_rads"):  # --featout's field, in radians per second
+            out["feat-rads"] = (p.name, None, "--featout: field (rad/s)", "rad/s")
+        elif name.endswith("_fieldmap_mag"):  # --featout's magnitude image
+            out["feat-mag"] = (p.name, None, "--featout: magnitude", "")
         elif a.ndim == 4 and a.shape[3] == len(pe):
             for k in range(a.shape[3]):
                 out[f"corrected-{k + 1}"] = (p.name, k, f"Corrected: volume {k + 1} ({pe[k]})",

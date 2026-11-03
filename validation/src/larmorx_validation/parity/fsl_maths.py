@@ -189,8 +189,33 @@ def _files(d: Path, before: set[str]) -> dict[str, Path]:
     }
 
 
+_COMPRESSED = ("", ".gz", ".bz2", ".zst")
+
+
 def _is_image(name: str) -> bool:
-    return name.endswith((".nii", ".nii.gz", ".hdr", ".hdr.gz", ".nii.zst", ".nii.bz2"))
+    return name.endswith(tuple(e + c for e in (".nii", ".hdr") for c in _COMPRESSED))
+
+
+def _is_pair_data(name: str) -> bool:
+    return name.endswith(tuple(".img" + c for c in _COMPRESSED))
+
+
+def _load(path: Path):
+    """An image written by FSL or the original; a zstd-compressed one decompressed by FSL's own
+    ``zstd`` program (this Python has no zstd module, which nibabel needs)."""
+    import nibabel as nib
+
+    if path.name.endswith(".zst"):
+        raw = subprocess.run(
+            [str(rep.fsldir() / "bin" / "zstd"), "-dcq", str(path)],
+            capture_output=True,
+            check=True,
+        ).stdout
+        if path.name.endswith(".nii.zst"):
+            cls = nib.Nifti2Image if raw[:4] == (540).to_bytes(4, "little") else nib.Nifti1Image
+            return cls.from_bytes(raw)
+        raise ValueError(f"{path.name}: a zstd-compressed image pair is not read here")
+    return nib.load(str(path))
 
 
 def _header_block(img) -> bytes:
@@ -233,7 +258,6 @@ def compare(
     args: list[str],
 ) -> None:
     """Compares the original's run with FSL's (§21's metrics as checks)."""
-    import nibabel as nib
 
     ok_exit = oracle.code == ours.code or (
         oracle.code != 0 and ours.code != 0 and (oracle.code < 0 or oracle.code > 128)
@@ -269,7 +293,7 @@ def compare(
     )
     ulps = _double_ulps(args)
     for name in sorted(set(fa) & set(fb)):
-        if name.endswith(".img") or name.endswith(".img.gz"):
+        if _is_pair_data(name):
             continue
         if not _is_image(name):
             if roc:
@@ -280,7 +304,7 @@ def compare(
             same = fa[name].read_bytes() == fb[name].read_bytes()
             checks(f"{name}: bytes", same)
             continue
-        ia, ib = nib.load(str(fa[name])), nib.load(str(fb[name]))
+        ia, ib = _load(fa[name]), _load(fb[name])
         ha, hb = _header_block(ia), _header_block(ib)
         checks(
             f"{name}: header (descrip left out)",
@@ -436,7 +460,6 @@ TENSOR_RELATIVE, TENSOR_MO, TENSOR_COS, TENSOR_DISTINCT = 1e-5, 1e-4, 0.9999, 1e
 
 def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.ndarray) -> None:
     """§21's metric for -tensor_decomp's outputs (FSL's eigenvectors' signs are LAPACK's)."""
-    import nibabel as nib
 
     x64, y64 = x.astype(np.float64), y.astype(np.float64)
     stem = name
@@ -446,9 +469,7 @@ def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.nda
     if kind in ("V1", "V2", "V3"):
         k = int(kind[1]) - 1
         lam = [
-            np.asarray(nib.load(str(fa[name.replace(f"_{kind}", f"_L{j}")])).dataobj).astype(
-                np.float64
-            )
+            np.asarray(_load(fa[name.replace(f"_{kind}", f"_L{j}")]).dataobj).astype(np.float64)
             for j in (1, 2, 3)
         ]
         distinct = np.ones(lam[0].shape, bool)
@@ -492,10 +513,11 @@ def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.nda
     )
 
 
-def _expected_divergence(checks: CheckList, name: str) -> None:
-    """A case of :data:`EXPECTED_DIVERGENCES` whose only failures are the sums' share checks
-    ends as an expected divergence, its failing checks' numbers in the reason."""
-    reason = EXPECTED_DIVERGENCES.get(name)
+def _expected_divergence(checks: CheckList, name: str, reason: str | None = None) -> None:
+    """A case of :data:`EXPECTED_DIVERGENCES` (or given its ``reason``) whose only failures are
+    the sums' share checks ends as an expected divergence, its failing checks' numbers in the
+    reason."""
+    reason = reason or EXPECTED_DIVERGENCES.get(name)
     failed = [c for c in checks.checks if not c.passed]
     if reason is None or not failed or any(SUM_SHARE_CHECK not in c.name for c in failed):
         return
@@ -539,7 +561,6 @@ def _value_diff(x: np.ndarray, y: np.ndarray) -> str:
 
 def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reproduced, before):
     """D13: the original's default run against its ``reproduce`` run."""
-    import nibabel as nib
 
     with tempfile.TemporaryDirectory(prefix="lx-maths-fix_") as name:
         tmp = Path(name)
@@ -555,7 +576,7 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
         change = defects.Change(0, 0, 0.0)
         for key in sorted(set(x) & set(y)):
             if _is_image(key):
-                ix, iy = nib.load(str(x[key])), nib.load(str(y[key]))
+                ix, iy = _load(x[key]), _load(y[key])
                 change = change + defects.Change.of(np.asarray(iy.dataobj), np.asarray(ix.dataobj))
                 if _header_block(ix) != _header_block(iy):
                     others.append(f"{key} header")
@@ -796,7 +817,7 @@ def cases(tier: str) -> list[Case]:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
-    kind, payload = case.payload
+    kind, payload, *expected = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
     elif kind == "goodvoxels":
@@ -807,7 +828,8 @@ def run_case(case: Case, checks: CheckList) -> None:
         _run_case(_own_cases()[payload][2], checks)
     else:
         _run_case(rep._cases()[payload][2], checks)
-    _expected_divergence(checks, case.id)
+    # a permanent case of random testing expected to diverge carries its reason
+    _expected_divergence(checks, case.id, expected[0] if expected else None)
 
 
 def suite() -> Suite:

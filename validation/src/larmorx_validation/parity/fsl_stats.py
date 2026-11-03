@@ -524,6 +524,9 @@ def run_case(case: Case, checks: CheckList) -> None:
         _bet_case(checks)
     elif kind == "own":
         _run_case(_own_cases()[payload][2], checks)
+    elif kind == "direct":
+        # a case of random testing (difftest's fsl-stats-original)
+        _run_case(payload, checks)
     else:
         _run_case(replica_cases()[payload][2], checks)
 

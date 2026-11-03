@@ -262,3 +262,31 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | `topup::vb` | the undocumented `--method=vb2D`, `vb3D`, `vb4D`: the mean-field variational-Bayes restoration (Gamma priors on the noise and smoothness precisions, the squared-second-difference prior weighted by the voxel sizes, Gauss-Seidel over the lines, its printed iterations), FSL-141 to FSL-143 | §7.5, §10; findings 23 to 27 |
 | `cli::applytopup` | the command line (long and short options), the usage and the compulsory options' block, the checks in FSL's order with FSL's aborts (exit 1), `--topup`'s files, `--datatype` (FSL-09), the output, FSL-132 to FSL-135 and FSL-141 to FSL-144 | §7, §8, §10; findings 17 to 28 |
 | `topup::model`, `topup::minimise`, `cli::topup_debug` (relay 5b: random testing) | FSL-146's reproduce (each axis' Jacobian term over the volumes displaced along it), the mask of an oblique phase encoding (no axis wraps), the scaled conjugate gradients' second gradient with the current point's regulariser weight, `--debug`'s images in FSL's order | findings 32 to 35 (black-box: `first_step.py`) |
+
+## fslmaths (`maths`, `cli::fslmaths`; relay 1, 2026-11-03)
+
+`fslmaths` (FSL's image calculator: its command line, computing types, binary operations,
+thresholds, masks, voxelwise functions, random numbers, index and grid; the next relays add the
+kernels and filters, the reductions and the statistics) was written by a clean-room implementer
+who never opened FSL's source code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy),
+the replica crates (`crates-nc/`, `crates/larmorx-afni-replica`, `crates-gpl/`), Armadillo's,
+nlohmann's or glibc's sources, the restricted findings (`docs/findings/fsl-maths.md`,
+`fsl-topup.md`, `fsl-fast.md`, `fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI
+source-derived ones, the register's sections marked †), `docs/parts/`, the replica parts' and spec
+writers' investigations, `validation/probes/`, `validation/difftest/triage.toml`, the replica
+authors' permanent cases or the history of replica and spec-writer commits. Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/fslmaths.md`](../../specs/fslmaths.md) (FSL 6.0.7.23, fsl-avwutils 2209.6) and `specs/bet.md` §3, §4.2 | the behaviour: the command line, the usage text, the data types, C's arithmetic, every operation, the robust range, the messages, the numeric conventions, the defects |
+| B. A. Wichmann and I. D. Hill, Applied Statistics 31(2):188-190, 1982 (AS 183) | `-rand`'s generator |
+| Black-box runs of FSL 6.0.7.23's `fslmaths` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md)) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md): the thresholds' far side (inclusive for `-thr`/`-uthr`, exclusive for `-bin`; `short` wraps too), `-save`'s type and display range, the layouts of an image of other sizes (FSL-159), the input's and an operand's messages |
+| The defect register's summary rows of FSL-151 to FSL-159, FSL-187 and GLIBC-07 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options}` (FSL's image names, reading and writing, `strtod`), `fast::rng` (glibc's `rand`, for `-seed`), `flirt::mat::atoi`, `larmorx_mri::hmc::image` (the stored values), `larmorx_core` (correctly rounded maths, thread pools, D13) | images, numbers, threads |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `maths::num` | the computing types (`char`, its unsigned form for FSL-154's correction, `short`, `int`, `float`, `double`), C's arithmetic on x86-64 (promotion, wrapping, truncating division), x86-64's conversions and FSL-151's clamped ones, NaN's bits through the conversions | §2.4, §4 |
+| `maths::image` | the input and the operands read in the computing type (scaling, the radiological frame), the output's rounding and conversion, FSL-157, `-save`'s type, the header | §3; findings |
+| `maths::ops` | the binary operations with numbers and images and their layouts (FSL-159), the thresholds and their far side (FSL-152, FSL-153), `-bin`, `-binv`, `-invbin`, the robust range (FSL-153, FSL-187) and the percentage thresholds, the voxelwise functions (correctly rounded: GLIBC-07), Wichmann-Hill and `-seed`, `-index`, `-grid` | §5-§8; AS 183; findings |
+| `cli::fslmaths` | the command line, the usage text, `-dt`/`-odt` and the computing type (FSL-154, FSL-155), the chain, the messages and exit statuses, FSL-156 and FSL-158's refusals, the orientation warning and the sizes' rule, the display range | §2, §3, §17, §19; findings |

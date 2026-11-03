@@ -119,7 +119,9 @@ def _own(text: str, d: Path) -> str:
 
 def _files(d: Path, before: set[str]) -> dict[str, Path]:
     return {
-        str(p.relative_to(d)): p for p in sorted(d.rglob("*")) if p.is_file() and str(p.relative_to(d)) not in before
+        str(p.relative_to(d)): p
+        for p in sorted(d.rglob("*"))
+        if p.is_file() and str(p.relative_to(d)) not in before
     }
 
 
@@ -260,7 +262,7 @@ def _first_diff(x: str, y: str) -> str:
 
 def _header_diff(ia, ib) -> str:
     out = []
-    for key in ia.header.keys():
+    for key in ia.header:
         if key == "descrip":
             continue
         va, vb = ia.header[key], ib.header[key]
@@ -298,9 +300,7 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
         for key in sorted(set(x) & set(y)):
             if _is_image(key):
                 ix, iy = nib.load(str(x[key])), nib.load(str(y[key]))
-                change = change + defects.Change.of(
-                    np.asarray(iy.dataobj), np.asarray(ix.dataobj)
-                )
+                change = change + defects.Change.of(np.asarray(iy.dataobj), np.asarray(ix.dataobj))
                 if _header_block(ix) != _header_block(iy):
                     others.append(f"{key} header")
             elif x[key].read_bytes() != y[key].read_bytes():
@@ -315,7 +315,8 @@ def _agree_on_errors(checks: CheckList, oracle: rep.Completed) -> None:
         text = " ".join(oracle.stderr.split())[:160]
         raise Outcome(
             BOTH_ERROR,
-            f"fslmaths exits {oracle.code}; the same from the original." + (f" {text}" if text else ""),
+            f"fslmaths exits {oracle.code}; the same from the original."
+            + (f" {text}" if text else ""),
         )
 
 

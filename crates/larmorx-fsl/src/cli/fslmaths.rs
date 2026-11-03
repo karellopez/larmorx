@@ -103,7 +103,11 @@ fn usage(out: &mut dyn Write) {
 /// string (the C++ runtime's `logic_error`, reproduced), else as a number (a crash).
 fn past_end(notices: &mut Notices, err: &mut dyn Write, what: &str, string: bool) -> Exit {
     if string && notices.reproduce() {
-        let _ = writeln!(err, "{}", common_abort_text("std::logic_error", NULL_STRING));
+        let _ = writeln!(
+            err,
+            "{}",
+            common_abort_text("std::logic_error", NULL_STRING)
+        );
         let _ = writeln!(
             err,
             "larmorx fsl fslmaths: {what} reads a null argument past the end of the command line \
@@ -385,7 +389,9 @@ fn typed<T: Num>(s: &Stored, notices: &mut Notices) -> Img<T> {
     } else if changed {
         image::fsl151(notices, "the image's values in the computing type");
     }
-    if T::KIND == Kind::UChar && s.stored == DataType::U8 && data.iter().any(|&v| v.to_f64() >= 128.0)
+    if T::KIND == Kind::UChar
+        && s.stored == DataType::U8
+        && data.iter().any(|&v| v.to_f64() >= 128.0)
     {
         notices.add(
             &defects::FSL_154,
@@ -466,16 +472,24 @@ fn note157<T: Num>(ctx: &Ctx<'_>, img: &Img<T>, notices: &mut Notices) {
     let int8 = ctx.stored_type == DataType::I8;
     let differs = ops::any(&img.data, |v| {
         let x = v.to_f64();
-        let rounded = if x > 0.0 { (x + 0.5).trunc() } else { (x - 0.5).trunc() };
+        let rounded = if x > 0.0 {
+            (x + 0.5).trunc()
+        } else {
+            (x - 0.5).trunc()
+        };
         rounded != x.trunc() || (int8 && x.trunc() < 0.0)
     });
     if differs {
         let detail = match notices.mode() {
-            UpstreamDefects::Fix => "-odt input on an int8 or uint16 image: the values rounded \
+            UpstreamDefects::Fix => {
+                "-odt input on an int8 or uint16 image: the values rounded \
                                      (FSL truncates them) and int8 written as int8 (FSL writes \
-                                     uint8)",
-            UpstreamDefects::Reproduce => "-odt input on an int8 or uint16 image: the values \
-                                           truncated (and int8 written as uint8), as FSL does",
+                                     uint8)"
+            }
+            UpstreamDefects::Reproduce => {
+                "-odt input on an int8 or uint16 image: the values \
+                                           truncated (and int8 written as uint8), as FSL does"
+            }
         };
         notices.add(&defects::FSL_157, detail);
     }
@@ -485,11 +499,7 @@ fn note157<T: Num>(ctx: &Ctx<'_>, img: &Img<T>, notices: &mut Notices) {
 fn range_of<T: Num>(data: &[T], notices: &mut Notices) -> Option<(f64, f64)> {
     let fix = notices.fix();
     let rep = ops::extremes(data, false)?;
-    let got = if fix {
-        ops::extremes(data, true)?
-    } else {
-        rep
-    };
+    let got = if fix { ops::extremes(data, true)? } else { rep };
     if !(got.0.same(rep.0) && got.1.same(rep.1)) {
         notices.add(
             &defects::FSL_153,
@@ -509,7 +519,15 @@ fn write_image<T: Num>(
     err: &mut dyn Write,
 ) -> Result<(), Exit> {
     let mode = notices.mode();
-    match image::write(ctx.settings, img, name, values, mode, notices, ctx.n_threads) {
+    match image::write(
+        ctx.settings,
+        img,
+        name,
+        values,
+        mode,
+        notices,
+        ctx.n_threads,
+    ) {
         Ok(()) => Ok(()),
         Err(WriteError::OutputType(m)) => {
             let _ = err.write_all(m.as_bytes());
@@ -629,10 +647,7 @@ fn step<T: Num>(
             };
             let s = atoi(s);
             if s == 0 {
-                return Err(refuse_stop(
-                    err,
-                    Stop::DivZero("-grid with a spacing of 0"),
-                ));
+                return Err(refuse_stop(err, Stop::DivZero("-grid with a spacing of 0")));
             }
             let x = ops::number::<T>(v, notices);
             ops::grid(&mut st.img, x, s);
@@ -820,4 +835,69 @@ fn binary_image<T: Num>(
         }
     };
     ops::with_image(&mut st.img, b, &w, layout, notices).map_err(|s| refuse_stop(err, s))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_args(args: &[&str], vars: &[(&str, &str)]) -> (u8, String, String) {
+        let settings = Settings {
+            vars: vars
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+            dir: None,
+            stdin: None,
+        };
+        let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = main(&args, &settings, &mut out, &mut err);
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    #[test]
+    fn the_usage_and_the_command_line_errors() {
+        let (code, out, _) = run_args(&[], &[]);
+        assert_eq!(code, 1);
+        assert!(out.starts_with("\nUsage: fslmaths [-dt <datatype>]"));
+        assert!(out.ends_with("demeaned_4D_inputVolume\n\n"));
+        let (code, out, _) = run_args(&["-h"], &[]);
+        assert_eq!((code, out.len()), (0, USAGE.len()));
+        let (code, out, _) = run_args(&["in", "out", "-odt", "bogus"], &[]);
+        assert_eq!(code, 1);
+        assert_eq!(
+            out,
+            "Error: Unknown datatype \"bogus\" - Possible datatypes are: char short int float \
+             double input\n"
+        );
+        // FSL-158: -dt without an input reads a null string (the runtime's abort reproduced)
+        let (code, _, err) = run_args(&["-dt", "float"], &[(defects::ENV, "reproduce")]);
+        assert_eq!(code, 1);
+        assert!(
+            err.starts_with(
+                "terminate called after throwing an instance of 'std::logic_error'\n  what():  \
+                 basic_string: construction from null is not valid\n"
+            ),
+            "{err}"
+        );
+        let (code, _, err) = run_args(&["-dt", "float"], &[]);
+        assert_eq!(code, 1);
+        assert!(
+            err.contains("larmorx: error: fslmaths: the input reads past the end"),
+            "{err}"
+        );
+        let (code, _, err) = run_args(&["nothere", "out"], &[]);
+        assert_eq!(code, 1);
+        assert!(
+            err.starts_with(
+                "Image Exception : #63 :: No image files match: nothere\nterminate called"
+            ),
+            "{err}"
+        );
+    }
 }

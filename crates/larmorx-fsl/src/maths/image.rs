@@ -53,7 +53,10 @@ impl<T> Img<T> {
 
     /// FSL's `d(v)`: the 1-based index of the last axis whose size exceeds 1 (at least 1).
     pub fn last_axis(&self) -> usize {
-        (0..4).rev().find(|&k| self.dims[k] > 1).map_or(1, |k| k + 1)
+        (0..4)
+            .rev()
+            .find(|&k| self.dims[k] > 1)
+            .map_or(1, |k| k + 1)
     }
 
     /// The voxel sizes (the stored magnitudes, as FSL holds them in single precision).
@@ -215,7 +218,11 @@ fn read_files(files: &ImageFiles, n_threads: usize) -> Result<Stored, ImageError
     // a slope below 1e-30 in magnitude means no scaling (§3.1)
     let scale = (m.abs() >= 1e-30 && (m != 1.0 || b != 0.0) && !m.is_nan()).then_some((
         f64::from(m as f32),
-        if b.is_finite() { f64::from(b as f32) } else { 0.0 },
+        if b.is_finite() {
+            f64::from(b as f32)
+        } else {
+            0.0
+        },
     ));
     let flipped = is_neurological(&header);
     Ok(Stored {

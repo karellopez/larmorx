@@ -368,7 +368,10 @@ mod tests {
     fn nan_conversions_keep_sign_and_payload() {
         let n = f64::from_bits(DEFAULT_NAN_64);
         assert_eq!(to_f32(n).to_bits(), DEFAULT_NAN_32);
-        assert_eq!(to_f64(f32::from_bits(DEFAULT_NAN_32)).to_bits(), DEFAULT_NAN_64);
+        assert_eq!(
+            to_f64(f32::from_bits(DEFAULT_NAN_32)).to_bits(),
+            DEFAULT_NAN_64
+        );
         assert_eq!(to_f32(f64::NAN).to_bits(), 0x7fc0_0000);
     }
 }

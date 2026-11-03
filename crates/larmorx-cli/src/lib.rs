@@ -424,11 +424,11 @@ mod tests {
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["fslmaths", "fslstats"]
+            ["fslstats"]
         );
-        // every FSL tool but mcflirt (`mri hmc`) and fslmaths and fslstats (the replicas only)
-        // is larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
+        // every FSL tool but mcflirt (`mri hmc`) and fslstats (the replica only) is
+        // larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 1], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -453,12 +453,17 @@ mod tests {
                 && err.contains("\nPart of FSL (ID: 2412.6-dirty)\napplytopup (Version 1.0)\n"),
             "{err}"
         );
-        // fslmaths and fslstats have no original yet: `original` is an error that says so.
-        for tool in ["fslmaths", "fslstats"] {
-            let (code, _, err) = run_options(&["lx", "fsl", tool], &original);
-            assert_ne!(code, 0);
-            assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
-        }
+        // fslmaths runs its clean-room original (2026-11-03): no arguments, the usage (exit 1)
+        let (code, out, _) = run_options(&["lx", "fsl", "fslmaths"], &original);
+        assert_eq!(code, 1);
+        assert!(
+            out.starts_with("\nUsage: fslmaths [-dt <datatype>]"),
+            "{out}"
+        );
+        // fslstats has no original yet: `original` is an error that says so.
+        let (code, _, err) = run_options(&["lx", "fsl", "fslstats"], &original);
+        assert_ne!(code, 0);
+        assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
         let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
         assert_eq!(code, 1);

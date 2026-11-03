@@ -5,7 +5,8 @@ pass their operations as the command line has them (in-memory images written in 
 type, numbers as their shortest text), in the caller's working directory, with FSL's settings and
 D13's choice of this call; the typed wrappers build the command lines they stand for; fslstats'
 printed numbers are read per volume and per label; a failure carries fslmaths' message without
-its usage text; without the program they refuse clearly (no clean-room original yet). The
+its usage text; without the program fslmaths runs its clean-room original in this process, and
+fslstats refuses clearly (no clean-room original yet). The
 replicas themselves are checked by their golden tests (``crates-nc/larmorx-nc-cli/tests/
 golden.rs``) and by the parity suites against FSL."""
 
@@ -112,10 +113,18 @@ def image(dtype=np.float32, shape=(5, 4, 3)) -> tuple[np.ndarray, np.ndarray]:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fslmaths"):
-        lx.fsl.fslmaths(image(), "-abs")
-    with pytest.raises(NotImplementedError, match="larmorx-nc"):
-        lx.fsl.fslmaths(image(), "-abs", implementation="original")
+    # fslmaths' clean-room original runs ("auto" without larmorx-nc, and "original")
+    data, affine = image()
+    for impl in ("auto", "original"):
+        r = lx.fsl.fslmaths((data - 30, affine), "-abs", "-thr", 5, implementation=impl)
+        want = np.abs(data - 30)
+        assert np.array_equal(np.asarray(r.data), np.where(want >= 5, want, 0))
+        assert np.asarray(r.data).dtype == np.float32
+    mask = ((data > 20).astype(np.uint8), affine)
+    m = lx.fsl.fslmaths((data, affine), "-mul", mask, n_threads=3)
+    assert np.array_equal(np.asarray(m.data), data * (data > 20))
+    with pytest.raises(RuntimeError, match="unknown option"):
+        lx.fsl.fslmaths(image(), "-nosuchop", implementation="original")
     with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fslstats"):
         lx.fsl.image_mean(image())
 

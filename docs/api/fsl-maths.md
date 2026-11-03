@@ -15,10 +15,16 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 under the FSL Licence's terms; translated from FSL's source with the image library's arithmetic,
 statistics, kernels, filters, FFT and probability functions in `larmorx-nc-core`:
 [PROVENANCE](../../crates-nc/larmorx-nc-avwutils/PROVENANCE.md)), done (2026-11-03), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/fslmaths.md`](../../specs/fslmaths.md). Until then every function runs the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
+clean-room **original** in the main package (Apache-2.0, `crates/larmorx-fsl`'s `maths`,
+written from [`specs/fslmaths.md`](../../specs/fslmaths.md), FSL's documentation and black-box
+runs of FSL's program: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in progress since
+2026-11-03: it takes the command line, every data type, the binary operations, thresholds,
+masks, voxelwise functions, `-rand`, `-seed`, `-index` and `-grid` (relay 1); the kernels and
+filters, the reductions, the statistics and `-randn` come with its next relays and are refused
+until then (`... is not implemented yet in the clean-room original`). `implementation="auto"`
+(the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
+`"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
+original in this process on `n_threads` threads (its results the same at any count). The
 command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
@@ -125,7 +131,7 @@ unless said:
 | `-tensor_decomp` | `tensor_decomp(image)` → `TensorDecomposition` (`image`, `l1`, `l2`, `l3`, `fa`, `md`, `mo`, `v1`, `v2`, `v3`) | eigenvalues, FA, MD, mode and eigenvectors of a 6-volume tensor image |
 | `-dt <type>`, `-odt <type>` | `dt=`, `odt=` (`DATATYPES`: `"char"`, `"short"`, `"int"`, `"float"`, `"double"`, `"input"`) | the type the chain computes in (float, or double for a double image) and the output's (float, or double) |
 | `-save`, `-restart`, `-pow`, `-invbin`, chains | `fslmaths(image, *operations)` | any command line |
-| | `implementation` | `"auto"`, `"replica"` (`"original"`: not yet) |
+| | `implementation` | `"auto"`, `"replica"`, `"original"` (the original's operations so far: above) |
 | | `upstream_defects` | `"fix"` (default) or `"reproduce"`: FSL's defects as FSL has them (below) |
 
 The typed wrappers check their arguments (`ValueError`: an unknown name, a non-finite number, a
@@ -222,7 +228,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original (`implementation="original"`), from `specs/fslmaths.md`.
+- The clean-room original's kernels and filters, reductions, statistics and `-randn`, its speed
+  work, golden cases and record (its next relays).
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).
 - The goodvoxels mask with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

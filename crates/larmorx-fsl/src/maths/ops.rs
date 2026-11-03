@@ -182,8 +182,7 @@ pub fn with_number<T: Num>(
                     "-div by a number whose integer part is 0 under an integer type",
                 ));
             }
-            if T::KIND.is_int() && n.to_f64() == -1.0 && any(&img.data, |v| v.to_f64() == T::MIN)
-            {
+            if T::KIND.is_int() && n.to_f64() == -1.0 && any(&img.data, |v| v.to_f64() == T::MIN) {
                 return Err(Stop::DivZero("the most negative int divided by -1"));
             }
             map(&mut img.data, |v| (v.div(n), false))
@@ -457,20 +456,14 @@ pub fn bin_values<T: Num>(data: &mut [T], notices: &mut Notices, what: &str) {
 pub fn binv<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
     bin_values(&mut img.data, notices, "-binv");
     map(&mut img.data, |v| {
-        (
-            if v == T::zero() { T::one() } else { T::zero() },
-            false,
-        )
+        (if v == T::zero() { T::one() } else { T::zero() }, false)
     });
 }
 
 /// `-invbin` (hidden): 1 where `v = 0`.
 pub fn invbin<T: Num>(img: &mut Img<T>) {
     map(&mut img.data, |v| {
-        (
-            if v == T::zero() { T::one() } else { T::zero() },
-            false,
-        )
+        (if v == T::zero() { T::one() } else { T::zero() }, false)
     });
 }
 
@@ -599,7 +592,11 @@ fn robust_pass<T: Num>(
         let b = 1000.0 * (-lof) / w;
         let (hist, f) = histogram(data, &keep, a, b, last_bin);
         far |= f;
-        let (first, end) = if ends_out { (1usize, 998usize) } else { (0, 999) };
+        let (first, end) = if ends_out {
+            (1usize, 998usize)
+        } else {
+            (0, 999)
+        };
         let n = if ends_out {
             total - hist[0] - hist[999]
         } else {
@@ -839,10 +836,7 @@ pub fn unary<T: Num>(img: &mut Img<T>, f: Unary, notices: &mut Notices) {
             (if v.non_finite() { T::zero() } else { v }, false)
         }),
         Unary::Nanm => map(&mut img.data, |v| {
-            (
-                if v.non_finite() { T::one() } else { T::zero() },
-                false,
-            )
+            (if v.non_finite() { T::one() } else { T::zero() }, false)
         }),
         _ => map(&mut img.data, |v| T::convert(double_fn(f, v.to_f64()), fix)),
     };
@@ -900,8 +894,8 @@ impl WichmannHill {
         self.x = step(self.x, 171, 177, 2, 30269);
         self.y = step(self.y, 172, 176, 35, 30307);
         self.z = step(self.z, 170, 178, 63, 30323);
-        let s = f64::from(self.x) / 30269.0 + f64::from(self.y) / 30307.0
-            + f64::from(self.z) / 30323.0;
+        let s =
+            f64::from(self.x) / 30269.0 + f64::from(self.y) / 30307.0 + f64::from(self.z) / 30323.0;
         ((s - s.floor()) + 1.0) - 1.0
     }
 }
@@ -932,19 +926,17 @@ pub fn grid<T: Num>(img: &mut Img<T>, v: T, s: i32) {
     let s = s.unsigned_abs() as usize;
     let [nx, ny, nz, _] = img.dims;
     let per = nx * ny * nz;
-    img.data
-        .par_chunks_mut(per.max(1))
-        .for_each(|vol| {
-            for z in 0..nz {
-                for y in 0..ny {
-                    for x in 0..nx {
-                        if x % s == 0 || y % s == 0 || z % s == 0 {
-                            vol[x + nx * (y + ny * z)] = v;
-                        }
+    img.data.par_chunks_mut(per.max(1)).for_each(|vol| {
+        for z in 0..nz {
+            for y in 0..ny {
+                for x in 0..nx {
+                    if x % s == 0 || y % s == 0 || z % s == 0 {
+                        vol[x + nx * (y + ny * z)] = v;
                     }
                 }
             }
-        });
+        }
+    });
 }
 
 #[cfg(test)]

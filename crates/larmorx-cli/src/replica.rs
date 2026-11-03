@@ -725,10 +725,7 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(
-            replica_only("fsl").collect::<Vec<_>>(),
-            ["fslstats"]
-        );
+        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["fslstats"]);
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

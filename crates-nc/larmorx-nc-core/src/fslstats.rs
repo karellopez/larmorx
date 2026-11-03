@@ -359,6 +359,11 @@ fn fmrib_main_float(
                 let collected = ctx.collecting.take().unwrap_or_default();
                 match r {
                     Err(e) => {
+                        // the notices of the options before it too (with -json, deferred until
+                        // the output that never comes: random testing, 2026-11-03)
+                        for (_, earlier) in std::mem::take(&mut pending) {
+                            ctx.flush(earlier);
+                        }
                         ctx.flush(collected);
                         return Err(e);
                     }

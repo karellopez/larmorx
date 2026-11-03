@@ -1,0 +1,274 @@
+{
+  "defect": null,
+  "description": "random testing (2026-11-03): -json -E -k <mask> -X of a 1 x 1 x 1 x 2 image: -E's correction (FSL-185) was named only when the JSON was printed, and -X's refusal (FSL-184) ended the run first; the notices of the options before a refusal are now printed",
+  "expect": "pass",
+  "found": {
+    "detail": "D13: FSL crashes; the default refuses or corrects, naming the defect: reproduce ['FSL-185'], default exit 1 ['FSL-184']",
+    "n": 36380,
+    "seed": "fsl-maths-trial",
+    "shrink_moves": [
+      "dropped -M (-M)",
+      "img: axis 2 27 -> 13 voxels",
+      "img: axis 2 13 -> 6 voxels",
+      "img: axis 0 11 -> 5 voxels",
+      "img: axis 1 7 -> 3 voxels",
+      "img: axis 2 6 -> 3 voxels",
+      "img: axis 0 5 -> 2 voxels",
+      "img: axis 1 3 -> 1 voxels",
+      "img: axis 2 3 -> 1 voxels",
+      "img: axis 0 2 -> 1 voxels",
+      "img: 5 -> 2 volumes",
+      "img (and its grid): plumb orientation",
+      "img (and its grid): unit spacing",
+      "img: no slice timing",
+      "i1: content labels -> blobs",
+      "img (and its grid): origin at 0"
+    ],
+    "signature": [
+      "DN: FSL crashes; the default refuses or corrects, naming the defect"
+    ]
+  },
+  "id": "json-notices-before-refusal",
+  "implementations": [
+    "replica"
+  ],
+  "reason": "",
+  "recipe": {
+    "extra": {
+      "program": "fslstats"
+    },
+    "features": {
+      "-K": false,
+      "-json": true,
+      "-t": false,
+      "4D mask": true,
+      "axis0": 0.75,
+      "axis1": 1.15,
+      "axis2": 0.95,
+      "binary": false,
+      "blobs": 1,
+      "centre0": 2.5,
+      "centre1": -5.5,
+      "centre2": -5.5,
+      "content": "labels",
+      "dtype": "float32",
+      "extreme": false,
+      "form": false,
+      "kind": "series",
+      "labels": 4,
+      "one slice": false,
+      "option0": "-E",
+      "option1": "-M",
+      "option2": "-k",
+      "option3": "-X",
+      "options": 4,
+      "orientation": "oblique",
+      "origin0": 45.5,
+      "origin1": -52.0,
+      "origin2": 15.0,
+      "other orientation": false,
+      "period": 2,
+      "qfac": 1,
+      "qform_code": 1,
+      "range": "plain",
+      "sform": "same",
+      "sform_code": 1,
+      "shape": "11x7x27x5",
+      "signal": 0.02,
+      "size": 29.0,
+      "size0": 11,
+      "size1": 7,
+      "size2": 27,
+      "slice_code": 6,
+      "spacing0": 1.0,
+      "spacing1": 1.0,
+      "spacing2": 2.0,
+      "suffix": ".nii.gz",
+      "tr": 0.8,
+      "tunits": "sec",
+      "units": "mm",
+      "volumes": 5
+    },
+    "groups": [
+      {
+        "args": [
+          "-json"
+        ],
+        "name": "-json",
+        "optional": true
+      },
+      {
+        "args": [
+          "{in:img}"
+        ],
+        "name": "input",
+        "optional": false
+      },
+      {
+        "args": [
+          "-E"
+        ],
+        "name": "-E",
+        "optional": true
+      },
+      {
+        "args": [
+          "-k",
+          "{in:i1}"
+        ],
+        "name": "-k",
+        "optional": true
+      },
+      {
+        "args": [
+          "-X"
+        ],
+        "name": "-X",
+        "optional": true
+      }
+    ],
+    "inputs": {
+      "i1": {
+        "content": {
+          "axes": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "centre": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "n": 1,
+          "seed": 128305172,
+          "size": 12.0,
+          "type": "blobs"
+        },
+        "dtype": "float32",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "suffix": ".nii.gz",
+        "timing": {
+          "slice_code": 0,
+          "tr": 0.8,
+          "tunits": "sec"
+        },
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0
+        }
+      },
+      "img": {
+        "content": {
+          "axes": [
+            1.25,
+            1.2,
+            1.0
+          ],
+          "centre": [
+            -5.0,
+            -5.5,
+            1.5
+          ],
+          "n": 1,
+          "seed": 421934846,
+          "size": 21.0,
+          "type": "blobs"
+        },
+        "dtype": "float32",
+        "geometry": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "qfac": 1,
+          "qform_code": 1,
+          "quaternion": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "sform": "same",
+          "sform_code": 1,
+          "spacing": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "units": "mm"
+        },
+        "scaling": null,
+        "shape": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "signal": {
+          "amplitude": 0.02,
+          "period": 2
+        },
+        "suffix": ".nii",
+        "timing": {
+          "slice_code": 0,
+          "slice_duration": 0.037,
+          "slice_end": 0,
+          "slice_start": 0,
+          "tr": 1.0,
+          "tunits": "sec"
+        },
+        "values": {
+          "offset": 0.0,
+          "scale": 1.0
+        }
+      }
+    },
+    "n": 36380,
+    "options": [
+      "-E",
+      "-M",
+      "-X",
+      "-json",
+      "-k",
+      "kind series"
+    ],
+    "seed": "fsl-maths-trial",
+    "tool": "fsl-stats"
+  },
+  "rule": null,
+  "status": "fixed",
+  "suite": "fsl-stats-replica",
+  "tier": "standard",
+  "tool": "fsl-stats"
+}

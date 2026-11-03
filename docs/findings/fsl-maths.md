@@ -798,3 +798,53 @@ whoever reads the specs against this file:
   built from the paper's formula does not scale its output by the step.
 - **The spec writer's verification**: the usage texts in both specs were compared byte for byte
   with the replica's (`usage.rs`, `fslstats::USAGE`), which the suites check against FSL.
+
+## Random testing (sub-task 6, 2026-11-03)
+
+The descriptors `fsl-maths` and `fsl-stats` (`validation/src/larmorx_validation/difftest/tools/
+fsl_avwutils.py`); a one-minute check (`oracles/difftest/2026-11-03-fsl-maths-check`, 5,186
+cases) and the trial (`oracles/difftest/2026-11-03-fsl-maths-replica`, seed `fsl-maths-trial`,
+24 minutes, 13 jobs at one thread, 1.5 GiB per case, the oracle cache in use mode: 183,983
+realistic cases, 114,906 fslmaths and 69,077 fslstats). What they found:
+
+- **`-edge` in double precision** (fixed): edge_strengthen's `pow(x, 2.0)` is `x * x` in FSL's
+  build (GCC folds it); glibc's `pow` differs from the correctly rounded square in the last place
+  for some doubles (2 of 4,608 voxels of a double series). The replica multiplies
+  (`validation/investigations/fsl-maths/edge_pow_probe.py`: glibc's pow 4,606 of 4,608, x * x
+  4,608). Permanent case `edge-double-square`.
+- **`-subsamp2` of an image 3 voxels wide** (fixed; FSL-75 extended): `subsample_by_2` fills
+  its new volume with `backgroundval()` first, whose border buffer is too small (FSL-75, found in
+  FLIRT): fslmaths writes past it and aborts (`double free or corruption`). The value is never
+  used (every voxel is overwritten), so both modes give the same result and name FSL-75; a
+  1 x 1 x 1 image (an empty buffer, a crash) is refused by `reproduce`. Permanent case
+  `subsamp2-three-wide`.
+- **FSL-154's notice** (fixed): the default's unsigned template also holds no negative
+  intermediate value (a difference of Gaussians' signs), so FSL-154 is named for every image the
+  unsigned template reads (it is among the notices the suite allows without a visible change).
+  Permanent case `dt-input-uint8-dog-edge`.
+- **FSL-164's notice** (made precise): named only where filtering every volume changes a voxel.
+- **The centre of gravity's NaN signs** (`fslstats -c`, `-C`, BET's `-l <t> -C`; fixed):
+  calc_cog adds each block's partial sums into the totals with the partial sum as `addsd`'s
+  destination (`tot + total`, `vx + v_cog(1)`, read from `libfsl-newimage.so`'s machine code), so
+  of two NaNs the partial sum's sign is kept. Permanent cases `cog-nan-sign-voxels`,
+  `cog-nan-sign-mm`.
+- **`-json`'s deferred notices** (fixed): an option's notice waited for the JSON output, so a
+  later refusal (FSL-184's `-X` of an empty mask) dropped an earlier correction's notice (FSL-185);
+  the notices of the options before an error are now printed. Permanent case
+  `json-notices-before-refusal`.
+- **OPEN: the Kiss FFT engine for lengths with a radix-3 stage of 5 or more** (15, 30, 60, ...):
+  `larmorx-nc-core`'s `KissFft` differs from Armadillo 14.2.1's `fft` and `ifft` by a few units
+  in the last place (`validation/probes/fsl-avwutils-lib/fft_probe.cc` against
+  `crates-nc/larmorx-nc-core/tests/fft_probe.rs`: lengths 2 to 25 identical except 15; 30 and 60
+  differ; the twiddle factors are identical to glibc's (`fft_twiddles.py`; and `std::exp` of a
+  complex = `cos`, `sin`), GCC's complex multiplication is the formula, and a literal Python
+  transcription of the engine gives the replica's values, not Armadillo's). Seen once in the
+  trial: `-kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 image (transforms of 60 and 38 points), 1
+  of 90 float voxels one unit in the last place (finding `fsl-maths-trial-61795`). Only the FFT
+  path of the non-separable convolutions meets it (`-fmeanu`, and `-fmean` with `sphere`, `file`,
+  `3D`, `2D` kernels when the kernel is large); fMRIPrep's calls never do. For the next step.
+- **Notices without a visible change** (595 fslmaths cases, none in fslstats): a correction named
+  for an intermediate result whose effect a later operation removes (`-restart`, a threshold,
+  `-bin`, a reduction), and FSL-151's output rounding of values that both modes store alike
+  (NaN or values beyond `int` rounded to `INT_MIN`, whose low bytes are 0 in a `short` or `char`
+  file). D13's notice is per operation; these are the trial's *notice* verdicts, not differences.

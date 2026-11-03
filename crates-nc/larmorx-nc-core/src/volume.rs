@@ -1072,19 +1072,23 @@ impl Volume {
                     n += 1;
                     if n > nlim {
                         n = 0;
-                        total = add(total, tot);
-                        v_cog[0] = add(v_cog[0], vx);
-                        v_cog[1] = add(v_cog[1], vy);
-                        v_cog[2] = add(v_cog[2], vz);
+                        // FSL's build adds the partial sum into the total with the partial sum
+                        // as `addsd`'s destination (`tot + total`, `vx + v_cog(1)`): of two
+                        // NaNs, the partial sum's is kept (random testing, 2026-11-03: the signs
+                        // fslstats -c and -C print)
+                        total = add(tot, total);
+                        v_cog[0] = add(vx, v_cog[0]);
+                        v_cog[1] = add(vy, v_cog[1]);
+                        v_cog[2] = add(vz, v_cog[2]);
                         (tot, vx, vy, vz) = (0.0, 0.0, 0.0, 0.0);
                     }
                 }
             }
         }
-        total = add(total, tot);
-        v_cog[0] = add(v_cog[0], vx);
-        v_cog[1] = add(v_cog[1], vy);
-        v_cog[2] = add(v_cog[2], vz);
+        total = add(tot, total);
+        v_cog[0] = add(vx, v_cog[0]);
+        v_cog[1] = add(vy, v_cog[1]);
+        v_cog[2] = add(vz, v_cog[2]);
         (v_cog, total)
     }
 

@@ -775,6 +775,11 @@ How `fslstats.cc` computes, and what decides the bits:
     results of `-sin`, `-cos`, `-tan`, `-asin`, `-acos`, `-atan`, `-exp`, `-log` and `-pow` depend
     on whether the CPU has FMA (the probe's README has both builds' counts); the replica's
     `reproduce` bits for `exp`, `log` and `pow` are the FMA build's, which the oracle machine runs.
+    **"glibc's bits" means the FMA build** (the orchestrator's decision, 2026-11-03): glibc 2.35
+    picks the FMA builds at run time on every x86-64 CPU since 2013, and the oracle machines (the
+    main machine and the old laptop) run them; the other build is a variant to note, not a target.
+    A later exact reproduction of the six IBM functions and `sincos` (the `cbrtf` route) follows
+    the FMA builds too (`sincos` has one build).
   In a float convolution such a factor moves an output voxel by one unit in the last place at
   most, on few voxels: the random-testing trial met it once in 114,906 fslmaths cases (5,263 of
   them with `-fmean` or `-fmeanu`): `-recip -kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 float

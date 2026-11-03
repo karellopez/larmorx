@@ -81,6 +81,8 @@ pub mod blas;
 pub mod blocked;
 /// The reference LAPACK routines of `dsyevd` and `dgesdd`.
 pub mod reference;
+/// The symmetric indefinite factorisation and solve (`dsytrf`, `dsytrs`) of `inv(A) * B`.
+pub mod sytrf;
 
 /// The largest matrix the LU routines follow OpenBLAS for: up to 8 × 8, `getf2_k`'s and
 /// `iamax_sse2.S`'s short path (at most 7 elements after the first) and the unblocked

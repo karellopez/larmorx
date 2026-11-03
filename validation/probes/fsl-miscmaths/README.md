@@ -66,6 +66,34 @@ differed in 1 to 746 elements each. Relay 2 corrected it (`lapack::blas::dgemm` 
 tile, as `lapack::blocked` does; the 8 cases agree); the mcflirt, BET, FLIRT and FAST records are
 re-made in sub-task 6 to show that they did not meet the case.
 
+**The symmetric solver** (sub-task 1d, 2026-11-03). Armadillo 14.2.1 turns `inv(A) * B` for a
+symmetric `A` of 100 rows or more (`sym_helper::is_approx_sym(A, 100)`; topup meets it in
+`splinefield::Set` along a direction of 100 or more coefficients) into `auxlib::solve_sym_fast`:
+LAPACK `dsytrf('L')` after a workspace query, then `dsytrs('L')`. Kind 3 of `lapack_probe.c`
+calls FSL's OpenBLAS in that sequence and prints the workspace size, `info`, the pivots, the
+factor's lower triangle and the solution; kind 4 calls the BLAS routines that solve calls, alone,
+at its shapes (`daxpy` of 1 to 255 elements, `dger` with a strided `y`, `dsyr('L')` with exact
+zeros in `x`, `dgemv('T')` with a strided `y`, `dgemv('N')` with a strided `x`, `dgemm('N','T')`
+up to 636 rows). `check_lapack.py` makes 99 symmetric systems of 5 to 700 rows (spline normal
+equations with 1 to 110 right-hand sides, indefinite matrices with a zero diagonal, matrices with
+30 % exact zeros, diagonally dominant ones, and from 64 rows ones with a zero row and column) and
+110 BLAS cases. The replica's side is `larmorx_nc_core::lapack::sytrf` (`sytrf_l`, `sytrs_l`)
+and `lapack::blas` (`axpy_k`, `dger`, `dsyr_l`, `dgemv_t_inc`, `dgemv_n`, `dgemm`).
+
+```bash
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fsl-miscmaths/check_lapack.py \
+    --probe <scratch>/lapack_probe --work <scratch>/lp1d --only sym,blas
+```
+
+Result on 2026-11-03: 209 cases (2,482,871 lines), 0 lines differ: 1 × 1 and 2 × 2 pivots with
+interchanges (`sym_n700_indef`: 476 entries of 2 × 2 pivots, 82 interchanges), the blocked panels
+of `dlasyf` from 65 rows, `info` of a singular `D` (`sym_n129_zerocol`: 44; no solve, as
+Armadillo stops there). `dsytrf`, `dlasyf`, `dsytf2` and `dsytrs` are reference LAPACK 3.12.0's
+Fortran, which FSL's build compiles to scalar SSE2 without fused multiply-adds (disassembled);
+of the BLAS they call, `daxpy`'s Haswell kernel fuses its first `n & -16` elements and not its C
+tail, and `dgemv('T')` with a strided `y` adds the totals of its groups of four columns by a
+contracted C loop (`y = fma(t, α, y)`) where the unit increment's assembly rounds twice.
+
 Facts it found (for the topup replica's findings, restricted):
 
 - `SpMat`'s sum of two matrices of different sparsity (`add_diff_sparsity_mat_to_me`) restarts

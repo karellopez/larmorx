@@ -36,7 +36,7 @@ const GEMM_Q: usize = 256;
 
 /// `IAMAX_K` with unit stride: the 1-based index of the first element of largest magnitude (the
 /// kernel's short paths, with their quirks, for up to 8 elements: [`super::iamax`]).
-fn iamax_any(x: &[f64]) -> usize {
+pub(crate) fn iamax_any(x: &[f64]) -> usize {
     if x.len() <= 8 {
         return super::iamax(x);
     }

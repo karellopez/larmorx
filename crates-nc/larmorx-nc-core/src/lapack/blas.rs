@@ -5,13 +5,16 @@
 //! The BLAS routines the reference LAPACK code of FSL's eigen- and singular-value
 //! decompositions calls, as OpenBLAS 0.3.33 computes them on its **Haswell** kernels (the
 //! kernels the validation pins: `OPENBLAS_CORETYPE=Haswell`), for the small sizes FSL's
-//! programs reach (vectors of fewer than 16 elements, matrices of a few rows and columns).
+//! programs reach (vectors of fewer than 16 elements, matrices of a few rows and columns), and
+//! for the medium sizes of LAPACK's symmetric indefinite solver ([`super::sytrf`]: `daxpy` of any
+//! length, `dger`, `dsyr`, `dgemv` with strided vectors).
 //!
 //! Each routine is the OpenBLAS interface (`interface/*.c`: the quick returns, `beta`'s scaling)
-//! followed by its Haswell kernel (`kernel/x86_64/KERNEL.HASWELL`): `ddot.c`, `daxpy.c`,
-//! `dscal.c`, `drot.c`, `nrm2.S` (x87 extended precision), `dgemv_n_4.c` and
-//! `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c` and `dgemv_t_microk_haswell-4.c`, `dsymv_U.c`,
-//! `../generic/ger.c`, `interface/syr2.c`. The C kernels were compiled by GCC with `-mavx2` and
+//! followed by its Haswell kernel (`kernel/x86_64/KERNEL.HASWELL`): `ddot.c`, `daxpy.c` and
+//! `daxpy_microk_haswell-2.c`, `dscal.c`, `drot.c`, `nrm2.S` (x87 extended precision),
+//! `dgemv_n_4.c` and `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c` and
+//! `dgemv_t_microk_haswell-4.c`, `dsymv_U.c`, `../generic/ger.c`, `interface/syr.c`,
+//! `interface/syr2.c`. The C kernels were compiled by GCC with `-mavx2` and
 //! without `-mfma` (`kernel/Makefile`'s `AVX2OPT` for GCC), so their products and sums round
 //! separately; the hand-written assembly fuses where its instructions do (`vfmadd231pd`).
 //! The logic is re-expressed in Rust; no code was copied.
@@ -139,15 +142,20 @@ pub fn ddot_unit(x: &[f64], y: &[f64], nthreads: usize) -> f64 {
     dot
 }
 
-/// `DAXPY_K` (`daxpy.c`, fewer than 16 elements with unit strides; any count strided):
-/// `y[i] + da·x[i]` (the interface's `alpha == 0` return is the caller's: [`daxpy`]).
+/// `DAXPY_K` (`daxpy.c`): with unit strides the first `n & -16` elements by the Haswell kernel
+/// `daxpy_kernel_8` (`daxpy_microk_haswell-2.c`: `vfmadd231pd`, `y = fma(x, da, y)`), the rest
+/// `y[i] + da·x[i]` with two roundings (the C tail is not contracted: measured on FSL's
+/// library); other strides `y[i] + da·x[i]` with two roundings. The kernel computes even for
+/// `da == 0` (the interface's `alpha == 0` return is the caller's: [`daxpy`]; `GER` and `SYR`
+/// call the kernel directly).
 pub fn axpy_k(da: f64, x: &[f64], incx: usize, y: &mut [f64], incy: usize) {
     let n = x.len();
     assert!(y.len() >= n);
-    if incx == 1 && incy == 1 {
-        assert!(n < 16, "daxpy's 16-way kernel is not ported");
+    let n1 = if incx == 1 && incy == 1 { n & !15 } else { 0 };
+    for i in 0..n1 {
+        y[i] = fma(x[i], da, y[i]);
     }
-    for i in 0..n {
+    for i in n1..n {
         y[i] += da * x[i];
     }
 }
@@ -520,6 +528,27 @@ pub fn dgemv_t(
     beta: f64,
     y: &mut [f64],
 ) {
+    dgemv_t_inc(m, n, alpha, a, am, x, incx, beta, y, 1);
+}
+
+/// [`dgemv_t`] with `y`'s increment `incy` (`y` gathered): a `y` of increment other than 1 takes
+/// `dgemv_t_4.c`'s C loop of `add_y` for the totals of the groups of four columns, which GCC
+/// contracts (`y = fma(t, alpha, y)`; the unit increment's `add_y` is assembly: `y + t·alpha`
+/// with two roundings, measured on FSL's library); every other path is the same for every
+/// increment.
+#[allow(clippy::too_many_arguments)]
+pub fn dgemv_t_inc(
+    m: usize,
+    n: usize,
+    alpha: f64,
+    a: &[f64],
+    am: MatRef,
+    x: &[f64],
+    incx: usize,
+    beta: f64,
+    y: &mut [f64],
+    incy: usize,
+) {
     let _ = incx;
     if m == 0 || n == 0 {
         return;
@@ -548,7 +577,11 @@ pub fn dgemv_t(
         for _ in 0..n1 {
             let t: Vec<f64> = (0..4).map(|k| lanes4(col + k)).collect();
             for k in 0..4 {
-                y[col + k] += t[k] * alpha;
+                y[col + k] = if incy == 1 {
+                    y[col + k] + t[k] * alpha
+                } else {
+                    fma(t[k], alpha, y[col + k])
+                };
             }
             col += 4;
         }
@@ -604,23 +637,41 @@ pub fn dgemv_t(
 }
 
 /// `DGER` (`interface/ger.c`, `../generic/ger.c`): `A += alpha·x·yᵀ` for the `m × n` matrix `A`,
-/// one column at a time by `daxpy`'s kernel with `alpha·y[j]`; nothing when `m`, `n` or `alpha` is
-/// zero.
+/// one column at a time by `daxpy`'s kernel ([`axpy_k`] with unit strides: a strided `x` is
+/// copied to a buffer first, and every column of `A` is contiguous) with `alpha·y[j]` (a zero
+/// `y[j]` included); nothing when `m`, `n` or `alpha` is zero. One thread whatever the size
+/// (the threaded driver is compiled only under `SMPTEST`). `x` and `y` are gathered; `y`'s
+/// increment does not change any value.
 pub fn dger(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
     let m = x.len();
     let n = y.len();
     if m == 0 || n == 0 || alpha == 0.0 {
         return;
     }
-    assert!(
-        m < 16,
-        "dger's columns of 16 or more rows (daxpy's kernel) are not ported"
-    );
     for j in 0..n {
         let da = alpha * y[j];
-        for i in 0..m {
-            let k = am.at(i, j);
-            a[k] += da * x[i];
+        let s = am.at(0, j);
+        axpy_k(da, x, 1, &mut a[s..s + m], 1);
+    }
+}
+
+/// `DSYR` with the lower triangle and a unit increment (`interface/syr.c`'s path for fewer than
+/// 100 rows): `A += alpha·x·xᵀ` on the lower triangle of the `n × n` matrix `A`, column `i` by
+/// `daxpy`'s kernel ([`axpy_k`]) adding `alpha·x[i]·x[i..n]` to its rows `i..n`, skipped when
+/// `x[i]` is zero; nothing when `n` or `alpha` is zero.
+pub fn dsyr_l(alpha: f64, x: &[f64], a: &mut [f64], am: MatRef) {
+    let n = x.len();
+    if n == 0 || alpha == 0.0 {
+        return;
+    }
+    assert!(
+        n < 100,
+        "dsyr's driver for 100 or more rows (driver/level2/syr_k.c) is not ported"
+    );
+    for i in 0..n {
+        if x[i] != 0.0 {
+            let s = am.at(i, i);
+            axpy_k(alpha * x[i], &x[i..], 1, &mut a[s..s + n - i], 1);
         }
     }
 }

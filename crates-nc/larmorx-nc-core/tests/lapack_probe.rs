@@ -3,12 +3,14 @@
 // LICENSE).
 //! The replica's side of `validation/probes/fsl-miscmaths/lapack_probe.c`: for every case file
 //! `*.case` under `LP_PROBE_ROOT`, writes `<case>.replica` with the lines the probe prints from
-//! FSL's OpenBLAS (`dgesv`, `dsyrk('U', 'T')`, `dgemm`), from `larmorx_nc_core::lapack::blocked`,
-//! `arma::syrk_t` and `lapack::blas::dgemm`. Run with `--ignored`.
+//! FSL's OpenBLAS (`dgesv`, `dsyrk('U', 'T')`, `dgemm`, Armadillo's `dsytrf`/`dsytrs` sequence
+//! and the BLAS routines it calls), from `larmorx_nc_core::lapack::blocked`, `arma::syrk_t`,
+//! `lapack::blas` and `lapack::sytrf`. Run with `--ignored`.
 
 use larmorx_nc_core::arma::{Mat, syrk_t};
-use larmorx_nc_core::lapack::blas::{MatRef, dgemm};
+use larmorx_nc_core::lapack::blas::{MatRef, axpy_k, dgemm, dgemv_n, dgemv_t_inc, dger, dsyr_l};
 use larmorx_nc_core::lapack::blocked::gesv_any;
+use larmorx_nc_core::lapack::sytrf::{armadillo_lwork, sytrf_l, sytrs_l};
 use std::fmt::Write as _;
 
 fn f64s(b: &[u8], off: usize, n: usize) -> Vec<f64> {
@@ -56,6 +58,136 @@ fn lapack_probe() {
                 // dgesv leaves B as it was when the factorisation failed.
                 for &v in &f64s(&b, 12 + 8 * n * n, n * nrhs) {
                     pd(&mut out, "x", v);
+                }
+            }
+        } else if h[0] == 3 {
+            let (n, nrhs) = (h[1] as usize, h[2] as usize);
+            let mut a = f64s(&b, 12, n * n);
+            let mut x = f64s(&b, 12 + 8 * n * n, n * nrhs);
+            let lwork = armadillo_lwork(n);
+            if n > 16 {
+                writeln!(out, "lwork {lwork}").unwrap();
+            }
+            let mut ipiv = vec![0i32; n];
+            let info = sytrf_l(&mut a, n, n, &mut ipiv, lwork);
+            writeln!(out, "info {info}").unwrap();
+            for v in &ipiv {
+                writeln!(out, "ipiv {v}").unwrap();
+            }
+            for j in 0..n {
+                for i in j..n {
+                    pd(&mut out, "f", a[j * n + i]);
+                }
+            }
+            if info == 0 {
+                sytrs_l(&a, n, n, &ipiv, &mut x, n, nrhs);
+                writeln!(out, "info2 0").unwrap();
+                for &v in &x {
+                    pd(&mut out, "x", v);
+                }
+            }
+        } else if h[0] == 4 {
+            let (op, m) = (h[1], h[2] as usize);
+            let n = u32::from_le_bytes(b[12..16].try_into().unwrap()) as usize;
+            let mut off = 16;
+            let mut take = |k: usize| {
+                let v = f64s(&b, off, k);
+                off += 8 * k;
+                v
+            };
+            match op {
+                0 => {
+                    let alpha = take(1)[0];
+                    let x = take(m);
+                    let mut y = take(m);
+                    if alpha != 0.0 {
+                        axpy_k(alpha, &x, 1, &mut y, 1);
+                    }
+                    for &v in &y {
+                        pd(&mut out, "y", v);
+                    }
+                }
+                1 => {
+                    let ld = m + 1;
+                    let x = take(m);
+                    let mut bm = take(ld * n);
+                    let y: Vec<f64> = (0..n).map(|j| bm[j * ld]).collect();
+                    dger(-1.0, &x, &y, &mut bm, MatRef { off: 1, ld });
+                    for &v in &bm {
+                        pd(&mut out, "b", v);
+                    }
+                }
+                2 => {
+                    let ld = m + 3;
+                    let alpha = take(1)[0];
+                    let x = take(m);
+                    let mut a = take(ld * m);
+                    dsyr_l(alpha, &x, &mut a, MatRef { off: 0, ld });
+                    for &v in &a {
+                        pd(&mut out, "a", v);
+                    }
+                }
+                3 => {
+                    let ld = m + 1;
+                    let x = take(m);
+                    let bm = take(ld * n);
+                    let mut y: Vec<f64> = (0..n).map(|j| bm[j * ld]).collect();
+                    dgemv_t_inc(
+                        m,
+                        n,
+                        -1.0,
+                        &bm,
+                        MatRef { off: 1, ld },
+                        &x,
+                        1,
+                        1.0,
+                        &mut y,
+                        ld,
+                    );
+                    for &v in &y {
+                        pd(&mut out, "y", v);
+                    }
+                }
+                4 => {
+                    let a = take(m * n);
+                    let xs = take(n * 5);
+                    let x: Vec<f64> = (0..n).map(|j| xs[5 * j]).collect();
+                    let mut y = take(m);
+                    dgemv_n(m, n, -1.0, &a, MatRef { off: 0, ld: m }, &x, 5, 1.0, &mut y);
+                    for &v in &y {
+                        pd(&mut out, "y", v);
+                    }
+                }
+                _ => {
+                    let k = u32::from_le_bytes(b[16..20].try_into().unwrap()) as usize;
+                    off = 20;
+                    let ldw = n + 2;
+                    let mut take = |k: usize| {
+                        let v = f64s(&b, off, k);
+                        off += 8 * k;
+                        v
+                    };
+                    let a = take(m * k);
+                    let w = take(ldw * k);
+                    let mut c = take(m * n);
+                    dgemm(
+                        false,
+                        true,
+                        m,
+                        n,
+                        k,
+                        -1.0,
+                        &a,
+                        MatRef { off: 0, ld: m },
+                        &w,
+                        MatRef { off: 0, ld: ldw },
+                        1.0,
+                        &mut c,
+                        MatRef { off: 0, ld: m },
+                    );
+                    for &v in &c {
+                        pd(&mut out, "c", v);
+                    }
                 }
             }
         } else if h[0] == 2 {

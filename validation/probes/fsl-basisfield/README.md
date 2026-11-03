@@ -43,6 +43,19 @@ of right-hand sides; `set-quad`, quadratic splines; `set-k3`, knot spacings 3, 2
 711,327 lines differ; `cubic-k232` (a voxel size that is not a float) is refused by both
 ("Voxel size mismatch beween basisfield class and supplied field").
 
+With 100 coefficients or more along a direction (sub-task 1d, 2026-11-03) that direction's
+normal equations take Armadillo's symmetric solver (LAPACK `dsytrf`/`dsytrs`,
+`larmorx_nc_core::lapack::sytrf`): three more cases, `set-sym` (110 × 40 × 20 at knot spacing 1),
+`set-sym-quad` (quadratic, 104 coefficients along y) and `set-sym-k1-200` (200 along x), with
+`set-topup-like` again: 0 of 845,280 lines differ. `--set-only <names>` runs only those Set()
+cases:
+
+```bash
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fsl-basisfield/check.py \
+    --probe <scratch>/basisfield_probe --work <scratch>/bf1d \
+    --set-only set-sym,set-sym-quad,set-sym-k1-200,set-topup-like
+```
+
 Facts it found (for the topup replica's findings, restricted):
 
 - `AsVolume` compares the field's double voxel size with the volume's float one, so a field made

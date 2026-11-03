@@ -43,6 +43,11 @@ SET = {
     "set-odd": ((45, 37, 21), (2.0, 2.5, 3.0), (1, 2, 1), 3),
     "set-quad": ((33, 30, 17), (2.0, 2.0, 2.0), (1, 1, 2), 2),
     "set-k3": ((50, 41, 30), (2.0, 2.0, 2.0), (3, 2, 1), 3),
+    # 100 coefficients or more along a direction (sub-task 1d): Armadillo's symmetric solver
+    # (LAPACK dsytrf/dsytrs) for that direction's normal equations.
+    "set-sym": ((110, 40, 20), (2.0, 2.0, 2.0), (1, 1, 1), 3),
+    "set-sym-quad": ((24, 104, 10), (2.0, 2.5, 3.0), (2, 1, 2), 2),
+    "set-sym-k1-200": ((200, 12, 8), (1.5, 2.0, 2.0), (1, 2, 2), 3),
 }
 # Energies only, on more than 10000 coefficients: OpenBLAS's threaded ddot.
 BIG = {"cubic-k1-big": ((24, 22, 20), (2.0, 2.0, F33), (1, 1, 1), 3)}
@@ -87,8 +92,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", required=True, help="the basisfield_probe binary")
     ap.add_argument("--work", required=True, help="a scratch directory for the cases")
+    ap.add_argument(
+        "--set-only",
+        default="",
+        help="comma-separated Set() cases to run alone (skips every other comparison)",
+    )
     args = ap.parse_args()
     work = Path(args.work)
+    if args.set_only:
+        return run_set(args, work, args.set_only.split(","), 0)
     for i, (name, (size, vxs, ksp, order)) in enumerate(CASES.items()):
         make_case(work / name, size, vxs, ksp, order, seed=1000 + i)
     env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OPENBLAS_CORETYPE="Haswell")
@@ -181,9 +193,15 @@ def main() -> int:
         e4 = (work / name / "fsl_blas4.txt").read_text().splitlines()[:3]
         print(f"  FSL's energies at 1 and 4 OpenBLAS threads: {'same' if e1 == e4 else 'differ'}")
     # Set(): the coefficients fitted to ima1 and ima2 (FSL at one thread), every case.
+    return run_set(args, work, list(CASES) + list(SET), total_bad)
+
+
+def run_set(args, work: Path, set_names: list[str], total_bad: int) -> int:
+    """Set() on the named cases (those of ``SET`` made here; those of ``CASES`` already made)."""
+    env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OPENBLAS_CORETYPE="Haswell")
     for i, (name, (size, vxs, ksp, order)) in enumerate(SET.items()):
-        make_case(work / name, size, vxs, ksp, order, seed=5000 + i)
-    set_names = list(CASES) + list(SET)
+        if name in set_names:
+            make_case(work / name, size, vxs, ksp, order, seed=5000 + i)
     for name in set_names:
         with open(work / name / "fsl_set.txt", "w") as out:
             subprocess.run(

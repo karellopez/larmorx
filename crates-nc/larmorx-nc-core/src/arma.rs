@@ -1523,11 +1523,14 @@ fn inv_lu(x: &Mat) -> Result<Mat, Singular> {
 }
 
 /// `inv(A) * B` as Armadillo 14.2.1 evaluates it (`glue_times_redirect2_helper`, also for
-/// `inv(A) * B * C` and `A * inv(B) * C`): `auxlib::solve_square_fast`, LAPACK `dgesv`
-/// ([`lapack::gesv`]) for every size FSL meets (the symmetric `dsytrf`/`dsytrs` path needs at
-/// least 100 rows). A zero pivot is an error ("matrix multiplication: problem with matrix
-/// inverse"). Only sizes up to 4 × 4 with up to 4 columns of `B` are ported. FSL 6.0.7.17's
-/// Armadillo 10.5.1 multiplied `B` by its closed-form inverse ([`armadillo_10_5_1::solve`]).
+/// `inv(A) * B * C` and `A * inv(B) * C`): a matrix of at least 100 rows that
+/// [`is_approx_sym`] takes `auxlib::solve_sym_fast`, LAPACK `dsytrf('L')` and `dsytrs('L')`
+/// ([`lapack::sytrf::solve_sym`]: Bunch-Kaufman pivoting, any number of columns of `B`, up to
+/// 2047 rows); any other `auxlib::solve_square_fast`, LAPACK `dgesv` ([`lapack::gesv`] up to
+/// 4 × 4 with up to 4 columns of `B` and up to 8 × 8 for one column, OpenBLAS's blocked
+/// [`lapack::blocked::gesv_any`] up to 256 rows for two or more columns). A zero pivot is an
+/// error ("matrix multiplication: problem with matrix inverse"). FSL 6.0.7.17's Armadillo
+/// 10.5.1 multiplied `B` by its closed-form inverse ([`armadillo_10_5_1::solve`]).
 pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     assert_eq!(a.rows, b.rows, "solve(): number of rows must be the same");
     assert_eq!(a.rows, a.cols, "inv(): given matrix must be square sized");
@@ -1535,13 +1538,20 @@ pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     if n == 0 || b.is_empty() {
         return Ok(Mat::zeros(a.cols, b.cols));
     }
-    if !((n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1)) {
-        // Larger systems with several right-hand sides: OpenBLAS's blocked dgesv. From 100
-        // rows a symmetric matrix takes Armadillo's dsytrf/dsytrs path instead (not ported).
+    if n >= 100 && is_approx_sym(a) {
         assert!(
-            b.cols >= 2 && n <= 256 && !(n >= 100 && is_approx_sym(a)),
-            "solve(): LAPACK's path is ported up to 4 x 4 (8 x 8 for one column; up to \
-             256 rows, and up to 99 for a symmetric matrix, for several columns)"
+            n < 2048,
+            "solve(): the symmetric path is ported up to 2047 rows (OpenBLAS's dgemv blocks)"
+        );
+        let data = lapack::sytrf::solve_sym(&a.data, n, &b.data, b.cols).ok_or(Singular)?;
+        return Ok(Mat::from_col_major(n, b.cols, &data));
+    }
+    if !((n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1)) {
+        // Larger systems with several right-hand sides: OpenBLAS's blocked dgesv.
+        assert!(
+            b.cols >= 2 && n <= 256,
+            "solve(): LAPACK's dgesv is ported up to 4 x 4 (8 x 8 for one column; up to \
+             256 rows for several columns)"
         );
         let mut lu = a.data.clone();
         let mut out = b.clone();

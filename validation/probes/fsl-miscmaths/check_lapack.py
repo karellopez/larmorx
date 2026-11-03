@@ -4,10 +4,17 @@
 Generates the cases (seeded): ``dgesv`` of general, nearly singular-pivot, exactly singular and
 spline-normal-equation systems of 9 to 120 unknowns with 2 to 70 right-hand sides, and
 ``dsyrk('U', 'T')`` with inner dimensions from 49 to 700 (one, a halved and several blocks) and
-``dgemm('N', 'N')`` with odd and even column counts and more than 512 rows;
+``dgemm('N', 'N')`` with odd and even column counts and more than 512 rows; the symmetric
+indefinite solve as Armadillo's ``solve_sym_fast`` calls it (``dsytrf('L')``, ``dsytrs('L')``) on
+spline normal equations, indefinite matrices (zero diagonals: 2 × 2 pivots), matrices with zero
+columns (exact zeros skipped by ``dsyr``; a singular ``D``) and well-conditioned ones, of 5 to 700
+rows with 1 to 110 right-hand sides; and the BLAS routines that solve calls, alone, at the
+shapes it calls them (``daxpy`` of any length, ``dger`` with a strided ``y``, ``dsyr('L')``,
+``dgemv('T')`` with a strided ``y``, ``dgemv('N')`` with a strided ``x``, ``dgemm('N', 'T')``);
 runs ``lapack_probe`` (built by ``build.sh``) on each and the replica's side (the ignored test
 ``lapack_probe`` of ``crates-nc/larmorx-nc-core``), and counts the differing lines. See
-README.md. Run inside a memory box (``scripts/orchestration/boxed.sh``).
+README.md. Run inside a memory box (``scripts/orchestration/boxed.sh``). ``--only sym,blas``
+runs only the cases whose names start with those prefixes.
 """
 
 from __future__ import annotations
@@ -55,10 +62,126 @@ def spline_normal(isz: int, csz: int, rng) -> np.ndarray:
     return as_.T @ as_ + 1e-3 * rng.random((csz, csz)) * 0
 
 
+def sym_case(path: Path, a: np.ndarray, b: np.ndarray) -> None:
+    n, nrhs = b.shape
+    path.write_bytes(
+        struct.pack("<III", 3, n, nrhs)
+        + np.asarray(a, "<f8").T.copy().tobytes()
+        + np.asarray(b, "<f8").T.copy().tobytes()
+    )
+
+
+def blas_case(path: Path, op: int, m: int, n: int, *arrays, k: int | None = None) -> None:
+    head = struct.pack("<IIII", 4, op, m, n) + (struct.pack("<I", k) if k is not None else b"")
+    path.write_bytes(head + b"".join(np.asarray(x, "<f8").T.copy().tobytes() for x in arrays))
+
+
+def sym_cases(work: Path, rng) -> list[str]:
+    """Symmetric systems: spline normal equations (``splinefield::Set``'s), indefinite ones with
+    a zero diagonal (2 × 2 pivots), ones with exact zeros (``dsyr`` skips them) or a zero column
+    (``D`` singular: ``dsytrf``'s info), diagonally dominant ones (no interchange)."""
+    names = []
+    for n in [5, 17, 40, 64, 65, 99, 100, 101, 112, 127, 128, 129, 150, 191, 200, 256, 300, 700]:
+        nr = [1, 2, 7, 110] if n in (100, 112, 129, 256) else [3]
+        for nrhs in nr:
+            name = f"sym_n{n}_spline_r{nrhs}"
+            sym_case(
+                work / f"{name}.case", spline_normal(n + 8, n, rng), rng.normal(0, 1, (n, nrhs))
+            )
+            names.append(name)
+        x = rng.normal(0, 1, (n, n))
+        a = x + x.T
+        np.fill_diagonal(a, 0.0)
+        sym_case(work / f"sym_n{n}_indef.case", a, rng.normal(0, 1, (n, 4)))
+        names.append(f"sym_n{n}_indef")
+        x = rng.normal(0, 1, (n, n))
+        a = x + x.T
+        a[rng.random((n, n)) < 0.3] = 0.0
+        a = np.tril(a) + np.tril(a, -1).T
+        sym_case(work / f"sym_n{n}_zeros.case", a, rng.normal(0, 1, (n, 2)))
+        names.append(f"sym_n{n}_zeros")
+        a = rng.normal(0, 1, (n, n))
+        a = a + a.T + 2 * n * np.eye(n)
+        sym_case(work / f"sym_n{n}_dd.case", a, rng.normal(0, 1, (n, 5)))
+        names.append(f"sym_n{n}_dd")
+        if n >= 64:
+            x = rng.normal(0, 1, (n, n))
+            a = x + x.T
+            a[:, n // 3] = 0.0
+            a[n // 3, :] = 0.0
+            sym_case(work / f"sym_n{n}_zerocol.case", a, rng.normal(0, 1, (n, 2)))
+            names.append(f"sym_n{n}_zerocol")
+    return names
+
+
+def blas_cases(work: Path, rng) -> list[str]:
+    names = []
+    for m in [1, 5, 15, 16, 17, 31, 32, 33, 63, 64, 100, 255]:
+        name = f"blas_axpy_m{m}"
+        blas_case(
+            work / f"{name}.case", 0, m, 1, [rng.normal()], rng.normal(0, 1, m), rng.normal(0, 1, m)
+        )
+        names.append(name)
+        for n in [1, 3, 9]:
+            name = f"blas_ger_m{m}_n{n}"
+            blas_case(
+                work / f"{name}.case", 1, m, n, rng.normal(0, 1, m), rng.normal(0, 1, (m + 1, n))
+            )
+            names.append(name)
+            name = f"blas_gemvt_m{m}_n{n}"
+            blas_case(
+                work / f"{name}.case", 3, m, n, rng.normal(0, 1, m), rng.normal(0, 1, (m + 1, n))
+            )
+            names.append(name)
+        if m < 100:
+            x = rng.normal(0, 1, m)
+            x[rng.random(m) < 0.25] = 0.0
+            name = f"blas_syr_m{m}"
+            blas_case(
+                work / f"{name}.case", 2, m, m, [-rng.random()], x, rng.normal(0, 1, (m + 3, m))
+            )
+            names.append(name)
+    for m, n in [(1, 3), (2, 5), (3, 4), (5, 7), (8, 1), (17, 63), (64, 63), (130, 2), (255, 64)]:
+        name = f"blas_gemvn_m{m}_n{n}"
+        blas_case(
+            work / f"{name}.case",
+            4,
+            m,
+            n,
+            rng.normal(0, 1, (m, n)),
+            rng.normal(0, 1, n * 5),
+            rng.normal(0, 1, m),
+        )
+        names.append(name)
+    for m, n, k in [
+        (1, 64, 63),
+        (3, 64, 64),
+        (6, 13, 63),
+        (36, 64, 63),
+        (191, 64, 64),
+        (636, 64, 64),
+        (7, 9, 5),
+    ]:
+        name = f"blas_gemmnt_m{m}_n{n}_k{k}"
+        blas_case(
+            work / f"{name}.case",
+            5,
+            m,
+            n,
+            rng.normal(0, 1, (m, k)),
+            rng.normal(0, 1, (n + 2, k)),
+            rng.normal(0, 1, (m, n)),
+            k=k,
+        )
+        names.append(name)
+    return names
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", required=True, help="the lapack_probe binary")
     ap.add_argument("--work", required=True, help="a scratch directory for the cases")
+    ap.add_argument("--only", default="", help="comma-separated name prefixes to run")
     args = ap.parse_args()
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
@@ -120,6 +243,14 @@ def main() -> int:
             + np.asarray(rng.normal(0, 1, (k, n)), "<f8").T.copy().tobytes()
         )
         names.append(name)
+    names += sym_cases(work, np.random.default_rng(4343))
+    names += blas_cases(work, np.random.default_rng(4444))
+    if args.only:
+        prefixes = tuple(args.only.split(","))
+        names = [n for n in names if n.startswith(prefixes)]
+        for c in work.glob("*.case"):
+            if not c.stem.startswith(prefixes):
+                c.unlink()
     env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OPENBLAS_CORETYPE="Haswell")
     for name in names:
         with open(work / f"{name}.fsl", "w") as out:

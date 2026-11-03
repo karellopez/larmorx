@@ -75,6 +75,9 @@ CARGO_BUILD_JOBS=14 scripts/orchestration/boxed.sh 8 python -P validation/probes
 # end to end: the probe build in its own target directory (never the repository's)
 (cd crates-nc && CARGO_TARGET_DIR=<scratch>/target-probe cargo build -j 14 --release --locked \
     -p larmorx-nc-cli --features larmorx-nc-core/probe-twiddles)
+# the gates never build the probe-only feature: lint it by hand after any change to kissfft.rs
+(cd crates-nc && CARGO_TARGET_DIR=<scratch>/target-probe cargo clippy -j 14 --locked \
+    -p larmorx-nc-core --features probe-twiddles --all-targets -- -D warnings)
 LARMORX_ORACLE_CACHE_MODE=use scripts/orchestration/boxed.sh 4 python -P \
     validation/probes/fsl-avwutils-lib/check_fft_case.py \
     --probe-bin <scratch>/target-probe/release/larmorx-nc --twiddles <scratch>/fft/arma_twiddles.txt

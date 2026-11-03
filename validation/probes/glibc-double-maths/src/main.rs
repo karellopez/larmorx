@@ -317,6 +317,8 @@ unsafe extern "C" {
 }
 
 type Fn64 = extern "C" fn(f64) -> f64;
+/// One function checked against CORE-MATH's C: its name, ours, CORE-MATH's, its worst cases' file.
+type Checked<'a> = (&'a str, fn(f64) -> f64, Fn64, &'a str);
 
 /// A function of the shared library compiled from CORE-MATH's C (`build.sh`).
 fn core_math(lib: &str, symbol: &std::ffi::CStr) -> Fn64 {
@@ -385,7 +387,7 @@ fn any_arg(f: u32, i: u64) -> f64 {
 fn coremath(lib: &str, tan_wc: &str, atan_wc: &str, log2n: u32, threads: usize) -> bool {
     let c_tan = core_math(lib, c"cr_tan");
     let c_atan = core_math(lib, c"cr_atan");
-    let ours: [(&str, fn(f64) -> f64, Fn64, &str); 2] = [
+    let ours: [Checked; 2] = [
         ("tan", math::tan, c_tan, tan_wc),
         ("atan", |x| math::atan2(x, 1.0), c_atan, atan_wc),
     ];

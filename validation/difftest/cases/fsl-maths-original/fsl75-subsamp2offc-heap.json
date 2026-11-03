@@ -1,0 +1,171 @@
+{
+ "defect": null,
+ "description": "-subsamp2offc of a 3 x 6 x 1 image: FSL-75's unused background value overruns FSL's buffer (FSL aborts after writing); named in both modes (findings 24)",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: ; standard error: line 1: FSL 'double free or corruption (out)' / original ''; out.nii.gz: header (descrip left out): qoffset_x: 1.0 / 0.0",
+  "n": 10,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [
+   "dropped -add (-add -20)",
+   "dropped -grid (-grid 100 4)",
+   "img: axis 0 26 -> 13 voxels",
+   "img: axis 1 26 -> 13 voxels",
+   "img: axis 2 16 -> 8 voxels",
+   "img: axis 0 13 -> 6 voxels",
+   "img: axis 1 13 -> 6 voxels",
+   "img: axis 2 8 -> 4 voxels",
+   "img: axis 2 4 -> 2 voxels",
+   "img: axis 2 2 -> 1 voxels",
+   "img: axis 0 6 -> 3 voxels",
+   "img (and its grid): unit spacing",
+   "img (and its grid): origin at 0",
+   "img (and its grid): sform = qform",
+   "img: plain value range",
+   "img: content noise -> constant"
+  ],
+  "signature": [
+   "out.nii.gz: header (descrip left out)"
+  ]
+ },
+ "id": "fsl75-subsamp2offc-heap",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-add value": -20,
+   "-dt": false,
+   "-odt": true,
+   "-odt value": "short",
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 3,
+   "content": "noise",
+   "dtype": "int32",
+   "extreme": false,
+   "family": "number",
+   "grid": 0,
+   "kind": "pmap",
+   "number op": "-add",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -48.0,
+   "origin1": -10.0,
+   "origin2": 53.0,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "26x26x16",
+   "shear0": -0.05,
+   "shear1": -0.075,
+   "shear2": 0.075,
+   "size0": 26,
+   "size1": 26,
+   "size2": 16,
+   "spacing0": 0.5,
+   "spacing1": 1.5,
+   "spacing2": 1.0,
+   "subsample": "-subsamp2offc",
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-subsamp2offc"
+    ],
+    "name": "-subsamp2offc",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-odt",
+     "short"
+    ],
+    "name": "-odt",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "seed": 510257826,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     6,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 10,
+  "options": [
+   "-add",
+   "-grid",
+   "-subsamp2offc",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind pmap"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

@@ -1,0 +1,299 @@
+{
+ "defect": null,
+ "description": "-kernel file of odd sizes: no off-centre warning (findings 25)",
+ "expect": "pass",
+ "found": {
+  "detail": "standard error: line 1: FSL '' / original 'WARNING:: Off-centre morphfilter being performed as kernel has even dimensions'",
+  "n": 9367,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "standard error"
+  ]
+ },
+ "id": "kernel-file-odd-sizes",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "double",
+   "-kernel": true,
+   "-odt": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.8,
+   "axis1": 0.8,
+   "axis2": 0.8,
+   "binary": true,
+   "blobs": 3,
+   "centre0": -2.0,
+   "centre1": 2.0,
+   "centre2": 5.0,
+   "chain": 2,
+   "content": "blobs",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "filter",
+   "filter": "-fmedian",
+   "image op": "-add",
+   "kernel": "file",
+   "kernel 0": "3",
+   "kernel 1": "5",
+   "kernel 2": "5",
+   "kind": "mask",
+   "labels": 5,
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -7.75,
+   "origin1": 58.5,
+   "origin2": -39.75,
+   "other orientation": false,
+   "output": "out.nii.gz",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "10x29x9",
+   "size": 15.5,
+   "size0": 10,
+   "size1": 29,
+   "size2": 9,
+   "spacing0": 0.8,
+   "spacing1": 2.0,
+   "spacing2": 1.0,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "double"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-add",
+     "{in:i1}"
+    ],
+    "name": "-add",
+    "optional": true
+   },
+   {
+    "args": [
+     "-kernel",
+     "file",
+     "{in:i2}"
+    ],
+    "name": "-kernel",
+    "optional": true
+   },
+   {
+    "args": [
+     "-fmedian"
+    ],
+    "name": "-fmedian",
+    "optional": true
+   },
+   {
+    "args": [
+     "out.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "i1": {
+    "content": {
+     "axes": [
+      1.1,
+      1.1,
+      1.0
+     ],
+     "centre": [
+      -4.5,
+      -4.5,
+      -5.5
+     ],
+     "n": 4,
+     "seed": 358705042,
+     "size": 22.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -7.75,
+      58.5,
+      -39.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     29,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "i2": {
+    "content": {
+     "axes": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "centre": [
+      -2.0,
+      2.0,
+      5.0
+     ],
+     "n": 3,
+     "seed": 437569624,
+     "size": 15.5,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     5,
+     5
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "img": {
+    "content": {
+     "axes": [
+      1.2,
+      1.25,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      -5.0,
+      -3.5
+     ],
+     "n": 5,
+     "seed": 792399181,
+     "size": 9.5,
+     "type": "labels"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -7.75,
+      58.5,
+      -39.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     29,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   }
+  },
+  "n": 9367,
+  "options": [
+   "-add",
+   "-dt double",
+   "-fmedian",
+   "-kernel",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind mask"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

@@ -1,0 +1,189 @@
+{
+ "defect": null,
+ "description": "-json -h of a constant image: an empty list (findings 28)",
+ "expect": "pass",
+ "found": {
+  "detail": "standard output (JSON): the documents' text differs beyond their numbers",
+  "n": 163,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [
+   "dropped -S (-S)",
+   "dropped -S (-S)",
+   "img: axis 1 25 -> 12 voxels",
+   "img: axis 1 12 -> 6 voxels",
+   "img: axis 0 6 -> 3 voxels",
+   "img: axis 1 6 -> 3 voxels",
+   "img: axis 0 3 -> 1 voxels",
+   "img: axis 1 3 -> 1 voxels",
+   "img: 5 -> 2 volumes",
+   "img (and its grid): plumb orientation",
+   "img (and its grid): unit spacing",
+   "img (and its grid): origin at 0",
+   "img (and its grid): qform and sform codes 1",
+   "img: float32 storage"
+  ],
+  "signature": [
+   "standard output (JSON)"
+  ]
+ },
+ "id": "json-no-histogram",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "program": "fslstats"
+  },
+  "features": {
+   "-K": false,
+   "-json": true,
+   "-t": false,
+   "axis0": 1.0,
+   "axis1": 1.2,
+   "axis2": 1.15,
+   "bins": "32",
+   "blobs": 4,
+   "centre0": -3.5,
+   "centre1": -5.5,
+   "centre2": -6.0,
+   "content": "blobs",
+   "dtype": "int32",
+   "extreme": false,
+   "form": false,
+   "kind": "series",
+   "one slice": true,
+   "option0": "-h",
+   "option1": "-S",
+   "option2": "-S",
+   "options": 3,
+   "orientation": "oblique",
+   "origin0": 52.0,
+   "origin1": -58.25,
+   "origin2": 18.75,
+   "period": 3,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "6x25x1x5",
+   "signal": 0.05,
+   "size": 14.0,
+   "size0": 6,
+   "size1": 25,
+   "size2": 19,
+   "spacing0": 3.0,
+   "spacing1": 2.0,
+   "spacing2": 0.5,
+   "suffix": ".nii.gz",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "mm",
+   "volumes": 5
+  },
+  "groups": [
+   {
+    "args": [
+     "-json"
+    ],
+    "name": "-json",
+    "optional": true
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-h",
+     "32"
+    ],
+    "name": "-h",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      1.0,
+      1.2,
+      1.15
+     ],
+     "centre": [
+      -3.5,
+      -5.5,
+      -6.0
+     ],
+     "n": 4,
+     "seed": 1566488517,
+     "size": 14.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "signal": {
+     "amplitude": 0.05,
+     "period": 3
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 163,
+  "options": [
+   "-S",
+   "-h",
+   "-json",
+   "kind series"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-stats-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-stats",
+ "tier": "standard",
+ "tool": "fsl-stats-original"
+}

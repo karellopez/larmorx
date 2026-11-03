@@ -1,0 +1,184 @@
+{
+ "defect": null,
+ "description": "-subsamp2 under the char type: the sums not wrapped (findings 29)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: values bit for bit: 12 differ; first at [1, 2, 3]: FSL [3, 3, 3] / original [2, 2, 1]; D13 fix pass: no defect named: 14 of 15 values, max |diff| 7 changed",
+  "n": 63379,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass",
+   "out.nii.gz: values bit for bit"
+  ]
+ },
+ "id": "subsamp2-char-sums",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "input",
+   "-odt": true,
+   "-odt value": "short",
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 3,
+   "collapse": "std",
+   "collapse axis": "Y",
+   "content": "ramp",
+   "dtype": "uint8",
+   "extreme": false,
+   "family": "collapse",
+   "kind": "general",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -18.0,
+   "origin1": -33.75,
+   "origin2": -17.0,
+   "output": "out",
+   "qfac": -1,
+   "qform_code": 0,
+   "ramp0": 2,
+   "ramp1": -1,
+   "ramp2": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "30x16x8",
+   "size0": 30,
+   "size1": 16,
+   "size2": 8,
+   "spacing0": 0.8,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "specials": false,
+   "subsample": "-subsamp2",
+   "suffix": ".nii",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "input"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-Zmean"
+    ],
+    "name": "-Zmean",
+    "optional": true
+   },
+   {
+    "args": [
+     "-subsamp2"
+    ],
+    "name": "-subsamp2",
+    "optional": true
+   },
+   {
+    "args": [
+     "-Ystd"
+    ],
+    "name": "-Ystd",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-odt",
+     "short"
+    ],
+    "name": "-odt",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "direction": [
+      2,
+      -1,
+      0
+     ],
+     "seed": 1681630351,
+     "type": "ramp"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -18.0,
+      -33.75,
+      -17.0
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     30,
+     16,
+     8
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 63379,
+  "options": [
+   "-Ystd",
+   "-Zmean",
+   "-dt input",
+   "-subsamp2",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind general"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

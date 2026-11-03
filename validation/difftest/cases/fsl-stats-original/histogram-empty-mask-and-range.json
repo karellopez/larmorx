@@ -1,0 +1,224 @@
+{
+ "defect": null,
+ "description": "-h with an empty mask and an empty range: no histogram (findings 28)",
+ "expect": "pass",
+ "found": {
+  "detail": "standard output: 12 vs 2 lines: FSL ' 0.000000 0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n0.000000 \\n \\n' / original ' 0.000000  \\n'",
+  "n": 3101,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "standard output"
+  ]
+ },
+ "id": "histogram-empty-mask-and-range",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "program": "fslstats"
+  },
+  "features": {
+   "-H": 0,
+   "-K": false,
+   "-json": false,
+   "-t": false,
+   "4D": false,
+   "axis0": 1.1,
+   "axis1": 1.15,
+   "axis2": 0.9,
+   "binary": true,
+   "bins": "10",
+   "centre0": -6.0,
+   "centre1": 2.0,
+   "centre2": -0.5,
+   "content": "labels",
+   "dtype": "int16",
+   "extreme": false,
+   "form": false,
+   "kind": "general",
+   "labels": 8,
+   "one slice": false,
+   "option0": "-k",
+   "option1": "-h",
+   "option2": "-m",
+   "option3": "-H",
+   "options": 4,
+   "orientation": "plumb",
+   "origin0": 41.25,
+   "origin1": -42.75,
+   "origin2": -27.75,
+   "other orientation": false,
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "18x27x31",
+   "size": 14.5,
+   "size0": 18,
+   "size1": 27,
+   "size2": 31,
+   "spacing0": 0.5,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "specials": false,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-k",
+     "{in:i1}"
+    ],
+    "name": "-k",
+    "optional": true
+   },
+   {
+    "args": [
+     "-h",
+     "10"
+    ],
+    "name": "-h",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   },
+   {
+    "args": [
+     "-H",
+     "10",
+     "0",
+     "100"
+    ],
+    "name": "-H",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "i1": {
+    "content": {
+     "axes": [
+      1.1,
+      1.15,
+      0.9
+     ],
+     "centre": [
+      -6.0,
+      2.0,
+      -0.5
+     ],
+     "n": 8,
+     "seed": 1536337327,
+     "size": 14.5,
+     "type": "labels"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      41.25,
+      -42.75,
+      -27.75
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      0.5,
+      0.8,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     18,
+     27,
+     31
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "img": {
+    "content": {
+     "seed": 705623402,
+     "type": "zeros"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      41.25,
+      -42.75,
+      -27.75
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      0.5,
+      0.8,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     18,
+     27,
+     31
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 3101,
+  "options": [
+   "-H",
+   "-h",
+   "-k",
+   "-m",
+   "kind general"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-stats-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-stats",
+ "tier": "standard",
+ "tool": "fsl-stats-original"
+}

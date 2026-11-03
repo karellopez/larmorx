@@ -1,0 +1,248 @@
+{
+ "defect": null,
+ "description": "-fillh26 of a single slice without holes: FSL-165 (findings 27)",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: ; files written: FSL [], original ['out.nii']",
+  "n": 909,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "exit status",
+   "files written"
+  ]
+ },
+ "id": "fsl165-no-holes",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "input",
+   "-odt": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.9,
+   "axis1": 1.2,
+   "axis2": 1.05,
+   "bias0": 0.005,
+   "bias1": 0.005,
+   "bias2": 0.01,
+   "bias3": 0.0025,
+   "centre0": 0.5,
+   "centre1": 1.0,
+   "centre2": 2.5,
+   "chain": 3,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "unary",
+   "kind": "series",
+   "noise": 3.0,
+   "one slice": true,
+   "orientation": "axes+oblique",
+   "origin0": 2.25,
+   "origin1": -36.0,
+   "origin2": -34.25,
+   "other orientation": false,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "reduction": "std",
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "17x11x1x7",
+   "size": 25.5,
+   "size0": 17,
+   "size1": 11,
+   "size2": 6,
+   "spacing0": 1.5,
+   "spacing1": 4.0,
+   "spacing2": 3.0,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tr": 3.0,
+   "tunits": "sec",
+   "unary": "-fillh26",
+   "units": "mm",
+   "volumes": 7
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "input"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-Tstd"
+    ],
+    "name": "-Tstd",
+    "optional": true
+   },
+   {
+    "args": [
+     "-restart",
+     "{in:i1}"
+    ],
+    "name": "-restart",
+    "optional": true
+   },
+   {
+    "args": [
+     "-fillh26"
+    ],
+    "name": "-fillh26",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "i1": {
+    "content": {
+     "axes": [
+      0.9,
+      1.2,
+      1.05
+     ],
+     "bias": [
+      0.005,
+      0.005,
+      0.01,
+      0.0025
+     ],
+     "centre": [
+      0.5,
+      1.0,
+      2.5
+     ],
+     "noise": 3.0,
+     "seed": 1779911351,
+     "size": 25.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      2.25,
+      -36.0,
+      -34.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      31,
+      35,
+      33,
+      41
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      1.5,
+      4.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     17,
+     11,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "img": {
+    "content": {
+     "seed": 1789035110,
+     "type": "noise"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      2.25,
+      -36.0,
+      -34.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      31,
+      35,
+      33,
+      41
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      1.5,
+      4.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     17,
+     11,
+     1,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 3.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 909,
+  "options": [
+   "-Tstd",
+   "-dt input",
+   "-fillh26",
+   "-restart",
+   "FSLOUTPUTTYPE=NIFTI",
+   "kind series"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

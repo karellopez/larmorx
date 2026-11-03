@@ -1,0 +1,147 @@
+{
+ "defect": null,
+ "description": "-subsamp2 of an image with qfac -1: the qform's quaternion from FSL's product of matrices (findings 24)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: header (descrip left out): quatern_c: -0.0 / 0.0",
+  "n": 610,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz: header (descrip left out)"
+  ]
+ },
+ "id": "subsamp2-qform-quaternion",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "input",
+   "-odt": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 1,
+   "content": "noise",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "subsample",
+   "kind": "pmap",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -29.75,
+   "origin1": 21.75,
+   "origin2": -8.0,
+   "output": "out",
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "25x18x18",
+   "size0": 25,
+   "size1": 18,
+   "size2": 18,
+   "spacing0": 1.0,
+   "spacing1": 1.5,
+   "spacing2": 4.0,
+   "subsample": "-subsamp2",
+   "suffix": ".nii.gz",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "input"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-subsamp2"
+    ],
+    "name": "-subsamp2",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "seed": 1778020807,
+     "type": "noise"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -29.75,
+      21.75,
+      -8.0
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     18,
+     18
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 0.01
+    }
+   }
+  },
+  "n": 610,
+  "options": [
+   "-dt input",
+   "-subsamp2",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind pmap"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

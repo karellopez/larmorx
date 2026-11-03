@@ -1,0 +1,173 @@
+{
+ "defect": null,
+ "description": "-Xmax of an image FSL holds mirrored: the output's offset moved to the held frame's first voxel (findings 24)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii: header (descrip left out): qoffset_x: 2.0 / 0.0; srow_x: [1. 0. 0. 2.] / [1. 0. 0. 0.]",
+  "n": 60,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [
+   "dropped -s (-s 2.5)",
+   "img: axis 0 30 -> 15 voxels",
+   "img: axis 1 20 -> 10 voxels",
+   "img: axis 0 15 -> 7 voxels",
+   "img: axis 2 13 -> 6 voxels",
+   "img: axis 1 10 -> 5 voxels",
+   "img: axis 0 7 -> 3 voxels",
+   "img: axis 2 6 -> 3 voxels",
+   "img: axis 1 5 -> 2 voxels",
+   "img: axis 2 3 -> 1 voxels",
+   "img: axis 1 2 -> 1 voxels",
+   "img (and its grid): plumb orientation",
+   "img (and its grid): unit spacing",
+   "img (and its grid): origin at 0",
+   "img (and its grid): qform and sform codes 1",
+   "img (and its grid): millimetres",
+   "img: plain value range",
+   "img: content head -> constant"
+  ],
+  "signature": [
+   "out.nii: header (descrip left out)"
+  ]
+ },
+ "id": "geometry-xmax-mirrored",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-odt": false,
+   "-s sigma": 2.5,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 1.1,
+   "axis1": 1.1,
+   "axis2": 1.25,
+   "bias0": 0.0,
+   "bias1": -0.005,
+   "bias2": -0.0025,
+   "bias3": -0.005,
+   "centre0": 3.5,
+   "centre1": 1.5,
+   "centre2": 4.0,
+   "chain": 2,
+   "collapse": "max",
+   "collapse axis": "X",
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "smooth",
+   "kind": "general",
+   "noise": 6.0,
+   "one slice": false,
+   "orientation": "axes+oblique",
+   "origin0": 9.0,
+   "origin1": -1.75,
+   "origin2": 13.5,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "tiny",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "30x20x13",
+   "size": 17.5,
+   "size0": 30,
+   "size1": 20,
+   "size2": 13,
+   "spacing0": 1.5,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "specials": false,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-Xmax"
+    ],
+    "name": "-Xmax",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "seed": 645216011,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 60,
+  "options": [
+   "-Xmax",
+   "-s",
+   "FSLOUTPUTTYPE=NIFTI",
+   "kind general"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

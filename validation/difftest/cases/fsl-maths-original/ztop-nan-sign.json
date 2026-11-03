@@ -1,0 +1,190 @@
+{
+ "defect": null,
+ "description": "-ztop of the default NaN: the positive NaN (findings 30)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.hdr.bz2: values within the sums' bound: 8192 of 8192 voxels differ; the NaN or infinite voxels differ; out.hdr.bz2: the sums' share of voxels within 4 ulp: max 9223372036854775807 ulp",
+  "n": 107730,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "out.hdr.bzN: the sums' share of voxels within N ulp",
+   "out.hdr.bzN: values within the sums' bound"
+  ]
+ },
+ "id": "ztop-nan-sign",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI2_PAIR_BZ2",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-inm value": "1000",
+   "-odt": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI2_PAIR_BZ2",
+   "axis0": 1.05,
+   "axis1": 1.05,
+   "axis2": 0.85,
+   "bias0": 0.005,
+   "bias1": 0.0075,
+   "bias2": -0.01,
+   "bias3": 0.0,
+   "binary": true,
+   "centre0": -4.0,
+   "centre1": -5.0,
+   "centre2": -4.0,
+   "chain": 3,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "zp",
+   "kind": "mask",
+   "noise": 6.0,
+   "normalise": "-inm",
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": -22.25,
+   "origin1": -55.25,
+   "origin2": 46.5,
+   "output": "out.nii.gz",
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "32x32x8",
+   "size": 28.0,
+   "size0": 32,
+   "size1": 32,
+   "size2": 8,
+   "spacing0": 3.0,
+   "spacing1": 1.0,
+   "spacing2": 0.5,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "unary": "-binv",
+   "units": "mm",
+   "zp": "-ztop"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-binv"
+    ],
+    "name": "-binv",
+    "optional": true
+   },
+   {
+    "args": [
+     "-inm",
+     "1000"
+    ],
+    "name": "-inm",
+    "optional": true
+   },
+   {
+    "args": [
+     "-ztop"
+    ],
+    "name": "-ztop",
+    "optional": true
+   },
+   {
+    "args": [
+     "out.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      1.05,
+      1.05,
+      0.85
+     ],
+     "bias": [
+      0.005,
+      0.0075,
+      -0.01,
+      0.0
+     ],
+     "centre": [
+      -4.0,
+      -5.0,
+      -4.0
+     ],
+     "noise": 6.0,
+     "seed": 1956658303,
+     "size": 28.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -22.25,
+      -55.25,
+      46.5
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     32,
+     32,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   }
+  },
+  "n": 107730,
+  "options": [
+   "-binv",
+   "-inm",
+   "-ztop",
+   "FSLOUTPUTTYPE=NIFTI2_PAIR_BZ2",
+   "kind mask"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

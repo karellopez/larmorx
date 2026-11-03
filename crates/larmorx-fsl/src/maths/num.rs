@@ -56,6 +56,44 @@ pub fn to_f64(x: f32) -> f64 {
     }
 }
 
+/// `r = a op b` with x86-64's NaN rules on every platform: a NaN operand passes on quieted (the
+/// first one when both are NaN), and a NaN made from numbers (0/0, inf - inf, 0 * inf) is the
+/// default NaN, sign set (AArch64's has the sign clear; compilers may also swap the operands).
+#[inline]
+pub fn nan32(a: f32, b: f32, r: f32) -> f32 {
+    if !r.is_nan() {
+        r
+    } else if a.is_nan() {
+        f32::from_bits(a.to_bits() | 0x0040_0000)
+    } else if b.is_nan() {
+        f32::from_bits(b.to_bits() | 0x0040_0000)
+    } else {
+        f32::from_bits(DEFAULT_NAN_32)
+    }
+}
+
+/// [`nan32`] in double precision.
+#[inline]
+pub fn nan64(a: f64, b: f64, r: f64) -> f64 {
+    if !r.is_nan() {
+        r
+    } else if a.is_nan() {
+        quiet(a)
+    } else if b.is_nan() {
+        quiet(b)
+    } else {
+        default_nan()
+    }
+}
+
+/// `float(acc + x)`: a double added to a single-precision running sum, rounded back (x86-64's
+/// NaN rules).
+#[inline]
+pub fn acc32(acc: f32, x: f64) -> f32 {
+    let a = to_f64(acc);
+    to_f32(nan64(a, x, a + x))
+}
+
 /// x86-64's conversion of a double to a 32-bit integer (`cvttsd2si`): truncation toward zero,
 /// `INT_MIN` for NaN and for values outside the range.
 #[inline]
@@ -253,19 +291,19 @@ impl Num for f32 {
     }
     #[inline]
     fn add(self, o: Self) -> Self {
-        self + o
+        nan32(self, o, self + o)
     }
     #[inline]
     fn sub(self, o: Self) -> Self {
-        self - o
+        nan32(self, o, self - o)
     }
     #[inline]
     fn mul(self, o: Self) -> Self {
-        self * o
+        nan32(self, o, self * o)
     }
     #[inline]
     fn div(self, o: Self) -> Self {
-        self / o
+        nan32(self, o, self / o)
     }
     #[inline]
     fn diff(self, o: Self) -> f64 {
@@ -313,19 +351,19 @@ impl Num for f64 {
     }
     #[inline]
     fn add(self, o: Self) -> Self {
-        self + o
+        nan64(self, o, self + o)
     }
     #[inline]
     fn sub(self, o: Self) -> Self {
-        self - o
+        nan64(self, o, self - o)
     }
     #[inline]
     fn mul(self, o: Self) -> Self {
-        self * o
+        nan64(self, o, self * o)
     }
     #[inline]
     fn div(self, o: Self) -> Self {
-        self / o
+        nan64(self, o, self / o)
     }
     #[inline]
     fn diff(self, o: Self) -> f64 {

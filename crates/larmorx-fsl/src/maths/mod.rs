@@ -6,10 +6,17 @@
 //! - [`num`]: the computing types and C's arithmetic and conversions on x86-64 (§2.4, §4);
 //! - [`image`]: reading in a computing type and writing the output (§3);
 //! - [`ops`]: the binary operations, thresholds, masks, voxelwise functions, random numbers,
-//!   index and grid (§5-§8).
+//!   index and grid (§5-§8);
+//! - [`kernel`]: the kernels of the spatial filters (§9);
+//! - [`filters`]: the morphological filters, `-dilall` and the convolutions (§10.1, §10.2);
+//! - [`spatial`]: subsampling, edges, the difference of Gaussians, hole filling and the
+//!   intensity normalisations (§10.3-§10.7).
 //!
 //! The command line (`larmorx fsl fslmaths`) is [`crate::cli::fslmaths`].
 
+pub mod filters;
 pub mod image;
+pub mod kernel;
 pub mod num;
 pub mod ops;
+pub mod spatial;

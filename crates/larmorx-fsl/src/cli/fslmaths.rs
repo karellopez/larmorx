@@ -6,8 +6,9 @@
 //! current image at once, in the computing type `-dt` sets (the whole chain is generic over it:
 //! [`Chain`]). The operations of this file are §5-§8's (the binary operations, thresholds,
 //! masks, voxelwise functions, random numbers, the index and the grid) and the chain's own
-//! (`-seed`, `-restart`, `-save`, `-range`); the rest of the usage text is refused as not yet
-//! implemented until the next parts of the original add it.
+//! (`-seed`, `-restart`, `-save`, `-range`), the kernels and spatial filters (§9, §10); the rest
+//! of the usage text is refused as not yet implemented until the next parts of the original add
+//! it.
 
 use std::io::Write;
 
@@ -19,9 +20,12 @@ use super::Settings;
 use super::common;
 use super::options::strtod;
 use crate::flirt::mat::atoi;
+use crate::maths::filters::{self, Morph};
 use crate::maths::image::{self, Img, OutType, Stored, WriteError, WriteSpec};
+use crate::maths::kernel::Kernel;
 use crate::maths::num::{Kind, Num};
 use crate::maths::ops::{self, Binary, Layout, Stop, Unary, WichmannHill};
+use crate::maths::spatial;
 
 /// The usage text (§2.5), exactly as FSL prints it on standard output.
 pub const USAGE: &str = include_str!("fslmaths_usage.txt");
@@ -35,30 +39,11 @@ const DATATYPES: [&str; 6] = ["char", "short", "int", "float", "double", "input"
 /// The operations of the usage text the next parts of the original add.
 const LATER: &[&str] = &[
     "-randn",
-    "-fillh",
-    "-fillh26",
-    "-edge",
-    "-dog_edge",
     "-tfce",
     "-tfceS",
     "-tfce_minT",
     "-tfce_delta",
-    "-inm",
-    "-ing",
     "-tensor_decomp",
-    "-kernel",
-    "-dilM",
-    "-dilD",
-    "-dilF",
-    "-dilall",
-    "-ero",
-    "-eroF",
-    "-fmedian",
-    "-fmean",
-    "-fmeanu",
-    "-s",
-    "-subsamp2",
-    "-subsamp2offc",
     "-pval",
     "-pval0",
     "-cpval",
@@ -414,6 +399,8 @@ struct State<T> {
     img: Img<T>,
     rng: WichmannHill,
     range: bool,
+    /// The current kernel (§9; `-restart` keeps it).
+    kernel: Kernel,
 }
 
 fn chain<T: Num>(
@@ -429,6 +416,7 @@ fn chain<T: Num>(
         img: typed::<T>(stored, notices),
         rng: WichmannHill::default(),
         range: false,
+        kernel: Kernel::default(),
     };
     let mut i = ctx.first + 1;
     let mut ran = false;
@@ -684,6 +672,56 @@ fn step<T: Num>(
             write_image(ctx, &st.img, &a, values, notices, err)?;
             Ok(1)
         }
+        "-kernel" => kernel_step(ctx, st, i, notices, err),
+        "-s" => {
+            let sigma = strtod(arg(1).unwrap_or("")).0;
+            st.kernel = Kernel::gauss(sigma, st.img.voxel());
+            filters::smooth(&mut st.img, &st.kernel, notices, err)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(1)
+        }
+        "-fmean" | "-fmeanu" => {
+            filters::fmean(&mut st.img, &st.kernel, op == "-fmean", op, notices, err)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(0)
+        }
+        "-dilall" => {
+            filters::dilall(&mut st.img, notices);
+            Ok(0)
+        }
+        "-subsamp2" | "-subsamp2offc" => {
+            spatial::subsample(&mut st.img, op == "-subsamp2offc", notices)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(0)
+        }
+        "-edge" => {
+            spatial::edge(&mut st.img, notices);
+            Ok(0)
+        }
+        "-dog_edge" => {
+            let (Some(a), Some(b)) = (arg(1), arg(2)) else {
+                return Err(past_end(notices, err, "-dog_edge", false));
+            };
+            let (s1, s2) = (strtod(a).0, strtod(b).0);
+            spatial::dog_edge(&mut st.img, s1, s2, notices).map_err(|s| refuse_stop(err, s))?;
+            Ok(2)
+        }
+        "-fillh" | "-fillh26" => {
+            spatial::fill_holes(&mut st.img, op == "-fillh26", notices)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(0)
+        }
+        "-inm" | "-ing" => {
+            let m = strtod(arg(1).unwrap_or("")).0;
+            spatial::normalise(&mut st.img, m, op == "-ing", notices, err);
+            Ok(1)
+        }
+        _ if Morph::of(op).is_some() => {
+            let f = Morph::of(op).unwrap_or(Morph::DilF);
+            filters::morph(&mut st.img, &st.kernel, f, op, notices, err)
+                .map_err(|s| refuse_stop(err, s))?;
+            Ok(0)
+        }
         _ => {
             let reduction = op.len() >= 2 && op.as_bytes()[1].is_ascii_uppercase();
             if reduction || LATER.contains(&op) {
@@ -695,6 +733,66 @@ fn step<T: Num>(
             Err(Exit(1))
         }
     }
+}
+
+/// `-kernel <type> [arguments]` (§9): the numeric argument is read before the type is looked
+/// at; `3D` and `2D` take none, `boxv3` three, the others (an unknown type too) one.
+fn kernel_step<T: Num>(
+    ctx: &Ctx<'_>,
+    st: &mut State<T>,
+    i: usize,
+    notices: &mut Notices,
+    err: &mut dyn Write,
+) -> Result<usize, Exit> {
+    let words = ctx.words;
+    let arg = |k: usize| words.get(i + k).map(String::as_str);
+    let Some(kind) = arg(1) else {
+        return Err(past_end(notices, err, "-kernel", true));
+    };
+    let Some(p) = arg(2) else {
+        return Err(past_end(notices, err, "-kernel", false));
+    };
+    let x = strtod(p).0;
+    let vox = st.img.voxel();
+    let sep = st.kernel.separable;
+    let int = |v: f64| i64::from(crate::maths::num::cvtt(v));
+    let (k, used) = match kind {
+        "3D" => (Kernel::ones([3, 3, 3], sep), 1),
+        "2D" => (Kernel::ones([3, 3, 1], sep), 1),
+        "box" => (Kernel::box_mm(x, vox), 2),
+        "boxv" => {
+            let n = int(x);
+            (Kernel::ones([n, n, n], true), 2)
+        }
+        "boxv3" => {
+            let (Some(y), Some(z)) = (arg(3), arg(4)) else {
+                return Err(past_end(notices, err, "-kernel boxv3", false));
+            };
+            (
+                Kernel::ones([int(x), int(strtod(y).0), int(strtod(z).0)], true),
+                4,
+            )
+        }
+        "gauss" => (Kernel::gauss(x, vox), 2),
+        "sphere" => (Kernel::sphere(x, vox), 2),
+        "file" => {
+            let mut ns = Vec::new();
+            let s = image::read_stored(ctx.settings, p, notices.mode(), &mut ns, ctx.n_threads);
+            notices.extend(ns);
+            let s = s.map_err(|e| read_failure(err, p, &e, false))?;
+            let (data, _) = s.values::<f32>(notices.fix());
+            let [nx, ny, nz, nt] = s.dims;
+            if nt > 1 {
+                let _ = writeln!(err, "{}", common::TRUNCATED);
+            }
+            let mut data = data;
+            data.truncate(nx * ny * nz);
+            (Kernel::from_values([nx, ny, nz], data), 2)
+        }
+        _ => (Kernel::none(sep), 2),
+    };
+    st.kernel = k;
+    Ok(used)
 }
 
 /// The voxel-to-world matrix FSL compares (§3.2): the sform when set, else the qform, in the

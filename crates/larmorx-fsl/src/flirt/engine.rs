@@ -2853,10 +2853,16 @@ fn apply(
     }
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
-    // the output has the input's TR (§9.3), a 3D input's too (observed: FSL's registered FAST
-    // priors carry the prior's pixdim[4] 0, not the reference's 1;
-    // docs/findings/fsl-flirt-original.md)
-    let tr = Some(input.input.header.pixdim[4]);
+    // the output has the input's TR (§9.3), a 3D input's too, as FSL reads it: its absolute
+    // value, and 1 for an input with a time axis (dim[0] 4 or more) whose TR is 0 (observed on
+    // NIfTI and ANALYZE inputs: docs/findings/fsl-flirt-original.md, "-applyxfm's TR")
+    let h = &input.input.header;
+    let read_tr = h.pixdim[4].abs();
+    let tr = Some(if h.dim[0] >= 4 && read_tr == 0.0 {
+        1.0
+    } else {
+        read_tr
+    });
     if trace.at(2) {
         let d = refv.voxel_size.map(f64::from);
         let shown = (input.vols.len() > 1).then(|| input.input.header.pixdim[4]);

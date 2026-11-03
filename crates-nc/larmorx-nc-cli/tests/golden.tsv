@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 79dbdf0b4d6785b45222f21b0cd803b1362963db on 2026-11-03 (Linux x86_64)
+# Recorded from 5c26745aaa8bedf5a140a161174b2c9b8e242fb3 on 2026-11-03 (Linux x86_64)
 # case	output	sha256	type	sample
 aff2rigid.default	rigid.mat	7d8900a15c14c36e92cc26c3a1ebe371d32655cb54b9b5dd2d365f00d50ecb20	-	-
 applytopup.jac-trilinear-short	hifi.nii.data	9718b6b3992d013f449c512d2c7300340e7492145dfe6f0847d5566a48158425	int16	0e00f9ff18000f004901140005001000
@@ -467,12 +467,12 @@ topup.float-membrane	feat_fieldmap_mag.nii.header	89e9f3a6de570a1a8c9e5f3d9652fa
 topup.float-membrane	feat_fieldmap_rads.nii.data	a552dc1c2631c2095be849d41be115b85e4a40fee2b80f0320ab40f03bf983c8	float32	496f8e3c6e03903aa0b38239b7311d3c685d47382f38c43a72b15d3a00000000
 topup.float-membrane	feat_fieldmap_rads.nii.header	50edb67f9efabf2bab8b2855536b10136f848b841d491472a951e7fa4aa1b6ea	-	-
 topup.float-membrane	stdout.txt	d3aaaff0db5ec6120bf2a2f625e012080ff12593943d1e019992b3f98cb328a4	-	-
-topup.float-membrane	tu.log	c16c0f22cdca5ce8c56ca0c210cb165c3305ac08eef9eff5a303092981c1b2b6	-	-
+topup.float-membrane	tu.log	6203ee693977440572098c7e6ff91c161c232351522289e1f74b114beecdb721	-	-
 topup.float-membrane	tu_fieldcoef.nii.data	8349b327a54f647f200f6033e5321ac18c15dae4c99989d25992f81249b564b0	float32	113487b720d0683a57a22b3a82edd7ba9a7b6b3a2cf32dbb7dd9ceba59d4f43b
 topup.float-membrane	tu_fieldcoef.nii.header	561e98b548d257c661644560f4511a901fe4a40bd735fa98aff17843a773a448	-	-
 topup.float-membrane	tu_movpar.txt	7e54e12b1640457fca307a42863adf117d13b5494840a87d3d3fb51f3c160cd4	-	-
 topup.float-membrane.reproduce	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
-topup.float-membrane.reproduce	tu.log	75366a26090efffff4f17428b12d0f3853c92fa76861ec2efc48511eb6502c01	-	-
+topup.float-membrane.reproduce	tu.log	77ae6518d839ec742beaf813f2efbacf13f855f54bd1b49cffe05a92c93dcf39	-	-
 topup.float-membrane.reproduce	tu_fieldcoef.nii.data	81300e83b81e80c11dced826929eb9ffc90739c55e0c93888c21a8dd6a86a646	float32	aebd78baa178853d9e1c6d3d5c0c02be68ff883d5b7837be448309becda3603f
 topup.float-membrane.reproduce	tu_fieldcoef.nii.header	561e98b548d257c661644560f4511a901fe4a40bd735fa98aff17843a773a448	-	-
 topup.float-membrane.reproduce	tu_movpar.txt	eb81c3c96b9d371bb248e1c31a3b3ca0fe849167e4fb5e732e80b50b355e6f70	-	-
@@ -488,7 +488,7 @@ topup.two-levels	jac_01.nii.header	2aad4ca1a627d5775af56fb3b8272a4e35a7414713cac
 topup.two-levels	jac_02.nii.data	aab45a0a06f362d27ce21d80d86a11accf6150ad2601c06d15a09e12ebc55eac	float32	f18c7c3f5aea803f68e67f3f42667f3f715d803ff69f7f3fe62e803f315e7b3f
 topup.two-levels	jac_02.nii.header	2aad4ca1a627d5775af56fb3b8272a4e35a7414713cac1dbe05845d13cb8973f	-	-
 topup.two-levels	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
-topup.two-levels	tu.log	45af2964b53c4b31ffa5f9d13eefac39a630a58813023fc57ddd06189301aaed	-	-
+topup.two-levels	tu.log	bc2204e693d238d2371bab8e27e0a36daa1b0c8d58dec5a7847f33f309985cae	-	-
 topup.two-levels	tu_fieldcoef.nii.data	8a7b872f7c651fc4e9201186ed5bec9a07e9534c53e60e57ccb665e8cdccb0b0	float32	c06def4033e03c411e094641fbf99441dd3b9f413b182241b68994413ff8bd41
 topup.two-levels	tu_fieldcoef.nii.header	038240917d5391ab1b428e6dd5db72250d8a18fa2cea1630323b33b81efcd1e2	-	-
 topup.two-levels	tu_movpar.txt	6f840f0ee8e2ff67dcfdc9e2a07c4c317e9b573f8af62d4c4459c13006789912	-	-

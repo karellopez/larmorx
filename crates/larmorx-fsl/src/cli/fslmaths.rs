@@ -7,9 +7,9 @@
 //! [`Chain`]). The operations of this file are §5-§8's (the binary operations, thresholds,
 //! masks, voxelwise functions, random numbers, the index and the grid) and the chain's own
 //! (`-seed`, `-restart`, `-save`, `-range`), the kernels and spatial filters (§9, §10), the
-//! reductions (§11), the statistical transforms (§12), `-roi` and `-bptf` (§13), TFCE (§14);
-//! the rest of the usage text (`-roc`, `-tensor_decomp`) is refused as not yet implemented until
-//! the next part of the original adds it.
+//! reductions (§11), the statistical transforms (§12), `-roi` and `-bptf` (§13), TFCE (§14),
+//! the ROC analysis (§15) and `-tensor_decomp` (§16): every operation of the usage text and the
+//! hidden ones the spec lists.
 
 use std::io::Write;
 
@@ -28,19 +28,13 @@ use crate::maths::num::{Kind, Num};
 use crate::maths::ops::{self, Binary, Layout, Stop, Unary, WichmannHill};
 use crate::maths::reduce::{self, Stat};
 use crate::maths::stats::{self, PvalKind};
-use crate::maths::{regions, spatial, tensor, tfce};
+use crate::maths::{regions, roc, spatial, tensor, tfce};
 
 /// The usage text (§2.5), exactly as FSL prints it on standard output.
 pub const USAGE: &str = include_str!("fslmaths_usage.txt");
 
-/// The refusal of an operation the original does not take yet.
-pub const NOT_YET: &str = "is not implemented yet in the clean-room original";
-
 /// The datatype names of `-dt` and `-odt`.
 const DATATYPES: [&str; 6] = ["char", "short", "int", "float", "double", "input"];
-
-/// The operations of the usage text the next parts of the original add.
-const LATER: &[&str] = &["-roc"];
 
 /// How a run ends early: its exit status (the messages are printed).
 struct Exit(u8);
@@ -784,6 +778,7 @@ fn step<T: Num>(
             tensor_step(ctx, st, notices, out, err)?;
             Ok(0)
         }
+        "-roc" => roc_step(ctx, st, i, notices, out, err),
         _ if Morph::of(op).is_some() => {
             let f = Morph::of(op).unwrap_or(Morph::DilF);
             filters::morph(&mut st.img, &st.kernel, f, op, notices, err)
@@ -794,12 +789,110 @@ fn step<T: Num>(
             reduction_step(ctx, st, i, notices, err)
         }
         _ => {
-            if LATER.contains(&op) {
-                let _ = writeln!(err, "larmorx: error: fslmaths: {op} {NOT_YET}");
-                return Err(Exit(1));
-            }
             let _ = write!(out, "\n Error in command line: unknown option \"{op}\"\n\n");
             usage(out);
+            Err(Exit(1))
+        }
+    }
+}
+
+/// `-roc L curve [noise] truth` (§15): `L < 0` takes no noise image. The curve file is created
+/// first (FSL-193: one that cannot be written is an error by default; FSL skips it silently),
+/// then the noise and truth images are read (single precision; a 4D truth's first volume with
+/// the warning) and the truth's sizes checked; the current image is unchanged.
+fn roc_step<T: Num>(
+    ctx: &Ctx<'_>,
+    st: &mut State<T>,
+    i: usize,
+    notices: &mut Notices,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<usize, Exit> {
+    let words = ctx.words;
+    let arg = |k: usize| words.get(i + k).map(String::as_str);
+    let Some(l) = arg(1) else {
+        return Err(past_end(notices, err, "-roc", false));
+    };
+    let limit = strtod(l).0;
+    let with_noise = !(limit < 0.0);
+    let used = if with_noise { 4 } else { 3 };
+    let mut names = Vec::with_capacity(3);
+    for k in 2..=used {
+        let Some(w) = arg(k) else {
+            return Err(past_end(notices, err, "-roc", true));
+        };
+        names.push(w);
+    }
+    let curve_name = names[0];
+    let file = match std::fs::File::create(ctx.settings.path(curve_name)) {
+        Ok(f) => Some(f),
+        Err(e) if notices.fix() => {
+            notices.add(
+                &defects::FSL_193,
+                format!(
+                    "-roc's curve file {curve_name} cannot be written: an error (FSL writes no \
+                     curve and says nothing)"
+                ),
+            );
+            let _ = writeln!(
+                err,
+                "larmorx: error: fslmaths: -roc: cannot write the curve file {curve_name}: {e} \
+                 (FSL-193: FSL skips it silently)"
+            );
+            return Err(Exit(1));
+        }
+        Err(_) => {
+            notices.add(
+                &defects::FSL_193,
+                format!("-roc's curve file {curve_name} cannot be written: skipped silently, as FSL does"),
+            );
+            None
+        }
+    };
+    let read = |name: &str, notices: &mut Notices, err: &mut dyn Write| {
+        let mut ns = Vec::new();
+        let s = image::read_stored(ctx.settings, name, notices.mode(), &mut ns, ctx.n_threads);
+        notices.extend(ns);
+        let s = s.map_err(|e| read_failure(err, name, &e, false))?;
+        let (data, _) = s.values::<f32>(notices.fix());
+        Ok::<_, Exit>((data, s.dims))
+    };
+    let mut noise = if with_noise {
+        let (data, dims) = read(names[1], notices, err)?;
+        Some(roc::Noise { data, dims })
+    } else {
+        None
+    };
+    let (mut truth, tdims) = read(names[used - 2], notices, err)?;
+    if tdims[3] > 1 {
+        let _ = writeln!(err, "{}", common::TRUNCATED);
+    }
+    let [nx, ny, nz, _] = st.img.dims;
+    if tdims[..3] != [nx, ny, nz] {
+        let what = "Attempted to multiply images of different sizes";
+        let _ = writeln!(err, "Image Exception : #3 :: {what}");
+        common::abort(err, "fslmaths", "std::runtime_error", what);
+        return Err(Exit(1));
+    }
+    truth.truncate(nx * ny * nz);
+    let r = roc::roc(&st.img, limit, noise.as_mut(), &truth, notices)
+        .map_err(|s| refuse_stop(err, s))?;
+    if let Some(mut f) = file
+        && let Err(e) = f.write_all(r.curve.as_bytes())
+    {
+        let _ = writeln!(
+            err,
+            "larmorx: error: fslmaths: -roc: cannot write the curve file {curve_name}: {e}"
+        );
+        return Err(Exit(1));
+    }
+    match r.result {
+        Ok(line) => {
+            let _ = out.write_all(line.as_bytes());
+            Ok(used)
+        }
+        Err(abort) => {
+            let _ = err.write_all(abort.as_bytes());
             Err(Exit(1))
         }
     }

@@ -217,3 +217,53 @@ and the extension), and the display ranges are `0` to the image's maximum for `L
 (their extremes, the zeros of the voxels without a positive eigenvalue included), `0 1` for `FA`,
 `-1 1` for `MO` and the vectors.
 
+
+## 19. `-roc`'s arithmetic, relay 4
+
+`fsl_outputs.py` kept FSL's outputs of the replica suite's `roc/` and `d13/roc-*` cases and of
+six probes (their command lines in `fit_roc.py`'s docstring: a 6 x 5 x 4 x 2 ramp whose minimum
+lies in its truth's region, with and without a noise image, a 4D truth, a 3D input with a
+3-volume noise image, truth voxels of -0.0005). A numpy model of §15 (`fit_roc.py`) gives every
+curve file of the twelve runs line for line (C++'s default format, 6 significant digits) and
+their printed area and quartiles (one run's area differs in its sixth digit: the model's area is
+a double sum, FSL's single) with these choices, each the only one of its alternatives that does
+(the variants' counts from `fit_roc.py <dir> <variant>`):
+- the noise image's counts take **every voxel** of a noise volume: the truth's mask (voxels
+  below -0.001 left out) is not applied to them (with it, 398 of `roc/never-reached`'s 1001
+  lines differ); the rates of the noise volumes behind the curve's `sd(FP)` are those counts
+  over the volume's voxels, and the standard deviations are 0 for one volume (`rocF`);
+- the false-positive candidates without a noise image are the voxels the mask keeps that are
+  **not above 0** (`-0.0005` counts; with "equal to 0", 39 of the probe's 246 lines differ);
+- the rates' means (`TP`, and `FP` without a noise image) are **double sums of the
+  single-precision rates, rounded to single precision** (summed in single precision, 23 of
+  1001 lines differ in their last digit);
+- a double image's log values (double `log`) are **compared with the thresholds in single
+  precision** (in double, one of `roc/double`'s 60 lines differs);
+- the thresholds' column takes a correctly rounded `expf` (numpy's single-precision `exp` misses
+  three of `roc/truth`'s 420 lines in their sixth digit);
+- **each volume's area takes the common false-positive rate as its axis** (the mean of the
+  volumes' rates without a noise image) with that volume's true-positive rate, and stops where
+  the common rate crosses `|L|` (on each volume's own rate the quartiles differ: `roc/truth`
+  0.531871 and 0.661897 against FSL's 0.582092 and 0.703603);
+- when the common rate never reaches `|L|` (the thresholds reach 0 first), the area, and each
+  volume's, adds the rectangle from the last rate to `|L|` at the last true-positive rate
+  (`roc/never-reached`: 0.5 of the printed 0.677579; the probe with a true voxel at the
+  image's minimum tells the last rate from 1 or the mean of both);
+- the quartiles are interpolated over the volumes' areas **before** the division by `|L|`
+  (`-roc 0`'s areas are 0, not NaN, so its quartiles' sort runs and its output is
+  `-nan -nan -nan`).
+A noise image of another size (FSL-179, with `reproduce`): the log transform takes the noise
+image's first `nx·ny·nz·nt` values (the input's sizes); its minimum and maximum are taken over
+every value, the raw ones of the volumes left over included (so `d13/roc-noise-larger`'s
+thresholds start at `inf`), and its `nt` first volumes give the rates (the model gives that case
+and `rocF`, a 3D input with a 3-volume noise image, line for line). The curve file is created
+before the noise and truth images are read: a missing image leaves it empty (the probes with a
+missing noise or truth image).
+
+## 20. FSL-193: a curve file that cannot be written, relay 4
+
+`-roc -0.05 nodir/roc.txt` (a folder that does not exist) prints FSL's area and quartiles, writes
+the output image and exits 0, without a curve file and without a message (the probe `rocH`, kept
+as the suite's `orig/roc-nodir`). A request the run cannot satisfy passes silently (rule B):
+larmorx stops with an error naming the file by default, and skips the curve silently with
+`reproduce`, as FSL does. Registered as FSL-193.

@@ -14,8 +14,10 @@ Run (in a memory box): ``python -P fsl_outputs.py <outdir> <case or 'args:...'> 
   ``x + 20 y + 400 z`` with the same voxel sizes
   (``rampnan``, ``rampinf``: its first voxel NaN or +inf);
   ``asym``: a 13 × 11 × 9 asymmetric kernel file of values in [0, 1); ``asym<nx>x<ny>x<nz>``: an
-  asymmetric kernel of those sizes, values ``1 + x + 3 y + 7 z``), each written once with fixed
-  bytes.
+  asymmetric kernel of those sizes, values ``1 + x + 3 y + 7 z``; ``rocramp``, ``roctruthx``: a
+  6 x 5 x 4 x 2 ramp for ``-roc`` whose minimum lies in its truth's region, and that truth;
+  ``roctruthsmallneg``: that truth with its x = 5 plane -0.0005), each
+  written once with fixed bytes.
 """
 
 from __future__ import annotations
@@ -54,6 +56,19 @@ def _probe_input(name: str, d: Path) -> str:
         sx, sy, sz = (int(v) for v in name[4:].split("x"))
         x, y, z = np.meshgrid(np.arange(sx), np.arange(sy), np.arange(sz), indexing="ij")
         a = (1 + x + 3 * y + 7 * z).astype(np.float32)
+    elif name == "rocramp":
+        # -roc: a 6 x 5 x 4 x 2 ramp x + 6 y + 30 z + 120 t, its minimum (0) in the truth's region
+        x, y, z, t = np.meshgrid(*(np.arange(n) for n in (6, 5, 4, 2)), indexing="ij")
+        a = (x + 6 * y + 30 * z + 120 * t).astype(np.float32)
+    elif name == "roctruthx":
+        # -roc: its truth, 1 where x < 3, else 0
+        a = np.zeros((6, 5, 4), dtype=np.float32)
+        a[:3] = 1.0
+    elif name == "roctruthsmallneg":
+        # -roc: that truth with its x = 5 plane -0.0005 (inside the mask, below 0)
+        a = np.zeros((6, 5, 4), dtype=np.float32)
+        a[:3] = 1.0
+        a[5] = -0.0005
     else:
         raise SystemExit(f"unknown probe input {name}")
     img = nib.Nifti1Image(a, aff)

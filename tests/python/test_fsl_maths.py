@@ -201,6 +201,27 @@ def test_the_originals_reductions_and_statistics(scripts):
     assert np.array_equal(np.asarray(s.data), np.zeros((4, 3, 2), np.float32))
 
 
+def test_the_originals_roc(scripts):
+    # -roc through the typed wrapper and fslmaths' clean-room original: a ramp whose minimum
+    # is a true voxel, with and without a noise image (the clean-room suite's orig/roc-ramp)
+    x, y, z, t = np.meshgrid(*(np.arange(n) for n in (6, 5, 4, 2)), indexing="ij")
+    ramp = (x + 6 * y + 30 * z + 120 * t).astype(np.float32)
+    truth = np.zeros((6, 5, 4), np.float32)
+    truth[:3] = 1.0
+    affine = np.diag([2.0, 2.0, 2.0, 1.0])
+    orig = {"implementation": "original"}
+    r = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, **orig)
+    # FSL 6.0.7.23 prints 0.739618 0.610417 0.868819 (the area never reaches 2: the last
+    # rectangle at the last true-positive rate)
+    assert np.allclose([r.aroc, *r.aroc_quartiles], [0.739618, 0.610417, 0.868819], atol=1e-5)
+    assert r.curve.shape == (2004, 3) and np.array_equal(np.asarray(r.image.data), ramp)
+    n = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, noise=(ramp, affine), n_threads=2, **orig)
+    assert np.allclose([n.aroc, *n.aroc_quartiles], [0.620833, 0.491667, 0.75], atol=1e-5)
+    assert n.curve.shape == (1002, 5)
+    with pytest.raises(RuntimeError, match="FSL-180"):
+        lx.fsl.roc((ramp, affine), (np.ones_like(truth), affine), 0.05, **orig)
+
+
 def test_the_generic_fslmaths(scripts, monkeypatch, tmp_path):
     program = stub(scripts)
     monkeypatch.setenv("FSLOUTPUTTYPE", "NIFTI_PAIR")  # must not reach the replica

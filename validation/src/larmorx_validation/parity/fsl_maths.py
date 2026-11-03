@@ -7,8 +7,7 @@ oracle runs, the goodvoxels chain on ds005040's BOLD series, every operation onc
 and code path, the messages and failures, the defects in both modes), run here against the
 original, and the original's own cases (``orig/``: paths the replica suite's inputs do not
 reach, on inputs of :func:`own_inputs`). Every FSL run goes through the oracle-output cache with
-the replica suite's keys and policy, so the runs that suite made are served from it. The
-operations the original does not take yet (it refuses them, naming them) are skipped.
+the replica suite's keys and policy, so the runs that suite made are served from it.
 
 What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 
@@ -22,8 +21,9 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
   correctly rounded everywhere, the original's are), the fraction that differs reported; the
   sums (``_SUM_OPS``) under the floating types by §21's sums' metric, both of its parts as
   checks (the cases of ``EXPECTED_DIVERGENCES`` may miss its share of voxels within 4 units in
-  the last place only, each with its reason);
-  other files byte for byte;
+  the last place only, each with its reason); ``-roc``'s printed area and quartiles within
+  1e-5 absolute and its curve file's numbers to 5 significant digits (half a unit of the 5th
+  digit), its other words identical; other files byte for byte;
 - the D13 fix pass: a defect named exactly when the default's outputs differ from
   ``reproduce``.
 """
@@ -53,8 +53,6 @@ from larmorx_validation.parity.harness import (
 
 SUITE = "fsl-maths"
 PROGRAM = "fslmaths"
-#: The original's refusal of what it does not take yet (the next sub-tasks of its part).
-NOT_YET = "is not implemented yet in the clean-room original"
 #: The original's thread count in the cases.
 LX_THREADS = 4
 #: The voxelwise functions that run in double precision through glibc's maths in FSL.
@@ -96,6 +94,10 @@ SUM_SHARE = 0.99
 SUM_ULPS = 4
 #: The name of the share's check (the one an expected divergence may miss).
 SUM_SHARE_CHECK = "the sums' share of voxels within 4 ulp"
+#: -roc (§21): the printed area and quartiles within this absolute difference...
+ROC_PRINTED = 1e-5
+#: ... and the curve file's numbers to this many significant digits.
+ROC_DIGITS = 5
 _FFT = (
     "FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to "
     "the image's largest values, not to each voxel's own last place (findings 8; spec "
@@ -163,15 +165,6 @@ def run_original(
         timeout=3600,
     )
     return rep.Completed(p.returncode, p.stdout, p.stderr)
-
-
-def _refusal(stderr: str) -> str:
-    return next((ln for ln in stderr.splitlines() if ln.startswith("larmorx: error:")), "")
-
-
-def _not_yet(ours: rep.Completed) -> str:
-    line = _refusal(ours.stderr)
-    return line if ours.code == 1 and NOT_YET in line else ""
 
 
 # ------------------------------------------------------------------------------------------------
@@ -253,11 +246,15 @@ def compare(
         threshold="the same (FSL's crash: 1)",
     )
     so, su = _own(oracle.stdout, a), _own(ours.stdout, b)
-    checks(
-        "standard output",
-        so == su,
-        detail="" if so == su else _first_diff(so, su),
-    )
+    roc = "-roc" in args
+    if roc:
+        _roc_text(checks, "standard output", so, su, absolute=ROC_PRINTED)
+    else:
+        checks(
+            "standard output",
+            so == su,
+            detail="" if so == su else _first_diff(so, su),
+        )
     eo, eu = _own(oracle.stderr, a), _own(ours.stderr, b)
     checks(
         "standard error",
@@ -275,6 +272,11 @@ def compare(
         if name.endswith(".img") or name.endswith(".img.gz"):
             continue
         if not _is_image(name):
+            if roc:
+                x = fa[name].read_text(encoding="utf-8", errors="replace")
+                y = fb[name].read_text(encoding="utf-8", errors="replace")
+                _roc_text(checks, f"{name}: the curve", x, y, digits=ROC_DIGITS)
+                continue
             same = fa[name].read_bytes() == fb[name].read_bytes()
             checks(f"{name}: bytes", same)
             continue
@@ -326,6 +328,68 @@ def compare(
                 threshold=0,
                 detail="" if differ == 0 else _value_diff(x, y),
             )
+
+
+def _number(word: str) -> float | None:
+    try:
+        v = float(word)
+    except ValueError:
+        return None
+    return v if np.isfinite(v) else None
+
+
+def _roc_text(
+    checks: CheckList,
+    name: str,
+    x: str,
+    y: str,
+    *,
+    absolute: float | None = None,
+    digits: int | None = None,
+) -> None:
+    """§21's -roc metric on a text, word by word: the same lines and words; finite numbers
+    within ``absolute`` of FSL's, or agreeing to ``digits`` significant digits (the difference
+    at most half a unit of the last of them, from the larger magnitude); every other word (NaN,
+    inf, text) identical."""
+    xs, ys = x.split("\n"), y.split("\n")
+    worst, bad = 0.0, ""
+    if len(xs) != len(ys):
+        bad = f"{len(xs)} vs {len(ys)} lines"
+    for k, (p, q) in enumerate(zip(xs, ys, strict=False)):
+        if bad:
+            break
+        pw, qw = p.split(), q.split()
+        if len(pw) != len(qw):
+            bad = f"line {k + 1}: FSL {p[:120]!r} / original {q[:120]!r}"
+            break
+        for u, v in zip(pw, qw, strict=True):
+            a, b = _number(u), _number(v)
+            if a is None or b is None:
+                if u != v:
+                    bad = f"line {k + 1}: FSL {u!r} / original {v!r}"
+                    break
+                continue
+            d = abs(a - b)
+            if absolute is not None:
+                allowed = absolute
+            else:
+                m = max(abs(a), abs(b))
+                allowed = 0.0 if m == 0 else 0.5 * 10 ** (np.floor(np.log10(m)) - (digits - 1))
+            worst = max(worst, d / allowed if allowed else (0.0 if d == 0 else np.inf))
+            if d > allowed:
+                bad = f"line {k + 1}: FSL {u} / original {v} (|diff| {d:.3g} > {allowed:.3g})"
+                break
+    rule = (
+        f"within {absolute:g} absolute" if absolute is not None else f"{digits} significant digits"
+    )
+    checks(
+        f"{name} ({rule})",
+        not bad,
+        metric="largest difference / its allowance",
+        value=float(f"{worst:.3g}"),
+        threshold=1,
+        detail=bad,
+    )
 
 
 def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: np.ndarray) -> None:
@@ -518,11 +582,14 @@ def _agree_on_errors(checks: CheckList, oracle: rep.Completed) -> None:
 
 def own_inputs() -> Path:
     """The original's own synthetic inputs, made once (fixed bytes): ``ramp16`` (16 x 13 x 11,
-    ``x + 20 y + 400 z``), ``ramp25`` (25 x 25 x 25, ``x + 30 y + 900 z``), ``rampnan`` (its first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel,
-    ``1 + x + 3 y + 7 z``); voxel sizes 2, 2.5, 3."""
+    ``x + 20 y + 400 z``), ``ramp25`` (25 x 25 x 25, ``x + 30 y + 900 z``), ``rampnan`` (its
+    first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel, ``1 + x + 3 y + 7 z``); for ``-roc``:
+    ``rocramp`` (6 x 5 x 4 x 2, ``x + 6 y + 30 z + 120 t``: its minimum lies in the truth's
+    region), ``roctruthx`` (1 where x < 3, else 0), ``roctruthneg5`` (the same with its x = 5
+    plane -0.0005: inside the mask, below 0); the sform's voxel sizes of ``fsl_maths_replica``."""
     ws = rep.workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v2.done"
+    marker = base / "v3.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -538,6 +605,14 @@ def own_inputs() -> Path:
     x, y, z = np.meshgrid(np.arange(13), np.arange(11), np.arange(9), indexing="ij")
     asym = (1 + x + 3 * y + 7 * z).astype(np.float32)
     rep._save(base / "asym.nii.gz", asym, dtype=np.float32, affine=rep._affine(asym.shape))
+    x, y, z, t = np.meshgrid(*(np.arange(n) for n in (6, 5, 4, 2)), indexing="ij")
+    rr = (x + 6 * y + 30 * z + 120 * t).astype(np.float32)
+    rep._save(base / "rocramp.nii.gz", rr, dtype=np.float32, affine=rep._affine(rr.shape[:3]))
+    tx = np.zeros((6, 5, 4), np.float32)
+    tx[:3] = 1.0
+    rep._save(base / "roctruthx.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
+    tx[5] = -0.0005
+    rep._save(base / "roctruthneg5.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
     marker.write_text("1\n", encoding="utf-8")
     return base
 
@@ -580,6 +655,37 @@ def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
             "beyond the kernel's reach of most voxels",
             rep._r("@orig:rampnan", "-kernel", "boxv", "11", "-fmeanu", "out", fixed="FSL-191"),
         ),
+        "orig/roc-ramp": (
+            T,
+            "-roc -2 without a noise image: the rate never reaches 2 and the last true-positive "
+            "rate is below 1 (the image's minimum is a true voxel: the area's last rectangle)",
+            rep._r("@orig:rocramp", "-roc", "-2", "roc.txt", "@orig:roctruthx", "out"),
+        ),
+        "orig/roc-ramp-noise": (
+            T,
+            "-roc 2 with the same image as its noise: the FWE rate never reaches 2, the last "
+            "true-positive rate below 1",
+            rep._r(
+                "@orig:rocramp", "-roc", "2", "roc.txt", "@orig:rocramp", "@orig:roctruthx", "out"
+            ),
+        ),
+        "orig/roc-below-zero": (
+            T,
+            "-roc -0.5 with truth voxels of -0.0005 (inside the mask, below 0: false-positive "
+            "candidates)",
+            rep._r("@orig:rocramp", "-roc", "-0.5", "roc.txt", "@orig:roctruthneg5", "out"),
+        ),
+        "orig/roc-truth4d": (
+            T,
+            "-roc with a 4D truth image (its first volume, with the image library's warning)",
+            rep._r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise", "@rocim", "out"),
+        ),
+        "orig/roc-nodir": (
+            T,
+            "FSL-193: -roc with a curve file in a folder that does not exist (FSL writes no "
+            "curve and says nothing; the default stops with an error)",
+            rep._r("@rocim", "-roc", "-0.05", "nodir/roc.txt", "@roctruth", "out"),
+        ),
     }
 
 
@@ -595,8 +701,6 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
                 b = Path(b_)
                 args = _prepare(run, b)
                 r = run_original(args, cwd=b, settings=settings, mode=mode)
-                if _not_yet(r):
-                    raise Outcome(SKIPPED, _not_yet(r))
                 checks(
                     f"{run.undefined}: the original refuses ({mode})",
                     r.code == 1 and run.undefined in r.stderr,
@@ -612,8 +716,6 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         _prepare(run, b)
         before = set(_files(b, set()))
         ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
-        if _not_yet(ours):
-            raise Outcome(SKIPPED, _not_yet(ours))
         oracle = rep.run_oracle(args, cwd=a, settings=settings)
         compare(checks, oracle, ours, a, b, before, args)
         if run.fix and ours.code == 0:
@@ -672,8 +774,6 @@ def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
         rep._goodvoxels_args(template, files, values, b)
         before = set(_files(b, set()))
         ours = run_original(args, cwd=b, settings={}, mode=defects.REPRODUCE)
-        if _not_yet(ours):
-            raise Outcome(SKIPPED, _not_yet(ours))
         oracle = rep.run_oracle(args, cwd=a, settings={})
         compare(checks, oracle, ours, a, b, before, args)
         if oracle.code == 0 and ours.code == 0:
@@ -738,7 +838,8 @@ def suite() -> Suite:
                 "4 units in the last place, the NaN and infinite voxels identical (§21); "
                 "-tensor_decomp's eigenvalues, FA and MD within 1e-5 relative, its mode 1e-4 "
                 "absolute, its eigenvectors up to their sign (|cos| >= 0.9999) where the "
-                "eigenvalues are distinct by more than 1e-4 relative",
+                "eigenvalues are distinct by more than 1e-4 relative; -roc's printed area and "
+                "quartiles within 1e-5 absolute, its curve's numbers to 5 significant digits",
             ),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
         ],
@@ -748,8 +849,7 @@ def suite() -> Suite:
         notes=(
             "The cases are the replica suite's (`fsl-maths-replica`); FSL's runs are served from "
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run. The operations "
-            "the original does not take yet are skipped until its next sub-tasks. The goodvoxels "
+            "mode (D13) and its default `fix` pass against the reproduced run. The goodvoxels "
             "chain's ribbon is a stand-in: the segmentation's grey matter (the no-reconall runs "
             "have no FreeSurfer ribbon)."
         ),

@@ -25,8 +25,8 @@ morphological filters, `-dilall`, the convolutions (`-s`, `-fmean`, `-fmeanu`), 
 reductions along T, X, Y, Z, `-roi`, `-bptf`, `-ztop`, `-ptoz`, `-pval`, `-pval0`, `-cpval`,
 `-rank`, `-ranknorm`, `-randn`, TFCE (`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta`) and
 `-tensor_decomp` (relay 3; its eigenvectors' signs are its own: each one's largest component
-positive, where FSL's are LAPACK's); `-roc` comes with its next relay and is refused until then
-(`... is not implemented yet in the clean-room original`). Where FSL convolves a large kernel by
+positive, where FSL's are LAPACK's) and `-roc` (relay 4): every operation of the usage text and
+the hidden ones. Where FSL convolves a large kernel by
 its FFT, the original computes the convolution by the direct sum, in the direct sum's
 orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
 FSL's largest value on the record's cases). `implementation="auto"`
@@ -229,6 +229,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   support's arrays and a voxel outside the image: corrected or refused.
 - **FSL-179**, **FSL-180**: `-roc` with a noise image of another size, or without true or noise
   voxels: errors.
+- **FSL-193** (the clean-room original's black-box runs): `-roc` with a curve file that cannot be
+  written (a folder that does not exist) writes no curve and says nothing: an error.
 - **FSL-191** (the clean-room original's black-box runs): with a kernel large enough for FSL's
   FFT convolution, `-fmean` and `-fmeanu` make the whole volume NaN when one voxel is NaN or
   infinite: NaN only within the kernel's reach, as FSL's direct sum for smaller kernels gives.
@@ -243,8 +245,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 
 ## Not yet
 
-- The clean-room original's `-roc`, its speed work (an FFT for
-  large kernels among it), golden cases and record (its next relays).
+- The clean-room original's speed work (an FFT for large kernels among it), golden cases and
+  record (its next relays).
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).
 - The goodvoxels mask with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

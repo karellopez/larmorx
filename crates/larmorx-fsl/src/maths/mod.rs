@@ -15,6 +15,7 @@
 //! - [`stats`]: the statistical transforms and `-randn` (§12, §8.2);
 //! - [`regions`]: `-roi` and `-bptf` (§13);
 //! - [`tfce`]: threshold-free cluster enhancement (§14);
+//! - [`roc`]: the ROC analysis `-roc` (§15);
 //! - [`tensor`]: `-tensor_decomp` (§16).
 //!
 //! The command line (`larmorx fsl fslmaths`) is [`crate::cli::fslmaths`].
@@ -26,6 +27,7 @@ pub mod num;
 pub mod ops;
 pub mod reduce;
 pub mod regions;
+pub mod roc;
 pub mod spatial;
 pub mod stats;
 pub mod tensor;

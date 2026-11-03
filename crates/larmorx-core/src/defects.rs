@@ -622,6 +622,8 @@ defects! {
         "-fmean and -fmeanu with a kernel large enough for FSL's FFT convolution (nvox * nker > 44 * 2 nvox * log2(2 nvox)) make every voxel of a volume NaN when one of its voxels is NaN or infinite, where the direct sum FSL uses for smaller kernels leaves NaN only within the kernel's reach of that voxel";
     FSL_192 = "FSL-192", "fslmaths", true,
         "-fmean and -fmeanu with a kernel large enough for FSL's FFT convolution (nvox * nker > 44 * 2 nvox * log2(2 nvox)) apply the kernel mirrored along every axis (a true convolution), where the direct sum FSL uses for smaller kernels or larger images applies it as stored (a correlation): for a kernel that is not point-symmetric, or of an even size, the result depends on the kernel's and the image's sizes";
+    FSL_193 = "FSL-193", "fslmaths", true,
+        "-roc with a curve file that cannot be written (a folder that does not exist, no permission) writes no curve and says nothing: the run goes on and exits 0";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

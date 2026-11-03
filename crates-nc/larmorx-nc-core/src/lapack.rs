@@ -78,6 +78,7 @@ use crate::sse::{DEFAULT_NAN_F64, add_f64, div_f64, mul_f64, quiet_f64, sub_f64}
 
 /// The BLAS kernels of the eigen- and singular-value decompositions (general small sizes).
 pub mod blas;
+pub mod blocked;
 /// The reference LAPACK routines of `dsyevd` and `dgesdd`.
 pub mod reference;
 

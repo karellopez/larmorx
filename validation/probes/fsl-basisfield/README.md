@@ -35,6 +35,14 @@ Result on 2026-11-03: 8 cases (1.18 million lines), 0 lines differ; FSL at 1 and
 identical in every case; the energies of 10560 coefficients identical at 1 and 4 OpenBLAS
 threads (FSL's own values differ between the two).
 
+`Set()` (sub-task 1b, 2026-11-03): the probe's `set` mode fits the coefficients to `ima1` and to
+`ima2` (`splinefield::Set`) and prints them and the field they give; the replica's side runs
+with `BF_PROBE_SET=1`. Every case above and four more (`set-topup-like`, 64 × 64 × 40 at knot
+spacing 1: 67 coefficients along x, OpenBLAS's blocked LU; `set-odd`, 45 × 37 × 21: odd numbers
+of right-hand sides; `set-quad`, quadratic splines; `set-k3`, knot spacings 3, 2, 1): 0 of
+711,327 lines differ; `cubic-k232` (a voxel size that is not a float) is refused by both
+("Voxel size mismatch beween basisfield class and supplied field").
+
 Facts it found (for the topup replica's findings, restricted):
 
 - `AsVolume` compares the field's double voxel size with the volume's float one, so a field made

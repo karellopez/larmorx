@@ -18,7 +18,8 @@
 //! diagonals, the single-threaded one copies the same elements from the columns already made, so
 //! both store the same values. This translation computes them on one thread.
 
-use super::splines::Spline3D;
+use super::splines::{Spline1D, Spline3D};
+use crate::arma::Mat;
 use crate::volume::{FslError, Volume};
 
 /// `BASISFIELD::MAX_SIZE`: the largest field size along any direction.
@@ -429,6 +430,47 @@ impl SplineField {
             *d = s as f32;
         }
         Ok(())
+    }
+
+    /// `Set(pfield)`: the coefficients of the field that fits `pfield` (as `double`) best, one
+    /// direction after the other (x, then y and z for fields of that many dimensions): along
+    /// each line, `b = M·y` with `M = (ASᵀAS)⁻¹Aᵀ`, `A` the splines sampled at the voxels
+    /// (`GetAMatrix`) and `AS = A & 0.005·S`, `S` a penalty on the two ends (`get_s_matrix`).
+    /// The voxel sizes are compared as FSL does (the field's `double` with the volume's
+    /// `float`).
+    pub fn set_from_volume(&mut self, pfield: &Volume<f32>) -> Result<(), FslError> {
+        if i64::from(self.sz[0]) != pfield.xsize()
+            || i64::from(self.sz[1]) != pfield.ysize()
+            || i64::from(self.sz[2]) != pfield.zsize()
+        {
+            return Err(basisfield_error(
+                "basisfield::Set:: Matrix size mismatch beween basisfield class and supplied field",
+            ));
+        }
+        if self.vxs[0] != f64::from(pfield.xdim())
+            || self.vxs[1] != f64::from(pfield.ydim())
+            || self.vxs[2] != f64::from(pfield.zdim())
+        {
+            return Err(basisfield_error(
+                "basisfield::Set:: Voxel size mismatch beween basisfield class and supplied field",
+            ));
+        }
+        let n = self.field_sz() as usize;
+        let mut hv = HelperVol {
+            sz: self.sz,
+            data: pfield.data[..n].iter().map(|&v| f64::from(v)).collect(),
+        };
+        let csz = self.coef_size();
+        let ksp = self.ksp();
+        let order = self.order();
+        hv = get_coefs_one_dim(&hv, 0, csz[0], order, ksp[0])?;
+        if self.ndim > 1 {
+            hv = get_coefs_one_dim(&hv, 1, csz[1], order, ksp[1])?;
+        }
+        if self.ndim > 2 {
+            hv = get_coefs_one_dim(&hv, 2, csz[2], order, ksp[2])?;
+        }
+        self.set_coef(&hv.data)
     }
 
     fn check_image(&self, ima: &Volume<f32>, msg: &str) -> Result<(), FslError> {
@@ -1216,4 +1258,114 @@ fn calculate_atab(
         }
     }
     grad
+}
+
+/// `helper_vol`: a `double` volume whose lines along any direction can be read and written.
+struct HelperVol {
+    sz: [u32; 3],
+    data: Vec<f64>,
+}
+
+impl HelperVol {
+    /// `start(i, j, dim)` and `step(dim)`.
+    fn line(&self, i: u32, j: u32, dim: usize) -> (usize, usize) {
+        let (s0, s1) = (self.sz[0] as usize, self.sz[1] as usize);
+        let (i, j) = (i as usize, j as usize);
+        match dim {
+            0 => (j * s0 * s1 + i * s0, 1),
+            1 => (j * s0 * s1 + i, s0),
+            _ => (j * s0 + i, s0 * s1),
+        }
+    }
+    fn get_column(&self, i: u32, j: u32, dim: usize) -> Vec<f64> {
+        let (st, step) = self.line(i, j, dim);
+        (0..self.sz[dim] as usize)
+            .map(|k| self.data[st + k * step])
+            .collect()
+    }
+    fn set_column(&mut self, i: u32, j: u32, dim: usize, col: &[f64]) {
+        let (st, step) = self.line(i, j, dim);
+        for (k, &v) in col.iter().enumerate().take(self.sz[dim] as usize) {
+            self.data[st + k * step] = v;
+        }
+    }
+}
+
+/// `Spline1D::GetAMatrix(isz, csz)`: the `isz × csz` matrix of the splines sampled at the
+/// voxels (column `i`: spline `i` over its range).
+fn get_a_matrix(sp: &Spline1D, isz: u32, csz: u32) -> Mat {
+    let csz = if csz == 0 { sp.ncoef(isz) } else { csz };
+    let mut a = Mat::zeros(isz as usize, csz as usize);
+    for i in 0..csz {
+        let (fr, lr) = sp.range(i, isz);
+        let so = sp.offset(i, isz);
+        for (si, j) in (so..).zip(fr..lr) {
+            a.set(j as usize, i as usize, sp.at(si));
+        }
+    }
+    a
+}
+
+/// `get_s_matrix(isz, csz)`: zeros but `2, −1, …, −1` in the first row and `−1, …, −1, 2` in
+/// the last (assigned in that order, so a single row keeps the last row's values where they
+/// meet).
+fn get_s_matrix(isz: u32, csz: u32) -> Mat {
+    let (r, c) = (isz as usize, csz as usize);
+    let mut s = Mat::zeros(r, c);
+    s.set(0, 0, 2.0);
+    s.set(0, 1, -1.0);
+    s.set(0, c - 1, -1.0);
+    s.set(r - 1, 0, -1.0);
+    s.set(r - 1, c - 2, -1.0);
+    s.set(r - 1, c - 1, 2.0);
+    s
+}
+
+/// `get_coefs_one_dim(in, dim, csz, order, ksp)`: every line of `in` along `dim` replaced by
+/// its `csz` coefficients.
+fn get_coefs_one_dim(
+    inv: &HelperVol,
+    dim: usize,
+    csz: u32,
+    order: u32,
+    ksp: u32,
+) -> Result<HelperVol, FslError> {
+    let mut nsz = inv.sz;
+    nsz[dim] = csz;
+    let mut out = HelperVol {
+        sz: nsz,
+        data: vec![0.0; nsz.iter().map(|&v| v as usize).product()],
+    };
+    let (ii, jj) = match dim {
+        0 => (inv.sz[1], inv.sz[2]),
+        1 => (inv.sz[0], inv.sz[2]),
+        _ => (inv.sz[0], inv.sz[1]),
+    };
+    let isz = inv.sz[dim];
+    if csz < 2 {
+        // get_s_matrix writes column 2 (FSL: outside a one-column matrix); never met (a spline
+        // field has at least 3 coefficients per direction).
+        return Err(basisfield_error(
+            "splinefield::get_coefs_one_dim: fewer than 2 coefficients",
+        ));
+    }
+    let sp = Spline1D::new(order, ksp, 0)?;
+    let a = get_a_matrix(&sp, isz, csz);
+    let s = get_s_matrix(isz, csz).scale(0.005);
+    let as_ = crate::bfmatrix::vcat(&a, &s);
+    let ata = crate::arma::syrk_t(&as_);
+    let m = crate::arma::solve(&ata, &a.t()).map_err(|_| FslError {
+        printed: Vec::new(),
+        type_name: "std::runtime_error",
+        what: "matrix multiplication: problem with matrix inverse; suggest to use solve() instead"
+            .to_owned(),
+    })?;
+    for i in 0..ii {
+        for j in 0..jj {
+            let y = inv.get_column(i, j, dim);
+            let b = crate::arma::mul(&m, &Mat::col(&y), false);
+            out.set_column(i, j, dim, b.as_slice());
+        }
+    }
+    Ok(out)
 }

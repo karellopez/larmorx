@@ -619,6 +619,118 @@ pub fn syrk(a: &Mat) -> Mat {
     c
 }
 
+/// `sym_helper::is_approx_sym(A, 100)` (Armadillo 14.2.1, the rule `inv(A)*B` uses to choose
+/// the symmetric solver): square, at least 100 rows, a finite diagonal, and every pair
+/// `A(i,j)`, `A(j,i)` within `100·ε` absolutely or relatively to the larger.
+pub fn is_approx_sym(a: &Mat) -> bool {
+    let n = a.rows;
+    if a.rows != a.cols || n < 100 {
+        return false;
+    }
+    let tol = 100.0 * f64::EPSILON;
+    if (0..n).any(|j| !a.at(j, j).is_finite()) {
+        return false;
+    }
+    for j in 0..n.saturating_sub(1) {
+        for i in j + 1..n {
+            let aij = a.at(i, j);
+            let aji = a.at(j, i);
+            let delta = (aij - aji).abs();
+            let amax = if aij.abs() < aji.abs() {
+                aji.abs()
+            } else {
+                aij.abs()
+            };
+            if delta > tol && delta > amax * tol {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// `Aᵀ·A` for one object on both sides (`glue_times` hands it to `syrk<true>`): a vector by
+/// `syrk_vec` (a column: its dot product with itself, [`dot_blas`] on one thread; a row: the
+/// products `aₖ·aᵢ`, mirrored), up to 48 elements by `syrk_emul` (each element [`dot_arma`] of
+/// two columns, mirrored), larger by BLAS `dsyrk('U', 'T')`: OpenBLAS's syrk driver (the inner
+/// dimension in blocks of `GEMM_Q` = 256, a remainder between 256 and 512 halved; the columns
+/// in chunks of 32, each a call of the syrk kernel: a GEMM kernel call for the rows above the
+/// chunk and one for its diagonal block into a zeroed buffer), each element's block total
+/// summed as its tile of the GEMM kernel sums it ([`crate::lapack::blocked`]) and added to the
+/// element; the upper triangle mirrored.
+pub fn syrk_t(a: &Mat) -> Mat {
+    let (k, n) = (a.rows, a.cols);
+    let mut c = Mat::zeros(n, n);
+    if a.rows == 1 || a.cols == 1 {
+        if n == 1 {
+            c.data[0] = dot_blas(&a.data, &a.data, 1);
+            return c;
+        }
+        for kk in 0..n {
+            for i in kk..n {
+                let v = a.data[kk] * a.data[i];
+                c.set(kk, i, v);
+                c.set(i, kk, v);
+            }
+        }
+        return c;
+    }
+    if a.data.len() <= 48 {
+        for ca in 0..n {
+            for kk in ca..n {
+                let v = dot_arma(a.colptr(ca), a.colptr(kk));
+                c.set(ca, kk, v);
+                c.set(kk, ca, v);
+            }
+        }
+        return c;
+    }
+    use crate::lapack::blocked::{ksum, tile_sum};
+    const GEMM_Q: usize = 256;
+    // GEMM_UNROLL_MN: the driver's column chunks, each a call of the syrk kernel.
+    const MN: usize = 32;
+    let mut ls = 0;
+    while ls < k {
+        let mut min_l = k - ls;
+        if min_l >= GEMM_Q * 2 {
+            min_l = GEMM_Q;
+        } else if min_l > GEMM_Q {
+            min_l = min_l.div_ceil(2);
+        }
+        let mut jjs = 0;
+        while jjs < n {
+            let nn = (n - jjs).min(MN);
+            for j in jjs..jjs + nn {
+                let cj = a.colptr(j);
+                for i in 0..=j {
+                    let ci = a.colptr(i);
+                    let ab = |l: usize| (ci[ls + l], cj[ls + l]);
+                    if i < jjs {
+                        // The rows above the chunk's diagonal block: GEMM_KERNEL(jjs, nn, k).
+                        let acc = ksum(tile_sum(i, j - jjs, jjs, nn, min_l), min_l, ab);
+                        c.set(i, j, c.at(i, j) + acc * 1.0);
+                    } else {
+                        // The diagonal block: GEMM_KERNEL(nn, nn, k) into a zeroed buffer, whose
+                        // upper triangle is then added.
+                        let acc = ksum(tile_sum(i - jjs, j - jjs, nn, nn, min_l), min_l, ab);
+                        let sub = 0.0 + acc * 1.0;
+                        c.set(i, j, c.at(i, j) + sub);
+                    }
+                }
+            }
+            jjs += nn;
+        }
+        ls += min_l;
+    }
+    for j in 0..n {
+        for i in 0..j {
+            let v = c.at(i, j);
+            c.set(j, i, v);
+        }
+    }
+    c
+}
+
 /// `eig_sym(eigval, eigvec, X)` with the default method `"dc"` (as armawrap's `Jacobi` and
 /// `EigenValues` call it): Armadillo's rudimentary symmetry check (its corner elements; a
 /// failure prints `warning: eig_sym(): given matrix is not symmetric`, after a blank line, into
@@ -1423,10 +1535,22 @@ pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     if n == 0 || b.is_empty() {
         return Ok(Mat::zeros(a.cols, b.cols));
     }
-    assert!(
-        (n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1),
-        "solve(): LAPACK's path is ported up to 4 x 4 (8 x 8 for one column)"
-    );
+    if !((n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1)) {
+        // Larger systems with several right-hand sides: OpenBLAS's blocked dgesv. From 100
+        // rows a symmetric matrix takes Armadillo's dsytrf/dsytrs path instead (not ported).
+        assert!(
+            b.cols >= 2 && n <= 256 && !(n >= 100 && is_approx_sym(a)),
+            "solve(): LAPACK's path is ported up to 4 x 4 (8 x 8 for one column; up to \
+             256 rows, and up to 99 for a symmetric matrix, for several columns)"
+        );
+        let mut lu = a.data.clone();
+        let mut out = b.clone();
+        let mut ipiv = vec![0i32; n];
+        if lapack::blocked::gesv_any(&mut lu, n, &mut ipiv, &mut out.data, b.cols) != 0 {
+            return Err(Singular);
+        }
+        return Ok(out);
+    }
     let mut lu = a.data.clone();
     let mut out = b.clone();
     let mut ipiv = [0i32; lapack::MAX_N];

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23 (fsl-miscmaths 2412.4: SpMat.h, cg.h, bicg.h). FSL is
+// Translated to Rust from FSL 6.0.7.23 (fsl-miscmaths 2412.6: SpMat.h, cg.h, bicg.h). FSL is
 // Copyright (C) 2007 University of Oxford (cg.h and bicg.h after IML++, Copyright NIST). Rust
 // translation Copyright 2026 Karel Lopez Vilaret; modified from the originals. Distributed under
 // the FSL Licence (see LICENSE).

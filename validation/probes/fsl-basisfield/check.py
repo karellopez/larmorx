@@ -35,6 +35,15 @@ CASES = {
     "quad-k5": ((17, 12, 9), (1.5, 3.0, 2.0), (5, 3, 3), 2),
     "cubic-topup-like": ((24, 24, 16), (3.0, 3.0, F33), (5, 5, 4), 3),
 }
+# Set() only (sub-task 1b): fields large enough for OpenBLAS's blocked LU (more than 33
+# coefficients along a direction), odd sizes (an odd number of right-hand sides), quadratic
+# splines; Set() also runs on every case above.
+SET = {
+    "set-topup-like": ((64, 64, 40), (3.0, 3.0, F33), (1, 1, 1), 3),
+    "set-odd": ((45, 37, 21), (2.0, 2.5, 3.0), (1, 2, 1), 3),
+    "set-quad": ((33, 30, 17), (2.0, 2.0, 2.0), (1, 1, 2), 2),
+    "set-k3": ((50, 41, 30), (2.0, 2.0, 2.0), (3, 2, 1), 3),
+}
 # Energies only, on more than 10000 coefficients: OpenBLAS's threaded ddot.
 BIG = {"cubic-k1-big": ((24, 22, 20), (2.0, 2.0, F33), (1, 1, 1), 3)}
 
@@ -171,6 +180,46 @@ def main() -> int:
         e1 = (work / name / "fsl_blas1.txt").read_text().splitlines()[:3]
         e4 = (work / name / "fsl_blas4.txt").read_text().splitlines()[:3]
         print(f"  FSL's energies at 1 and 4 OpenBLAS threads: {'same' if e1 == e4 else 'differ'}")
+    # Set(): the coefficients fitted to ima1 and ima2 (FSL at one thread), every case.
+    for i, (name, (size, vxs, ksp, order)) in enumerate(SET.items()):
+        make_case(work / name, size, vxs, ksp, order, seed=5000 + i)
+    set_names = list(CASES) + list(SET)
+    for name in set_names:
+        with open(work / name / "fsl_set.txt", "w") as out:
+            subprocess.run(
+                [args.probe, str(work / name), "1", "set"], stdout=out, env=env, check=False
+            )
+    for name in set_names:
+        subprocess.run(
+            [
+                "cargo",
+                "test",
+                "--release",
+                "-q",
+                "-p",
+                "larmorx-nc-core",
+                "--test",
+                "basisfield_probe",
+                "--",
+                "--ignored",
+            ],
+            cwd=REPO / "crates-nc",
+            env=dict(
+                env,
+                BF_PROBE_ROOT=str(work),
+                BF_PROBE_ONLY=name,
+                BF_PROBE_SET="1",
+                BF_PROBE_OUTNAME="replica_set.txt",
+            ),
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        a = (work / name / "fsl_set.txt").read_text().splitlines()
+        b = (work / name / "replica_set.txt").read_text().splitlines()
+        nd = sum(x != y for x, y in zip(a, b, strict=False)) + abs(len(a) - len(b))
+        total_bad += nd
+        last = a[-1] if a and a[-1].startswith("exception") else ""
+        print(f"{name} (Set): {len(a)} lines, replica differs {nd} {last}")
     print(f"total differing lines: {total_bad}")
     return 1 if total_bad else 0
 

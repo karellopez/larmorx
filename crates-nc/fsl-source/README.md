@@ -21,7 +21,7 @@ them again.
 |---|---|---|---|
 | fsl-mcflirt | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/mcflirt | `mcflirt.cc`, `Globaloptions.{h,cc}`, `Log.{h,cc}` |
 | fsl-newimage | 2601.0 | https://git.fmrib.ox.ac.uk/fsl/newimage | `newimage.{h,cc}`, `newimagefns.{h,cc}`, `newimageio.h`, `generalio.cc`, `costfns.{h,cc}` |
-| fsl-miscmaths | 2412.6 | https://git.fmrib.ox.ac.uk/fsl/miscmaths | `miscmaths.{h,cc}`, `optimise.{h,cc}`, `kernel.{h,cc}`, `splinterpolator.h` |
+| fsl-miscmaths | 2412.6 | https://git.fmrib.ox.ac.uk/fsl/miscmaths | `miscmaths.{h,cc}`, `optimise.{h,cc}`, `kernel.{h,cc}`, `splinterpolator.h`; for topup: `SpMat.h`, `cg.h`, `bicg.h`, `bfmatrix.{h,cpp}`, `nonlin.{h,cpp}` |
 | fsl-newnifti | 5.0.0 | https://git.fmrib.ox.ac.uk/fsl/NewNifti | `NewNifti.{h,cc}`, `legacyFunctions.{h,cc}`, `nifti1.h`, `nifti2.h` |
 | fsl-znzlib | 2511.3 | https://git.fmrib.ox.ac.uk/fsl/znzlib | `znzlib.{h,cpp}`, `raw_plugin.{h,cpp}`, `gzip_plugin.{h,cpp}`, `zlib_wrapper.h`, `zstd_reader.{h,cpp}`, `zstd_writer.{h,cpp}`, `bzip2_plugin.{h,cpp}` (2111.0's `znzlib.c` is gone: znzlib is C++ since 2511) |
 | fsl-bet2 | 2111.9 | https://git.fmrib.ox.ac.uk/fsl/bet2 | `bet` (the script), `bet2.cpp`, `betsurf.{h,cpp}` (`robustfov`, the Tcl GUI and `bet4animal` are not translated) |

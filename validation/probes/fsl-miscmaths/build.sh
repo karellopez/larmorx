@@ -7,3 +7,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 g++ -O2 -std=c++17 -DARMA_DONT_USE_WRAPPER -I "$FSL/include" "$HERE/miscmaths_probe.cc" \
   -L "$FSL/lib" -lfsl-newimage -lfsl-miscmaths -lfsl-NewNifti -lfsl-znz \
   -lfsl-cprob -lfsl-utils -llapack -lblas -lz -pthread -Wl,-rpath,"$FSL/lib" -o "$1"
+# lapack_probe (FSL's OpenBLAS): build.sh <miscmaths_probe path> <lapack_probe path>
+if [ $# -ge 2 ]; then
+  gcc -O1 "$HERE/lapack_probe.c" -L "$FSL/lib" -llapack -lblas -Wl,-rpath,"$FSL/lib" -o "$2"
+fi

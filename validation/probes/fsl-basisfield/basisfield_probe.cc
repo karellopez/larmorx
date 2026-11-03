@@ -4,8 +4,9 @@
 // line per value, in the order and format of the replica's side
 // (crates-nc/larmorx-nc-core/tests/basisfield_probe.rs). See README.md.
 //
-// Usage: basisfield_probe <case dir> <nthr> [energy]   (energy: only the sizes, the energies and
-// their gradients)
+// Usage: basisfield_probe <case dir> <nthr> [energy|set]   (energy: only the sizes, the energies
+// and their gradients; set: only the coefficients Set() fits to ima1 and to ima2, and the field
+// they give)
 // <case dir>/params.txt: nx ny nz vx vy vz kx ky kz order
 // coef.bin (double, CoefSz), ima1.bin, ima2.bin (float, FieldSz), mask.bin (char, FieldSz),
 // points.txt (x y z per line: Peek), wide.txt (i j k per line: PeekWide).
@@ -67,6 +68,7 @@ int main(int argc, char* argv[])
   string dir(argv[1]);
   int nthr = atoi(argv[2]);
   bool energy_only = argc > 3 && string(argv[3]) == "energy";
+  bool set_only = argc > 3 && string(argv[3]) == "set";
   unsigned int nx, ny, nz, kx, ky, kz; double vx, vy, vz; int order;
   { ifstream p(dir + "/params.txt"); p >> nx >> ny >> nz >> vx >> vy >> vz >> kx >> ky >> kz >> order; }
   try {
@@ -83,6 +85,24 @@ int main(int argc, char* argv[])
       pd("bendeng", f.BendEnergy());
       pvec("memen_grad", f.MemEnergyGrad());
       pvec("bend_grad", f.BendEnergyGrad());
+      return 0;
+    }
+
+    if (set_only) {
+      vector<char> b1 = slurp(dir + "/ima1.bin"), b2 = slurp(dir + "/ima2.bin");
+      const float* q1 = reinterpret_cast<const float*>(b1.data());
+      const float* q2 = reinterpret_cast<const float*>(b2.data());
+      NEWIMAGE::volume<float> v1(nx, ny, nz), v2(nx, ny, nz);
+      v1.setdims(vx, vy, vz); v2.setdims(vx, vy, vz);
+      unsigned int vi = 0;
+      for (unsigned int k = 0; k < nz; k++) for (unsigned int j = 0; j < ny; j++) for (unsigned int i = 0; i < nx; i++, vi++) {
+        v1(i, j, k) = q1[vi]; v2(i, j, k) = q2[vi];
+      }
+      f.Set(v1);
+      pvec("set1", *f.GetCoef());
+      pvec("set1_field", *f.Get(BASISFIELD::FIELD));
+      f.Set(v2);
+      pvec("set2", *f.GetCoef());
       return 0;
     }
     unsigned int n = nx * ny * nz;

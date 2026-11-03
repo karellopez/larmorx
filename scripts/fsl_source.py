@@ -163,6 +163,14 @@ FILES = [
     ("fsl-basisfield", "splinefield.h"),
     ("fsl-basisfield", "splinefield.cpp"),
     ("fsl-basisfield", "fsl_splines.h"),
+    # topup (2026-11-03): fsl-miscmaths' sparse matrices, solvers and optimisers
+    ("fsl-miscmaths", "SpMat.h"),
+    ("fsl-miscmaths", "cg.h"),
+    ("fsl-miscmaths", "bicg.h"),
+    ("fsl-miscmaths", "bfmatrix.h"),
+    ("fsl-miscmaths", "bfmatrix.cpp"),
+    ("fsl-miscmaths", "nonlin.h"),
+    ("fsl-miscmaths", "nonlin.cpp"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

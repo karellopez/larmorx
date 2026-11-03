@@ -82,6 +82,15 @@ fn run(dir: &Path, blas_threads: usize, out: &mut String) -> Result<(), FslError
     };
     let ima1 = mk(rf("ima1.bin"));
     let ima2 = mk(rf("ima2.bin"));
+    if std::env::var("BF_PROBE_SET").is_ok() {
+        f.set_from_volume(&ima1)?;
+        pvec(out, "set1", f.coefs());
+        let g = f.get(FieldIndex::Field)?.to_vec();
+        pvec(out, "set1_field", &g);
+        f.set_from_volume(&ima2)?;
+        pvec(out, "set2", f.coefs());
+        return Ok(());
+    }
     let ones = mk(vec![1.0; n]);
     let mut mask: Volume<i8> = Volume::new(i64::from(nx), i64::from(ny), i64::from(nz), 1);
     mask.setdims(vx as f32, vy as f32, vz as f32);

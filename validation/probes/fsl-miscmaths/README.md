@@ -1,6 +1,6 @@
 # fsl-miscmaths' sparse matrices, solvers and optimisers, bit for bit
 
-What it shows: that `larmorx-nc-core`'s translations of FSL 6.0.7.23's fsl-miscmaths 2412.4
+What it shows: that `larmorx-nc-core`'s translations of FSL 6.0.7.23's fsl-miscmaths 2412.6
 sparse matrices (`spmat`: `SpMat<float>` and `SpMat<double>`), `BFMatrix` (`bfmatrix`: dense and
 sparse, the conversions between them), the iterative solvers of `SpMat::SolveForx` (IML++'s
 `CG` and `BiCG` with the diagonal preconditioner) and the non-linear optimisers topup uses
@@ -37,6 +37,31 @@ scripts/orchestration/boxed.sh 4 python -P validation/probes/fsl-miscmaths/check
 ```
 
 Result on 2026-11-03: 4 cases (86,013 lines), 0 lines differ.
+
+`lapack_probe.c` (with `check_lapack.py`) runs FSL's own OpenBLAS 0.3.33 (`liblapack.so.3`,
+`libblas.so`) on systems of equations and products: `dgesv` of 9 to 120 unknowns (general
+matrices with 2, 9, 25 and 70 right-hand sides, a diagonally dominant one, a banded
+normal-equation matrix like `splinefield::Set`'s with 64, a matrix whose first column is
+subnormal, an exactly singular one), printing the LU factors, the pivots and the solutions; and
+`dsyrk('U', 'T')` with inner dimensions from 49 to 700. The replica's side is the ignored test
+`lapack_probe` of `crates-nc/larmorx-nc-core/tests/lapack_probe.rs`
+(`larmorx_nc_core::lapack::blocked::gesv_any`, `arma::syrk_t`).
+
+```bash
+bash build.sh <scratch>/miscmaths_probe <scratch>/lapack_probe
+scripts/orchestration/boxed.sh 4 python -P validation/probes/fsl-miscmaths/check_lapack.py \
+    --probe <scratch>/lapack_probe --work <scratch>/lpprobe
+```
+
+Result on 2026-11-03: 128 cases (527,035 lines), 0 lines differ. The first version, which summed
+every element of the GEMM kernel in one accumulator, differed in every system whose trailing
+block or right-hand sides had an odd number of columns: OpenBLAS's Haswell kernel
+(`dgemm_kernel_4x8_haswell.S`) sums an element of its 4-row, 1-column tile in four partial
+sums (the products of each group of 8 by their index modulo 4, then the rest into the first,
+added as `(s0 + s1) + (s2 + s3)`); every other tile uses one accumulator. The core's older
+`lapack::blas::dgemm` (FLIRT's and FAST's larger products) models every tile with one
+accumulator: it differs from FSL's for an odd number of columns with at least 4 rows and 8 or
+more products (not met by those replicas' records; noted for the orchestrator).
 
 Facts it found (for the topup replica's findings, restricted):
 

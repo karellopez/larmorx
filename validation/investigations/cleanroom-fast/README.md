@@ -32,3 +32,38 @@ original (`LARMORX_FAST_BIN`, a `larmorx` binary, else `python -m larmorx`); eac
 glibc's `rand` (the MRF's random posteriors, `specs/fast.md` §8.1) was checked through ctypes
 (`srand(0xFFFFFFFF)`: the first values and the millionth; `srand(0)`); the values are in
 `crates/larmorx-fsl/src/fast/rng.rs`'s test.
+
+## `math::exp_in_place` against the scalar `exp` (relay 4, 2026-11-03)
+
+The batch `exp` the PVE likelihoods use (`larmorx_core::math::exp_in_place`, relay 3: `exp`'s fast
+path four values at a time, compiled with AVX2 and FMA where the CPU has them) must give the scalar
+`exp`'s bits on every input, or Linux x64 (the AVX2 path) and the platforms without it (the baseline
+path: aarch64, x86-64 CPUs without AVX2) part. The probe is the ignored test
+`math::exp::tests::exp_in_place_randomized` in `crates/larmorx-core/src/math/exp.rs` (inside the
+crate so that it reaches both builds of the batch, the fast path's lane test and the accurate path's
+database):
+
+    boxed.sh 4 cargo test --release -j 14 -p larmorx-core --lib exp_in_place_randomized -- --ignored --nocapture
+
+(`LARMORX_EXP_CHECK_N` sets the count, 2^32 by default; `LARMORX_EXP_CHECK_THREADS` the threads, 14.)
+Every value goes through the baseline batch and the dispatched batch, in buffers of 4,093 values (the
+scalar tail runs too) where every kind below is mixed, so each lane meets every kind; each result is
+compared bit for bit, NaN payloads included, with the scalar `exp` and the dispatched `math::exp`.
+
+The run on the main machine (AMD, AVX-512; the dispatched batch on AVX2 and FMA), 20 s on 14 threads,
+**4,294,967,296 values, 0 differences**:
+
+| values | kind |
+|---:|---|
+| 536,814,387 | uniform bit patterns over all 2^64 (NaNs and infinities included) |
+| 805,275,751 | uniform bit patterns over the finite doubles |
+| 805,337,402 | uniform in [-746, 710] (the fast path's range and both thresholds beyond it) |
+| 536,942,013 | uniform in [-60, 1] (the range FAST's likelihoods use) |
+| 536,874,988 | every binade from 2^-64 to 2^10, both signs |
+| 268,395,820 | within 2^20 ulps of each branch threshold, both signs: `abs(x) = 2^-54` (`1 + x`), overflow, the subnormal results, underflow, infinity |
+| 268,429,078 | within 8 ulps of `(k + 1/2) / S` (the rounding of `x S` to the table's index), k over the whole range |
+| 268,434,649 | within 2^12 ulps of each database input (the accurate path's hard cases) |
+| 268,463,208 | subnormal inputs, ±0, ±inf, NaNs of random payloads, both signs, quiet and signalling |
+
+Of the lanes of the 4-wide path, 2,408,075,977 kept the fast path's result and 17,222,731 were sent by
+its rounding test to the scalar `exp` (its accurate path); the rest were outside the fast path's range.

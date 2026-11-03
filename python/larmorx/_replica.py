@@ -112,13 +112,24 @@ class ReplicaError(RuntimeError):
         The program's exit code.
     stderr
         What it wrote to standard error.
+    stdout
+        What it wrote to standard output (FSL's programs print some of their errors there).
     """
 
-    def __init__(self, message: str, *, command: Sequence[str], returncode: int, stderr: str):
+    def __init__(
+        self,
+        message: str,
+        *,
+        command: Sequence[str],
+        returncode: int,
+        stderr: str,
+        stdout: str = "",
+    ):
         super().__init__(message)
         self.command = list(command)
         self.returncode = returncode
         self.stderr = stderr
+        self.stdout = stdout
 
 
 @dataclass(frozen=True)
@@ -286,6 +297,7 @@ def run(
             command=command,
             returncode=process.returncode,
             stderr=process.stderr,
+            stdout=process.stdout,
         )
     return process
 

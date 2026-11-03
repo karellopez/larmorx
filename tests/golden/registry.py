@@ -1006,11 +1006,44 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
-#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below); topup and applytopup
-#: (2026-11-03) have their replicas only, until their clean-room originals are written.
+#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below); topup and applytopup,
+#: fslmaths and fslstats (2026-11-03: their generic functions and typed wrappers) have their
+#: replicas only, until their clean-room originals are written.
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
     "lx.fsl.topup": "fsl topup",
     "lx.fsl.applytopup": "fsl applytopup",
+    "lx.fsl.add_noise": "fsl fslmaths",
+    "lx.fsl.apply_mask": "fsl fslmaths",
+    "lx.fsl.arithmetic": "fsl fslmaths",
+    "lx.fsl.bandpass_temporal_filter": "fsl fslmaths",
+    "lx.fsl.binarise": "fsl fslmaths",
+    "lx.fsl.collapse": "fsl fslmaths",
+    "lx.fsl.dog_edge": "fsl fslmaths",
+    "lx.fsl.fslmaths": "fsl fslmaths",
+    "lx.fsl.grid": "fsl fslmaths",
+    "lx.fsl.normalise_intensity": "fsl fslmaths",
+    "lx.fsl.roc": "fsl fslmaths",
+    "lx.fsl.roi": "fsl fslmaths",
+    "lx.fsl.smooth": "fsl fslmaths",
+    "lx.fsl.spatial_filter": "fsl fslmaths",
+    "lx.fsl.statistical": "fsl fslmaths",
+    "lx.fsl.subsample2": "fsl fslmaths",
+    "lx.fsl.tensor_decomp": "fsl fslmaths",
+    "lx.fsl.tfce": "fsl fslmaths",
+    "lx.fsl.tfce_support": "fsl fslmaths",
+    "lx.fsl.threshold": "fsl fslmaths",
+    "lx.fsl.unary": "fsl fslmaths",
+    "lx.fsl.bounding_roi": "fsl fslstats",
+    "lx.fsl.centre_of_gravity": "fsl fslstats",
+    "lx.fsl.extremum_position": "fsl fslstats",
+    "lx.fsl.fslstats": "fsl fslstats",
+    "lx.fsl.image_entropy": "fsl fslstats",
+    "lx.fsl.image_histogram": "fsl fslstats",
+    "lx.fsl.image_mean": "fsl fslstats",
+    "lx.fsl.image_percentile": "fsl fslstats",
+    "lx.fsl.image_range": "fsl fslstats",
+    "lx.fsl.image_std": "fsl fslstats",
+    "lx.fsl.image_volume": "fsl fslstats",
 }
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases

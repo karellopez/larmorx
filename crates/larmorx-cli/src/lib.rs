@@ -38,8 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup` and `applytopup` have their
-/// replicas only; a test checks the list).
+/// FLIRT's and FAST's programs are `larmorx_fsl::cli`; `fsl topup`, `applytopup`, `fslmaths` and
+/// `fslstats` have their replicas only; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -62,6 +62,8 @@ const FSL_TOOLS: &[&str] = &[
     "fast",
     "topup",
     "applytopup",
+    "fslmaths",
+    "fslstats",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -412,7 +414,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats"),
             "{out}"
         );
         assert!(
@@ -422,11 +424,11 @@ mod tests {
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["topup", "applytopup"]
+            ["topup", "applytopup", "fslmaths", "fslstats"]
         );
-        // every FSL tool but mcflirt (`mri hmc`) and topup and applytopup (the replicas only) is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
+        // every FSL tool but mcflirt (`mri hmc`) and topup, applytopup, fslmaths and fslstats (the
+        // replicas only) is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 4], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -435,8 +437,9 @@ mod tests {
         let (code, _, err) = run_options(&["lx", "fsl", "fast"], &original);
         assert_eq!(code, 1);
         assert!(err.contains("\nFAST \nCopyright(c) 2004-2012"), "{err}");
-        // topup and applytopup have no original yet: `original` is an error that says so.
-        for tool in ["topup", "applytopup"] {
+        // topup, applytopup, fslmaths and fslstats have no original yet: `original` is an error
+        // that says so.
+        for tool in ["topup", "applytopup", "fslmaths", "fslstats"] {
             let (code, _, err) = run_options(&["lx", "fsl", tool], &original);
             assert_ne!(code, 0);
             assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");

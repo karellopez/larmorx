@@ -718,9 +718,8 @@ def _balanced(stages: list[str]) -> bool:
         kind, _, name = ln.partition(" ")
         if kind == "Entering":
             open_.append(name)
-        elif kind == "Leaving":
-            if not open_ or open_.pop() != name:
-                return False
+        elif kind == "Leaving" and (not open_ or open_.pop() != name):
+            return False
     return not open_
 
 

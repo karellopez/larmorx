@@ -35,5 +35,18 @@ FSL or larmorx goes in a memory box (`scripts/orchestration/boxed.sh 8 ...`).
 | `t_trans24.py` | that penalty against probes D to H: FSL's level-2 start fields to single precision (the zero-continued penalty misses by 0.002 to 0.023 Hz rms) |
 | `final_ssd.py` | the last level's SSD recomputed from `--iout` (it equals `-v`'s last SSD): the final cost of runs without `-v`, FSL's at `--nthr=4` included |
 
+| `mov_euler.py`, `mov_order.py` | the rigid-body matrix: the Euler order and signs, the centre of `--rbmout`'s matrices (`debug/movements`, `opt/four-volumes`; finding 13) |
+| `mov_model.py` | the movement model against FSL's corrected volumes of `debug/movements` (the sampling `R^T (x - c - t) + c`, the image's centre; finding 13) |
+| `mov_grad.py`, `mov_grad_at.py`, `mov_fit.py`, `mov_fit_lever.py`, `mov_brute.py`, `mov_mask.py`, `mov_fd.py`, `mov_fd_images.py`, `mov_trilinear.py` | the movement part of FSL's gradients against the exact derivative and the rejected hypotheses (lever arms, centres, units, masks, finite differences; finding 14) |
+| `mov_replica_probe.py` | the replica (`LARMORX_NC_BIN`, a black box) on synthetic images with a residual at one voxel: FSL's lever arms (`SX=-1` radiological storage, `Q=1` curved images, `V0` the voxels, `MINE` the original for comparison; finding 14) |
+| `mov_vs_replica.py` | the original against the replica: the first gradient's movement entries in five settings of regridding, subsampling and smoothing (finding 14) |
+| `quad_layout.py` | the quadratic B-spline layout from FSL's `_fieldcoef` and `--fout` (`opt/splineorder-2`; finding 16) |
+
+The probes of relay 2 (FSL through the cache with `fsl_case.py args`, then `mine.py`): `I` the
+defaults with `-v` (finding 15), `J` and `K` the membrane energy with scaled conjugate gradients
+and Levenberg-Marquardt, `L` trilinear interpolation, `M` FSL-118 at the first level, `N` and
+`O` the oblique and `b02b0_7T` cases without the movements, `P` a negative `--fwhm`, `Q` a
+negative `--lambda` (finding 16); `mine.py` takes `LXD=reproduce` for the original's mode.
+
 Example: `TOPUP_RUNS=<scratch>/runs python -P fsl_case.py case debug/one-level $TOPUP_RUNS/fsl-debug1`
 then `python -I proto3.py $TOPUP_RUNS/fsl-debug1`.

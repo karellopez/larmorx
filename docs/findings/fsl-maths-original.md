@@ -267,3 +267,29 @@ the output image and exits 0, without a curve file and without a message (the pr
 as the suite's `orig/roc-nodir`). A request the run cannot satisfy passes silently (rule B):
 larmorx stops with an error naming the file by default, and skips the curve silently with
 `reproduce`, as FSL does. Registered as FSL-193.
+
+## 21. fslstats: what black-box runs show beyond the spec, relay 4
+
+`show_fslstats.py` printed FSL 6.0.7.23's output on the replica suite's synthetic cases and on
+probes (the suite's own cases `orig/` keep them):
+- **Preoptions.** `-t`, `-K <index>` and `-json` are taken while at least two arguments remain;
+  then fewer than two (`fslstats -t img`, `fslstats -K lab`) print the usage (status 1).
+- **A crash loses buffered output.** FSL's standard output is written in blocks, flushed by
+  each line on its standard error and at its exit: `-m -E -m` on a constant image (FSL-185's
+  crash, no message before it) prints nothing, `-m -u -1e30 -X` (FSL-184, after its
+  `calculateExtrema` line) prints the mean. The original's refusals of FSL's crashes print
+  alike.
+- **The masks the options make.** `-P`, `-e`, `-E` and `-w` make the masks from the thresholds
+  when there are none as `-l` does, multiplying the image by the mask: on an image holding
+  `+inf`, `-P 50 -D` prints `-nan` where `-D` alone prints `inf`.
+- **Empty forms.** `-M`, `-S` (and `-s`, `-m`) without a mask on an image of zeros print 0 without
+  a message; `-json -K` without a positive label writes `"indices": []`; `-p nan` gives the
+  smallest value.
+- **Message order.** A histogram's `findHistogram: mask is empty` comes before the check of its
+  limits (an empty mask on a constant image prints it); `-l 100 -e` prints it, then crashes
+  (FSL-185).
+- **The centre of gravity of a neurological image.** BET's call (`-l 0.001 -C` on ds005040's
+  T1w, stored with a positive determinant) prints x = 97.862242 where the spec's double sums
+  give 97.862248 (y and z identical): one unit in the sixth decimal, 6e-8 relative, inside
+  §10's bound (1e-6); the arithmetic of FSL's mapping back to the file's x is not known (single
+  precision at the end gives 97.862251 or 97.862244, neither): a spec question.

@@ -449,7 +449,37 @@ def _real_case(checks: CheckList, files, args: list[str]) -> None:
 
 
 def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
-    return {}
+    """Paths the replica suite's cases do not reach (black-box runs of the clean-room part)."""
+    T = "standard"
+    r = rep._r
+    return {
+        "orig/P-makes-masks": (
+            T,
+            "-P makes the masks from the thresholds and multiplies the image by them (+inf "
+            "becomes NaN for the later -D)",
+            r("@orig:rampinf", "-P", "50", "-D"),
+        ),
+        "orig/w-makes-masks": (T, "-w makes the masks likewise", r("@orig:rampinf", "-w", "-D")),
+        "orig/e-makes-masks": (T, "-e makes the masks likewise", r("@orig:rampinf", "-e", "-D")),
+        "orig/zeros-M": (T, "-M without nonzero values (0, no message)", r("@zeros3", "-M")),
+        "orig/zeros-sS": (
+            T,
+            "-m, -s, -S, -V without nonzero values",
+            r("@zeros3", "-m", "-s", "-S", "-V"),
+        ),
+        "orig/json-K-none": (
+            T,
+            "-json -K without a positive label: an empty list of indices",
+            r("-json", "-K", "@labneg", "@a", "-m"),
+        ),
+        "orig/e-empty-mask": (
+            T,
+            "-l 100 -e -E: the histogram's message, then FSL-185 (FSL crashes)",
+            r("@a", "-l", "100", "-e", "-E"),
+        ),
+        "orig/p-nan": (T, "-p nan -P nan: the smallest value", r("@a", "-p", "nan", "-P", "nan")),
+        "orig/t-3d": (T, "-t on a 3D image: one pass", r("-t", "@a", "-m")),
+    }
 
 
 def cases(tier: str) -> list[Case]:

@@ -301,3 +301,23 @@ authors' permanent cases or the history of replica and spec-writer commits. Its 
 | `maths::tfce` (relay 3) | `-tfce` (the interior voxels, the thresholds' single-precision sums, the clusters by connectivity class, `pow(s, E) · powf(h, H)` with `E` and `H` in single precision, the messages; FSL-153, 174, 175, 176), `-tfceS` (the voxel's cluster per threshold, the sum from the top, the output at the threshold reached, at `h₀` or the voxels outside every cluster; FSL-174, 176, 177, 178), `-tfce_minT`, `-tfce_delta` | §14, §19; findings 17 |
 | `maths::roc` (relay 4) | `-roc`: the log transform, the thresholds' steps, the truth's mask, true voxels and candidates, the rates and their means, the noise image's family-wise rate and spreads, the areas and the last rectangle, the quartiles, the curve file and the printed line (findings 19), FSL-153, FSL-179, FSL-180, FSL-193; the counts by binary search over each volume's sorted values (the original's own) | §15, §19; findings 19, 20 |
 | `maths::tensor` (relay 3) | `-tensor_decomp`: the 6-volume check, the symmetric eigenproblem (cyclic Jacobi rotations, the original's own; FSL calls LAPACK), `FA`, `MD`, `MO` in single precision, the nine images' names and display ranges, the chain on with `FA`, FSL-166 | §16, §19; findings 18 |
+
+## fslstats (`cli::fslstats`; relay 4 of fslmaths' and fslstats' part, 2026-11-03)
+
+`fslstats` (FSL's image statistics: its preoptions, every option, the messages and exit statuses,
+the JSON output, FSL-181 to FSL-189) was written by the same clean-room implementer, under the
+same rules as fslmaths above (FSL's source, its tests included, never opened; the replica suite's
+`fsltest/` cases, which read FSL's own test script and images from FSL's source tree, are left
+out of the original's suite). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/fslstats.md`](../../specs/fslstats.md) (FSL 6.0.7.23, fsl-avwutils 2209.6) | the behaviour: the command line, the usage text, the pass state and the options that change it, every statistic, the output and nlohmann's number form as the spec describes it, the defects |
+| Black-box runs of FSL 6.0.7.23's `fslstats` (through the oracle cache: the replica suite's synthetic cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md), `show_fslstats.py`) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md) findings 21: the preoptions' rule, the messages' order, the lost output of a crash, the masks `-P`, `-e`, `-E`, `-w` make, the empty forms |
+| The defect register's summary rows of FSL-181 to FSL-189 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `maths::{image, ops, num, reduce}` (the reading, the robust range, the extremes, the block sums, C's conversions), `flirt::schedule::std_sort_checked` (libstdc++'s sort, for `-p`, `-P` with `reproduce`), `cli::{common, options, fmt}` | images, numbers, formats |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::fslstats` | the preoptions (`-t`, `-K`, `-json`) and the usage, the passes, the thresholds and masks (`-l`, `-u`, `-k`, the masks `-P`, `-e`, `-E`, `-w` make), `-d`, `-a`, `-n`, the counts, the masked and unmasked means and standard deviations in FSL's blocks (FSL-182), `-D`, the extremes and their positions (FSL-181, FSL-184), the robust range (FSL-181, FSL-187), the percentiles (libstdc++'s order where NaN or ±0 make it matter), the histograms (FSL-186, FSL-187), the entropies (FSL-185), the bounding box (FSL-188), the centres of gravity, `-t` with `-k`, `-d` (FSL-183), the text and the JSON document (FSL-189), the messages and statuses, a crash's lost output | §2-§8; findings 21 |
+| `cli::fmt::json` | nlohmann/json's number form (the shortest round-trip digits; fixed notation from 1e-4 to below 1e15, an integral value with `.0`; else `d.ddde±XX`; `null`) | §6.2 |

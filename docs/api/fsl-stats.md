@@ -16,11 +16,18 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 `crates-nc/larmorx-nc-core`, because BET's script runs it, with its command line in
 `crates-nc/larmorx-nc-avwutils`, under the FSL Licence's terms:
 [PROVENANCE](../../crates-nc/larmorx-nc-core/PROVENANCE.md)), done (2026-11-03), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/fslstats.md`](../../specs/fslstats.md). Until then every function runs the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
-command line chooses alike (`LARMORX_IMPLEMENTATION`).
+clean-room **original** in the main package (Apache-2.0, `crates/larmorx-fsl`'s
+`cli::fslstats`, written from [`specs/fslstats.md`](../../specs/fslstats.md), FSL's
+documentation and black-box runs of FSL's program:
+[PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in progress since 2026-11-03: every
+option, preoption (`-t`, `-K`, `-json`), message, exit status and failure case, the defects
+FSL-181 to FSL-189 (relay 4 of its part; its suite `fsl-stats`: fMRIPrep's four goodvoxels
+calls and BET's call among its 158 cases, every one identical to FSL or failing alike, BET's
+`-C` within §10's bound: its x one unit in the sixth decimal off). `implementation="auto"` (the
+default) runs the replica when `larmorx-nc` is installed, the original otherwise; `"replica"`
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the original in this
+process on `n_threads` threads (its results the same at any count; a failure raises
+`RuntimeError` with its messages). The command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-stats-replica`, record [fsl-stats-replica](../validation/fsl-stats-replica.md), standard
@@ -147,7 +154,7 @@ on standard error (`larmorx-nc: upstream defect FSL-<n> (fslstats) corrected: ..
 
 ## Not yet
 
-- The clean-room original (`implementation="original"`), from `specs/fslstats.md`.
+- The clean-room original's speed work, golden cases and record (its next relays).
 - zstd and bzip2 inputs are decompressed whole before they are read (about twice the memory of
   gzip ones; fMRIPrep writes neither).
 - The goodvoxels calls with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

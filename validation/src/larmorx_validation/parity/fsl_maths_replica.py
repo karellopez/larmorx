@@ -15,6 +15,9 @@ cases:
   the kernels and spatial filters (every ``-kernel`` type, the dilations, erosions, median,
   convolutions by the direct sum and the FFT, subsampling, edges, hole filling, mean
   normalisation, tensor decomposition), one case per path;
+- **dim**, **stat**, **roi**, **bptf**, **tfce**, **tfceS**, **roc**: the reductions along a
+  dimension, the statistics, ``-roi``, ``-bptf``, the threshold-free cluster enhancement and the
+  ROC analysis (FSL-167 to FSL-180), one case per path;
 
 all on small synthetic images made once (``oracles/inputs/fsl-maths-replica/``, seeded, every
 NIfTI type and header the cases need).
@@ -107,7 +110,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v6.done"
+    marker = base / "v7.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -352,6 +355,52 @@ def _make_inputs(d: Path) -> None:
     ptiny = pmap.copy()
     ptiny[0, 1, 0], ptiny[1, 1, 0], ptiny[2, 1, 0], ptiny[3, 1, 0] = 1e-20, 1e-30, 1e-45, 2e-16
     _save(d / "ptiny.nii.gz", ptiny, dtype=np.float32)
+    # sub-task 3b: -tfce, -tfceS (statistic maps with two blobs: centres (3, 3, 3) and (7, 6, 5),
+    # plain arithmetic) and -roc (signal in the truth's region, pure noise, a truth image)
+    tsh = (10, 9, 8)
+    gx, gy, gz = np.meshgrid(*(np.arange(n) for n in tsh), indexing="ij")
+    r1 = (gx - 3) ** 2 + (gy - 3) ** 2 + (gz - 3) ** 2
+    r2 = (gx - 7) ** 2 + (gy - 6) ** 2 + (gz - 5) ** 2
+    blobs = np.maximum(0, 4.0 - r1 * 0.8) + np.maximum(0, 3.0 - r2 * 0.6)
+    tfz = (blobs + rng.standard_normal(tsh) * 0.3).astype(np.float32)
+    _save(d / "tfz.nii.gz", tfz, dtype=np.float32, affine=_affine(tsh))
+    tfz4 = np.stack([tfz, (tfz * 0.5 + rng.standard_normal(tsh) * 0.2).astype(np.float32)], -1)
+    _save(d / "tfz4.nii.gz", tfz4.astype(np.float32), dtype=np.float32, affine=_affine(tsh))
+    _save(d / "tfd.nii.gz", tfz.astype(np.float64) / 3, dtype=np.float64, affine=_affine(tsh))
+    _save(d / "tfs.nii.gz", np.round(tfz * 2).astype(np.int16), dtype=np.int16, affine=_affine(tsh))
+    _save(d / "tfzero.nii.gz", np.zeros(tsh, np.float32), dtype=np.float32, affine=_affine(tsh))
+    tfneg = (-np.abs(tfz) - 0.5).astype(np.float32)
+    _save(d / "tfneg.nii.gz", tfneg, dtype=np.float32, affine=_affine(tsh))
+    tfnan = tfz.copy()
+    tfnan[0, 0, 0], tfnan[5, 5, 5] = np.nan, np.nan
+    _save(d / "tfnan.nii.gz", tfnan, dtype=np.float32, affine=_affine(tsh))
+    tfinf = tfz.copy()
+    tfinf[3, 3, 3] = np.inf
+    _save(d / "tfinf.nii.gz", tfinf, dtype=np.float32, affine=_affine(tsh))
+    _save(d / "tfsmall.nii.gz", tfz[:2], dtype=np.float32, affine=_affine((2, 9, 8)))
+    rsh = (8, 7, 6)
+    truth = np.zeros(rsh, np.float32)
+    truth[2:5, 2:5, 1:4] = 1.0
+    truth[5, 5, 4] = 0.5
+    truth[0, 0, :] = -1.0  # excluded from the noise (-roc with a negative threshold)
+    _save(d / "roctruth.nii.gz", truth, dtype=np.float32, affine=_affine(rsh))
+    rocim = (100 + rng.standard_normal((*rsh, 3)) * 5).astype(np.float32)
+    rocim += (truth[..., None] > 0.25) * np.float32(12)
+    _save(d / "rocim.nii.gz", rocim, dtype=np.float32, affine=_affine(rsh))
+    _save(d / "rocimd.nii.gz", rocim.astype(np.float64), dtype=np.float64, affine=_affine(rsh))
+    _save(d / "rocims.nii.gz", np.round(rocim).astype(np.int16), dtype=np.int16)
+    _save(d / "rocim3.nii.gz", rocim[..., 0], dtype=np.float32, affine=_affine(rsh))
+    rocnan = rocim.copy()
+    rocnan[0, 0, 0, 0] = np.nan
+    _save(d / "rocnan.nii.gz", rocnan, dtype=np.float32, affine=_affine(rsh))
+    rocnoise = (100 + rng.standard_normal((*rsh, 3)) * 5).astype(np.float32)
+    _save(d / "rocnoise.nii.gz", rocnoise, dtype=np.float32, affine=_affine(rsh))
+    noise4 = (100 + rng.standard_normal((*rsh, 4)) * 5).astype(np.float32)
+    _save(d / "rocnoise4.nii.gz", noise4, dtype=np.float32, affine=_affine(rsh))
+    _save(d / "rocnoise2.nii.gz", rocnoise[..., :2], dtype=np.float32, affine=_affine(rsh))
+    _save(d / "roctruthneg.nii.gz", -np.ones(rsh, np.float32), dtype=np.float32)
+    _save(d / "roctruthones.nii.gz", np.ones(rsh, np.float32), dtype=np.float32)
+    _save(d / "roctruthsmall.nii.gz", truth[:6], dtype=np.float32, affine=_affine((6, 7, 6)))
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1021,6 +1070,7 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
     }
     c.update(_filter_cases())
     c.update(_dim_cases())
+    c.update(_tfce_cases())
     return c
 
 
@@ -1656,6 +1706,261 @@ def _dim_cases() -> dict[str, tuple[str, str, Run]]:
             T,
             "FSL-171: -bptf inf -1 (FSL writes outside its array)",
             _r(TSC, "-bptf", "inf", "-1", "out", undefined="FSL-171"),
+        ),
+    }
+    return c
+
+
+def _tfce_cases() -> dict[str, tuple[str, str, Run]]:
+    """Sub-task 3b: -tfce, -tfceS, -tfce_minT, -tfce_delta and -roc (one case per path)."""
+    S, T = "smoke", "standard"
+    Z = "@tfz"
+    ROC = ("@rocnoise", "@roctruth")
+    c: dict[str, tuple[str, str, Run]] = {
+        "tfce/basic": (S, "-tfce 2 0.5 6", _r(Z, "-tfce", "2", "0.5", "6", "out")),
+        "tfce/conn18": (T, "-tfce 2 0.5 18", _r(Z, "-tfce", "2", "0.5", "18", "out")),
+        "tfce/conn26": (T, "-tfce 2 0.5 26", _r(Z, "-tfce", "2", "0.5", "26", "out")),
+        "tfce/minT": (
+            T,
+            "-tfce_minT 1 -tfce 2 0.5 6",
+            _r(Z, "-tfce_minT", "1", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "tfce/delta": (
+            T,
+            "-tfce_delta 0.3 -tfce 1.5 0.66 26",
+            _r(Z, "-tfce_delta", "0.3", "-tfce", "1.5", "0.66", "26", "out"),
+        ),
+        "tfce/negative-minT": (
+            T,
+            "-tfce_minT -1 -tfce 0.5 0.5 6 (powf of negative heights: NaN)",
+            _r(Z, "-tfce_minT", "-1", "-tfce", "0.5", "0.5", "6", "out"),
+        ),
+        "tfce/many-steps": (
+            T,
+            "-tfce_delta 0.0004: the warning of many integral steps",
+            _r(Z, "-tfce_delta", "0.0004", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "tfce/4d": (
+            T,
+            "-tfce of each volume of a 4D image",
+            _r("@tfz4", "-tfce", "2", "1", "6", "out"),
+        ),
+        "tfce/double": (T, "-tfce of a double image", _r("@tfd", "-tfce", "2", "0.5", "6", "out")),
+        "tfce/short": (
+            T,
+            "-tfce under -dt short",
+            _r("-dt", "short", "@tfs", "-tfce", "1", "0.5", "6", "out", "-odt", "short"),
+        ),
+        "tfce/inf": (
+            T,
+            "-tfce with an infinite maximum",
+            _r("@tfinf", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "tfce/small": (
+            T,
+            "-tfce of an image 2 voxels wide (tfce's error)",
+            _r("@tfsmall", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "tfce/negative-delta": (
+            T,
+            "-tfce_delta -1 (tfce's error)",
+            _r(Z, "-tfce_delta", "-1", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "tfce/into-output": (
+            T,
+            "-tfce with the output name as its connectivity",
+            _r(Z, "-tfce", "2", "0.5", "out"),
+        ),
+        "tfce/chain": (
+            T,
+            "-tfce then -mul (the options kept between operations)",
+            _r(Z, "-tfce_delta", "0.25", "-tfce", "2", "0.5", "6", "-mul", "2", "out"),
+        ),
+        "tfceS/basic": (
+            S,
+            "-tfceS 2 0.5 6 3 3 3 30",
+            _r(Z, "-tfceS", "2", "0.5", "6", "3", "3", "3", "30", "out"),
+        ),
+        "tfceS/conn26": (
+            T,
+            "-tfceS 2 0.5 26 7 6 5 20",
+            _r(Z, "-tfceS", "2", "0.5", "26", "7", "6", "5", "20", "out"),
+        ),
+        "tfceS/not-reached": (
+            T,
+            "-tfceS with a threshold its sum never reaches (the message)",
+            _r(Z, "-tfceS", "2", "0.5", "6", "3", "3", "3", "1e9", "out"),
+        ),
+        "tfceS/delta": (
+            T,
+            "-tfce_delta 0.35 -tfceS (the arrays sized from the step)",
+            _r(Z, "-tfce_delta", "0.35", "-tfceS", "2", "0.5", "6", "3", "3", "3", "15", "out"),
+        ),
+        "tfceS/4d": (
+            T,
+            "-tfceS of each volume of a 4D image",
+            _r("@tfz4", "-tfceS", "2", "0.5", "6", "3", "3", "3", "10", "out"),
+        ),
+        "tfceS/double": (
+            T,
+            "-tfceS of a double image",
+            _r("@tfd", "-tfceS", "1", "1", "18", "7", "6", "5", "2", "out"),
+        ),
+        "tfceS/low-voxel": (
+            T,
+            "-tfceS at a voxel without positive value",
+            _r(Z, "-tfceS", "2", "0.5", "6", "0", "8", "0", "5", "out"),
+        ),
+        "tfceS/inf": (
+            T,
+            "-tfceS at an infinite voxel (in no cluster: std::out_of_range)",
+            _r("@tfinf", "-tfceS", "2", "0.5", "6", "3", "3", "3", "5", "out"),
+        ),
+        # D13
+        "d13/tfce-zero": (
+            T,
+            "FSL-175: -tfce of an image of zeros",
+            _r("@tfzero", "-tfce", "2", "0.5", "6", "out", fixed="FSL-175"),
+        ),
+        "d13/tfce-negative": (
+            T,
+            "FSL-175: -tfce of an image without positive values",
+            _r("@tfneg", "-tfce", "2", "0.5", "6", "out", fixed="FSL-175"),
+        ),
+        "d13/tfce-nan": (
+            T,
+            "FSL-153: -tfce with a NaN first voxel",
+            _r("@tfnan", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "d13/tfce-conn7": (T, "FSL-176: -tfce 2 0.5 7", _r(Z, "-tfce", "2", "0.5", "7", "out")),
+        "d13/tfceS-conn7": (
+            T,
+            "FSL-176: -tfceS with connectivity 7",
+            _r(Z, "-tfceS", "2", "0.5", "7", "3", "3", "3", "30", "out"),
+        ),
+        "d13/tfce-delta-nan": (
+            T,
+            "FSL-174: -tfce_delta nan (FSL: zeros)",
+            _r(Z, "-tfce_delta", "nan", "-tfce", "2", "0.5", "6", "out"),
+        ),
+        "d13/tfce-stall": (
+            T,
+            "FSL-174: -tfce_minT -1e9 (the thresholds never advance: FSL never ends)",
+            _r(Z, "-tfce_minT", "-1e9", "-tfce", "2", "0.5", "6", "out", undefined="FSL-174"),
+        ),
+        "d13/tfceS-stall": (
+            T,
+            "FSL-174: -tfceS with -tfce_minT -1e9 (std::out_of_range)",
+            _r(Z, "-tfce_minT", "-1e9", "-tfceS", "2", "0.5", "6", "3", "3", "3", "30", "out"),
+        ),
+        "d13/tfceS-negative-delta": (
+            T,
+            "FSL-174: -tfceS with -tfce_delta -0.5",
+            _r(Z, "-tfce_delta", "-0.5", "-tfceS", "2", "0.5", "6", "3", "3", "3", "30", "out"),
+        ),
+        "d13/tfceS-minT": (
+            T,
+            "FSL-177: -tfceS with -tfce_minT -2 (more thresholds than its arrays)",
+            _r(
+                Z,
+                "-tfce_minT",
+                "-2",
+                "-tfceS",
+                "2",
+                "0.5",
+                "6",
+                "3",
+                "3",
+                "3",
+                "30",
+                "out",
+                fixed="FSL-177",
+            ),
+        ),
+        "d13/tfceS-outside": (
+            T,
+            "FSL-178: -tfceS at x = 10 of 10 (FSL reads the next row's first voxel)",
+            _r(Z, "-tfceS", "2", "0.5", "6", "10", "2", "3", "30", "out"),
+        ),
+        "d13/tfceS-far": (
+            T,
+            "FSL-178: -tfceS at a voxel far outside (FSL reads outside the image)",
+            _r(Z, "-tfceS", "2", "0.5", "6", "4000", "2", "3", "30", "out", undefined="FSL-178"),
+        ),
+        # -roc
+        "roc/noise": (
+            S,
+            "-roc 0.05 with a noise image (the FWE rate)",
+            _r("@rocim", "-roc", "0.05", "roc.txt", *ROC, "out"),
+        ),
+        "roc/truth": (
+            T,
+            "-roc -0.05: the FP rate from the truth's zero voxels (negative ones left out)",
+            _r("@rocim", "-roc", "-0.05", "roc.txt", "@roctruth", "out"),
+        ),
+        "roc/never-reached": (
+            T,
+            "-roc 2 (the FP rate never reaches it)",
+            _r("@rocim", "-roc", "2", "roc.txt", *ROC, "out"),
+        ),
+        "roc/3d": (
+            T,
+            "-roc of a 3D image",
+            _r("@rocim3", "-roc", "-0.1", "roc.txt", "@roctruth", "out"),
+        ),
+        "roc/double": (
+            T,
+            "-roc of a double image (log in double)",
+            _r("@rocimd", "-roc", "0.05", "roc.txt", *ROC, "out"),
+        ),
+        "roc/short": (
+            T,
+            "-roc under -dt short",
+            _r("-dt", "short", "@rocims", "-roc", "-0.05", "roc.txt", "@roctruth", "out"),
+        ),
+        "roc/zero": (
+            T,
+            "-roc 0 (0 / 0 printed)",
+            _r("@rocim", "-roc", "0", "roc.txt", *ROC, "out"),
+        ),
+        "roc/truth-size": (
+            T,
+            "-roc with a truth image of another size (newimage's exception)",
+            _r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise", "@roctruthsmall", "out"),
+        ),
+        "d13/roc-nan": (
+            T,
+            "FSL-153: -roc of an image whose first voxel is NaN",
+            _r("@rocnan", "-roc", "0.05", "roc.txt", *ROC, "out"),
+        ),
+        "d13/roc-noise-larger": (
+            T,
+            "FSL-179: -roc with a noise image of 4 volumes for 3",
+            _r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise4", "@roctruth", "out"),
+        ),
+        "d13/roc-noise-smaller": (
+            T,
+            "FSL-179: -roc with a noise image of 2 volumes for 3 (FSL writes outside it)",
+            _r(
+                "@rocim",
+                "-roc",
+                "0.05",
+                "roc.txt",
+                "@rocnoise2",
+                "@roctruth",
+                "out",
+                undefined="FSL-179",
+            ),
+        ),
+        "d13/roc-no-true": (
+            T,
+            "FSL-180: -roc with a truth image without true voxels",
+            _r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise", "@roctruthneg", "out"),
+        ),
+        "d13/roc-no-noise": (
+            T,
+            "FSL-180: -roc -0.05 with a truth image without zero voxels",
+            _r("@rocim", "-roc", "-0.05", "roc.txt", "@roctruthones", "out"),
         ),
     }
     return c

@@ -22,13 +22,15 @@
 //!   (`larmorx_nc_core::filters`, `kissfft`).
 //! - **Along dimensions and statistics** (`stats`): `-T`, `-X`, `-Y`, `-Z` reductions, `-pval`,
 //!   `-pval0`, `-cpval`, `-ztop`, `-ptoz`, `-rank`, `-ranknorm`, `-roi`, `-bptf`.
+//! - **Threshold-free cluster enhancement and ROC** (`tfce`): `-tfce`, `-tfceS`, `-tfce_minT`,
+//!   `-tfce_delta`, `-roc`.
 //! - **D13.** FSL-151 (conversions to integers), FSL-152 (the `max() + 1` bound), FSL-153 (a
 //!   NaN first voxel), FSL-155 (`-dt input` of a type without its own), FSL-156 (integer
 //!   division traps), FSL-158 (arguments read past the command line), FSL-159 (images of
 //!   another size), FSL-160 (a zero-width Gaussian), FSL-161 (a kernel without voxels), FSL-162
 //!   (a NaN in a sorted window), FSL-163 (4D subsampling), FSL-164 (4D `-dog_edge`), FSL-165
 //!   (`-fillh` of one slice), FSL-166 (a non-finite tensor), FSL-167 to FSL-172 (`stats`'
-//!   defects): corrected by default, reproduced
+//!   defects), FSL-173 to FSL-180 (`tfce`'s): corrected by default, reproduced
 //!   with `LARMORX_UPSTREAM_DEFECTS=reproduce` (crashes are refused in both modes).
 
 use std::io::Write;
@@ -49,6 +51,7 @@ use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Volu
 use crate::usage;
 
 mod stats;
+mod tfce;
 
 /// How the program runs: FSL's environment settings and D13's mode.
 pub struct Run<'a> {
@@ -355,9 +358,6 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
         _ => input_parser::<f32>(a, output_dt, ctx),
     }
 }
-
-/// The operations of later sub-tasks (refused until they are translated).
-const NOT_YET: &[&str] = &["-roc", "-tfce_minT", "-tfce_delta", "-tfce", "-tfceS"];
 
 fn read4d<T: Arith>(ctx: &Ctx, name: &str) -> Result<Volume<T>, FslError> {
     Ok(volume::read_volume4d::<T>(name, ctx.run.fsl)?.0)
@@ -668,6 +668,8 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
     let mut separable = false;
     let mut zero_width = false;
     let mut set_display_range = false;
+    // -tfce_minT and -tfce_delta
+    let mut tfce_params = tfce::TfceParams::default();
     let mut modified = false;
     let mut i = 2usize;
     while i + 1 < argc {
@@ -695,6 +697,25 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 stats::bptf(ctx, &mut input, argv, i)?;
                 i += 2;
             }
+            "-tfce_minT" => {
+                i += 1;
+                tfce_params.min_t = cnum::atof(number_arg(ctx, argv, i)?) as f32;
+            }
+            "-tfce_delta" => {
+                i += 1;
+                tfce_params.delta = cnum::atof(number_arg(ctx, argv, i)?) as f32;
+            }
+            "-tfce" => {
+                if let Some(code) = tfce::tfce(ctx, &mut input, argv, i, tfce_params)? {
+                    return Ok(code);
+                }
+                i += 3;
+            }
+            "-tfceS" => {
+                tfce::tfce_support(ctx, &mut input, argv, i, tfce_params)?;
+                i += 7;
+            }
+            "-roc" => i = tfce::roc(ctx, &input, argv, i)?,
             "-mas" => {
                 i += 1;
                 let name = string_arg(ctx, argv, i)?;
@@ -1120,7 +1141,6 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     ctx.put(&printed);
                 }
             }
-            _ if NOT_YET.contains(&op) => return Err(not_yet(ctx, op)),
             _ => {
                 ctx.put(&format!(
                     "\n Error in command line: unknown option \"{op}\"\n\n"
@@ -1414,13 +1434,6 @@ fn morph<T: Arith>(
         input.data[t * nvox..(t + 1) * nvox].copy_from_slice(&out);
     }
     Ok(())
-}
-
-fn not_yet(ctx: &mut Ctx, op: &str) -> Stop {
-    ctx.eput(&format!(
-        "larmorx-nc: error: fslmaths: {op} is not translated yet in this build\n"
-    ));
-    Stop::Exit(1)
 }
 
 /// `sqrt` of a positive value in the type's own function (`sqrtf` for `float`, `sqrt` of the

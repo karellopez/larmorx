@@ -572,6 +572,22 @@ defects! {
         "-bptf with a sigma whose filter half-width is not a valid int (+inf, or a sigma above about 3.6e8 volumes for the high-pass, 5.4e7 for the low-pass): either filter crashes or stops the program (an uncaught exception: std::bad_array_new_length)";
     FSL_172 = "FSL-172", "fslmaths", true,
         "-ptoz of a p-value so small that 1 - p rounds to 1 (below about 1.1e-16) gives an infinite z and prints ndtri domain error for each such voxel, instead of the z of that p-value";
+    FSL_173 = "FSL-173", "fslmaths", true,
+        "-tfce reads one element past the end of its list of voxels above the lowest threshold in both of its loops over that list (each tests the element before the bound); the element read never changes the result, but the read may fall outside the program's memory when the list fills its allocation to the end of a page";
+    FSL_174 = "FSL-174", "fslmaths", true,
+        "-tfce and -tfceS with a threshold step that cannot advance the thresholds (a step below the precision of the float threshold it is added to, a NaN step, and for -tfceS a negative one): -tfce never ends, or with a NaN step returns zeros; -tfceS stops (an uncaught exception: std::out_of_range) once its arrays are full";
+    FSL_175 = "FSL-175", "fslmaths", true,
+        "-tfce of a volume whose maximum is 0 or below (an all-zero statistic image, for example) stops with tfce requires a positive deltaT input when the step is automatic, where no voxel is above the lowest threshold and the enhancement is 0 everywhere";
+    FSL_176 = "FSL-176", "fslmaths", true,
+        "-tfce and -tfceS accept any connectivity: -tfce joins the neighbours of the largest of 6, 18 and 26 not above it (none below 6), -tfceS none at all unless it is exactly 6, 18 or 26";
+    FSL_177 = "FSL-177", "fslmaths", true,
+        "-tfceS sizes its arrays of cluster sizes and thresholds from the voxel's value over the step, leaving out the lowest threshold (-tfce_minT) and the rounding of the accumulated float thresholds: with a negative lowest threshold, or one step more than planned, the program stops (an uncaught exception: std::out_of_range), and where the arrays have no element (the voxel's value over the step below 0) or the voxel's volume has no cluster at all it divides by zero (SIGFPE)";
+    FSL_178 = "FSL-178", "fslmaths", true,
+        "-tfceS with a voxel outside the image reads the image and the cluster labels at the voxel's offset from their start (another voxel, or memory outside the image)";
+    FSL_179 = "FSL-179", "fslmaths", true,
+        "-roc with a noise image of another size than the input indexes the noise image with the input's sizes: its log transform misses volumes (whose raw values then set the thresholds' range) or reaches voxels twice, and a smaller noise image is read and written outside its memory";
+    FSL_180 = "FSL-180", "fslmaths", true,
+        "-roc with a truth image without true voxels (or, without a noise image, without zero voxels) divides 0 by 0 for the true (false) positive rates, writes them as NaN to the curve and stops in its quartiles' sort (an uncaught exception: sort(): detected NaN)";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

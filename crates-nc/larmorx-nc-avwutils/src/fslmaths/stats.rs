@@ -504,19 +504,7 @@ pub(super) fn roi<T: Arith>(
     let y1 = end(y0, a[3], input.ysize() - 1);
     let z1 = end(z0, a[5], input.zsize() - 1);
     let t1 = end(t0, a[7], input.tsize() - 1);
-    let m = input.niftivox2newimagevox_mat();
-    let map = |x: i32, y: i32, z: i32| -> [i32; 3] {
-        let v = [f64::from(x), f64::from(y), f64::from(z), 1.0];
-        let mut r = [0i32; 3];
-        for (row, out) in r.iter_mut().enumerate() {
-            let mut s = 0.0;
-            for (c, &vc) in v.iter().enumerate() {
-                s += m.at(row, c) * vc;
-            }
-            *out = volume::round_f64(s);
-        }
-        r
-    };
+    let map = |x: i32, y: i32, z: i32| nifti_to_newimage_vox(input, x, y, z);
     let [mut x0, mut y0, mut z0] = map(x0, y0, z0);
     let [mut x1, mut y1, mut z1] = map(x1, y1, z1);
     if x0 > x1 {
@@ -545,6 +533,27 @@ pub(super) fn roi<T: Arith>(
         }
     }
     Ok(())
+}
+
+/// NIfTI voxel coordinates in newimage's order: `niftivox2newimagevox_mat() * (x, y, z, 1)`,
+/// each `MISCMATHS::round`ed (`-roi`, `-tfceS`).
+pub(super) fn nifti_to_newimage_vox<T: Arith>(
+    input: &Volume<T>,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> [i32; 3] {
+    let m = input.niftivox2newimagevox_mat();
+    let v = [f64::from(x), f64::from(y), f64::from(z), 1.0];
+    let mut r = [0i32; 3];
+    for (row, out) in r.iter_mut().enumerate() {
+        let mut s = 0.0;
+        for (c, &vc) in v.iter().enumerate() {
+            s += m.at(row, c) * vc;
+        }
+        *out = volume::round_f64(s);
+    }
+    r
 }
 
 /// `-bptf <hp_sigma> <lp_sigma>`; FSL-171: a sigma beyond int's range.

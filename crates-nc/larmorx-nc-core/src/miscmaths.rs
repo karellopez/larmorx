@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.17: fsl-miscmaths 2203.2 (miscmaths.{h,cc}). Copyright (C)
+// Translated to Rust from FSL 6.0.7.17: fsl-miscmaths 2203.2 (miscmaths.{h,cc}); `mean`, `var`,
+// `quantile`, `percentile`, `interp1` and `seq` from FSL 6.0.7.23: fsl-miscmaths 2412.6. Copyright (C)
 // 1999-2018 University of Oxford (Mark Jenkinson et al.). Rust translation Copyright 2026 Karel
 // Lopez Vilaret; modified from the original. Distributed under the FSL Licence (see LICENSE).
 //! The transform algebra of FSL's registration tools: Euler rotations about a centre
@@ -686,9 +687,109 @@ pub fn read_ascii_matrix(filename: &str) -> Result<Mat, MatrixFileError> {
     Ok(mat)
 }
 
+// ------------------------------------------------------------------------------------------------
+// The column statistics of fslmaths' -roc (FSL 6.0.7.23: fsl-miscmaths 2412.6, miscmaths.cc)
+
+/// `mean(v)` of a column vector (`dim` 1): `res += v(r) / N` row by row (SSE's NaN).
+pub fn mean_col(v: &[f64]) -> f64 {
+    use crate::sse::{add_f64, div_f64};
+    let n = v.len() as i32 as f64;
+    v.iter().fold(0.0, |s, &x| add_f64(s, div_f64(x, n)))
+}
+
+/// `var(v)` of a column vector: `res += (v(r) - m) * (v(r) - m) / (N - 1)` with `m` the
+/// [`mean_col`], 0 for one value or none.
+pub fn var_col(v: &[f64]) -> f64 {
+    use crate::sse::{add_f64, div_f64, mul_f64, sub_f64};
+    let n = v.len() as i32;
+    if n <= 1 {
+        return 0.0;
+    }
+    let m = mean_col(v);
+    let d = f64::from(n - 1);
+    v.iter().fold(0.0, |s, &x| {
+        let a = sub_f64(x, m);
+        add_f64(s, div_f64(mul_f64(a, a), d))
+    })
+}
+
+/// `interp1(x, y, xi)`: `y` at `xi` by linear interpolation in the ascending `x`, in `float`
+/// (`y` of the last row at or beyond `x`'s maximum, of the first at or below its minimum).
+pub fn interp1(x: &[f64], y: &[f64], xi: f32) -> f32 {
+    let xmax = crate::arma::direct_max(x);
+    let xmin = crate::arma::direct_min(x);
+    let xd = f64::from(xi);
+    if xd >= xmax {
+        return y[y.len() - 1] as f32;
+    }
+    if xd <= xmin {
+        return y[0] as f32;
+    }
+    let mut ind = 1usize;
+    while xd >= x[ind] {
+        ind += 1;
+    }
+    let (xa, xb) = (x[ind - 1] as f32, x[ind] as f32);
+    let (ya, yb) = (y[ind - 1] as f32, y[ind] as f32);
+    use crate::sse::{add_f32, div_f32, mul_f32, sub_f32};
+    let t = mul_f32(div_f32(sub_f32(xi, xa), sub_f32(xb, xa)), sub_f32(yb, ya));
+    add_f32(t, ya)
+}
+
+/// `percentile(in, p)`: `in` sorted (Armadillo's `sort`, `None` for a NaN: `sort(): detected
+/// NaN`), then [`interp1`] of `[y(1); y; y(num)]` at `p` over `[0; 100 (seq - 0.5) / num; 100]`.
+pub fn percentile_col(v: &[f64], p: f32) -> Option<f32> {
+    let mut y = v.to_vec();
+    if !crate::filters::arma_sort(&mut y, false) {
+        return None;
+    }
+    let num = y.len();
+    let mut xx = Vec::with_capacity(num + 2);
+    xx.push(0.0);
+    for i in 1..=num {
+        xx.push(((i as f64 - 0.5) * 100.0) / num as i32 as f64);
+    }
+    xx.push(100.0);
+    let mut yy = Vec::with_capacity(num + 2);
+    yy.push(y[0]);
+    yy.extend_from_slice(&y);
+    yy.push(y[num - 1]);
+    Some(interp1(&xx, &yy, p))
+}
+
+/// `quantile(in, which)`: the percentile 0, 25, 50, 75 or 100 (`which` 0 to 4; else 0).
+pub fn quantile_col(v: &[f64], which: i32) -> Option<f32> {
+    let p = match which {
+        1 => 25.0,
+        2 => 50.0,
+        3 => 75.0,
+        4 => 100.0,
+        _ => 0.0,
+    };
+    percentile_col(v, p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn column_statistics() {
+        let v = [0.25, 0.5, 0.125, 1.0];
+        assert_eq!(
+            mean_col(&v),
+            0.25 / 4.0 + 0.5 / 4.0 + 0.125 / 4.0 + 1.0 / 4.0
+        );
+        assert!(var_col(&v) > 0.0);
+        assert_eq!(var_col(&[3.0]), 0.0);
+        // percentile 25 of 4 sorted values: between the first (12.5) and second (37.5) points
+        let q1 = quantile_col(&v, 1).unwrap();
+        assert_eq!(q1, 0.125 + (25.0 - 12.5) / (37.5 - 12.5) * (0.25 - 0.125));
+        assert_eq!(quantile_col(&[7.0], 3), Some(7.0));
+        assert_eq!(quantile_col(&v, 0), Some(0.125));
+        assert_eq!(quantile_col(&v, 4), Some(1.0));
+        assert_eq!(quantile_col(&[1.0, f64::NAN], 1), None);
+    }
 
     #[test]
     fn quaternion_round_trip_and_messages() {

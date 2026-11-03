@@ -425,6 +425,215 @@ pub fn expf(x: f32) -> f32 {
     (y * s) as f32
 }
 
+/// `__powf_log2_data` (Arm's `powf_log2_data.c`, `POWF_LOG2_TABLE_BITS` 4; `POWF_SCALE` 1 on
+/// x86-64, which has no `TOINT_INTRINSICS`): `(invc, logc)` per subinterval and the polynomial,
+/// as 64-bit patterns (every word found as one block in Ubuntu 22.04's libm.so.6, glibc
+/// 2.35-0ubuntu3: `validation/investigations/fsl-maths/arm_glibc_powf.py`).
+#[rustfmt::skip]
+mod powf_tables {
+    /// `tab`.
+    pub const TAB: [(u64, u64); 16] = [
+        (0x3ff661ec79f8f3be, 0xbfdefec65b963019), (0x3ff571ed4aaf883d, 0xbfdb0b6832d4fca4),
+        (0x3ff49539f0f010b0, 0xbfd7418b0a1fb77b), (0x3ff3c995b0b80385, 0xbfd39de91a6dcf7b),
+        (0x3ff30d190c8864a5, 0xbfd01d9bf3f2b631), (0x3ff25e227b0b8ea0, 0xbfc97c1d1b3b7af0),
+        (0x3ff1bb4a4a1a343f, 0xbfc2f9e393af3c9f), (0x3ff12358f08ae5ba, 0xbfb960cbbf788d5c),
+        (0x3ff0953f419900a7, 0xbfaa6f9db6475fce), (0x3ff0000000000000, 0x0000000000000000),
+        (0x3fee608cfd9a47ac, 0x3fb338ca9f24f53d), (0x3feca4b31f026aa0, 0x3fc476a9543891ba),
+        (0x3feb2036576afce6, 0x3fce840b4ac4e4d2), (0x3fe9c2d163a1aa2d, 0x3fd40645f0c6651c),
+        (0x3fe886e6037841ed, 0x3fd88e9c2c1b9ff8), (0x3fe767dcf5534862, 0x3fdce0a44eb17bcc),
+    ];
+    /// `poly`.
+    pub const POLY: [u64; 5] = [
+        0x3fd27616c9496e0b, 0xbfd71969a075c67a, 0x3fdec70a6ca7badd, 0xbfe7154748bef6c8,
+        0x3ff71547652ab82b,
+    ];
+    /// `__exp2f_data.shift_scaled` (0x1.8p+52 / 32).
+    pub const SHIFT_SCALED: u64 = 0x42e8000000000000;
+    /// `__exp2f_data.poly`.
+    pub const EXP2_POLY: [u64; 3] = [0x3fac6af84b912394, 0x3fcebfce50fac4f3, 0x3fe62e42ff0c52d6];
+    /// `0x1.fffffffd1d571p+6`: the limit of `|x^y|` above `0x1.ffffffp127`.
+    pub const OFLOW: u64 = 0x405fffffffd1d571;
+}
+
+/// `log2_inline(ix)` of Arm's `powf.c`: `log2(x)` in double for the representation `ix` of a
+/// positive normal (or normalised subnormal) `x`. GCC fuses its six multiply-adds in glibc's
+/// FMA build (`__powf_fma`, read from `objdump -d` of Ubuntu 22.04's libm.so.6).
+#[inline]
+fn powf_log2_inline(ix: u32) -> f64 {
+    use powf_tables::{POLY, TAB};
+    const OFF: u32 = 0x3f33_0000;
+    let tmp = ix.wrapping_sub(OFF);
+    let i = ((tmp >> (23 - 4)) % 16) as usize;
+    let top = tmp & 0xff80_0000;
+    let iz = ix.wrapping_sub(top);
+    let k = (top as i32) >> 23;
+    let invc = f64::from_bits(TAB[i].0);
+    let logc = f64::from_bits(TAB[i].1);
+    let z = f64::from(f32::from_bits(iz));
+    let a = |n: usize| f64::from_bits(POLY[n]);
+    let r = z.mul_add(invc, -1.0);
+    let y0 = logc + f64::from(k);
+    let r2 = r * r;
+    let y = a(0).mul_add(r, a(1));
+    let p = a(2).mul_add(r, a(3));
+    let r4 = r2 * r2;
+    let q = a(4).mul_add(r, y0);
+    let q = p.mul_add(r2, q);
+    y.mul_add(r4, q)
+}
+
+/// `exp2_inline(xd, sign_bias)` of Arm's `powf.c` (no `TOINT_INTRINSICS`): `2^xd` rounded to
+/// float, negated when `sign_bias` holds `SIGN_BIAS`. Three multiply-adds fused.
+#[inline]
+fn powf_exp2_inline(xd: f64, sign_bias: u32) -> f32 {
+    use exp2f_tables::TAB;
+    use powf_tables::{EXP2_POLY, SHIFT_SCALED};
+    let shift = f64::from_bits(SHIFT_SCALED);
+    let kd = xd + shift;
+    let ki = kd.to_bits();
+    let kd = kd - shift;
+    let r = xd - kd;
+    let ski = ki.wrapping_add(u64::from(sign_bias));
+    let t = TAB[(ki % 32) as usize].wrapping_add(ski << (52 - 5));
+    let s = f64::from_bits(t);
+    let c = |n: usize| f64::from_bits(EXP2_POLY[n]);
+    let z = c(0).mul_add(r, c(1));
+    let r2 = r * r;
+    let y = c(2).mul_add(r, 1.0);
+    let y = z.mul_add(r2, y);
+    (y * s) as f32
+}
+
+/// `checkint(iy)`: 0 if `y` is not an integer, 1 if an odd one, 2 if an even one (`y` finite and
+/// not zero).
+#[inline]
+fn powf_checkint(iy: u32) -> i32 {
+    let e = ((iy >> 23) & 0xff) as i32;
+    if e < 0x7f {
+        return 0;
+    }
+    if e > 0x7f + 23 {
+        return 2;
+    }
+    let sh = (0x7f + 23 - e) as u32;
+    if iy & ((1u32 << sh) - 1) != 0 {
+        return 0;
+    }
+    if iy & (1u32 << sh) != 0 {
+        return 1;
+    }
+    2
+}
+
+/// `zeroinfnan(i)`: the representation of 0, an infinity or a NaN.
+#[inline]
+fn powf_zeroinfnan(i: u32) -> bool {
+    i.wrapping_mul(2).wrapping_sub(1) >= 2u32.wrapping_mul(0x7f80_0000).wrapping_sub(1)
+}
+
+/// `issignalingf_inline(x)` with IEEE 754-2008 signalling NaNs (x86-64).
+#[inline]
+fn issignalingf(x: f32) -> bool {
+    (x.to_bits() ^ 0x0040_0000).wrapping_mul(2) > 2u32.wrapping_mul(0x7fc0_0000)
+}
+
+/// glibc's `powf` (x86-64, FMA build: `__powf_fma`, Arm's `powf.c` compiled with -mfma -mavx2;
+/// `WANT_ROUNDING`, `WANT_ERRNO`, `WANT_ERRNO_UFLOW`). Not correctly rounded (Arm: 0.82 ulp).
+/// FSL's binaries bind `powf@GLIBC_2.2.5`, the SVID-compatible wrapper: its replacements (the
+/// overflow's and pole's `±HUGE_VAL`, the underflow's `±0`, `zero / zero` for a negative number
+/// to a non-integer power, SSE's `-nan`) are this function's own values, so the wrapper changes
+/// no result (`tools/libm-verify` checks it against the wrapper).
+#[must_use]
+pub fn powf(x: f32, y: f32) -> f32 {
+    use crate::sse::{add_f32, div_f32, mul_f32};
+    const SIGN_BIAS: u32 = 1 << (5 + 11);
+    let mut sign_bias: u32 = 0;
+    let mut ix = x.to_bits();
+    let iy = y.to_bits();
+    if ix.wrapping_sub(0x0080_0000) >= 0x7f80_0000 - 0x0080_0000 || powf_zeroinfnan(iy) {
+        // Either (x < 0x1p-126 or inf or nan) or (y is 0 or inf or nan).
+        if powf_zeroinfnan(iy) {
+            if iy.wrapping_mul(2) == 0 {
+                return if issignalingf(x) { add_f32(x, y) } else { 1.0 };
+            }
+            if ix == 0x3f80_0000 {
+                return if issignalingf(y) { add_f32(x, y) } else { 1.0 };
+            }
+            if ix.wrapping_mul(2) > 2u32.wrapping_mul(0x7f80_0000)
+                || iy.wrapping_mul(2) > 2u32.wrapping_mul(0x7f80_0000)
+            {
+                return add_f32(x, y);
+            }
+            if ix.wrapping_mul(2) == 2 * 0x3f80_0000 {
+                return 1.0;
+            }
+            if (ix.wrapping_mul(2) < 2 * 0x3f80_0000) == (iy & 0x8000_0000 == 0) {
+                // |x| < 1 && y == inf or |x| > 1 && y == -inf
+                return 0.0;
+            }
+            return y * y;
+        }
+        if powf_zeroinfnan(ix) {
+            let mut x2 = mul_f32(x, x);
+            if ix & 0x8000_0000 != 0 && powf_checkint(iy) == 1 {
+                x2 = -x2;
+                sign_bias = 1;
+            }
+            if ix.wrapping_mul(2) == 0 && iy & 0x8000_0000 != 0 {
+                // __math_divzerof(sign_bias)
+                return if sign_bias != 0 {
+                    f32::NEG_INFINITY
+                } else {
+                    f32::INFINITY
+                };
+            }
+            return if iy & 0x8000_0000 != 0 {
+                div_f32(1.0, x2)
+            } else {
+                x2
+            };
+        }
+        // x and y are non-zero finite.
+        if ix & 0x8000_0000 != 0 {
+            let yint = powf_checkint(iy);
+            if yint == 0 {
+                return math_invalidf(x);
+            }
+            if yint == 1 {
+                sign_bias = SIGN_BIAS;
+            }
+            ix &= 0x7fff_ffff;
+        }
+        if ix < 0x0080_0000 {
+            // A subnormal x, normalised so that its exponent is negative.
+            ix = (x * f32::from_bits(0x4b00_0000)).to_bits();
+            ix &= 0x7fff_ffff;
+            ix = ix.wrapping_sub(23 << 23);
+        }
+    }
+    let logx = powf_log2_inline(ix);
+    let ylogx = f64::from(y) * logx;
+    if ((ylogx.to_bits() >> 47) & 0xffff) >= (126.0f64.to_bits() >> 47) {
+        // |y * log(x)| >= 126
+        let sign = |v: f32| if sign_bias != 0 { -v } else { v };
+        if ylogx > f64::from_bits(powf_tables::OFLOW) {
+            // __math_oflowf: 0x1p97f * 0x1p97f
+            return sign(f32::from_bits(0x7000_0000)) * f32::from_bits(0x7000_0000);
+        }
+        // Above 0x1.fffffffa3aae2p+6 (|x^y| > 0x1.fffffep127) Arm's code tests whether the
+        // rounding mode rounds away from 0: never in round-to-nearest, so nothing happens.
+        if ylogx <= -150.0 {
+            // __math_uflowf: 0x1p-95f * 0x1p-95f
+            return sign(f32::from_bits(0x1000_0000)) * f32::from_bits(0x1000_0000);
+        }
+        if ylogx < -149.0 {
+            // __math_may_uflowf: 0x1.4p-75f * 0x1.4p-75f
+            return sign(f32::from_bits(0x1a20_0000)) * f32::from_bits(0x1a20_0000);
+        }
+    }
+    powf_exp2_inline(ylogx, sign_bias)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,6 +669,33 @@ mod tests {
         assert_eq!(logf(f32::INFINITY), f32::INFINITY);
         let (s, c) = sincosf(1e-30);
         assert_eq!((s, c), (1e-30, 1.0));
+    }
+
+    /// `powf@GLIBC_2.2.5`'s values on Linux x86-64 (glibc 2.35, FMA build, `tools/libm-verify`'s
+    /// reference): the main path, a negative base, poles, a subnormal base, overflow, underflow.
+    #[test]
+    fn powf_values() {
+        let cases: [(f32, f32, u32); 11] = [
+            (2.0, 0.5, 0x3fb5_04f3),
+            (3.7, 2.0, 0x415b_0a3e),
+            (0.04, 2.5, 0x39a7_c5ac),
+            (1234.0, 0.6667, 0x42e6_263e),
+            (-8.0, 3.0, 0xc400_0000),
+            (-8.0, 0.5, 0xffc0_0000),
+            (0.0, -1.0, 0x7f80_0000),
+            (-0.0, -3.0, 0xff80_0000),
+            (1e-40, 0.5, 0x1e3c_e4e7),
+            (10.0, 40.0, 0x7f80_0000),
+            (10.0, -50.0, 0),
+        ];
+        for (x, y, want) in cases {
+            assert_eq!(powf(x, y).to_bits(), want, "powf({x:e}, {y:e})");
+        }
+        assert_eq!(powf(f32::NAN, 0.0), 1.0);
+        assert_eq!(powf(1.0, f32::NAN), 1.0);
+        assert!(powf(f32::NAN, 2.0).is_nan());
+        assert_eq!(powf(0.5, f32::INFINITY), 0.0);
+        assert_eq!(powf(2.0, f32::INFINITY), f32::INFINITY);
     }
 
     /// Values glibc 2.35 (FMA build) returns, from the verification tool on Linux x86-64; among

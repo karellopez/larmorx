@@ -164,3 +164,24 @@ even `box`/`boxv`/`boxv3` and asymmetric files) are not affected. fMRIPrep's cal
 it (goodvoxels' `-s 5` is separable). New register entry FSL-192 (the handoff); the suite's cases
 `orig/fft-asym` (the default's fix pass names it) and `orig/direct-asym` (the direct path's
 orientation, bit for bit).
+
+## 15. `-bptf`'s high-pass products as FSL evaluates them, relay 3
+
+`fsl_outputs.py` with `-bptf` on the replica suite's double series (`@tsd`, 9 volumes): the
+high-pass alone (`-bptf 2.5 -1`, `3.3 -1`, `0.7 -1`), the low-pass alone (`-bptf -1 1`, `-1 1.5`,
+`-1 0.7`) and both (`-bptf 2.5 1`), then `fit_bptf.py`. FSL's values are given bit for bit, on
+every probe (7,560 values), by the high-pass sums' products taken left to right, `C = Σ (w Δ) Δ`
+and `D = Σ (w Δ) x`, with plain left-to-right sums; the spec's `C = Σ w Δ²` gives 607 of 1,080
+values of `-bptf 2.5 -1` and 113 of 1,080 of `-bptf 2.5 1` (the rest one or two units in the last
+place apart). The weights `exp(−Δ² / (2σ²))` and `exp(−0.5 Δ² / (σ σ))` give the same values on
+these probes (the original takes the second). In single precision the spec's form rounds to the
+same values on the record's float cases; in double only FSL's order gives its bits (the
+original's `-bptf` is bit for bit on every case of the record).
+
+## 16. The NaN of `-ztop` and `-ptoz`, relay 3
+
+`d13/ztop-inf`: FSL's `-ztop` of `+inf` and `-inf` is the positive NaN (`0x7fc00000`), not the
+default NaN. `stat/ptoz`: FSL's `-ptoz` of a NaN voxel (the input's `0x7fc00000`) is the default
+NaN (`0xffc00000`), not the input's NaN passed on. The original gives those bits (the spec does
+not say which NaN).
+

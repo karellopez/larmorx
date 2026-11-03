@@ -172,6 +172,35 @@ def test_the_originals_filters(scripts):
         lx.fsl.spatial_filter((data, affine), "dilM", kernel=("boxv", 0), **orig)
 
 
+def test_the_originals_reductions_and_statistics(scripts):
+    # sub-task 3's operations through the typed wrappers and fslmaths' clean-room original
+    rng = np.random.default_rng(3)
+    series = rng.integers(0, 50, (4, 3, 2, 7)).astype(np.float32)
+    affine = np.diag([2.0, 2.0, 2.0, 1.0])
+    orig = {"implementation": "original"}
+    m = np.asarray(lx.fsl.collapse((series, affine), "mean", **orig).data)
+    assert m.shape == (4, 3, 2) and np.allclose(m, series.mean(axis=3), rtol=1e-6)
+    mx = np.asarray(lx.fsl.collapse((series, affine), "max", axis="X", **orig).data)
+    assert np.array_equal(mx[0], series.max(axis=0))
+    md = np.asarray(lx.fsl.collapse((series, affine), "median", n_threads=2, **orig).data)
+    assert np.array_equal(md, np.sort(series, axis=3)[..., 3])
+    r = np.asarray(lx.fsl.statistical((series, affine), "rank", **orig).data)
+    assert np.array_equal(np.sort(r, axis=3)[0, 0, 0], np.arange(1, 8))
+    p = np.asarray(lx.fsl.statistical((series, affine), "pval", **orig).data)
+    assert p.shape == (4, 3, 2) and np.all((p > 0) & (p <= 1))
+    z = np.asarray(
+        lx.fsl.statistical((np.full((2, 2, 2), 0.025, np.float32), affine), "ptoz", **orig).data
+    )
+    assert np.allclose(z, 1.959964, atol=1e-5)
+    box = np.asarray(lx.fsl.roi((series, affine), x=(1, 2), t=(0, 1), **orig).data)
+    assert np.count_nonzero(box[[0, 3]]) == 0 and np.count_nonzero(box[..., 1:]) == 0
+    bp = np.asarray(lx.fsl.bandpass_temporal_filter((series, affine), 2.0, -1.0, **orig).data)
+    assert np.allclose(bp.mean(axis=3), 0.0, atol=1e-4)
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-167"):
+        s = lx.fsl.collapse((series[..., :1], affine), "std", **orig)
+    assert np.array_equal(np.asarray(s.data), np.zeros((4, 3, 2), np.float32))
+
+
 def test_the_generic_fslmaths(scripts, monkeypatch, tmp_path):
     program = stub(scripts)
     monkeypatch.setenv("FSLOUTPUTTYPE", "NIFTI_PAIR")  # must not reach the replica

@@ -83,8 +83,8 @@ fn active(sigma: f64) -> bool {
     sigma > 0.0
 }
 
-/// The weight `exp(−Δ² / (2σ²))` as FSL evaluates it, `exp(−0.5 Δ² / (σ σ))` (Δ² a 32-bit
-/// integer; black-box runs in double: findings 15).
+/// The weight `exp(−Δ² / (2σ²))`, evaluated as `exp(−0.5 Δ² / (σ σ))` (Δ² a 32-bit integer;
+/// the two give the same values on the black-box probes of findings 15).
 #[inline]
 fn weight(d2: i32, sigma: f64) -> f64 {
     math::exp(-0.5 * f64::from(d2) / (sigma * sigma))

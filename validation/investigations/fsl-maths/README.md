@@ -64,6 +64,21 @@ measurement on 10^8 arguments per function, and the check of `larmorx_core::math
   Run boxed with the replica built: `LARMORX_NC_BIN=crates-nc/target/release/larmorx-nc
   scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-maths/wrappers_check.py`.
 
+## Random testing (sub-task 6) and the FFT's twiddle factors (relay 6b)
+
+- `finding_values.py <finding.json> [drawn]`: a random-testing finding's shrunk case run by FSL
+  (through the cache) and by the replica in `reproduce` mode: the voxels that differ, with both
+  values and their bits.
+- `edge_pow_probe.py <image>`: whether FSL's `-edge` squares with glibc's `pow` or with `x * x`
+  on a double image: `x * x` (GCC folds `pow(x, 2.0)`; 4,608 of 4,608 voxels against 4,606).
+- `fft_twiddles.py <N> ...`: per transform size, how many of the twiddle factors glibc gives
+  other than the correctly rounded value, through `sincos` (what FSL's `cexp` takes) and through
+  the separate `cos` and `sin`. Result (2026-11-03): 60 points: `sin(8 k)` and `sin(57 k)` (both
+  directions) through `sincos`, none through the separate functions (the FMA build on this
+  machine), so the first reading, which used only the latter, missed the cause. The full
+  comparison of Armadillo's own factors and transforms: `validation/probes/fsl-avwutils-lib`
+  (`check_fft.py`, `check_fft_case.py`).
+
 ## The specs (sub-task 5c)
 
 - `spec_cases.py`: every parity-suite case that `specs/fslmaths.md` and `specs/fslstats.md` cite

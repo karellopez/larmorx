@@ -224,7 +224,12 @@ Every source file starts with an SPDX header naming its licence and the files it
   FSL's in the last place (GLIBC-07, measured: 0.07 to 0.21 % of double results, none rounded to
   float). Their `exp`, `log` and `pow` are correctly rounded by default and glibc's (Arm's
   Optimized Routines, `glibc_double`) with `reproduce`; the kernels' and filters' own `exp`,
-  `expf`, `logf`, `powf` and `pow` are glibc's in both modes.
+  `expf`, `logf`, `powf` and `pow` are glibc's in both modes. The Kiss FFT's twiddle factors
+  (`kissfft`), which FSL's library takes from glibc's `cexp`, hence `sincos` (IBM's code, LGPL),
+  are correctly rounded `cos` and `sin` in both modes (GLIBC-07: 80 of the lengths 1 to 256 hold
+  a factor one bit away); `KissFft::with_twiddles` and the probe-only feature `probe-twiddles`
+  (never in a release build) hand the engine Armadillo's own factors, with which it gives
+  Armadillo's transforms bit for bit (`validation/probes/fsl-avwutils-lib`, "The FFT").
 - **D13 hooks (fslmaths, fslstats)**: `volops::robust_range` returns FSL's robust range and the
   corrected one (`RobustRange`, FSL-187), and each caller (bet2, FLIRT, fslmaths, fslstats) picks
   by its mode and names the defect where the result changes; `Elem` and `Arith` for `u8` (FSL-154's

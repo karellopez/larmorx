@@ -35,8 +35,9 @@ convolutions, every message, exit status and failure case, each output compared 
 by file (data and header). Random testing (2026-11-03, 24 minutes: 114,906 realistic chains of
 one to four operations on drawn images of every stored type): every one identical after three
 fixes, but one, an FFT convolution of a 30 x 1 x 3 image one unit in the last place in 1 of 90
-voxels (the FFT engine for transform lengths such as 15, 30 and 60: open), and 595 notices of a
-correction whose effect a later operation of the chain removed.
+voxels (the FFT's twiddle factors, which FSL takes from glibc's `sincos`: GLIBC-07, below; with
+FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of a correction
+whose effect a later operation of the chain removed.
 
 ## Quick start
 
@@ -152,6 +153,13 @@ for `exp`, `log` and `pow` and names GLIBC-07 where they change a voxel, while `
 `tan`, `asin`, `acos` and `atan` stay correctly rounded in both modes (glibc's code for them is
 LGPL and is not translated).
 
+The FFT convolution (`-fmeanu`, and `-fmean` with a `3D`, `2D`, `sphere` or `file` kernel, when
+the image and the kernel are large enough) meets the same difference in its twiddle factors: FSL
+computes them with glibc's `sincos`, larmorx correctly rounded in both modes. Of the transform
+lengths 1 to 256, 80 hold a factor one bit away (15, 20, 30, 39, 40, 60, ...); in a float image
+such a factor moves a few voxels by one unit in the last place (random testing met it once in
+114,906 cases). fMRIPrep's calls never take the FFT.
+
 ### File names on Windows
 
 FSL finds a name's directory and extension at the last `/`. On Windows, where FSL does not run,
@@ -207,7 +215,8 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   voxels: errors.
 - **FSL-187** (shared with fslstats, BET and FLIRT): the robust range counts a value far above a
   histogram's range in its first bin: the last (none of fMRIPrep's inputs reaches it, measured).
-- **GLIBC-07**: glibc's double-precision maths functions are not correctly rounded (above).
+- **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle
+  factors, are not correctly rounded (above).
 
 ## Not yet
 

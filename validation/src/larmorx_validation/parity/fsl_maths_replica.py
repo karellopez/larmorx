@@ -444,7 +444,9 @@ class Run:
     glibc's double ``sin``, ``cos``, ``tan``, ``asin``, ``acos`` or ``atan`` (IBM's code in glibc,
     LGPL), which the replica computes correctly rounded in both modes (GLIBC-07): FSL's output
     may differ by at most that many units in the last place, on a few voxels (an expected
-    divergence, reported with its counts)."""
+    divergence, reported with its counts); ``glibc_where``: where glibc's function enters, when
+    not the operation itself (the FFT's twiddle factors, glibc's ``sincos``: a ``float`` output
+    is then compared in ``float``)."""
 
     args: tuple[str, ...]
     settings: tuple[tuple[str, str | None], ...] = ()
@@ -452,6 +454,7 @@ class Run:
     undefined: str = ""
     fixed: str = ""
     glibc: int = 0
+    glibc_where: str = ""
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -503,7 +506,7 @@ def _run_case(run: Run, checks: CheckList) -> None:
         replica = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         compare(checks, PROGRAM, oracle, replica, a, b)
         if run.glibc and any(not c.passed for c in checks.checks):
-            reason = _glibc_divergence(a, b, run.glibc)
+            reason = _glibc_divergence(a, b, run.glibc, run.glibc_where)
             if reason is not None:
                 raise Outcome("expected-divergence", reason)
         if run.fix and replica.code == 0:
@@ -543,9 +546,10 @@ GLIBC_FREQUENCY = {
 }
 
 
-def _glibc_divergence(a: Path, b: Path, ulps: int) -> str | None:
-    """GLIBC-07's expected divergence: the same files and headers, double values at most ``ulps``
-    units in the last place apart on fewer than 2 % of the voxels; the reason, else ``None``."""
+def _glibc_divergence(a: Path, b: Path, ulps: int, where: str = "") -> str | None:
+    """GLIBC-07's expected divergence: the same files and headers, double values (with
+    ``where``: double or float values) at most ``ulps`` units in the last place apart on fewer
+    than 2 % of the voxels; the reason, else ``None``."""
     import nibabel as nib
 
     fa, fb = sorted(a.glob("out*")), sorted(b.glob("out*"))
@@ -556,15 +560,23 @@ def _glibc_divergence(a: Path, b: Path, ulps: int) -> str | None:
         return None
     x = np.asarray(ia.dataobj).ravel()
     y = np.asarray(ib.dataobj).ravel()
-    if x.dtype != np.float64 or y.dtype != np.float64 or x.shape != y.shape:
+    kinds = (np.float64, np.float32) if where else (np.float64,)
+    if x.dtype != y.dtype or x.dtype not in kinds or x.shape != y.shape:
         return None
-    xi, yi = x.view(np.int64), y.view(np.int64)
-    # ulp distance between doubles of the same sign
+    xi = x.view(np.int64 if x.dtype == np.float64 else np.int32).astype(np.int64)
+    yi = y.view(np.int64 if y.dtype == np.float64 else np.int32).astype(np.int64)
+    # ulp distance between values of the same sign
     same_sign = (xi < 0) == (yi < 0)
     dist = np.where(same_sign, np.abs(xi - yi), np.iinfo(np.int64).max)
     differ = int(np.count_nonzero(dist))
     if differ == 0 or int(dist.max()) > ulps or differ >= 0.02 * x.size:
         return None
+    kind = "double" if x.dtype == np.float64 else "float"
+    if where:
+        return (
+            f"GLIBC-07: {differ} of {x.size} {kind} voxels {int(dist.max())} unit(s) in the last "
+            f"place from FSL's: {where}"
+        )
     freq = ", ".join(f"{k} {v}" for k, v in GLIBC_FREQUENCY.items())
     return (
         f"GLIBC-07: {differ} of {x.size} double voxels {int(dist.max())} unit(s) in the last place "
@@ -844,8 +856,9 @@ def _r(
     undefined: str = "",
     fixed: str = "",
     glibc: int = 0,
+    glibc_where: str = "",
 ) -> Run:
-    return Run(tuple(args), tuple((env or {}).items()), fix, undefined, fixed, glibc)
+    return Run(tuple(args), tuple((env or {}).items()), fix, undefined, fixed, glibc, glibc_where)
 
 
 #: name -> (tier, description, run).

@@ -43,10 +43,17 @@
 //! of `float` volumes (`fft3`, `ifft3`: each line's transform in `double`, stored back in `float`)
 //! and efficient_convolve's FFT convolution.
 //!
-//! Complex products are libstdc++'s `std::complex<double>` products (`ac - bd`, `ad + bc`); the
-//! twiddle factors `exp(i 2 pi n / N)` are glibc's `cexp`, `(cos, sin)` of the angle, computed
-//! with correctly rounded `cos` and `sin` (glibc 2.35's double `sin` and `cos` are LGPL code and
-//! not always correctly rounded: GLIBC-07).
+//! Complex products are libstdc++'s `std::complex<double>` products (`ac - bd`, `ad + bc`). The
+//! twiddle factors `exp(i 2 pi n / N)` are glibc's `cexp` in FSL (its library calls `cexp(0 +
+//! i y)`, which takes glibc's `sincos` of the angle `y`, the same build on every x86-64 CPU);
+//! the replica computes them with correctly rounded `cos` and `sin` in both modes. glibc 2.35's
+//! `sincos` is LGPL code and not always correctly rounded (GLIBC-07): on the angles `i k` of
+//! the lengths 1 to 256, 220 of 65,792 factors differ in the last bit, in 80 lengths (the first
+//! 15, 20, 30, 39, 40), and the transforms of 60 of those lengths differ in the last bits. With
+//! Armadillo's own factors the engine gives Armadillo's transforms bit for bit (0 of 197,376
+//! values differ: `validation/probes/fsl-avwutils-lib/check_fft.py`).
+
+use std::collections::HashMap;
 
 use larmorx_core::math;
 
@@ -100,6 +107,29 @@ impl KissFft {
     /// The engine: the factors of `n` (4 first, then 2, 3, 5, 7, ...; the rest itself once its
     /// square exceeds it) and the twiddle factors `exp(i k n)`, `k = (+-2) pi / N`.
     pub fn new(n: usize, inverse: bool) -> KissFft {
+        #[cfg(feature = "probe-twiddles")]
+        if let Some(coeffs) = probe::twiddles(n, inverse) {
+            return KissFft::with_twiddles(n, inverse, coeffs);
+        }
+        let k = (if inverse { 2.0 } else { -2.0 }) * math::acos(-1.0) / n as f64;
+        let coeffs = (0..n)
+            .map(|i| {
+                let y = i as f64 * k;
+                if y.abs() > f64::MIN_POSITIVE {
+                    C::new(math::cos(y), math::sin(y))
+                } else {
+                    C::new(1.0, y)
+                }
+            })
+            .collect();
+        KissFft::with_twiddles(n, inverse, coeffs)
+    }
+
+    /// The engine with the twiddle factors given (`coeffs[i]` for `exp(i k i)`): for the probes
+    /// that hand it Armadillo's own factors (`validation/probes/fsl-avwutils-lib`), so that the
+    /// transform's arithmetic is checked apart from the factors.
+    pub fn with_twiddles(n: usize, inverse: bool, coeffs: Vec<C>) -> KissFft {
+        assert_eq!(coeffs.len(), n, "one twiddle factor per point");
         let (mut residue, mut radix) = (Vec::new(), Vec::new());
         let (mut m, mut r) = (n, 4usize);
         while m >= 2 {
@@ -117,17 +147,6 @@ impl KissFft {
             residue.push(m);
             radix.push(r);
         }
-        let k = (if inverse { 2.0 } else { -2.0 }) * math::acos(-1.0) / n as f64;
-        let coeffs = (0..n)
-            .map(|i| {
-                let y = i as f64 * k;
-                if y.abs() > f64::MIN_POSITIVE {
-                    C::new(math::cos(y), math::sin(y))
-                } else {
-                    C::new(1.0, y)
-                }
-            })
-            .collect();
         KissFft {
             n,
             inverse,
@@ -286,6 +305,55 @@ impl KissFft {
     }
 }
 
+/// Twiddle factors by transform length and direction (`(n, inverse)`).
+pub type TwiddleTable = HashMap<(usize, bool), Vec<C>>;
+
+/// The twiddle factors of `validation/probes/fsl-avwutils-lib/fft_twiddles.cc`'s lines (`tw <n>
+/// <dir> <i> <angle> <re> <im> ...`, 64-bit patterns, `dir` 1 for the inverse): Armadillo's own,
+/// for the probes, by `(n, inverse)`.
+pub fn parse_twiddle_table(text: &str) -> TwiddleTable {
+    let mut out = TwiddleTable::new();
+    let bits = |s: &str| f64::from_bits(u64::from_str_radix(s, 16).expect("a 64-bit pattern"));
+    for line in text.lines() {
+        let w: Vec<&str> = line.split_whitespace().collect();
+        if w.len() < 7 || w[0] != "tw" {
+            continue;
+        }
+        let n: usize = w[1].parse().expect("a length");
+        let i: usize = w[3].parse().expect("an index");
+        let v = out.entry((n, w[2] == "1")).or_default();
+        assert_eq!(v.len(), i, "the factors in order");
+        v.push(C::new(bits(w[5]), bits(w[6])));
+    }
+    out
+}
+
+/// Probes only (the feature `probe-twiddles`, never in a release build): the factors of the
+/// lengths the file `LARMORX_PROBE_FFT_TWIDDLES` names holds (Armadillo's own, from
+/// `fft_twiddles.cc`), so that a whole fslmaths run can be compared with FSL's apart from the
+/// factors. Without the variable, the replica's own; a length the file lacks stops the run.
+#[cfg(feature = "probe-twiddles")]
+mod probe {
+    use std::sync::OnceLock;
+
+    use super::{C, TwiddleTable};
+
+    static TABLE: OnceLock<Option<TwiddleTable>> = OnceLock::new();
+
+    pub(super) fn twiddles(n: usize, inverse: bool) -> Option<Vec<C>> {
+        let table = TABLE.get_or_init(|| {
+            let path = std::env::var_os("LARMORX_PROBE_FFT_TWIDDLES")?;
+            let text = std::fs::read_to_string(path).expect("LARMORX_PROBE_FFT_TWIDDLES");
+            Some(super::parse_twiddle_table(&text))
+        });
+        let table = table.as_ref()?;
+        let coeffs = table.get(&(n, inverse)).unwrap_or_else(|| {
+            panic!("LARMORX_PROBE_FFT_TWIDDLES holds no factors of length {n} ({inverse})")
+        });
+        Some(coeffs.clone())
+    }
+}
+
 /// newimage's `fft` / `ifft` of a complex `float` volume (sizes `dims`): each line along x, then
 /// y, then z (when there is more than one slice) transformed in `double` and stored back in
 /// `float`.
@@ -415,6 +483,35 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn a_twiddle_table_gives_the_engine_its_factors() {
+        let n = 15;
+        for inverse in [false, true] {
+            let own = KissFft::new(n, inverse);
+            let text: String = own
+                .coeffs
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
+                    format!(
+                        "tw {n} {} {i} 0 {:016x} {:016x} 0 0\n",
+                        u8::from(inverse),
+                        c.re.to_bits(),
+                        c.im.to_bits()
+                    )
+                })
+                .collect();
+            let table = parse_twiddle_table(&text);
+            let given = KissFft::with_twiddles(n, inverse, table[&(n, inverse)].clone());
+            assert_eq!(given.coeffs, own.coeffs);
+            let x: Vec<C> = (0..n).map(|j| C::new(j as f64 - 7.0, 0.5)).collect();
+            let (mut a, mut b) = (vec![C::default(); n], vec![C::default(); n]);
+            KissFft::new(n, inverse).transform(&x, &mut a);
+            KissFft::with_twiddles(n, inverse, own.coeffs.clone()).transform(&x, &mut b);
+            assert_eq!(a, b);
+        }
     }
 
     #[test]

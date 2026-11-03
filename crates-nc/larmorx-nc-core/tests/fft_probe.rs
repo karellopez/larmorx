@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 //! The replica's Kiss FFT (Armadillo 14.2.1's engine) on the inputs of
-//! `validation/probes/fsl-avwutils-lib/fft_probe.cc`: the same lines, for `check_fft.py`.
+//! `validation/probes/fsl-avwutils-lib/fft_probe.cc`: the same lines, for `check_fft.py`
+//! (which runs these ignored tests; see that directory's README):
+//!
+//! - `kiss_fft_lines`: the engine as fslmaths runs it (correctly rounded twiddle factors);
+//! - `kiss_fft_lines_with_twiddles`: the same engine handed Armadillo's own factors (the lines
+//!   `fft_twiddles.cc` prints, in the file `LARMORX_FFT_TWIDDLES`), so that the transform's
+//!   arithmetic is compared apart from the factors;
+//! - `twiddles`: the factors the replica computes.
+//!
 //! `LARMORX_FFT_SIZES="60 38" cargo test --release -p larmorx-nc-core --test fft_probe --
-//! --ignored --nocapture > rust.txt`.
+//! --ignored --nocapture kiss_fft_lines > rust.txt`.
 
-use larmorx_nc_core::kissfft::{C, KissFft};
+use larmorx_nc_core::kissfft::{C, KissFft, parse_twiddle_table};
 
 struct Lcg(u32);
 
@@ -15,15 +23,18 @@ impl Lcg {
     }
 }
 
-#[test]
-#[ignore = "a probe against Armadillo: run by hand"]
-fn kiss_fft_lines() {
-    let sizes = std::env::var("LARMORX_FFT_SIZES").unwrap_or_else(|_| "60 38".into());
-    let mut rng = Lcg(12345);
-    for n in sizes
+fn sizes() -> Vec<usize> {
+    std::env::var("LARMORX_FFT_SIZES")
+        .unwrap_or_else(|_| "60 38".into())
         .split_whitespace()
         .map(|s| s.parse::<usize>().unwrap())
-    {
+        .collect()
+}
+
+/// `fft_probe.cc`'s lines, with the engines `make` gives.
+fn lines(make: impl Fn(usize, bool) -> KissFft) {
+    let mut rng = Lcg(12345);
+    for n in sizes() {
         for rep in 0..3 {
             let x: Vec<C> = (0..n)
                 .map(|_| {
@@ -34,7 +45,7 @@ fn kiss_fft_lines() {
                 .collect();
             for (dir, inverse) in [("fwd", false), ("inv", true)] {
                 let mut out = vec![C::default(); n];
-                KissFft::new(n, inverse).transform(&x, &mut out);
+                make(n, inverse).transform(&x, &mut out);
                 for (i, v) in out.iter().enumerate() {
                     println!(
                         "{n} {rep} {dir} {i} {:016x} {:016x}",
@@ -47,16 +58,32 @@ fn kiss_fft_lines() {
     }
 }
 
+#[test]
+#[ignore = "a probe against Armadillo: run by hand"]
+fn kiss_fft_lines() {
+    lines(KissFft::new);
+}
+
+#[test]
+#[ignore = "a probe against Armadillo: run by hand"]
+fn kiss_fft_lines_with_twiddles() {
+    let path = std::env::var("LARMORX_FFT_TWIDDLES").expect("LARMORX_FFT_TWIDDLES");
+    let table = parse_twiddle_table(&std::fs::read_to_string(path).expect("the twiddle file"));
+    lines(|n, inverse| {
+        let coeffs = table
+            .get(&(n, inverse))
+            .unwrap_or_else(|| panic!("no factors for {n} {inverse}"))
+            .clone();
+        KissFft::with_twiddles(n, inverse, coeffs)
+    });
+}
+
 /// The twiddle factors' `cos` and `sin` as the replica computes them (correctly rounded,
-/// `larmorx_core::math`), for `check_fft.py`'s comparison with mpmath.
+/// `larmorx_core::math`), for `check_fft.py`'s comparison with Armadillo's.
 #[test]
 #[ignore = "a probe: run by hand"]
 fn twiddles() {
-    let sizes = std::env::var("LARMORX_FFT_SIZES").unwrap_or_else(|_| "60 38".into());
-    for n in sizes
-        .split_whitespace()
-        .map(|s| s.parse::<usize>().unwrap())
-    {
+    for n in sizes() {
         for sign in [-2.0f64, 2.0] {
             let k = sign * larmorx_core::math::acos(-1.0) / n as f64;
             for i in 0..n {

@@ -8,7 +8,8 @@ tan.rs`) against its C. glibc's functions are called as black boxes: their code 
 
 A small Rust program of its own (its own cargo workspace, never part of larmorx's build):
 
-- `measure [--log2n N] [--threads T]`: each function on `2^N` random arguments of each family
+- `measure [--log2n N] [--threads T] [--only f,g]`: each function on `2^N` random arguments of
+  each family
   (image intensities as `float` and as `double` voxels: magnitudes log-uniform from 2^-10 to
   2^17, both signs, positive for `log` and `pow`'s base; uniform on [-1, 1] for `asin` and
   `acos`; uniform on [-40, 40] for `exp`; `pow`'s exponent uniform on [-3, 3]) and on every
@@ -54,3 +55,47 @@ So a float image's result is FSL's whatever the function; a double image's diffe
 place on that fraction of its voxels where the replica cannot have glibc's bits (`sin`, `cos`,
 `tan`, `asin`, `acos`, `atan`: IBM's code in glibc, LGPL). `exp`, `log` and `pow` have glibc's
 bits with `reproduce` (Arm's Optimized Routines, `larmorx_nc_core::glibc_double`).
+
+**`sincos`, and glibc's two builds (2026-11-03, relay 6b).** `measure` also counts glibc's
+`sincos` (`sincos.sin`, `sincos.cos`: the twiddle factors of fslmaths' FFT convolution, which
+FSL's library computes with `cexp`, which takes `sincos`; `validation/probes/fsl-avwutils-lib`,
+"The FFT") against the correctly rounded `sin` and `cos`, and against glibc's own `sin` and `cos`
+(`sincos.sin-vs-sin`, `sincos.cos-vs-cos`), on the intensities and on the twiddle angles
+(uniform on [-2 pi, 2 pi]); `--only` picks functions. glibc 2.35 on x86-64 chooses, at run time,
+an FMA build of `sin`, `cos`, `tan`, `atan`, `asin`, `acos`, `exp`, `log` and `pow` on a CPU with
+FMA (as this one), another build without; `sincos` has one build. The second column below is the
+same run with `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA` (the other build); 2^26 arguments per
+row, double results that differ:
+
+| function, arguments | FMA build (this CPU) | without FMA |
+|---|---|---|
+| `sin`, double intensities | 80,110 (0.119 %) | 85,986 (0.128 %) |
+| `sin`, twiddle angles | 92,258 (0.138 %) | 99,575 (0.148 %) |
+| `cos`, double intensities | 57,295 (0.085 %) | 61,328 (0.091 %) |
+| `cos`, twiddle angles | 92,561 (0.138 %) | 99,913 (0.149 %) |
+| `sincos.sin`, double intensities | 85,564 (0.128 %) | 85,564 (0.128 %) |
+| `sincos.sin`, twiddle angles | 99,234 (0.148 %) | 99,234 (0.148 %) |
+| `sincos.cos`, double intensities | 61,417 (0.092 %) | 61,417 (0.092 %) |
+| `sincos.cos`, twiddle angles | 99,591 (0.148 %) | 99,591 (0.148 %) |
+| `sincos.sin` vs glibc's `sin`, intensities / angles | 37,623 / 45,548 (0.056 / 0.068 %) | 0 / 0 |
+| `sincos.cos` vs glibc's `cos`, intensities / angles | 28,640 / 46,253 (0.043 / 0.069 %) | 0 / 0 |
+| `tan`, double intensities | 138,418 (0.206 %) | 139,075 (0.207 %) |
+| `atan`, double intensities | 55,664 (0.083 %) | 62,647 (0.093 %) |
+| `asin`, double on [-1, 1] | 106,195 (0.158 %) | 113,682 (0.169 %) |
+| `acos`, double on [-1, 1] | 47,315 (0.071 %) | 50,512 (0.075 %) |
+| `exp`, double on [-40, 40] | 51,023 (0.076 %) | 64,614 (0.096 %) |
+| `log`, double intensities | 13,954 (0.021 %) | 14,039 (0.021 %) |
+| `pow`, double intensities | 55,329 (0.082 %) | 67,912 (0.101 %) |
+
+So `sincos` is the non-FMA build's `sin` and `cos` (0 differ without FMA), the same on every
+x86-64 CPU; and FSL's own double results of every function above depend on whether the CPU has
+FMA (the counts against the correctly rounded value change with the build). The replica's
+`reproduce` bits for `exp`, `log` and `pow` (`larmorx_nc_core::glibc_double`, checked against
+this machine's glibc) are the FMA build's.
+
+```bash
+scripts/orchestration/boxed.sh 2 <scratch>/gdm/glibc-double-maths measure --log2n 26 --threads 14 \
+  --only sin,cos,sincos.sin,sincos.cos,sincos.sin-vs-sin,sincos.cos-vs-cos
+GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA scripts/orchestration/boxed.sh 2 \
+  <scratch>/gdm/glibc-double-maths measure --log2n 26 --threads 14 --only sin,cos,sincos.sin,sincos.cos
+```

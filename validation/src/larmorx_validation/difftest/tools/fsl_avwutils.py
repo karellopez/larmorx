@@ -624,9 +624,13 @@ def case_maths(
     from larmorx_validation.parity.harness import Case
 
     prefix = _ants.prefix_of(recipe, case_prefix)
+    # a permanent case that expects GLIBC-07's divergence (its reason says where glibc enters)
+    glibc = kw.get("expect") == "divergence"
     run = fm.Run(
         _words(recipe, prefix),
         settings=(("FSLOUTPUTTYPE", recipe["extra"].get("output_type", "NIFTI_GZ")),),
+        glibc=1 if glibc else 0,
+        glibc_where=kw.get("reason", "") if glibc else "",
     )
     return Case(
         cid or _ants.case_id(recipe),

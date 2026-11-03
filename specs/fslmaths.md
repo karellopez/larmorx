@@ -602,7 +602,14 @@ non-zero ones (NaN counts as non-zero). An empty window leaves the voxel's value
   FFT instead when `nvox · nker > 44 · (2 nvox) · log₂(2 nvox)` (single precision; `nvox` the
   image's voxels, `nker` the kernel's): the same convolution computed through Kiss FFT on volumes
   twice the larger size along each axis, the product in single precision, without the warning;
-  its results differ from the direct sum in the last bits [conv/fft-*].
+  its results differ from the direct sum in the last bits [conv/fft-*]. Its twiddle factors
+  `exp(∓2πi n / N)` are glibc 2.35's `cexp` values, that is glibc's double `sincos` of the angle
+  `n · (∓2 acos(−1) / N)` (the quotient and the product in double; `(1, angle)` when the angle's
+  magnitude is at most the smallest normal double), which is not always correctly rounded
+  (GLIBC-07, §7): of the lengths 1 to 256, 80 hold a factor one bit from the correctly rounded
+  one (the first: 15, 20, 30, 39, 40, 60), and a float output then differs from a correctly
+  rounded transform's by one unit in the last place on a few voxels (random testing's permanent
+  case `fft-twiddles-glibc-sincos`).
 - FSL-160 (zero width) and FSL-161 (no voxels) apply.
 
 ### 10.3 `-subsamp2` and `-subsamp2offc`
@@ -890,7 +897,7 @@ changes the result.
 | FSL-179 | `-roc` with a noise image of another size: misplaced, repeated or outside values | rule B: an error | FSL's result inside the noise image's memory; refused beyond |
 | FSL-180 | `-roc` without true voxels (or without zero voxels and no noise image): NaN rates, then `sort(): detected NaN` | rule B: an error before the curve | FSL's curve and abort |
 | FSL-187 | the robust range's histogram (the thresholds' `p` forms) counts a value more than about 2³¹ bins above a pass's range in the first bin | the last bin; named where the limits change | FSL's |
-| GLIBC-07 | glibc 2.35's double functions are not correctly rounded (§7) | correctly rounded | glibc's bits for `exp`, `log`, `pow`; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (an expected divergence of the last place in a double image) |
+| GLIBC-07 | glibc 2.35's double functions are not correctly rounded (§7), nor its `sincos` in the FFT convolution's twiddle factors (§10) | correctly rounded | glibc's bits for `exp`, `log`, `pow`; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` and the twiddle factors correctly rounded in both modes (an expected divergence of the last place in a double image, or in a few voxels of an FFT convolution) |
 
 Measured for FSL-187 (rule D, before deciding): none of fMRIPrep's inputs reaches it; the
 smallest trigger is 99 values on [0, 1) and one at 1e12.
@@ -961,7 +968,9 @@ cache's stored FSL runs):
     §13.1, §16's set of files and their headers; a maximum, minimum or median of `+0` and `−0`
     may differ in sign only;
   - double-precision functions (§7): every voxel within one unit in the last place of FSL's, the
-    fraction that differs reported (GLIBC-07: at most about 0.2 %);
+    fraction that differs reported (GLIBC-07: at most about 0.2 %); the FFT convolution with
+    correctly rounded twiddle factors likewise, on a length that holds a factor glibc's `sincos`
+    rounds otherwise;
   - the sums (`-s`, `-fmean`, `-fmeanu`, `-dilM`, `-dilall`, `-edge`, `-subsamp2` and
     `-subsamp2offc` under the floating types, `-inm`, `-ing`,
     `mean`, `std`, `ar1`, `-ranknorm`, `-bptf`, `-ztop`, `-ptoz`): the maximum absolute difference

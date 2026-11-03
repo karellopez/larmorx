@@ -2,12 +2,15 @@
 //! glibc's double maths functions against the correctly rounded ones (`larmorx_core::math`,
 //! CORE-MATH's), on the arguments `fslmaths` gives them.
 //!
-//! - `measure [--log2n N] [--threads T]`: for each of `sin`, `cos`, `tan`, `atan`, `asin`,
-//!   `acos`, `exp`, `log` and `pow`, the C library's result (a black box: its code is never
-//!   read) against the correctly rounded one on `2^N` random arguments of each family (default
-//!   2^25: about 10^8 per function), and on every integer of an int16 image's range: how often
-//!   the double results differ, and how often the difference survives the rounding to `float`
-//!   (fslmaths' default `-dt float`: `(float) f((double) v)`). Counts only.
+//! - `measure [--log2n N] [--threads T] [--only f,g]`: for each of `sin`, `cos`, `tan`, `atan`,
+//!   `asin`, `acos`, `exp`, `log`, `pow` and `sincos`'s two results (`sincos.sin`, `sincos.cos`:
+//!   the twiddle factors of fslmaths' FFT, which FSL computes with `cexp`, which takes `sincos`),
+//!   the C library's result (a black box: its code is never read) against the correctly rounded
+//!   one on `2^N` random arguments of each family (default 2^25: about 10^8 per function), and
+//!   on every integer of an int16 image's range: how often the double results differ, and how
+//!   often the difference survives the rounding to `float` (fslmaths' default `-dt float`:
+//!   `(float) f((double) v)`); and `sincos.sin-vs-sin`, `sincos.cos-vs-cos`: how often glibc's
+//!   `sincos` and its own `sin` and `cos` disagree. Counts only.
 //! - `coremath <libcrmath.so> <tan.wc> <atan.wc> [log2n]`: `larmorx_core::math::tan` and
 //!   `larmorx_core::math::atan2(x, 1)` (the replica's `-atan`) against CORE-MATH's C `cr_tan`
 //!   and `cr_atan` (`build.sh`), on every worst case of `tan.wc` and `atan.wc` at ±x and `2^log2n`
@@ -34,9 +37,11 @@ unsafe extern "C" {
     fn exp(x: f64) -> f64;
     fn log(x: f64) -> f64;
     fn pow(x: f64, y: f64) -> f64;
+    fn sincos(x: f64, s: *mut f64, c: *mut f64);
 }
 
-/// The functions measured: name, glibc's, the correctly rounded one.
+/// The functions measured: name, glibc's, the correctly rounded one (for the last two, glibc's
+/// `sin` and `cos`: how often `sincos` and they disagree).
 type Pair = (&'static str, fn(f64, f64) -> f64, fn(f64, f64) -> f64);
 
 // SAFETY (every wrapper): a pure function of its arguments.
@@ -67,8 +72,19 @@ fn g_log(x: f64, _: f64) -> f64 {
 fn g_pow(x: f64, y: f64) -> f64 {
     unsafe { pow(x, y) }
 }
+fn g_sincos(x: f64) -> (f64, f64) {
+    let (mut s, mut c) = (0.0, 0.0);
+    unsafe { sincos(x, &mut s, &mut c) };
+    (s, c)
+}
+fn g_sincos_sin(x: f64, _: f64) -> f64 {
+    g_sincos(x).0
+}
+fn g_sincos_cos(x: f64, _: f64) -> f64 {
+    g_sincos(x).1
+}
 
-const PAIRS: [Pair; 9] = [
+const PAIRS: [Pair; 13] = [
     ("sin", g_sin, |x, _| math::sin(x)),
     ("cos", g_cos, |x, _| math::cos(x)),
     ("tan", g_tan, |x, _| math::tan(x)),
@@ -78,6 +94,12 @@ const PAIRS: [Pair; 9] = [
     ("exp", g_exp, |x, _| math::exp(x)),
     ("log", g_log, |x, _| math::log(x)),
     ("pow", g_pow, math::pow),
+    // glibc's `sincos` is one build (no CPU-dependent variants on x86-64), where `sin` and `cos`
+    // choose an FMA build on CPUs that have FMA: the two can differ.
+    ("sincos.sin", g_sincos_sin, |x, _| math::sin(x)),
+    ("sincos.cos", g_sincos_cos, |x, _| math::cos(x)),
+    ("sincos.sin-vs-sin", g_sincos_sin, g_sin),
+    ("sincos.cos-vs-cos", g_sincos_cos, g_cos),
 ];
 
 /// SplitMix64.
@@ -110,6 +132,8 @@ enum Family {
     FloatExp,
     /// Uniform on [-40, 40] as `double`.
     DoubleExp,
+    /// Uniform on [-2 pi, 2 pi] as `double`: the angles of the FFT's twiddle factors.
+    DoubleAngle,
 }
 
 impl Family {
@@ -121,6 +145,7 @@ impl Family {
             Family::DoubleUnit => "double, uniform [-1, 1]",
             Family::FloatExp => "float, uniform [-40, 40]",
             Family::DoubleExp => "double, uniform [-40, 40]",
+            Family::DoubleAngle => "double, uniform [-2 pi, 2 pi] (FFT twiddle angles)",
         }
     }
 
@@ -149,6 +174,7 @@ impl Family {
             }
             Family::FloatUnit | Family::DoubleUnit => u * 2.0 - 1.0,
             Family::FloatExp | Family::DoubleExp => u * 80.0 - 40.0,
+            Family::DoubleAngle => (u * 4.0 - 2.0) * std::f64::consts::PI,
         };
         let y = ((splitmix(&mut s) >> 11) as f64 / (1u64 << 53) as f64) * 6.0 - 3.0;
         if self.is_float() {
@@ -164,6 +190,14 @@ fn families(name: &str) -> &'static [Family] {
     match name {
         "asin" | "acos" => &[Family::FloatUnit, Family::DoubleUnit],
         "exp" => &[Family::FloatExp, Family::DoubleExp],
+        "sin" | "cos" => &[
+            Family::FloatIntensity,
+            Family::DoubleIntensity,
+            Family::DoubleAngle,
+        ],
+        "sincos.sin" | "sincos.cos" | "sincos.sin-vs-sin" | "sincos.cos-vs-cos" => {
+            &[Family::DoubleIntensity, Family::DoubleAngle]
+        }
         _ => &[Family::FloatIntensity, Family::DoubleIntensity],
     }
 }
@@ -235,10 +269,13 @@ fn percent(a: u64, n: u64) -> String {
     format!("{:.4} %", 100.0 * a as f64 / n.max(1) as f64)
 }
 
-fn measure(log2n: u32, threads: usize) {
+fn measure(log2n: u32, threads: usize, only: &[String]) {
     let n = 1u64 << log2n;
     println!("function | arguments | n | double results differ | float results differ");
     for (f, pair) in PAIRS.iter().enumerate() {
+        if !only.is_empty() && !only.iter().any(|o| o == pair.0) {
+            continue;
+        }
         for &fam in families(pair.0) {
             let c = measure_one(pair, f, fam, n, threads);
             let fl = if fam.is_float() {
@@ -254,6 +291,9 @@ fn measure(log2n: u32, threads: usize) {
                 c.double,
                 percent(c.double, c.n)
             );
+        }
+        if pair.0.starts_with("sincos") {
+            continue; // the FFT's angles are never integers
         }
         let c = measure_integers(pair);
         println!(
@@ -413,7 +453,15 @@ fn main() {
     };
     let threads = opt("--threads", 14);
     match args.get(1).map(String::as_str) {
-        Some("measure") => measure(opt("--log2n", 25) as u32, threads),
+        Some("measure") => {
+            let only: Vec<String> = args
+                .iter()
+                .position(|a| a == "--only")
+                .and_then(|k| args.get(k + 1))
+                .map(|v| v.split(',').map(str::to_string).collect())
+                .unwrap_or_default();
+            measure(opt("--log2n", 25) as u32, threads, &only)
+        }
         Some("coremath") if args.len() >= 5 => {
             let log2n = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(24);
             if !coremath(&args[2], &args[3], &args[4], log2n, threads) {
@@ -422,7 +470,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: glibc-double-maths measure [--log2n N] [--threads T]\n       \
+                "usage: glibc-double-maths measure [--log2n N] [--threads T] [--only f,g]\n       \
                  glibc-double-maths coremath <libcrmath.so> <tan.wc> <atan.wc> [log2n] [--threads T]"
             );
             std::process::exit(2);

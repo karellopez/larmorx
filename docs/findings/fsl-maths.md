@@ -146,9 +146,12 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   through Kiss FFT, stored back in `float`; z skipped for one slice), the product in `float`
   (complexvolume's `*=`), `ifft3` (Armadillo's inverse scaled by `1/N` in `double`), the real
   part read at the kernel's centre offset `(size - 1) / 2`; no warning on that path. The twiddle
-  factors are glibc's `cexp` of `i 2 pi n / N`: `(cos, sin)` from `sincos`, here the correctly
-  rounded `cos` and `sin` (the 8 FFT cases are bit-identical, including radices 2, 3, 4, 5, 11
-  and 13).
+  factors are glibc's `cexp` of `i 2 pi n / N` (`libfsl-newimage.so` calls `cexp(0 + i y)`),
+  which takes glibc's `sincos`; here the correctly rounded `cos` and `sin` in both modes
+  (GLIBC-07, "Known differences": 80 of the lengths 1 to 256 hold a factor one bit away; the 8
+  FFT cases are bit-identical, including radices 2, 3, 4, 5, 11 and 13). Given Armadillo's own
+  factors, the engine is Armadillo's bit for bit on every length from 1 to 256
+  (`validation/probes/fsl-avwutils-lib`, "The FFT").
 - **-subsamp2, -subsamp2offc.** The image's extrapolation is set to extraslice for the call
   (restored after). `subsample_by_2` sums each group of the centred 3x3x3 smoothing in `T`'s
   arithmetic (`int` for `char` and `short`, wrapping `int`), weights `0.125`, `0.0625`, `0.0312`,
@@ -752,6 +755,33 @@ How `fslstats.cc` computes, and what decides the bits:
   `-cos`, `-atan`, `-asin` happen to agree on their 210 values). Exact glibc bits for these six
   would need the `cbrtf` route (a behaviour spec, then a clean-room implementation): for the
   orchestrator to schedule. The replica's earlier `tan` (the `libm` crate, FreeBSD's) is gone.
+- **The FFT's twiddle factors (GLIBC-07, class d; relay 6b, 2026-11-03).** The FFT convolution
+  (the non-separable `-fmeanu`, and `-fmean` with a `3D`, `2D`, `sphere` or `file` kernel, when
+  `(float) nvox (float) nker` is large enough) builds Armadillo's Kiss FFT engine for each
+  transform length; FSL's library computes each twiddle factor with glibc's `cexp`, which takes
+  glibc's double `sincos` (IBM's code, LGPL, never read or translated). The replica computes the
+  factors correctly rounded in both modes. Measured (`validation/probes/fsl-avwutils-lib`,
+  "The FFT"; `validation/probes/glibc-double-maths`, "sincos"):
+  - on the lengths 1 to 256: 220 of 65,792 factors differ in the last bit, in 80 lengths (the
+    first: 15, 20, 30, 39, 40, 49, 51, 59, 60, 61); a butterfly reads one in 64 of them, and the
+    transforms of seeded vectors differ in 60 (5,426 of 197,376 values, the last bits); given
+    Armadillo's own factors the replica's engine gives Armadillo's transforms bit for bit (0
+    differ), and the trial's case end to end gives FSL's output bit for bit;
+  - glibc's `sincos` against the correctly rounded value on the twiddle angles (uniform on
+    [-2 pi, 2 pi], 2^26 each): `sin` 0.148 %, `cos` 0.148 %;
+  - glibc's `sincos` has one build on x86-64, so the factors are the same on every CPU; its `sin`
+    and `cos` choose an FMA build on a CPU with FMA (as the oracle machine), which disagrees with
+    `sincos` on 0.04 to 0.07 % of arguments (0 without FMA). More generally FSL's own double
+    results of `-sin`, `-cos`, `-tan`, `-asin`, `-acos`, `-atan`, `-exp`, `-log` and `-pow` depend
+    on whether the CPU has FMA (the probe's README has both builds' counts); the replica's
+    `reproduce` bits for `exp`, `log` and `pow` are the FMA build's, which the oracle machine runs.
+  In a float convolution such a factor moves an output voxel by one unit in the last place at
+  most, on few voxels: the random-testing trial met it once in 114,906 fslmaths cases (5,263 of
+  them with `-fmean` or `-fmeanu`): `-recip -kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 float
+  image, transforms of 60 and 26 points, 1 of 90 voxels (permanent case
+  `fft-twiddles-glibc-sincos`, an expected divergence naming GLIBC-07). fMRIPrep's calls never
+  take the FFT (its `-s` is separable; `-dilD` is no convolution). Exact factors would need
+  `sincos` by the `cbrtf` route, as the six functions above.
 
 ## Memory (sub-task 5b)
 
@@ -832,17 +862,15 @@ realistic cases, 114,906 fslmaths and 69,077 fslstats). What they found:
   later refusal (FSL-184's `-X` of an empty mask) dropped an earlier correction's notice (FSL-185);
   the notices of the options before an error are now printed. Permanent case
   `json-notices-before-refusal`.
-- **OPEN: the Kiss FFT engine for lengths with a radix-3 stage of 5 or more** (15, 30, 60, ...):
-  `larmorx-nc-core`'s `KissFft` differs from Armadillo 14.2.1's `fft` and `ifft` by a few units
-  in the last place (`validation/probes/fsl-avwutils-lib/fft_probe.cc` against
-  `crates-nc/larmorx-nc-core/tests/fft_probe.rs`: lengths 2 to 25 identical except 15; 30 and 60
-  differ; the twiddle factors are identical to glibc's (`fft_twiddles.py`; and `std::exp` of a
-  complex = `cos`, `sin`), GCC's complex multiplication is the formula, and a literal Python
-  transcription of the engine gives the replica's values, not Armadillo's). Seen once in the
-  trial: `-kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 image (transforms of 60 and 38 points), 1
-  of 90 float voxels one unit in the last place (finding `fsl-maths-trial-61795`). Only the FFT
-  path of the non-separable convolutions meets it (`-fmeanu`, and `-fmean` with `sphere`, `file`,
-  `3D`, `2D` kernels when the kernel is large); fMRIPrep's calls never do. For the next step.
+- **The Kiss FFT's twiddle factors** (explained, relay 6b: GLIBC-07, "Known differences"): the
+  replica's engine differed from Armadillo 14.2.1's `fft` and `ifft` in the last bits for the
+  lengths 15, 30, 60, ... The first reading compared glibc's separate `cos` and `sin`, which on
+  the oracle machine are an FMA build that agrees with the correctly rounded value; FSL's
+  library takes `cexp`, hence `sincos`, which does not (60 points: `sin(8 k)` and `sin(57 k)`).
+  With Armadillo's own factors the engine is Armadillo's bit for bit on every length from 1 to
+  256, and the trial's case (`-recip -kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 image, finding
+  `fsl-maths-trial-61795`, 1 of 90 float voxels one unit in the last place) is FSL's bit for
+  bit. Permanent case `fft-twiddles-glibc-sincos`: an expected divergence naming GLIBC-07.
 - **Notices without a visible change** (595 fslmaths cases, none in fslstats): a correction named
   for an intermediate result whose effect a later operation removes (`-restart`, a threshold,
   `-bin`, a reduction), and FSL-151's output rounding of values that both modes store alike

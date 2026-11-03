@@ -244,23 +244,11 @@ impl Op1 {
         op
     }
 
-    /// Row `r` applied to a strided input.
-    #[inline]
-    fn row(&self, r: usize, input: &[f64], base: usize, stride: usize) -> f64 {
-        let mut s = 0.0;
-        let o = r * self.width;
-        for j in 0..self.width {
-            let w = self.w[o + j];
-            if w != 0.0 {
-                s += w * input[base + self.idx[o + j] * stride];
-            }
-        }
-        s
-    }
-
     /// The operator applied along `axis` of `data` (dimensions `dims`, x fastest): the result
-    /// has `dims[axis] = self.out`. Every output value is one row's sum in a fixed order, so the
-    /// result does not depend on the thread count.
+    /// has `dims[axis] = self.out`. Every output value is one row's sum in a fixed order (its
+    /// slots in order, the zero weights left out), so the result does not depend on the thread
+    /// count. Along y and z a row's weights are the same for every x: they are applied to whole
+    /// lines and planes at once (contiguous, vectorised), each value still summed in slot order.
     pub fn apply_axis(
         &self,
         data: &[f64],
@@ -268,39 +256,81 @@ impl Op1 {
         axis: usize,
     ) -> (Vec<f64>, [usize; 3]) {
         assert_eq!(dims[axis], self.inp, "operator and axis lengths differ");
-        let [nx, ny, nz] = dims;
+        let [nx, ny, _nz] = dims;
         let mut od = dims;
         od[axis] = self.out;
         let [ox, oy, _oz] = od;
         let mut out = vec![0.0; od[0] * od[1] * od[2]];
+        let width = self.width;
         match axis {
             0 => {
-                out.par_chunks_mut(ox).enumerate().for_each(|(line, o)| {
-                    let base = line * nx;
-                    for (r, v) in o.iter_mut().enumerate() {
-                        *v = self.row(r, data, base, 1);
-                    }
-                });
+                // blocks of lines, transposed so that a row's weights apply to the block's
+                // lines at once
+                const LINES: usize = 64;
+                out.par_chunks_mut(ox * LINES)
+                    .enumerate()
+                    .for_each(|(b, o)| {
+                        let nl = o.len() / ox;
+                        let src = &data[b * LINES * nx..(b * LINES + nl) * nx];
+                        let mut tin = vec![0.0; nx * nl];
+                        for (l, line) in src.chunks(nx).enumerate() {
+                            for (x, &v) in line.iter().enumerate() {
+                                tin[x * nl + l] = v;
+                            }
+                        }
+                        let mut tout = vec![0.0; ox * nl];
+                        for (r, orow) in tout.chunks_mut(nl).enumerate() {
+                            for j in 0..width {
+                                let w = self.w[r * width + j];
+                                if w != 0.0 {
+                                    let i = self.idx[r * width + j];
+                                    axpy(orow, w, &tin[i * nl..(i + 1) * nl]);
+                                }
+                            }
+                        }
+                        for (l, line) in o.chunks_mut(ox).enumerate() {
+                            for (r, v) in line.iter_mut().enumerate() {
+                                *v = tout[r * nl + l];
+                            }
+                        }
+                    });
             }
             1 => {
                 out.par_chunks_mut(ox * oy).enumerate().for_each(|(z, o)| {
-                    for r in 0..oy {
-                        for x in 0..ox {
-                            o[r * ox + x] = self.row(r, data, z * nx * ny + x, nx);
+                    let src = &data[z * nx * ny..(z + 1) * nx * ny];
+                    for (r, orow) in o.chunks_mut(ox).enumerate() {
+                        for j in 0..width {
+                            let w = self.w[r * width + j];
+                            if w != 0.0 {
+                                let i = self.idx[r * width + j];
+                                axpy(orow, w, &src[i * nx..(i + 1) * nx]);
+                            }
                         }
                     }
                 });
             }
             _ => {
-                out.par_chunks_mut(ox * oy).enumerate().for_each(|(r, o)| {
-                    for (i, v) in o.iter_mut().enumerate() {
-                        *v = self.row(r, data, i, nx * ny);
+                let plane = nx * ny;
+                out.par_chunks_mut(plane).enumerate().for_each(|(r, o)| {
+                    for j in 0..width {
+                        let w = self.w[r * width + j];
+                        if w != 0.0 {
+                            let i = self.idx[r * width + j];
+                            axpy(o, w, &data[i * plane..(i + 1) * plane]);
+                        }
                     }
                 });
-                let _ = nz;
             }
         }
         (out, od)
+    }
+}
+
+/// `y += w x`, element by element (each `y[i] + w · x[i]` rounded as written).
+#[inline]
+pub fn axpy(y: &mut [f64], w: f64, x: &[f64]) {
+    for (a, b) in y.iter_mut().zip(x) {
+        *a += w * b;
     }
 }
 

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "6342d2742e0e",
+  "larmorx_commit": "a51517a323eb",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -23,8 +23,8 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 39,
-  "saved_seconds": 3.6,
-  "served": 376
+  "saved_seconds": 3.7,
+  "served": 377
  },
  "reference": "fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-cprob 2111.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths)",
  "results": [
@@ -42,7 +42,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own mask (its container's FSL 6.0.7.x) has the same values": "yes"
    },
-   "seconds": 0.089,
+   "seconds": 0.154,
    "status": "pass"
   },
   {
@@ -59,7 +59,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own mask (its container's FSL 6.0.7.x) has the same values": "yes"
    },
-   "seconds": 0.097,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -76,7 +76,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own mask (its container's FSL 6.0.7.x) has the same values": "yes"
    },
-   "seconds": 0.099,
+   "seconds": 0.156,
    "status": "pass"
   },
   {
@@ -93,7 +93,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own mask (its container's FSL 6.0.7.x) has the same values": "yes"
    },
-   "seconds": 0.092,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -109,7 +109,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.227,
+   "seconds": 1.163,
    "status": "pass"
   },
   {
@@ -125,7 +125,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.187,
+   "seconds": 0.998,
    "status": "pass"
   },
   {
@@ -141,7 +141,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.14,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
@@ -157,7 +157,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.107,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -173,7 +173,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -189,7 +189,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.102,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -205,7 +205,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.862,
+   "seconds": 0.741,
    "status": "pass"
   },
   {
@@ -221,7 +221,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -237,7 +237,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.08,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -253,7 +253,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -269,7 +269,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.037,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -285,7 +285,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -301,7 +301,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -317,7 +317,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -330,7 +330,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "fslmaths exits 1; the same from the replica. ",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -346,7 +346,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -362,7 +362,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "pass"
   },
   {
@@ -375,7 +375,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #63 :: No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): No image files match: nothere",
-   "seconds": 0.029,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -404,7 +404,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -417,7 +417,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ",
-   "seconds": 0.011,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -430,7 +430,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -443,7 +443,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -456,7 +456,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null is not valid",
-   "seconds": 0.031,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -472,7 +472,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -485,7 +485,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #63 :: No image files match: out Image Exception : #22 :: Failed to read volume out Error : No image files match: out terminate called after throwing an instance of 'std::runtime_err",
-   "seconds": 0.031,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -501,7 +501,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -517,7 +517,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -533,7 +533,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -549,7 +549,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -565,7 +565,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.016,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -597,7 +597,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -610,7 +610,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -623,7 +623,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
-   "seconds": 0.006,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -639,7 +639,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -652,7 +652,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #22 :: Failed to read volume trunc.nii.gz Error : Error: short read, file may be truncated terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read ",
-   "seconds": 0.038,
+   "seconds": 0.032,
    "status": "both-error"
   },
   {
@@ -665,7 +665,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #22 :: Failed to read volume truncraw.nii Error : Error: short read, file may be truncated terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read ",
-   "seconds": 0.043,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -678,7 +678,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #22 :: Failed to read volume hugehdr.nii Error : Error: short read, file may be truncated terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read v",
-   "seconds": 1.677,
+   "seconds": 1.596,
    "status": "both-error"
   },
   {
@@ -694,7 +694,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -710,7 +710,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.015,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -726,7 +726,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -742,7 +742,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -758,7 +758,7 @@
    "reported": {
     "D13 fix pass": 97
    },
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -774,7 +774,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -790,7 +790,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -806,7 +806,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -822,7 +822,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -838,7 +838,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -854,7 +854,7 @@
    "reported": {
     "D13 fix pass": 106
    },
-   "seconds": 0.011,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -870,7 +870,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -886,7 +886,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.012,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -902,7 +902,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -918,7 +918,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -934,7 +934,7 @@
    "reported": {
     "D13 fix pass": 88
    },
-   "seconds": 0.013,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -950,7 +950,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -966,7 +966,7 @@
    "reported": {
     "D13 fix pass": 68
    },
-   "seconds": 0.011,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -982,7 +982,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.015,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -998,7 +998,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1014,7 +1014,7 @@
    "reported": {
     "D13 fix pass": 61
    },
-   "seconds": 0.012,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1030,7 +1030,7 @@
    "reported": {
     "D13 fix pass": 106
    },
-   "seconds": 0.015,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -1046,7 +1046,7 @@
    "reported": {
     "D13 fix pass": 106
    },
-   "seconds": 0.017,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1062,7 +1062,7 @@
    "reported": {
     "D13 fix pass": 210
    },
-   "seconds": 0.035,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1078,7 +1078,7 @@
    "reported": {
     "D13 fix pass": 118
    },
-   "seconds": 0.016,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1094,7 +1094,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.016,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -1110,7 +1110,7 @@
    "reported": {
     "D13 fix pass": 2
    },
-   "seconds": 0.015,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -1126,7 +1126,7 @@
    "reported": {
     "D13 fix pass": 194
    },
-   "seconds": 0.013,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -1142,7 +1142,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1190,7 +1190,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -1206,7 +1206,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1222,7 +1222,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1238,7 +1238,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1254,7 +1254,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1270,7 +1270,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1286,7 +1286,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -1302,7 +1302,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1315,7 +1315,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #3 :: Attempted to add images of different sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to add images of different sizes",
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -1328,7 +1328,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "fslmaths exits -6; the same from the replica. WARNING:: Inconsistent orientations for individual images in pipeline! Will use voxel-based orientation which is probably incorrect - *PLEASE CHECK*! Image Exception : #3 :: Attempted to add images of",
-   "seconds": 0.024,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1344,7 +1344,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -1360,7 +1360,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1376,7 +1376,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -1392,7 +1392,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1424,7 +1424,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1456,7 +1456,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1472,7 +1472,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1488,7 +1488,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1520,7 +1520,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1536,7 +1536,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1552,7 +1552,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1600,7 +1600,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1648,7 +1648,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.012,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1664,7 +1664,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.029,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1677,7 +1677,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. Error: -thr requires a number",
-   "seconds": 0.021,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1690,7 +1690,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. Error: -uthrP requires a number",
-   "seconds": 0.021,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1706,7 +1706,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1722,7 +1722,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.027,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1738,7 +1738,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1754,7 +1754,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1770,7 +1770,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1786,7 +1786,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.03,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1802,7 +1802,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1818,7 +1818,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1834,7 +1834,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.028,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1850,7 +1850,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1866,7 +1866,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1882,7 +1882,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1898,7 +1898,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1914,7 +1914,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1930,7 +1930,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1946,7 +1946,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1962,7 +1962,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -1978,7 +1978,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2010,7 +2010,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2026,7 +2026,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2048,7 +2048,7 @@
     "every file bit-identical": "1/2"
    },
    "reason": "GLIBC-07: 3 of 210 double voxels 1 unit(s) in the last place from FSL's, where glibc 2.35's function (IBM's code, LGPL) is not correctly rounded and the replica is (measured on image intensities: sin 0.12 %, cos 0.085 %, tan 0.21 %, asin 0.16 %, acos 0.071 %, atan 0.083 %)",
-   "seconds": 0.016,
+   "seconds": 0.014,
    "status": "expected-divergence"
   },
   {
@@ -2064,7 +2064,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2080,7 +2080,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2128,7 +2128,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -2192,7 +2192,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2240,7 +2240,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2256,7 +2256,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2304,7 +2304,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2320,7 +2320,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2336,7 +2336,7 @@
    "reported": {
     "D13 fix pass": 209
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2352,7 +2352,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2368,7 +2368,7 @@
    "reported": {
     "D13 fix pass": 107
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2384,7 +2384,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2400,7 +2400,7 @@
    "reported": {
     "D13 fix pass": 148
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2432,7 +2432,7 @@
    "reported": {
     "D13 fix pass": 120
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2448,7 +2448,7 @@
    "reported": {
     "D13 fix pass": 120
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2464,7 +2464,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2493,7 +2493,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.026,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -2506,7 +2506,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.025,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -2519,7 +2519,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.025,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -2532,7 +2532,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.024,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -2545,7 +2545,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.026,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -2558,7 +2558,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -11; the same from the replica. ",
-   "seconds": 0.024,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -2606,7 +2606,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -2616,7 +2616,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2680,7 +2680,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2696,7 +2696,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2712,7 +2712,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2728,7 +2728,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2760,7 +2760,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2776,7 +2776,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2808,7 +2808,7 @@
    "reported": {
     "D13 fix pass": 210
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2824,7 +2824,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2888,7 +2888,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -2904,7 +2904,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2968,7 +2968,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -2984,7 +2984,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3000,7 +3000,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3016,7 +3016,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3080,7 +3080,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3160,7 +3160,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3208,7 +3208,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3224,7 +3224,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3256,7 +3256,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3272,7 +3272,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3288,7 +3288,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3336,7 +3336,7 @@
    "reported": {
     "D13 fix pass": 203
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3352,7 +3352,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3416,7 +3416,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -3480,7 +3480,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3519,7 +3519,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
-   "seconds": 0.026,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -3551,7 +3551,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3567,7 +3567,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3583,7 +3583,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3599,7 +3599,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3615,7 +3615,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3631,7 +3631,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3647,7 +3647,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3663,7 +3663,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3679,7 +3679,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3695,7 +3695,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3727,7 +3727,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3759,7 +3759,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3791,7 +3791,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3823,7 +3823,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -3839,7 +3839,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -3855,7 +3855,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -3871,7 +3871,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -3951,7 +3951,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -3999,7 +3999,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -4015,7 +4015,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.023,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -4031,7 +4031,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -4044,7 +4044,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
-   "seconds": 0.02,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -4070,7 +4070,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -11; the same from the replica. ",
-   "seconds": 0.032,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -4083,7 +4083,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #75 :: 3D only method called by higher-dimensional volume. terminate called after throwing an instance of 'std::runtime_error' what(): 3D only method called by higher-dimensional vol",
-   "seconds": 0.032,
+   "seconds": 0.028,
    "status": "both-error"
   },
   {
@@ -4096,7 +4096,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #75 :: 3D only method called by higher-dimensional volume. terminate called after throwing an instance of 'std::runtime_error' what(): 3D only method called by higher-dimensional vol",
-   "seconds": 0.031,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -4112,7 +4112,7 @@
    "reported": {
     "D13 fix pass": 24
    },
-   "seconds": 0.029,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -4173,7 +4173,7 @@
    "reported": {
     "D13 fix pass": 210
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4189,7 +4189,7 @@
    "reported": {
     "D13 fix pass": 210
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4205,7 +4205,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4221,7 +4221,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -4237,7 +4237,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4269,7 +4269,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4285,7 +4285,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4314,7 +4314,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): sort(): detected NaN",
-   "seconds": 0.025,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -4327,7 +4327,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): sort(): detected NaN",
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -4340,7 +4340,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.026,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -4356,7 +4356,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4372,7 +4372,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -4436,7 +4436,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4468,7 +4468,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4628,7 +4628,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4660,7 +4660,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4676,7 +4676,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4692,7 +4692,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4705,7 +4705,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. Error unknown Dimensionality operation: -Tfoo",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -4731,7 +4731,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #4 :: Percentiles must be in the range [0.0,1.0] terminate called after throwing an instance of 'std::runtime_error' what(): Percentiles must be in the range [0.0,1.0]",
-   "seconds": 0.024,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -4744,7 +4744,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #4 :: Percentiles must be in the range [0.0,1.0] terminate called after throwing an instance of 'std::runtime_error' what(): Percentiles must be in the range [0.0,1.0]",
-   "seconds": 0.024,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -4760,7 +4760,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4789,7 +4789,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4805,7 +4805,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -4821,7 +4821,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -4837,7 +4837,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4853,7 +4853,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4869,7 +4869,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4901,7 +4901,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.009,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4933,7 +4933,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -4965,7 +4965,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -4997,7 +4997,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5029,7 +5029,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5045,7 +5045,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5061,7 +5061,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5093,7 +5093,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5109,7 +5109,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5125,7 +5125,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5141,7 +5141,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5173,7 +5173,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -5205,7 +5205,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5221,7 +5221,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5237,7 +5237,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5253,7 +5253,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5282,7 +5282,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. Error: no output filename specified!",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -5295,7 +5295,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -11; the same from the replica. ",
-   "seconds": 0.013,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -5311,7 +5311,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5327,7 +5327,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5343,7 +5343,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5375,7 +5375,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5423,7 +5423,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5455,7 +5455,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5471,7 +5471,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5500,7 +5500,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5516,7 +5516,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5548,7 +5548,7 @@
    "reported": {
     "D13 fix pass": 3
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5564,7 +5564,7 @@
    "reported": {
     "D13 fix pass": 2
    },
-   "seconds": 0.006,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5596,7 +5596,7 @@
    "reported": {
     "D13 fix pass": 2
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5612,7 +5612,7 @@
    "reported": {
     "D13 fix pass": 96
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -5654,7 +5654,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): sort(): detected NaN",
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -5686,7 +5686,7 @@
    "reported": {
     "D13 fix pass": 3
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5702,7 +5702,7 @@
    "reported": {
     "D13 fix pass": 57
    },
-   "seconds": 0.009,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -5718,7 +5718,7 @@
    "reported": {
     "D13 fix pass": 2
    },
-   "seconds": 0.014,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -5734,7 +5734,7 @@
    "reported": {
     "D13 fix pass": 3
    },
-   "seconds": 0.008,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -5747,7 +5747,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -11; the same from the replica. ",
-   "seconds": 0.02,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -5760,7 +5760,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::bad_array_new_length' what(): std::bad_array_new_length",
-   "seconds": 0.027,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -5773,7 +5773,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::bad_array_new_length' what(): std::bad_array_new_length",
-   "seconds": 0.025,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -5783,7 +5783,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -5815,7 +5815,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -5831,7 +5831,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -5847,7 +5847,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5863,7 +5863,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5879,7 +5879,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5895,7 +5895,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -5927,7 +5927,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5943,7 +5943,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -5985,7 +5985,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ERROR: TFCE failed, please check your file for valid sizes and voxel values.Error: tfce requires a positive deltaT input. Exiting",
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -6062,7 +6062,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -6078,7 +6078,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -6094,7 +6094,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -6110,7 +6110,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -6126,7 +6126,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -6139,7 +6139,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
-   "seconds": 0.017,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -6152,7 +6152,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ERROR: TFCE failed, please check your file for valid sizes and voxel values.Error: tfce requires a positive deltaT input. Exiting",
-   "seconds": 0.003,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -6165,7 +6165,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits 1; the same from the replica. ERROR: TFCE failed, please check your file for valid sizes and voxel values.Error: tfce requires a positive deltaT input. Exiting",
-   "seconds": 0.003,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -6181,7 +6181,7 @@
    "reported": {
     "D13 fix pass": 201
    },
-   "seconds": 0.007,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -6197,7 +6197,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -6213,7 +6213,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -6229,7 +6229,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -6239,7 +6239,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.004,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -6252,7 +6252,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
-   "seconds": 0.033,
+   "seconds": 0.08,
    "status": "both-error"
   },
   {
@@ -6265,7 +6265,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -8; the same from the replica. ",
-   "seconds": 0.032,
+   "seconds": 0.074,
    "status": "both-error"
   },
   {
@@ -6278,7 +6278,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
-   "seconds": 0.033,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -6294,7 +6294,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -6304,7 +6304,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.003,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -6320,7 +6320,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -6336,7 +6336,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.025,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -6352,7 +6352,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -6368,7 +6368,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -6384,7 +6384,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -6400,7 +6400,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -6416,7 +6416,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -6429,7 +6429,7 @@
     "every file bit-identical": "4/4"
    },
    "reason": "fslmaths exits -6; the same from the replica. Image Exception : #3 :: Attempted to multiply images of different sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to multiply images of different sizes",
-   "seconds": 0.031,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -6445,7 +6445,7 @@
    "reported": {
     "D13 fix pass": 300
    },
-   "seconds": 0.009,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -6461,7 +6461,7 @@
    "reported": {
     "D13 fix pass": 4855
    },
-   "seconds": 0.013,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -6471,7 +6471,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.004,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -6497,7 +6497,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "fslmaths exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): sort(): detected NaN",
-   "seconds": 0.022,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -6513,7 +6513,7 @@
    "reported": {
     "D13 fix pass": 2
    },
-   "seconds": 0.02,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -6529,8 +6529,30 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.025,
    "status": "pass"
+  },
+  {
+   "case": "difftest/fft-twiddles-glibc-sincos",
+   "category": "difftest",
+   "checks_passed": 4,
+   "checks_total": 5,
+   "failed_checks": [
+    {
+     "detail": "out.nii.gz: 1 of 90 values differ (max |diff| 4.66e-10)",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "1/2"
+    }
+   ],
+   "measured": {
+    "every file bit-identical": "1/2"
+   },
+   "reason": "GLIBC-07: 1 of 90 float voxels 1 unit(s) in the last place from FSL's: the FFT convolution's twiddle factors, which FSL takes from glibc 2.35's sincos (through cexp: IBM's code, LGPL, not always correctly rounded; the same build on every x86-64 CPU) and the replica computes correctly rounded in both modes; with FSL's own factors the replica's output is FSL's bit for bit (validation/probes/fsl-avwutils-lib/check_fft.py)",
+   "seconds": 0.027,
+   "status": "expected-divergence"
   },
   {
    "case": "difftest/subsamp2-three-wide",
@@ -6542,14 +6564,14 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "both-error"
   }
  ],
  "suite": "fsl-maths-replica",
  "summary": {
   "both-error": 61,
-  "expected-divergence": 1,
+  "expected-divergence": 2,
   "fail": 0,
   "pass": 358,
   "skipped": 0

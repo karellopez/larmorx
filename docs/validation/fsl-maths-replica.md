@@ -1,12 +1,12 @@
 # Parity: fslmaths replica (bit-exact, FSL Licence)
 
-**All cases agree.** 420 cases on the `standard` tier: 358 pass, 61 rejected by both, 1 expected divergences, 0 failures.
+**All cases agree.** 421 cases on the `standard` tier: 358 pass, 61 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl fslmaths` (crate larmorx-nc-avwutils, translated from FSL 6.0.7.23's source)
 - **Reference:** fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-cprob 2111.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths-replica --tier standard`
-- **Original programs:** 415 runs: 376 from the oracle cache, 39 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 416 runs: 377 from the oracle cache, 39 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -26,7 +26,7 @@
 | cli | 24 | 14 | 10 | 0 | 0 |
 | conv | 29 | 27 | 2 | 0 | 0 |
 | d13 | 82 | 56 | 26 | 0 | 0 |
-| difftest | 3 | 2 | 1 | 0 | 0 |
+| difftest | 4 | 2 | 1 | 1 | 0 |
 | dilall | 4 | 4 | 0 | 0 | 0 |
 | dim | 38 | 33 | 5 | 0 | 0 |
 | dog | 5 | 5 | 0 | 0 | 0 |
@@ -53,6 +53,7 @@
 | Case | Reason |
 |---|---|
 | `fn/double-tan` | GLIBC-07: 3 of 210 double voxels 1 unit(s) in the last place from FSL's, where glibc 2.35's function (IBM's code, LGPL) is not correctly rounded and the replica is (measured on image intensities: sin 0.12 %, cos 0.085 %, tan 0.21 %, asin 0.16 %, acos 0.071 %, atan 0.083 %) |
+| `difftest/fft-twiddles-glibc-sincos` | GLIBC-07: 1 of 90 float voxels 1 unit(s) in the last place from FSL's: the FFT convolution's twiddle factors, which FSL takes from glibc 2.35's sincos (through cexp: IBM's code, LGPL, not always correctly rounded; the same build on every x86-64 CPU) and the replica computes correctly rounded in bot… |
 
 ## Rejected by both
 
@@ -124,7 +125,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6342d2742e0e) |
+| larmorx | 0.0.1 (a51517a323eb) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -559,4 +560,5 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `d13/roc-no-noise` | both-error | 5/5 | FSL-180: -roc -0.05 with a truth image without zero voxels |
 | `difftest/dt-input-uint8-dog-edge` | pass | 6/6 | random testing (2026-11-03): -dt input on a uint8 image, -mul and -dog_edge: the default's unsigned template (FSL-154) … |
 | `difftest/edge-double-square` | pass | 6/6 | random testing (2026-11-03): -edge of a double series: FSL's build squares with x * x (GCC folds pow(x, 2.0)), not glib… |
+| `difftest/fft-twiddles-glibc-sincos` | expected-divergence | 4/5 | random testing (2026-11-03): -recip, -kernel gauss 2.25 and -fmeanu of a 30 x 1 x 3 float image (an FFT convolution: a … |
 | `difftest/subsamp2-three-wide` | both-error | 2/2 | random testing (2026-11-03): -subsamp2 of a 3 x 1 x 2 image (a 6-voxel axis halved twice): the background value's buffe… |

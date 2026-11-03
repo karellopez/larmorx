@@ -24,6 +24,8 @@ replica suite's runner, so a run made once is served after), and print what it w
 | `recheck_trial.py <night> <out.jsonl> [--jobs N]` | every finding of the trial replayed with the current build, the verdicts and the remaining differences counted |
 | `triage_counts.py <night> <recheck.jsonl> [--json out.json]` | every finding in one triage category (fixed by which change, or explained, expected, registered, open) with counts and one reproducer each: `trial_triage.json` |
 | `fit_tfce.py <dir>` | TFCE's arithmetic (`E` in single precision) and `-tfceS`'s output with and without a threshold reached, on FSL's outputs of the replica suite's TFCE cases (findings 17) |
+| `fft_reference.py <figures cache> [<cache>]` | the fslmaths page's `-kernel sphere 21 -fmean` of ds005040's BOLD mean (FSL's FFT path) against its exact result in float64 from §10.2's definition: FSL's FFT within 1.5e-7 of the largest value, the original's single-precision direct sum within 1.4e-5, and what a sum in double rounded once would give against FSL (findings 31; the evidence's own functions) |
+| `site_inventory.py <site> <tool>... --out <file>`, `--compare <before> <after>` | the site's evidence pages counted (examples, panels, comparisons, tables and rows, cases and their results, verdict chips, numbers with a JSON pointer, still images, blobs, headings, words), before and after a change: every count after >= before (relay 7's site check) |
 
 Run from the repository with the validation package on the path, inside a memory box:
 

@@ -40,7 +40,10 @@ convolves a large kernel by
 its FFT, the original computes the convolution by the direct sum (faster than FSL's FFT on
 every kernel the benchmarks measured), in the direct sum's
 orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
-FSL's largest value on the record's cases). `implementation="auto"`
+FSL's largest value on the record's cases; on the site's real call `-kernel sphere 21 -fmean`
+of a BOLD mean, 1,313 kernel voxels, 1.39e-5, beyond §21's 1e-5: its single-precision sum is
+the less accurate there, FSL's FFT lying within 1.5e-7 of the exact result, findings 31).
+`implementation="auto"`
 (the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
 `"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
 original in this process on `n_threads` threads (its results the same at any count). The
@@ -284,7 +287,10 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 ## Not yet
 
 - The clean-room original's 10 open differences of random testing (the record's notes) and
-  the spec questions of its findings. Its speed: the
+  the spec questions of its findings. On FSL's FFT path its direct sum adds in single precision,
+  which a large kernel makes less accurate than FSL's FFT (findings 31: 1.39e-5 of FSL's largest
+  value on the site's `-kernel sphere 21 -fmean`, beyond §21's bound): a follow-up, the products
+  added in double where FSL takes its FFT (2.0e-7 from FSL's output on that call). Its speed: the
   [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 42 times faster than FSL on one thread, up to
   356 times on 14; the direct sum outruns FSL's FFT on every kernel measured, so the original
   has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)

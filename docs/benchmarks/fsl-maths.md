@@ -40,7 +40,7 @@ stand-in: the segmentation's grey matter on the BOLD grid, as the run has no Fre
 | T1w `-dilD` | 3.80 (195) | 1.72 (185) | 1.05 (128) | 0.24 (128) | 1 = 14 threads; identical |
 | T1w `-kernel sphere 6 -fmean` (FSL's FFT path) | 227.71 (4063) | 195.74 (3159) | 5.41 (188) | 0.64 (187) | 1 = 14 threads; max \|d\| 8.4e-6 of FSL's largest value |
 | BET's `fslstats <T1w> -l 0.001 -C` | 0.58 (315) | 0.34 (245) | 0.45 (278) | 0.29 (277) | 1 = 14 threads; 1 of 3 numbers differs, 6.1e-8 relative (findings 21) |
-| `fslstats -t <BOLD> -M -S -r` | 0.23 (47) | 0.23 (37) | 0.22 (41) | 0.23 (43) | 1 = 14 threads; 54 of 252 numbers differ (`-S`'s last digits), at most 3.0e-10 relative |
+| `fslstats -t <BOLD> -M -S -r` | 0.23 (47) | 0.23 (37) | 0.22 (41) | 0.23 (43) | 1 = 14 threads; identical with the final build (relay 7's check, below; at relay 5 54 of 252 numbers differed: `-S`'s last digits, at most 3.0e-10 relative) |
 
 "Identical": the images' data and headers are FSL's bit for bit (`descrip` aside). The
 differences are within the specs' thresholds (§21 of `specs/fslmaths.md`: the sums' largest
@@ -55,7 +55,14 @@ difference at most 1e-5 of FSL's largest value; §10 of `specs/fslstats.md`: 1e-
   the original's output is FSL's bit for bit (re-run at one thread, 2.26 s, 127 MiB; the other
   timings are relay 5's, the change touches only the kernel's 49 values);
 - fslstats' unmasked `-S` on a volume of many nonzero voxels (`Σ v²` of single-precision
-  squares) differs from FSL's in the printed last digits (3e-10 relative; findings 23).
+  squares) differed from FSL's in the printed last digits at relay 5 (3e-10 relative); run again
+  with the part's final build (relay 7, 2026-11-04, at 1 and 14 threads) the original prints
+  FSL's text in all 252 numbers (findings 23).
+- on FSL's FFT path the original's direct sum adds in single precision (§10.2's arithmetic of
+  FSL's direct path), whose error grows with the kernel: on the fslmaths evidence page's
+  `-kernel sphere 21 -fmean` of the series' mean (1,313 kernel voxels) it lies 1.39e-5 of FSL's
+  largest value from FSL, beyond §21's 1e-5, and 1.4e-5 from the exact result where FSL's FFT
+  lies 1.5e-7 from it (findings 31: a follow-up, a double sum where FSL takes its FFT).
 
 ## What the numbers show
 

@@ -352,10 +352,13 @@ images and fMRIPrep's calls, all identical or within the thresholds):
   `i²dx² + j²dy² + k²dz²` without the products' order, which matters at these voxel sizes.
   `-kernel sphere`'s test `i² dx² + … ≤ r²` keeps the spec's order (no case shows a difference).
 - **fslstats' unmasked `-S`** on a volume with many nonzero voxels (`-t <BOLD> -M -S -r`, 63
-  volumes of 136,400 voxels): `-M` and `-r` are FSL's text, `-S` differs in its last printed
-  digits in 54 of 63 volumes (at most 3.0e-10 relative; §10's bound 1e-6). §5.2's form (`Σ v²` of
-  single-precision squares widened, in double) is not FSL's order or precision exactly (the
-  goodvoxels calls, with few nonzero voxels, are identical). A spec question.
+  volumes of 136,400 voxels): at relay 5 `-M` and `-r` were FSL's text and `-S` differed in its
+  last printed digits in 54 of 63 volumes (at most 3.0e-10 relative; §10's bound 1e-6).
+  **Measured again in relay 7** (2026-11-04) with the part's final build (the Rust code of
+  13a1356): FSL's text in all 252 numbers, at 1 and at 14 threads (the call run on the series
+  and compared with FSL's output of relay 5's benchmark, no new FSL run); `-t <BOLD> -M -S` on
+  the evidence page likewise. Which of relay 6's changes brought it was not isolated (none of
+  them names `-S`); spec question 27 needs no answer for the original's sake.
 
 
 ## 24. The geometry of a new grid along x (`-subsamp2`, `-subsamp2offc`, the X reductions), relay 6
@@ -443,3 +446,34 @@ constant image's `-h`, FSL-186's `-H`), the text holds nothing and the JSON an e
 FSL's `-ptoz` of a NaN voxel is that NaN quieted with its **sign flipped**: the input's
 `0x7fc00000` gives the default NaN `0xffc00000` (findings 16), and the default NaN (from `-inm`
 with an empty mask) gives `0x7fc00000`. The original flips it.
+
+
+## 31. FSL's FFT convolution is the more accurate on a large kernel, relay 7
+
+The fslmaths page's real call `fslmaths mean -kernel sphere 21 -fmean out` (FSL's `-Tmean` of
+ds005040's BOLD series in T1w space, 50 × 62 × 44 voxels of 3 × 3 × 3.3 mm, values up to 8 × 10⁴:
+a 15 × 15 × 13 kernel of 1,313 voxels, which FSL convolves by its FFT) gives the original's
+output **1.39e-5 of FSL's largest value away from FSL's, beyond §21's bound of 1e-5**, with 0.19 %
+of the voxels within 4 units in the last place (the record's FFT cases, on small synthetic
+images, stay within 2.6e-6). Against the exact result, computed in float64 from §10.2's
+definition (the convolution with zeros outside divided by the convolution of ones; the sphere of
+§9; `fft_reference.py` in the investigations folder, the evidence page's own numbers), **FSL's
+FFT lies within 1.5e-7 of the largest value (median 1.6e-8), the original's direct sum within
+1.4e-5 (median 2.3e-6)**: the difference is the original's rounding, not FSL's. The original
+computes the direct sum in §10.2's arithmetic of FSL's direct path (each product added to a
+single-precision sum), which is FSL's bit for bit where FSL sums directly; over 1,313 terms of
+about 60 that sum rounds about every addition at a unit of 8 × 10⁻³ (values near 8 × 10⁴), so
+its error grows with the kernel, while FSL's FFT error stays near single precision's of the
+image's largest value. The record's reason for its 5 FFT expected divergences ("the FFT's
+rounding is relative to the image's largest values") is therefore half the story: there too the
+original's single-precision sums may be the less accurate (not measured on those cases).
+
+A follow-up for the original (reported in the part's handoff, not done in this relay, which
+changes no Rust code): where FSL would take its FFT, add the products in double precision and
+round once. The exact result rounded once to single lies 2.0e-7 of FSL's largest value from
+FSL's output on this call, inside §21's bound, with 75.8 % of the voxels within 4 units in the
+last place (FSL's FFT error is relative to the image's largest values, so §21's share stays an
+expected divergence on that path, as spec question 14 says); FSL's direct path keeps §10.2's
+single-precision sum, bit for bit. The benchmark's FFT-path calls (`-kernel boxv 13 -fmeanu` on
+the series, `-kernel sphere 6 -fmean` on the T1w: 2.8e-6 and 8.4e-6 of FSL's largest value) are
+within the bound but the same arithmetic.

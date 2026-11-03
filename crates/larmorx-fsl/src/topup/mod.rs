@@ -136,6 +136,10 @@ pub struct Estimate {
     pub field: Field,
     pub prepared: Prepared,
     pub warpres_last: f64,
+    /// The smoothing (FWHM, mm) of the outputs' predictions: the last level's when it was not
+    /// subsampled, else none (§6: a subsampled last level's smoothing and subsampling are
+    /// removed; observed, `thr/openblas`: one level of FWHM 4 mm, FSL's `--iout` is smoothed).
+    pub fwhm_out: f64,
 }
 
 /// Runs the estimation (§4) on `volumes` (each `dims`, x fastest, radiological frame) with voxel
@@ -225,14 +229,15 @@ pub fn estimate(
         field: f,
         prepared,
         warpres_last: last.warpres,
+        fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
     }
 }
 
-/// The predictions at full resolution (§6): the unsmoothed, regridded volumes interpolated on the
-/// input's grid.
+/// The predictions at full resolution (§6): the regridded volumes (smoothed as the last level's
+/// when it was not subsampled, [`Estimate::fwhm_out`]) interpolated on the input's grid.
 pub fn full_resolution(est: &Estimate, scans: &[Scan], regmod: RegMod) -> (Level, Eval) {
     let p = &est.prepared;
-    let imgs = images::level_images(p, 1, 0.0);
+    let imgs = images::level_images(p, 1, est.fwhm_out);
     let level = Level::new(
         imgs,
         p.dims,

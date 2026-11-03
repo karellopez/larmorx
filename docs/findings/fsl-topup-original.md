@@ -88,6 +88,13 @@ is a question for the spec writer (the part's handoff).
       of the change; the deviation from the identity only in the columns of the two end
       coefficients at each end) and testing penalties on those rows.
 
+12. **The outputs' predictions keep the last level's smoothing** when that level is not
+    subsampled (§6 removes "the smoothing and subsampling" only after a subsampled last level):
+    in `thr/openblas`'s case (one level, `--fwhm=4`, no subsampling) FSL's `--iout` agrees with
+    the predictions from the smoothed images to 1.5e-5 relative at the 99th percentile, and
+    differs from the unsmoothed ones by 2e-2. With a subsampled last level both are removed;
+    fMRIPrep's calls end with a level of FWHM 0, where the two readings agree.
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

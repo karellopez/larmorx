@@ -270,10 +270,11 @@ fn usage_error(err: &mut dyn Write, notices: &[Notice], message: &str) -> u8 {
     1
 }
 
-/// A refusal of the original (larmorx's message), exit status 1.
+/// A refusal of the original (larmorx's message, as FAST's: `larmorx: error: topup: <why>`),
+/// exit status 1.
 fn refuse(err: &mut dyn Write, notices: &[Notice], why: &str) -> u8 {
     print_notices(err, notices);
-    let _ = writeln!(err, "larmorx fsl topup: {why} (larmorx)");
+    let _ = writeln!(err, "larmorx: error: topup: {why}");
     1
 }
 

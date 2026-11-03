@@ -147,7 +147,13 @@ def _numbers_close(want: str, got: str) -> tuple[bool, str]:
     significant digits; the first difference otherwise."""
     wl, gl = want.split("\n"), got.split("\n")
     if len(wl) != len(gl):
-        return False, f"{len(wl)} lines, the original {len(gl)}"
+        k = next((i for i, (a, b) in enumerate(zip(wl, gl, strict=False)) if a != b), None)
+        k = min(len(wl), len(gl)) if k is None else k
+        first = (wl[k] if k < len(wl) else "")[:80], (gl[k] if k < len(gl) else "")[:80]
+        return (
+            False,
+            f"{len(wl)} lines, the original {len(gl)}; line {k + 1}: {first[0]!r} / {first[1]!r}",
+        )
     for k, (a, b) in enumerate(zip(wl, gl, strict=True)):
         if a == b:
             continue
@@ -358,10 +364,11 @@ def _acquisition(d: Path, args: list[str]) -> np.ndarray | None:
 
 
 def _image_in(d: Path, name: str | None) -> Path | None:
+    """The image ``name`` names in ``d`` (as given, or with an extension), if it is one."""
     if not name:
         return None
     for cand in (name, name + ".nii.gz", name + ".nii"):
-        if (d / cand).is_file():
+        if (d / cand).is_file() and _is_image(cand):
             return d / cand
     return None
 

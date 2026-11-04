@@ -86,3 +86,44 @@ $V list sin 3 0 10      # compare with ../glibc-dbl/blackbox's `list sin 3 0 10`
 The comparisons with the system's functions are meaningful on x86-64 Linux with glibc 2.35 and a
 CPU with FMA and AVX2 (the oracle machine); the record comparison and the unit tests on any
 platform. Memory: well under 1 GiB.
+
+## The tools' `reproduce` paths: cases where the two choices differ (relay 2b, 2026-11-04)
+
+The clean-room originals take glibc's functions with `reproduce` and the correctly rounded ones
+by default (`larmorx_core::math::Libm`). To check those paths against FSL and AFNI, the suites
+need inputs where the two choices give other outputs; the existing cases had none.
+`case_search.py` finds them by black-box runs of larmorx's command line in both modes:
+
+| Search | Found (outputs that differ between the modes) | Used by |
+|---|---|---|
+| `fslmaths <dir>` (the suite's own inputs, `fsl_maths.own_inputs`) | `-s` / `-kernel gauss` 3.95 (1,217 voxels), 4.8 (32), 5.2 (3,030) of 110 sigmas; `-bptf 1.73 -1` (11,785) and `5.72 -1` (3,980) of a double image, `1.7` none; `-tfce_delta 0.01 -tfce 1.7 0.5 6` (2) of 18 settings; none of them named (filters) | `fsl_maths.py`: `orig/glibc-s`, `orig/glibc-kernel-gauss`, `orig/glibc-bptf`, `orig/glibc-tfce` |
+| `bptf-weights` (CPython's `math.exp`, the system's glibc, against mpmath) | 62 of 1,940 sigmas (0.60 to 19.99) have a weight whose glibc `exp` is not correctly rounded, the first 1.73 at Δ = 1 | the `-bptf` sigma above |
+| `tshift <dir> [n]` (the suite's float32 series, 4 slices) | about one in three random sets of slice times gives other `-wsinc5`/`-wsinc9` values (1 to 14 of 3,600), each named GLIBC-07 in both modes | `afni_tshift.py`: `methods/glibc-sinf-wsinc5`, `-wsinc9` |
+
+The double-precision voxelwise functions need no search: on a 32³ double image uniform in
+[-20, 20) (`-sin` 49 voxels, `-cos` 40, `-exp` 34) or in [0.001, 1000) (`-log` 3, `-pow 1.7` 29)
+the default and `reproduce` differ, each named exactly (`orig/glibc-double-*`). The golden cases
+of these paths (`cli.fsl.fslmaths.reproduce`, `cli.afni.3dTshift.wsinc`, `cli.fsl.flirt.reproduce`,
+`cli.fsl.mcflirt.reproduce`, `cli.fsl.makerot.reproduce`) use the registry's own inputs, each
+call checked to differ between the modes.
+
+Not found, and why: `-dog_edge` (its output is 0 or 1: a last bit of a Gaussian practically never
+moves a zero crossing; 50 settings), `-roc` (its rates are printed with six digits), fslstats'
+`-e` and `-E` (six digits). topup's taps are rounded to single precision, where the two `exp`s
+practically never differ.
+
+**`-edge` calls no glibc function** (`edge_forms.py`): FSL's double `-edge` on the case
+`orig/edge-double` is, in all 27,000 interior voxels, the exact squares `d·d / (v·v)` added from
+z to x; glibc's `pow(d, 2)` in the spec's order gives 24,352. `specs/fslmaths.md` §10.4's
+`pow(x, 2)` is compiled as `x·x` (GCC folds it), and the terms are added from the last axis. The
+clean-room original follows (both modes).
+
+```bash
+python -P validation/investigations/cleanroom-glibc-dbl/case_search.py fslmaths <scratch>/cs-fm
+python -P validation/investigations/cleanroom-glibc-dbl/case_search.py bptf-weights
+python -P validation/investigations/cleanroom-glibc-dbl/case_search.py tshift <scratch>/cs-ts 15
+python -P validation/investigations/cleanroom-glibc-dbl/edge_forms.py
+```
+
+(each inside `scripts/orchestration/boxed.sh 24`, with `PYTHONPATH=<worktree>/python:<worktree>/validation/src`
+and `LARMORX_ORACLE_CACHE_MODE=use`; a few minutes each.)

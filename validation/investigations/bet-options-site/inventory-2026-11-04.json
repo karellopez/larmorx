@@ -1,0 +1,282 @@
+{
+ "before": "site main 51d5465 (evidence-blobs 67aa66e)",
+ "after": "site bet-options-pages 4dddba7 (evidence-blobs a1dfe8b), exported from larmorx 65543af7",
+ "counts [before, after]": {
+  "pages:tools/fsl-bet": {
+   "a": [
+    760,
+    930
+   ],
+   "code": [
+    638,
+    1062
+   ],
+   "data-ev": [
+    274,
+    459
+   ],
+   "ev-cases": [
+    3,
+    3
+   ],
+   "ev-example": [
+    4,
+    11
+   ],
+   "figure": [
+    38,
+    80
+   ],
+   "h1": [
+    1,
+    1
+   ],
+   "h2": [
+    11,
+    14
+   ],
+   "h3": [
+    0,
+    3
+   ],
+   "h4": [
+    0,
+    0
+   ],
+   "img": [
+    21,
+    55
+   ],
+   "li": [
+    106,
+    140
+   ],
+   "p": [
+    597,
+    758
+   ],
+   "svg": [
+    11,
+    11
+   ],
+   "table": [
+    5,
+    12
+   ],
+   "tr": [
+    258,
+    410
+   ],
+   "words": [
+    28388,
+    39413
+   ]
+  },
+  "pages:tools/fsl-maths": {
+   "a": [
+    1130,
+    1132
+   ],
+   "code": [
+    1234,
+    1258
+   ],
+   "data-ev": [
+    464,
+    463
+   ],
+   "ev-cases": [
+    3,
+    3
+   ],
+   "ev-example": [
+    3,
+    3
+   ],
+   "figure": [
+    30,
+    30
+   ],
+   "h1": [
+    1,
+    1
+   ],
+   "h2": [
+    12,
+    12
+   ],
+   "h3": [
+    0,
+    0
+   ],
+   "h4": [
+    0,
+    0
+   ],
+   "img": [
+    15,
+    15
+   ],
+   "li": [
+    79,
+    79
+   ],
+   "p": [
+    961,
+    962
+   ],
+   "svg": [
+    11,
+    11
+   ],
+   "table": [
+    14,
+    14
+   ],
+   "tr": [
+    621,
+    622
+   ],
+   "words": [
+    41357,
+    41683
+   ]
+  },
+  "evidence:fsl-bet": {
+   "blob bytes": [
+    5099848,
+    7658262
+   ],
+   "blobs": [
+    33,
+    111
+   ],
+   "case results": [
+    519,
+    604
+   ],
+   "cases": [
+    192,
+    281
+   ],
+   "cases_credits": [
+    12,
+    12
+   ],
+   "credits": [
+    12,
+    12
+   ],
+   "examples": [
+    4,
+    11
+   ],
+   "implementations": [
+    3,
+    3
+   ],
+   "leaves": [
+    7916,
+    13175
+   ],
+   "provenance": [
+    5,
+    5
+   ],
+   "speed": [
+    6,
+    6
+   ]
+  },
+  "evidence:fsl-maths": {
+   "blob bytes": [
+    5024021,
+    5024021
+   ],
+   "blobs": [
+    47,
+    47
+   ],
+   "case results": [
+    873,
+    874
+   ],
+   "cases": [
+    456,
+    457
+   ],
+   "cases_credits": [
+    3,
+    3
+   ],
+   "credits": [
+    3,
+    3
+   ],
+   "examples": [
+    3,
+    3
+   ],
+   "implementations": [
+    2,
+    2
+   ],
+   "leaves": [
+    24002,
+    24027
+   ],
+   "provenance": [
+    7,
+    7
+   ],
+   "speed": [
+    6,
+    6
+   ],
+   "tables": [
+    6,
+    6
+   ]
+  }
+ },
+ "checks before": {
+  "tools/fsl-bet/": {
+   "examples": 4,
+   "viewers": 100,
+   "viewers_bad": [],
+   "checked": 247,
+   "agree": 247,
+   "disagree": [],
+   "failed": 0
+  },
+  "tools/fsl-maths/": {
+   "examples": 3,
+   "viewers": 152,
+   "viewers_bad": [],
+   "checked": 451,
+   "agree": 451,
+   "disagree": [],
+   "failed": 0
+  }
+ },
+ "checks after": {
+  "tools/fsl-bet/": {
+   "examples": 11,
+   "viewers": 180,
+   "viewers_bad": [],
+   "checked": 416,
+   "agree": 416,
+   "disagree": [],
+   "failed": 0
+  },
+  "tools/fsl-maths/": {
+   "examples": 3,
+   "viewers": 152,
+   "viewers_bad": [],
+   "checked": 450,
+   "agree": 450,
+   "disagree": [],
+   "failed": 0
+  }
+ }
+}

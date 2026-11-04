@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (the first half done 2026-11-04, the second half next; item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves done 2026-11-04, the replicas' step (b) next with BET's options; item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool

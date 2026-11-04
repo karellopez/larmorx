@@ -22,7 +22,7 @@
 //! sizes), FSL-180 (no true voxels, or no zero voxels without a noise image).
 
 use larmorx_core::defects::{self, Notices};
-use larmorx_core::math;
+use larmorx_core::math::{self, Libm};
 use rayon::prelude::*;
 
 use super::filters::abort_lines;
@@ -127,30 +127,43 @@ fn extremes_of<T: Num>(data: &[T], fix: bool) -> (Option<(T, T)>, bool) {
 
 /// `ln(v - minval + 1)` in single precision: `logf` for the single-precision and integer
 /// computing types, double `log` rounded to single for a double image (its comparisons with
-/// the thresholds are in single precision: observed).
-fn log_values<T: Num>(data: &[T], m: f64) -> Vec<f32> {
+/// the thresholds are in single precision: observed). The functions are `libm`'s (glibc's with
+/// `reproduce`, GLIBC-07); its witness compares the single-precision values.
+fn log_values<T: Num>(data: &[T], m: f64, libm: &Libm) -> Vec<f32> {
+    let g = libm.is_glibc();
+    let one = |v: T, g: bool| match T::KIND {
+        Kind::Double => {
+            let x = v.to_f64();
+            let a = num::nan64(x, m, x - m);
+            let a = num::nan64(a, 1.0, a + 1.0);
+            num::to_f32(log64(a, g))
+        }
+        Kind::Float => {
+            let x = num::to_f32(v.to_f64());
+            let mf = num::to_f32(m);
+            let a = num::nan32(x, mf, x - mf);
+            logf32(num::nan32(a, 1.0, a + 1.0), g)
+        }
+        _ => logf32((v.to_f64() - m + 1.0) as f32, g),
+    };
     data.par_iter()
-        .map(|&v| match T::KIND {
-            Kind::Double => {
-                let x = v.to_f64();
-                let a = num::nan64(x, m, x - m);
-                let a = num::nan64(a, 1.0, a + 1.0);
-                num::to_f32(log64(a))
+        .map(|&v| {
+            let r = one(v, g);
+            if libm.watching() {
+                libm.note(one(v, !g).to_bits() != r.to_bits());
             }
-            Kind::Float => {
-                let x = num::to_f32(v.to_f64());
-                let mf = num::to_f32(m);
-                let a = num::nan32(x, mf, x - mf);
-                logf32(num::nan32(a, 1.0, a + 1.0))
-            }
-            _ => logf32((v.to_f64() - m + 1.0) as f32),
+            r
         })
         .collect()
 }
 
-/// `logf` (correctly rounded), x86-64's NaN for a negative argument.
-fn logf32(x: f32) -> f32 {
-    let r = math::logf(x);
+/// `logf` (correctly rounded, or glibc's with `glibc`), x86-64's NaN for a negative argument.
+fn logf32(x: f32, glibc: bool) -> f32 {
+    let r = if glibc {
+        math::logf_glibc(x)
+    } else {
+        math::logf(x)
+    };
     if r.is_nan() && !x.is_nan() {
         f32::from_bits(num::DEFAULT_NAN_32)
     } else {
@@ -158,9 +171,13 @@ fn logf32(x: f32) -> f32 {
     }
 }
 
-/// `log` (correctly rounded), x86-64's NaN for a negative argument.
-fn log64(x: f64) -> f64 {
-    let r = math::log(x);
+/// `log` (correctly rounded, or glibc's with `glibc`), x86-64's NaN for a negative argument.
+fn log64(x: f64, glibc: bool) -> f64 {
+    let r = if glibc {
+        math::log_glibc(x)
+    } else {
+        math::log(x)
+    };
     if r.is_nan() && !x.is_nan() {
         num::default_nan()
     } else {
@@ -241,6 +258,7 @@ pub fn roc<T: Num>(
     notices: &mut Notices,
 ) -> Result<Roc, Stop> {
     let fix = notices.fix();
+    let libm = Libm::new(notices.mode());
     let [nx, ny, nz, nt] = img.dims;
     let nvox = nx * ny * nz;
     let k = nvox * nt;
@@ -287,15 +305,21 @@ pub fn roc<T: Num>(
     {
         minval_d = min_of(minval_d, num::to_f64(lo));
     }
-    let lg = log_values(&img.data, minval_d);
+    let lg = log_values(&img.data, minval_d, &libm);
     let (lext, lnan) = extremes_of(&lg, fix);
     let mut maxlog = lext.map_or(0.0, |e| e.1);
     let mf = num::to_f32(minval_d);
     if let Some(n) = noise.as_deref_mut() {
         let one = 1.0f32;
+        let g = libm.is_glibc();
         n.data[..k].par_iter_mut().for_each(|v| {
             let a = num::nan32(*v, mf, *v - mf);
-            *v = logf32(num::nan32(a, one, a + one));
+            let a = num::nan32(a, one, a + one);
+            let r = logf32(a, g);
+            if libm.watching() {
+                libm.note(logf32(a, !g).to_bits() != r.to_bits());
+            }
+            *v = r;
         });
         if let Some((_, hi)) = ops::extremes(&n.data, fix) {
             maxlog = max_of(maxlog, hi);
@@ -377,7 +401,7 @@ pub fn roc<T: Num>(
             .iter()
             .map(|(tr, _)| num::to_f64(div32(count_f32(at_or_above(tr, h)), ntrue)))
             .collect();
-        let e = math::expf(h);
+        let e = libm.expf(h);
         let thr = num::nan32(e, 1.0, e - 1.0);
         let thr = fmt::g(num::to_f64(num::nan32(thr, mf, thr + mf)));
         let new_fp = if noise.is_some() {
@@ -438,6 +462,7 @@ pub fn roc<T: Num>(
             *a = num::nan64(*a, r, *a + r);
         }
     }
+    ops::note_glibc(notices, &libm, "-roc's logarithms and exponentials");
     if vareas.iter().any(|v| v.is_nan()) {
         // FSL-180 reproduced (or a limit that is NaN): the quartiles' sort detects NaN
         return Ok(Roc {

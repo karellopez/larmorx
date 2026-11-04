@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 
 use super::filters::abort_lines;
 use super::image::Img;
@@ -100,6 +100,7 @@ pub fn tfce<T: Num>(
     out: &mut dyn Write,
 ) -> Result<(), Stop> {
     let fix = notices.fix();
+    let libm = Libm::new(notices.mode());
     check_connectivity(notices, "-tfce", c)?;
     let [nx, ny, nz, nt] = img.dims;
     // FSL tests each volume's step before the sizes (random testing, findings 26)
@@ -180,7 +181,7 @@ pub fn tfce<T: Num>(
             h = next;
         }
         let v = single(vol);
-        let enh = enhance(&v, [nx, ny, nz], &hs, h_exp, e_exp, &offs);
+        let enh = enhance(&v, [nx, ny, nz], &hs, h_exp, e_exp, &offs, &libm);
         let mut changed = false;
         for e in enh {
             let (x, ch) = T::convert(num::to_f64(e), fix);
@@ -212,13 +213,15 @@ pub fn tfce<T: Num>(
              requires a positive deltaT input)",
         );
     }
+    super::ops::note_glibc(notices, &libm, "-tfce's powers");
     img.data = result;
     Ok(())
 }
 
 /// The enhancement of one volume (single precision) over the thresholds `hs`: at each, the
 /// clusters of interior voxels above it; each voxel of a cluster of `s` adds
-/// `pow(s, E) · powf(h, H)` (the product in double).
+/// `pow(s, E) · powf(h, H)` (the product in double; `libm`'s functions, glibc's with
+/// `reproduce`).
 fn enhance(
     v: &[f32],
     dims: [usize; 3],
@@ -226,6 +229,7 @@ fn enhance(
     h_exp: f32,
     e_exp: f32,
     offs: &[[i64; 3]],
+    libm: &Libm,
 ) -> Vec<f32> {
     let [nx, ny, nz] = dims;
     let n = v.len();
@@ -254,7 +258,7 @@ fn enhance(
         for &k in &active {
             mark[k] = step;
         }
-        let hp = math::powf(h, h_exp);
+        let hp = libm.powf(h, h_exp);
         let hp = if hp.is_nan() && !h.is_nan() && !h_exp.is_nan() {
             f32::from_bits(num::DEFAULT_NAN_32)
         } else {
@@ -282,7 +286,7 @@ fn enhance(
             let term = num::nan64(
                 s,
                 f64::from(hp),
-                math::pow(s, f64::from(e_exp)) * f64::from(hp),
+                libm.pow(s, f64::from(e_exp)) * f64::from(hp),
             );
             for &p in &members {
                 enh[p] = num::acc32(enh[p], term);
@@ -348,6 +352,7 @@ pub fn tfce_support<T: Num>(
     out: &mut dyn Write,
 ) -> Result<(), Stop> {
     let fix = notices.fix();
+    let libm = Libm::new(notices.mode());
     check_connectivity(notices, "-tfceS", c)?;
     let [nx, ny, nz, nt] = img.dims;
     let per = nx * ny * nz;
@@ -486,8 +491,8 @@ pub fn tfce_support<T: Num>(
         let mut acc = 0.0f32;
         let mut reached = None;
         for k in (0..hs.len()).rev() {
-            let s = math::powf(sizes[k] as f32, e_exp);
-            let p = math::powf(hs[k], h_exp);
+            let s = libm.powf(sizes[k] as f32, e_exp);
+            let p = libm.powf(hs[k], h_exp);
             acc += num::nan32(s, p, s * p);
             if acc >= target {
                 reached = Some(k);
@@ -515,6 +520,7 @@ pub fn tfce_support<T: Num>(
             "-tfceS: arrays as long as the thresholds taken (FSL's are shorter: it stops)",
         );
     }
+    super::ops::note_glibc(notices, &libm, "-tfceS's powers");
     img.data = result;
     Ok(())
 }
@@ -538,7 +544,7 @@ mod tests {
         // at h = 1: the voxel of 2 above it adds 1 * 1
         let mut v = vec![0.0f32; 125];
         v[62] = 2.0;
-        let e = enhance(&v, [5, 5, 5], &[0.0, 1.0], 2.0, 0.5, &offsets(6));
+        let e = enhance(&v, [5, 5, 5], &[0.0, 1.0], 2.0, 0.5, &offsets(6), &Libm::default());
         assert_eq!(e[62], 1.0);
         assert_eq!(e.iter().filter(|&&x| x != 0.0).count(), 1);
     }

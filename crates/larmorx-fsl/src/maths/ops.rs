@@ -10,8 +10,8 @@
 //! correction changed a value its notice says so, which needs FSL's result beside the
 //! corrected one only where the two can differ.
 
-use larmorx_core::defects::{self, Notices};
-use larmorx_core::math;
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
+use larmorx_core::math::{self, Libm};
 use rayon::prelude::*;
 
 use super::image::Img;
@@ -781,17 +781,24 @@ impl Unary {
 
 /// A double function of §7 with FSL's NaN results: a NaN argument passes on quieted; `asin`
 /// and `acos` outside [-1, 1] give a positive NaN; `sin`, `cos`, `tan` of an infinity the
-/// default NaN. The values are correctly rounded (GLIBC-07: glibc's are not everywhere).
+/// default NaN. The values are correctly rounded by default; with `glibc` (`reproduce`,
+/// GLIBC-07) `exp`, `log`, `pow`, `sin` and `cos` are glibc 2.35's, which FSL calls; `tan`,
+/// `asin`, `acos` and `atan` stay correctly rounded in both modes (the user's decision of
+/// 2026-11-04).
 #[inline]
-fn double_fn(f: Unary, x: f64) -> f64 {
+fn double_fn(f: Unary, x: f64, glibc: bool) -> f64 {
     if x.is_nan() {
         return num::quiet(x);
     }
     match f {
+        Unary::Exp if glibc => math::exp_glibc(x),
         Unary::Exp => math::exp(x),
+        Unary::Log if glibc => math::log_glibc(x),
         Unary::Log => math::log(x),
         Unary::Sin | Unary::Cos | Unary::Tan if x.is_infinite() => num::default_nan(),
+        Unary::Sin if glibc => math::sin_glibc(x),
         Unary::Sin => math::sin(x),
+        Unary::Cos if glibc => math::cos_glibc(x),
         Unary::Cos => math::cos(x),
         Unary::Tan => math::tan(x),
         Unary::Asin | Unary::Acos if !(-1.0..=1.0).contains(&x) => f64::NAN,
@@ -802,20 +809,66 @@ fn double_fn(f: Unary, x: f64) -> f64 {
             if p.is_nan() {
                 return if x == 1.0 { 1.0 } else { num::quiet(p) };
             }
-            let r = math::pow(x, p);
+            let r = if glibc {
+                math::pow_glibc(x, p)
+            } else {
+                math::pow(x, p)
+            };
             if r.is_nan() { num::default_nan() } else { r }
         }
         _ => x,
     }
 }
 
+/// Whether glibc's function and the correctly rounded one can differ for `f` (GLIBC-07).
+fn glibc_sensitive(f: Unary) -> bool {
+    matches!(
+        f,
+        Unary::Exp | Unary::Log | Unary::Sin | Unary::Cos | Unary::Pow(_)
+    )
+}
+
+/// `f` of `v` stored in the computing type, with the witness of GLIBC-07: while it looks, the
+/// other choice's stored value too, and whether the two differ (bit for bit).
+#[inline]
+fn stored_fn<T: Num>(f: Unary, v: T, fix: bool, libm: &Libm) -> (T, bool) {
+    let x = v.to_f64();
+    let r = T::convert(double_fn(f, x, libm.is_glibc()), fix);
+    if glibc_sensitive(f) && libm.watching() {
+        let o = T::convert(double_fn(f, x, !libm.is_glibc()), fix).0;
+        libm.note(o.to_f64().to_bits() != r.0.to_f64().to_bits());
+    }
+    r
+}
+
+/// GLIBC-07 (§7, §18): FSL calls glibc 2.35's functions, which are not correctly rounded;
+/// named where the default's correctly rounded values (or, reproduced, glibc's) and the other
+/// choice's differ in `what`, as `libm`'s witness saw.
+pub fn note_glibc(notices: &mut Notices, libm: &Libm, what: &str) {
+    if !libm.differed() {
+        return;
+    }
+    let detail = match notices.mode() {
+        UpstreamDefects::Fix => format!(
+            "{what}: the correctly rounded functions' values, where glibc's (FSL's) give other \
+             last bits"
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "{what}: glibc's functions' values, as FSL, where the correctly rounded ones give \
+             other last bits"
+        ),
+    };
+    notices.add(&defects::GLIBC_07, detail);
+}
+
 /// Applies a voxelwise function.
 pub fn unary<T: Num>(img: &mut Img<T>, f: Unary, notices: &mut Notices) {
     let fix = notices.fix();
+    let libm = Libm::new(notices.mode());
     let changed = match f {
         Unary::Log => map(&mut img.data, |v| {
             if v > T::zero() {
-                T::convert(math::log(v.to_f64()), fix)
+                stored_fn(f, v, fix, &libm)
             } else {
                 (v, false)
             }
@@ -853,9 +906,10 @@ pub fn unary<T: Num>(img: &mut Img<T>, f: Unary, notices: &mut Notices) {
         Unary::Nanm => map(&mut img.data, |v| {
             (if v.non_finite() { T::one() } else { T::zero() }, false)
         }),
-        _ => map(&mut img.data, |v| T::convert(double_fn(f, v.to_f64()), fix)),
+        _ => map(&mut img.data, |v| stored_fn(f, v, fix, &libm)),
     };
     note151(notices, changed, "a voxelwise function's results");
+    note_glibc(notices, &libm, "a voxelwise function's results");
 }
 
 // ------------------------------------------------------------------------------------------

@@ -1153,8 +1153,22 @@ fn print_histogram(
     p.text.push(' ');
 }
 
-/// `-e`, `-E`'s value from a 1000-bin histogram over `range`: `None` for an empty range.
-fn entropy_of(c: &HistCall<'_>, range: (f32, f32), skip_nan: bool, last_bin: bool) -> Option<f64> {
+/// `-e`, `-E`'s value from a 1000-bin histogram over `range`: `None` for an empty range. The
+/// logarithms are correctly rounded, or glibc's with `glibc` (`reproduce`, GLIBC-07: FSL's).
+fn entropy_of(
+    c: &HistCall<'_>,
+    range: (f32, f32),
+    skip_nan: bool,
+    last_bin: bool,
+    glibc: bool,
+) -> Option<f64> {
+    let log = |x: f64| {
+        if glibc {
+            math::log_glibc(x)
+        } else {
+            math::log(x)
+        }
+    };
     let (lo, hi) = range;
     if hi == lo {
         return None;
@@ -1167,10 +1181,10 @@ fn entropy_of(c: &HistCall<'_>, range: (f32, f32), skip_nan: bool, last_bin: boo
     for &k in &counts {
         if k > 0 {
             let q = k as f64 / n as f64;
-            e -= q * math::log(q);
+            e -= q * log(q);
         }
     }
-    Some(e / math::log(1000.0))
+    Some(e / log(1000.0))
 }
 
 /// `-e`, `-E` (§5.5): the entropy of a 1000-bin histogram over the robust range of every value
@@ -1194,7 +1208,8 @@ fn entropy(
         let _ = writeln!(err, "{HISTOGRAM_EMPTY}");
     }
     let active = if fix { range.fix } else { range.rep }.unwrap_or((0.0, 0.0));
-    let Some(ours) = entropy_of(&c, active, fix, fix) else {
+    let glibc = notices.reproduce();
+    let Some(ours) = entropy_of(&c, active, fix, fix, glibc) else {
         // FSL-185: an empty robust range
         if fix {
             notices.add(
@@ -1214,10 +1229,19 @@ fn entropy(
         );
         return Err(Exit(CRASHED));
     };
+    // GLIBC-07: named where the other choice of logarithm prints another value
+    if entropy_of(&c, active, fix, fix, !glibc).is_some_and(|v| shown64(json, ours, v)) {
+        let detail = if fix {
+            format!("{o}: the correctly rounded logarithms' entropy, where glibc's (FSL's) print another")
+        } else {
+            format!("{o}: glibc's logarithms, as FSL, where the correctly rounded ones print another")
+        };
+        notices.add(&defects::GLIBC_07, detail);
+    }
     if fix {
-        let theirs = entropy_of(&c, range.rep.unwrap_or((0.0, 0.0)), false, false);
+        let theirs = entropy_of(&c, range.rep.unwrap_or((0.0, 0.0)), false, false, false);
         if theirs.is_none_or(|t| shown64(json, ours, t)) {
-            let nan_only = entropy_of(&c, active, true, false);
+            let nan_only = entropy_of(&c, active, true, false, false);
             let nan_changes = kept_nan(&c) || range.causes.iter().any(|x| x.0.id == "FSL-153");
             let far_changes = nan_only.is_none_or(|v| shown64(json, ours, v))
                 || range.causes.iter().any(|x| x.0.id == "FSL-187");

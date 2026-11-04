@@ -9,6 +9,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
+use larmorx_core::math::{self, Libm};
 use rayon::prelude::*;
 
 use super::filters::{EMPTY_MASK, abort_lines};
@@ -218,6 +219,11 @@ pub fn subsample<T: Num>(img: &mut Img<T>, offc: bool, notices: &mut Notices) ->
 /// (in-plane only when the image has at most 2 slices).
 pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
     let fix = notices.fix();
+    // FSL squares by `pow(x, 2)` (§10.4): glibc's with `reproduce` (GLIBC-07), which differs
+    // from the exact product `d · d` only for a double image (a single-precision or integer
+    // difference squares exactly in double)
+    let libm = Libm::new(notices.mode());
+    let double = T::KIND == Kind::Double;
     let [nx, ny, nz, _] = img.dims;
     let planar = nz <= 2;
     let axes = if planar { 2 } else { 3 };
@@ -253,7 +259,12 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                             _ => p.diff(m),
                         };
                         // x86-64's NaN rules (a voxel size of 0: 0 / 0, inf / inf)
-                        let (dd, vv) = (d * d, vox[a] * vox[a]);
+                        let dd = if double {
+                            libm.choose64(|| d * d, || math::pow_glibc(d, 2.0))
+                        } else {
+                            d * d
+                        };
+                        let vv = vox[a] * vox[a];
                         let q = num::nan64(dd, vv, dd / vv);
                         sum = num::nan64(sum, q, sum + q);
                     }
@@ -267,13 +278,16 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
         })
         .reduce(|| false, |a, b| a || b);
     ops::note151(notices, changed, "-edge's values");
+    ops::note_glibc(notices, &libm, "-edge's squares");
 }
 
 // ------------------------------------------------------------------------------------------
 // -dog_edge (§10.5)
 
-/// The 2D Gaussian of `-dog_edge` of radius `r` (in voxels), normalised by `1 / Σ`.
-fn dog_gauss(sigma: f64, r: i64) -> Vec<f32> {
+/// The 2D Gaussian of `-dog_edge` of radius `r` (in voxels), normalised by `1 / Σ`; `libm`'s
+/// `exp` (glibc's with `reproduce`, GLIBC-07; its witness compares the values rounded to
+/// single precision).
+fn dog_gauss(sigma: f64, r: i64, libm: &Libm) -> Vec<f32> {
     let n = (2 * r + 1) as usize;
     let mut g = vec![0.0f32; n * n];
     if sigma <= 1e-6 {
@@ -283,7 +297,18 @@ fn dog_gauss(sigma: f64, r: i64) -> Vec<f32> {
             for i in 0..n {
                 let (di, dj) = (i as i64 - r, j as i64 - r);
                 let q = -((di * di + dj * dj) as f64) / (2.0 * sigma * sigma);
-                g[i + n * j] = num::to_f32(larmorx_core::math::exp(q));
+                let e = |glibc: bool| {
+                    num::to_f32(if glibc {
+                        math::exp_glibc(q)
+                    } else {
+                        math::exp(q)
+                    })
+                };
+                let v = e(libm.is_glibc());
+                if libm.watching() {
+                    libm.note(e(!libm.is_glibc()).to_bits() != v.to_bits());
+                }
+                g[i + n * j] = v;
             }
         }
     }
@@ -317,8 +342,9 @@ pub fn dog_edge<T: Num>(
     }
     let [nx, ny, nz, nt] = img.dims;
     let per = nx * ny * nz;
+    let libm = Libm::new(notices.mode());
     let kernel = if r >= 0 {
-        let (g1, g2) = (dog_gauss(s1, r), dog_gauss(s2, r));
+        let (g1, g2) = (dog_gauss(s1, r, &libm), dog_gauss(s2, r, &libm));
         let data: Vec<f32> = g2
             .iter()
             .zip(&g1)
@@ -329,6 +355,7 @@ pub fn dog_edge<T: Num>(
     } else {
         super::kernel::Kernel::none(false)
     };
+    ops::note_glibc(notices, &libm, "-dog_edge's Gaussians");
     if nt > 1 {
         let detail = match notices.mode() {
             UpstreamDefects::Fix => {

@@ -16,6 +16,7 @@ mod atanf_glibc;
 mod cbrt;
 mod cbrtf;
 mod cbrtf_glibc;
+mod choice;
 mod cos;
 pub(crate) mod dint;
 mod exp;
@@ -43,6 +44,11 @@ mod tanhf;
 mod x86_nan;
 
 pub use powi::powi;
+
+/// The C library functions of one call of a clean-room original, with the last bits its mode
+/// asks for: correctly rounded by default, glibc 2.35's with `reproduce` (GLIBC-07), and the
+/// witness its notices name (`choice.rs`).
+pub use choice::Libm;
 
 /// `tanh(x)` for `f32`, correctly rounded (CORE-MATH's `cr_tanhf`; its only fused
 /// multiply-adds are explicit `mul_add` calls on tiny arguments, so it has no FMA-compiled

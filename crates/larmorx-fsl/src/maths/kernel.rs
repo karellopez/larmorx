@@ -7,7 +7,7 @@
 //! centre is voxel `(n - 1) / 2` along each axis (C's integer division).
 
 use super::num::{self, DEFAULT_NAN_32};
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 
 /// A kernel.
 #[derive(Clone, Debug)]
@@ -89,8 +89,9 @@ impl Kernel {
     /// `-kernel gauss σ`: `2 ⌈4σ / d⌉ + 1` voxels along each axis; the values
     /// `expf(−(i² dx² + j² dy² + k² dz²) / (2σ²))` in single precision, not normalised; each
     /// term `i² (d d)` (the voxel size squared first), the terms added x, y, z, divided by
-    /// `(2σ) σ` (findings 23: FSL's kernel bit for bit at voxel sizes not exact in binary).
-    pub fn gauss(sigma: f64, vox: [f64; 3]) -> Kernel {
+    /// `(2σ) σ` (findings 23: FSL's kernel bit for bit at voxel sizes not exact in binary);
+    /// `libm`'s `expf` (glibc's with `reproduce`, GLIBC-07).
+    pub fn gauss(sigma: f64, vox: [f64; 3], libm: &Libm) -> Kernel {
         let s = sigma as f32;
         let d = vox.map(|v| v as f32);
         let dims = d.map(|v| 2 * c_int((4.0 * s / v).ceil()) + 1);
@@ -115,7 +116,7 @@ impl Kernel {
                         + (dj * dj) as f32 * dd[1]
                         + (dk * dk) as f32 * dd[2];
                     let q = num::nan32(-r2, den, -r2 / den);
-                    let v = if q.is_nan() { q } else { math::expf(q) };
+                    let v = if q.is_nan() { q } else { libm.expf(q) };
                     k.data[x + nx * (y + ny * z)] = v;
                 }
             }
@@ -204,6 +205,7 @@ pub fn default_nan32() -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_core::math;
 
     #[test]
     fn sizes_follow_the_spec() {
@@ -212,16 +214,16 @@ mod tests {
         assert_eq!(Kernel::box_mm(-3.0, v).dims, [-1, -1, -1]);
         assert_eq!(Kernel::sphere(12.0, v).dims, [13, 11, 9]);
         assert_eq!(Kernel::sphere(5.0, v).dims, [7, 5, 5]);
-        let g = Kernel::gauss(1.0, v);
+        let g = Kernel::gauss(1.0, v, &Libm::default());
         assert_eq!(g.dims, [5, 5, 5]);
         assert_eq!(g.at(2, 2, 2), 1.0);
         assert!(g.separable && !g.zero_width);
-        let z = Kernel::gauss(0.0, v);
+        let z = Kernel::gauss(0.0, v, &Libm::default());
         assert_eq!(z.dims, [1, 1, 1]);
         assert!(z.zero_width);
         assert_eq!(z.data[0].to_bits(), DEFAULT_NAN_32);
         assert_eq!(z.for_convolution(true).data, vec![1.0]);
-        assert!(Kernel::gauss(-1.0, v).is_empty());
+        assert!(Kernel::gauss(-1.0, v, &Libm::default()).is_empty());
     }
 
     /// Findings 23: FSL's Gaussian squares the voxel size first (`i² (d d)`) and adds the
@@ -229,7 +231,7 @@ mod tests {
     #[test]
     fn the_gaussian_squares_the_voxel_size_first() {
         let v = [0.85, 0.8333333, 0.83];
-        let g = Kernel::gauss(5.0, v);
+        let g = Kernel::gauss(5.0, v, &Libm::default());
         assert_eq!(g.dims, [49, 49, 51]);
         let d = v.map(|x| x as f32);
         let dd = d.map(|x| x * x);

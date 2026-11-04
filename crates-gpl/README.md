@@ -33,6 +33,7 @@ run by hand on Linux x86-64 with glibc 2.35; nothing here is distributed in a wh
 | `tools/glibc-reference` | the earlier translations of glibc 2.35's `sinf`, `cosf` (both x86-64 builds), `tanhf`, `expm1f` and `cbrtf`, as the replicas used them until 2026-10-29 (GPL-3.0-or-later AND LGPL-2.1-or-later; `LICENSES/LGPL-2.1.txt`) |
 | `tools/sincosf-verify` | the proof that the replicas' `sinf` and `cosf`, translated from Arm's Optimized Routines v19.11 (MIT), equal the glibc translation on all 2^32 inputs of each function and build, and glibc itself (both builds) |
 | `tools/floatmath-verify` | the replicas' `tanhf` (fdlibm) against glibc on all 2^32 inputs, and the reference `cbrtf`'s hash against glibc (`glibc_reference.c`) |
+| `tools/glibc-dbl-model` | the spec writer's model of `specs/glibc-dbl.md` (glibc 2.35's double `sin`, `cos`, `sincos`, written from the spec's text by someone who had read glibc's source: GPL-3.0-or-later AND LGPL-2.1-or-later), checked against the black-box record of `validation/investigations/glibc-dbl/`; a clean-room implementer may run it, never open it |
 | `tools/cbrtf-measure` | what glibc's last bit of `cbrtf` changes in 3dUnifize `-EPI` (the radius, its message, the ball of neighbours) on every float32 voxel volume, and that the replica warns wherever it can |
 
 ```bash

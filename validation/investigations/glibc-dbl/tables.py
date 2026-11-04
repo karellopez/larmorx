@@ -197,26 +197,26 @@ def constants(dbl: Path) -> bool:
         for k in ("t576", "tm600", "tm24", "big", "big1", "hp0", "hp1", "mp1", "mp2")
     }
     checks = [
-        ("hp0", pi2, g["hp0"]),
-        ("hp1", pi2 - mpf(g["hp0"]), g["hp1"]),
-        ("hpinv", 2 / mpmath.pi, g["hpinv"]),
-        ("mp1", pi2, g["mp1"]),
-        ("mp2", pi2 - mpf(g["mp1"]), g["mp2"]),
-        ("pp3", pi2 - mpf(g["mp1"]) - mpf(g["mp2"]), g["pp3"]),
-        ("pp4", pi2 - mpf(g["mp1"]) - mpf(g["mp2"]) - mpf(g["pp3"]), g["pp4"]),
-        ("reduction's mp1", pi2, r["mp1"]),
-        ("reduction's mp2", pi2 - mpf(r["mp1"]), r["mp2"]),
-        ("reduction's hp0", pi2, r["hp0"]),
-        ("reduction's hp1", pi2 - mpf(r["hp0"]), r["hp1"]),
+        ("H0", pi2, g["hp0"]),
+        ("H1", pi2 - mpf(g["hp0"]), g["hp1"]),
+        ("G", 2 / mpmath.pi, g["hpinv"]),
+        ("M1", pi2, g["mp1"]),
+        ("M2", pi2 - mpf(g["mp1"]), g["mp2"]),
+        ("M3", pi2 - mpf(g["mp1"]) - mpf(g["mp2"]), g["pp3"]),
+        ("M4", pi2 - mpf(g["mp1"]) - mpf(g["mp2"]) - mpf(g["pp3"]), g["pp4"]),
+        ("large reduction's M1", pi2, r["mp1"]),
+        ("large reduction's M2L", pi2 - mpf(r["mp1"]), r["mp2"]),
+        ("large reduction's H0", pi2, r["hp0"]),
+        ("large reduction's H1", pi2 - mpf(r["hp0"]), r["hp1"]),
     ]
     exact = [
-        ("toint", mpf(3) * mpf(2) ** 51, g["toint"]),
-        ("big", mpf(3) * mpf(2) ** 44, g["big"]),
-        ("reduction's big", mpf(3) * mpf(2) ** 51, r["big"]),
-        ("reduction's big1", mpf(3) * mpf(2) ** 53, r["big1"]),
-        ("t576", mpf(2) ** 576, r["t576"]),
-        ("tm600", mpf(2) ** -600, r["tm600"]),
-        ("tm24", mpf(2) ** -24, r["tm24"]),
+        ("K52 (small reduction)", mpf(3) * mpf(2) ** 51, g["toint"]),
+        ("K45 (the table index)", mpf(3) * mpf(2) ** 44, g["big"]),
+        ("K52 (large reduction)", mpf(3) * mpf(2) ** 51, r["big"]),
+        ("K54", mpf(3) * mpf(2) ** 53, r["big1"]),
+        ("2^576", mpf(2) ** 576, r["t576"]),
+        ("2^-600", mpf(2) ** -600, r["tm600"]),
+        ("2^-24", mpf(2) ** -24, r["tm24"]),
     ]
     ok = True
     for name, v, target in checks:
@@ -357,7 +357,7 @@ def search_sincos(src: list[float]) -> None:
             )
     results.sort()
     print(
-        "sin/cos table, rules tried (numbers missed of 440): "
+        "table R, rules tried (numbers missed of 440): "
         + ", ".join(f"{r[1]}: {r[0]}" for r in results[:6])
         + f"; {len(results)} rules, none misses fewer than {results[0][0]}"
     )
@@ -390,9 +390,26 @@ def main() -> int:
     ap.add_argument("--debug", type=Path, default=None)
     ap.add_argument("--print", action="store_true", help="list the table entries that differ")
     ap.add_argument(
+        "--emit",
+        type=Path,
+        default=None,
+        help="write the definitions' table R (110 rows of four doubles) and digits D_j (75) as hexadecimal bit patterns",
+    )
+    ap.add_argument(
         "--search", action="store_true", help="the other rules tried for the sin/cos table"
     )
     a = ap.parse_args()
+    if a.emit is not None:  # from the definitions alone: no glibc file is read
+        lines = ["# table R: N SH SL CH CL (bit patterns), from specs/glibc-dbl.md section 5.1"]
+        r = sincos_table()
+        for n in range(110):
+            lines.append(f"R {n} " + " ".join(hexd(v) for v in r[4 * n : 4 * n + 4]))
+        lines.append("# the digits D_j of 2/pi, section 3")
+        for j, v in enumerate(two_over_pi_digits()):
+            lines.append(f"D {j} {hexd(v)}")
+        a.emit.write_text("\n".join(lines) + "\n")
+        print(f"wrote {a.emit}")
+        return 0
     glibc = a.glibc
     if glibc is None:  # the workspace's tags/glibc-2.35, above this checkout
         glibc = next(
@@ -421,13 +438,13 @@ def main() -> int:
     src = doubles_from_words_be(
         words_of_block((dbl / "sincostab.c").read_text(), "#ifdef BIG_ENDI")
     )
-    sincos_ok = compare("sin/cos table (source)", gen, src, quiet=not a.print)
+    sincos_ok = compare("table R of sin and cos of N/128 (source)", gen, src, quiet=not a.print)
     if a.search:
         search_sincos(src)
-    compare("sin/cos table (libm.so.6)", gen, binary.doubles("__sincostab"), quiet=True)
+    compare("table R (libm.so.6)", gen, binary.doubles("__sincostab"), quiet=True)
     # the same table with glibc's numbers in place: the binary holds the source's table
     compare(
-        "sin/cos table: libm.so.6 against the source",
+        "table R: libm.so.6 against the source",
         src,
         binary.doubles("__sincostab"),
         quiet=True,
@@ -439,7 +456,7 @@ def main() -> int:
     i = text.index("toverp[75]")
     body = text[text.index("{", i) : text.index("}", i)]
     src = [float(v) for v in re.findall(r"([0-9]+)\.0", body)]
-    ok &= compare("2/pi digits (source)", gen, src)
+    ok &= compare("the digits D_j of 2/pi (source)", gen, src)
 
     # the constants of sin and cos, from their definitions
     ok &= constants(dbl)
@@ -451,7 +468,7 @@ def main() -> int:
     print(
         "TABLES: 2/pi's digits and the sin/cos constants from their definitions: "
         + ("all" if ok else "NOT ALL")
-        + "; the sin/cos table: "
+        + "; table R: "
         + ("all" if sincos_ok else "not all (its low parts, above)")
         + "; tan's points, asin/acos's and atan's tables: no definition (above)"
     )

@@ -780,6 +780,9 @@ The items below keep their history.
   (the suite's `_random_band`, through the oracle cache: about 80 runs of seconds) would classify
   them. Its record's notes still say that options the original does not take are skipped (0 are):
   the suite's text, to correct when the record is next made.
+- **`evidence/fsl_maths.py`'s overlays come out in a varying key order** (seen at the merge verification of
+  2026-11-04: `thrp` and `ero` swapped places between two exports; their contents are identical, so the page is
+  unchanged): an export should be byte-identical when its data are; sort the keys where the dictionary is built.
 - **The originals' suites hold the spec answers' new cases** (seen at the merge verification of 2026-11-04): the
   replicas' suites gained cases for the switches of 2026-11-03, and the originals' suites run them too. Two fail on
   the clean-room originals today, as the answers predict: topup's `opt/fsl145-one-coefficient` (the original's

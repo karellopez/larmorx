@@ -415,11 +415,22 @@ def case(
     # FSL-43's notice is about where a fill starts, whose effect the outputs may not show (a
     # constant image; as the record's single-slice case): named without a change is no finding
     kw.setdefault("silent_ok", ("FSL-43",))
-    if recipe["extra"]["tool"] == "bet" and {"-S", "-B"} & set(recipe["options"]):
-        # -S's and -B's corrections of FLIRT's integer output inside standard_space_roi
-        # (FSL-09) and of fslstats -S (FSL-182) change intermediate values only, as in the
-        # record's -S and -B cases
-        kw["silent_ok"] = (*kw["silent_ok"], "FSL-09", "FSL-182")
+    tool = recipe["extra"]["tool"]
+    options = set(recipe["options"])
+    # The corrections inside bet's -S, -B, -A, -A2 and standard_space_roi change intermediate
+    # values only, which the outputs may not show (as in the record's cases; the trial of
+    # 2026-11-04): FLIRT's integer output (FSL-09: standard_space_roi's transformed masks, -A2's
+    # T2 in the T1's space), its NaN voxels (FSL-14) and its background value (FSL-75: a
+    # pyramid level of 3 voxels), fslstats -S (FSL-182) and its sort (FSL-22), FAST's variance
+    # (FSL-202), standard_space_roi's stop at a failed program (FSL-214) where bet fails later
+    # in both modes
+    if tool == "bet" and {"-S", "-B"} & options:
+        extra = ("FSL-09", "FSL-14", "FSL-22", "FSL-75", "FSL-182", "FSL-202", "FSL-214")
+    elif tool == "standard_space_roi" or (tool == "bet" and {"-A", "-A2"} & options):
+        extra = ("FSL-09", "FSL-14", "FSL-75")
+    else:
+        extra = ()
+    kw["silent_ok"] = (*kw["silent_ok"], *extra)
     s = fb.Scenario(
         recipe["extra"]["tool"],
         tuple(words),

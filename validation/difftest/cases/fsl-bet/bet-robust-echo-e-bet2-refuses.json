@@ -1,0 +1,163 @@
+{
+ "defect": null,
+ "description": "bet -R -e on a 22 x 14 x 19 int32 image of two blobs: bet2's fill starts outside the image (FSL-43: the default refuses, reproduce fills), so no run given the echoed options finishes; the replica named FSL-63 (bash's echo takes -e) all the same, a notice without a change; it names it since 2026-11-04 only once a run given those options has finished (found by the BET part's trial of 2026-11-04, case 565)",
+ "expect": "pass",
+ "found": {
+  "detail": "FSL-63: no values changed",
+  "n": 565,
+  "seed": "bet-options-6",
+  "shrink_moves": [],
+  "signature": [
+   "notice: FSL-63, FSL-43"
+  ]
+ },
+ "id": "bet-robust-echo-e-bet2-refuses",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": true,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.8,
+   "axis1": 1.2,
+   "axis2": 1.15,
+   "blobs": 2,
+   "centre0": -5.0,
+   "centre1": 3.0,
+   "centre2": 1.5,
+   "content": "blobs",
+   "dtype": "int32",
+   "extreme": false,
+   "orientation": "oblique",
+   "origin0": -12.5,
+   "origin1": -5.25,
+   "origin2": -52.25,
+   "qfac": -1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "22x14x19",
+   "size": 19.0,
+   "spacing0": 4.0,
+   "spacing1": 1.2,
+   "spacing2": 1.2,
+   "suffix": ".nii",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e"
+    ],
+    "name": "-e",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.8,
+      1.2,
+      1.15
+     ],
+     "centre": [
+      -5.0,
+      3.0,
+      1.5
+     ],
+     "n": 2,
+     "seed": 505252185,
+     "size": 19.0,
+     "type": "blobs"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      -12.5,
+      -5.25,
+      -52.25
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      14,
+      0,
+      2,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      1.2,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     22,
+     14,
+     19
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 565,
+  "options": [
+   "-R",
+   "-e",
+   "FSLOUTPUTTYPE=NIFTI",
+   "bet"
+  ],
+  "seed": "bet-options-6",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "step": [],
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

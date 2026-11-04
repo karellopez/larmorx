@@ -1,0 +1,185 @@
+{
+ "defect": null,
+ "description": "bet -Z -n -v on a 25 x 17 x 6 head: bet2 writes nothing (-n), so only the run's temporary files would be cropped, which the cleanup removes; the replica named FSL-45 (imglob off the PATH) all the same, a notice without a change; since 2026-11-04 it compares only what stays (the temporary files count with -d) (found by the BET part's trial of 2026-11-04, case 1983)",
+ "expect": "pass",
+ "found": {
+  "detail": "FSL-45: no values changed",
+  "n": 1983,
+  "seed": "bet-options-6",
+  "shrink_moves": [],
+  "signature": [
+   "notice: FSL-45"
+  ]
+ },
+ "id": "bet-small-fov-n-nothing-cropped",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": true,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": true,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.15,
+   "axis1": 0.75,
+   "axis2": 1.2,
+   "bias0": 0.0025,
+   "bias1": 0.0,
+   "bias2": -0.01,
+   "bias3": 0.0025,
+   "centre0": -3.5,
+   "centre1": 0.5,
+   "centre2": 4.5,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "noise": 6.0,
+   "nx": 25,
+   "ny": 17,
+   "nz": 6,
+   "orientation": "plumb",
+   "origin0": 6.0,
+   "origin1": -19.5,
+   "origin2": 26.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "size": 18.5,
+   "spacing0": 1.0,
+   "spacing1": 3.0,
+   "spacing2": 3.0,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "-Z"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-Z"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-n"
+    ],
+    "name": "-n",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.15,
+      0.75,
+      1.2
+     ],
+     "bias": [
+      0.0025,
+      0.0,
+      -0.01,
+      0.0025
+     ],
+     "centre": [
+      -3.5,
+      0.5,
+      4.5
+     ],
+     "noise": 6.0,
+     "seed": 880484025,
+     "size": 18.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      6.0,
+      -19.5,
+      26.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     17,
+     6
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1983,
+  "options": [
+   "-Z",
+   "-n",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "bet-options-6",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "step": [],
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

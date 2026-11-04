@@ -422,6 +422,32 @@ exit 0, and refuses without it. A wheel installed into a fresh environment
 (`pip install --no-deps`) put them at `<venv>/share/larmorx-nc/fsl-data/` and ran the same call
 without FSL (exit 0).
 
+### Random testing of the options (2026-11-04, the part's short trial)
+
+`difftest --tools fsl-bet --budget 0.5 --seed bet-options-6` (24 jobs, FSL through the oracle cache;
+`oracles/difftest/2026-11-04-bet-options-6b`): 2,699 cases, bet's `-S`, `-B`, `-A`, `-A2`, fslroi
+and standard_space_roi drawn among bet2, bet and betsurf. The replica: 2,580 agree, 70 notices
+without a visible change, 47 differences, 1 timeout (bet -S at 300 s, the heavy queue); every one
+triaged in `validation/difftest/triage.toml`:
+
+- **Two replica mistakes, fixed** (permanent cases): FSL-63 was named for `bet -R -e` when no run
+  given the echoed options finished (bet2's fill refused first, FSL-43): it is named once such a
+  run has finished (`bet-robust-echo-e-bet2-refuses`); FSL-45 was named for `bet -Z -n`, where only
+  the temporary files, removed by the cleanup, differ: the comparison counts only the files that
+  stay (`bet-small-fov-n-nothing-cropped`). Notices only: no output changed.
+- **Explained**: the corrections inside the scripts' programs that change intermediate values only
+  (FLIRT's FSL-09 and FSL-14, fslstats' FSL-22 and FSL-182, FAST's FSL-202, standard_space_roi's
+  FSL-214; allowed silent in the descriptor as in the record's cases); FLIRT's buffer overrun
+  FSL-75 (class (a)) on constant and tiny images, after which FSL's FLIRT segfaults or finishes by
+  its heap's layout (28 cases of standard_space_roi and `bet -A2`).
+- **Open**: fslpy's `imcp` conversion with nibabel (`standard_space_roi -maskNONE -roiNONE` on an
+  input of another file type than `FSLOUTPUTTYPE`'s, 8 cases), refused clearly by the replica in
+  both modes (findings/fsl-flirt.md, "Not replicated yet").
+
+The clean-room original's 190 differences (betsurf on tiny heads, mostly) are its own, for the
+clean-room catch-up part; the original's suite and random cases leave out fslroi and
+standard_space_roi (no original yet) and FSL-217's three `bet` cases.
+
 ## FSL 6.0.7.23 (the version update, 2026-10-29)
 
 FSL 6.0.7.17 → 6.0.7.23: fsl-bet2 2111.8 → 2111.9 (`bet2.cpp`; the `bet` script, `betsurf.{h,cpp}`

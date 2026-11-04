@@ -2483,7 +2483,7 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     // eye mask (a block in front of the brain), both uint8
     let std_dir = dir.join(FSL_DATA).join("standard");
     std::fs::create_dir_all(&std_dir).unwrap();
-    let mut standard = |name: &str, datatype: i16, bitpix: i16, data: Vec<u8>| {
+    let standard = |name: &str, datatype: i16, bitpix: i16, data: Vec<u8>| {
         let p = std_dir.join(format!("{name}.nii"));
         std::fs::write(&p, bet_nifti(&[nx, ny, nz], datatype, bitpix, &data)).unwrap();
     };

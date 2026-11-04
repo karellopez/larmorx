@@ -614,37 +614,46 @@ impl Script<'_, '_> {
     /// the variation and `whom` what gets the options, for the notice): bash's echo takes the
     /// leading words made of `-n`, `-e` and `-E` as its own options (FSL-63), and the command
     /// substitution drops the trailing newline. By default the options given, less `pat`; in
-    /// `reproduce` what the script's echo and sed leave.
-    fn echo_sed(&mut self, bet2opts: &str, pat: &str, who: &str, whom: &str) -> Vec<String> {
+    /// `reproduce` what the script's echo and sed leave. FSL-63's notice, where the two differ,
+    /// is returned: the caller names it once a run given those options has finished (a run that
+    /// fails first shows no difference).
+    fn echo_sed(
+        &mut self,
+        bet2opts: &str,
+        pat: &str,
+        who: &str,
+        whom: &str,
+    ) -> (Vec<String>, Option<String>) {
         let words = split_words(bet2opts);
         let given = split_words(&words.join(" ").replace(pat, ""));
         let (printed, taken) = echo::run(&words);
         let theirs = split_words(printed.replace(pat, "").trim_end_matches('\n'));
         if theirs == given {
-            given
+            (given, None)
         } else if self.reproduce() {
-            self.notices.add(
-                &defects::FSL_63,
-                format!(
-                    "{who} passes bet2's options through bash's echo, which takes '{}' as its \
-                     own: {whom} gets '{}', as in FSL",
-                    taken.join(" "),
-                    theirs.join(" ")
-                ),
+            let detail = format!(
+                "{who} passes bet2's options through bash's echo, which takes '{}' as its own: \
+                 {whom} gets '{}', as in FSL",
+                taken.join(" "),
+                theirs.join(" ")
             );
-            theirs
+            (theirs, Some(detail))
         } else {
-            self.notices.add(
-                &defects::FSL_63,
-                format!(
-                    "{who} passes bet2's options through bash's echo, which takes '{}' as its \
-                     own (FSL's {whom} gets '{}'): {whom} gets '{}', the options given",
-                    taken.join(" "),
-                    theirs.join(" "),
-                    given.join(" ")
-                ),
+            let detail = format!(
+                "{who} passes bet2's options through bash's echo, which takes '{}' as its own \
+                 (FSL's {whom} gets '{}'): {whom} gets '{}', the options given",
+                taken.join(" "),
+                theirs.join(" "),
+                given.join(" ")
             );
-            given
+            (given, Some(detail))
+        }
+    }
+
+    /// Names FSL-63 (from [`Self::echo_sed`]) once the run given the options has finished.
+    fn echo_named(&mut self, detail: &mut Option<String>) {
+        if let Some(d) = detail.take() {
+            self.notices.add(&defects::FSL_63, d);
         }
     }
 
@@ -930,6 +939,7 @@ impl Script<'_, '_> {
             w,
         )?;
         let mut opts = split_words(bet2opts);
+        let mut echoed = None;
         // get skull if asked for
         if skull {
             let w = cat([
@@ -949,7 +959,7 @@ impl Script<'_, '_> {
             ]);
             self.bet2(&w)?;
             // bet2opts=`echo $bet2opts | sed 's/-s//g'`
-            opts = self.echo_sed(bet2opts, "-s", "-B with -s", "the robust bet");
+            (opts, echoed) = self.echo_sed(bet2opts, "-s", "-B with -s", "the robust bet");
             let w = cat([t(self, "tmp_unbiased_forskull_skull"), t(self, "skull")]);
             self.immv(w)?;
         }
@@ -979,6 +989,7 @@ impl Script<'_, '_> {
         if code != 0 {
             return Err(Stop::Failed);
         }
+        self.echo_named(&mut echoed);
         Ok(())
     }
 
@@ -1089,7 +1100,7 @@ impl Script<'_, '_> {
     /// `-R`.
     fn robust(&mut self, ins: &[String], outs: &[String], bet2opts: &str) -> Result<(), Stop> {
         // bet2opts=`echo $bet2opts | sed 's/-n//g'`
-        let opts = self.echo_sed(bet2opts, "-n", "-R", "bet2");
+        let (opts, mut echoed) = self.echo_sed(bet2opts, "-n", "-R", "bet2");
         let out = outs.join(" ");
         // get_dims $IN: fslval runs (their values are unused by -R)
         let mut i: i64 = 1;
@@ -1103,6 +1114,7 @@ impl Script<'_, '_> {
                 w.extend(outs.iter().cloned());
                 w.extend(opts.iter().cloned());
                 self.bet2(&w)?;
+                self.echo_named(&mut echoed);
                 let c = self.cog(&out)?;
                 (x, y, z) = c;
             } else {
@@ -1291,7 +1303,17 @@ impl Script<'_, '_> {
         } else {
             Vec::new()
         };
-        if orig_would_crop != ours {
+        // what stays to be seen: without -d the run's temporary files are removed whatever
+        // happens to them (a run whose bet2 writes nothing, -n, changes nothing visible)
+        let tmp_prefix = format!("{out_name}_tmp");
+        let visible = |names: &[String]| -> Vec<String> {
+            names
+                .iter()
+                .filter(|f| debug || !avw::remove_ext(f).starts_with(&tmp_prefix))
+                .cloned()
+                .collect()
+        };
+        if visible(&orig_would_crop) != visible(&ours) {
             let others: Vec<&str> = globbed
                 .iter()
                 .filter(|f| !ours.contains(f))

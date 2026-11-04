@@ -374,16 +374,34 @@ def _verdicts(diffs: list[dict], same: dict, e: fcache.Entry, spec: Spec, arrays
             continue
         if i in ("replica23-fsl23", "replica23-repro") and fix_named:
             x["verdict"] = "d13"
+            moved = []
+            for oid, _suf, lab in spec.outputs:
+                mt = x["metrics"].get(oid)
+                if mt is None or mt["identical"]:
+                    continue
+                part = f"{lab.lower()}: {mt['differ']:,} values"
+                if oid in MASKS:
+                    a, b = arrays[x["a"]][oid] != 0, arrays[x["b"]][oid] != 0
+                    dice = (
+                        2
+                        * np.count_nonzero(a & b)
+                        / max(1, np.count_nonzero(a) + np.count_nonzero(b))
+                    )
+                    part = (
+                        f"{lab.lower()}: {mt['differ']:,} voxels of {int(np.count_nonzero(b)):,} "
+                        f"(Dice {dice:.4f})"
+                    )
+                moved.append(part)
             x["reason"] = (
                 f"Corrected by default with a notice: {_describe(fix_named)}. "
                 + (
                     "bet -B divides the head by FAST's bias field before it extracts the brain, "
-                    "so the default's slightly different field changes the brain's values "
-                    "(and may move the mask's edge by a voxel); "
+                    "and bet's surface then settles on the slightly different unbiased head"
                     if "FSL-202" in fix_named
-                    else ""
+                    else "The correction reaches what bet writes"
                 )
-                + "the reproduce mode gives FSL's bytes (the row "
+                + (": " + "; ".join(moved) if moved else "")
+                + ". The reproduce mode gives FSL's bytes (the row "
                 + ("above" if i == "replica23-fsl23" else "of the reproduce mode")
                 + "), and the record compares that mode."
             )

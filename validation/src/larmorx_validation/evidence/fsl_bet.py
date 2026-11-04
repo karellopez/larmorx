@@ -1290,11 +1290,38 @@ REFUSED = {
 }
 
 
-def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
+def _d13_note(case: str, desc: str, fix, refuses, d13: dict[str, list[str]]) -> str:
+    """What the default mode does on a case: the corrections and refusals its description names
+    and the record's D13 section names on it (``d13``), the corrections inside the programs a
+    script runs among them; the values that change (``fix``)."""
+    import re
+
+    ids = re.findall(r"\b(FSL-\d+)\b", desc)
+    named = [d for d in dict.fromkeys([*ids, *d13.get(case, [])]) if d in CORRECTED]
+    refused = [d for d in dict.fromkeys(ids) if d in REFUSED and d != refuses]
+    inner = [d for d in d13.get(case, []) if d in INNER and d not in named]
+    parts = []
+    if named:
+        parts.append(f"the replica corrects {', '.join(named)} and names it")
+    if refused:
+        parts.append(
+            "it stops with an error naming "
+            + ", ".join(f"{d} (rule B: {REFUSED[d]})" for d in refused)
+        )
+    if inner:
+        parts.append(
+            "the programs the script runs correct " + ", ".join(f"{d} ({INNER[d]})" for d in inner)
+        )
+    if not parts:
+        return ""
+    size = f": {fix:,} values change" if fix else (": no output changes" if inner else "")
+    return "in its default mode " + ", and ".join(parts) + size + " (the record's D13 section)"
+
+
+def case_verdict(r: dict, desc: str, s, d13: dict[str, list[str]] | None = None) -> tuple[str, str]:
     """A case's verdict: the record compares the replica in reproduce mode with FSL (every file
     byte for byte, exit status, messages); the fix pass, fMRIPrep's own outputs and FSL's
     variability are reported."""
-    import re
 
     from larmorx_validation.parity.fsl_bet import FILLED, PENDING
 
@@ -1344,8 +1371,13 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
         )
     if st == "expected-divergence":
         return "divergence", common.clip("Pending: " + r["reason"].removeprefix(PENDING))
+    d13 = d13 or {}
+    fix = {**r.get("reported", {}), **r.get("measured", {})}.get("D13 fix pass")
     v = common.outcome_verdict(r)
     if v is not None:
+        note = _d13_note(r["case"], desc, fix, refuses, d13)
+        if v[0] == "both-reject" and note:
+            return v[0], common.clip(f"{v[1]} {note[0].upper()}{note[1:]}.", 600)
         return v
     rep = {**r.get("reported", {}), **r.get("measured", {})}
     notes = ["every file FSL writes, byte for byte, with FSL's exit status and messages"]
@@ -1364,27 +1396,14 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
         notes.append(
             f"FSL's mask against the phantom's known brain: Dice {v:.4f}, the replica's the same"
         )
-    fix = rep.get("D13 fix pass")
-    named = [d for d in re.findall(r"\b(FSL-\d+)\b", desc) if d in CORRECTED]
-    inner = [d for d in D13_BY_CASE.get(r["case"], []) if d in INNER and d not in named]
     verdict = "bit-identical"
-    if named:
-        notes.append(
-            f"in its default mode the replica corrects {', '.join(named)} and names it"
-            + (f": {fix:,} values change" if fix and not inner else "")
-            + " (the record's D13 section)"
-        )
-    if inner:
-        notes.append(
-            "in its default mode the programs the script runs correct "
-            + ", ".join(f"{d} ({INNER[d]})" for d in inner)
-            + (f": {fix:,} values change" if fix else ": no output changes")
-            + " (the record's D13 section)"
-        )
+    note = _d13_note(r["case"], desc, fix, refuses, d13)
+    if note:
+        notes.append(note)
     return verdict, common.clip("; ".join(notes), 600)
 
 
-def case_verdict_orig(r: dict, desc: str, s) -> tuple[str, str]:
+def case_verdict_orig(r: dict, desc: str, s, d13: dict | None = None) -> tuple[str, str]:
     """A case's verdict for the clean-room original: its record compares it with FSL 6.0.7.23 by
     specs/bet.md §11's thresholds (bit-identical where it is; betsurf's masks Dice >= 0.99 and
     boundary p95 <= 1 voxel), exit status and messages identical."""
@@ -1445,7 +1464,7 @@ def cases(
     verdict_of = case_verdict_orig if impl == "original" else case_verdict
     for r in rec.results:
         desc, s = defs.get(r["case"], ("", None))
-        v, why = verdict_of(r, desc, s)
+        v, why = verdict_of(r, desc, s, d13=D13_BY_CASE if impl == "replica-23" else None)
         result = {
             "outcome": r["status"],
             "verdict": v,

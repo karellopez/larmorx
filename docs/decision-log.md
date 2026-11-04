@@ -1910,3 +1910,14 @@ together at the end.
   `reproduce`); BET's `-S`/`-B`/`-A`/`-A2` replica (its first relay wires the replicas' `reproduce` to the new
   functions); the clean-room catch-up the spec answers opened (topup, FAST, FLIRT, BET, `lx.mri.hmc`) with BET's new
   options' clean-room original; PRELUDE's replica, then its clean-room original. One agent at a time.
+
+## 2026-11-04: GLIBC-07's notice in the default (the user)
+- **Asked:** with `reproduce` on glibc's exact functions, the default (correctly rounded) differs from it wherever
+  glibc's last bit differs. Pointwise tools (fslmaths' functions, fslstats, avscale, makerot, `convert_xfm`) can tell
+  exactly when an output changed; iterative fits (FLIRT, FAST, mcflirt's mutual information, topup, BET) cannot without
+  running twice, and a last-bit difference in any function value almost always moves their results' last bits: naming
+  GLIBC-07 there would print it, with a Python warning, on nearly every default FLIRT and FAST run.
+- **User decision:** "Name exact cases only": the pointwise tools name GLIBC-07 when the output changes; the iterative
+  fits stay quiet, the difference documented on their API pages (`reproduce` gives FSL's maths). Warnings keep meaning a
+  defect that changed a result, not last-bit noise. The parity suites accept GLIBC-07's difference without a notice for
+  the iterative programs (a documented category, as the record says).

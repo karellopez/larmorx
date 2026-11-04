@@ -98,7 +98,8 @@ MIXED = {
     "python/larmorx/ndimage.py": "Apache-2.0 AND BSD-3-Clause",
     "python/larmorx/transforms/chain.py": "Apache-2.0 AND MIT",
     "python/larmorx/transforms/resample.py": "Apache-2.0 AND MIT",
-    "crates/larmorx-afni-replica/src/sincosf.rs": "Apache-2.0 AND MIT",
+    # Since 2026-11-04 a re-export of larmorx_core::math's copy (no Arm code of its own).
+    "crates/larmorx-afni-replica/src/sincosf.rs": "Apache-2.0",
     "crates/larmorx-afni-replica/src/fdlibm.rs": "Apache-2.0 AND SunPro",
 }
 

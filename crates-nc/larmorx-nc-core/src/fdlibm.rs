@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND SunPro
-// Translated to Rust from fdlibm's code as the GNU C Library 2.35 ships it: the float functions
-// sysdeps/ieee754/flt-32/e_atan2f.c and s_atanf.c, and the double functions
+// Translated to Rust from fdlibm's code as the GNU C Library 2.35 ships it: the double functions
 // sysdeps/ieee754/dbl-64/s_tanh.c and s_expm1.c, which carry only Sun's notice:
 //
 //   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -18,10 +17,14 @@
 //!
 //! FSL's `rotmat2euler` calls `atan2` with `float` arguments, which C++ resolves to `atan2f`;
 //! its results start every line search of mcflirt, so they must be glibc's bits, which are
-//! not always correctly rounded. `atanf` is bit-identical to glibc 2.35's on all 2^32 inputs,
-//! `atan2f` on 2^32 random and rotation-like pairs and every special case
-//! (`tools/glibc-float-verify`). BET's surface model calls `tanh` 2.5 million times per run;
-//! `tanh` and `expm1` are checked against glibc on random inputs (`tools/libm-verify`).
+//! not always correctly rounded. Since 2026-11-04 the translation of `atan2f` and `atanf`
+//! (glibc 2.35's `sysdeps/ieee754/flt-32/e_atan2f.c`, `s_atanf.c`, Sun's notice) lives once, in
+//! the main package's `larmorx_core::math` (`atan2f_glibc`, `atanf_glibc`), and this module
+//! re-exports it under the C names. That copy was this module's own translation until then, proved
+//! equal to it on all 2^32 inputs of `atanf` and on more than 10^9 pairs of `atan2f` and every
+//! pair of special values, and to glibc itself (`validation/investigations/glibc-maths/`).
+//! BET's surface model calls `tanh` 2.5 million times per run; `tanh` and `expm1` are this
+//! module's, checked against glibc on random inputs (`tools/libm-verify`).
 //!
 //! The constants are fdlibm's decimal literals as the compiler rounds them, not the hex values
 //! of its comments: for `aT[0]`, `3.3333334327e-01` is `0x3eaaaaab` (glibc's binary holds it),
@@ -30,169 +33,12 @@
 //! optimisation stage in two of fMRIPrep's mcflirt calls (`docs/findings/fsl-mcflirt.md`).
 
 pub use double::{expm1, tanh};
-
-/// glibc's `atan2f(y, x)` (`__ieee754_atan2f`).
-pub fn atan2f(y: f32, x: f32) -> f32 {
-    const TINY: f32 = 1.0e-30;
-    const PI_O_4: f32 = f32::from_bits(0x3f49_0fdb);
-    const PI_O_2: f32 = f32::from_bits(0x3fc9_0fdb);
-    const PI: f32 = f32::from_bits(0x4049_0fdb);
-    const PI_LO: f32 = f32::from_bits(0xb3bb_bd2e);
-
-    let hx = x.to_bits() as i32;
-    let ix = hx & 0x7fff_ffff;
-    let hy = y.to_bits() as i32;
-    let iy = hy & 0x7fff_ffff;
-    if ix > 0x7f80_0000 || iy > 0x7f80_0000 {
-        // `x + y`: glibc's binary adds `y` into `x` (`addss %xmm2,%xmm0`), so `x`'s NaN wins.
-        return crate::sse::add_f32(x, y);
-    }
-    if hx == 0x3f80_0000 {
-        return atanf(y);
-    }
-    let m = ((hy >> 31) & 1) | ((hx >> 30) & 2);
-    if iy == 0 {
-        match m {
-            0 | 1 => return y,
-            2 => return PI + TINY,
-            _ => return -PI - TINY,
-        }
-    }
-    if ix == 0 {
-        return if hy < 0 {
-            -PI_O_2 - TINY
-        } else {
-            PI_O_2 + TINY
-        };
-    }
-    if ix == 0x7f80_0000 {
-        if iy == 0x7f80_0000 {
-            return match m {
-                0 => PI_O_4 + TINY,
-                1 => -PI_O_4 - TINY,
-                2 => 3.0f32 * PI_O_4 + TINY,
-                _ => -3.0f32 * PI_O_4 - TINY,
-            };
-        }
-        return match m {
-            0 => 0.0,
-            1 => -0.0,
-            2 => PI + TINY,
-            _ => -PI - TINY,
-        };
-    }
-    if iy == 0x7f80_0000 {
-        return if hy < 0 {
-            -PI_O_2 - TINY
-        } else {
-            PI_O_2 + TINY
-        };
-    }
-    let k = (iy - ix) >> 23;
-    let z = if k > 60 {
-        PI_O_2 + 0.5f32 * PI_LO
-    } else if hx < 0 && k < -60 {
-        0.0
-    } else {
-        atanf((y / x).abs())
-    };
-    match m {
-        0 => z,
-        1 => f32::from_bits(z.to_bits() ^ 0x8000_0000),
-        2 => PI - (z - PI_LO),
-        _ => (z - PI_LO) - PI,
-    }
-}
-
-/// glibc's `atanf(x)` (`__atanf`).
-pub fn atanf(x: f32) -> f32 {
-    atanf_with_at0(x, AT0)
-}
+pub use larmorx_core::math::{
+    atan2f_glibc as atan2f, atanf_glibc as atanf, atanf_glibc_with_at0 as atanf_with_at0,
+};
 
 /// `aT[0]` as the compiler rounds fdlibm's `3.3333334327e-01` (its comment says `0x3eaaaaaa`).
 pub const AT0: f32 = f32::from_bits(0x3eaa_aaab);
-
-/// [`atanf`] with another first polynomial coefficient `aT[0]`: how far fdlibm's comment value
-/// (`0x3eaaaaaa`) moves the results (`tools/glibc-float-verify atanf`).
-pub fn atanf_with_at0(x: f32, at0: f32) -> f32 {
-    const ATANHI: [f32; 4] = [
-        f32::from_bits(0x3eed_6338),
-        f32::from_bits(0x3f49_0fda),
-        f32::from_bits(0x3f7b_985e),
-        f32::from_bits(0x3fc9_0fda),
-    ];
-    const ATANLO: [f32; 4] = [
-        f32::from_bits(0x31ac_3769),
-        f32::from_bits(0x3322_2168),
-        f32::from_bits(0x3314_0fb4),
-        f32::from_bits(0x33a2_2168),
-    ];
-    // AT[0] is not used: `at0` (AT0, 0x3eaaaaab, for glibc's atanf) takes its place.
-    const AT: [f32; 11] = [
-        f32::from_bits(0x3eaa_aaab),
-        f32::from_bits(0xbe4c_cccd),
-        f32::from_bits(0x3e12_4925),
-        f32::from_bits(0xbde3_8e38),
-        f32::from_bits(0x3dba_2e6e),
-        f32::from_bits(0xbd9d_8795),
-        f32::from_bits(0x3d88_6b35),
-        f32::from_bits(0xbd6e_f16b),
-        f32::from_bits(0x3d4b_da59),
-        f32::from_bits(0xbd15_a221),
-        f32::from_bits(0x3c85_69d7),
-    ];
-    const ONE: f32 = 1.0;
-    const HUGE: f32 = 1.0e30;
-
-    let hx = x.to_bits() as i32;
-    let ix = hx & 0x7fff_ffff;
-    let mut x = x;
-    let id: i32;
-    if ix >= 0x4c00_0000 {
-        if ix > 0x7f80_0000 {
-            return crate::sse::add_f32(x, x);
-        }
-        return if hx > 0 {
-            ATANHI[3] + ATANLO[3]
-        } else {
-            -ATANHI[3] - ATANLO[3]
-        };
-    }
-    if ix < 0x3ee0_0000 {
-        if ix < 0x3100_0000 && HUGE + x > ONE {
-            return x;
-        }
-        id = -1;
-    } else {
-        x = x.abs();
-        if ix < 0x3f98_0000 {
-            if ix < 0x3f30_0000 {
-                id = 0;
-                x = (2.0f32 * x - ONE) / (2.0f32 + x);
-            } else {
-                id = 1;
-                x = (x - ONE) / (x + ONE);
-            }
-        } else if ix < 0x401c_0000 {
-            id = 2;
-            x = (x - 1.5f32) / (ONE + 1.5f32 * x);
-        } else {
-            id = 3;
-            x = -1.0f32 / x;
-        }
-    }
-    let z = x * x;
-    let w = z * z;
-    let s1 = z * (at0 + w * (AT[2] + w * (AT[4] + w * (AT[6] + w * (AT[8] + w * AT[10])))));
-    let s2 = w * (AT[1] + w * (AT[3] + w * (AT[5] + w * (AT[7] + w * AT[9]))));
-    if id < 0 {
-        x - x * (s1 + s2)
-    } else {
-        let i = id as usize;
-        let z = ATANHI[i] - ((x * (s1 + s2) - ATANLO[i]) - x);
-        if hx < 0 { -z } else { z }
-    }
-}
 
 #[cfg(test)]
 mod tests {

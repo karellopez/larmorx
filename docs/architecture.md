@@ -13,7 +13,8 @@ How the code is organised and the conventions every tool follows. The plan behin
  Rust crates                                                                       crates/larmorx-*
    larmorx-core      Affine, Grid3, Image<T, D>, DynArray/DynImage, element types, thread pools,
                      small linear algebra (incl. vnl's SVD inverse, bit-exact with ITK, and
-                     vnl's float SVD solve), correctly rounded math (CORE-MATH ports)
+                     vnl's float SVD solve), correctly rounded math (CORE-MATH ports) and
+                     glibc 2.35's own functions for `reproduce` (`math::*_glibc`)
    larmorx-io        file formats: NIfTI (nibabel and ITK semantics), ITK transform files
    larmorx-transform ITK transforms: matrix-offset family, displacement fields, composites, -t chains;
                      nitransforms chains (RAS) and fMRIPrep's one-shot BOLD resampler
@@ -64,6 +65,7 @@ How the code is organised and the conventions every tool follows. The plan behin
 - **Errors:** typed in Rust (`thiserror`), mapped to Python exceptions: missing files → `FileNotFoundError`, other I/O → `OSError`, bad arguments → `ValueError`, malformed files → `larmorx.io.NiftiError` (a `ValueError`).
 - **Safety:** `#![forbid(unsafe_code)]` in every crate; pure-Rust dependencies only (CLAUDE.md rule 5).
 - **Compatibility:** a re-implementation reproduces its reference's results (nibabel for I/O; ANTs, AFNI, FreeSurfer for the tool families). Deliberate differences are listed in the tool's docs page and in its validation record, with the reason.
+- **Maths** (`larmorx_core::math`, [findings/platform-math.md](findings/platform-math.md)): by default every transcendental function is correctly rounded (`exp`, `sinf`, ...: CORE-MATH ports, the same bits on every platform). Where an original program's result depends on the C library's last bit, `reproduce` uses the functions with glibc 2.35's x86-64 bits, also the same on every platform: `sinf_glibc`, `cosf_glibc`, `sincosf_glibc`, `logf_glibc`, `expf_glibc`, `powf_glibc`, `exp_glibc`, `log_glibc`, `pow_glibc` (Arm's Optimized Routines, MIT), `atanf_glibc`, `atan2f_glibc`, `tanh_glibc` (fdlibm, Sun's notice), `cbrtf_glibc` (clean-room, from `specs/cbrtf.md`). There is one translation of each: the FSL replicas (`larmorx-nc-core`'s `glibc_float`, `glibc_double`, `fdlibm`) and the AFNI replicas (`sincosf`) re-export the core's; only glibc's SVID-compatible wrappers of old symbols (`logf_compat`, `log_compat`) and fdlibm's double `tanh` and `expm1` as the FSL replicas translate them stay in `larmorx-nc-core`. glibc's LGPL functions (IBM's double `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, GLIBC-07) are never copied; the replicas' verification tools that keep earlier translations of LGPL code are in `crates-gpl/tools/`.
 - **Upstream defects (D13):** a deterministic defect of the original is corrected by default; `upstream_defects="reproduce"` (Python), `LARMORX_UPSTREAM_DEFECTS=reproduce` (command line) or `UpstreamDefects::Reproduce` (Rust options) gives the original's result bit for bit. Tools return `larmorx_core::defects::Notice`s for the defects that changed a result; Python raises them as `lx.UpstreamDefectWarning`, the command line prints them on standard error ([api/upstream-defects.md](api/upstream-defects.md)).
 
 ## Testing and validation

@@ -227,6 +227,86 @@ fn b32(x: f32) -> u64 {
     u64::from(x.to_bits())
 }
 
+/// `sse2`: run with glibc's FMA builds switched off (`GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA`,
+/// so that glibc's resolver picks `__sinf_sse2`, `__cosf_sse2`, `__sincosf_sse2`), the SSE2 builds
+/// against the system's, every float input; and the FMA builds against them, which must differ
+/// exactly where the two builds differ (34 inputs).
+fn sse2(m: &Libm, threads: usize, out: Option<&str>) {
+    let tunables = std::env::var("GLIBC_TUNABLES").unwrap_or_default();
+    let names: [(&'static str, &'static str); 4] = [
+        ("sinf_glibc_sse2", "glibc sinf (SSE2 build)"),
+        ("cosf_glibc_sse2", "glibc cosf (SSE2 build)"),
+        (
+            "sincosf_glibc_sse2 (both outputs)",
+            "glibc sincosf (SSE2 build)",
+        ),
+        (
+            "sinf_glibc and cosf_glibc (FMA build)",
+            "glibc sinf and cosf (SSE2 build): the builds' differences",
+        ),
+    ];
+    let start = Instant::now();
+    let t = parallel(threads, (1u64 << 32) / CHUNK, names.len(), |c| {
+        let mut v: Vec<Tally> = (0..names.len()).map(|_| Tally::default()).collect();
+        for i in c * CHUNK..(c + 1) * CHUNK {
+            let x = f32::from_bits(i as u32);
+            let what = || format!("{i:#010x}");
+            let (gs, gc) = m.sincos(x);
+            let (s, c2) = ((m.sinf)(x), (m.cosf)(x));
+            v[0].count(b32(s), s.is_nan(), b32(lx::sinf_glibc_sse2(x)), what);
+            v[1].count(b32(c2), c2.is_nan(), b32(lx::cosf_glibc_sse2(x)), what);
+            let (os, oc) = lx::sincosf_glibc_sse2(x);
+            v[2].count(
+                b32(gs) << 32 | b32(gc),
+                gs.is_nan(),
+                b32(os) << 32 | b32(oc),
+                what,
+            );
+            v[3].count(
+                b32(s) << 32 | b32(c2),
+                false,
+                b32(lx::sinf_glibc(x)) << 32 | b32(lx::cosf_glibc(x)),
+                what,
+            );
+        }
+        v
+    });
+    let checks: Vec<Check> = names
+        .into_iter()
+        .zip(t)
+        .map(|((function, reference), tally)| Check {
+            function,
+            reference,
+            inputs: "all 2^32 floats".into(),
+            tally,
+        })
+        .collect();
+    let failing = checks[..3]
+        .iter()
+        .filter(|c| c.tally.same != c.tally.n)
+        .count();
+    let builds_differ = checks[3].tally.n - checks[3].tally.same;
+    let commit = std::env::var("LARMORX_COMMIT").unwrap_or_else(|_| "unknown".into());
+    let result = format!(
+        "{{\n  \"larmorx_commit\": \"{commit}\",\n  \"libc\": \"glibc {}\",\n  \"glibc_tunables\": \"{tunables}\",\n  \
+         \"threads\": {threads},\n  \"seconds\": {:.1},\n  \"checks\": [\n{}  ],\n  \
+         \"failing_checks\": {failing},\n  \"inputs_where_the_builds_differ\": {builds_differ}\n}}\n",
+        libc_version(),
+        start.elapsed().as_secs_f64(),
+        json_checks(&checks),
+    );
+    print!("{result}");
+    if let Some(path) = out {
+        std::fs::write(path, &result).expect("the result file");
+    }
+    // The system must have run its SSE2 build: the FMA build then differs on 34 inputs.
+    let ok = failing == 0 && builds_differ == 34;
+    println!("{}", if ok { "SSE2-PASS" } else { "SSE2-FAIL" });
+    if !ok {
+        std::process::exit(1);
+    }
+}
+
 /// Every float input of the one-argument float functions.
 fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
     let names: [(&'static str, &'static str); 13] = [
@@ -559,7 +639,11 @@ fn main() {
         hashes(&m);
         return;
     }
-    assert_eq!(command, "verify", "commands: verify, hashes");
+    if command == "sse2" {
+        sse2(&m, threads, out.as_deref());
+        return;
+    }
+    assert_eq!(command, "verify", "commands: verify, sse2, hashes");
     let all = args.is_empty();
     let want = |s: &str| all || args.iter().any(|a| a == s);
     #[cfg(target_arch = "x86_64")]

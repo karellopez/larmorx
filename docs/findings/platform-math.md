@@ -219,6 +219,52 @@ CORE-MATH's worst cases (`asin.wc`, `acos.wc`, `atan2.wc`, `cbrt.wc`) and random
 (uniform, near ±1, tiny, random bit patterns, the entries of rotation matrices, `atan2` with
 exponent differences around 53, where its accurate path runs). *Verified* (2026-10-17).
 
+## glibc's own bits for `reproduce`: what lives where (2026-11-04)
+
+The default is correctly rounded everywhere (the sections above). Where an original program's
+result depends on glibc's last bit (mcflirt's rotations and sinc kernels, FAST's energies, BET's
+radius and smoothness weight, AFNI's weighted sinc, 3dUnifize `-EPI`'s radius, `fslmaths`'
+`-exp`, `-log`, `-pow`, `-atan`, TFCE), the replicas compute with glibc 2.35's own functions as
+its x86-64 FMA build runs them, and the clean-room originals do with `reproduce`. Since
+2026-11-04 every such function lives once, in `larmorx_core::math` (Apache-2.0), with the same
+bits on every platform (each fused multiply-add a `mul_add`; every NaN result SSE's, sign bit set
+for a NaN made from numbers):
+
+| Function | larmorx | From | How it was proved |
+|---|---|---|---|
+| `sinf`, `cosf`, `sincosf` (FMA and SSE2 builds) | `sinf_glibc`, `cosf_glibc`, `sincosf_glibc`, `*_glibc_sse2` | Arm's Optimized Routines v19.11 (MIT) | all 2^32 inputs against glibc 2.35 (its SSE2 build forced by `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA`) |
+| `logf`, `expf` | `logf_glibc`, `expf_glibc` | Arm | all 2^32 inputs against glibc 2.35 |
+| `powf` | `powf_glibc` | Arm | 1.6 × 10^9 sampled pairs and every pair of 174 special values |
+| `exp`, `log` | `exp_glibc`, `log_glibc` | Arm | 1.6 × 10^9 sampled arguments each and 174 special values |
+| `pow` | `pow_glibc` | Arm | 1.07 × 10^9 sampled pairs and every pair of 174 special values |
+| `atanf`, `atan2f` | `atanf_glibc`, `atan2f_glibc` | fdlibm as glibc carries it (Sun's notice) | `atanf` all 2^32 inputs; `atan2f` 1.34 × 10^9 sampled pairs and every pair of special values |
+| `tanh` | `tanh_glibc` | fdlibm 5.3 from netlib, by BET's clean-room implementer (2026-10-30) | 12.9 × 10^9 arguments |
+| `cbrtf` | `cbrtf_glibc` | clean-room, from `specs/cbrtf.md` (glibc's is LGPL) | all 2^32 inputs |
+
+Every comparison is bit for bit, NaN results included; 0 differ
+(`validation/investigations/glibc-maths/`, larmorx `4d223de`, glibc 2.35 on the main machine:
+63 × 10^9 comparisons in 29 s on 28 threads). The copies were the FSL replica core's translations
+(`larmorx-nc-core`'s `glibc_float`, `glibc_double`, `fdlibm`) and, for `sinf` and `cosf`, the AFNI
+replicas' (`larmorx-afni-replica`'s `sincosf`); the core's are proved equal to them on the same
+inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify copy`; the AFNI translation in the
+verifier), and those crates now re-export the core's: one translation, no replica's result moved
+(their unit tests, the FSL replicas' golden test and the AFNI replicas' golden cases unchanged).
+What stays in the FSL replica core: the SVID-compatible wrappers of the old symbols its programs
+bind (`logf_compat`, `log_compat`: C's positive `NAN` for the logarithm of a negative number) and
+its translation of glibc's fdlibm `tanh` and `expm1`.
+
+On this machine the replica core's translations and the copies agree also on NaN bits; on AArch64
+the replica core's `pow` and the AFNI replicas' `sinf`/`cosf` computed a NaN made from numbers
+with Rust's own arithmetic (AArch64's default NaN, sign bit clear), the copies with SSE's: x86-64's
+bits everywhere, the bits the golden tests record on Linux x86-64 (no golden case reaches those
+NaNs, so no checksum changes).
+
+**glibc's LGPL functions are not here.** glibc 2.35's double `sin`, `cos`, `sincos`, `tan`, `asin`,
+`acos` and `atan` are IBM's Accurate Mathematical Library (LGPL-2.1-or-later) and are never copied
+or translated (GLIBC-07); their bits come by the route `cbrtf` took: a behaviour spec
+(`specs/glibc-dbl.md`) and a clean-room implementation from it. The replicas' verification tools
+that keep earlier translations of glibc's LGPL code stay in `crates-gpl/tools/`.
+
 ## Making ANTs correctly rounded: the preload library
 
 `scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin`,

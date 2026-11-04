@@ -169,6 +169,15 @@ on standard error (`larmorx-nc: upstream defect FSL-<n> (fslstats) corrected: ..
   range.
 - **FSL-189**: `-json`'s voxel counts are written in single precision: exact.
 
+### glibc's maths functions (GLIBC-07)
+
+FSL's fslstats takes the entropies' logarithms (`-e`, `-E`) from glibc 2.35's `log`, which is not
+correctly rounded. The clean-room original computes them correctly rounded by default and takes
+glibc's with `upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit
+for bit against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only).
+Both modes name GLIBC-07 exactly where the other choice prints another value: with six significant
+digits, practically never.
+
 ## Not yet
 
 - The clean-room original's spec questions (its findings). Its speed: the

@@ -184,6 +184,17 @@ documented (rule C):
 **FSL-49** (betsurf keeps the T1's scalp estimate when the T2's lies further out) and **FSL-57**
 (betsurf's smoothness weight set to 0 after it was used: no effect).
 
+### glibc's maths functions (GLIBC-07)
+
+FSL's bet2 takes its initial radius and the fractional threshold's power from glibc 2.35's `pow`,
+and betsurf its blurring's weights from glibc's `exp` (`specs/bet.md` §8), which are not correctly
+rounded. The clean-room original computes them correctly rounded by default and takes glibc's with
+`upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
+against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). The
+surface is an iterative fit: one power's last bit can move it, and bet2 cannot tell without fitting
+twice, so neither mode names GLIBC-07: the default's correctly rounded functions can move a
+surface's last bits. bet2's `tanh` is a separate choice (GLIBC-06, `tanh=`, above).
+
 ## Deliberate differences
 
 - Where FSL aborts on an uncaught exception (a missing input, FSL-40's `.img` name), the

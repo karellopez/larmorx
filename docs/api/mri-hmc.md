@@ -294,6 +294,19 @@ is not more accurate on the synthetic ground truth (better on 5 of 8 series, wor
 It cannot be combined with `upstream_defects="reproduce"`, and the command line has no option
 for it.
 
+### glibc's maths functions (GLIBC-07)
+
+mcflirt's histogram costs (`cost="mutualinfo"`, `"normmi"`) take their logarithms from glibc 2.35's
+`logf` (`specs/mcflirt.md` appendix B), which is not correctly rounded. The clean-room original
+computes them correctly rounded by default and takes glibc's with `upstream_defects="reproduce"`
+(`larmorx_core::math`'s `*_glibc` functions, proved bit for bit against glibc 2.35; the user's
+decision of 2026-11-04: glibc's bits for `reproduce` only). The registration is an iterative fit:
+one logarithm's last bit can move the matrices' last digits, and the estimate cannot tell without
+registering twice, so neither mode names GLIBC-07: the default's correctly rounded functions can
+move a mutual-information registration's last bits. The other costs call none of glibc's functions;
+the rotations' sines and cosines are the correctly rounded single-precision values in both modes
+(the spec names no glibc function there).
+
 ## Agreement with mcflirt
 
 The implementation follows mcflirt's algorithm to the float32 operation where the spec

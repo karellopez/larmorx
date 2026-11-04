@@ -1898,3 +1898,15 @@ together at the end.
   correctly rounded** in `reproduce` too: no LGPL data in larmorx; they differ from glibc only in the last bit, in
   0.05 to 0.25 % of results (GLIBC-07's frequencies), reached only by fslmaths' double `-tan`, `-asin`, `-acos`,
   `-atan`, never by fMRIPrep.
+
+## 2026-11-04: The pace until Saturday's reset, and PRELUDE (the user)
+- **Asked:** the week at 61 % on Wednesday 10:00 (the reset Saturday 23:00; two agents burn about 1 % an hour and would
+  reach the hard limit around Thursday evening). And: PRELUDE (FSL's phase unwrapping, which sdcflows runs for
+  phase-difference field maps) is the one FSL program fMRIPrep calls that is not ported; the plan had it with field maps.
+- **User decision:** "One agent, continuously" until the reset: the pace line's SLOW DOWN no longer holds the work,
+  one agent at a time without pauses, near 90 to 95 % by Saturday. And "Yes, in the FSL block": PRELUDE, a replica and a
+  clean-room original, after BET's `-S`/`-B`/`-A`/`-A2` and the clean-room catch-up.
+- **The FSL block's order from here:** the glibc maths part's second half (clean-room `sin`/`cos`/`sincos` for
+  `reproduce`); BET's `-S`/`-B`/`-A`/`-A2` replica (its first relay wires the replicas' `reproduce` to the new
+  functions); the clean-room catch-up the spec answers opened (topup, FAST, FLIRT, BET, `lx.mri.hmc`) with BET's new
+  options' clean-room original; PRELUDE's replica, then its clean-room original. One agent at a time.

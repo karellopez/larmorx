@@ -7,13 +7,13 @@
 //! in parallel, each value computed alone, so the results do not depend on the thread count.
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::volume::Volume;
 use rayon::prelude::*;
 
 /// The blur kernel along an axis of voxel size `d` for resolution `r` (§5): `None` when no blur
 /// applies; else the normalised taps (double precision).
-pub fn blur_kernel(r: f32, d: f32) -> Option<Vec<f64>> {
+pub fn blur_kernel(r: f32, d: f32, libm: &Libm) -> Option<Vec<f64>> {
     if d.abs() < 1e-8 {
         return None;
     }
@@ -34,7 +34,7 @@ pub fn blur_kernel(r: f32, d: f32) -> Option<Vec<f64>> {
     let mut taps: Vec<f64> = (1..=n)
         .map(|k| {
             let q = ((k - c) * (k - c)) as f32;
-            math::exp(-(f64::from(q) / denom))
+            libm.exp(-(f64::from(q) / denom))
         })
         .collect();
     // two interleaved accumulators (even and odd taps), then added
@@ -175,10 +175,10 @@ fn convolve_axis_in_place(data: &mut [f32], shape: [usize; 3], axis: usize, taps
 }
 
 /// The blur of `v` to resolution `r` mm (§5): a separable convolution along x, y, z.
-pub fn blur(v: &Volume, r: f32) -> Volume {
+pub fn blur(v: &Volume, r: f32, libm: &Libm) -> Volume {
     let mut data = v.data.clone();
     for axis in 0..3 {
-        if let Some(taps) = blur_kernel(r, v.voxel_size[axis]) {
+        if let Some(taps) = blur_kernel(r, v.voxel_size[axis], libm) {
             convolve_axis_in_place(&mut data, v.shape, axis, &taps);
         }
     }
@@ -466,9 +466,10 @@ mod tests {
 
     #[test]
     fn kernels() {
-        assert!(blur_kernel(1.0, 1.0).is_none());
-        assert!(blur_kernel(8.0, 0.0).is_none());
-        let k = blur_kernel(8.0, 1.0).unwrap();
+        let l = Libm::default();
+        assert!(blur_kernel(1.0, 1.0, &l).is_none());
+        assert!(blur_kernel(8.0, 0.0, &l).is_none());
+        let k = blur_kernel(8.0, 1.0, &l).unwrap();
         // sigma = 3.4: 2·3 + 3 = 9 taps
         assert_eq!(k.len(), 9);
         let s: f64 = k.iter().sum();

@@ -735,7 +735,7 @@ def _fix_pass(
             elif path.is_file() and path.read_bytes() != fixed[key].read_bytes():
                 others.append(f"{key} text")
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=_SILENT
+            checks, entries, change, other_changes="; ".join(others), silent_ok=(*_SILENT, *defects.CONDITION_NOTICES)
         )
         reproduced_entries = defects.notices_in(" ".join(e for _, e in logs))
         if sorted(entries) != sorted(reproduced_entries):

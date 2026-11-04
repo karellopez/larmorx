@@ -5,6 +5,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::math::Libm;
 
 use super::Settings;
 use super::common::{self, abort, print_notices};
@@ -47,16 +48,21 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         );
     };
     let mut notices = Vec::new();
+    let libm = Libm::new(mode);
     let code = run(
         matrix,
         args.get(first + 1).map(String::as_str),
         (all_params, eddies),
         settings,
-        mode,
+        (mode, &libm),
         &mut notices,
         out,
         err,
     );
+    // GLIBC-07, whichever way the run ended
+    if let Some(n) = crate::flirt::glibc_notice(&libm, "avscale's angles and rotations") {
+        larmorx_core::defects::push_once(&mut notices, n);
+    }
     print_notices(err, &notices);
     code
 }
@@ -67,7 +73,7 @@ fn run(
     volume: Option<&str>,
     (all_params, eddies): (bool, bool),
     settings: &Settings,
-    mode: UpstreamDefects,
+    (mode, libm): (UpstreamDefects, &Libm),
     notices: &mut Vec<larmorx_core::defects::Notice>,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -115,7 +121,7 @@ fn run(
         }
         (None, None) => [0.0; 3],
     };
-    let a = match programs::avscale(&m, centre) {
+    let a = match programs::avscale(&m, centre, libm) {
         Ok(a) => a,
         Err(what) => {
             let _ = writeln!(err, "{what}");
@@ -148,7 +154,7 @@ fn run(
         }
     );
     let _ = write!(out, "{text}");
-    let (forward, backward) = match programs::half_transforms(&m, a.determinant) {
+    let (forward, backward) = match programs::half_transforms(&m, a.determinant, libm) {
         Ok(h) => h,
         Err(what) => {
             let _ = writeln!(err, "{what}");

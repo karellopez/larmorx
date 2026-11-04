@@ -3,7 +3,7 @@
 //! engine's, `larmorx_mri::hmc::rigid`) and, with `-anglerep quaternion`, the vector part of a
 //! unit quaternion. The search always uses Euler angles (§8.1).
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::rigid::{self, Params};
 
 use super::cost::Log;
@@ -51,8 +51,9 @@ fn about(l: &M3, c: [f64; 3]) -> Mat4 {
 /// The rotation by `angle` about coordinate axis `axis` about the centre `c`, as FLIRT makes it
 /// (§3): `θ = √(a·a)` rounded to single (the identity below 1e-8), `u = a/θ`, `v = (−u_y, u_x,
 /// 0)/|v|` (or `(1, 0, 0)`), `w = (u × v)/|w|`, `B = [v w u]`, the rotation `(B·C)·Bᵀ` with `C`
-/// the single-precision cosine and sine of `θ` in the `(v, w)` plane, its translation `(I − R)·c`.
-fn elementary(axis: usize, angle: f64, c: [f64; 3]) -> Mat4 {
+/// the single-precision cosine and sine of `θ` in the `(v, w)` plane (`libm`'s: glibc's `cosf`
+/// and `sinf` with `reproduce`, GLIBC-07), its translation `(I − R)·c`.
+fn elementary(axis: usize, angle: f64, c: [f64; 3], libm: &Libm) -> Mat4 {
     let mut a = [0.0; 3];
     a[axis] = angle;
     let theta = dot3(a, a).sqrt() as f32;
@@ -77,7 +78,7 @@ fn elementary(axis: usize, angle: f64, c: [f64; 3]) -> Mat4 {
     let w = w0.map(|x| x / nw);
     let b: M3 = [[v[0], w[0], u[0]], [v[1], w[1], u[1]], [v[2], w[2], u[2]]];
     let bt: M3 = [[v[0], v[1], v[2]], [w[0], w[1], w[2]], [u[0], u[1], u[2]]];
-    let (cs, sn) = (f64::from(math::cosf(theta)), f64::from(math::sinf(theta)));
+    let (cs, sn) = (f64::from(libm.cosf(theta)), f64::from(libm.sinf(theta)));
     let cm: M3 = [[cs, sn, 0.0], [-sn, cs, 0.0], [0.0, 0.0, 1.0]];
     let r = mul3(&mul3(&b, &cm), &bt);
     let mut d = [[0.0; 3]; 3];
@@ -92,11 +93,11 @@ fn elementary(axis: usize, angle: f64, c: [f64; 3]) -> Mat4 {
 /// FLIRT's composition of the first `n` Euler parameters of `p` about `c` (§3, exactly): the
 /// three elementary rotations `((I·R_x)·R_y)·R_z`, the translations added to the fourth column,
 /// and with more than 6 parameters `(M·K)·S` with the skew and the scale about the centre.
-pub fn euler_compose(p: &Params, n: usize, c: [f64; 3]) -> Mat4 {
+pub fn euler_compose(p: &Params, n: usize, c: [f64; 3], libm: &Libm) -> Mat4 {
     let angle = |k: usize| if k < n { p[k] } else { 0.0 };
     let mut m = IDENTITY;
     for k in 0..3 {
-        m = mat::mul(&m, &elementary(k, angle(k), c));
+        m = mat::mul(&m, &elementary(k, angle(k), c, libm));
     }
     for i in 0..3 {
         if 3 + i < n {
@@ -120,8 +121,8 @@ pub fn euler_compose(p: &Params, n: usize, c: [f64; 3]) -> Mat4 {
 /// FLIRT's decomposition of `m` about `c` (§3, exactly): the scales and skews from
 /// single-precision steps, the rotation `A·(S⁻¹·K⁻¹)`, its angles by `atan2f` of
 /// single-precision quotients, the translations `A·c + m − c`. Returns the 12 parameters and the
-/// rotation.
-pub fn euler_decompose_parts(m: &Mat4, c: [f64; 3]) -> (Params, M3) {
+/// rotation. The arctangent is `libm`'s (glibc's `atan2f` with `reproduce`, GLIBC-07).
+pub fn euler_decompose_parts(m: &Mat4, c: [f64; 3], libm: &Libm) -> (Params, M3) {
     let a: M3 = [0, 1, 2].map(|i| [m[i][0], m[i][1], m[i][2]]);
     let col = |j: usize| [a[0][j], a[1][j], a[2][j]];
     let (x, y, z) = (col(0), col(1), col(2));
@@ -147,7 +148,7 @@ pub fn euler_decompose_parts(m: &Mat4, c: [f64; 3]) -> (Params, M3) {
     let recip = [sxd, syd, f64::from(sz)].map(|v| 1.0 / v);
     let sk: M3 = [0, 1, 2].map(|i| inv[i].map(|v| v * recip[i]));
     let r = mul3(&a, &sk);
-    let atan2f = |y: f32, x: f32| math::atan2(f64::from(y), f64::from(x)) as f32;
+    let atan2f = |y: f32, x: f32| libm.atan2f(y, x);
     let cy = (r[0][0] * r[0][0] + r[0][1] * r[0][1]).sqrt() as f32;
     let angles = if cy >= 1e-4 {
         let cd = f64::from(cy);
@@ -186,11 +187,11 @@ pub fn euler_decompose_parts(m: &Mat4, c: [f64; 3]) -> (Params, M3) {
 
 /// [`euler_decompose_parts`]'s parameters; a matrix with a NaN entry gives NaN parameters, with
 /// the signs a C++ program printing them shows.
-pub fn euler_decompose(m: &Mat4, c: [f64; 3]) -> Params {
+pub fn euler_decompose(m: &Mat4, c: [f64; 3], libm: &Libm) -> Params {
     if m.iter().take(3).flatten().any(|v| v.is_nan()) {
         return rigid::decompose(m, c);
     }
-    euler_decompose_parts(m, c).0
+    euler_decompose_parts(m, c, libm).0
 }
 
 /// The rotation's parameters (`-anglerep`).
@@ -235,7 +236,7 @@ fn quaternion_rotation(x: f64, y: f64, z: f64) -> Option<[[f64; 3]; 3]> {
 /// The quaternion's messages go to `log`.
 pub fn compose(rep: AngleRep, p: &Params, n: usize, centre: [f64; 3], log: &Log) -> Mat4 {
     if rep == AngleRep::Euler {
-        return euler_compose(p, n, centre);
+        return euler_compose(p, n, centre, log.libm());
     }
     if n < 3 {
         log.push(format!("Can only do 3 or more, not {n}"));
@@ -265,12 +266,13 @@ pub fn compose(rep: AngleRep, p: &Params, n: usize, centre: [f64; 3], log: &Log)
 
 /// The 12 parameters of `m` about `centre` (§3), with `rep`'s rotation: for quaternions the
 /// rotation's entries in single precision turned into a quaternion as the NIfTI-1 reference
-/// library does it (`bet::quatern`, shared with BET), its vector part.
-pub fn decompose(rep: AngleRep, m: &Mat4, centre: [f64; 3]) -> Params {
+/// library does it (`bet::quatern`, shared with BET), its vector part. The functions are
+/// `libm`'s.
+pub fn decompose(rep: AngleRep, m: &Mat4, centre: [f64; 3], libm: &Libm) -> Params {
     if rep == AngleRep::Euler || m.iter().take(3).flatten().any(|v| v.is_nan()) {
-        return euler_decompose(m, centre);
+        return euler_decompose(m, centre, libm);
     }
-    let (mut p, r) = euler_decompose_parts(m, centre);
+    let (mut p, r) = euler_decompose_parts(m, centre, libm);
     let rf = r.map(|row| row.map(|v| f64::from(v as f32)));
     let ([b, c, d], _) = crate::bet::quatern::mat_to_quatern(&rf);
     p[0] = b;
@@ -294,7 +296,7 @@ mod tests {
             [0.0, 1.5, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
         ];
         for p in ps {
-            let a = euler_compose(&p, 12, c);
+            let a = euler_compose(&p, 12, c, &Libm::default());
             let b = rigid::compose(&p, 12, c);
             for i in 0..3 {
                 for j in 0..4 {
@@ -304,8 +306,8 @@ mod tests {
                     );
                 }
             }
-            let q = euler_decompose(&a, c);
-            let m = euler_compose(&q, 12, c);
+            let q = euler_decompose(&a, c, &Libm::default());
+            let m = euler_compose(&q, 12, c, &Libm::default());
             for i in 0..3 {
                 for j in 0..4 {
                     assert!((a[i][j] - m[i][j]).abs() < 1e-4, "{p:?} {q:?}");
@@ -322,7 +324,7 @@ mod tests {
             0.05, -0.02, 0.03, 1.0, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
         ];
         let m = compose(AngleRep::Quaternion, &p, 6, c, &log);
-        let q = decompose(AngleRep::Quaternion, &m, c);
+        let q = decompose(AngleRep::Quaternion, &m, c, log.libm());
         for k in 0..6 {
             assert!((p[k] - q[k]).abs() < 1e-5, "{k}: {} {}", p[k], q[k]);
         }

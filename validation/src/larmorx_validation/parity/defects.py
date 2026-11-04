@@ -101,6 +101,14 @@ class Change:
         )
 
 
+#: Notices that name a condition: a clean-room original names GLIBC-07 where its witness saw
+#: the other choice of C library function give another value on one of the arguments it
+#: evaluated (``larmorx_core::math::Libm``: correctly rounded by default, glibc 2.35's with
+#: ``reproduce``), whether or not the outputs then differ (after an iterative fit it cannot
+#: tell), so the fix pass accepts it without a change; a change it explains is still named.
+CONDITION_NOTICES = ("GLIBC-07",)
+
+
 def add_fix_check(
     checks: CheckList,
     entries: list[str],

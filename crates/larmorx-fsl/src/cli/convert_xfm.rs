@@ -3,6 +3,8 @@
 
 use std::io::Write;
 
+use larmorx_core::math::Libm;
+
 use super::Settings;
 use crate::flirt::mat::{self, Mat4, Stream};
 use crate::flirt::xfm;
@@ -115,7 +117,19 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             show(out, &mut stream, "Initial matrix:", &m);
             show(out, &mut stream, "Fix Scale-Skew matrix:", &s);
         }
-        m = xfm::fix_scale_skew(&m, &s);
+        let mode = match settings.defects() {
+            Ok(m) => m,
+            Err(e) => {
+                let _ = writeln!(err, "larmorx fsl convert_xfm: {e}");
+                return 2;
+            }
+        };
+        let libm = Libm::new(mode);
+        m = xfm::fix_scale_skew(&m, &s, &libm);
+        // GLIBC-07 (the decompositions' arctangents, the composition's sines and cosines)
+        if let Some(n) = crate::flirt::glibc_notice(&libm, "-fixscaleskew's decompositions") {
+            super::common::print_notices(err, &[n]);
+        }
     }
     if let Some(c) = &concat {
         let Some(s) = read(settings, c, err) else {

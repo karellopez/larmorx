@@ -2,16 +2,19 @@
 //! `convert_xfm`'s matrix algebra (`specs/flirt.md` §10): concatenation, the scales and skews of
 //! another matrix, the inverse.
 
+use larmorx_core::math::Libm;
+
 use super::mat::{self, Mat4};
 
 /// `m`'s rotations and translations with `other`'s scales and skews (§10): both decomposed about
-/// the origin, combined, composed with 12 parameters.
-pub fn fix_scale_skew(m: &Mat4, other: &Mat4) -> Mat4 {
-    let a = super::param::euler_decompose(m, [0.0; 3]);
-    let b = super::param::euler_decompose(other, [0.0; 3]);
+/// the origin, combined, composed with 12 parameters (`libm`'s functions: glibc's with
+/// `reproduce`, GLIBC-07).
+pub fn fix_scale_skew(m: &Mat4, other: &Mat4, libm: &Libm) -> Mat4 {
+    let a = super::param::euler_decompose(m, [0.0; 3], libm);
+    let b = super::param::euler_decompose(other, [0.0; 3], libm);
     let mut p = a;
     p[6..12].copy_from_slice(&b[6..12]);
-    super::param::euler_compose(&p, 12, [0.0; 3])
+    super::param::euler_compose(&p, 12, [0.0; 3], libm)
 }
 
 /// `second · m` (§10).
@@ -43,7 +46,7 @@ mod tests {
             [-0.009474399331, 0.9949077902, 0.05179466561, -3.0],
             [0.01894880027, -0.05147051078, 1.199611428, 1.5],
         ];
-        let got = fix_scale_skew(&a, &b);
+        let got = fix_scale_skew(&a, &b, &Libm::default());
         for i in 0..3 {
             for j in 0..4 {
                 assert!(

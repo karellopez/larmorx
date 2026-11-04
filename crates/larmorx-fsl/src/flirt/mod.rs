@@ -26,6 +26,33 @@ pub mod search;
 pub mod trace;
 pub mod xfm;
 
+use larmorx_core::defects::{self, Notice};
+use larmorx_core::math::Libm;
+
+/// GLIBC-07 for FLIRT and its programs (`specs/flirt.md` §3, §5, §9.2, §12): FSL calls glibc
+/// 2.35's `sinf`, `cosf`, `atan2f`, `exp`, `cos` and `logf`, which are not correctly rounded.
+/// Named where `libm`'s witness saw the two choices differ on an argument of `what` (the
+/// correctly rounded ones by default, glibc's with `reproduce`); whether the run's results then
+/// differ, an iterative registration cannot tell.
+pub fn glibc_notice(libm: &Libm, what: &str) -> Option<Notice> {
+    if !libm.differed() {
+        return None;
+    }
+    let mode = libm.mode();
+    let detail = if mode.fix() {
+        format!(
+            "{what}: the correctly rounded functions, where glibc's (FSL's) give other last bits \
+             on some arguments, which may move the results"
+        )
+    } else {
+        format!(
+            "{what}: glibc's functions, as FSL, where the correctly rounded ones give other last \
+             bits on some arguments"
+        )
+    };
+    Some(Notice::new(&defects::GLIBC_07, mode, detail))
+}
+
 pub use cost::Cost;
 
 /// The final interpolation (`-interp`).

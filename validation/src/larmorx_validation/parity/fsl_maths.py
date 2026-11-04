@@ -630,7 +630,7 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
             elif x[key].read_bytes() != y[key].read_bytes():
                 others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=rep._SILENT
+            checks, entries, change, other_changes="; ".join(others), silent_ok=(*rep._SILENT, *defects.CONDITION_NOTICES)
         )
 
 

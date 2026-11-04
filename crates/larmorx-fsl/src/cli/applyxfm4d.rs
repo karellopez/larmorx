@@ -178,6 +178,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         settings,
         mode,
         n_threads: settings.threads(),
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::new(mode)),
     };
     let result = larmorx_core::parallel::with_threads(ctx.n_threads, || {
         let (mut o_buf, mut e_buf, mut notices) = (Vec::new(), Vec::new(), Vec::new());
@@ -185,9 +186,14 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         (code, o_buf, e_buf, notices)
     });
     match result {
-        Ok((code, o_buf, e_buf, notices)) => {
+        Ok((code, o_buf, e_buf, mut notices)) => {
             let _ = out.write_all(&o_buf);
             let _ = err.write_all(&e_buf);
+            if let Some(n) =
+                crate::flirt::glibc_notice(&ctx.libm, "applyxfm4D's sinc table and decompositions")
+            {
+                larmorx_core::defects::push_once(&mut notices, n);
+            }
             print_notices(err, &notices);
             code
         }
@@ -337,8 +343,8 @@ fn run(
     // the sinc kernel: blackman of width 7, or with -3D the rectangular window of width 9 it asks
     // for (FSL-80: FSL uses the first)
     let fsl80 = o.three_d && o.interp == Interp::Sinc;
-    let asked = SincKernel::new(9.0, SincWindow::Rectangular);
-    let first = SincKernel::new(7.0, SincWindow::Blackman);
+    let asked = SincKernel::new(9.0, SincWindow::Rectangular, &ctx.libm);
+    let first = SincKernel::new(7.0, SincWindow::Blackman, &ctx.libm);
     let (kernel, other_kernel) = if fsl80 && mode.fix() {
         (&asked, &first)
     } else {

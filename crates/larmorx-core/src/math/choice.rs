@@ -219,7 +219,12 @@ mod tests {
             let f = x as f32;
             let p = (u * 3.0) as f32;
             let pairs64: [(f64, f64, f64, f64); 5] = [
-                (fix.exp(x), rep.exp(x), super::super::exp(x), super::super::exp_glibc(x)),
+                (
+                    fix.exp(x),
+                    rep.exp(x),
+                    super::super::exp(x),
+                    super::super::exp_glibc(x),
+                ),
                 (
                     fix.log(u),
                     rep.log(u),
@@ -232,8 +237,18 @@ mod tests {
                     super::super::pow(u, x),
                     super::super::pow_glibc(u, x),
                 ),
-                (fix.sin(x), rep.sin(x), super::super::sin(x), super::super::sin_glibc(x)),
-                (fix.cos(x), rep.cos(x), super::super::cos(x), super::super::cos_glibc(x)),
+                (
+                    fix.sin(x),
+                    rep.sin(x),
+                    super::super::sin(x),
+                    super::super::sin_glibc(x),
+                ),
+                (
+                    fix.cos(x),
+                    rep.cos(x),
+                    super::super::cos(x),
+                    super::super::cos_glibc(x),
+                ),
             ];
             for (k, (a, b, c, g)) in pairs64.into_iter().enumerate() {
                 assert_eq!((a.to_bits(), b.to_bits()), (c.to_bits(), g.to_bits()));
@@ -292,7 +307,12 @@ mod tests {
         let l = Libm::new(UpstreamDefects::Fix);
         for k in 0..100 {
             // exact cases: e^0, log 1, small integer powers, sin 0
-            let _ = (l.exp(0.0), l.log(1.0), l.pow(2.0, f64::from(k % 10)), l.sin(0.0));
+            let _ = (
+                l.exp(0.0),
+                l.log(1.0),
+                l.pow(2.0, f64::from(k % 10)),
+                l.sin(0.0),
+            );
         }
         assert!(!l.differed());
         l.note(false);

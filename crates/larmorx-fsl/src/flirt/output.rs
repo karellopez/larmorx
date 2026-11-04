@@ -8,7 +8,7 @@
 
 use std::f64::consts::PI;
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::interp::{floor, trilinear_extended};
 use larmorx_mri::hmc::kernels::{Spline, nearest};
 use larmorx_mri::hmc::volume::Volume;
@@ -30,7 +30,9 @@ impl SincKernel {
     /// The table (§9.2): full width `round(width)`, half-width `h = (w − 1)/2`, 1201 samples at
     /// `x = ((k − m − 1)/m)·h` (single, `m = 600`), each the single product of the sinc (`sinf(y)/y`,
     /// `y = π·x` rounded to single; `1 − |x|` below 1e-7) and the window (double, rounded).
-    pub fn new(width: f32, window: SincWindow) -> SincKernel {
+    /// The sine and the window's cosines are `libm`'s (glibc's `sinf` and `cos` with
+    /// `reproduce`, GLIBC-07).
+    pub fn new(width: f32, window: SincWindow, libm: &Libm) -> SincKernel {
         let w = (width.round() as i64).max(1);
         let half = ((w - 1) / 2).max(1);
         let h = half as f32;
@@ -43,7 +45,7 @@ impl SincKernel {
                     1.0 - x.abs()
                 } else {
                     let y = (PI * f64::from(x)) as f32;
-                    math::sinf(y) / y
+                    libm.sinf(y) / y
                 };
                 let xd = f64::from(x);
                 let win = if x.abs() > h {
@@ -51,10 +53,10 @@ impl SincKernel {
                 } else {
                     (match window {
                         SincWindow::Rectangular => 1.0,
-                        SincWindow::Hanning => 0.5 + 0.5 * math::cos((PI * xd) / hd),
+                        SincWindow::Hanning => 0.5 + 0.5 * libm.cos((PI * xd) / hd),
                         SincWindow::Blackman => {
-                            0.42 + 0.5 * math::cos((PI * xd) / hd)
-                                + 0.08 * math::cos((2.0 * PI * xd) / hd)
+                            0.42 + 0.5 * libm.cos((PI * xd) / hd)
+                                + 0.08 * libm.cos((2.0 * PI * xd) / hd)
                         }
                     }) as f32
                 };
@@ -119,8 +121,8 @@ impl SincKernel {
 /// The blur of the input before its resampling (§9.2): §5's blur to `r` mm, the values beyond
 /// the image's edges read by the extraslice rule (one voxel beyond: the edge voxel; further:
 /// `pad`).
-pub fn blur_for_output(v: &Volume, r: f32, pad: f32) -> Volume {
-    blur_with_edge(v, r, Edge::Extraslice(pad))
+pub fn blur_for_output(v: &Volume, r: f32, pad: f32, libm: &Libm) -> Volume {
+    blur_with_edge(v, r, Edge::Extraslice(pad), libm)
 }
 
 /// What a blur reads beyond the image (§9.2, §9.3).
@@ -135,11 +137,11 @@ pub enum Edge {
 }
 
 /// The blur of `v` to `r` mm (§5) reading beyond the image by `edge`.
-pub fn blur_with_edge(v: &Volume, r: f32, edge: Edge) -> Volume {
+pub fn blur_with_edge(v: &Volume, r: f32, edge: Edge, libm: &Libm) -> Volume {
     let mut data = v.data.clone();
     let [nx, ny, _] = v.shape;
     for axis in 0..3 {
-        let Some(taps) = pyramid::blur_kernel(r, v.voxel_size[axis]) else {
+        let Some(taps) = pyramid::blur_kernel(r, v.voxel_size[axis], libm) else {
             continue;
         };
         let n = v.shape[axis] as i64;

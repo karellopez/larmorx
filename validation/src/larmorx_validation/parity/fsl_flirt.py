@@ -937,7 +937,7 @@ def fix_pass(
                 except ValueError:
                     others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=rep._SILENT
+            checks, entries, change, other_changes="; ".join(others), silent_ok=(*rep._SILENT, *defects.CONDITION_NOTICES)
         )
 
 

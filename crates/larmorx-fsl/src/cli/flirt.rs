@@ -331,6 +331,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         settings,
         mode,
         n_threads: settings.threads(),
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::new(mode)),
     };
     engine::run(&o, &ctx, out, err)
 }

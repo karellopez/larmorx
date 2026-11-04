@@ -3,7 +3,7 @@
 //! brain image alignment using boundary-based registration"): pairs of points on either side of
 //! the white-matter boundary, the input's contrast across each pair, and a field map's shift.
 
-use larmorx_core::math;
+use larmorx_core::math::{self, Libm};
 use larmorx_mri::hmc::volume::Volume;
 use rayon::prelude::*;
 
@@ -63,7 +63,8 @@ pub fn bad_type_message(t: &str) -> String {
 
 /// The boundary pairs of `src` for a pair whose reference level has voxel sizes `ref_voxel`
 /// (§6.5). `Err` for an unknown BBR type (the message).
-pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
+/// The segmentation's Gaussian takes `libm`'s `exp` (glibc's with `reproduce`, GLIBC-07).
+pub fn points(src: &BbrSource, ref_voxel: [f32; 3], libm: &Libm) -> Result<BbrPair, String> {
     let kind = match src.bbr_type.as_str() {
         "signed" => Kind::Signed,
         "global_abs" => Kind::GlobalAbs,
@@ -81,7 +82,7 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
         let sum = pyramid::box3(seg);
         let vox: [f64; 3] = seg.voxel_size.map(f64::from);
         // the segmentation smoothed by a Gaussian of σ = 2 mm (§6.5)
-        let taps = [0, 1, 2].map(|k| gaussian(seg.voxel_size[k]));
+        let taps = [0, 1, 2].map(|k| gaussian(seg.voxel_size[k], libm));
         let smooth = pyramid::convolve(seg, &taps).data;
         let s = |x: i64, y: i64, z: i64| -> f32 {
             if x < 0 || y < 0 || z < 0 || x >= nx as i64 || y >= ny as i64 || z >= nz as i64 {
@@ -148,12 +149,19 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
 /// The taps of BBR's Gaussian of σ = 2 mm along an axis of voxel size `d` (§6.5): `σ = 2/d`
 /// voxels (single), radius `2·trunc(σ − 0.001) + 3`, `exp(−j²/((2σ)·σ))` rounded to single and
 /// summed in single in `j` order, each applied as `g_j·(1/Σ)` in double.
-fn gaussian(d: f32) -> Vec<f64> {
+fn gaussian(d: f32, libm: &Libm) -> Vec<f64> {
     let sigma = 2.0f32 / d;
     let r = 2 * (f64::from(sigma) - 0.001).trunc() as i64 + 3;
     let den = (2.0 * f64::from(sigma)) * f64::from(sigma);
     let g: Vec<f32> = (-r..=r)
-        .map(|j| larmorx_core::math::exp(-((j * j) as f64) / den) as f32)
+        .map(|j| {
+            let q = -((j * j) as f64) / den;
+            // the witness compares the taps as stored (single precision)
+            libm.choose32(
+                || larmorx_core::math::exp(q) as f32,
+                || larmorx_core::math::exp_glibc(q) as f32,
+            )
+        })
         .collect();
     let mut sum = 0.0f32;
     for &v in &g {
@@ -386,7 +394,7 @@ pub fn setup_errors(pair: &Pair, log: &Log, times: usize) {
     };
     let pts = pair
         .bbr
-        .get_or_init(|| points(src, pair.reference.voxel_size));
+        .get_or_init(|| points(src, pair.reference.voxel_size, log.libm()));
     if pts.as_ref().is_ok_and(|p| p.gm.is_empty()) {
         for _ in 0..times {
             log.push("ERROR::set_bbr_seg: could not find any boundary points!");
@@ -411,7 +419,7 @@ pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f
     };
     let pts = pair
         .bbr
-        .get_or_init(|| points(src, pair.reference.voxel_size));
+        .get_or_init(|| points(src, pair.reference.voxel_size, log.libm()));
     let pts = match pts {
         Ok(p) => p,
         Err(m) => {

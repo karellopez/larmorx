@@ -915,7 +915,7 @@ def fix_pass(
             elif x[key].read_bytes() != y[key].read_bytes():
                 others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=rep.SILENT
+            checks, entries, change, other_changes="; ".join(others), silent_ok=(*rep.SILENT, *defects.CONDITION_NOTICES)
         )
 
 

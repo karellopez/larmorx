@@ -1232,9 +1232,13 @@ fn entropy(
     // GLIBC-07: named where the other choice of logarithm prints another value
     if entropy_of(&c, active, fix, fix, !glibc).is_some_and(|v| shown64(json, ours, v)) {
         let detail = if fix {
-            format!("{o}: the correctly rounded logarithms' entropy, where glibc's (FSL's) print another")
+            format!(
+                "{o}: the correctly rounded logarithms' entropy, where glibc's (FSL's) print another"
+            )
         } else {
-            format!("{o}: glibc's logarithms, as FSL, where the correctly rounded ones print another")
+            format!(
+                "{o}: glibc's logarithms, as FSL, where the correctly rounded ones print another"
+            )
         };
         notices.add(&defects::GLIBC_07, detail);
     }

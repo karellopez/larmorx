@@ -544,7 +544,15 @@ mod tests {
         // at h = 1: the voxel of 2 above it adds 1 * 1
         let mut v = vec![0.0f32; 125];
         v[62] = 2.0;
-        let e = enhance(&v, [5, 5, 5], &[0.0, 1.0], 2.0, 0.5, &offsets(6), &Libm::default());
+        let e = enhance(
+            &v,
+            [5, 5, 5],
+            &[0.0, 1.0],
+            2.0,
+            0.5,
+            &offsets(6),
+            &Libm::default(),
+        );
         assert_eq!(e[62], 1.0);
         assert_eq!(e.iter().filter(|&&x| x != 0.0).count(), 1);
     }

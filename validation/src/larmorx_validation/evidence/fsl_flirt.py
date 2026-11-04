@@ -1334,9 +1334,20 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
             + note,
             600,
         )
-    if disp and band is not None and max(disp) <= band["p95"]:
+    # every displacement the record measured, a zero one included (a matrix within the record's
+    # printed precision of FSL's, where only the printed digits differ)
+    measured = [
+        x
+        for k, x in r.get("measured", {}).items()
+        if "displacement" in k and isinstance(x, (int, float))
+    ]
+    if measured and band is not None and max(measured) <= band["p95"]:
+        at = (
+            "" if disp else f"; the matrix {max(measured):g} mm from FSL's (the record's precision)"
+        )
         return "within-variability", common.clip(
-            f"{parts}; within FSL's own variability on this call, measured for the worked "
+            f"{parts}{at}"
+            + f"; within FSL's own variability on this call, measured for the worked "
             f"example: {band['p95']:.3g} mm at the 95th percentile (its input perturbed by "
             "noise of half an intensity unit)." + note,
             600,

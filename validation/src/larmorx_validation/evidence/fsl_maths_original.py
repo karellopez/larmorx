@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import tempfile
 import types
 from pathlib import Path
@@ -91,7 +92,9 @@ def run(e: fcache.Entry, label: str, mode: str, n: int, args: list[str], put,
     from larmorx_validation.parity.fsl_flirt_replica import _environment
 
     cwd = e.dir / label
-    cwd.mkdir(exist_ok=True)
+    if cwd.is_dir():  # an entry computed again: its earlier outputs are not inputs
+        shutil.rmtree(cwd)
+    cwd.mkdir()
     put(cwd)
     given = list(cwd.iterdir())
     env = {**_environment({}), defects.ENV: mode, "OMP_NUM_THREADS": str(n),

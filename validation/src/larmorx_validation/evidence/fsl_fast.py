@@ -1175,20 +1175,31 @@ def _verdicts_original(
             )
             x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
         elif i == "original-cr":
-            beyond = _beyond(x, band)
+            # the reproduce mode computes glibc's functions (since 2026-11-04), so it is held to
+            # FSL as built: from FSL with correctly rounded maths it may differ by FSL's own band
+            # and its own differences from FSL as built together
+            of = by["original-fsl"]["metrics"]
+            beyond = [
+                o
+                for o, m in x["metrics"].items()
+                if o in band["metrics"]
+                and m["differ"] > band["metrics"][o]["differ"] + of.get(o, {}).get("differ", 0)
+            ]
             diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
             if not beyond:
                 x["verdict"] = "within-variability"
                 x["reason"] = (
-                    "Not the same bits as FSL with correctly rounded maths, but no further from it, "
-                    "in any output, than FSL as built is (the yardstick row): "
-                    + _counts(x, diff_out, labels, band)
-                    + "."
+                    "The reproduce mode computes exp, log, expf and logf as glibc 2.35 does, as "
+                    "FSL's build (since 2026-11-04), so it is held to FSL as built (the row "
+                    "above); from FSL with correctly rounded maths it differs by no more than "
+                    "FSL's own last-bit band (the yardstick row) and its own differences from FSL "
+                    "as built together: " + _counts(x, diff_out, labels, band) + "."
                 )
             else:
                 x["verdict"] = "open"
                 x["reason"] = (
-                    "Further from FSL with correctly rounded maths than FSL as built is, in "
+                    "Further from FSL with correctly rounded maths than FSL's own last-bit band "
+                    "and the original's differences from FSL as built together, in "
                     f"{len(beyond)} output(s): " + _counts(x, beyond, labels, band) + "."
                 )
             x["links"].append({"label": "findings", "href": FINDINGS})
@@ -1851,7 +1862,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
             "record's thresholds" + tail,
             700,
         )
-    near = _near_cr(oc, "multi" in r["case"])
+    near = _near_fsl(of, "multi" in r["case"])
     if not beyond:
         return "within-variability", common.clip(
             f"In each of the {n} images the clean-room original differs from FSL in no more "
@@ -1877,13 +1888,12 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     )
 
 
-def _near_cr(oc: dict[str, dict], multi: bool) -> str:
-    """What the original's differences from FSL with correctly rounded maths are."""
-    total = sum(x["orig_cr"][0] for x in oc.values())
-    text = (
-        f"it equals FSL with correctly rounded maths but in {total:,} values of {len(oc)} image(s)"
-    )
-    if all(x["kind"] == "pve" and x["orig_cr"][1] <= 0.0100001 for x in oc.values()):
+def _near_fsl(of: dict[str, dict], multi: bool) -> str:
+    """What the original's differences from FSL as built are (its reproduce mode computes
+    glibc's exp, log, expf and logf since 2026-11-04, so FSL as built is its reference)."""
+    total = sum(x["orig_fsl"][0] for x in of.values())
+    text = f"it equals FSL as built but in {total:,} values of {len(of)} image(s)"
+    if all(x["kind"] == "pve" and x["orig_fsl"][1] <= 0.0100001 for x in of.values()):
         text += (
             ", each a partial volume one fraction step (0.01) away: near ties between "
             "neighbouring fractions, decided by last bits"

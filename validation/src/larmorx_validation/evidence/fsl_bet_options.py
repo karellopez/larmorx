@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """BET's variations that run other FSL programs (``bet -S``, ``-B``, ``-A``, ``-A2``; the
 replica since 2026-11-04): the six real cases of the replica's record, each a worked example of
-BET's page. FSL 6.0.7.23 runs through the oracle-output cache with the parity suite's own
+BET's page, and standard_space_roi's ``-b`` (the call ``-S`` and ``-B`` make) on a child's head. FSL 6.0.7.23 runs through the oracle-output cache with the parity suite's own
 environment and arguments (so the record's runs are served, never computed twice), and so does
 FSL's ``bet`` without the variation on the same head (``-m``, with ``-s`` where the variation
 writes a skull image): what the option changes in FSL's own output. The larmorx-nc replica runs
@@ -50,6 +50,7 @@ class Spec:
     data: dict
     title: str
     summary: str
+    program: str = "bet"
 
 
 def _o(*ids: str) -> tuple[tuple[str, str, str], ...]:
@@ -61,6 +62,7 @@ def _o(*ids: str) -> tuple[tuple[str, str, str], ...]:
         "outskull": ("_outskull_mask.nii.gz", "Outer skull mask"),
         "outskin": ("_outskin_mask.nii.gz", "Scalp mask"),
         "skullmask": ("_skull_mask.nii.gz", "Skull mask (betsurf -s)"),
+        "roi": (".nii.gz", "The head inside MNI152's dilated brain mask"),
     }
     return tuple((i, *table[i]) for i in ids)
 
@@ -131,6 +133,15 @@ SPECS = [
          "`-A2` with the child's T2w, on the T1w of a child of 7.5 from the head-motion study "
          "(ds000256 sub-CTS203), `bet <T1w> out -A2 <T2w> -m`: FLIRT registers the T2w to the "
          "T1w (sinc), then the steps of `-A`, betsurf profiling both images."),
+    Spec("ssroi-child", "ssroi/child-b", "child-3y", "-b", ("-b", "-d"), None, _o("roi"),
+         DS000228, "standard_space_roi -b: the head inside MNI152's brain, a 3-year-old",
+         "standard_space_roi registers the head to MNI152 with FLIRT, brings a standard-space "
+         "mask back into the head through the inverse (convert_xfm, FLIRT `-applyxfm`) and masks "
+         "or cuts the head with it. `-b` is the call `bet -S` and `-B` make: MNI152's dilated "
+         "brain mask, thresholded at 0.5, the head kept on its own grid; `-d` keeps the "
+         "temporary files. On the T1w of the data panel's youngest subject (ds000228 "
+         "sub-pixar008, aged 3.5), `standard_space_roi <T1w> out -b -d`, whose MNI152 "
+         "registration a child's small head makes harder.", program="standard_space_roi"),
 ]  # fmt: skip
 BY_CASE = {s.case: s for s in SPECS}
 
@@ -158,8 +169,8 @@ def _unset() -> tuple[str, ...]:
     )
 
 
-def _fsl(e: fcache.Entry, label: str, argv: list[str]) -> None:
-    """FSL 6.0.7.23's ``bet`` through the parity suite's own runner (the oracle-output cache;
+def _fsl(e: fcache.Entry, label: str, argv: list[str], program: str = "bet") -> None:
+    """FSL 6.0.7.23's ``program`` through the parity suite's own runner (the oracle-output cache;
     its environment, as the record's cases), into ``<entry>/<label>``."""
     from larmorx_validation.parity import fsl_bet as fb
     from larmorx_validation.parity import fsl_versions
@@ -168,20 +179,20 @@ def _fsl(e: fcache.Entry, label: str, argv: list[str]) -> None:
     cwd.mkdir(exist_ok=True)
     with fsl_versions.using("replica"):
         env = fb.environment()
-        r = fb.oracle_run("bet", argv, env, cwd)
-        program = str(fb.fsl_dir() / "bin" / "bet")
+        r = fb.oracle_run(program, argv, env, cwd)
+        path = str(fb.fsl_dir() / "bin" / program)
     (e.dir / f"{label}.log").write_text(
-        f"$ bet {' '.join(argv)}\n# exit {r.code}\n--- stdout\n{r.out}\n--- stderr\n{r.err}",
+        f"$ {program} {' '.join(argv)}\n# exit {r.code}\n--- stdout\n{r.out}\n--- stderr\n{r.err}",
         encoding="utf-8",
     )
-    run = fcache.Run(label, [program, *argv], {k: v for k, v in env.items() if k != "HOME"})
+    run = fcache.Run(label, [path, *argv], {k: v for k, v in env.items() if k != "HOME"})
     run.exit, run.stderr_tail = r.code, r.err[-2000:]
     e.runs.append(run)
     if r.code != 0:
-        raise RuntimeError(f"{e.case}: FSL's bet exited {r.code}: {r.err[-800:]}")
+        raise RuntimeError(f"{e.case}: FSL's {program} exited {r.code}: {r.err[-800:]}")
 
 
-def _replica(e: fcache.Entry, label: str, mode: str, argv: list[str]) -> None:
+def _replica(e: fcache.Entry, label: str, mode: str, argv: list[str], program: str = "bet") -> None:
     """The larmorx-nc replica in ``mode``, in the suite's environment, into ``<entry>/<label>``;
     the register entries its notices name kept."""
     from larmorx_validation.parity import fsl_bet as fb
@@ -195,7 +206,7 @@ def _replica(e: fcache.Entry, label: str, mode: str, argv: list[str]) -> None:
     cwd = e.dir / label
     cwd.mkdir(exist_ok=True)
     env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode}
-    e.run(label, [nc, "fsl", "bet", *argv], env=env, unset=_unset(), cwd=cwd)
+    e.run(label, [nc, "fsl", program, *argv], env=env, unset=_unset(), cwd=cwd)
     log = (e.dir / f"{label}.log").read_text(encoding="utf-8")
     e.extra.setdefault("named", {})[label] = sorted(set(NOTICE.findall(log)))
 
@@ -210,14 +221,14 @@ def _compute(e: fcache.Entry, spec: Spec) -> None:
     argv = _argv(spec, spec.args)
     for label, mode in RUNS:
         if mode is None:
-            _fsl(e, label, argv)
+            _fsl(e, label, argv, spec.program)
         else:
-            _replica(e, label, mode, argv)
+            _replica(e, label, mode, argv, spec.program)
     if spec.plain is not None:
         _fsl(e, "fsl23-plain", _argv(spec, spec.plain))
     e.finish(
         versions={"fsl": fb.fsl_version(fsl_step.NEW), "larmorx-nc": fb.replica_version()},
-        command=f"bet <T1w> out {' '.join(spec.args).replace('{t2}', '<T2w>')}",
+        command=f"{spec.program} <T1w> out {' '.join(spec.args).replace('{t2}', '<T2w>')}",
         record_case=spec.case,
         settings=f"The replica's record case {spec.case}: FSL {fsl_step.NEW} (~/fsl-"
         f"{fsl_step.NEW}, never on the PATH) through the oracle-output cache with the parity "
@@ -233,11 +244,12 @@ def _compute(e: fcache.Entry, spec: Spec) -> None:
 
 
 def entry(ctx: core.Context, spec: Spec) -> fcache.Entry:
+    tag = spec.case.split("/")[-1] if spec.program == "bet" else spec.case.replace("/", "-")
     return fcache.entry(
         ctx.figures_context(),
         TOOL,
-        f"options-{spec.case.split('/')[-1]}",
-        f"bet {spec.option} on a real head (the replica's record case {spec.case}): FSL "
+        f"options-{tag}",
+        f"{spec.program} {spec.option} on a real head (the replica's record case {spec.case}): FSL "
         f"{fsl_step.NEW} and the replica, default and reproduce",
         lambda e: _compute(e, spec),
     )
@@ -401,8 +413,10 @@ def _view_voxel(ex, spec: Spec) -> list[int]:
             region = lab == (int(np.argmax(sizes)) + 1)
         else:
             region = a
-    else:
+    elif any(o == "inskull" for o, _s, _l in spec.outputs):
         region = ex.values(ex.key("fsl23", "inskull")) != 0
+    else:
+        region = ex.values(ex.key("fsl23", spec.outputs[0][0])) != 0
     idx = np.argwhere(region)
     c = idx.mean(0)
     return [int(v) for v in idx[int(np.argmin(((idx - c) ** 2).sum(axis=1)))]]
@@ -451,7 +465,7 @@ def example(ctx: core.Context, spec: Spec, rec) -> dict:
                      {"all": raw}, scale=scale, inter=inter))  # fmt: skip
     over = {o: {"on": "t1", "window": _window(ex)} for o, _s, _l in spec.outputs if o in MASKS}
     opt = " ".join(spec.args).replace("{t2}", "<T2w>")
-    ex.add(exm.Panel("fsl23", "original", f"{fsl_step.NEW_LABEL}, bet {opt}",
+    ex.add(exm.Panel("fsl23", "original", f"{fsl_step.NEW_LABEL}, {spec.program} {opt}",
                      f"the conda installation, as run (the oracle cache); {fsl_step.REFERENCE}",
                      arrays["fsl23"], overlay=over))  # fmt: skip
     ex.add(exm.Panel("replica23", "larmorx", "larmorx-nc replica", "default mode",
@@ -489,6 +503,8 @@ def example(ctx: core.Context, spec: Spec, rec) -> dict:
     main_out = "mask" if any(o == "mask" for o, _s, _l in spec.outputs) else "inskull"
     if spec.option in ("-A", "-A2"):
         main_out = "outskull"
+    if spec.program != "bet":
+        main_out = spec.outputs[0][0]
     panels = ["t1", "fsl23", "replica23"] + (["fsl23-plain"] if spec.plain else
                                              ["replica23-reproduce"])  # fmt: skip
     default = {
@@ -503,13 +519,23 @@ def example(ctx: core.Context, spec: Spec, rec) -> dict:
         f"the crosshair inside the largest region where {spec.option} changed FSL's mask"
         if spec.plain
         else "the crosshair at the inner skull's centre"
+        if spec.program == "bet"
+        else "the crosshair at the kept head's centre"
     )
     out = common.finish(ctx, ex, diffs, copy.deepcopy(outputs), default=default,
                         window_panel="fsl23",
                         caption=where + "; the three slices through it are stored at full "
                         "resolution.")  # fmt: skip
     vers = info.get("versions", {})
-    m = arrays["fsl23"].get("mask", arrays["fsl23"].get("inskull"))
+    m = next(arrays["fsl23"][k] for k in ("mask", "inskull", "roi") if k in arrays["fsl23"])
+    m_label = {"mask": "Mask", "inskull": "Inner skull", "roi": "Head kept"}[
+        next(k for k in ("mask", "inskull", "roi") if k in arrays["fsl23"])
+    ]
+    runs_what = (
+        "its `bet` script running FSL's programs"
+        if spec.program == "bet"
+        else "its `standard_space_roi` script running FLIRT, convert_xfm, fslmaths and fslval"
+    )
     files = ", ".join(f"`out{suf}`" for _o2, suf, _l in spec.outputs)
     facts = [
         {
@@ -523,13 +549,13 @@ def example(ctx: core.Context, spec: Spec, rec) -> dict:
         {"label": "Command", "text": "`" + short_command(info["command"]) + "`"},
         {
             "label": "Programs",
-            "text": f"{vers.get('fsl', '?')}, its `bet` script running FSL's programs; "
+            "text": f"{vers.get('fsl', '?')}, {runs_what}; "
             f"{vers.get('larmorx-nc', '?')} (the replica: every program in its process), from "
             f"larmorx at commit `{info['larmorx_commit'][:12]}`",
         },
         {"label": "Files compared", "text": files + " (and every other file, in the record)"},
         {
-            "label": "Mask" if "mask" in arrays["fsl23"] else "Inner skull",
+            "label": m_label,
             "text": f"{int(np.count_nonzero(m)):,} of {m.size:,} voxels in FSL's",
         },
         {"label": "Record", "text": _record_fact(rec, spec.case)},

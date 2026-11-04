@@ -8,15 +8,20 @@ C library on Linux x86-64 (glibc 2.35, Ubuntu 22.04, the oracle machines), bit f
 correctly rounded (GLIBC-07, `docs/findings/upstream-defects.md`; the shares are in §10.3). The
 default of every larmorx implementation stays correctly rounded (`larmorx_core::math`'s CORE-MATH
 ports); the user decided on 2026-11-04 that `reproduce` gives glibc's own bits (decision log,
-"glibc's exact maths for `reproduce`"). glibc's code for these seven functions is IBM's Accurate
+"glibc's exact maths for `reproduce`") and then, once this spec had measured the tables (decision
+log, "GLIBC-07's tables"), that this holds for `sin`, `cos` and `sincos`, while `tan`, `asin`,
+`acos` and `atan` stay correctly rounded in `reproduce` too (§9). glibc's code for these seven functions is IBM's Accurate
 Mathematical Library, LGPL-2.1-or-later: it is never copied or translated. This spec describes
 the behaviour as mathematics, from which another agent writes the functions (the `cbrtf` route,
 `specs/cbrtf.md`).
 
-**What this spec covers.** `sin`, `cos` and `sincos` completely (§1 to §8), with one open
-question, the table of §5 (18 of its 440 numbers; §5.3). `tan`, `asin`, `acos` and `atan` are
-**not specified**: their tables are data that no definition reproduces (§9), a licence question
-for the user. The black-box record (§10) covers all seven functions.
+**What this spec covers.** `sin`, `cos` and `sincos` completely (§1 to §8), with the table of §5
+generated from its mathematical definition, as the user decided (§5.3: 18 of its 440 numbers are
+not glibc's, a documented gap that changed no result tested). `tan`, `asin`, `acos` and `atan` are
+**not specified**: their tables are data that no definition reproduces, and the user decided that
+they stay correctly rounded in `reproduce` too, so that no glibc data enters larmorx (§9). The
+black-box record (§10) covers all seven functions: for the four, it measures how often
+`reproduce`'s correctly rounded result differs from glibc's (§10.3).
 
 **Whoever implements it must not open:** glibc's source (`<workspace>/tags/glibc-2.35/`, any
 other copy), its disassembly, the spec writer's model (`crates-gpl/tools/glibc-dbl-model`, written
@@ -169,7 +174,7 @@ round it to the nearest double (ties to even) for `SH`, then round `s − SH` to
 for `SL`; the same for `cos`. `tables.py`'s `sincos_table()` does it with `mpmath`
 (`python -P validation/investigations/glibc-dbl/tables.py`).
 
-### 5.3 What the definition reproduces (the open question)
+### 5.3 What the definition reproduces (decided: the definition)
 
 Compared with glibc's table, bit for bit (`tables.py`; its source text and the bytes of the
 system's `libm.so.6`, which agree with each other): **422 of the 440 numbers agree**. Every
@@ -191,12 +196,21 @@ those that use those 18 rows. **On the record's 3.2 × 10^9 arguments of `sin`, 
 gives the same results with §5.1's table as with glibc's own 18 numbers in their place on those
 arguments and on 1.8 × 10^10 more of each function chosen next to the 17 rows (§11.3).
 
-**For the user** (through the orchestrator): (a) keep §5.1's table: no number from glibc's code,
-glibc's bits on every argument tested, a difference possible on a vanishing share (an estimated
-one evaluation in about 10^16 of those that use the 18 rows, none known); (b) give the 18
-numbers (data read from LGPL code: the licence question); (c) leave `sin`, `cos` and `sincos`
-correctly rounded in `reproduce` too. Recommended: (a), with (b) only if the user rules that
-these 18 numbers may be used.
+**Decided** (the user, 2026-11-04, decision log "GLIBC-07's tables", of three options: §5.1's
+table, glibc's 18 numbers in its place, or `sin`, `cos` and `sincos` correctly rounded in
+`reproduce` too): **the implementation generates table `R` from §5.1's definition** (§5.2), and no
+number from glibc's code enters larmorx. The gap this leaves is documented, not hidden:
+
+- in 18 low parts (17 rows) the table is not glibc's, so a result can differ from glibc's where
+  the exact correction of §6.2 lies within about 2^-107 of a rounding boundary: an estimated one
+  evaluation in about 2^53 (about 10^16) of those that read these rows;
+- **none is known**: 0 differences on the record's 3.2 × 10^9 arguments and on 1.8 × 10^10 more
+  per function chosen next to the 17 rows (§11.3);
+- the implementation's documentation says so (`reproduce` gives glibc's bits on every argument
+  tested, with this one theoretical exception); a difference from glibc found later is reported
+  with its argument (§12), and a validation agent tells with the spec writer's model (§11.3)
+  whether it is this gap (the model gives glibc's result with glibc's 18 numbers and the
+  implementation's with §5.1's) or a mistake to fix.
 
 ## 6. The three kernels
 
@@ -342,7 +356,7 @@ For finite `x` with `|x| ≥ L2` (the signed `x`; every operation one rounding, 
 
 The result is `(n, a, da)`.
 
-## 9. `tan`, `asin`, `acos`, `atan`: not specified (their tables)
+## 9. `tan`, `asin`, `acos`, `atan`: correctly rounded in `reproduce` too (decided)
 
 Each of the four takes, besides constants, a table of numbers. A behaviour spec can give a table
 only by a definition that regenerates it (the brief; never glibc's numbers). `tables.py` tested
@@ -354,10 +368,19 @@ the natural definitions against glibc's tables **(observed**, 2026-11-04**)**:
 | `asin`, `acos` | 216 subintervals of [0.125, 0.96875), each a point and a polynomial (6 to 10 coefficients, a constant term in two parts) | the first-derivative coefficient is `fl(asin'(x0))` in 209 of 216, the second in 99, the higher ones in none (they are fitted, up to 10^13 units in the last place from the Taylor coefficients); the constant term approximates `asin(x0)` only to 2^-64: fitted data |
 | `atan` | 241 rows on (1/16, 1): a point and 6 coefficients | `fl(atan x0)` and `fl(atan'(x0))` on all 241; the points are searched points and the higher coefficients are fitted |
 
-So `tan` needs its 186 points, `asin` and `acos` their 2,568 numbers and `atan` 241 points and
-964 coefficients from glibc's code: **a licence question for the user** (through the
-orchestrator), before any spec of these four. Their black-box record is ready (§10), so whichever
-way is decided, an implementation can be checked without reading glibc.
+So `tan` would need its 186 points, `asin` and `acos` their 2,568 numbers and `atan` 241 points
+and 964 coefficients from glibc's code (about 4,000 numbers in all), data that only glibc's
+LGPL source holds.
+
+**Decided** (the user, 2026-11-04, decision log "GLIBC-07's tables"): **`tan`, `asin`, `acos`
+and `atan` stay correctly rounded in `reproduce` too** (`larmorx_core::math`'s CORE-MATH ports `tan`,
+`asin`, `acos`, and `atan(x)` as `atan2(x, 1)`), so no glibc data enters larmorx. Their behaviour
+is therefore not specified here, and nothing is to be implemented for them. What it costs: in
+`reproduce`, these four differ from glibc's only in the last bit, on the shares of §10.3 (0.05 to
+0.25 % of results; `tan` 0.19 %, `asin` 0.08 %, `acos` 0.05 %, `atan` 0.07 % over all families),
+and they are reached only by fslmaths' double `-tan`, `-asin`, `-acos` and `-atan`, never by
+fMRIPrep. Their black-box record stays (§10): it measures those shares, and it would check an
+implementation without reading glibc if the decision were ever revisited.
 
 ## 10. The black-box record
 
@@ -514,9 +537,12 @@ arguments that reach these rows through a reduction, some may exist.
 
 1. **The record.** The implementation's test tool includes `families.rs`, computes the block
    hashes of §10.2 from its own `sin`, `cos` and `sincos` and compares them with the record's 768
-   blocks of these three functions: every one must agree; a block that differs is listed with
-   `blackbox list` and compared value by value. The special arguments' results must agree one by
-   one, NaN bits included.
+   blocks of these three functions: every one must agree (§5.3's gap is not met on them: with
+   §5.1's table the method gives glibc's bits on all of them, §11.2); a block that differs is
+   listed with `blackbox list` and compared value by value. The special arguments' results must
+   agree one by one, NaN bits included. Table `R` is generated from §5.1's definition (§5.2), at
+   build time or as constants written by the generator with its command recorded, never taken
+   from glibc.
 2. **The two readings of `FMA`.** `sin` and `cos` with the fused reading against the record;
    `sincos` with two roundings. In Rust: `f64::mul_add` for the fused reading (correctly rounded
    on every platform, with or without FMA hardware; for speed, `larmorx_core::math`'s
@@ -534,5 +560,8 @@ arguments that reach these rows through a reduction, some may exist.
 5. **Independently of the implementer** (the orchestrator or a validation agent): the
    implementation against the spec writer's model (§11.2) on the record's arguments and on 10^10
    more, and against glibc itself on fresh seeds.
-6. **In use** (the second half): which records move when `reproduce` takes these functions (the
+6. **The documentation** of the three functions says what `reproduce` gives: glibc 2.35's bits on
+   every argument tested, with §5.3's theoretical exception; and that `tan`, `asin`, `acos` and
+   `atan` stay correctly rounded in `reproduce` (§9), with §10.3's shares.
+7. **In use** (the second half): which records move when `reproduce` takes these functions (the
    handoff lists them).

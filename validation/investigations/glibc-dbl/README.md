@@ -33,7 +33,10 @@ clean-room implementer must not open it, but may run it as a black box).
 - **The other tables have no definition**: tan's 186 points are searched points (their `F`, `FF`,
   `G` columns are correctly rounded functions of the points, all 186); asin's and acos's 216
   subintervals hold fitted polynomials; atan's 241 rows searched points and fitted coefficients.
-  So `tan`, `asin`, `acos`, `atan` are not specified: a licence question for the user.
+  So `tan`, `asin`, `acos`, `atan` are not specified: the user decided (2026-11-04, decision
+  log "GLIBC-07's tables") that they stay correctly rounded in `reproduce` too, so no glibc data
+  enters larmorx; their record stays, for the shares above. For table `R` the user decided the
+  definition (spec §5.3: the 18 numbers are a documented gap that changed no result tested).
 - **The model** (`glibc-dbl-model check`, from the spec's text with `--emit`'s table): `sin`,
   `cos`, `sincos`: 768 of 768 blocks (3.2 × 10^9 arguments) and 184 of 184 special arguments per
   function agree with the record (`MODEL-PASS`, 6.6 s); with `--sse2`, 512 of 512 blocks of the

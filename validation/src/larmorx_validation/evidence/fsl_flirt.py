@@ -868,7 +868,7 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "wm-init", "wm-fsl", "fsl", "replica", "orig"],
-        "diffs": ["replica-fsl", "orig-fsl", "fsl-init"],
+        "diffs": ["replica-fsl", "orig-fsl", "origfix-orig", "fsl-init"],
         "compare": {"a": "fsl", "b": "init"},
     }
     out = common.finish(
@@ -1131,7 +1131,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", *(["wm-fsl"] if not four_d else []), "fsl", "replica", "orig"],
-        "diffs": ["replica-fsl", "fix-replica", "orig-fsl"],
+        "diffs": ["replica-fsl", "fix-replica", "orig-fsl", "origfix-orig"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(

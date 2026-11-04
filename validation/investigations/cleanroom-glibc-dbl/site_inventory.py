@@ -92,6 +92,8 @@ def _sizes(x, prefix: str, out: dict[str, int], depth: int) -> None:
         return
     items = x.items() if isinstance(x, dict) else enumerate(x) if isinstance(x, list) else ()
     for k, v in items:
+        if isinstance(v, dict) and isinstance(v.get("id"), str):
+            k = v["id"]  # a list's element by its id: a row inserted before it moves no count
         if isinstance(v, (dict, list)):
             key = f"{prefix}/{k}"
             out[key] = len(v)

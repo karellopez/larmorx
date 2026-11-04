@@ -1360,7 +1360,7 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "fsl", "replica", "original"],
-        "diffs": ["replica-fsl", "original-fsl"],
+        "diffs": ["replica-fsl", "original-fsl", "ofix-original"],
         "compare": {"a": "fsl", "b": "original"},
     }
     agree = (
@@ -1557,12 +1557,12 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         out_id, a, b = "bias", "fsl", "original"
         panels = ["in1", "fsl", "replica", "original"]
         what_differs = "bias field"
-        shown_diffs = ["replica-fsl", "original-fsl"]
+        shown_diffs = ["replica-fsl", "original-fsl", "ofix-original"]
     else:
         out_id, a, b = "seg", "fsl", "original"
         panels = ["in1", "in2", "in3", "fsl", "replica", "original"]
         what_differs = "classes"
-        shown_diffs = ["replica-fsl", "original-fsl"]
+        shown_diffs = ["replica-fsl", "original-fsl", "ofix-original"]
     at = _default_view(ex, "volume", a, b, out_id)
     if ex_id != "priors":
         cap = (

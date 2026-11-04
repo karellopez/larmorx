@@ -30,6 +30,7 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 
 from __future__ import annotations
 
+import itertools
 import os
 import re
 import shutil
@@ -615,7 +616,7 @@ def unnamed_glibc(args: list[str]) -> bool:
     """Whether ``args`` hold an operation whose default may change the outputs without
     naming GLIBC-07 (:data:`UNNAMED_OPS`, ``-kernel gauss``)."""
     return any(a in UNNAMED_OPS for a in args) or any(
-        a == "-kernel" and b == "gauss" for a, b in zip(args, args[1:], strict=False)
+        a == "-kernel" and b == "gauss" for a, b in itertools.pairwise(args)
     )
 
 
@@ -698,7 +699,7 @@ def own_inputs() -> Path:
     inputs where they and the correctly rounded ones give other values): ``dbl32`` (32³
     float64, uniform in [-20, 20)), ``dblpos32`` (32³ float64, uniform in [0.001, 1000)),
     ``flt24`` (24³ float32, uniform in [0, 1000)), ``dbl4d`` (8 x 8 x 6 x 40 float64, uniform in
-    [0, 1000)), ``tstat`` (20 x 20 x 16 float32, normal with σ 3), each from its own seeded
+    [0, 1000)), ``tstat`` (20 x 20 x 16 float32, normal with standard deviation 3), each from its own seeded
     generator; the sform's voxel sizes of ``fsl_maths_replica``."""
     ws = rep.workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
@@ -855,9 +856,7 @@ def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
             T,
             "-bptf 1.73 -1 of a double 4D image (-dt double -odt double): a high-pass weight "
             "exp(-1/(2·1.73²)) whose glibc exp differs (GLIBC-07; the default names nothing)",
-            rep._r(
-                "-dt", "double", "@orig:dbl4d", "-bptf", "1.73", "-1", "out", "-odt", "double"
-            ),
+            rep._r("-dt", "double", "@orig:dbl4d", "-bptf", "1.73", "-1", "out", "-odt", "double"),
         ),
         "orig/glibc-tfce": (
             T,

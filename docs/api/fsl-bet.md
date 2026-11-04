@@ -20,15 +20,16 @@ Each image's `implementation` names the one that ran. The command line chooses a
 (`LARMORX_IMPLEMENTATION=auto|replica|original`).
 
 **Status: `validated`** (the replica), against FSL 6.0.7.23 itself
-([record](../validation/fsl-bet-replica.md), standard tier: 176 cases, 128 compared, every one
-bit-identical, 315 of 315 files byte for byte, FSL's own step from 6.0.7.17 in every case;
+([record](../validation/fsl-bet-replica.md), standard tier, re-made 2026-11-04 with `-S`, `-B`,
+`-A`, `-A2`, standard_space_roi and fslroi: 263 cases, 201 compared, every one bit-identical, 600
+of 600 files byte for byte, FSL's own step from 6.0.7.17 in every case;
 [full tier](../validation/fsl-bet-replica-full.md), against FSL 6.0.7.17: 173 cases, 129
 compared, 364 of 364 files byte for byte): every compared case gives FSL's exit status, messages and files byte
 for byte (images: header and data; meshes as text), fMRIPrep's 29 BET calls on its twelve oracle
 runs with BOLD runs included (the data panel's), whose outputs also have the values of fMRIPrep's
-own (and of fMRIPrep's build of FSL in its image). 30 cases are rejected by both alike; in 10, FSL
-crashes on what it leaves undefined and `reproduce` fills it (below); 4 variations wait for FLIRT
-and FAST. The records include random testing's seven permanent cases (`difftest/...`; BET's
+own (and of fMRIPrep's build of FSL in its image). 47 cases are rejected by both alike; in 13, FSL
+crashes on what it leaves undefined and `reproduce` fills it (below); 1 waits for fslpy's `imcp`
+conversion (standard_space_roi, below). The records include random testing's permanent cases (17 in the standard tier) (`difftest/...`; BET's
 random testing: [docs/validation/difftest.md](../validation/difftest.md)), and the replica needs no
 more memory than FSL in any measured call (`tests/parity/test_memory_peak.py`).
 

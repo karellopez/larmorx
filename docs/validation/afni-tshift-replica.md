@@ -1,21 +1,21 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 315 cases on the `standard` tier: 280 pass, 32 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 317 cases on the `standard` tier: 282 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_26.3.05), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
-- **Original programs:** 630 runs: 624 from the oracle cache, 6 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
+- **Original programs:** 634 runs: 628 from the oracle cache, 6 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical: 280 of 280 passing cases** produce exactly the bytes of AFNI's output data.
+**Bit-identical: 282 of 282 passing cases** produce exactly the bytes of AFNI's output data.
 - Fourier: 147 of 147 bit-identical.
-- Lagrange and weighted-sinc methods and copies: 133 of 133 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 135 of 135 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 - Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
 - Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if the call read the environment (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
 - **AFNI's global options and environment variables** (categories `global` and `environment`, 63 cases): exit status and messages compared too, standard output and error byte for byte (colour codes included; AFNI's version banner and compile date, and larmorx's own lines, set aside): 63 of 63 identical.
-- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 309 of 315 cases identical (exit status, messages, every output); 6 changed: 2 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`; 4 by AFNI-05 (AFNI 26.3.05 de-means each voxel of a -no_detrend pair with its own mean; 25.2.09 de-meaned the first twice and shifted the second as raw values): `options/float32-no-detrend`, `options/float32-no-detrend-fourier`, `options/int16-no-detrend`, `options/int16-no-detrend-fourier`.
+- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 311 of 317 cases identical (exit status, messages, every output); 6 changed: 2 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`; 4 by AFNI-05 (AFNI 26.3.05 de-means each voxel of a -no_detrend pair with its own mean; 25.2.09 de-meaned the first twice and shifted the second as raw values): `options/float32-no-detrend`, `options/float32-no-detrend-fourier`, `options/int16-no-detrend`, `options/int16-no-detrend-fourier`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 7 case(s) named it, 7 with changed values (largest difference 8.54e+03): `synthetic/dtypes/int16-negative-slope`, `methods/dtypes/int16-negative-slope-linear`, `methods/dtypes/int16-negative-slope-cubic`, `methods/dtypes/int16-negative-slope-quintic`, `methods/dtypes/int16-negative-slope-heptic`, `methods/dtypes/int16-negative-slope-wsinc5`, `methods/dtypes/int16-negative-slope-wsinc9`
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
@@ -36,7 +36,7 @@
 | geometry | 3 | 3 | 0.0e+00 | – | 0.0e+00 |
 | global | 19 | 19 | 0.0e+00 | 0 | 0.0e+00 |
 | header-timing | 13 | 13 | 0.0e+00 | – | 0.0e+00 |
-| methods | 84 | 84 | 0.0e+00 | 0 | 0.0e+00 |
+| methods | 86 | 86 | 0.0e+00 | 0 | 0.0e+00 |
 | options | 42 | 42 | 0.0e+00 | 0 | 0.0e+00 |
 | real | 20 | 20 | 0.0e+00 | 0 | 0.0e+00 |
 | synthetic | 33 | 33 | 0.0e+00 | 0 | 0.0e+00 |
@@ -65,7 +65,7 @@
 | geometry | 3 | 3 | 0 | 0 | 0 |
 | global | 26 | 19 | 7 | 0 | 0 |
 | header-timing | 13 | 13 | 0 | 0 | 0 |
-| methods | 84 | 84 | 0 | 0 | 0 |
+| methods | 86 | 86 | 0 | 0 | 0 |
 | options | 42 | 42 | 0 | 0 | 0 |
 | real | 20 | 20 | 0 | 0 | 0 |
 | synthetic | 33 | 33 | 0 | 0 | 0 |
@@ -120,7 +120,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (b6c7066c2dc2) |
+| larmorx | 0.0.1 (3a795ff019fb-dirty) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -315,6 +315,8 @@ Both programs read the same files with the same arguments; outputs are read with
 | `tpattern/file-repeat` | pass | 13/13 | -tpattern @file: N@value repetition |
 | `tpattern/file-tr` | pass | 13/13 | -tpattern @file: a value equal to the TR |
 | `tpattern/inline-1D` | pass | 13/13 | -tpattern '@1D: 0 1 0.5 1.5' |
+| `methods/glibc-sinf-wsinc5` | pass | 13/13 | -wsinc5 -tpattern '@1D: 0 0.543 0.102 0.728': weights where glibc's sinf and cosf differ from the correctly rounded one… |
+| `methods/glibc-sinf-wsinc9` | pass | 13/13 | -wsinc9 -tpattern '@1D: 0 0.911 1.821 0.603': weights where glibc's sinf and cosf differ from the correctly rounded one… |
 | `header-timing/code1-seq-inc` | pass | 13/13 | no -tpattern, slice_code 1 (sequential increasing) |
 | `header-timing/code2-seq-dec` | pass | 13/13 | no -tpattern, slice_code 2: AFNI gives every slice time 0 |
 | `header-timing/code3-alt-inc` | pass | 13/13 | no -tpattern, slice_code 3 (alternating increasing) |

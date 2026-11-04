@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "9b833a357520",
+  "larmorx_commit": "3a795ff019fb",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -18,15 +18,16 @@
   "fresh": {
    "ended by a signal, SIGABRT (never stored)": 7,
    "ended by a signal, SIGSEGV (never stored)": 10,
-   "never cached: FSL-43: FSL reads memory it never wrote": 34,
+   "never cached: FSL-43: FSL reads memory it never wrote": 38,
    "never cached: FSL-53: FSL reads memory it never wrote": 2,
-   "never cached: files in the run's directory that bet may remove (FSL-46): the cache replays no removal": 2
+   "never cached: files in the run's directory that bet may remove (FSL-46): the cache replays no removal": 4,
+   "never cached: maskthr in the environment (FSL-213): a variable of the script, not of FSL's family, so not in the cache's key": 2
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 55,
-  "saved_seconds": 424.9,
-  "served": 381
+  "ran": 63,
+  "saved_seconds": 3121.1,
+  "served": 563
  },
  "reference": "bet, bet2 and betsurf from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`",
  "results": [
@@ -45,7 +46,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.017,
+   "seconds": 2.831,
    "status": "pass"
   },
   {
@@ -63,7 +64,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.119,
+   "seconds": 2.632,
    "status": "pass"
   },
   {
@@ -81,7 +82,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.253,
+   "seconds": 2.939,
    "status": "pass"
   },
   {
@@ -99,7 +100,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.087,
+   "seconds": 2.79,
    "status": "pass"
   },
   {
@@ -117,7 +118,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.129,
+   "seconds": 2.322,
    "status": "pass"
   },
   {
@@ -135,7 +136,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.161,
+   "seconds": 2.905,
    "status": "pass"
   },
   {
@@ -153,7 +154,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.134,
+   "seconds": 2.897,
    "status": "pass"
   },
   {
@@ -171,7 +172,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.221,
+   "seconds": 2.442,
    "status": "pass"
   },
   {
@@ -189,7 +190,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.984,
+   "seconds": 2.592,
    "status": "pass"
   },
   {
@@ -207,7 +208,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.164,
+   "seconds": 2.756,
    "status": "pass"
   },
   {
@@ -225,7 +226,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.075,
+   "seconds": 2.849,
    "status": "pass"
   },
   {
@@ -243,7 +244,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.366,
+   "seconds": 2.44,
    "status": "pass"
   },
   {
@@ -261,7 +262,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.565,
+   "seconds": 3.054,
    "status": "pass"
   },
   {
@@ -279,7 +280,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.803,
+   "seconds": 2.805,
    "status": "pass"
   },
   {
@@ -297,7 +298,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.929,
+   "seconds": 3.017,
    "status": "pass"
   },
   {
@@ -315,7 +316,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.86,
+   "seconds": 2.753,
    "status": "pass"
   },
   {
@@ -333,7 +334,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.643,
+   "seconds": 3.0,
    "status": "pass"
   },
   {
@@ -351,7 +352,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.815,
+   "seconds": 2.999,
    "status": "pass"
   },
   {
@@ -369,7 +370,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.735,
+   "seconds": 2.959,
    "status": "pass"
   },
   {
@@ -387,7 +388,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.851,
+   "seconds": 2.574,
    "status": "pass"
   },
   {
@@ -405,7 +406,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.401,
+   "seconds": 3.362,
    "status": "pass"
   },
   {
@@ -423,7 +424,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.758,
+   "seconds": 2.589,
    "status": "pass"
   },
   {
@@ -441,7 +442,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.81,
+   "seconds": 2.656,
    "status": "pass"
   },
   {
@@ -459,7 +460,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.753,
+   "seconds": 3.044,
    "status": "pass"
   },
   {
@@ -477,7 +478,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.014,
+   "seconds": 2.852,
    "status": "pass"
   },
   {
@@ -495,7 +496,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 4.447,
+   "seconds": 4.302,
    "status": "pass"
   },
   {
@@ -513,7 +514,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 3.801,
+   "seconds": 4.519,
    "status": "pass"
   },
   {
@@ -531,7 +532,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 2.121,
+   "seconds": 2.405,
    "status": "pass"
   },
   {
@@ -549,7 +550,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 1.824,
+   "seconds": 2.164,
    "status": "pass"
   },
   {
@@ -565,7 +566,7 @@
     "Dice with the known brain (larmorx)": 0.953628,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.155,
+   "seconds": 4.291,
    "status": "pass"
   },
   {
@@ -581,7 +582,7 @@
     "Dice with the known brain (larmorx)": 0.953628,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 5.097,
+   "seconds": 5.443,
    "status": "pass"
   },
   {
@@ -597,7 +598,7 @@
     "Dice with the known brain (larmorx)": 0.950656,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.565,
+   "seconds": 4.133,
    "status": "pass"
   },
   {
@@ -613,7 +614,7 @@
     "Dice with the known brain (larmorx)": 0.952596,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.504,
+   "seconds": 4.328,
    "status": "pass"
   },
   {
@@ -629,7 +630,7 @@
     "Dice with the known brain (larmorx)": 0.956718,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.38,
+   "seconds": 4.025,
    "status": "pass"
   },
   {
@@ -645,7 +646,7 @@
     "Dice with the known brain (larmorx)": 0.5599,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.314,
+   "seconds": 4.72,
    "status": "pass"
   },
   {
@@ -659,7 +660,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.086,
+   "seconds": 4.258,
    "status": "pass"
   },
   {
@@ -673,7 +674,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.098,
+   "seconds": 4.579,
    "status": "pass"
   },
   {
@@ -687,7 +688,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.304,
+   "seconds": 3.875,
    "status": "pass"
   },
   {
@@ -701,7 +702,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.477,
+   "seconds": 4.117,
    "status": "pass"
   },
   {
@@ -715,7 +716,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.449,
+   "seconds": 4.69,
    "status": "pass"
   },
   {
@@ -729,7 +730,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.453,
+   "seconds": 3.755,
    "status": "pass"
   },
   {
@@ -743,7 +744,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.637,
+   "seconds": 3.895,
    "status": "pass"
   },
   {
@@ -757,7 +758,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.24,
+   "seconds": 3.873,
    "status": "pass"
   },
   {
@@ -771,7 +772,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.751,
+   "seconds": 3.86,
    "status": "pass"
   },
   {
@@ -785,7 +786,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.451,
+   "seconds": 4.114,
    "status": "pass"
   },
   {
@@ -799,7 +800,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.572,
+   "seconds": 4.529,
    "status": "pass"
   },
   {
@@ -813,7 +814,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.404,
+   "seconds": 4.476,
    "status": "pass"
   },
   {
@@ -827,7 +828,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.626,
+   "seconds": 4.579,
    "status": "pass"
   },
   {
@@ -841,7 +842,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -855,7 +856,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.007,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -869,7 +870,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.007,
+   "seconds": 2.277,
    "status": "both-error"
   },
   {
@@ -883,7 +884,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.008,
+   "seconds": 2.32,
    "status": "both-error"
   },
   {
@@ -897,7 +898,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.009,
+   "seconds": 2.395,
    "status": "both-error"
   },
   {
@@ -911,7 +912,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 2.068,
    "status": "both-error"
   },
   {
@@ -925,7 +926,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 2.175,
    "status": "both-error"
   },
   {
@@ -939,7 +940,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 2.193,
    "status": "both-error"
   },
   {
@@ -953,7 +954,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -967,7 +968,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.009,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -981,7 +982,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -995,7 +996,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.035,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -1009,7 +1010,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.819,
+   "seconds": 0.644,
    "status": "both-error"
   },
   {
@@ -1023,7 +1024,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.673,
+   "seconds": 1.984,
    "status": "pass"
   },
   {
@@ -1037,7 +1038,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 6.119,
+   "seconds": 5.849,
    "status": "expected-divergence"
   },
   {
@@ -1051,7 +1052,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.158,
+   "seconds": 2.256,
    "status": "pass"
   },
   {
@@ -1065,7 +1066,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.764,
+   "seconds": 1.668,
    "status": "pass"
   },
   {
@@ -1079,7 +1080,7 @@
     "D13 fix pass": 196500,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.323,
+   "seconds": 1.784,
    "status": "pass"
   },
   {
@@ -1107,7 +1108,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 4.908,
+   "seconds": 4.742,
    "status": "expected-divergence"
   },
   {
@@ -1121,7 +1122,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.769,
+   "seconds": 0.991,
    "status": "pass"
   },
   {
@@ -1135,7 +1136,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 4.94,
+   "seconds": 5.175,
    "status": "expected-divergence"
   },
   {
@@ -1149,7 +1150,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.79,
+   "seconds": 1.933,
    "status": "pass"
   },
   {
@@ -1163,7 +1164,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.696,
+   "seconds": 1.877,
    "status": "pass"
   },
   {
@@ -1177,7 +1178,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.587,
+   "seconds": 1.665,
    "status": "pass"
   },
   {
@@ -1191,7 +1192,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.688,
+   "seconds": 1.999,
    "status": "pass"
   },
   {
@@ -1205,7 +1206,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.752,
+   "seconds": 3.706,
    "status": "pass"
   },
   {
@@ -1219,7 +1220,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.88,
+   "seconds": 1.973,
    "status": "pass"
   },
   {
@@ -1233,7 +1234,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.568,
+   "seconds": 1.905,
    "status": "pass"
   },
   {
@@ -1247,7 +1248,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.871,
+   "seconds": 1.872,
    "status": "pass"
   },
   {
@@ -1261,7 +1262,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.727,
+   "seconds": 1.835,
    "status": "pass"
   },
   {
@@ -1275,7 +1276,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.726,
+   "seconds": 2.103,
    "status": "pass"
   },
   {
@@ -1289,7 +1290,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.76,
+   "seconds": 1.92,
    "status": "pass"
   },
   {
@@ -1303,7 +1304,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.868,
+   "seconds": 1.67,
    "status": "pass"
   },
   {
@@ -1317,7 +1318,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.768,
+   "seconds": 1.669,
    "status": "pass"
   },
   {
@@ -1331,7 +1332,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.748,
+   "seconds": 1.657,
    "status": "pass"
   },
   {
@@ -1345,7 +1346,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.924,
+   "seconds": 1.881,
    "status": "pass"
   },
   {
@@ -1359,7 +1360,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.036,
+   "seconds": 2.012,
    "status": "pass"
   },
   {
@@ -1373,7 +1374,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.259,
+   "seconds": 1.881,
    "status": "pass"
   },
   {
@@ -1387,7 +1388,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.364,
+   "seconds": 1.54,
    "status": "pass"
   },
   {
@@ -1401,7 +1402,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.149,
+   "seconds": 1.664,
    "status": "pass"
   },
   {
@@ -1415,7 +1416,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.995,
+   "seconds": 1.538,
    "status": "pass"
   },
   {
@@ -1429,7 +1430,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.115,
+   "seconds": 1.862,
    "status": "pass"
   },
   {
@@ -1443,7 +1444,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.527,
+   "seconds": 2.101,
    "status": "pass"
   },
   {
@@ -1457,7 +1458,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.62,
+   "seconds": 1.867,
    "status": "pass"
   },
   {
@@ -1471,7 +1472,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.146,
+   "seconds": 1.453,
    "status": "both-error"
   },
   {
@@ -1485,7 +1486,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.844,
+   "seconds": 1.387,
    "status": "both-error"
   },
   {
@@ -1499,7 +1500,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.107,
+   "seconds": 1.774,
    "status": "pass"
   },
   {
@@ -1513,7 +1514,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.372,
+   "seconds": 1.94,
    "status": "pass"
   },
   {
@@ -1527,7 +1528,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.15,
+   "seconds": 2.122,
    "status": "pass"
   },
   {
@@ -1541,7 +1542,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.369,
+   "seconds": 2.509,
    "status": "pass"
   },
   {
@@ -1555,7 +1556,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.766,
+   "seconds": 1.295,
    "status": "both-error"
   },
   {
@@ -1569,7 +1570,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.851,
+   "seconds": 1.621,
    "status": "both-error"
   },
   {
@@ -1583,7 +1584,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.276,
+   "seconds": 1.999,
    "status": "pass"
   },
   {
@@ -1597,7 +1598,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.191,
+   "seconds": 3.079,
    "status": "pass"
   },
   {
@@ -1611,7 +1612,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.997,
+   "seconds": 1.27,
    "status": "pass"
   },
   {
@@ -1625,7 +1626,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.734,
+   "seconds": 1.722,
    "status": "pass"
   },
   {
@@ -1639,7 +1640,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.625,
+   "seconds": 1.941,
    "status": "pass"
   },
   {
@@ -1653,7 +1654,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.568,
+   "seconds": 2.506,
    "status": "pass"
   },
   {
@@ -1667,7 +1668,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.476,
+   "seconds": 2.644,
    "status": "pass"
   },
   {
@@ -1681,7 +1682,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.784,
+   "seconds": 2.022,
    "status": "pass"
   },
   {
@@ -1695,7 +1696,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 7.172,
+   "seconds": 6.096,
    "status": "pass"
   },
   {
@@ -1709,7 +1710,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 5.133,
+   "seconds": 3.99,
    "status": "pass"
   },
   {
@@ -1723,7 +1724,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.505,
+   "seconds": 4.338,
    "status": "pass"
   },
   {
@@ -1737,7 +1738,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 6.238,
+   "seconds": 3.629,
    "status": "pass"
   },
   {
@@ -1751,7 +1752,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.777,
+   "seconds": 2.943,
    "status": "pass"
   },
   {
@@ -1765,7 +1766,7 @@
     "D13 fix pass": 1118208,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.373,
+   "seconds": 2.344,
    "status": "pass"
   },
   {
@@ -1779,7 +1780,7 @@
     "D13 fix pass": 1677312,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.107,
+   "seconds": 2.245,
    "status": "pass"
   },
   {
@@ -1793,7 +1794,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.493,
+   "seconds": 2.081,
    "status": "pass"
   },
   {
@@ -1807,48 +1808,344 @@
     "D13 fix pass": 1763328,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.346,
+   "seconds": 2.212,
    "status": "pass"
   },
   {
-   "case": "bet/pending-S",
+   "case": "bet/fmri-int8",
    "category": "bet",
-   "checks_passed": 1,
-   "checks_total": 1,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
-   "reason": "needs FSL programs larmorx does not replicate yet: bet: -S (eye and optic nerve cleanup) runs FSL's FLIRT (standard_space_roi and flirt), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.01,
-   "status": "expected-divergence"
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 8066,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.911,
+   "status": "pass"
   },
   {
-   "case": "bet/pending-B",
+   "case": "bet/fmri-int8-positive",
    "category": "bet",
-   "checks_passed": 1,
-   "checks_total": 1,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
-   "reason": "needs FSL programs larmorx does not replicate yet: bet: -B (bias field and neck cleanup) runs FSL's FLIRT (standard_space_roi) and FAST (the bias field), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.008,
-   "status": "expected-divergence"
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 2.227,
+   "status": "pass"
   },
   {
-   "case": "bet/pending-A",
+   "case": "bet/small-fov-int8",
    "category": "bet",
-   "checks_passed": 1,
-   "checks_total": 1,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
-   "reason": "needs FSL programs larmorx does not replicate yet: bet: -A (skull and scalp surfaces) runs FSL's FLIRT (the registration to MNI152), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.005,
-   "status": "expected-divergence"
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1118208,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.989,
+   "status": "pass"
   },
   {
-   "case": "bet/pending-A2",
+   "case": "bet/small-fov-int8-debug",
    "category": "bet",
-   "checks_passed": 1,
-   "checks_total": 1,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
-   "reason": "needs FSL programs larmorx does not replicate yet: bet: -A2 (skull and scalp surfaces with a T2) runs FSL's FLIRT (the T2-to-T1 and MNI152 registrations), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.014,
-   "status": "expected-divergence"
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1763328,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.785,
+   "status": "pass"
+  },
+  {
+   "case": "bet/eyes",
+   "category": "bet",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 79.651,
+   "status": "pass"
+  },
+  {
+   "case": "bet/eyes-debug",
+   "category": "bet",
+   "checks_passed": 23,
+   "checks_total": 23,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 57.299,
+   "status": "pass"
+  },
+  {
+   "case": "bet/eyes-verbose",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 51.821,
+   "status": "pass"
+  },
+  {
+   "case": "bet/eyes-outline-mesh",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 48.898,
+   "status": "pass"
+  },
+  {
+   "case": "bet/eyes-no-brain",
+   "category": "bet",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: bet failed during command:<generated>/phantoms/head.nii.gz out -S -n",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 51.362,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/eyes-pair",
+   "category": "bet",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 48.963,
+   "status": "pass"
+  },
+  {
+   "case": "bet/bias",
+   "category": "bet",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 106171,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 150.953,
+   "status": "pass"
+  },
+  {
+   "case": "bet/bias-debug",
+   "category": "bet",
+   "checks_passed": 29,
+   "checks_total": 29,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1652538,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 114.982,
+   "status": "pass"
+  },
+  {
+   "case": "bet/bias-skull",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 108780,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 152.57,
+   "status": "pass"
+  },
+  {
+   "case": "bet/bias-n",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 214438,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 110.716,
+   "status": "pass"
+  },
+  {
+   "case": "bet/surfaces",
+   "category": "bet",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 72.925,
+   "status": "pass"
+  },
+  {
+   "case": "bet/surfaces-debug",
+   "category": "bet",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 53.479,
+   "status": "pass"
+  },
+  {
+   "case": "bet/surfaces-t2",
+   "category": "bet",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 129.335,
+   "status": "pass"
+  },
+  {
+   "case": "bet/surfaces-t2-debug",
+   "category": "bet",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 87.757,
+   "status": "pass"
+  },
+  {
+   "case": "bet/surfaces-t2-missing",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: betsurf: stopped: FSL's betsurf aborts here with an uncaught std::runtime_error (Failed to read volume out_tmp_T2_to_T1 / Error : No image files match: out_tmp_T2_to_T1) (larmorx)",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 23.723,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/surfaces-t2-no-value",
+   "category": "bet",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.054,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/last-variation",
+   "category": "bet",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 54.125,
+   "status": "pass"
+  },
+  {
+   "case": "defects/eyes-threshold-exponent",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 51.025,
+   "status": "pass"
+  },
+  {
+   "case": "defects/eyes-nan",
+   "category": "defects",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: bet2: stopped: FSL's bet2 aborts here with an uncaught std::runtime_error (Failed to read volume out_tmp_premask / Error : No image files match: out_tmp_premask) (larmorx)",
+   "reported": {
+    "D13 fix pass": 1,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 14.526,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/bias-skull-echo",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 108780,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 149.393,
+   "status": "pass"
   },
   {
    "case": "bet/usage",
@@ -1861,7 +2158,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.122,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -1875,7 +2172,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.077,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -1889,7 +2186,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.048,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1903,7 +2200,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.069,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -1917,7 +2214,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.041,
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -1931,7 +2228,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.054,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1945,7 +2242,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.147,
+   "seconds": 1.071,
    "status": "both-error"
   },
   {
@@ -1959,7 +2256,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.401,
+   "seconds": 1.999,
    "status": "pass"
   },
   {
@@ -1973,7 +2270,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 10.387,
+   "seconds": 6.999,
    "status": "pass"
   },
   {
@@ -1987,7 +2284,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 15.37,
+   "seconds": 10.055,
    "status": "pass"
   },
   {
@@ -2001,7 +2298,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 10.225,
+   "seconds": 7.445,
    "status": "pass"
   },
   {
@@ -2015,7 +2312,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 9.955,
+   "seconds": 6.847,
    "status": "pass"
   },
   {
@@ -2029,7 +2326,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 14.776,
+   "seconds": 10.68,
    "status": "pass"
   },
   {
@@ -2043,7 +2340,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 9.278,
+   "seconds": 6.622,
    "status": "pass"
   },
   {
@@ -2057,7 +2354,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.054,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2071,7 +2368,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.01,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -2085,7 +2382,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -2099,7 +2396,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.039,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -2113,7 +2410,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.034,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2127,7 +2424,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.114,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -2141,7 +2438,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.024,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -2155,7 +2452,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.013,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -2169,7 +2466,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.018,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -2183,7 +2480,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 17.444,
+   "seconds": 11.983,
    "status": "pass"
   },
   {
@@ -2197,7 +2494,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 18.468,
+   "seconds": 13.599,
    "status": "expected-divergence"
   },
   {
@@ -2211,7 +2508,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 10.164,
+   "seconds": 6.617,
    "status": "expected-divergence"
   },
   {
@@ -2225,7 +2522,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 18.13,
+   "seconds": 14.908,
    "status": "expected-divergence"
   },
   {
@@ -2239,7 +2536,7 @@
     "D13 fix pass": 1,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 5.878,
+   "seconds": 3.549,
    "status": "pass"
   },
   {
@@ -2253,7 +2550,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 9.246,
+   "seconds": 6.716,
    "status": "pass"
   },
   {
@@ -2267,7 +2564,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 8.838,
+   "seconds": 6.7,
    "status": "pass"
   },
   {
@@ -2283,7 +2580,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 6.622,
+   "seconds": 5.437,
    "status": "pass"
   },
   {
@@ -2299,7 +2596,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 12.73,
+   "seconds": 10.584,
    "status": "pass"
   },
   {
@@ -2315,7 +2612,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 5.509,
+   "seconds": 4.427,
    "status": "pass"
   },
   {
@@ -2331,7 +2628,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 11.593,
+   "seconds": 10.204,
    "status": "pass"
   },
   {
@@ -2347,7 +2644,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 9.43,
+   "seconds": 7.271,
    "status": "pass"
   },
   {
@@ -2363,7 +2660,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 12.208,
+   "seconds": 12.092,
    "status": "pass"
   },
   {
@@ -2379,7 +2676,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 8.457,
+   "seconds": 8.487,
    "status": "pass"
   },
   {
@@ -2395,7 +2692,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 7.196,
+   "seconds": 7.735,
    "status": "pass"
   },
   {
@@ -2411,7 +2708,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed",
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 8.877,
+   "seconds": 9.401,
    "status": "pass"
   },
   {
@@ -2425,7 +2722,91 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 9.525,
+   "seconds": 8.671,
+   "status": "pass"
+  },
+  {
+   "case": "real/adult-ds000005-S",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 105.8,
+   "status": "pass"
+  },
+  {
+   "case": "real/tumour-S",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 154.13,
+   "status": "pass"
+  },
+  {
+   "case": "real/child-3y-B",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1122749,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 195.707,
+   "status": "pass"
+  },
+  {
+   "case": "real/older-82y-B",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1398022,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 333.915,
+   "status": "pass"
+  },
+  {
+   "case": "real/older-75y-A",
+   "category": "real",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 149.489,
+   "status": "pass"
+  },
+  {
+   "case": "real/child-7y-A2",
+   "category": "real",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 274.552,
    "status": "pass"
   },
   {
@@ -2439,7 +2820,801 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.702,
+   "seconds": 1.929,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/t",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.528,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/box",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/box-4d",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.36,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/t-4d",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 4.114,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-i16",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-u8",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-i8",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 120000,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-u16",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-i32",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.111,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-f64",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.158,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-i16-scaled",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.11,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-neuro",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.115,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-oblique",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-noxform",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.118,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-pair",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-nifti2",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.111,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/type-head-analyze",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/output-pair",
+   "category": "fslroi",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/usage",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "fslroi/no-arguments",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "fslroi/invalid-roi",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/time-out-of-bounds",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/missing-input",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/words",
+   "category": "fslroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/int8-negative",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 903168,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.149,
+   "status": "pass"
+  },
+  {
+   "case": "fslroi/int8-positive",
+   "category": "fslroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 903168,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.175,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-default",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 37.572,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-debug",
+   "category": "ssroi",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 38.998,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-masknone",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 32.622,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-roinone",
+   "category": "ssroi",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 34.058,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-none",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 38.602,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-none-convert",
+   "category": "ssroi",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "needs FSL programs larmorx does not replicate yet: larmorx-nc: error: standard_space_roi: imcp of /tmp/lx-fsl-gen_2zp06ufn/phantoms/head-t2.nii.gz: fslpy converts a NIFTI_GZ image to the output type NIFTI with nibabel; converting file types is pending in the larmorx-nc replica (set FSLOUTPUTTYPE to NIFTI_GZ, or convert the image first) (larmorx)",
+   "seconds": 18.878,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "ssroi/phantom-masks",
+   "category": "ssroi",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 37.662,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-altinput",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 36.539,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-flirt-options",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 37.541,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-pair",
+   "category": "ssroi",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 37.36,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/phantom-last-wins",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 35.645,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/usage",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.052,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/invalid-input",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Input image /nonexistent/in not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/empty-input",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/invalid-ssref",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with standard space reference image not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/ssref-without-value",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/invalid-altinput",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Input image /nonexistent/x not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.051,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/invalid-roimask",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Image /nonexistent/x not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.06,
+   "status": "both-error"
+  },
+  {
+   "case": "ssroi/invalid-maskmask",
+   "category": "ssroi",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Image /nonexistent/x not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.058,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/flirt-refuses",
+   "category": "defects",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.137,
+   "status": "pass"
+  },
+  {
+   "case": "defects/output-blank",
+   "category": "defects",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 10.736,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/input-blank",
+   "category": "defects",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Input image <generated>/phantoms/head-t2 x not valid",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.086,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/option-blank",
+   "category": "defects",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.173,
+   "status": "pass"
+  },
+  {
+   "case": "defects/cleanup-glob",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 59.373,
+   "status": "pass"
+  },
+  {
+   "case": "defects/maskthr-env",
+   "category": "defects",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 23122,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 61.36,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/adult-default",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 72.842,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/child-b",
+   "category": "ssroi",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 77.966,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/older-maskfov",
+   "category": "ssroi",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 441591,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 109.746,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/tumour-roimask",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 119.627,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/philips-b-masks",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 120.071,
+   "status": "pass"
+  },
+  {
+   "case": "ssroi/t2-default",
+   "category": "ssroi",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 143.964,
    "status": "pass"
   },
   {
@@ -2453,7 +3628,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.915,
+   "seconds": 2.602,
    "status": "pass"
   },
   {
@@ -2467,7 +3642,7 @@
     "D13 fix pass": 4320,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 20.452,
+   "seconds": 33.465,
    "status": "pass"
   },
   {
@@ -2481,7 +3656,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 43.837,
+   "seconds": 55.134,
    "status": "pass"
   },
   {
@@ -2495,7 +3670,21 @@
     "D13 fix pass": 11760,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 117.377,
+   "seconds": 122.452,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "difftest/bet-robust-echo-e-bet2-refuses",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status 1); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-43 and then stops where FSL never gets (bet2: stopped: the surface's centre lies outside the image (voxel -2147483648 -2147483648 -2147483648), where FSL's bet2 starts its fill of a mask, writing outside the image (FSL-43) (larmorx))",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 5.836,
    "status": "expected-divergence"
   },
   {
@@ -2509,7 +3698,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 23.167,
+   "seconds": 32.794,
    "status": "pass"
   },
   {
@@ -2523,8 +3712,22 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 4.466,
+   "seconds": 7.111,
    "status": "expected-divergence"
+  },
+  {
+   "case": "difftest/bet-small-fov-n-nothing-cropped",
+   "category": "difftest",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 32.448,
+   "status": "pass"
   },
   {
    "case": "difftest/bet2-centre-neurological-solve",
@@ -2537,7 +3740,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.587,
+   "seconds": 3.279,
    "status": "pass"
   },
   {
@@ -2551,7 +3754,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.492,
+   "seconds": 3.295,
    "status": "pass"
   },
   {
@@ -2565,7 +3768,7 @@
     "D13 fix pass": 96,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.129,
+   "seconds": 1.578,
    "status": "expected-divergence"
   },
   {
@@ -2579,7 +3782,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 4.208,
+   "seconds": 6.798,
    "status": "expected-divergence"
   },
   {
@@ -2593,7 +3796,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 4.297,
+   "seconds": 5.716,
    "status": "expected-divergence"
   },
   {
@@ -2607,7 +3810,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.28,
+   "seconds": 5.77,
    "status": "expected-divergence"
   },
   {
@@ -2621,7 +3824,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 16.414,
+   "seconds": 25.83,
    "status": "expected-divergence"
   },
   {
@@ -2635,7 +3838,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.24,
+   "seconds": 0.358,
    "status": "both-error"
   },
   {
@@ -2649,16 +3852,16 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.601,
+   "seconds": 6.214,
    "status": "pass"
   }
  ],
  "suite": "fsl-bet-replica",
  "summary": {
-  "both-error": 31,
-  "expected-divergence": 17,
+  "both-error": 47,
+  "expected-divergence": 15,
   "fail": 0,
-  "pass": 130,
+  "pass": 201,
   "skipped": 0
  },
  "tier": "standard"

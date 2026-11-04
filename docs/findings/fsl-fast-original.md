@@ -248,3 +248,20 @@ runs) and looked at with `probe.py --finding` (both runs kept, streams diffed):
 The thread test found, before the trial, that the outputs' expansion and the negative-value rule
 ran on rayon's global pool (one thread per CPU) after the segmentation's pool had returned; they
 now run on the call's own pool (`fast::grid::Grid::expand_on`).
+
+## glibc's functions in `reproduce` (the glibc maths part, 2026-11-04)
+
+With `reproduce` the original now calls glibc 2.35's `exp`, `log`, `expf` and `logf` where
+`specs/fast.md` §8 names them (`larmorx_core::math::Libm`; the default keeps the correctly
+rounded functions, unchanged). The standard record, made again from `be3db91`: fMRIPrep's three
+calls and every single-channel case are FSL's values bit for bit (Dice and identical voxels
+1.00000, partial volumes, probabilities and bias fields 0; before: Dice 0.998 to 0.99998, partial
+volumes up to 0.00022 on average), so their checks no longer need the comparison with FSL under
+the CORE-MATH preload. Two to eight channels: the segmentations FSL's, the partial volumes FSL's
+or within 1.3e-7 on average (nine cases; the covariances' arithmetic). The fix passes now change
+values (the default's functions against glibc's), reported as "GLIBC-07 (not named)" (FAST names
+nothing, the user's decision of 2026-11-04). `multi/s5` still fails (identical voxels 0.95852 to
+0.95850 in `_mixeltype`): its five channels' nearly singular covariance, above, not the C
+library. New in the record (main's suite gained it after main's record; the same with main's
+code): `opt/nan-first`, where the default should name FSL-203 and names FSL-103: FSL-203 is not
+yet in the original (a follow-up).

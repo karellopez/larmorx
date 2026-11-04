@@ -177,3 +177,19 @@ closer to mcflirt:
 | `real/ds000005/opt-cost-woods` | "no parameter is identifiable" 48.21 / 50.64 | 13.42 / 2.65 |
 | `failures/bins1-woods` (`reproduce`) | RMS deviation p95 73.82 mm | 3.64 mm |
 | `failures/bins8-corratio` (`reproduce`) | RMS deviation p95 0.0717 mm | 0.0416 mm |
+
+## glibc's `logf` in `reproduce` (the glibc maths part, 2026-11-04)
+
+With `reproduce` the mutual-information costs now take glibc 2.35's `logf` (and the no-overlap
+`log`) where `specs/mcflirt.md` names them (`larmorx_core::math::Libm`; the default keeps the
+correctly rounded functions; the rotations' sines and cosines are not wired: the spec does not
+name glibc's there). The standard record, made again from `be3db91` (serially: the report's
+tables come from per-case metrics that `--jobs` workers do not return): every status as before;
+`real/ds000005/opt-cost-mutualinfo` 0.0048 to 0.0047 mm (the 95th percentile of the RMS
+deviation), `opt-cost-normmi` 0.0108 to 0.0126 mm (threshold 0.1), `difftest/normmi-aligns-worse`
+(an expected divergence) a median 0.0214 to 0.0200 mm, and the `failures/` cases' reported
+`reproduce` deviations 7.35 to 7.34, 1.15 to 0.97 and 4.88 to 3.18 mm. `normmi`'s move away from
+FSL is the size of the fit's own sensitivity to the C library's last bits: the default against
+`reproduce` is 0.0109 mm (`validation/investigations/cleanroom-glibc-dbl/record_moves.py`); the
+default against FSL stays 0.0108 mm, main's number. The interpolation and the sums are not FSL's
+bit for bit, so the paths still part.

@@ -626,3 +626,41 @@ the apply path (`flirt::engine::apply`): the eleven outputs' headers are FSL's; 
 cases pass (12, and 2 both-error as before), and FLIRT's 28 suite cases that apply a matrix keep
 their statuses (25 pass, 2 both-error, 1 expected divergence). `-verbose 2`'s "Resampled volume"
 line keeps its TR as before (not observed otherwise).
+
+## glibc's functions in `reproduce` (the glibc maths part, 2026-11-04)
+
+With `reproduce` the original now calls glibc 2.35's `sinf`, `cosf`, `atan2f`, `exp`, `cos` and
+`logf` where `specs/flirt.md` names them (`larmorx_core::math::Libm`; the default keeps the
+correctly rounded functions, unchanged). The standard record, made again from `be3db91` and
+compared with main's case by case:
+
+- **Toward FSL.** Most registrations' matrices are now FSL's text: `real/dof6`, `dof7`, `dof9`,
+  `real/default` (its image too), `default-full`, `init`, `coarse-fine`, `minsampling`,
+  `noclamp`, `noresample`, `nosearch`, `usesqform`, `searchcost-normmi`, the four `basescale`
+  cases (`basescale-small` was 0.673 mm), `-cost mutualinfo` (0.62 mm), `woods` (8.72 mm),
+  `normmi`, the schedules, every verbose level (their standard output now FSL's numbers too),
+  the sinc cases' and applyxfm4D's images (FSL's values; `real/interp-sinc` was 32,052 voxels one
+  last bit off). Two failures of the list above are closed: `real/cost-normmi` (1.60 mm) and
+  `real/weights-normmi` (10.15 mm) were decided by the C library's last bits. fMRIPrep's three
+  calls: 0.006, 0.0011, 0.0101 mm before, 0.0000, 0.0002, 0.0065 now. `real/weights-woods`'s matrix
+  is FSL's text; it still fails on the line where Woods' warning is printed (one evaluation
+  fewer).
+- **Away from FSL, within the thresholds.** `bbr/default` (with `bbr/debug`,
+  `bbr/fmriprep-form`, `bbr/type-global_abs`) 0.0197 to 0.0693 mm, `bbr/coords` 0.0016 to
+  0.0040, `bbr/fieldmap-mask` 0.0386 to 0.0518 (threshold 0.1), `real/bins64` 0.0601 to 0.0692,
+  `real/searchr` 0.0330 to 0.1349, `real/weights` 0.2100 to 0.3059 (threshold 0.5).
+  `validation/investigations/cleanroom-glibc-dbl/record_moves.py` measures, for each, the default
+  against `reproduce` (one program, only the C library's last bits differ): 0.0651, 0.0033,
+  0.0415, 0.0984, 0.1463, 0.4251 mm, the size of each move. glibc's functions make the C
+  library's bits FSL's, but the rest of the arithmetic (BBR's boundary points and normals, the
+  sums' order) is not FSL's bit for bit, so these paths still part and end on either side of the
+  cost's flat minimum. The default stays where it was: FSL against the default is main's number
+  in every case.
+- **The fix passes** of every registration and of applyxfm4D now change values (the default's
+  correctly rounded functions against `reproduce`'s glibc ones), reported as "GLIBC-07 (not
+  named)" (`parity/defects.py`, `UNNAMED_GLIBC`: the iterative programs name nothing, the user's
+  decision of 2026-11-04).
+- **Unchanged failures:** `real/cost-leastsq` (81.81 to 82.08 mm; FSL's own 46.76),
+  `real/weights-normcorr` (0.5785 to 0.5083, toward FSL; FSL's own 0.1879), FSL-91's and FSL-92's
+  three. New in the record (main's suite gained it after main's record; the same with main's
+  code): `programs/pointflirt-no-points`, FSL-204, not yet in the original (a follow-up).

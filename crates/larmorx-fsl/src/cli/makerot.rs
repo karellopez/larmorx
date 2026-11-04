@@ -201,8 +201,22 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         }
     }
     let m = programs::makerot(theta as f32, axis, centre, mode.reproduce(), &libm);
-    if let Some(n) = crate::flirt::glibc_notice(&libm, "makerot's cosine and sine") {
-        defects::push_once(&mut notices, n);
+    // GLIBC-07 (§15.4): named where the other choice of cosine and sine writes another matrix
+    let other = Libm::new(if mode.fix() {
+        UpstreamDefects::Reproduce
+    } else {
+        UpstreamDefects::Fix
+    });
+    let m2 = programs::makerot(theta as f32, axis, centre, mode.reproduce(), &other);
+    if mat::file_text(&m) != mat::file_text(&m2) || mat::print_text(&m) != mat::print_text(&m2) {
+        let detail = if mode.fix() {
+            "the rotation's cosine and sine correctly rounded, where glibc's cosf and sinf (FSL's) \
+             write another matrix"
+        } else {
+            "the rotation's cosine and sine from glibc's cosf and sinf, as FSL, where the correctly \
+             rounded ones write another matrix"
+        };
+        defects::push_once(&mut notices, Notice::new(&defects::GLIBC_07, mode, detail));
     }
     match text(4).last() {
         Some(name) => {

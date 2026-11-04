@@ -59,10 +59,6 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         out,
         err,
     );
-    // GLIBC-07, whichever way the run ended
-    if let Some(n) = crate::flirt::glibc_notice(&libm, "avscale's angles and rotations") {
-        larmorx_core::defects::push_once(&mut notices, n);
-    }
     print_notices(err, &notices);
     code
 }
@@ -121,12 +117,45 @@ fn run(
         }
         (None, None) => [0.0; 3],
     };
-    let a = match programs::avscale(&m, centre, libm) {
+    let (text, end) = report(&m, centre, (all_params, eddies), libm);
+    // GLIBC-07 (§12): named where the other choice of functions prints another report
+    let other = Libm::new(if libm.is_glibc() {
+        UpstreamDefects::Fix
+    } else {
+        UpstreamDefects::Reproduce
+    });
+    if report(&m, centre, (all_params, eddies), &other) != (text.clone(), end) {
+        let detail = if libm.is_glibc() {
+            "avscale's values from glibc's atan2f, sinf, cosf and cos, as FSL, where the correctly \
+             rounded functions print others"
+        } else {
+            "avscale's values from the correctly rounded functions, where glibc's atan2f, sinf, \
+             cosf and cos (FSL's) print others"
+        };
+        larmorx_core::defects::push_once(
+            notices,
+            larmorx_core::defects::Notice::new(&larmorx_core::defects::GLIBC_07, mode, detail),
+        );
+    }
+    let _ = write!(out, "{text}");
+    if let Some(what) = end {
+        let _ = writeln!(err, "{what}");
+        return abort(err, "avscale", "std::runtime_error", what);
+    }
+    0
+}
+
+/// avscale's standard output for `m` about `centre` with `libm`'s functions, up to the
+/// exception that ends it (FSL's message), if one does.
+fn report(
+    m: &mat::Mat4,
+    centre: [f64; 3],
+    (all_params, eddies): (bool, bool),
+    libm: &Libm,
+) -> (String, Option<&'static str>) {
+    let a = match programs::avscale(m, centre, libm) {
         Ok(a) => a,
-        Err(what) => {
-            let _ = writeln!(err, "{what}");
-            return abort(err, "avscale", "std::runtime_error", what);
-        }
+        Err(what) => return (String::new(), Some(what)),
     };
     let mut s = Stream::default();
     let p = &a.params;
@@ -153,24 +182,18 @@ fn run(
             "swapped"
         }
     );
-    let _ = write!(out, "{text}");
-    let (forward, backward) = match programs::half_transforms(&m, a.determinant, libm) {
+    let (forward, backward) = match programs::half_transforms(m, a.determinant, libm) {
         Ok(h) => h,
-        Err(what) => {
-            let _ = writeln!(err, "{what}");
-            return abort(err, "avscale", "std::runtime_error", what);
-        }
+        Err(what) => return (text, Some(what)),
     };
-    let mut text = format!(
+    text += &format!(
         "Forward half transform =\n{}\nBackward half transform =\n{}\n",
         s.matrix(&forward),
         s.matrix(&backward)
     );
     if eddies {
-        let Some((check, eddy)) = programs::inverted_eddies(&m, &a) else {
-            let _ = write!(out, "{text}");
-            let _ = writeln!(err, "{}", mat::SINGULAR);
-            return abort(err, "avscale", "std::runtime_error", mat::SINGULAR);
+        let Some((check, eddy)) = programs::inverted_eddies(m, &a) else {
+            return (text, Some(mat::SINGULAR));
         };
         text += &format!(
             "\nMatrix check: mat^-1 * rotmat * skew * scale =\n{}\nInverted eddy matrix:\n{}\n",
@@ -178,8 +201,7 @@ fn run(
             s.matrix(&eddy)
         );
     }
-    let _ = write!(out, "{text}");
-    0
+    (text, None)
 }
 
 #[cfg(test)]

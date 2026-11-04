@@ -250,6 +250,36 @@ def entry(ctx: core.Context, tool: str, which: str) -> fcache.Entry:
     )  # fmt: skip
 
 
+#: The original's entries that glibc's functions in reproduce mode reach (2026-11-04): the
+#: calls with -s, -bptf, -tfce, the double-precision functions, fslstats' -e and -E, and the
+#: default mode on every case (its exact GLIBC-07 notices); the others (combine_masks,
+#: fslstats' goodvoxels calls) use none of those functions.
+GLIBC_REACHED = (("fsl-maths", "goodvoxels"), ("fsl-maths", "families"), ("fsl-maths", "glibc"),
+                 ("fsl-stats", "options"))  # fmt: skip
+
+
+def refresh(ctx: core.Context, why: str, which=GLIBC_REACHED,
+            programs: tuple[str, ...] = ("fslmaths", "fslstats")) -> None:  # fmt: skip
+    """After a change of the clean-room originals: the entries ``which`` (every run in them is
+    the original's) and the default mode on every case of each program's record computed
+    again, each recording why."""
+    fctx = ctx.figures_context()
+    for tool, w in which:
+        name, compute = _COMPUTE[(tool, w)]
+        fcache.recompute(
+            fctx, tool, f"original-{name}",
+            f"The calls of {tool}/{name}: LARMORX's clean-room original, reproduce mode at 14 "
+            "threads and at one, the default mode", lambda e, compute=compute: compute(ctx, e),
+            why,
+        )  # fmt: skip
+    for program in programs:
+        fcache.recompute(
+            fctx, RECORD[program], "original-cases-default-mode",
+            f"LARMORX's clean-room {program} in its default mode on every case of its record: "
+            "its exit status and the entries it names", _compute_default(program), why,
+        )  # fmt: skip
+
+
 # ----------------------------------------------------------------- the examples' verdicts
 
 

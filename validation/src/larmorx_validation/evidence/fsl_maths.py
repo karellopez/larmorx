@@ -1566,6 +1566,9 @@ if __name__ == "__main__":  # compute the cache entries only:
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     what = sys.argv[1:] or ["combine", "goodvoxels", "families", "glibc", "named"]
+    if what[0] == "refresh-original":  # fo.refresh: the original's entries glibc's maths reach
+        fo.refresh(c, " ".join(what[1:]))
+        sys.exit(0)
     fns = {"combine": combine_entry, "goodvoxels": goodvoxels_entry, "families": families_entry,
            "glibc": glibc_entry, "named": named_entry,
            "original-default": lambda x: fo.default_entry(x, "fslmaths")}  # fmt: skip

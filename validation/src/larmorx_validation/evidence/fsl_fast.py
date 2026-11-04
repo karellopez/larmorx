@@ -674,15 +674,46 @@ def _compute_cases_original(e: fcache.Entry) -> None:
     )
 
 
+CASES_ORIGINAL_TEXT = (
+    "Every case of the clean-room original's record: its default mode, and each passing case's "
+    "files against FSL and FSL with correctly rounded maths"
+)
+
+
 def cases_original_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-original",
-        "Every case of the clean-room original's record: its default mode, and each passing "
-        "case's files against FSL and FSL with correctly rounded maths",
+        ctx.figures_context(), TOOL, "cases-original", CASES_ORIGINAL_TEXT,
         _compute_cases_original,
-    )
+    )  # fmt: skip
+
+
+def _emptied(d: Path) -> None:
+    """The outputs of a run directory being made again (the run writes the same files)."""
+    for f in d.iterdir():
+        shutil.rmtree(f) if f.is_dir() else f.unlink()
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIGINAL_RUNS`) of every
+    example's entry already computed made again, in their working directories with their
+    inputs (FSL's run with correctly rounded maths kept: the original's change does not touch
+    it), and every case of its record classified again (the ``cases-original`` entry, FSL's runs
+    served by the oracle-output cache)."""
+    fctx = ctx.figures_context()
+    for source in [run for _i, run, _v, _w in FMRIPREP] + list(REAL.values()):
+        name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+        e = fcache.Entry(fctx, TOOL, f"original-{name}", "")
+        if not e.done:
+            continue
+        info = e.info()
+        args, put, settings, _never, _ins = _source(source)
+        e.runs, e.extra = [], {}
+        for label, mode, n in ORIGINAL_RUNS:
+            _emptied(e.dir / label)
+            _original_run(e, label, args, put, settings, mode, n)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(fctx, TOOL, "cases-original", CASES_ORIGINAL_TEXT, _compute_cases_original,
+                     why)  # fmt: skip
 
 
 # ------------------------------------------------------------------------- the files
@@ -1956,7 +1987,8 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica)
+if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica;
+    # ``refresh-original WHY``: refresh_original)
     import sys
 
     from larmorx_validation.figures.core import REPO, default_cache
@@ -1964,6 +1996,9 @@ if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: r
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     if sys.argv[1:2] == ["refresh"]:
         refresh_replica(c, " ".join(sys.argv[2:]))
+        sys.exit(0)
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, " ".join(sys.argv[2:]))
         sys.exit(0)
     for _i, run, _v, _w in FMRIPREP:
         print("done", fmriprep_entry(c, run).dir)

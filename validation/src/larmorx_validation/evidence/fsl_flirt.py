@@ -417,6 +417,30 @@ def orig_real_entry(ctx: core.Context, case: str) -> fcache.Entry:
     )
 
 
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIG_RUNS`) of every
+    example's entry already computed made again, in their working directories with their inputs
+    (an entry not computed yet is computed whole by the export); FSL's run on a perturbed input
+    (FSL's own variability) is kept: the original's change does not touch it."""
+    fctx = ctx.figures_context()
+    fp = _suite()
+    sources = [(f"fmriprep-{run}-original", fp.fmriprep_args(run, _bbr_node(run)), {})
+               for _i, run, _v, _w in BBR]  # fmt: skip
+    for case in REAL.values():
+        sources.append((case.replace("/", "-") + "-original", *_real_args(case)))
+    for name, args, inputs in sources:
+        e = fcache.Entry(fctx, TOOL, name, "")
+        if not e.done:
+            continue
+        info = e.info()
+        e.runs, e.extra = [], {}
+        for label, _m, _t in ORIG_RUNS:  # the outputs being made again
+            for f in (e.dir / label).iterdir():
+                shutil.rmtree(f) if f.is_dir() else f.unlink()
+        _original(e, args, inputs)
+        fcache.merge_rerun(e, info, why)
+
+
 # ------------------------------------------------------------------------- matrices
 
 
@@ -1481,10 +1505,14 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only
+if __name__ == "__main__":  # compute the cache entries only (``refresh-original WHY``:
+    # refresh_original)
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, " ".join(sys.argv[2:]))
+        sys.exit(0)
     for _i, run, _v, _w in BBR:
         print("done", bbr_entry(c, run).dir)
     for case in REAL.values():

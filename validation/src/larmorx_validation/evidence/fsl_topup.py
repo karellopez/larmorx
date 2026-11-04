@@ -742,15 +742,40 @@ def _compute_cases_original(e: fcache.Entry) -> None:
     )
 
 
+CASES_ORIGINAL_TEXT = (
+    "Every case of the clean-room original's record: its default mode, and each passing case's "
+    "files against FSL's, with FSL's own thread band where the record measures it"
+)
+
+
 def cases_original_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-original",
-        "Every case of the clean-room original's record: its default mode, and each passing "
-        "case's files against FSL's, with FSL's own thread band where the record measures it",
+        ctx.figures_context(), TOOL, "cases-original", CASES_ORIGINAL_TEXT,
         _compute_cases_original,
-    )
+    )  # fmt: skip
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIGINAL_RUNS`) of every
+    example's entry already computed made again, in their working directories with their inputs
+    (an entry not computed yet is computed whole by the export), and every case of its record
+    run again (the ``cases-original`` entry, FSL's runs served by the oracle-output cache)."""
+    fctx = ctx.figures_context()
+    for source in [run for _i, run, _f in FMRIPREP] + list(REAL.values()):
+        name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+        e = fcache.Entry(fctx, TOOL, f"original-{name}", "")
+        if not e.done:
+            continue
+        info = e.info()
+        args, put, settings, program = _original_source(source)
+        e.runs, e.extra = [], {}
+        for label, mode, n in ORIGINAL_RUNS:
+            for f in (e.dir / label).iterdir():  # the outputs being made again
+                shutil.rmtree(f) if f.is_dir() else f.unlink()
+            _original_run(e, label, args, put, settings, mode, n, program)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(fctx, TOOL, "cases-original", CASES_ORIGINAL_TEXT, _compute_cases_original,
+                     why)  # fmt: skip
 
 
 # ------------------------------------------------------------------------- the files
@@ -2284,6 +2309,9 @@ if __name__ == "__main__":  # compute the cache entries only:
     what = sys.argv[1:] or ["all"]
     if what[0] == "refresh":  # refresh_replica, the reason given
         refresh_replica(c, " ".join(what[1:]))
+        sys.exit(0)
+    if what[0] == "refresh-original":  # refresh_original, the reason given
+        refresh_original(c, " ".join(what[1:]))
         sys.exit(0)
     if what[0] in ("fmriprep", "all"):
         for _i, run, _f in FMRIPREP:

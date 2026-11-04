@@ -43,7 +43,7 @@ env = {
 }
 t0 = time.time()
 p = subprocess.run(
-    [str(W / "target/release/larmorx"), "fsl", "topup", *args],
+    [os.environ.get("LARMORX_BIN", str(W / "target/release/larmorx")), "fsl", "topup", *args],
     cwd=dst,
     env=env,
     capture_output=True,

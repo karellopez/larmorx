@@ -17,11 +17,13 @@
 //!   derivatives, or, for a field image, the derivatives of its cubic spline (coefficients with
 //!   mirrored ends, zero beyond the image);
 //! - `lsr`'s collections, lines and matrices as §7.4 describes them, a line with an invalid
-//!   voxel skipped in every collection (its voxels 0 in the output).
+//!   voxel skipped in every collection (its voxels 0 in the output); the matrices built row by
+//!   row by FSL's walk (§7.4, spec writer 2026-11-03), the mapping at a negative index read
+//!   circularly by default and as FSL reads it with FSL-133 reproduced.
 
 use rayon::prelude::*;
 
-use super::images::{Grid, interp, prefilter};
+use super::images::{Grid, HORIZON, interp, pole, prefilter};
 use super::model::Scan;
 use super::movement::Motion;
 use super::spline::{Axis, Op1, apply3};
@@ -40,26 +42,62 @@ pub struct FieldOnGrid {
     pub dims: [usize; 3],
     pub h: Vec<f64>,
     pub dh: [Vec<f64>; 3],
+    /// The voxels whose Jacobian is 0 (FSL-134 reproduced: a field of another shape, its
+    /// Jacobian 0 beyond its own grid); empty when none.
+    pub jac_zero: Vec<bool>,
+}
+
+impl FieldOnGrid {
+    /// FSL-134 reproduced (`specs/topup.md` §7.3, spec writer 2026-11-03, observed): this field
+    /// of a coefficient file, evaluated on its own grid, laid onto the grid `to` of as many
+    /// voxels: the displacement from the values in storage order (the image's voxel of linear
+    /// index `L` takes the field's of index `L`), the Jacobian's derivatives at the same indices
+    /// `(x, y, z)` (the field's beyond the image's grid dropped, the image's beyond the field's
+    /// grid a Jacobian of 0).
+    pub fn laid_onto(&self, to: [usize; 3]) -> FieldOnGrid {
+        let n = to.iter().product::<usize>();
+        let f = self.dims;
+        let inside = |v: usize| {
+            let x = [v % to[0], (v / to[0]) % to[1], v / (to[0] * to[1])];
+            (x[0] < f[0] && x[1] < f[1] && x[2] < f[2]).then(|| x[0] + f[0] * (x[1] + f[1] * x[2]))
+        };
+        let dh = std::array::from_fn(|a| {
+            (0..n)
+                .map(|v| inside(v).map_or(0.0, |w| self.dh[a][w]))
+                .collect()
+        });
+        FieldOnGrid {
+            dims: to,
+            h: self.h[..n].to_vec(),
+            dh,
+            jac_zero: (0..n).map(|v| inside(v).is_none()).collect(),
+        }
+    }
 }
 
 /// The field of topup's coefficients `coef` (dims `cdims`, x fastest) for a field of `n` voxels
-/// with knot spacings `k` and B-splines of `order`, evaluated at its voxels; `None` when the
-/// coefficients' grid is not that layout's.
+/// with knot spacings `k` and B-splines of `order`, evaluated at its voxels, and whether it is
+/// laid with the general quadratic count on an axis where FSL's differs (FSL-145: FSL refuses
+/// such a file); `None` when the coefficients' grid is not that layout's. `fsl_only`
+/// (FSL-145 reproduced): FSL's own count only.
 pub fn coefficient_field(
     coef: &[f64],
     cdims: [usize; 3],
     n: [usize; 3],
     k: [usize; 3],
     order: u8,
-) -> Option<FieldOnGrid> {
-    // the layout whose count is the file's (FSL-145: FSL writes two quadratic coefficients on
-    // an axis shorter than two knot spacings, the default four)
+    fsl_only: bool,
+) -> Option<(FieldOnGrid, bool)> {
+    // the layout whose count is the file's (FSL-145: on an axis shorter than two knot spacings
+    // FSL writes one or two quadratic coefficients, the default the general count)
+    let mut general_on_short = false;
     let axes: [Axis; 3] = std::array::from_fn(|a| {
         let axis = Axis::of_order(n[a], k[a], order);
         let fsl = axis.with_fsl145(true);
-        if axis.ncoef() != cdims[a] && fsl.ncoef() == cdims[a] {
+        if fsl_only || (axis.ncoef() != cdims[a] && fsl.ncoef() == cdims[a]) {
             fsl
         } else {
+            general_on_short |= axis.short_quadratic();
             axis
         }
     });
@@ -71,35 +109,46 @@ pub fn coefficient_field(
         let o: [&Op1; 3] = std::array::from_fn(|a| &ops[a][usize::from(deriv == Some(a))]);
         apply3(coef, cdims, [Some(o[0]), Some(o[1]), Some(o[2])]).0
     };
-    Some(FieldOnGrid {
-        dims: n,
-        h: eval(None),
-        dh: [eval(Some(0)), eval(Some(1)), eval(Some(2))],
-    })
+    Some((
+        FieldOnGrid {
+            dims: n,
+            h: eval(None),
+            dh: [eval(Some(0)), eval(Some(1)), eval(Some(2))],
+            jac_zero: Vec::new(),
+        },
+        general_on_short,
+    ))
 }
 
-/// The cubic B-spline coefficients of samples `s` with mirrored ends (`c[-1] = c[1]`, `c[n] =
-/// c[n - 2]`), in place: the tridiagonal system `(c[i-1] + 4 c[i] + c[i+1]) / 6 = s[i]`.
-fn mirror_prefilter_line(s: &mut [f64], work: &mut Vec<f64>) {
-    let n = s.len();
-    if n < 2 {
+/// The cubic B-spline coefficients of samples `s` with mirrored ends, in place (`specs/topup.md`
+/// §7.3, spec writer 2026-11-03): §4.5's recursive prefilter with the mirrored start, the forward
+/// initial value `Σ_{i<n} z^i f[i]` truncated at `n = min(N, 15)` terms and the backward one
+/// `−z / (1 − z²) (2 c⁺[N − 1] − f[N − 1])`, the coefficients `6 c⁻`. For `N ≥ 15` these are the
+/// mirrored spline's (`c[-1] = c[1]`, `c[n] = c[n - 2]`) to about 1e-9.
+fn mirror_prefilter_line(s: &mut [f64]) {
+    let nn = s.len();
+    if nn < 2 {
         return;
     }
-    work.clear();
-    work.resize(n, 0.0);
-    let (a, b) = (1.0 / 6.0, 4.0 / 6.0);
-    let lower = |i: usize| if i == n - 1 { 2.0 * a } else { a };
-    let upper = |i: usize| if i == 0 { 2.0 * a } else { a };
-    let mut m = b;
-    work[0] = upper(0) / m;
-    s[0] /= m;
-    for i in 1..n {
-        m = b - lower(i) * work[i - 1];
-        work[i] = upper(i) / m;
-        s[i] = (s[i] - lower(i) * s[i - 1]) / m;
+    let z = pole();
+    let n = nn.min(HORIZON);
+    let last = s[nn - 1];
+    let mut zi = 1.0;
+    let mut c0 = 0.0;
+    for &v in &s[..n] {
+        c0 += zi * v;
+        zi *= z;
     }
-    for i in (0..n - 1).rev() {
-        s[i] -= work[i] * s[i + 1];
+    s[0] = c0;
+    for i in 1..nn {
+        s[i] += z * s[i - 1];
+    }
+    s[nn - 1] = -z / (1.0 - z * z) * (2.0 * s[nn - 1] - last);
+    for i in (0..nn - 1).rev() {
+        s[i] = z * (s[i + 1] - s[i]);
+    }
+    for v in s.iter_mut() {
+        *v *= 6.0;
     }
 }
 
@@ -130,14 +179,32 @@ fn for_lines(data: &mut [f64], d: [usize; 3], axis: usize, f: impl Fn(&mut [f64]
 /// ends, its derivative along each axis evaluated at the voxels with the coefficients beyond the
 /// image taken as zero (observed: FSL's Jacobians of field images, findings 18).
 pub fn image_field(h: Vec<f64>, n: [usize; 3]) -> FieldOnGrid {
+    image_field_on(h, n, n)
+}
+
+/// [`image_field`] on the grid `to` of as many voxels (FSL-134 reproduced, `specs/topup.md`
+/// §7.3): the values laid in storage order for the displacement, the spline's derivatives
+/// evaluated at the image's voxels `(x, y, z)` with the coefficients beyond the field image's
+/// own grid taken as zero.
+pub fn image_field_on(h: Vec<f64>, n: [usize; 3], to: [usize; 3]) -> FieldOnGrid {
     let mut c = h.clone();
     for axis in 0..3 {
-        for_lines(&mut c, n, axis, |line| {
-            let mut w = Vec::new();
-            mirror_prefilter_line(line, &mut w);
-        });
+        for_lines(&mut c, n, axis, mirror_prefilter_line);
     }
-    let dh = std::array::from_fn(|deriv| {
+    // the coefficients on a grid covering both (zeros beyond the field image's)
+    let big: [usize; 3] = std::array::from_fn(|a| n[a].max(to[a]));
+    if big != n {
+        let mut p = vec![0.0; big.iter().product()];
+        for z in 0..n[2] {
+            for y in 0..n[1] {
+                for x in 0..n[0] {
+                    p[x + big[0] * (y + big[1] * z)] = c[x + n[0] * (y + n[1] * z)];
+                }
+            }
+        }
+        c = p;
+    }
+    let dh: [Vec<f64>; 3] = std::array::from_fn(|deriv| {
         let mut d = c.clone();
         for axis in 0..3 {
             let k: [f64; 3] = if axis == deriv {
@@ -145,7 +212,7 @@ pub fn image_field(h: Vec<f64>, n: [usize; 3]) -> FieldOnGrid {
             } else {
                 [1.0 / 6.0, 4.0 / 6.0, 1.0 / 6.0]
             };
-            for_lines(&mut d, n, axis, |line| {
+            for_lines(&mut d, big, axis, |line| {
                 let m = line.len();
                 let src = line.to_vec();
                 for (j, out) in line.iter_mut().enumerate() {
@@ -161,9 +228,26 @@ pub fn image_field(h: Vec<f64>, n: [usize; 3]) -> FieldOnGrid {
                 }
             });
         }
-        d
+        if big == to {
+            d
+        } else {
+            let mut o = Vec::with_capacity(to.iter().product());
+            for z in 0..to[2] {
+                for y in 0..to[1] {
+                    for x in 0..to[0] {
+                        o.push(d[x + big[0] * (y + big[1] * z)]);
+                    }
+                }
+            }
+            o
+        }
     });
-    FieldOnGrid { dims: n, h, dh }
+    FieldOnGrid {
+        dims: to,
+        h,
+        dh,
+        jac_zero: Vec::new(),
+    }
 }
 
 /// How an image is moved before its correction: its sampling position `P = A x + b` (mm).
@@ -239,9 +323,12 @@ pub struct Settings {
     pub interp: Interp,
     /// FSL-132 reproduced: the first volume of the first image interpolated trilinearly.
     pub first_trilinear: bool,
-    /// FSL-134 reproduced (a field image): the Jacobian's y term times the field's x voxel
-    /// size over its y voxel size (1 otherwise).
-    pub jac_y_scale: f64,
+    /// The Jacobian's terms' scales along x and y (`specs/topup.md` §7.3): a coefficient
+    /// field's the image's voxel size over the field's (1 on its own grid); a field image's 1, or
+    /// with FSL-134 reproduced FSL's, the image's x voxel size over the field image's.
+    pub jac_scale: [f64; 2],
+    /// FSL-133 reproduced: the mapping at a negative index read as FSL reads it.
+    pub fsl133: bool,
 }
 
 /// The output: each volume's values (the images' volume count) and the mask.
@@ -249,6 +336,9 @@ pub struct Settings {
 pub struct Corrected {
     pub volumes: Vec<Vec<f32>>,
     pub mask: Vec<bool>,
+    /// FSL-133: a restored line's matrix read the mapping at a negative index where FSL's read
+    /// and the circular one take different field values.
+    pub wrap_read_differs: bool,
 }
 
 /// The axis an encoding wraps along: the only one of x and y it has a component along.
@@ -323,9 +413,16 @@ pub fn jac(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Corrected {
             *m &= *v;
         }
         let (px, py, t) = (img.scan.pe[0], img.scan.pe[1], img.scan.t);
+        let [sx, sy] = s.jac_scale;
         let jac: Vec<f64> = (0..nvox)
             .into_par_iter()
-            .map(|v| 1.0 + t * (px * field.dh[0][v] + py * s.jac_y_scale * field.dh[1][v]))
+            .map(|v| {
+                if field.jac_zero.get(v) == Some(&true) {
+                    0.0
+                } else {
+                    1.0 + t * (px * field.dh[0][v] * sx + py * field.dh[1][v] * sy)
+                }
+            })
             .collect();
         for (vi, vol) in img.volumes.iter().enumerate() {
             let linear = s.interp == Interp::Trilinear || (s.first_trilinear && k == 0 && vi == 0);
@@ -346,7 +443,11 @@ pub fn jac(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Corrected {
                 .collect()
         })
         .collect();
-    Corrected { volumes, mask }
+    Corrected {
+        volumes,
+        mask,
+        wrap_read_differs: false,
+    }
 }
 
 /// Why the least-squares restoration cannot run.
@@ -384,41 +485,84 @@ pub fn collections(images: &[Image]) -> Result<Vec<(usize, Vec<usize>)>, LsrErro
     Ok(out)
 }
 
-/// The resampling matrix of one line (§7.4; Andersson et al. 2003): `K[i][j]` the length of
-/// undistorted voxel `j`'s extent `[j - 1/2, j + 1/2]` that `φ(u) = u + h(u) pt` (linear between
-/// the voxels, the line periodic) maps into observed voxel `i`'s extent, row-major `n × n`.
-pub fn resampling_matrix(h: &[f64], pt: f64) -> Vec<f64> {
+/// The resampling matrix of one line (§7.4; Andersson et al. 2003), row-major `n × n`, and
+/// whether a read of the mapping at a negative index took a field value FSL's read would not
+/// (FSL-133). `K[i][j]` is the length (in undistorted voxels) of `[u₁, u₂] ∩ [j − 1/2, j +
+/// 1/2]`, the columns wrapping circularly, where `u₁` and `u₂` are the points at which the
+/// mapping `φ(k) = k + pt h_{w(k)}` (linear between the integers) reaches observed voxel `i`'s
+/// edges `i ∓ 1/2`, each found by FSL's walk from `⌈x⌉` (`specs/topup.md` §7.4, spec writer
+/// 2026-11-03, observed): up while `x > φ(k)` (the last `k` below), `k` itself when `x =
+/// φ(k)`, else down while `x < φ(k − 1)`; then `u = k + (x − φ(k)) / (φ(k + 1) − φ(k))`.
+/// Where `φ` increases this is the overlap of voxel `j`'s image with voxel `i`; where it folds
+/// the walk takes the crossing it meets (FSL's, rule C). `w(k) = k mod n` for `k ≥ 0`; for `k <
+/// 0` the circular `n + k`, or with `fsl133` FSL's `(k + 2³²) mod n` (FSL-133).
+pub fn resampling_matrix(h: &[f64], pt: f64, fsl133: bool) -> (Vec<f64>, bool) {
     let n = h.len();
     let mut k = vec![0.0; n * n];
-    let ni = n as isize;
-    let phi = |a: isize| a as f64 + h[a.rem_euclid(ni) as usize] * pt;
-    for j in 0..ni {
-        for (u0, u1, a, b) in [
-            (j as f64 - 0.5, j as f64, j - 1, j),
-            (j as f64, j as f64 + 0.5, j, j + 1),
-        ] {
-            let (pa, pb) = (phi(a), phi(b));
-            let slope = pb - pa;
-            let v0 = pa + (u0 - a as f64) * slope;
-            let v1 = pa + (u1 - a as f64) * slope;
-            let (lo, hi) = if v0 <= v1 { (v0, v1) } else { (v1, v0) };
-            let s = slope.abs();
-            if s == 0.0 {
-                let i = (lo + 0.5).floor() as isize;
-                k[i.rem_euclid(ni) as usize * n + j as usize] += u1 - u0;
-                continue;
+    if n == 0 {
+        return (k, false);
+    }
+    let ni = n as i64;
+    let differs = std::cell::Cell::new(false);
+    let phi = |a: i64| {
+        let j = if a >= 0 {
+            (a % ni) as usize
+        } else {
+            let circular = a.rem_euclid(ni) as usize;
+            let fsl = (a + (1i64 << 32)).rem_euclid(ni) as usize;
+            if h[fsl].to_bits() != h[circular].to_bits() {
+                differs.set(true);
             }
-            let first = (lo + 0.5).floor() as isize;
-            let last = (hi + 0.5).floor() as isize;
-            for i in first..=last {
-                let ov = hi.min(i as f64 + 0.5) - lo.max(i as f64 - 0.5);
-                if ov > 0.0 {
-                    k[i.rem_euclid(ni) as usize * n + j as usize] += ov / s;
-                }
+            if fsl133 { fsl } else { circular }
+        };
+        a as f64 + h[j] * pt
+    };
+    // the walk's reach: φ(k) lies within the largest displacement of k
+    let reach = h.iter().fold(0.0f64, |m, &v| m.max((v * pt).abs()));
+    let steps = if reach.is_finite() {
+        reach.min(1e7) as i64 + 4
+    } else {
+        4
+    };
+    let crossing = |x: f64| -> f64 {
+        let mut c = x.ceil() as i64;
+        let start = c;
+        let base = if x > phi(c) {
+            while x > phi(c) && c - start <= steps {
+                c += 1;
+            }
+            c - 1
+        } else if x == phi(c) {
+            c
+        } else {
+            while x < phi(c - 1) && start - c <= steps {
+                c -= 1;
+            }
+            c - 1
+        };
+        let (a, b) = (phi(base), phi(base + 1));
+        if x == a {
+            base as f64
+        } else {
+            base as f64 + (x - a) / (b - a)
+        }
+    };
+    for i in 0..n {
+        let u1 = crossing(i as f64 - 0.5);
+        let u2 = crossing(i as f64 + 0.5);
+        if !(u2 > u1) {
+            continue;
+        }
+        let first = (u1 + 0.5).floor() as i64;
+        let last = (u2 + 0.5).floor() as i64;
+        for j in first..=last {
+            let ov = u2.min(j as f64 + 0.5) - u1.max(j as f64 - 0.5);
+            if ov > 0.0 {
+                k[i * n + j.rem_euclid(ni) as usize] += ov;
             }
         }
     }
-    k
+    (k, differs.get())
 }
 
 /// The Cholesky factor (lower, row-major) of the symmetric positive definite `a` (`n × n`);
@@ -553,6 +697,7 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
     let (moved, mask) = moved_images(s, images);
     let mut out = vec![vec![0.0f64; nvox]; n_vols];
     let mut skipped = vec![false; nvox];
+    let mut wrap_read_differs = false;
     for (axis, members) in &colls {
         let axis = *axis;
         let n = s.dims[axis];
@@ -562,14 +707,22 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
             .iter()
             .map(|&k| images[k].scan.pe[axis] * images[k].scan.t)
             .collect();
-        let lines: Vec<(usize, Option<Vec<Vec<f64>>>)> = starts
+        let lines: Vec<(usize, Option<Vec<Vec<f64>>>, bool)> = starts
             .par_iter()
             .map(|&s0| {
                 if (0..n).any(|j| !mask[s0 + j * stride]) {
-                    return (s0, None);
+                    return (s0, None, false);
                 }
                 let h: Vec<f64> = (0..n).map(|j| field.h[s0 + j * stride]).collect();
-                let ks: Vec<Vec<f64>> = pts.iter().map(|&pt| resampling_matrix(&h, pt)).collect();
+                let mut differs = false;
+                let ks: Vec<Vec<f64>> = pts
+                    .iter()
+                    .map(|&pt| {
+                        let (m, d) = resampling_matrix(&h, pt, s.fsl133);
+                        differs |= d;
+                        m
+                    })
+                    .collect();
                 // A = Σ KᵀK + λ SᵀS
                 let mut a: Vec<f64> = gram.iter().map(|g| LSR_LAMBDA * g).collect();
                 for kmat in &ks {
@@ -584,7 +737,7 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
                     }
                 }
                 let Some(l) = cholesky(&a, n) else {
-                    return (s0, None);
+                    return (s0, None, differs);
                 };
                 let restored = (0..n_vols)
                     .map(|vi| {
@@ -605,10 +758,11 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
                         b
                     })
                     .collect();
-                (s0, Some(restored))
+                (s0, Some(restored), differs)
             })
             .collect();
-        for (s0, r) in lines {
+        for (s0, r, differs) in lines {
+            wrap_read_differs |= differs && r.is_some();
             match r {
                 None => {
                     for j in 0..n {
@@ -635,7 +789,11 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
         })
         .collect();
     let mask = skipped.iter().map(|&sk| !sk).collect();
-    Ok(Corrected { volumes, mask })
+    Ok(Corrected {
+        volumes,
+        mask,
+        wrap_read_differs,
+    })
 }
 
 #[cfg(test)]
@@ -644,7 +802,7 @@ mod tests {
 
     #[test]
     fn a_zero_field_resamples_each_voxel_onto_itself() {
-        let k = resampling_matrix(&[0.0; 6], 0.05);
+        let (k, _) = resampling_matrix(&[0.0; 6], 0.05, false);
         for i in 0..6 {
             for j in 0..6 {
                 assert_eq!(k[i * 6 + j], if i == j { 1.0 } else { 0.0 });
@@ -656,7 +814,7 @@ mod tests {
     fn every_voxel_is_resampled_whole() {
         let h = [3.0, -2.0, 5.0, 8.0, 1.0, -4.0, 0.0, 2.5];
         for pt in [0.05, -0.05, 0.11] {
-            let k = resampling_matrix(&h, pt);
+            let (k, _) = resampling_matrix(&h, pt, false);
             for j in 0..8 {
                 let s: f64 = (0..8).map(|i| k[i * 8 + j]).sum();
                 assert!((s - 1.0).abs() < 1e-12, "{s}");
@@ -665,10 +823,44 @@ mod tests {
     }
 
     #[test]
+    fn fsl133_reads_the_middle_of_a_line_of_30() {
+        // the mapping at -1 takes voxel 15's field in FSL's read, voxel 29's circularly
+        let mut h = vec![0.0; 30];
+        h[15] = 4.0;
+        h[29] = -4.0;
+        let (a, differs) = resampling_matrix(&h, 0.05, false);
+        let (b, same) = resampling_matrix(&h, 0.05, true);
+        assert!(differs && same);
+        assert!(a.iter().zip(&b).any(|(x, y)| x != y));
+        // a power of two wraps the same in both reads
+        let h32: Vec<f64> = (0..32).map(|i| (i % 7) as f64 - 3.0).collect();
+        let (c, d32) = resampling_matrix(&h32, 0.05, false);
+        let (e, _) = resampling_matrix(&h32, 0.05, true);
+        assert!(!d32);
+        assert_eq!(c, e);
+    }
+
+    #[test]
+    fn a_field_of_another_shape_is_laid_in_storage_order() {
+        let f = FieldOnGrid {
+            dims: [4, 2, 1],
+            h: (0..8).map(f64::from).collect(),
+            dh: std::array::from_fn(|a| (0..8).map(|v| f64::from(v + 10 * a as i32)).collect()),
+            jac_zero: Vec::new(),
+        };
+        let l = f.laid_onto([2, 4, 1]);
+        assert_eq!(l.h, f.h);
+        // (x, y) = (1, 1) is the field's index 1 + 4 = 5; (0, 2) lies beyond the field's grid
+        assert_eq!(l.dh[0][1 + 2], 5.0);
+        assert!(l.jac_zero[4] && !l.jac_zero[3]);
+    }
+
+    #[test]
     fn mirror_prefilter_interpolates() {
-        let s0 = [1.0, 4.0, -2.0, 7.0, 3.0];
-        let mut c = s0.to_vec();
-        mirror_prefilter_line(&mut c, &mut Vec::new());
+        // from 15 voxels on, the mirrored spline's coefficients (to ~1e-9)
+        let s0: Vec<f64> = (0..17).map(|i| ((i * 5 + 1) % 7) as f64 - 2.0).collect();
+        let mut c = s0.clone();
+        mirror_prefilter_line(&mut c);
         let n = c.len();
         let at = |i: isize| {
             c[if i < 0 {
@@ -682,7 +874,7 @@ mod tests {
         for (j, &v) in s0.iter().enumerate() {
             let j = j as isize;
             let back = (at(j - 1) + 4.0 * at(j) + at(j + 1)) / 6.0;
-            assert!((back - v).abs() < 1e-12);
+            assert!((back - v).abs() < 1e-7, "{j}: {back} {v}");
         }
     }
 

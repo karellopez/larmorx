@@ -6,8 +6,8 @@ The cases are the replica suite's (``fsl_topup_replica``: fMRIPrep's two field-m
 the debug runs, every option, FSL's configurations, the messages and failures, the thread
 counts, applytopup), run here against the original. Every FSL run goes through the
 oracle-output cache with the replica suite's keys and policies, so the runs that suite made are
-served from it. The options the original does not take yet (it refuses them, naming them) are
-skipped.
+served from it. The original takes every option of both programs (an option it did not take
+would be skipped, naming its refusal: none is).
 
 What is compared (``specs/topup.md`` §12), each output against FSL's:
 
@@ -94,37 +94,14 @@ BAND_THREADS = 4
 #: The original's thread count in the cases (random testing sets its worker's).
 LX_THREADS = 4
 #: Cases whose metrics are expected outside the thresholds, and why (their exit status, files,
-#: messages and headers are still compared): the original's movement derivatives are the exact
-#: derivatives of the cost, FSL's rotation derivatives are not (findings 14), so where the
-#: movements are estimated and not converged the two paths part (each case with the movements
-#: off agrees: probes N and O); and FSL-126's negative weight, which makes both minimisations
-#: diverge.
+#: messages and headers are still compared): FSL-126's negative weight, which makes both
+#: minimisations diverge; FSL-143's indefinite prior, whose diverging iterations amplify the
+#: moved images' float-level differences; vb2D's transients. (The movements' cases of findings 14
+#: pass since FSL-201's ``reproduce`` takes FSL's forward differences, and the long lines since
+#: FSL-133's ``reproduce`` reads FSL's wrap-around: the clean-room catch-up, 2026-11-04.)
 EXPECTED_DIVERGENCES: dict[str, str] = {
-    **{
-        name: "the movements estimated, not converged: FSL's rotation derivatives are not its "
-        "cost's (findings 14)"
-        for name in (
-            "opt/levels",
-            "opt/scg-movements",
-            "opt/four-volumes",
-            "opt/oblique-phase-encoding",
-            "opt/zero-readout",
-            "cfg/b02b0",
-            "cfg/b02b0_2",
-            "cfg/b02b0_4",
-            "cfg/b02b0_7T",
-        )
-    },
     "opt/lambda-negative": "FSL-126 reproduced: a negative weight rewards a rough field, both "
     "minimisations diverge",
-    **{
-        name: "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose "
-        "length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their "
-        "ends, outside the brain) is not known from the spec and the black-box probes (findings "
-        "21); the original wraps circularly in both modes (exact for lines of 32 voxels, where "
-        "FSL's wrap is circular)"
-        for name in ("at/lsr-long", "at/vb2d-long", "at/vb3d-long", "at/vb4d-long")
-    },
     **{
         name: "FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations "
         "diverge (lambda below 0 in the first iterations, then phi and lambda fall towards "
@@ -141,20 +118,14 @@ EXPECTED_DIVERGENCES: dict[str, str] = {
     "26)",
 }
 #: Cases whose FSL behaviour the original does not reproduce and refuses in ``reproduce`` mode
-#: too (its refusal must name the entry), and why.
-ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {
-    "at/jac-other-shape": (
-        "FSL-134",
-        "FSL lays a field of as many voxels as the images in another shape on the images' grid; "
-        "how it does is not known from the spec and the black-box runs (findings 22)",
-    ),
-}
+#: too (its refusal must name the entry), and why: none since the clean-room catch-up
+#: (``at/jac-other-shape``, FSL-134's field of another shape, is reproduced from
+#: ``specs/topup.md`` §7.3).
+ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {}
 #: Cases whose default run the original refuses where the replica suite's case does not say so
-#: (defects found by the original's part, rule B), with the entry its refusal names.
-FIX_REFUSES: dict[str, str] = {
-    # jac with a phase encoding along z, which topup refuses: FSL leaves the component out
-    "at/jac-z": "FSL-144",
-}
+#: (defects found by the original's part, rule B), with the entry its refusal names: none since
+#: the replica suite's ``at/jac-z`` names FSL-144 itself.
+FIX_REFUSES: dict[str, str] = {}
 #: The checks of an expected divergence that must still pass (everything but §12's metrics).
 _EXACT_KINDS = (
     "Exit status",
@@ -1246,7 +1217,7 @@ def suite() -> Suite:
         notes=(
             "The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served from "
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run. The options the "
-            "original does not take yet are skipped until its next sub-tasks."
+            "mode (D13) and its default `fix` pass against the reproduced run. The original "
+            "takes every option of both programs (none is skipped)."
         ),
     )

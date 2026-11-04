@@ -600,6 +600,7 @@ pub fn vb(
     );
     let mut counts_wrap = false;
     let mut count_differs = false;
+    let mut wrap_read_differs = false;
     for (axis, members) in &colls {
         let axis = *axis;
         let other = 1 - axis;
@@ -609,15 +610,24 @@ pub fn vb(
             .iter()
             .map(|&k| images[k].scan.pe[axis] * images[k].scan.t)
             .collect();
-        let ks: Vec<Vec<SparseK>> = starts
+        let built: Vec<(Vec<SparseK>, bool)> = starts
             .par_iter()
             .map(|&s0| {
                 let h: Vec<f64> = (0..n).map(|j| field.h[s0 + j * stride]).collect();
-                pts.iter()
-                    .map(|&pt| SparseK::of_dense(&resampling_matrix(&h, pt), n))
-                    .collect()
+                let mut differs = false;
+                let ks = pts
+                    .iter()
+                    .map(|&pt| {
+                        let (m, d) = resampling_matrix(&h, pt, s.fsl133);
+                        differs |= d;
+                        SparseK::of_dense(&m, n)
+                    })
+                    .collect();
+                (ks, differs)
             })
             .collect();
+        wrap_read_differs |= built.iter().any(|b| b.1);
+        let ks: Vec<Vec<SparseK>> = built.into_iter().map(|b| b.0).collect();
         let lines = Lines {
             n,
             stride,
@@ -710,7 +720,11 @@ pub fn vb(
         })
         .collect();
     Ok(VbResult {
-        corrected: Corrected { volumes, mask },
+        corrected: Corrected {
+            volumes,
+            mask,
+            wrap_read_differs,
+        },
         stdout,
         counts_wrap,
         count_differs,

@@ -1871,3 +1871,18 @@ together at the end.
 - **Open for the user:** whether glibc's exact single-precision functions (Arm's and fdlibm's permissive code, now in
   the FSL replica core) may be copied into `larmorx_core::math` for the clean-room originals' `reproduce` (rule 1:
   moving code from a replica crate needs the user), asked together with GLIBC-07's cbrtf route.
+
+## 2026-11-04: glibc's exact maths for `reproduce`, and the next part (the user)
+- **Asked (orchestrator, one batch):** (1) copy glibc 2.35's exact functions that come from permissive code (Arm's
+  Optimized Routines, MIT: `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and the double `exp`, `log`, `pow`;
+  fdlibm, Sun's notice: `atan2f`, `atanf`), now translated in `larmorx-nc-core`, into `larmorx_core::math`, so the
+  clean-room originals' `reproduce` gives FSL's bits (rule 1: moving code from a replica crate needs the user);
+  (2) GLIBC-07's exact bits (glibc's LGPL double `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sincos`) by the cbrtf
+  route; (3) what runs next.
+- **User decision:** (1) "Yes, copy"; (2) "Yes, small part"; (3) "glibc maths first", then BET's `-S`/`-B`/`-A`/`-A2`
+  replica beside the clean-room follow-ups the spec answers opened.
+- **How the part runs:** a spec writer and replica author first (the copy, with exhaustive or sampled proofs of equal
+  bits, one translation shared by every crate; then `specs/glibc-dbl.md`, the LGPL functions' behaviour as
+  mathematics and data defined mathematically, with a validation plan of glibc's results as black-box hashes), then a
+  clean-room implementer (the functions in `larmorx_core::math` from the spec alone; the originals' and replicas'
+  `reproduce` wired to them; the records they move re-made). One agent at a time: the second half needs the spec.

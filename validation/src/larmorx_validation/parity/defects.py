@@ -101,12 +101,19 @@ class Change:
         )
 
 
-#: Notices that name a condition: a clean-room original names GLIBC-07 where its witness saw
-#: the other choice of C library function give another value on one of the arguments it
-#: evaluated (``larmorx_core::math::Libm``: correctly rounded by default, glibc 2.35's with
-#: ``reproduce``), whether or not the outputs then differ (after an iterative fit it cannot
-#: tell), so the fix pass accepts it without a change; a change it explains is still named.
-CONDITION_NOTICES = ("GLIBC-07",)
+#: Defects that may change the default's outputs without a notice. GLIBC-07 (the user's
+#: decision of 2026-11-04, "name exact cases only"): a clean-room original calls the C library
+#: functions its spec names through ``larmorx_core::math::Libm``, correctly rounded by default
+#: and glibc 2.35's (the original's) with ``reproduce``. A pointwise computation (fslmaths'
+#: voxelwise functions and ``-edge``, fslstats' ``-e`` and ``-E``, avscale, makerot,
+#: ``convert_xfm -fixscaleskew``, 3dTshift's weighted sinc) compares what it stores and names
+#: GLIBC-07 exactly where the outputs differ; an iterative fit (FLIRT and applyxfm4D, FAST,
+#: mcflirt's mutual-information costs, topup, bet2, betsurf) or a filter combining many function
+#: values (fslmaths' kernels, ``-dog_edge``, ``-bptf``, ``-tfce``, ``-roc``) cannot tell without
+#: running twice and names nothing, the difference documented on its API page. For such a case
+#: the suites pass ``unnamed_ok=UNNAMED_GLIBC``: outputs that change with no defect named are
+#: GLIBC-07's, reported as such ("GLIBC-07 (not named)") in the record.
+UNNAMED_GLIBC = ("GLIBC-07",)
 
 
 def add_fix_check(
@@ -116,15 +123,21 @@ def add_fix_check(
     *,
     other_changes: str = "",
     silent_ok: Iterable[str] = (),
+    unnamed_ok: Iterable[str] = (),
 ) -> Check:
     """The fix pass's check: the defects named and what the correction changed. It passes when
     a defect is named exactly when the outputs differ (``other_changes`` describes differences
     beyond the compared values, such as headers or file names, which count as differences).
     Defects in ``silent_ok`` may be named without changing the outputs: their notice is about
     a condition (a different starting point, an ignored option) whose effect the comparison
-    may not see."""
+    may not see. Defects in ``unnamed_ok`` may change the outputs without being named
+    (:data:`UNNAMED_GLIBC`): a change with no defect named is theirs, listed in the detail as
+    ``<ID> (not named)``."""
     changed = change.differing > 0 or bool(other_changes)
     quiet = set(silent_ok)
+    unnamed = list(unnamed_ok)
+    if changed and not entries and unnamed:
+        entries = [f"{e} (not named)" for e in unnamed]
     ok = bool(entries) if changed else all(e in quiet for e in entries)
     what = (
         f"{change.differing} of {change.total} values, max |diff| {change.max_abs:.3g}"

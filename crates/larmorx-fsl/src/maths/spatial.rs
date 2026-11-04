@@ -221,7 +221,8 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
     let fix = notices.fix();
     // FSL squares by `pow(x, 2)` (§10.4): glibc's with `reproduce` (GLIBC-07), which differs
     // from the exact product `d · d` only for a double image (a single-precision or integer
-    // difference squares exactly in double)
+    // difference squares exactly in double). GLIBC-07 is named exactly: while the witness
+    // looks, each voxel's value is computed with the other choice too and compared as stored.
     let libm = Libm::new(notices.mode());
     let double = T::KIND == Kind::Double;
     let [nx, ny, nz, _] = img.dims;
@@ -250,6 +251,9 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                     let i = x + nx * (y + ny * z);
                     let steps = [1, nx, plane];
                     let mut sum = 0.0f64;
+                    // the other choice's sum, while the witness looks (double images only)
+                    let other = double && libm.watching();
+                    let mut sum_o = 0.0f64;
                     for a in 0..axes {
                         let (p, m) = (vol[i + steps[a]], vol[i - steps[a]]);
                         // C's arithmetic: char and short differences as int, not wrapped to
@@ -259,17 +263,31 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                             _ => p.diff(m),
                         };
                         // x86-64's NaN rules (a voxel size of 0: 0 / 0, inf / inf)
-                        let dd = if double {
-                            libm.choose64(|| d * d, || math::pow_glibc(d, 2.0))
-                        } else {
-                            d * d
+                        let square = |glibc: bool| {
+                            if double && glibc {
+                                math::pow_glibc(d, 2.0)
+                            } else {
+                                d * d
+                            }
                         };
                         let vv = vox[a] * vox[a];
+                        let dd = square(libm.is_glibc());
                         let q = num::nan64(dd, vv, dd / vv);
                         sum = num::nan64(sum, q, sum + q);
+                        if other {
+                            let dd = square(!libm.is_glibc());
+                            let q = num::nan64(dd, vv, dd / vv);
+                            sum_o = num::nan64(sum_o, q, sum_o + q);
+                        }
                     }
-                    let r = super::reduce::sqrt64(sum);
-                    let (v, c) = T::convert(num::nan64(r, den, r / den), fix);
+                    let value = |sum: f64| {
+                        let r = super::reduce::sqrt64(sum);
+                        T::convert(num::nan64(r, den, r / den), fix)
+                    };
+                    let (v, c) = value(sum);
+                    if other {
+                        libm.note(value(sum_o).0.to_f64().to_bits() != v.to_f64().to_bits());
+                    }
                     ch |= c;
                     o[x + nx * y] = v;
                 }
@@ -278,15 +296,14 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
         })
         .reduce(|| false, |a, b| a || b);
     ops::note151(notices, changed, "-edge's values");
-    ops::note_glibc(notices, &libm, "-edge's squares");
+    ops::note_glibc(notices, &libm, "-edge's values (its squares by pow)");
 }
 
 // ------------------------------------------------------------------------------------------
 // -dog_edge (§10.5)
 
 /// The 2D Gaussian of `-dog_edge` of radius `r` (in voxels), normalised by `1 / Σ`; `libm`'s
-/// `exp` (glibc's with `reproduce`, GLIBC-07; its witness compares the values rounded to
-/// single precision).
+/// `exp` (glibc's with `reproduce`, GLIBC-07; not named: `-dog_edge` is a filter).
 fn dog_gauss(sigma: f64, r: i64, libm: &Libm) -> Vec<f32> {
     let n = (2 * r + 1) as usize;
     let mut g = vec![0.0f32; n * n];
@@ -304,11 +321,7 @@ fn dog_gauss(sigma: f64, r: i64, libm: &Libm) -> Vec<f32> {
                         math::exp(q)
                     })
                 };
-                let v = e(libm.is_glibc());
-                if libm.watching() {
-                    libm.note(e(!libm.is_glibc()).to_bits() != v.to_bits());
-                }
-                g[i + n * j] = v;
+                g[i + n * j] = e(libm.is_glibc());
             }
         }
     }
@@ -342,7 +355,9 @@ pub fn dog_edge<T: Num>(
     }
     let [nx, ny, nz, nt] = img.dims;
     let per = nx * ny * nz;
-    let libm = Libm::new(notices.mode());
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     let kernel = if r >= 0 {
         let (g1, g2) = (dog_gauss(s1, r, &libm), dog_gauss(s2, r, &libm));
         let data: Vec<f32> = g2
@@ -355,7 +370,6 @@ pub fn dog_edge<T: Num>(
     } else {
         super::kernel::Kernel::none(false)
     };
-    ops::note_glibc(notices, &libm, "-dog_edge's Gaussians");
     if nt > 1 {
         let detail = match notices.mode() {
             UpstreamDefects::Fix => {

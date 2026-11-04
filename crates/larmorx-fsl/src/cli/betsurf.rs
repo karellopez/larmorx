@@ -551,21 +551,11 @@ fn run_in(
     }
     let gshape = grid.shape;
     let gvox = grid.voxel;
-    let libm = larmorx_core::math::Libm::new(mode);
+    // quiet: betsurf names no GLIBC-07 (its fit cannot tell whether a weight's last bit moved it)
+    let libm = larmorx_core::math::Libm::quiet(mode);
     let smoothed = |v: Vec<f32>| in_pool(n_threads, v, |v| bs::smooth(v, gshape, gvox, 3.0, &libm));
     let inner_s = smoothed(votes.inner);
     let scalp_s = smoothed(votes.scalp);
-    // GLIBC-07 (§8): the blurring's Gaussian weights
-    if libm.differed() {
-        let detail = if mode.fix() {
-            "the blurring's Gaussian weights from the correctly rounded exp, where glibc's (FSL's) \
-             gives other last bits"
-        } else {
-            "the blurring's Gaussian weights from glibc's exp, as FSL, where the correctly rounded \
-             exp gives other last bits"
-        };
-        defects::push_once(&mut notices, Notice::new(&defects::GLIBC_07, mode, detail));
-    }
     let mut outer_counts = votes.outer;
     if o.verbose {
         let _ = writeln!(out, "computation");

@@ -10,14 +10,23 @@
 //! `reproduce` gives the original program's bits wherever its result depends on glibc's last
 //! bit.
 //!
-//! **The witness.** A [`Libm`] also records whether the other choice would have given another
-//! value (bit for bit) on an argument it evaluated ([`Libm::differed`]): the condition the tools'
-//! GLIBC-07 notices name, in both modes (D13: named where the result would change; where a
-//! tool cannot tell whether its output changes, as after an iterative fit, the notice names
-//! the condition). It looks until the first difference only, so after that each call costs one
+//! **The witness.** A [`Libm::new`] also records whether the other choice would have given
+//! another value (bit for bit) on an argument it evaluated ([`Libm::differed`]). GLIBC-07 is
+//! named only where a tool can tell exactly that its output changed (the user's decision of
+//! 2026-11-04, "name exact cases only"): a pointwise computation (fslmaths' voxelwise
+//! functions, fslstats' entropies, avscale, makerot, `convert_xfm -fixscaleskew`, 3dTshift's
+//! weighted sinc) compares the values it stores itself, evaluating both with
+//! [`Libm::is_glibc`] and calling [`Libm::note`], and names GLIBC-07 in both modes where they
+//! differ. It looks until the first difference only, so after that each call costs one
 //! function; it is deterministic whatever the threads (the OR over every argument evaluated).
-//! Sites that compare the values they store themselves (a voxelwise function rounded to the
-//! image's type) evaluate both with [`Libm::is_glibc`] and call [`Libm::note`].
+//!
+//! **Quiet.** An iterative fit (FLIRT, FAST, mcflirt's mutual information, topup, bet2,
+//! betsurf) and a filter that combines many function values (fslmaths' kernels, `-bptf`,
+//! `-tfce`, `-roc`) cannot tell whether a last bit moved its outputs without running twice,
+//! so it names nothing and takes a [`Libm::quiet`]: the same functions, without the witness
+//! (one function per call). Their API pages say that `reproduce` gives glibc's (the
+//! original's) maths and that the default's correctly rounded functions can move a result's
+//! last bits.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -25,18 +34,41 @@ use crate::defects::UpstreamDefects;
 
 /// The C library functions of one call of an original program, with the last bits its mode
 /// asks for (see the module's documentation).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Libm {
     glibc: bool,
+    /// The witness looks ([`Libm::new`]); not for a [`Libm::quiet`].
+    watch: bool,
     differed: AtomicBool,
+}
+
+impl Default for Libm {
+    /// [`Libm::quiet`] of [`UpstreamDefects::Fix`]: correctly rounded, without the witness.
+    fn default() -> Libm {
+        Libm::quiet(UpstreamDefects::Fix)
+    }
 }
 
 impl Libm {
     /// Correctly rounded for [`UpstreamDefects::Fix`], glibc 2.35's for
     /// [`UpstreamDefects::Reproduce`].
+    /// The witness looks: [`Libm::differed`] tells whether the other choice gave another
+    /// value on an argument evaluated.
     pub fn new(mode: UpstreamDefects) -> Libm {
         Libm {
             glibc: mode.reproduce(),
+            watch: true,
+            differed: AtomicBool::new(false),
+        }
+    }
+
+    /// The same functions as [`Libm::new`] of `mode`, without the witness: for a program that
+    /// names nothing (an iterative fit, a filter; see the module's documentation), each call
+    /// evaluates one function and [`Libm::differed`] stays `false`.
+    pub fn quiet(mode: UpstreamDefects) -> Libm {
+        Libm {
+            glibc: mode.reproduce(),
+            watch: false,
             differed: AtomicBool::new(false),
         }
     }
@@ -56,7 +88,8 @@ impl Libm {
         }
     }
 
-    /// Whether the other choice gave another value on an argument evaluated so far.
+    /// Whether the other choice gave another value on an argument evaluated so far (always
+    /// `false` for a [`Libm::quiet`]).
     #[inline]
     pub fn differed(&self) -> bool {
         self.differed.load(Ordering::Relaxed)
@@ -66,16 +99,16 @@ impl Libm {
     /// what they store themselves.
     #[inline]
     pub fn note(&self, differs: bool) {
-        if differs {
+        if differs && self.watch {
             self.differed.store(true, Ordering::Relaxed);
         }
     }
 
-    /// Whether the witness still looks (no difference seen yet): a site that compares itself
-    /// may skip the other evaluation once this is false.
+    /// Whether the witness still looks (no difference seen yet; never for a [`Libm::quiet`]):
+    /// a site that compares itself may skip the other evaluation once this is false.
     #[inline]
     pub fn watching(&self) -> bool {
-        !self.differed()
+        self.watch && !self.differed()
     }
 
     /// `cr()` by default, `glibc()` with `reproduce`; the other evaluated too while the witness
@@ -319,6 +352,27 @@ mod tests {
         assert!(!l.differed());
         l.note(true);
         assert!(l.differed() && !l.watching());
+    }
+
+    #[test]
+    fn a_quiet_libm_gives_the_same_bits_without_the_witness() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (w, q) = (Libm::new(mode), Libm::quiet(mode));
+            assert_eq!(q.is_glibc(), mode.reproduce());
+            for i in 0..5000 {
+                let x = (f64::from(i) - 2500.0) * 0.0137;
+                assert_eq!(w.exp(x).to_bits(), q.exp(x).to_bits());
+                assert_eq!(w.sin(x).to_bits(), q.sin(x).to_bits());
+                let f = x as f32;
+                assert_eq!(w.cosf(f).to_bits(), q.cosf(f).to_bits());
+            }
+            let mut v: Vec<f64> = (0..5000).map(|i| f64::from(i) * 0.011 - 27.0).collect();
+            q.exp_in_place(&mut v);
+            q.note(true);
+            assert!(w.differed(), "{mode}");
+            assert!(!q.differed() && !q.watching(), "{mode}");
+        }
+        assert!(!Libm::default().watching() && !Libm::default().is_glibc());
     }
 
     #[test]

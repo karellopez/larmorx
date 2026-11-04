@@ -146,15 +146,7 @@ fn log_values<T: Num>(data: &[T], m: f64, libm: &Libm) -> Vec<f32> {
         }
         _ => logf32((v.to_f64() - m + 1.0) as f32, g),
     };
-    data.par_iter()
-        .map(|&v| {
-            let r = one(v, g);
-            if libm.watching() {
-                libm.note(one(v, !g).to_bits() != r.to_bits());
-            }
-            r
-        })
-        .collect()
+    data.par_iter().map(|&v| one(v, g)).collect()
 }
 
 /// `logf` (correctly rounded, or glibc's with `glibc`), x86-64's NaN for a negative argument.
@@ -258,7 +250,9 @@ pub fn roc<T: Num>(
     notices: &mut Notices,
 ) -> Result<Roc, Stop> {
     let fix = notices.fix();
-    let libm = Libm::new(notices.mode());
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     let [nx, ny, nz, nt] = img.dims;
     let nvox = nx * ny * nz;
     let k = nvox * nt;
@@ -315,11 +309,7 @@ pub fn roc<T: Num>(
         n.data[..k].par_iter_mut().for_each(|v| {
             let a = num::nan32(*v, mf, *v - mf);
             let a = num::nan32(a, one, a + one);
-            let r = logf32(a, g);
-            if libm.watching() {
-                libm.note(logf32(a, !g).to_bits() != r.to_bits());
-            }
-            *v = r;
+            *v = logf32(a, g);
         });
         if let Some((_, hi)) = ops::extremes(&n.data, fix) {
             maxlog = max_of(maxlog, hi);
@@ -462,7 +452,6 @@ pub fn roc<T: Num>(
             *a = num::nan64(*a, r, *a + r);
         }
     }
-    ops::note_glibc(notices, &libm, "-roc's logarithms and exponentials");
     if vareas.iter().any(|v| v.is_nan()) {
         // FSL-180 reproduced (or a limit that is NaN): the quartiles' sort detects NaN
         return Ok(Roc {

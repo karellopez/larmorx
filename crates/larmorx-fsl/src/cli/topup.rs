@@ -553,20 +553,8 @@ fn run(
         }
         match est {
             Ok(est) => {
-                // GLIBC-07: the smoothing's taps, where the other choice of exp gives others
-                if est.glibc_differed {
-                    let detail = if mode.fix() {
-                        "the smoothing's taps from the correctly rounded exp, where glibc's \
-                         (FSL's) gives other single-precision taps"
-                    } else {
-                        "the smoothing's taps from glibc's exp, as FSL, where the correctly \
-                         rounded exp gives other single-precision taps"
-                    };
-                    larmorx_core::defects::push_once(
-                        &mut ns,
-                        Notice::new(&larmorx_core::defects::GLIBC_07, mode, detail),
-                    );
-                }
+                // GLIBC-07 is not named: an iterative fit cannot tell whether the smoothing's
+                // last bits moved its results (the user's decision of 2026-11-04)
                 write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
             }
             Err(topup::LevelError::Subsampling(l)) => {

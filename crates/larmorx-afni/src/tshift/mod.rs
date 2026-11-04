@@ -154,21 +154,42 @@ pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<Vec<Notice>,
     let kernels: Vec<Option<Kernel>> = shifts.iter().map(|&s| Kernel::new(s, params, nt)).collect();
     let factors = bricks.factors.clone();
     let shape = bricks.shape;
-    parallel::with_threads(params.n_threads, || match &mut bricks.data {
+    let glibc_differs = parallel::with_threads(params.n_threads, || match &mut bricks.data {
         BrickData::Byte(v) => run(v, shape, &factors, &kernels, params),
         BrickData::Short(v) => run(v, shape, &factors, &kernels, params),
         BrickData::Float(v) => run(v, shape, &factors, &kernels, params),
     })?;
-    Ok(notices(&factors, &kernels, params))
+    Ok(notices(&factors, &kernels, params, glibc_differs))
 }
 
-/// The notices of [`tshift`]: AFNI-01 when a shifted slice has a negative brick factor.
-fn notices(factors: &[f32], kernels: &[Option<Kernel>], params: &TshiftParams) -> Vec<Notice> {
+/// The notices of [`tshift`]: AFNI-01 when a shifted slice has a negative brick factor;
+/// GLIBC-07 when the weighted sinc's values stored differ with the other choice of `sinf` and
+/// `cosf` (`glibc_differs`: exact, compared as stored).
+fn notices(
+    factors: &[f32],
+    kernels: &[Option<Kernel>],
+    params: &TshiftParams,
+    glibc_differs: bool,
+) -> Vec<Notice> {
     let mode = params.upstream_defects;
     let shifted = kernels.iter().filter(|k| k.is_some()).count();
     let mut out = Vec::new();
     if shifted == 0 {
         return out;
+    }
+    if glibc_differs {
+        let detail = match mode {
+            UpstreamDefects::Fix => {
+                "the weighted sinc's weights from the correctly rounded sine and cosine, where \
+                 glibc's sinf and cosf (AFNI's) give other last bits: some shifted values differ"
+            }
+            UpstreamDefects::Reproduce => {
+                "the weighted sinc's weights from glibc's sinf and cosf, as AFNI, where the \
+                 correctly rounded sine and cosine give other last bits: some shifted values \
+                 differ"
+            }
+        };
+        out.push(Notice::new(&defects::GLIBC_07, mode, detail));
     }
     if let Some(&f) = factors.iter().find(|&&f| f < 0.0) {
         let detail = match mode {
@@ -195,7 +216,9 @@ enum Kernel {
         zero: bool,
     },
     Lagrange(Lagrange),
-    Wsinc(Wsinc),
+    /// The weights of the mode's sine and cosine, and the other choice's where they differ
+    /// (GLIBC-07, named exactly: the outputs are then computed with both and compared).
+    Wsinc(Wsinc, Option<Wsinc>),
 }
 
 impl Kernel {
@@ -214,8 +237,17 @@ impl Kernel {
                     zero: s.abs() > m as f32,
                 }
             }
-            Method::Wsinc5 => Kernel::Wsinc(Wsinc::new(s, 5)),
-            Method::Wsinc9 => Kernel::Wsinc(Wsinc::new(s, 9)),
+            Method::Wsinc5 | Method::Wsinc9 => {
+                let radius = if params.method == Method::Wsinc5 {
+                    5
+                } else {
+                    9
+                };
+                let glibc = params.upstream_defects.reproduce();
+                let (w, o) = (Wsinc::new(s, radius, glibc), Wsinc::new(s, radius, !glibc));
+                let other = (o != w).then_some(o);
+                Kernel::Wsinc(w, other)
+            }
             method => Kernel::Lagrange(Lagrange::new(method, s)),
         })
     }
@@ -225,15 +257,17 @@ impl Kernel {
 /// depend on the thread count.
 const ROWS_PER_TASK: usize = 4;
 
+/// Returns whether the other choice of the weighted sinc's sine and cosine stores another
+/// value somewhere (GLIBC-07).
 fn run<T: Datum>(
     data: &mut [T],
     [nx, ny, nz, nt]: [usize; 4],
     factors: &[f32],
     kernels: &[Option<Kernel>],
     params: &TshiftParams,
-) {
+) -> bool {
     if data.is_empty() {
-        return;
+        return false;
     }
     // Split every volume into blocks of rows, and give each task its block in every volume.
     let block = nx * ROWS_PER_TASK;
@@ -250,20 +284,21 @@ fn run<T: Datum>(
     tasks
         .into_par_iter()
         .enumerate()
-        .for_each(|(task, chunks)| {
-            if let Some(kernel) = &kernels[task / blocks_per_slice] {
-                process_block(chunks, factors, kernel, params);
-            }
-        });
+        .map(|(task, chunks)| match &kernels[task / blocks_per_slice] {
+            Some(kernel) => process_block(chunks, factors, kernel, params),
+            None => false,
+        })
+        .reduce(|| false, |a, b| a || b)
 }
 
 /// Shifts the voxels of one block: `chunks[t]` holds the block's values at time point `t`.
+/// Returns whether the weighted sinc's other weights store another value (GLIBC-07).
 fn process_block<T: Datum>(
     mut chunks: Vec<&mut [T]>,
     factors: &[f32],
     kernel: &Kernel,
     params: &TshiftParams,
-) {
+) -> bool {
     let nt = chunks.len();
     let voxels = chunks[0].len();
     // Gather each voxel's series contiguously.
@@ -285,6 +320,7 @@ fn process_block<T: Datum>(
         }
     };
     let mut scratch = Vec::new();
+    let mut glibc_differs = false;
     match kernel {
         Kernel::Fourier {
             fft,
@@ -326,12 +362,31 @@ fn process_block<T: Datum>(
                 series::retrend(x, &d, params.restore);
             }
         }
-        Kernel::Wsinc(wsinc) => {
+        Kernel::Wsinc(wsinc, other) => {
+            let mut alt: Vec<f32> = Vec::new();
             for (voxel, v) in buf.chunks_mut(nt).enumerate() {
                 let x = &mut v[skip..];
                 let d = series::detrend(x, removal(voxel));
+                // GLIBC-07, exact: until a difference is seen, the other choice's weights
+                // shift a copy of the series too, and the two are compared as stored
+                let compare = match other {
+                    Some(o) if !glibc_differs => {
+                        alt.clear();
+                        alt.extend_from_slice(x);
+                        o.apply(&mut alt, &mut scratch);
+                        series::retrend(&mut alt, &d, params.restore);
+                        true
+                    }
+                    _ => false,
+                };
                 wsinc.apply(x, &mut scratch);
                 series::retrend(x, &d, params.restore);
+                if compare {
+                    glibc_differs = x.iter().zip(&alt).enumerate().any(|(i, (&a, &b))| {
+                        let f = factors[skip + i];
+                        store::<T>(a, f).to_f32().to_bits() != store::<T>(b, f).to_f32().to_bits()
+                    });
+                }
             }
         }
     }
@@ -340,6 +395,7 @@ fn process_block<T: Datum>(
             *x = store(buf[v * nt + t], factors[t]);
         }
     }
+    glibc_differs
 }
 
 #[cfg(test)]
@@ -386,6 +442,41 @@ mod tests {
             tshift(&mut many, &params(5, method, 4)).unwrap();
             assert_eq!(one, many, "{method:?}");
         }
+    }
+
+    /// GLIBC-07 in the weighted sinc: `reproduce` takes glibc's sinf and cosf, the default the
+    /// correctly rounded ones; both name GLIBC-07 exactly where the stored values differ.
+    #[test]
+    fn wsinc_names_glibc_07_exactly_where_the_values_differ() {
+        let mut named = 0;
+        for (k, method) in [Method::Wsinc5, Method::Wsinc9].into_iter().enumerate() {
+            for nz in [2usize, 5, 7] {
+                let input = dataset([3, 4, nz, 30]);
+                let run = |mode| {
+                    let mut b = input.clone();
+                    let mut p = params(nz, method, 2);
+                    p.upstream_defects = mode;
+                    let n = tshift(&mut b, &p).unwrap();
+                    (b, n.iter().any(|n| n.defect.id == "GLIBC-07"))
+                };
+                let (fixed, nf) = run(UpstreamDefects::Fix);
+                let (afni, na) = run(UpstreamDefects::Reproduce);
+                let differs = fixed != afni;
+                assert_eq!((nf, na), (differs, differs), "{method:?} nz {nz} ({k})");
+                named += usize::from(differs);
+            }
+        }
+        // some slice of these shifts has weights whose last bits differ
+        assert!(named > 0);
+        // the weights of the two choices differ on some fractions, not on most (spec §5.3:
+        // about 1 % of the values)
+        let differing = (1..100)
+            .filter(|&i| {
+                let s = i as f32 / 100.0;
+                series::Wsinc::new(s, 9, true) != series::Wsinc::new(s, 9, false)
+            })
+            .count();
+        assert!(differing > 0 && differing < 99, "{differing}");
     }
 
     #[test]

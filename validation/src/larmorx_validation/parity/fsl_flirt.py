@@ -81,6 +81,9 @@ TEXT_PROGRAMS = (
 FIT_PROGRAMS = ("midtrans", "pointflirt", "aff2rigid")
 #: The programs with a clean-room original.
 PROGRAMS = ("flirt", "convert_xfm", *TEXT_PROGRAMS, *FIT_PROGRAMS, "applyxfm4D", "pairreg")
+#: The programs whose default may change their outputs without naming GLIBC-07 (iterative
+#: registrations and resampling; :data:`defects.UNNAMED_GLIBC`).
+UNNAMED_PROGRAMS = ("flirt", "applyxfm4D", "pairreg")
 #: GNU sed's usage text (GPL), which extracttxt's runs print and the Apache original does not
 #: reproduce: left out of FSL's standard error (the original prints one line of its own there).
 _SED_USAGE = re.compile(
@@ -941,7 +944,10 @@ def fix_pass(
             entries,
             change,
             other_changes="; ".join(others),
-            silent_ok=(*rep._SILENT, *defects.CONDITION_NOTICES),
+            silent_ok=rep._SILENT,
+            # a registration and applyxfm4D's resampling name no GLIBC-07 (defects.
+            # UNNAMED_GLIBC); avscale, makerot and convert_xfm -fixscaleskew name it exactly
+            unnamed_ok=defects.UNNAMED_GLIBC if program in UNNAMED_PROGRAMS else (),
         )
 
 

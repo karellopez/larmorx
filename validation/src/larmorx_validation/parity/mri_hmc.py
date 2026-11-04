@@ -660,7 +660,12 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
                 refnum == ours_refnum,
                 detail=f"{refnum} vs {ours_refnum}",
             )
-        metrics.update(_fix_pass(checks, replay, ours, copied, reference, logs))
+        histogram = any(
+            a == "-cost" and b in ("mutualinfo", "normmi")
+            for s in run["steps"]
+            for a, b in zip(s["argv"], s["argv"][1:], strict=False)
+        )
+        metrics.update(_fix_pass(checks, replay, ours, copied, reference, logs, histogram))
     return metrics
 
 
@@ -677,9 +682,13 @@ def _fix_pass(
     copied: set[str],
     reference: Path,
     logs: list[tuple[str, str]],
+    histogram: bool = False,
 ) -> dict[str, Any]:
     """D13: the run replayed in larmorx's default (``fix``) mode, compared with the
-    ``reproduce`` outputs: the defects named, the files, matrices and images that change."""
+    ``reproduce`` outputs: the defects named, the files, matrices and images that change.
+    With ``histogram`` (a mutual-information cost, whose ``logf`` is glibc's with
+    ``reproduce``), GLIBC-07 may change the outputs without a notice
+    (:data:`defects.UNNAMED_GLIBC`)."""
     import nibabel as nib
 
     with tempfile.TemporaryDirectory(prefix="lx-hmc-fix-") as tmp_name:
@@ -739,7 +748,8 @@ def _fix_pass(
             entries,
             change,
             other_changes="; ".join(others),
-            silent_ok=(*_SILENT, *defects.CONDITION_NOTICES),
+            silent_ok=_SILENT,
+            unnamed_ok=defects.UNNAMED_GLIBC if histogram else (),
         )
         reproduced_entries = defects.notices_in(" ".join(e for _, e in logs))
         if sorted(entries) != sorted(reproduced_entries):

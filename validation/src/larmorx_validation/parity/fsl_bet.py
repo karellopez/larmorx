@@ -2016,7 +2016,7 @@ def _fix_pass(
             checks,
             entries,
             defects.Change(0, 0, 0.0),
-            silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES),
+            silent_ok=s.silent_ok,
         )
         return
     a, b = _images(r_dir, inputs), _images(fix_dir, inputs)
@@ -2042,7 +2042,9 @@ def _fix_pass(
         entries,
         change,
         other_changes="; ".join(others),
-        silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES),
+        silent_ok=s.silent_ok,
+        # bet2 and betsurf name no GLIBC-07 (iterative fits; defects.UNNAMED_GLIBC)
+        unnamed_ok=defects.UNNAMED_GLIBC,
     )
 
 

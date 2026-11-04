@@ -70,9 +70,6 @@ pub struct Found {
     pub points: Vec<V3>,
     /// The passes run (the first, then the reruns).
     pub passes: Vec<Pass>,
-    /// GLIBC-07: the other choice of `pow` (the radius, the fractional threshold's power) gave
-    /// another value (`reproduce`: glibc's, as FSL; by default the correctly rounded one).
-    pub glibc_differed: bool,
 }
 
 /// Runs `f` in a pool of exactly `n_threads` threads (0: all), so that its parallel work never
@@ -108,7 +105,8 @@ fn find_surface_in(
     opts: &Deformation,
     mode: UpstreamDefects,
 ) -> Found {
-    let libm = larmorx_core::math::Libm::new(mode);
+    // quiet: bet2 names no GLIBC-07 (a fit cannot tell whether a power's last bit moved it)
+    let libm = larmorx_core::math::Libm::quiet(mode);
     let init = params::initial(vol, radius, centre, mode, &libm);
     let mesh = Mesh::sphere(4);
     let start = surface::initial_surface(&mesh, &init);
@@ -132,7 +130,6 @@ fn find_surface_in(
                 mesh,
                 points,
                 passes,
-                glibc_differed: libm.differed(),
             };
         }
         pass += 1;

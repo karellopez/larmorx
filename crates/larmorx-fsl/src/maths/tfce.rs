@@ -100,7 +100,9 @@ pub fn tfce<T: Num>(
     out: &mut dyn Write,
 ) -> Result<(), Stop> {
     let fix = notices.fix();
-    let libm = Libm::new(notices.mode());
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     check_connectivity(notices, "-tfce", c)?;
     let [nx, ny, nz, nt] = img.dims;
     // FSL tests each volume's step before the sizes (random testing, findings 26)
@@ -213,7 +215,6 @@ pub fn tfce<T: Num>(
              requires a positive deltaT input)",
         );
     }
-    super::ops::note_glibc(notices, &libm, "-tfce's powers");
     img.data = result;
     Ok(())
 }
@@ -352,7 +353,9 @@ pub fn tfce_support<T: Num>(
     out: &mut dyn Write,
 ) -> Result<(), Stop> {
     let fix = notices.fix();
-    let libm = Libm::new(notices.mode());
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     check_connectivity(notices, "-tfceS", c)?;
     let [nx, ny, nz, nt] = img.dims;
     let per = nx * ny * nz;
@@ -520,7 +523,6 @@ pub fn tfce_support<T: Num>(
             "-tfceS: arrays as long as the thresholds taken (FSL's are shorter: it stops)",
         );
     }
-    super::ops::note_glibc(notices, &libm, "-tfceS's powers");
     img.data = result;
     Ok(())
 }

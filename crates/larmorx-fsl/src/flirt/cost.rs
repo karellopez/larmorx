@@ -64,15 +64,15 @@ pub struct Log {
     lines: Mutex<Vec<String>>,
     fatal: Mutex<Option<String>>,
     /// The run's C library functions (GLIBC-07: correctly rounded by default, glibc's with
-    /// `reproduce`) and their witness, shared with the run's quiet logs.
+    /// `reproduce`; quiet, FLIRT names no GLIBC-07), shared with the run's quiet logs.
     libm: Arc<Libm>,
 }
 
 impl Log {
-    /// The log of a run in `mode` (its functions [`Libm::new`]'s).
+    /// The log of a run in `mode` (its functions [`Libm::quiet`]'s).
     pub fn new(mode: UpstreamDefects) -> Log {
         Log {
-            libm: Arc::new(Libm::new(mode)),
+            libm: Arc::new(Libm::quiet(mode)),
             ..Log::default()
         }
     }
@@ -83,7 +83,7 @@ impl Log {
             ..Log::default()
         }
     }
-    /// A log whose messages are dropped, with this log's functions and witness.
+    /// A log whose messages are dropped, with this log's functions.
     pub fn quiet(&self) -> Log {
         Log {
             libm: Arc::clone(&self.libm),

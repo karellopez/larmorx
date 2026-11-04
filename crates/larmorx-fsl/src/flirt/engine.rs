@@ -54,7 +54,7 @@ pub struct Ctx<'a> {
     pub mode: UpstreamDefects,
     pub n_threads: usize,
     /// The run's C library functions (GLIBC-07: correctly rounded by default, glibc's with
-    /// `reproduce`) and their witness ([`Libm::new`] of `mode`).
+    /// `reproduce`), quiet: FLIRT names no GLIBC-07 ([`Libm::quiet`] of `mode`).
     pub libm: Arc<Libm>,
 }
 
@@ -692,12 +692,6 @@ pub fn run(o: &Options, ctx: &Ctx<'_>, out: &mut dyn Write, err: &mut dyn Write)
             u8::from(ctx.mode.fix())
         }
     };
-    if let Some(n) = super::glibc_notice(
-        &ctx.libm,
-        "FLIRT's sines, cosines, arctangents, exponentials and logarithms",
-    ) {
-        defects::push_once(&mut notices, n);
-    }
     for x in &notices {
         let _ = writeln!(err, "larmorx: {}", x.line());
     }

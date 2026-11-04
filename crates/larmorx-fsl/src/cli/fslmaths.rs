@@ -697,9 +697,9 @@ fn step<T: Num>(
         "-kernel" => kernel_step(ctx, st, i, notices, err),
         "-s" => {
             let sigma = strtod(arg(1).unwrap_or("")).0;
-            let libm = Libm::new(notices.mode());
+            // quiet: a filter names no GLIBC-07 (§18; the user's decision of 2026-11-04)
+            let libm = Libm::quiet(notices.mode());
             st.kernel = Kernel::gauss(sigma, st.img.voxel(), &libm);
-            ops::note_glibc(notices, &libm, "-s's Gaussian kernel");
             filters::smooth(&mut st.img, &st.kernel, notices, err)
                 .map_err(|s| refuse_stop(err, s))?;
             Ok(1)
@@ -1066,10 +1066,9 @@ fn kernel_step<T: Num>(
             )
         }
         "gauss" => {
-            let libm = Libm::new(notices.mode());
-            let k = Kernel::gauss(x, vox, &libm);
-            ops::note_glibc(notices, &libm, "-kernel gauss's values");
-            (k, 2)
+            // quiet: the kernel's filters name no GLIBC-07 (§18; the user's decision of
+            // 2026-11-04)
+            (Kernel::gauss(x, vox, &Libm::quiet(notices.mode())), 2)
         }
         "sphere" => (Kernel::sphere(x, vox), 2),
         "file" => {

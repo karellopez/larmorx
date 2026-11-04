@@ -222,8 +222,6 @@ pub struct Estimate {
     /// subsampled, else none (§6: a subsampled last level's smoothing and subsampling are
     /// removed; observed, `thr/openblas`: one level of FWHM 4 mm, FSL's `--iout` is smoothed).
     pub fwhm_out: f64,
-    /// GLIBC-07: the other choice of `exp` gives other smoothing taps at some level.
-    pub glibc_differed: bool,
     /// The run's choice of `exp` (glibc's with `reproduce`).
     pub glibc: bool,
 }
@@ -249,7 +247,6 @@ pub fn estimate(
     let mut field: Option<Field> = None;
     let mut prev: Option<LevelSpec> = None;
     let mut cached: Option<(usize, f64, LevelImages)> = None;
-    let mut glibc_differed = false;
     let mut mov = vec![[0.0; 6]; scans.len()];
     for (l, spec) in params.levels.iter().enumerate() {
         let s = spec.subsamp.max(1);
@@ -283,7 +280,6 @@ pub fn estimate(
             Some((cs, cf, im)) if *cs == s && cf.to_bits() == spec.fwhm.to_bits() => im.clone(),
             _ => {
                 let im = images::level_images(&prepared, s, spec.fwhm, params.glibc);
-                glibc_differed |= im.glibc_differs;
                 cached = Some((s, spec.fwhm, im.clone()));
                 im
             }
@@ -339,7 +335,6 @@ pub fn estimate(
         warpres_last: last.warpres,
         movements: mov,
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
-        glibc_differed,
         glibc: params.glibc,
     })
 }

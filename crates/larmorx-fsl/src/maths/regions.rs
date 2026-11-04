@@ -319,7 +319,9 @@ impl Filters {
 /// `-bptf hp lp` (§13.2): the high-pass, then the low-pass, of every voxel's series.
 pub fn bptf<T: Num>(img: &mut Img<T>, hp: f64, lp: f64, notices: &mut Notices) -> Result<(), Stop> {
     let fix = notices.fix();
-    let libm = Libm::new(notices.mode());
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     let nt = img.dims[3].max(1);
     let per = img.per_volume();
     let mut width = |sigma: f64,
@@ -379,7 +381,6 @@ pub fn bptf<T: Num>(img: &mut Img<T>, hp: f64, lp: f64, notices: &mut Notices) -
             .map(|w| w / total)
             .collect::<Vec<f64>>()
     });
-    super::ops::note_glibc(notices, &libm, "-bptf's Gaussian weights");
     let filters = Filters::new(
         nt,
         wh.clone().zip(mh.map(|m| m.min(span))),

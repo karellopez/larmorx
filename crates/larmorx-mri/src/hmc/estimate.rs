@@ -582,7 +582,10 @@ fn run_stages(
     let dof = params.dof.clamp(6, 12);
     let mode = params.upstream_defects;
     let fix = mode.fix();
-    let libm = Libm::new(mode);
+    // quiet: the histogram costs' logf (glibc's with `reproduce`, `specs/mcflirt.md` appendix
+    // B) name no GLIBC-07: a fit cannot tell whether a last bit moved the matrices (the user's
+    // decision of 2026-11-04)
+    let libm = Libm::quiet(mode);
     let mut matrices = vec![IDENTITY; n];
     let mut notices = Vec::new();
     let registered: Vec<usize> = (0..n).filter(|&v| Some(v) != ref_index).collect();
@@ -781,17 +784,6 @@ fn run_stages(
     })?;
     let (matrices, in_plane, stage_notices) = out;
     notices.extend(stage_notices);
-    // GLIBC-07: mcflirt's histogram costs take glibc's logf (`specs/mcflirt.md` appendix B)
-    if libm.differed() {
-        let detail = if fix {
-            "the mutual-information costs' logarithms correctly rounded, where glibc's logf \
-             (mcflirt's) gives other last bits on some of them, which may move the matrices"
-        } else {
-            "the mutual-information costs' logarithms are glibc's logf, as mcflirt's, where the \
-             correctly rounded ones give other last bits on some of them"
-        };
-        notices.push(Notice::new(&defects::GLIBC_07, mode, detail));
-    }
     Ok((matrices, in_plane, notices))
 }
 

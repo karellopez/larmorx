@@ -606,6 +606,19 @@ def _value_diff(x: np.ndarray, y: np.ndarray) -> str:
     return f"{bad.size} differ; first at {k.tolist()}: FSL {xr[k].tolist()} / original {yr[k].tolist()}"
 
 
+#: fslmaths' operations that name no GLIBC-07 (filters combining many function values:
+#: :data:`defects.UNNAMED_GLIBC`); its voxelwise functions and ``-edge`` name it exactly.
+UNNAMED_OPS = ("-s", "-dog_edge", "-bptf", "-tfce", "-tfceS", "-roc")
+
+
+def unnamed_glibc(args: list[str]) -> bool:
+    """Whether ``args`` hold an operation whose default may change the outputs without
+    naming GLIBC-07 (:data:`UNNAMED_OPS`, ``-kernel gauss``)."""
+    return any(a in UNNAMED_OPS for a in args) or any(
+        a == "-kernel" and b == "gauss" for a, b in zip(args, args[1:], strict=False)
+    )
+
+
 def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reproduced, before):
     """D13: the original's default run against its ``reproduce`` run."""
 
@@ -634,7 +647,8 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
             entries,
             change,
             other_changes="; ".join(others),
-            silent_ok=(*rep._SILENT, *defects.CONDITION_NOTICES),
+            silent_ok=rep._SILENT,
+            unnamed_ok=defects.UNNAMED_GLIBC if unnamed_glibc(list(args)) else (),
         )
 
 

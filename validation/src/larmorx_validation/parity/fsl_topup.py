@@ -919,7 +919,10 @@ def fix_pass(
             entries,
             change,
             other_changes="; ".join(others),
-            silent_ok=(*rep.SILENT, *defects.CONDITION_NOTICES),
+            silent_ok=rep.SILENT,
+            # topup names no GLIBC-07 (an iterative fit; defects.UNNAMED_GLIBC); applytopup
+            # calls none of glibc's functions
+            unnamed_ok=defects.UNNAMED_GLIBC if program == PROGRAM else (),
         )
 
 

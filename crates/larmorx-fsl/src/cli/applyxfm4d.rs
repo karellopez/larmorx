@@ -178,7 +178,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         settings,
         mode,
         n_threads: settings.threads(),
-        libm: std::sync::Arc::new(larmorx_core::math::Libm::new(mode)),
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     let result = larmorx_core::parallel::with_threads(ctx.n_threads, || {
         let (mut o_buf, mut e_buf, mut notices) = (Vec::new(), Vec::new(), Vec::new());
@@ -186,14 +186,9 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         (code, o_buf, e_buf, notices)
     });
     match result {
-        Ok((code, o_buf, e_buf, mut notices)) => {
+        Ok((code, o_buf, e_buf, notices)) => {
             let _ = out.write_all(&o_buf);
             let _ = err.write_all(&e_buf);
-            if let Some(n) =
-                crate::flirt::glibc_notice(&ctx.libm, "applyxfm4D's sinc table and decompositions")
-            {
-                larmorx_core::defects::push_once(&mut notices, n);
-            }
             print_notices(err, &notices);
             code
         }

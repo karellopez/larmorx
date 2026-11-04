@@ -419,7 +419,9 @@ def fix_pass(
             entries,
             change,
             other_changes="; ".join(others),
-            silent_ok=(*rep.SILENT, *defects.CONDITION_NOTICES),
+            silent_ok=rep.SILENT,
+            # FAST names no GLIBC-07 (an iterative fit; defects.UNNAMED_GLIBC)
+            unnamed_ok=defects.UNNAMED_GLIBC,
         )
 
 

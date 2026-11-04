@@ -211,17 +211,16 @@ pub fn sample_op_of(xs: &[f64], n: usize, deriv: bool, linear: bool) -> Op1 {
 
 /// The Gaussian smoothing of a volume (§4.4): FWHM `fwhm` mm, voxel sizes `voxel`, separable,
 /// periodic.
-/// The taps' `exp` is glibc's with `glibc` (`reproduce`, GLIBC-07); the second value says
-/// whether the other choice gives other taps (single precision, as stored).
-pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3], glibc: bool) -> (Grid, bool) {
+/// The taps' `exp` is glibc's with `glibc` (`reproduce`, GLIBC-07), correctly rounded
+/// otherwise (named by neither: topup's fit cannot tell whether a tap's last bit moved it).
+pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3], glibc: bool) -> Grid {
     // FWHM 0 is no smoothing; so is a negative one (FSL-125 reproduced; observed: FSL's first
     // cost with --fwhm=-8 is that of no smoothing, probe P)
     if !(fwhm > 0.0) || !fwhm.is_finite() {
-        return (g.clone(), false);
+        return g.clone();
     }
     let sigma = fwhm / (8.0 * std::f64::consts::LN_2).sqrt();
     let mut ops: [Option<Op1>; 3] = [None, None, None];
-    let mut differs = false;
     for a in 0..3 {
         let n = g.dims[a];
         let sv = sigma / voxel[a];
@@ -237,9 +236,6 @@ pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3], glibc: bool) -> (Grid, bool)
             f64::from(v as f32)
         };
         let mut k: Vec<f64> = (-r..=r).map(|j| tap(j, glibc)).collect();
-        differs |= (-r..=r)
-            .zip(&k)
-            .any(|(j, v)| tap(j, !glibc).to_bits() != v.to_bits());
         let s: f64 = k.iter().sum();
         for v in &mut k {
             *v /= s;
@@ -259,14 +255,11 @@ pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3], glibc: bool) -> (Grid, bool)
         g.dims,
         [ops[0].as_ref(), ops[1].as_ref(), ops[2].as_ref()],
     );
-    (
-        Grid {
-            dims,
-            data,
-            linear: g.linear,
-        },
-        differs,
-    )
+    Grid {
+        dims,
+        data,
+        linear: g.linear,
+    }
 }
 
 /// The `s × s × s` block means (sizes divisible by `s`).
@@ -411,8 +404,6 @@ pub struct LevelImages {
     pub dims: [usize; 3],
     pub voxel: [f64; 3],
     pub coef: Vec<Grid>,
-    /// GLIBC-07: the other choice of `exp` gives other smoothing taps.
-    pub glibc_differs: bool,
 }
 
 /// The smoothing's `exp` is glibc's with `glibc` (`reproduce`).
@@ -422,13 +413,11 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64, glibc: bool) -> LevelImag
         p.reg_voxel[1] * s as f64,
         p.reg_voxel[2] * s as f64,
     ];
-    let mut glibc_differs = false;
     let coef: Vec<Grid> = p
         .volumes
         .iter()
         .map(|v| {
-            let (g, d) = smooth(&subsample(v, s), fwhm, voxel, glibc);
-            glibc_differs |= d;
+            let g = smooth(&subsample(v, s), fwhm, voxel, glibc);
             if g.linear { g } else { prefilter(&g) }
         })
         .collect();
@@ -436,7 +425,6 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64, glibc: bool) -> LevelImag
         dims: coef[0].dims,
         voxel,
         coef,
-        glibc_differs,
     }
 }
 

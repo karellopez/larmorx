@@ -718,7 +718,7 @@ pub fn run(
             &channels,
             &Outputs::Empty(zeros, o.pve && multi),
             notices,
-            &Libm::new(mode),
+            &Libm::quiet(mode),
             err,
         );
     }
@@ -813,7 +813,9 @@ pub fn run(
         priors: priors.take(),
         priors_throughout: o.priors_throughout,
         fsl98_pairing: !fix,
-        libm: std::sync::Arc::new(larmorx_core::math::Libm::new(mode)),
+        // quiet: FAST names no GLIBC-07 (its iterations cannot tell whether a last bit of its
+        // functions moved the segmentation; the user's decision of 2026-11-04)
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     let result = larmorx_core::parallel::with_threads(n_threads, || {
         let mut text: Vec<u8> = Vec::new();
@@ -938,23 +940,6 @@ struct Parts<'a> {
     bias_outside: f32,
 }
 
-/// GLIBC-07 (§8): FAST's `exp`, `log`, `expf` and `logf` are glibc's; named where `libm`'s
-/// witness saw the other choice give another value (whether the segmentation then changes, the
-/// iterations cannot tell).
-fn note_glibc(notices: &mut Vec<Notice>, mode: UpstreamDefects, libm: &Libm) {
-    if !libm.differed() {
-        return;
-    }
-    let detail = if mode.fix() {
-        "the exponentials and logarithms correctly rounded, where glibc's (FSL's) give other last \
-         bits on some arguments, which may move the segmentation"
-    } else {
-        "the exponentials and logarithms are glibc's, as FSL's, where the correctly rounded ones \
-         give other last bits on some arguments"
-    };
-    defects::push_once(notices, Notice::new(&defects::GLIBC_07, mode, detail));
-}
-
 /// Writes the outputs (§3.2, §3.3) in FAST's order, then the notices.
 #[allow(clippy::too_many_arguments)]
 fn write_outputs(
@@ -967,7 +952,6 @@ fn write_outputs(
     libm: &Libm,
     err: &mut dyn Write,
 ) -> u8 {
-    note_glibc(&mut notices, mode, libm);
     let ot = match settings.get("FSLOUTPUTTYPE") {
         None => {
             print_notices(err, &notices);
@@ -1218,7 +1202,6 @@ fn write_outputs(
             }
         }
     }
-    note_glibc(&mut notices, mode, libm);
     print_notices(err, &notices);
     0
 }

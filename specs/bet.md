@@ -35,7 +35,8 @@ the bits", following it keeps the original closest to FSL.
 
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-40,
--42 to -48, -50, -51, -53 to -56. §9 lists what the default does for each. Where FSL crashes
+-42 to -48, -50, -51, -53 to -56, -63, -216 (spec writer, 2026-11-04; and the defects of the
+programs `-S`, `-B`, `-A`, `-A2` run, in their own specs). §9 lists what the default does for each. Where FSL crashes
 on what it leaves undefined (FSL-41, -52, and FSL-43's fill far outside the image), the default
 refuses with a clear message, and `reproduce` keeps everything FSL defines and fills the rest
 deterministically, with a warning (D13's failure cases). Two questionable behaviours are kept as
@@ -64,9 +65,10 @@ scalp from the brain's surface.
 - **`bet2`** is the brain extraction (§4).
 - **`bet`** is a shell script (`#!/bin/bash -e`, `LC_ALL=C`) that runs `bet2` with the options it
   is given, or one of its variations (§5): `-R` (bet2 repeated from the brain's centre), `-F` (4D
-  data), `-Z` (small field of view in z), and `-S`, `-B`, `-A`, `-A2`, which run FSL programs
-  larmorx does not have yet (standard_space_roi, FLIRT, FAST, betsurf after FLIRT): larmorx refuses
-  these four, naming what is missing (exit 1, "pending").
+  data), `-Z` (small field of view in z), and `-S`, `-B`, `-A`, `-A2`, which run FSL's other
+  programs (standard_space_roi, FLIRT, FAST, fslmaths, fslstats, betsurf after FLIRT) and read FSL's
+  standard images (§5.3, §5.4; spec writer, 2026-11-04: the replica runs them since 2026-11-04; the
+  original refuses them, `NotImplementedError` in Python, until it implements §5.3).
 - **`betsurf`** finds the skull and scalp surfaces (§6).
 
 All three take FSL's image names: a file name with or without its extension (§3.1).
@@ -722,8 +724,182 @@ Miscellaneous options:
   outputs stay padded (FSL-45). (spec writer, 2026-10-30) **(observed)** The temporary files:
   `<out>_tmp` (the padded image), `<out>_tmp_bottom` and `<out>_tmp_top` (one slice each, written
   2D, §3.2; the top one's origin moved to the top slice).
-- **`-S`, `-B`, `-A`, `-A2`**: pending in larmorx (they need standard_space_roi, FLIRT, FAST):
-  refused with exit 1 and a message naming the missing program.
+- **`-S`, `-B`, `-A`, `-A2`**: §5.3. They run FSL's other programs (FLIRT, `standard_space_roi`,
+  FAST, `fslmaths`, `fslstats`, betsurf) and read FSL's standard images (§5.4).
+
+### 5.3 `-S`, `-B`, `-A`, `-A2` (spec writer, 2026-11-04)
+
+Each variation is a fixed sequence of FSL's programs. The original runs larmorx's own
+implementation of each, with the arguments named below: FLIRT and `convert_xfm` as
+`specs/flirt.md`, `standard_space_roi` as `specs/standard_space_roi.md`, FAST as `specs/fast.md`,
+`fslmaths` as `specs/fslmaths.md`, `fslstats` as `specs/fslstats.md`, bet2 as §4, betsurf as §6;
+each program's own messages, statuses and defects (D13) are its spec's. `<in>` and `<out>` are the
+names after `remove_ext` (§5.1); `<opts>` are the options passed to bet2 (§5.1's `bet2opts`, in
+the order given, `-v` among them with `-v`). Every temporary file is named `<out>_tmp...`, is
+written in `FSLOUTPUTTYPE`'s format and is kept with `-d` (the cleanup, FSL-46, otherwise removes
+it); **(observed)** with `-d` the files listed below are exactly the ones FSL leaves. A program
+that fails makes the script fail (§5.1: `bet failed during command:<args>` on standard output,
+exit 1), unless said otherwise. The data types below are **(observed)** for an int16 input.
+
+**`-S`: the eyes and optic nerves removed** (SIENA's cleanup; "disables -o" means only that the
+outline, and the mesh, reach the temporary run alone). In order:
+1. bet2 `<in> <out>_tmp_betraw -s <opts>`: the raw brain (float32), its skull
+   `<out>_tmp_betraw_skull` (int16), and whatever `<opts>` asks for, all under the temporary name.
+2. `standard_space_roi <in> <out>_tmp_premask -b -d`: the input masked by the dilated MNI152
+   brain mask taken into its space (float32); being run with `-d`, it leaves its own temporary
+   files `<out>_tmp_premask_tmp_to_std` (the input on MNI152's grid, the input's type),
+   `_tmp_to_std.mat`, `_tmp_to_std_inv.mat` (the inverse), `_tmp_standard_mask`,
+   `_tmp_standard_mask_to_in`, `_tmp_masked` (float32).
+3. bet2 `<out>_tmp_premask <out>_tmp_premask_bet -n -m -f 0.4 <opts>`: only its mask
+   `<out>_tmp_premask_bet_mask` (int16) is used; a `-f` among `<opts>` replaces the 0.4 (bet2's
+   last `-f` counts, §4.1).
+4. FLIRT `-ref <in> -in MNI152_T1_2mm_eye_mask -applyxfm -init <out>_tmp_premask_tmp_to_std_inv.mat
+   -datatype float -out <out>_tmp_eye_mask`: the eye mask on the input's grid (trilinear, float32).
+5. fslmaths `<out>_tmp_eye_mask -thr 0.5 -bin -dilF -kernel 2D -dilF` and 6 more `-dilF`, `-odt
+   short`, into `<out>_tmp_eyes7dil` (int16): the first dilation with the default 3 × 3 × 3 box,
+   the other seven with the 3 × 3 × 1 one.
+6. fslmaths `<out>_tmp_eyes7dil -mul -1 -add 1` into `<out>_tmp_eyes7dil_inv` (float32).
+7. fslmaths `<out>_tmp_betraw -bin -mas <out>_tmp_eyes7dil_inv -add <out>_tmp_premask_bet_mask -bin
+   -mul <out>_tmp_betraw` into `<out>_tmp_prebrain` (float32): the raw brain where it is outside
+   the dilated eyes or inside the premasked run's mask.
+8. `Mean` and `SD`: fslstats `<out>_tmp_prebrain -M` and fslstats `<out>_tmp_prebrain -S` (the
+   non-zero voxels' mean and standard deviation), as the programs print them (6 significant digits,
+   a trailing blank; `specs/fslstats.md`).
+9. The eye threshold `thr` = `Mean + 3.5 × SD`, computed **in decimal** on the printed numbers, as
+   GNU dc does it with scale 10 (a printed number with an exponent first written out in plain
+   decimal, exactly: `2.1e+06` is `2100000`, `1.23457e-05` is `.0000123457`): the product
+   `3.5 × SD` is exact when `SD` has at most 9 decimal places, else truncated toward zero to `SD`'s
+   own number of places (**observed**: `3.5 × .000000000001` is `.000000000003`); the sum is
+   exact; the result is the decimal text
+   dc prints (no leading zero before the point, `.4` not `0.4`; `-` for a negative value; the
+   trailing zeros of the operands' scale kept: `3.5 × 2 + 3` is `10.0`; zero is `0`). fslmaths then
+   reads that text as its number. **(observed)** `523.418` and `81.2345` give `807.73875`. Computing
+   it in binary floating point instead can move the threshold by one unit in the last place and
+   so flip the voxels that equal it. FSL hands the printed text to dc as dc's own input, which
+   misreads three kinds of values (FSL-216, §9): an exponent (`2.1e+06`, a mean of 1,000,000 or
+   more, or below 0.0001), a minus sign (a negative mean is read as a subtraction), and `nan` or
+   `inf` (non-finite voxels in the brain).
+10. fslmaths `<out>_tmp_prebrain -uthr <thr> -bin -ero -dilF -dilF -ero -mul <out>_tmp_prebrain -uthr
+    <thr> -bin -kernel 2D -ero -dilF -mul <out>_tmp_betraw` into `<out>` (float32): the brain below
+    the threshold, opened and closed with the 3D box, then once more below the threshold, eroded
+    and dilated in 2D, times the raw brain.
+11. fslmaths `<out> -bin` into `<out>_mask` (float32; always written, `-m` or not).
+12. fslmaths `<out>_tmp_eyes7dil -ero -kernel 2D -ero -mul -1 -add 1` into `<out>_tmp_eyes5dil_inv`
+    (float32), then fslmaths `<out>_tmp_betraw_skull -mas <out>_tmp_eyes5dil_inv` into
+    `<out>_skull` (float32; always written).
+With `-n` among `<opts>` step 1 writes no raw brain and step 7 fails on the missing image
+(**observed**, standard error: `Image Exception : #63 :: No image files match: out_tmp_betraw`,
+`terminate called after throwing an instance of 'std::runtime_error'`, `  what():  No image files
+match: out_tmp_betraw`, and bash's report `<script>: line 399: <pid> Aborted                 ${FSLDIR}/bin/fslmaths ${OUT}_tmp_betraw -bin -mas ${OUT}_tmp_eyes7dil_inv -add ${OUT}_tmp_premask_bet_mask -bin -mul ${OUT}_tmp_betraw ${OUT}_tmp_prebrain`
+(the command as the script writes it; the process ID right-aligned in 5 columns; `Aborted`
+padded with blanks to 24 characters); then the failure line on standard output, exit 1; the replica prints
+`bet` for `<script>`); the Python API refuses `variation="eyes"`
+with `brain=False` (and with `outline` or `mesh`, which only the temporary run writes). A NaN
+voxel in the input reaches FLIRT inside step 2 first (FSL-14 of FLIRT: the default refuses there).
+
+**`-B`: the bias field and the neck removed** (SIENA's). In order:
+1. `standard_space_roi <in> <out>_tmp_premask -b -d` (as `-S`'s step 2).
+2. FAST `-b <out>_tmp_premask` with its defaults (three classes, T1), its standard output and
+   error discarded: `<out>_tmp_premask_bias` (the estimated bias field, float32) and FAST's
+   default outputs `_seg`, `_pveseg`, `_mixeltype` (int32), `_pve_0`, `_pve_1`, `_pve_2` (float32),
+   all `<out>_tmp_premask_...`. (larmorx's own notices and refusals are not discarded: they are
+   larmorx's, not FAST's messages.)
+3. fslmaths `<in> -div <out>_tmp_premask_bias` into `<out>_tmp_unbiased` (float32).
+4. Only with `-s` among the options: `standard_space_roi <out>_tmp_unbiased
+   <out>_tmp_unbiased_forskull_reduced -maskFOV -roiNONE -d`, bet2
+   `<out>_tmp_unbiased_forskull_reduced <out>_tmp_unbiased_forskull <opts>`, then `<opts>` loses
+   every `-s` (the text `-s` removed wherever it stands, after the options were printed by the
+   shell's `echo`, as `-R` does: FSL-63, §5.1), and the skull is renamed (fslpy's `immv`) from
+   `<out>_tmp_unbiased_forskull_skull` to `<out>_skull`.
+5. `standard_space_roi <out>_tmp_unbiased <out>_tmp_unbiased_premask -b -d`.
+6. The bet script itself, again: `bet <out>_tmp_unbiased_premask <out> -m <opts> -R -d` (§5.2's
+   `-R`, which removes `-n`: the brain is always written; its verbose lines with `-v`; its own
+   failure line before the outer script's when it fails; its `-d` keeps nothing of its own, the
+   outer cleanup removes `<out>_tmp...`). So `<out>` (float32) and `<out>_mask` (int16) are always
+   written.
+**(observed)** With `-d`, the files kept: `<out>_tmp_premask` and its six standard_space_roi files,
+FAST's seven, `<out>_tmp_unbiased`, `<out>_tmp_unbiased_premask` and its six (the
+`_tmp_unbiased_forskull...` files too with `-s`).
+
+**`-A`: the skull and scalp surfaces** (T1 only):
+1. FLIRT `-ref MNI152_T1_2mm -in <in> -omat <out>_tmp_T1_to_std.mat` (FLIRT's defaults: 12
+   degrees of freedom, the correlation ratio; the matrix only).
+2. bet2 `<in> <out> -e <opts>`: the brain (unless `-n`), the mesh `<out>_mesh.vtk`, and what
+   `<opts>` asks for.
+3. betsurf `--t1only -o -m -s <in> <out>_mesh.vtk <out>_tmp_T1_to_std.mat <out>` (§6): the
+   surfaces' outlines, masks and the skull mask (int16) and the three VTK meshes (§6.6).
+
+**`-A2 <T2>`: the same with a T2-weighted image** (not brain-extracted):
+1. FLIRT `-in <T2> -ref <in> -out <out>_tmp_T2_to_T1 -omat <out>_tmp_T2_to_T1.mat -interp sinc`:
+   the T2 registered to the input (float32 on the input's grid). `<T2>` is passed as given (no
+   `remove_ext`; FSL splits a name with blanks, FSL-44).
+2. and 3. as `-A`'s 1 and 2.
+4. betsurf `-o -m -s <in> <out>_tmp_T2_to_T1 <out>_mesh.vtk <out>_tmp_T1_to_std.mat <out>`.
+A T2 that does not exist makes FLIRT fail (FSL-68 of FLIRT: the default's exit 1), so the script
+fails; `-A2` as the last argument prints the usage (§5.1).
+
+**Which variation, and the order.** The last of `-R`, `-S`, `-Z`, `-F`, `-A`, `-A2`, `-B` given
+counts (`bet <in> <out> -B -R -S -A` runs `-A`); the options are read first, so `-v`'s lines
+(§5.1) come before anything runs. With `-v`, each program prints its own verbose output (bet2's
+`-v` among `<opts>`; FLIRT, FAST and `standard_space_roi` are not given `-v`).
+
+**FSL's standard images missing** (§5.4): the original checks, before running anything, that
+every image the variation reads is found, and refuses with exit 1 naming the image and every place
+looked; FSL's script would fail in the middle (FLIRT cannot read the reference).
+
+**Python** (`lx.fsl.bet`): `variation="eyes"` (`-S`), `"bias"` (`-B`), `"surfaces"` (`-A`),
+`"surfaces_t2"` (`-A2`, with `t2=` the T2-weighted image, required there and refused elsewhere),
+`fsl_data=` (a directory laid out as FSL's `data`, §5.4); `BetResult.surfaces` (a
+`BetsurfResult`: the inner skull, outer skull and scalp masks, the skull mask and the outlines) for
+`"surfaces"` and `"surfaces_t2"`; `"eyes"` refuses `brain=False`, `outline=True` and `mesh=True`
+(`ValueError`). The replica's wrapper is the model (`python/larmorx/fsl/bet.py`, its arguments
+and results).
+
+### 5.4 FSL's standard images (spec writer, 2026-11-04)
+
+The variations read three images of FSL 6.0.7.23's data package `fsl-data_standard` 2208.0 (FSL's
+`${FSLDIR}/data/standard/`), all on FSL's 2 mm MNI152 grid (91 × 109 × 91, 2 mm voxels):
+
+| Image | Read by | Type | Bytes (`.nii.gz`) | SHA-256 |
+|---|---|---|---|---|
+| `MNI152_T1_2mm` | `-S`, `-B` (standard_space_roi's reference), `-A`, `-A2` (FLIRT's reference) | int16 | 1,406,977 | `0585cd056bf5ccfb8bf97a5f6a66082d4e7caad525718fc11e40d80a827fcb92` |
+| `MNI152_T1_2mm_brain_mask_dil` | `-S`, `-B` (standard_space_roi `-b`) | uint8 | 11,132 | `342d41e1c445d87a812ca288786a116306e96a5595a198e46ba7e7515d4f221c` |
+| `MNI152_T1_2mm_eye_mask` | `-S` (step 4) | uint8 | 2,788 | `5ce2da5f524da4562d2274192010c69e152b83166f214ac75dbcc5a778493ad5` |
+
+FAST (`-b`, no priors) and betsurf read none. **Their licence**: FSL's data package names no
+licence of its own, so the FSL Licence applies (non-commercial use); `MNI152_T1_2mm` (FSL's MNI152,
+the MNI ICBM 152 non-linear 6th generation average) also carries the McConnell Brain Imaging
+Centre's permissive notice. The main package (Apache-2.0) never ships them: the original reads
+them as input data at run time, and FSL's terms then bind their use, as with FSL itself.
+
+**Where the original finds each image** (the user's decision of 2026-11-04), in this order:
+1. The directory the call names: `fsl_data=` in Python, `LARMORX_FSL_DATA` otherwise (a directory
+   laid out as FSL's `data`: `<dir>/standard/MNI152_T1_2mm.nii.gz`, any of FSL's image extensions
+   accepted); when it is given, nothing else is searched (the replica does the same).
+2. larmorx-nc's copy, when larmorx-nc is installed: its wheel installs the three files, byte for
+   byte, at `<prefix>/share/larmorx-nc/fsl-data/standard/` with a `MANIFEST.tsv` (file, bytes,
+   SHA-256), where `<prefix>` is the installation prefix of the `larmorx-nc` program larmorx finds
+   (the replica search, `docs/licensing.md`: the program's directory's parent; in Windows'
+   per-user scheme, whose program is in `<userbase>\Python3XY\Scripts` and data in `<userbase>`,
+   one level higher). The original reads these files as data only: it runs and links nothing of
+   larmorx-nc.
+3. `$FSLDIR/data/standard/`, when `FSLDIR` is set and holds the image.
+4. A download, once: FSL's conda package
+   `https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/public/noarch/fsl-data_standard-2208.0-0.tar.bz2`
+   (196,312,969 bytes; SHA-256 `2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a`;
+   a bzip2-compressed tar whose members `data/standard/<image>.nii.gz` are the files of the
+   table), checked against both checksums, only the three members kept, cached in larmorx's data
+   cache for every later call (the place and the command that fetches ahead for offline machines
+   are the ones the decision log names for every fetched data set; a message names FSL's Licence
+   when it downloads).
+When none has the image, the original refuses before running anything (exit 1), naming the image
+and every place looked, and saying how to provide it. Files from larmorx-nc's copy and from the
+download must match the table's SHA-256 (else refused: a damaged file); files from the named
+directory or `$FSLDIR` are used as they are (another FSL release's images give that release's
+results, as in FSL).
+
+The replica's order differs in one place, by design: it reads `$FSLDIR` before its own copy, as
+FSL's scripts name `$FSLDIR`; with FSL 6.0.7.23's files both give the same bytes.
 
 ## 6. `betsurf`
 
@@ -942,7 +1118,10 @@ the phases above.
 | bet | no output name | usage (stdout) | 1 |
 | bet | input not an image | empty line, `Error: input image <in> not valid`, empty line | 1 |
 | bet | a failing step | `<path> failed during command:<args>` (stdout) | 1 |
-| bet | `-S`, `-B`, `-A`, `-A2` | larmorx: pending | 1 |
+| bet | `-S`, `-B`, `-A`, `-A2`: a standard image found nowhere (§5.4) | larmorx: the image and every place looked, before anything runs | 1 |
+| bet | `-S`: the brain's mean or deviation not a number (FSL-216) | larmorx: refused, naming FSL-216 | 1 |
+| bet | `-S -n` | fslmaths' abort, bash's report, the failure line (§5.3) | 1 |
+| bet | `-A2` without its T2 | usage (stdout) | 1 |
 | betsurf | too few arguments | `too few arguments`, usage | 255 (`--t1only`: 0) |
 | betsurf | matrix not found | `unable to open <name>` | 255 (`--t1only`: 0) |
 | betsurf | mesh not found | `error opening file` / `could not open the following file: <name>` / `terminating.` | 255 |
@@ -1118,10 +1297,11 @@ on nine real T1w images, NIfTI-1 and NIfTI-2 outputs alike (18 of 18).
 | FSL-41 | no voxel for the median intensity: FSL 6.0.7.17 read an empty list and crashed | **(FSL 6.0.7.23)** fixed upstream: `tm = t98` | the same |
 | FSL-42 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w ≤ 0`, a non-finite `-c` or search depth are used as given | refuses, naming the value | uses them |
 | FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume, reaching points by their linear index (other voxels of the volume, or memory beyond it); at a centroid that is not a number it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | FSL's fill point by point by the linear index (§4.6): inside the volume exactly, memory beyond it read as not 1 and not written; a centroid that is not a number: no fill (the drawn surface only); warns |
-| FSL-44 | bet expands its arguments unquoted: a name with a blank becomes several words; an empty argument ends the options | quotes them | FSL's word splitting |
-| FSL-63 | `bet -R` passes bet2's options through bash's `echo`, which takes leading `-n`, `-e`, `-E` words as its own: a leading `-e` (the mesh) is dropped, escapes read after it | the options as given | FSL's `echo` |
+| FSL-44 | bet expands its arguments unquoted: a name with a blank becomes several words; an empty argument ends the options; (spec writer, 2026-11-04) `-A2`'s T2 too, and the names it hands to every program of §5.3 | quotes them | FSL's word splitting |
+| FSL-63 | `bet -R` passes bet2's options through bash's `echo`, which takes leading `-n`, `-e`, `-E` words as its own: a leading `-e` (the mesh) is dropped, escapes read after it; (spec writer, 2026-11-04) `-B -s` too, whose removal of `-s` also removes `-s` inside other words | the options as given (with `-B -s`, the word `-s` removed) | FSL's `echo` and removal |
 | FSL-45 | `-Z` crops with `imglob`, called without `${FSLDIR}/bin`: off the PATH the outputs stay padded; on it, other images named like the output are cropped too | crops exactly its outputs | FSL's behaviour for the PATH given |
-| FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own | removes all |
+| FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own (spec writer, 2026-11-04: with §5.3, every `<out>_tmp...` file the run's programs wrote, FAST's and standard_space_roi's included: the files that did not exist before the run or changed during it) | removes all |
+| FSL-216 | (spec writer, 2026-11-04) `-S`'s eye threshold is computed by dc from the printed mean and deviation (§5.3 step 9): a number with an exponent has its `e` and sign read as dc's commands (dc's message lands in the threshold and fslmaths fails), a negative mean is read as a subtraction, `nan` and `inf` are commands (the threshold is garbage) | rule A: the numbers read as numbers (§5.3 step 9; named when the result differs from FSL's); rule B: a mean or deviation that is not a number refused (exit 1) | what GNU dc 1.4.1 prints for FSL's text, its messages too (`dc: ` on standard error, the rest on standard output, so in the threshold); named |
 | FSL-47 | `--t1only`'s scalp mask is filled from the outer skull surface's centre in the working grid | fills from the scalp surface's | FSL's |
 | FSL-48 | a T2 on another grid is sampled at the T1's voxel coordinates | refuses | samples it so |
 | FSL-49 | `S < S2` keeps the T1's scalp (`outskin = outskin`) | kept (rule C) | kept |
@@ -1154,6 +1334,15 @@ Where FSL spends its time (one 1 mm T1, about 2 s for bet2 and 40 s for betsurf 
 - The masks' fills: a breadth-first fill or a scanline fill is far faster than FSL's stack of
   single voxels, with the same result.
 - Reading and writing: `.nii.gz` compression dominates for large images (parallel deflate).
+- (spec writer, 2026-11-04) `-S`, `-B`, `-A`, `-A2` (§5.3): the registrations to MNI152 (FLIRT,
+  each about 10-30 s for a 1 mm T1), FAST in `-B`, betsurf in `-A`/`-A2`, and `-B`'s robust run
+  (up to 11 bet2 runs). Steps that do not read each other's outputs can run at the same time with
+  the same results: in `-S`, the raw bet2 run (step 1) beside standard_space_roi (step 2); in `-A`,
+  the FLIRT run beside bet2; in `-A2`, both FLIRT runs and bet2. `-B`'s two standard_space_roi
+  runs register nearly the same image (before and after the bias correction) and cannot share a
+  registration without changing the result. The replica's times on the main machine (FSL single
+  threaded, the replica with 4 threads; a 1 mm adult T1, a child's T1 and T2 for `-A2`): `-S` 41 /
+  32 s, `-B` 106 / 61 s, `-A` 32 / 28 s, `-A2` 134 / 97 s.
 
 ## 11. Validation plan
 
@@ -1181,3 +1370,32 @@ same cases with `implementation="original"`):
   a last-bit difference in `pow` after 1000 iterations (§8).
 - **Speed**: against FSL and the replica on the real data (single thread and all cores),
   reported, not gated.
+
+### 11.1 `-S`, `-B`, `-A`, `-A2` (spec writer, 2026-11-04)
+
+Against FSL 6.0.7.23 (`~/fsl-6.0.7.23`, FSL's standard images of §5.4), through the BET suite
+with `implementation="original"` (the replica's cases are the model: `bet/eyes-*`, `bet/bias-*`,
+`bet/surfaces-*`, `bet/last-variation`, `defects/eyes-threshold-exponent`, `defects/eyes-nan`,
+`defects/bias-skull-echo`, and the real images `real/adult-ds000005-S`, `real/tumour-S`,
+`real/child-3y-B`, `real/older-82y-B`, `real/older-75y-A`, `real/child-7y-A2`: an adult, a
+tumour, a 3.5-year-old, an 82-year-old with the neck, a 75-year-old at 1.5 T, a 7.5-year-old with
+motion and its T2w):
+- **Cases**: each variation with `-d` (every temporary file compared), `-v`, `-m`, `-s`, `-n`,
+  `-o`, `-e`, `-t`, `-f`, the options' combinations of §5.3 (`-S -n`, `-B -s`, `-B -e -s`, `-B
+  -n -o`), every `FSLOUTPUTTYPE` (a pair), the last variation given, `-A2` without its T2 and with
+  a T2 that does not exist, FSL-216's three kinds of values (a phantom scaled above 1,000,000; a
+  brain with a negative mean; NaN voxels, refused by FLIRT first, so the threshold's NaN rule in a
+  unit test), and each image of §5.4 missing.
+- **Metrics**: exit statuses and both streams identical (bash's process IDs masked); the eye
+  threshold's text identical to GNU dc's for the same printed numbers (a unit test on dc's
+  expressions: exponents, negative means, products truncated at 10 and more places, zero); stage by
+  stage, each step given FSL's previous files (kept by `-d`) within that program's own thresholds
+  (its spec), so that each difference is attributed to the step that makes it; where the original's
+  FLIRT and FAST give FSL's matrix and bias field bit for bit, every output bit for bit; else the
+  masks (brain, `<out>_mask`, betsurf's) Dice ≥ 0.99, boundary distance 95th percentile ≤ 1 voxel,
+  maximum ≤ 3 voxels, and the brain identical to the input times the mask.
+- **The data** (§5.4): the order (the named directory alone when given; larmorx-nc's copy; `$FSLDIR`;
+  the download), each refusal's message, the download from a pre-filled cache and from a local copy
+  of the package (no network in tests), a damaged file refused (a changed byte).
+- **Speed**: against FSL and the replica on the real images (one thread and all cores), reported,
+  not gated.

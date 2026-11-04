@@ -1886,3 +1886,15 @@ together at the end.
   mathematics and data defined mathematically, with a validation plan of glibc's results as black-box hashes), then a
   clean-room implementer (the functions in `larmorx_core::math` from the spec alone; the originals' and replicas'
   `reproduce` wired to them; the records they move re-made). One agent at a time: the second half needs the spec.
+
+## 2026-11-04: GLIBC-07's tables (the user)
+- **Asked:** the spec writer's two licence questions (`specs/glibc-dbl.md` §5.3). (1) glibc's double `sin`/`cos`
+  table of sin and cos of N/128 (440 numbers): its mathematical definition reproduces 422; 18 low parts are 1 to 2
+  units off (one 39), and glibc's 18 numbers change no result on 1.9 × 10^10 arguments per function (about one
+  difference in 2^53 uses expected). (2) `tan`, `asin`, `acos`, `atan`: their tables are the output of a search or a
+  fit (about 4,000 numbers), which no definition reproduces.
+- **User decision:** (1) **keep the definition**: the clean-room `sin`, `cos` and `sincos` regenerate the table from
+  it, no glibc data in larmorx, the theoretical gap documented. (2) **leave `tan`, `asin`, `acos` and `atan`
+  correctly rounded** in `reproduce` too: no LGPL data in larmorx; they differ from glibc only in the last bit, in
+  0.05 to 0.25 % of results (GLIBC-07's frequencies), reached only by fslmaths' double `-tan`, `-asin`, `-acos`,
+  `-atan`, never by fMRIPrep.

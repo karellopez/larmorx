@@ -1,0 +1,15 @@
+{
+  "larmorx_commit": "7958e0e",
+  "libc": "glibc 2.35",
+  "glibc_tunables": "glibc.cpu.hwcaps=-AVX2,-FMA",
+  "threads": 28,
+  "seconds": 6.0,
+  "checks": [
+    {"function": "sinf_glibc_sse2", "reference": "glibc sinf (SSE2 build)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
+    {"function": "cosf_glibc_sse2", "reference": "glibc cosf (SSE2 build)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
+    {"function": "sincosf_glibc_sse2 (both outputs)", "reference": "glibc sincosf (SSE2 build)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
+    {"function": "sinf_glibc and cosf_glibc (FMA build)", "reference": "glibc sinf and cosf (SSE2 build): the builds' differences", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967262, "differing": 34, "nan_results": 0, "nan_identical": 0, "first_mismatches": ["0x418a3adb", "0x418a3adc", "0x418a3add", "0x418a3ade", "0x41bc76d9", "0x4202eb4b", "0x4255b0a9", "0x42687a55"]}
+  ],
+  "failing_checks": 0,
+  "inputs_where_the_builds_differ": 34
+}

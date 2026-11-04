@@ -58,7 +58,8 @@ AFNI is public domain; newer NIH programs call MCW library routines
 | Replica author | everything | the replica in the licence family's workspace, with SPDX headers and the upstream's notices |
 
 The clean-room implementer must not open the upstream source, the replica crates
-(`crates/larmorx-afni-replica`, `crates-gpl/tools/glibc-reference`, `crates-nc/`), or
+(`crates/larmorx-afni-replica`, `crates-gpl/` with its glibc tools, among them `tools/glibc-reference`
+and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
 [findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
 [findings/afni-licence-routines.md](findings/afni-licence-routines.md),

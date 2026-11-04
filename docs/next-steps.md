@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (the first half done 2026-11-04, the second half next; item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -594,6 +594,38 @@ The items below keep their history.
    is less accurate than FSL's FFT, beyond §21's bound on the page's real call; the original's
    double sums there, 2026-11-04, lie closer to the exact result than FSL's FFT, 2.0e-7 of FSL's
    largest value from FSL's output).
+   **glibc's exact maths for `reproduce`: the first half done (2026-11-04, relays 1 to 3; the
+   user's decisions of 2026-11-04).** (1) *The copy:* glibc 2.35's functions from permissive
+   code, Arm's Optimized Routines v19.11 (MIT: `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`
+   and the double `exp`, `log`, `pow`; also glibc's SSE2 build of `sinf`, `cosf`, `sincosf`) and
+   fdlibm (Sun's notice: `atanf`, `atan2f`), are `larmorx_core::math`'s `*_glibc` functions,
+   with x86-64's NaN bits on every platform and FMA copies behind the core's audited dispatch.
+   Proved equal to glibc 2.35 itself, bit for bit with NaN bits (63 × 10^9 comparisons in 29 s:
+   every one-argument float function on all 2^32 inputs, `powf` and `atan2f` on 1.3 to 1.6 × 10^9
+   pairs, the double functions on 1.1 to 1.6 × 10^9 arguments, every special value; the SSE2 build
+   with glibc's FMA build switched off, on all 2^32 inputs), and to the replicas' translations,
+   which now re-export them: one translation, no replica's output moved (the unit tests, the FSL
+   replicas' golden test, the AFNI replicas' golden cases). (2) *The spec:* `specs/glibc-dbl.md`
+   for glibc's LGPL double `sin`, `cos` and `sincos` (x86-64: the FMA build of `sin` and `cos`,
+   `sincos`'s single build): the method as mathematics, its constants and its table of sines and
+   cosines of N/128 from their definitions (`validation/investigations/glibc-dbl/tables.py`), the
+   black-box record of the seven IBM functions (1,600 block hashes over 6.7 × 10^9 arguments, and
+   glibc's SSE2 build of `sin` and `cos`), proved by a model written from the text alone
+   (`crates-gpl/tools/glibc-dbl-model`: 768 of 768 blocks, 3.2 × 10^9 arguments, every special
+   argument, NaN bits included). The user decided the table's definition (422 of glibc's 440
+   numbers; the 18 others changed no result on 1.9 × 10^10 arguments per function) and that
+   `tan`, `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too (their tables are
+   searched and fitted data). **The second half** (next; two roles, one after the other): (a) a
+   clean-room implementer who never read glibc writes `sin_glibc`, `cos_glibc` and
+   `sincos_glibc` in `larmorx_core::math` from `specs/glibc-dbl.md` alone (its §12: the record's
+   768 blocks and the special arguments, both readings of the fused operations, golden cases) and
+   wires the clean-room originals' `reproduce` to the `*_glibc` functions wherever their specs
+   name glibc's (fslmaths, fslstats, FLIRT, FAST, topup, BET, the head-motion correction),
+   re-making the records that move; (b) a replica-side step (an agent that may read
+   `crates-nc/`) wires the FSL replicas' `reproduce` to the new `sin_glibc`, `cos_glibc` and
+   `sincos_glibc` (fslmaths' `-sin` and `-cos`, the Kiss FFT's twiddle factors, the kernels'
+   windows, avscale's `sqrtaff`) and re-makes their records (random testing's permanent case
+   `fft-twiddles-glibc-sincos` then bit for bit; `fn/double-tan` stays an expected divergence).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -723,7 +755,11 @@ The items below keep their history.
   from FSL's at its 3,983rd evaluation by `sinf`/`cosf`, at line 4,814 by `atan2f`). The ways:
   a shared module in `larmorx-core` (the implementer may not read the AFNI replica's copy of
   Arm's `sinf`/`cosf`), or each from a behaviour spec, implemented clean-room (the `cbrtf` and
-  GLIBC-07 route).
+  GLIBC-07 route). **The shared module exists since 2026-11-04** (the user's decision; the glibc
+  maths part's first half, item 7): `larmorx_core::math`'s `sinf_glibc`, `cosf_glibc`,
+  `sincosf_glibc` and `atan2f_glibc`, translated from Arm's and fdlibm's permissive code (not
+  from any replica), open to every implementer; the wiring in FLIRT's original is the second
+  half's.
 - **`lx.mri.hmc`'s centres of mass, blocked as mcflirt's** (2026-11-03, `specs/mcflirt.md` §6.1,
   spec writer): both of mcflirt's centres are FLIRT's blocked sums (`specs/flirt.md` §8.1 step 3:
   `v − v_min` in single precision, double running sums over the voxels in z, y, x order flushed into
@@ -809,8 +845,11 @@ The items below keep their history.
   `--nthr=4`: the field up to 3.2 Hz inside the brain, FSL-116; the site's page): a candidate for
   an upstream report (`docs/upstream-reports/`), the user decides.
 - **fslmaths and fslstats: follow-ups** (2026-11-03, the replica part):
-  - **GLIBC-07 by the `cbrtf` route** (for the orchestrator to schedule, a small part as GLIBC-05
-    was): glibc 2.35's double `sin` (0.12 % of image intensities one unit in the last place), `cos`
+  - **GLIBC-07 by the `cbrtf` route** (scheduled 2026-11-04 as the glibc maths part, item 7: the
+    spec written for `sin`, `cos` and `sincos`, the clean-room implementation its second half;
+    `tan`, `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too, the user's
+    decision of 2026-11-04, so the record's `fn/double-tan` stays an expected divergence; the
+    text below is the plan as it stood before): glibc 2.35's double `sin` (0.12 % of image intensities one unit in the last place), `cos`
     (0.085 %), `tan` (0.21 %), `asin` (0.16 %), `acos` (0.071 %), `atan` (0.083 %) and `sincos`
     (0.148 % of the FFT's twiddle angles; one build) are IBM's code in glibc (LGPL): a behaviour
     spec, then a clean-room implementation of glibc's bits in `larmorx_core::math`, for fslmaths'
@@ -823,8 +862,9 @@ The items below keep their history.
   - **Their follow-ups** (2026-11-04; the first one found, the direct sum in double precision
     where FSL takes its FFT, findings 31, done in the part's relay 7b with the record re-made):
     (1) the original's `reproduce` gives glibc's `exp`, `log` and `pow` bits
-    as §19 asks (Arm's Optimized Routines, MIT: a port into `larmorx_core::math`), today
-    correctly rounded in both modes; (2) correctly rounded `erf` and `erfc` in
+    as §19 asks (Arm's Optimized Routines, MIT: the port into `larmorx_core::math` exists since
+    2026-11-04, `exp_glibc`, `log_glibc`, `pow_glibc`; the wiring is the glibc maths part's second
+    half, item 7), today correctly rounded in both modes; (2) correctly rounded `erf` and `erfc` in
     `larmorx_core::math` (the original's `-ztop` uses the `libm` crate's, within rule 5);
     (3) larmorx-io's parallel gzip writer holds two 256 KiB blocks and their outputs per worker
     (about 3 MiB each): 4D outputs at 32 threads exceed FSL's memory allowance (one block per

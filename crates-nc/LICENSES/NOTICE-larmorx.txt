@@ -283,18 +283,27 @@ originals, contain no AFNI code)
   in any work or product based on this material"; the NIfTI library states "This code is released
   to the public domain."
 
-Arm Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c, cosf.c, sincosf_data.c: the
-single-precision sine and cosine that glibc 2.35 ships) - MIT License
+Arm Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c, cosf.c, sincosf_data.c,
+logf.c, logf_data.c, expf.c, exp2f_data.c, powf.c, powf_log2_data.c, exp.c, exp_data.c, log.c,
+log_data.c, pow.c, pow_log_data.c, math_config.h: the single-precision sine, cosine, logarithm,
+exponential and power and the double exponential, logarithm and power that glibc 2.35 ships) -
+MIT License
   Copyright (c) 1999-2019, Arm Limited.
-  Translated into Rust in crates/larmorx-afni-replica/src/sincosf.rs, modified from the originals.
-  The licence text is in LICENSES/MIT-arm-optimized-routines.txt.
+  Translated into Rust in crates/larmorx-core/src/math/sincosf_glibc.rs, logf_glibc.rs,
+  expf_glibc.rs, powf_glibc.rs, exp_glibc.rs, log_glibc.rs and pow_glibc.rs (since 2026-11-04;
+  the AFNI replicas' sine and cosine, translated in crates/larmorx-afni-replica/src/sincosf.rs
+  from 2026-10-29, now use them), modified from the originals. The licence text is in
+  LICENSES/MIT-arm-optimized-routines.txt.
 
-fdlibm, as glibc 2.35 carries it (sysdeps/ieee754/flt-32/s_tanhf.c, s_expm1f.c)
+fdlibm, as glibc 2.35 carries it (sysdeps/ieee754/flt-32/s_tanhf.c, s_expm1f.c, s_atanf.c,
+e_atan2f.c)
   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
   Developed at SunPro, a Sun Microsystems, Inc. business.
   Permission to use, copy, modify, and distribute this software is freely granted, provided that
   this notice is preserved.
-  Translated into Rust in crates/larmorx-afni-replica/src/fdlibm.rs, modified from the originals.
+  Translated into Rust in crates/larmorx-afni-replica/src/fdlibm.rs (tanhf, expm1f) and
+  crates/larmorx-core/src/math/atanf_glibc.rs (atanf, atan2f; since 2026-11-04), modified from
+  the originals. The notice is in LICENSES/LicenseRef-fdlibm.txt.
 
 fdlibm 5.3, as netlib distributes it (s_tanh.c, s_expm1.c: the double-precision tanh glibc 2.35 ships)
   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.

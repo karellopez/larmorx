@@ -53,6 +53,38 @@ Differences from the C code, all without effect on the result in round-to-neares
 - the NaN returned for negative `log` arguments is the canonical quiet NaN on every platform.
 - inline hints are `#[inline(always)]` so that the kernels compile into the FMA-enabled copy that `math` selects at run time on x86-64. That changes code generation only; the results are bit-identical, which a unit test checks.
 
+**Ported from Arm's Optimized Routines and fdlibm: glibc 2.35's own functions from permissive
+code** (2026-11-04, the user's decision of that day: copied from the FSL replica core, so that the
+clean-room originals' `reproduce` gives the originals' bits, and shared by every crate). glibc
+2.35 took these functions from Arm's Optimized Routines v19.11 (MIT, "Copyright (c) 1999-2019,
+Arm Limited", `LICENSES/MIT-arm-optimized-routines.txt`) and from fdlibm (Sun's notice,
+`LICENSES/LicenseRef-fdlibm.txt`) and kept their arithmetic; the translations are made from those
+originals, not from glibc's LGPL files (compared line by line when they were first written in
+the replica crates, 2026-10-10 to 2026-11-03). They give glibc 2.35's x86-64 bits (the FMA build,
+which glibc runs on CPUs with FMA and AVX2, the oracles' build) on every platform: each fused
+multiply-add GCC makes in that build (read from `objdump -d` of Ubuntu 22.04's libm.so.6) is a
+`mul_add`, and every NaN result is SSE's (`math/x86_nan.rs`, larmorx's own: the default NaN
+`0xffc00000`/`0xfff8000000000000` for a NaN made from numbers, the first operand's NaN quieted).
+They are for `reproduce` and the replicas only; the defaults stay the correctly rounded functions.
+
+| larmorx | Translated from | Until 2026-11-04 in | Verification |
+|---|---|---|---|
+| `math/sincosf_glibc.rs` (`sinf_glibc`, `cosf_glibc`, `sincosf_glibc`; the SSE2 build `*_glibc_sse2`) | Arm `math/sincosf.h`, `sincosf.c`, `sinf.c`, `cosf.c`, `sincosf_data.c` | `larmorx-nc-core` `glibc_float.rs`, `larmorx-afni-replica` `sincosf.rs` (the SSE2 build there) | all 2^32 inputs of each against glibc 2.35 (FMA build; the SSE2 build against glibc's forced by `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA`) and against both earlier translations: 0 differ, NaN bits included |
+| `math/logf_glibc.rs` | Arm `math/logf.c`, `logf_data.c` | `glibc_float.rs` | all 2^32 inputs against glibc and the earlier translation: 0 differ |
+| `math/expf_glibc.rs` (and `__exp2f_data`) | Arm `math/expf.c`, `exp2f_data.c` | `glibc_float.rs` | as `logf_glibc` |
+| `math/powf_glibc.rs` | Arm `math/powf.c`, `powf_log2_data.c` | `glibc_float.rs` | 1,610,612,736 sampled pairs in six families (TFCE's, negative bases, subnormals, the overflow and underflow limits, random bits) and every pair of 174 special values, against glibc and the earlier translation: 0 differ |
+| `math/exp_glibc.rs` (and `__exp_data`) | Arm `math/exp.c`, `exp_data.c`, `math_config.h` | `glibc_double.rs` | 1,610,612,736 sampled arguments in six families and 174 special values: 0 differ |
+| `math/log_glibc.rs` | Arm `math/log.c`, `log_data.c` | `glibc_double.rs` | as `exp_glibc` |
+| `math/pow_glibc.rs` | Arm `math/pow.c`, `pow_log_data.c` | `glibc_double.rs` | 1,073,741,824 sampled pairs in eight families (BET's exponents, x near 1 with large y, negative bases, the limits, subnormal x, tiny and huge y, random bits) and every pair of 174 special values: 0 differ |
+| `math/atanf_glibc.rs` (`atanf_glibc`, `atan2f_glibc`) | glibc 2.35's fdlibm copies `sysdeps/ieee754/flt-32/s_atanf.c`, `e_atan2f.c` (Sun's notice only) | `larmorx-nc-core` `fdlibm.rs` | `atanf` all 2^32 inputs, `atan2f` 1,342,177,280 sampled pairs in five families (rotation-like, exponent differences beyond 60, `x = ±1`, ...) and every pair of special values: 0 differ |
+
+The tool, its sample families and its results: `validation/investigations/glibc-maths/`; the
+check against the replica core's translations: `crates-nc/larmorx-nc-core/tools/glibc-float-verify
+copy`. Unit tests check glibc's hash of every 4099th input of each one-argument float function and
+of 65,536 seeded arguments of the others (recorded from glibc 2.35 on Linux x86-64), on every
+platform. On x86-64 each function with fused multiply-adds has an FMA-compiled copy chosen at run
+time (the same bits; a unit test checks it).
+
 ## vnl's SVD (`src/vnl_svd.rs`)
 
 **Ported** from VXL as bundled with ITK v5.4.5 (BSD; LINPACK and reference BLAS from

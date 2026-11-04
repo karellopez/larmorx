@@ -51,6 +51,17 @@ MIXED = {
     "crates/larmorx-core/src/math/logf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/sinf.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-core/src/math/tanhf.rs": "Apache-2.0 AND MIT",
+    # glibc 2.35's functions from Arm's Optimized Routines (MIT) and fdlibm (Sun's notice), for
+    # reproduce and the replicas (2026-11-04).
+    "crates/larmorx-core/src/math/sincosf_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/logf_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/expf_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/powf_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/exp_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/log_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/pow_glibc.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-core/src/math/atanf_glibc.rs": "Apache-2.0 AND LicenseRef-fdlibm",
+    "crates/larmorx-core/src/math/tanh_glibc.rs": "Apache-2.0 AND LicenseRef-fdlibm",
     "crates/larmorx-core/src/eigen_sym.rs": "Apache-2.0 AND MPL-2.0",
     "crates/larmorx-core/src/vnl_eigen.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_fixed.rs": "Apache-2.0 AND BSD-3-Clause",
@@ -87,7 +98,8 @@ MIXED = {
     "python/larmorx/ndimage.py": "Apache-2.0 AND BSD-3-Clause",
     "python/larmorx/transforms/chain.py": "Apache-2.0 AND MIT",
     "python/larmorx/transforms/resample.py": "Apache-2.0 AND MIT",
-    "crates/larmorx-afni-replica/src/sincosf.rs": "Apache-2.0 AND MIT",
+    # Since 2026-11-04 a re-export of larmorx_core::math's copy (no Arm code of its own).
+    "crates/larmorx-afni-replica/src/sincosf.rs": "Apache-2.0",
     "crates/larmorx-afni-replica/src/fdlibm.rs": "Apache-2.0 AND SunPro",
 }
 

@@ -1,0 +1,10 @@
+[package]
+name = "glibc-dbl-model"
+description = "The spec writer's model of specs/glibc-dbl.md (glibc 2.35's double sin, cos, sincos), checked against the black-box record (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license = "GPL-3.0-or-later AND LGPL-2.1-or-later"
+publish = false
+
+[dependencies]
+rayon.workspace = true

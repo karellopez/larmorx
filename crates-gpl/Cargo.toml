@@ -12,6 +12,7 @@ resolver = "3"
 members = [
     "tools/cbrtf-measure",
     "tools/floatmath-verify",
+    "tools/glibc-dbl-model",
     "tools/glibc-reference",
     "tools/sincosf-verify",
 ]

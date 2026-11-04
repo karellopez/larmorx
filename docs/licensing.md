@@ -27,7 +27,9 @@ and lives in the main package.
 | MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, in the surfaces track, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded). First step: a patent check of FastPD and HOCR |
 | tedana | LGPL-2.1 | possible in an LGPL package; not planned | ✓ main package (from the published equations) |
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
-| Arm's Optimized Routines (v19.11: the `sinf`/`cosf` glibc 2.35 ships) | MIT | ✓ main package (the AFNI replicas' `sincosf.rs`) | not needed |
+| Arm's Optimized Routines (v19.11: the `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and double `exp`, `log`, `pow` glibc 2.35 ships) | MIT | ✓ main package since 2026-11-04 (`larmorx_core::math`'s `*_glibc`, `LICENSES/MIT-arm-optimized-routines.txt`): one translation for `reproduce`, the AFNI replicas and the FSL replicas' core (the AFNI replicas' `sincosf.rs` from 2026-10-29) | not needed |
+| fdlibm (as glibc 2.35 carries it: `atanf`, `atan2f`, `tanhf`, `expm1f`; netlib's fdlibm 5.3: `tanh`) | Sun's notice (`LicenseRef-fdlibm`) | ✓ main package (`larmorx_core::math`'s `atanf_glibc`, `atan2f_glibc` since 2026-11-04 and `tanh_glibc`; the AFNI replicas' `tanhf`, `expm1f`) | not needed |
+| the GNU C Library 2.35's own code (IBM's Accurate Mathematical Library: the double `sin`, `cos`, `sincos`, `tan`, `asin`, `acos`, `atan`; `cbrtf`) | LGPL-2.1-or-later | ✗ never copied or translated (verification tools and a spec writer's model in `crates-gpl/tools/` only) | ✓ main package, from behaviour specs: `cbrtf_glibc` (`specs/cbrtf.md`), `sin`, `cos`, `sincos` (`specs/glibc-dbl.md`, its tables from definitions); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (the user, 2026-11-04) |
 
 ## Packages
 
@@ -37,7 +39,7 @@ command-line binary. Code from different families is never linked into one binar
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
 | `larmorx` | Apache-2.0 | everything permissive, plus every original | – |
-| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
+| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never published as a wheel) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
 | `larmorx-nc` | the FSL Licence's terms (non-commercial, source included) | replicas of FSL | `larmorx` |
 | `larmorx-freesurfer` | FreeSurfer Software License | replicas of FreeSurfer | `larmorx` |
 
@@ -63,7 +65,9 @@ command-line binary. Code from different families is never linked into one binar
   `crates-nc/fsl-source/` beside mcflirt's (one `MANIFEST.tsv`). Also translated, each with its
   notice in `crates-nc/NOTICE`: fslpy 3.21.1's `imtest`, `remove_ext` and `imglob` (Apache-2.0),
   fdlibm's `tanh` and `expm1` (Sun's notice), glibc 2.35's `pow` and `exp` from Arm's Optimized
-  Routines v19.11 (MIT: the code glibc ships, as for the float functions; no LGPL code), and
+  Routines v19.11 (MIT: the code glibc ships, as for the float functions; no LGPL code; since
+  2026-11-04 these and the float functions are translated once, in `larmorx_core::math`, which
+  the FSL replicas' core re-exports, with fdlibm's `atanf` and `atan2f`), and
   bet2's `--ct` conversion, which FSL adapted from Chris Rorden's BSD-2-clause `clinical_h2c.m`.
   The core's `std::sort` and `std::nth_element` emulation (FSL-22, FSL-55; the mesh sweep) is
   written from the SGI STL's introsort and introselect under the HP/SGI permission notice, with
@@ -286,7 +290,8 @@ Each tool's validation record reports both.
 - Replica authors may read everything.
 - Clean-room implementers of originals must not open:
   - the upstream source;
-  - the replica crates (they are derived from it);
+  - the replica crates (they are derived from it), and `crates-gpl/` (its tools keep or read
+    glibc's LGPL code; `tools/glibc-dbl-model` is the spec writer's model of `specs/glibc-dbl.md`);
   - `docs/findings/` notes written from that source.
 
   They work from `specs/<tool>.md`, documentation, papers and black-box runs of the

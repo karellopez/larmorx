@@ -62,7 +62,13 @@ from 786e708 (the parity smoke tier passing: 2,607 tests): their surfaces follow
 §8.1's arithmetic (glibc's `tanh` as `larmorx_core::math::tanh_glibc`, no fused multiply-add, the
 same bits on every platform); `cli.fsl.bet2.options` and `cli.fsl.bet2.reproduce` and every other
 checksum unchanged. `larmorx_core::math::tanh` and `tanh_glibc` are Rust-only, with their own unit
-tests (recorded values, a sequence hash, the FMA copy against the portable one). BET's clean-room
+tests (recorded values, a sequence hash, the FMA copy against the portable one). So are glibc 2.35's
+permissive functions copied into `larmorx_core::math` on 2026-11-04 (`sinf_glibc`, `cosf_glibc`,
+`sincosf_glibc` and their SSE2 builds, `logf_glibc`, `expf_glibc`, `powf_glibc`, `exp_glibc`,
+`log_glibc`, `pow_glibc`, `atanf_glibc`, `atan2f_glibc`): their unit tests (glibc's own test
+vectors, values recorded from glibc 2.35, seeded stride and sample hashes of glibc's results, the
+FMA copies against the portable ones) run on every platform CI's `cargo test` runs; no golden
+case added, every checksum unchanged (the replicas that call them re-export them). BET's clean-room
 original, part 2b (2026-10-31): `cli.fsl.betsurf` (betsurf with a T2, `-o -m -s -v`, on a
 generated head with a generated sphere mesh and matrix), `cli.fsl.betsurf.t1only` (`--t1only -m
 -p 1`), `py.fsl.betsurf` (`lx.fsl.betsurf(implementation="original")`) and `cli.fsl.bet2.tanh`

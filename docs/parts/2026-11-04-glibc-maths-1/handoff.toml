@@ -1,0 +1,329 @@
+# glibc's exact maths for `reproduce`, first half (the spec writer and replica author): the exact
+# changes to the shared documents (scripts/orchestration/apply_handoff.py). The reasons are in
+# HANDOFF.md beside this file. Paths are relative to the larmorx checkout; no site file.
+
+# ---------------------------------------------------------------- the register: GLIBC-07's row
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''`sin`, `cos`, `tan`, `asin`, `acos`, `atan` and `sincos` are IBM's Accurate Mathematical Library in glibc (LGPL, never translated): correctly rounded in both modes, the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; fslmaths' replica 2026-11-03; fslmaths' clean-room original: correctly rounded in both modes (its `reproduce` does not give glibc's `exp`, `log`, `pow` yet; its record holds them to one unit in the last place), its FFT none (a direct sum) | reproduce (the clean-room original's `exp`, `log`, `pow`: Arm's Optimized Routines, MIT; the six IBM functions and `sincos`: by the `cbrtf` route, GLIBC-05, when scheduled) |'''
+new = '''`sin`, `cos`, `tan`, `asin`, `acos`, `atan` and `sincos` are IBM's Accurate Mathematical Library in glibc (LGPL, never copied or translated): correctly rounded in both modes today, the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; by the user's decisions of 2026-11-04, `sin`, `cos` and `sincos` get glibc's bits for `reproduce` from a behaviour spec (`specs/glibc-dbl.md`, written 2026-11-04 and proved by a model from its text; its table of sines and cosines from a definition, no glibc data), while `tan`, `asin`, `acos` and `atan` stay correctly rounded in both modes (glibc's tables for them are searched and fitted data that no definition reproduces; one unit in the last place on 0.05 to 0.25 % of arguments); fslmaths' replica 2026-11-03; fslmaths' clean-room original: correctly rounded in both modes (its `reproduce` does not give glibc's `exp`, `log`, `pow` yet, whose exact copies are in `larmorx_core::math` since 2026-11-04; its record holds them to one unit in the last place), its FFT none (a direct sum) | reproduce (the glibc maths part's second half: `sin`, `cos`, `sincos` from `specs/glibc-dbl.md`, in both implementations; the clean-room original's `exp`, `log`, `pow` wired to `larmorx_core::math`'s copies) |'''
+
+# ------------------------------------------------- the register: GLIBC-02's and GLIBC-03's entries
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''- **larmorx:** correctly rounded (`larmorx_core::math::{expf, logf, powf}`).
+  The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
+  `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
+  inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
+  them (2026-10-24).'''
+new = '''- **larmorx:** correctly rounded (`larmorx_core::math::{expf, logf, powf}`).
+  The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
+  `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
+  inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
+  them (2026-10-24). Since 2026-11-04 that translation, with `expf`, `powf` and the double
+  `exp`, `log` and `pow`, is `larmorx_core::math`'s (`sinf_glibc`, `cosf_glibc`, `sincosf_glibc`,
+  `logf_glibc`, `expf_glibc`, `powf_glibc`, `exp_glibc`, `log_glibc`, `pow_glibc`; the user's
+  decision of 2026-11-04): one copy, which the FSL and AFNI replicas re-export and the clean-room
+  originals' `reproduce` may call, proved equal to glibc 2.35 itself bit for bit, NaN bits
+  included, on all 2^32 inputs of each one-argument float function and on at least 10^9 sampled
+  arguments of the others (`validation/investigations/glibc-maths/`); no replica's result moved.'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''- **larmorx:** the 3dTshift original uses correctly rounded functions; the replica carries a
+  translation of glibc's FMA build (LGPL), the one this machine's AFNI runs.'''
+new = '''- **larmorx:** the 3dTshift original uses correctly rounded functions; the replica carries
+  glibc's FMA build, the one this machine's AFNI runs: since 2026-10-29 from Arm's Optimized
+  Routines v19.11 (MIT, the code glibc 2.35 ships), since 2026-11-04 as `larmorx_core::math`'s
+  `sinf_glibc` and `cosf_glibc` (one copy for the AFNI and FSL replicas and `reproduce`; glibc's
+  SSE2 build is `sinf_glibc_sse2` and `cosf_glibc_sse2`, proved equal to it with glibc's FMA
+  build switched off, on all 2^32 inputs).'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it
+  bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences;
+  2026-10-25).'''
+new = '''rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it
+  bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences;
+  2026-10-25), since 2026-11-04 as `larmorx_core::math`'s `atanf_glibc` and `atan2f_glibc`
+  (fdlibm's, Sun's notice; one copy, which the replica core re-exports).'''
+
+# ------------------------------------------------------------- the register: GLIBC-07's entry
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''`tan` 313, `asin` 209, `acos` 20, `atan` 200 of 136,400 values one unit from FSL's; `exp` 110
+  and `log` 15 values corrected by the default mode.'''
+new = '''`tan` 313, `asin` 209, `acos` 20, `atan` 200 of 136,400 values one unit from FSL's; `exp` 110
+  and `log` 15 values corrected by the default mode. `specs/glibc-dbl.md` §10 (2026-11-04): a
+  black-box record of glibc's seven IBM functions (`validation/investigations/glibc-dbl/`: seeded
+  families of arguments, 1,600 hashes over 6.7 × 10^9 results) and their shares differing from
+  the correctly rounded value: `sin` 0.100 %, `cos` 0.092 %, `sincos` 0.108 % (sine) and 0.099 %
+  (cosine), `tan` 0.188 %, `asin` 0.077 %, `acos` 0.053 %, `atan` 0.065 % over all families,
+  0.12 to 0.25 % on uniform angles and on float values.'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''- **larmorx:** correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` ported
+  2026-11-03); `reproduce` gives glibc's bits for `exp`, `log` and `pow` (Arm's Optimized
+  Routines, the code glibc ships; `larmorx_nc_core::glibc_double`), named where they change a
+  voxel; the six IBM functions and `sincos` (LGPL) are correctly rounded in both modes: the
+  record's `fn/double-tan` and random testing's permanent case `fft-twiddles-glibc-sincos` are
+  expected divergences.
+- **D13 / gap:** **reproduce** for the six IBM functions and `sincos`: glibc's bits by the
+  `cbrtf` route (GLIBC-05: a behaviour spec, then a clean-room implementation), when scheduled.'''
+new = '''- **larmorx:** correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` ported
+  2026-11-03); in fslmaths' replica `reproduce` gives glibc's bits for `exp`, `log` and `pow`
+  (Arm's Optimized Routines, the code glibc ships; since 2026-11-04 one translation,
+  `larmorx_core::math`'s `exp_glibc`, `log_glibc` and `pow_glibc`, which the replica core
+  re-exports), named where they change a voxel; the six IBM functions and `sincos` (LGPL, never
+  copied or translated) are correctly rounded in both modes today: the record's `fn/double-tan`
+  and random testing's permanent case `fft-twiddles-glibc-sincos` are expected divergences.
+  **Decided by the user (2026-11-04, decision log "GLIBC-07's tables"):** `sin`, `cos` and
+  `sincos` get glibc's bits for `reproduce` by the `cbrtf` route. `specs/glibc-dbl.md` (written
+  2026-11-04) gives the method as mathematics, proved by a model written from its text alone on
+  all 3.2 × 10^9 arguments of the record and every special argument, NaN bits included; its
+  table of sines and cosines of N/128 comes from the table's definition, which gives 422 of
+  glibc's 440 numbers: the 18 others changed no result on 1.9 × 10^10 arguments per function
+  (about one result in 10^16 of those that read them could differ; none is known), and no
+  number from glibc's code enters larmorx. `tan`, `asin`, `acos` and `atan` stay correctly
+  rounded in `reproduce` too: their tables in glibc are searched points and fitted polynomials
+  (about 4,000 numbers) that no definition reproduces, and they reach only fslmaths' double
+  `-tan`, `-asin`, `-acos` and `-atan`.
+- **D13 / gap:** **reproduce** for `sin`, `cos` and `sincos` (the glibc maths part's second
+  half: the clean-room functions from `specs/glibc-dbl.md`, then both fslmaths implementations'
+  `reproduce` and the replica's FFT twiddle factors on them), and for the clean-room fslmaths'
+  `exp`, `log` and `pow` (to wire to `larmorx_core::math`'s copies). None for `tan`, `asin`,
+  `acos` and `atan` (decided: correctly rounded in both modes).'''
+
+# ---------------------------------------------------------- the register: the dated paragraph
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''is the orchestrator's to redo (`scripts/orchestration/register_counts.py`). No new **decide**
+entry.
+
+## D13 gaps: what the next task switches to "correct by default"'''
+new = '''is the orchestrator's to redo (`scripts/orchestration/register_counts.py`). No new **decide**
+entry.
+**2026-11-04, glibc's exact maths for `reproduce`, first half (the spec writer and replica
+author):** no new entry. GLIBC-02 and GLIBC-03: glibc 2.35's functions from permissive code
+(Arm's Optimized Routines: `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`, `exp`, `log`,
+`pow`; fdlibm: `atanf`, `atan2f`) are one translation in `larmorx_core::math`, shared by the FSL
+and AFNI replicas and open to the clean-room originals' `reproduce` (the user's decision of
+2026-11-04), proved equal to glibc 2.35 bit for bit; no replica's result moved. GLIBC-07:
+`specs/glibc-dbl.md` for `sin`, `cos` and `sincos`, with the black-box record of the seven IBM
+functions; the user decided its table (from the definition) and that `tan`, `asin`, `acos` and
+`atan` stay correctly rounded in both modes; the gap column's **reproduce** now names the second
+half. The counts are unchanged. No new **decide** entry.
+
+## D13 gaps: what the next task switches to "correct by default"'''
+
+# ------------------------------------------------------------------- the API page's GLIBC-07 row
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''correctly rounded by default; `reproduce` glibc's bits (the FMA build's) for `exp`, `log` and `pow`, named; the six IBM functions and `sincos` correctly rounded in both modes (an expected divergence) |'''
+new = '''correctly rounded by default; `reproduce` glibc's bits (the FMA build's) for `exp`, `log` and `pow`, named; `sin`, `cos` and `sincos` correctly rounded in both modes for now (glibc's bits for `reproduce` are planned, written from a behaviour spec of glibc's method); `tan`, `asin`, `acos` and `atan` correctly rounded in both modes (decided 2026-11-04: glibc's own tables for them cannot be reproduced without copying its LGPL data), an expected divergence |'''
+
+# ---------------------------------------------------------------------------------- next-steps
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''fslmaths and fslstats (the replicas done 2026-11-03; item 7); field maps,'''
+new = '''fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (the first half done 2026-11-04, the second half next; item 7); field maps,'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''   largest value from FSL's output).
+8. **Field maps, FreeSurfer, surfaces, confounds:**'''
+new = '''   largest value from FSL's output).
+   **glibc's exact maths for `reproduce`: the first half done (2026-11-04, relays 1 to 3; the
+   user's decisions of 2026-11-04).** (1) *The copy:* glibc 2.35's functions from permissive
+   code, Arm's Optimized Routines v19.11 (MIT: `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`
+   and the double `exp`, `log`, `pow`; also glibc's SSE2 build of `sinf`, `cosf`, `sincosf`) and
+   fdlibm (Sun's notice: `atanf`, `atan2f`), are `larmorx_core::math`'s `*_glibc` functions,
+   with x86-64's NaN bits on every platform and FMA copies behind the core's audited dispatch.
+   Proved equal to glibc 2.35 itself, bit for bit with NaN bits (63 × 10^9 comparisons in 29 s:
+   every one-argument float function on all 2^32 inputs, `powf` and `atan2f` on 1.3 to 1.6 × 10^9
+   pairs, the double functions on 1.1 to 1.6 × 10^9 arguments, every special value; the SSE2 build
+   with glibc's FMA build switched off, on all 2^32 inputs), and to the replicas' translations,
+   which now re-export them: one translation, no replica's output moved (the unit tests, the FSL
+   replicas' golden test, the AFNI replicas' golden cases). (2) *The spec:* `specs/glibc-dbl.md`
+   for glibc's LGPL double `sin`, `cos` and `sincos` (x86-64: the FMA build of `sin` and `cos`,
+   `sincos`'s single build): the method as mathematics, its constants and its table of sines and
+   cosines of N/128 from their definitions (`validation/investigations/glibc-dbl/tables.py`), the
+   black-box record of the seven IBM functions (1,600 block hashes over 6.7 × 10^9 arguments, and
+   glibc's SSE2 build of `sin` and `cos`), proved by a model written from the text alone
+   (`crates-gpl/tools/glibc-dbl-model`: 768 of 768 blocks, 3.2 × 10^9 arguments, every special
+   argument, NaN bits included). The user decided the table's definition (422 of glibc's 440
+   numbers; the 18 others changed no result on 1.9 × 10^10 arguments per function) and that
+   `tan`, `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too (their tables are
+   searched and fitted data). **The second half** (next; two roles, one after the other): (a) a
+   clean-room implementer who never read glibc writes `sin_glibc`, `cos_glibc` and
+   `sincos_glibc` in `larmorx_core::math` from `specs/glibc-dbl.md` alone (its §12: the record's
+   768 blocks and the special arguments, both readings of the fused operations, golden cases) and
+   wires the clean-room originals' `reproduce` to the `*_glibc` functions wherever their specs
+   name glibc's (fslmaths, fslstats, FLIRT, FAST, topup, BET, the head-motion correction),
+   re-making the records that move; (b) a replica-side step (an agent that may read
+   `crates-nc/`) wires the FSL replicas' `reproduce` to the new `sin_glibc`, `cos_glibc` and
+   `sincos_glibc` (fslmaths' `-sin` and `-cos`, the Kiss FFT's twiddle factors, the kernels'
+   windows, avscale's `sqrtaff`) and re-makes their records (random testing's permanent case
+   `fft-twiddles-glibc-sincos` then bit for bit; `fn/double-tan` stays an expected divergence).
+8. **Field maps, FreeSurfer, surfaces, confounds:**'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''  - **GLIBC-07 by the `cbrtf` route** (for the orchestrator to schedule, a small part as GLIBC-05
+    was): glibc 2.35's double `sin` (0.12 % of image intensities one unit in the last place), `cos`'''
+new = '''  - **GLIBC-07 by the `cbrtf` route** (scheduled 2026-11-04 as the glibc maths part, item 7: the
+    spec written for `sin`, `cos` and `sincos`, the clean-room implementation its second half;
+    `tan`, `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too, the user's
+    decision of 2026-11-04, so the record's `fn/double-tan` stays an expected divergence; the
+    text below is the plan as it stood before): glibc 2.35's double `sin` (0.12 % of image intensities one unit in the last place), `cos`'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''    (1) the original's `reproduce` gives glibc's `exp`, `log` and `pow` bits
+    as §19 asks (Arm's Optimized Routines, MIT: a port into `larmorx_core::math`), today
+    correctly rounded in both modes;'''
+new = '''    (1) the original's `reproduce` gives glibc's `exp`, `log` and `pow` bits
+    as §19 asks (Arm's Optimized Routines, MIT: the port into `larmorx_core::math` exists since
+    2026-11-04, `exp_glibc`, `log_glibc`, `pow_glibc`; the wiring is the glibc maths part's second
+    half, item 7), today correctly rounded in both modes;'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''  a shared module in `larmorx-core` (the implementer may not read the AFNI replica's copy of
+  Arm's `sinf`/`cosf`), or each from a behaviour spec, implemented clean-room (the `cbrtf` and
+  GLIBC-07 route).'''
+new = '''  a shared module in `larmorx-core` (the implementer may not read the AFNI replica's copy of
+  Arm's `sinf`/`cosf`), or each from a behaviour spec, implemented clean-room (the `cbrtf` and
+  GLIBC-07 route). **The shared module exists since 2026-11-04** (the user's decision; the glibc
+  maths part's first half, item 7): `larmorx_core::math`'s `sinf_glibc`, `cosf_glibc`,
+  `sincosf_glibc` and `atan2f_glibc`, translated from Arm's and fdlibm's permissive code (not
+  from any replica), open to every implementer; the wiring in FLIRT's original is the second
+  half's.'''
+
+# ----------------------------------------------------------------------------------- licensing
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''| Arm's Optimized Routines (v19.11: the `sinf`/`cosf` glibc 2.35 ships) | MIT | ✓ main package (the AFNI replicas' `sincosf.rs`) | not needed |'''
+new = '''| Arm's Optimized Routines (v19.11: the `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and double `exp`, `log`, `pow` glibc 2.35 ships) | MIT | ✓ main package since 2026-11-04 (`larmorx_core::math`'s `*_glibc`, `LICENSES/MIT-arm-optimized-routines.txt`): one translation for `reproduce`, the AFNI replicas and the FSL replicas' core (the AFNI replicas' `sincosf.rs` from 2026-10-29) | not needed |
+| fdlibm (as glibc 2.35 carries it: `atanf`, `atan2f`, `tanhf`, `expm1f`; netlib's fdlibm 5.3: `tanh`) | Sun's notice (`LicenseRef-fdlibm`) | ✓ main package (`larmorx_core::math`'s `atanf_glibc`, `atan2f_glibc` since 2026-11-04 and `tanh_glibc`; the AFNI replicas' `tanhf`, `expm1f`) | not needed |
+| the GNU C Library 2.35's own code (IBM's Accurate Mathematical Library: the double `sin`, `cos`, `sincos`, `tan`, `asin`, `acos`, `atan`; `cbrtf`) | LGPL-2.1-or-later | ✗ never copied or translated (verification tools and a spec writer's model in `crates-gpl/tools/` only) | ✓ main package, from behaviour specs: `cbrtf_glibc` (`specs/cbrtf.md`), `sin`, `cos`, `sincos` (`specs/glibc-dbl.md`, its tables from definitions); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (the user, 2026-11-04) |'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |'''
+new = '''| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never published as a wheel) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''  fdlibm's `tanh` and `expm1` (Sun's notice), glibc 2.35's `pow` and `exp` from Arm's Optimized
+  Routines v19.11 (MIT: the code glibc ships, as for the float functions; no LGPL code), and'''
+new = '''  fdlibm's `tanh` and `expm1` (Sun's notice), glibc 2.35's `pow` and `exp` from Arm's Optimized
+  Routines v19.11 (MIT: the code glibc ships, as for the float functions; no LGPL code; since
+  2026-11-04 these and the float functions are translated once, in `larmorx_core::math`, which
+  the FSL replicas' core re-exports, with fdlibm's `atanf` and `atan2f`), and'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''- Clean-room implementers of originals must not open:
+  - the upstream source;
+  - the replica crates (they are derived from it);'''
+new = '''- Clean-room implementers of originals must not open:
+  - the upstream source;
+  - the replica crates (they are derived from it), and `crates-gpl/` (its tools keep or read
+    glibc's LGPL code; `tools/glibc-dbl-model` is the spec writer's model of `specs/glibc-dbl.md`);'''
+
+# ------------------------------------------------------------------------------------ CLAUDE.md
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''Arm's Optimized Routines, CORE-MATH, nibabel): the main `larmorx` package (Apache-2.0);'''
+new = '''Arm's Optimized Routines, fdlibm (Sun's notice), CORE-MATH, nibabel): the main `larmorx` package (Apache-2.0);'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''(GPL-3.0-or-later, `crates-gpl/`, which today holds only the verification tools that keep glibc's LGPL code);'''
+new = '''(GPL-3.0-or-later, `crates-gpl/`, which today holds only development tools that keep or read glibc's LGPL code: verification tools and the spec writer's model of `specs/glibc-dbl.md`);'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''the replica crates (`crates/larmorx-afni-replica` since 2026-10-29, `crates-gpl/tools/glibc-reference`, `crates-nc/`)'''
+new = '''the replica crates (`crates/larmorx-afni-replica` since 2026-10-29, `crates-gpl/` with its glibc tools, `crates-nc/`)'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''   - Arm's Optimized Routines v19.11 (the AFNI replicas' `sinf`/`cosf`, the code glibc 2.35 ships; MIT)'''
+new = '''   - Arm's Optimized Routines v19.11 (the code glibc 2.35 ships; MIT) and fdlibm as glibc 2.35 carries it (Sun's notice): `larmorx_core::math`'s `*_glibc` since 2026-11-04 (`sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`, `exp`, `log`, `pow`; `atanf`, `atan2f`), one translation for `reproduce` and the AFNI and FSL replicas
+   - glibc 2.35 itself (LGPL-2.1-or-later): never copied or translated; behaviour specs only (`specs/cbrtf.md`, `specs/glibc-dbl.md`)'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''earlier glibc translations (`tools/glibc-reference`, `sincosf-verify`, `floatmath-verify`, `cbrtf-measure`)'''
+new = '''earlier glibc translations (`tools/glibc-reference`, `sincosf-verify`, `floatmath-verify`, `cbrtf-measure`) and, since 2026-11-04, the spec writer's model of `specs/glibc-dbl.md` (`tools/glibc-dbl-model`, GPL-3.0-or-later AND LGPL-2.1-or-later; closed to its clean-room implementer)'''
+
+# ------------------------------------------------------------------------------ porting guide §1
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''(`crates/larmorx-afni-replica`, `crates-gpl/tools/glibc-reference`, `crates-nc/`), or'''
+new = '''(`crates/larmorx-afni-replica`, `crates-gpl/` with its glibc tools, among them `tools/glibc-reference`
+and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or'''
+
+# ------------------------------------------------------------------------------ architecture
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''- **Safety:** `#![forbid(unsafe_code)]` in every crate; pure-Rust dependencies only (CLAUDE.md rule 5).'''
+new = '''- **Safety:** `#![forbid(unsafe_code)]` in every crate but `larmorx-core`, which denies it except in one audited module: `larmorx_core::math`'s `fma`, the copies of the maths kernels compiled with FMA, each call guarded by `is_x86_feature_detected!` (CORE-MATH's since 2026-10-09; glibc's permissive functions' copies, through `glibc_dispatch!`, since 2026-11-04); pure-Rust dependencies only (CLAUDE.md rule 5).'''
+
+# ------------------------------------------------------------------------------------ status
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''1.8 to 28 times FSL's speed on one thread, up to 268 times on 14). Next: BET's `-S`, `-B`, `-A`, `-A2`,'''
+new = '''1.8 to 28 times FSL's speed on one thread, up to 268 times on 14). glibc's exact maths for `reproduce`, first half (2026-11-04): glibc 2.35's permissive functions (Arm's `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`, `exp`, `log`, `pow`; fdlibm's `atanf`, `atan2f`) in `larmorx_core::math`, one translation shared by the FSL and AFNI replicas, proved equal to glibc on every float input and on at least 10^9 arguments of the others; `specs/glibc-dbl.md` for glibc's LGPL double `sin`, `cos` and `sincos`, proved by a model from its text on 3.2 × 10^9 arguments (`tan`, `asin`, `acos`, `atan` stay correctly rounded, the user's decision). Next: its second half (the clean-room `sin`, `cos`, `sincos`; `reproduce` wired to the new functions), then BET's `-S`, `-B`, `-A`, `-A2`,'''
+
+# ------------------------------------------------------------------------------------ golden
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''checksum unchanged. `larmorx_core::math::tanh` and `tanh_glibc` are Rust-only, with their own unit
+tests (recorded values, a sequence hash, the FMA copy against the portable one).'''
+new = '''checksum unchanged. `larmorx_core::math::tanh` and `tanh_glibc` are Rust-only, with their own unit
+tests (recorded values, a sequence hash, the FMA copy against the portable one). So are glibc 2.35's
+permissive functions copied into `larmorx_core::math` on 2026-11-04 (`sinf_glibc`, `cosf_glibc`,
+`sincosf_glibc` and their SSE2 builds, `logf_glibc`, `expf_glibc`, `powf_glibc`, `exp_glibc`,
+`log_glibc`, `pow_glibc`, `atanf_glibc`, `atan2f_glibc`): their unit tests (glibc's own test
+vectors, values recorded from glibc 2.35, seeded stride and sample hashes of glibc's results, the
+FMA copies against the portable ones) run on every platform CI's `cargo test` runs; no golden
+case added, every checksum unchanged (the replicas that call them re-export them).'''
+
+# ------------------------------------------------------- the site's roadmap (optional, a new row)
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''| 2026-11-04 | **fslmaths' and fslstats' clean-room originals: fslmaths and fslstats complete.**'''
+new = '''| 2026-11-04 | **The C library's own digits for `reproduce`, first half.** The functions of the GNU C Library 2.35 that come from permissive code (Arm's routines for the single-precision sine, cosine, logarithm, exponential and power and for the double exponential, logarithm and power; fdlibm's single-precision arctangents) are now one exact copy in LARMORX's maths module, shared by the replicas and open to the clean-room originals' `reproduce` mode, proved equal to the C library itself on every single-precision input and on more than a billion arguments of each other function; for the C library's double sine and cosine, whose code is LGPL and never copied, a behavioural specification of its method, proved by a model written from that text alone on 3.2 billion arguments (the tangent and the inverse functions stay correctly rounded: their tables in the C library cannot be rebuilt from a definition); the clean-room implementation and its use in the tools come next |
+| 2026-11-04 | **fslmaths' and fslstats' clean-room originals: fslmaths and fslstats complete.**'''

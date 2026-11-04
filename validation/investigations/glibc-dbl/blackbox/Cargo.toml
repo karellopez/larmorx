@@ -1,0 +1,17 @@
+[package]
+name = "glibc-dbl-blackbox"
+description = "The black-box record of glibc 2.35's double sin, cos, sincos, tan, asin, acos and atan (specs/glibc-dbl.md): block hashes of its results on seeded families of arguments, and how often it differs from the correctly rounded value"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measuring tool, never part of larmorx's build (it calls the C library's
+# functions through dlopen, as a black box).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

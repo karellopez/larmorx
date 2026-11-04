@@ -248,7 +248,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
 | GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in both implementations (2026-10-30: the clean-room original, then the replica, whose last-bit warning is gone) | – |
 | GLIBC-06 | glibc 2.35 | `tanh` (double) not correctly rounded: one unit (rarely two) in the last place on 21.3 % of 805 million random arguments and on 22,506 of CORE-MATH's 62,880 worst cases; FSL's `bet2` takes its smoothness weight from it at every vertex of every iteration, and the reruns of a surface whose first pass self-intersects amplify that last bit into another surface and mask (`specs/bet.md` §4.5, §8.1) | d | every BET run's surface (measured on the standard tier's 13 real images: the same outputs on 9; other masks on the three rerun cases, Dice 0.9959, 0.9848, 0.9920, and ds000005's BOLD first volume, 0.9966) | glibc's bits in both modes for now (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to glibc 2.35's on 12.9 billion arguments); the correctly rounded `larmorx_core::math::tanh` (CORE-MATH) ported and verified, its notice wired (2026-10-30, BET's clean-room part 2a). BET's default keeps glibc's bits (the user, 2026-10-31, rule C: the correctly rounded surface is another surface, not a more accurate one, and its exact notice would make a run 1.9 times slower); the correctly rounded `tanh` on request | – (decided 2026-10-31: glibc's bits kept by default) |
-| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) for `exp`, `log` and `pow` (Arm's Optimized Routines, the code glibc ships), named where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` and `sincos` are IBM's Accurate Mathematical Library in glibc (LGPL, never translated): correctly rounded in both modes, the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; fslmaths' replica 2026-11-03; fslmaths' clean-room original: correctly rounded in both modes (its `reproduce` does not give glibc's `exp`, `log`, `pow` yet; its record holds them to one unit in the last place), its FFT none (a direct sum) | reproduce (the clean-room original's `exp`, `log`, `pow`: Arm's Optimized Routines, MIT; the six IBM functions and `sincos`: by the `cbrtf` route, GLIBC-05, when scheduled) |
+| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) for `exp`, `log` and `pow` (Arm's Optimized Routines, the code glibc ships), named where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` and `sincos` are IBM's Accurate Mathematical Library in glibc (LGPL, never copied or translated): correctly rounded in both modes today, the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; by the user's decisions of 2026-11-04, `sin`, `cos` and `sincos` get glibc's bits for `reproduce` from a behaviour spec (`specs/glibc-dbl.md`, written 2026-11-04 and proved by a model from its text; its table of sines and cosines from a definition, no glibc data), while `tan`, `asin`, `acos` and `atan` stay correctly rounded in both modes (glibc's tables for them are searched and fitted data that no definition reproduces; one unit in the last place on 0.05 to 0.25 % of arguments); fslmaths' replica 2026-11-03; fslmaths' clean-room original: correctly rounded in both modes (its `reproduce` does not give glibc's `exp`, `log`, `pow` yet, whose exact copies are in `larmorx_core::math` since 2026-11-04; its record holds them to one unit in the last place), its FFT none (a direct sum) | reproduce (the glibc maths part's second half: `sin`, `cos`, `sincos` from `specs/glibc-dbl.md`, in both implementations; the clean-room original's `exp`, `log`, `pow` wired to `larmorx_core::math`'s copies) |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -669,6 +669,16 @@ topup's refit penalty between levels (the two wrap-around second differences, we
 applytopup `lsr`'s matrices on folded lines. FSL-205 to FSL-210 unused. The count paragraph above
 is the orchestrator's to redo (`scripts/orchestration/register_counts.py`). No new **decide**
 entry.
+**2026-11-04, glibc's exact maths for `reproduce`, first half (the spec writer and replica
+author):** no new entry. GLIBC-02 and GLIBC-03: glibc 2.35's functions from permissive code
+(Arm's Optimized Routines: `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`, `exp`, `log`,
+`pow`; fdlibm: `atanf`, `atan2f`) are one translation in `larmorx_core::math`, shared by the FSL
+and AFNI replicas and open to the clean-room originals' `reproduce` (the user's decision of
+2026-11-04), proved equal to glibc 2.35 bit for bit; no replica's result moved. GLIBC-07:
+`specs/glibc-dbl.md` for `sin`, `cos` and `sincos`, with the black-box record of the seven IBM
+functions; the user decided its table (from the definition) and that `tan`, `asin`, `acos` and
+`atan` stay correctly rounded in both modes; the gap column's **reproduce** now names the second
+half. The counts are unchanged. No new **decide** entry.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -3591,7 +3601,13 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
   `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
   inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
-  them (2026-10-24).
+  them (2026-10-24). Since 2026-11-04 that translation, with `expf`, `powf` and the double
+  `exp`, `log` and `pow`, is `larmorx_core::math`'s (`sinf_glibc`, `cosf_glibc`, `sincosf_glibc`,
+  `logf_glibc`, `expf_glibc`, `powf_glibc`, `exp_glibc`, `log_glibc`, `pow_glibc`; the user's
+  decision of 2026-11-04): one copy, which the FSL and AFNI replicas re-export and the clean-room
+  originals' `reproduce` may call, proved equal to glibc 2.35 itself bit for bit, NaN bits
+  included, on all 2^32 inputs of each one-argument float function and on at least 10^9 sampled
+  arguments of the others (`validation/investigations/glibc-maths/`); no replica's result moved.
 - **D13 / gap:** not D13.
 
 ### GLIBC-03 `sinf`, `cosf` are not correctly rounded, and two builds differ — (d)
@@ -3601,8 +3617,12 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** verified on all 2^32 inputs of both functions (2026-10-10, with the
   verification tool of the 3dTshift replica).
 - **fMRIPrep:** none (3dTshift's default interpolation is Fourier).
-- **larmorx:** the 3dTshift original uses correctly rounded functions; the replica carries a
-  translation of glibc's FMA build (LGPL), the one this machine's AFNI runs.
+- **larmorx:** the 3dTshift original uses correctly rounded functions; the replica carries
+  glibc's FMA build, the one this machine's AFNI runs: since 2026-10-29 from Arm's Optimized
+  Routines v19.11 (MIT, the code glibc 2.35 ships), since 2026-11-04 as `larmorx_core::math`'s
+  `sinf_glibc` and `cosf_glibc` (one copy for the AFNI and FSL replicas and `reproduce`; glibc's
+  SSE2 build is `sinf_glibc_sse2` and `cosf_glibc_sse2`, proved equal to it with glibc's FMA
+  build switched off, on all 2^32 inputs).
   `Euler3DTransform<float>` calls them too, under `antsApplyTransforms --float 1`; larmorx uses
   correctly rounded ports of CORE-MATH's `sinf` and `cosf` there (2026-10-11), and the CORE-MATH
   preload replaces glibc's `sinf`, `cosf` and `sincosf` ([ants-float.md](ants-float.md)).
@@ -3612,7 +3632,8 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   them (2026-10-24). glibc 2.35's `atanf` (fdlibm, no FMA build) is not correctly
   rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it
   bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences;
-  2026-10-25).
+  2026-10-25), since 2026-11-04 as `larmorx_core::math`'s `atanf_glibc` and `atan2f_glibc`
+  (fdlibm's, Sun's notice; one copy, which the replica core re-exports).
 - **D13 / gap:** not D13.
 
 ### GLIBC-04 `pow` for SciPy's filter poles — (d)
@@ -3642,16 +3663,36 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   256, 0 of 197,376 values differ, and the trial's case end to end); on a real image (fslmaths
   `-dt double` on FSL's mean of ds005040's BOLD series, the site's page): `sin` 211, `cos` 84,
   `tan` 313, `asin` 209, `acos` 20, `atan` 200 of 136,400 values one unit from FSL's; `exp` 110
-  and `log` 15 values corrected by the default mode.
+  and `log` 15 values corrected by the default mode. `specs/glibc-dbl.md` §10 (2026-11-04): a
+  black-box record of glibc's seven IBM functions (`validation/investigations/glibc-dbl/`: seeded
+  families of arguments, 1,600 hashes over 6.7 × 10^9 results) and their shares differing from
+  the correctly rounded value: `sin` 0.100 %, `cos` 0.092 %, `sincos` 0.108 % (sine) and 0.099 %
+  (cosine), `tan` 0.188 %, `asin` 0.077 %, `acos` 0.053 %, `atan` 0.065 % over all families,
+  0.12 to 0.25 % on uniform angles and on float values.
 - **fMRIPrep:** none (its fslmaths calls compute in float; its `-s` convolves by separable sums).
 - **larmorx:** correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` ported
-  2026-11-03); `reproduce` gives glibc's bits for `exp`, `log` and `pow` (Arm's Optimized
-  Routines, the code glibc ships; `larmorx_nc_core::glibc_double`), named where they change a
-  voxel; the six IBM functions and `sincos` (LGPL) are correctly rounded in both modes: the
-  record's `fn/double-tan` and random testing's permanent case `fft-twiddles-glibc-sincos` are
-  expected divergences.
-- **D13 / gap:** **reproduce** for the six IBM functions and `sincos`: glibc's bits by the
-  `cbrtf` route (GLIBC-05: a behaviour spec, then a clean-room implementation), when scheduled.
+  2026-11-03); in fslmaths' replica `reproduce` gives glibc's bits for `exp`, `log` and `pow`
+  (Arm's Optimized Routines, the code glibc ships; since 2026-11-04 one translation,
+  `larmorx_core::math`'s `exp_glibc`, `log_glibc` and `pow_glibc`, which the replica core
+  re-exports), named where they change a voxel; the six IBM functions and `sincos` (LGPL, never
+  copied or translated) are correctly rounded in both modes today: the record's `fn/double-tan`
+  and random testing's permanent case `fft-twiddles-glibc-sincos` are expected divergences.
+  **Decided by the user (2026-11-04, decision log "GLIBC-07's tables"):** `sin`, `cos` and
+  `sincos` get glibc's bits for `reproduce` by the `cbrtf` route. `specs/glibc-dbl.md` (written
+  2026-11-04) gives the method as mathematics, proved by a model written from its text alone on
+  all 3.2 × 10^9 arguments of the record and every special argument, NaN bits included; its
+  table of sines and cosines of N/128 comes from the table's definition, which gives 422 of
+  glibc's 440 numbers: the 18 others changed no result on 1.9 × 10^10 arguments per function
+  (about one result in 10^16 of those that read them could differ; none is known), and no
+  number from glibc's code enters larmorx. `tan`, `asin`, `acos` and `atan` stay correctly
+  rounded in `reproduce` too: their tables in glibc are searched points and fitted polynomials
+  (about 4,000 numbers) that no definition reproduces, and they reach only fslmaths' double
+  `-tan`, `-asin`, `-acos` and `-atan`.
+- **D13 / gap:** **reproduce** for `sin`, `cos` and `sincos` (the glibc maths part's second
+  half: the clean-room functions from `specs/glibc-dbl.md`, then both fslmaths implementations'
+  `reproduce` and the replica's FFT twiddle factors on them), and for the clean-room fslmaths'
+  `exp`, `log` and `pow` (to wire to `larmorx_core::math`'s copies). None for `tan`, `asin`,
+  `acos` and `atan` (decided: correctly rounded in both modes).
 
 ### ANTSPY-01 `ants.apply_transforms` inverts unasked — (c?)
 - **What:** when given exactly two transforms, the first a `.mat` and the second not,

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "bb36e15a24bb",
+  "larmorx_commit": "be3db916dce3",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -17,14 +17,14 @@
   "differences": 0,
   "fresh": {
    "never cached: AFNI-20: AFNI's 1D text file holds a random identifier": 2,
-   "not storable: its output afni+orig.HEAD holds a temporary path (lx-tshift-a2qu9p8f)": 2,
-   "not storable: its standard error names a temporary path (lx-tshift-gen-zzgstn6m) in a form the cache cannot map": 2
+   "not storable: its output afni+orig.HEAD holds a temporary path (lx-tshift-chihqg0x)": 2,
+   "not storable: its standard error names a temporary path (lx-tshift-gen-s56qb1mp) in a form the cache cannot map": 2
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 6,
   "saved_seconds": 358.0,
-  "served": 624
+  "served": 628
  },
  "reference": "3dTshift from AFNI (AFNI_26.3.05), the binary built by `scripts/build_afni_oracle.sh`",
  "results": [
@@ -50,7 +50,7 @@
     "bit-identical": 8,
     "method": "Fourier"
    },
-   "seconds": 0.105,
+   "seconds": 0.258,
    "status": "pass"
   },
   {
@@ -75,7 +75,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.108,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -100,7 +100,7 @@
     "bit-identical": 2713,
     "method": "Fourier"
    },
-   "seconds": 0.105,
+   "seconds": 0.212,
    "status": "pass"
   },
   {
@@ -125,7 +125,7 @@
     "bit-identical": 1218,
     "method": "Fourier"
    },
-   "seconds": 0.131,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -150,7 +150,7 @@
     "bit-identical": 230,
     "method": "Fourier"
    },
-   "seconds": 0.11,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -174,7 +174,7 @@
     "bit-identical": 167,
     "method": "Fourier"
    },
-   "seconds": 0.104,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -199,7 +199,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -223,7 +223,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -247,7 +247,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -271,7 +271,7 @@
     "bit-identical": 162,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -295,7 +295,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -320,7 +320,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -344,7 +344,7 @@
     "bit-identical": 167,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -369,7 +369,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -394,7 +394,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -419,7 +419,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -444,7 +444,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -469,7 +469,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -494,7 +494,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -519,7 +519,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -544,7 +544,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -569,7 +569,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -594,7 +594,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.177,
    "status": "pass"
   },
   {
@@ -619,7 +619,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -644,7 +644,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -669,7 +669,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -694,7 +694,7 @@
     "bit-identical": 1,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -719,7 +719,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -744,7 +744,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -769,7 +769,7 @@
     "bit-identical": 2,
     "method": "Fourier"
    },
-   "seconds": 0.012,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -794,7 +794,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.015,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -819,7 +819,7 @@
     "bit-identical": 1,
     "method": "Fourier"
    },
-   "seconds": 0.017,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -844,7 +844,7 @@
     "bit-identical": 2,
     "method": "Fourier"
    },
-   "seconds": 0.028,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -869,7 +869,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -894,7 +894,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -919,7 +919,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.009,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -944,7 +944,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -969,7 +969,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.009,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -994,7 +994,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1019,7 +1019,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.008,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -1044,7 +1044,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.007,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1069,7 +1069,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -1094,7 +1094,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1119,7 +1119,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1144,7 +1144,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1169,7 +1169,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.008,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1194,7 +1194,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.009,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1219,7 +1219,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.011,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1244,7 +1244,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.009,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1269,7 +1269,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.01,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1294,7 +1294,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.01,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1319,7 +1319,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.01,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1344,7 +1344,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.007,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1369,7 +1369,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.008,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1394,7 +1394,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1419,7 +1419,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.009,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1444,7 +1444,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1469,7 +1469,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -1494,7 +1494,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -1519,7 +1519,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.008,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1544,7 +1544,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1569,7 +1569,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.009,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1594,7 +1594,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.009,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1618,7 +1618,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.009,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1642,7 +1642,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1666,7 +1666,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.009,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1690,7 +1690,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1714,7 +1714,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1738,7 +1738,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1763,7 +1763,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -1788,7 +1788,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.009,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -1813,7 +1813,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.008,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -1838,7 +1838,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1863,7 +1863,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1888,7 +1888,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -1912,7 +1912,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1936,7 +1936,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -1960,7 +1960,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.008,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -1984,7 +1984,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2008,7 +2008,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2032,7 +2032,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2056,7 +2056,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2080,7 +2080,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2104,7 +2104,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.009,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2128,7 +2128,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -2152,7 +2152,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2176,7 +2176,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.007,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2200,7 +2200,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2224,7 +2224,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.007,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2248,7 +2248,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2272,7 +2272,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -2296,7 +2296,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -2320,7 +2320,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2344,7 +2344,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2368,7 +2368,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2392,7 +2392,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2416,7 +2416,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.007,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2440,7 +2440,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2464,7 +2464,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.009,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -2489,7 +2489,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.009,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2514,7 +2514,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.009,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2539,7 +2539,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2564,7 +2564,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.007,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2589,7 +2589,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2614,7 +2614,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2638,7 +2638,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.009,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2662,7 +2662,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2686,7 +2686,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2710,7 +2710,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -2734,7 +2734,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -2758,7 +2758,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -2783,7 +2783,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2808,7 +2808,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2833,7 +2833,7 @@
     "bit-identical": 0,
     "method": "quintic"
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -2858,7 +2858,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.008,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -2883,7 +2883,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2908,7 +2908,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -2933,7 +2933,7 @@
     "bit-identical": 170,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2958,7 +2958,7 @@
     "bit-identical": 117,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2983,7 +2983,7 @@
     "bit-identical": 113,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3008,7 +3008,7 @@
     "bit-identical": 117,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -3033,7 +3033,7 @@
     "bit-identical": 113,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3058,7 +3058,7 @@
     "bit-identical": 139,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -3083,7 +3083,7 @@
     "bit-identical": 2970,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -3108,7 +3108,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -3133,7 +3133,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3158,7 +3158,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.009,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -3183,7 +3183,7 @@
     "bit-identical": 158,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -3208,7 +3208,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -3233,7 +3233,7 @@
     "bit-identical": 159,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -3256,7 +3256,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -3279,7 +3279,7 @@
     "bit-identical": 113,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -3304,7 +3304,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -3329,7 +3329,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3354,7 +3354,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.007,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -3379,7 +3379,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -3404,7 +3404,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -3429,7 +3429,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.007,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -3454,7 +3454,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -3479,7 +3479,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3504,7 +3504,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -3529,7 +3529,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -3554,7 +3554,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -3579,7 +3579,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -3604,7 +3604,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -3629,7 +3629,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -3654,7 +3654,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -3679,7 +3679,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.009,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -3704,7 +3704,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -3729,7 +3729,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -3754,7 +3754,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -3777,7 +3777,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -3800,7 +3800,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -3825,7 +3825,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -3850,7 +3850,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -3875,7 +3875,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 0.008,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -3900,7 +3900,7 @@
     "bit-identical": 0,
     "method": "heptic"
    },
-   "seconds": 0.007,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -3925,7 +3925,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.007,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -3950,7 +3950,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.008,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -3975,7 +3975,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -4000,7 +4000,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -4025,7 +4025,7 @@
     "bit-identical": 154,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -4050,7 +4050,7 @@
     "bit-identical": 148,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -4075,7 +4075,7 @@
     "bit-identical": 148,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -4100,7 +4100,7 @@
     "bit-identical": 153,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.066,
    "status": "pass"
   },
   {
@@ -4125,7 +4125,7 @@
     "bit-identical": 165,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -4150,7 +4150,7 @@
     "bit-identical": 165,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -4175,7 +4175,7 @@
     "bit-identical": 151,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -4200,7 +4200,7 @@
     "bit-identical": 151,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -4225,7 +4225,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -4250,7 +4250,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -4273,7 +4273,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -4296,7 +4296,7 @@
     "bit-identical": 148,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -4319,7 +4319,7 @@
     "bit-identical": 148,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -4342,7 +4342,7 @@
     "bit-identical": 171,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -4365,7 +4365,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -4388,7 +4388,7 @@
     "bit-identical": 165,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -4411,7 +4411,7 @@
     "bit-identical": 182,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -4434,7 +4434,53 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "methods/glibc-sinf-wsinc5",
+   "category": "methods",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 2,
+    "bit-identical": 0,
+    "method": "wsinc5"
+   },
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "methods/glibc-sinf-wsinc9",
+   "category": "methods",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "data type": "float32",
+    "geometry (qform)": "0.0e+00",
+    "geometry (sform)": "0.0e+00",
+    "values": "0.0e+00",
+    "voxel sizes (pixdim[1:4])": "0.0e+00"
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 14,
+    "bit-identical": 0,
+    "method": "wsinc9"
+   },
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -4457,7 +4503,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.016,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -4480,7 +4526,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.016,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -4503,7 +4549,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.016,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -4526,7 +4572,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.016,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -4572,7 +4618,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.018,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -4595,7 +4641,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.009,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -4618,7 +4664,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 0.008,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -4641,7 +4687,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -4664,7 +4710,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -4687,7 +4733,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -4710,7 +4756,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.009,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -4735,7 +4781,7 @@
     "bit-identical": 151,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -4759,7 +4805,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 0.009,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -4782,7 +4828,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.01,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -4807,7 +4853,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -4830,7 +4876,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.01,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -4879,7 +4925,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -4902,7 +4948,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.011,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -4927,7 +4973,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -4952,7 +4998,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -4977,7 +5023,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -5002,7 +5048,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -5025,7 +5071,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.008,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -5048,7 +5094,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -5071,7 +5117,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5094,7 +5140,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5117,7 +5163,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -5140,7 +5186,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5163,7 +5209,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -5186,7 +5232,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -5199,7 +5245,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -5212,7 +5258,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -5225,7 +5271,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -5238,7 +5284,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -5251,7 +5297,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -5264,7 +5310,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -5277,7 +5323,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5290,7 +5336,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -5303,7 +5349,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5316,7 +5362,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5329,7 +5375,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -5342,7 +5388,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -5355,7 +5401,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -5368,7 +5414,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -5381,7 +5427,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -5394,7 +5440,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -5407,7 +5453,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -5420,7 +5466,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5444,7 +5490,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -5468,7 +5514,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -5492,7 +5538,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -5516,7 +5562,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -5540,7 +5586,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -5565,7 +5611,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -5581,7 +5627,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -5606,7 +5652,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -5631,7 +5677,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -5655,7 +5701,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -5679,7 +5725,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -5704,7 +5750,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -5720,7 +5766,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -5736,7 +5782,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -5752,7 +5798,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -5768,7 +5814,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5784,7 +5830,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -5800,7 +5846,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5824,7 +5870,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -5848,7 +5894,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -5872,7 +5918,7 @@
     "bit-identical": 169,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -5896,7 +5942,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.007,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -5921,7 +5967,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -5946,7 +5992,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -5962,7 +6008,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -5987,7 +6033,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -6003,7 +6049,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.023,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -6027,7 +6073,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.012,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -6052,7 +6098,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.013,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -6077,7 +6123,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -6102,7 +6148,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -6126,7 +6172,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.009,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -6151,7 +6197,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -6176,7 +6222,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -6201,7 +6247,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -6226,7 +6272,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -6251,7 +6297,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -6276,7 +6322,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -6301,7 +6347,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -6326,7 +6372,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -6350,7 +6396,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -6374,7 +6420,7 @@
     "bit-identical": 169,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -6390,7 +6436,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -6406,7 +6452,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -6430,7 +6476,7 @@
     "bit-identical": 148,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -6455,7 +6501,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.014,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -6480,7 +6526,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.021,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -6505,7 +6551,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.015,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -6529,7 +6575,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -6553,7 +6599,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -6577,7 +6623,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.007,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -6601,7 +6647,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.008,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -6626,7 +6672,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.041,
    "status": "pass"
   },
   {
@@ -6651,7 +6697,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -6676,7 +6722,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.018,
+   "seconds": 0.041,
    "status": "expected-divergence"
   },
   {
@@ -6701,7 +6747,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -6717,7 +6763,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -6733,7 +6779,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -6749,7 +6795,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -6774,7 +6820,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -6799,7 +6845,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.011,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -6824,7 +6870,7 @@
     "bit-identical": 168,
     "method": "Fourier"
    },
-   "seconds": 0.01,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -6849,7 +6895,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.009,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -6862,7 +6908,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.108,
+   "seconds": 0.272,
    "status": "expected-divergence"
   },
   {
@@ -6875,7 +6921,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.006,
+   "seconds": 0.015,
    "status": "expected-divergence"
   },
   {
@@ -6900,7 +6946,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.321,
+   "seconds": 0.658,
    "status": "pass"
   },
   {
@@ -6925,7 +6971,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.315,
+   "seconds": 0.518,
    "status": "pass"
   },
   {
@@ -6950,7 +6996,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.314,
+   "seconds": 0.504,
    "status": "pass"
   },
   {
@@ -6975,7 +7021,7 @@
     "bit-identical": 0,
     "method": "Fourier"
    },
-   "seconds": 0.675,
+   "seconds": 0.983,
    "status": "pass"
   },
   {
@@ -7000,7 +7046,7 @@
     "bit-identical": 240,
     "method": "Fourier"
    },
-   "seconds": 6.803,
+   "seconds": 12.346,
    "status": "pass"
   },
   {
@@ -7025,7 +7071,7 @@
     "bit-identical": 173,
     "method": "Fourier"
    },
-   "seconds": 6.691,
+   "seconds": 10.77,
    "status": "pass"
   },
   {
@@ -7050,7 +7096,7 @@
     "bit-identical": 146,
     "method": "Fourier"
    },
-   "seconds": 6.485,
+   "seconds": 12.609,
    "status": "pass"
   },
   {
@@ -7075,7 +7121,7 @@
     "bit-identical": 31,
     "method": "Fourier"
    },
-   "seconds": 3.205,
+   "seconds": 5.339,
    "status": "pass"
   },
   {
@@ -7099,7 +7145,7 @@
     "bit-identical": 23875172,
     "method": "Fourier"
    },
-   "seconds": 18.649,
+   "seconds": 37.457,
    "status": "pass"
   },
   {
@@ -7124,7 +7170,7 @@
     "bit-identical": 177,
     "method": "Fourier"
    },
-   "seconds": 5.688,
+   "seconds": 11.389,
    "status": "pass"
   },
   {
@@ -7149,7 +7195,7 @@
     "bit-identical": 1808,
     "method": "Fourier"
    },
-   "seconds": 96.893,
+   "seconds": 176.717,
    "status": "pass"
   },
   {
@@ -7174,7 +7220,7 @@
     "bit-identical": 0,
     "method": "linear"
    },
-   "seconds": 5.483,
+   "seconds": 11.047,
    "status": "pass"
   },
   {
@@ -7199,7 +7245,7 @@
     "bit-identical": 0,
     "method": "cubic"
    },
-   "seconds": 5.831,
+   "seconds": 9.737,
    "status": "pass"
   },
   {
@@ -7224,7 +7270,7 @@
     "bit-identical": 6,
     "method": "quintic"
    },
-   "seconds": 5.924,
+   "seconds": 9.754,
    "status": "pass"
   },
   {
@@ -7249,7 +7295,7 @@
     "bit-identical": 6,
     "method": "heptic"
    },
-   "seconds": 6.019,
+   "seconds": 10.073,
    "status": "pass"
   },
   {
@@ -7274,7 +7320,7 @@
     "bit-identical": 0,
     "method": "wsinc5"
    },
-   "seconds": 5.45,
+   "seconds": 8.904,
    "status": "pass"
   },
   {
@@ -7299,7 +7345,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 6.072,
+   "seconds": 10.252,
    "status": "pass"
   },
   {
@@ -7324,7 +7370,7 @@
     "bit-identical": 137,
     "method": "Fourier"
    },
-   "seconds": 5.63,
+   "seconds": 9.846,
    "status": "pass"
   },
   {
@@ -7347,7 +7393,7 @@
     "bit-identical": 222,
     "method": "Fourier"
    },
-   "seconds": 4.084,
+   "seconds": 6.91,
    "status": "pass"
   },
   {
@@ -7370,7 +7416,7 @@
     "bit-identical": 0,
     "method": "copy"
    },
-   "seconds": 0.044,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -7393,7 +7439,7 @@
     "bit-identical": 0,
     "method": "wsinc9"
    },
-   "seconds": 0.014,
+   "seconds": 0.055,
    "status": "pass"
   }
  ],
@@ -7402,7 +7448,7 @@
   "both-error": 32,
   "expected-divergence": 3,
   "fail": 0,
-  "pass": 280,
+  "pass": 282,
   "skipped": 0
  },
  "tier": "standard"

@@ -1,12 +1,12 @@
 # Parity: topup (clean-room original)
 
-**All cases agree.** 180 cases on the `standard` tier: 92 pass, 66 rejected by both, 22 expected divergences, 0 failures.
+**1 case(s) fail.** 183 cases on the `standard` tier: 94 pass, 66 rejected by both, 22 expected divergences, 1 failures.
 
 - **Validated:** `larmorx fsl topup` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/topup.md, Apache-2.0)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5), the conda build at `~/fsl-6.0.7.23`, one thread
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
-- **Original programs:** 182 runs: 161 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
+- **Original programs:** 185 runs: 164 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -33,8 +33,18 @@
 | difftest | 7 | 6 | 0 | 1 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
 | fmriprep | 2 | 2 | 0 | 0 | 0 |
-| opt | 34 | 27 | 1 | 6 | 0 |
+| opt | 37 | 29 | 1 | 6 | 1 |
 | thr | 3 | 3 | 0 | 0 | 0 |
+
+## Failures
+
+### `opt/fsl145-one-coefficient`
+
+--splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; the default runs)
+
+- **Exit status**: FSL 1, the original 0
+- **Files written**: FSL only [], original only ['f.nii.gz', 'o_fieldcoef.nii.gz', 'o_movpar.txt']
+- **Standard error (the original's own lines left out)**: 3 lines, the original 1; line 1: 'Error occurred when preparing to run topup' / ''
 
 ## Expected divergences
 
@@ -138,7 +148,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (f9bedb020451) |
+| larmorx | 0.0.1 (be3db916dce3) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -168,6 +178,8 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `opt/membrane-lm` | pass | 16/16 | --regmod=membrane_energy with Levenberg-Marquardt (the energy's Hessian) |
 | `opt/membrane-scg` | pass | 16/16 | --regmod=membrane_energy with scaled conjugate gradients (the energy's gradient) |
 | `opt/splineorder-2` | pass | 16/16 | --splineorder=2 |
+| `opt/fsl145-short-axis` | pass | 16/16 | --splineorder=2 with z shorter than two knot spacings (FSL-145: 2 coefficients) |
+| `opt/fsl145-one-coefficient` | fail | 4/7 | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; t… |
 | `opt/scale` | pass | 18/18 | --scale=1: each volume scaled to the mean |
 | `opt/ssqlambda-0` | pass | 16/16 | --ssqlambda=0: lambda as given |
 | `opt/regrid-0` | pass | 16/16 | --regrid=0: the image's own grid, two levels |
@@ -177,6 +189,7 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `opt/datain-transposed` | pass | 12/12 | an acquisition-parameter file of four rows |
 | `opt/x-phase-encoding` | pass | 34/34 | phase encoding along x (the translation along x left out), the movements |
 | `opt/four-volumes` | expected-divergence | 41/50 | four volumes along x and y: six movement parameters for each moving scan |
+| `opt/fsl146-four-axes` | pass | 16/16 | four volumes along y and x without the movements (FSL-146: each axis' Jacobian term of the gradient over the volumes en… |
 | `opt/oblique-phase-encoding` | pass | 24/24 | a phase-encoding vector along x and y (the Jacobian of both displacements) |
 | `opt/readout-times` | pass | 16/16 | different read-out times |
 | `opt/zero-readout` | expected-divergence | 12/22 | one read-out time of 0 (a synthesised undistorted image) |
@@ -290,7 +303,7 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `at/jac-field-aniso` | pass | 8/8 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
 | `at/jac-no-movpar` | pass | 8/8 | coefficients without their _movpar.txt (no movements) |
 | `at/jac-oblique` | pass | 8/8 | a phase-encoding vector along x and y |
-| `at/jac-z` | pass | 9/9 | phase encoding along z |
+| `at/jac-z` | pass | 8/8 | phase encoding along z (FSL-144: FSL leaves the z component out silently; the default refuses) |
 | `at/datatype-preserve` | pass | 8/8 | --datatype=preserve |
 | `at/datatype-char` | pass | 8/8 | --datatype=char |
 | `at/datatype-short` | pass | 8/8 | --datatype=short |

@@ -1,12 +1,12 @@
 # Parity: FAST (clean-room original)
 
-**1 case(s) fail.** 87 cases on the `standard` tier: 60 pass, 25 rejected by both, 1 expected divergences, 1 failures.
+**2 case(s) fail.** 88 cases on the `standard` tier: 60 pass, 25 rejected by both, 1 expected divergences, 2 failures.
 
 - **Validated:** `larmorx fsl fast` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/fast.md, Apache-2.0)
 - **Reference:** fast from FSL 6.0.7.23 (fsl-fast4 2111.3), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-fast --tier standard`
-- **Original programs:** 100 runs: 77 from the oracle cache, 23 run (11 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-fast --tier standard`
+- **Original programs:** 88 runs: 67 from the oracle cache, 21 run (9 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -29,7 +29,7 @@
 | err | 29 | 9 | 19 | 1 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
 | multi | 15 | 13 | 1 | 0 | 1 |
-| opt | 22 | 21 | 1 | 0 | 0 |
+| opt | 23 | 21 | 1 | 0 | 1 |
 | priors | 13 | 11 | 2 | 0 | 0 |
 | real | 1 | 1 | 0 | 0 | 0 |
 
@@ -39,9 +39,15 @@
 
 -S 5 -B -b (T1w+T2w, T1w/T2w ratio, BOLD reference, T2w, T1w): 5 x 5 covariances (LAPACK's LU, inverse and solve beyond 4 x 4)
 
-- **Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels** (per file = seg_mixeltype.nii.gz: identical 0.95852, Dice 0.90695, threshold Dice >= 0.999, identical >= 99.9%, outside identical): seg_mixeltype.nii.gz: identical 0.95852, Dice 0.90695; seg_pveseg.nii.gz: identical 0.97892, Dice 0.97265; seg_seg.nii.gz: identical 0.98555, Dice 0.98201
+- **Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels** (per file = seg_mixeltype.nii.gz: identical 0.95850, Dice 0.90691, threshold Dice >= 0.999, identical >= 99.9%, outside identical): seg_mixeltype.nii.gz: identical 0.95850, Dice 0.90691; seg_pveseg.nii.gz: identical 0.97891, Dice 0.97265; seg_seg.nii.gz: identical 0.98555, Dice 0.98201
 - **Partial volumes (_pve_n): mean and p99.9 differences, totals** (per file = seg_pve_0.nii.gz: mean 0.0064, p99.9 0.81, total 0.00058, threshold mean <= 0.001, p99.9 <= 0.02, total within 0.1%): seg_pve_0.nii.gz: mean 0.0064, p99.9 0.81, total 0.00058; seg_pve_1.nii.gz: mean 0.021, p99.9 1, total 0.0023; seg_pve_2.nii.gz: mean 0.017, p99.9 0.91, total 0.0025
 - **Bias field and restored image: relative difference (p99.9)** (per file = seg_bias_1.nii.gz: rel p99.9 0.041, threshold <= 0.0001): seg_bias_1.nii.gz: rel p99.9 0.041; seg_bias_2.nii.gz: rel p99.9 0.043; seg_bias_3.nii.gz: rel p99.9 0.11; seg_bias_4.nii.gz: rel p99.9 0.034; seg_bias_5.nii.gz: rel p99.9 0.014; seg_restore_1.nii.gz: rel p99.9 0.042
+
+### `opt/nan-first`
+
+the negative voxels' image with a NaN first voxel (FSL-203: FSL's extrema NaN, the negative voxels kept and the mask empty: the k-means exception, exit 255; the default segments)
+
+- **the default run finishes and names FSL-203**: exit 0: FSL-103
 
 ## Expected divergences
 
@@ -83,7 +89,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (f0dd88b671b6) |
+| larmorx | 0.0.1 (be3db916dce3) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -133,6 +139,7 @@ The cases are the replica suite's (`fsl-fast-replica`); FSL's runs are served fr
 | `opt/4d` | pass | 8/8 | a 4D image (its first volume, with newimage's warning) |
 | `opt/offset` | both-error | 5/5 | negative values, 2nd percentile below 0 (the minimum subtracted) |
 | `opt/negvox` | pass | 9/9 | a few negative voxels (set to 0) |
+| `opt/nan-first` | fail | 5/6 | the negative voxels' image with a NaN first voxel (FSL-203: FSL's extrema NaN, the negative voxels kept and the mask em… |
 | `opt/nan` | pass | 11/11 | NaN voxels with -B -b -p |
 | `opt/int16` | pass | 8/8 | a 16-bit integer image |
 | `opt/big` | pass | 8/8 | values above 2^24 (the brightest voxels and the mask) |

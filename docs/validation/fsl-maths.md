@@ -1,12 +1,12 @@
 # Parity: fslmaths (clean-room original)
 
-**All cases agree.** 442 cases on the `standard` tier: 374 pass, 63 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 452 cases on the `standard` tier: 384 pass, 63 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl fslmaths` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/fslmaths.md, Apache-2.0)
 - **Reference:** fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6), the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths --tier standard`
-- **Original programs:** 437 runs: 396 from the oracle cache, 41 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 447 runs: 406 from the oracle cache, 41 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -42,7 +42,7 @@
 | morph | 24 | 23 | 1 | 0 | 0 |
 | norm | 6 | 6 | 0 | 0 | 0 |
 | op | 25 | 23 | 2 | 0 | 0 |
-| orig | 8 | 7 | 0 | 1 | 0 |
+| orig | 18 | 17 | 0 | 1 | 0 |
 | roc | 8 | 7 | 1 | 0 | 0 |
 | roi | 7 | 5 | 2 | 0 | 0 |
 | stat | 16 | 16 | 0 | 0 | 0 |
@@ -134,7 +134,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (4182e89066bc) |
+| larmorx | 0.0.1 (be3db916dce3) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -576,6 +576,16 @@ Random testing (one trial, 2026-11-03, `<workspace>/oracles/difftest/2026-11-03-
 | `orig/roc-ramp-noise` | pass | 8/8 | -roc 2 with the same image as its noise: the FWE rate never reaches 2, the last true-positive rate below 1 |
 | `orig/roc-below-zero` | pass | 8/8 | -roc -0.5 with truth voxels of -0.0005 (inside the mask, below 0: false-positive candidates) |
 | `orig/roc-truth4d` | pass | 8/8 | -roc with a 4D truth image (its first volume, with the image library's warning) |
+| `orig/glibc-double-sin` | pass | 7/7 | -sin of a 32³ double image in double (-dt double -odt double): glibc's sin where it is not correctly rounded (GLIBC-07) |
+| `orig/glibc-double-cos` | pass | 7/7 | -cos of a 32³ double image in double (-dt double -odt double): glibc's cos where it is not correctly rounded (GLIBC-07) |
+| `orig/glibc-double-exp` | pass | 7/7 | -exp of a 32³ double image in double (-dt double -odt double): glibc's exp where it is not correctly rounded (GLIBC-07) |
+| `orig/glibc-double-log` | pass | 7/7 | -log of a 32³ double image in double (-dt double -odt double): glibc's log where it is not correctly rounded (GLIBC-07) |
+| `orig/glibc-double-pow` | pass | 7/7 | -pow 1.7 of a 32³ double image in double (-dt double -odt double): glibc's pow where it is not correctly rounded (GLIBC… |
+| `orig/edge-double` | pass | 7/7 | -edge of a 32³ double image in double (-dt double -odt double): FSL's squares are exact products (§10.4's pow(x, 2), as… |
+| `orig/glibc-s` | pass | 7/7 | -s 3.95 of a 24³ float image: a Gaussian tap whose expf differs between glibc's and the correctly rounded one (GLIBC-07… |
+| `orig/glibc-kernel-gauss` | pass | 7/7 | -kernel gauss 4.8 -fmean: the same for -kernel gauss (another tap) |
+| `orig/glibc-bptf` | pass | 7/7 | -bptf 1.73 -1 of a double 4D image (-dt double -odt double): a high-pass weight exp(-1/(2·1.73²)) whose glibc exp diffe… |
+| `orig/glibc-tfce` | pass | 7/7 | -tfce_delta 0.01 -tfce 1.7 0.5 6: about 1,170 thresholds, among them powers (powf(h, 1.7), pow(s, 0.5)) where glibc's d… |
 | `orig/roc-nodir` | pass | 7/7 | FSL-193: -roc with a curve file in a folder that does not exist (FSL writes no curve and says nothing; the default stop… |
 | `difftest/edge-char-int-differences` | pass | 7/7 | -edge under -dt char: the differences as C's int (findings 29) |
 | `difftest/fsl154-unsigned-wrap` | pass | 7/7 | -dt char on a uint8 image of zeros, -sub 1: FSL-154 named (the unsigned type wraps at 0) |

@@ -99,3 +99,12 @@ next re-make; its cases and numbers are right.
 - HANDOFF.toml's 40 operations applied (12 files); `register_counts.py` 393 entries (a 91, b 13, c 191, d 24, e 59,
   f 13), nothing waiting for the user; `tables --site`, `tables --check`, the summary re-exported; the site build 0
   problems.
+- Verified (`verify-merge.sh` on 04c878b, 22:29-23:04; the fslmaths replica's suite then separately on 5d9409e, the
+  same code): the three Rust workspaces' gates, the GPL and nc builds, the Python gates, the smoke tier and golden
+  (every checksum unchanged, only the header: 5d9409e). Re-runs against the committed records: `fsl-bet-replica`
+  263/263, `afni-tshift-replica` 317/317, `fsl-maths-replica` 422/422, no status or detail differs. The clean-room
+  original's `fsl-bet` suite (its record of 168 cases not re-made in this part): the 168 unchanged; of the 23 new
+  cases (the options'), 21 are expected divergences (pending in the original) and 2 fail
+  (`bet/eyes-no-brain`, `bet/surfaces-t2-missing`: FSL fails midway, the original refuses before running), for the
+  catch-up part. The evidence re-export of BET's and fslmaths' pages changed only the exporter's fingerprint (site
+  54eb60f).

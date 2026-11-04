@@ -401,7 +401,10 @@ def run_larmorx(tool: str, args: list[str], mode: str, env: dict[str, str], cwd:
 _TERMINATE = re.compile(
     r"terminate called after throwing an instance of [^\n]*\n(?:  what\(\): [^\n]*\n)?"
 )
-_BASH_SIGNAL = re.compile(r"^[^\n]*: line \d+: +\d+ (?:Aborted|Segmentation fault)[^\n]*\n", re.M)
+#: bash's report of a command ended by a signal (its process ID, or ``PID`` once masked).
+_BASH_SIGNAL = re.compile(
+    r"^[^\n]*: line \d+: +(?:\d+|PID) (?:Aborted|Segmentation fault)[^\n]*\n", re.M
+)
 #: The ``bet`` script's ``ERR`` trap, on its standard output after a program it runs crashed.
 _BET_FAILED = re.compile(r"^bet failed during command:[^\n]*\n", re.M)
 

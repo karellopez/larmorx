@@ -975,9 +975,13 @@ GLIBC_CALLS: dict[str, tuple[str, tuple[str, ...]]] = {
     "exp": ("exp", ("-mul", "1e-4", "-exp")),
     "log": ("log", ("-abs", "-add", "1", "-log")),
 }
-#: The functions whose glibc code is IBM's (LGPL, never translated): correctly rounded in both
-#: modes; the others' glibc bits come with ``reproduce``.
-IBM = ("sin", "cos", "tan", "asin", "acos", "atan")
+#: The functions whose glibc code is IBM's (LGPL, never translated) and that stay correctly
+#: rounded in both modes (the user's decision of 2026-11-04); the others' glibc bits come with
+#: ``reproduce``: exp and log from Arm's Optimized Routines, sin and cos since 2026-11-04 from
+#: LARMORX's implementation of their behavioural specification (``specs/glibc-dbl.md``).
+IBM = ("tan", "asin", "acos", "atan")
+#: The functions of glibc's IBM code whose bits the replica's reproduce gives since 2026-11-04.
+GLIBC_DBL = ("sin", "cos")
 
 
 def glibc_args(rid: str) -> list[str]:
@@ -1040,6 +1044,12 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
         if fn in IBM:
             verdict = "divergence" if n_r else "bit-identical"
             how = "correctly rounded in both modes (IBM's code in glibc, LGPL, never translated)"
+        elif fn in GLIBC_DBL:
+            verdict = "bit-identical" if n_r == 0 else "open"
+            how = (
+                "glibc's bits with reproduce (LARMORX's implementation of glibc's sin and cos, "
+                "since 2026-11-04), correctly rounded by default (GLIBC-07 named)"
+            )
         else:
             verdict = "bit-identical" if n_r == 0 else "open"
             how = "glibc's bits with reproduce, correctly rounded by default (GLIBC-07 named)"
@@ -1066,10 +1076,13 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
         "output compared bit for bit with FSL 6.0.7.23's (through the oracle cache: glibc 2.35's "
         "functions as FSL's build calls them, the FMA builds this CPU selects). Where glibc's "
         "result is not correctly rounded and the replica's is, they differ by one unit in the "
-        "last place: GLIBC-07, an expected divergence for IBM's six functions (no permissive "
-        "code gives glibc's bits), a correction by default for exp and log, whose glibc bits "
-        "the reproduce mode gives. Float results (fslmaths' default type) are the same: no "
-        "float differs after rounding.",
+        "last place: GLIBC-07, an expected divergence for tan, asin, acos and atan (IBM's code "
+        "in glibc: no permissive code gives their bits, and they stay correctly rounded in both "
+        "modes, the user's decision of 2026-11-04), a correction by default for exp, log, sin "
+        "and cos, whose glibc bits the reproduce mode gives (sin and cos since 2026-11-04, "
+        "from LARMORX's implementation of glibc's code written from its behavioural "
+        "specification). Float results (fslmaths' default type) are the same: no float differs "
+        "after rounding.",
     )  # fmt: skip
     return table, fcache.provenance(e)
 
@@ -1175,9 +1188,9 @@ FIX_REASONS = {
     "FSL-167": "FSL-167, corrected by default with a notice: the standard deviation along a "
     "dimension takes the variance without the clamp at 0 and the guard for one value that "
     "the masked variance has; the default takes the masked form.",
-    "GLIBC-07": "GLIBC-07, corrected by default with a notice: glibc 2.35's double exp, log and "
-    "pow are not always correctly rounded; the default's are, and the reproduce mode gives "
-    "glibc's bits.",
+    "GLIBC-07": "GLIBC-07, corrected by default with a notice: glibc 2.35's double exp, log, "
+    "pow, sin and cos are not always correctly rounded; the default's are, and the reproduce "
+    "mode gives glibc's bits.",
 }
 
 
@@ -1389,6 +1402,32 @@ def _stats_case_table() -> dict[str, tuple[str, tuple]]:
     return out
 
 
+def refresh_replica(ctx: core.Context, why: str) -> None:
+    """After a change of the replica: every entry holding the replica's runs computed again,
+    FSL's runs served by the oracle-output cache (never computed twice), each recording why
+    (``recomputed``). The previous entry is kept beside it, never deleted
+    (``<cache>/fsl-maths/.superseded/<case>-<its commit>``): it is moved away first, as the
+    replica's runs remove what their directory held before them (the inputs they were given)."""
+    fctx = ctx.figures_context()
+    for get, compute in (
+        (combine_entry, _compute_combine),
+        (goodvoxels_entry, _compute_goodvoxels),
+        (families_entry, _compute_families),
+        (glibc_entry, _compute_glibc),
+        (named_entry, lambda e: compute_default_mode(e, RECORD, "fslmaths")),
+    ):
+        old = get(ctx)
+        prev = old.info().get("larmorx_commit") or "unknown"
+        kept = old.dir.parent / ".superseded" / f"{old.case}-{prev[:12]}"
+        kept.parent.mkdir(exist_ok=True)
+        old.dir.rename(kept)
+        e = fcache.recompute(fctx, TOOL, old.case, old.description, compute, why)
+        info = e.info()
+        info["recomputed"] = {"previous_larmorx_commit": prev, "why": why,
+                              "previous_entry": f".superseded/{kept.name}"}  # fmt: skip
+        e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+
+
 def named_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(), TOOL, "cases-default-mode",
@@ -1576,6 +1615,9 @@ if __name__ == "__main__":  # compute the cache entries only:
     what = sys.argv[1:] or ["combine", "goodvoxels", "families", "glibc", "named"]
     if what[0] == "refresh-original":  # fo.refresh: the original's entries glibc's maths reach
         fo.refresh(c, " ".join(what[1:]))
+        sys.exit(0)
+    if what[0] == "refresh-replica":  # the replica's entries, after a change of the replica
+        refresh_replica(c, " ".join(what[1:]))
         sys.exit(0)
     fns = {"combine": combine_entry, "goodvoxels": goodvoxels_entry, "families": families_entry,
            "glibc": glibc_entry, "named": named_entry,

@@ -2,8 +2,9 @@
 """BET's evidence: fMRIPrep's call (``bet <boldref> <out> -f 0.20 -m``) on a real BOLD reference
 by FSL 6.0.7.17, by fMRIPrep's own FSL (its image) and by the larmorx-nc replica in its default
 and ``reproduce`` modes; ``bet -R -m`` on a real T1w; ``betsurf`` (T1 and T2) on the synthetic
-head of the parity suite, whose skull and scalp surfaces can be shown whole without a face; the
-cases of the record.
+head of the parity suite, whose skull and scalp surfaces can be shown whole without a face;
+``bet -S``, ``-B``, ``-A`` and ``-A2`` on six real heads of the data panel (FSL 6.0.7.23 and the
+replica, :mod:`fsl_bet_options`); the cases of the records.
 
 The replica (``larmorx-nc``, under the FSL Licence's terms) runs as a separate program, as
 everywhere in the validation package (Apache-2.0). Every run of FSL goes through the parity
@@ -27,7 +28,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core, fsl_step
+from larmorx_validation.evidence import common, core, fsl_bet_options, fsl_step
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1241,8 +1242,40 @@ def command(s) -> str:
     return " ".join(x for x in (" ".join(env), " ".join(parts), files) if x)
 
 
-#: The register entries the replica corrects by default.
-CORRECTED = frozenset(f"FSL-{n}" for n in (40, 43, 44, 45, 46, 47, 50, 51, 54, 56, 60, 62, 63))
+#: The register entries the replica corrects by default (FSL-211 to FSL-217: bet's -S, -B, -A,
+#: -A2, standard_space_roi and fslroi, 2026-11-04).
+CORRECTED = frozenset(
+    f"FSL-{n}"
+    for n in (40, 43, 44, 45, 46, 47, 50, 51, 54, 56, 60, 62, 63, 211, 212, 213, 215, 216, 217)
+)
+#: The corrections inside the programs the variations run (FLIRT, FAST, fslstats), which the
+#: record's D13 section names per case.
+INNER = {
+    "FSL-09": "FLIRT's integer output inside standard_space_roi",
+    "FSL-14": "FLIRT's NaN voxels",
+    "FSL-182": "fslstats' standard deviation",
+    "FSL-202": "FAST's class variances, which -B's bias field comes from",
+}
+#: The record's D13 section: case -> the entries the default named there (``d13_named``).
+D13_BY_CASE: dict[str, list[str]] = {}
+
+
+def d13_named(repo: Path, record: str) -> dict[str, list[str]]:
+    """The record's D13 section read back: each case with the register entries the default mode
+    named on it (``- FSL-nn: ... : `case`, `case` …``; a list cut short names fewer)."""
+    import re
+
+    out: dict[str, list[str]] = {}
+    md = repo / "docs" / "validation" / f"{record}.md"
+    for line in md.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\s+- ((?:FSL|GLIBC)-\d+): \d+ case\(s\) named it", line)
+        if not m:
+            continue
+        for case in re.findall(r"`([a-z0-9]+/[^`]+)`", line.split("): ", 1)[-1]):
+            out.setdefault(case, []).append(m.group(1))
+    return out
+
+
 #: Refused by default (rule B): the entry -> what FSL does with the input (observable behaviour).
 REFUSED = {
     "FSL-42": "bet2 checks -f and -g against their ranges only (NaN passes) and the other numeric "
@@ -1252,6 +1285,8 @@ REFUSED = {
     "FSL-55": "the 98th percentile of values that include NaN is undefined",
     "FSL-61": "bet2 applies the brain mask made on --binaryMask's grid over an input of other "
     "dimensions, reading and writing outside it",
+    "FSL-214": "standard_space_roi checks no step's status: after a program fails, the next "
+    "steps run on missing files and the script exits with its cleanup's status",
 }
 
 
@@ -1299,6 +1334,14 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
             "mask and names the entry; its default starts the fill at the nearest voxel inside.",
             400,
         )
+    if st == "expected-divergence" and "fslpy converts" in r["reason"]:
+        return "divergence", common.clip(
+            "Not replicated yet: standard_space_roi copies an input of another file type than "
+            "FSLOUTPUTTYPE's with fslpy's imcp, which converts it with nibabel. The replica "
+            "refuses that conversion clearly in both modes, naming it (findings/fsl-flirt.md, "
+            '"Not replicated yet"); every other step of the script is FSL\'s.',
+            400,
+        )
     if st == "expected-divergence":
         return "divergence", common.clip("Pending: " + r["reason"].removeprefix(PENDING))
     v = common.outcome_verdict(r)
@@ -1323,11 +1366,19 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
         )
     fix = rep.get("D13 fix pass")
     named = [d for d in re.findall(r"\b(FSL-\d+)\b", desc) if d in CORRECTED]
+    inner = [d for d in D13_BY_CASE.get(r["case"], []) if d in INNER and d not in named]
     verdict = "bit-identical"
     if named:
         notes.append(
             f"in its default mode the replica corrects {', '.join(named)} and names it"
-            + (f": {fix:,} values change" if fix else "")
+            + (f": {fix:,} values change" if fix and not inner else "")
+            + " (the record's D13 section)"
+        )
+    if inner:
+        notes.append(
+            "in its default mode the programs the script runs correct "
+            + ", ".join(f"{d} ({INNER[d]})" for d in inner)
+            + (f": {fix:,} values change" if fix else ": no output changes")
             + " (the record's D13 section)"
         )
     return verdict, common.clip("; ".join(notes), 600)
@@ -1462,7 +1513,10 @@ def export(ctx: core.Context) -> dict:
         "real/adult-ds000005-R": "t1w-robust",
         "betsurf/t1t2": "betsurf-head",
         "fmriprep/ds000228-task_pixar-enhance_and_skullstrip_bold": "panel-ds000228-child",
+        **{s.case: s.example for s in fsl_bet_options.SPECS},
     }
+    D13_BY_CASE.clear()
+    D13_BY_CASE.update(d13_named(ctx.repo, RECORD_NEW))
     cs = cases(rec, _scenarios(), examples)
     cases(rec_new, _scenarios(), examples, impl="replica-23", into=cs)
     cases(rec_orig, _scenarios(), examples, impl="original", into=cs)
@@ -1471,6 +1525,7 @@ def export(ctx: core.Context) -> dict:
     pe = panel_entry(ctx)
     n, sn, pn = entry_new(ctx), surf_entry_new(ctx), panel_entry_new(ctx)
     o, so, po = entry_orig(ctx), surf_entry_orig(ctx), panel_entry_orig(ctx)
+    opts = fsl_bet_options.entries(ctx)
     bench, chart = speed(ctx)
     return {
         "schema": 1,
@@ -1480,7 +1535,7 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source() + rec_new.source() + rec_orig.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(x) for x in (e, s, pe, n, sn, pn, o, so, po)],
+            "cache": [fcache.provenance(x) for x in (e, s, pe, n, sn, pn, o, so, po, *opts)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1517,6 +1572,7 @@ def export(ctx: core.Context) -> dict:
             _example_t1(ctx, e, n, o),
             _example_surf(ctx, s, sn, so),
             _example_panel(ctx, pe, pn, po),
+            *fsl_bet_options.examples(ctx, rec_new),
         ],
     }
 

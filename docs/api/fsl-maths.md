@@ -71,21 +71,24 @@ FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of
 whose effect a later operation of the chain removed.
 
 The original against FSL 6.0.7.23 (the parity suite `fsl-maths`, record
-[fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-03, §21's thresholds): 442 cases
+[fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-04, §21's thresholds): 442 cases
 (the replica suite's cases, the original's own `orig/` cases and 17 permanent cases of random
-testing), 372 within the thresholds, 63 rejected by both alike, 7 expected divergences, 0
-failures. Of the 372, 358 identical to FSL's outputs (data, header, messages, exit status):
+testing), 374 within the thresholds, 63 rejected by both alike, 5 expected divergences, 0
+failures. Of the 374, 358 identical to FSL's outputs (data, header, messages, exit status):
 fMRIPrep's mask combination on its three oracle runs and its 14 goodvoxels calls on ds005040
 among them (the `-s 5` at 3 × 3 × 3.3 mm too; the ribbon a stand-in, as above); 3 of
 `-tensor_decomp` identical but for the eigenvectors' signs (the original's own convention,
-compared up to the sign); 11 within the thresholds: 9 sums (FSL's FFT path on two kernels,
-`-subsamp2` under the floating types, the double `-ztop` and `-ranknorm`) at most 2.4e-7 of
+compared up to the sign); 13 within the thresholds: 11 sums (FSL's FFT path on four kernels,
+`-subsamp2` under the floating types, the double `-ztop` and `-ranknorm`) at most 2.0e-7 of
 FSL's largest value, `fn/double-tan` one unit in the last place in its double values (glibc's
-`tan`, GLIBC-07), one `-roc` area 1e-7 from FSL's. The 7 expected divergences (FSL's FFT
-convolution against the original's direct sum on 5 kernels, `-subsamp2offc`'s means on 2 cases)
-stay inside the sums' bound (at most 2.6e-6 of FSL's largest value) and miss only its share of
-voxels within 4 units in the last place (spec questions 13 and 14), each with its reason in the
-record. Random testing's trial (2026-11-03, 20 minutes: 150,000 realistic chains): 143,191
+`tan`, GLIBC-07), one `-roc` area 1e-7 from FSL's. The 5 expected divergences (FSL's
+single-precision FFT convolution against the original's double sums on 3 kernels,
+`-subsamp2offc`'s means on 2 cases) stay inside the sums' bound (at most 1.1e-7 of FSL's
+largest value) and miss only its share of voxels within 4 units in the last place (spec
+questions 13 and 14), each with its reason in the record; on the FFT cases the original lies
+closer to the exact result than FSL's FFT (findings 31). Before the double sums of 2026-11-04
+(the record of 2026-11-03), 372 within the thresholds and 7 expected divergences, the FFT cases
+up to 2.6e-6 of FSL's largest value. Random testing's trial (2026-11-03, 20 minutes: 150,000 realistic chains): 143,191
 identical, 804 differing only by a named correction; of the 6,005 others, 4,681 fixed by the
 part's corrections (above), 96 by corrections of the suite's checks, 1,178 explained, 33
 expected (`-subsamp2offc`), 7 FSL-75's heap corruption in FSL, and 10 open (8 display ranges

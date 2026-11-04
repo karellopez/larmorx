@@ -1,11 +1,11 @@
 # Parity: fslmaths (clean-room original)
 
-**All cases agree.** 442 cases on the `standard` tier: 372 pass, 63 rejected by both, 7 expected divergences, 0 failures.
+**All cases agree.** 442 cases on the `standard` tier: 374 pass, 63 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl fslmaths` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/fslmaths.md, Apache-2.0)
 - **Reference:** fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6), the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths --tier standard`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths --tier standard`
 - **Original programs:** 437 runs: 396 from the oracle cache, 41 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
@@ -27,7 +27,7 @@
 |---|---|---|---|---|---|
 | bptf | 12 | 11 | 1 | 0 | 0 |
 | cli | 24 | 14 | 10 | 0 | 0 |
-| conv | 29 | 23 | 2 | 4 | 0 |
+| conv | 29 | 25 | 2 | 2 | 0 |
 | d13 | 82 | 56 | 26 | 0 | 0 |
 | difftest | 17 | 14 | 3 | 0 | 0 |
 | dilall | 4 | 4 | 0 | 0 | 0 |
@@ -56,13 +56,11 @@
 
 | Case | Reason |
 |---|---|
-| `conv/fft-sphere` | FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to the image's largest values, not to each voxel's own last place (findings 8; spec question 14). Inside the bound: max \|diff\| 1.2e-06 of max \|FSL\| (bound 1e-05). Outside the threshold: out.nii.gz: the sums' sha… |
-| `conv/fft-odd` | FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to the image's largest values, not to each voxel's own last place (findings 8; spec question 14). Inside the bound: max \|diff\| 2.55e-06 of max \|FSL\| (bound 1e-05). Outside the threshold: out.nii.gz: the sums' sh… |
-| `conv/fft-double` | FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to the image's largest values, not to each voxel's own last place (findings 8; spec question 14). Inside the bound: max \|diff\| 1.43e-06 of max \|FSL\| (bound 1e-05). Outside the threshold: out.nii.gz: the sums' sh… |
-| `conv/fft-4d` | FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to the image's largest values, not to each voxel's own last place (findings 8; spec question 14). Inside the bound: max \|diff\| 3.01e-07 of max \|FSL\| (bound 1e-05). Outside the threshold: out.nii.gz: the sums' sh… |
+| `conv/fft-double` | FSL's single-precision FFT convolution against the original's direct sum (where FSL takes its FFT, its products added in double precision and rounded once): the FFT's rounding is relative to the image's largest values, not to each voxel's own last place; against the exact result (float64) FSL's FFT… |
+| `conv/fft-4d` | FSL's single-precision FFT convolution against the original's direct sum (where FSL takes its FFT, its products added in double precision and rounded once): the FFT's rounding is relative to the image's largest values, not to each voxel's own last place; against the exact result (float64) FSL's FFT… |
 | `sub/subsamp2offc` | FSL's arithmetic of -subsamp2offc's 2 x 2 x 2 means, which no order of a single or double sum of the eight values gives (findings 13 and 29; spec question 13), against the spec's mean: the voxels beyond 4 ulp are those whose value cancels to near 0. Inside the bound: max \|diff\| 3.95e-08 of max \|FSL… |
 | `sub/subsamp2offc-double` | FSL's arithmetic of -subsamp2offc's 2 x 2 x 2 means, which no order of a single or double sum of the eight values gives (findings 13 and 29; spec question 13), against the spec's mean: the voxels beyond 4 ulp are those whose value cancels to near 0. Inside the bound: max \|diff\| 5.52e-17 of max \|FSL… |
-| `orig/fft-asym` | FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to the image's largest values, not to each voxel's own last place (findings 8; spec question 14). Inside the bound: max \|diff\| 1e-06 of max \|FSL\| (bound 1e-05). Outside the threshold: out.nii.gz: the sums' share… |
+| `orig/fft-asym` | FSL's single-precision FFT convolution against the original's direct sum (where FSL takes its FFT, its products added in double precision and rounded once): the FFT's rounding is relative to the image's largest values, not to each voxel's own last place; against the exact result (float64) FSL's FFT… |
 
 ## Rejected by both
 
@@ -136,7 +134,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (8ce1c6adf070) |
+| larmorx | 0.0.1 (4182e89066bc) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -366,10 +364,10 @@ Random testing (one trial, 2026-11-03, `<workspace>/oracles/difftest/2026-11-03-
 | `conv/fmeanu-gauss` | pass | 7/7 | -kernel gauss 2 -fmeanu (not separable) |
 | `conv/fmeanu-char` | pass | 7/7 | -kernel sphere 3 -fmeanu under -dt char |
 | `conv/fmean-int` | pass | 7/7 | -kernel boxv 3 -fmean under -dt int (separable) |
-| `conv/fft-sphere` | expected-divergence | 7/8 | -kernel sphere 12 -fmean (the FFT path: radices 2, 3, 11, 13) |
+| `conv/fft-sphere` | pass | 8/8 | -kernel sphere 12 -fmean (the FFT path: radices 2, 3, 11, 13) |
 | `conv/fft-box` | pass | 8/8 | -kernel box 24 -fmeanu (the FFT path) |
 | `conv/fft-even` | pass | 8/8 | -kernel boxv 12 -fmeanu (the FFT path, an even kernel: radix 4) |
-| `conv/fft-odd` | expected-divergence | 7/8 | -kernel sphere 10 -fmean of an odd, anisotropic image (the FFT path: radix 5) |
+| `conv/fft-odd` | pass | 8/8 | -kernel sphere 10 -fmean of an odd, anisotropic image (the FFT path: radix 5) |
 | `conv/fft-double` | expected-divergence | 7/8 | -kernel sphere 12 -fmean of a double image (the FFT path) |
 | `conv/fft-4d` | expected-divergence | 7/8 | -kernel sphere 12 -fmeanu of a 4D image (the FFT path) |
 | `conv/fft-int` | pass | 7/7 | -kernel sphere 12 -fmeanu under -dt int (the FFT path) |

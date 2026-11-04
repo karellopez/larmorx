@@ -625,7 +625,10 @@ The items below keep their history.
    `crates-nc/`) wires the FSL replicas' `reproduce` to the new `sin_glibc`, `cos_glibc` and
    `sincos_glibc` (fslmaths' `-sin` and `-cos`, the Kiss FFT's twiddle factors, the kernels'
    windows, avscale's `sqrtaff`) and re-makes their records (random testing's permanent case
-   `fft-twiddles-glibc-sincos` then bit for bit; `fn/double-tan` stays an expected divergence).
+   `fft-twiddles-glibc-sincos` then bit for bit; `fn/double-tan` stays an expected divergence); (b) is the first relay
+   of BET's `-S`/`-B`/`-A`/`-A2` replica part, after (a) merges (the orchestrator, 2026-11-04). AFNI's `tanhf` and
+   `expm1f` (fdlibm) stay in the AFNI replica crate: not on the user's list of 2026-11-04; a question for the user if
+   an AFNI clean-room original's `reproduce` ever needs them.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room

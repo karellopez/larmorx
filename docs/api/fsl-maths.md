@@ -52,7 +52,7 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-maths-replica`, record [fsl-maths-replica](../validation/fsl-maths-replica.md), standard
-tier, 2026-11-04: 359 of 360 compared cases bit-identical, the other one, `fn/double-tan`,
+tier, 2026-11-04: 360 of 361 compared cases bit-identical, the other one, `fn/double-tan`,
 differing in the last place in 3 of its 210 double-precision values as glibc's `tan` does
 (GLIBC-07, below; random testing's `fft-twiddles-glibc-sincos`, an expected divergence on
 2026-11-03, is FSL's bit for bit since the replica's `reproduce` takes glibc's `sincos` for the

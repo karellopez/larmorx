@@ -12,18 +12,38 @@
 //!   then the outputs cropped back;
 //! - `-F`: `bet2 -m -n -f 0.3` on the first volume, the mask dilated (`fslmaths -dilF`), every
 //!   volume masked (`fslmaths -mas`);
-//! - `-S`, `-B`, `-A`, `-A2` need FSL's FLIRT (and FAST for `-B`): not yet replicated, refused
-//!   with a message naming them.
+//! - `-S`: `bet2 -s`, `standard_space_roi -b -d` and `bet2 -n -m -f 0.4` on its result, MNI152's
+//!   eye mask taken into the input's space (`flirt -applyxfm` through standard_space_roi's
+//!   inverse matrix) and dilated (`fslmaths`), the brain without the eyes and without what is
+//!   brighter than 3.5 standard deviations above its mean (`fslstats -M`, `-S`, `dc`), the skull
+//!   without the eyes;
+//! - `-B`: `standard_space_roi -b -d`, FAST's bias field (`fast -b`, its messages discarded),
+//!   the input divided by it, (with `-s` the skull from `standard_space_roi -maskFOV -roiNONE`
+//!   and `bet2`, moved with fslpy's `immv`), `standard_space_roi -b -d` again and `bet -m -R -d`
+//!   (this script again) on its result;
+//! - `-A`: `flirt` to MNI152 (the matrix only), `bet2 -e`, `betsurf --t1only -o -m -s`;
+//! - `-A2 <T2>`: `flirt` of the T2 to the input (`-interp sinc`), `flirt` to MNI152, `bet2 -e`,
+//!   `betsurf -o -m -s` with the registered T2.
+//!
+//! Every program runs in this process (the replicas of FLIRT, standard_space_roi, FAST,
+//! fslmaths, fslstats, betsurf); a failure stops the script through its `ERR` trap, as bash's
+//! `-e` does. The standard images (`${FSLDIR}/data/standard/MNI152_T1_2mm`, its dilated brain
+//! mask, the eye mask) are found by [`larmorx_nc_core::fsldata`]; the script refuses before it
+//! runs anything when one it needs is nowhere.
 //!
 //! The script expands its arguments unquoted (FSL-44): the replica reproduces the word
 //! splitting of blanks in `reproduce` mode and uses the names as given by default.
 
 use std::io::Write;
+use std::time::SystemTime;
 
-use larmorx_core::defects::{self, Notices};
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
 
 use crate::bet2::{self, Run};
 use larmorx_nc_core::avwutils::{self as avw, ToolFailure};
+use larmorx_nc_core::exception;
+use larmorx_nc_core::fsldata;
+use larmorx_nc_core::fslpy;
 use larmorx_nc_core::settings::Settings;
 
 const USAGE: &str = "
@@ -62,6 +82,46 @@ Miscellaneous options:
 /// program is not found).
 const IMGLOB_LINE: u32 = 329;
 
+/// The line bash names in its report of a program that crashed inside the variations' `if`
+/// block: the block's end (`fi`), where bash's parser stood when it ran the block.
+const VARIATIONS_FI: u32 = 399;
+
+/// The standard images the variations read (relative to `${FSLDIR}/data`).
+const STD_T1: &str = "standard/MNI152_T1_2mm";
+const STD_BRAIN_MASK_DIL: &str = "standard/MNI152_T1_2mm_brain_mask_dil";
+const STD_EYE_MASK: &str = "standard/MNI152_T1_2mm_eye_mask";
+
+/// A program the script runs (the replica's, in this process).
+type Program =
+    fn(&[String], &Settings, UpstreamDefects, usize, &mut dyn Write, &mut dyn Write) -> u8;
+
+/// `standard_space_roi`, `flirt`, `fslmaths`, `fslstats`, `fast` as the script runs them.
+fn ssroi(
+    a: &[String],
+    s: &Settings,
+    m: UpstreamDefects,
+    t: usize,
+    o: &mut dyn Write,
+    e: &mut dyn Write,
+) -> u8 {
+    larmorx_nc_flirt::standard_space_roi(a, s, m, t, o, e)
+}
+
+/// Runs `f` in this process: its exit status, or, where an exception nothing in it catches ends
+/// it (FSL's process aborts), what it wrote on standard error from the throw on.
+fn call(
+    run: &Run,
+    f: Program,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<u8, String> {
+    let (fsl, mode, threads) = (run.fsl, run.mode, run.threads);
+    let r = exception::catch(|| f(args, fsl, mode, threads, out, err));
+    let _ = out.flush();
+    r.map_err(|e| e.stderr_text())
+}
+
 /// How the script stops.
 enum Stop {
     /// `exit <code>` (the usage, an invalid input, a refusal).
@@ -79,10 +139,27 @@ struct Script<'a, 'w> {
     args: Vec<String>,
     /// Files this run created (the correction of the cleanup's glob, FSL-46).
     created: Vec<String>,
+    /// The files named `<output>_tmp...` before the run, with their modification times: a file
+    /// not among them, or changed since, is this run's (FSL-46; the programs' many temporary
+    /// files: FAST's, standard_space_roi's with `-d`).
+    before: Vec<(String, Option<SystemTime>)>,
 }
 
 /// `bet`'s main (`args[0]` is the program name).
 pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let (code, notices) = run_script(args, run, out, err);
+    crate::bet2::print_notices(&notices, err);
+    code
+}
+
+/// The script: its exit status and its notices (printed by the caller; `-B` runs the script
+/// again inside itself and keeps one set).
+fn run_script(
+    args: &[String],
+    run: &Run,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> (u8, Notices) {
     let mut s = Script {
         run,
         out,
@@ -90,6 +167,7 @@ pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
         notices: Notices::new(run.mode),
         args: args[1..].to_vec(),
         created: Vec::new(),
+        before: Vec::new(),
     };
     let code = match s.body() {
         Ok(()) => 0,
@@ -102,8 +180,22 @@ pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
         }
     };
     let notices = std::mem::replace(&mut s.notices, Notices::new(run.mode));
-    crate::bet2::print_notices(&notices, s.err);
-    code
+    (code, notices)
+}
+
+/// A file's modification time (`None` when it cannot be read).
+fn modified(f: &str) -> Option<SystemTime> {
+    std::fs::symlink_metadata(f).and_then(|m| m.modified()).ok()
+}
+
+/// The words of a literal part of a command.
+fn lit(s: &str) -> Vec<String> {
+    split_words(s)
+}
+
+/// A command's words, part after part.
+fn cat<const N: usize>(parts: [Vec<String>; N]) -> Vec<String> {
+    parts.into_iter().flatten().collect()
 }
 
 /// Bash's word splitting of an unquoted expansion (default IFS: blanks, tabs, newlines).
@@ -317,7 +409,6 @@ impl Script<'_, '_> {
                 _ => return Err(self.usage()),
             }
         }
-        let _ = in2;
         if verbose {
             let _ = writeln!(self.out, "IN={}", split_words(&in_name).join(" "));
             let _ = writeln!(self.out, "OUT={}", split_words(&out_name).join(" "));
@@ -343,42 +434,115 @@ impl Script<'_, '_> {
             v.extend(extra.iter().cloned());
             v
         };
+        // the standard images the variation reads, before anything runs (FSL's script would
+        // fail at the first program that reads a missing one)
+        let needed: &[&str] = match variation {
+            2 => &[STD_T1, STD_BRAIN_MASK_DIL, STD_EYE_MASK],
+            5 | 6 => &[STD_T1],
+            7 => &[STD_T1, STD_BRAIN_MASK_DIL],
+            _ => &[],
+        };
+        for rel in needed {
+            self.data(rel)?;
+        }
+        // the files named ${OUT}_tmp... before the run (the cleanup's correction, FSL-46)
+        self.before = avw::shell_glob_prefix(&format!("{out_name}_tmp"))
+            .into_iter()
+            .map(|f| {
+                let m = modified(&f);
+                (f, m)
+            })
+            .collect();
         match variation {
             0 => self.bet2(&pair(&opts))?,
             1 => self.robust(&ins, &outs, &bet2opts)?,
+            2 => self.eyes(&in_name, &out_name, &bet2opts)?,
             3 => return self.small_fov(&in_name, &out_name, &opts, debug),
             4 => self.fmri(&in_name, &out_name, &opts)?,
-            2 | 5 | 6 | 7 => {
-                let (what, need) = match variation {
-                    2 => (
-                        "-S (eye and optic nerve cleanup)",
-                        "FLIRT (standard_space_roi and flirt)",
-                    ),
-                    5 => (
-                        "-A (skull and scalp surfaces)",
-                        "FLIRT (the registration to MNI152)",
-                    ),
-                    6 => (
-                        "-A2 (skull and scalp surfaces with a T2)",
-                        "FLIRT (the T2-to-T1 and MNI152 registrations)",
-                    ),
-                    _ => (
-                        "-B (bias field and neck cleanup)",
-                        "FLIRT (standard_space_roi) and FAST (the bias field)",
-                    ),
-                };
-                let _ = writeln!(
-                    self.err,
-                    "bet: {what} runs FSL's {need}, which larmorx does not replicate yet; \
-                     this option is pending (larmorx)"
-                );
-                return Err(Stop::Exit(1));
-            }
+            5 => self.surfaces(&in_name, &out_name, &opts, None)?,
+            6 => self.surfaces(&in_name, &out_name, &opts, Some(&in2))?,
+            7 => self.bias(&in_name, &out_name, &bet2opts, skull)?,
             _ => {}
         }
-        let _ = skull;
         self.cleanup(&out_name, debug);
         Ok(())
+    }
+
+    /// The standard image `rel`'s name as FSL's programs get it, or the refusal (exit 1) naming
+    /// it and every place looked.
+    fn data(&mut self, rel: &str) -> Result<String, Stop> {
+        match fsldata::find(rel, self.fsl()) {
+            Ok(f) => Ok(f.name),
+            Err(e) => {
+                let _ = writeln!(self.err, "larmorx-nc: error: bet: {e}");
+                Err(Stop::Exit(1))
+            }
+        }
+    }
+
+    /// `$v` as a command gets it, without a notice (the arguments' own were named when read):
+    /// its words in `reproduce` (FSL-44), the value itself by default.
+    fn wq(&self, v: &str) -> Vec<String> {
+        if self.reproduce() {
+            split_words(v)
+        } else {
+            vec![v.to_owned()]
+        }
+    }
+
+    /// `${OUT}_<suffix>` as a command gets it.
+    fn tmp(&self, out: &str, suffix: &str) -> Vec<String> {
+        self.wq(&format!("{out}_{suffix}"))
+    }
+
+    /// Runs one of the script's programs (`source`: its line in the script, for bash's report
+    /// of a crash); a failure stops the script through its `ERR` trap.
+    fn program(&mut self, source: &str, f: Program, args: Vec<String>) -> Result<(), Stop> {
+        let r = call(self.run, f, &args, &mut *self.out, &mut *self.err);
+        self.status(r, source)
+    }
+
+    /// A program's end as bash sees it: its status, or its crash (what FSL printed, then bash's
+    /// report on the script's standard error); a failure stops the script (the `ERR` trap).
+    fn status(&mut self, r: Result<u8, String>, source: &str) -> Result<(), Stop> {
+        let code = match r {
+            Ok(c) => c,
+            Err(text) => {
+                let _ = self.err.write_all(text.as_bytes());
+                self.aborted(source);
+                134
+            }
+        };
+        if code != 0 {
+            return Err(Stop::Failed);
+        }
+        Ok(())
+    }
+
+    /// bash's report of a program that aborted (its process ID masked by the suites).
+    fn aborted(&mut self, source: &str) {
+        let _ = writeln!(
+            self.err,
+            "bet: line {VARIATIONS_FI}: {:>5} Aborted                 {source}",
+            std::process::id()
+        );
+    }
+
+    /// `` V=`<program> args` ``: what the program printed (bash's command substitution, the
+    /// trailing newlines removed); a failure stops the script.
+    fn captured(&mut self, f: Program, args: Vec<String>) -> Result<String, Stop> {
+        let mut buf = Vec::new();
+        let r = call(self.run, f, &args, &mut buf, &mut *self.err);
+        match r {
+            Ok(0) => {}
+            Ok(_) => return Err(Stop::Failed),
+            Err(text) => {
+                let _ = self.err.write_all(text.as_bytes());
+                return Err(Stop::Failed);
+            }
+        }
+        let s = String::from_utf8_lossy(&buf).into_owned();
+        Ok(s.trim_end_matches('\n').to_owned())
     }
 
     /// `rm -f ${OUT}_tmp*` (unless `-d`): by default only this run's temporary files; the
@@ -398,6 +562,10 @@ impl Script<'_, '_> {
                 self.created
                     .iter()
                     .any(|c| c.starts_with(&prefix) && avw::remove_ext(f) == *c)
+                    || !self
+                        .before
+                        .iter()
+                        .any(|(b, m)| b == *f && *m == modified(f))
             })
             .cloned()
             .collect();
@@ -432,23 +600,24 @@ impl Script<'_, '_> {
         }
     }
 
-    /// `-R`.
-    fn robust(&mut self, ins: &[String], outs: &[String], bet2opts: &str) -> Result<(), Stop> {
-        // bet2opts=`echo $bet2opts | sed 's/-n//g'`: bash's echo takes leading words of `-n`,
-        // `-e` and `-E` as its own options (FSL-63); the command substitution drops the
-        // trailing newline
+    /// `` bet2opts=`echo $bet2opts | sed 's/<pat>//g'` `` (in `-R` and in `-B` with `-s`; `who`
+    /// the variation and `whom` what gets the options, for the notice): bash's echo takes the
+    /// leading words made of `-n`, `-e` and `-E` as its own options (FSL-63), and the command
+    /// substitution drops the trailing newline. By default the options given, less `pat`; in
+    /// `reproduce` what the script's echo and sed leave.
+    fn echo_sed(&mut self, bet2opts: &str, pat: &str, who: &str, whom: &str) -> Vec<String> {
         let words = split_words(bet2opts);
-        let given = split_words(&words.join(" ").replace("-n", ""));
+        let given = split_words(&words.join(" ").replace(pat, ""));
         let (printed, taken) = echo::run(&words);
-        let theirs = split_words(printed.replace("-n", "").trim_end_matches('\n'));
-        let opts = if theirs == given {
+        let theirs = split_words(printed.replace(pat, "").trim_end_matches('\n'));
+        if theirs == given {
             given
         } else if self.reproduce() {
             self.notices.add(
                 &defects::FSL_63,
                 format!(
-                    "-R passes bet2's options through bash's echo, which takes '{}' as its own: \
-                     bet2 gets '{}', as in FSL",
+                    "{who} passes bet2's options through bash's echo, which takes '{}' as its \
+                     own: {whom} gets '{}', as in FSL",
                     taken.join(" "),
                     theirs.join(" ")
                 ),
@@ -458,15 +627,459 @@ impl Script<'_, '_> {
             self.notices.add(
                 &defects::FSL_63,
                 format!(
-                    "-R passes bet2's options through bash's echo, which takes '{}' as its own \
-                     (FSL's bet2 gets '{}'): bet2 gets '{}', the options given",
+                    "{who} passes bet2's options through bash's echo, which takes '{}' as its \
+                     own (FSL's {whom} gets '{}'): {whom} gets '{}', the options given",
                     taken.join(" "),
                     theirs.join(" "),
                     given.join(" ")
                 ),
             );
             given
+        }
+    }
+
+    /// Runs `betsurf` with these words (its notices joining this run's); a failure stops the
+    /// script.
+    fn betsurf(&mut self, words: Vec<String>) -> Result<(), Stop> {
+        let mut argv = vec!["betsurf".to_owned()];
+        argv.extend(words);
+        let run = Run {
+            fsl: self.run.fsl,
+            mode: self.run.mode,
+            threads: self.run.threads,
+            fill: false,
         };
+        let code = crate::betsurf::main_with(&argv, &run, self.out, self.err, &mut self.notices);
+        if code != 0 {
+            return Err(Stop::Failed);
+        }
+        Ok(())
+    }
+
+    /// `-S`: the SIENA eye and optic nerve cleanup.
+    fn eyes(&mut self, inn: &str, out: &str, bet2opts: &str) -> Result<(), Stop> {
+        let opts = split_words(bet2opts);
+        let ins = self.wq(inn);
+        let outs = self.wq(out);
+        let t = |s: &Self, suffix: &str| s.tmp(out, suffix);
+        // get the raw brain and skull images
+        let w = cat([ins.clone(), t(self, "tmp_betraw"), lit("-s"), opts.clone()]);
+        self.bet2(&w)?;
+        // run betpremask (keep intermediate files around using -d) and feed it into bet
+        let w = cat([ins.clone(), t(self, "tmp_premask"), lit("-b -d")]);
+        self.program(
+            "${FSLDIR}/bin/standard_space_roi $IN ${OUT}_tmp_premask -b -d",
+            ssroi,
+            w,
+        )?;
+        let w = cat([
+            t(self, "tmp_premask"),
+            t(self, "tmp_premask_bet"),
+            lit("-n -m -f 0.4"),
+            opts.clone(),
+        ]);
+        self.bet2(&w)?;
+        // bring eye mask from standard space into native and dilate, mostly in 2D and then
+        // invert
+        let eye = self.data(STD_EYE_MASK)?;
+        let w = cat([
+            lit("-ref"),
+            ins.clone(),
+            lit("-in"),
+            vec![eye],
+            lit("-applyxfm -init"),
+            t(self, "tmp_premask_tmp_to_std_inv.mat"),
+            lit("-datatype float -out"),
+            t(self, "tmp_eye_mask"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/flirt -ref $IN -in ${FSLDIR}/data/standard/MNI152_T1_2mm_eye_mask -applyxfm -init ${OUT}_tmp_premask_tmp_to_std_inv.mat -datatype float -out ${OUT}_tmp_eye_mask",
+            larmorx_nc_flirt::flirt,
+            w,
+        )?;
+        let w = cat([
+            t(self, "tmp_eye_mask"),
+            lit("-thr 0.5 -bin -dilF -kernel 2D -dilF -dilF -dilF -dilF -dilF -dilF -dilF"),
+            t(self, "tmp_eyes7dil"),
+            lit("-odt short"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_eye_mask -thr 0.5 -bin -dilF -kernel 2D -dilF -dilF -dilF -dilF -dilF -dilF -dilF ${OUT}_tmp_eyes7dil -odt short",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        let w = cat([
+            t(self, "tmp_eyes7dil"),
+            lit("-mul -1 -add 1"),
+            t(self, "tmp_eyes7dil_inv"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_eyes7dil -mul -1 -add 1 ${OUT}_tmp_eyes7dil_inv",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        // mask original brain mask with inverted-eye-mask, ADD betpremask_bet_mask and X by
+        // original brain
+        let w = cat([
+            t(self, "tmp_betraw"),
+            lit("-bin -mas"),
+            t(self, "tmp_eyes7dil_inv"),
+            lit("-add"),
+            t(self, "tmp_premask_bet_mask"),
+            lit("-bin -mul"),
+            t(self, "tmp_betraw"),
+            t(self, "tmp_prebrain"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_betraw -bin -mas ${OUT}_tmp_eyes7dil_inv -add ${OUT}_tmp_premask_bet_mask -bin -mul ${OUT}_tmp_betraw ${OUT}_tmp_prebrain",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        // find upper threshold used to delete eyes
+        let mean = self.captured(
+            larmorx_nc_avwutils::fslstats,
+            cat([t(self, "tmp_prebrain"), lit("-M")]),
+        )?;
+        let sd = self.captured(
+            larmorx_nc_avwutils::fslstats,
+            cat([t(self, "tmp_prebrain"), lit("-S")]),
+        )?;
+        let thr = split_words(&self.eye_threshold(&mean, &sd)?);
+        // apply threshold and a little morphology (twice) to cleanup further and produce final
+        // brain image
+        let w = cat([
+            t(self, "tmp_prebrain"),
+            lit("-uthr"),
+            thr.clone(),
+            lit("-bin -ero -dilF -dilF -ero -mul"),
+            t(self, "tmp_prebrain"),
+            lit("-uthr"),
+            thr,
+            lit("-bin -kernel 2D -ero -dilF -mul"),
+            t(self, "tmp_betraw"),
+            outs.clone(),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_prebrain -uthr $thr -bin -ero -dilF -dilF -ero -mul ${OUT}_tmp_prebrain -uthr $thr -bin -kernel 2D -ero -dilF -mul ${OUT}_tmp_betraw $OUT",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        let w = cat([outs.clone(), lit("-bin"), t(self, "mask")]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths $OUT -bin ${OUT}_mask",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        // remove eyes from original skull to produce final skull image
+        let w = cat([
+            t(self, "tmp_eyes7dil"),
+            lit("-ero -kernel 2D -ero -mul -1 -add 1"),
+            t(self, "tmp_eyes5dil_inv"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_eyes7dil -ero -kernel 2D -ero -mul -1 -add 1 ${OUT}_tmp_eyes5dil_inv",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        let w = cat([
+            t(self, "tmp_betraw_skull"),
+            lit("-mas"),
+            t(self, "tmp_eyes5dil_inv"),
+            t(self, "skull"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths ${OUT}_tmp_betraw_skull -mas ${OUT}_tmp_eyes5dil_inv ${OUT}_skull",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )
+    }
+
+    /// `` thr=`echo "10 k 3.5 $SD * $Mean + p" | dc` ``: 3.5 standard deviations above the
+    /// brain's mean, in GNU dc's decimal arithmetic. dc reads what fslstats printed as dc's
+    /// own text (FSL-216): an exponent (`1.23457e+06`), a minus sign, `nan` or `inf` become
+    /// commands. By default the numbers as printed are read as numbers (an exponent or a minus
+    /// sign written in dc's notation), and a mean or deviation that is not a number is refused;
+    /// `reproduce` gives what FSL's dc prints (its messages on standard error).
+    fn eye_threshold(&mut self, mean: &str, sd: &str) -> Result<String, Stop> {
+        let mut msgs = Vec::new();
+        let theirs = dc::eval(&format!("10 k 3.5 {sd} * {mean} + p"), &mut msgs);
+        let theirs = theirs.trim_end_matches('\n').to_owned();
+        let (m, s) = (dc::decimal(mean.trim()), dc::decimal(sd.trim()));
+        let (Some(m), Some(s)) = (m, s) else {
+            if self.reproduce() {
+                self.notices.add(
+                    &defects::FSL_216,
+                    format!(
+                        "-S's eye threshold from a mean of '{}' and a standard deviation of \
+                         '{}' (the brain holds values that are not numbers): '{theirs}', what \
+                         FSL's dc prints",
+                        mean.trim(),
+                        sd.trim()
+                    ),
+                );
+                let _ = self.err.write_all(&msgs);
+                return Ok(theirs);
+            }
+            self.notices.add(
+                &defects::FSL_216,
+                format!(
+                    "refused: -S's eye threshold needs the brain's mean and standard deviation, \
+                     and fslstats printed '{}' and '{}' (the brain holds values that are not \
+                     numbers; FSL's dc reads them as its commands and gives '{theirs}')",
+                    mean.trim(),
+                    sd.trim()
+                ),
+            );
+            let _ = writeln!(
+                self.err,
+                "larmorx-nc: error: bet: -S: the brain's mean ({}) or standard deviation ({}) \
+                 is not a number, so its eye threshold is undefined (FSL-216)",
+                mean.trim(),
+                sd.trim()
+            );
+            return Err(Stop::Exit(1));
+        };
+        let ours = dc::eval(&format!("10 k 3.5 {s} * {m} + p"), &mut Vec::new());
+        let ours = ours.trim_end_matches('\n').to_owned();
+        if ours == theirs && msgs.is_empty() {
+            return Ok(theirs);
+        }
+        if self.reproduce() {
+            self.notices.add(
+                &defects::FSL_216,
+                format!(
+                    "-S's eye threshold from fslstats' '{}' and '{}': '{theirs}', as FSL's dc \
+                     reads them (3.5 standard deviations above the mean: {ours})",
+                    mean.trim(),
+                    sd.trim()
+                ),
+            );
+            let _ = self.err.write_all(&msgs);
+            return Ok(theirs);
+        }
+        self.notices.add(
+            &defects::FSL_216,
+            format!(
+                "-S's eye threshold from fslstats' '{}' and '{}': {ours}, 3.5 standard \
+                 deviations above the mean (FSL's dc reads the numbers as commands: '{theirs}')",
+                mean.trim(),
+                sd.trim()
+            ),
+        );
+        Ok(ours)
+    }
+
+    /// `-B`: the SIENA bias field and neck cleanup.
+    fn bias(&mut self, inn: &str, out: &str, bet2opts: &str, skull: bool) -> Result<(), Stop> {
+        let ins = self.wq(inn);
+        let outs = self.wq(out);
+        let t = |s: &Self, suffix: &str| s.tmp(out, suffix);
+        // run betpremask
+        let w = cat([ins.clone(), t(self, "tmp_premask"), lit("-b -d")]);
+        self.program(
+            "${FSLDIR}/bin/standard_space_roi $IN ${OUT}_tmp_premask -b -d",
+            ssroi,
+            w,
+        )?;
+        // run FAST to get bias field: fast -b ${OUT}_tmp_premask >/dev/null 2>&1 (larmorx's
+        // own lines, its notices and refusals, still shown)
+        let w = cat([lit("-b"), t(self, "tmp_premask")]);
+        let mut discarded = Vec::new();
+        let r = call(
+            self.run,
+            larmorx_nc_fast::fast,
+            &w,
+            &mut std::io::sink(),
+            &mut discarded,
+        );
+        let ours: String = String::from_utf8_lossy(&discarded)
+            .lines()
+            .filter(|l| l.starts_with("larmorx-nc: "))
+            .map(|l| format!("{l}\n"))
+            .collect();
+        let _ = self.err.write_all(ours.as_bytes());
+        let r = match r {
+            Err(_) => {
+                // what FAST printed went to /dev/null; bash reports the crash itself
+                self.aborted("${FSLDIR}/bin/fast -b ${OUT}_tmp_premask > /dev/null 2>&1");
+                Ok(134)
+            }
+            ok => ok,
+        };
+        self.status(r, "")?;
+        // apply bias correction to original
+        let w = cat([
+            ins.clone(),
+            lit("-div"),
+            t(self, "tmp_premask_bias"),
+            t(self, "tmp_unbiased"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/fslmaths $IN -div ${OUT}_tmp_premask_bias ${OUT}_tmp_unbiased",
+            larmorx_nc_avwutils::fslmaths,
+            w,
+        )?;
+        let mut opts = split_words(bet2opts);
+        // get skull if asked for
+        if skull {
+            let w = cat([
+                t(self, "tmp_unbiased"),
+                t(self, "tmp_unbiased_forskull_reduced"),
+                lit("-maskFOV -roiNONE -d"),
+            ]);
+            self.program(
+                "${FSLDIR}/bin/standard_space_roi ${OUT}_tmp_unbiased ${OUT}_tmp_unbiased_forskull_reduced -maskFOV -roiNONE -d",
+                ssroi,
+                w,
+            )?;
+            let w = cat([
+                t(self, "tmp_unbiased_forskull_reduced"),
+                t(self, "tmp_unbiased_forskull"),
+                opts.clone(),
+            ]);
+            self.bet2(&w)?;
+            // bet2opts=`echo $bet2opts | sed 's/-s//g'`
+            opts = self.echo_sed(bet2opts, "-s", "-B with -s", "the robust bet");
+            let w = cat([t(self, "tmp_unbiased_forskull_skull"), t(self, "skull")]);
+            self.immv(w)?;
+        }
+        // re-run betpremask
+        let w = cat([
+            t(self, "tmp_unbiased"),
+            t(self, "tmp_unbiased_premask"),
+            lit("-b -d"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/standard_space_roi ${OUT}_tmp_unbiased ${OUT}_tmp_unbiased_premask -b -d",
+            ssroi,
+            w,
+        )?;
+        // re-run in robust mode: ${FSLDIR}/bin/bet ${OUT}_tmp_unbiased_premask $OUT -m
+        // $bet2opts -R -d, this script again (its own ERR trap's message, then this one's)
+        let mut argv = vec!["bet".to_owned()];
+        argv.extend(cat([
+            t(self, "tmp_unbiased_premask"),
+            outs,
+            lit("-m"),
+            opts,
+            lit("-R -d"),
+        ]));
+        let (code, notices) = run_script(&argv, self.run, &mut *self.out, &mut *self.err);
+        self.notices.extend(notices.into_vec());
+        if code != 0 {
+            return Err(Stop::Failed);
+        }
+        Ok(())
+    }
+
+    /// `${FSLDIR}/bin/immv <words>` (fslpy's): the last word the destination, a directory when
+    /// there are several sources; its usage or failure on standard output, status 1.
+    fn immv(&mut self, mut words: Vec<String>) -> Result<(), Stop> {
+        if words.len() < 2
+            || (words.len() > 2 && !std::path::Path::new(&words[words.len() - 1]).is_dir())
+        {
+            let usage = fslpy::IMCP_USAGE.replace("imcp", "immv").replace(
+                "Copy images from <file1> to <file2>, or copy all",
+                "Moves images from <file1> to <file2>, or move all",
+            );
+            let _ = writeln!(self.out, "{usage}");
+            return Err(Stop::Failed);
+        }
+        let dest = words.pop().unwrap_or_default();
+        for src in &words {
+            match fslpy::copy(src, &dest, self.fsl(), true) {
+                Ok(()) => {}
+                Err(f) if f.unsupported => {
+                    let _ = writeln!(self.err, "larmorx-nc: error: bet: {}", f.text);
+                    return Err(Stop::Exit(1));
+                }
+                Err(f) => {
+                    if let Some(w) = &f.warning {
+                        let _ = writeln!(self.err, "{w}");
+                    }
+                    let _ = writeln!(self.out, "{}", f.text);
+                    return Err(Stop::Failed);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// `-A` (`t2` absent) and `-A2 <T2>`: bet2's mesh, then betsurf's skull and scalp surfaces.
+    fn surfaces(
+        &mut self,
+        inn: &str,
+        out: &str,
+        opts: &[String],
+        t2: Option<&str>,
+    ) -> Result<(), Stop> {
+        let ins = self.wq(inn);
+        let outs = self.wq(out);
+        let t = |s: &Self, suffix: &str| s.tmp(out, suffix);
+        let std = self.data(STD_T1)?;
+        if let Some(t2) = t2 {
+            // register T2 to T1
+            let t2w = self.words(t2, "the T2");
+            let w = cat([
+                lit("-in"),
+                t2w,
+                lit("-ref"),
+                ins.clone(),
+                lit("-out"),
+                t(self, "tmp_T2_to_T1"),
+                lit("-omat"),
+                t(self, "tmp_T2_to_T1.mat"),
+                lit("-interp sinc"),
+            ]);
+            self.program(
+                "${FSLDIR}/bin/flirt -in $IN2 -ref $IN -out ${OUT}_tmp_T2_to_T1 -omat ${OUT}_tmp_T2_to_T1.mat -interp sinc",
+                larmorx_nc_flirt::flirt,
+                w,
+            )?;
+        }
+        // register T1 to standard space
+        let w = cat([
+            lit("-ref"),
+            vec![std],
+            lit("-in"),
+            ins.clone(),
+            lit("-omat"),
+            t(self, "tmp_T1_to_std.mat"),
+        ]);
+        self.program(
+            "${FSLDIR}/bin/flirt -ref ${FSLDIR}/data/standard/MNI152_T1_2mm -in $IN -omat ${OUT}_tmp_T1_to_std.mat",
+            larmorx_nc_flirt::flirt,
+            w,
+        )?;
+        // run brain extraction and save brain mesh
+        let w = cat([ins.clone(), outs.clone(), lit("-e"), opts.to_vec()]);
+        self.bet2(&w)?;
+        // find other surfaces
+        let w = if t2.is_some() {
+            cat([
+                lit("-o -m -s"),
+                ins,
+                t(self, "tmp_T2_to_T1"),
+                t(self, "mesh.vtk"),
+                t(self, "tmp_T1_to_std.mat"),
+                outs,
+            ])
+        } else {
+            cat([
+                lit("--t1only -o -m -s"),
+                ins,
+                t(self, "mesh.vtk"),
+                t(self, "tmp_T1_to_std.mat"),
+                outs,
+            ])
+        };
+        self.betsurf(w)
+    }
+
+    /// `-R`.
+    fn robust(&mut self, ins: &[String], outs: &[String], bet2opts: &str) -> Result<(), Stop> {
+        // bet2opts=`echo $bet2opts | sed 's/-n//g'`
+        let opts = self.echo_sed(bet2opts, "-n", "-R", "bet2");
         let out = outs.join(" ");
         // get_dims $IN: fslval runs (their values are unused by -R)
         let mut i: i64 = 1;
@@ -854,8 +1467,10 @@ pub mod echo {
     }
 }
 
-/// GNU dc for the expressions the script computes: numbers (`_` for a minus), `k`, `+ - * / ^`
-/// and `p`, with bc's scale rules and truncation.
+/// GNU dc (1.4.1) for the expressions the script computes: numbers (`_` for a minus, read in
+/// the input base), `k`, `+ - * / ^` and `p`, with bc's scale rules and truncation, and the
+/// commands the numbers FSL's programs print can hold (`fslstats`' `nan`, `inf`, `1e+06`, a
+/// minus sign: FSL-216): `n`, `f`, `a` (a string), `i`, and any other character's message.
 pub mod dc {
     use std::io::Write;
 
@@ -884,31 +1499,12 @@ pub mod dc {
         }
     }
 
-    fn parse(tok: &str) -> Option<Num> {
-        let (neg, t) = match tok.strip_prefix('_') {
-            Some(r) => (true, r),
-            None => (false, tok),
-        };
-        let (ip, fp) = match t.split_once('.') {
-            Some((a, b)) => (a, b),
-            None => (t, ""),
-        };
-        if !(ip.chars().all(|c| c.is_ascii_digit()) && fp.chars().all(|c| c.is_ascii_digit())) {
-            return None;
-        }
-        let digits = format!("{ip}{fp}");
-        let mant: i128 = if digits.is_empty() {
-            0
-        } else {
-            digits.parse().ok()?
-        };
-        Some(Num {
-            mant: if neg { -mant } else { mant },
-            scale: fp.len() as u32,
-        })
-    }
-
+    /// dc's printing (output base 10): zero as `0` at any scale, no leading `0` before the
+    /// point (`.5`, `-.5`).
     fn show(a: Num) -> String {
+        if a.mant == 0 {
+            return "0".to_owned();
+        }
         let neg = a.mant < 0;
         let m = a.mant.unsigned_abs().to_string();
         let s = a.scale as usize;
@@ -926,130 +1522,271 @@ pub mod dc {
         }
     }
 
-    /// dc's lexemes: a number is digits and points (with `_` before it for a minus); every other
-    /// character but white space is a command of its own, so `-0.000000` (what FSL 6.0.7.23's
-    /// `fslstats -C` prints for a centre that is minus zero: Armadillo 14.2.1's solve through
-    /// LAPACK) is the subtraction `-` followed by `0.000000`, as GNU dc reads it.
-    fn lexemes(expr: &str) -> Vec<String> {
-        let mut out = Vec::new();
-        let mut num = String::new();
-        let flush = |num: &mut String, out: &mut Vec<String>| {
-            if !num.is_empty() {
-                out.push(std::mem::take(num));
-            }
-        };
-        for c in expr.chars() {
-            if c.is_ascii_digit() || c == '.' || (c == '_' && num.is_empty()) {
-                num.push(c);
-            } else {
-                flush(&mut num, &mut out);
-                if !c.is_whitespace() {
-                    out.push(c.to_string());
-                }
-            }
-        }
-        flush(&mut num, &mut out);
-        out
+    /// A value on dc's stack.
+    #[derive(Clone, Debug)]
+    enum Val {
+        N(Num),
+        S(Vec<u8>),
     }
 
-    /// Evaluates `expr` and returns what `p` printed (dc's own messages to `err`).
-    pub fn eval(expr: &str, err: &mut dyn Write) -> String {
-        let mut stack: Vec<Num> = Vec::new();
-        let mut k: u32 = 0;
-        let mut out = String::new();
-        for tok in lexemes(expr) {
-            let tok = tok.as_str();
-            let op = |stack: &mut Vec<Num>, err: &mut dyn Write| -> Option<(Num, Num)> {
-                if stack.len() < 2 {
-                    let _ = writeln!(err, "dc: stack empty");
-                    return None;
-                }
-                let b = stack.pop().unwrap();
-                let a = stack.pop().unwrap();
-                Some((a, b))
+    fn print_val(v: &Val, out: &mut Vec<u8>) {
+        match v {
+            Val::N(n) => out.extend_from_slice(show(*n).as_bytes()),
+            Val::S(s) => out.extend_from_slice(s),
+        }
+    }
+
+    /// The digit `c` is in dc's input (0-9 and A-F, whatever the input base).
+    fn digit(c: u8) -> Option<u32> {
+        match c {
+            b'0'..=b'9' => Some(u32::from(c - b'0')),
+            b'A'..=b'F' => Some(u32::from(c - b'A') + 10),
+            _ => None,
+        }
+    }
+
+    /// Reads a number at `b[*i..]` (it starts with a digit, a point or `_`) in base `ibase`:
+    /// the integer digits, then after a point the fraction's digits read as an integer and
+    /// divided by `ibase` to their count, truncated to as many decimals.
+    fn read_number(b: &[u8], i: &mut usize, ibase: u32) -> Num {
+        let neg = b[*i] == b'_';
+        if neg {
+            *i += 1;
+        }
+        let base = i128::from(ibase);
+        let mut int: i128 = 0;
+        while let Some(d) = b.get(*i).copied().and_then(digit) {
+            int = int.saturating_mul(base).saturating_add(i128::from(d));
+            *i += 1;
+        }
+        let mut num = Num {
+            mant: int,
+            scale: 0,
+        };
+        if b.get(*i) == Some(&b'.') {
+            *i += 1;
+            let (mut frac, mut denom, mut n): (i128, i128, u32) = (0, 1, 0);
+            while let Some(d) = b.get(*i).copied().and_then(digit) {
+                frac = frac.saturating_mul(base).saturating_add(i128::from(d));
+                denom = denom.saturating_mul(base);
+                n += 1;
+                *i += 1;
+            }
+            let f = frac.saturating_mul(pow10(n)) / denom;
+            num = Num {
+                mant: int.saturating_mul(pow10(n)).saturating_add(f),
+                scale: n,
             };
-            match tok {
-                "k" => match stack.pop() {
-                    Some(v) => k = rescale(v, 0).mant.max(0) as u32,
-                    None => {
-                        let _ = writeln!(err, "dc: stack empty");
-                    }
-                },
-                "p" => match stack.last() {
+        }
+        if neg {
+            num.mant = -num.mant;
+        }
+        num
+    }
+
+    /// Evaluates `expr` and returns what dc printed on its standard output (`p`, `n`, `f`;
+    /// bytes that are not UTF-8 replaced), its own messages to `err`.
+    pub fn eval(expr: &str, err: &mut dyn Write) -> String {
+        let b = expr.as_bytes();
+        let mut stack: Vec<Val> = Vec::new();
+        let mut k: u32 = 0;
+        let mut ibase: u32 = 10;
+        let mut out: Vec<u8> = Vec::new();
+        let mut i = 0;
+        while i < b.len() {
+            let c = b[i];
+            if digit(c).is_some() || c == b'.' || c == b'_' {
+                let n = read_number(b, &mut i, ibase);
+                stack.push(Val::N(n));
+                continue;
+            }
+            i += 1;
+            let empty = |err: &mut dyn Write| {
+                let _ = writeln!(err, "dc: stack empty");
+            };
+            match c {
+                b' ' | b'\t' | b'\n' | b'\r' => {}
+                b'p' => match stack.last() {
                     Some(v) => {
-                        out.push_str(&show(*v));
-                        out.push('\n');
+                        print_val(v, &mut out);
+                        out.push(b'\n');
                     }
-                    None => {
-                        let _ = writeln!(err, "dc: stack empty");
-                    }
+                    None => empty(err),
                 },
-                "+" | "-" => {
-                    if let Some((a, b)) = op(&mut stack, err) {
-                        let s = a.scale.max(b.scale);
-                        let (a, b) = (rescale(a, s), rescale(b, s));
-                        let mant = if tok == "+" {
-                            a.mant + b.mant
-                        } else {
-                            a.mant - b.mant
-                        };
-                        stack.push(Num { mant, scale: s });
+                b'n' => match stack.pop() {
+                    Some(v) => print_val(&v, &mut out),
+                    None => empty(err),
+                },
+                b'f' => {
+                    for v in stack.iter().rev() {
+                        print_val(v, &mut out);
+                        out.push(b'\n');
                     }
                 }
-                "*" => {
-                    if let Some((a, b)) = op(&mut stack, err) {
-                        let full = Num {
-                            mant: a.mant * b.mant,
-                            scale: a.scale + b.scale,
-                        };
-                        let s = (a.scale + b.scale).min(k.max(a.scale).max(b.scale));
-                        stack.push(rescale(full, s));
+                b'k' => match stack.pop() {
+                    Some(Val::N(v)) if v.mant >= 0 => k = rescale(v, 0).mant as u32,
+                    Some(_) => {
+                        let _ = writeln!(err, "dc: scale must be a nonnegative number");
                     }
-                }
-                "/" => {
-                    if let Some((a, b)) = op(&mut stack, err) {
-                        if b.mant == 0 {
+                    None => empty(err),
+                },
+                b'i' => match stack.pop() {
+                    Some(Val::N(v)) if (2..=16).contains(&rescale(v, 0).mant) => {
+                        ibase = rescale(v, 0).mant as u32;
+                    }
+                    Some(_) => {
+                        let _ = writeln!(
+                            err,
+                            "dc: input base must be a number between 2 and 16 (inclusive)"
+                        );
+                    }
+                    None => empty(err),
+                },
+                b'a' => match stack.pop() {
+                    // the low-order byte of the integer part, as a one-character string
+                    Some(Val::N(v)) => stack.push(Val::S(vec![(rescale(v, 0).mant & 0xff) as u8])),
+                    Some(Val::S(s)) => stack.push(Val::S(s.into_iter().take(1).collect())),
+                    None => empty(err),
+                },
+                b'+' | b'-' | b'*' | b'/' | b'^' => {
+                    if stack.len() < 2 {
+                        empty(err);
+                        continue;
+                    }
+                    let (Val::N(a), Val::N(bv)) = (
+                        stack[stack.len() - 2].clone(),
+                        stack[stack.len() - 1].clone(),
+                    ) else {
+                        let _ = writeln!(err, "dc: non-numeric value");
+                        continue;
+                    };
+                    let r = binop(c, a, bv, k);
+                    match r {
+                        Some(v) => {
+                            stack.truncate(stack.len() - 2);
+                            stack.push(Val::N(v));
+                        }
+                        None => {
                             let _ = writeln!(err, "dc: divide by zero");
-                            stack.push(a);
-                            stack.push(b);
-                        } else {
-                            // a / b at scale k, truncated: (a * 10^(k + sb - sa)) / b
-                            let num = rescale(a, k + b.scale).mant;
-                            stack.push(Num {
-                                mant: num / b.mant,
-                                scale: k,
-                            });
                         }
                     }
                 }
-                "^" => {
-                    if let Some((a, b)) = op(&mut stack, err) {
-                        let e = rescale(b, 0).mant;
-                        if e >= 0 {
-                            let e = e as u32;
-                            let s = (a.scale * e).min(k.max(a.scale));
-                            let mut full = Num { mant: 1, scale: 0 };
-                            for _ in 0..e {
-                                full = Num {
-                                    mant: full.mant * a.mant,
-                                    scale: full.scale + a.scale,
-                                };
-                            }
-                            stack.push(rescale(full, s));
-                        } else {
-                            stack.push(Num { mant: 0, scale: k });
-                        }
-                    }
+                other => {
+                    // GNU dc prints its name on standard error and the rest on standard
+                    // output, which the script's command substitution takes
+                    let _ = write!(err, "dc: ");
+                    out.extend_from_slice(
+                        format!("'{}' (0{:o}) unimplemented\n", char::from(other), other)
+                            .as_bytes(),
+                    );
                 }
-                t => match parse(t) {
-                    Some(v) => stack.push(v),
-                    None => {
-                        let _ = writeln!(err, "dc: '{t}' unimplemented");
-                    }
-                },
             }
         }
-        out
+        String::from_utf8_lossy(&out).into_owned()
+    }
+
+    /// `a op b` at scale `k` (bc's scale rules, truncated); `None` for a division by zero.
+    fn binop(op: u8, a: Num, b: Num, k: u32) -> Option<Num> {
+        Some(match op {
+            b'+' | b'-' => {
+                let s = a.scale.max(b.scale);
+                let (a, b) = (rescale(a, s), rescale(b, s));
+                let mant = if op == b'+' {
+                    a.mant + b.mant
+                } else {
+                    a.mant - b.mant
+                };
+                Num { mant, scale: s }
+            }
+            b'*' => {
+                let full = Num {
+                    mant: a.mant * b.mant,
+                    scale: a.scale + b.scale,
+                };
+                let s = (a.scale + b.scale).min(k.max(a.scale).max(b.scale));
+                rescale(full, s)
+            }
+            b'/' => {
+                if b.mant == 0 {
+                    return None;
+                }
+                // a / b at scale k, truncated: (a * 10^(k + sb - sa)) / b
+                let num = rescale(a, k + b.scale).mant;
+                Num {
+                    mant: num / b.mant,
+                    scale: k,
+                }
+            }
+            _ => {
+                let e = rescale(b, 0).mant;
+                if e >= 0 {
+                    let e = e as u32;
+                    let s = (a.scale * e).min(k.max(a.scale));
+                    let mut full = Num { mant: 1, scale: 0 };
+                    for _ in 0..e {
+                        full = Num {
+                            mant: full.mant * a.mant,
+                            scale: full.scale + a.scale,
+                        };
+                    }
+                    rescale(full, s)
+                } else {
+                    Num { mant: 0, scale: k }
+                }
+            }
+        })
+    }
+
+    /// A number as C++'s iostream prints a double (`523.418`, `-3.25`, `1.23457e+06`,
+    /// `1e-05`) written in dc's notation (`_` for a minus, the exponent applied: `_3.25`,
+    /// `1234570`, `0.00001`); `None` for what is not a finite number (`nan`, `-nan`, `inf`).
+    pub fn decimal(s: &str) -> Option<String> {
+        let (neg, body) = match s.strip_prefix('-') {
+            Some(r) => (true, r),
+            None => (false, s.strip_prefix('+').unwrap_or(s)),
+        };
+        let (mant, exp) = match body.find(['e', 'E']) {
+            Some(p) => (&body[..p], body[p + 1..].parse::<i32>().ok()?),
+            None => (body, 0),
+        };
+        let (ip, fp) = mant.split_once('.').unwrap_or((mant, ""));
+        if ip.is_empty() && fp.is_empty()
+            || !ip.bytes().all(|c| c.is_ascii_digit())
+            || !fp.bytes().all(|c| c.is_ascii_digit())
+        {
+            return None;
+        }
+        let digits = format!("{ip}{fp}");
+        // the point after `point` digits
+        let point = ip.len() as i64 + i64::from(exp);
+        let (int, frac) = if point <= 0 {
+            (
+                "0".to_owned(),
+                format!("{}{digits}", "0".repeat((-point) as usize)),
+            )
+        } else if point as usize >= digits.len() {
+            (
+                format!("{digits}{}", "0".repeat(point as usize - digits.len())),
+                String::new(),
+            )
+        } else {
+            (
+                digits[..point as usize].to_owned(),
+                digits[point as usize..].to_owned(),
+            )
+        };
+        let int = int.trim_start_matches('0');
+        let int = if int.is_empty() { "0" } else { int };
+        let mut out = String::new();
+        if neg {
+            out.push('_');
+        }
+        out.push_str(int);
+        if !frac.is_empty() {
+            out.push('.');
+            out.push_str(&frac);
+        }
+        Some(out)
     }
 
     #[cfg(test)]
@@ -1076,6 +1813,112 @@ pub mod dc {
                     &mut e
                 ),
                 "3\n"
+            );
+            assert!(e.is_empty());
+        }
+
+        /// What GNU dc 1.4.1 prints (standard output, standard error) for the numbers fslstats
+        /// can print in `bet -S`'s threshold (FSL-216) and the commands they hold (run
+        /// 2026-11-04).
+        #[test]
+        fn gnu_dc_on_what_fslstats_prints() {
+            let cases: &[(&str, &str, &str)] = &[
+                (
+                    "10 k 3.5 1.23457e+06 * 5.5 + p",
+                    "'e' (0145) unimplemented\n33.90742\n",
+                    "dc: ",
+                ),
+                (
+                    "10 k 3.5 nan * 5.5 + p",
+                    "3.55.5\n",
+                    "dc: stack empty\ndc: stack empty\ndc: stack empty\ndc: stack empty\n",
+                ),
+                (
+                    "10 k 3.5 -nan * 5.5 + p",
+                    "3.55.5\n",
+                    "dc: stack empty\ndc: stack empty\ndc: stack empty\ndc: stack empty\ndc: stack empty\n",
+                ),
+                (
+                    "10 k 3.5 inf * 5.5 + p",
+                    "6.6\n",
+                    "dc: stack empty\ndc: stack empty\ndc: stack empty\n",
+                ),
+                (
+                    "10 k 3.5 12.5  * -3.25  + p",
+                    "47.00\n",
+                    "dc: stack empty\n",
+                ),
+                ("10 k 3.5 81.2345  * 523.418  + p", "807.73875\n", ""),
+                ("10 k 3.5 0  * 0  + p", "0\n", ""),
+                ("3.5 a p", "\u{3}\n", ""),
+                ("300 a p f", ",\n,\n", ""),
+                ("_3 a f", "\u{fffd}\n", ""),
+                ("3.5 i 5.5 p", "6.6\n", ""),
+                (
+                    "1 i 5 p",
+                    "5\n",
+                    "dc: input base must be a number between 2 and 16 (inclusive)\n",
+                ),
+                (
+                    "0 k 3.5 a 2 * p f",
+                    "2\n2\n\u{3}\n",
+                    "dc: non-numeric value\n",
+                ),
+                (
+                    "10 k 3.5 nan * nan + p",
+                    "3.5",
+                    &"dc: stack empty\n".repeat(8),
+                ),
+                ("10 k 3.5 inf * inf + p", "", &"dc: stack empty\n".repeat(6)),
+                (
+                    "_2 k 1 p",
+                    "1\n",
+                    "dc: scale must be a nonnegative number\n",
+                ),
+                ("3 i 5.55 p", "7.22\n", ""),
+                ("16 i A.8 p", "10.5\n", ""),
+                (
+                    "10 k 3.5 1e-05 * 2 + p",
+                    "'e' (0145) unimplemented\n14.5\n",
+                    "dc: ",
+                ),
+                (
+                    "10 k 3.5 0.5 * -nan + p",
+                    "1.75",
+                    &"dc: stack empty\n".repeat(5),
+                ),
+                ("1.2.3 f", ".3\n1.2\n", ""),
+            ];
+            for (expr, out, err) in cases {
+                let mut e = Vec::new();
+                assert_eq!(eval(expr, &mut e), *out, "{expr}");
+                assert_eq!(String::from_utf8(e).unwrap(), *err, "{expr}");
+            }
+        }
+
+        #[test]
+        fn numbers_as_printed_in_dcs_notation() {
+            for (s, d) in [
+                ("523.418", Some("523.418")),
+                ("-3.25", Some("_3.25")),
+                ("1.23457e+06", Some("1234570")),
+                ("1e-05", Some("0.00001")),
+                ("2.5e-07", Some("0.00000025")),
+                ("0", Some("0")),
+                ("-0", Some("_0")),
+                ("12345.6", Some("12345.6")),
+                ("nan", None),
+                ("-nan", None),
+                ("inf", None),
+                ("-inf", None),
+                ("", None),
+            ] {
+                assert_eq!(decimal(s).as_deref(), d, "{s}");
+            }
+            let mut e = Vec::new();
+            assert_eq!(
+                eval("10 k 3.5 0.00001 * 1234570 + p", &mut e),
+                "1234570.000035\n"
             );
             assert!(e.is_empty());
         }

@@ -116,6 +116,18 @@ pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
     code
 }
 
+/// [`main`] collecting its notices into `notices` (printed by the caller): how `bet -A` and
+/// `-A2` run it.
+pub fn main_with(
+    args: &[String],
+    run: &Run,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    notices: &mut Notices,
+) -> u8 {
+    main_inner(args, run, out, err, notices)
+}
+
 fn main_inner(
     args: &[String],
     run: &Run,

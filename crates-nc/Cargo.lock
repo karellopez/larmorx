@@ -207,7 +207,10 @@ name = "larmorx-nc-bet"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-nc-avwutils",
  "larmorx-nc-core",
+ "larmorx-nc-fast",
+ "larmorx-nc-flirt",
  "tempfile",
 ]
 

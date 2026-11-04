@@ -9,6 +9,10 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-nc-core.workspace = true
+# bet's -S, -B, -A, -A2 run FLIRT (and standard_space_roi), FAST, fslmaths and fslstats in-process
+larmorx-nc-flirt.workspace = true
+larmorx-nc-fast.workspace = true
+larmorx-nc-avwutils.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

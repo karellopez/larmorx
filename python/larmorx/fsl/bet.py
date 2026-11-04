@@ -9,8 +9,16 @@ original.
 ``bet`` deforms a tessellated sphere onto the brain's surface (S. M. Smith, Human Brain Mapping
 17(3), 2002) and returns the brain, its mask, the surface's outline and mesh, and an approximate
 skull, as ``bet2`` writes them, or one of the ``bet`` script's variations (``-R``, ``-F``,
-``-Z``). ``betsurf`` finds the inner and outer skull and the scalp from the brain's mesh, the T1
-(and a T2 registered to it) and the T1's registration to MNI152.
+``-Z``, ``-S``, ``-B``, ``-A``, ``-A2``). ``betsurf`` finds the inner and outer skull and the
+scalp from the brain's mesh, the T1 (and a T2 registered to it) and the T1's registration to
+MNI152.
+
+The variations ``-S``, ``-B``, ``-A`` and ``-A2`` run FLIRT, ``standard_space_roi``, FAST,
+``fslmaths`` and ``fslstats`` (``bet`` does, in FSL) and read FSL's standard images
+(``MNI152_T1_2mm``, its dilated brain mask, the eye mask): from ``fsl_data`` (a directory laid
+out as ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise), else ``$FSLDIR/data``,
+else the copy larmorx-nc carries. They have only their replica yet; their clean-room original is
+to be written from ``specs/bet.md``.
 
 FSL's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``);
 ``upstream_defects="reproduce"`` gives FSL's output. FSL's environment variables are settings of
@@ -38,9 +46,11 @@ __all__ = ["VARIATIONS", "BetResult", "BetsurfResult", "Surface", "bet", "betsur
 
 #: ``bet``'s variations: ``"robust"`` (``-R``: bet2 run again from the brain's centre until it
 #: moves less than a voxel), ``"small_fov"`` (``-Z``: the image padded to 100 mm in z first),
-#: ``"fmri"`` (``-F``: the mask of the first volume, dilated, applied to every volume), and the
-#: ones that need FSL programs larmorx does not replicate yet: ``"eyes"`` (``-S``),
-#: ``"bias"`` (``-B``), ``"surfaces"`` (``-A``), ``"surfaces_t2"`` (``-A2``).
+#: ``"fmri"`` (``-F``: the mask of the first volume, dilated, applied to every volume),
+#: ``"eyes"`` (``-S``: the eyes and optic nerves removed, through MNI152's eye mask),
+#: ``"bias"`` (``-B``: FAST's bias field removed and the neck cut off, then ``"robust"``),
+#: ``"surfaces"`` (``-A``: also betsurf's skull and scalp surfaces) and ``"surfaces_t2"``
+#: (``-A2``: the same with a T2, ``t2``). The last four have only their replica yet.
 VARIATIONS = ("robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2")
 
 Variation = Literal["robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2"]
@@ -51,13 +61,20 @@ TANHS = ("glibc", "correctly-rounded")
 
 Tanh = Literal["glibc", "correctly-rounded"]
 
-_FLAGS = {"robust": "-R", "small_fov": "-Z", "fmri": "-F"}
-_PENDING = {
-    "eyes": ("-S", "standard_space_roi, FLIRT and fslmaths' morphology"),
-    "bias": ("-B", "standard_space_roi and FAST"),
-    "surfaces": ("-A", "FLIRT (lx.fsl.betsurf runs the surfaces from a matrix you give it)"),
-    "surfaces_t2": ("-A2", "FLIRT (lx.fsl.betsurf runs the surfaces from a matrix you give it)"),
+_FLAGS = {
+    "robust": "-R",
+    "small_fov": "-Z",
+    "fmri": "-F",
+    "eyes": "-S",
+    "bias": "-B",
+    "surfaces": "-A",
+    "surfaces_t2": "-A2",
 }
+#: The variations with a replica only (their clean-room original is to be written).
+_REPLICA_ONLY = ("eyes", "bias", "surfaces", "surfaces_t2")
+
+#: The environment variable of larmorx-nc's data directory (``larmorx_nc_core::fsldata``).
+FSL_DATA_ENV = "LARMORX_FSL_DATA"
 
 
 @dataclass(frozen=True)
@@ -94,6 +111,9 @@ class BetResult:
         An approximate skull (int16; ``-s``).
     mesh
         The brain's surface (``-e``).
+    surfaces
+        The inner skull, outer skull and scalp surfaces, their masks, the skull's mask and the
+        surfaces' outlines (``"surfaces"`` and ``"surfaces_t2"``: betsurf ``-o -m -s``).
     """
 
     brain: Image | None = None
@@ -101,6 +121,7 @@ class BetResult:
     outline: Image | None = None
     skull: Image | None = None
     mesh: Surface | None = None
+    surfaces: BetsurfResult | None = None
 
 
 @dataclass(frozen=True)
@@ -228,17 +249,19 @@ def _run(
     *,
     n_threads: int,
     upstream_defects: str,
+    env: dict[str, str | None] | None = None,
 ) -> None:
     """Runs the replica in ``tmp`` with FSL's settings of this call (NIfTI-1 outputs; no FSL
-    program on the ``PATH``); its notices and FSL's warnings become Python warnings."""
+    program on the ``PATH``; ``env``: where the standard images are); its notices and FSL's
+    warnings become Python warnings."""
     process = _replica.run(
         selected,
         list(args),
         cwd=tmp,
         n_threads=n_threads,
         upstream_defects=upstream_defects,
-        env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp},
-        exclude=_is_fsl_variable,
+        env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp, **(env or {})},
+        exclude=lambda name: _is_fsl_variable(name) or name in ("maskthr", FSL_DATA_ENV),
     )
     for line in process.stderr.splitlines():
         notice = _defects.parse_line(line)
@@ -291,12 +314,14 @@ def bet(
     threshold: bool = False,
     head_ct: bool = False,
     variation: Variation | None = None,
+    t2: Any = None,
     brain: bool = True,
     mask: bool = False,
     outline: bool = False,
     skull: bool = False,
     mesh: bool = False,
     tanh: Tanh = "glibc",
+    fsl_data: str | os.PathLike[str] | None = None,
     n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
@@ -327,12 +352,19 @@ def bet(
         The input is a CT in Hounsfield units (``--ct``; bet2 only).
     variation
         One of :data:`VARIATIONS`, or ``None`` for bet2 itself. ``"eyes"``, ``"bias"``,
-        ``"surfaces"`` and ``"surfaces_t2"`` run FSL programs larmorx does not replicate yet:
-        :class:`NotImplementedError`.
+        ``"surfaces"`` and ``"surfaces_t2"`` have only their replica yet (with
+        ``implementation="original"``, or ``"auto"`` without larmorx-nc:
+        :class:`NotImplementedError`).
+    t2
+        The T2-weighted image of ``"surfaces_t2"`` (``-A2``; not brain-extracted: it is
+        registered to the input with FLIRT).
     brain, mask, outline, skull, mesh
         Which outputs to return: the brain (unless ``brain=False``, ``-n``), its mask (``-m``),
         the outline (``-o``), the skull (``-s``), the mesh (``-e``). ``"fmri"`` returns the brain
-        and the mask, and no others; ``"robust"`` always computes the brain.
+        and the mask, and no others; ``"robust"`` and ``"bias"`` always compute the brain;
+        ``"eyes"`` writes no outline or mesh (its bet2 runs are temporary) and needs the brain
+        (``bet -S -n`` fails); ``"surfaces"`` and ``"surfaces_t2"`` always compute the mesh and
+        return betsurf's surfaces in :attr:`BetResult.surfaces`.
     n_threads
         Threads (0 = all); the result does not depend on it.
     tanh
@@ -341,6 +373,10 @@ def bet(
         (CORE-MATH's; the clean-room original only, as larmorx's own ``--tanh`` option:
         GLIBC-06, ``docs/api/upstream-defects.md``). Where a surface self-intersects and is
         found again, the last bit of ``tanh`` can change the result.
+    fsl_data
+        Where ``"eyes"``, ``"bias"``, ``"surfaces"`` and ``"surfaces_t2"`` read FSL's standard
+        images: a directory laid out as ``$FSLDIR/data`` (default: the variable
+        ``LARMORX_FSL_DATA``, else ``$FSLDIR/data``, else the copy larmorx-nc carries).
     implementation
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
         clean-room original (always the original with ``tanh="correctly-rounded"``);
@@ -370,11 +406,19 @@ def bet(
     n_threads = _threads(n_threads)
     if variation is not None and variation not in VARIATIONS:
         raise ValueError(f"variation must be one of {VARIATIONS} or None, not {variation!r}")
-    if variation in _PENDING:
-        flag, need = _PENDING[variation]
+    replica_only = variation in _REPLICA_ONLY
+    if (variation == "surfaces_t2") != (t2 is not None):
+        raise ValueError("t2 is the T2 of variation='surfaces_t2' (-A2), and it needs one")
+    if variation == "eyes" and (outline or mesh or not brain):
+        raise ValueError(
+            "variation='eyes' (bet -S) writes no outline or mesh (its bet2 runs are temporary) "
+            "and needs the brain (bet -S -n fails)"
+        )
+    if replica_only and (implementation == "original" or tanh != "glibc"):
         raise NotImplementedError(
-            f"bet's variation {variation!r} ({flag}) runs FSL's {need}, which larmorx does not "
-            f"replicate yet"
+            f"bet's variation {variation!r} ({_FLAGS[variation]}) has only its replica yet "
+            "(larmorx-nc, implementation='replica' or 'auto', tanh='glibc'): its clean-room "
+            "original is to be written from specs/bet.md"
         )
     f, g = float(frac), float(gradient)
     if f < 0.0 or f > 1.0:
@@ -388,11 +432,13 @@ def bet(
         options.append("-m")
     if skull:
         options.append("-s")
-    if not brain:
+    if not brain and variation != "bias":
+        # (bet -B's robust run removes -n: the brain is always written)
         options.append("-n")
     if threshold:
         options.append("-t")
-    if mesh:
+    if mesh and variation not in ("surfaces", "surfaces_t2"):
+        # (bet -A and -A2 run bet2 -e themselves)
         options.append("-e")
     if frac != 0.5:
         options += ["-f", _number("frac", frac)]
@@ -434,9 +480,24 @@ def bet(
         implementation = "original"
         options.append(f"--tanh={tanh}")
     selected = _replica.select("fsl", tool, implementation)
+    if selected is None and replica_only:
+        raise NotImplementedError(
+            f"bet's variation {variation!r} ({_FLAGS[variation]}) has only its replica, and "
+            "larmorx-nc is not installed: its clean-room original is to be written from "
+            "specs/bet.md"
+        )
     impl = _replica.ORIGINAL if selected is None else selected.implementation()
+    env: dict[str, str | None] = {}
+    if replica_only:
+        data = fsl_data if fsl_data is not None else os.environ.get(FSL_DATA_ENV)
+        if data:
+            env[FSL_DATA_ENV] = os.path.abspath(os.fspath(data))
+        if os.environ.get("FSLDIR"):
+            env["FSLDIR"] = os.environ["FSLDIR"]
     with tempfile.TemporaryDirectory(prefix="larmorx-bet-", ignore_cleanup_errors=True) as tmp:
         source = _write_image(image, tmp, "input", n_threads)
+        if variation == "surfaces_t2":
+            options.insert(options.index("-A2") + 1, _write_image(t2, tmp, "t2", n_threads))
         if selected is None:
             _run_original(
                 tool,
@@ -452,18 +513,25 @@ def bet(
                 tmp,
                 n_threads=n_threads,
                 upstream_defects=upstream_defects,
+                env=env,
             )
 
         def read(name: str) -> Image:
             return _read_image(os.path.join(tmp, f"out{name}.nii"), n_threads, impl)
 
         fmri = variation == "fmri"
+        surfaces = None
+        if variation in ("surfaces", "surfaces_t2"):
+            surfaces = _betsurf_result(
+                tmp, n_threads, impl, masks=True, skull_mask=True, outlines=True
+            )
         return BetResult(
             brain=read("") if brain else None,
             mask=read("_mask") if mask or fmri else None,
             outline=read("_overlay") if outline else None,
             skull=read("_skull") if skull else None,
             mesh=read_vtk(os.path.join(tmp, "out_mesh.vtk")) if mesh else None,
+            surfaces=surfaces,
         )
 
 
@@ -563,21 +631,37 @@ def betsurf(
         else:
             _run(selected, args, tmp, n_threads=n_threads, upstream_defects=upstream_defects)
 
-        def read(name: str) -> Image:
-            return _read_image(os.path.join(tmp, f"out_{name}.nii"), n_threads, impl)
-
-        def surface(name: str) -> Surface:
-            return read_vtk(os.path.join(tmp, f"out_{name}_mesh.vtk"))
-
-        return BetsurfResult(
-            inskull=surface("inskull"),
-            outskull=surface("outskull"),
-            outskin=surface("outskin"),
-            inskull_mask=read("inskull_mask") if masks else None,
-            outskull_mask=read("outskull_mask") if masks else None,
-            outskin_mask=read("outskin_mask") if masks else None,
-            skull_mask=read("skull_mask") if skull_mask else None,
-            inskull_outline=read("inskull_mesh") if outlines else None,
-            outskull_outline=read("outskull_mesh") if outlines else None,
-            outskin_outline=read("outskin_mesh") if outlines else None,
+        return _betsurf_result(
+            tmp, n_threads, impl, masks=masks, skull_mask=skull_mask, outlines=outlines
         )
+
+
+def _betsurf_result(
+    tmp: str,
+    n_threads: int,
+    impl: _replica.Implementation,
+    *,
+    masks: bool,
+    skull_mask: bool,
+    outlines: bool,
+) -> BetsurfResult:
+    """betsurf's outputs ``out_*`` in ``tmp``."""
+
+    def read(name: str) -> Image:
+        return _read_image(os.path.join(tmp, f"out_{name}.nii"), n_threads, impl)
+
+    def surface(name: str) -> Surface:
+        return read_vtk(os.path.join(tmp, f"out_{name}_mesh.vtk"))
+
+    return BetsurfResult(
+        inskull=surface("inskull"),
+        outskull=surface("outskull"),
+        outskin=surface("outskin"),
+        inskull_mask=read("inskull_mask") if masks else None,
+        outskull_mask=read("outskull_mask") if masks else None,
+        outskin_mask=read("outskin_mask") if masks else None,
+        skull_mask=read("skull_mask") if skull_mask else None,
+        inskull_outline=read("inskull_mesh") if outlines else None,
+        outskull_outline=read("outskull_mesh") if outlines else None,
+        outskin_outline=read("outskin_mesh") if outlines else None,
+    )

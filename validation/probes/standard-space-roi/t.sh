@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 x="a b"; [ _$x = _ ]; echo "s=$?"
 x="a b c"; [ _$x = _ ]; echo "s=$?"
 x="a b c d"; [ _$x = _ ]; echo "s=$?"

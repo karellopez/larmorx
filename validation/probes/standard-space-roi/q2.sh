@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # probe: FSL's standard_space_roi vs the replica: $1 tag, $2 input, then args after "in out"
 set -u
 P=${PROBE_DIR:-/tmp/ssroi-probe}

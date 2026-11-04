@@ -632,6 +632,16 @@ defects! {
         "an input whose first voxel is NaN has a NaN minimum and maximum (they start from the first voxel and NaN never replaces them): the negative values are not cleared and, with one channel, the brain mask (every voxel between 0 and the maximum + 1) is empty, so FAST stops with an exception (exit 255) or segments nothing";
     FSL_204 = "FSL-204", "pointflirt", true,
         "with two coordinate files that are both empty or missing (no points), pointflirt crashes (a segmentation fault) after its messages instead of saying that there are no points to fit";
+    FSL_211 = "FSL-211", "standard_space_roi", true,
+        "the script expands its arguments unquoted: a name with a blank is split into words (an input, reference or mask with a blank is reported not valid, an output with a blank writes and removes other files, an option with a blank ends the options with a message of the shell), and FLIRT's options given after the script's are split again";
+    FSL_212 = "FSL-212", "standard_space_roi", true,
+        "the cleanup removes every file whose name starts with <output>_tmp, also files the run did not create (a missing one makes rm fail and the script exit 1)";
+    FSL_213 = "FSL-213", "standard_space_roi", true,
+        "a variable maskthr in the environment is applied, as fslmaths options, to the standard-space mask transformed into the input's space (the script sets it only for -b)";
+    FSL_214 = "FSL-214", "standard_space_roi", true,
+        "a program that fails (FLIRT refusing an option, an image FSL cannot read or write) does not stop the script: the next steps run on what is missing, and the script exits with the status of its cleanup, 0 when nothing else went wrong, mostly without an output";
+    FSL_215 = "FSL-215", "fslroi", true,
+        "fslroi exits with status 0 after the errors it reports (an image that cannot be read, an invalid region, a time index outside the series), without writing an output";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

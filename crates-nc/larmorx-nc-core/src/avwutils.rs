@@ -221,6 +221,9 @@ pub fn shell_glob_prefix(prefix: &str) -> Vec<String> {
 pub struct ToolFailure {
     pub err: String,
     pub code: u8,
+    /// Whether the program threw (an exception its `main` catches as `std::exception`: fslroi
+    /// prints it and falls off `main`, exit status 0) rather than returning `code` itself.
+    pub exception: bool,
 }
 
 fn failed(e: FslError) -> ToolFailure {
@@ -231,7 +234,11 @@ fn failed(e: FslError) -> ToolFailure {
         err.push_str(&e.what);
         err.push('\n');
     }
-    ToolFailure { err, code: 1 }
+    ToolFailure {
+        err,
+        code: 1,
+        exception: true,
+    }
 }
 
 fn save_failed(e: SaveError) -> ToolFailure {
@@ -240,6 +247,7 @@ fn save_failed(e: SaveError) -> ToolFailure {
         SaveError::OutputType(o) => ToolFailure {
             err: o.printed.iter().map(|l| format!("{l}\n")).collect(),
             code: 1,
+            exception: false,
         },
         SaveError::Exception(e) => failed(e),
     }
@@ -251,6 +259,7 @@ fn header_of(name: &str, fsl: &Settings) -> Result<nifti::NiftiHeader, ToolFailu
     nifti::load_header(Path::new(&path), &fsl.open_options()).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
+        exception: true,
     })
 }
 
@@ -276,12 +285,14 @@ pub fn template_type(name: &str, fsl: &Settings) -> Result<i16, ToolFailure> {
             return Err(ToolFailure {
                 err: "COMPLEX not supported as an independent type\n".into(),
                 code: 255,
+                exception: false,
             });
         }
         other => {
             return Err(ToolFailure {
                 err: format!("Datatype {other} is NOT supported - please check your image\n"),
                 code: 255,
+                exception: false,
             });
         }
     })
@@ -359,8 +370,11 @@ fn save<T: Elem>(
         .map_err(save_failed)
 }
 
-/// `fslroi <in> <out> <args>` with 2 (t) or 6 (x, y, z) numbers, in the input's type;
-/// `reproduce_offset` as for every save (FSL-56).
+/// `fslroi <in> <out> <args>` with 2 (t), 6 (x, y, z) or 8 (x, y, z, t) numbers, in the input's
+/// type; `reproduce_offset` as for every save (FSL-56). Its failures: the exceptions fslroi's
+/// `main` catches (`exception`: an image that does not read, `Invalid ROI dimensions` (21), a
+/// time index outside the series (5), a volume that cannot be allocated (99)), the data types
+/// it refuses (status 255) and the output type's (status 1).
 pub fn fslroi(
     input: &str,
     output: &str,
@@ -386,7 +400,8 @@ fn fslroi_t<T: Elem>(
 ) -> Result<(), ToolFailure> {
     let (v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
     let a: Vec<i64> = args.iter().map(|s| i64::from(cnum::atoi(s))).collect();
-    let (mut min, mut max) = ([0i64; 4], [0i64; 4]);
+    // int minx(-1), ..., maxt(-1): the values of an argument count fslroi's main refuses
+    let (mut min, mut max) = ([-1i64; 4], [-1i64; 4]);
     if a.len() == 2 {
         min = [0, 0, 0, a[0]];
         max = [v.xsize() - 1, v.ysize() - 1, v.zsize() - 1, a[1] + a[0] - 1];
@@ -398,6 +413,19 @@ fn fslroi_t<T: Elem>(
             a[5] + a[4] - 1,
             v.tsize() - 1,
         ];
+    } else if a.len() == 8 {
+        min = [a[0], a[2], a[4], a[6]];
+        max = [
+            a[1] + a[0] - 1,
+            a[3] + a[2] - 1,
+            a[5] + a[4] - 1,
+            a[7] + a[6] - 1,
+        ];
+    }
+    // int arithmetic: the sums wrap as FSL's 32-bit ints do
+    for k in 0..4 {
+        min[k] = i64::from(min[k] as i32);
+        max[k] = i64::from(max[k] as i32);
     }
     for k in 0..3 {
         if max[k] == min[k] - 2 {
@@ -408,10 +436,7 @@ fn fslroi_t<T: Elem>(
         max[3] = v.tsize() - 1;
     }
     if max[0] < min[0] || max[1] < min[1] || max[2] < min[2] || max[3] < min[3] {
-        return Err(ToolFailure {
-            err: "Image Exception : #21 :: Invalid ROI dimensions\nInvalid ROI dimensions\n".into(),
-            code: 1,
-        });
+        return Err(failed(FslError::imthrow("Invalid ROI dimensions", 21)));
     }
     let m = v.niftivox2newimagevox_mat();
     let lo = arma::gemv_tinysq(
@@ -432,6 +457,18 @@ fn fslroi_t<T: Elem>(
         if mn[k] > mx[k] {
             std::mem::swap(&mut mn[k], &mut mx[k]);
         }
+    }
+    // volume::ROI: the new volume (newimage's allocation, Out of memory), then the copy, whose
+    // first read at a time index outside the series throws (the const 4D accessor)
+    let n = [
+        mx[0] - mn[0] + 1,
+        mx[1] - mn[1] + 1,
+        mx[2] - mn[2] + 1,
+        max[3] - min[3] + 1,
+    ];
+    crate::exception::try_volume::<T>(n[0], n[1], n[2], n[3]).map_err(failed)?;
+    if min[3] < 0 || max[3] >= v.tsize() {
+        return Err(failed(FslError::imthrow("Out of Bounds (time index)", 5)));
     }
     let r = roi(
         &v,
@@ -489,6 +526,7 @@ fn fslmerge_z_t<T: Elem>(
                     "Error in size-match along non-concatenated dimension for input file: {name}\n"
                 ),
                 code: 1,
+                exception: false,
             });
         }
         let nvox_in = v.nvoxels() as usize;
@@ -616,7 +654,11 @@ pub fn fslstats_cog(
     let mut printed = String::from_utf8_lossy(&out).into_owned();
     let err = String::from_utf8_lossy(&err).into_owned();
     if code != 0 {
-        return Err(ToolFailure { err, code });
+        return Err(ToolFailure {
+            err,
+            code,
+            exception: false,
+        });
     }
     if printed.ends_with('\n') {
         printed.pop();

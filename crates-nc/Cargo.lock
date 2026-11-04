@@ -256,6 +256,7 @@ name = "larmorx-nc-flirt"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-nc-avwutils",
  "larmorx-nc-core",
  "tempfile",
 ]

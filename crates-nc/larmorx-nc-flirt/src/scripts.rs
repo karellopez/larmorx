@@ -339,7 +339,7 @@ fn integer(s: &str) -> Option<i64> {
 /// than two numbers on the stack writes "dc: stack empty" and does nothing, so the sign of a
 /// signed number is a command and its digits a separate number. Returns the number `p`
 /// prints (dc prints a negative one as `-N`).
-fn dc(expr: &str, err: &mut dyn Write) -> Option<i64> {
+pub(crate) fn dc(expr: &str, err: &mut dyn Write) -> Option<i64> {
     let mut stack: Vec<i64> = Vec::new();
     let mut printed = None;
     let b = expr.as_bytes();

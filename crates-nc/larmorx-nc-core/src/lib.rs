@@ -63,6 +63,8 @@ pub mod crand;
 pub mod exception;
 pub mod fdlibm;
 pub mod filters;
+pub mod fsldata;
+pub mod fslpy;
 pub mod fslstats;
 pub mod glibc_double;
 pub mod glibc_float;

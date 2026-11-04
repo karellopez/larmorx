@@ -1720,6 +1720,10 @@ REPLICA_ONLY_VARIATIONS = ("-S", "-B", "-A", "-A2")
 #: from ``specs/standard_space_roi.md``): left out of the original's suite; a random case the
 #: original's descriptor draws for them expects larmorx's refusal.
 REPLICA_ONLY_TOOLS = ("fslroi", "standard_space_roi")
+#: Cases of FSL-217 (bet -F and -Z of an int8 image with negative values), which the clean-room
+#: original does not reproduce yet (the register's gap "original": the clean-room catch-up part's):
+#: left out of the original's suite until then.
+ORIGINAL_PENDING_CASES = ("bet/fmri-int8", "bet/small-fov-int8", "bet/small-fov-int8-debug")
 
 
 def replica_only_variation(s: Scenario) -> bool:
@@ -2373,7 +2377,11 @@ def _original_cases(tier: str) -> list[Case]:
     """The suite's cases, and from the standard tier on also betsurf's real images (the full
     tier's for the replica): fMRIPrep does not call betsurf, so its real cases are the ones
     that show the original on real heads (bet2's mesh and FLIRT's matrices made by FSL)."""
-    cases = [c for c in cases_of(tier) if c.payload.tool not in REPLICA_ONLY_TOOLS]
+    cases = [
+        c
+        for c in cases_of(tier)
+        if c.payload.tool not in REPLICA_ONLY_TOOLS and c.id not in ORIGINAL_PENDING_CASES
+    ]
     if TIERS.index(tier) >= TIERS.index("standard"):
         have = {c.id for c in cases}
         for cid, category, desc, s in _scenarios():

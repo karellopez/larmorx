@@ -1921,3 +1921,21 @@ together at the end.
   fits stay quiet, the difference documented on their API pages (`reproduce` gives FSL's maths). Warnings keep meaning a
   defect that changed a result, not last-bit noise. The parity suites accept GLIBC-07's difference without a notice for
   the iterative programs (a documented category, as the record says).
+
+## 2026-11-04: The data the programs read: FSL's standard files in larmorx-nc, the rest fetched (the user)
+- **Asked:** BET's `-S`, `-B`, `-A`, `-A2` and `standard_space_roi` read FSL's standard files
+  (`MNI152_T1_2mm`, its dilated brain mask, the eye mask: about 1.5 MB). FSL's data package declares no licence of
+  its own, so FSL's Licence applies: copying is allowed without financial return when its terms pass to the
+  receiver, which only `larmorx-nc` (FSL Licence, non-commercial) satisfies; the Apache main package may not ship
+  them. The MNI152 images themselves carry MNI's permissive notice. FreeSurfer's atlases (about 650 MB compressed,
+  the Talairach atlases not redistributable) were decided on 2026-10-26 (D6: downloaded on first use). The user
+  asked whether the clean-room original may use FSL's files: yes, as input data read at run time (the clean-room
+  rule concerns code; FSL's terms then bind the files' use, in either implementation).
+- **User decision:** "for now FSL templates can be in the nc package. We can discuss the others later, but for now
+  they can be fetched." So: the small FSL standard files BET's options and `standard_space_roi` need ship inside
+  `larmorx-nc` (with FSL's Licence, MNI's notice and a manifest: origin, version, checksum); the clean-room
+  original reads them from `larmorx-nc` when installed, else from `$FSLDIR` when present, else downloads them once
+  from FSL's official package site, checksum-verified and cached. Every other data set (FreeSurfer's atlases,
+  fMRIPrep's templates through TemplateFlow, pretrained weights) is fetched on first use from its official source,
+  checksum-verified and cached, with a command to fetch ahead for offline machines; bundling them is to be
+  discussed later.

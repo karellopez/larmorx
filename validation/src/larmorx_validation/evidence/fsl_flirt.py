@@ -644,6 +644,12 @@ def _orig_diffs() -> list[dict]:
     ]  # fmt: skip
 
 
+#: The C library's functions FLIRT's clean-room original computes as glibc 2.35 does in its
+#: reproduce mode since 2026-11-04 (the rotations, the decomposition, the blurs, the sinc
+#: kernel, the mutual information), correctly rounded by default (GLIBC-07).
+GLIBC_FUNCTIONS = "sinf, cosf, atan2f, cos, exp and logf"
+
+
 def _named(o: fcache.Entry, label: str) -> list[str]:
     """The register entries the run ``label`` of ``o`` named on its standard error."""
     log = o.dir / f"{label}.log"
@@ -659,12 +665,14 @@ def _orig_verdicts(
     band: dict | None,
     threshold: float,
     background: float | None = None,
+    fix_shift: dict | None = None,
 ) -> None:
     """The clean-room original's comparisons: its matrix against FSL's beside FSL's own
     variability (``shift``: the original's displacement from FSL's matrix, ``band``: FSL's on a
     perturbed input, both over the reference's brain; ``None`` for ``-applyxfm``, where both use
-    the given matrix), its threads and its two modes; ``background``: FSL's output outside the
-    input's field of view (its first voxel), to say where the images differ most."""
+    the given matrix), its threads and its two modes (``fix_shift``: the default's matrix
+    against the reproduce mode's); ``background``: FSL's output outside the input's field of
+    view (its first voxel), to say where the images differ most."""
     for x in diffs:
         i = x["id"]
         if not i.startswith("orig"):
@@ -741,13 +749,32 @@ def _orig_verdicts(
                     "No correction of the register applies to this call: both modes give the "
                     "same values."
                 )
-            else:
+            elif names:
                 x["verdict"] = "d13"
                 x["reason"] = (
                     "The default corrects FSL's deterministic defects and names them: "
-                    + (", ".join(names) or "none named")
-                    + "; reproduce mode gives FSL's behaviour."
+                    + ", ".join(names)
+                    + f"; it also computes {GLIBC_FUNCTIONS} correctly rounded (GLIBC-07, not "
+                    "named); reproduce mode gives FSL's behaviour."
                 )
+                x["links"] += [{"label": n, "href": common.GLIBC07_REGISTER} for n in names]
+            else:
+                x["verdict"] = "d13"
+                moved = (
+                    f" Here the two modes' matrices part by {fix_shift['p95']:.3g} mm at the "
+                    f"95th percentile of the brain (at most {fix_shift['max']:.3g} mm)"
+                    + (
+                        f", against FSL's own {band['p95']:.3g} mm on a perturbed input"
+                        if band is not None
+                        else ""
+                    )
+                    + ": the fit's sensitivity to the C library's last bits."
+                    if fix_shift is not None
+                    else " Here the two modes' images differ in "
+                    f"{m.get('share', 0):.1%} of their values."
+                )
+                x["reason"] = common.glibc07(GLIBC_FUNCTIONS, "FLIRT", named=False) + moved
+                x["links"].append({"label": "GLIBC-07", "href": common.GLIBC07_REGISTER})
 
 
 def _flirt_threshold(args: list[str]) -> float:
@@ -830,7 +857,8 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     m["init"] = np.loadtxt(Path(_arg(args, "-init")))
     o_shift = displacement(m["orig"], m["fsl"], ref, brain)
     o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
-    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]))
+    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]),
+                   displacement(m["orig-fix"], m["orig"], ref, brain))  # fmt: skip
     if view == "slices":
         at = common.slice_voxel(ex, "fsl", "init", "registered")
     else:
@@ -1044,7 +1072,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
     same = common.identical(diffs)
     tables = []
     mats_same = True
-    o_shift = o_band = None
+    o_shift = o_band = fix_shift = None
     if "-omat" in args:
         mats = {pid: e.dir / pid / _arg(args, "-omat") for pid, *_ in PANELS}
         mats.update({pid: o.dir / pid / _arg(args, "-omat") for pid, *_ in ORIG_PANELS})
@@ -1053,6 +1081,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         m = {k: np.loadtxt(p) for k, p in mats.items()}
         o_shift = displacement(m["orig"], m["fsl"], ref, brain)
         o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
+        fix_shift = displacement(m["orig-fix"], m["orig"], ref, brain)
         tables = [
             _matrix_table(
                 f"{ex_id}-matrices",
@@ -1094,6 +1123,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         o_band,
         _flirt_threshold(args),
         float(arrays["fsl"]["registered"].flat[0]),
+        fix_shift,
     )
     at, _k = common.centre_view(ex)
     default = {
@@ -1278,8 +1308,7 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
     named = sorted(set(re.findall(r"\b(FSL-\d+)\b", desc)))
     fix = rep_.get("D13 fix pass")
     note = (
-        f" In its default mode the original corrects {', '.join(named) or 'a defect of the register'} and "
-        f"names it: {fix:,} values change."
+        " I" + common.fix_note(fix, named, GLIBC_FUNCTIONS)[1:] + "."
         if isinstance(fix, int) and fix
         else ""
     )

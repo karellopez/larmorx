@@ -1074,9 +1074,17 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
     return table, fcache.provenance(e)
 
 
+#: The double functions whose glibc 2.35 bits the clean-room original's reproduce mode gives
+#: since 2026-11-04 (larmorx_core::math: exp, log and pow from Arm's Optimized Routines as glibc
+#: ships them; sin and cos written from specs/glibc-dbl.md); tan, asin, acos and atan stay
+#: correctly rounded in both modes (the user's decision of 2026-11-04).
+ORIGINAL_GLIBC = ("sin", "cos", "exp", "log", "pow")
+
+
 def _glibc_table_original(ctx: core.Context) -> dict:
-    """The same calls by the clean-room original: correctly rounded in both modes (CORE-MATH's
-    functions), within the record's one unit in the last place per function."""
+    """The same calls by the clean-room original: glibc's bits in its reproduce mode for
+    :data:`ORIGINAL_GLIBC`, correctly rounded otherwise and in its default mode, within the
+    record's one unit in the last place per function."""
     import nibabel as nib
 
     e = glibc_entry(ctx)
@@ -1094,14 +1102,16 @@ def _glibc_table_original(ctx: core.Context) -> dict:
         n_o, u_o = _ulps(fsl[finite], org[finite])
         n_of, _u = _ulps(fsl[finite], ofix[finite])
         assert np.array_equal(np.isnan(fsl), np.isnan(org)), rid
-        same_cr = org.tobytes() == rep.ravel().tobytes()
+        same_cr = ofix.tobytes() == rep.ravel().tobytes()
         named = oinfo.get("named", {}).get(f"original-fix-{rid}", [])
+        how = ("glibc's bits with reproduce, correctly rounded by default (GLIBC-07 named)"
+               if fn in ORIGINAL_GLIBC else "correctly rounded in both modes")  # fmt: skip
         rows.append({
             "head": f"`{fn}`",
             "sub": "`fslmaths " + " ".join(glibc_args(rid)) + "`",
-            "cells": [common.cell(int(finite.sum()), "count"), common.cell(n_o, "count"),
-                      common.cell(u_o, "count"), common.cell(n_of, "count"),
-                      common.cell(", ".join(named) or "–"),
+            "cells": [common.cell(int(finite.sum()), "count"), common.cell(how),
+                      common.cell(n_o, "count"), common.cell(u_o, "count"),
+                      common.cell(n_of, "count"), common.cell(", ".join(named) or "–"),
                       common.cell("identical" if same_cr else "differs"),
                       common.cell("identical" if one.tobytes() == org.tobytes() else "differs")],
             "verdict": "divergence" if n_o else "bit-identical",
@@ -1109,21 +1119,24 @@ def _glibc_table_original(ctx: core.Context) -> dict:
     return common.table(
         "glibc-double-original",
         "GLIBC-07 on a real image: the clean-room original",
-        ["Function", {"label": "Values", "num": True},
+        ["Function", {"label": "Values", "num": True}, "The original's function",
          {"label": "Reproduce mode: values that differ from FSL's", "num": True},
          {"label": "Largest distance (units in the last place)", "num": True},
          {"label": "Default mode: values that differ from FSL's", "num": True},
-         "Named by the default", "Against the replica's default (correctly rounded)",
+         "Named by the default", "Default against the replica's default (correctly rounded)",
          "1 thread against 14"],
         rows,
-        note="The same calls by LARMORX's clean-room original (14 threads, and at one): its "
-        "double functions are CORE-MATH's correctly rounded ones (larmorx_core::math) in both "
-        "modes, the replica's default's bits. Its reproduce mode does not give glibc's bits for "
-        "exp, log and pow, which specs/fslmaths.md §19 asks of it (glibc 2.35 ships Arm's "
-        "Optimized Routines for them, MIT-licensed: a follow-up); its record holds the double "
-        "functions to one unit in the last place per function of the chain (§21), and every "
-        "differing value here is one unit away (GLIBC-07, an expected divergence). Float results "
-        "are FSL's.",
+        note="The same calls by LARMORX's clean-room original (14 threads, and at one). Since "
+        "2026-11-04 its reproduce mode gives glibc 2.35's bits for sin, cos, exp, log and pow "
+        "(larmorx_core::math: exp, log and pow from Arm's Optimized Routines as glibc ships them, "
+        "MIT; sin and cos written from a behavioural specification of glibc's code, "
+        "specs/glibc-dbl.md, and checked against the system's glibc on 11.8 billion arguments "
+        "each), as specs/fslmaths.md §19 asks; tan, asin, acos and atan stay correctly rounded "
+        "in both modes (the user's decision of 2026-11-04). Its default computes every one "
+        "correctly rounded (CORE-MATH's, the replica's default's bits) and names GLIBC-07 "
+        "exactly where a value differs from glibc's. Its record holds the double functions to "
+        "one unit in the last place per function of the chain (§21); every value that differs "
+        "here is one unit away (GLIBC-07, an expected divergence). Float results are FSL's.",
     )  # fmt: skip
 
 

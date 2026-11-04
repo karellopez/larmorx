@@ -47,6 +47,13 @@ PANELS = [
     ("original-fix", "larmorx", "LARMORX clean-room original",
      "default mode (D13 corrections), 14 threads"),
 ]  # fmt: skip
+#: The C library's functions of fslmaths' filters that the clean-room original computes as glibc
+#: 2.35 does in its reproduce mode since 2026-11-04, correctly rounded by default; the filters
+#: name GLIBC-07 nowhere (the user's decision of 2026-11-04), the voxelwise double functions
+#: exactly where the default's values differ.
+FILTER_FUNCTIONS = ("the filters' expf, exp, pow, powf and logf (-s and -kernel gauss, -bptf, "
+                    "-tfce, -roc, -dog_edge)")  # fmt: skip
+VOXELWISE_FUNCTIONS = "the double-precision sin, cos, exp, log and pow"
 #: specs/fslmaths.md §21's metric of the sums: the largest difference relative to FSL's largest
 #: magnitude, and the share of voxels within 4 units in the last place.
 SUM_RELATIVE, SUM_SHARE, SUM_ULPS = 1e-5, 0.99, 4
@@ -381,6 +388,7 @@ def verdicts(diffs: list[dict], same: dict[str, bool], named: list[str], outcome
     from larmorx_validation.evidence import fsl_maths as fm
 
     fix = {k: v.replace("the default", "the original's default") for k, v in fm.FIX_REASONS.items()}
+    fix["GLIBC-07"] = common.glibc07(VOXELWISE_FUNCTIONS, "fslmaths", named=True)
     for x in diffs:
         i = x["id"]
         if not i.startswith(("original", "ofix")):
@@ -418,6 +426,19 @@ def verdicts(diffs: list[dict], same: dict[str, bool], named: list[str], outcome
             x["verdict"] = "d13"
             x["reason"] = " ".join(fix.get(n, f"{n}, corrected by default.") for n in named)
             x["links"] += [{"label": n, "href": REGISTER} for n in named]
+        elif i == "ofix-original":
+            x["verdict"] = "d13"
+            moved = [f"{o}: {m['differ']:,} values (at most {m['max_abs']:.3g})"
+                     for o, m in x["metrics"].items() if not m["identical"]]  # fmt: skip
+            why = "a filter would have to run twice to know whether a value moved"
+            x["reason"] = (
+                common.glibc07(FILTER_FUNCTIONS, "fslmaths' filters", named=False, why=why)
+                + " Here: "
+                + "; ".join(moved[:3])
+                + (f"; {len(moved) - 3} more" if len(moved) > 3 else "")
+                + "."
+            )
+            x["links"].append({"label": "GLIBC-07", "href": REGISTER})
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example (see the record)."
@@ -630,8 +651,10 @@ TAN = (
     "GLIBC-07: with -dt double, glibc 2.35's tan (IBM's code in glibc, LGPL) is not always "
     "correctly rounded, and the clean-room original's is (CORE-MATH's, in both modes): one unit "
     "in the last place on a few of the 210 double values, within §21's one unit per function. "
-    "No permissive code gives glibc's bits; an exact reproduction is planned by a clean-room "
-    "implementation of glibc's behaviour."
+    "Since 2026-11-04 the reproduce mode gives glibc's bits for sin, cos, exp, log and pow "
+    "(LARMORX's glibc functions; sin and cos written from a behavioural specification of "
+    "glibc's code); tan, asin, acos and atan stay correctly rounded in both modes (the user's "
+    "decision of 2026-11-04)."
 )
 
 
@@ -678,10 +701,7 @@ def case_verdict(r: dict, dm: dict, program: str) -> tuple[str, str]:
     notes = []
     fix = r.get("reported", {}).get("D13 fix pass")
     if isinstance(fix, int) and fix:
-        notes.append(
-            f"in its default mode the clean-room original corrects "
-            f"{', '.join(named) or 'a register entry'} and names it: {fix:,} values change"
-        )
+        notes.append(common.fix_note(fix, named, FILTER_FUNCTIONS))
     elif named and code not in (0, None):
         notes.append(f"its default mode refuses the call (exit {code}), naming {', '.join(named)}")
     elif named:

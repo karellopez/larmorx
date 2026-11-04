@@ -820,9 +820,10 @@ def _files_table(
     if counted:
         note += (
             " For the clean-room original, where the values are not the same, how many of the "
-            "file's values differ: from FSL's file, and in the last column from the file of FSL "
-            "with correctly rounded maths (the record holds them to specs/fast.md §11's "
-            "thresholds, not to FSL's bytes)."
+            "file's values differ: from FSL's file, and in the last two columns from the file of "
+            "FSL with correctly rounded maths (the record holds them to specs/fast.md §11's "
+            "thresholds, not to FSL's bytes; since 2026-11-04 its reproduce mode computes exp, "
+            "log, expf and logf as glibc 2.35 does and its default correctly rounded, GLIBC-07)."
         )
     return common.table(
         tid,
@@ -962,6 +963,8 @@ def _diffs_original(own: bool) -> list[dict]:
           common.ROLE_LX),
         d("original-cr", "original", "fsl-cr", "main",
           "clean-room original − FSL, correctly rounded maths", common.ROLE_LX),
+        d("ofix-cr", "original-fix", "fsl-cr", "main",
+          "clean-room original, default − FSL, correctly rounded maths", common.ROLE_LX),
         d("original1-original", "original-1", "original", "check",
           "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
         d("ofix-original", "original-fix", "original", "check",
@@ -1020,7 +1023,10 @@ def _verdicts_original(
     diffs: list[dict], same: dict[str, bool], what: str, oinfo: dict, labels: dict[str, str]
 ):
     """The clean-room original's comparisons: verdicts from the metrics, against FSL as built,
-    FSL with correctly rounded maths and FSL's own last-bit band (``cr-fsl``)."""
+    FSL with correctly rounded maths and FSL's own last-bit band (``cr-fsl``). Since 2026-11-04
+    its reproduce mode computes exp, log, expf and logf as glibc 2.35 does and its default
+    correctly rounded (GLIBC-07, not named): the reproduce mode is held to FSL as built, the
+    default to FSL with correctly rounded maths."""
     by = {x["id"]: x for x in diffs}
     named = [n for n in oinfo.get("named", {}).get("original-fix", []) if n.startswith("FSL-")]
     shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
@@ -1049,17 +1055,59 @@ def _verdicts_original(
                 "original-cr": "With correctly rounded maths FSL computes exactly the clean-room "
                 f"original's values in every image FAST writes on {what}: the original follows "
                 "FAST's arithmetic, with correctly rounded exp and log.",
+                "ofix-cr": "With correctly rounded maths FSL computes exactly the clean-room "
+                f"original's default values in every image FAST writes on {what}: the default "
+                "follows FAST's arithmetic with exp, log, expf and logf correctly rounded on "
+                "every platform"
+                + (
+                    ", and no correction of the register applies to this call."
+                    if not shown
+                    else "."
+                ),
                 "original1-original": "The thread count changes nothing: the clean-room "
                 "original's parallel sweeps (a pipeline of planes in the serial order), blocked "
                 "sums and sorts give its one-thread result bit for bit at any thread count.",
                 "ofix-original": _fix_same(named),
             }.get(i, "The same values, every one.")
-        elif i == "ofix-original" and shown:
+        elif i in ("ofix-original", "ofix-cr") and shown:
             x["verdict"] = "d13"
             x["reason"] = " ".join(
                 ORIGINAL_FIX.get(n, f"{n}, corrected by default.") for n in shown
+            ) + (
+                " It also computes exp, log, expf and logf correctly rounded (GLIBC-07, not named)."
+                if i == "ofix-original"
+                else ""
             )
             x["links"] += [{"label": n, "href": REGISTER} for n in shown]
+        elif i == "ofix-original":
+            x["verdict"] = "d13"
+            x["reason"] = common.glibc07("exp, log, expf and logf", "FAST", named=False) + (
+                " The default gives FSL's values with correctly rounded maths bit for bit and "
+                "the reproduce mode FSL's as built (the rows above), so this row is FSL's own "
+                "last-bit band, value for value (the yardstick row)."
+                if same.get("ofix-cr") and same.get("original-fsl")
+                else " "
+                + _counts(
+                    x, [o for o, m in x["metrics"].items() if not m["identical"]], labels, band
+                )
+                + "."
+            )
+            x["links"].append({"label": "GLIBC-07", "href": REGISTER})
+        elif i == "ofix-cr":
+            beyond = _beyond(x, band)
+            diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
+            x["verdict"] = "open" if beyond else "within-variability"
+            x["reason"] = (
+                "The default against FSL with correctly rounded maths: "
+                + _counts(x, beyond or diff_out, labels, band)
+                + (
+                    "; further than FSL as built is from it."
+                    if beyond
+                    else "; no further, in any output, than FSL as built is from it (FSL's own "
+                    "last-bit band)."
+                )
+            )
+            x["links"].append({"label": "findings", "href": FINDINGS})
         elif i == "original-own" and not same.get("replica-own"):
             x["verdict"] = "open"
             x["reason"] = "fMRIPrep's own output is not FSL's here (see the replica's row)."
@@ -1117,6 +1165,15 @@ def _verdicts_original(
                     "classes; it can still be improved."
                 )
                 x["links"].append({"label": "findings", "href": FINDINGS})
+        elif i == "original-cr" and same["original-fsl"]:
+            x["verdict"] = "within-variability"
+            x["reason"] = (
+                "The reproduce mode computes exp, log, expf and logf as glibc 2.35 does, as FSL's "
+                "build, so it gives FSL's values as built, every one (the row above); against "
+                "FSL with correctly rounded maths its differences are therefore FSL's own "
+                "last-bit band, value for value (the yardstick row)."
+            )
+            x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
         elif i == "original-cr":
             beyond = _beyond(x, band)
             diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
@@ -1214,7 +1271,9 @@ def _counted(e: fcache.Entry, o: fcache.Entry) -> dict[str, tuple[Path, Path]]:
         "original (reproduce)": (o.dir / "original", e.dir / "fsl"),
         "original (default)": (o.dir / "original-fix", e.dir / "fsl"),
         "original − FSL, correctly rounded maths": (o.dir / "original", o.dir / "fsl-cr"),
-    }
+        "original (default) − FSL, correctly rounded maths": (o.dir / "original-fix",
+                                                               o.dir / "fsl-cr"),
+    }  # fmt: skip
 
 
 def _provenance(info: dict, e: fcache.Entry, oinfo: dict, o: fcache.Entry, data: list) -> list:
@@ -1742,10 +1801,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     fix = rep.get("D13 fix pass")
     shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
     if isinstance(fix, int) and fix:
-        notes.append(
-            f"in its default mode the clean-room original corrects {', '.join(shown or named)} "
-            f"and names it: {fix:,} values change"
-        )
+        notes.append(common.fix_note(fix, shown or named, "exp, log, expf and logf"))
     elif named and code not in (0, None):
         notes.append(
             f"its default mode refuses the call (exit {code}), naming {', '.join(named)}: an "
@@ -1773,9 +1829,18 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
         if x["orig_cr"][0] > x["cr_fsl"][0] or x["orig_cr"][1] > x["cr_fsl"][1]
     }
     if not of:
+        cr = [k for k, x in files.items() if x["cr_fsl"][0]]
         return "bit-identical", common.clip(
             f"Every value of all {n} images FSL writes, with FSL's exit status and messages (the "
-            "record checks the headers' grid, forms and data types)" + tail,
+            "record checks the headers' grid, forms and data types)"
+            + (
+                f"; FSL with correctly rounded maths differs in {len(cr)} of them, so glibc's "
+                "last bits matter here: the reproduce mode computes exp, log, expf and logf as "
+                "glibc 2.35 does (since 2026-11-04)"
+                if cr
+                else ""
+            )
+            + tail,
             700,
         )
     if not oc:

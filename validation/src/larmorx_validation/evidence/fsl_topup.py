@@ -1188,6 +1188,11 @@ ORIGINAL_FIX["FSL-146"] = (
 )
 
 
+#: The C library's function the clean-room original computes as glibc 2.35 does in its
+#: reproduce mode since 2026-11-04, correctly rounded by default (GLIBC-07, not named).
+GLIBC_FUNCTIONS = "exp (the smoothing's Gaussian)"
+
+
 def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: dict,
                        what: str) -> None:  # fmt: skip
     """The clean-room original's comparisons: against FSL (from the case's classification), with
@@ -1219,7 +1224,8 @@ def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: 
                 "original's parallel loops (fixed blocks of lines, planes and coefficients, "
                 "sums in a fixed order) give its one-thread result bit for bit at 14 threads.",
                 "ofix-original": "No correction of the register applies to this call: both "
-                "modes give the same values."
+                "modes give the same values (the smoothing's exp, glibc's in the reproduce mode "
+                "and correctly rounded by default, GLIBC-07, gives the same result here)."
                 if not named
                 else "No correction of the register changes this call's values: the default "
                 f"mode names {', '.join(named)}, with the same values in both modes.",
@@ -1229,6 +1235,18 @@ def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: 
             x["reason"] = " ".join(ORIGINAL_FIX.get(n, f"{n}, corrected by default.")
                                    for n in named)  # fmt: skip
             x["links"] += [{"label": n, "href": REGISTER} for n in named]
+        elif i == "ofix-original":
+            x["verdict"] = "d13"
+            moved = [f"{o}: {m['differ']:,} values (at most {m['max_abs']:.3g})"
+                     for o, m in x["metrics"].items() if not m["identical"]]  # fmt: skip
+            x["reason"] = (
+                common.glibc07(GLIBC_FUNCTIONS, "topup", named=False)
+                + " Here: "
+                + "; ".join(moved[:3])
+                + (f"; {len(moved) - 3} more" if len(moved) > 3 else "")
+                + "."
+            )
+            x["links"].append({"label": "GLIBC-07", "href": REGISTER})
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example (see the record)."
@@ -1928,10 +1946,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     fix = r.get("reported", {}).get("D13 fix pass")
     notes = []
     if isinstance(fix, int) and fix:
-        notes.append(
-            f"in its default mode the clean-room original corrects "
-            f"{', '.join(named) or 'a register entry'} and names it: {fix:,} values change"
-        )
+        notes.append(common.fix_note(fix, named, GLIBC_FUNCTIONS))
     elif named and code not in (0, None):
         notes.append(f"its default mode refuses the call (exit {code}), naming {', '.join(named)}")
     elif named:

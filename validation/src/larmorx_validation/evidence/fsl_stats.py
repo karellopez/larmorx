@@ -217,10 +217,12 @@ def _orig_cell(text: str, fsl: str, args: list[str], named: list[str]) -> tuple[
     else:
         so._compare_text(checks, fsl, text, args)
     c = checks.checks[-1]
-    extra = f"; names {', '.join(named)}" if named else ""
+    if named:  # the default mode's correction, named (its size beside it)
+        size = f": {c.value} relative" if c.passed and c.value else ""
+        return common.cell(f"differs ({', '.join(named)}{size})"), False
     if c.passed:
-        return common.cell(f"within §10's bound ({c.value} relative){extra}"), False
-    return common.cell(f"differs ({c.detail[:80]}){extra}"), False
+        return common.cell(f"within §10's bound ({c.value} relative)"), False
+    return common.cell(f"differs ({c.detail[:80]})"), False
 
 
 def _options_table(ctx: core.Context) -> tuple[dict, fcache.Entry]:

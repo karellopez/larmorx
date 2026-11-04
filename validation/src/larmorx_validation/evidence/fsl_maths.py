@@ -1022,7 +1022,6 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
 
     e = glibc_entry(ctx)
     info = e.info()
-    eo = fo.entry(ctx, TOOL, "glibc")
     rows = []
     for rid, (fn, _ops) in GLIBC_CALLS.items():
         fsl = np.asarray(nib.load(str(e.dir / f"fsl-{rid}" / f"{rid}.nii.gz")).dataobj).ravel()
@@ -1030,49 +1029,34 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
         fix = np.asarray(
             nib.load(str(e.dir / f"replica-fix-{rid}" / f"{rid}.nii.gz")).dataobj
         ).ravel()
-        org = np.asarray(
-            nib.load(str(eo.dir / f"original-{rid}" / f"{rid}.nii.gz")).dataobj
-        ).ravel()
-        ofix = np.asarray(
-            nib.load(str(eo.dir / f"original-fix-{rid}" / f"{rid}.nii.gz")).dataobj
-        ).ravel()
         finite = np.isfinite(fsl)
         n_r, u_r = _ulps(fsl[finite], rep[finite])
         n_f, _u_f = _ulps(fsl[finite], fix[finite])
-        n_o, u_o = _ulps(fsl[finite], org[finite])
-        n_of, _u_of = _ulps(fsl[finite], ofix[finite])
         same_nan = bool(np.array_equal(np.isnan(fsl), np.isnan(rep)))
-        same_nan_o = bool(np.array_equal(np.isnan(fsl), np.isnan(org)))
         named = info.get("named", {}).get(f"replica-fix-{rid}", [])
         if fn in IBM:
-            verdict = "divergence" if n_r or n_o else "bit-identical"
+            verdict = "divergence" if n_r else "bit-identical"
             how = "correctly rounded in both modes (IBM's code in glibc, LGPL, never translated)"
         else:
-            verdict = "bit-identical" if n_r == 0 and n_o == 0 else "open"
+            verdict = "bit-identical" if n_r == 0 else "open"
             how = "glibc's bits with reproduce, correctly rounded by default (GLIBC-07 named)"
         rows.append({
             "head": f"`{fn}`",
             "sub": "`fslmaths " + " ".join(glibc_args(rid)) + "`",
             "cells": [common.cell(int(finite.sum()), "count"), common.cell(n_r, "count"),
                       common.cell(u_r, "count"), common.cell(n_f, "count"),
-                      common.cell(", ".join(named) or "–"), common.cell(n_o, "count"),
-                      common.cell(u_o, "count"), common.cell(n_of, "count"),
-                      common.cell(how)],
+                      common.cell(", ".join(named) or "–"), common.cell(how)],
             "verdict": verdict,
         })  # fmt: skip
-        assert same_nan and same_nan_o, rid
+        assert same_nan, rid
     table = common.table(
         "glibc-double",
         "GLIBC-07 on a real image: glibc 2.35's double functions",
         ["Function", {"label": "Values", "num": True},
-         {"label": "Replica, reproduce mode: values that differ from FSL's", "num": True},
+         {"label": "Reproduce mode: values that differ from FSL's", "num": True},
          {"label": "Largest distance (units in the last place)", "num": True},
-         {"label": "Replica, default mode: values that differ from FSL's", "num": True},
-         "Named by the replica's default",
-         {"label": "Clean-room original, reproduce mode: values that differ", "num": True},
-         {"label": "Largest distance (units in the last place)", "num": True},
-         {"label": "Clean-room original, default mode: values that differ", "num": True},
-         "The maths (both implementations)"],
+         {"label": "Default mode: values that differ from FSL's", "num": True},
+         "Named by the default", "The replica's maths"],
         rows,
         note="fslmaths with `-dt double` and `-odt double` on FSL's mean of ds005040's BOLD "
         "series in T1w space, scaled into each function's range; every finite value of the "
@@ -1082,11 +1066,62 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
         "last place: GLIBC-07, an expected divergence for IBM's six functions (no permissive "
         "code gives glibc's bits), a correction by default for exp and log, whose glibc bits "
         "the reproduce mode gives. Float results (fslmaths' default type) are the same: no "
-        "float differs after rounding. The clean-room original follows the same rule (CORE-MATH's "
-        "functions; glibc's exp, log and pow bits in its reproduce mode, from their documented "
-        "behaviour), at 14 threads.",
+        "float differs after rounding.",
     )  # fmt: skip
     return table, fcache.provenance(e)
+
+
+def _glibc_table_original(ctx: core.Context) -> dict:
+    """The same calls by the clean-room original: correctly rounded in both modes (CORE-MATH's
+    functions), within the record's one unit in the last place per function."""
+    import nibabel as nib
+
+    e = glibc_entry(ctx)
+    eo = fo.entry(ctx, TOOL, "glibc")
+    oinfo = eo.info()
+    rows = []
+    for rid, (fn, _ops) in GLIBC_CALLS.items():
+        fsl = np.asarray(nib.load(str(e.dir / f"fsl-{rid}" / f"{rid}.nii.gz")).dataobj).ravel()
+        rep = np.asarray(nib.load(str(e.dir / f"replica-fix-{rid}" / f"{rid}.nii.gz")).dataobj)
+        org, ofix, one = (
+            np.asarray(nib.load(str(eo.dir / f"{lab}-{rid}" / f"{rid}.nii.gz")).dataobj).ravel()
+            for lab in ("original", "original-fix", "original-1")
+        )
+        finite = np.isfinite(fsl)
+        n_o, u_o = _ulps(fsl[finite], org[finite])
+        n_of, _u = _ulps(fsl[finite], ofix[finite])
+        assert np.array_equal(np.isnan(fsl), np.isnan(org)), rid
+        same_cr = org.tobytes() == rep.ravel().tobytes()
+        named = oinfo.get("named", {}).get(f"original-fix-{rid}", [])
+        rows.append({
+            "head": f"`{fn}`",
+            "sub": "`fslmaths " + " ".join(glibc_args(rid)) + "`",
+            "cells": [common.cell(int(finite.sum()), "count"), common.cell(n_o, "count"),
+                      common.cell(u_o, "count"), common.cell(n_of, "count"),
+                      common.cell(", ".join(named) or "–"),
+                      common.cell("identical" if same_cr else "differs"),
+                      common.cell("identical" if one.tobytes() == org.tobytes() else "differs")],
+            "verdict": "divergence" if n_o else "bit-identical",
+        })  # fmt: skip
+    return common.table(
+        "glibc-double-original",
+        "GLIBC-07 on a real image: the clean-room original",
+        ["Function", {"label": "Values", "num": True},
+         {"label": "Reproduce mode: values that differ from FSL's", "num": True},
+         {"label": "Largest distance (units in the last place)", "num": True},
+         {"label": "Default mode: values that differ from FSL's", "num": True},
+         "Named by the default", "Against the replica's default (correctly rounded)",
+         "1 thread against 14"],
+        rows,
+        note="The same calls by LARMORX's clean-room original (14 threads, and at one): its "
+        "double functions are CORE-MATH's correctly rounded ones (larmorx_core::math) in both "
+        "modes, the replica's default's bits. Its reproduce mode does not give glibc's bits for "
+        "exp, log and pow, which specs/fslmaths.md §19 asks of it (glibc 2.35 ships Arm's "
+        "Optimized Routines for them, MIT-licensed: a follow-up); its record holds the double "
+        "functions to one unit in the last place per function of the chain (§21), and every "
+        "differing value here is one unit away (GLIBC-07, an expected divergence). Float results "
+        "are FSL's.",
+    )  # fmt: skip
 
 
 # ------------------------------------------------------------------------------ shared texts
@@ -1482,6 +1517,7 @@ def export(ctx: core.Context) -> dict:
     tt, tprov = trial(ctx, TOOL)
     to, toprov = fo.trial(ctx, TOOL)
     gt, _gprov = _glibc_table(ctx)
+    gto = _glibc_table_original(ctx)
     bench, chart, bt = fo.speed(ctx, "fslmaths")
     return {
         "schema": 1,
@@ -1510,7 +1546,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cs,
         "cases_total": len(cs),
         "speed": chart,
-        "tables": [tt, gt, *to, bt],
+        "tables": [tt, gt, gto, *to, bt],
         "examples": [
             _example_combine(ctx, rec),
             _example_goodvoxels(ctx),

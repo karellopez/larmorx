@@ -290,7 +290,12 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   the spec questions of its findings. On FSL's FFT path its direct sum adds in single precision,
   which a large kernel makes less accurate than FSL's FFT (findings 31: 1.39e-5 of FSL's largest
   value on the site's `-kernel sphere 21 -fmean`, beyond §21's bound): a follow-up, the products
-  added in double where FSL takes its FFT (2.0e-7 from FSL's output on that call). Its speed: the
+  added in double where FSL takes its FFT (2.0e-7 from FSL's output on that call).
+- The clean-room original's reproduce mode computes `exp`, `log` and `pow` correctly rounded as
+  its default does, where `specs/fslmaths.md` §19 asks glibc's bits of it (GLIBC-07): its
+  double outputs then differ from FSL's by one unit in the last place in a few values (110 of
+  136,400 for `exp` and 15 for `log` on the site's real image), within its record's threshold.
+  glibc 2.35's `exp`, `log` and `pow` are Arm's Optimized Routines (MIT): a follow-up. Its speed: the
   [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 42 times faster than FSL on one thread, up to
   356 times on 14; the direct sum outruns FSL's FFT on every kernel measured, so the original
   has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)

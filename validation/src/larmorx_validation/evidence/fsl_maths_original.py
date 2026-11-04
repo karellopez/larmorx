@@ -356,8 +356,10 @@ def verdicts(diffs: list[dict], same: dict[str, bool], named: list[str], outcome
         elif i == "original-own":
             if same.get(i):
                 x["verdict"] = "bit-identical"
-                x["reason"] = "fMRIPrep's own file (fslmaths in fMRIPrep 25.2.6's image) holds the "
-                "same values."
+                x["reason"] = (
+                    "fMRIPrep's own file (fslmaths in fMRIPrep 25.2.6's image) holds the same "
+                    "values."
+                )
             elif own_same is False:
                 x["verdict"] = "open"
                 x["reason"] = "fMRIPrep's own output is not FSL's here (see the replica's row)."
@@ -552,6 +554,14 @@ OPEN_REASONS = {
     "sums back to millimetres in a neurological image, whose arithmetic in FSL is not known "
     "(findings 21; spec question 24)",
 }
+#: The record's expected divergences on FSL's FFT path, and what findings 31 adds to their reason.
+FFT_DIVERGENCES = ("conv/fft-sphere", "conv/fft-odd", "conv/fft-double", "conv/fft-4d",
+                   "orig/fft-asym")  # fmt: skip
+FFT_NOTE = (
+    "Findings 31 (2026-11-04): on the fslmaths page's real call FSL's FFT proved the more "
+    "accurate (1.5e-7 of the largest value from the exact result, the original's "
+    "single-precision direct sum 1.4e-5); on this case's input that is not measured."
+)
 TAN = (
     "GLIBC-07: with -dt double, glibc 2.35's tan (IBM's code in glibc, LGPL) is not always "
     "correctly rounded, and the clean-room original's is (CORE-MATH's, in both modes): one unit "
@@ -597,7 +607,9 @@ def case_verdict(r: dict, dm: dict, program: str) -> tuple[str, str]:
                 else f" The clean-room original's default mode ends with exit status {code}, "
                 f"naming {', '.join(named)}."
             )
-        return verdict, common.clip(why, 700)
+        if verdict == "divergence" and r["case"] in FFT_DIVERGENCES:
+            why = common.clip(r["reason"], 560) + " " + FFT_NOTE
+        return verdict, common.clip(why, 900)
     diff = _differs(r.get("measured", {}))
     notes = []
     fix = r.get("reported", {}).get("D13 fix pass")
@@ -629,7 +641,10 @@ def _input(name: str) -> str:
     if name.startswith("orig:"):
         return f"<{name[5:]}: a synthetic input of the original's suite>"
     if name.startswith("dt:"):
-        return f"<random testing's input {name.split(':', 1)[1][:12]}>"
+        rest = name.split(":", 1)[1]
+        if rest.startswith("case/"):  # a permanent case's own input: its file's name
+            return f"<the case's {rest.rsplit('/', 1)[-1]}>"
+        return f"<random testing's input {rest[:12]}>"
     return f"<{name}: a synthetic input>"
 
 
@@ -973,7 +988,8 @@ def speed(ctx: core.Context, program: str) -> tuple[list[dict], dict | None, dic
     trows = []
     for r in rows:
         cells = [common.cell(f"{s:.2f} s ({mib} MiB)") for s, mib in r["runs"]]
-        trows.append({"head": _plain(r["case"]), "cells": [*cells, common.cell(r["checks"])]})
+        checks = r["checks"].replace("\\|", "|").replace("`", "").replace("(below; ", "(")
+        trows.append({"head": _plain(r["case"]), "cells": [*cells, common.cell(checks)]})
     table = common.table(
         "benchmark",
         "The benchmark: seconds and peak memory",

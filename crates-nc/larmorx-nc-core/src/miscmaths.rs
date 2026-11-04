@@ -411,9 +411,12 @@ fn decompose_aff_impl(
 /// halved (its axis scaled by `1 / (2 cos(t/2))`, `t = asin(|q|)`), the square roots of the
 /// scales, half the skews, and the translation that both halves share (`(mat S⁻¹ K⁻¹ R⁻¹ + I)`'s
 /// 3 × 3 part solved against the translation). Armadillo's errors are returned: [`INV_ERROR`]
-/// from an inverse, [`SOLVE_ERROR`] from the solve. `asin` and `cos` are the correctly rounded
-/// ones of `larmorx_core::math` (glibc's agree with them on all but rare arguments).
-pub fn sqrtaff(mat: &Mat) -> Result<Mat, &'static str> {
+/// from an inverse, [`SOLVE_ERROR`] from the solve. The double `cos` comes from `libm`:
+/// correctly rounded by default, glibc 2.35's with `reproduce` (GLIBC-07; IBM's code, LGPL:
+/// [`larmorx_core::math::cos_glibc`], the clean-room implementation of `specs/glibc-dbl.md`).
+/// `asin` is the correctly rounded one in both modes (the user's decision of 2026-11-04: glibc's
+/// `asin` stays out of larmorx; it differs from it in the last bit on 0.16 % of arguments).
+pub fn sqrtaff(mat: &Mat, libm: &larmorx_core::math::Libm) -> Result<Mat, &'static str> {
     let zero = Mat::col(&[0.0, 0.0, 0.0]);
     let mut params = decompose_aff_try(mat, &zero, true)?;
     let sint =
@@ -421,7 +424,7 @@ pub fn sqrtaff(mat: &Mat) -> Result<Mat, &'static str> {
             .sqrt()
             .0;
     let t = larmorx_core::math::asin(sint);
-    let factor = (S64(1.0) / (S64(2.0) * larmorx_core::math::cos((S64(0.5) * t).0))).0;
+    let factor = (S64(1.0) / (S64(2.0) * libm.cos((S64(0.5) * t).0))).0;
     for k in 0..3 {
         params[k] = (S64(factor) * params[k]).0;
     }

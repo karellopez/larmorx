@@ -328,6 +328,15 @@ functions can move a registration's last bits. avscale, makerot and `convert_xfm
 compute both choices and name GLIBC-07, in both modes, exactly where the other choice prints or
 writes another result.
 
+The replica takes glibc's `sinf`, `cosf`, `atan2f`, `exp` and `logf` in both modes (permissive
+code, as FSL's build runs them), and since 2026-11-04 glibc's double `cos` with `reproduce` where
+FSL calls it (`larmorx_core::math::cos_glibc`): the sinc kernels' Hanning and Blackman windows
+(FLIRT's `-interp sinc`, applyxfm4D, mcflirt's `-sinc_final`; correctly rounded by default, named
+nothing: the windows are stored as float and the two choices give the same kernels at every width
+from 1 to 1001) and avscale's half transforms (`sqrtaff`; named, in both modes, where the two
+choices print different reports, which the half transforms' float rotation makes rare). The
+stage-4 cost's sinc table is the same with either `cos` (all 201 entries), so it serves both modes.
+
 ## Not yet
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are

@@ -1,7 +1,7 @@
 {
  "defect": "GLIBC-07",
- "description": "random testing (2026-11-03): -recip, -kernel gauss 2.25 and -fmeanu of a 30 x 1 x 3 float image (an FFT convolution: a 60-point transform along x); 1 of 90 voxels one unit in the last place from FSL's: two of the 60-point transform's twiddle factors are glibc's sincos values, one bit from the correctly rounded ones (GLIBC-07)",
- "expect": "divergence",
+ "description": "random testing (2026-11-03): -recip, -kernel gauss 2.25 and -fmeanu of a 30 x 1 x 3 float image (an FFT convolution: a 60-point transform along x); 1 of 90 voxels one unit in the last place from FSL's then: two of the 60-point transform's twiddle factors are glibc's sincos values, one bit from the correctly rounded ones (GLIBC-07). Since 2026-11-04 the replica's reproduce mode takes glibc's sincos (larmorx_core::math::sincos_glibc): FSL's output bit for bit; the default keeps the correctly rounded factors and names nothing (a filter)",
+ "expect": "pass",
  "found": {
   "detail": "every file bit-identical: out.nii.gz: 1 of 90 values differ (max |diff| 4.66e-10)",
   "n": 61795,
@@ -27,7 +27,7 @@
  "implementations": [
   "replica"
  ],
- "reason": "the FFT convolution's twiddle factors, which FSL takes from glibc 2.35's sincos (through cexp: IBM's code, LGPL, not always correctly rounded; the same build on every x86-64 CPU) and the replica computes correctly rounded in both modes; with FSL's own factors the replica's output is FSL's bit for bit (validation/probes/fsl-avwutils-lib/check_fft.py)",
+ "reason": "the FFT convolution's twiddle factors, which FSL takes from glibc 2.35's sincos (through cexp: IBM's code, LGPL, not always correctly rounded; the same build on every x86-64 CPU): glibc's with reproduce since 2026-11-04 (validation/probes/fsl-avwutils-lib/check_fft.py --mode reproduce: 0 of 65,792 factors and 0 of 197,376 transform values differ from Armadillo's)",
  "recipe": {
   "extra": {
    "output_type": "NIFTI_GZ",

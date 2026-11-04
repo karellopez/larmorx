@@ -618,6 +618,28 @@ const BET_CASES: &[BetCase] = &[
         named: &[],
         output_type: "NIFTI",
     },
+    // the sinc window's cos from glibc's (GLIBC-07, reproduce only; an interpolation: named
+    // nothing)
+    BetCase {
+        id: "flirt.applyxfm-sinc.reproduce",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyxfm",
+            "-interp",
+            "sinc",
+            "-out",
+            "out",
+        ],
+        mode: "reproduce",
+        named: &[],
+        output_type: "NIFTI",
+    },
     BetCase {
         id: "flirt.applyisoxfm-4d-spline",
         tool: "fsl flirt",
@@ -733,6 +755,15 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl avscale",
         args: &["--allparams", "{init}", "{t1}"],
         mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // the half transforms' cos from glibc's (GLIBC-07, reproduce only)
+    BetCase {
+        id: "avscale.allparams.reproduce",
+        tool: "fsl avscale",
+        args: &["--allparams", "{init}", "{t1}"],
+        mode: "reproduce",
         named: &[],
         output_type: "NIFTI",
     },
@@ -935,6 +966,38 @@ const BET_CASES: &[BetCase] = &[
         args: &["{slab}", "out", "-Z", "-m"],
         mode: "reproduce",
         named: &["FSL-45"],
+        output_type: "NIFTI",
+    },
+    // -S, -B, -A2 (2026-11-04) on the generated standard images (LARMORX_FSL_DATA, see
+    // `FSL_DATA`): the eyes removed (FLIRT and standard_space_roi's mask, the eye mask, the
+    // threshold of the brain's statistics), the bias field (FAST) and neck cleanup with the skull
+    // (FSL-63's echo, immv), the surfaces from the T1 and the T2 (FLIRT to the template and of the
+    // T2 to the T1, bet2's mesh, betsurf). Not separate cases, to keep CI's time (about 14 s in
+    // the tests' build): -A (betsurf.t1only covers its betsurf; its other steps are -A2's), -S in
+    // `reproduce` (GNU dc's reading differs from the default only for the numbers FSL-216 names:
+    // the unit tests)
+    BetCase {
+        id: "bet.eyes",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-S", "-m"],
+        mode: "fix",
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.bias",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-B", "-s"],
+        mode: "fix",
+        named: &["FSL-09", "FSL-100", "FSL-202"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.surfaces-t2",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-A2", "{t2}"],
+        mode: "fix",
+        named: &[],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1228,7 +1291,7 @@ const BET_CASES: &[BetCase] = &[
     // (`{t1}` int16, `{t2}` float32, `{4d}` int16, 4 volumes; `{mask}` float32, `{mask8}` its
     // uint8 brain mask; `{labels}` labels 1 and 3, 2 missing; `{sparse}` one voxel in nine;
     // `{i8}` int8), a z-like map and its partner (`{zmap}`, `{zmap2}`, 16 x 16 x 12), a truth
-    // for -roc (`{truth}`), a kernel file (`{kern}`) and a tensor of six volumes on 8 x 8 x 6
+    // for -roc (`{truth}`), a kernel file (`{kern}`), a 30 x 1 x 3 checkerboard (`{chk}`) and a tensor of six volumes on 8 x 8 x 6
     // (`{tensor}`): niworkflows' combination of two masks; the binary operations with numbers
     // and images (a 3D image cloned over the 4D one; an integer output); the thresholds; the
     // maths functions (float, and double); masks; the seeded noise; the kernels and filters
@@ -1236,7 +1299,8 @@ const BET_CASES: &[BetCase] = &[
     // dimension; the statistical transforms; -roi and -bptf; TFCE; -roc (its curves and printed
     // areas); -tensor_decomp; the data types (char, int, int8 with -odt input: FSL-157 corrected
     // and reproduced, written by FSL as uint8 with its values wrapped, FSL-151; a compressed output); the double functions (GLIBC-07: glibc's bits of exp
-    // and log in reproduce); FSL-160 corrected and reproduced, FSL-162 corrected. fslstats (its
+    // and log, and since 2026-11-04 of sin and cos, in reproduce; the FFT's twiddle factors from glibc's
+    // sincos in reproduce); FSL-160 corrected and reproduced, FSL-162 corrected. fslstats (its
     // printed numbers): every option in one call, -t with -K, -json (FSL-182), FSL-182 corrected
     // and reproduced. Intermediate images are kept with -save (written in the run directory).
     BetCase {
@@ -1343,6 +1407,25 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl fslmaths",
         args: &["{t2}", "-kernel", "boxv", "13", "-fmeanu", "out"],
         mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // the FFT's twiddle factors (a 60-point transform of `{chk}`): correctly rounded by default,
+    // glibc's sincos with reproduce (GLIBC-07; a filter: named nothing); the two outputs differ
+    // in one voxel
+    BetCase {
+        id: "fslmaths.filters-fft-twiddles",
+        tool: "fsl fslmaths",
+        args: &["{chk}", "-recip", "-kernel", "gauss", "3", "-fmeanu", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.filters-fft-twiddles.reproduce",
+        tool: "fsl fslmaths",
+        args: &["{chk}", "-recip", "-kernel", "gauss", "3", "-fmeanu", "out"],
+        mode: "reproduce",
         named: &[],
         output_type: "NIFTI",
     },
@@ -1623,6 +1706,73 @@ const BET_CASES: &[BetCase] = &[
         args: &["{one}", "-s", "-S"],
         mode: "reproduce",
         named: &["FSL-182"],
+        output_type: "NIFTI",
+    },
+    // fslroi (2026-11-04): a box and a range of volumes of the 4D head (x, y, z, t), the
+    // spatial form on the 3D head with a size of -1
+    BetCase {
+        id: "fslroi.box",
+        tool: "fsl fslroi",
+        args: &["{4d}", "out", "2", "20", "1", "-1", "3", "12", "1", "2"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslroi.spatial",
+        tool: "fsl fslroi",
+        args: &["{t1}", "out", "4", "-1", "0", "16", "5", "9"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // FSL-217 (2026-11-04): an int8 image with negative values, written as int8 by default and
+    // as FSL's uint8 (the same bytes) in `reproduce`
+    BetCase {
+        id: "fslroi.int8",
+        tool: "fsl fslroi",
+        args: &["{i8}", "out", "2", "20", "0", "-1", "3", "12"],
+        mode: "fix",
+        named: &["FSL-217"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslroi.int8.reproduce",
+        tool: "fsl fslroi",
+        args: &["{i8}", "out", "2", "20", "0", "-1", "3", "12"],
+        mode: "reproduce",
+        named: &["FSL-217"],
+        output_type: "NIFTI",
+    },
+    // standard_space_roi (2026-11-04): the T2-like head to the T1-like one as the reference
+    // (-ssref: no FSL data needed), the default FOV mask and cut; the masks given (-maskMASK,
+    // -roiMASK) with the temporary files kept (-d)
+    BetCase {
+        id: "standard_space_roi.fov",
+        tool: "fsl standard_space_roi",
+        args: &["{t2}", "out", "-ssref", "{t1}", "-dof", "6"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "standard_space_roi.masks",
+        tool: "fsl standard_space_roi",
+        args: &[
+            "{t2}",
+            "out",
+            "-ssref",
+            "{t1}",
+            "-maskMASK",
+            "{mask}",
+            "-roiMASK",
+            "{mask}",
+            "-d",
+            "-dof",
+            "6",
+        ],
+        mode: "fix",
+        named: &[],
         output_type: "NIFTI",
     },
 ];
@@ -2304,6 +2454,16 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     add("truth", &[zx, zy, zz], 16, 32, f32_bytes(&truth));
     let kern: Vec<i64> = (1..=27).collect();
     add("kern", &[3, 3, 3], 16, 32, f32_bytes(&kern));
+    // a 30 x 1 x 3 checkerboard of 100 and 20 (random testing's case fft-twiddles-glibc-sincos):
+    // its FFT convolution transforms 60 points, whose twiddle factors glibc's sincos and the
+    // correctly rounded functions give differently
+    let mut chk = Vec::new();
+    for k in 0..3i64 {
+        for i in 0..30i64 {
+            chk.push(if (i / 2 + k / 2) % 2 == 0 { 100 } else { 20 });
+        }
+    }
+    add("chk", &[30, 1, 3], 16, 32, f32_bytes(&chk));
     let (tx, ty, tz) = (8i64, 8i64, 6i64);
     let mut tensor = Vec::new();
     for c in 0..6i64 {
@@ -2317,8 +2477,39 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         }
     }
     add("tensor", &[tx, ty, tz, 6], 16, 32, tenths(&tensor));
+    // FSL's standard images for bet -S, -B, -A and -A2 (2026-11-04), small and synthetic, in a
+    // directory laid out as $FSLDIR/data (LARMORX_FSL_DATA, [`FSL_DATA`]): the "template" a head
+    // of other noise on the head's grid (int16, as MNI152_T1_2mm), its dilated brain mask and an
+    // eye mask (a block in front of the brain), both uint8
+    let std_dir = dir.join(FSL_DATA).join("standard");
+    std::fs::create_dir_all(&std_dir).unwrap();
+    let standard = |name: &str, datatype: i16, bitpix: i16, data: Vec<u8>| {
+        let p = std_dir.join(format!("{name}.nii"));
+        std::fs::write(&p, bet_nifti(&[nx, ny, nz], datatype, bitpix, &data)).unwrap();
+    };
+    let template = bet_head_values(T1_LEVELS, 7);
+    standard("MNI152_T1_2mm", 4, 16, i16_bytes(&template));
+    let mut dil = Vec::with_capacity(template.len());
+    let mut eye = Vec::with_capacity(template.len());
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let (x, y, z) = (2 * i - 31, 2 * j - 31, 2 * k - 23);
+                dil.push(i64::from(x * x + y * y + 2 * z * z < 400));
+                eye.push(i64::from(
+                    (12..20).contains(&i) && (24..28).contains(&j) && (8..12).contains(&k),
+                ));
+            }
+        }
+    }
+    standard("MNI152_T1_2mm_brain_mask_dil", 2, 8, u8_bytes(&dil));
+    standard("MNI152_T1_2mm_eye_mask", 2, 8, u8_bytes(&eye));
     paths
 }
+
+/// The generated FSL data directory's name in the BET inputs' directory (`LARMORX_FSL_DATA` of
+/// the cases of `bet -S`, `-B`, `-A` and `-A2`).
+const FSL_DATA: &str = "fsl-data";
 
 // ------------------------------------------------------------------------------------------------
 // Fingerprints
@@ -2648,10 +2839,22 @@ fn run_bet(
         .current_dir(cwd)
         .env_remove("FSLDIR")
         .env_remove("FSL_LOAD_NIFTI_EXTENSIONS")
+        .env_remove("LARMORX_FSL_DATA")
+        .env_remove("maskthr")
         .env("PATH", "")
         .env("FSLOUTPUTTYPE", output_type)
         .env("LARMORX_UPSTREAM_DEFECTS", mode)
         .env("OMP_NUM_THREADS", "2");
+    // bet's variations that read FSL's standard images: the generated ones (no FSL data and
+    // not larmorx-nc's own copy, 91 x 109 x 91)
+    if tool == "bet"
+        && args
+            .iter()
+            .any(|a| ["-S", "-B", "-A", "-A2"].contains(&a.as_str()))
+    {
+        let data = cwd.parent().unwrap().join("bet-inputs").join(FSL_DATA);
+        command.env("LARMORX_FSL_DATA", data);
+    }
     // FAST reads FSLDIR before it segments (FSL-100): its run directory, which holds no priors,
     // except where the case is FSLDIR unset
     if tool == "fast" && !cwd.ends_with("fast.fsldir-unset") {

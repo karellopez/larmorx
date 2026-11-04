@@ -441,12 +441,14 @@ class Run:
     the environment; ``undefined``: FSL reads memory it never wrote (the register entry): FSL is
     not run, the replica must refuse in both modes; ``fixed``: FSL stops (the register entry),
     the default must give an output and name the defect; ``glibc``: the output passes through
-    glibc's double ``sin``, ``cos``, ``tan``, ``asin``, ``acos`` or ``atan`` (IBM's code in glibc,
-    LGPL), which the replica computes correctly rounded in both modes (GLIBC-07): FSL's output
-    may differ by at most that many units in the last place, on a few voxels (an expected
-    divergence, reported with its counts); ``glibc_where``: where glibc's function enters, when
-    not the operation itself (the FFT's twiddle factors, glibc's ``sincos``: a ``float`` output
-    is then compared in ``float``)."""
+    glibc's double ``tan``, ``asin``, ``acos`` or ``atan`` (IBM's code in glibc, LGPL), which the
+    replica computes correctly rounded in both modes (GLIBC-07, the user's decision of
+    2026-11-04): FSL's output may differ by at most that many units in the last place, on a few
+    voxels (an expected divergence, reported with its counts); ``glibc_where``: where glibc's
+    function enters, when not the operation itself (a ``float`` output is then compared in
+    ``float``). glibc's ``sin``, ``cos`` and ``sincos`` (the FFT's twiddle factors) are FSL's
+    bits with ``reproduce`` since 2026-11-04 (``larmorx_core::math::sin_glibc``, ``cos_glibc``,
+    ``sincos_glibc``): their cases pass bit for bit."""
 
     args: tuple[str, ...]
     settings: tuple[tuple[str, str | None], ...] = ()
@@ -479,6 +481,18 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
         else:
             out.append(a)
     return out
+
+
+#: The operations whose convolution may take efficient_convolve's FFT (a kernel that is not
+#: separable): its twiddle factors are glibc's ``sincos`` with ``reproduce`` and correctly
+#: rounded by default, a filter that names nothing (GLIBC-07, the user's decision of 2026-11-04;
+#: :data:`defects.UNNAMED_GLIBC`).
+FFT_OPS = ("-fmean", "-fmeanu")
+
+
+def fft_possible(args) -> bool:
+    """Whether ``args`` hold an operation that may convolve through the FFT (:data:`FFT_OPS`)."""
+    return any(a in FFT_OPS for a in args)
 
 
 def _run_case(run: Run, checks: CheckList) -> None:
@@ -519,6 +533,7 @@ def _run_case(run: Run, checks: CheckList) -> None:
                 b,
                 replica,
                 silent_ok=_SILENT,
+                unnamed_ok=defects.UNNAMED_GLIBC if fft_possible(args) else (),
             )
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
     if run.fixed:
@@ -533,12 +548,12 @@ def _run_case(run: Run, checks: CheckList) -> None:
             )
 
 
-#: How often glibc 2.35's double functions differ from the correctly rounded result on image
-#: intensities, measured by ``validation/probes/glibc-double-maths`` (2^26 random arguments
-#: of each family; ``[-1, 1]`` for ``asin`` and ``acos``).
+#: How often glibc 2.35's double functions that the replica keeps correctly rounded in both
+#: modes differ from the correctly rounded result on image intensities, measured by
+#: ``validation/probes/glibc-double-maths`` (2^26 random arguments of each family; ``[-1, 1]``
+#: for ``asin`` and ``acos``). ``sin`` (0.12 %) and ``cos`` (0.085 %) are glibc's with
+#: ``reproduce`` since 2026-11-04.
 GLIBC_FREQUENCY = {
-    "sin": "0.12 %",
-    "cos": "0.085 %",
     "tan": "0.21 %",
     "asin": "0.16 %",
     "acos": "0.071 %",
@@ -1127,8 +1142,8 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
         "fn/tan-inf": (T, "-tan of infinite and NaN voxels", _r("@nan3", "-tan", "out")),
         "fn/exp-inf": (T, "-exp of infinite and NaN voxels", _r("@inf3", "-exp", "out")),
         "fn/log-inf": (T, "-log of infinite voxels", _r("@inf3", "-log", "out")),
-        "fn/double-sin": (T, "-sin in double", _r("@d3", "-sin", "out", glibc=1)),
-        "fn/double-cos": (T, "-cos in double", _r("@d3", "-cos", "out", glibc=1)),
+        "fn/double-sin": (T, "-sin in double", _r("@d3", "-sin", "out")),
+        "fn/double-cos": (T, "-cos in double", _r("@d3", "-cos", "out")),
         "fn/double-tan": (T, "-tan in double", _r("@d3", "-tan", "out", glibc=1)),
         "fn/double-atan": (T, "-atan in double", _r("@d3", "-atan", "out", glibc=1)),
         "fn/double-asin": (

@@ -221,6 +221,9 @@ pub fn shell_glob_prefix(prefix: &str) -> Vec<String> {
 pub struct ToolFailure {
     pub err: String,
     pub code: u8,
+    /// Whether the program threw (an exception its `main` catches as `std::exception`: fslroi
+    /// prints it and falls off `main`, exit status 0) rather than returning `code` itself.
+    pub exception: bool,
 }
 
 fn failed(e: FslError) -> ToolFailure {
@@ -231,7 +234,11 @@ fn failed(e: FslError) -> ToolFailure {
         err.push_str(&e.what);
         err.push('\n');
     }
-    ToolFailure { err, code: 1 }
+    ToolFailure {
+        err,
+        code: 1,
+        exception: true,
+    }
 }
 
 fn save_failed(e: SaveError) -> ToolFailure {
@@ -240,6 +247,7 @@ fn save_failed(e: SaveError) -> ToolFailure {
         SaveError::OutputType(o) => ToolFailure {
             err: o.printed.iter().map(|l| format!("{l}\n")).collect(),
             code: 1,
+            exception: false,
         },
         SaveError::Exception(e) => failed(e),
     }
@@ -251,6 +259,7 @@ fn header_of(name: &str, fsl: &Settings) -> Result<nifti::NiftiHeader, ToolFailu
     nifti::load_header(Path::new(&path), &fsl.open_options()).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
+        exception: true,
     })
 }
 
@@ -276,12 +285,14 @@ pub fn template_type(name: &str, fsl: &Settings) -> Result<i16, ToolFailure> {
             return Err(ToolFailure {
                 err: "COMPLEX not supported as an independent type\n".into(),
                 code: 255,
+                exception: false,
             });
         }
         other => {
             return Err(ToolFailure {
                 err: format!("Datatype {other} is NOT supported - please check your image\n"),
                 code: 255,
+                exception: false,
             });
         }
     })
@@ -352,28 +363,108 @@ fn save<T: Elem>(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let opts =
-        SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(reproduce_offset);
-    v.save_volume(name, fsl, &opts)
-        .map(|_| ())
-        .map_err(save_failed)
+    save_coded(v, name, fsl, reproduce_offset, None)
 }
 
-/// `fslroi <in> <out> <args>` with 2 (t) or 6 (x, y, z) numbers, in the input's type;
-/// `reproduce_offset` as for every save (FSL-56).
+/// [`save`] with the header's datatype `code` in place of the type's own (FSL-217's int8).
+fn save_coded<T: Elem>(
+    v: &Volume<T>,
+    name: &str,
+    fsl: &Settings,
+    reproduce_offset: bool,
+    code: Option<i16>,
+) -> Result<(), ToolFailure> {
+    let opts =
+        SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(reproduce_offset);
+    match code {
+        Some(c) => v.save_volume_coded(name, fsl, &opts, c),
+        None => v.save_volume(name, fsl, &opts),
+    }
+    .map(|_| ())
+    .map_err(save_failed)
+}
+
+/// What `fslroi` or `fslmerge` did with an int8 image (FSL-217): FSL reads it in its closest
+/// templated type, `char`, whose files are uint8, and writes the same bytes as uint8, so every
+/// negative value becomes 128 to 255; corrected by default (written as int8, the values kept).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Int8Output {
+    /// The output's negative values (the voxels FSL's uint8 changes).
+    pub negative: usize,
+    /// Written as int8 (the correction); `false`: as FSL's uint8 (`reproduce`).
+    pub kept: bool,
+}
+
+impl Int8Output {
+    /// The notice's text for `program` (`fslroi`, `fslmerge`).
+    pub fn detail(&self, program: &str) -> String {
+        if self.kept {
+            format!(
+                "{program}: an int8 image written as int8, its values kept ({} negative), not as \
+                 uint8 with the same bytes",
+                self.negative
+            )
+        } else {
+            format!(
+                "{program}: an int8 image written as uint8 with the same bytes, as FSL's: {} \
+                 negative values became 128 to 255",
+                self.negative
+            )
+        }
+    }
+}
+
+/// Whether `name` is an int8 image as FSL reads it (`dtype`: no scaling), and so meets FSL-217.
+fn is_int8(name: &str, fsl: &Settings) -> bool {
+    volume::file_dtype(name, fsl).is_ok_and(|t| t == dt::INT8)
+}
+
+/// Saves an image read in `char` (FSL's template of uint8 and int8): as int8 when the input was
+/// int8 and the defect is corrected, else in `char`'s own uint8 (FSL-217).
+fn save_char<T: Elem>(
+    v: &Volume<T>,
+    name: &str,
+    fsl: &Settings,
+    reproduce: bool,
+    int8: bool,
+) -> Result<Option<Int8Output>, ToolFailure> {
+    if !int8 {
+        save(v, name, fsl, reproduce)?;
+        return Ok(None);
+    }
+    let negative = v.data.iter().filter(|x| x.to_f64() < 0.0).count();
+    let code = (!reproduce).then_some(dt::INT8);
+    save_coded(v, name, fsl, reproduce, code)?;
+    Ok(Some(Int8Output {
+        negative,
+        kept: !reproduce,
+    }))
+}
+
+/// `fslroi <in> <out> <args>` with 2 (t), 6 (x, y, z) or 8 (x, y, z, t) numbers, in the input's
+/// type; `reproduce` as for every save (FSL-56). Its failures: the exceptions fslroi's
+/// `main` catches (`exception`: an image that does not read, `Invalid ROI dimensions` (21), a
+/// time index outside the series (5), a volume that cannot be allocated (99)), the data types
+/// it refuses (status 255) and the output type's (status 1).
+///
+/// `reproduce` also decides FSL-217: an int8 input is written as int8 with its values by
+/// default (`Some`: what was written, for the caller's notice), as FSL's uint8 in `reproduce`.
 pub fn fslroi(
     input: &str,
     output: &str,
     args: &[&str],
     fsl: &Settings,
-    reproduce_offset: bool,
-) -> Result<(), ToolFailure> {
+    reproduce: bool,
+) -> Result<Option<Int8Output>, ToolFailure> {
     match template_type(input, fsl)? {
-        dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl, reproduce_offset),
-        dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl, reproduce_offset),
-        dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl, reproduce_offset),
-        dt::DOUBLE => fslroi_t::<f64>(input, output, args, fsl, reproduce_offset),
-        _ => fslroi_t::<f32>(input, output, args, fsl, reproduce_offset),
+        dt::UNSIGNED_CHAR => {
+            let int8 = is_int8(input, fsl);
+            fslroi_t::<i8>(input, output, args, fsl, reproduce, int8)
+        }
+        dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl, reproduce, false),
+        dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl, reproduce, false),
+        dt::DOUBLE => fslroi_t::<f64>(input, output, args, fsl, reproduce, false),
+        _ => fslroi_t::<f32>(input, output, args, fsl, reproduce, false),
     }
 }
 
@@ -383,10 +474,12 @@ fn fslroi_t<T: Elem>(
     args: &[&str],
     fsl: &Settings,
     reproduce_offset: bool,
-) -> Result<(), ToolFailure> {
+    int8: bool,
+) -> Result<Option<Int8Output>, ToolFailure> {
     let (v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
     let a: Vec<i64> = args.iter().map(|s| i64::from(cnum::atoi(s))).collect();
-    let (mut min, mut max) = ([0i64; 4], [0i64; 4]);
+    // int minx(-1), ..., maxt(-1): the values of an argument count fslroi's main refuses
+    let (mut min, mut max) = ([-1i64; 4], [-1i64; 4]);
     if a.len() == 2 {
         min = [0, 0, 0, a[0]];
         max = [v.xsize() - 1, v.ysize() - 1, v.zsize() - 1, a[1] + a[0] - 1];
@@ -398,6 +491,19 @@ fn fslroi_t<T: Elem>(
             a[5] + a[4] - 1,
             v.tsize() - 1,
         ];
+    } else if a.len() == 8 {
+        min = [a[0], a[2], a[4], a[6]];
+        max = [
+            a[1] + a[0] - 1,
+            a[3] + a[2] - 1,
+            a[5] + a[4] - 1,
+            a[7] + a[6] - 1,
+        ];
+    }
+    // int arithmetic: the sums wrap as FSL's 32-bit ints do
+    for k in 0..4 {
+        min[k] = i64::from(min[k] as i32);
+        max[k] = i64::from(max[k] as i32);
     }
     for k in 0..3 {
         if max[k] == min[k] - 2 {
@@ -408,10 +514,7 @@ fn fslroi_t<T: Elem>(
         max[3] = v.tsize() - 1;
     }
     if max[0] < min[0] || max[1] < min[1] || max[2] < min[2] || max[3] < min[3] {
-        return Err(ToolFailure {
-            err: "Image Exception : #21 :: Invalid ROI dimensions\nInvalid ROI dimensions\n".into(),
-            code: 1,
-        });
+        return Err(failed(FslError::imthrow("Invalid ROI dimensions", 21)));
     }
     let m = v.niftivox2newimagevox_mat();
     let lo = arma::gemv_tinysq(
@@ -433,28 +536,44 @@ fn fslroi_t<T: Elem>(
             std::mem::swap(&mut mn[k], &mut mx[k]);
         }
     }
+    // volume::ROI: the new volume (newimage's allocation, Out of memory), then the copy, whose
+    // first read at a time index outside the series throws (the const 4D accessor)
+    let n = [
+        mx[0] - mn[0] + 1,
+        mx[1] - mn[1] + 1,
+        mx[2] - mn[2] + 1,
+        max[3] - min[3] + 1,
+    ];
+    crate::exception::try_volume::<T>(n[0], n[1], n[2], n[3]).map_err(failed)?;
+    if min[3] < 0 || max[3] >= v.tsize() {
+        return Err(failed(FslError::imthrow("Out of Bounds (time index)", 5)));
+    }
     let r = roi(
         &v,
         [mn[0], mn[1], mn[2], min[3]],
         [mx[0], mx[1], mx[2], max[3]],
     );
-    save(&r, output, fsl, reproduce_offset)
+    save_char(&r, output, fsl, reproduce_offset, int8)
 }
 
-/// `fslmerge -z <out> <inputs...>`, in the first input's type.
+/// `fslmerge -z <out> <inputs...>`, in the first input's type (an int8 first input: FSL-217, as
+/// [`fslroi`]).
 pub fn fslmerge_z(
     output: &str,
     inputs: &[String],
     fsl: &Settings,
-    reproduce_offset: bool,
-) -> Result<(), ToolFailure> {
+    reproduce: bool,
+) -> Result<Option<Int8Output>, ToolFailure> {
     let first = inputs.first().map_or("", String::as_str);
     match template_type(first, fsl)? {
-        dt::UNSIGNED_CHAR => fslmerge_z_t::<i8>(output, inputs, fsl, reproduce_offset),
-        dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl, reproduce_offset),
-        dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl, reproduce_offset),
-        dt::DOUBLE => fslmerge_z_t::<f64>(output, inputs, fsl, reproduce_offset),
-        _ => fslmerge_z_t::<f32>(output, inputs, fsl, reproduce_offset),
+        dt::UNSIGNED_CHAR => {
+            let int8 = is_int8(first, fsl);
+            fslmerge_z_t::<i8>(output, inputs, fsl, reproduce, int8)
+        }
+        dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl, reproduce, false),
+        dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl, reproduce, false),
+        dt::DOUBLE => fslmerge_z_t::<f64>(output, inputs, fsl, reproduce, false),
+        _ => fslmerge_z_t::<f32>(output, inputs, fsl, reproduce, false),
     }
 }
 
@@ -463,7 +582,8 @@ fn fslmerge_z_t<T: Elem>(
     inputs: &[String],
     fsl: &Settings,
     reproduce_offset: bool,
-) -> Result<(), ToolFailure> {
+    int8: bool,
+) -> Result<Option<Int8Output>, ToolFailure> {
     let h0 = header_of(&inputs[0], fsl)?;
     let new_tr = h0.pixdim[4] as f32;
     let x = h0.dim[1].max(1);
@@ -489,6 +609,7 @@ fn fslmerge_z_t<T: Elem>(
                     "Error in size-match along non-concatenated dimension for input file: {name}\n"
                 ),
                 code: 1,
+                exception: false,
             });
         }
         let nvox_in = v.nvoxels() as usize;
@@ -507,7 +628,7 @@ fn fslmerge_z_t<T: Elem>(
         zoff += v.zsize();
     }
     out.pixdims[3] = new_tr.abs();
-    save(&out, output, fsl, reproduce_offset)
+    save_char(&out, output, fsl, reproduce_offset, int8)
 }
 
 /// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume ([`filters::morphfilter`]): the
@@ -616,7 +737,11 @@ pub fn fslstats_cog(
     let mut printed = String::from_utf8_lossy(&out).into_owned();
     let err = String::from_utf8_lossy(&err).into_owned();
     if code != 0 {
-        return Err(ToolFailure { err, code });
+        return Err(ToolFailure {
+            err,
+            code,
+            exception: false,
+        });
     }
     if printed.ends_with('\n') {
         printed.pop();

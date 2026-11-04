@@ -681,3 +681,106 @@ README "FLIRT, questions 22 to 25 and 38"); FSL 6.0.7.23's source:
   `--vox` and `-v` steps, whose lines FSL prints first) is refused in both modes (`End::Refuse`,
   `larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1), where
   FSL's later submatrix copies of the empty products crash (signal 11).
+
+## standard_space_roi and fslroi (2026-11-04, BET's -S/-B/-A/-A2 part, sub-task 2)
+
+`standard_space_roi` (fsl-flirt 2111.4, a bash script, `#!/usr/bin/env bash`, `LC_ALL=C`
+exported, no `-e`) is replicated in `crates-nc/larmorx-nc-flirt/src/ssroi.rs`; FSL's `fslroi`
+(fsl-avwutils 2209.6 `fslroi.cc`) as a program in `crates-nc/larmorx-nc-avwutils/src/fslroi.rs`
+(its region the core's `avwutils::fslroi`, now with all three argument forms); fslpy 3.27.0's
+`imcp`/`immv` in `crates-nc/larmorx-nc-core/src/fslpy.rs`; where the script's data images are
+found in `larmorx-nc-core/src/fsldata.rs`.
+
+**How the script runs** (lines of FSL 6.0.7.23's script): `[ _$2 = _ ] && Usage` (112: the usage
+heredoc on standard output with `${FSLDIR}` expanded, exit 1); `in=`remove_ext $1`` (114),
+`imtest $in` (115: "Input image $in not valid", exit 1, on standard output); `out=`remove_ext $2``
+(121); the option loop `while [ _$1 != _ ]` (133: an empty argument ends it; an unknown option
+ends it too and goes, with the rest, to FLIRT as `$@`); `-ssref`, `-altinput`, `-roiMASK`,
+`-maskMASK` check their value with `[ _$2 = _ ] && Usage` and then `imtest` ("standard space
+reference image not valid", "Input image $2 not valid", "Image $2 not valid"); `-b` sets
+`maskthr="-thr 0.5"`, `mask=2`, `maskmask=${FSLDIR}/data/standard/MNI152_T1_2mm_brain_mask_dil`,
+`roi=3`. The work: `flirt -in $in -ref $standard -o ${out}_tmp_to_std -omat ${out}_tmp_to_std.mat
+$@` (211), `convert_xfm -inverse` (212), `X=$(fslval $standard dim1)` then `dc` of `"$X 2 - p"`
+(214 to 216); masking (mask 1 or 2): the FOV image `fslmaths $standard -mul 0 -add 1 -roi 1 $X 1 $Y
+1 $Z 0 1 ... -odt float` (221: the reference's grid less its outer voxel on each side) or
+`fslmaths $maskmask -bin ... -odt float` (223), `flirt -applyxfm -init ..._inv.mat` into the
+input's space (225), `fslmaths ... $maskthr ...` (226), `fslmaths $inapply -mas ...` (227); then
+the cut (roi 1 or 2): the same FOV or `$roimask -bin` (234, 236), its `flirt -applyxfm` (238) and
+`fslroi $inapply $out `fslstats ..._roi_to_in -w`` (239), else `imcp $inapply $out` (241); the
+cleanup `/bin/rm ${out}_tmp*` unless `-d` (248). The exit status is the last command's: `rm`'s
+(1 when one of its names is missing or a directory), or 0 with `-d` (the `if` that runs no branch).
+A program that crashes is reported by bash (`$0: line N: PID Aborted                 <the line's
+text>`, N the command's own line at the top level but the `fi` of the `if` block it runs in:
+229 for lines 219 to 229, 242 for 232 to 242) and the script goes on; `/bin/rm`'s messages name
+it so (`/bin/rm: cannot remove 'x': No such file or directory`). bash's `[` on split words is
+bash 5.1's `test` (`shtest.rs`: POSIX's rules up to four arguments, the `-a`/`-o`/`!`/`(`
+grammar beyond; `[: too many arguments`, ``[: syntax error: `-x' unexpected``, `[: _a: integer
+expression expected`, by which word follows), in `reproduce` only.
+
+**The programs in-process.** Every program is the replica's own (`larmorx_nc_flirt::flirt`,
+`convert_xfm`, `larmorx_nc_avwutils::fslmaths`, `fslstats`, `fslroi`, the core's `fslval`, `imcp`),
+with its own messages, statuses and notices; an exception nothing in one catches is caught by
+the script's runner, which prints the C++ runtime's text and bash's report (status 134) and goes
+on. GNU `dc` of `"$X 2 - p"`: `scripts::dc`. First probe (`probe/quick.sh` in the relay's
+scratch, ds000005's T1w to FSL's MNI152_T1_2mm, `reproduce`): the defaults, `-b -d` and
+`-maskFOV -roiNONE -d` bit for bit, every temporary file included but for FLIRT's `descrip`:
+the FLIRT replica wrote `larmorx-nc fsl flirt` where FLIRT writes newimage's build string; it
+writes FSL's since (`run.rs`'s `DESCRIP`; FLIRT's golden header checksums move, data unchanged).
+
+**The BET replica suite's new cases** (`fsl-bet --implementation replica`, standard tier, the
+categories `fslroi/`, `ssroi/` and six of `defects/`, against FSL 6.0.7.23 through the oracle
+cache, 2026-11-04, not a record): 55 cases, 42 identical (exit status, both streams with bash's
+process IDs masked, every file byte for byte, the D13 fix pass), 12 refused by both alike, 1
+expected divergence (`phantom-none-convert`, imcp's nibabel conversion, below); 0 fail. Real
+T1w images (an adult, a child of 3.5 with `-b -d` as bet runs it, an 82-year-old with
+`-maskFOV -roiNONE -d`, a tumour with `-roiMASK`, a Philips T1w with `-b -maskMASK`, a T2w) with
+FSL's MNI152_T1_2mm, and the phantoms with `-ssref` for every option, output type and failure.
+
+**fslroi's statuses (black-box runs of FSL 6.0.7.23).** `main` catches `std::exception` (newimage's
+`Exception` is one), prints `what()` after the `Image Exception : #n :: msg` line, and falls off
+its end: exit 0 after `Invalid ROI dimensions` (#21), `Out of Bounds (time index)` (#5: the ROI's
+first read of a time point outside the series, through the const 4D accessor) and `No image
+files match` (#63); the usage (argument counts other than 4, 8 and 10 after the program) exits 1.
+A box reaching outside the image in x, y or z is filled with the extrapolation's zeros (a written
+output, exit 0). The 32-bit `int` sums `max += min - 1` wrap as FSL's do. Note: the core's
+`ToolFailure` gave status 1 for these exceptions, which the `bet` script's uses of `fslroi`
+(`-F`, `-Z`) never reach (their regions are always valid); it now carries `exception`, and the
+fslroi program applies FSL-215.
+
+**Defects (D13; FSL-211 to FSL-215, register rows through the handoff):**
+
+| ID | What | Rule | Default / `reproduce` |
+|---|---|---|---|
+| FSL-211 | the script expands `$1`, `$2`, `$in`, `$out`, `$standard`, `$inapply`, the masks and `$@` unquoted: a name with a blank is split (an input, reference or mask is then "not valid": `imtest` prints 0 for more than one word; an output writes and removes other files; an option with a blank makes `[` print `too many arguments` and ends the options; FLIRT's options are split again); an empty input makes `remove_ext` print its usage, which becomes the input's name | A | names as given / split as bash does, the `[` messages with their line numbers; a name with `*`, `?` or `[` is refused in `reproduce` (the shell's pathname expansion is not reproduced) |
+| FSL-212 | `rm ${out}_tmp*` removes every file named so, also the user's | A | only this run's temporary files / the glob, rm's messages and status |
+| FSL-213 | `maskthr` is never initialised: bash takes it from the environment, and line 226 applies it to the transformed mask (unless `-b` sets it) | A | ignored (named when set) / applied |
+| FSL-214 | no step's status is checked: after a failure (FLIRT refusing an option, an image that cannot be written) the script runs the rest on missing files and exits with the cleanup's status, 0 when its temporary files exist, mostly without an output | B | stops at the first failed program, exit 1, temporary files removed unless `-d` / goes on |
+| FSL-215 | fslroi exits 0 after the errors it reports | A | exit 1 / exit 0 |
+
+**FSL-217 (found 2026-11-04, sub-task 5, rule A; corrected in the replica the same day):** fslroi
+reads an image in newimage's closest templated type, which for int8 (`DT_INT8`) is
+`DT_UNSIGNED_CHAR` (`closestTemplatedType`), and saves it so: the bytes are kept and the type
+becomes uint8, so every negative value becomes 128 to 255. The same mapping is in `fslmerge` (the
+first input's type), which `bet -Z` runs on the slices fslroi cut, and in `bet -F`'s first-volume
+fslroi: bet2 then runs on the wrapped values (its outputs are float either way). fslmaths has the
+same mapping for `-odt input` (FSL-157, corrected there). **The replica** (`larmorx_nc_core::avwutils`:
+`fslroi`, `fslmerge_z`, `Int8Output`) keeps int8 and its values by default (the file written with
+datatype 256) and gives FSL's uint8 in `reproduce`. Named: fslroi's own output whenever its input
+is int8 (the type differs), with the number of negative values; inside `bet`, where the result
+differs, a negative value (bet2 on other values) or `-d` keeping the int8 temporary files; in
+`reproduce` where a value is negative. **Parity** (the BET replica suite, standard tier, FSL 6.0.7.23
+through the oracle cache, 2026-11-04): `fslroi/int8-negative`, `fslroi/int8-positive`,
+`fslroi/type-head-i8`, `bet/fmri-int8`, `bet/fmri-int8-positive`, `bet/small-fov-int8`,
+`bet/small-fov-int8-debug` identical to FSL in `reproduce` (FSL's datatype 2 confirmed); the
+default changes them exactly where FSL-217 is named (`bet/fmri-int8`: 8,066 voxels of the brain
+and mask differ, bet2 having run on the true values; `bet/fmri-int8-positive`: no change, not
+named). Unit test: `larmorx-nc-avwutils` `fslroi::tests::an_int8_input_keeps_its_type_by_default`.
+uint16 → int32 keeps every value (rule C, FSL's design, as for fslmaths); uint32, int64 and uint64
+→ float32 round integers beyond 2^24 (rule C, the type's design; documented in
+`specs/standard_space_roi.md` §3.2).
+
+**Not replicated yet:** fslpy's `imcp` of a source whose file type (nibabel's class and the
+extension: NIfTI-1, NIfTI-2 or ANALYZE, single or pair, compressed or not) is not
+`$FSLOUTPUTTYPE`'s: fslpy loads it with nibabel 5.4.2 and saves it in the output type (the header
+copied, slope and intercept set explicitly). Only `standard_space_roi -maskNONE -roiNONE` (and
+`-b -maskNONE`) on such an input reaches it; the replica refuses it in both modes (exit 1, "pending").

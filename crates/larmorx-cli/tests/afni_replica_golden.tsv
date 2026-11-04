@@ -2,7 +2,7 @@
 # Golden checksums of the AFNI replicas (tests/afni_replica_golden.rs): SHA-256 of the
 # NIfTI header and data they write on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 00723346a25a72ada5af02bcfd388fb48ee1ce7a on 2026-10-30 (Linux x86_64)
+# Recorded from 9a6a77a08d243c406137d110e93baec1a546b33a on 2026-11-04 (Linux x86_64)
 # case	output	sha256	type	sample
 3dAutomask.2d	data	8aff51b83ef2becbb88f5b2dc0a61250c4b0b649768abc311cdf1dcbea15cb82	uint8	0000000101000100
 3dAutomask.2d	header	79a6a2db8b5d92f6d6b91bc913305ef315702829030f0e96df491429d9aa63f7	-	-
@@ -36,6 +36,8 @@
 3dTshift.fourier.float32.ignore	header	d0dbbb595c05bd2882d30181c155ab1c9d17b74cc1e91713c6c3ea21bfa62b7e	-	-
 3dTshift.fourier.int16	data	fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f	int16	21037904980509044105ae03d5042506
 3dTshift.fourier.int16	header	e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c	-	-
+3dTshift.fourier.int16.reproduce	data	fcb6462c54c36d4cd7ccb0e67600b54e7ed7fc694a6dd26b583c160716a6613f	int16	21037904980509044105ae03d5042506
+3dTshift.fourier.int16.reproduce	header	e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c	-	-
 3dTshift.heptic.uint8.no_detrend	data	3b3cfb2defd486805f0724ff2692f40d5b4781f3a93bcef9bf14ed401a316d7f	uint8	153e652f58264a75
 3dTshift.heptic.uint8.no_detrend	header	0c0c1c7d64fa8f0833b77df2b66da2ea20fc13448399301c29b433228536719f	-	-
 3dTshift.linear.float32	data	d8bbe320fc73af5b40ece09fc8512daea64ed6368bcef3aef243a98cf2d4d946	float32	c6c04b4300208e43ccf0b343214f8043dbeea9431d32694300a09a43d4bdc443

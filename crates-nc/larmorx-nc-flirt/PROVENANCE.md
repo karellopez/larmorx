@@ -34,6 +34,7 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
 | `pointflirt` | `pointflirt.cc` (part 3) | the options, `procrustes`, `main` |
 | `applyxfm4d` | `applyxfm4D.cc` (part 3); fsl-newimage 2601.0 `fmribmain.h`, `newimagefns.h` (the templated `affine_transform`) | `fmrib_main<T>` for `char`, `short`, `int`, `float`, `double`, `get_interptype`, `main`, `call_fmrib_main` (FSL-09, FSL-75, FSL-79, FSL-80) |
 | `scripts` | the scripts `pairreg`, `extracttxt`, `aff2rigid` and the schedules `flirtsch/pairreg1.sch`, `pairreg2.sch`, `pairreg3.sch` (part 3) | `pairreg` (its three flirt runs and `convert_xfm -fixscaleskew`, in-process), `extracttxt` (with dash's `exit -1`, GNU grep's basic regular expressions as the script uses them, dc's and sed's arithmetic and messages), `aff2rigid` (NumPy's arithmetic on OpenBLAS; FSL-81) |
+| `ssroi` | the script `standard_space_roi` (2026-11-04, BET's -S/-B/-A/-A2 part) | the whole script: its usage (FSLDIR expanded), options, messages and exit statuses; its programs in-process (`flirt`, `convert_xfm`, `fslval`, `fslmaths`, `fslstats -w`, `fslroi`, fslpy's `imcp`), GNU `dc` and `rm`, bash's word splitting and `[` messages (FSL-211 to FSL-214, with their switches); the data images found by `larmorx_nc_core::fsldata` |
 
 ## Changes from the original
 
@@ -67,6 +68,11 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
   expand, are refused.
 - **Threads.** FLIRT is single-threaded; the replica runs the boundary points' Gaussian smoothing
   on `OMP_NUM_THREADS` threads, with the same result at any count.
-- **The `descrip` field** of the images it writes is `larmorx-nc fsl flirt`.
+- **The `descrip` field** of the images `flirt` writes is newimage's build string, as FSL's
+  (`larmorx-nc fsl flirt` until 2026-11-04); `applyxfm4D`'s is `larmorx-nc fsl applyxfm4D`.
 - **The C library's maths** are glibc 2.35's (`larmorx-nc-core`: `exp`, `tanh`, `logf`), as FSL's
-  Linux binaries call them, so the outputs are FLIRT's on Linux x86-64 on every platform.
+  Linux binaries call them, so the outputs are FLIRT's on Linux x86-64 on every platform. The
+  double `cos` of the sinc windows and of avscale's half transforms (glibc's is IBM's LGPL code)
+  is correctly rounded by default and, since 2026-11-04, glibc's with `reproduce`
+  (`larmorx_core::math::cos_glibc`, LARMORX's clean-room implementation of `specs/glibc-dbl.md`,
+  Apache-2.0; GLIBC-07), through `larmorx_core::math::Libm`.

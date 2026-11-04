@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves done 2026-11-04, the replicas' step (b) next with BET's options; item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves and the replicas' step (b) done 2026-11-04; item 7), BET's `-S`, `-B`, `-A`, `-A2` (the replica done 2026-11-04, with `standard_space_roi` and `fslroi`; item 7), then the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`) and PRELUDE (a replica, then a clean-room original; the user, 2026-11-04); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -320,7 +320,7 @@ The items below keep their history.
    image (`bet2 -c`, `fslstats -C`: a 4 x 4 inverse whose last bits §8.1 leaves open); random-testing
    cases 677 (`-c`: another first-pass surface) and 622 (`bet -R`: `fslstats -C` prints `-0.000000`,
    and the script's `dc` prints `dc: stack empty` twice; every file FSL's) wait for it. And `bet -S`, `-B`, `-A`, `-A2` once
-   standard_space_roi, FLIRT and FAST are replicated. Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
+   standard_space_roi, FLIRT and FAST are replicated (the replica done 2026-11-04, below). Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
    missing from the plan on 2026-10-30, the user's question: fMRIPrep calls `fslmaths -mul` in every
    BOLD reference's skull strip, and 14 `fslmaths` and 4 `fslstats` in the optional goodvoxels mask,
    `docs/analysis/01-fmriprep-bold-pipeline.md` rows 7 and 11; the BET replica holds only what
@@ -626,14 +626,53 @@ The items below keep their history.
    fMRIPrep calls and 41 FLIRT cases now give FSL's bytes, FLIRT's `cost-normmi` and
    `weights-normmi` fail → pass; GLIBC-07 named exactly in the pointwise programs only (the
    user's decision); 8 records re-made, golden 223 → 228 cases (no checksum moved); the eight
-   tools' site pages re-exported; (b) *next*: a replica-side step (an agent that may read
-   `crates-nc/`) wires the FSL replicas' `reproduce` to the new `sin_glibc`, `cos_glibc` and
-   `sincos_glibc` (fslmaths' `-sin` and `-cos`, the Kiss FFT's twiddle factors, the kernels'
-   windows, avscale's `sqrtaff`) and re-makes their records (random testing's permanent case
-   `fft-twiddles-glibc-sincos` then bit for bit; `fn/double-tan` stays an expected divergence); (b) is the first relay
-   of BET's `-S`/`-B`/`-A`/`-A2` replica part, after (a) merges (the orchestrator, 2026-11-04). AFNI's `tanhf` and
+   tools' site pages re-exported; (b) *done* (2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` replica part,
+   relay 1; `docs/parts/2026-11-04-bet-options/`): every place the FSL and AFNI replicas' sources call
+   glibc's double `sin`, `cos` or `sincos` takes `sin_glibc`, `cos_glibc` or `sincos_glibc` with
+   `reproduce`, the correctly rounded functions by default: fslmaths' `-sin` and `-cos` (named
+   exactly), the Kiss FFT's twiddle factors (Armadillo's 65,792 factors and 197,376 transform
+   values of the lengths 1 to 256 bit for bit: `check_fft.py --mode reproduce`), the sinc
+   kernels' windows, avscale's half transforms (named exactly), the stage-4 cost's table (the same
+   with either `cos`), the AFNI replicas' FFT tables and 3dTshift's Fourier phase factors (AFNI's
+   build merges each pair into `sincos`; the same floats in both modes on every table length and
+   every float argument); the record `fsl-maths-replica` re-made (`fft-twiddles-glibc-sincos`
+   expected divergence -> pass; `fn/double-tan` stays an expected divergence), the FLIRT, mcflirt
+   and 3dTshift replica records unchanged; two replica mistakes it met fixed, both NaN signs and
+   both in main's build too (cprob's `expx2` under the optimiser: `-ztop` of a NaN voxel, four
+   record cases; `-dilall`'s sum order: random testing's short trial, 69,962 cases, permanent case
+   `dilall-nan-order`); golden: 5 new cases, `fslmaths.unary-double.reproduce` re-recorded. AFNI's `tanhf` and
    `expm1f` (fdlibm) stay in the AFNI replica crate: not on the user's list of 2026-11-04; a question for the user if
    an AFNI clean-room original's `reproduce` ever needs them.
+   **BET's `-S`, `-B`, `-A`, `-A2`: the replica done (2026-11-04, relays 1 to 7;
+   `docs/parts/2026-11-04-bet-options/`).** `crates-nc/larmorx-nc-bet`'s `bet` runs every variation of
+   FSL 6.0.7.23's script: `-S` (the eyes and optic nerves removed through MNI152's eye mask, the
+   threshold through GNU dc 1.4.1's arithmetic), `-B` (FAST's bias field, the neck through
+   `standard_space_roi`, then the script again with `-R`), `-A` and `-A2` (FLIRT to MNI152, `bet2
+   -e`, betsurf, with a T2-weighted image for `-A2`), every program in-process (FLIRT,
+   standard_space_roi, FAST, fslmaths, fslstats, betsurf, fslpy's `immv`), the `ERR` trap and
+   bash's report of an aborted program; `standard_space_roi` (fsl-flirt 2111.4's script, every
+   option) and `fslroi` (every argument form) as replica programs (`larmorx-nc fsl
+   standard_space_roi`, `fslroi`; `lx.fsl.standard_space_roi`, `lx.fsl.fslroi`; registry
+   `original: false`); `lx.fsl.bet(variation="eyes" | "bias" | "surfaces" | "surfaces_t2", t2=...,
+   fsl_data=...)`. FSL's three standard images (1,420,897 bytes, byte for byte from
+   fsl-data_standard 2208.0) in `crates-nc/wheel-data/` (the user's decisions of 2026-11-04; the
+   Linux wheel 6.2 MB), found without FSL; `LARMORX_FSL_DATA` and `$FSLDIR` honoured first. Record
+   [fsl-bet-replica](validation/fsl-bet-replica.md) (standard_space_roi's and fslroi's cases
+   in it): 263 cases, 201 bit-identical (600 of 600 files; the six new real heads: an adult and a
+   tumour with `-S`, a 3.5-year-old and an 82-year-old with `-B`, a 75-year-old at 1.5 T with
+   `-A`, a 7.5-year-old with `-A2`), 47 rejected by both, 15 expected divergences (13 FSL crashes
+   filled in `reproduce`, FSL-43's read beyond the volume, fslpy's `imcp` conversion pending), 0
+   fail; fMRIPrep's 29 BET calls still bit-identical. FSL-211 to FSL-217 (FSL-217: fslroi and
+   fslmerge write int8 as uint8, so `bet -F` and `-Z` ran bet2 on wrapped values; corrected by
+   default); FSL-63 widened to `-B -s`. Golden: 9 cases (`larmorx-nc` 134); memory: 4 calls (`-S`
+   37.6 MiB against FSL's 66.9, `-B` 104.7 against 114.6, `-A2` 46.0 against 71.9,
+   `standard_space_roi -b` 35.4 against 66.9); random testing: a 30-minute trial of 2,699 cases,
+   every difference triaged (two replica mistakes fixed). The older replica suites re-run (FAST,
+   topup, fslstats, 3dAutomask, 3dUnifize: identical to their records); `afni-tshift-replica`
+   re-made (317 cases, the 2 its suite had gained pass). Specs for the clean-room original:
+   `specs/bet.md` §5.3 and §5.4, `specs/standard_space_roi.md`. Site: BET's page with seven worked
+   examples of the options and standard_space_roi on the data panel's heads and sections on the
+   variations, standard_space_roi and fslroi and the data; fslmaths' page exported again.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -649,6 +688,42 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From BET's `-S`/`-B`/`-A`/`-A2` replica part (2026-11-04).**
+  - *For the clean-room catch-up:* the original of `bet -S`, `-B`, `-A`, `-A2` from `specs/bet.md`
+    §5.3 and §5.4, with the data search (`fsl_data=` or `LARMORX_FSL_DATA`, larmorx-nc's copy
+    read as data, `$FSLDIR/data`, then a checksum-verified, cached download of FSL's
+    `fsl-data_standard-2208.0-0.tar.bz2`, 196,312,969 bytes, of which only the three images are
+    kept), and of `standard_space_roi` and `fslroi` from `specs/standard_space_roi.md` (then
+    `original: true` in `crates/larmorx-cli/src/replica.rs`); put back what the original's suite
+    leaves out for now: `REPLICA_ONLY_TOOLS` and `ORIGINAL_PENDING_CASES` in
+    `validation/src/larmorx_validation/parity/fsl_bet.py`, `REPLICA_ONLY_BET_CASES` in
+    `tests/parity/test_memory_peak.py`; the original's 190 differences in the part's random-testing
+    trial (betsurf on tiny heads) are open in `validation/difftest/triage.toml`.
+  - *fslpy's file-type conversion in `imcp`* (`standard_space_roi` copying an input of another
+    file type: fslpy 3.27.0 converts it through nibabel 5.4.2) is not replicated: refused clearly
+    (one pending record case, 8 trial differences, triage "open").
+  - *`applyxfm4D`'s and `mcflirt`'s replicas* still write `larmorx-nc fsl ...` into an image's
+    `descrip`, where FSL writes newimage's build string (FLIRT's replica now writes FSL's).
+  - *A messages-only gap:* bet2 or betsurf aborting on an uncaught exception inside `bet` print
+    the replica's own line (`bet2: stopped: ... (larmorx)`) instead of the C++ runtime's text and
+    bash's report at the script's line (the suite compares up to the crash).
+  - *A smaller source for the original's download:* TemplateFlow's `tpl-MNI152NLin6Asym` res-02
+    T1w appears to be FSL's `MNI152_T1_2mm` (not compared byte for byte; FSL's two masks are not
+    there): a later choice.
+  - *FSL's own step from 6.0.7.17 to 6.0.7.23* in `fsl-bet-replica` lists 6 standard_space_roi
+    cases without a known reason: `ssroi/usage` and `ssroi/ssref-without-value` print the usage,
+    whose `${FSLDIR}` is each installation's path (the script is the same file in both);
+    `ssroi/phantom-debug`, `-roinone`, `-masks` and `defects/maskthr-env` keep temporary files
+    (to classify): reasons to add to the step's list (`fsl_versions`).
+  - *The record's notes:* `fsl-bet-replica` (made at 3a795ff) still says that the options are
+    refused and names only bet, bet2 and betsurf (the suite's text, corrected after the record):
+    right at its next re-make.
+  - *The oracle-cache tests under pytest-xdist:* with `-n 16`, one or two tests of
+    `validation/tests/test_oracle_cache.py` fail, different ones in each run (a run the test
+    expects stored is not), at main `0f10327` too (`test_a_rewritten_input_is_replayed_onto_this_runs_input`,
+    `test_a_command_not_found_is_never_stored_nor_served`; on the branch
+    `test_stdout_bytes_are_what_subprocess_text_mode_gives` and, in an earlier run,
+    `test_a_peak_is_measured_kept_and_served`); serially every one passes, as the gates run them.
 - **From the glibc maths part, second half (2026-11-04).**
   - *Clean-room originals, failing on main's code too* (cases main's replica suites gained after the
     originals' last records; the originals' records of FLIRT, FAST and topup were older than main's
@@ -662,10 +737,6 @@ The items below keep their history.
     GLIBC-07 row and §7 (sin and cos are now glibc's in the original's reproduce mode too); FLIRT
     §3 and §8.1 step 9 (the arithmetic of the skews, `x0 · z` and `y0 · z`, for a near-orthonormal
     matrix under gimbal lock: `real/weights-empty-refweight` parts from FSL's trace there).
-  - *The replica side, step (b)*: the replicas take up `larmorx_core::math`'s new `sin_glibc`,
-    `cos_glibc` and `sincos_glibc` where FSL's build calls glibc's double `sin`, `cos` and `sincos`
-    (fslmaths' `-dt double -sin` and `-cos`, the FFT's twiddle factors: the record's
-    `difftest/fft-twiddles-glibc-sincos` and its FSL-side probe).
   - *Harness*: the `mri-hmc` record must be made with `--jobs 1` (its report's tables of fMRIPrep's
     runs, the ground truth and the D13 summary come from module-level per-case metrics that
     `--jobs` workers do not return), or the metrics carried with the results.

@@ -45,20 +45,47 @@
 //!
 //! Complex products are libstdc++'s `std::complex<double>` products (`ac - bd`, `ad + bc`). The
 //! twiddle factors `exp(i 2 pi n / N)` are glibc's `cexp` in FSL (its library calls `cexp(0 +
-//! i y)`, which takes glibc's `sincos` of the angle `y`, the same build on every x86-64 CPU);
-//! the replica computes them with correctly rounded `cos` and `sin` in both modes. glibc 2.35's
-//! `sincos` is LGPL code and not always correctly rounded (GLIBC-07): on the angles `i k` of
-//! the lengths 1 to 256, 220 of 65,792 factors differ in the last bit, in 80 lengths (the first
-//! 15, 20, 30, 39, 40), and the transforms of 60 of those lengths differ in the last bits. With
+//! i y)`, which takes glibc's `sincos` of the angle `y` where `|y| > DBL_MIN`, the same build on
+//! every x86-64 CPU). glibc 2.35's `sincos` is LGPL code and not always correctly rounded
+//! (GLIBC-07): on the angles `i k` of the lengths 1 to 256, 220 of 65,792 factors differ from
+//! the correctly rounded ones in the last bit, in 80 lengths (the first 15, 20, 30, 39, 40), and
+//! the transforms of 60 of those lengths differ in the last bits. The replica's factors come
+//! from the [`Libm`] its caller gives: correctly rounded `cos` and `sin` by default (larmorx's
+//! rule 5), glibc 2.35's `sincos` with `reproduce` ([`math::sincos_glibc`], the clean-room
+//! implementation of `specs/glibc-dbl.md`). A filter combining many factors, it names nothing
+//! (GLIBC-07's notice is for the pointwise programs: the user's decision of 2026-11-04). With
 //! Armadillo's own factors the engine gives Armadillo's transforms bit for bit (0 of 197,376
-//! values differ: `validation/probes/fsl-avwutils-lib/check_fft.py`).
+//! values differ), and so do its `reproduce` factors (0 of 65,792 factors and 0 of 197,376
+//! values differ: `validation/probes/fsl-avwutils-lib/check_fft.py --mode reproduce`).
 
 use std::collections::HashMap;
 
-use larmorx_core::math;
+use larmorx_core::math::{self, Libm};
 
 use crate::volops::Arith;
 use crate::volume::Volume;
+
+/// The twiddle factors of length `n` the engine computes (`cexp(0 + i y)` of the angles
+/// `y = i k`): `(1, y)` where `|y| <= DBL_MIN`, as glibc's `cexp` gives it, else `(cos y, sin y)`
+/// from `libm`: correctly rounded, or glibc 2.35's `sincos` for `reproduce`.
+pub fn twiddles(n: usize, inverse: bool, libm: &Libm) -> Vec<C> {
+    let k = (if inverse { 2.0 } else { -2.0 }) * math::acos(-1.0) / n as f64;
+    (0..n)
+        .map(|i| {
+            let y = i as f64 * k;
+            if y.abs() > f64::MIN_POSITIVE {
+                let (s, c) = if libm.is_glibc() {
+                    math::sincos_glibc(y)
+                } else {
+                    (math::sin(y), math::cos(y))
+                };
+                C::new(c, s)
+            } else {
+                C::new(1.0, y)
+            }
+        })
+        .collect()
+}
 
 /// A `std::complex<double>`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -105,24 +132,14 @@ pub struct KissFft {
 
 impl KissFft {
     /// The engine: the factors of `n` (4 first, then 2, 3, 5, 7, ...; the rest itself once its
-    /// square exceeds it) and the twiddle factors `exp(i k n)`, `k = (+-2) pi / N`.
-    pub fn new(n: usize, inverse: bool) -> KissFft {
+    /// square exceeds it) and the twiddle factors `exp(i k n)`, `k = (+-2) pi / N`, with
+    /// `libm`'s sine and cosine (see the module's documentation).
+    pub fn new(n: usize, inverse: bool, libm: &Libm) -> KissFft {
         #[cfg(feature = "probe-twiddles")]
         if let Some(coeffs) = probe::twiddles(n, inverse) {
             return KissFft::with_twiddles(n, inverse, coeffs);
         }
-        let k = (if inverse { 2.0 } else { -2.0 }) * math::acos(-1.0) / n as f64;
-        let coeffs = (0..n)
-            .map(|i| {
-                let y = i as f64 * k;
-                if y.abs() > f64::MIN_POSITIVE {
-                    C::new(math::cos(y), math::sin(y))
-                } else {
-                    C::new(1.0, y)
-                }
-            })
-            .collect();
-        KissFft::with_twiddles(n, inverse, coeffs)
+        KissFft::with_twiddles(n, inverse, twiddles(n, inverse, libm))
     }
 
     /// The engine with the twiddle factors given (`coeffs[i]` for `exp(i k i)`): for the probes
@@ -356,12 +373,12 @@ mod probe {
 
 /// newimage's `fft` / `ifft` of a complex `float` volume (sizes `dims`): each line along x, then
 /// y, then z (when there is more than one slice) transformed in `double` and stored back in
-/// `float`.
-pub fn fft3(re: &mut [f32], im: &mut [f32], dims: [usize; 3], inverse: bool) {
+/// `float`; the twiddle factors from `libm` ([`KissFft::new`]).
+pub fn fft3(re: &mut [f32], im: &mut [f32], dims: [usize; 3], inverse: bool, libm: &Libm) {
     let [nx, ny, nz] = dims;
     let idx = |x: usize, y: usize, z: usize| (z * ny + y) * nx + x;
     let mut pass = |n: usize, lines: Vec<Vec<usize>>| {
-        let mut e = KissFft::new(n, inverse);
+        let mut e = KissFft::new(n, inverse, libm);
         let mut xin = vec![C::default(); n];
         let mut out = vec![C::default(); n];
         for line in lines {
@@ -404,11 +421,12 @@ pub fn fft3(re: &mut [f32], im: &mut [f32], dims: [usize; 3], inverse: bool) {
 /// both inserted at the origin of `float` volumes twice the larger size along each axis,
 /// transformed (`fft3`), multiplied (complexvolume's `*=` in `float`), transformed back
 /// (`ifft3`), and the real part read from the kernel's centre offset (`extractpart`); `conv` is
-/// `(T)` of the `float`.
+/// `(T)` of the `float`; the twiddle factors from `libm` ([`KissFft::new`]).
 pub fn fft_convolve<T: Arith>(
     vin: &Volume<T>,
     kdims: [i64; 3],
     kdata: &[f32],
+    libm: &Libm,
     conv: &mut impl FnMut(f64) -> T,
 ) -> Volume<T> {
     let (vx, vy, vz) = (vin.xsize(), vin.ysize(), vin.zsize());
@@ -434,15 +452,15 @@ pub fn fft_convolve<T: Arith>(
             }
         }
     }
-    fft3(&mut ir, &mut ii, [sx, sy, sz], false);
-    fft3(&mut kr, &mut ki, [sx, sy, sz], false);
+    fft3(&mut ir, &mut ii, [sx, sy, sz], false, libm);
+    fft3(&mut kr, &mut ki, [sx, sy, sz], false, libm);
     for k in 0..n {
         let r2 = ir[k] * kr[k] - ii[k] * ki[k];
         let i2 = ir[k] * ki[k] + ii[k] * kr[k];
         ir[k] = r2;
         ii[k] = i2;
     }
-    fft3(&mut ir, &mut ii, [sx, sy, sz], true);
+    fft3(&mut ir, &mut ii, [sx, sy, sz], true, libm);
     let (ox, oy, oz) = (
         ((kdims[0] - 1) / 2) as usize,
         ((kdims[1] - 1) / 2) as usize,
@@ -489,7 +507,7 @@ mod tests {
     fn a_twiddle_table_gives_the_engine_its_factors() {
         let n = 15;
         for inverse in [false, true] {
-            let own = KissFft::new(n, inverse);
+            let own = KissFft::new(n, inverse, &Libm::default());
             let text: String = own
                 .coeffs
                 .iter()
@@ -508,7 +526,7 @@ mod tests {
             assert_eq!(given.coeffs, own.coeffs);
             let x: Vec<C> = (0..n).map(|j| C::new(j as f64 - 7.0, 0.5)).collect();
             let (mut a, mut b) = (vec![C::default(); n], vec![C::default(); n]);
-            KissFft::new(n, inverse).transform(&x, &mut a);
+            KissFft::new(n, inverse, &Libm::default()).transform(&x, &mut a);
             KissFft::with_twiddles(n, inverse, own.coeffs.clone()).transform(&x, &mut b);
             assert_eq!(a, b);
         }
@@ -522,7 +540,7 @@ mod tests {
                     .map(|j| C::new(((j * 7) % 11) as f64 - 3.0, ((j * 5) % 3) as f64))
                     .collect();
                 let mut out = vec![C::default(); n];
-                KissFft::new(n, inverse).transform(&x, &mut out);
+                KissFft::new(n, inverse, &Libm::default()).transform(&x, &mut out);
                 for (a, b) in out.iter().zip(dft(&x, inverse)) {
                     assert!(
                         (a.re - b.re).abs() < 1e-9 && (a.im - b.im).abs() < 1e-9,
@@ -531,5 +549,45 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// `reproduce`'s factors are glibc's `sincos` of the angles (GLIBC-07); they differ from the
+    /// default's correctly rounded ones exactly where FSL's (Armadillo's, measured by
+    /// `validation/probes/fsl-avwutils-lib/check_fft.py`) do: 220 of the 65,792 factors of the
+    /// lengths 1 to 256, in 80 lengths, the first 15, 20, 30, 39 and 40.
+    #[test]
+    fn reproduce_takes_glibcs_sincos_where_the_probe_found_fsls_factors_differ() {
+        let (fix, glibc) = (
+            Libm::quiet(larmorx_core::defects::UpstreamDefects::Fix),
+            Libm::quiet(larmorx_core::defects::UpstreamDefects::Reproduce),
+        );
+        let (mut differ, mut lengths) = (0usize, Vec::new());
+        for n in 1..=256usize {
+            let mut here = 0;
+            for inverse in [false, true] {
+                let (a, b) = (twiddles(n, inverse, &fix), twiddles(n, inverse, &glibc));
+                let k = (if inverse { 2.0 } else { -2.0 }) * math::acos(-1.0) / n as f64;
+                for (i, (a, b)) in a.iter().zip(&b).enumerate() {
+                    let y = i as f64 * k;
+                    if y.abs() > f64::MIN_POSITIVE {
+                        let (s, c) = math::sincos_glibc(y);
+                        assert_eq!((b.re.to_bits(), b.im.to_bits()), (c.to_bits(), s.to_bits()));
+                        assert_eq!(
+                            (a.re.to_bits(), a.im.to_bits()),
+                            (math::cos(y).to_bits(), math::sin(y).to_bits())
+                        );
+                    } else {
+                        assert_eq!((a, b), (&C::new(1.0, y), &C::new(1.0, y)));
+                    }
+                    here += usize::from(a != b);
+                }
+            }
+            if here > 0 {
+                lengths.push(n);
+            }
+            differ += here;
+        }
+        assert_eq!((differ, lengths.len()), (220, 80));
+        assert_eq!(lengths[..5], [15, 20, 30, 39, 40]);
     }
 }

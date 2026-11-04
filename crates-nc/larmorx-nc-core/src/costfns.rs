@@ -1301,19 +1301,25 @@ pub fn calc_weighted_entropy(
 // The sinc interpolation of the stage-4 cost
 
 /// The kernel table of `q_setupkernel` (Hanning-windowed sinc, half-width 3, 201 samples),
-/// built on first use as FSL's static table is.
+/// built on first use as FSL's static table is. Its window's double `cos` is FSL's (glibc 2.35's,
+/// GLIBC-07) and correctly rounded alike: on all 201 arguments glibc's `cos`
+/// ([`math::cos_glibc`]) gives the same `float` window as the correctly rounded one (the test
+/// `the_stage4_table_is_the_same_with_glibcs_cos`), so one table serves both modes.
 fn sinc_table() -> &'static [f32; 201] {
     static TABLE: OnceLock<[f32; 201]> = OnceLock::new();
-    TABLE.get_or_init(|| {
-        let w = 3;
-        let mut t = [0f32; 201];
-        for (n, v) in t.iter_mut().enumerate() {
-            // x=(n-100)/100.0*Globalkernelwidth: double, then float.
-            let x = ((n as f64 - 100.0) / 100.0 * f64::from(w)) as f32;
-            *v = q_sinc(x) * q_hanning(x, w);
-        }
-        t
-    })
+    TABLE.get_or_init(|| sinc_table_with(math::cos))
+}
+
+/// [`sinc_table`]'s values with `cos` the window's double cosine.
+fn sinc_table_with(cos: fn(f64) -> f64) -> [f32; 201] {
+    let w = 3;
+    let mut t = [0f32; 201];
+    for (n, v) in t.iter_mut().enumerate() {
+        // x=(n-100)/100.0*Globalkernelwidth: double, then float.
+        let x = ((n as f64 - 100.0) / 100.0 * f64::from(w)) as f32;
+        *v = q_sinc(x) * q_hanning(x, w, cos);
+    }
+    t
 }
 
 /// `q_sinc(x)`.
@@ -1325,12 +1331,12 @@ fn q_sinc(x: f32) -> f32 {
     crate::kernel::sinf(y) / y
 }
 
-/// `q_hanning(x, w)`.
-fn q_hanning(x: f32, w: i32) -> f32 {
+/// `q_hanning(x, w)`, with `cos` the double cosine.
+fn q_hanning(x: f32, w: i32, cos: fn(f64) -> f64) -> f32 {
     if x.abs() > w as f32 {
         0.0
     } else {
-        (0.5 + 0.5 * math::cos(std::f64::consts::PI * f64::from(x) / f64::from(w))) as f32
+        (0.5 + 0.5 * cos(std::f64::consts::PI * f64::from(x) / f64::from(w))) as f32
     }
 }
 
@@ -1668,4 +1674,22 @@ pub fn calc_entropy(
         margentropy2 = l as f32;
     }
     (jointentropy, margentropy1, margentropy2)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// GLIBC-07 cannot move the stage-4 cost: its table is the same with glibc's `cos` (FSL's)
+    /// as with the correctly rounded one, bit for bit.
+    #[test]
+    fn the_stage4_table_is_the_same_with_glibcs_cos() {
+        let (cr, glibc) = (sinc_table_with(math::cos), sinc_table_with(math::cos_glibc));
+        assert!(
+            cr.iter()
+                .zip(&glibc)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
+        assert_eq!(sinc_table().map(f32::to_bits), cr.map(f32::to_bits));
+    }
 }

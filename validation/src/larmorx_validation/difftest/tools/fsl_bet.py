@@ -9,7 +9,12 @@ to its record's thresholds (``docs/validation/fsl-bet.md``).
 
 Drawn: bet2 with its options (``-f``, ``-g``, ``-r``, ``-c``, ``-m``, ``-o``, ``-s``, ``-e``,
 ``-n``, ``-t``, ``-w``, ``-v``, ``--ct``); bet with them and its variations (``-R``, ``-F`` on a
-series, ``-Z`` on a slab, ``-d``); betsurf with and without a T2 (``--t1only``, ``-m``, ``-s``,
+series, ``-Z`` on a slab, ``-S``, ``-B``, ``-A``, ``-A2`` with a T2 on the same grid: FLIRT to FSL's
+MNI152_T1_2mm, standard_space_roi, FAST, fslmaths, fslstats, betsurf, since 2026-11-04; ``-d``);
+fslroi with each argument form (t; x, y, z; x, y, z, t), regions reaching outside the image and
+sizes of -1 and 0, int8 inputs (FSL-217); standard_space_roi with its options (``-b``, the
+``-mask*`` and ``-roi*`` choices with drawn masks, ``-ssref`` with a drawn reference (mostly: the
+quick registration), ``-altinput``, ``-d``) and FLIRT options after them; betsurf with and without a T2 (``--t1only``, ``-m``, ``-s``,
 ``-o``, ``-p``, ``-v``) on a closed surface made here (a subdivided octahedron, its vertices on a
 sphere at the image's centre, in FSL's millimetres) and a matrix near the identity; inputs of
 every stored type, shapes up to 32 voxels per axis, NIfTI and FSL's output types. Where FSL
@@ -28,6 +33,8 @@ from larmorx_validation.difftest.tools import _ants
 HEADS = ("head", "crop", "blobs", "noise", "ramp", "constant", "zeros")
 HEAD_WEIGHTS = (7, 2, 1, 0.4, 0.4, 0.15, 0.05)
 DTYPES = ("float32", "float32", "int16", "int16", "uint8", "float64", "int32")
+#: fslroi's: every type it keeps, int8 among them (FSL-217: written as uint8 by FSL)
+ROI_DTYPES = ("float32", "int16", "uint8", "int8", "int8", "float64", "int32")
 # FSL 6.0.7.23 added the zstd and bzip2 types (drawn rarely: NIFTI_ZST, NIFTI2_PAIR_BZ2)
 OUTPUT_TYPES = (
     "NIFTI_GZ",
@@ -102,8 +109,23 @@ def draw_bet2(d: gen.Draw) -> dict:
     }
 
 
+def _t2_of(d: gen.Draw, t1: dict) -> dict:
+    """A T2-like image on ``t1``'s grid (other noise; a head's tissues as a T2's)."""
+    t2 = dict(t1)
+    content = dict(t1["content"])
+    content["seed"] = d.child("t2").seed()
+    if content.get("type") == "head":
+        content["tissues"] = "t2"
+    t2["content"] = content
+    return t2
+
+
 def draw_bet(d: gen.Draw) -> dict:
-    variation = d.choice("variation", ("none", "-R", "-F", "-Z"), (4, 3, 1.5, 1.5))
+    variation = d.choice(
+        "variation",
+        ("none", "-R", "-F", "-Z", "-S", "-B", "-A", "-A2"),
+        (4, 3, 1.5, 1.5, 1.2, 1, 0.8, 0.8),
+    )
     if variation == "-F":
         spec = _image(d.child("input"), 4, volumes=(2, 5))
     elif variation == "-Z":
@@ -114,17 +136,123 @@ def draw_bet(d: gen.Draw) -> dict:
     else:
         spec = _image(d.child("input"))
     groups, options = _bet2_options(d, spec["shape"][:3], bet=True)
-    if variation != "none":
+    inputs = {"input": spec}
+    if variation == "-A2":
+        inputs["t2"] = _t2_of(d, spec)
+        groups.insert(0, required("variation", "-A2", "{in:t2}"))
+        options.append(variation)
+    elif variation != "none":
         groups.insert(0, required("variation", variation))
         options.append(variation)
-    if d.chance("-d", 0.05):
+    if d.chance("-d", 0.05 if variation in ("none", "-R", "-F", "-Z") else 0.15):
         groups.append(group("-d", "-d"))
         options.append("-d")
     return {
         "groups": [required("input", "{in:input}", "out"), *groups],
-        "inputs": {"input": spec},
+        "inputs": inputs,
         "options": options,
         "extra": {"tool": "bet"},
+    }
+
+
+def draw_fslroi(d: gen.Draw) -> dict:
+    ndim = d.choice("ndim", (3, 4), (2, 1))
+    c = d.child("input")
+    spec = gen.draw_image(
+        c,
+        ndim,
+        contents=HEADS,
+        content_weights=HEAD_WEIGHTS,
+        dtypes=ROI_DTYPES,
+        specials=0.02,
+        extreme=0.05,
+        scaling=0.1,
+        lo=2,
+        suffix=c.choice("suffix", (".nii.gz", ".nii.gz", ".nii")),
+        **({"volumes": (2, 5)} if ndim == 4 else {}),
+    )
+    shape = list(spec["shape"]) + [1] * (4 - len(spec["shape"]))
+
+    def pair(name: str, n: int) -> list[str]:
+        start = d.integer(f"{name}min", -2, n)
+        size = d.choice(f"{name}size", ("-1", "0", "1", str(max(1, n // 2)), str(n), str(n + 3)))
+        return [str(start), size]
+
+    form = d.choice("form", ("t", "xyz", "xyzt"), (1, 2, 1))
+    if form == "t":
+        numbers = pair("t", shape[3])
+    else:
+        numbers = [w for k, a in enumerate("xyz") for w in pair(a, shape[k])]
+        if form == "xyzt":
+            numbers += pair("t", shape[3])
+    return {
+        "groups": [required("files", "{in:input}", "out", *numbers)],
+        "inputs": {"input": spec},
+        "options": [f"form={form}", f"dtype={spec['dtype']}"],
+        "extra": {"tool": "fslroi"},
+    }
+
+
+def draw_ssroi(d: gen.Draw) -> dict:
+    spec = _image(d.child("input"), lo=10)
+    inputs = {"input": spec}
+    groups, options = [], []
+
+    def mask(name: str) -> str:
+        c = d.child(name)
+        inputs[name] = gen.draw_image(
+            c,
+            3,
+            contents=("head", "blobs", "constant"),
+            content_weights=(3, 2, 0.3),
+            dtypes=("uint8", "float32", "int16"),
+            lo=6,
+            suffix=".nii.gz",
+        )
+        return "{in:" + name + "}"
+
+    if d.chance("-ssref", 0.75):
+        inputs["ref"] = _image(d.child("ref"), lo=10)
+        groups.append(required("-ssref", "-ssref", "{in:ref}"))
+        options.append("-ssref")
+    for name, p, words in (
+        ("-b", 0.2, lambda: ["-b"]),
+        (
+            "mask",
+            0.5,
+            lambda: (lambda m: ["-maskMASK", mask("mask")] if m == "-maskMASK" else [m])(
+                d.choice("mask choice", ("-maskFOV", "-maskMASK", "-maskNONE"))
+            ),
+        ),
+        (
+            "roi",
+            0.5,
+            lambda: (lambda r: ["-roiMASK", mask("roimask")] if r == "-roiMASK" else [r])(
+                d.choice("roi choice", ("-roiFOV", "-roiMASK", "-roiNONE"))
+            ),
+        ),
+        ("-altinput", 0.1, lambda: ["-altinput", "{in:alt}"]),
+        ("-d", 0.3, lambda: ["-d"]),
+    ):
+        if d.chance(name, p):
+            w = words()
+            if w[0] == "-altinput":
+                inputs["alt"] = _t2_of(d, spec)
+            groups.append(group(name, *w))
+            options.append(w[0])
+    # FLIRT's options after the script's (passed on to its first FLIRT)
+    if d.chance("flirt options", 0.3):
+        w = d.choice(
+            "flirt option",
+            (("-dof", "6"), ("-dof", "7"), ("-cost", "normmi"), ("-searchrx", "-30", "30")),
+        )
+        groups.append(group("flirt", *w))
+        options.append(w[0])
+    return {
+        "groups": [required("files", "{in:input}", "out"), *groups],
+        "inputs": inputs,
+        "options": options,
+        "extra": {"tool": "standard_space_roi"},
     }
 
 
@@ -244,8 +372,16 @@ def draw_betsurf(d: gen.Draw) -> dict:
 
 
 def draw(d: gen.Draw) -> dict:
-    tool = d.choice("tool", ("bet2", "bet", "betsurf"), (5, 3, 2))
-    body = {"bet2": draw_bet2, "bet": draw_bet, "betsurf": draw_betsurf}[tool](d)
+    tool = d.choice(
+        "tool", ("bet2", "bet", "betsurf", "fslroi", "standard_space_roi"), (5, 4, 2, 1, 1.5)
+    )
+    body = {
+        "bet2": draw_bet2,
+        "bet": draw_bet,
+        "betsurf": draw_betsurf,
+        "fslroi": draw_fslroi,
+        "standard_space_roi": draw_ssroi,
+    }[tool](d)
     body["extra"]["output_type"] = d.choice("FSLOUTPUTTYPE", OUTPUT_TYPES, OUTPUT_WEIGHTS)
     body["options"] = [tool, *body["options"], f"FSLOUTPUTTYPE={body['extra']['output_type']}"]
     return body
@@ -279,6 +415,22 @@ def case(
     # FSL-43's notice is about where a fill starts, whose effect the outputs may not show (a
     # constant image; as the record's single-slice case): named without a change is no finding
     kw.setdefault("silent_ok", ("FSL-43",))
+    tool = recipe["extra"]["tool"]
+    options = set(recipe["options"])
+    # The corrections inside bet's -S, -B, -A, -A2 and standard_space_roi change intermediate
+    # values only, which the outputs may not show (as in the record's cases; the trial of
+    # 2026-11-04): FLIRT's integer output (FSL-09: standard_space_roi's transformed masks, -A2's
+    # T2 in the T1's space), its NaN voxels (FSL-14) and its background value (FSL-75: a
+    # pyramid level of 3 voxels), fslstats -S (FSL-182) and its sort (FSL-22), FAST's variance
+    # (FSL-202), standard_space_roi's stop at a failed program (FSL-214) where bet fails later
+    # in both modes
+    if tool == "bet" and {"-S", "-B"} & options:
+        extra = ("FSL-09", "FSL-14", "FSL-22", "FSL-75", "FSL-182", "FSL-202", "FSL-214")
+    elif tool == "standard_space_roi" or (tool == "bet" and {"-A", "-A2"} & options):
+        extra = ("FSL-09", "FSL-14", "FSL-75")
+    else:
+        extra = ()
+    kw["silent_ok"] = (*kw["silent_ok"], *extra)
     s = fb.Scenario(
         recipe["extra"]["tool"],
         tuple(words),

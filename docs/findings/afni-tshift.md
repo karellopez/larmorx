@@ -274,7 +274,19 @@ the output if it is done any other way; the replica does each as AFNI does.
   glibc's in the last double bit for 0.3 % of the table arguments and never once rounded to
   float. *Verified* on all 539,282 table arguments. 3dTshift's phase factors take one argument
   per slice; a difference there would need the double results to straddle a float rounding
-  boundary (about one chance in 10^8 per slice).
+  boundary (about one chance in 10^8 per slice). GCC merges each `cos(a)`/`sin(a)` pair into one
+  `sincos` call: AFNI 26.3.05's `3dTshift`, `3dAutomask` and `3dUnifize` call `sincos@plt`, never
+  `sin` or `cos`, in `fft64`, `fft128`, `fft256`, `fft512`, `fft_4dec`, `fft_3dec`, `fft_5dec`,
+  `csfft_trigconsts` and `fft_shift2` (`objdump -d` of the oracle's binaries, 2026-11-04).
+  **Since 2026-11-04** (BET's `-S`/`-B`/`-A`/`-A2` part, relay 1; GLIBC-07, the user's decision
+  of 2026-11-04: glibc's bits for `reproduce` only) the replica's `reproduce` takes glibc 2.35's
+  `sincos` there (`larmorx_core::math::sincos_glibc`, the clean-room implementation of
+  `specs/glibc-dbl.md`; `CsfftPlan::with_mode`, `ShiftWork::with_mode`), the default the
+  correctly rounded `sin` and `cos`. Both give the same floats everywhere: the tables of every
+  length `csfft_cox` computes are identical in both modes (test `both_modes_give_the_same_tables`),
+  and `CEXPIT` gives the same pair of floats in both modes on every one of the 2^32 - 2^24 finite
+  floats (0 differ: the probe `shift::tests::cexpit_on_every_float`, 11 s on 14 threads), so
+  3dTshift's Fourier method gives the same output in both modes for any input, and names nothing.
 - **The phase factors are a float recurrence** (`fac = CMULT(csf, fac)`, `RECUR`), and `dk =
   (2.0*PI)/nup` is computed in double, stored as float, then multiplied in float by the
   shift. The final scale `0.5/nup` is also a double rounded to float (`:128-164`). *Read.*

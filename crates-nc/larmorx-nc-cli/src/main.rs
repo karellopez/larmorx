@@ -57,6 +57,8 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("applytopup", larmorx_nc_topup::applytopup),
     ("fslmaths", larmorx_nc_avwutils::fslmaths),
     ("fslstats", larmorx_nc_avwutils::fslstats),
+    ("fslroi", larmorx_nc_avwutils::fslroi),
+    ("standard_space_roi", larmorx_nc_flirt::standard_space_roi),
 ];
 
 fn tool_names() -> String {
@@ -252,7 +254,7 @@ mod tests {
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats, fslroi, standard_space_roi"),
             "{out}"
         );
         let (code, out, err) = run_capture(&["larmorx-nc"]);

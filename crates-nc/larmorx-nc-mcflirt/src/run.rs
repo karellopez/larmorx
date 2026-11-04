@@ -1054,8 +1054,11 @@ impl Run<'_> {
         timeseries.interp = requested;
         if self.o.sinc_final && timeseries.kernel.is_none() {
             let mut msgs = Vec::new();
+            // the window's cos: correctly rounded by default, glibc's with reproduce (GLIBC-07;
+            // an interpolation: named nothing)
+            let libm = larmorx_core::math::Libm::quiet(self.mode);
             timeseries.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
-                "blackman", 7, 1201, &mut msgs,
+                "blackman", 7, 1201, &libm, &mut msgs,
             )));
         }
         // With a reference file the output grid is the reference's; mcflirt reads it in the

@@ -268,10 +268,12 @@ def fix_pass(
     reproduced: Completed,
     *,
     silent_ok: tuple[str, ...] = _SILENT,
+    unnamed_ok: tuple[str, ...] = (),
 ) -> None:
     """D13: the replica's default ``fix`` run against its ``reproduce`` run (a defect named
     exactly when something changed; ``silent_ok``: the entries that may be named without a
-    visible change)."""
+    visible change; ``unnamed_ok``: those that may change the outputs without being named,
+    :data:`defects.UNNAMED_GLIBC` for a filter on glibc's functions)."""
     with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-fix-") as name:
         tmp = Path(name)
         prepare(tmp)
@@ -306,7 +308,12 @@ def fix_pass(
                 except ValueError:
                     others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=silent_ok
+            checks,
+            entries,
+            change,
+            other_changes="; ".join(others),
+            silent_ok=silent_ok,
+            unnamed_ok=unnamed_ok,
         )
 
 

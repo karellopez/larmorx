@@ -6,11 +6,15 @@ Runs, for every transform length given:
 
 1. ``fft_twiddles`` (``fft_twiddles.cc``): Armadillo's engine's factors, and glibc's ``cexp``,
    ``sincos``, ``cos`` and ``sin`` on the same angles; against the replica's factors (the ignored
-   test ``twiddles`` of ``crates-nc/larmorx-nc-core/tests/fft_probe.rs``: correctly rounded
-   ``cos`` and ``sin``);
+   test ``twiddles`` of ``crates-nc/larmorx-nc-core/tests/fft_probe.rs``: with ``--mode fix``,
+   larmorx's default, correctly rounded ``cos`` and ``sin``; with ``--mode reproduce``, glibc's
+   ``sincos`` from ``larmorx_core::math::sincos_glibc``, GLIBC-07);
 2. ``fft_probe`` (``fft_probe.cc``): Armadillo's ``fft`` and ``ifft`` of seeded vectors; against
-   the replica's engine (``kiss_fft_lines``) and against the replica's engine handed Armadillo's
-   own factors (``kiss_fft_lines_with_twiddles``).
+   the replica's engine in that mode (``kiss_fft_lines``) and against the replica's engine
+   handed Armadillo's own factors (``kiss_fft_lines_with_twiddles``).
+
+With ``--mode reproduce`` it exits 0 only when the replica's factors and transforms are
+Armadillo's on every length (the replica's ``reproduce`` is FSL's, bit for bit).
 
 Prints counts only (and the first differing factors). Run inside a memory box
 (``scripts/orchestration/boxed.sh``) from the repository's root, with ``cargo`` on the path. See
@@ -73,10 +77,18 @@ def main() -> int:
     ap.add_argument("--fft-probe", type=Path, required=True)
     ap.add_argument("--work", type=Path, required=True)
     ap.add_argument("--sizes", default="2-130", help="lengths, e.g. '2-130' or '15 30 60'")
+    ap.add_argument(
+        "--mode",
+        choices=("fix", "reproduce"),
+        default="fix",
+        help="the replica's mode: fix (correctly rounded factors) or reproduce (glibc's sincos)",
+    )
     a = ap.parse_args()
     sizes = _parse_size_list(a.sizes)
     words = " ".join(str(n) for n in sizes)
     a.work.mkdir(parents=True, exist_ok=True)
+    mode_env = {"LARMORX_FFT_MODE": a.mode}
+    factors = "glibc's sincos" if a.mode == "reproduce" else "correctly rounded"
 
     # 1. the twiddle factors
     tw_path = a.work / "arma_twiddles.txt"
@@ -89,7 +101,7 @@ def main() -> int:
         w = line.split()
         arma[(int(w[1]), int(w[2]), int(w[3]))] = w[4:]
     rep: dict[tuple[int, int, int], list[str]] = {}
-    for line in _cargo_test("twiddles", words, {}):
+    for line in _cargo_test("twiddles", words, mode_env):
         w = line.split()
         if not w or w[0] != "tw":
             continue
@@ -124,7 +136,7 @@ def main() -> int:
         f"vs separate cos and sin: {counts['cos,sin']}"
     )
     print(
-        f"  Armadillo vs replica (correctly rounded): {counts['replica']} differ, in "
+        f"  Armadillo vs replica ({a.mode}: {factors}): {counts['replica']} differ, in "
         f"{len(sizes_differ)} of {len(sizes)} lengths"
     )
     print(f"  lengths with a differing factor: {' '.join(map(str, sorted(sizes_differ)))}")
@@ -139,7 +151,7 @@ def main() -> int:
     def keep(lines: list[str]) -> list[str]:
         return [x for x in lines if len(x.split()) == 6 and x.split()[2] in ("fwd", "inv")]
 
-    own = keep(_cargo_test("kiss_fft_lines", words, {}))
+    own = keep(_cargo_test("kiss_fft_lines", words, mode_env))
     given = keep(
         _cargo_test("kiss_fft_lines_with_twiddles", words, {"LARMORX_FFT_TWIDDLES": str(tw_path)})
     )
@@ -153,7 +165,7 @@ def main() -> int:
     d_given, n_given = compare(given)
     print(f"transforms: {len(arma_lines)} output values")
     print(
-        f"  replica's engine: {d_own} differ, in {len(n_own)} lengths: "
+        f"  replica's engine ({a.mode}): {d_own} differ, in {len(n_own)} lengths: "
         f"{' '.join(map(str, n_own)) or '-'}"
     )
     print(
@@ -165,6 +177,8 @@ def main() -> int:
         f"  lengths whose transforms differ without a differing factor: "
         f"{' '.join(str(n) for n in n_own if n not in with_factor) or '-'}"
     )
+    if a.mode == "reproduce":
+        return 0 if d_given == 0 and counts["replica"] == 0 and d_own == 0 else 1
     return 0 if d_given == 0 else 1
 
 

@@ -32,8 +32,12 @@ pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
 pub mod scripts;
+pub mod shtest;
+pub mod ssroi;
 
 use std::io::Write;
+
+pub use ssroi::standard_space_roi;
 
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_nc_core::settings::Settings;

@@ -222,6 +222,10 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
 #: repeatedly, fslstats) and ``-F`` (a 4D series: fslroi, bet2, fslmaths ``-mas``), betsurf on
 #: bet2's surface. ``{in}``: a head of 160 x 192 x 160 voxels; ``{in4d}``: 30 volumes of a smaller
 #: one, stored as int16; ``{mesh}``: FSL's bet2 surface of ``{in}``; ``{mat}``: an identity.
+#: bet's ``-S``, ``-B`` and ``-A2`` and standard_space_roi ``-b`` (2026-11-04: FLIRT to FSL's
+#: MNI152_T1_2mm, standard_space_roi, FAST, fslmaths, fslstats, betsurf, every program in the
+#: replica's process, one after the other) on the suite's 96 x 112 x 84 head ``{head}`` and its
+#: T2-like contrast ``{head2}`` (FSL's standard images from ``$FSLDIR/data``, as FSL reads them).
 #: Every output (images decompressed) is FSL's byte for byte in ``reproduce``.
 BET_CASES = [
     ("bet2", "{in} out -m"),
@@ -229,6 +233,14 @@ BET_CASES = [
     ("bet", "{in} out -R -m"),
     ("bet", "{in4d} out -F"),
     ("betsurf", "--t1only -m -s {in} {mesh} {mat} out"),
+]
+#: The replica's alone until the clean-room catch-up part writes their original
+#: (``specs/bet.md`` §5.3, ``specs/standard_space_roi.md``).
+REPLICA_ONLY_BET_CASES = [
+    ("bet", "{head} out -S -m"),
+    ("bet", "{head} out -B"),
+    ("bet", "{head} out -A2 {head2}"),
+    ("standard_space_roi", "{head} out -b"),
 ]
 
 
@@ -238,6 +250,10 @@ def _bet_inputs(tmp: Path, fb) -> dict[str, Path]:
     small, _ = fb._head(fb.T1_LEVELS, 2)
     series = np.stack([small * (1.0 + 0.01 * t) for t in range(30)], axis=-1)
     paths["in4d"] = fb._save(np.round(series).astype(np.int16), tmp / "series.nii.gz")
+    t1, _ = fb._head(fb.T1_LEVELS, 1)
+    t2, _ = fb._head(fb.T2_LEVELS, 2)
+    paths["head"] = fb._save(t1, tmp / "head1.nii.gz")
+    paths["head2"] = fb._save(t2, tmp / "head2.nii.gz")
     prep = tmp / "prep"
     prep.mkdir()
     p = oracle_cache.run(
@@ -264,7 +280,7 @@ def _contents(d: Path) -> dict[str, bytes]:
     return out
 
 
-@pytest.mark.parametrize(("tool", "args"), BET_CASES)
+@pytest.mark.parametrize(("tool", "args"), BET_CASES + REPLICA_ONLY_BET_CASES)
 def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
     fb = pytest.importorskip("larmorx_validation.parity.fsl_bet")
     if fb.fsl_dir() is None:

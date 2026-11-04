@@ -83,6 +83,8 @@ FILES = [
     ("fsl-flirt", "flirtsch/pairreg1.sch"),
     ("fsl-flirt", "flirtsch/pairreg2.sch"),
     ("fsl-flirt", "flirtsch/pairreg3.sch"),
+    # standard_space_roi (BET's -S/-B/-A/-A2 part, 2026-11-04; fslroi.cc is fsl-avwutils')
+    ("fsl-flirt", "standard_space_roi"),
     ("fsl-newimage", "fmribmain.h"),
     ("fsl-armawrap", "armawrap/function_svd.hpp"),
     ("fsl-armawrap", "armawrap/function_eigenvalues.hpp"),

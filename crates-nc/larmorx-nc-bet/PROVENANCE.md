@@ -37,7 +37,7 @@ what it translates and where it departs from the original (the D13 corrections, 
 |---|---|---|
 | `bet2` | fsl-bet2 `bet2.cpp` (2111.9: `--binaryMask`, the empty median) | `main`, `bet_parameters`, `adjust_initial_mesh`, `step_of_computation`, `draw_segment`, `draw_mesh`, `draw_mesh_bis`, `make_mask_from_mesh`, `find_skull`, the head-CT conversion (`--ct`), the options, messages and exit statuses |
 | `betsurf` | fsl-bet2 `betsurf.cpp`, `betsurf.h` | `main`, `t1only_main`, `standard_step_of_computation`, `special_case`, `co_ext`, `special_extract`, `t1only_co_ext`, `t1only_special_extract`, `write_ext_skull`, `t1only_write_ext_skull`, `draw_segment`, `draw_mesh`, `make_mask_from_mesh`, `trMatrix` |
-| `bet` | fsl-bet2 `bet` (bash) | the script: its arguments, `Usage`, the option loop, variations 0 (bet2), 1 (`-R`), 3 (`-Z`), 4 (`-F`); `-S`, `-B`, `-A`, `-A2` refused as pending; the `ERR` trap, the cleanup; `dc`'s arithmetic as the script uses it; bash's builtin `echo` (its options and `-e` escapes, from bash's manual and observed runs: FSL-63) for `-R`'s option text |
+| `bet` | fsl-bet2 `bet` (bash) | the script: its arguments, `Usage`, the option loop, every variation: 0 (bet2), 1 (`-R`), 2 (`-S`), 3 (`-Z`), 4 (`-F`), 5 (`-A`), 6 (`-A2`), 7 (`-B`, running the script again for its robust run), with the programs they run called in this process (`larmorx-nc-flirt`'s `flirt` and `standard_space_roi`, `larmorx-nc-fast`'s `fast`, `larmorx-nc-avwutils`' `fslmaths` and `fslstats`, `betsurf`, the core's fslpy `immv`); the `ERR` trap and bash's report of a program that aborts; the cleanup; GNU dc 1.4.1's arithmetic and the commands what `fslstats` prints can hold (`n`, `f`, `a`, `i`, the message of any other character; from GNU dc's manual and observed runs: FSL-216); bash's builtin `echo` (its options and `-e` escapes, from bash's manual and observed runs: FSL-63) for `-R`'s and `-B -s`'s option text |
 | `cli` | — | the entry points `larmorx-nc fsl bet`, `bet2`, `betsurf` (`larmorx-nc-cli`) |
 
 Until BET's merge (2026-10-25) this crate carried its own translations of the libraries; they
@@ -51,7 +51,7 @@ FSL's deterministic defects are corrected by default and reproduced with
 `.img` opened under another name, FSL 6.0.7.23), FSL-40 (bet2's `.hdr`
 stripping), FSL-42 (meaningless numeric options), FSL-43 (a mask's fill starting outside the
 image), FSL-44 (bet's unquoted expansions), FSL-45 (`-Z`'s crop needs `imglob` on the PATH),
-FSL-46 (bet's cleanup glob), FSL-47 (`--t1only`'s scalp mask filled from the wrong surface),
+FSL-46 (bet's cleanup glob), FSL-216 (`-S`'s eye threshold through `dc`), FSL-47 (`--t1only`'s scalp mask filled from the wrong surface),
 FSL-48 (a T2 on another grid), FSL-50 (one bad profile ends betsurf silently), FSL-51 (profile
 searches reading past the samples), FSL-53 (short matrix files), FSL-54 (`--t1only`'s exit
 status), FSL-55 (NaN in the 98th percentile), FSL-56 (NewNifti's `vox_offset` of several

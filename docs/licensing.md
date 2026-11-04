@@ -95,6 +95,33 @@ command-line binary. Code from different families is never linked into one binar
   (BSD-3-Clause) and the reference LAPACK 3.12.0 it bundles (modified BSD), Armadillo 14.2.1's
   rules are in `arma.rs` (Apache-2.0); their notices are in `crates-nc/NOTICE`. Permissive
   sources, included in the FSL-licensed package as the other permissive ones are.
+- **standard_space_roi and fslroi; fslpy's `imcp` and `immv`; the shell tools the scripts run**
+  (2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` replica part): `larmorx-nc fsl standard_space_roi`
+  (fsl-flirt 2111.4's bash script, added to `crates-nc/fsl-source/` with `MANIFEST.tsv`) and
+  `larmorx-nc fsl fslroi` (fsl-avwutils 2209.6's `fslroi.cc`) are translations under the FSL
+  Licence; fslpy 3.27.0's `imcp` and `immv` rules (Apache-2.0, notice in `crates-nc/NOTICE`) are
+  translated in `larmorx-nc-core/src/fslpy.rs`. GNU dc 1.4.1 (`bet -S`'s eye threshold, `-R`'s
+  distance, standard_space_roi's sizes) and bash's `[`, `echo` and word splitting are emulated as
+  their manuals document them and as they behave in observed runs (the crates' `PROVENANCE.md`):
+  no GNU code (GPL-3.0) is copied or translated.
+- **FSL's standard images** (the user's decision of 2026-11-04; decision log, "The data the
+  programs read"): `larmorx-nc`'s wheel carries the three images FSL's `bet` script (`-S`, `-B`,
+  `-A`, `-A2`) and `standard_space_roi` read, `MNI152_T1_2mm`, `MNI152_T1_2mm_brain_mask_dil` and
+  `MNI152_T1_2mm_eye_mask` (`.nii.gz`, 1,420,897 bytes), byte for byte from FSL 6.0.7.23's
+  `fsl-data_standard` 2208.0, committed in `crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`
+  (maturin's wheel data: installed at `<prefix>/share/larmorx-nc/fsl-data`, where the replica finds
+  them without an FSL installation) with FSL's Licence (`LICENSE`), the package's origin and MNI's
+  notice (`NOTICE`, also in `crates-nc/NOTICE` and among the wheel's licence files) and
+  `MANIFEST.tsv` (file, bytes, SHA-256, package, version, the programs that read it), checked by
+  `crates-nc/larmorx-nc-cli/tests/fsl_data.rs`. FSL's data package names no licence of its own, so
+  FSL's Licence applies, which only `larmorx-nc` meets: the main package carries none of them.
+  `MNI152_T1_2mm` (FSL's MNI152, the MNI ICBM 152 non-linear 6th generation average made for FSL by
+  Andrew Janke) also carries the McConnell Brain Imaging Centre's permissive notice (copies keep
+  it). They are the one exception to the repository's rule of no image data in git (CLAUDE.md).
+  The clean-room original reads the same files as input data at run time: `larmorx-nc`'s copy when
+  installed, else `$FSLDIR/data`, else a checksum-verified download from FSL's package site, cached
+  (`specs/bet.md`, `specs/standard_space_roi.md`); FSL's terms then bind the files' use, in either
+  implementation.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root): the originals and the AFNI replicas

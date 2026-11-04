@@ -549,12 +549,15 @@ fn typed_main<T: Elem>(
         Interp::Sinc => Interpolation::Sinc,
         Interp::Spline => Interpolation::Spline,
     };
+    // the sinc windows' cos: correctly rounded by default, glibc's with reproduce (GLIBC-07; an
+    // interpolation: named nothing)
+    let libm = larmorx_core::math::Libm::quiet(r.mode);
     let set_interp = |v: &mut Volume, msgs: &mut Vec<String>, window: &str, w: i32| {
         v.extrap = Extrapolation::Extraslice;
         v.interp = method;
         if o.interp == Interp::Sinc {
             v.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
-                window, w, 1201, msgs,
+                window, w, 1201, &libm, msgs,
             )));
         }
     };

@@ -3,16 +3,28 @@
 //! `validation/probes/fsl-avwutils-lib/fft_probe.cc`: the same lines, for `check_fft.py`
 //! (which runs these ignored tests; see that directory's README):
 //!
-//! - `kiss_fft_lines`: the engine as fslmaths runs it (correctly rounded twiddle factors);
+//! - `kiss_fft_lines`: the engine as fslmaths runs it (by default correctly rounded twiddle
+//!   factors; `LARMORX_FFT_MODE=reproduce`: glibc's `sincos`, GLIBC-07);
 //! - `kiss_fft_lines_with_twiddles`: the same engine handed Armadillo's own factors (the lines
 //!   `fft_twiddles.cc` prints, in the file `LARMORX_FFT_TWIDDLES`), so that the transform's
 //!   arithmetic is compared apart from the factors;
-//! - `twiddles`: the factors the replica computes.
+//! - `twiddles`: the factors the replica computes (in the mode `LARMORX_FFT_MODE` names).
 //!
 //! `LARMORX_FFT_SIZES="60 38" cargo test --release -p larmorx-nc-core --test fft_probe --
 //! --ignored --nocapture kiss_fft_lines > rust.txt`.
 
-use larmorx_nc_core::kissfft::{C, KissFft, parse_twiddle_table};
+use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::math::Libm;
+use larmorx_nc_core::kissfft::{self, C, KissFft, parse_twiddle_table};
+
+/// The mode `LARMORX_FFT_MODE` names: `fix` (the default) or `reproduce`.
+fn libm() -> Libm {
+    match std::env::var("LARMORX_FFT_MODE").as_deref() {
+        Ok("reproduce") => Libm::quiet(UpstreamDefects::Reproduce),
+        Ok("fix") | Err(_) => Libm::quiet(UpstreamDefects::Fix),
+        Ok(other) => panic!("LARMORX_FFT_MODE={other}: fix or reproduce"),
+    }
+}
 
 struct Lcg(u32);
 
@@ -61,7 +73,8 @@ fn lines(make: impl Fn(usize, bool) -> KissFft) {
 #[test]
 #[ignore = "a probe against Armadillo: run by hand"]
 fn kiss_fft_lines() {
-    lines(KissFft::new);
+    let libm = libm();
+    lines(|n, inverse| KissFft::new(n, inverse, &libm));
 }
 
 #[test]
@@ -78,21 +91,25 @@ fn kiss_fft_lines_with_twiddles() {
     });
 }
 
-/// The twiddle factors' `cos` and `sin` as the replica computes them (correctly rounded,
-/// `larmorx_core::math`), for `check_fft.py`'s comparison with Armadillo's.
+/// The twiddle factors' `cos` and `sin` as the replica computes them (`larmorx_core::math`'s
+/// correctly rounded ones, or glibc's `sincos` with `LARMORX_FFT_MODE=reproduce`), for
+/// `check_fft.py`'s comparison with Armadillo's. At a zero angle the replica's factor is `(1,
+/// angle)`, as glibc's `cexp` gives it.
 #[test]
 #[ignore = "a probe: run by hand"]
 fn twiddles() {
+    let libm = libm();
     for n in sizes() {
-        for sign in [-2.0f64, 2.0] {
+        for (sign, inverse) in [(-2.0f64, false), (2.0, true)] {
             let k = sign * larmorx_core::math::acos(-1.0) / n as f64;
-            for i in 0..n {
+            let factors = kissfft::twiddles(n, inverse, &libm);
+            for (i, c) in factors.iter().enumerate() {
                 let y = i as f64 * k;
                 println!(
                     "tw {n} {sign} {i} {:016x} {:016x} {:016x}",
                     y.to_bits(),
-                    larmorx_core::math::cos(y).to_bits(),
-                    larmorx_core::math::sin(y).to_bits()
+                    c.re.to_bits(),
+                    c.im.to_bits()
                 );
             }
         }

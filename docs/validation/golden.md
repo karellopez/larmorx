@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 228 cases, 1,623 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 42 cases, 94 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 121 cases, 679 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 228 cases, 1,623 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 43 cases, 96 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 134 cases, 746 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -23,6 +23,29 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 | CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-<platform>` (its `afni-replica/` folder) | `golden-mismatches-gpl-<platform>` |
 
 No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+`larmorx-nc`'s and the AFNI replicas' checksums were re-recorded on 2026-11-04 from 9a6a77a
+(BET's `-S`/`-B`/`-A`/`-A2` part, relay 1: the replicas' `reproduce` on glibc's double `sin`,
+`cos` and `sincos`, GLIBC-07; the fslmaths replica's record re-made and the FLIRT, mcflirt and
+3dTshift replicas' re-run unchanged at that code). `larmorx-nc`: 4 cases added,
+`avscale.allparams.reproduce`, `flirt.applyxfm-sinc.reproduce` (both the default's output, as the
+float rotation and the float sinc windows hide glibc's last bit),
+`fslmaths.filters-fft-twiddles` and its `.reproduce` (a 30 x 1 x 3 checkerboard `{chk}`, a
+60-point transform: the two differ in one voxel, the FFT's twiddle factors correctly rounded or
+glibc's `sincos`); `fslmaths.unary-double.reproduce`'s data moved (glibc's `sin` and `cos`); every
+other checksum unchanged. AFNI replicas: `3dTshift.fourier.int16.reproduce` added (the default's
+output: the Fourier method's floats are the same in both modes for every input); every other
+checksum unchanged.
+
+`larmorx-nc`'s checksums were recorded again on 2026-11-04 from 87e1bb8, whose parity smoke tier
+passed (BET's `-S`/`-B`/`-A`/`-A2` part, relay 5): 9 cases added, `bet.eyes`, `bet.bias`,
+`bet.surfaces-t2`, `fslroi.box`, `fslroi.spatial`, `fslroi.int8` and its `.reproduce` (FSL-217),
+`standard_space_roi.fov` and `.masks`; the headers the FLIRT replica writes moved in 8 FLIRT cases
+and `fast.priors` (its `descrip` now newimage's build string, as FLIRT writes it; the data
+unchanged); every other checksum unchanged. Left out for CI's time: `bet -A` (its betsurf is
+`betsurf.t1only`'s, its other steps `-A2`'s) and `bet -S` in `reproduce` (GNU dc's reading differs
+from the default only for FSL-216's numbers, which the unit tests cover); the test grows by about
+14 s per platform. `larmorx`'s checksums were re-recorded from the same commit, every one
+unchanged.
 
 `larmorx-nc`'s checksums were re-recorded on 2026-10-25 from ef73e6f (the NaN fix for ARM): one
 checksum changed, `mcflirt.nonfinite.reproduce`'s `.par` (`b08d9de2…` → `0f3a48c6…`), which is FSL
@@ -97,7 +120,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `larmorx afni 3dAutomask`, `3dUnifize` (the replicas) | 16 | 3dAutomask: fMRIPrep's call on an int16 head phantom with `-apply_prefix` and `-depth`; `-eclip -nograd -NN1 -erode`; a 4D series with `-SI`; a 2D slice; `-peels 0` (AFNI-43) in both modes. 3dUnifize: the default on int16 with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-GM -nosquash`; `-T2 -T2`; `-EPI` on a series, and on one with a negative scale factor in both modes (AFNI-01); `-T2up 100` in both modes (AFNI-45); a 2D slice |
 | `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 | `larmorx-nc fsl mcflirt` | 24 | int16 (the default outputs, int16 written), float32 with a reference file, `-stages 4` and `-sinc_final`, `-meanvol` with `-spline_final` and `-dof 12`, every cost (`mutualinfo` with `-nn_final` and `-bins 64`, `normmi`, `corratio`, `woods`, `leastsquares` with `-smooth 0`), `-init` with `-fudge` and `-rotation 2`, the in-plane mode on a 3-slice slab (and `-2d`), `-stats`, `-gdt`, uint8 and int8 input, NaN and infinite voxels, big-endian float32 in the neurological order written as NIfTI-2, a TR in milliseconds; mcflirt's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced (FSL-03, -04, -08, -09, -10, -14); every file written fingerprinted (images by header and data, `.mat`, `.par`, `.rms`); each case checks the defects named on standard error; FSL-59 reproduced (`-nn_final` resampled trilinearly, as FSL 6.0.7.23) with zstd outputs (`FSLOUTPUTTYPE=NIFTI_ZST`) |
-| `larmorx-nc fsl bet`, `bet2`, `betsurf` | 12 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it); `--binaryMask` (FSL 6.0.7.23) with bzip2 outputs (`NIFTI_BZ2`), and `bet` with zstd outputs (`NIFTI_ZST`) |
+| `larmorx-nc fsl bet`, `bet2`, `betsurf`, `standard_space_roi`, `fslroi` | 21 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it); `--binaryMask` (FSL 6.0.7.23) with bzip2 outputs (`NIFTI_BZ2`), and `bet` with zstd outputs (`NIFTI_ZST`); since 2026-11-04 `bet -S -m`, `-B -s` and `-A2` on generated standard images (`LARMORX_FSL_DATA`: a template head of other noise on the same grid, int16, its dilated brain mask and an eye block, uint8; neither FSL's data nor larmorx-nc's own copy), standard_space_roi with `-ssref` (the FOV mask and cut; `-maskMASK`, `-roiMASK`, `-d`), fslroi's box and spatial forms and an int8 image corrected and reproduced (FSL-217) |
 
 What the coverage test enumerates:
 

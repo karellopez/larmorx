@@ -70,11 +70,16 @@
 //!   `exp(-i·…)` one.
 //!
 //! The double `cos`/`sin` come from glibc in AFNI (gcc merges each pair into one `sincos`
-//! call) and from [`larmorx_core::math`] here (correctly rounded, the same bits on every
-//! platform). Only their values rounded to `f32` matter: two double results within 1 ulp of
-//! each other round to different `f32` values only when they straddle an `f32` rounding
-//! boundary. Over the 539,282 arguments of all tables of all supported lengths, the correctly
-//! rounded values and glibc 2.35's agree after rounding to `f32` (`tools/csfft-verify`).
+//! call: AFNI 26.3.05's binaries call `sincos` in every table routine and in `fft_shift2`) and
+//! from [`larmorx_core::math`] here, the same bits on every platform: correctly rounded by
+//! default, glibc 2.35's `sincos` with `reproduce` ([`larmorx_core::math::sincos_glibc`], the
+//! clean-room implementation of `specs/glibc-dbl.md`; GLIBC-07), chosen per plan
+//! ([`CsfftPlan::with_mode`]). Only their values rounded to `f32` matter: two double results
+//! within 1 ulp of each other round to different `f32` values only when they straddle an `f32`
+//! rounding boundary. Over the 539,282 arguments of all tables of all supported lengths, the
+//! correctly rounded values and glibc 2.35's agree after rounding to `f32`
+//! (`tools/csfft-verify`), so both modes give the same tables (the test
+//! `both_modes_give_the_same_tables`).
 //!
 //! # Licence
 //!
@@ -91,6 +96,8 @@
 
 use std::f64::consts::PI;
 use std::fmt;
+
+use larmorx_core::defects::UpstreamDefects;
 
 /// AFNI's `complex` (`mrilib.h`: `typedef struct complex { float r, i; } complex;`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -128,14 +135,15 @@ impl fmt::Display for UnsupportedLength {
 
 impl std::error::Error for UnsupportedLength {}
 
-/// `cos` of a double argument, correctly rounded (glibc's in AFNI; see the module docs).
-fn cos(x: f64) -> f64 {
-    larmorx_core::math::cos(x)
-}
-
-/// `sin` of a double argument, correctly rounded (glibc's in AFNI; see the module docs).
-fn sin(x: f64) -> f64 {
-    larmorx_core::math::sin(x)
+/// `(sin x, cos x)` of a double argument, as AFNI's `sin(x)` and `cos(x)`, which GCC merges into
+/// one `sincos` call: correctly rounded by default (`glibc` false), glibc 2.35's `sincos` with
+/// `reproduce` (see the module docs).
+pub(crate) fn sincos(x: f64, glibc: bool) -> (f64, f64) {
+    if glibc {
+        larmorx_core::math::sincos_glibc(x)
+    } else {
+        (larmorx_core::math::sin(x), larmorx_core::math::cos(x))
+    }
 }
 
 /// In-place complex FFT of `x`, bit-identical to AFNI's `csfft_cox(mode, x.len(), x)`.
@@ -173,14 +181,32 @@ pub struct CsfftPlan {
 }
 
 impl CsfftPlan {
-    /// Prepares the transform of length `n`.
+    /// Prepares the transform of length `n`, its tables from correctly rounded `sin` and `cos`
+    /// (larmorx's default; [`CsfftPlan::with_mode`]).
     ///
     /// # Errors
     ///
     /// [`UnsupportedLength`] if AFNI would compute this length with `fftn`.
     pub fn new(n: usize) -> Result<Self, UnsupportedLength> {
+        Self::with_mode(n, UpstreamDefects::Fix)
+    }
+
+    /// Prepares the transform of length `n`, its tables from correctly rounded `sin` and `cos`
+    /// ([`UpstreamDefects::Fix`]) or from glibc 2.35's `sincos`, AFNI's
+    /// ([`UpstreamDefects::Reproduce`], GLIBC-07); both give the same tables for every length
+    /// (see the module docs).
+    ///
+    /// # Errors
+    ///
+    /// [`UnsupportedLength`] if AFNI would compute this length with `fftn`.
+    pub fn with_mode(n: usize, mode: UpstreamDefects) -> Result<Self, UnsupportedLength> {
+        let glibc = mode.reproduce();
         // csfft_cox: `if( idim <= 1 ) return ;` comes before the fftn routing.
-        let root = if n <= 1 { Node::Identity } else { cox_node(n)? };
+        let root = if n <= 1 {
+            Node::Identity
+        } else {
+            cox_node(n, glibc)?
+        };
         let scratch_len = root.scratch_len(n);
         Ok(CsfftPlan {
             n,
@@ -242,6 +268,7 @@ impl fmt::Debug for CsfftPlan {
 
 /// One routine of `csfft.c` with its tables; the decimations hold the routine they recurse
 /// into for each subarray (all subarrays of one call have the same length).
+#[derive(Debug)]
 enum Node {
     /// Length 1: `case 1: break ;` in `fft_3dec`/`fft_5dec` (and `idim <= 1` in `csfft_cox`).
     Identity,
@@ -295,33 +322,34 @@ impl Node {
     }
 }
 
-/// `csfft_cox(mode, n, x)` for `n >= 2`: the `fftn` routing test, then the dispatch.
-fn cox_node(n: usize) -> Result<Node, UnsupportedLength> {
+/// `csfft_cox(mode, n, x)` for `n >= 2`: the `fftn` routing test, then the dispatch (`glibc`:
+/// the tables from glibc's `sincos`, [`sincos`]).
+fn cox_node(n: usize, glibc: bool) -> Result<Node, UnsupportedLength> {
     if !csfft_cox_handles(n) {
         return Err(UnsupportedLength(n));
     }
     // switch( idim ): every power of two from 2 to 32768.
     if n.is_power_of_two() {
-        return Ok(pow2_node(n));
+        return Ok(pow2_node(n, glibc));
     }
     let th = 2.0 * PI / n as f64;
     if n.is_multiple_of(3) {
         let m = n / 3;
         return Ok(Node::Dec3 {
-            cs: twiddle_table(th, 2 * m),
-            sub: Box::new(dec_sub(m)?),
+            cs: twiddle_table(th, 2 * m, glibc),
+            sub: Box::new(dec_sub(m, glibc)?),
         });
     }
     if n.is_multiple_of(5) {
         let m = n / 5;
         return Ok(Node::Dec5 {
-            cs: twiddle_table(th, 4 * m),
-            sub: Box::new(dec_sub(m)?),
+            cs: twiddle_table(th, 4 * m, glibc),
+            sub: Box::new(dec_sub(m, glibc)?),
         });
     }
     // The general power-of-two routine (unreachable for the lengths routed here).
     Ok(Node::Radix2 {
-        trig: TrigConsts::new(n),
+        trig: TrigConsts::new(n, glibc),
         butterflies: Butterflies::General,
     })
 }
@@ -329,65 +357,67 @@ fn cox_node(n: usize) -> Result<Node, UnsupportedLength> {
 /// The power-of-two routines; `csfft_cox`'s `switch(idim)` (2..=32768), `fft_4dec`'s
 /// `switch(N)` and the `switch(M)` of `fft_3dec`/`fft_5dec` (2..=2048) agree on the routine
 /// for each length. `n` must be a power of two in 2..=32768.
-fn pow2_node(n: usize) -> Node {
+fn pow2_node(n: usize, glibc: bool) -> Node {
     match n {
         2 => Node::Fft2,
         4 => Node::Fft4,
         8 | 16 => Node::Radix2 {
-            trig: TrigConsts::new(n),
+            trig: TrigConsts::new(n, glibc),
             butterflies: Butterflies::UnitSkipped,
         },
         32 => Node::Radix2 {
-            trig: TrigConsts::new(n),
+            trig: TrigConsts::new(n, glibc),
             butterflies: Butterflies::UnitAndQuarterSkipped,
         },
         // fft64: `double th = (PI/32.0)`, 32 entries (cs[0] is never used).
         64 => Node::Fft64 {
-            cs: twiddle_table(PI / 32.0, 32),
-            sub: Box::new(pow2_node(32)),
+            cs: twiddle_table(PI / 32.0, 32, glibc),
+            sub: Box::new(pow2_node(32, glibc)),
         },
         // fft128/fft256/fft512 (sub = fft32/fft64/fft128) and fft_4dec (sub = fft256, fft512,
         // fft_4dec(1024), ...): `double th = (2.0*PI/N)`, M3 = 3N/4 entries.
         _ => Node::Dec4 {
-            cs: twiddle_table(2.0 * PI / n as f64, 3 * (n / 4)),
-            sub: Box::new(pow2_node(n / 4)),
+            cs: twiddle_table(2.0 * PI / n as f64, 3 * (n / 4), glibc),
+            sub: Box::new(pow2_node(n / 4, glibc)),
         },
     }
 }
 
 /// The routine `fft_3dec`/`fft_5dec` use for their subarrays of length `m`: `switch(M)`, whose
 /// `default` calls `csfft_cox` (routing test included).
-fn dec_sub(m: usize) -> Result<Node, UnsupportedLength> {
+fn dec_sub(m: usize, glibc: bool) -> Result<Node, UnsupportedLength> {
     match m {
         1 => Ok(Node::Identity),
-        2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 => Ok(pow2_node(m)),
-        _ => cox_node(m),
+        2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 => Ok(pow2_node(m, glibc)),
+        _ => cox_node(m, glibc),
     }
 }
 
 /// `cs[0] = (1, 0)` and `cs[k] = ((float)cos(k*th), (float)sin(k*th))` for `k` in `1..len`: the
 /// tables of `fft64`, `fft128`/`fft256`/`fft512`, `fft_4dec`, `fft_3dec` and `fft_5dec`.
-fn twiddle_table(th: f64, len: usize) -> Vec<Complex32> {
+fn twiddle_table(th: f64, len: usize, glibc: bool) -> Vec<Complex32> {
     let mut cs = Vec::with_capacity(len);
     cs.push(Complex32::new(1.0, 0.0));
     for k in 1..len {
         let a = k as f64 * th;
-        cs.push(Complex32::new(cos(a) as f32, sin(a) as f32));
+        let (s, c) = sincos(a, glibc);
+        cs.push(Complex32::new(c as f32, s as f32));
     }
     cs
 }
 
 /// The `csplus` (`mode > 0`) and `csminus` tables of `csfft_trigconsts(idim)`.
+#[derive(Debug)]
 struct TrigConsts {
     plus: Vec<Complex32>,
     minus: Vec<Complex32>,
 }
 
 impl TrigConsts {
-    fn new(idim: usize) -> Self {
+    fn new(idim: usize, glibc: bool) -> Self {
         TrigConsts {
-            plus: trigconsts_table(idim, 1.0),
-            minus: trigconsts_table(idim, -1.0),
+            plus: trigconsts_table(idim, 1.0, glibc),
+            minus: trigconsts_table(idim, -1.0, glibc),
         }
     }
 
@@ -400,7 +430,7 @@ impl TrigConsts {
 /// One table of `csfft_trigconsts(n)`: for each stage `m = 1, 2, ..., n/2`, `cs[m-1] = (1, 0)`
 /// followed by `m` powers of `exp(i·f1·π/m)` from an `f32` recurrence (`cs[m-1]` is
 /// overwritten by the next stage).
-fn trigconsts_table(n: usize, f1: f32) -> Vec<Complex32> {
+fn trigconsts_table(n: usize, f1: f32, glibc: bool) -> Vec<Complex32> {
     let mut cs = vec![Complex32::default(); n];
     let mut m = 1usize;
     let mut k = 0usize;
@@ -408,8 +438,9 @@ fn trigconsts_table(n: usize, f1: f32) -> Vec<Complex32> {
         let i3 = m << 1;
         let f2 = m as f32;
         let al = f64::from(f1) * PI / f64::from(f2);
-        let co = cos(al) as f32;
-        let si = sin(al) as f32;
+        let (s, c) = sincos(al, glibc);
+        let co = c as f32;
+        let si = s as f32;
         cs[k] = Complex32::new(1.0, 0.0);
         for _ in 0..m {
             k += 1;
@@ -835,19 +866,24 @@ pub mod verification {
 
     /// `csfft_cox`'s general power-of-two loop on its own (no AFNI length reaches it).
     pub fn radix2_general(mode: i32, x: &mut [Complex32]) {
-        let trig = TrigConsts::new(x.len());
+        let trig = TrigConsts::new(x.len(), false);
         bit_reverse(x);
         radix2_stages(x, trig.select(mode), Butterflies::General);
     }
 
-    /// The double `cos` the twiddle tables use.
+    /// The double `cos` the twiddle tables use by default (correctly rounded).
     pub fn table_cos(a: f64) -> f64 {
-        cos(a)
+        sincos(a, false).1
     }
 
-    /// The double `sin` the twiddle tables use.
+    /// The double `sin` the twiddle tables use by default (correctly rounded).
     pub fn table_sin(a: f64) -> f64 {
-        sin(a)
+        sincos(a, false).0
+    }
+
+    /// The double `(sin, cos)` the twiddle tables use with `reproduce` (glibc's `sincos`).
+    pub fn table_sincos_glibc(a: f64) -> (f64, f64) {
+        sincos(a, true)
     }
 }
 
@@ -860,6 +896,25 @@ mod tests {
         (2..=CSFFT_COX_MAX_LEN)
             .filter(|&n| csfft_cox_handles(n))
             .collect()
+    }
+
+    /// GLIBC-07 cannot move `csfft_cox`: glibc's `sincos` (AFNI's, `reproduce`) and the correctly
+    /// rounded `sin` and `cos` (the default) give the same `f32` tables, bit for bit, for every
+    /// length it computes (the `Debug` form prints every `f32` exactly, signed zeros included),
+    /// although the double values differ on some arguments.
+    #[test]
+    fn both_modes_give_the_same_tables() {
+        let mut doubles_differ = 0;
+        for n in cox_lengths() {
+            let a = CsfftPlan::with_mode(n, UpstreamDefects::Fix).unwrap();
+            let b = CsfftPlan::with_mode(n, UpstreamDefects::Reproduce).unwrap();
+            assert_eq!(format!("{:?}", a.root), format!("{:?}", b.root), "n={n}");
+            let th = 2.0 * PI / n as f64;
+            doubles_differ += (1..n)
+                .filter(|&k| sincos(k as f64 * th, true) != sincos(k as f64 * th, false))
+                .count();
+        }
+        assert!(doubles_differ > 0);
     }
 
     fn lcg(seed: &mut u64) -> f32 {

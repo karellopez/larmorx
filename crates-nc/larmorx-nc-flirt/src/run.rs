@@ -29,8 +29,10 @@ use crate::options::{AngleRep, EXIT_MINUS_ONE, Interp, Options, Parsed, Window, 
 use crate::pair::{BinsFailure, CostMessages, Pair, RefSlot};
 use crate::schedule::{self, BadName, MatName, Scalars};
 
-/// The `descrip` field of the images the replica writes (FLIRT writes FSL's build string).
-pub const DESCRIP: &[u8] = b"larmorx-nc fsl flirt";
+/// The `descrip` field of the images the replica writes: newimage's build string, as FLIRT
+/// writes it (`larmorx-nc fsl flirt` until 2026-11-04, when `standard_space_roi`'s comparison of
+/// FLIRT's temporary files with FSL's showed the difference).
+pub const DESCRIP: &[u8] = larmorx_nc_core::volume::BUILDSTRING.as_bytes();
 
 /// How a run stops before `main` returns normally.
 #[derive(Debug)]
@@ -2142,8 +2144,11 @@ impl<'a> Flirt<'a> {
                     Window::Rect => "rectangular",
                 };
                 let mut msgs = Vec::new();
+                // the windows' cos: correctly rounded by default, glibc's with reproduce
+                // (GLIBC-07; an interpolation: named nothing)
+                let libm = larmorx_core::math::Libm::quiet(self.mode);
                 vol.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
-                    name, w, 1201, &mut msgs,
+                    name, w, 1201, &libm, &mut msgs,
                 )));
                 for l in &msgs {
                     self.el(l);

@@ -106,6 +106,19 @@ const CASES: &[Case] = &[
         input: Input::Int16,
         args: &["-tpattern", "alt+z2"],
     },
+    // the Fourier method's sin and cos from glibc's sincos (GLIBC-07, reproduce only; the same
+    // floats as the correctly rounded ones on every argument: csfft's and shift's tests)
+    Case {
+        id: "3dTshift.fourier.int16.reproduce",
+        tool: "afni 3dTshift",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "reproduce",
+        input: Input::Int16,
+        args: &["-tpattern", "alt+z2"],
+    },
     Case {
         id: "3dTshift.fourier.float32.ignore",
         tool: "afni 3dTshift",

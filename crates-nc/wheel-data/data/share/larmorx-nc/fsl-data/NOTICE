@@ -1,0 +1,40 @@
+FSL's standard images in larmorx-nc
+===================================
+
+This directory holds three files of FSL's standard-space data, copied byte for byte from FSL
+6.0.7.23's data package fsl-data_standard 2208.0 (FSL's conda channel,
+https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/public/noarch/fsl-data_standard-2208.0-0.tar.bz2,
+SHA-256 2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a), where they are
+${FSLDIR}/data/standard/<file>. MANIFEST.tsv lists each file, its size and its SHA-256. They are
+the images FSL's bet script (its options -S, -B, -A, -A2) and standard_space_roi read, and
+larmorx-nc's replicas of those scripts read them from here when no FSL installation is given.
+
+FSL (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
+  FSL's data package names no licence of its own; it is distributed as part of FSL, under the
+  FSL Licence (LICENSE, a copy of crates-nc/LICENSE): solely for non-commercial use, without
+  financial return, with the licence's conditions passed on to every receiver. FSL is
+  Copyright (C) 1999-2023 University of Oxford. For commercial use of FSL, contact Oxford
+  University Innovation (fsl@innovation.ox.ac.uk, Reference Project 9564, FSL).
+  MNI152_T1_2mm is FSL's MNI152 template: the MNI ICBM 152 non-linear 6th generation
+  asymmetric average brain, made for FSL by Andrew Janke (Evans AC, Janke AL, Collins DL,
+  Baillet S (2012). Brain templates and atlases. NeuroImage 62(2):911-922,
+  doi:10.1016/j.neuroimage.2012.01.024; https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/Atlases).
+  MNI152_T1_2mm_brain_mask_dil and MNI152_T1_2mm_eye_mask are FSL's masks on its grid.
+
+The McConnell Brain Imaging Centre, Montreal Neurological Institute - MNI's notice
+  The MNI152 average is made from the International Consortium for Brain Mapping's 152 scans
+  at the Montreal Neurological Institute, whose templates carry this notice (as the MNI
+  ICBM 152 models are distributed, e.g. TemplateFlow's tpl-MNI152NLin6Sym LICENSE):
+
+    Copyright (C) 1993-2009 Louis Collins, McConnell Brain Imaging Centre, Montreal
+    Neurological Institute, McGill University. Permission to use, copy, modify, and
+    distribute this software and its documentation for any purpose and without fee is
+    hereby granted, provided that the above copyright notice appear in all copies. The
+    authors and McGill University make no representations about the suitability of this
+    software for any purpose. It is provided "as is" without express or implied warranty.
+    The authors are not responsible for any data loss, equipment damage, property loss, or
+    injury to subjects or patients resulting from the use or misuse of this software
+    package.
+
+larmorx-nc does not present these files as its own work; they are unchanged. larmorx's main
+package (Apache-2.0) does not carry them (docs/licensing.md).

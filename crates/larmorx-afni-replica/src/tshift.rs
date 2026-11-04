@@ -182,7 +182,7 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<Vec<Notice>, TshiftE
                 BrickData::Float(a) => extract(a, &factors, need, fix, base, nvox, &mut slice),
             }
             slice.par_chunks_mut(2 * ntt).with_min_len(8).for_each_init(
-                ShiftWork::default,
+                || ShiftWork::with_mode(p.upstream_defects),
                 |work, pair| {
                     let (far, gar) = pair.split_at_mut(ntt);
                     let gar = (!gar.is_empty()).then_some(gar);

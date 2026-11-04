@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-nc-core.workspace = true
+larmorx-nc-avwutils.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

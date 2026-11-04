@@ -1427,7 +1427,7 @@ implementation = "replica"
 signature = ["every file bit-identical"]
 status = "register"
 defect = "GLIBC-07"
-explanation = "-recip -kernel gauss 2.25 -fmeanu of a 30 x 1 x 3 float image (the trial, one case of 114,906; 5,263 with -fmean or -fmeanu): an FFT convolution (transforms of 60 and 26 points), 1 of 90 voxels one unit in the last place. FSL's library takes each Kiss FFT twiddle factor from glibc's cexp, hence sincos (IBM's code, LGPL; one build on x86-64), which is not always correctly rounded (60 points: sin(8 k) and sin(57 k)); the replica computes the factors correctly rounded in both modes (GLIBC-07). Given Armadillo's own factors the replica's engine is Armadillo's bit for bit on every length 1 to 256 (0 of 197,376 values) and this case is FSL's bit for bit (validation/probes/fsl-avwutils-lib: check_fft.py, check_fft_case.py). The first reading had compared glibc's separate cos and sin, an FMA build on this CPU that agrees with the correctly rounded value there. Not met by fMRIPrep's calls."
+explanation = "-recip -kernel gauss 2.25 -fmeanu of a 30 x 1 x 3 float image (the trial, one case of 114,906; 5,263 with -fmean or -fmeanu): an FFT convolution (transforms of 60 and 26 points), 1 of 90 voxels one unit in the last place. FSL's library takes each Kiss FFT twiddle factor from glibc's cexp, hence sincos (IBM's code, LGPL; one build on x86-64), which is not always correctly rounded (60 points: sin(8 k) and sin(57 k)); the replica computes the factors correctly rounded in both modes (GLIBC-07). Given Armadillo's own factors the replica's engine is Armadillo's bit for bit on every length 1 to 256 (0 of 197,376 values) and this case is FSL's bit for bit (validation/probes/fsl-avwutils-lib: check_fft.py, check_fft_case.py). The first reading had compared glibc's separate cos and sin, an FMA build on this CPU that agrees with the correctly rounded value there. Not met by fMRIPrep's calls. Since 2026-11-04 (BET's -S/-B/-A/-A2 part, relay 1) the replica's reproduce mode takes the factors from glibc's sincos (larmorx_core::math::sincos_glibc, LARMORX's clean-room implementation of specs/glibc-dbl.md): Armadillo's factors and transforms bit for bit on every length 1 to 256 (check_fft.py --mode reproduce), and the permanent case passes; the default keeps the correctly rounded factors, a filter that names nothing (the user's decision of 2026-11-04)."
 link = "validation/difftest/cases/fsl-maths/fft-twiddles-glibc-sincos.json"
 
 [[difference]]
@@ -3009,3 +3009,86 @@ signature = ["standard output (JSON)"]
 status = "fixed"
 explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 275 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: fslstats' histograms without a histogram (findings 28) (272); explained: fslstats' last printed digit at §10's bound (or bounded words unattributed) (3). Reproducer: fsl-maths-trial-00163-original."
 link = "docs/findings/fsl-maths-original.md"
+
+# fslmaths' replica after its reproduce took glibc's sin, cos and sincos (BET's -S/-B/-A/-A2 part, relay 1):
+# the short trial of 2026-11-04 (seed bet-options-1-sincos, 9 min, 24 jobs, 69,962 cases with -sin and -cos
+# drawn in double precision, the oracle cache in use mode; oracles/difftest/2026-11-04-bet-options-1-fsl-maths):
+# one difference, fixed; the notices without a visible change as in the trial of 2026-11-03 (GLIBC-07 in 77
+# cases: a double -exp, -log, -sin or -cos whose value a later operation or a float output removes)
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "-dilall of a 7 x 13 x 3 float image holding NaN, inf and -inf, written as double: 42 of 273 voxels a NaN of the other sign. FSL's build adds each neighbour with the neighbour's converted value as the destination register (dilateval's sum += im(x, y, z)), so of a NaN neighbour and the default NaN an earlier inf + -inf left in the sum it passes on the neighbour's; the replica added the sum first. Fixed: filters::dilall takes the neighbour first (sse::add_f64), unit test dilall_passes_on_the_neighbours_nan_first; main's build gives the same difference (not from this part's change)"
+link = "validation/difftest/cases/fsl-maths/dilall-nan-order.json"
+
+# BET's -S/-B/-A/-A2 part, relay 5 (sub-task 6): the short trial of 2026-11-04 of the descriptor's new paths
+# (seed bet-options-6, 0.5 h, 24 jobs, 2,699 cases: bet -S, -B, -A, -A2, fslroi, standard_space_roi among
+# bet2, bet and betsurf; FSL through the oracle cache in use mode; oracles/difftest/2026-11-04-bet-options-6b;
+# a first start, 2026-11-04-bet-options-6, stopped after 127 cases: the original's runs of the replica-only
+# programs, fixed in the harness). The replica: 2,580 agree; 70 notices and 47 differences triaged below;
+# one timeout (case 1271, bet -S on a 300 s limit: the heavy queue).
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["notice: FSL-09"]
+status = "explained"
+explanation = "Trial 2026-11-04-bet-options-6b: standard_space_roi (52 cases) and bet -A2 (4) name FLIRT's integer output corrected (FSL-09: rounded, not truncated) where it changes an intermediate image only (the transformed standard-space mask, thresholded later; -A2's T2 in the T1's space, which betsurf samples): the outputs unchanged. Not a difference; allowed silent in the descriptor since 2026-11-04, as in the record's cases. Reproducer: fsl-bet:bet-options-6:20."
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["notice: FSL-09, FSL-202, FSL-14, FSL-22, FSL-214"]
+status = "explained"
+explanation = "Trial 2026-11-04-bet-options-6b: bet -B on small random images (cases 225, 725, 1021, 2050; 894 without FSL-09; standard_space_roi with FSL-14 alone, 1599; FSL-75 alone, 456, 2405, 2278) names the corrections inside its programs (FLIRT's FSL-09 and FSL-14, fslstats' FSL-22, FAST's FSL-202, standard_space_roi's FSL-214) where they change intermediate values only, or where both modes fail later alike: the outputs and statuses unchanged. Not a difference; allowed silent in the descriptor since. Reproducer: fsl-bet:bet-options-6:225."
+link = "docs/findings/fsl-bet.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["DN fix pass", "files written", "messages: FSL's, byte for byte"]
+status = "explained"
+explanation = "Trial 2026-11-04-bet-options-6b: standard_space_roi on constant and tiny random images (23 cases with this and the two neighbouring signatures, every one naming FSL-75; shrunk to a 1 x 1 x 1 input and reference): FLIRT's background value overruns its buffer for a pyramid level 3 voxels wide or reads an empty one for 1 x 1 x 1 (FSL-75, class (a), registered): FSL's FLIRT then segfaults or finishes by its heap's layout (bash's 'line 211: PID Segmentation fault', the script going on to fslroi's usage), the replica's gives FLIRT's defined result or refuses the empty read (larmorx-nc's FSL-75 line); D13: a crash defines nothing. Not a replica mistake. Reproducer: fsl-bet:bet-options-6:60."
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["DN fix pass", "messages before FSL's crash"]
+status = "explained"
+explanation = "Trial 2026-11-04-bet-options-6b: bet -A2 on small random images (603, 1978, 2497; with exit status and files: 409, 2674), each naming FSL-75: the FLIRT runs of -A2 meet FLIRT's background overrun (FSL-75, class (a)), after which FSL's FLIRT crashed or bet2's fill crashed (FSL-43) where the replica's finished or filled: whether and where FSL stops depends on its heap. Not a replica mistake. Reproducer: fsl-bet:bet-options-6:2674."
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["exit status", "files written"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b: standard_space_roi -maskNONE -roiNONE (and -b -maskNONE) on an input whose file type is not FSLOUTPUTTYPE's (8 cases: 222, 88, 657, 1375, 1378, 1679, 2000, 2403): fslpy's imcp converts it with nibabel 5.4.2, which the replica does not replicate yet: it refuses clearly in both modes (exit 1, 'pending'), as the record's ssroi/phantom-none-convert (an expected divergence). The replica's gap, documented in findings/fsl-flirt.md ('Not replicated yet'); open for a later part. Reproducer: fsl-bet:bet-options-6:657."
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["notice: FSL-63, FSL-43"]
+status = "fixed"
+explanation = "bet -R -e on a 22 x 14 x 19 int32 image of two blobs: bet2's fill starts outside the image (FSL-43: the default refuses), so no run given the echoed options finishes, yet the replica named FSL-63 (bash's echo takes -e): a notice without a change. Fixed: FSL-63 is named once a run given those options has finished (bet.rs echo_sed/echo_named, -R and -B -s); permanent case bet-robust-echo-e-bet2-refuses."
+link = "validation/difftest/cases/fsl-bet/bet-robust-echo-e-bet2-refuses.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["notice: FSL-45"]
+status = "fixed"
+explanation = "bet -Z -n -v on a 25 x 17 x 6 head: bet2 writes nothing (-n), so only the run's temporary files differ between the corrected crop and FSL's (imglob off the PATH), and the cleanup removes them: the replica named FSL-45 without a change. Fixed: the comparison counts only the files that stay (the temporary files with -d); permanent case bet-small-fov-n-nothing-cropped. The clean-room original names FSL-45 there too (its catch-up part)."
+link = "validation/difftest/cases/fsl-bet/bet-small-fov-n-nothing-cropped.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the clean-room original, not this part's code): betsurf on small random heads, 190 cases over some 50 signatures of its masks, meshes and messages (outskin and skull masks most: 42 + 22 + 15 cases; 5 exit status 255 where FSL finishes; 5 undefined FSL-51), bet's skull (-s, 6) and -Z's temporary files of int8 slabs (330, 2254: FSL-217, the original's gap), bet -Z -n's FSL-45 notice without a change (1983); the same kinds as the open betsurf entries above (the profiles' search and the mask's fill on tiny heads). For the clean-room catch-up part. Reproducers: fsl-bet:bet-options-6:<n> (results.jsonl of the trial)."
+link = "docs/findings/fsl-bet-original.md"

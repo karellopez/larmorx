@@ -24,6 +24,9 @@ original (since 2026-11-03, written from ``specs/fast.md``). ``topup`` and
 operations, :func:`arithmetic`, :func:`threshold`, :func:`collapse`, ...) and ``fslstats`` (image
 statistics: the generic :func:`fslstats` and typed wrappers, :func:`image_mean`,
 :func:`centre_of_gravity`, ...) have their replicas only, since 2026-11-03.
+``fslroi`` (a region or range of volumes) and FLIRT's ``standard_space_roi`` script (an image
+masked and cut down to a standard space's field of view or mask) have their replicas only,
+since 2026-11-04 (their clean-room originals are to come).
 """
 
 from larmorx.fsl.bet import (
@@ -85,6 +88,7 @@ from larmorx.fsl.maths import (
     threshold,
     unary,
 )
+from larmorx.fsl.regions import StandardSpaceRoiResult, fslroi, standard_space_roi
 from larmorx.fsl.stats import (
     bounding_roi,
     centre_of_gravity,
@@ -116,6 +120,7 @@ __all__ = [
     "FastResult",
     "FlirtResult",
     "RocResult",
+    "StandardSpaceRoiResult",
     "Surface",
     "TensorDecomposition",
     "TopupResult",
@@ -140,6 +145,7 @@ __all__ = [
     "fast",
     "flirt",
     "fslmaths",
+    "fslroi",
     "fslstats",
     "grid",
     "image_entropy",
@@ -162,6 +168,7 @@ __all__ = [
     "roi",
     "smooth",
     "spatial_filter",
+    "standard_space_roi",
     "statistical",
     "std2imgcoord",
     "subsample2",

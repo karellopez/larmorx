@@ -5,14 +5,19 @@
 //! Interpolation kernels: the windowed sinc of `setinterpolationmethod(sinc)`
 //! (`sinckernel1D`) and its lookup (`kernelval`).
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 
 use crate::glibc_float;
 
 /// The sine in single precision: C++'s `sin(float)`, i.e. the C library's `sinf`, as FSL's Linux
-/// build computes it (glibc 2.35, FMA build; [`glibc_float::sinf`]). The double `cos` of the
-/// windows is correctly rounded: glibc's agrees with it on every argument the kernels use
-/// (`tools/glibc-float-verify kernel`).
+/// build computes it (glibc 2.35, FMA build; [`glibc_float::sinf`]). The windows' double `cos`
+/// (`cos(M_PI*x/w)`: a `float` times a `double`) comes from the caller's [`Libm`]: correctly
+/// rounded by default, glibc 2.35's with `reproduce` (IBM's code, LGPL, GLIBC-07:
+/// [`larmorx_core::math::cos_glibc`], the clean-room implementation of `specs/glibc-dbl.md`).
+/// The windows are returned as `float`, which hides the double's last bit: the two choices give
+/// the same kernel at every width from 1 to 1001 (the test `the_windows_agree_in_both_modes`).
+/// An interpolation names nothing (GLIBC-07's notice is for the pointwise programs: the user's
+/// decision of 2026-11-04).
 #[inline]
 pub fn sinf(x: f32) -> f32 {
     glibc_float::sinf(x)
@@ -39,23 +44,23 @@ pub fn sincfn(x: f32) -> f32 {
     sinf(y) / y
 }
 
-/// `hanning(x, w)` (`w` the half-width).
-pub fn hanning(x: f32, w: i32) -> f32 {
+/// `hanning(x, w)` (`w` the half-width), its `cos` from `libm`.
+pub fn hanning(x: f32, w: i32, libm: &Libm) -> f32 {
     if x.abs() > w as f32 {
         0.0
     } else {
-        (0.5 + 0.5 * math::cos(std::f64::consts::PI * f64::from(x) / f64::from(w))) as f32
+        (0.5 + 0.5 * libm.cos(std::f64::consts::PI * f64::from(x) / f64::from(w))) as f32
     }
 }
 
-/// `blackman(x, w)` (`w` the half-width).
-pub fn blackman(x: f32, w: i32) -> f32 {
+/// `blackman(x, w)` (`w` the half-width), its `cos` from `libm`.
+pub fn blackman(x: f32, w: i32, libm: &Libm) -> f32 {
     if x.abs() > w as f32 {
         0.0
     } else {
         let a = std::f64::consts::PI * f64::from(x) / f64::from(w);
         let b = 2.0 * std::f64::consts::PI * f64::from(x) / f64::from(w);
-        (0.42 + 0.5 * math::cos(a) + 0.08 * math::cos(b)) as f32
+        (0.42 + 0.5 * libm.cos(a) + 0.08 * libm.cos(b)) as f32
     }
 }
 
@@ -64,9 +69,15 @@ pub fn rectangular(x: f32, w: i32) -> f32 {
     if x.abs() > w as f32 { 0.0 } else { 1.0 }
 }
 
-/// `sinckernel1D(type, w, n)` (`w` the full width): `n` samples of the windowed sinc. An
-/// unknown window prints FSL's message and uses Blackman's.
-pub fn sinckernel1d(window: &str, w: i32, n: i32, messages: &mut Vec<String>) -> Vec<f64> {
+/// `sinckernel1D(type, w, n)` (`w` the full width): `n` samples of the windowed sinc, the
+/// windows' `cos` from `libm`. An unknown window prints FSL's message and uses Blackman's.
+pub fn sinckernel1d(
+    window: &str,
+    w: i32,
+    n: i32,
+    libm: &Libm,
+    messages: &mut Vec<String>,
+) -> Vec<f64> {
     let nstore = n.max(1);
     let hw = (w - 1) / 2;
     let halfnk = ((f64::from(nstore) - 1.0) / 2.0) as f32;
@@ -75,12 +86,12 @@ pub fn sinckernel1d(window: &str, w: i32, n: i32, messages: &mut Vec<String>) ->
         // (n-halfnk-1)/halfnk*hw: int - float - int, / float, * int, all float.
         let x = ((k as f32 - halfnk - 1.0) / halfnk) * hw as f32;
         let v = match window {
-            "hanning" | "h" => sincfn(x) * hanning(x, hw),
-            "blackman" | "b" => sincfn(x) * blackman(x, hw),
+            "hanning" | "h" => sincfn(x) * hanning(x, hw, libm),
+            "blackman" | "b" => sincfn(x) * blackman(x, hw, libm),
             "rectangular" | "r" => sincfn(x) * rectangular(x, hw),
             _ => {
                 messages.push("ERROR: Unrecognised sinc window type - using Blackman".to_owned());
-                return sinckernel1d("b", w, nstore, messages);
+                return sinckernel1d("b", w, nstore, libm, messages);
             }
         };
         ker[(k - 1) as usize] = f64::from(v);
@@ -89,9 +100,15 @@ pub fn sinckernel1d(window: &str, w: i32, n: i32, messages: &mut Vec<String>) ->
 }
 
 /// `definesincinterpolation(type, w, nstore)`: the same kernel along the three axes, with
-/// half-widths `(w-1)/2`.
-pub fn sinc_kernel(window: &str, w: i32, nstore: i32, messages: &mut Vec<String>) -> Kernel {
-    let k = sinckernel1d(window, w, nstore, messages);
+/// half-widths `(w-1)/2`, the windows' `cos` from `libm`.
+pub fn sinc_kernel(
+    window: &str,
+    w: i32,
+    nstore: i32,
+    libm: &Libm,
+    messages: &mut Vec<String>,
+) -> Kernel {
+    let k = sinckernel1d(window, w, nstore, libm, messages);
     let hw = (w - 1) / 2;
     Kernel {
         widthx: hw,
@@ -122,4 +139,58 @@ pub fn kernelval(x: f32, w: i32, kernel: &[f64]) -> f32 {
     }
     let (a, b) = (kernel[(n - 1) as usize], kernel[n as usize]);
     (a * (1.0 - f64::from(dn)) + b * f64::from(dn)) as f32
+}
+
+#[cfg(test)]
+mod tests {
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_core::math;
+
+    use super::*;
+
+    /// With `reproduce` the windows take glibc's `cos` (GLIBC-07): on an argument where glibc's
+    /// last bit differs, the window's double sum differs before its rounding to `float`.
+    #[test]
+    fn reproduce_windows_take_glibcs_cos() {
+        let glibc = Libm::quiet(UpstreamDefects::Reproduce);
+        let fix = Libm::quiet(UpstreamDefects::Fix);
+        assert!(glibc.is_glibc() && !fix.is_glibc());
+        let mut seen = 0;
+        for w in 1..=40 {
+            for k in 0..=200 {
+                let x = (k as f32 / 100.0 - 1.0) * w as f32;
+                let a = std::f64::consts::PI * f64::from(x) / f64::from(w);
+                if math::cos(a) != math::cos_glibc(a) {
+                    seen += 1;
+                    assert_eq!(glibc.cos(a).to_bits(), math::cos_glibc(a).to_bits());
+                    assert_eq!(fix.cos(a).to_bits(), math::cos(a).to_bits());
+                }
+            }
+        }
+        assert!(
+            seen > 0,
+            "an argument where glibc's cos is not correctly rounded"
+        );
+    }
+
+    /// The `float` windows hide the double `cos`'s last bit: every width from 1 to 1001 gives the
+    /// same Hanning and Blackman kernels (FSL's 1201 samples, and mcflirt's) in both modes, so
+    /// FLIRT's, applyxfm4D's and mcflirt's sinc interpolation is the same in both.
+    #[test]
+    fn the_windows_agree_in_both_modes() {
+        let glibc = Libm::quiet(UpstreamDefects::Reproduce);
+        let fix = Libm::quiet(UpstreamDefects::Fix);
+        let mut msgs = Vec::new();
+        for w in 1..=1001 {
+            for window in ["hanning", "blackman"] {
+                let a = sinckernel1d(window, w, 1201, &fix, &mut msgs);
+                let b = sinckernel1d(window, w, 1201, &glibc, &mut msgs);
+                assert!(
+                    a.iter().zip(&b).all(|(p, q)| p.to_bits() == q.to_bits()),
+                    "{window} {w}"
+                );
+            }
+        }
+        assert!(msgs.is_empty());
+    }
 }

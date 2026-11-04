@@ -278,6 +278,21 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
+    // FSL's fslroi and FLIRT's standard_space_roi script (2026-11-04, BET's -S/-B/-A/-A2 part):
+    // the replicas; their clean-room originals are to be written from specs/fslroi.md and
+    // specs/standard_space_roi.md (the clean-room catch-up).
+    Replica {
+        family: "fsl",
+        tool: "fslroi",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "standard_space_roi",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -725,7 +740,11 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(replica_only("fsl").count(), 0);
+        // fslroi and standard_space_roi have only their replicas (2026-11-04)
+        assert_eq!(
+            replica_only("fsl").collect::<Vec<_>>(),
+            ["fslroi", "standard_space_roi"]
+        );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

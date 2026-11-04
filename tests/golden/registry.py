@@ -1090,8 +1090,12 @@ def image_math_operations() -> list[str]:
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
 #: and since 2026-11-03 FAST, topup, applytopup, fslmaths and fslstats have theirs (the cases
 #: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
-#: functions below): no public function runs a replica-only tool now.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: functions below). Since 2026-11-04 ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` run
+#: tools with only their replicas (FSL's fslroi, FLIRT's standard_space_roi script).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
+    "lx.fsl.fslroi": "fsl fslroi",
+    "lx.fsl.standard_space_roi": "fsl standard_space_roi",
+}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and

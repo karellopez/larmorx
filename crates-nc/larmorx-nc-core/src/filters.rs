@@ -485,13 +485,17 @@ pub fn dilall<T: Arith>(input: &[T], dims: [i64; 3], conv: &mut impl FnMut(f64) 
             for yy in (y - 1).max(0)..=(y + 1).min(ny - 1) {
                 for xx in (x - 1).max(0)..=(x + 1).min(nx - 1) {
                     if mask[idx(xx, yy, zz)] && !(xx == x && yy == y && zz == z) {
-                        sum += im[idx(xx, yy, zz)].to_f64();
+                        // SSE's NaNs, the neighbour first: FSL's build converts the neighbour into
+                        // the register it adds the sum to (`addsd`), so of a NaN neighbour and the
+                        // default NaN of an earlier `inf + -inf` it passes on the neighbour's
+                        // (random testing's case `dilall-nan-order`, 2026-11-04)
+                        sum = sse::add_f64(im[idx(xx, yy, zz)].to_f64(), sum);
                         n += 1;
                     }
                 }
             }
         }
-        im[idx(x, y, z)] = conv(sum / f64::from(n.max(1)));
+        im[idx(x, y, z)] = conv(sse::div_f64(sum, f64::from(n.max(1))));
         mask[idx(x, y, z)] = true;
         for zz in (z - 1).max(0)..=(z + 1).min(nz - 1) {
             for yy in (y - 1).max(0)..=(y + 1).min(ny - 1) {
@@ -671,9 +675,9 @@ fn convolve_masked_axis<T: Arith>(
 ///   ([`convolve_masked_axis`]).
 /// - Not separable: the kernel divided (in `float`) by its sum when that is not 0, each volume
 ///   convolved by efficient_convolve (the direct sum, [`convolve_plain`], or, for a large kernel,
-///   the FFT, [`crate::kissfft::fft_convolve`], which prints no warning), then,
-///   when renormalising, divided by the same convolution of a volume of ones (an integer
-///   division by zero is FSL's trap).
+///   the FFT, [`crate::kissfft::fft_convolve`], which prints no warning, its twiddle factors
+///   from `libm`), then, when renormalising, divided by the same convolution of a volume of
+///   ones (an integer division by zero is FSL's trap).
 ///
 /// `msgs` receives what FSL prints, in its order (the empty kernel's sum message, the
 /// off-centre warnings of each call).
@@ -682,6 +686,7 @@ pub fn generic_convolve<T: Arith>(
     k: &Kern,
     separable: bool,
     renormalise: bool,
+    libm: &larmorx_core::math::Libm,
     msgs: &mut Vec<String>,
     conv: &mut impl FnMut(f64) -> T,
 ) -> Result<Volume<T>, ConvStop> {
@@ -732,7 +737,9 @@ pub fn generic_convolve<T: Arith>(
     let warn = !fft && norm_kernel.off_centre_by_size();
     let efficient = |v: &Volume<T>, conv: &mut dyn FnMut(f64) -> T| -> Volume<T> {
         if fft {
-            crate::kissfft::fft_convolve(v, norm_kernel.dims, &norm_kernel.data, &mut |x| conv(x))
+            crate::kissfft::fft_convolve(v, norm_kernel.dims, &norm_kernel.data, libm, &mut |x| {
+                conv(x)
+            })
         } else {
             convolve_plain(v, &norm_kernel, &mut |x| conv(x))
         }
@@ -1525,6 +1532,31 @@ pub fn masked_mean<T: Arith>(values: &[T], mask: &[T]) -> (f64, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `-dilall`'s mean as FSL's SSE build adds it, the neighbour first: neighbours `inf`, `-inf`
+    /// and then a positive NaN give the neighbour's NaN (`0x7fc00000`), not the default NaN of
+    /// `inf + -inf` that the running sum holds (random testing's case `dilall-nan-order`); `-inf`
+    /// and `inf` alone give the default NaN (`0xffc00000` stored as float).
+    #[test]
+    fn dilall_passes_on_the_neighbours_nan_first() {
+        let nan = f32::from_bits(0x7fc0_0000);
+        let input = [
+            f32::INFINITY,
+            -f32::INFINITY,
+            nan,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+        ];
+        let out = dilall(&input, [3, 3, 1], &mut |x| x as f32);
+        assert_eq!(out[4].to_bits(), nan.to_bits());
+        let input = [-f32::INFINITY, 0.0, f32::INFINITY];
+        let out = dilall(&input, [3, 1, 1], &mut |x| x as f32);
+        assert_eq!(out[1].to_bits(), 0xffc0_0000);
+    }
 
     #[test]
     fn kernels_have_fsl_sizes() {

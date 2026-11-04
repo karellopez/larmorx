@@ -263,6 +263,11 @@ def case_never(s: Scenario) -> str:
             "files in the run's directory that bet may remove (FSL-46): the cache replays no "
             "removal"
         )
+    if any(name == "maskthr" for name, _ in s.env):
+        return (
+            "maskthr in the environment (FSL-213): a variable of the script, not of FSL's family, "
+            "so not in the cache's key"
+        )
     text = " ".join((s.reason, s.fix_refuses or "", *s.silent_ok))
     for d in UNDEFINED_MEMORY:
         if d in text:
@@ -396,7 +401,10 @@ def run_larmorx(tool: str, args: list[str], mode: str, env: dict[str, str], cwd:
 _TERMINATE = re.compile(
     r"terminate called after throwing an instance of [^\n]*\n(?:  what\(\): [^\n]*\n)?"
 )
-_BASH_SIGNAL = re.compile(r"^[^\n]*: line \d+: +\d+ (?:Aborted|Segmentation fault)[^\n]*\n", re.M)
+#: bash's report of a command ended by a signal (its process ID, or ``PID`` once masked).
+_BASH_SIGNAL = re.compile(
+    r"^[^\n]*: line \d+: +(?:\d+|PID) (?:Aborted|Segmentation fault)[^\n]*\n", re.M
+)
 #: The ``bet`` script's ``ERR`` trap, on its standard output after a program it runs crashed.
 _BET_FAILED = re.compile(r"^bet failed during command:[^\n]*\n", re.M)
 
@@ -407,16 +415,28 @@ def larmorx_own(line: str) -> bool:
     return s.startswith(("larmorx: ", "larmorx-nc: ")) or s.endswith("(larmorx)")
 
 
+#: bash's report of a crashed command: the process ID (and a core dump's note) left out.
+_BASH_PID = re.compile(
+    r"(: line \d+: +)\d+( (?:Aborted|Segmentation fault) +)(?:\(core dumped\) )?"
+)
+
+
+def _mask_pids(text: str) -> str:
+    return _BASH_PID.sub(r"\1PID\2", text)
+
+
 def fsl_text(text: str) -> str:
-    """FSL's messages as compared: the ``bet`` script's own path (``$0``) read as ``bet``."""
+    """FSL's messages as compared: the ``bet`` and ``standard_space_roi`` scripts' own path
+    (``$0``) read as their name, bash's process IDs left out."""
     for d in {fsl_dir(), *(fsl_dir(v) for v in fsl_versions.INSTALLS)}:
         if d is not None:
             text = text.replace(f"{d}/bin/bet", "bet")
-    return text
+            text = text.replace(f"{d}/bin/standard_space_roi", "standard_space_roi")
+    return _mask_pids(text)
 
 
 def larmorx_text(text: str) -> str:
-    return "".join(ln for ln in text.splitlines(keepends=True) if not larmorx_own(ln))
+    return _mask_pids("".join(ln for ln in text.splitlines(keepends=True) if not larmorx_own(ln)))
 
 
 def first_difference(a: str, b: str) -> str:
@@ -452,8 +472,17 @@ def check_messages(
     output may also be lost at its crash, as with ``-v`` on a constant image)."""
     a_out, a_err = fsl_text(fsl.out), fsl_text(fsl.err)
     b_out, b_err = larmorx_text(ours.out), larmorx_text(ours.err)
+    if crash and not filled and a_out == b_out and a_err == b_err:
+        # the replica printed what FSL printed, its crash report included (a program that
+        # aborts inside bet's script or standard_space_roi, which go on or trap it)
+        checks(CRASH, True, detail="the same, FSL's report of the crash included")
+        return
     if crash:
         a_err = before_crash(a_err)
+        if not filled:
+            # the replica prints FSL's text of a program that aborts inside the script (FLIRT's
+            # programs inside standard_space_roi, fslmaths inside bet): compared up to it too
+            b_err = before_crash(b_err)
         name = CRASH
     else:
         name = MESSAGES
@@ -1103,10 +1132,49 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("small-fov-verbose", "bet", "-Z -v -s", S("bet", ("{0}", "out", "-Z", "-m", "-v", "-s"), ("slab",), tier="standard"))
     add("small-fov-large", "bet", "-Z on an image already 100 mm high: no padding", S("bet", ("{0}", "out", "-Z", "-m"), (h,), tier="standard"))
     add("debug", "bet", "-d: the temporary files kept", S("bet", ("{0}", "out", "-Z", "-d"), ("slab",), tier="standard"))
-    for v, need in (("-S", "eyes"), ("-B", "bias"), ("-A", "surfaces")):
-        add(f"pending{v}", "bet", f"{v}: needs FSL programs larmorx does not replicate yet ({need})",
-            S("bet", ("{0}", "out", v), (h,), expect="pending", tier="standard"))
-    add("pending-A2", "bet", "-A2 <T2>: pending (FLIRT)", S("bet", ("{0}", "out", "-A2", "{1}"), (h, "head-t2"), expect="pending", tier="standard"))
+    # FSL-217 (2026-11-04): fslroi and fslmerge write an int8 image as uint8 with the same bytes
+    add("fmri-int8", "bet", "-F of an int8 head with negative values: fslroi writes uint8 (FSL-217), bet2 runs on 128 to 255",
+        S("bet", ("{0}", "out", "-F"), ("head-i8",), tier="standard"))
+    add("fmri-int8-positive", "bet", "-F of an int8 head without negative values: the same values either way (FSL-217 not named)",
+        S("bet", ("{0}", "out", "-F"), ("head-i8-positive",), tier="standard"))
+    add("small-fov-int8", "bet", "-Z of an int8 slab with negative values: fslroi's slices and fslmerge (FSL-217)",
+        S("bet", ("{0}", "out", "-Z", "-m"), ("slab-i8",), tier="standard"))
+    add("small-fov-int8-debug", "bet", "-Z -d of an int8 slab: the int8 temporary files kept (FSL-217)",
+        S("bet", ("{0}", "out", "-Z", "-d"), ("slab-i8",), tier="standard"))
+    # -S, -B, -A, -A2 (2026-11-04): standard_space_roi, FLIRT, FAST, fslmaths, fslstats and
+    # betsurf run by the script, MNI152's standard images from FSLDIR. -S's corrections of
+    # FLIRT's integer output inside standard_space_roi (FSL-09) and of fslstats -S (FSL-182)
+    # change intermediate values only: the outputs change where a voxel lies between the two
+    # thresholds
+    s_ok = ("FSL-09", "FSL-182")
+    add("eyes", "bet", "-S: the eyes and optic nerves removed (standard_space_roi -b, FLIRT, fslmaths, fslstats, dc)",
+        S("bet", ("{0}", "out", "-S", "-m"), (h,), silent_ok=s_ok,
+          python=("bet", {"variation": "eyes", "mask": True, "skull": True}, {"out.nii.gz": "brain", "out_mask.nii.gz": "mask", "out_skull.nii.gz": "skull"})))
+    add("eyes-debug", "bet", "-S -d: every temporary file kept (standard_space_roi's too)", S("bet", ("{0}", "out", "-S", "-d"), (h,), tier="standard", silent_ok=s_ok))
+    add("eyes-verbose", "bet", "-S -v -t -f 0.4: the options passed to both bet2 runs (the later -f wins)", S("bet", ("{0}", "out", "-S", "-v", "-t", "-f", "0.4"), (h,), tier="standard", silent_ok=s_ok))
+    add("eyes-outline-mesh", "bet", "-S -o -e: the outline and mesh only in the temporary bet2 run", S("bet", ("{0}", "out", "-S", "-o", "-e", "-m"), (h,), tier="standard", silent_ok=s_ok))
+    add("eyes-no-brain", "bet", "-S -n: the raw brain is not written and fslmaths aborts (the ERR trap)", S("bet", ("{0}", "out", "-S", "-n"), (h,), expect="error", tier="standard"))
+    add("eyes-pair", "bet", "-S with FSLOUTPUTTYPE=NIFTI_PAIR (every program's output a pair)", S("bet", ("{0}", "out", "-S"), (h,), output_type="NIFTI_PAIR", tier="standard", silent_ok=s_ok))
+    add("bias", "bet", "-B: FAST's bias field removed, the neck cut (standard_space_roi -b twice), bet -R",
+        S("bet", ("{0}", "out", "-B"), (h,), python=("bet", {"variation": "bias", "mask": True}, {"out.nii.gz": "brain", "out_mask.nii.gz": "mask"})))
+    add("bias-debug", "bet", "-B -d: FAST's and standard_space_roi's files kept", S("bet", ("{0}", "out", "-B", "-d"), (h,), tier="standard"))
+    add("bias-skull", "bet", "-B -s -v: the skull from standard_space_roi -maskFOV -roiNONE and bet2, immv", S("bet", ("{0}", "out", "-B", "-s", "-v"), (h,), tier="standard"))
+    add("bias-n", "bet", "-B -n -o: the robust run removes -n (the brain written)", S("bet", ("{0}", "out", "-B", "-n", "-o"), (h,), tier="standard"))
+    add("surfaces", "bet", "-A: FLIRT to MNI152, bet2 -e, betsurf --t1only -o -m -s",
+        S("bet", ("{0}", "out", "-A"), (h,), python=("bet", {"variation": "surfaces"}, {"out.nii.gz": "brain", "out_inskull_mask.nii.gz": "surfaces.inskull_mask", "out_skull_mask.nii.gz": "surfaces.skull_mask"})))
+    add("surfaces-debug", "bet", "-A -d -m: FLIRT's matrix kept", S("bet", ("{0}", "out", "-A", "-d", "-m"), (h,), tier="standard"))
+    add("surfaces-t2", "bet", "-A2 <T2>: FLIRT of the T2 (sinc), FLIRT to MNI152, bet2 -e, betsurf -o -m -s",
+        S("bet", ("{0}", "out", "-A2", "{1}"), (h, "head-t2"), python=("bet", {"variation": "surfaces_t2", "t2": "{1}"}, {"out.nii.gz": "brain", "out_outskin_mask.nii.gz": "surfaces.outskin_mask"})))
+    add("surfaces-t2-debug", "bet", "-A2 <T2> -d -v", S("bet", ("{0}", "out", "-A2", "{1}", "-d", "-v"), (h, "head-t2"), tier="standard"))
+    add("surfaces-t2-missing", "bet", "-A2 of a T2 that does not exist: FLIRT fails (the ERR trap)", S("bet", ("{0}", "out", "-A2", "/nonexistent/t2"), (h,), expect="error", tier="standard", silent_ok=("FSL-68",)))
+    add("surfaces-t2-no-value", "bet", "-A2 as the last argument: the usage", S("bet", ("{0}", "out", "-A2"), (h,), expect="error", tier="standard"))
+    add("last-variation", "bet", "-B -R -S -A: the last variation given (-A)", S("bet", ("{0}", "out", "-B", "-R", "-S", "-A"), (h,), tier="standard"))
+    add("eyes-threshold-exponent", "defects", "-S on intensities above 1e6: fslstats prints 2.1e+06 and dc reads the exponent as commands (FSL-216)",
+        S("bet", ("{0}", "out", "-S", "-m"), ("head-large",), tier="standard", silent_ok=s_ok))
+    add("eyes-nan", "defects", "-S with NaN voxels in the brain: FLIRT inside standard_space_roi fails (FSL-14; convert_xfm aborts, the script goes on), bet2 then aborts (FSL-216's threshold is not reached)",
+        S("bet", ("{0}", "out", "-S"), ("head-nan",), fix_refuses="FSL-14", tier="standard"))
+    add("bias-skull-echo", "defects", "-B -e -s: the skull's sed passes bet2's options through echo, which takes -e (FSL-63)",
+        S("bet", ("{0}", "out", "-B", "-e", "-s"), (h,), tier="standard"))
     add("usage", "bet", "bet without an output", S("bet", ("{0}",), (h,), expect="error"))
     add("no-input", "bet", "an input that does not exist", S("bet", ("/nonexistent/in", "out"), (), expect="error"))
     add("unknown-option", "bet", "an unknown option", S("bet", ("{0}", "out", "-w", "2"), (h,), expect="error"))
@@ -1157,7 +1225,73 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         add(f"{name}-surf-t2", "real", f"{desc}: betsurf -o -m -s with the T2 FLIRT registered", S("betsurf", ("-o", "-m", "-s", "{0}", "{1}", "{2}", "{3}", "out"),
                                                                                                   (f"real:{name}", f"t2:{name}", f"mesh:{name}", f"mat:{name}"), tier="full"))
     add("bold-F", "real", "a BOLD series (ds000005): bet -F", S("bet", ("{0}", "out", "-F"), ("real:bold-ds000005",), tier="standard"))
+    # bet -S, -B, -A, -A2 on real heads (SIENA's and the skull surfaces' calls; 2026-11-04)
+    add("adult-ds000005-S", "real", "an adult (ds000005): bet -S -m (the eyes removed)", S("bet", ("{0}", "out", "-S", "-m"), ("real:adult-ds000005",), tier="standard", silent_ok=s_ok))
+    add("tumour-S", "real", "a tumour (ds005003): bet -S", S("bet", ("{0}", "out", "-S"), ("real:tumour",), tier="standard", silent_ok=s_ok))
+    add("child-3y-B", "real", "a 3.5-year-old (ds000228): bet -B -m (the bias field, the neck)", S("bet", ("{0}", "out", "-B", "-m"), ("real:child-3y",), tier="standard"))
+    add("older-82y-B", "real", "an adult of 82 years with the neck (ds003592): bet -B -s", S("bet", ("{0}", "out", "-B", "-s"), ("real:older-82y",), tier="standard"))
+    add("older-75y-A", "real", "an adult of 75 years at 1.5 T (ds002422): bet -A", S("bet", ("{0}", "out", "-A"), ("real:older-75y",), tier="standard"))
+    add("child-7y-A2", "real", "a child of 7.5 years with motion (ds000256): bet -A2 with its T2w", S("bet", ("{0}", "out", "-A2", "{1}", "-m"), ("real:child-7y", "real:t2:child-7y"), tier="standard"))
     add("bold-first", "real", "a BOLD series (ds000005): bet2 on its first volume (FSL's warning)", S("bet2", ("{0}", "out", "-f", "0.3", "-m"), ("real:bold-ds000005",), tier="standard"))
+
+    # --- fslroi (2026-11-04: the program; bet's -F and -Z and standard_space_roi run it) ---------
+    R = "fslroi"
+    add("t", R, "one volume (tmin tsize) of a 3D image", S(R, ("{0}", "out", "0", "1"), (h,)))
+    add("box", R, "a box with a negative start (zeros outside) and a size of -1", S(R, ("{0}", "out", "10", "40", "-2", "30", "5", "-1"), (h,)))
+    add("box-4d", R, "x, y, z and t of a BOLD series", S(R, ("{0}", "out", "10", "20", "12", "30", "5", "10", "2", "3"), ("real:bold-ds000005",), tier="standard"))
+    add("t-4d", R, "volumes 3 to the end (-1) of a BOLD series", S(R, ("{0}", "out", "3", "-1"), ("real:bold-ds000005",), tier="standard"))
+    for name in ("head-i16", "head-u8", "head-i8", "head-u16", "head-i32", "head-f64", "head-i16-scaled", "head-neuro", "head-oblique", "head-noxform", "head-pair", "head-nifti2", "head-analyze"):
+        add(f"type-{name}", R, f"a box of {name} (its type, orientation, transforms and format kept)", S(R, ("{0}", "out", "3", "50", "4", "60", "2", "40"), (name,), tier="standard"))
+    add("output-pair", R, "FSLOUTPUTTYPE=NIFTI_PAIR", S(R, ("{0}", "out", "3", "50", "4", "60", "2", "40"), (h,), output_type="NIFTI_PAIR", tier="standard"))
+    add("usage", R, "three arguments: the usage (exit 1)", S(R, ("{0}", "out", "1"), (h,), expect="error"))
+    add("no-arguments", R, "no arguments: the usage", S(R, (), (), expect="error"))
+    add("invalid-roi", R, "a size of -3: Invalid ROI dimensions, exit 0 (FSL-215)", S(R, ("{0}", "out", "5", "-3"), (h,)))
+    add("time-out-of-bounds", R, "a time index past the series: Out of Bounds, exit 0 (FSL-215)", S(R, ("{0}", "out", "0", "10", "0", "10", "0", "10", "5", "1"), (h,), tier="standard"))
+    add("missing-input", R, "an input that does not exist: exit 0 (FSL-215)", S(R, ("/nonexistent/in", "out", "0", "1"), ()))
+    add("words", R, "numbers that are words (atoi: 0)", S(R, ("{0}", "out", "a", "b"), (h,), tier="standard"))
+    add("int8-negative", R, "an int8 image with negative values: written as uint8 with the same bytes (FSL-217)", S(R, ("{0}", "out", "0", "1"), ("head-i8",), tier="standard"))
+    add("int8-positive", R, "an int8 image without negative values: uint8 (FSL-217, the type only)", S(R, ("{0}", "out", "0", "1"), ("head-i8-positive",), tier="standard"))
+
+    # --- standard_space_roi (2026-11-04: FLIRT's script, run by bet -S and -B) -------------------
+    Q = "standard_space_roi"
+    fsl_std = fsl_dir()
+    std_mask = str(fsl_std / "data/standard/MNI152_T1_2mm_brain_mask.nii.gz") if fsl_std else "/missing"
+    # the phantoms: the T2-like head to the T1-like one as the reference (-ssref), FLIRT quick
+    ref = ("-ssref", "{1}")
+    ph = ("head-t2", h)
+    add("phantom-default", "ssroi", "the T2-like head to the T1-like one (-ssref): the FOV mask and cut", S(Q, ("{0}", "out", *ref), ph))
+    add("phantom-debug", "ssroi", "-d: the temporary files kept", S(Q, ("{0}", "out", *ref, "-d"), ph))
+    add("phantom-masknone", "ssroi", "-maskNONE: the cut only", S(Q, ("{0}", "out", *ref, "-maskNONE"), ph, tier="standard"))
+    add("phantom-roinone", "ssroi", "-roiNONE -d: the mask only (imcp of the masked image)", S(Q, ("{0}", "out", *ref, "-roiNONE", "-d"), ph))
+    add("phantom-none", "ssroi", "-maskNONE -roiNONE: imcp of the input, as stored (.nii.gz)", S(Q, ("{0}", "out", *ref, "-maskNONE", "-roiNONE"), ph, tier="standard"))
+    add("phantom-none-convert", "ssroi", "-maskNONE -roiNONE with FSLOUTPUTTYPE=NIFTI: fslpy converts the .nii.gz input with nibabel",
+        S(Q, ("{0}", "out", *ref, "-maskNONE", "-roiNONE"), ph, output_type="NIFTI", expect="pending", tier="standard"))
+    add("phantom-masks", "ssroi", "-maskMASK and -roiMASK (the head's mask as a standard-space mask) -d", S(Q, ("{0}", "out", *ref, "-maskMASK", "{2}", "-roiMASK", "{2}", "-d"), (*ph, "head-mask")))
+    add("phantom-altinput", "ssroi", "-altinput: another image masked and cut", S(Q, ("{0}", "out", *ref, "-altinput", "{2}"), (*ph, "head-i16"), tier="standard"))
+    add("phantom-flirt-options", "ssroi", "FLIRT's options after the script's (-dof 6 -cost mutualinfo)", S(Q, ("{0}", "out", *ref, "-dof", "6", "-cost", "mutualinfo"), ph, tier="standard"))
+    add("phantom-pair", "ssroi", "FSLOUTPUTTYPE=NIFTI_PAIR (every file a pair; imcp copies the pair)", S(Q, ("{0}", "out", *ref, "-roiNONE"), ph, output_type="NIFTI_PAIR", tier="standard"))
+    add("phantom-last-wins", "ssroi", "-maskNONE -maskFOV -roiNONE -roiFOV: the last of each kind", S(Q, ("{0}", "out", *ref, "-maskNONE", "-maskFOV", "-roiNONE", "-roiFOV"), ph, tier="standard"))
+    add("usage", "ssroi", "one argument: the usage (exit 1; FSLDIR in its text)", S(Q, ("{0}",), (h,), expect="error"))
+    add("invalid-input", "ssroi", "an input that does not exist", S(Q, ("/nonexistent/in", "out"), (), expect="error"))
+    add("empty-input", "ssroi", "an empty input: remove_ext's usage becomes its name (FSL-211)", S(Q, ("", "out"), (), expect="error", tier="standard"))
+    add("invalid-ssref", "ssroi", "-ssref of an image that does not exist", S(Q, ("{0}", "out", "-ssref", "/nonexistent/ref"), (h,), expect="error"))
+    add("ssref-without-value", "ssroi", "-ssref as the last argument: the usage", S(Q, ("{0}", "out", "-ssref"), (h,), expect="error", tier="standard"))
+    add("invalid-altinput", "ssroi", "-altinput of an image that does not exist", S(Q, ("{0}", "out", "-altinput", "/nonexistent/x"), (h,), expect="error", tier="standard"))
+    add("invalid-roimask", "ssroi", "-roiMASK of an image that does not exist", S(Q, ("{0}", "out", "-roiMASK", "/nonexistent/x"), (h,), expect="error", tier="standard"))
+    add("invalid-maskmask", "ssroi", "-maskMASK of an image that does not exist", S(Q, ("{0}", "out", "-maskMASK", "/nonexistent/x"), (h,), expect="error", tier="standard"))
+    add("flirt-refuses", "defects", "an option FLIRT refuses: the script goes on and exits 0 without an output (FSL-214)", S(Q, ("{0}", "out", *ref, "-bogus"), ph))
+    add("output-blank", "defects", "an output name with a blank: split into words (FSL-211)", S(Q, ("{0}", "out put", *ref, "-dof", "6"), ph, tier="standard"))
+    add("input-blank", "defects", "an input name with a blank: not valid (FSL-211)", S(Q, ("{0} x", "out", *ref), ph, expect="error", tier="standard"))
+    add("option-blank", "defects", "an option with a blank ends the options with the shell's message (FSL-211)", S(Q, ("{0}", "out", *ref, "-d -maskNONE"), ph, tier="standard"))
+    add("cleanup-glob", "defects", "a file of the user named <out>_tmp...: the cleanup removes it (FSL-212)", S(Q, ("{0}", "out", *ref), ph, files=(("out_tmp_notes.txt", "mine\n"),), tier="standard"))
+    add("maskthr-env", "defects", "maskthr in the environment applied to the mask (FSL-213)", S(Q, ("{0}", "out", *ref, "-roiNONE", "-d"), ph, env=(("maskthr", "-thr 0.9"),), tier="standard"))
+    # real T1w images with FSL's MNI152_T1_2mm (FSLDIR): bet -S/-B's calls and the defaults
+    add("adult-default", "ssroi", "an adult's T1w (ds000005) to MNI152 2 mm: the defaults", S(Q, ("{0}", "out"), ("real:adult-ds000005",), tier="standard", silent_ok=("FSL-09",)))
+    add("child-b", "ssroi", "a 3.5-year-old's T1w: -b -d (bet -S and -B's call)", S(Q, ("{0}", "out", "-b", "-d"), ("real:child-3y",), tier="standard"))
+    add("older-maskfov", "ssroi", "an 82-year-old's T1w: -maskFOV -roiNONE -d (bet -B's skull call)", S(Q, ("{0}", "out", "-maskFOV", "-roiNONE", "-d"), ("real:older-82y",), tier="standard"))
+    add("tumour-roimask", "ssroi", "a tumour's T1w: -maskNONE -roiMASK MNI152's brain mask", S(Q, ("{0}", "out", "-maskNONE", "-roiMASK", std_mask), ("real:tumour",), tier="standard", silent_ok=("FSL-09",)))
+    add("philips-b-masks", "ssroi", "a Philips T1w: -b then -maskMASK (the last mask, -b's threshold kept)", S(Q, ("{0}", "out", "-b", "-maskMASK", std_mask), ("real:philips",), tier="standard", silent_ok=("FSL-09",)))
+    add("t2-default", "ssroi", "a T2w (ds000256) to the T1 template: the defaults", S(Q, ("{0}", "out"), ("real:t2:child-7y",), tier="standard", silent_ok=("FSL-09",)))
     # fmt: on
     return out
 
@@ -1277,6 +1411,9 @@ def _phantoms() -> dict[str, Path]:
     p["head-i16"] = _save(np.round(t1).astype(np.int16), d / "head-i16.nii.gz")
     p["head-u8"] = _save(np.clip(np.round(t1 / 4), 0, 255).astype(np.uint8), d / "head-u8.nii.gz")
     p["head-i8"] = _save(np.clip(np.round(t1 / 8), -128, 127).astype(np.int8), d / "head-i8.nii.gz")
+    p["head-i8-positive"] = _save(
+        np.clip(np.round(t1 / 8), 0, 127).astype(np.int8), d / "head-i8p.nii.gz"
+    )
     p["head-u16"] = _save(np.round(t1 * 10).astype(np.uint16), d / "head-u16.nii.gz")
     p["head-i32"] = _save(np.round(t1 * 1000).astype(np.int32), d / "head-i32.nii.gz")
     p["head-f64"] = _save(t1.astype(np.float64), d / "head-f64.nii.gz")
@@ -1300,6 +1437,9 @@ def _phantoms() -> dict[str, Path]:
     )
     p["head-2d"] = _save(t1[:, :, 42:43], d / "head-2d.nii.gz")
     p["slab"] = _save(t1[:, :, 27:57], d / "slab.nii.gz")
+    p["slab-i8"] = _save(
+        np.clip(np.round(t1[:, :, 27:57] / 8), -128, 127).astype(np.int8), d / "slab-i8.nii.gz"
+    )
     p["constant"] = _save(np.full((40, 40, 30), 100.0, dtype=np.float32), d / "constant.nii.gz")
     ct = np.where(truth > 0, 40.0, -1000.0).astype(np.float32)
     ct[(t1 > 700) & (truth == 0)] = 1200.0
@@ -1315,6 +1455,13 @@ def _phantoms() -> dict[str, Path]:
     p["head-ext"] = d / "head-ext.nii"
     small, _ = _head(T2_LEVELS, 4, shape=(80, 96, 70))
     p["head-t2-small"] = _save(small, d / "head-t2-small.nii.gz")
+    # bet -S's threshold (FSL-216): intensities whose brain mean fslstats prints with an
+    # exponent, and NaN voxels inside the brain (its mean printed nan)
+    p["head-large"] = _save((t1 * 3000).astype(np.float32), d / "head-large.nii.gz")
+    nan = t1.copy()
+    c = tuple(n // 2 for n in HEAD_SHAPE)
+    nan[c[0] - 2 : c[0] + 2, c[1] - 2 : c[1] + 2, c[2] - 2 : c[2] + 2] = np.nan
+    p["head-nan"] = _save(nan, d / "head-nan.nii.gz")
     # betsurf's inputs: FSL's own bet2 mesh of the head, and a matrix to MNI152's 2 mm grid
     mesh_dir = d / "mesh"
     mesh_dir.mkdir(exist_ok=True)
@@ -1567,6 +1714,30 @@ def named_entry(run: Run) -> str | None:
     return next((d for d in FILL_DEFECTS if f"upstream defect {d} (" in run.err), None)
 
 
+#: bet's variations with a replica only (2026-11-04): the clean-room original refuses them.
+REPLICA_ONLY_VARIATIONS = ("-S", "-B", "-A", "-A2")
+#: The programs of this suite with no clean-room original yet (the clean-room catch-up part's,
+#: from ``specs/standard_space_roi.md``): left out of the original's suite; a random case the
+#: original's descriptor draws for them expects larmorx's refusal.
+REPLICA_ONLY_TOOLS = ("fslroi", "standard_space_roi")
+#: Cases of FSL-217 (bet -F and -Z of an int8 image with negative values), which the clean-room
+#: original does not reproduce yet (the register's gap "original": the clean-room catch-up part's):
+#: left out of the original's suite until then.
+ORIGINAL_PENDING_CASES = ("bet/fmri-int8", "bet/small-fov-int8", "bet/small-fov-int8-debug")
+
+
+def replica_only_variation(s: Scenario) -> bool:
+    """Whether a ``bet`` case runs ``-S``, ``-B``, ``-A`` or ``-A2`` (the last variation given
+    decides, as in the script)."""
+    if s.tool != "bet":
+        return False
+    last = None
+    for a in s.args[2:]:
+        if a in ("-R", "-S", "-Z", "-F", "-A", "-A2", "-B"):
+            last = a
+    return last in REPLICA_ONLY_VARIATIONS
+
+
 def run_case(case: Case, checks: CheckList) -> None:
     with fsl_versions.using("replica"):
         _run_case(case, checks)
@@ -1583,7 +1754,20 @@ def _run_case(case: Case, checks: CheckList) -> None:
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
     args = _arguments(s, paths)
+    if original() and s.expect != "error" and replica_only_variation(s):
+        # bet -S, -B, -A, -A2: the clean-room original refuses them as pending (their original
+        # is to be written from specs/bet.md)
+        s = replace(s, expect="pending")
     env = environment(s.output_type, s.env)
+    if original() and s.tool in REPLICA_ONLY_TOOLS:
+        # no clean-room original of the program yet: larmorx says so (exit 127)
+        with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
+            ours = run_larmorx(s.tool, args, "reproduce", env, Path(tmp))
+        refused = ours.code == 127 and "no clean-room original" in ours.err
+        checks("refused: no clean-room original yet", refused, detail=larmorx_err_line(ours))
+        raise Outcome(
+            EXPECTED, f"{s.tool} has no clean-room original yet: {larmorx_err_line(ours)}"
+        )
     inputs = tuple(name for name, _ in s.files)
     with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
         root = option_free(Path(tmp))
@@ -1597,7 +1781,9 @@ def _run_case(case: Case, checks: CheckList) -> None:
             raise Outcome(EXPECTED, PENDING + larmorx_err_line(ours))
         fsl = oracle_run(s.tool, args, env, f_dir, never=case_never(s))
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
-        crash = crashed(fsl)
+        # standard_space_roi goes on after a program it runs crashed (no -e, no trap): only the
+        # script's own end by a signal is a crash
+        crash = crashed(fsl) if s.tool != "standard_space_roi" else fsl.code in (134, 139)
         fill_entry = s.fix_refuses if s.expect == "crash-filled" else None
         # a random case whose filled run then meets a failure FSL never reaches (an unknown
         # FSLOUTPUTTYPE at the first save)
@@ -2052,6 +2238,13 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
     import larmorx as lx
 
     function, kwargs, outputs = s.python  # type: ignore[misc]
+    # an input named as the case's ({k}); bet's standard images from the oracle's FSLDIR
+    kwargs = {
+        k: str(paths[int(v[1:-1])]) if isinstance(v, str) and v[:1] == "{" else v
+        for k, v in kwargs.items()
+    }
+    if function == "bet" and kwargs.get("variation") in ("eyes", "bias", "surfaces", "surfaces_t2"):
+        kwargs["fsl_data"] = str(fsl_dir() / "data")
     env = dict(os.environ, LARMORX_NC_BIN=str(replica_binary()))
     impl = "original" if original() else "auto"
     with process_environment(env), warnings.catch_warnings():
@@ -2073,7 +2266,9 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
                 **kwargs,
             )
     for name, attr in outputs.items():
-        img = getattr(result, attr)
+        img = result
+        for part in attr.split("."):
+            img = getattr(img, part)
         theirs = image_data(f_dir / name)
         same = (
             img is not None
@@ -2101,8 +2296,8 @@ def highlights(results: list[CaseResult]) -> list[str]:
         f"- **{passed} of {n} cases bit-identical to FSL** (exit status, messages, every file); "
         f"{both} where both refuse or FSL crashes and the replica refuses; {filled} where FSL "
         "crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure "
-        f"cases: deterministic, named; the default refuses or corrects); {pending} pending (options that "
-        "run FSL programs larmorx does not replicate yet).",
+        f"cases: deterministic, named; the default refuses or corrects); {pending} pending (steps of FSL's "
+        "larmorx does not replicate yet).",
         f"- **{same} of {files} files** written byte for byte as FSL writes them.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
@@ -2138,15 +2333,18 @@ def suite(implementation: str = "replica") -> Suite:
     if implementation == "original":
         return _original_suite()
     tool = (
-        f"`larmorx-nc fsl bet`, `bet2` and `betsurf` ({replica_version()}; crate larmorx-nc-bet, the "
-        f"replica translated from FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
-        "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`"
+        f"`larmorx-nc fsl bet` (every variation), `bet2`, `betsurf`, `standard_space_roi` and `fslroi` "
+        f"({replica_version()}; crates larmorx-nc-bet, -flirt and -avwutils, the replicas translated from "
+        f"FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
+        "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf` / `lx.fsl.standard_space_roi` / "
+        "`lx.fsl.fslroi`"
     )
     return Suite(
         name="fsl-bet-replica",
         title="BET (replica)",
         tool=tool,
-        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
+        reference=f"bet, bet2, betsurf, standard_space_roi and fslroi (with the programs bet's options run) "
+        f"from {fsl_version()}, the conda installation in "
         f"`~/{fsl_versions.INSTALLS.get(fsl_versions.selected('replica'), 'fsl')}`",
         thresholds=[
             (
@@ -2171,8 +2369,10 @@ def suite(implementation: str = "replica") -> Suite:
             "(FSL never on it), `FSLDIR` set, an empty `HOME` and the case's `FSLOUTPUTTYPE`. The replica is "
             "compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also compare the "
             "replica with fMRIPrep's own outputs of the node and run FSL again and fMRIPrep 25.2.6's FSL (FSL's "
-            "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does "
-            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing. "
+            "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run their programs in the "
+            "replica's process (FLIRT, standard_space_roi, FAST, fslmaths, fslstats, betsurf, fslpy's `immv`, "
+            "GNU dc's arithmetic), with FSL's standard images from `FSLDIR` (the files larmorx-nc ships); the "
+            "cases of standard_space_roi and fslroi are in this record. "
             + fsl_versions.record_line("replica")
         ),
     )
@@ -2182,7 +2382,11 @@ def _original_cases(tier: str) -> list[Case]:
     """The suite's cases, and from the standard tier on also betsurf's real images (the full
     tier's for the replica): fMRIPrep does not call betsurf, so its real cases are the ones
     that show the original on real heads (bet2's mesh and FLIRT's matrices made by FSL)."""
-    cases = cases_of(tier)
+    cases = [
+        c
+        for c in cases_of(tier)
+        if c.payload.tool not in REPLICA_ONLY_TOOLS and c.id not in ORIGINAL_PENDING_CASES
+    ]
     if TIERS.index(tier) >= TIERS.index("standard"):
         have = {c.id for c in cases}
         for cid, category, desc, s in _scenarios():
@@ -2260,8 +2464,8 @@ def _original_suite() -> Suite:
             "variability) and report the original's agreement with fMRIPrep's own outputs. "
             "betsurf's real images (the full tier's for the replica) run in this standard tier, "
             "on bet2's meshes and FLIRT's matrices made by FSL. The `-S`, `-B`, `-A` and `-A2` variations of "
-            "`bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): "
-            "the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
+            "`bet` have no clean-room original yet (the replica runs them; the original's catch-up, from "
+            "`specs/bet.md` §5.3): the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
             "`--fsl-version` default)."
         ),
     )

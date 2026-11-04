@@ -60,3 +60,19 @@ pub fn fslstats(
     };
     larmorx_nc_core::fslstats::main(&argv, &run, out, err)
 }
+
+/// `fslroi <input> <output> <xmin> <xsize> <ymin> <ysize> <zmin> <zsize> [<tmin> <tsize>]` or
+/// `fslroi <input> <output> <tmin> <tsize>`, with FSL's messages and exit statuses (0 after the
+/// exceptions its `main` catches: FSL-215, corrected to 1 by default). fslroi runs on one thread.
+pub fn fslroi(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    _threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let mut argv = vec!["fslroi".to_owned()];
+    argv.extend(args.iter().cloned());
+    crate::fslroi::main(&argv, settings, mode, out, err)
+}

@@ -1943,3 +1943,22 @@ together at the end.
   otherwise download FSL's whole data package (about 196 MB) for 1.5 MB of it. **User decision:** "yes": the small
   FSL standard files `larmorx-nc` ships are committed under `crates-nc/` (with FSL's Licence, MNI's notice and a
   manifest of origin and SHA-256), the one exception to the rule (CLAUDE.md, "Working on this machine").
+
+## 2026-11-04: BET's `-S`, `-B`, `-A`, `-A2` in the replica (the decisions by the rules)
+- **The part:** the BET replica runs every variation of FSL 6.0.7.23's `bet` script, with
+  `standard_space_roi` and `fslroi` as replicas of their own and FSL's three standard images in
+  `larmorx-nc` (the user's two decisions above); its first relay wired the replicas' `reproduce`
+  to glibc's double `sin`, `cos` and `sincos` (GLIBC-07 named in exact cases only, as decided).
+- **By the rules, each with the `reproduce` switch:** FSL-211 (standard_space_roi's unquoted
+  names, rule A: the names as given), FSL-212 (its cleanup's glob, A: only its own files),
+  FSL-213 (`maskthr` taken from the environment, A: ignored, named), FSL-214 (no step's status
+  checked, mostly exit 0 without an output; rule B: stop at the first failure, exit 1), FSL-215
+  (fslroi's exit 0 after its errors, A), FSL-216 (`-S`'s eye threshold through `dc`: A for a
+  number with an exponent or a minus sign, B for NaN and infinity), FSL-217 (fslroi and fslmerge
+  write int8 as uint8 with the same bytes, A: int8 kept with its values; fslroi's output is then
+  int8 where FSL's is uint8, named on every int8 input).
+- **Kept (rule C, documented in `specs/standard_space_roi.md` §3.2):** fslroi's other templated
+  types (uint16 written as int32 keeps every value; uint32, int64 and uint64 written as float32
+  round integers beyond 2^24), FSL's design as for fslmaths.
+- **Not replicated yet, refused clearly:** fslpy's conversion of an image's file type in `imcp`
+  (nibabel); one record case pending.

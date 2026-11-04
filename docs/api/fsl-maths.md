@@ -52,11 +52,12 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-maths-replica`, record [fsl-maths-replica](../validation/fsl-maths-replica.md), standard
-tier, 2026-11-03: 358 of 360 compared cases bit-identical, the other two differing in the last
-place as glibc does (GLIBC-07, below): `fn/double-tan` in 3 of its 210 double-precision values
-(glibc's `tan`) and random testing's `fft-twiddles-glibc-sincos` in 1 of its 90 float voxels
-(glibc's `sincos` in the FFT's twiddle factors); 61 more rejected by both alike; random
-testing's permanent cases among them): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
+tier, 2026-11-04: 360 of 361 compared cases bit-identical, the other one, `fn/double-tan`,
+differing in the last place in 3 of its 210 double-precision values as glibc's `tan` does
+(GLIBC-07, below; random testing's `fft-twiddles-glibc-sincos`, an expected divergence on
+2026-11-03, is FSL's bit for bit since the replica's `reproduce` takes glibc's `sincos` for the
+FFT's twiddle factors); 61 more rejected by both alike; random testing's permanent cases among
+them): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
 bit-identical on three oracle runs (ds000005, ds005040 in two kinds, ds003592), fMRIPrep's 14
 goodvoxels calls bit-identical in their workflow's order on ds005040's BOLD series (the ribbon a
 stand-in: the segmentation's grey matter, as the no-reconall oracle runs have no FreeSurfer
@@ -67,8 +68,9 @@ by file (data and header). Random testing (2026-11-03, 24 minutes: 114,906 reali
 one to four operations on drawn images of every stored type): every one identical after three
 fixes, but one, an FFT convolution of a 30 x 1 x 3 image one unit in the last place in 1 of 90
 voxels (the FFT's twiddle factors, which FSL takes from glibc's `sincos`: GLIBC-07, below; with
-FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of a correction
-whose effect a later operation of the chain removed.
+FSL's own factors the replica's output is FSL's bit for bit, and so it is with `reproduce` since
+2026-11-04), and 595 notices of a correction whose effect a later operation of the chain
+removed.
 
 The original against FSL 6.0.7.23 (the parity suite `fsl-maths`, record
 [fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-04, §21's thresholds): 442 cases
@@ -207,9 +209,15 @@ a float image's result is FSL's. Under `-dt double` a few voxels differ in the l
 for `log` to 0.21 % for `tan`). With `upstream_defects="reproduce"` the clean-room original gives
 glibc's bits for `exp`, `log`, `pow`, `sin` and `cos` (`larmorx_core::math`'s `*_glibc`
 functions, written from permissive code and from `specs/glibc-dbl.md`, proved bit for bit against
-glibc 2.35), the replica for `exp`, `log` and `pow`; `tan`, `asin`, `acos` and `atan` stay
-correctly rounded in both modes (the user's decision of 2026-11-04). The original names GLIBC-07,
-in both modes, exactly where the other choice stores another value in a voxel.
+glibc 2.35), and so does the replica (since 2026-11-04 for `sin` and `cos`); `tan`, `asin`, `acos`
+and `atan` stay correctly rounded in both modes (the user's decision of 2026-11-04). Both name
+GLIBC-07, in both modes, exactly where the other choice stores another value in a voxel. The
+replica's FFT convolution (FSL's path for a large non-separable kernel of `-fmean` or `-fmeanu`)
+takes its twiddle factors from glibc's `sincos` with `reproduce` (FSL's library's, through
+`cexp`: Armadillo's factors and transforms bit for bit on every length from 1 to 256) and
+correctly rounded by default; a filter, it names nothing, and the default's factors can move a
+convolved voxel's last bit (the original computes its convolutions by the direct sum, without
+twiddle factors).
 
 The original makes the same choice wherever `specs/fslmaths.md` names glibc's functions: `-s`'s and
 `-kernel gauss`'s single-precision taps (`expf`), `-dog_edge`'s Gaussians and `-bptf`'s weights
@@ -298,9 +306,9 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   writing its output, depending on its heap. No output voxel depends on it: the original names it
   in both modes and writes the output.
 - **GLIBC-07**: glibc's maths functions, and `sincos` in the FFT's twiddle factors, are not
-  correctly rounded (above): `reproduce` gives glibc's bits where the spec names them (not the
-  twiddles: the original has no FFT); named exactly for the voxelwise functions, not for the
-  filters.
+  correctly rounded (above): `reproduce` gives glibc's bits where the spec names them (the
+  original has no FFT; the replica's FFT takes glibc's `sincos` with `reproduce`); named exactly
+  for the voxelwise functions, not for the filters.
 
 ## Not yet
 

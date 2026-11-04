@@ -1933,6 +1933,14 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     v = common.outcome_verdict(r)
     if v is not None:
         verdict, why = v
+        if r["case"] == "opt/fsl145-one-coefficient":
+            why = (
+                "Outside the record, a follow-up of the clean-room original: --splineorder=2 at "
+                "--subsamp=2 with z shorter than one knot spacing, where FSL-145 gives one "
+                "coefficient whose refit stops FSL ('Error occurred when preparing to run "
+                "topup', exit status 1); the original's reproduce mode runs on (FSL's stop "
+                "follows in its next part). " + why
+            )
         if verdict == "both-reject" and named:
             why += (
                 f" The clean-room original's default mode finishes instead (exit status 0), "

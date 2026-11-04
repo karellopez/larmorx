@@ -564,7 +564,9 @@ def outcome_verdict(r: dict) -> tuple[str, str] | None:
         return "divergence", clip(r["reason"])
     if st == "fail":
         why = "; ".join(
-            f"{c['name']}: {c.get('value')} (threshold {c.get('threshold')})"
+            f"{c['name']}: {c.get('detail')}"
+            if c.get("value") is None and c.get("detail")
+            else f"{c['name']}: {c.get('value')} (threshold {c.get('threshold')})"
             for c in r.get("failed_checks", [])
         )
         return "open", clip(why or r["reason"])

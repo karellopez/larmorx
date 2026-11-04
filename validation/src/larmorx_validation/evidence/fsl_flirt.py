@@ -1292,6 +1292,17 @@ def _zero(x) -> bool:
     return x == "yes" or (isinstance(x, (int, float)) and not isinstance(x, bool) and x == 0)
 
 
+#: Failing cases of the original's record that came from the replica's suite after the
+#: original's last part, and what follows for them.
+FOLLOW_UPS = {
+    "programs/pointflirt-no-points": "Outside the record, a follow-up of the clean-room original: "
+    "pointflirt given two coordinate files that do not exist (no points), where FSL crashes "
+    "(FSL-204, registered on 2026-11-03); the record asks the original to refuse naming "
+    "FSL-204, and it exits with status 1 and FSL's message but names nothing yet (FSL-204 "
+    "follows in its next part).",
+}
+
+
 def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str, str]:
     """A case's verdict for the clean-room original: its record holds it to specs/flirt.md §13's
     thresholds (exit status and messages FSL's; files identical, matrices within a displacement,
@@ -1302,6 +1313,8 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
     from larmorx_validation.parity import fsl_flirt as fo
 
     v = common.outcome_verdict(r)
+    if v is not None and r["case"] in FOLLOW_UPS:
+        return v[0], common.clip(FOLLOW_UPS[r["case"]] + " " + v[1], 600)
     if v is not None:
         return v
     rep_ = r.get("reported", {})

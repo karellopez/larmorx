@@ -1795,6 +1795,16 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
                 else f" The clean-room original's default mode ends with exit status {code}, "
                 f"naming {', '.join(named)}."
             )
+        if r["case"] == "opt/nan-first":
+            why = (
+                "Outside the record, a follow-up of the clean-room original: an image whose first "
+                "voxel is NaN, whose extrema FAST takes as NaN and whose brain mask is then empty, "
+                "so its k-means stops with exit status 255 (FSL-203, registered with the "
+                "specification's answers of 2026-11-03); the original passes the case's "
+                "other checks against FSL (5 of 6), and its default finishes (exit status 0) but "
+                "names FSL-103 where the record asks for FSL-203 (FSL-203 follows in the "
+                "original's next part). " + why
+            )
         if r["case"] == "multi/s5":
             why = (
                 "Outside §11's thresholds, explained: five channels of which the first is nearly "

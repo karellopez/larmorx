@@ -86,6 +86,11 @@ the user's decision of 2026-10-29).
   last-bit warning of 2026-10-29 (a line ending in `(larmorx)`) is gone. The earlier glibc translations
   (`glibc_sincosf.rs`, `glibc_floatmath.rs`) are kept, unchanged and GPL-3.0-or-later AND
   LGPL-2.1-or-later, as the verification tools' reference in `crates-gpl/tools/glibc-reference`.
+  Likewise glibc's double `sincos` (IBM's code, LGPL), which AFNI's build calls for csfft's tables
+  and 3dTshift's Fourier phase factors: correctly rounded `sin` and `cos` by default and, since
+  2026-11-04, `larmorx_core::math::sincos_glibc` with `reproduce` (LARMORX's clean-room
+  implementation of `specs/glibc-dbl.md`, Apache-2.0; GLIBC-07; `csfft::sincos`), which gives the
+  same floats there (`docs/findings/afni-tshift.md`).
 - **larmorx's own code written for `larmorx-gpl`** (`x87`, `cnum`, `cli::output`, the command
   lines' dispatch, `cli::mod`; the tests and golden cases now in `crates/larmorx-cli/tests/`):
   relicensed to Apache-2.0 by its author, Karel Lopez Vilaret, on 2026-10-29, when the user

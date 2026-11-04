@@ -28,10 +28,13 @@
 //!   ([`crate::sincosf`]).
 //! - The Fourier method shifts two rows at once through one complex FFT (AFNI's own
 //!   `csfft_cox`, [`crate::csfft`]), with the phase factors built by recurrence (`RECUR`) from
-//!   double `cos`/`sin` stored as float, and the rows padded with zeros (`ZFILL`).
+//!   double `cos`/`sin` stored as float (one `sincos` call in AFNI's build: correctly rounded
+//!   by default, glibc 2.35's with `reproduce`, GLIBC-07; [`ShiftWork::with_mode`]), and the rows
+//!   padded with zeros (`ZFILL`).
 
 use crate::csfft::{Complex32, CsfftPlan};
 use crate::sincosf::{cosf, sinf};
+use larmorx_core::defects::UpstreamDefects;
 
 /// The interpolation methods of `SHIFT_set_method` (`MRI_FOURIER`, `MRI_LINEAR`, ...).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -59,9 +62,14 @@ pub enum Method {
 }
 
 /// Work space for [`shift_two_rows`]: AFNI keeps it in static variables (`row`, `cf`, `cg`,
-/// `lcbuf`); here each thread owns one. The FFT plan is kept for the last length used.
+/// `lcbuf`); here each thread owns one. The FFT plan is kept for the last length used. Its mode
+/// chooses the Fourier method's double `sin` and `cos` (AFNI's `sincos`, glibc's: GLIBC-07):
+/// correctly rounded by default ([`ShiftWork::default`]), glibc 2.35's with `reproduce`
+/// ([`ShiftWork::with_mode`]); a filter, so it names nothing (the user's decision of
+/// 2026-11-04).
 #[derive(Default)]
 pub struct ShiftWork {
+    mode: UpstreamDefects,
     plan: Option<CsfftPlan>,
     scratch: Vec<Complex32>,
     row: Vec<Complex32>,
@@ -77,9 +85,18 @@ impl std::fmt::Debug for ShiftWork {
 }
 
 impl ShiftWork {
+    /// Work space whose Fourier method takes its `sin` and `cos` as `mode` asks (see the type's
+    /// documentation).
+    pub fn with_mode(mode: UpstreamDefects) -> ShiftWork {
+        ShiftWork {
+            mode,
+            ..ShiftWork::default()
+        }
+    }
+
     fn plan(&mut self, nup: usize) -> &CsfftPlan {
         if self.plan.as_ref().is_none_or(|p| p.size() != nup) {
-            let plan = CsfftPlan::new(nup).unwrap_or_else(|e| panic!("{e}"));
+            let plan = CsfftPlan::with_mode(nup, self.mode).unwrap_or_else(|e| panic!("{e}"));
             self.scratch = vec![Complex32::default(); plan.scratch_len()];
             self.plan = Some(plan);
         }
@@ -149,14 +166,12 @@ fn cmult(u: Complex32, v: Complex32) -> Complex32 {
     Complex32::new(u.r * v.r - u.i * v.i, u.r * v.i + u.i * v.r)
 }
 
-/// `CEXPIT(t)`: `cos` and `sin` of the float `t` in double, stored as float.
+/// `CEXPIT(t)`: `cos` and `sin` of the float `t` in double (one `sincos` call in AFNI's build:
+/// glibc's with `glibc`, correctly rounded otherwise), stored as float.
 #[inline]
-fn cexpit(t: f32) -> Complex32 {
-    let t = f64::from(t);
-    Complex32::new(
-        larmorx_core::math::cos(t) as f32,
-        larmorx_core::math::sin(t) as f32,
-    )
+fn cexpit(t: f32, glibc: bool) -> Complex32 {
+    let (s, c) = crate::csfft::sincos(f64::from(t), glibc);
+    Complex32::new(c as f32, s as f32)
 }
 
 /// `fft_shift2` with `ZFILL` and `RECUR` defined, as AFNI builds it.
@@ -186,6 +201,7 @@ fn fft_shift2(
         return;
     }
 
+    let glibc = work.mode.reproduce();
     work.plan(nup);
     let ShiftWork {
         plan,
@@ -235,8 +251,8 @@ fn fft_shift2(
     let dk = ((2.0 * PI) / nup as f64) as f32;
     let sf = -af * dk;
     let sg = -ag * dk;
-    let csf = cexpit(sf);
-    let csg = cexpit(sg);
+    let csf = cexpit(sf, glibc);
+    let csg = cexpit(sg, glibc);
     let mut fac = Complex32::new(1.0, 0.0);
     let mut gac = Complex32::new(1.0, 0.0);
     for ii in 1..=nby2 {
@@ -629,6 +645,71 @@ fn ts_shift(af: f32, f: &mut [f32], lcbuf: &mut Vec<f32>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `CEXPIT` with `reproduce` stores glibc's `sincos` (AFNI's), by default the correctly
+    /// rounded `sin` and `cos`; rounded to `float`, the two agree on these arguments, although
+    /// their doubles differ on some.
+    #[test]
+    fn cexpit_takes_glibcs_sincos_with_reproduce() {
+        let mut doubles_differ = 0;
+        for k in -20000..=20000 {
+            let t = k as f32 * 1.7e-4;
+            let (s, c) = larmorx_core::math::sincos_glibc(f64::from(t));
+            let g = cexpit(t, true);
+            assert_eq!(
+                (g.r.to_bits(), g.i.to_bits()),
+                ((c as f32).to_bits(), (s as f32).to_bits())
+            );
+            let d = cexpit(t, false);
+            let x = f64::from(t);
+            let (sc, cc) = (larmorx_core::math::sin(x), larmorx_core::math::cos(x));
+            assert_eq!(
+                (d.r.to_bits(), d.i.to_bits()),
+                ((cc as f32).to_bits(), (sc as f32).to_bits())
+            );
+            doubles_differ += usize::from((s, c) != (sc, cc));
+            assert_eq!(
+                (g.r.to_bits(), g.i.to_bits()),
+                (d.r.to_bits(), d.i.to_bits()),
+                "{t}"
+            );
+        }
+        assert!(doubles_differ > 0);
+    }
+
+    /// Every finite `float` argument of `CEXPIT`: whether glibc's `sincos` and the correctly
+    /// rounded `sin` and `cos` ever give another `float` (a probe over 2^32 arguments, about 20 s
+    /// on 14 threads: `cargo test --release -p larmorx-afni-replica --lib -- --ignored
+    /// cexpit_on_every_float --nocapture`). Its result is in the record of the AFNI replica's
+    /// GLIBC-07 wiring (`docs/findings/afni-tshift.md`).
+    #[test]
+    #[ignore = "a probe over every float: run by hand, in release"]
+    fn cexpit_on_every_float() {
+        use rayon::prelude::*;
+        let differ: Vec<u32> = (0..=u32::MAX)
+            .into_par_iter()
+            .filter(|&b| {
+                let t = f32::from_bits(b);
+                if !t.is_finite() {
+                    return false;
+                }
+                let (g, d) = (cexpit(t, true), cexpit(t, false));
+                (g.r.to_bits(), g.i.to_bits()) != (d.r.to_bits(), d.i.to_bits())
+            })
+            .collect();
+        println!(
+            "cexpit: {} of the finite floats give another float pair",
+            differ.len()
+        );
+        for b in differ.iter().take(20) {
+            let t = f32::from_bits(*b);
+            println!(
+                "  {t:e} ({b:08x}): {:?} vs {:?}",
+                cexpit(t, true),
+                cexpit(t, false)
+            );
+        }
+    }
 
     fn ramp(n: usize) -> Vec<f32> {
         (0..n)

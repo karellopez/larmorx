@@ -33,8 +33,10 @@ FSL cannot represent, the hidden options; the sorting statistics of values holdi
 may read outside its vector (fslmaths' ``-Tmedian``, ``-Tperc`` and their X, Y and Z forms,
 fslstats' ``-p`` and ``-P``: FSL-168 and FSL-181, the record's cases), ``-tfce``, ``-tfceS`` and
 ``-roc`` of values holding NaN or infinities (FSL-153, FSL-174: the record's cases), and glibc's
-double ``sin``, ``cos``, ``tan``, ``asin``, ``acos`` and ``atan`` in double precision (GLIBC-07:
-the record's expected divergences)."""
+double ``tan``, ``asin``, ``acos`` and ``atan`` in double precision (GLIBC-07: correctly rounded
+in both modes by the user's decision of 2026-11-04, the record's expected divergences). glibc's
+``sin`` and ``cos`` are drawn in double precision too since 2026-11-04 (the replica's
+``reproduce`` gives their bits)."""
 
 from __future__ import annotations
 
@@ -70,6 +72,9 @@ GENERAL = ("head", "blobs", "noise", "ramp", "checker", "constant", "zeros", "sp
 GENERAL_WEIGHTS = (4, 3, 2, 1.5, 0.6, 0.3, 0.2, 0.8, 1)
 #: glibc 2.35's double functions that are IBM's code (not correctly rounded: GLIBC-07).
 IBM = ("-sin", "-cos", "-tan", "-asin", "-acos", "-atan")
+#: Those the replica computes correctly rounded in both modes (not drawn in double precision):
+#: glibc's ``sin`` and ``cos`` are its ``reproduce`` mode's since 2026-11-04.
+IBM_CORRECTLY_ROUNDED = ("-tan", "-asin", "-acos", "-atan")
 UNARY = {
     "-bin": 4,
     "-binv": 2,
@@ -327,7 +332,7 @@ def _op(c: _Chain, kind: str) -> None:
         else:
             c.add(op, op, _num(d.choice(op + " value", (2, 10, 25, 50, 75, 90, 98))))
     elif f == "unary":
-        ops = {k: w for k, w in UNARY.items() if not (st.double and k in IBM)}
+        ops = {k: w for k, w in UNARY.items() if not (st.double and k in IBM_CORRECTLY_ROUNDED)}
         op = d.choice("unary", tuple(ops), tuple(ops.values()))
         if op in ("-rand", "-randn") and d.chance("-seed", 0.5):
             c.add("-seed", "-seed", str(d.choice("seed", (1, 42, 12345))))

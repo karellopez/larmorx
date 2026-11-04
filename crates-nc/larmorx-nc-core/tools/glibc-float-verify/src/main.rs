@@ -130,7 +130,9 @@ fn sweep(
 
 fn kernel_report() -> bool {
     let (w, n) = (7, 1201);
-    let port = kernel::sinckernel1d("blackman", w, n, &mut Vec::new());
+    // the port as `reproduce` computes it (glibc's sinf and cos, the C library's)
+    let glibc = math::Libm::quiet(larmorx_core::defects::UpstreamDefects::Reproduce);
+    let port = kernel::sinckernel1d("blackman", w, n, &glibc, &mut Vec::new());
     let hw = (w - 1) / 2;
     let halfnk = ((f64::from(n) - 1.0) / 2.0) as f32;
     let (mut d_sinf, mut d_cos, mut d_val, mut d_port) = (0, 0, 0, 0);

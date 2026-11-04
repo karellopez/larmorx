@@ -69,4 +69,8 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
   on `OMP_NUM_THREADS` threads, with the same result at any count.
 - **The `descrip` field** of the images it writes is `larmorx-nc fsl flirt`.
 - **The C library's maths** are glibc 2.35's (`larmorx-nc-core`: `exp`, `tanh`, `logf`), as FSL's
-  Linux binaries call them, so the outputs are FLIRT's on Linux x86-64 on every platform.
+  Linux binaries call them, so the outputs are FLIRT's on Linux x86-64 on every platform. The
+  double `cos` of the sinc windows and of avscale's half transforms (glibc's is IBM's LGPL code)
+  is correctly rounded by default and, since 2026-11-04, glibc's with `reproduce`
+  (`larmorx_core::math::cos_glibc`, LARMORX's clean-room implementation of `specs/glibc-dbl.md`,
+  Apache-2.0; GLIBC-07), through `larmorx_core::math::Libm`.

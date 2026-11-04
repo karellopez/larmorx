@@ -249,6 +249,14 @@ where the other choice gives other weights, the original shifts the slice's seri
 names GLIBC-07, in both modes, exactly where the other choice stores another value (the record's
 `methods/glibc-sinf-wsinc5` and `-wsinc9`).
 
+The replica takes glibc's `sinf` and `cosf` for the weighted sinc in both modes (Arm's permissive
+code, as before), and since 2026-11-04 glibc's double `sincos` (AFNI's build merges each `sin` and
+`cos` into one `sincos` call) for the Fourier method's FFT tables and phase factors with
+`reproduce` (`larmorx_core::math::sincos_glibc`), the correctly rounded `sin` and `cos` by default.
+Rounded to float, the two choices agree on every table of every FFT length and on every float phase
+argument (`docs/findings/afni-tshift.md`), so the Fourier method's output is the same in both modes
+and names nothing.
+
 ## AFNI's global options and environment variables
 
 AFNI programs take *global options* out of the command line before reading their own, wherever

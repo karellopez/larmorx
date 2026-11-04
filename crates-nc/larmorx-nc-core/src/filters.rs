@@ -671,9 +671,9 @@ fn convolve_masked_axis<T: Arith>(
 ///   ([`convolve_masked_axis`]).
 /// - Not separable: the kernel divided (in `float`) by its sum when that is not 0, each volume
 ///   convolved by efficient_convolve (the direct sum, [`convolve_plain`], or, for a large kernel,
-///   the FFT, [`crate::kissfft::fft_convolve`], which prints no warning), then,
-///   when renormalising, divided by the same convolution of a volume of ones (an integer
-///   division by zero is FSL's trap).
+///   the FFT, [`crate::kissfft::fft_convolve`], which prints no warning, its twiddle factors
+///   from `libm`), then, when renormalising, divided by the same convolution of a volume of
+///   ones (an integer division by zero is FSL's trap).
 ///
 /// `msgs` receives what FSL prints, in its order (the empty kernel's sum message, the
 /// off-centre warnings of each call).
@@ -682,6 +682,7 @@ pub fn generic_convolve<T: Arith>(
     k: &Kern,
     separable: bool,
     renormalise: bool,
+    libm: &larmorx_core::math::Libm,
     msgs: &mut Vec<String>,
     conv: &mut impl FnMut(f64) -> T,
 ) -> Result<Volume<T>, ConvStop> {
@@ -732,7 +733,9 @@ pub fn generic_convolve<T: Arith>(
     let warn = !fft && norm_kernel.off_centre_by_size();
     let efficient = |v: &Volume<T>, conv: &mut dyn FnMut(f64) -> T| -> Volume<T> {
         if fft {
-            crate::kissfft::fft_convolve(v, norm_kernel.dims, &norm_kernel.data, &mut |x| conv(x))
+            crate::kissfft::fft_convolve(v, norm_kernel.dims, &norm_kernel.data, libm, &mut |x| {
+                conv(x)
+            })
         } else {
             convolve_plain(v, &norm_kernel, &mut |x| conv(x))
         }

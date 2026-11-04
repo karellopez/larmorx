@@ -618,6 +618,28 @@ const BET_CASES: &[BetCase] = &[
         named: &[],
         output_type: "NIFTI",
     },
+    // the sinc window's cos from glibc's (GLIBC-07, reproduce only; an interpolation: named
+    // nothing)
+    BetCase {
+        id: "flirt.applyxfm-sinc.reproduce",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyxfm",
+            "-interp",
+            "sinc",
+            "-out",
+            "out",
+        ],
+        mode: "reproduce",
+        named: &[],
+        output_type: "NIFTI",
+    },
     BetCase {
         id: "flirt.applyisoxfm-4d-spline",
         tool: "fsl flirt",
@@ -733,6 +755,15 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl avscale",
         args: &["--allparams", "{init}", "{t1}"],
         mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // the half transforms' cos from glibc's (GLIBC-07, reproduce only)
+    BetCase {
+        id: "avscale.allparams.reproduce",
+        tool: "fsl avscale",
+        args: &["--allparams", "{init}", "{t1}"],
+        mode: "reproduce",
         named: &[],
         output_type: "NIFTI",
     },
@@ -1236,7 +1267,8 @@ const BET_CASES: &[BetCase] = &[
     // dimension; the statistical transforms; -roi and -bptf; TFCE; -roc (its curves and printed
     // areas); -tensor_decomp; the data types (char, int, int8 with -odt input: FSL-157 corrected
     // and reproduced, written by FSL as uint8 with its values wrapped, FSL-151; a compressed output); the double functions (GLIBC-07: glibc's bits of exp
-    // and log in reproduce); FSL-160 corrected and reproduced, FSL-162 corrected. fslstats (its
+    // and log, and since 2026-11-04 of sin and cos, in reproduce; the FFT's twiddle factors from glibc's
+    // sincos in reproduce); FSL-160 corrected and reproduced, FSL-162 corrected. fslstats (its
     // printed numbers): every option in one call, -t with -K, -json (FSL-182), FSL-182 corrected
     // and reproduced. Intermediate images are kept with -save (written in the run directory).
     BetCase {
@@ -1343,6 +1375,16 @@ const BET_CASES: &[BetCase] = &[
         tool: "fsl fslmaths",
         args: &["{t2}", "-kernel", "boxv", "13", "-fmeanu", "out"],
         mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // the FFT's twiddle factors from glibc's sincos (GLIBC-07, reproduce only; a filter: named
+    // nothing)
+    BetCase {
+        id: "fslmaths.filters-fft.reproduce",
+        tool: "fsl fslmaths",
+        args: &["{t2}", "-kernel", "boxv", "13", "-fmeanu", "out"],
+        mode: "reproduce",
         named: &[],
         output_type: "NIFTI",
     },

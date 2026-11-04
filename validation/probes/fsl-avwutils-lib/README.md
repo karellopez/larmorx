@@ -103,6 +103,13 @@ Results on 2026-11-03 (glibc 2.35, x86-64), lengths 1 to 256:
   90 voxels, one unit in the last place); the probe build with Armadillo's factors is
   identical.
 
+**The replica's `reproduce` mode (2026-11-04).** Since BET's `-S`/`-B`/`-A`/`-A2` part (relay 1)
+the replica's `reproduce` takes the factors from glibc's `sincos` (`larmorx_core::math::sincos_glibc`,
+LARMORX's clean-room implementation of `specs/glibc-dbl.md`), the default keeping the correctly
+rounded `cos` and `sin`. `check_fft.py --mode reproduce` (the ignored tests read
+`LARMORX_FFT_MODE`), lengths 1 to 256, result on 2026-11-04: **0 of 65,792 factors differ from
+Armadillo's, and 0 of 197,376 transform values** (exit 0; `--mode fix` gives the counts above).
+
 Relay 9's first reading (`validation/investigations/fsl-maths/fft_twiddles.py`, glibc's
 separate `cos` and `sin`) had compared the wrong glibc function: on this CPU those are the FMA
 builds, which agree with the correctly rounded value where `sincos` does not.

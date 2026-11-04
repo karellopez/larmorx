@@ -52,10 +52,14 @@ what it translates.
 - **Maths (GLIBC-07):** fslmaths' `-exp`, `-log`, `-sin`, `-cos`, `-tan`, `-asin`, `-acos`,
   `-atan` and the hidden `-pow` are larmorx-core's correctly rounded functions (CORE-MATH's; `tan`
   ported for fslmaths, 2026-11-03) by default; with `reproduce`, `exp`, `log` and `pow` are glibc
-  2.35's (Arm's Optimized Routines, as the core translates them) and the other six stay correctly
-  rounded (glibc's are IBM's LGPL code, not translated): a double image then differs from FSL's
-  in the last place on the measured fraction of its voxels (0.07 to 0.21 %), a float image never
-  (`docs/findings/fsl-maths.md`, "Known differences"). The kernels', filters' and TFCE's own
+  2.35's (Arm's Optimized Routines, as the core translates them), since 2026-11-04 `sin` and `cos`
+  too (`larmorx_core::math::sin_glibc`, `cos_glibc`: LARMORX's clean-room implementation of
+  `specs/glibc-dbl.md`, Apache-2.0, no glibc code), and `tan`, `asin`, `acos` and `atan` stay
+  correctly rounded (glibc's are IBM's LGPL code with searched and fitted tables, not translated:
+  the user's decision of 2026-11-04): a double image then differs from FSL's in the last place on
+  the measured fraction of its voxels there (0.07 to 0.21 %), a float image never
+  (`docs/findings/fsl-maths.md`, "Known differences"). The FFT convolution's twiddle factors are
+  glibc's `sincos` with `reproduce` (`larmorx_core::math::sincos_glibc`). The kernels', filters' and TFCE's own
   `exp`, `expf`, `logf`, `pow` and `powf` are glibc's in both modes (`powf` from Arm's Optimized
   Routines: 0 of 10 million differ).
 - **Uncaught exceptions** (a missing image, images of other sizes): FSL aborts (SIGABRT) after

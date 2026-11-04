@@ -2142,8 +2142,11 @@ impl<'a> Flirt<'a> {
                     Window::Rect => "rectangular",
                 };
                 let mut msgs = Vec::new();
+                // the windows' cos: correctly rounded by default, glibc's with reproduce
+                // (GLIBC-07; an interpolation: named nothing)
+                let libm = larmorx_core::math::Libm::quiet(self.mode);
                 vol.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
-                    name, w, 1201, &mut msgs,
+                    name, w, 1201, &libm, &mut msgs,
                 )));
                 for l in &msgs {
                     self.el(l);

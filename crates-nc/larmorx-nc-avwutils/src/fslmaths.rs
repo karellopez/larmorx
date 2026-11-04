@@ -1132,10 +1132,12 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
             }
             "-exp" | "-log" | "-cos" | "-sin" | "-tan" | "-asin" | "-acos" | "-atan" => {
                 // Correctly rounded by default (larmorx_core::math, CORE-MATH's); glibc 2.35's
-                // functions are not (GLIBC-07). Its bits with `reproduce` where permissive code
-                // has them (exp, log: Arm's Optimized Routines, the code glibc 2.35 ships),
-                // named where they change a voxel; sin, cos, tan, asin, acos and atan (IBM's
-                // code in glibc, LGPL) are correctly rounded in both modes.
+                // functions are not (GLIBC-07). Its bits with `reproduce` for exp and log (Arm's
+                // Optimized Routines, the code glibc 2.35 ships) and for sin and cos (IBM's code
+                // in glibc, LGPL: the clean-room implementation of specs/glibc-dbl.md, the FMA
+                // build FSL's binary runs), named where they change a voxel; tan, asin, acos and
+                // atan are correctly rounded in both modes (the user's decision of 2026-11-04:
+                // their tables are searched and fitted data, no LGPL data in larmorx).
                 let n = looped_len(&input);
                 let reproduce = ctx.reproduce();
                 let mut moved = 0usize;
@@ -1149,8 +1151,8 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                     let (cr, glibc) = match op {
                         "-exp" => (math::exp(x), Some(glibc_double::exp(x))),
                         "-log" => (math::log(x), Some(glibc_double::log(x))),
-                        "-cos" => (math::cos(x), None),
-                        "-sin" => (math::sin(x), None),
+                        "-cos" => (math::cos(x), Some(math::cos_glibc(x))),
+                        "-sin" => (math::sin(x), Some(math::sin_glibc(x))),
                         "-tan" => (math::tan(x), None),
                         "-asin" => (math::asin(x), None),
                         "-acos" => (math::acos(x), None),
@@ -1357,7 +1359,9 @@ fn no_voxels(ctx: &mut Ctx, what: &str, known: bool) -> Res<()> {
 }
 
 /// `generic_convolve(input, kernel, separable, renormalise)` (`-s`, `-fmean`, `-fmeanu`), with
-/// FSL-160's correction: a zero-width Gaussian (its centre NaN) filters as the unit impulse.
+/// FSL-160's correction: a zero-width Gaussian (its centre NaN) filters as the unit impulse. The
+/// FFT's twiddle factors are correctly rounded by default and glibc's `sincos` with `reproduce`
+/// (GLIBC-07; a filter: named nothing, the user's decision of 2026-11-04).
 fn convolve<T: Arith>(
     ctx: &mut Ctx,
     input: &mut Volume<T>,
@@ -1386,9 +1390,16 @@ fn convolve<T: Arith>(
         }
     }
     let mut msgs = Vec::new();
-    let r = filters::generic_convolve(input, k, separable, renormalise, &mut msgs, &mut |x| {
-        ctx.conv::<T>(x, op)
-    });
+    let libm = math::Libm::quiet(ctx.run.mode);
+    let r = filters::generic_convolve(
+        input,
+        k,
+        separable,
+        renormalise,
+        &libm,
+        &mut msgs,
+        &mut |x| ctx.conv::<T>(x, op),
+    );
     for m in msgs {
         ctx.eput(&format!("{m}\n"));
     }
@@ -2000,5 +2011,61 @@ mod tests {
         let (r, _, err) = run(&[&p("in"), "-rem", "0", &p("out2")], UpstreamDefects::Fix);
         assert!(matches!(r, Err(Stop::Exit(1))), "{err}");
         assert!(err.contains("FSL-156"), "{err}");
+    }
+
+    /// `-sin` and `-cos` in double: glibc 2.35's bits with `reproduce` (FSL's), the correctly
+    /// rounded ones by default, GLIBC-07 named in both modes where they differ (GLIBC-07, the
+    /// user's decision of 2026-11-04: the pointwise functions name it exactly); a voxel whose
+    /// two values agree names nothing.
+    #[test]
+    fn double_sin_and_cos_are_glibcs_with_reproduce() {
+        let d = tempfile::tempdir().unwrap();
+        let p = |n: &str| d.path().join(n).to_string_lossy().into_owned();
+        let opts = SaveOptions::new(volume::BUILDSTRING.as_bytes());
+        for (op, cr, glibc) in [
+            (
+                "-sin",
+                math::sin as fn(f64) -> f64,
+                math::sin_glibc as fn(f64) -> f64,
+            ),
+            ("-cos", math::cos, math::cos_glibc),
+        ] {
+            // the first two arguments of a ramp where glibc's last bit differs, then one where
+            // it does not
+            let ramp = (1..).map(|k| f64::from(k) * 0.0137 - 3.0);
+            let mut xs: Vec<f64> = ramp
+                .clone()
+                .filter(|&x| cr(x) != glibc(x))
+                .take(2)
+                .collect();
+            xs.push(ramp.clone().find(|&x| cr(x) == glibc(x)).unwrap());
+            let mut v = Volume::<f64>::new(3, 1, 1, 1);
+            v.data.copy_from_slice(&xs);
+            v.save_volume(&p("in"), &settings(), &opts).unwrap();
+            for (mode, f) in [
+                (UpstreamDefects::Reproduce, glibc),
+                (UpstreamDefects::Fix, cr),
+            ] {
+                let args = ["-dt", "double", &p("in"), op, &p("out"), "-odt", "double"];
+                let (r, _, err) = run(&args, mode);
+                assert_eq!(r.unwrap(), 0, "{err}");
+                assert!(
+                    err.contains("GLIBC-07") && err.contains("2 voxels"),
+                    "{op}: {err}"
+                );
+                let (o, _, _) = volume::read_volume4d::<f64>(&p("out"), &settings()).unwrap();
+                let want: Vec<u64> = xs.iter().map(|&x| f(x).to_bits()).collect();
+                let got: Vec<u64> = o.data.iter().map(|y| y.to_bits()).collect();
+                assert_eq!(got, want, "{op} {mode:?}");
+            }
+            v.data.copy_from_slice(&[xs[2]; 3]);
+            v.save_volume(&p("in"), &settings(), &opts).unwrap();
+            let (r, _, err) = run(
+                &["-dt", "double", &p("in"), op, &p("out")],
+                UpstreamDefects::Fix,
+            );
+            assert_eq!(r.unwrap(), 0, "{err}");
+            assert!(!err.contains("GLIBC-07"), "{op}: {err}");
+        }
     }
 }

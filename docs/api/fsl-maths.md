@@ -207,9 +207,15 @@ a float image's result is FSL's. Under `-dt double` a few voxels differ in the l
 for `log` to 0.21 % for `tan`). With `upstream_defects="reproduce"` the clean-room original gives
 glibc's bits for `exp`, `log`, `pow`, `sin` and `cos` (`larmorx_core::math`'s `*_glibc`
 functions, written from permissive code and from `specs/glibc-dbl.md`, proved bit for bit against
-glibc 2.35), the replica for `exp`, `log` and `pow`; `tan`, `asin`, `acos` and `atan` stay
-correctly rounded in both modes (the user's decision of 2026-11-04). The original names GLIBC-07,
-in both modes, exactly where the other choice stores another value in a voxel.
+glibc 2.35), and so does the replica (since 2026-11-04 for `sin` and `cos`); `tan`, `asin`, `acos`
+and `atan` stay correctly rounded in both modes (the user's decision of 2026-11-04). Both name
+GLIBC-07, in both modes, exactly where the other choice stores another value in a voxel. The
+replica's FFT convolution (FSL's path for a large non-separable kernel of `-fmean` or `-fmeanu`)
+takes its twiddle factors from glibc's `sincos` with `reproduce` (FSL's library's, through
+`cexp`: Armadillo's factors and transforms bit for bit on every length from 1 to 256) and
+correctly rounded by default; a filter, it names nothing, and the default's factors can move a
+convolved voxel's last bit (the original computes its convolutions by the direct sum, without
+twiddle factors).
 
 The original makes the same choice wherever `specs/fslmaths.md` names glibc's functions: `-s`'s and
 `-kernel gauss`'s single-precision taps (`expf`), `-dog_edge`'s Gaussians and `-bptf`'s weights
@@ -298,9 +304,9 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   writing its output, depending on its heap. No output voxel depends on it: the original names it
   in both modes and writes the output.
 - **GLIBC-07**: glibc's maths functions, and `sincos` in the FFT's twiddle factors, are not
-  correctly rounded (above): `reproduce` gives glibc's bits where the spec names them (not the
-  twiddles: the original has no FFT); named exactly for the voxelwise functions, not for the
-  filters.
+  correctly rounded (above): `reproduce` gives glibc's bits where the spec names them (the
+  original has no FFT; the replica's FFT takes glibc's `sincos` with `reproduce`); named exactly
+  for the voxelwise functions, not for the filters.
 
 ## Not yet
 

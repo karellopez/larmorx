@@ -274,6 +274,19 @@ reproduces, and they differ from glibc only in the last bit, on 0.05 to 0.25 % o
 §9, §10.3). The replicas' verification tools that keep earlier translations of glibc's LGPL code,
 and the spec writer's model (`glibc-dbl-model`), stay in `crates-gpl/tools/`.
 
+**The replicas' `reproduce` (2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` part, relay 1).** Every place
+an FSL or AFNI replica's source calls glibc's double `sin`, `cos` or `sincos` takes
+`sin_glibc`, `cos_glibc` or `sincos_glibc` with `reproduce` and the correctly rounded functions by
+default (found in FSL's sources and in the AFNI oracle's machine code: `objdump` shows AFNI's build
+merging each pair into `sincos`): fslmaths' `-sin` and `-cos` (named exactly where a voxel
+changes), the Kiss FFT's twiddle factors (`cexp`, hence `sincos`: Armadillo's 65,792 factors of the
+lengths 1 to 256 bit for bit, `validation/probes/fsl-avwutils-lib/check_fft.py --mode reproduce`),
+the sinc kernels' windows, avscale's half transforms (named where its report changes), the AFNI
+replicas' FFT tables and 3dTshift's Fourier phase factors. Several of them give the same floats in
+both modes everywhere they are used (the windows at every width from 1 to 1001, the stage-4 cost's
+table, csfft's tables of every length, 3dTshift's phase factors on every float), so their outputs
+cannot move.
+
 ## Making ANTs correctly rounded: the preload library
 
 `scripts/build_crmath_preload.sh` compiles CORE-MATH's `expf`, `logf`, `exp`, `log`, `sin`,

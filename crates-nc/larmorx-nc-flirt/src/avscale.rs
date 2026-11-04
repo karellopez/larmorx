@@ -4,11 +4,14 @@
 // modified from the original. Distributed under the FSL Licence (see LICENSE).
 //! `avscale`: the decomposition of an affine matrix (rotations, translations about a volume's
 //! centre of gravity, scales, skews), its determinant, and its two half transforms, as FSL
-//! prints them, with its messages and exit statuses.
+//! prints them, with its messages and exit statuses. The half transforms' double `cos`
+//! (sqrtaff) is correctly rounded by default and glibc 2.35's with `reproduce` (GLIBC-07), named
+//! in both modes where the two print different reports.
 
 use std::io::Write;
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
 use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::miscmaths::{self, INV_ERROR, MatrixFileError};
@@ -100,7 +103,14 @@ fn read_matrix(name: &str, err: &mut String) -> Result<Mat, End> {
     }
 }
 
-fn body(args: &[String], settings: &Settings, out: &mut Cout, err: &mut String) -> Result<(), End> {
+fn body(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    out: &mut Cout,
+    err: &mut String,
+    notices: &mut Vec<Notice>,
+) -> Result<(), End> {
     let argc = args.len() + 1;
     if argc < 2 {
         err.push_str(
@@ -141,7 +151,7 @@ fn body(args: &[String], settings: &Settings, out: &mut Cout, err: &mut String) 
                 err.push_str(w);
                 err.push('\n');
             }
-            return report(&affmat, cor, &optionarg, out);
+            return report_named(&affmat, cor, &optionarg, out, mode, notices);
         }
         affmat = read_matrix(arg(1 + offset)?, err)?;
         if affmat.rows() < 4 {
@@ -158,10 +168,58 @@ fn body(args: &[String], settings: &Settings, out: &mut Cout, err: &mut String) 
         }
     }
     let _ = &mut cor;
-    report(&affmat, cor, &optionarg, out)
+    report_named(&affmat, cor, &optionarg, out, mode, notices)
 }
 
-fn report(affmat: &Mat, cor: [f64; 3], optionarg: &str, out: &mut Cout) -> Result<(), End> {
+/// [`report`] with the mode's double `cos` (sqrtaff's: correctly rounded by default, glibc's with
+/// `reproduce`, GLIBC-07), and GLIBC-07 named, in both modes, where the other choice prints
+/// another report (the user's decision of 2026-11-04: a pointwise program names it exactly).
+fn report_named(
+    affmat: &Mat,
+    cor: [f64; 3],
+    optionarg: &str,
+    out: &mut Cout,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<(), End> {
+    let start = out.text.len();
+    let mut other_out = Cout {
+        text: String::new(),
+        fixed: out.fixed,
+    };
+    let r = report(affmat, cor, optionarg, out, &Libm::quiet(mode));
+    let other_mode = if mode.reproduce() {
+        UpstreamDefects::Fix
+    } else {
+        UpstreamDefects::Reproduce
+    };
+    let r_other = report(
+        affmat,
+        cor,
+        optionarg,
+        &mut other_out,
+        &Libm::quiet(other_mode),
+    );
+    if other_out.text != out.text[start..] || r.is_ok() != r_other.is_ok() {
+        let detail = if mode.reproduce() {
+            "avscale's half transforms from glibc's cos, as FSL, where the correctly rounded cos \
+             prints others"
+        } else {
+            "avscale's half transforms from the correctly rounded cos, where glibc's (FSL's) \
+             prints others"
+        };
+        defects::push_once(notices, Notice::new(&defects::GLIBC_07, mode, detail));
+    }
+    r
+}
+
+fn report(
+    affmat: &Mat,
+    cor: [f64; 3],
+    optionarg: &str,
+    out: &mut Cout,
+    libm: &Libm,
+) -> Result<(), End> {
     if affmat.rows() != 4 || affmat.cols() != 4 {
         return Err(End::Unsupported(format!(
             "a {} x {} matrix",
@@ -207,7 +265,7 @@ fn report(affmat: &Mat, cor: [f64; 3], optionarg: &str, out: &mut Cout) -> Resul
     if det < 0.0 {
         swapmat.set(0, 0, -1.0);
     }
-    let m2 = miscmaths::sqrtaff(&arma::mul_tinysq(affmat, &swapmat)).map_err(runtime)?;
+    let m2 = miscmaths::sqrtaff(&arma::mul_tinysq(affmat, &swapmat), libm).map_err(runtime)?;
     // m2 * affmat.i(): the inverse evaluated, then the product.
     let ai = arma::inv(affmat).map_err(|_| runtime(INV_ERROR))?;
     let m0 = arma::mul_tinysq(&m2, &ai);
@@ -253,13 +311,14 @@ fn report(affmat: &Mat, cor: [f64; 3], optionarg: &str, out: &mut Cout) -> Resul
 pub fn run(
     args: &[String],
     settings: &Settings,
-    _mode: UpstreamDefects,
+    mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
     let mut o = Cout::default();
     let mut e_text = String::new();
-    let code = match body(args, settings, &mut o, &mut e_text) {
+    let mut notices = Vec::new();
+    let code = match body(args, settings, mode, &mut o, &mut e_text, &mut notices) {
         Ok(()) => 0,
         Err(End::Exit(c)) => c,
         Err(End::Throw {
@@ -290,9 +349,76 @@ pub fn run(
             1
         }
     };
+    for n in &notices {
+        e_text.push_str(&format!("{PREFIX}: {}\n", n.line()));
+    }
     let _ = out.write_all(o.text.as_bytes());
     let _ = err.write_all(e_text.as_bytes());
     let _ = out.flush();
     let _ = err.flush();
     code
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A rotation of Euler angles `(rx, ry, rz)` about the origin, its translation `t`.
+    fn affine(r: [f64; 3], t: [f64; 3]) -> Mat {
+        let zero = Mat::col(&[0.0, 0.0, 0.0]);
+        let mut m = miscmaths::construct_rotmat_euler(&Mat::col(&[r[0], r[1], r[2]]), 3, &zero);
+        for (i, v) in t.iter().enumerate() {
+            m.set(i, 3, *v);
+        }
+        m
+    }
+
+    /// The argument of sqrtaff's `cos` for `m` (its expressions, `m` of positive determinant).
+    fn cos_argument(m: &Mat) -> f64 {
+        let zero = Mat::col(&[0.0, 0.0, 0.0]);
+        let p = miscmaths::decompose_aff_try(m, &zero, true).unwrap();
+        let sint = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+        0.5 * larmorx_core::math::asin(sint)
+    }
+
+    /// GLIBC-07 in avscale (the user's decision of 2026-11-04: a pointwise program names it
+    /// exactly): the half transforms' `cos` is glibc's with `reproduce` and correctly rounded by
+    /// default, and GLIBC-07 is named, in both modes, only where the two print different
+    /// reports. sqrtaff builds its rotation in `float` (construct_rotmat_quat), which hides the
+    /// double factor's last bit: on the rotations about z whose `cos` argument glibc does not
+    /// round correctly (the factor `1 / (2 cos)` differs in most), with translations of 10^13 mm
+    /// (where a last bit would reach the printed digits), the half transforms and the reports are
+    /// the same in both modes and nothing is named.
+    #[test]
+    fn glibc07_is_named_only_where_the_reports_differ() {
+        let (cos, cos_glibc) = (larmorx_core::math::cos, larmorx_core::math::cos_glibc);
+        let (mut compared, mut factors_differ) = (0, 0);
+        for k in 1..60000 {
+            let m = affine([0.0, 0.0, f64::from(k) * 5e-5], [3e13, -2e13, 1e13]);
+            let u = cos_argument(&m);
+            if cos(u).to_bits() == cos_glibc(u).to_bits() && k % 5000 != 0 {
+                continue;
+            }
+            compared += 1;
+            let factor = |c: f64| (1.0 / (2.0 * c)).to_bits();
+            factors_differ += usize::from(factor(cos(u)) != factor(cos_glibc(u)));
+            let half = |mode| {
+                let h = miscmaths::sqrtaff(&m, &Libm::quiet(mode)).unwrap();
+                h.as_slice().iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+            };
+            assert_eq!(half(UpstreamDefects::Fix), half(UpstreamDefects::Reproduce));
+            let mut texts = Vec::new();
+            for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+                let (mut out, mut notices) = (Cout::default(), Vec::new());
+                assert!(report_named(&m, [0.0; 3], "", &mut out, mode, &mut notices).is_ok());
+                assert!(notices.is_empty(), "{k}: {notices:?}");
+                texts.push(out.text);
+            }
+            assert_eq!(texts[0], texts[1]);
+        }
+        assert!(
+            compared > 30 && factors_differ > 20,
+            "{compared}, {factors_differ}"
+        );
+    }
 }

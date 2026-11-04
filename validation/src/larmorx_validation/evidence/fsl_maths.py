@@ -1269,14 +1269,6 @@ DIVERGENCE_REASONS = {
     "values one unit in the last place from FSL's (tan differs on 0.21 % of image intensities). "
     "No permissive code gives glibc's tan, and tan, asin, acos and atan stay correctly rounded "
     "in both modes (the user's decision of 2026-11-04).",
-    "difftest/fft-twiddles-glibc-sincos": "GLIBC-07, from random testing: fslmaths convolves "
-    "this kernel by the FFT, whose twiddle factors FSL's library takes from glibc's sincos "
-    "(IBM's code, LGPL, not always correctly rounded: 0.148 % of the angles), while the "
-    "replica computes them correctly rounded, in both modes: 1 of 90 float voxels one unit in "
-    "the last place. Given FSL's own factors the replica's output is FSL's bit for bit (the FFT "
-    "probe: every length from 1 to 256, and this case). Never met on fMRIPrep's calls (they "
-    "convolve by separable sums). LARMORX's own implementation of glibc's sincos (2026-11-04, "
-    "from a behavioural specification) can give the replica FSL's factors: a follow-up.",
 }
 
 
@@ -1504,7 +1496,9 @@ DRAWN = {
 TRIAGE = {
     "fsl-maths": "Its one difference (a convolution by the FFT of a 30 × 1 × 3 image: 1 of 90 "
     "voxels one unit in the last place) is GLIBC-07, the twiddle factors FSL takes from glibc's "
-    "sincos: a permanent case of the record, an expected divergence. The notices without a "
+    "sincos: a permanent case of the record, an expected divergence until 2026-11-04 and FSL's "
+    "bit for bit since (the replica's reproduce mode takes glibc's sincos from LARMORX's "
+    "clean-room implementation of its behavioural specification). The notices without a "
     "visible change name a correction of an intermediate result that a later operation removes "
     "(a threshold, -bin, -restart, a reduction). The check run before the trial found three "
     "mistakes of the replica's, fixed with permanent cases.",

@@ -228,7 +228,8 @@ Every source file starts with an SPDX header naming its licence and the files it
   `acos` and `atan` are correctly rounded (`larmorx_core::math`, CORE-MATH's): glibc 2.35's are
   IBM's Accurate Mathematical Library (LGPL), not translated, so a double image may differ from
   FSL's in the last place (GLIBC-07, measured: 0.07 to 0.21 % of double results, none rounded to
-  float). Their `exp`, `log` and `pow` are correctly rounded by default and glibc's (Arm's
+  float); since 2026-11-04 `sin` and `cos` are glibc's with `reproduce` (`sin_glibc`,
+  `cos_glibc`: the clean-room implementation, Apache-2.0). Their `exp`, `log` and `pow` are correctly rounded by default and glibc's (Arm's
   Optimized Routines, `glibc_double`) with `reproduce`; the kernels' and filters' own `exp`,
   `expf`, `logf`, `powf` and `pow` are glibc's in both modes. The Kiss FFT's twiddle factors
   (`kissfft`), which FSL's library takes from glibc's `cexp`, hence `sincos` (IBM's code, LGPL),

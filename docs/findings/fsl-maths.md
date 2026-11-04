@@ -147,11 +147,12 @@ newimage operations (`larmorx-nc-core`'s `volops`, `vstats`, `cprob`, `filters`,
   (complexvolume's `*=`), `ifft3` (Armadillo's inverse scaled by `1/N` in `double`), the real
   part read at the kernel's centre offset `(size - 1) / 2`; no warning on that path. The twiddle
   factors are glibc's `cexp` of `i 2 pi n / N` (`libfsl-newimage.so` calls `cexp(0 + i y)`),
-  which takes glibc's `sincos`; here the correctly rounded `cos` and `sin` in both modes
-  (GLIBC-07, "Known differences": 80 of the lengths 1 to 256 hold a factor one bit away; the 8
-  FFT cases are bit-identical, including radices 2, 3, 4, 5, 11 and 13). Given Armadillo's own
-  factors, the engine is Armadillo's bit for bit on every length from 1 to 256
-  (`validation/probes/fsl-avwutils-lib`, "The FFT").
+  which takes glibc's `sincos`; here the correctly rounded `cos` and `sin` by default and
+  glibc's `sincos` with `reproduce` since 2026-11-04 (GLIBC-07, "Known differences": 80 of the
+  lengths 1 to 256 hold a factor one bit away from the correctly rounded one; the 8 FFT cases are
+  bit-identical, including radices 2, 3, 4, 5, 11 and 13). Given Armadillo's own factors, the
+  engine is Armadillo's bit for bit on every length from 1 to 256, and so is it with its own
+  `reproduce` factors (`validation/probes/fsl-avwutils-lib`, "The FFT").
 - **-subsamp2, -subsamp2offc.** The image's extrapolation is set to extraslice for the call
   (restored after). `subsample_by_2` sums each group of the centred 3x3x3 smoothing in `T`'s
   arithmetic (`int` for `char` and `short`, wrapping `int`), weights `0.125`, `0.0625`, `0.0312`,
@@ -749,25 +750,39 @@ How `fslstats.cc` computes, and what decides the bits:
   Optimized Routines, the code glibc 2.35 ships, in `larmorx_nc_core::glibc_double`; since
   2026-11-04 a re-export of `larmorx_core::math`'s `exp_glibc`, `log_glibc`, `pow_glibc`), and names
   GLIBC-07 where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos` and `atan` are IBM's
-  Accurate Mathematical Library in glibc (LGPL): their code is never read or translated, so
-  they are correctly rounded in both modes and a double image differs from FSL's in the last
-  place on the measured fraction of its voxels. The suite reports those cases as expected
-  divergences (`fn/double-tan`: 3 of 210 voxels, one unit in the last place; `fn/double-sin`,
-  `-cos`, `-atan`, `-asin` happen to agree on their 210 values). Exact glibc bits for these six
-  would need the `cbrtf` route (a behaviour spec, then a clean-room implementation): for the
-  orchestrator to schedule. The replica's earlier `tan` (the `libm` crate, FreeBSD's) is gone.
+  Accurate Mathematical Library in glibc (LGPL): their code is never read or translated. Since
+  2026-11-04 (BET's `-S`/`-B`/`-A`/`-A2` part, relay 1) `reproduce` gives glibc's bits for `sin`
+  and `cos` too, by the `cbrtf` route: `larmorx_core::math::sin_glibc` and `cos_glibc`, the
+  clean-room implementation of `specs/glibc-dbl.md` (glibc 2.35's FMA build, the one FSL's binary
+  runs on the oracle machines; 1.18 × 10^10 fresh arguments per function against the system's
+  glibc, 0 differ), named where they change a voxel, in both modes (the unit test
+  `double_sin_and_cos_are_glibcs_with_reproduce`). `tan`, `asin`, `acos` and `atan` stay correctly
+  rounded in both modes (the user's decision of 2026-11-04: their tables are searched and fitted
+  data, no LGPL data in larmorx), so a double image differs from FSL's in the last place on the
+  measured fraction of its voxels there. The suite reports those cases as expected divergences
+  (`fn/double-tan`: 3 of 210 voxels, one unit in the last place; `fn/double-atan`, `-asin` happen
+  to agree on their 210 values); `fn/double-sin` and `-cos` are exact by construction since
+  2026-11-04. The replica's earlier `tan` (the `libm` crate, FreeBSD's) is gone.
 - **The FFT's twiddle factors (GLIBC-07, class d; relay 6b, 2026-11-03).** The FFT convolution
   (the non-separable `-fmeanu`, and `-fmean` with a `3D`, `2D`, `sphere` or `file` kernel, when
   `(float) nvox (float) nker` is large enough) builds Armadillo's Kiss FFT engine for each
   transform length; FSL's library computes each twiddle factor with glibc's `cexp`, which takes
-  glibc's double `sincos` (IBM's code, LGPL, never read or translated). The replica computes the
-  factors correctly rounded in both modes. Measured (`validation/probes/fsl-avwutils-lib`,
-  "The FFT"; `validation/probes/glibc-double-maths`, "sincos"):
+  glibc's double `sincos` (IBM's code, LGPL, never read or translated). The replica computed the
+  factors correctly rounded in both modes until 2026-11-04; since then `reproduce` takes glibc's
+  `sincos` (`larmorx_core::math::sincos_glibc`, the clean-room implementation of
+  `specs/glibc-dbl.md`), the default keeps the correctly rounded factors, and neither names
+  GLIBC-07 (a filter: the user's decision of 2026-11-04). Measured
+  (`validation/probes/fsl-avwutils-lib`, "The FFT"; `validation/probes/glibc-double-maths`,
+  "sincos"):
   - on the lengths 1 to 256: 220 of 65,792 factors differ in the last bit, in 80 lengths (the
     first: 15, 20, 30, 39, 40, 49, 51, 59, 60, 61); a butterfly reads one in 64 of them, and the
     transforms of seeded vectors differ in 60 (5,426 of 197,376 values, the last bits); given
     Armadillo's own factors the replica's engine gives Armadillo's transforms bit for bit (0
-    differ), and the trial's case end to end gives FSL's output bit for bit;
+    differ), and the trial's case end to end gives FSL's output bit for bit; with its own
+    `reproduce` factors (glibc's `sincos`, 2026-11-04: `check_fft.py --mode reproduce`) 0 of the
+    65,792 factors and 0 of the 197,376 transform values differ from Armadillo's, and the unit
+    test `reproduce_takes_glibcs_sincos_where_the_probe_found_fsls_factors_differ` finds the
+    same 220 factors in the same 80 lengths where the two modes' factors differ;
   - glibc's `sincos` against the correctly rounded value on the twiddle angles (uniform on
     [-2 pi, 2 pi], 2^26 each): `sin` 0.148 %, `cos` 0.148 %;
   - glibc's `sincos` has one build on x86-64, so the factors are the same on every CPU; its `sin`
@@ -785,9 +800,11 @@ How `fslstats.cc` computes, and what decides the bits:
   most, on few voxels: the random-testing trial met it once in 114,906 fslmaths cases (5,263 of
   them with `-fmean` or `-fmeanu`): `-recip -kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 float
   image, transforms of 60 and 26 points, 1 of 90 voxels (permanent case
-  `fft-twiddles-glibc-sincos`, an expected divergence naming GLIBC-07). fMRIPrep's calls never
-  take the FFT (its `-s` is separable; `-dilD` is no convolution). Exact factors would need
-  `sincos` by the `cbrtf` route, as the six functions above.
+  `fft-twiddles-glibc-sincos`, an expected divergence naming GLIBC-07 until 2026-11-04, FSL's
+  bit for bit in `reproduce` since). fMRIPrep's calls never take the FFT (its `-s` is
+  separable; `-dilD` is no convolution). The default's fix pass may see such a change with no
+  defect named: the suite accepts GLIBC-07 there unnamed for `-fmean` and `-fmeanu`
+  (`fsl_maths_replica.FFT_OPS`, `defects.UNNAMED_GLIBC`).
 
 ## Memory (sub-task 5b)
 
@@ -876,7 +893,8 @@ realistic cases, 114,906 fslmaths and 69,077 fslstats). What they found:
   With Armadillo's own factors the engine is Armadillo's bit for bit on every length from 1 to
   256, and the trial's case (`-recip -kernel gauss 2.25 -fmeanu` of a 30 x 1 x 3 image, finding
   `fsl-maths-trial-61795`, 1 of 90 float voxels one unit in the last place) is FSL's bit for
-  bit. Permanent case `fft-twiddles-glibc-sincos`: an expected divergence naming GLIBC-07.
+  bit. Permanent case `fft-twiddles-glibc-sincos`: an expected divergence naming GLIBC-07 until
+  2026-11-04; a pass since the replica's `reproduce` takes glibc's `sincos`.
 - **Notices without a visible change** (595 fslmaths cases, none in fslstats): a correction named
   for an intermediate result whose effect a later operation removes (`-restart`, a threshold,
   `-bin`, a reduction), and FSL-151's output rounding of values that both modes store alike

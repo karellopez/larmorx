@@ -284,6 +284,12 @@ def within(m: dict) -> bool:
     return m["nonfinite_same"] and m["relative"] <= SUM_RELATIVE and m["share"] >= SUM_SHARE
 
 
+def fft_expected(m: dict) -> bool:
+    """On FSL's FFT path: within §21's bound but below its share (the record's expected
+    divergences there: FSL's FFT rounds relative to the image's largest values)."""
+    return not within(m) and m["nonfinite_same"] and m["relative"] <= SUM_RELATIVE
+
+
 def metric_words(label: str, m: dict) -> str:
     return (
         f"{label}: max |Δ| {m['relative']:.2g} of FSL's largest value (§21: at most 1e-5), "
@@ -294,9 +300,10 @@ def metric_words(label: str, m: dict) -> str:
 #: What the original does differently on an output whose values are not FSL's (example
 #: outputs' operations), in plain words.
 CAUSES = {
-    "fft": "FSL convolves this kernel by its FFT, the original by a direct sum in single "
-    "precision (§10.2's arithmetic of FSL's direct path): their roundings differ (findings 8 "
-    "and 31; spec question 14)",
+    "fft": "FSL convolves this kernel by its FFT in single precision, whose rounding is relative "
+    "to the image's largest values; the original by a direct sum whose products it adds in "
+    "double precision, the sum rounded once to single precision (findings 8 and 31; spec "
+    "question 14)",
     "sums": "the original adds in its own order, which §21 leaves open (bit-identity welcome, "
     "not required)",
 }
@@ -401,13 +408,25 @@ def outcome(fsl: dict[str, np.ndarray], ours: dict[str, np.ndarray], labels: dic
         return ("bit-identical", f"The same values, every one, in every output {what} (the "
                 "record compares every file, the header, the messages and the exit status "
                 "too)."), {}  # fmt: skip
-    parts = []
+    parts, expected = [], []
     for oid, m in metrics.items():
+        c = cause.get(oid, "sums")
+        if c == "fft" and fft_expected(m):
+            # FSL's FFT path: within the bound, below the share (the record's expected
+            # divergences on that path)
+            expected.append(oid)
+            parts.append(
+                f"{metric_words(labels[oid], m)}: within §21's bound and below its share of "
+                f"voxels within 4 units in the last place, an expected divergence as the "
+                f"record's on FSL's FFT path: {CAUSES[c]}"
+            )
+            continue
         ok = "within §21's thresholds" if within(m) else "beyond §21's thresholds"
-        parts.append(f"{metric_words(labels[oid], m)}: {ok}, as {CAUSES[cause.get(oid, 'sums')]}")
+        parts.append(f"{metric_words(labels[oid], m)}: {ok}, as {CAUSES[c]}")
     n = len(fsl) - len(metrics)
     head = f"{n} of {len(fsl)} outputs FSL's bit for bit; " if len(fsl) > 1 else ""
-    return ("open", common.clip(head + "; ".join(parts) + ".", 900)), metrics
+    verdict = "divergence" if len(expected) == len(metrics) else "open"
+    return (verdict, common.clip(head + "; ".join(parts) + ".", 900)), metrics
 
 
 def programs(oinfo: dict) -> str:
@@ -525,8 +544,10 @@ def default_entry(ctx: core.Context, program: str) -> fcache.Entry:
 #: The record's passing cases whose values are not FSL's bit for bit, and why (the record's
 #: measured values give the numbers).
 OPEN_REASONS = {
+    "conv/fft-sphere": CAUSES["fft"],
     "conv/fft-box": CAUSES["fft"],
     "conv/fft-even": CAUSES["fft"],
+    "conv/fft-odd": CAUSES["fft"],
     "sub/subsamp2": "FSL's subsampling arithmetic under the floating types is not known: no "
     "order of a single or double sum of the voxels gives FSL's last bits (findings 13 and 29; "
     "spec questions 13 and 38)",
@@ -554,14 +575,27 @@ OPEN_REASONS = {
     "sums back to millimetres in a neurological image, whose arithmetic in FSL is not known "
     "(findings 21; spec question 24)",
 }
-#: The record's expected divergences on FSL's FFT path, and what findings 31 adds to their reason.
-FFT_DIVERGENCES = ("conv/fft-sphere", "conv/fft-odd", "conv/fft-double", "conv/fft-4d",
-                   "orig/fft-asym")  # fmt: skip
-FFT_NOTE = (
-    "Findings 31 (2026-11-04): on the fslmaths page's real call FSL's FFT proved the more "
-    "accurate (1.5e-7 of the largest value from the exact result, the original's "
-    "single-precision direct sum 1.4e-5); on this case's input that is not measured."
-)
+#: The record's expected divergences on FSL's FFT path, and what findings 31 measured on each:
+#: FSL's output and the original's against the exact result (float64, §10.2's definition),
+#: relative to its largest magnitude (``validation/investigations/cleanroom-maths/
+#: fft_cases_reference.py``).
+FFT_EXACT = {
+    "conv/fft-double": (8.0e-8, 6.3e-8),
+    "conv/fft-4d": (6.9e-8, 4.1e-8),
+    "orig/fft-asym": (1.0e-7, 5.0e-8),
+}
+FFT_DIVERGENCES = tuple(FFT_EXACT)
+
+
+def fft_note(case: str) -> str:
+    fsl, ours = FFT_EXACT[case]
+    return (
+        f"Findings 31: against the exact result FSL's FFT lies within {fsl:.2g} of the largest "
+        f"value, the original's direct sum (its products in double precision, rounded once) "
+        f"within {ours:.2g}: the difference is FSL's single-precision FFT's."
+    )
+
+
 TAN = (
     "GLIBC-07: with -dt double, glibc 2.35's tan (IBM's code in glibc, LGPL) is not always "
     "correctly rounded, and the clean-room original's is (CORE-MATH's, in both modes): one unit "
@@ -608,7 +642,7 @@ def case_verdict(r: dict, dm: dict, program: str) -> tuple[str, str]:
                 f"naming {', '.join(named)}."
             )
         if verdict == "divergence" and r["case"] in FFT_DIVERGENCES:
-            why = common.clip(r["reason"], 560) + " " + FFT_NOTE
+            why = common.clip(r["reason"], 560) + " " + fft_note(r["case"])
         return verdict, common.clip(why, 900)
     diff = _differs(r.get("measured", {}))
     notes = []

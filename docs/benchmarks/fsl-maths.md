@@ -35,10 +35,10 @@ stand-in: the segmentation's grey matter on the BOLD grid, as the run has no Fre
 | BOLD `-s 5` (goodvoxels' smoothing, on the series) | 2.79 (80) | 1.71 (70) | 0.85 (42) | 0.21 (88) | 1 = 14 threads; identical |
 | BOLD `-fmedian` | 5.32 (80) | 4.19 (70) | 2.22 (42) | 0.39 (81) | 1 = 14 threads; identical |
 | BOLD `-bptf 25 2` | 1.82 (80) | 5.26 (70) | 0.79 (48) | 0.26 (90) | 1 = 14 threads; identical |
-| BOLD `-kernel boxv 13 -fmeanu` (FSL's FFT path) | 28.73 (113) | 16.12 (95) | 2.98 (42) | 0.43 (89) | 1 = 14 threads; max \|d\| 2.8e-6 of FSL's largest value |
+| BOLD `-kernel boxv 13 -fmeanu` (FSL's FFT path) | 28.73 (113) | 16.12 (95) | 3.86 (42) | 0.51 (80) | 1 = 14 threads; max \|d\| 1.0e-7 of FSL's largest value since relay 7b's double sum (below; before: 2.98 s and 0.43 s, 2.8e-6) |
 | T1w `-s 5` | 11.15 (196) | 8.62 (186) | 2.28 (128) | 0.35 (127) | 1 = 14 threads; identical since relay 6's kernel correction (below; before: max \|d\| 2.8e-7 of FSL's largest value, 98.6 % within 4 ulp) |
 | T1w `-dilD` | 3.80 (195) | 1.72 (185) | 1.05 (128) | 0.24 (128) | 1 = 14 threads; identical |
-| T1w `-kernel sphere 6 -fmean` (FSL's FFT path) | 227.71 (4063) | 195.74 (3159) | 5.41 (188) | 0.64 (187) | 1 = 14 threads; max \|d\| 8.4e-6 of FSL's largest value |
+| T1w `-kernel sphere 6 -fmean` (FSL's FFT path) | 227.71 (4063) | 195.74 (3159) | 8.14 (188) | 0.85 (187) | 1 = 14 threads; max \|d\| 1.9e-7 of FSL's largest value since relay 7b's double sum (below; before: 5.41 s and 0.64 s, 8.4e-6) |
 | BET's `fslstats <T1w> -l 0.001 -C` | 0.58 (315) | 0.34 (245) | 0.45 (278) | 0.29 (277) | 1 = 14 threads; 1 of 3 numbers differs, 6.1e-8 relative (findings 21) |
 | `fslstats -t <BOLD> -M -S -r` | 0.23 (47) | 0.23 (37) | 0.22 (41) | 0.23 (43) | 1 = 14 threads; identical with the final build (relay 7's check, below; at relay 5 54 of 252 numbers differed: `-S`'s last digits, at most 3.0e-10 relative) |
 
@@ -58,11 +58,16 @@ difference at most 1e-5 of FSL's largest value; §10 of `specs/fslstats.md`: 1e-
   squares) differed from FSL's in the printed last digits at relay 5 (3e-10 relative); run again
   with the part's final build (relay 7, 2026-11-04, at 1 and 14 threads) the original prints
   FSL's text in all 252 numbers (findings 23).
-- on FSL's FFT path the original's direct sum adds in single precision (§10.2's arithmetic of
-  FSL's direct path), whose error grows with the kernel: on the fslmaths evidence page's
-  `-kernel sphere 21 -fmean` of the series' mean (1,313 kernel voxels) it lies 1.39e-5 of FSL's
-  largest value from FSL, beyond §21's 1e-5, and 1.4e-5 from the exact result where FSL's FFT
-  lies 1.5e-7 from it (findings 31: a follow-up, a double sum where FSL takes its FFT).
+- on FSL's FFT path the original's direct sum added in single precision until relay 7
+  (§10.2's arithmetic of FSL's direct path), whose error grows with the kernel: on the fslmaths
+  evidence page's `-kernel sphere 21 -fmean` of the series' mean (1,313 kernel voxels) it lay
+  1.39e-5 of FSL's largest value from FSL, beyond §21's 1e-5, and 1.4e-5 from the exact result
+  where FSL's FFT lies 1.5e-7 from it (findings 31). Since relay 7b (2026-11-04) it adds the
+  products in double precision there and rounds once: 7.9e-8 from the exact result on that call
+  and 2.0e-7 from FSL's output; on the two FFT-path rows above 1.0e-7 and 1.9e-7 of FSL's
+  largest value. Its cost, measured once each with the same script: 3.86 s against 2.98 s
+  (boxv 13 on the series) and 8.14 s against 5.41 s (sphere 6 on the T1w) on one thread, 0.51 s
+  and 0.85 s on 14, the same memory; still 7.4 and 28 times faster than FSL's FFT on one thread.
 
 ## What the numbers show
 
@@ -76,16 +81,18 @@ difference at most 1e-5 of FSL's largest value; §10 of `specs/fslstats.md`: 1e-
   7 times on 14.
 - **Large kernels (the orchestrator's question: an FFT of the original's own?)**: no. On FSL's
   FFT path the original's direct sum, a row of voxels at a time with the kernel's zeros left out
-  of a finite volume, is 9.6 times faster than FSL's FFT on one thread for `boxv 13` on the
-  series (2.98 s against 28.73 s) and 42 times faster for `sphere 6` on the T1w (5.41 s against
-  227.71 s; 356 times on 14 threads), with 37 % and 5 % of FSL's memory there (FSL's FFT holds
-  volumes of twice the image's size per axis: 4 GiB for the T1w). FSL's FFT costs the same for
-  every kernel past its switch (the padded size depends on the image); the direct sum grows with
-  the kernel's nonzero taps: `sphere 6` on the T1w is about 1,500 taps per voxel, so the direct
-  sum on one thread would reach FSL's 228 s only near 60,000 taps (a sphere of about 20 mm on a
-  0.83 mm grid), and on 14 threads beyond 500,000 taps. The direct sum also keeps the results
-  FSL's direct sum gives (bit for bit where FSL sums directly; FSL-191 and FSL-192 corrected by
-  default), which an FFT would not.
+  of a finite volume, is 7.4 times faster than FSL's FFT on one thread for `boxv 13` on the
+  series (3.86 s against 28.73 s) and 28 times faster for `sphere 6` on the T1w (8.14 s against
+  227.71 s; 268 times on 14 threads), with 37 % and 5 % of FSL's memory there (FSL's FFT holds
+  volumes of twice the image's size per axis: 4 GiB for the T1w); these are relay 7b's sums in
+  double precision, which made the two calls 1.3 and 1.5 times slower than relay 5's
+  single-precision sums (9.6 and 42 times faster than FSL) and their results 28 and 44 times
+  closer to FSL's. FSL's FFT costs the same for every kernel past its switch (the padded size
+  depends on the image); the direct sum grows with the kernel's nonzero taps: `sphere 6` on the
+  T1w is about 1,500 taps per voxel, so the direct sum on one thread would reach FSL's 228 s
+  near 40,000 taps (a sphere of about 18 mm on a 0.83 mm grid), and on 14 threads near 400,000
+  taps. The direct sum also keeps the results FSL's direct sum gives (bit for bit where FSL sums
+  directly; FSL-191 and FSL-192 corrected by default), which an FFT would not.
 - **fslstats**: reading the image is most of its time (BET's call 0.45 s on one thread against
   FSL's 0.58, the 63-volume series 0.22 against 0.23); its memory is below FSL's (41 MiB against
   47 on the series: before relay 5 the stored values and their single-precision copy were both

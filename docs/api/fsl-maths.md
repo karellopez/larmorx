@@ -38,11 +38,12 @@ names FSL-154 for every uint8 image computed unsigned, FSL-157 for every int8 im
 FSL-75 (below) in both modes ([findings](../findings/fsl-maths-original.md) 24 to 30). Where FSL
 convolves a large kernel by
 its FFT, the original computes the convolution by the direct sum (faster than FSL's FFT on
-every kernel the benchmarks measured), in the direct sum's
-orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then within 2.6e-6 of
-FSL's largest value on the record's cases; on the site's real call `-kernel sphere 21 -fmean`
-of a BOLD mean, 1,313 kernel voxels, 1.39e-5, beyond §21's 1e-5: its single-precision sum is
-the less accurate there, FSL's FFT lying within 1.5e-7 of the exact result, findings 31).
+every kernel the benchmarks measured), its products added in double precision and the sum
+rounded once there (where FSL sums directly, FSL's single-precision sum, bit for bit), in the
+direct sum's orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then
+within 2.0e-7 of FSL's largest value on the record's cases and on the site's real call `-kernel
+sphere 21 -fmean` of a BOLD mean, 1,313 kernel voxels; closer to the exact result than FSL's
+single-precision FFT: 7.9e-8 of its largest value against FSL's 1.5e-7 there, findings 31).
 `implementation="auto"`
 (the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
 `"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
@@ -287,18 +288,15 @@ memory it never wrote, both modes refuse with a message (exit status 1).
 ## Not yet
 
 - The clean-room original's 10 open differences of random testing (the record's notes) and
-  the spec questions of its findings. On FSL's FFT path its direct sum adds in single precision,
-  which a large kernel makes less accurate than FSL's FFT (findings 31: 1.39e-5 of FSL's largest
-  value on the site's `-kernel sphere 21 -fmean`, beyond §21's bound): a follow-up, the products
-  added in double where FSL takes its FFT (2.0e-7 from FSL's output on that call).
+  the spec questions of its findings.
 - The clean-room original's reproduce mode computes `exp`, `log` and `pow` correctly rounded as
   its default does, where `specs/fslmaths.md` §19 asks glibc's bits of it (GLIBC-07): its
   double outputs then differ from FSL's by one unit in the last place in a few values (110 of
   136,400 for `exp` and 15 for `log` on the site's real image), within its record's threshold.
   glibc 2.35's `exp`, `log` and `pow` are Arm's Optimized Routines (MIT): a follow-up. Its speed: the
-  [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 42 times faster than FSL on one thread, up to
-  356 times on 14; the direct sum outruns FSL's FFT on every kernel measured, so the original
-  has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)
+  [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 28 times faster than FSL on one thread, up to
+  268 times on 14; the direct sum, in double precision where FSL takes its FFT, outruns FSL's
+  FFT on every kernel measured, so the original has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)
   is a follow-up.
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).

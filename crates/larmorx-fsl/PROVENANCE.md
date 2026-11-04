@@ -348,3 +348,9 @@ and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row
 | `cli::fslmaths` | FSL-157 named for every int8 `-odt input`, FSL-154 for every uint8 image computed unsigned | findings 29; the register's rows |
 | `cli::fslstats` | the histogram of an empty mask (zeros, or none with an empty range) and the JSON's empty list without a histogram | findings 28 |
 | `cli::common` (`name_start`), `cli::topup`, `cli::applytopup` | topup's and applytopup's file names split at `/`, and at `\` on Windows only | `docs/api/fsl-topup.md`, "File names on Windows" |
+
+### The direct sum where FSL takes its FFT (relay 7b of fslmaths' and fslstats' part, 2026-11-04)
+
+| Module | What changed | From |
+|---|---|---|
+| `maths::filters` (`direct_volume`, `convolve_in_place`) | where FSL convolves by its FFT (§10.2's criterion), the direct sum's products in double precision added to a double-precision sum, rounded once to single precision (FSL's direct path keeps §10.2's single-precision sum); the same order of taps, NaN rules and bits at any thread count | findings 31 (the page's `-kernel sphere 21 -fmean` against its exact result; `fft_cases_reference.py` on the record's FFT cases) |

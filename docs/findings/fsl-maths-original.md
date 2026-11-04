@@ -95,8 +95,9 @@ in both. For a symmetric kernel of even size the two windows are one voxel apart
 the flipped kernel where FSL would take its FFT (§10.2's criterion; no off-centre warning there,
 as in FSL), and its results are then within 2.6e-6 of FSL's largest magnitude (the record's
 expected divergences: the FFT's rounding is relative to the image's largest values, not to each
-voxel's last place). The default keeps the direct sum's orientation at every size: FSL-192
-(finding 14).
+voxel's last place). Since relay 7b the original adds the products in double precision there
+(finding 31): within 2.0e-7 of FSL's largest magnitude, 3 of the 5 FFT cases still below §21's
+share. The default keeps the direct sum's orientation at every size: FSL-192 (finding 14).
 
 ## 9. FSL-191: a NaN on the FFT path makes the whole volume NaN, relay 2
 
@@ -448,12 +449,12 @@ FSL's `-ptoz` of a NaN voxel is that NaN quieted with its **sign flipped**: the 
 with an empty mask) gives `0x7fc00000`. The original flips it.
 
 
-## 31. FSL's FFT convolution is the more accurate on a large kernel, relay 7
+## 31. FSL's FFT convolution and the original's sums on a large kernel, relays 7 and 7b
 
 The fslmaths page's real call `fslmaths mean -kernel sphere 21 -fmean out` (FSL's `-Tmean` of
 ds005040's BOLD series in T1w space, 50 × 62 × 44 voxels of 3 × 3 × 3.3 mm, values up to 8 × 10⁴:
-a 15 × 15 × 13 kernel of 1,313 voxels, which FSL convolves by its FFT) gives the original's
-output **1.39e-5 of FSL's largest value away from FSL's, beyond §21's bound of 1e-5**, with 0.19 %
+a 15 × 15 × 13 kernel of 1,313 voxels, which FSL convolves by its FFT) gave the original's
+output (relay 7's build) **1.39e-5 of FSL's largest value away from FSL's, beyond §21's bound of 1e-5**, with 0.19 %
 of the voxels within 4 units in the last place (the record's FFT cases, on small synthetic
 images, stay within 2.6e-6). Against the exact result, computed in float64 from §10.2's
 definition (the convolution with zeros outside divided by the convolution of ones; the sphere of
@@ -468,12 +469,46 @@ image's largest value. The record's reason for its 5 FFT expected divergences ("
 rounding is relative to the image's largest values") is therefore half the story: there too the
 original's single-precision sums may be the less accurate (not measured on those cases).
 
-A follow-up for the original (reported in the part's handoff, not done in this relay, which
-changes no Rust code): where FSL would take its FFT, add the products in double precision and
-round once. The exact result rounded once to single lies 2.0e-7 of FSL's largest value from
+A follow-up for the original, then (relay 7): where FSL would take its FFT, add the products in
+double precision and round once. The exact result rounded once to single lies 2.0e-7 of FSL's largest value from
 FSL's output on this call, inside §21's bound, with 75.8 % of the voxels within 4 units in the
 last place (FSL's FFT error is relative to the image's largest values, so §21's share stays an
 expected divergence on that path, as spec question 14 says); FSL's direct path keeps §10.2's
 single-precision sum, bit for bit. The benchmark's FFT-path calls (`-kernel boxv 13 -fmeanu` on
 the series, `-kernel sphere 6 -fmean` on the T1w: 2.8e-6 and 8.4e-6 of FSL's largest value) are
 within the bound but the same arithmetic.
+
+**Done in relay 7b** (`maths::filters::direct_volume`'s `wide` sum): where FSL takes its FFT
+(§10.2's criterion), each product is formed in double precision (the value as the computing type
+gives it, a double image's as it is, times the kernel's value: exact for single-precision values)
+and added to a double-precision sum, which is rounded once to single precision; the same order
+of taps, the same NaN rules (a NaN result recomputed by x86-64's), the same bits at any thread
+count (unit tests at 1 and 3 threads), no new full-size copy (one row of double sums per worker).
+FSL's direct path keeps §10.2's single-precision sum. On the page's call the original now lies
+**7.9e-8 of the exact result's largest value from it (median 3.4e-9), where FSL's FFT lies
+1.5e-7 (median 1.6e-8)**, and 2.0e-7 of FSL's largest value from FSL's output, 75.7 % of the
+voxels within 4 units in the last place (inside §21's bound; below its share as the record's
+FFT cases are). On the record's FFT cases (`fft_cases_reference.py`, FSL's outputs through the
+oracle cache; the original in its reproduce mode, as the record compares it), FSL's FFT and the
+original against the exact result, relative to its largest magnitude:
+
+| Case | FSL's FFT | the original | the original against FSL (§21) |
+|---|---|---|---|
+| `conv/fft-sphere` (`-kernel sphere 12 -fmean`) | 1.1e-7 | 6.1e-8 | 9.6e-8, 100.0 % within 4 ulp: passes |
+| `conv/fft-odd` (`-kernel sphere 10 -fmean`, odd sizes) | 1.5e-7 | 1.5e-7 | 2.0e-7, 100.0 %: passes |
+| `conv/fft-double` (a double image) | 8.0e-8 | 6.3e-8 | 1.1e-7, 30.0 %: expected divergence |
+| `conv/fft-4d` (`-fmeanu` of a 4D image) | 6.9e-8 | 4.1e-8 | 8.6e-8, 95.2 %: expected divergence |
+| `orig/fft-asym` (an asymmetric kernel file, mirrored as FSL's FFT applies it) | 1.0e-7 | 5.0e-8 | 1.0e-7, 98.8 %: expected divergence |
+
+Before relay 7b the five were expected divergences, 3.0e-7 to 2.6e-6 of FSL's largest value from
+FSL. The three that stay miss only §21's share: FSL's single-precision FFT rounds relative to
+the image's largest values, so where the values span a wide range its small values sit many
+units in their last place from the exact result, to which the original's sum is closer (spec
+question 14). A double image's convolution is rounded to single precision as both FSL paths
+round it (FSL's double output of `conv/fft-double` holds no single-precision value: its
+convolutions are single precision, its `-fmean` division double, as the original's). The cost:
+`-kernel boxv 13 -fmeanu` on the series 3.86 s on one thread (2.98 s with the single-precision
+sum; FSL 28.73 s), `-kernel sphere 6 -fmean` on the T1w 8.14 s (5.41 s; FSL 227.71 s), the
+same memory (the benchmark report). Converting each source row to double once per kernel row
+(to take the conversion out of the inner loop) measured slower (4.43 s and 8.62 s) and was not
+kept.

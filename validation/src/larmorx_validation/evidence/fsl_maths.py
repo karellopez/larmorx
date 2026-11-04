@@ -846,13 +846,14 @@ def _example_families(ctx: core.Context) -> dict:
     kernel = fo.sphere_kernel(float(words[words.index("sphere") + 1]), img.header.get_zooms()[:3])
     exact, _count = fo.exact_fmean(mean, kernel)
     fe, oe_ = fo.against_exact(exact, arrays["fsl"][oid], oarrays["original"][oid])
+    closer = "closer" if oe_["max"] < fe["max"] else "less accurate"
     vs_exact = (
         f"against the exact result (computed in float64 from §10.2's definition; {kernel.shape[0]} "
         f"× {kernel.shape[1]} × {kernel.shape[2]} kernel of {int(kernel.sum())} voxels) FSL's FFT "
         f"lies within {fe['max']:.2g} of the largest value (median {fe['median']:.2g}), the "
-        f"original's single-precision direct sum within {oe_['max']:.2g} (median "
-        f"{oe_['median']:.2g}): on this call the original is the less accurate of the two "
-        "(findings 31: a follow-up, its sums in double where FSL takes its FFT)"
+        f"original's direct sum (its products in double precision, rounded once) within "
+        f"{oe_['max']:.2g} (median {oe_['median']:.2g}): the original is the {closer} of the two "
+        "(findings 31)"
     )
     if oid in ometrics:
         result = (result[0], common.clip(result[1].rstrip(".") + "; " + vs_exact + ".", 1400))
@@ -894,7 +895,8 @@ def _example_families(ctx: core.Context) -> dict:
                       common.cell("–" if m["identical"] else m["max_abs"]),
                       common.cell("–" if sm is None else sm["relative"]),
                       common.cell("–" if sm is None else f"{sm['share']:.1%}")],
-            "verdict": "bit-identical" if m["identical"] else "open",
+            "verdict": "bit-identical" if m["identical"] else "divergence"
+            if oid in FFT_FAMILIES and sm is not None and fo.fft_expected(sm) else "open",
         })  # fmt: skip
     otable = common.table(
         "families-calls-original",
@@ -907,8 +909,9 @@ def _example_families(ctx: core.Context) -> dict:
         note="Each call's output by the clean-room original (reproduce mode, 14 threads; the "
         "same bits at one thread) against FSL's, every voxel of the files; where a value differs, "
         "specs/fslmaths.md §21's metric of the sums over every voxel (the non-finite voxels "
-        "identical). FSL convolves the 15 × 15 × 13 spherical kernel by its FFT, the original by "
-        f"a direct sum in single precision; {vs_exact}.",
+        "identical). FSL convolves the 15 × 15 × 13 spherical kernel by its FFT in single "
+        "precision, the original by a direct sum whose products it adds in double precision and "
+        f"rounds once; {vs_exact}.",
     )  # fmt: skip
     table = common.table(
         "families-calls",

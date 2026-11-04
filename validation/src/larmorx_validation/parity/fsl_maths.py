@@ -100,9 +100,11 @@ ROC_PRINTED = 1e-5
 #: ... and the curve file's numbers to this many significant digits.
 ROC_DIGITS = 5
 _FFT = (
-    "FSL's FFT convolution against the original's direct sum: the FFT's rounding is relative to "
-    "the image's largest values, not to each voxel's own last place (findings 8; spec "
-    "question 14)"
+    "FSL's single-precision FFT convolution against the original's direct sum (where FSL takes "
+    "its FFT, its products added in double precision and rounded once): the FFT's rounding is "
+    "relative to the image's largest values, not to each voxel's own last place; against the "
+    "exact result (float64) FSL's FFT lies within 6.9e-8 to 1.0e-7 of the largest value on these "
+    "cases, the original within 4.1e-8 to 6.3e-8 (findings 8 and 31; spec question 14)"
 )
 _SUBSAMPLING = (
     "FSL's arithmetic of -subsamp2offc's 2 x 2 x 2 means, which no order of a single or double "
@@ -113,7 +115,7 @@ _SUBSAMPLING = (
 #: largest difference stays inside the bound (1e-5 of FSL's largest magnitude), checked.
 EXPECTED_DIVERGENCES: dict[str, str] = {
     **dict.fromkeys(
-        ("conv/fft-sphere", "conv/fft-odd", "conv/fft-double", "conv/fft-4d", "orig/fft-asym"),
+        ("conv/fft-double", "conv/fft-4d", "orig/fft-asym"),
         _FFT,
     ),
     **dict.fromkeys(

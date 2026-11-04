@@ -5,7 +5,8 @@ oracle-output cache (served when they ran before), as the clean-room original ma
 
 Run (in a memory box): ``python -P fsl_outputs.py <outdir> <case or 'args:...'> ...``
 
-- ``<case>``: a replica-suite case name (``conv/fft-even``); its run directory is copied to
+- ``<case>``: a replica-suite case name (``conv/fft-even``), or one of the original's own cases
+  of the suite ``fsl-maths`` (``orig/fft-asym``); its run directory is copied to
   ``<outdir>/<case with / as _>/``;
 - ``args:<name>:<arg> <arg> ...``: fslmaths' arguments, ``@name`` naming a replica-suite input
   (copied into the run directory) or ``@probe:<recipe>`` one of this script's own inputs
@@ -97,6 +98,14 @@ def main(argv: list[str]) -> int:
                     else:
                         args.append(a)
                 settings: dict[str, str | None] = {}
+            elif item.startswith("orig/"):
+                # one of the original's own cases (suite fsl-maths), its own inputs
+                from larmorx_validation.parity import fsl_maths as own
+
+                label = item.replace("/", "_")
+                run = own._own_cases()[item][2]
+                args = own._prepare(run, d)
+                settings = dict(run.settings)
             else:
                 label = item.replace("/", "_")
                 run = cases[item][2]

@@ -8,8 +8,11 @@
 //! does not depend on the thread count. `-dilall` follows its queue in order (serial).
 //!
 //! FSL switches the direct sum to an FFT for large kernels (§10.2); the original keeps the
-//! direct sum, whose results differ from FSL's FFT only in the last bits (§21's thresholds),
-//! and prints the messages FSL prints on either path.
+//! direct sum and prints the messages FSL prints on either path. Where FSL sums directly the
+//! original's sum is §10.2's single-precision sum, FSL's bit for bit; where FSL takes its FFT the
+//! original adds the products in double precision and rounds the sum once (findings 31: over a
+//! large kernel a single-precision running sum drifts by units of the image's largest values,
+//! where FSL's FFT stays near single precision's rounding of them), within §21's thresholds.
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -619,10 +622,17 @@ fn fsl_uses_fft(nvox: usize, nker: usize) -> bool {
 /// One row of a kernel for the direct sum: its `j`, its `l` and its taps `(i, value)`.
 type TapRow = (i64, i64, Vec<(i64, f32)>);
 
-/// The direct sum of one volume with a kernel (outside the image: 0), in single precision
-/// (a double image's products in double); converted to `T`. Voxel `(i, j, k)` of the kernel
-/// weighs the image at the voxel plus `(i, j, k) − centre` (a correlation; FSL's FFT path is a
-/// true convolution, which the caller gives as the flipped kernel and its own centre).
+/// The direct sum of one volume with a kernel (outside the image: 0), converted to `T`.
+/// Voxel `(i, j, k)` of the kernel weighs the image at the voxel plus `(i, j, k) − centre` (a
+/// correlation; FSL's FFT path is a true convolution, which the caller gives as the flipped
+/// kernel and its own centre).
+///
+/// The arithmetic: without `wide`, §10.2's direct sum of FSL's direct path (each product in
+/// single precision added to a single-precision sum; a double image's products in double); with
+/// `wide` (where FSL takes its FFT), each product in double precision (the value as the
+/// computing type gives it to FSL's single-precision FFT, a double image's as it is, times the
+/// kernel's value: exact for single-precision values) added to a double-precision sum, rounded
+/// once to single precision at the end (findings 31).
 ///
 /// Built for speed with the same bits: a row of x at once, every voxel's taps added in the
 /// kernel's order (z slowest, x fastest; the taps outside the image left out, and the kernel's
@@ -635,6 +645,7 @@ fn direct_volume<T: Num>(
     dims: [usize; 3],
     k: &Kernel,
     centre: [i64; 3],
+    wide: bool,
     fix: bool,
 ) -> (Vec<T>, bool) {
     let [nx, ny, nz] = dims;
@@ -642,9 +653,18 @@ fn direct_volume<T: Num>(
     let [cx, cy, cz] = centre;
     let slow = k.non_finite();
     let double = T::KIND == super::num::Kind::Double;
+    // a value as the wide sum takes it: a double image's as it is, else in single precision
+    let wide_value = |v: f64| -> f64 {
+        if double {
+            v
+        } else {
+            num::to_f64(num::to_f32(v))
+        }
+    };
     // one voxel by x86-64's rules
     let exact = |x: usize, y: usize, z: usize| -> f32 {
         let mut sum = 0.0f32;
+        let mut wsum = 0.0f64;
         for l in 0..kz {
             let pz = z as i64 + l as i64 - cz;
             let zin = pz >= 0 && pz < nz as i64;
@@ -663,7 +683,11 @@ fn direct_volume<T: Num>(
                     } else {
                         continue;
                     };
-                    if double {
+                    if wide {
+                        let (a, b) = (wide_value(s.to_f64()), num::to_f64(kv));
+                        let p = num::nan64(a, b, a * b);
+                        wsum = num::nan64(wsum, p, wsum + p);
+                    } else if double {
                         let (a, b) = (s.to_f64(), f64::from(kv));
                         sum = num::acc32(sum, num::nan64(a, b, a * b));
                     } else {
@@ -674,7 +698,7 @@ fn direct_volume<T: Num>(
                 }
             }
         }
-        sum
+        if wide { num::to_f32(wsum) } else { sum }
     };
     let mut out = vec![T::zero(); src.len()];
     let convert = |o: &mut [T], sums: &mut dyn FnMut(usize) -> f32| -> bool {
@@ -707,14 +731,17 @@ fn direct_volume<T: Num>(
             (j as i64, l as i64, taps)
         })
         .collect();
+    // one row's sums: single precision, or double precision where `wide`
+    let (n32, n64) = if wide { (0, nx) } else { (nx, 0) };
     let changed = out
         .par_chunks_mut(nx.max(1))
         .enumerate()
         .map_init(
-            || vec![0.0f32; nx],
-            |acc, (row, o)| {
+            || (vec![0.0f32; n32], vec![0.0f64; n64]),
+            |(acc, accw), (row, o)| {
                 let (y, z) = ((row % ny) as i64, (row / ny) as i64);
                 acc.fill(0.0);
+                accw.fill(0.0);
                 for (j, l, taps) in &rows {
                     let (py, pz) = (y + j - cy, z + l - cz);
                     if py < 0 || py >= ny as i64 || pz < 0 || pz >= nz as i64 {
@@ -730,6 +757,21 @@ fn direct_volume<T: Num>(
                             continue;
                         }
                         let s = &srow[(xa as i64 + d) as usize..(xb as i64 + d) as usize];
+                        if wide {
+                            // the products exact in double for single-precision values
+                            let kd = f64::from(kv);
+                            let a = &mut accw[xa..xb];
+                            if double {
+                                for (a, &v) in a.iter_mut().zip(s) {
+                                    *a += v.fast_f64() * kd;
+                                }
+                            } else {
+                                for (a, &v) in a.iter_mut().zip(s) {
+                                    *a += f64::from(v.fast_f64() as f32) * kd;
+                                }
+                            }
+                            continue;
+                        }
                         let a = &mut acc[xa..xb];
                         if double {
                             let kd = f64::from(kv);
@@ -744,7 +786,7 @@ fn direct_volume<T: Num>(
                     }
                 }
                 convert(o, &mut |x| {
-                    let r = acc[x];
+                    let r = if wide { accw[x] as f32 } else { acc[x] };
                     if r.is_nan() {
                         exact(x, y as usize, z as usize)
                     } else {
@@ -790,7 +832,8 @@ fn point_symmetric(k: &Kernel) -> bool {
 
 /// The convolution of every volume with `k` (outside the image: 0). Where FSL takes the direct
 /// sum: a correlation with the kernel's centre and the warning per volume when a size is even.
-/// Where FSL takes its FFT (§10.2), no warning, and two defects of that path:
+/// Where FSL takes its FFT (§10.2): the direct sum's products added in double precision and
+/// rounded once (findings 31), no warning, and two defects of that path:
 /// - FSL-192: FSL's FFT is a true convolution (the kernel mirrored), so the kernel's orientation
 ///   depends on the kernel's and the image's sizes; the default keeps the direct sum's
 ///   orientation at every size, `reproduce` mirrors the kernel there (named where the two
@@ -841,11 +884,11 @@ fn convolve_in_place<T: Num>(
             poisoned = true;
             continue;
         }
-        let (o, ch) = direct_volume(vol, dims, &kk, centre, fix);
+        let (o, ch) = direct_volume(vol, dims, &kk, centre, fft, fix);
         if let Some((m, c)) = &mirror {
             // named where FSL's mirrored kernel gives another result (reproduce: it is that)
             mirrored |= !fix || {
-                let (r, _) = direct_volume(vol, dims, m, *c, fix);
+                let (r, _) = direct_volume(vol, dims, m, *c, fft, fix);
                 o.par_iter().zip(r.par_iter()).any(|(a, b)| !a.same(*b))
             };
         }
@@ -1133,44 +1176,108 @@ pub(crate) mod tests {
             let values: Vec<f32> = (0..24).map(|v| [0.0, 0.5, -1.25, 2.0][v % 4]).collect();
             let k = Kernel::from_values(kd, values);
             let centre = [1i64, 2, 0];
-            let want: Vec<f32> = (0..n)
-                .map(|idx| {
-                    let (x, y, z) = (idx % 13, (idx / 13) % 7, idx / 91);
-                    let mut sum = 0.0f32;
-                    for l in 0..2 {
-                        for j in 0..3 {
-                            for i in 0..4 {
-                                let (px, py, pz) = (
-                                    x as i64 + i - centre[0],
-                                    y as i64 + j - centre[1],
-                                    z as i64 + l - centre[2],
-                                );
-                                if px < 0 || py < 0 || pz < 0 || px >= 13 || py >= 7 || pz >= 6 {
-                                    continue;
+            // single precision (FSL's direct path), or double precision rounded once (`wide`:
+            // where FSL takes its FFT)
+            let plain = |wide: bool| -> Vec<f32> {
+                (0..n)
+                    .map(|idx| {
+                        let (x, y, z) = (idx % 13, (idx / 13) % 7, idx / 91);
+                        let mut sum = 0.0f32;
+                        let mut wsum = 0.0f64;
+                        for l in 0..2 {
+                            for j in 0..3 {
+                                for i in 0..4 {
+                                    let (px, py, pz) = (
+                                        x as i64 + i - centre[0],
+                                        y as i64 + j - centre[1],
+                                        z as i64 + l - centre[2],
+                                    );
+                                    if px < 0 || py < 0 || pz < 0 || px >= 13 || py >= 7 || pz >= 6
+                                    {
+                                        continue;
+                                    }
+                                    let a = src[(px + 13 * (py + 7 * pz)) as usize];
+                                    let kv = k.data[(i + 4 * (j + 3 * l)) as usize];
+                                    if wide {
+                                        let (a, b) = (num::to_f64(a), num::to_f64(kv));
+                                        let p = num::nan64(a, b, a * b);
+                                        wsum = num::nan64(wsum, p, wsum + p);
+                                    } else {
+                                        let p = num::nan32(a, kv, a * kv);
+                                        sum = num::nan32(sum, p, sum + p);
+                                    }
                                 }
-                                let a = src[(px + 13 * (py + 7 * pz)) as usize];
-                                let kv = k.data[(i + 4 * (j + 3 * l)) as usize];
-                                let p = num::nan32(a, kv, a * kv);
-                                sum = num::nan32(sum, p, sum + p);
                             }
                         }
-                    }
-                    sum
-                })
-                .collect();
-            for threads in [1, 3] {
-                let (got, _) = larmorx_core::parallel::with_threads(threads, || {
-                    direct_volume(&src, dims, &k, centre, true)
-                })
-                .unwrap();
-                assert!(
-                    got.iter()
-                        .zip(&want)
-                        .all(|(a, b)| a.to_bits() == b.to_bits()),
-                    "direct sum, finite {finite}, {threads} threads"
-                );
+                        if wide { num::to_f32(wsum) } else { sum }
+                    })
+                    .collect()
+            };
+            for wide in [false, true] {
+                let want = plain(wide);
+                for threads in [1, 3] {
+                    let (got, _) = larmorx_core::parallel::with_threads(threads, || {
+                        direct_volume(&src, dims, &k, centre, wide, true)
+                    })
+                    .unwrap();
+                    assert!(
+                        got.iter()
+                            .zip(&want)
+                            .all(|(a, b)| a.to_bits() == b.to_bits()),
+                        "direct sum, wide {wide}, finite {finite}, {threads} threads"
+                    );
+                }
             }
         }
+    }
+
+    #[test]
+    fn where_fsl_takes_its_fft_the_sum_is_the_exact_one_rounded_once() {
+        // a 64 x 64 image of values near 8e4 and a 41 x 41 kernel of ones / 1681: FSL's FFT
+        // path; the wide sum is the exact sum (computed in i128 units of 2^-40) rounded once,
+        // where a single-precision running sum is not
+        let (n, m) = (64usize, 41usize);
+        let data: Vec<f32> = (0..n * n)
+            .map(|v| 80_000.0 + ((v * 7919) % 1000) as f32 * 0.125)
+            .collect();
+        let k = normalised(&Kernel::ones([m as i64, m as i64, 1], false));
+        assert!(fsl_uses_fft(n * n, m * m));
+        let mut im = img([n, n, 1, 1], data.clone());
+        let mut err = Vec::new();
+        convolve_in_place(
+            &mut im,
+            &k,
+            "-fmeanu",
+            &mut notices(UpstreamDefects::Fix),
+            &mut err,
+            0,
+        );
+        let (single, _) = direct_volume(&data, [n, n, 1], &k, k.centre(), false, true);
+        let kv = f64::from(k.data[0]);
+        let (mut exact_hits, mut single_hits) = (0, 0);
+        for y in 0..n {
+            for x in 0..n {
+                let mut sum = 0f64;
+                for j in 0..m {
+                    for i in 0..m {
+                        let (px, py) = (x as i64 + i as i64 - 20, y as i64 + j as i64 - 20);
+                        if px >= 0 && py >= 0 && px < n as i64 && py < n as i64 {
+                            sum += f64::from(data[px as usize + n * py as usize]);
+                        }
+                    }
+                }
+                // the sum of values that are multiples of 1/8 below 2^17: exact in double
+                let want = (sum * kv) as f32;
+                let got = im.data[x + n * y];
+                exact_hits += usize::from(got.to_bits() == want.to_bits());
+                single_hits += usize::from(single[x + n * y].to_bits() == want.to_bits());
+                assert!((f64::from(got) - sum * kv).abs() <= f64::from(want).abs() * 1.2e-7);
+            }
+        }
+        // the product sum * kv rounds once more than the wide sum's products (each value times
+        // kv, then added); both are within one rounding of the exact result
+        assert!(exact_hits > n * n * 9 / 10, "{exact_hits}");
+        assert!(single_hits < n * n / 2, "{single_hits}");
     }
 
     #[test]

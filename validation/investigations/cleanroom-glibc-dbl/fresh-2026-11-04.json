@@ -1,0 +1,52 @@
+{
+  "what": "larmorx_core::math's clean-room sin_glibc, cos_glibc, sincos_glibc against the system's functions on fresh arguments",
+  "glibc": "2.35",
+  "cpu_fma_avx2": true,
+  "glibc_tunables": "",
+  "larmorx_commit": "d0c84e8",
+  "arguments_per_family": 1073741824,
+  "functions": {
+    "sin": {"compared": 11811160064, "differ": 0, "families": [
+        {"id": 1, "name": "bit patterns", "compared": 1073741824, "differ": 0, "glibc_nan_results": 523980, "examples": []},
+        {"id": 2, "name": "magnitudes 2^-40 to 2^40, log-uniform, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 3, "name": "uniform on [-2 pi, 2 pi)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 4, "name": "uniform on [-2^27, 2^27)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 5, "name": "near the multiples k pi/2, k = 1 to 2^28, within 2^16 units in the last place, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 6, "name": "within 2^24 units in the last place of the paths' limits, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 76702555, "examples": []},
+        {"id": 7, "name": "float values with magnitudes 2^-10 to 2^17, both signs (image intensities)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 8, "name": "magnitudes 2^26 to 2^1023, log-uniform, both signs (the large-argument reduction)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 9, "name": "the table rows: ±(N/128 + u), N = 0 to 109, u uniform on [-1/256, 1/256)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 10, "name": "the band near pi/2: uniform on [0.85546875, L1), both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 11, "name": "magnitudes 2^1 to 2^27, log-uniform, both signs (the medium reduction and its limit)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []}
+      ]},
+    "cos": {"compared": 11811160064, "differ": 0, "families": [
+        {"id": 1, "name": "bit patterns", "compared": 1073741824, "differ": 0, "glibc_nan_results": 524129, "examples": []},
+        {"id": 2, "name": "magnitudes 2^-40 to 2^40, log-uniform, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 3, "name": "uniform on [-2 pi, 2 pi)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 4, "name": "uniform on [-2^27, 2^27)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 5, "name": "near the multiples k pi/2, k = 1 to 2^28, within 2^16 units in the last place, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 6, "name": "within 2^24 units in the last place of the paths' limits, both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 76683234, "examples": []},
+        {"id": 7, "name": "float values with magnitudes 2^-10 to 2^17, both signs (image intensities)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 8, "name": "magnitudes 2^26 to 2^1023, log-uniform, both signs (the large-argument reduction)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 9, "name": "the table rows: ±(N/128 + u), N = 0 to 109, u uniform on [-1/256, 1/256)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 10, "name": "the band near pi/2: uniform on [0.85546875, L1), both signs", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []},
+        {"id": 11, "name": "magnitudes 2^1 to 2^27, log-uniform, both signs (the medium reduction and its limit)", "compared": 1073741824, "differ": 0, "glibc_nan_results": 0, "examples": []}
+      ]},
+    "sincos": {"compared": 11811160064, "differ": 0, "families": [
+        {"id": 1, "name": "bit patterns", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 1050592, "examples": []},
+        {"id": 2, "name": "magnitudes 2^-40 to 2^40, log-uniform, both signs", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 3, "name": "uniform on [-2 pi, 2 pi)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 4, "name": "uniform on [-2^27, 2^27)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 5, "name": "near the multiples k pi/2, k = 1 to 2^28, within 2^16 units in the last place, both signs", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 6, "name": "within 2^24 units in the last place of the paths' limits, both signs", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 153392374, "examples": []},
+        {"id": 7, "name": "float values with magnitudes 2^-10 to 2^17, both signs (image intensities)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 8, "name": "magnitudes 2^26 to 2^1023, log-uniform, both signs (the large-argument reduction)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 9, "name": "the table rows: ±(N/128 + u), N = 0 to 109, u uniform on [-1/256, 1/256)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 10, "name": "the band near pi/2: uniform on [0.85546875, L1), both signs", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []},
+        {"id": 11, "name": "magnitudes 2^1 to 2^27, log-uniform, both signs (the medium reduction and its limit)", "compared": 1073741824, "differ": [0, 0], "glibc_nan_results": 0, "examples": []}
+      ]}
+  },
+  "result": "PASS",
+  "seconds": 75.8,
+  "threads": 28
+}

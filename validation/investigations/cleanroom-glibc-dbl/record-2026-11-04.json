@@ -1,0 +1,13 @@
+{
+  "what": "larmorx_core::math's clean-room sin_glibc, cos_glibc, sincos_glibc against the black-box record (specs/glibc-dbl.md §12.1)",
+  "record": "glibc-dbl-2.35-x86_64-blocks.json",
+  "larmorx_commit": "d0c84e8",
+  "functions": {
+    "sin": {"blocks": 256, "blocks_agree": 256, "special": 184, "special_agree": 184, "function_hash": "f56e61144bf7fe10", "differing_blocks": [], "differing_special": []},
+    "cos": {"blocks": 256, "blocks_agree": 256, "special": 184, "special_agree": 184, "function_hash": "40834730f664179a", "differing_blocks": [], "differing_special": []},
+    "sincos": {"blocks": 256, "blocks_agree": 256, "special": 184, "special_agree": 184, "function_hash": "0c685a3d03758470", "differing_blocks": [], "differing_special": []}
+  },
+  "result": "PASS",
+  "seconds": 4.4,
+  "threads": 28
+}

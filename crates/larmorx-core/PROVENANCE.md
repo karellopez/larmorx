@@ -47,6 +47,24 @@ who never opened glibc's source or its translations (`crates-gpl/tools/`); prove
 ([`validation/investigations/cleanroom-cbrtf/`](../../validation/investigations/cleanroom-cbrtf/README.md));
 unit tests check the hash of every 4099th input and, ignored, of all inputs.
 
+**Not ported: `math/sincos_glibc.rs`** (2026-11-04: `sin_glibc`, `cos_glibc`, `sincos_glibc`, and
+`sin_glibc_sse2`, `cos_glibc_sse2`, glibc's build for CPUs without FMA), the double sine and cosine
+with glibc 2.35's x86-64 bits for `reproduce` (GLIBC-07), is a **clean-room implementation**
+(Apache-2.0) written only from [`specs/glibc-dbl.md`](../../specs/glibc-dbl.md) (the method as
+mathematics, its constants as bits) and black-box runs of the system's functions, by an
+implementer who never opened glibc's source (IBM's Accurate Mathematical Library,
+LGPL-2.1-or-later), the spec writer's model (`crates-gpl/tools/glibc-dbl-model`) or the spec
+writer's `tables.py`. Its tables, `math/sincos_glibc_tables.rs` (the digits of 2/π and table `R`
+of sines and cosines of N/128), are generated from their mathematical definitions by
+`validation/investigations/cleanroom-glibc-dbl/cleanroom_tables.py` (mpmath; no number from
+glibc: the spec's §5.3 documents the 18 low parts of table `R` that are not glibc's, a gap that
+changed no result tested). Proved equal to glibc 2.35 on the black-box record's 3.2 × 10^9
+arguments (768 of 768 blocks) and 184 special arguments per function, and on 1.18 × 10^10 fresh
+arguments per function against the system's `sin`, `cos` and `sincos` (the builds without FMA:
+512 of 512 blocks, 5.9 × 10^9 fresh arguments each), NaN bits included
+([`validation/investigations/cleanroom-glibc-dbl/`](../../validation/investigations/cleanroom-glibc-dbl/README.md));
+unit tests check glibc's hashes on 65,536 seeded arguments of each on every platform.
+
 Differences from the C code, all without effect on the result in round-to-nearest:
 - `__builtin_fma` is `f64::mul_add`, which is correctly rounded on every target;
 - exception flags and `errno` are not modelled;

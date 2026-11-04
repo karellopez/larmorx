@@ -13,7 +13,9 @@
 //! 3. The copy larmorx-nc carries ([`bundled`]: `<prefix>/share/larmorx-nc/fsl-data`, beside
 //!    the `larmorx-nc` program's `<prefix>/bin` or `<prefix>\Scripts`), where the wheel
 //!    installed it (the user's decision of 2026-11-04: the small standard files ship inside
-//!    larmorx-nc, from FSL 6.0.7.23's fsl-data_standard 2208.0).
+//!    larmorx-nc, from FSL 6.0.7.23's fsl-data_standard 2208.0). The files are committed in
+//!    `crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/` (its README, NOTICE, LICENSE and
+//!    MANIFEST.tsv; [`BUNDLED_IMAGES`] the images) and are maturin's wheel data.
 //!
 //! When none has it, the script refuses before it runs anything, naming the file and every
 //! place looked ([`find`]).
@@ -26,13 +28,39 @@ use crate::settings::Settings;
 /// The environment variable of larmorx's explicit data directory.
 pub const ENV: &str = "LARMORX_FSL_DATA";
 
+/// The images larmorx-nc's own copy holds (relative to FSL's `data` directory, without their
+/// `.nii.gz`): every one FSL's scripts that larmorx-nc replicates read, and no other
+/// (`MANIFEST.tsv` beside them lists them with their sizes and SHA-256s).
+pub const BUNDLED_IMAGES: [&str; 3] = [
+    "standard/MNI152_T1_2mm",
+    "standard/MNI152_T1_2mm_brain_mask_dil",
+    "standard/MNI152_T1_2mm_eye_mask",
+];
+
 /// The data directory larmorx-nc's wheel installs beside its program, if the program runs from
 /// an installation (`<prefix>/bin/larmorx-nc` or `<prefix>\Scripts\larmorx-nc.exe`).
 pub fn bundled() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let prefix = exe.parent()?.parent()?;
-    let dir = prefix.join("share").join("larmorx-nc").join("fsl-data");
-    dir.is_dir().then_some(dir)
+    bundled_for(&std::env::current_exe().ok()?)
+}
+
+/// [`bundled`] for the program at `exe`. pip installs a wheel's data under the scheme's `data`
+/// directory and its program under `scripts`: `<prefix>` and `<prefix>/bin` (or
+/// `<prefix>\Scripts`) in every scheme but Windows' per-user one, whose `scripts` is
+/// `<userbase>\Python3XY\Scripts` and `data` `<userbase>`: there the copy is one level higher.
+pub fn bundled_for(exe: &std::path::Path) -> Option<PathBuf> {
+    let at = |prefix: &std::path::Path| {
+        let dir = prefix.join("share").join("larmorx-nc").join("fsl-data");
+        dir.is_dir().then_some(dir)
+    };
+    let bin = exe.parent()?;
+    let prefix = bin.parent()?;
+    at(prefix).or_else(|| {
+        if bin.file_name()?.eq_ignore_ascii_case("Scripts") {
+            at(prefix.parent()?)
+        } else {
+            None
+        }
+    })
 }
 
 /// Where a data file was found.
@@ -114,6 +142,35 @@ pub fn find_in(rel: &str, fsl: &Settings, bundled: Option<PathBuf>) -> Result<Fo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The copy is found beside `<prefix>/bin`, `<prefix>\Scripts` and, for Windows' per-user
+    /// scheme, `<userbase>\Python3XY\Scripts`; not beside any other directory's program.
+    #[test]
+    fn the_bundled_copy_beside_the_program() {
+        let root = tempfile::tempdir().unwrap();
+        let share = |prefix: &std::path::Path| {
+            let d = prefix.join("share").join("larmorx-nc").join("fsl-data");
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        };
+        let venv = root.path().join("venv ~1");
+        let data = share(&venv);
+        for bin in ["bin", "Scripts"] {
+            let exe = venv.join(bin).join("larmorx-nc");
+            assert_eq!(bundled_for(&exe), Some(data.clone()), "{bin}");
+        }
+        let user = root.path().join("user");
+        let data = share(&user);
+        let exe = user
+            .join("Python312")
+            .join("Scripts")
+            .join("larmorx-nc.exe");
+        assert_eq!(bundled_for(&exe), Some(data));
+        let exe = user.join("Python312").join("bin").join("larmorx-nc");
+        assert_eq!(bundled_for(&exe), None);
+        let exe = root.path().join("elsewhere").join("larmorx-nc");
+        assert_eq!(bundled_for(&exe), None);
+    }
 
     fn image(dir: &std::path::Path, rel: &str) {
         let p = dir.join(format!("{rel}.nii.gz"));

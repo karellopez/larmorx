@@ -23,6 +23,9 @@ work/
 *.nii
 *.nii.gz
 *.mgz
+# The one exception (user, 2026-11-04): FSL's standard images larmorx-nc ships
+# (crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/README.md)
+!crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/standard/*.nii.gz
 # OS / editors
 .DS_Store
 .idea/

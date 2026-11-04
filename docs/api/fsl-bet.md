@@ -222,8 +222,10 @@ surface's last bits. bet2's `tanh` is a separate choice (GLIBC-06, `tanh=`, abov
   The standard images they read (`MNI152_T1_2mm`, `MNI152_T1_2mm_brain_mask_dil`,
   `MNI152_T1_2mm_eye_mask`) are looked for in `LARMORX_FSL_DATA` (a directory laid out as
   `$FSLDIR/data`; when set, only there), else `$FSLDIR/data`, else `larmorx-nc`'s own copy
-  (`<prefix>/share/larmorx-nc/fsl-data`); when one is nowhere, the script refuses (exit 1)
-  before it runs anything, naming it and every place looked.
+  (`<prefix>/share/larmorx-nc/fsl-data`, which the wheel installs: FSL 6.0.7.23's three files,
+  byte for byte, with FSL's Licence, MNI's notice and their manifest, so no FSL installation is
+  needed); when one is nowhere, the script refuses (exit 1) before it runs anything, naming it
+  and every place looked.
 - A program the script runs that aborts (fslmaths on an image that is not there, as `bet -S -n`
   meets) prints FSL's text and bash's report (`bet: line 399: <pid> Aborted ...`), then the
   `ERR` trap's line, exit 1, as FSL's script.

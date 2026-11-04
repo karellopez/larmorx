@@ -1,0 +1,4 @@
+file	bytes	sha256	package	version	read_by
+standard/MNI152_T1_2mm.nii.gz	1406977	0585cd056bf5ccfb8bf97a5f6a66082d4e7caad525718fc11e40d80a827fcb92	fsl-data_standard	2208.0	bet -S, -B, -A, -A2; standard_space_roi
+standard/MNI152_T1_2mm_brain_mask_dil.nii.gz	11132	342d41e1c445d87a812ca288786a116306e96a5595a198e46ba7e7515d4f221c	fsl-data_standard	2208.0	bet -S, -B; standard_space_roi -b
+standard/MNI152_T1_2mm_eye_mask.nii.gz	2788	5ce2da5f524da4562d2274192010c69e152b83166f214ac75dbcc5a778493ad5	fsl-data_standard	2208.0	bet -S

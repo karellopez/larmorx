@@ -27,6 +27,8 @@ license-files = [
     "fsl-source/MANIFEST.tsv",
     "fsl-source/*/*",
     "fsl-source/*/*/*",
+    "wheel-data/data/share/larmorx-nc/fsl-data/NOTICE",
+    "wheel-data/data/share/larmorx-nc/fsl-data/MANIFEST.tsv",
     "Cargo.toml",
     "Cargo.lock",
     "larmorx-nc-*/Cargo.toml",
@@ -54,3 +56,6 @@ Issues = "https://github.com/karellopez/larmorx/issues"
 [tool.maturin]
 bindings = "bin"
 manifest-path = "larmorx-nc-cli/Cargo.toml"
+# FSL's standard images the bet and standard_space_roi replicas read, installed at
+# <prefix>/share/larmorx-nc/fsl-data (wheel-data/data/share/larmorx-nc/fsl-data/README.md).
+data = "wheel-data"

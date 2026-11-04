@@ -388,6 +388,40 @@ SHA-256 `2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a`, no l
 The replica finds them through `larmorx_nc_core::fsldata` (`LARMORX_FSL_DATA`, `$FSLDIR/data`,
 larmorx-nc's own copy) and refuses before running anything when one is nowhere.
 
+**Their licence terms.** The package names no licence of its own (its conda record's `license`
+is empty, and it holds no licence file): it is distributed as part of FSL, so FSL's Licence
+applies (non-commercial use, without financial return, the conditions passed on to every
+receiver), which only `larmorx-nc` meets. The headers say where they come from: `descrip`
+`FSL5.0` (`MNI152_T1_2mm`, int16) and `FSL3.3` (the two masks, uint8), all on FSL's 91 × 109 × 91
+grid of 2 mm voxels. `MNI152_T1_2mm` is FSL's MNI152, the MNI ICBM 152 non-linear 6th generation
+asymmetric average made for FSL by Andrew Janke (TemplateFlow's `MNI152NLin6Asym`: Evans et al.
+2012, doi:10.1016/j.neuroimage.2012.01.024), so it also carries the McConnell Brain Imaging
+Centre's permissive notice (Copyright (C) 1993-2009 Louis Collins, MNI, McGill University;
+copies keep the notice), as the MNI ICBM 152 models are distributed (TemplateFlow's
+`tpl-MNI152NLin6Sym` `LICENSE`); the masks are FSL's own work on that grid.
+
+**larmorx-nc's copy** (the user's decision of 2026-11-04, "The data the programs read"): the
+three files, byte for byte (each one's size and SHA-256 equal the package's own record,
+`conda-meta/fsl-data_standard-2208.0-0.json`), are committed in
+`crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/standard/` with FSL's Licence (`LICENSE`, a
+copy of `crates-nc/LICENSE`), MNI's notice and the package's origin (`NOTICE`), a manifest
+(`MANIFEST.tsv`: file, bytes, SHA-256, package, version, the programs that read it) and a README.
+`crates-nc/wheel-data` is maturin's wheel data directory, so the wheel installs them at
+`<prefix>/share/larmorx-nc/fsl-data/`, beside the program (`fsldata::bundled`: `<prefix>/bin`,
+`<prefix>\Scripts`, and Windows' per-user scheme, whose program is in
+`<userbase>\Python3XY\Scripts` and data in `<userbase>`); its licence files also carry the
+NOTICE and the manifest. The wheel (Linux x86-64, release): 6,209,575 bytes with them, of which
+the three images are 1,419,464 bytes compressed (gzip data does not compress again): about 30 %
+more than the program and its licence files alone. `crates-nc/larmorx-nc-cli/tests/fsl_data.rs`
+checks the copy against its manifest (exactly those files, unchanged, the licence identical, the
+notice's lines, the wheel's data setting), that `fsldata` finds every image the scripts ask for
+in it, and the program end to end in an installation's layout (`<prefix>/bin/larmorx-nc`, a
+blank and a `~` in the prefix): without `FSLDIR`, `standard_space_roi -b -d` (FLIRT given the
+identity, so it only resamples) reads `MNI152_T1_2mm`'s grid and the dilated mask from the copy,
+exit 0, and refuses without it. A wheel installed into a fresh environment
+(`pip install --no-deps`) put them at `<venv>/share/larmorx-nc/fsl-data/` and ran the same call
+without FSL (exit 0).
+
 ## FSL 6.0.7.23 (the version update, 2026-10-29)
 
 FSL 6.0.7.17 → 6.0.7.23: fsl-bet2 2111.8 → 2111.9 (`bet2.cpp`; the `bet` script, `betsurf.{h,cpp}`

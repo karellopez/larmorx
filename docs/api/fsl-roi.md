@@ -33,7 +33,8 @@ process (FLIRT, `convert_xfm`, `fslval`, `fslmaths`, `fslstats -w`, `fslroi`, fs
 `MNI152_T1_2mm_brain_mask_dil`, from FSL's `data/standard`. The replica looks for each, in this
 order: `LARMORX_FSL_DATA` (a directory laid out as `$FSLDIR/data`; when it is set nothing else is
 searched), `$FSLDIR/data`, and the copy larmorx-nc carries (`<prefix>/share/larmorx-nc/fsl-data`
-beside its program). When none has the image it refuses before running anything, naming the
+beside its program, which the wheel installs: FSL 6.0.7.23's files byte for byte, with FSL's
+Licence, MNI's notice and their manifest; `crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`). When none has the image it refuses before running anything, naming the
 image and every place looked (`larmorx-nc: error: standard_space_roi: FSL's data image
 standard/MNI152_T1_2mm was not found: ...`, exit 1). `-ssref` (and masks given with `-maskMASK`,
 `-roiMASK`) need none of them. The Python wrapper takes `fsl_data=`.

@@ -190,6 +190,29 @@ The SGI STL (std::sort's introsort and std::nth_element's introselect, as libstd
   vector's ends (std::sort of floats that may be NaN, FSL-22).
 
 
+Data included
+=============
+
+FSL 6.0.7.23's standard images (fsl-data_standard 2208.0), The University of Oxford - the FSL
+Licence (LICENSE)
+  MNI152_T1_2mm, MNI152_T1_2mm_brain_mask_dil and MNI152_T1_2mm_eye_mask (.nii.gz), unchanged:
+  the images FSL's bet script (-S, -B, -A, -A2) and standard_space_roi read
+  (wheel-data/data/share/larmorx-nc/fsl-data/, installed at <prefix>/share/larmorx-nc/fsl-data;
+  its NOTICE, LICENSE and MANIFEST.tsv with each file's size and SHA-256). MNI152_T1_2mm is
+  FSL's MNI152 (the MNI ICBM 152 non-linear 6th generation average, made for FSL by Andrew
+  Janke) and carries the McConnell Brain Imaging Centre's notice:
+
+    Copyright (C) 1993-2009 Louis Collins, McConnell Brain Imaging Centre, Montreal
+    Neurological Institute, McGill University. Permission to use, copy, modify, and
+    distribute this software and its documentation for any purpose and without fee is
+    hereby granted, provided that the above copyright notice appear in all copies. The
+    authors and McGill University make no representations about the suitability of this
+    software for any purpose. It is provided "as is" without express or implied warranty.
+    The authors are not responsible for any data loss, equipment damage, property loss, or
+    injury to subjects or patients resulting from the use or misuse of this software
+    package.
+
+
 Apache-2.0 code included
 ========================
 

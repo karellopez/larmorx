@@ -105,7 +105,7 @@ class Change:
 #: decision of 2026-11-04, "name exact cases only"): a clean-room original calls the C library
 #: functions its spec names through ``larmorx_core::math::Libm``, correctly rounded by default
 #: and glibc 2.35's (the original's) with ``reproduce``. A pointwise computation (fslmaths'
-#: voxelwise functions and ``-edge``, fslstats' ``-e`` and ``-E``, avscale, makerot,
+#: voxelwise functions, fslstats' ``-e`` and ``-E``, avscale, makerot,
 #: ``convert_xfm -fixscaleskew``, 3dTshift's weighted sinc) compares what it stores and names
 #: GLIBC-07 exactly where the outputs differ; an iterative fit (FLIRT and applyxfm4D, FAST,
 #: mcflirt's mutual-information costs, topup, bet2, betsurf) or a filter combining many function

@@ -219,12 +219,6 @@ pub fn subsample<T: Num>(img: &mut Img<T>, offc: bool, notices: &mut Notices) ->
 /// (in-plane only when the image has at most 2 slices).
 pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
     let fix = notices.fix();
-    // FSL squares by `pow(x, 2)` (§10.4): glibc's with `reproduce` (GLIBC-07), which differs
-    // from the exact product `d · d` only for a double image (a single-precision or integer
-    // difference squares exactly in double). GLIBC-07 is named exactly: while the witness
-    // looks, each voxel's value is computed with the other choice too and compared as stored.
-    let libm = Libm::new(notices.mode());
-    let double = T::KIND == Kind::Double;
     let [nx, ny, nz, _] = img.dims;
     let planar = nz <= 2;
     let axes = if planar { 2 } else { 3 };
@@ -251,10 +245,13 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                     let i = x + nx * (y + ny * z);
                     let steps = [1, nx, plane];
                     let mut sum = 0.0f64;
-                    // the other choice's sum, while the witness looks (double images only)
-                    let other = double && libm.watching();
-                    let mut sum_o = 0.0f64;
-                    for a in 0..axes {
+                    // The squares are exact products `d · d` and the terms are added from the
+                    // last axis to the first (observed, black-box runs of FSL on a double
+                    // image: §10.4's `pow(x, 2)` is FSL's compiled `x · x`, never glibc's pow,
+                    // and only this order gives FSL's bits; `validation/investigations/
+                    // cleanroom-glibc-dbl/edge_forms.py`); a float or integer image's sum is
+                    // the same in any order once stored.
+                    for a in (0..axes).rev() {
                         let (p, m) = (vol[i + steps[a]], vol[i - steps[a]]);
                         // C's arithmetic: char and short differences as int, not wrapped to
                         // the type (random testing, findings 29)
@@ -263,31 +260,13 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                             _ => p.diff(m),
                         };
                         // x86-64's NaN rules (a voxel size of 0: 0 / 0, inf / inf)
-                        let square = |glibc: bool| {
-                            if double && glibc {
-                                math::pow_glibc(d, 2.0)
-                            } else {
-                                d * d
-                            }
-                        };
+                        let dd = d * d;
                         let vv = vox[a] * vox[a];
-                        let dd = square(libm.is_glibc());
                         let q = num::nan64(dd, vv, dd / vv);
                         sum = num::nan64(sum, q, sum + q);
-                        if other {
-                            let dd = square(!libm.is_glibc());
-                            let q = num::nan64(dd, vv, dd / vv);
-                            sum_o = num::nan64(sum_o, q, sum_o + q);
-                        }
                     }
-                    let value = |sum: f64| {
-                        let r = super::reduce::sqrt64(sum);
-                        T::convert(num::nan64(r, den, r / den), fix)
-                    };
-                    let (v, c) = value(sum);
-                    if other {
-                        libm.note(value(sum_o).0.to_f64().to_bits() != v.to_f64().to_bits());
-                    }
+                    let r = super::reduce::sqrt64(sum);
+                    let (v, c) = T::convert(num::nan64(r, den, r / den), fix);
                     ch |= c;
                     o[x + nx * y] = v;
                 }
@@ -296,7 +275,6 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
         })
         .reduce(|| false, |a, b| a || b);
     ops::note151(notices, changed, "-edge's values");
-    ops::note_glibc(notices, &libm, "-edge's values (its squares by pow)");
 }
 
 // ------------------------------------------------------------------------------------------

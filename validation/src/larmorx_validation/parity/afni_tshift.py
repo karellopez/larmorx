@@ -248,6 +248,18 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         "-tpattern '@1D: 0 1 0.5 1.5'",
         Scenario(F32, ("-tpattern", "@1D: 0 1 0.5 1.5")),
     )
+    # GLIBC-07 (spec §5.3): slice times whose weighted-sinc weights take other last bits with
+    # glibc's sinf and cosf (reproduce, AFNI's) than with the correctly rounded functions (the
+    # default, which names GLIBC-07 exactly where its values differ); found by black-box runs of
+    # both modes (validation/investigations/cleanroom-glibc-dbl/case_search.py)
+    for method, times in (("-wsinc5", "0 0.543 0.102 0.728"), ("-wsinc9", "0 0.911 1.821 0.603")):
+        add(
+            f"methods/glibc-sinf{method}",
+            "methods",
+            f"{method} -tpattern '@1D: {times}': weights where glibc's sinf and cosf differ "
+            "from the correctly rounded ones (GLIBC-07)",
+            Scenario(F32, ("-tpattern", f"@1D: {times}", method)),
+        )
 
     # Slice timing from the NIfTI header (inputs generated from the float32 file).
     header = [

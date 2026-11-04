@@ -1668,6 +1668,14 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-182"],
         output_type: "NIFTI",
     },
+    BetCase {
+        id: "fslstats.fsl182.reproduce",
+        tool: "fsl fslstats",
+        args: &["{one}", "-s", "-S"],
+        mode: "reproduce",
+        named: &["FSL-182"],
+        output_type: "NIFTI",
+    },
     // fslroi (2026-11-04): a box and a range of volumes of the 4D head (x, y, z, t), the
     // spatial form on the 3D head with a size of -1
     BetCase {

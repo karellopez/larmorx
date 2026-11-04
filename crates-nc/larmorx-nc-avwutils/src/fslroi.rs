@@ -13,7 +13,8 @@
 //! image that does not read, `Invalid ROI dimensions`, a time index outside the series), FSL-215;
 //! corrected by default (status 1, the messages unchanged), reproduced with `reproduce`. The
 //! usage (1), the output type's refusal (1) and the unsupported data types (255) give their own
-//! status in both modes.
+//! status in both modes. An int8 input is written as int8 with its values by default, as FSL's
+//! uint8 with the same bytes in `reproduce` (FSL-217, named).
 
 use std::io::Write;
 
@@ -45,7 +46,16 @@ pub fn main(
     }
     let numbers: Vec<&str> = argv[3..].iter().map(String::as_str).collect();
     match avwutils::fslroi(&argv[1], &argv[2], &numbers, fsl, reproduce) {
-        Ok(()) => 0,
+        Ok(None) => 0,
+        Ok(Some(int8)) => {
+            // FSL-217: the corrected output's type always differs from FSL's uint8; in
+            // `reproduce` named where FSL's bytes change a value
+            if int8.kept || int8.negative > 0 {
+                let n = Notice::new(&defects::FSL_217, mode, int8.detail("fslroi"));
+                let _ = writeln!(err, "larmorx-nc: {}", n.line());
+            }
+            0
+        }
         Err(f) => {
             let _ = err.write_all(f.err.as_bytes());
             if !f.exception {
@@ -98,6 +108,94 @@ mod tests {
             assert_eq!((code, err.as_str()), (1, ""));
             assert!(out.starts_with("\nUsage: fslroi <input>"), "{out}");
             assert!(out.ends_with("for that dimension.\n"), "{out}");
+        }
+    }
+
+    /// A 4 x 1 x 1 int8 `.nii` of `values`.
+    fn int8_nii(path: &std::path::Path, values: &[i8]) {
+        let mut h = vec![0u8; 352];
+        h[0..4].copy_from_slice(&348i32.to_le_bytes());
+        let dims: [i16; 8] = [3, values.len() as i16, 1, 1, 1, 1, 1, 1];
+        for (k, d) in dims.iter().enumerate() {
+            h[40 + 2 * k..42 + 2 * k].copy_from_slice(&d.to_le_bytes());
+        }
+        h[70..72].copy_from_slice(&256i16.to_le_bytes()); // DT_INT8
+        h[72..74].copy_from_slice(&8i16.to_le_bytes());
+        for (k, p) in [1.0f32, 1.0, 1.0, 1.0].iter().enumerate() {
+            h[76 + 4 * k..80 + 4 * k].copy_from_slice(&p.to_le_bytes());
+        }
+        h[108..112].copy_from_slice(&352f32.to_le_bytes());
+        h[112..116].copy_from_slice(&1f32.to_le_bytes());
+        h[344..348].copy_from_slice(b"n+1\0");
+        h.extend(values.iter().map(|&v| v as u8));
+        std::fs::write(path, h).unwrap();
+    }
+
+    /// FSL-217: an int8 input written as int8 with its values by default, as FSL's uint8 with
+    /// the same bytes in `reproduce`; named in both modes when a value is negative.
+    #[test]
+    fn an_int8_input_keeps_its_type_by_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("i8.nii");
+        int8_nii(&input, &[-64, 0, 5, 127]);
+        let fsl = Settings::new().with("FSLOUTPUTTYPE", "NIFTI");
+        for (mode, code, named) in [
+            (UpstreamDefects::Fix, 256i16, "int8 image written as int8"),
+            (
+                UpstreamDefects::Reproduce,
+                2i16,
+                "1 negative values became 128 to 255",
+            ),
+        ] {
+            let out = dir.path().join(format!("o{}", code));
+            let argv: Vec<String> = [
+                "fslroi",
+                &input.display().to_string(),
+                &out.display().to_string(),
+                "0",
+                "3",
+                "0",
+                "1",
+                "0",
+                "1",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            assert_eq!(main(&argv, &fsl, mode, &mut o, &mut e), 0);
+            let e = String::from_utf8(e).unwrap();
+            assert!(e.contains("FSL-217") && e.contains(named), "{e}");
+            let bytes = std::fs::read(out.with_extension("nii")).unwrap();
+            assert_eq!(i16::from_le_bytes([bytes[70], bytes[71]]), code);
+            let off = f32::from_le_bytes(bytes[108..112].try_into().unwrap()) as usize;
+            // x 0..2 of [-64, 0, 5, 127]: the same bytes in both modes, -64 or (uint8) 192
+            assert_eq!(&bytes[off..off + 3], &[0xC0u8, 0, 5]);
+        }
+        // a region without negative values: named by default only (the type differs)
+        for (mode, named) in [
+            (UpstreamDefects::Fix, true),
+            (UpstreamDefects::Reproduce, false),
+        ] {
+            let out = dir.path().join("p");
+            let argv: Vec<String> = [
+                "fslroi",
+                &input.display().to_string(),
+                &out.display().to_string(),
+                "2",
+                "2",
+                "0",
+                "1",
+                "0",
+                "1",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            assert_eq!(main(&argv, &fsl, mode, &mut o, &mut e), 0);
+            let e = String::from_utf8(e).unwrap();
+            assert_eq!(e.contains("FSL-217"), named, "{e}");
         }
     }
 

@@ -179,6 +179,15 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
   default refuses.
 - **FSL-56** (A): an image saved with two or more NIfTI extensions of different sizes (only with
   `FSL_LOAD_NIFTI_EXTENSIONS`) gets a wrong data offset; the default writes the right one.
+- **FSL-216** (A; B for a number that is not one): `bet -S` computes its eye threshold with GNU
+  `dc` from what `fslstats` prints, which `dc` misreads for a number with an exponent, a minus
+  sign, `nan` or `inf`; the default reads the numbers as numbers and refuses a mean or deviation
+  that is not a number; `reproduce` gives what `dc` prints, its messages too.
+- **FSL-217** (A): `bet -F` and `-Z` cut the input with fslroi (and `-Z` joins the slices with
+  fslmerge), which write an int8 image as uint8 with the same bytes: bet2 then runs on negative
+  values turned into 128 to 255. The default keeps int8 and its values, named where the result
+  differs (a negative value, or `-d` keeping the int8 temporary files); `reproduce` gives FSL's
+  uint8.
 
 Where FSL crashes on what it leaves undefined, the default refuses with the reason and
 `reproduce` keeps everything FSL defines, fills the rest deterministically and warns (D13's

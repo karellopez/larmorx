@@ -251,8 +251,9 @@ is 1, `abc` is 0).
   int32; uint32, int64, uint64 as float32 (integers beyond 2^24 rounded to float); float128 as
   float64; a scaled image as float32 (unless its slope is 0 or it is float64); the values copied
   (converted to that type). int8: FSL writes it as uint8 with the same bytes, so a negative value
-  becomes another (−64 is written 192; FSL-217, §6; from the source, a parity case to add); the
-  default keeps int8 and its values. Complex:
+  becomes another (−64 is written 192; FSL-217, §6; confirmed by black-box runs of FSL 6.0.7.23:
+  the output's datatype is 2, its bytes the input's); the default keeps int8 (datatype 256) and
+  its values. Complex:
   `COMPLEX not supported as an independent type`, exit 255; any other type: `Datatype <code> is NOT
   supported - please check your image`, exit 255 (standard error).
 - An input that cannot be read: `Image Exception : #63 :: No image files match: <name>` and `No
@@ -295,7 +296,7 @@ download, cached) and refuses before running anything when one is nowhere, namin
 | FSL-213 | the mask threshold is never initialised without `-b`: a variable `maskthr` in the environment is applied, as fslmaths' options, to the transformed mask | ignored (named when set) | applied |
 | FSL-214 | no step's status is checked (§2.4) | rule B: stops at the first program that fails, exit 1 | goes on, the cleanup's status |
 | FSL-215 | fslroi exits 0 after the errors it reports (§3.2) | exit 1, the messages unchanged | exit 0 |
-| FSL-217 | fslroi (and `fslmerge`, which `bet -Z` runs; `bet -F`'s and `-Z`'s fslroi, `specs/bet.md` §5.2) writes an int8 image as uint8 with the same bytes: its negative values become 128 to 255 | rule A: int8 kept, its values unchanged; named when a value was negative | FSL's uint8 |
+| FSL-217 | fslroi (and `fslmerge`, which `bet -Z` runs; `bet -F`'s and `-Z`'s fslroi, `specs/bet.md` §5.2) writes an int8 image as uint8 with the same bytes: its negative values become 128 to 255 | rule A: int8 kept, its values unchanged; fslroi's output named whenever its input is int8 (its type differs from FSL's), with the number of negative values; inside `bet` named where the result differs: a negative value (bet2 runs on other values) or `-d` keeping the int8 file | FSL's uint8; named where a value is negative |
 
 The programs' own defects are their specs' (FLIRT's FSL-09, FSL-14, FSL-68; fslmaths' and
 fslstats'). Each correction that changed a result is named on standard error (`larmorx: upstream

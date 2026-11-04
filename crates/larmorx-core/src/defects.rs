@@ -644,6 +644,8 @@ defects! {
         "fslroi exits with status 0 after the errors it reports (an image that cannot be read, an invalid region, a time index outside the series), without writing an output";
     FSL_216 = "FSL-216", "bet", true,
         "bet -S computes its eye threshold (3.5 standard deviations above the brain's mean) with dc from the numbers fslstats prints, which dc misreads when a number is printed with an exponent (its e and sign are taken as commands), with a minus sign (a subtraction), or as nan or inf (commands): the threshold is wrong or empty";
+    FSL_217 = "FSL-217", "fslroi", true,
+        "fslroi and fslmerge (and bet -F and -Z, which run them) write an int8 image as uint8 with the same bytes: every negative value becomes another (128 to 255), and bet2 then runs on those values";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

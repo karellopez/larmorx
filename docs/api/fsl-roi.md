@@ -74,6 +74,9 @@ the rest).
 - **FSL-214**: by default the script stops at the first program that fails (exit 1, its
   temporary files removed unless `-d`); FSL's goes on and exits with its cleanup's status.
 - **FSL-215** (`fslroi`): fslroi exits 1 after the errors it reports (FSL's exits 0).
+- **FSL-217** (`fslroi`): an int8 input is written as int8 with its values (FSL writes the same
+  bytes as uint8, so a negative value becomes 128 to 255); named whenever the input is int8, with
+  the number of negative values; `reproduce` writes FSL's uint8 (named where a value is negative).
 
 **Not replicated yet:** fslpy's `imcp` converts an input of another file type than
 `FSLOUTPUTTYPE` with nibabel (`standard_space_roi -maskNONE -roiNONE` on such an input); the

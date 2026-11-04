@@ -757,15 +757,24 @@ fslroi program applies FSL-215.
 | FSL-214 | no step's status is checked: after a failure (FLIRT refusing an option, an image that cannot be written) the script runs the rest on missing files and exits with the cleanup's status, 0 when its temporary files exist, mostly without an output | B | stops at the first failed program, exit 1, temporary files removed unless `-d` / goes on |
 | FSL-215 | fslroi exits 0 after the errors it reports | A | exit 1 / exit 0 |
 
-**FSL-217 (found 2026-11-04, sub-task 5, rule A; the replica's correction pending):** fslroi
+**FSL-217 (found 2026-11-04, sub-task 5, rule A; corrected in the replica the same day):** fslroi
 reads an image in newimage's closest templated type, which for int8 (`DT_INT8`) is
 `DT_UNSIGNED_CHAR` (`closestTemplatedType`), and saves it so: the bytes are kept and the type
-becomes uint8, so every negative value becomes 128 to 255 (the replica, a translation, gives
-−64 → 192 in both modes today; FSL's own output to be confirmed by a parity case). The same
-mapping is in `fslmerge` (the first input's type), which `bet -Z` runs on the slices fslroi cut,
-and in `bet -F`'s first-volume fslroi: bet2 then runs on the wrapped values. fslmaths has the
-same mapping for `-odt input` (FSL-157, corrected there). The default should keep int8 and its
-values (named when a value is negative), as FSL-157's correction does; `reproduce` FSL's uint8.
+becomes uint8, so every negative value becomes 128 to 255. The same mapping is in `fslmerge` (the
+first input's type), which `bet -Z` runs on the slices fslroi cut, and in `bet -F`'s first-volume
+fslroi: bet2 then runs on the wrapped values (its outputs are float either way). fslmaths has the
+same mapping for `-odt input` (FSL-157, corrected there). **The replica** (`larmorx_nc_core::avwutils`:
+`fslroi`, `fslmerge_z`, `Int8Output`) keeps int8 and its values by default (the file written with
+datatype 256) and gives FSL's uint8 in `reproduce`. Named: fslroi's own output whenever its input
+is int8 (the type differs), with the number of negative values; inside `bet`, where the result
+differs, a negative value (bet2 on other values) or `-d` keeping the int8 temporary files; in
+`reproduce` where a value is negative. **Parity** (the BET replica suite, standard tier, FSL 6.0.7.23
+through the oracle cache, 2026-11-04): `fslroi/int8-negative`, `fslroi/int8-positive`,
+`fslroi/type-head-i8`, `bet/fmri-int8`, `bet/fmri-int8-positive`, `bet/small-fov-int8`,
+`bet/small-fov-int8-debug` identical to FSL in `reproduce` (FSL's datatype 2 confirmed); the
+default changes them exactly where FSL-217 is named (`bet/fmri-int8`: 8,066 voxels of the brain
+and mask differ, bet2 having run on the true values; `bet/fmri-int8-positive`: no change, not
+named). Unit test: `larmorx-nc-avwutils` `fslroi::tests::an_int8_input_keeps_its_type_by_default`.
 uint16 → int32 keeps every value (rule C, FSL's design, as for fslmaths); uint32, int64 and uint64
 → float32 round integers beyond 2^24 (rule C, the type's design; documented in
 `specs/standard_space_roi.md` §3.2).

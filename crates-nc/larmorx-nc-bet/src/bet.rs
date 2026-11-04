@@ -468,7 +468,7 @@ impl Script<'_, '_> {
             1 => self.robust(&ins, &outs, &bet2opts)?,
             2 => self.eyes(&in_name, &out_name, &bet2opts)?,
             3 => return self.small_fov(&in_name, &out_name, &opts, debug),
-            4 => self.fmri(&in_name, &out_name, &opts)?,
+            4 => self.fmri(&in_name, &out_name, &opts, debug)?,
             5 => self.surfaces(&in_name, &out_name, &opts, None)?,
             6 => self.surfaces(&in_name, &out_name, &opts, Some(&in2))?,
             7 => self.bias(&in_name, &out_name, &bet2opts, skull)?,
@@ -1136,11 +1136,29 @@ impl Script<'_, '_> {
         Ok((g(0), g(1), g(2)))
     }
 
+    /// FSL-217 after fslroi or fslmerge wrote an int8 image: named where the result differs
+    /// from FSL's, when a value was negative (bet2 runs on other values) or the corrected int8
+    /// file is kept (`-d`); bet2's outputs are float either way.
+    fn int8_written(&mut self, written: Option<avw::Int8Output>, program: &str, debug: bool) {
+        if let Some(w) = written
+            && (w.negative > 0 || (w.kept && debug))
+        {
+            self.notices.add(&defects::FSL_217, w.detail(program));
+        }
+    }
+
     /// `-F`.
-    fn fmri(&mut self, in_name: &str, out_name: &str, opts: &[String]) -> Result<(), Stop> {
+    fn fmri(
+        &mut self,
+        in_name: &str,
+        out_name: &str,
+        opts: &[String],
+        debug: bool,
+    ) -> Result<(), Stop> {
         let tmp = format!("{out_name}_tmp");
         let r = avw::fslroi(in_name, &tmp, &["0", "1"], self.fsl(), self.reproduce());
-        self.tool(r)?;
+        let w = self.tool(r)?;
+        self.int8_written(w, "fslroi", debug);
         self.created(&tmp);
         let mut w = vec![
             tmp.clone(),
@@ -1216,7 +1234,8 @@ impl Script<'_, '_> {
             self.fsl(),
             self.reproduce(),
         );
-        self.tool(r)?;
+        let w = self.tool(r)?;
+        self.int8_written(w, "fslroi", debug);
         self.created(&bottom);
         let last = dc::eval(&format!("{zdim} 1 - p"), self.err);
         let r = avw::fslroi(
@@ -1226,7 +1245,8 @@ impl Script<'_, '_> {
             self.fsl(),
             self.reproduce(),
         );
-        self.tool(r)?;
+        let w = self.tool(r)?;
+        self.int8_written(w, "fslroi", debug);
         self.created(&top);
         let mut inputs: Vec<String> = Vec::new();
         for _ in 0..npad {
@@ -1238,7 +1258,8 @@ impl Script<'_, '_> {
         }
         let padded = format!("{out_name}_tmp");
         let r = avw::fslmerge_z(&padded, &inputs, self.fsl(), self.reproduce());
-        self.tool(r)?;
+        let w = self.tool(r)?;
+        self.int8_written(w, "fslmerge", debug);
         self.created(&padded);
         let mut w = vec![padded.clone(), out_name.to_owned()];
         w.extend(opts.iter().cloned());
@@ -1304,7 +1325,8 @@ impl Script<'_, '_> {
                 self.fsl(),
                 self.reproduce(),
             );
-            self.tool(r)?;
+            let w = self.tool(r)?;
+            self.int8_written(w, "fslroi", debug);
         }
         self.cleanup(out_name, debug);
         Ok(())

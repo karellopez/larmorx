@@ -885,6 +885,17 @@ realistic cases, 114,906 fslmaths and 69,077 fslstats). What they found:
   later refusal (FSL-184's `-X` of an empty mask) dropped an earlier correction's notice (FSL-185);
   the notices of the options before an error are now printed. Permanent case
   `json-notices-before-refusal`.
+- **A NaN's sign through `expx2`** (fixed 2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` part, relay 1):
+  the record re-made at 36ccf0c failed `stat/ztop`, `stat/ztop-double`, `stat/ztop-ptoz` and
+  `d13/ztop-inf` ("header differs": the data block of a NaN voxel), and so did main's own build
+  at 4e1f7fc: fslmaths' `-ztop` of a positive NaN voxel gave the default NaN `0xffc00000` where
+  FSL gives `0x7fc00000`. In FSL's SSE build `expx2(x, -1)` makes `|x|` negative, the products
+  pass that NaN on, `u = -u` makes it positive and glibc's `exp` and the square root keep it; the
+  replica wrote the products as plain Rust arithmetic, whose NaN signs the optimiser does not
+  keep (it may fold `-(m * m)` into `(-m) * m`), and the inlining that changed with the shared
+  maths copies of 2026-11-04 made it do so. Now every operation of `expx2` that a NaN reaches is
+  `sse`'s (x86-64's NaN rules taken explicitly), and the unit test
+  `a_nan_keeps_fsls_sign_through_expx2_and_ndtr` checks the bits in debug and release builds.
 - **The Kiss FFT's twiddle factors** (explained, relay 6b: GLIBC-07, "Known differences"): the
   replica's engine differed from Armadillo 14.2.1's `fft` and `ifft` in the last bits for the
   lengths 15, 30, 60, ... The first reading compared glibc's separate `cos` and `sin`, which on

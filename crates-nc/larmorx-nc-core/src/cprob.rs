@@ -371,23 +371,53 @@ pub fn expx2(x: f64, sign: i32) -> f64 {
     if sign < 0 {
         x = -x;
     }
-    let m = MINV * (M * x + 0.5).floor();
-    let f = x - m;
-    let mut u = m * m;
-    let mut u1 = 2.0 * m * f + f * f;
+    // SSE's NaNs taken explicitly (`sse`): the optimiser may fold `-(m * m)` into `(-m) * m`,
+    // which passes on the other sign of a NaN `m` (a NaN voxel's `-ztop`: FSL's positive NaN,
+    // the replica's negative one in the build of 2026-11-04 until this)
+    let floor = |v: f64| {
+        if v.is_nan() {
+            sse::quiet_f64(v)
+        } else {
+            v.floor()
+        }
+    };
+    let m = sse::mul_f64(MINV, floor(sse::add_f64(sse::mul_f64(M, x), 0.5)));
+    let f = sse::sub_f64(x, m);
+    let mut u = sse::mul_f64(m, m);
+    let mut u1 = sse::add_f64(sse::mul_f64(sse::mul_f64(2.0, m), f), sse::mul_f64(f, f));
     if sign < 0 {
         u = -u;
         u1 = -u1;
     }
-    if (u + u1) > MAXLOG {
+    if sse::add_f64(u, u1) > MAXLOG {
         return f64::INFINITY;
     }
-    glibc_double::exp(u) * glibc_double::exp(u1)
+    sse::mul_f64(glibc_double::exp(u), glibc_double::exp(u1))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A NaN's way through `expx2` and `ndtr` as FSL's SSE build computes it: `|x|` and its
+    /// negation give the NaN a negative sign, the products pass it on, `u = -u` makes it
+    /// positive again, and glibc's `exp` and the square root pass that on: fslmaths' `-ztop` of
+    /// a positive NaN voxel is a positive NaN (the record's `stat/ztop`, `-double`, `-ptoz`,
+    /// `d13/ztop-inf`).
+    #[test]
+    fn a_nan_keeps_fsls_sign_through_expx2_and_ndtr() {
+        for bits in [
+            0x7ff8_0000_0000_0000u64,
+            0xfff8_0000_0000_0000,
+            0x7ff8_0000_0000_1234,
+        ] {
+            let q = f64::from_bits(bits);
+            let positive = (q.to_bits() & !(1u64 << 63)) | 0x0008_0000_0000_0000;
+            assert_eq!(expx2(q, -1).to_bits(), positive, "{bits:016x}");
+            assert_eq!(ndtr(q).to_bits(), positive, "{bits:016x}");
+            assert_eq!((1.0 - ndtr(q)).to_bits(), positive, "{bits:016x}");
+        }
+    }
 
     #[test]
     fn drand_starts_from_the_fixed_state() {

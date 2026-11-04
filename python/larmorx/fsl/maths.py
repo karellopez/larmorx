@@ -12,13 +12,17 @@ combines for each BOLD reference; :func:`collapse`, :func:`apply_mask`, :func:`b
 :func:`smooth`, :func:`spatial_filter` and :func:`threshold`: the goodvoxels mask of
 ``--project-goodvoxels``).
 
-They run the bit-exact replica from ``larmorx-nc`` as a separate program
-(``docs/licensing.md``); the clean-room original is to be written from ``specs/fslmaths.md``, so
-``implementation="auto"`` needs ``larmorx-nc`` installed (and ``"original"`` is not available
-yet). FSL's deterministic defects are corrected by default (D13, ``docs/api/fsl-maths.md``);
-``upstream_defects="reproduce"`` gives FSL's results. FSL's environment variables are settings of
-the call, never read from the process environment (CLAUDE.md rule 6): the program writes
-NIfTI-1 (``FSLOUTPUTTYPE=NIFTI``). fslmaths runs on one thread.
+Two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as
+a separate program on one thread, and the clean-room original (Apache-2.0, written from
+``specs/fslmaths.md``, run in this process on ``n_threads`` threads, its results the same at any
+thread count); ``implementation="auto"`` runs the replica when it is installed, the original
+otherwise. The original takes the command line, every data type, the binary operations,
+thresholds, masks, voxelwise functions, ``-rand``, ``-seed``, ``-index`` and ``-grid`` so far;
+its other operations (kernels and filters, the reductions, the statistics, ``-randn``) come with
+its next parts and raise ``RuntimeError`` until then. FSL's deterministic defects are corrected
+by default (D13, ``docs/api/fsl-maths.md``); ``upstream_defects="reproduce"`` gives FSL's
+results. FSL's environment variables are settings of the call, never read from the process
+environment (CLAUDE.md rule 6): the program writes NIfTI-1 (``FSLOUTPUTTYPE=NIFTI``).
 """
 
 from __future__ import annotations
@@ -273,8 +277,7 @@ def _run(
     _datatype("dt", dt)
     _datatype("odt", odt)
     selected = _replica.select("fsl", "fslmaths", implementation)
-    assert selected is not None  # no clean-room original yet: select raises otherwise
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     args = [] if dt is None else ["-dt", dt]
     args.append(_input(image, tmp, "lx-in", n_threads))
     args += [_operand(v, i, tmp, n_threads) for i, v in enumerate(operations)]
@@ -282,6 +285,22 @@ def _run(
     args.append(out)
     if odt is not None:
         args += ["-odt", odt]
+    if selected is None:
+        # the clean-room original, in this process (its notices become warnings)
+        env = [("FSLOUTPUTTYPE", "NIFTI"), (_defects.ENV, upstream_defects)]
+        if n_threads > 0:
+            env.append(("OMP_NUM_THREADS", str(n_threads)))
+        code, stdout, stderr = _core.fsl_run_original("fslmaths", args, env, os.getcwd())
+        _warn_lines(stderr)
+        _warn_lines(stdout)
+        written = glob.glob(glob.escape(out) + ".nii")
+        if code != 0 or not written:
+            message = "\n".join(s for s in (stderr.strip(), _clean_stdout(stdout)) if s)
+            raise RuntimeError(
+                f"larmorx fsl fslmaths (the clean-room original) failed with exit code {code}"
+                + (f":\n{message}" if message else "")
+            )
+        return _Ran(_read_image(written[0], n_threads, impl), stdout, tmp)
     try:
         process = _replica.run(
             selected,
@@ -345,8 +364,13 @@ def fslmaths(
     Python arguments; :func:`tensor_decomp` and :func:`roc` also return the files those
     operations write.
 
-    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when fslmaths
-    fails (its messages are in the error), and :class:`larmorx.ReplicaNotFoundError` without
+    ``n_threads`` is the clean-room original's thread count (0: all; its results are the same
+    at any count); the replica runs on one thread. ``implementation`` chooses between them
+    (``"auto"``: the replica when ``larmorx-nc`` is installed, else the original).
+
+    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
+    fails and ``RuntimeError`` when the original fails (their messages are in the error), and
+    :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
     ``larmorx-nc``.
     """
     with tempfile.TemporaryDirectory(prefix="larmorx-fslmaths-") as tmp:

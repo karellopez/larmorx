@@ -722,7 +722,7 @@ pub fn read_series_lean(
 }
 
 /// Whether the header file of `files` is an ANALYZE 7.5 header (no NIfTI magic).
-fn analyze_header(files: &ImageFiles) -> bool {
+pub(crate) fn analyze_header(files: &ImageFiles) -> bool {
     if files.data.is_none() {
         return false;
     }

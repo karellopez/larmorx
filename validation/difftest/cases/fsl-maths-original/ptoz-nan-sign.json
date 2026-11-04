@@ -1,0 +1,179 @@
+{
+ "defect": null,
+ "description": "-ptoz of the default NaN: the positive NaN (findings 30)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: values within the sums' bound: 12992 of 12992 voxels differ; the NaN or infinite voxels differ; out.nii.gz: the sums' share of voxels within 4 ulp: max 9223372036854775807 ulp",
+  "n": 7071,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz: the sums' share of voxels within N ulp",
+   "out.nii.gz: values within the sums' bound"
+  ]
+ },
+ "id": "ptoz-nan-sign",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-inm value": "100",
+   "-odt": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.75,
+   "axis1": 0.85,
+   "axis2": 0.9,
+   "blobs": 3,
+   "centre0": -6.0,
+   "centre1": 3.0,
+   "centre2": -5.5,
+   "chain": 3,
+   "content": "blobs",
+   "dtype": "uint16",
+   "extreme": false,
+   "family": "zp",
+   "kind": "general",
+   "normalise": "-inm",
+   "one slice": false,
+   "orientation": "oblique",
+   "origin0": 44.25,
+   "origin1": -23.5,
+   "origin2": -48.5,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "14x29x32",
+   "size": 20.0,
+   "size0": 14,
+   "size1": 29,
+   "size2": 32,
+   "spacing0": 1.5,
+   "spacing1": 1.2,
+   "spacing2": 2.5,
+   "specials": false,
+   "suffix": ".nii.gz",
+   "unary": "-bin",
+   "units": "mm",
+   "zp": "-ptoz"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-bin"
+    ],
+    "name": "-bin",
+    "optional": true
+   },
+   {
+    "args": [
+     "-inm",
+     "100"
+    ],
+    "name": "-inm",
+    "optional": true
+   },
+   {
+    "args": [
+     "-ptoz"
+    ],
+    "name": "-ptoz",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      0.75,
+      0.85,
+      0.9
+     ],
+     "centre": [
+      -6.0,
+      3.0,
+      -5.5
+     ],
+     "n": 3,
+     "seed": 720506836,
+     "size": 20.0,
+     "type": "blobs"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      44.25,
+      -23.5,
+      -48.5
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      36,
+      1,
+      2,
+      -3
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.5,
+      1.2,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     29,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 7071,
+  "options": [
+   "-bin",
+   "-inm",
+   "-ptoz",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind general"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

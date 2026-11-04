@@ -16,11 +16,22 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 `crates-nc/larmorx-nc-core`, because BET's script runs it, with its command line in
 `crates-nc/larmorx-nc-avwutils`, under the FSL Licence's terms:
 [PROVENANCE](../../crates-nc/larmorx-nc-core/PROVENANCE.md)), done (2026-11-03), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/fslstats.md`](../../specs/fslstats.md). Until then every function runs the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
-command line chooses alike (`LARMORX_IMPLEMENTATION`).
+clean-room **original** in the main package (Apache-2.0, `crates/larmorx-fsl`'s
+`cli::fslstats`, written from [`specs/fslstats.md`](../../specs/fslstats.md), FSL's
+documentation and black-box runs of FSL's program:
+[PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in progress since 2026-11-03: every
+option, preoption (`-t`, `-K`, `-json`), message, exit status and failure case, the defects
+FSL-181 to FSL-189 (relay 4 of its part; its suite `fsl-stats`: fMRIPrep's four goodvoxels
+calls and BET's call among its 158 cases, every one identical to FSL or failing alike, BET's
+`-C` within §10's bound: its x one unit in the sixth decimal off). Random testing (relay 6)
+corrected its histograms without a histogram: with an empty mask `-h` and `-H` print
+`findHistogram: mask is empty` and then the histogram of zeros (the JSON holds the zeros), and
+without a histogram at all (a constant image's `-h`, FSL-186's `-H`) the text holds nothing and
+the JSON an empty list ([findings](../findings/fsl-maths-original.md) 28). `implementation="auto"` (the
+default) runs the replica when `larmorx-nc` is installed, the original otherwise; `"replica"`
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the original in this
+process on `n_threads` threads (its results the same at any count; a failure raises
+`RuntimeError` with its messages). The command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-stats-replica`, record [fsl-stats-replica](../validation/fsl-stats-replica.md), standard
@@ -34,6 +45,19 @@ data type, message, exit status and failure case. Random testing (2026-11-03, 24
 realistic option lists, the preoptions and fMRIPrep's and BET's forms among them): every one
 identical after two fixes (the centre of gravity's NaN signs, and `-json`'s notices before an
 error).
+
+The original against FSL 6.0.7.23 (the parity suite `fsl-stats`, record
+[fsl-stats](../validation/fsl-stats.md), standard tier, 2026-11-03, §10's thresholds): 162 cases
+(the replica suite's but its `fsltest/` ones, BET's call, the original's own `orig/` cases and 4
+permanent cases of random testing), 126 within the thresholds, 36 rejected by both alike, 0
+failures. 125 of the 126 identical to FSL's (standard output, standard error, exit status),
+fMRIPrep's four goodvoxels calls on ds005040's chain among them (the ribbon a stand-in, as
+above); BET's `-l 0.001 -C` on ds005040's T1w within §10's bound (its x 6.1e-8 relative from
+FSL's). Random testing's trial (2026-11-03, beside fslmaths': 150,000 realistic option lists):
+149,214 identical, 7 differing only by a named correction; of the 779 others, 545 fixed by the
+part's correction (above), 74 by corrections of the suite's checks, 160 explained (`-c` and
+`-C` of images holding NaN and infinities: the NaN's sign; the last printed digit at §10's
+bound), none open.
 
 ## Quick start
 
@@ -147,7 +171,8 @@ on standard error (`larmorx-nc: upstream defect FSL-<n> (fslstats) corrected: ..
 
 ## Not yet
 
-- The clean-room original (`implementation="original"`), from `specs/fslstats.md`.
+- The clean-room original's spec questions (its findings). Its speed: the
+  [benchmarks](../benchmarks/fsl-maths.md) (BET's call and a 63-volume `-t -M -S -r`).
 - zstd and bzip2 inputs are decompressed whole before they are read (about twice the memory of
   gzip ones; fMRIPrep writes neither).
 - The goodvoxels calls with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

@@ -228,6 +228,26 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
     Parsed::Run(Box::new(o))
 }
 
+/// FSL-187's notice where the correction moved the robust range (`fsl`: FSL's), once.
+fn note_187(notices: &mut Vec<Notice>, (t2, t98): (f64, f64), fsl: Option<(f64, f64)>) {
+    if let Some((f2, f98)) = fsl {
+        defects::push_once(
+            notices,
+            Notice::new(
+                &defects::FSL_187,
+                UpstreamDefects::Fix,
+                format!(
+                    "the robust range counts a value far above a histogram pass's range in its last bin: thresh2 {} thresh98 {} (FSL counts it in its first: {} {})",
+                    g(t2),
+                    g(t98),
+                    g(f2),
+                    g(f98)
+                ),
+            ),
+        );
+    }
+}
+
 /// A refusal of larmorx's own (its line ends with `(larmorx)`), after the notices.
 fn refuse(err: &mut dyn Write, notices: &[Notice], message: &str) -> u8 {
     print_notices(err, notices);
@@ -551,7 +571,13 @@ pub fn run(
         radius,
         centre_mm,
         &defo,
+        mode,
         n_threads,
+    );
+    note_187(
+        &mut notices,
+        (found.init.t2, found.init.t98),
+        found.init.fsl_187,
     );
     if found.init.one_d {
         let _ = writeln!(err, "Warning: Image appears to be 1D");
@@ -616,8 +642,11 @@ pub fn run(
     };
     let input_vol_work: &bet::Vol = work_out.as_ref().unwrap_or(&input_img.vol);
     let (t2, t98, t) = if surface_source.is_some() {
-        let (t2, t98) = bet::pooled(n_threads, || bet::params::robust_range(input_vol_work));
-        (t2, t98, t2 + 0.1 * (t98 - t2))
+        let r = bet::pooled(n_threads, || {
+            bet::params::robust_range_in(input_vol_work, mode)
+        });
+        note_187(&mut notices, (r.t2, r.t98), r.fsl);
+        (r.t2, r.t98, r.t2 + 0.1 * (r.t98 - r.t2))
     } else {
         (found.init.t2, found.init.t98, found.init.t)
     };
@@ -857,5 +886,77 @@ mod tests {
         assert_eq!(centre(&["-c", "-0.000000", "0", "0"]), None);
         assert_eq!(centre(&[]), None);
         assert_eq!(centre(&["-c", "0", "0", "1"]), Some([0.0, 0.0, 1.0]));
+    }
+
+    /// FSL-187 through bet2's notice: an image of values on [0, 1) with one at 10^12; the
+    /// default prints the corrected thresholds and names FSL's, `reproduce` prints FSL's.
+    #[test]
+    fn fsl_187_notice() {
+        let d = tempfile::tempdir().unwrap();
+        let shape = [5usize, 4, 5];
+        let mut data: Vec<f32> = (0..99).map(|i| i as f32 / 99.0).collect();
+        data.push(1e12);
+        let h = larmorx_io::nifti::NiftiHeader::new(
+            larmorx_io::nifti::NiftiVersion::V1,
+            &shape,
+            larmorx_core::element::DataType::F32,
+        )
+        .unwrap();
+        let o = Output {
+            template: &h,
+            flipped: false,
+            shape,
+            volumes: 1,
+            cal: None,
+            extensions: false,
+            defects: UpstreamDefects::Fix,
+            n_threads: 1,
+            descrip: "test",
+            rewrite_quaternion: false,
+        };
+        let path = d.path().join("outl.nii");
+        image::write(
+            path.to_str().unwrap(),
+            larmorx_io::nifti::NiftiVersion::V1,
+            &o,
+            Values::F32(data),
+        )
+        .unwrap();
+        let call = |mode: &str| {
+            let settings = Settings {
+                dir: Some(d.path().to_path_buf()),
+                vars: [
+                    ("FSLOUTPUTTYPE", "NIFTI_GZ"),
+                    (defects::ENV, mode),
+                    ("OMP_NUM_THREADS", "2"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
+                ..Settings::default()
+            };
+            let args: Vec<String> = ["outl.nii", "b_out", "-v", "-n"]
+                .iter()
+                .map(|s| (*s).to_owned())
+                .collect();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let code = main(&args, &settings, &mut out, &mut err);
+            assert_eq!(code, 0);
+            let out = String::from_utf8(out).unwrap();
+            let thresholds = out.lines().next().unwrap().to_owned();
+            (thresholds, String::from_utf8(err).unwrap())
+        };
+        let (fix, err) = call("fix");
+        let line = err
+            .lines()
+            .find(|l| l.contains("upstream defect FSL-187"))
+            .unwrap_or_else(|| panic!("FSL-187 named: {fix} / {err}"));
+        let (rep, rep_err) = call("reproduce");
+        assert!(!rep_err.contains("FSL-187"), "{rep_err}");
+        assert_ne!(fix, rep);
+        // the notice names FSL's thresholds: those reproduce prints
+        let words: Vec<&str> = rep.split_whitespace().collect();
+        let fsl = format!("its first: {} {})", words[3], words[7]);
+        assert!(line.contains(&fsl), "{line} / {rep}");
     }
 }

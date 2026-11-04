@@ -441,6 +441,21 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
     ):  # fmt: skip
         prog = name.split()[0]
         out.append(Program(f"fsl {name} (clean-room original)", (*fl, prog, *a), bet))
+    # fslmaths' and fslstats' clean-room originals (2026-11-03): the voxelwise passes in blocks,
+    # a neurological input's flip, the separable Gaussian's rows, the direct sum's rows (a
+    # sphere), the morphology and the median, -bptf's blocks of voxels, the reductions'
+    # columns, TFCE; fslstats' masked block sums and passes over a series
+    for name, a in (
+        ("fslmaths filters", [t1, "-mul", "2", "-thrp", "10", "-s", "2", "-kernel", "sphere", "3",
+                              "-fmeanu", "-dilM", "-fmedian", o + "_omaths"]),
+        ("fslmaths series", [s, "-bptf", "3", "1", "-Tstd", o + "_omathst"]),
+        ("fslmaths reductions", [s, "-Tmedian", "-Xmax", o + "_omathsr"]),
+        ("fslmaths tfce", [t1, "-sub", "200", "-tfce", "2", "0.5", "6", o + "_otfce"]),
+        ("fslstats", [t1, "-k", mask, "-M", "-S", "-r", "-C", "-p", "50", "-h", "10"]),
+        ("fslstats -t", ["-t", s, "-M", "-S", "-R"]),
+    ):  # fmt: skip
+        prog = name.split()[0]
+        out.append(Program(f"fsl {name} (clean-room original)", (*fl, prog, *a), bet))
     if nc:
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],

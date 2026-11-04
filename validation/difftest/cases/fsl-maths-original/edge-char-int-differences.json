@@ -1,0 +1,182 @@
+{
+ "defect": null,
+ "description": "-edge under -dt char: the differences as C's int (findings 29)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: values bit for bit: 12184 differ; first at [2242, 2246, 2256]: FSL [79, 79, 69] / original [40, 40, 47]",
+  "n": 39749,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz: values bit for bit"
+  ]
+ },
+ "id": "edge-char-int-differences",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "char",
+   "-odt": true,
+   "-odt value": "short",
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 1,
+   "content": "crop",
+   "corner0": 31,
+   "corner1": 56,
+   "corner2": 59,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "dtype": "int16",
+   "extreme": false,
+   "family": "unary",
+   "kind": "series",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": 52.5,
+   "origin1": 49.75,
+   "origin2": 5.0,
+   "output": "out.nii.gz",
+   "period": 4,
+   "qfac": -1,
+   "qform_code": 2,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "27x28x11x7",
+   "signal": 0.05,
+   "size0": 27,
+   "size1": 28,
+   "size2": 11,
+   "spacing0": 1.0,
+   "spacing1": 2.5,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tr": 0.5,
+   "tunits": "unknown",
+   "unary": "-edge",
+   "units": "mm",
+   "volumes": 7
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "char"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-edge"
+    ],
+    "name": "-edge",
+    "optional": true
+   },
+   {
+    "args": [
+     "out.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-odt",
+     "short"
+    ],
+    "name": "-odt",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "corner": [
+      31,
+      56,
+      59
+     ],
+     "seed": 985172621,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      52.5,
+      49.75,
+      5.0
+     ],
+     "qfac": -1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.0,
+      2.5,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     27,
+     28,
+     11,
+     7
+    ],
+    "signal": {
+     "amplitude": 0.05,
+     "period": 4
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.5,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 39749,
+  "options": [
+   "-dt char",
+   "-edge",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind series"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

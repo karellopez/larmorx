@@ -13,6 +13,8 @@ larmorx-io.workspace = true
 larmorx-mri.workspace = true
 rayon.workspace = true
 bytemuck.workspace = true
+# fslmaths' erf and erfc (FreeBSD's msun in pure Rust): larmorx_core::math has no erf yet
+libm.workspace = true
 # the coordinate programs read only an image's header bytes (pure Rust: zlib-rs, bzip2's Rust
 # backend), as FSL does
 flate2.workspace = true

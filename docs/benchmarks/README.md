@@ -18,6 +18,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [fsl-flirt](fsl-flirt.md) | flirt (FSL 6.0.7.23) and FLIRT's replica, against FLIRT's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-flirt/bench.py`) |
 | [fsl-fast](fsl-fast.md) | fast (FSL 6.0.7.23) and FAST's replica, against FAST's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-fast/bench.py`) |
 | [fsl-topup](fsl-topup.md) | topup and applytopup (FSL 6.0.7.23, at one thread and `--nthr=14`) and their replicas, against topup's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-topup/bench.py`) |
+| [fsl-maths.md](fsl-maths.md) | fslmaths' and fslstats' clean-room originals against FSL 6.0.7.23 and the replicas (2026-11-03; FSL's FFT path re-measured 2026-11-04 with the original's double sums): fMRIPrep's combine_masks and goodvoxels chain (4.5 times FSL's speed, half its memory), the heavy operations on a real BOLD series and T1w (1.8 to 28 times on one thread, up to 268 on 14; FSL's FFT path the largest), BET's fslstats call |
 | [ants-ai](ants-ai.md) | antsAI and antsAffineInitializer (ANTs 2.6.5 binaries with CORE-MATH): time, CPU time and peak memory, larmorx in both D13 modes at 1 and 8 threads |
 
 Reproduce a report (build larmorx in release mode first):

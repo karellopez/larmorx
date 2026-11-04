@@ -262,3 +262,95 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | `topup::vb` | the undocumented `--method=vb2D`, `vb3D`, `vb4D`: the mean-field variational-Bayes restoration (Gamma priors on the noise and smoothness precisions, the squared-second-difference prior weighted by the voxel sizes, Gauss-Seidel over the lines, its printed iterations), FSL-141 to FSL-143 | §7.5, §10; findings 23 to 27 |
 | `cli::applytopup` | the command line (long and short options), the usage and the compulsory options' block, the checks in FSL's order with FSL's aborts (exit 1), `--topup`'s files, `--datatype` (FSL-09), the output, FSL-132 to FSL-135 and FSL-141 to FSL-144 | §7, §8, §10; findings 17 to 28 |
 | `topup::model`, `topup::minimise`, `cli::topup_debug` (relay 5b: random testing) | FSL-146's reproduce (each axis' Jacobian term over the volumes displaced along it), the mask of an oblique phase encoding (no axis wraps), the scaled conjugate gradients' second gradient with the current point's regulariser weight, `--debug`'s images in FSL's order | findings 32 to 35 (black-box: `first_step.py`) |
+
+## fslmaths (`maths`, `cli::fslmaths`; relay 1, 2026-11-03)
+
+`fslmaths` (FSL's image calculator: its command line, computing types, binary operations,
+thresholds, masks, voxelwise functions, random numbers, index and grid; relay 2 its kernels and
+spatial filters; the next relays add the reductions and the statistics) was written by a clean-room implementer
+who never opened FSL's source code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy),
+the replica crates (`crates-nc/`, `crates/larmorx-afni-replica`, `crates-gpl/`), Armadillo's,
+nlohmann's or glibc's sources, the restricted findings (`docs/findings/fsl-maths.md`,
+`fsl-topup.md`, `fsl-fast.md`, `fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI
+source-derived ones, the register's sections marked †), `docs/parts/`, the replica parts' and spec
+writers' investigations, `validation/probes/`, `validation/difftest/triage.toml`, the replica
+authors' permanent cases or the history of replica and spec-writer commits. Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/fslmaths.md`](../../specs/fslmaths.md) (FSL 6.0.7.23, fsl-avwutils 2209.6) and `specs/bet.md` §3, §4.2 | the behaviour: the command line, the usage text, the data types, C's arithmetic, every operation, the robust range, the messages, the numeric conventions, the defects |
+| B. A. Wichmann and I. D. Hill, Applied Statistics 31(2):188-190, 1982 (AS 183) | `-rand`'s generator |
+| M. Abramowitz and I. A. Stegun, Handbook of Mathematical Functions (1964), 26.2.23 | the start of `Φ⁻¹`'s iterations (relay 3) |
+| The `libm` crate (0.2, MIT/Apache-2.0: FreeBSD msun's `erf` and `erfc` in Rust) | `Φ`'s `erf` and `erfc` (`larmorx_core::math` has no `erf` yet) |
+| Black-box runs of FSL 6.0.7.23's `fslmaths` (through the oracle cache: the replica suite's cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md)) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md): the thresholds' far side (inclusive for `-thr`/`-uthr`, exclusive for `-bin`; `short` wraps too), `-save`'s type and display range, the layouts of an image of other sizes (FSL-159), the input's and an operand's messages; relay 2: the kernel's count, the convolutions' messages and normalising sum, the FFT path's orientation and NaN (FSL-191), `-edge`'s denominator, `-dog_edge` under integer types, the empty mask of `-inm`, the subsampling's last bits; relay 4: `-roc`'s arithmetic, its curve file's creation and FSL-193 |
+| The defect register's summary rows of FSL-151 to FSL-180, FSL-187 and GLIBC-07 (`larmorx_core::defects`) | the defects' names in the notices; FSL-191, FSL-192 and FSL-193 are the original's own (findings 9, 14, 20) |
+| larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options}` (FSL's image names, reading and writing, `strtod`), `fast::rng` (glibc's `rand`, for `-seed`), `flirt::mat::atoi`, `larmorx_mri::hmc::image` (the stored values), `larmorx_core` (correctly rounded maths, thread pools, D13) | images, numbers, threads |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `maths::num` | the computing types (`char`, its unsigned form for FSL-154's correction, `short`, `int`, `float`, `double`), C's arithmetic on x86-64 (promotion, wrapping, truncating division), x86-64's conversions and FSL-151's clamped ones, NaN's bits through the conversions | §2.4, §4 |
+| `maths::image` | the input and the operands read in the computing type (scaling, the radiological frame), the output's rounding and conversion, FSL-157, `-save`'s type, the header | §3; findings |
+| `maths::ops` | the binary operations with numbers and images and their layouts (FSL-159), the thresholds and their far side (FSL-152, FSL-153), `-bin`, `-binv`, `-invbin`, the robust range (FSL-153, FSL-187) and the percentage thresholds, the voxelwise functions (correctly rounded: GLIBC-07), Wichmann-Hill and `-seed`, `-index`, `-grid` | §5-§8; AS 183; findings |
+| `cli::fslmaths` | the command line, the usage text, `-dt`/`-odt` and the computing type (FSL-154, FSL-155), the chain, the messages and exit statuses, FSL-156 and FSL-158's refusals, the orientation warning and the sizes' rule, the display range | §2, §3, §17, §19; findings |
+| `maths::kernel` (relay 2) | the current kernel and `-kernel`'s types (`3D`, `2D`, `box`, `boxv`, `boxv3`, `gauss`, `sphere`, `file`, unknown), their sizes and values in single precision, the separable flag, FSL-160's zero-width Gaussian; the Gaussian's exponent as FSL's impulse responses show it (`i² (d d)` per axis, added x, y, z; relay 6) | §9; findings 6, 7, 23 |
+| `maths::filters` (relay 2) | the morphological filters' window, count and overflow (Armadillo's bounds error as FSL prints it), the two-partial extremes and sums, the mode and the median (FSL-162), `-dilall`'s queue, the separable filter, the direct sum, FSL's FFT criterion and its orientation (computed by the direct sum; FSL-192), FSL-161's refusals, FSL-191, the warnings | §10.1, §10.2, §18, §19; findings 5-9, 14 |
+| `maths::spatial` (relay 2) | `-subsamp2` and `-subsamp2offc` (the grid and geometry, FSL-163), `-edge`, `-dog_edge` (FSL-161, FSL-164), `-fillh`, `-fillh26` (FSL-165), `-inm`, `-ing` (the block sums, FSL-152, FSL-153 for the mask, the empty mask) | §10.3-§10.7, §18, §19; findings 10-13 |
+| `maths::reduce` (relay 3) | the reductions along T, X, Y, Z (another letter: none): `max`, `min`, `maxn` from the first value (FSL-153), `mean` and `std` with §18's block sums (FSL-167), `median` and `perc` in libstdc++'s order (FLIRT's `std_sort`; FSL-168, refused where its scans would leave the values), `ar1` in the computing type's arithmetic, the percentile's range error | §11, §18, §19 |
+| `maths::stats` (relay 3) | `Φ` in the spec's form (the `libm` crate's `erf`, `erfc`), `Φ⁻¹` (Abramowitz and Stegun 26.2.23 refined by Halley's iterations) with the domain error and `MAXNUM`, `-ztop` (FSL-170), `-ptoz` (FSL-172), `-pval`, `-pval0`, `-cpval` (FSL-169), `-rank`'s ties and `-ranknorm` (FSL-162, FSL-167), `-randn`; the NaN bits of findings 16 | §8.2, §12, §19; findings 16 |
+| `maths::regions` (relay 3) | `-roi`'s box (the file's x mapped, the corners ordered, size −1 and 0), `-bptf`'s high-pass (the local weighted line, `c₀ + x − c`, the mean removed) and low-pass (the normalised Gaussian), FSL's evaluation of the weights and products (findings 15), FSL-171 | §13, §19; findings 15 |
+| `maths::tfce` (relay 3) | `-tfce` (the interior voxels, the thresholds' single-precision sums, the clusters by connectivity class, `pow(s, E) · powf(h, H)` with `E` and `H` in single precision, the messages; FSL-153, 174, 175, 176), `-tfceS` (the voxel's cluster per threshold, the sum from the top, the output at the threshold reached, at `h₀` or the voxels outside every cluster; FSL-174, 176, 177, 178), `-tfce_minT`, `-tfce_delta` | §14, §19; findings 17 |
+| `maths::roc` (relay 4) | `-roc`: the log transform, the thresholds' steps, the truth's mask, true voxels and candidates, the rates and their means, the noise image's family-wise rate and spreads, the areas and the last rectangle, the quartiles, the curve file and the printed line (findings 19), FSL-153, FSL-179, FSL-180, FSL-193; the counts by binary search over each volume's sorted values (the original's own) | §15, §19; findings 19, 20 |
+| `maths::tensor` (relay 3) | `-tensor_decomp`: the 6-volume check, the symmetric eigenproblem (cyclic Jacobi rotations, the original's own; FSL calls LAPACK), `FA`, `MD`, `MO` in single precision, the nine images' names and display ranges, the chain on with `FA`, FSL-166 | §16, §19; findings 18 |
+
+## fslstats (`cli::fslstats`; relay 4 of fslmaths' and fslstats' part, 2026-11-03)
+
+`fslstats` (FSL's image statistics: its preoptions, every option, the messages and exit statuses,
+the JSON output, FSL-181 to FSL-189) was written by the same clean-room implementer, under the
+same rules as fslmaths above (FSL's source, its tests included, never opened; the replica suite's
+`fsltest/` cases, which read FSL's own test script and images from FSL's source tree, are left
+out of the original's suite). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/fslstats.md`](../../specs/fslstats.md) (FSL 6.0.7.23, fsl-avwutils 2209.6) | the behaviour: the command line, the usage text, the pass state and the options that change it, every statistic, the output and nlohmann's number form as the spec describes it, the defects |
+| Black-box runs of FSL 6.0.7.23's `fslstats` (through the oracle cache: the replica suite's synthetic cases and the probes of [`validation/investigations/cleanroom-maths/`](../../validation/investigations/cleanroom-maths/README.md), `show_fslstats.py`) | the observations of [`docs/findings/fsl-maths-original.md`](../../docs/findings/fsl-maths-original.md) findings 21: the preoptions' rule, the messages' order, the lost output of a crash, the masks `-P`, `-e`, `-E`, `-w` make, the empty forms |
+| The defect register's summary rows of FSL-181 to FSL-189 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `maths::{image, ops, num, reduce}` (the reading, the robust range, the extremes, the block sums, C's conversions), `flirt::schedule::std_sort_checked` (libstdc++'s sort, for `-p`, `-P` with `reproduce`), `cli::{common, options, fmt}` | images, numbers, formats |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::fslstats` | the preoptions (`-t`, `-K`, `-json`) and the usage, the passes, the thresholds and masks (`-l`, `-u`, `-k`, the masks `-P`, `-e`, `-E`, `-w` make), `-d`, `-a`, `-n`, the counts, the masked and unmasked means and standard deviations in FSL's blocks (FSL-182), `-D`, the extremes and their positions (FSL-181, FSL-184), the robust range (FSL-181, FSL-187), the percentiles (libstdc++'s order where NaN or ±0 make it matter), the histograms (FSL-186, FSL-187), the entropies (FSL-185), the bounding box (FSL-188), the centres of gravity, `-t` with `-k`, `-d` (FSL-183), the text and the JSON document (FSL-189), the messages and statuses, a crash's lost output | §2-§8; findings 21 |
+| `cli::fmt::json` | nlohmann/json's number form (the shortest round-trip digits; fixed notation from 1e-4 to below 1e15, an integral value with `.0`; else `d.ddde±XX`; `null`) | §6.2 |
+
+### Speed and FSL-187 in BET and FLIRT (relay 5 of fslmaths' and fslstats' part, 2026-11-03)
+
+By the same clean-room implementer, under the same rules; no new inputs but timed black-box runs
+of FSL 6.0.7.23 (the benchmarks of [`docs/benchmarks/fsl-maths.md`](../../docs/benchmarks/fsl-maths.md))
+and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row.
+
+| larmorx | What changed | Source |
+|---|---|---|
+| `maths::filters` | the separable pass and the direct sum a row of x at a time (the weights' sum once per position; the kernel's zeros left out of a finite volume's sums: a sum from +0 never changes by a ±0 product), every voxel's taps still added in their order; NaN results recomputed by x86-64's rules; the convolutions in place, volume by volume; `-fmean`'s convolution of ones computed on one volume for a series (its messages printed per volume) | the original's own design (§20); the same bits as before on every case of the suite and the benchmarks |
+| `maths::regions` | `-bptf`: the windows' sums that do not depend on the voxel once per `t`, the others for blocks of 64 voxels in the series' order, in waves written back in place (no copy of the image); a series holding a NaN filtered again on its own | the original's own design; the same bits |
+| `maths::image`, `cli::fslmaths` | the input's values moved, not copied, where they already have the computing type (mirrored in place); the output's values moved to the writer where writing converts nothing: one copy of the image held, as FSL holds | the memory rule (CLAUDE.md) |
+| `bet::params`, `bet` (`find_surface`), `cli::bet2`, `flirt::engine` (`clamp_range`) | FSL-187's `reproduce` switch in BET's and FLIRT's robust range (a value whose bin does not fit in an `int` counted in the first bin) and its notice where the correction moves the range; the defaults unchanged | the register's FSL-187 row; findings 22 of `docs/findings/fsl-maths-original.md` |
+
+### Random testing's corrections (relay 6 of fslmaths' and fslstats' part, 2026-11-03)
+
+| Module | What changed | From |
+|---|---|---|
+| `maths::image` (`regrid_x`), `maths::spatial` (`subsample_header`), `maths::reduce` | the geometry of a new grid along x: set matrices through the held (mirrored) frame and the operation, unset ones through the mirroring; a subsampled set qform's quaternion from the product of matrices (its zeros +0) | black-box runs: `probe_geometry.py`, the trial's findings (findings 24 of `docs/findings/fsl-maths-original.md`) |
+| `maths::spatial` | FSL-75 named in `-subsamp2` (the unused background value's buffer, by the register's row); the subsampling's sums in double; `-edge`'s differences as C's `int`; FSL-165 on every image with an axis of size 1 | the register's FSL-75 row; findings 24, 27, 29 |
+| `maths::filters` | the off-centre warning by the kernel's sizes; no empty-mask message for a kernel without a value at or above 0.5 | `probe_kernel_file.py` (findings 25) |
+| `maths::tfce` | the step tested before the sizes; a double image's TFCE in single precision | findings 26 |
+| `maths::roc` | the false-positive candidates below the true voxels' bound | findings 29 |
+| `maths::stats` | `-ptoz` of NaN: the NaN's sign flipped; `-ztop` of NaN: the positive NaN | findings 30 |
+| `cli::fslmaths` | FSL-157 named for every int8 `-odt input`, FSL-154 for every uint8 image computed unsigned | findings 29; the register's rows |
+| `cli::fslstats` | the histogram of an empty mask (zeros, or none with an empty range) and the JSON's empty list without a histogram | findings 28 |
+| `cli::common` (`name_start`), `cli::topup`, `cli::applytopup` | topup's and applytopup's file names split at `/`, and at `\` on Windows only | `docs/api/fsl-topup.md`, "File names on Windows" |
+
+### The direct sum where FSL takes its FFT (relay 7b of fslmaths' and fslstats' part, 2026-11-04)
+
+| Module | What changed | From |
+|---|---|---|
+| `maths::filters` (`direct_volume`, `convolve_in_place`) | where FSL convolves by its FFT (§10.2's criterion), the direct sum's products in double precision added to a double-precision sum, rounded once to single precision (FSL's direct path keeps §10.2's single-precision sum); the same order of taps, NaN rules and bits at any thread count | findings 31 (the page's `-kernel sphere 21 -fmean` against its exact result; `fft_cases_reference.py` on the record's FFT cases) |

@@ -8,7 +8,8 @@ DenoiseImage's to ANTs with correctly rounded maths preloaded, the build their r
 with; ``validation/investigations/difftest/memory_pair.py`` measures any call by hand). FSL's
 BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's, FAST's,
 topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES``,
-``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``).
+``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``:
+fslmaths' and fslstats' since 2026-11-03).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -683,6 +684,53 @@ def test_topup_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
     f_dir.mkdir()
     code, fsl_mib = _original_peak(
         [str(ft.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_IMPLEMENTATION": "original",
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
+            f"entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{program} {name} original ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        assert sorted(p.name for p in f_dir.iterdir()) == sorted(p.name for p in r_dir.iterdir())
+
+
+#: fslmaths' and fslstats' clean-room originals (``crates/larmorx-fsl``, 2026-11-03) on the same
+#: calls, at one thread (a ``.nii.gz`` output's parallel writer adds about 3 MiB per worker:
+#: ``docs/benchmarks/fsl-maths.md``): their outputs are FSL's within the thresholds of their
+#: records (``docs/validation/fsl-maths.md``, ``fsl-stats.md``), their memory similar to FSL's.
+ORIGINAL_AVW_CASES = list(AVW_CASES)
+
+
+@pytest.mark.parametrize(("name", "program", "args"), ORIGINAL_AVW_CASES)
+def test_avwutils_original_needs_no_more_memory_than_fsl(tmp_path, name, program, args):
+    fm = pytest.importorskip("larmorx_validation.parity.fsl_maths_replica")
+    fb = pytest.importorskip("larmorx_validation.parity.fsl_bet")
+    if not (fm.fsldir() / "bin" / program).is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    paths = _avw_inputs(tmp_path, fm, fb)
+    if paths is None:
+        pytest.skip("the ds005040 fMRIPrep oracle run was not found")
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**fm._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak(
+        [str(fm.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
     )
     assert code == 0
     for mode in ("reproduce", "fix"):

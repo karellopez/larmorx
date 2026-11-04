@@ -82,17 +82,20 @@ pub fn pooled<R: Send>(n_threads: usize, f: impl Fn() -> R + Send + Sync) -> R {
 }
 
 /// Finds the brain's surface on `vol` (§4.3-§4.5): the initial parameters (with the radius
-/// and the centre in mm when given), then passes of the deformation until the surface does
-/// not self-intersect or the last pass.
+/// and the centre in mm when given; the robust range in `mode`, FSL-187), then passes of the
+/// deformation until the surface does not self-intersect or the last pass.
 pub fn find_surface(
     vol: &Vol,
     radius: Option<f64>,
     centre: Option<V3>,
     opts: &Deformation,
+    mode: UpstreamDefects,
     n_threads: usize,
 ) -> Found {
-    larmorx_core::parallel::with_threads(n_threads, || find_surface_in(vol, radius, centre, opts))
-        .unwrap_or_else(|_| find_surface_in(vol, radius, centre, opts))
+    larmorx_core::parallel::with_threads(n_threads, || {
+        find_surface_in(vol, radius, centre, opts, mode)
+    })
+    .unwrap_or_else(|_| find_surface_in(vol, radius, centre, opts, mode))
 }
 
 fn find_surface_in(
@@ -100,8 +103,9 @@ fn find_surface_in(
     radius: Option<f64>,
     centre: Option<V3>,
     opts: &Deformation,
+    mode: UpstreamDefects,
 ) -> Found {
-    let init = params::initial(vol, radius, centre);
+    let init = params::initial(vol, radius, centre, mode);
     let mesh = Mesh::sphere(4);
     let start = surface::initial_surface(&mesh, &init);
     let mut passes = Vec::new();
@@ -286,8 +290,8 @@ mod tests {
     fn deterministic_at_any_thread_count() {
         let v = head(28);
         let opts = Deformation::default();
-        let one = find_surface(&v, None, None, &opts, 1);
-        let many = find_surface(&v, None, None, &opts, 7);
+        let one = find_surface(&v, None, None, &opts, UpstreamDefects::Fix, 1);
+        let many = find_surface(&v, None, None, &opts, UpstreamDefects::Fix, 7);
         assert_eq!(one.points, many.points);
         assert_eq!(one.passes, many.passes);
         let mask = |f: &Found, n| {

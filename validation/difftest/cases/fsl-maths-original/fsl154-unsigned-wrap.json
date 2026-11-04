@@ -1,0 +1,169 @@
+{
+ "defect": null,
+ "description": "-dt char on a uint8 image of zeros, -sub 1: FSL-154 named (the unsigned type wraps at 0)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: 1771 of 1771 values, max |diff| 256 changed",
+  "n": 105787,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass"
+  ]
+ },
+ "id": "fsl154-unsigned-wrap",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "char",
+   "-odt": false,
+   "-sub value": 1,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.9,
+   "axis1": 0.95,
+   "axis2": 0.95,
+   "binary": true,
+   "centre0": 1.5,
+   "centre1": 2.5,
+   "centre2": 4.0,
+   "chain": 1,
+   "content": "labels",
+   "dtype": "uint8",
+   "extreme": false,
+   "family": "number",
+   "kind": "mask",
+   "labels": 5,
+   "number op": "-sub",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -24.0,
+   "origin1": 26.25,
+   "origin2": -36.5,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x23x7",
+   "size": 17.0,
+   "size0": 11,
+   "size1": 23,
+   "size2": 7,
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "char"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-sub",
+     "1"
+    ],
+    "name": "-sub",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      0.9,
+      0.95,
+      0.95
+     ],
+     "centre": [
+      1.5,
+      2.5,
+      4.0
+     ],
+     "n": 5,
+     "seed": 1634129866,
+     "size": 17.0,
+     "type": "labels"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -24.0,
+      26.25,
+      -36.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     23,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   }
+  },
+  "n": 105787,
+  "options": [
+   "-dt char",
+   "-sub",
+   "FSLOUTPUTTYPE=NIFTI",
+   "kind mask"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

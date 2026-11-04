@@ -1,0 +1,1837 @@
+# fslmaths' and fslstats' clean-room originals: the exact changes to the shared documents
+# (scripts/orchestration/apply_handoff.py). The reasons are in HANDOFF.md.
+
+[[op]]
+do = "block"
+kind = "tool"
+id = "fsl-maths"
+text = '''
+[[tool]]
+id = "fsl-maths"
+title = "fslmaths (image arithmetic, thresholds, filters, reductions, statistics, TFCE)"
+eco = "fsl"
+page = "/tools/fsl-maths/"
+use = ["larmorx fsl fslmaths", "lx.fsl.fslmaths", "lx.fsl.smooth", "lx.fsl.threshold"]
+how = "clean-room original, `experimental` (2026-11-04: every operation, option, data type, message and failure case, FSL-191 to FSL-193 found by its black-box runs; 1.8 to 28 times FSL's speed on one thread, up to 268 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every operation, option, data type, message and failure case)"
+validation = "original: [{fsl-maths.pass} of {fsl-maths.compared}](record:fsl-maths) compared cases within thresholds against FSL 6.0.7.23, {fsl-maths.identical} of them FSL's values in every file (fMRIPrep's {fsl-maths.fmriprep} calls included; the others: FSL's FFT path, `-subsamp2` under the floating types, the last bits of Φ, the eigenvectors' signs, GLIBC-07), {fsl-maths.both} more rejected by both alike, {fsl-maths.expected} expected divergences (FSL's FFT convolution against the original's direct sum, `-subsamp2offc`'s means); replica: [{fsl-maths-replica.pass} of {fsl-maths-replica.compared}](record:fsl-maths-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-maths-replica.fmriprep} calls (combine_masks on three oracle runs, the goodvoxels mask's fourteen), every operation in every data type; {fsl-maths-replica.both} more rejected by both alike; {fsl-maths-replica.expected} one unit in the last place where FSL's glibc 2.35 is not correctly rounded and the replica is (GLIBC-07: `-dt double -tan`, an FFT's twiddle factors)"'''
+
+[[op]]
+do = "block"
+kind = "tool"
+id = "fsl-stats"
+text = '''
+[[tool]]
+id = "fsl-stats"
+title = "fslstats (image statistics: means, extremes, percentiles, histograms, per volume and label, JSON)"
+eco = "fsl"
+page = "/tools/fsl-stats/"
+use = ["larmorx fsl fslstats", "lx.fsl.fslstats", "lx.fsl.image_mean", "lx.fsl.image_std"]
+how = "clean-room original, `experimental` (2026-11-04: every option, `-t`, `-K` and `-json`, every message and failure case); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, `-t`, `-K` and `-json`, every message and failure case; BET's replica runs it)"
+validation = "original: [{fsl-stats.pass} of {fsl-stats.compared}](record:fsl-stats) compared cases within thresholds against FSL 6.0.7.23, {fsl-stats.identical} of them FSL's numbers (fMRIPrep's {fsl-stats.fmriprep} goodvoxels calls included; BET's call within 6e-8 relative), {fsl-stats.both} more rejected by both alike; replica: [{fsl-stats-replica.pass} of {fsl-stats-replica.compared}](record:fsl-stats-replica) compared cases printing FSL 6.0.7.23's text byte for byte (with its messages and exit status): fMRIPrep's {fsl-stats-replica.fmriprep} goodvoxels calls, BET's call, FSL's own tests, every option; {fsl-stats-replica.both} more rejected by both alike"'''
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = "status = \"`experimental` ({fsl-topup-replica.pass}"
+text = '''
+[[record]]
+id = "fsl-maths"
+larmorx = "`lx.fsl.fslmaths(implementation=\"original\")` and its typed wrappers, `larmorx fsl fslmaths` (clean-room, `crates/larmorx-fsl`)"
+reference = "fslmaths (FSL 6.0.7.23, fsl-avwutils 2209.6); the replica suite's cases, the original's own `orig/` cases and its permanent cases of random testing"
+status = "`experimental` ({fsl-maths.pass} of {fsl-maths.compared} compared cases within thresholds, {fsl-maths.identical} of them bit-identical, fMRIPrep's {fsl-maths.fmriprep} calls included; {fsl-maths.both} rejected by both, with the same messages and status; {fsl-maths.expected} expected divergences, each with its reason in the record: FSL's FFT path against the original's direct sum, `-subsamp2offc`'s means)"'''
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = "status = \"`experimental` ({fsl-maths-replica.pass}"
+text = '''
+
+[[record]]
+id = "fsl-stats"
+larmorx = "`lx.fsl.fslstats(implementation=\"original\")` and its typed wrappers, `larmorx fsl fslstats` (clean-room, `crates/larmorx-fsl`)"
+reference = "fslstats (FSL 6.0.7.23, fsl-avwutils 2209.6); the replica suite's cases but FSL's own tests (they read FSL's source tree), BET's call, the original's own `orig/` cases and its permanent cases of random testing"
+status = "`experimental` ({fsl-stats.pass} of {fsl-stats.compared} compared cases within thresholds, {fsl-stats.identical} of them identical, fMRIPrep's {fsl-stats.fmriprep} calls included, BET's within §10's bound; {fsl-stats.both} rejected by both, with the same messages and status)"'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+typed wrappers are replica-only functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`)
+  until the clean-room originals.'''
+new = '''
+typed wrappers were replica-only functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`)
+  until the clean-room originals (below).'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "  unchanged; each case runs in 0.01 to 0.04 s."
+text = '''
+- **fslmaths and fslstats, the clean-room originals** (2026-11-03, nine cases in
+  `tests/golden/registry.py`, on new inputs written by the test, `anat_nan` and `bold_nan` (a
+  head and a series of seeded integers holding NaN and infinite voxels) and `tensor6` (six
+  volumes of 6 × 5 × 4, as the tensor decomposition needs six), with the existing ones):
+  `cli.fsl.fslmaths` (fMRIPrep's mask product; the voxelwise functions whose NaN and infinities
+  come from numbers, in single and double precision; thresholds by value and robust range, the
+  binarisations, hole filling, the index; the computing and output types, `-seed` with `-rand`
+  and `-randn`, `-grid`, `-save`, `-restart`; FSL-151 in both modes; the usage and an unknown
+  operation), `cli.fsl.fslmaths.filters` (the separable Gaussian and box, the direct sums of a
+  sphere, the morphology, a kernel image, the subsamplings, `-edge`, `-dog_edge`, `-inm`,
+  `-ing`, an even kernel's warning), `cli.fsl.fslmaths.series` (the reductions along T, X, Y, Z,
+  `-bptf`, `-roi`, the statistical transforms, TFCE, `-roc`, `-tensor_decomp`),
+  `cli.fsl.fslstats` (every statistic, thresholds, masks, a difference image, fMRIPrep's and
+  BET's forms, `-t`, `-K`, `-json`, the usage and an unknown option), and the typed wrappers
+  through `implementation="original"`: `py.fsl.maths.voxelwise`, `.filters`, `.series`,
+  `.special` and `py.fsl.stats`. Every family has a path that makes NaN from numbers (inf − inf,
+  0 · inf, the filters' and the reductions' NaN recomputed by x86-64's rules), so each
+  platform's NaN bits are checked against x86-64's (the replica's FSL-160 case had shown
+  AArch64's NaN without its sign bit). `REPLICA_ONLY_FUNCTIONS` is now empty. Recorded from
+  479e9b3 (committed as 01d8d98), the parity smoke tier's marker of the same commit and build
+  reused (2,754 passed): 9 cases and 224 outputs added (44, 37, 66, 24, 12, 7, 7, 15 and 12),
+  every other checksum unchanged.'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "| `fsl-topup-original` |"
+text = '''
+| `fsl-maths-original` | `parity.fsl_maths` (`difftest/tools/fsl_avwutils_original.py`: the replica's draws from the `fsl-maths` stream, so the replica trial's seed serves its FSL runs from the oracle cache; the suite's `direct` payloads; the permanent cases in `validation/difftest/cases/fsl-maths-original/` (17)) | clean-room original vs fslmaths | the same as `fsl-maths` (since 2026-11-03; its trial with `LARMORX_DIFFTEST_CACHE_MODE=use`: 150,000 cases, 143,191 agree, 804 differ only by a named correction, the 6,005 others re-run with the final build and triaged by category in `triage.toml`) |
+| `fsl-stats-original` | `parity.fsl_stats` (the same module, the `fsl-stats` stream; the permanent cases in `validation/difftest/cases/fsl-stats-original/` (4)) | clean-room original vs fslstats | the same as `fsl-stats` (since 2026-11-03; the same trial: 150,000 cases, 149,214 agree, 7 differ only by a named correction, the 779 others triaged in `triage.toml`) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/difftest.md"
+old = '''
+twiddle factors) and fslstats 69,077 (nine: the replica's, fixed), after a one-minute check run
+  of 5,186 cases (three of the replica's, fixed)).'''
+new = '''
+twiddle factors) and fslstats 69,077 (nine: the replica's, fixed), after a one-minute check run
+  of 5,186 cases (three of the replica's, fixed); their clean-room originals' trial of the same
+  day the fourth: `oracles/difftest/2026-11-03-fsl-maths-original`, seed `fsl-maths-trial` (the
+  replica trial's cases drawn again, then more), 20 minutes, 13 jobs at one thread, 1.5 GiB per
+  case: 300,000 cases; fslmaths 150,000 (143,191 agree, 804 a named correction only, 6,005
+  differ) and fslstats 150,000 (149,214, 7 and 779); every finding re-run with the final build
+  and put in one category (`validation/investigations/cleanroom-maths/trial_triage.json`): 5,168
+  the original's mistakes, fixed with 21 permanent cases, and 58 chains those fixes reach, 170
+  the suite's, 1,338 explained, 33
+  expected (`-subsamp2offc`'s means), 7 FSL-75 (registered), 10 open (8 display ranges after
+  `-range` in their last bits, 2 `-roc` curve numbers 2.4e-7 and 5e-7 from FSL's)).'''
+
+[[op]]
+do = "append"
+file = "validation/difftest/triage.toml"
+text = '''
+# fslmaths' and fslstats' clean-room originals: the trial of 2026-11-03
+# (validation/investigations/cleanroom-maths/triage_entries.py: one entry per distinct
+# signature of the trial, its status from the categories of its findings)
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)"]
+status = "open"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1845 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1303); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (297); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (181); fixed: a chain the fixes above reach (37); larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (6); open: out.nii.gz: header (descrip left out) out.nii.gz: header (descrip left out): cal (5); explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (5); explained: -subsamp2's last bits under the floating types (spec question 13) (3); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (3); larmorx mistake, fixed: FSL-75 named in -subsamp2 (findings 24: FSL's heap abort) (1); larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (1); harness, fixed: the suite's tensor check (compressed names, single slices) (1); expected: -subsamp2offc's means (findings 13 and 29) (1); explained: TFCE's last bits through a discontinuous operation (-rem) (1). Reproducer: fsl-maths-trial-00010-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "open"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1405 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (1403); open: roc.txt: the curve (N significant digits) roc.txt: the curve (5 significant digi (2). Reproducer: fsl-maths-trial-00025-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)"]
+status = "open"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 585 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (450); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (63); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (52); fixed: a chain the fixes above reach (12); explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (2); open: out.nii: header (descrip left out) out.nii: header (descrip left out): cal_max:  (1); explained: -subsamp2's last bits under the floating types (spec question 13) (1); harness, fixed: §21's TFCE metric in the suite (1). Reproducer: fsl-maths-trial-00060-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["standard error"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 501 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the morphology's messages with a kernel image (findings 25) (304); larmorx mistake, fixed: TFCE's step tested before the sizes (findings 26) (191); larmorx mistake, fixed: FSL-165 on every image with an axis of size 1 (findings 27) (4); larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (2). Reproducer: fsl-maths-trial-00563-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 173 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: FSL-157 named for every int8 -odt input (findings 29) (144); larmorx mistake, fixed: FSL-154 named for every uint8 image computed unsigned (29). Reproducer: fsl-maths-trial-00237-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: the sums' share of voxels within N ulp"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 137 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (55); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (35); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (24); expected: -subsamp2offc's means (findings 13 and 29) (18); larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (4); harness, fixed: §21's TFCE metric in the suite (1). Reproducer: fsl-maths-trial-00763-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 129 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (100); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (15); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (8); fixed: a chain the fixes above reach (6). Reproducer: fsl-maths-trial-04299-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: header (descrip left out)"]
+status = "open"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 88 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (67); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (11); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (8); open: out.nii.zst: header (descrip left out) out.nii.zst: header (descrip left out): c (1); fixed: a chain the fixes above reach (1). Reproducer: fsl-maths-trial-00721-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 85 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (85). Reproducer: fsl-maths-trial-00742-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 85 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: FSL-165 on every image with an axis of size 1 (findings 27) (85). Reproducer: fsl-maths-trial-00909-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 78 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (26); explained: -randn in double: Φ⁻¹'s last bits (20); explained: -dog_edge's crossings at exact ties (within the sums' bound) (20); harness, fixed: §21's TFCE metric in the suite (5); explained: the median's and mode's signed zero (§18: ±0's order) (3); explained: -subsamp2's last bits under the floating types (spec question 13) (2); explained: TFCE's last bits through a discontinuous operation (-rem) (1); larmorx mistake, fixed: -edge's integer differences (findings 29) (1). Reproducer: fsl-maths-trial-01935-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 57 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (44); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (9); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (3); fixed: a chain the fixes above reach (1). Reproducer: fsl-maths-trial-00221-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exception"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 53 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (single slices) and NIfTI-2 quaternions (51); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (2). Reproducer: fsl-maths-trial-00792-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 48 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (48). Reproducer: fsl-maths-trial-00710-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz: the sums' share of voxels within N ulp"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 39 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (20); expected: -subsamp2offc's means (findings 13 and 29) (10); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (7); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (1); larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-00518-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: the sums' share of voxels within N ulp"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 37 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (17); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (10); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (6); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (2); larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (2). Reproducer: fsl-maths-trial-01641-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: header (descrip left out)"]
+status = "open"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 35 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: the header's offsets after a grid change (at most 6 ulp of one offset) (22); larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (7); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (3); fixed: a chain the fixes above reach (1); open: out.hdr.bzN: header (descrip left out) out.hdr.bz2: header (descrip left out): c (1); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (1). Reproducer: fsl-maths-trial-02016-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "step.nii.gz: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 32 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (20); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (8); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (4). Reproducer: fsl-maths-trial-06909-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 29 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (29). Reproducer: fsl-maths-trial-04572-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 28 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (28). Reproducer: fsl-maths-trial-00575-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 23 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (23). Reproducer: fsl-maths-trial-04248-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: the sums' share of voxels within N ulp", "out.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 23 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (11); explained: -dog_edge's crossings at exact ties (within the sums' bound) (4); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (3); explained: -subsamp2's last bits under the floating types (spec question 13) (2); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (2); explained: TFCE's last bits through a discontinuous operation (-rem) (1). Reproducer: fsl-maths-trial-07071-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 20 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (20). Reproducer: fsl-maths-trial-01942-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_VN.nii.zst: values (relative)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 19 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (compressed names, single slices) (18); larmorx mistake, fixed: FSL-165 on every image with an axis of size 1 (findings 27) (1). Reproducer: fsl-maths-trial-16408-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values bit for bit"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 18 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (8); explained: -randn in double: Φ⁻¹'s last bits (4); larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (3); harness, fixed: §21's TFCE metric in the suite (1); explained: -subsamp2's last bits under the floating types (spec question 13) (1); larmorx mistake, fixed: -edge's integer differences (findings 29) (1). Reproducer: fsl-maths-trial-00413-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["roc.txt: the curve (N significant digits)", "standard output (within Ne-N absolute)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 14 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (14). Reproducer: fsl-maths-trial-02017-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 14 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (14). Reproducer: fsl-maths-trial-04703-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 13 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (8); larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (2); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (2); expected: -subsamp2offc's means (findings 13 and 29) (1). Reproducer: fsl-maths-trial-01697-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 12 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (12). Reproducer: fsl-maths-trial-08414-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out.nii: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 11 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (8); expected: -subsamp2offc's means (findings 13 and 29) (3). Reproducer: fsl-maths-trial-35705-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 10 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (10). Reproducer: fsl-maths-trial-12047-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: header (descrip left out)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 9 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (9). Reproducer: fsl-maths-trial-37093-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: values (relative)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 9 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (9). Reproducer: fsl-maths-trial-17556-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii.gz: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 9 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (7); explained: -subsamp2's last bits under the floating types (spec question 13) (1); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (1). Reproducer: fsl-maths-trial-14830-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: the sums' share of voxels within N ulp"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 9 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (3); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (3); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (2); harness, fixed: §21's TFCE metric in the suite (1). Reproducer: fsl-maths-trial-23679-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (7). Reproducer: fsl-maths-trial-02565-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: values bit for bit"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (4); larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (2); explained: -randn in double: Φ⁻¹'s last bits (1). Reproducer: fsl-maths-trial-02984-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_VN.hdr.bzN: values (relative)"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (compressed names, single slices) (7). Reproducer: fsl-maths-trial-05690-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: the sums' share of voxels within N ulp", "out.nii: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (5); larmorx mistake, fixed: the subsampling's sums in double (findings 29) (1); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (1). Reproducer: fsl-maths-trial-20195-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "standard error"]
+status = "register"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): register: FSL-75 (FSL's heap corruption crashes it before it writes; named) (7). Reproducer: fsl-maths-trial-21013-original."
+defect = "FSL-75"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (3); explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (3); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (1). Reproducer: fsl-maths-trial-16344-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.hdr: header (descrip left out)", "out_LN.hdr: values (relative)", "out_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (7). Reproducer: fsl-maths-trial-17545-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 7 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (7). Reproducer: fsl-maths-trial-13817-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 6 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (6). Reproducer: fsl-maths-trial-06759-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: header (descrip left out)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 6 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (6). Reproducer: fsl-maths-trial-33021-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 6 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (6). Reproducer: fsl-maths-trial-32599-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz: the sums' share of voxels within N ulp", "out.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 6 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (4); larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (1); larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (1). Reproducer: fsl-maths-trial-14955-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 6 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (6). Reproducer: fsl-maths-trial-26185-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: header (descrip left out)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 5 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (5). Reproducer: fsl-maths-trial-63229-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 5 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (5). Reproducer: fsl-maths-trial-42889-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.zst: header (descrip left out)", "out_LN.nii.zst: values (relative)", "out_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 5 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (5). Reproducer: fsl-maths-trial-53127-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (4). Reproducer: fsl-maths-trial-02359-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: header (descrip left out)", "out.hdr: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (3); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1). Reproducer: fsl-maths-trial-40040-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_VN.nii.zst: values (relative)"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (compressed names, single slices) (4). Reproducer: fsl-maths-trial-103396-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: values bit for bit"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (2); explained: -randn in double: Φ⁻¹'s last bits (1); harness, fixed: §21's TFCE metric in the suite (1). Reproducer: fsl-maths-trial-42417-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (4). Reproducer: fsl-maths-trial-45044-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (4). Reproducer: fsl-maths-trial-35582-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "step.nii: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (4). Reproducer: fsl-maths-trial-42446-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (4). Reproducer: fsl-maths-trial-69512-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: values (relative)", "out_FA.nii.zst: values (relative)", "out_LN.nii.zst: header (descrip left out)", "out_LN.nii.zst: values (relative)", "out_MD.nii.zst: header (descrip left out)", "out_MD.nii.zst: values (relative)", "out_MO.nii.zst: values (relative)", "out_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 4 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (4). Reproducer: fsl-maths-trial-56118-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: header (descrip left out)", "out.hdr.bzN: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: the header's offsets after a grid change (at most 6 ulp of one offset) (3). Reproducer: fsl-maths-trial-02978-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.hdr.gz: header (descrip left out)", "out_LN.hdr.gz: values (relative)", "out_VN.hdr.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-03142-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-44955-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-46697-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: header (descrip left out)", "out.hdr.gz: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (2); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1). Reproducer: fsl-maths-trial-52137-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii: values (relative)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-66815-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (2); explained: -subsamp2's last bits under the floating types (spec question 13) (1). Reproducer: fsl-maths-trial-124819-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.hdr.gz: header (descrip left out)", "out.nii.gz_LN.hdr.gz: values (relative)", "out.nii.gz_VN.hdr.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-125482-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["roc.txt: the curve (N significant digits)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (3). Reproducer: fsl-maths-trial-35886-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: header (descrip left out)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-45319-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_FA.nii: values (relative)", "out.nii.gz_LN.nii: header (descrip left out)", "out.nii.gz_LN.nii: values (relative)", "out.nii.gz_MD.nii: header (descrip left out)", "out.nii.gz_MD.nii: values (relative)", "out.nii.gz_MO.nii: values (the mode)", "out.nii.gz_VN.nii: eigenvectors up to their sign", "out.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-19865-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (3). Reproducer: fsl-maths-trial-20815-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values within the sums' bound"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 3 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (2); explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (1). Reproducer: fsl-maths-trial-46480-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: values bit for bit"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -randn in double: Φ⁻¹'s last bits (2). Reproducer: fsl-maths-trial-03894-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: header (descrip left out)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-06009-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-06364-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii: values (relative)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-06907-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-82966-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: header (descrip left out)", "out.nii.zst: the sums' share of voxels within N ulp"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1); explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1). Reproducer: fsl-maths-trial-51532-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["standard output (within Ne-N absolute)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (2). Reproducer: fsl-maths-trial-27634-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_VN.hdr.bzN: values (relative)"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (compressed names, single slices) (2). Reproducer: fsl-maths-trial-108529-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (units in the last place)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: TFCE of a double image in single precision (findings 26) (1); explained: -randn in double: Φ⁻¹'s last bits (1). Reproducer: fsl-maths-trial-113092-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: the sums' share of voxels within N ulp", "out.nii.gz: values within the sums' bound", "step.nii.gz: the sums' share of voxels within N ulp", "step.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (1); larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (1). Reproducer: fsl-maths-trial-113470-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.hdr: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-89227-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-116861-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii.zst: header (descrip left out)", "out.nii.gz_LN.nii.zst: values (relative)", "out.nii.gz_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-69985-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: header (descrip left out)", "step.nii.zst: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (2). Reproducer: fsl-maths-trial-88735-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_VN.nii.zst: values (relative)"]
+status = "harness"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): harness, fixed: the suite's tensor check (compressed names, single slices) (2). Reproducer: fsl-maths-trial-30073-original."
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-81832-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values bit for bit", "out.nii_FA.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MD.nii: header (descrip left out)", "out.nii_MD.nii: values (relative)", "out.nii_MO.nii: values (the mode)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-50056-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.gz: values (relative)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-67215-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "out_LN.nii.zst: values (relative)", "out_VN.nii.zst: values (relative)", "roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-59311-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: header (descrip left out)", "step.hdr.bzN: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1); larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-89683-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.hdr: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (2). Reproducer: fsl-maths-trial-16849-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_VN.hdr.bzN: values (relative)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (1); harness, fixed: the suite's tensor check (compressed names, single slices) (1). Reproducer: fsl-maths-trial-25156-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: values (relative)", "out_FA.hdr: values (relative)", "out_LN.hdr: header (descrip left out)", "out_LN.hdr: values (relative)", "out_MD.hdr: header (descrip left out)", "out_MD.hdr: values (relative)", "out_MO.hdr: values (the mode)", "out_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-28648-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii: header (descrip left out)", "out.nii.gz_LN.nii: values (relative)", "out.nii.gz_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-28728-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-29054-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "exit status", "files written", "roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (2). Reproducer: fsl-maths-trial-47055-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-47459-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.hdr: header (descrip left out)", "out.nii_LN.hdr: values (relative)", "out.nii_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-66784-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign", "step.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-79297-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 2 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (2). Reproducer: fsl-maths-trial-85874-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-01274-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: values (relative)", "out_FA.hdr.bzN: values (relative)", "out_LN.hdr.bzN: header (descrip left out)", "out_LN.hdr.bzN: values (relative)", "out_MD.hdr.bzN: header (descrip left out)", "out_MD.hdr.bzN: values (relative)", "out_MO.hdr.bzN: values (relative)", "out_VN.hdr.bzN: values (relative)", "step.hdr.bzN: values bit for bit"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-01553-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.hdr: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-02893-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: values (relative)", "out.nii.gz_FA.hdr: values (relative)", "out.nii.gz_LN.hdr: header (descrip left out)", "out.nii.gz_LN.hdr: values (relative)", "out.nii.gz_MD.hdr: header (descrip left out)", "out.nii.gz_MD.hdr: values (relative)", "out.nii.gz_MO.hdr: values (the mode)", "out.nii.gz_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-05817-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii: the sums' share of voxels within N ulp", "out.nii: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: FSL-154 named for every uint8 image computed unsigned (1). Reproducer: fsl-maths-trial-09917-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-101190-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-101624-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: values bit for bit", "step.hdr: values bit for bit"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -randn in double: Φ⁻¹'s last bits (1). Reproducer: fsl-maths-trial-103095-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values bit for bit", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-105601-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: the sums' share of voxels within N ulp", "out.hdr.bzN: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (1). Reproducer: fsl-maths-trial-107730-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_MO.nii.gz: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-108104-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["step.nii.gz: values bit for bit"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -randn in double: Φ⁻¹'s last bits (1). Reproducer: fsl-maths-trial-110443-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-111243-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["files written", "standard error"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (1). Reproducer: fsl-maths-trial-111707-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out.nii: values (relative)", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: header (descrip left out)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-113681-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out.nii: the sums' share of voxels within N ulp", "out.nii: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-113899-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-116657-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_FA.nii: values (relative)", "out.nii.gz_LN.nii: header (descrip left out)", "out.nii.gz_LN.nii: values (relative)", "out.nii.gz_MD.nii: header (descrip left out)", "out.nii.gz_MD.nii: values (relative)", "out.nii.gz_MO.nii: values (the mode)", "out.nii.gz_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-117183-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-117849-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii: header (descrip left out)", "out.nii: the sums' share of voxels within N ulp", "out.nii: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-118301-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: values (relative)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-118325-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-118346-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: header (descrip left out)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign", "standard error"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-118932-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out.nii_FA.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MD.nii: header (descrip left out)", "out.nii_MD.nii: values (relative)", "out.nii_MO.nii: values (the mode)", "out.nii_VN.nii: eigenvectors up to their sign", "step.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-119170-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_FA.nii.zst: values (relative)", "out.nii_LN.nii.zst: header (descrip left out)", "out.nii_LN.nii.zst: values (relative)", "out.nii_MD.nii.zst: header (descrip left out)", "out.nii_MD.nii.zst: values (relative)", "out.nii_MO.nii.zst: values (relative)", "out.nii_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-119554-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "standard error"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1). Reproducer: fsl-maths-trial-121461-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-121594-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.zst: values (relative)", "out.nii_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-123833-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["roc.txt: the curve (N significant digits)", "standard error"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -roc's false-positive candidates (findings 29) (1). Reproducer: fsl-maths-trial-123949-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.hdr.bzN: header (descrip left out)", "out_LN.hdr.bzN: values (relative)", "out_VN.hdr.bzN: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-126006-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-127567-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii.gz_FA.nii.gz: values (relative)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)", "out.nii.gz_MD.nii.gz: values (relative)", "out.nii.gz_MO.nii.gz: values (the mode)", "out.nii.gz_VN.nii.gz: eigenvectors up to their sign", "step.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-128311-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "standard error"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: the header's offsets after a grid change (at most 6 ulp of one offset) (1). Reproducer: fsl-maths-trial-128868-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: the sums' share of voxels within N ulp", "out.hdr: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: -ptoz's and -ztop's NaN (findings 30) (1). Reproducer: fsl-maths-trial-128958-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_LN.nii: header (descrip left out)", "out.nii.gz_LN.nii: values (relative)", "out.nii.gz_VN.nii: eigenvectors up to their sign", "out.nii: header (descrip left out)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-129597-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["step.hdr.gz: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (1). Reproducer: fsl-maths-trial-131264-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: the sums' share of voxels within N ulp", "out.hdr.gz: values within the sums' bound"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -dog_edge's crossings at exact ties (within the sums' bound) (1). Reproducer: fsl-maths-trial-13303-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out.nii_FA.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MD.nii: values (relative)", "out.nii_MO.nii: values (the mode)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-135131-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out_LN.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-138187-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii.zst: header (descrip left out)", "out.nii_LN.nii.zst: values (relative)", "out.nii_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-141837-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["step.nii.zst: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (1). Reproducer: fsl-maths-trial-142688-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_MO.hdr: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-14369-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: the sums' share of voxels within N ulp", "step.nii: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (1). Reproducer: fsl-maths-trial-147122-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-147683-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: the sums' share of voxels within N ulp", "step.hdr.gz: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (1). Reproducer: fsl-maths-trial-15265-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values bit for bit", "out.nii_FA.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MD.nii: values (relative)", "out.nii_MO.nii: values (the mode)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-17191-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["step.nii: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: sums beyond 4 ulp where they cancel to near 0 (spec question 14) (1). Reproducer: fsl-maths-trial-18961-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (1). Reproducer: fsl-maths-trial-20302-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["step.nii.gz: the sums' share of voxels within N ulp"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -ztop's and -ptoz's last bits (Φ, Φ⁻¹), within the sums' bound (1). Reproducer: fsl-maths-trial-22605-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_MO.nii.gz: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-23558-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign", "step.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-25027-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.gz: header (descrip left out)", "step.hdr.gz: header (descrip left out)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-26047-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: header (descrip left out)", "standard error"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-26819-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-27721-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-30536-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-31948-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-37580-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.zst: values (relative)", "out_FA.nii.zst: values (relative)", "out_LN.nii.zst: header (descrip left out)", "out_LN.nii.zst: values (relative)", "out_MD.nii.zst: values (relative)", "out_MO.nii.zst: values (relative)", "out_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-38200-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz_FA.hdr: values (relative)", "out.nii.gz_LN.hdr: header (descrip left out)", "out.nii.gz_LN.hdr: values (relative)", "out.nii.gz_MD.hdr: header (descrip left out)", "out.nii.gz_MD.hdr: values (relative)", "out.nii.gz_MO.hdr: values (the mode)", "out.nii.gz_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-38888-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out.nii_FA.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MD.nii: values (relative)", "out.nii_MO.nii: values (the mode)", "out.nii_VN.nii: eigenvectors up to their sign", "step.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-43624-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out.nii: values (relative)", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-43826-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz: values bit for bit"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -subsamp2's last bits under the floating types (spec question 13) (1). Reproducer: fsl-maths-trial-43910-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "standard error"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: FSL-154 named for every uint8 image computed unsigned (1). Reproducer: fsl-maths-trial-44016-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: header (descrip left out)", "out.nii.gz_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-46275-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-51018-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_MO.nii: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-55975-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr.bzN: header (descrip left out)", "out.nii_VN.hdr.bzN: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-57038-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: header (descrip left out)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-57790-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "standard error", "standard output (within Ne-N absolute)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-58431-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: a subsampled qform's quaternion (findings 24) (1). Reproducer: fsl-maths-trial-60324-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "out_LN.hdr: header (descrip left out)", "out_LN.hdr: values (relative)", "out_MO.hdr: values (the mode)", "out_VN.hdr: eigenvectors up to their sign", "roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-60740-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii.gz: values bit for bit"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: FSL-154 named for every uint8 image computed unsigned (1). Reproducer: fsl-maths-trial-63379-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["exit status", "files written", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)", "out_VN.nii: eigenvectors up to their sign", "roc.txt: the curve (N significant digits)", "standard error", "standard output (within Ne-N absolute)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-63551-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii.zst: values (relative)", "out_VN.nii.zst: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-63828-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_VN.nii: eigenvectors up to their sign", "standard error"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-65487-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-67826-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out_FA.nii.gz: values (relative)", "out_LN.nii.gz: header (descrip left out)", "out_LN.nii.gz: values (relative)", "out_MD.nii.gz: header (descrip left out)", "out_MD.nii.gz: values (relative)", "out_MO.nii.gz: values (the mode)", "out_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-70076-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)", "out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_VN.nii.gz: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-73518-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-75176-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out_MO.nii.gz: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-75956-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii_FA.nii.gz: values (relative)", "out.nii_LN.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)", "out.nii_MD.nii.gz: header (descrip left out)", "out.nii_MD.nii.gz: values (relative)", "out.nii_MO.nii.gz: values (the mode)", "out.nii_VN.nii.gz: eigenvectors up to their sign", "step.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-78001-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out_FA.nii: values (relative)", "out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)", "out_MD.nii: values (relative)", "out_MO.nii: values (the mode)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-83776-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii.gz: header (descrip left out)", "out.nii_LN.nii.gz: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-86767-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out_LN.nii: header (descrip left out)", "out_LN.nii: values (relative)"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-87578-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.hdr: header (descrip left out)", "out_FA.hdr: values (relative)", "out_LN.hdr: header (descrip left out)", "out_LN.hdr: values (relative)", "out_MD.hdr: header (descrip left out)", "out_MD.hdr: values (relative)", "out_MO.hdr: values (the mode)", "out_VN.hdr: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-90930-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["out.nii: values (relative)", "out.nii_LN.nii: header (descrip left out)", "out.nii_LN.nii: values (relative)", "out.nii_VN.nii: eigenvectors up to their sign"]
+status = "explained"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): explained: -tensor_decomp of degenerate tensors (eigenvalues at the rounding level) (1). Reproducer: fsl-maths-trial-94956-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-maths-original"
+implementation = "original"
+signature = ["DN fix pass", "out.nii.gz: header (descrip left out)", "out.nii.gz: the sums' share of voxels within N ulp", "out.nii.gz: values within the sums' bound"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 1 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: the geometry of a new grid along x (findings 24) (1). Reproducer: fsl-maths-trial-98908-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-stats-original"
+implementation = "original"
+signature = ["standard output"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 504 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: fslstats' histograms without a histogram (findings 28) (273); explained: fslstats -c/-C of images holding NaN and infinities: the NaN's sign (129); harness, fixed: §10's bound over a histogram's lines and an output cut short (74); explained: fslstats' last printed digit at §10's bound (or bounded words unattributed) (28). Reproducer: fsl-maths-trial-01175-original."
+link = "docs/findings/fsl-maths-original.md"
+
+[[difference]]
+tool = "fsl-stats-original"
+implementation = "original"
+signature = ["standard output (JSON)"]
+status = "fixed"
+explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 275 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: fslstats' histograms without a histogram (findings 28) (272); explained: fslstats' last printed digit at §10's bound (or bounded words unattributed) (3). Reproducer: fsl-maths-trial-00163-original."
+link = "docs/findings/fsl-maths-original.md"
+'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-189 †"
+text = '''
+| FSL-191 | fslmaths (`-fmean`, `-fmeanu` with a kernel large enough for FSL's FFT convolution: nvox · nker > 44 · 2 nvox · log2(2 nvox)) | one NaN or infinite voxel makes every voxel of its volume NaN, where the direct sum FSL takes for smaller kernels leaves NaN only within the kernel's reach: the result depends on the kernel's and the image's sizes (black-box runs: 2,288 of 2,288 voxels NaN on the FFT path, 120 on the direct one; findings 9 of `docs/findings/fsl-maths-original.md`) | c | none (goodvoxels' `-s 5` is separable) | rule A: the direct sum's local result by default in the clean-room original, named where it differs; FSL's NaN volume with `reproduce` (2026-11-03, `orig/fft-nan-local`); the replica gives FSL's NaN volume in both modes | replica |
+| FSL-192 | fslmaths (`-fmean`, `-fmeanu` with a kernel large enough for FSL's FFT convolution) | the kernel is applied mirrored along every axis (a true convolution), where the direct sum FSL takes for smaller kernels or larger images applies it as stored (a correlation): for a kernel that is not point-symmetric, or of an even size, the result depends on the kernel's and the image's sizes (black-box impulse probes: the same 13 × 11 × 9 kernel lands as stored on a 23³ impulse (FFT) and mirrored on a 25³ one (direct); an even 14 × 12 × 10 kernel likewise on 15³ and 67³; findings 14) | c | none (goodvoxels' `-s 5` is separable) | rule A: the direct sum's orientation at every size by default in the clean-room original, named where it changes the result; FSL's mirroring with `reproduce` (2026-11-03, `orig/fft-asym`, `orig/direct-asym`); the replica mirrors in both modes | replica |
+| FSL-193 | fslmaths (`-roc` with a curve file that cannot be written: a folder that does not exist, no permission) | no curve is written and nothing is said: the run goes on, prints the area and exits 0 (black-box run `-roc -0.05 nodir/roc.txt`; findings 20) | b | none (no `-roc`) | rule B: an error naming the file by default in the clean-room original; FSL's silent skip with `reproduce` (2026-11-03, `orig/roc-nodir`); the replica (larmorx-nc) presumably skips silently in both modes (not run here) | replica |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+a 1 × 1 × 1 image refused by `reproduce` (2026-11-03, random testing's permanent case `subsamp2-three-wide`) | – |'''
+new = '''
+a 1 × 1 × 1 image refused by `reproduce` (2026-11-03, random testing's permanent case `subsamp2-three-wide`); fslmaths' clean-room original the same, named in both modes (2026-11-03: random testing's 7 cases where FSL's heap corruption ended it before it wrote; its record compares the outputs where FSL ends by a signal, `difftest/fsl75-subsamp2offc-heap`) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+FSL's signed bytes with `reproduce`; fslmaths' replica 2026-11-03 (`dt/char`, `dt/input-char`, `d13/char-uint8-thr`, `d13/input-uint8-div`) | – |'''
+new = '''
+FSL's signed bytes with `reproduce`; fslmaths' replica 2026-11-03 (`dt/char`, `dt/input-char`, `d13/char-uint8-thr`, `d13/input-uint8-div`); fslmaths' clean-room original the same, named for every uint8 image computed unsigned (random testing, findings 29) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+uint16 written as int32 as FSL does (rule C); fslmaths' replica 2026-11-03 (`d13/odt-input-int8`, `d13/odt-input-uint16-round`, `dt/odt-input-uint16`) | – |'''
+new = '''
+uint16 written as int32 as FSL does (rule C); fslmaths' replica 2026-11-03 (`d13/odt-input-int8`, `d13/odt-input-uint16-round`, `dt/odt-input-uint16`); fslmaths' clean-room original the same, named for every int8 image written with `-odt input` (random testing, findings 29) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+rule A: filled in its plane, named; refused with `reproduce`; fslmaths' replica 2026-11-03 (`d13/fillh-2d`) | – |'''
+new = '''
+rule A: filled in its plane, named; refused with `reproduce`; fslmaths' replica 2026-11-03 (`d13/fillh-2d`); fslmaths' clean-room original the same, an axis of size 1 no edge for every such image (random testing, findings 27) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+`d13/thrp-far`, `d13/uthrP-far`), the BET and FLIRT replicas the same (their records unchanged) | – |'''
+new = '''
+`d13/thrp-far`, `d13/uthrP-far`), the BET and FLIRT replicas the same (their records unchanged); BET's and FLIRT's clean-room originals 2026-11-03 (`reproduce`: FSL's first bin; the default named where it moves the range; findings 22 of `docs/findings/fsl-maths-original.md`), fslmaths' and fslstats' clean-room originals the same | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; fslmaths' replica 2026-11-03 | reproduce ('''
+new = '''
+the record's two cases (`fn/double-tan`, `difftest/fft-twiddles-glibc-sincos`) expected divergences; fslmaths' replica 2026-11-03; fslmaths' clean-room original: correctly rounded in both modes (its `reproduce` does not give glibc's `exp`, `log`, `pow` yet; its record holds them to one unit in the last place), its FFT none (a direct sum) | reproduce (the clean-room original's `exp`, `log`, `pow`: Arm's Optimized Routines, MIT; '''
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-189 |"
+text = '''
+| FSL-191 | fslmaths | the clean-room original `larmorx fsl fslmaths` (`lx.fsl.fslmaths`, `implementation="original"`); the replica gives FSL's NaN volume in both modes | with a kernel large enough for FSL's FFT, one NaN or infinite voxel makes `-fmean`'s and `-fmeanu`'s whole volume NaN | NaN only within the kernel's reach, named; `reproduce` FSL's NaN volume |
+| FSL-192 | fslmaths | the clean-room original; the replica mirrors in both modes | with a kernel large enough for FSL's FFT, `-fmean` and `-fmeanu` apply the kernel mirrored, where smaller kernels apply it as stored | the direct sum's orientation at every size, named; `reproduce` FSL's mirroring |
+| FSL-193 | fslmaths | the clean-room original; the replica skips silently (not run) | `-roc` with a curve file that cannot be written writes no curve and says nothing | an error naming the file; `reproduce` FSL's silent skip |'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+| FSL-187 | fslstats, fslmaths, bet2, flirt | the fslstats and fslmaths replicas, BET's and FLIRT's replicas |'''
+new = '''
+| FSL-187 | fslstats, fslmaths, bet2, flirt | the fslstats and fslmaths replicas, BET's and FLIRT's replicas; the clean-room originals of fslmaths, fslstats, BET and FLIRT |'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "   data panel and long random testing wait for the final validation phase."
+text = '''
+   **fslmaths and fslstats: the clean-room originals done (2026-11-04, relays 1 to 7 and 6b).**
+   `crates/larmorx-fsl`'s `maths` (fslmaths' kernels, filters, reductions, statistics, ROC,
+   TFCE, the tensor) and `cli::fslmaths`, `cli::fslstats`, from `specs/fslmaths.md`,
+   `specs/fslstats.md`, FSL's usage texts and black-box runs (no FSL source): every operation,
+   option, data type, message, exit status and failure case of both programs; `lx.fsl.fslmaths`,
+   `lx.fsl.fslstats` and their typed wrappers with `implementation="original"` (and `auto`
+   without `larmorx-nc`). Built for speed: rows of voxels in parallel, fixed-order sums (the same
+   bits at any thread count), one copy of the image, the direct sum where FSL takes its FFT (its
+   products in double precision there); goodvoxels' chain 4.5 times FSL's speed with half its
+   memory, the heavy operations 1.8 to 28 times on one thread and up to 268 times on 14
+   ([benchmark](benchmarks/fsl-maths.md)). Records
+   [fsl-maths](validation/fsl-maths.md): 442 cases, 374 within §21's thresholds (358 FSL's values
+   in every file, fMRIPrep's four combine_masks calls and the goodvoxels mask's fourteen
+   included), 63 rejected by both, 5 expected divergences (FSL's single-precision FFT on 3
+   kernels, `-subsamp2offc` on 2);
+   [fsl-stats](validation/fsl-stats.md): 162 cases, 125 identical, BET's `-C` within §10's bound
+   (6.1e-8), 36 rejected by both. New defects from black-box runs: FSL-191 (FSL's FFT path makes
+   a volume NaN), FSL-192 (its kernel mirrored), FSL-193 (`-roc`'s unwritable curve, rule B);
+   FSL-187's switch in BET's and FLIRT's originals. One trial (20 minutes, 300,000 cases, FSL
+   through the cache): 5,168 of the original's mistakes fixed (21 permanent cases), 10 open;
+   golden: 9 cases (224 outputs); memory: 6 calls; thread test: every parallel path. topup's
+   Windows file names done (below). Site pages with both implementations; findings 1 to 31 of
+   `docs/findings/fsl-maths-original.md` (31: on a large kernel a single-precision direct sum
+   is less accurate than FSL's FFT, beyond §21's bound on the page's real call; the original's
+   double sums there, 2026-11-04, lie closer to the exact result than FSL's FFT, 2.0e-7 of FSL's
+   largest value from FSL's output).'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+- **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge): the replica'''
+new = '''
+- **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge; **done**
+  2026-11-03 by fslmaths' clean-room part, relay 6: `cli::common::name_start`, `\` a separator on
+  Windows only in topup's default stem, its configuration's directory test and applytopup's
+  extension test, unit tests under a folder whose name holds a dot): the replica'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+  - **The clean-room originals of fslmaths and fslstats** from `specs/fslmaths.md` and
+    `specs/fslstats.md` (the roadmap's next FSL step, beside the next replica); and BET's and
+    FLIRT's clean-room originals checked for FSL-187's behaviour (a value far above the robust
+    range's histogram counted in its first bin): the corrected last bin by default, FSL's with
+    `reproduce`, as the replicas do.'''
+new = '''
+  - **The clean-room originals of fslmaths and fslstats**: done 2026-11-04 (item 7), with
+    FSL-187's switch and notice in BET's and FLIRT's clean-room originals (their defaults
+    unchanged; no record input reaches it).
+  - **Their follow-ups** (2026-11-04; the first one found, the direct sum in double precision
+    where FSL takes its FFT, findings 31, done in the part's relay 7b with the record re-made):
+    (1) the original's `reproduce` gives glibc's `exp`, `log` and `pow` bits
+    as §19 asks (Arm's Optimized Routines, MIT: a port into `larmorx_core::math`), today
+    correctly rounded in both modes; (2) correctly rounded `erf` and `erfc` in
+    `larmorx_core::math` (the original's `-ztop` uses the `libm` crate's, within rule 5);
+    (3) larmorx-io's parallel gzip writer holds two 256 KiB blocks and their outputs per worker
+    (about 3 MiB each): 4D outputs at 32 threads exceed FSL's memory allowance (one block per
+    worker would halve it); (4) runtime SIMD dispatch in `larmorx-fsl` (an audited `unsafe`
+    module: 1.26 to 1.34 times on the large convolutions, measured with an x86-64-v3 build);
+    (5) the replica's `-bptf` is 2.9 times slower than FSL (5.26 s against 1.82); (6) the replica
+    follow-ups FSL-191, FSL-192, FSL-193 (its default to correct, `reproduce` FSL's); (7) the
+    replica suite's `fsltest/` cases (FSL's own tests, in its source tree) against the original
+    at a merge (a check outside the clean room), if wanted; (8) the spec questions of the
+    part's handoff (13, 14, 20, 26 to 38) for a spec-answers part.'''
+
+[[op]]
+do = "insert"
+file = "docs/benchmarks/README.md"
+after = "| [fsl-topup](fsl-topup.md) | topup and applytopup (FSL 6.0.7.23, at one thread and `--nthr=14`) and their replicas, against topup's clean-room original at 1 and 14 threads, informal (`validation/investigations/cleanroom-topup/bench.py`) |"
+text = '''
+| [fsl-maths.md](fsl-maths.md) | fslmaths' and fslstats' clean-room originals against FSL 6.0.7.23 and the replicas (2026-11-03; FSL's FFT path re-measured 2026-11-04 with the original's double sums): fMRIPrep's combine_masks and goodvoxels chain (4.5 times FSL's speed, half its memory), the heavy operations on a real BOLD series and T1w (1.8 to 28 times on one thread, up to 268 on 14; FSL's FFT path the largest), BET's fslstats call |'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+**Last updated: 2026-11-03.**'''
+new = '''
+**Last updated: 2026-11-04.**'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| The replicas complete (2026-11-03): every operation of `fslmaths` and every option of `fslstats`, 358 compared fslmaths cases bit-identical to FSL 6.0.7.23 and two one unit in the last place, where FSL's maths library is not correctly rounded, and 172 of 172 compared fslstats cases, fMRIPrep's mask combination on three oracle runs and its goodvoxels calls included; [fslmaths' page](/tools/fsl-maths/), [fslstats' page](/tools/fsl-stats/); the clean-room originals next |'''
+new = '''
+| The replicas complete (2026-11-03) and the clean-room originals complete (2026-11-04): every operation of `fslmaths` and every option of `fslstats`; the replicas bit-identical to FSL 6.0.7.23 in every compared case but two one unit in the last place, where FSL's maths library is not correctly rounded; the originals within their thresholds in 374 of 374 and 126 of 126 compared cases, 358 and 125 of them FSL's values, fMRIPrep's mask combination on three oracle runs and its goodvoxels calls included; [fslmaths' page](/tools/fsl-maths/), [fslstats' page](/tools/fsl-stats/); BET's options next |'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| Completed | Step |
+|---|---|
+'''
+new = '''
+| Completed | Step |
+|---|---|
+| 2026-11-04 | **fslmaths' and fslstats' clean-room originals: fslmaths and fslstats complete.** FSL's image calculator and image statistics written in LARMORX itself (Apache-2.0) from their behavioural specifications, FSL's usage texts and black-box runs of FSL's programs, without FSL's code: every operation, option, data type, message and failure case of both programs; 374 of 374 compared fslmaths cases within the record's thresholds, 358 of them FSL's values in every file, and 126 of 126 fslstats cases, 125 of them FSL's numbers, fMRIPrep's mask combination on three oracle runs and its goodvoxels calls included; three defects of FSL found by black-box runs, corrected by default (FSL-191 to FSL-193); built for speed: fMRIPrep's goodvoxels chain 4.5 times FSL's speed with half its memory, the heavy operations 1.8 to 28 times on one thread and up to 268 times on 14, the same result at any thread count; where FSL convolves a large kernel by its FFT the original adds in double precision, closer to the exact result than FSL's FFT; [fslmaths' page](/tools/fsl-maths/), [fslstats' page](/tools/fsl-stats/) |
+'''

@@ -193,8 +193,8 @@ What the coverage test enumerates:
   modes) and FSL-162; fslstats with every option in one call, `-t` with `-K`, `-json`, FSL-182
   (both modes); the refusals FSL-161 and FSL-186 by their status. fslmaths' and fslstats'
   printed output is a golden file too (`PRINTING`). `lx.fsl.fslmaths`, `lx.fsl.fslstats` and their
-  typed wrappers are replica-only functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`)
-  until the clean-room originals. `larmorx-nc`'s checksums recorded on 2026-11-03 from b19b5b9
+  typed wrappers were replica-only functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`)
+  until the clean-room originals (below). `larmorx-nc`'s checksums recorded on 2026-11-03 from b19b5b9
   (committed as 3f06ecb): 31 cases and 167 outputs added, every other checksum unchanged (the
   core's streaming NIfTI reader, Armadillo 14.2.1's maximum, FSL-187's robust range, the index
   error's type and calc_cog's order changed no golden output); the check passes after recording;
@@ -218,6 +218,28 @@ What the coverage test enumerates:
   empty). Recorded from a49e214 (committed as d898df9), the parity smoke tier's marker of the same
   commit and build reused (2,714 passed): 6 cases and 76 outputs added, every other checksum
   unchanged; each case runs in 0.01 to 0.04 s.
+- **fslmaths and fslstats, the clean-room originals** (2026-11-03, nine cases in
+  `tests/golden/registry.py`, on new inputs written by the test, `anat_nan` and `bold_nan` (a
+  head and a series of seeded integers holding NaN and infinite voxels) and `tensor6` (six
+  volumes of 6 × 5 × 4, as the tensor decomposition needs six), with the existing ones):
+  `cli.fsl.fslmaths` (fMRIPrep's mask product; the voxelwise functions whose NaN and infinities
+  come from numbers, in single and double precision; thresholds by value and robust range, the
+  binarisations, hole filling, the index; the computing and output types, `-seed` with `-rand`
+  and `-randn`, `-grid`, `-save`, `-restart`; FSL-151 in both modes; the usage and an unknown
+  operation), `cli.fsl.fslmaths.filters` (the separable Gaussian and box, the direct sums of a
+  sphere, the morphology, a kernel image, the subsamplings, `-edge`, `-dog_edge`, `-inm`,
+  `-ing`, an even kernel's warning), `cli.fsl.fslmaths.series` (the reductions along T, X, Y, Z,
+  `-bptf`, `-roi`, the statistical transforms, TFCE, `-roc`, `-tensor_decomp`),
+  `cli.fsl.fslstats` (every statistic, thresholds, masks, a difference image, fMRIPrep's and
+  BET's forms, `-t`, `-K`, `-json`, the usage and an unknown option), and the typed wrappers
+  through `implementation="original"`: `py.fsl.maths.voxelwise`, `.filters`, `.series`,
+  `.special` and `py.fsl.stats`. Every family has a path that makes NaN from numbers (inf − inf,
+  0 · inf, the filters' and the reductions' NaN recomputed by x86-64's rules), so each
+  platform's NaN bits are checked against x86-64's (the replica's FSL-160 case had shown
+  AArch64's NaN without its sign bit). `REPLICA_ONLY_FUNCTIONS` is now empty. Recorded from
+  479e9b3 (committed as 01d8d98), the parity smoke tier's marker of the same commit and build
+  reused (2,754 passed): 9 cases and 224 outputs added (44, 37, 66, 24, 12, 7, 7, 15 and 12),
+  every other checksum unchanged.
 - **The spec answers' switches in the FSL replicas** (2026-11-03, four cases added in
   `crates-nc/larmorx-nc-cli/tests/golden.rs`): `applyxfm4D.uint8` (FSL-111: a uint8 image read as
   stored by default), `fast.fsl203` (FSL-203: an input whose first voxel is NaN segmented by

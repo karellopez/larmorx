@@ -1,0 +1,983 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Parity of fslmaths' clean-room original (``larmorx fsl fslmaths``, crate larmorx-fsl,
+Apache-2.0, written from ``specs/fslmaths.md``) with FSL 6.0.7.23's ``fslmaths``.
+
+The cases are the replica suite's (``fsl_maths_replica``: fMRIPrep's combine_masks calls on the
+oracle runs, the goodvoxels chain on ds005040's BOLD series, every operation once per data type
+and code path, the messages and failures, the defects in both modes), run here against the
+original, and the original's own cases (``orig/``: paths the replica suite's inputs do not
+reach, on inputs of :func:`own_inputs`). Every FSL run goes through the oracle-output cache with
+the replica suite's keys and policy, so the runs that suite made are served from it.
+
+What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
+
+- the exit status (FSL's crash or abort against the original's status 1), standard output and
+  standard error line by line (the run directory replaced; the original's ``larmorx`` lines
+  left out), the files written;
+- each image's header, byte for byte but ``descrip``; its values bit for bit where the
+  operation is exactly defined by the computing type's arithmetic (§5-§8: every case of this
+  suite but the double-precision functions), and for the double-precision functions every
+  voxel within the case's units in the last place of FSL's (GLIBC-07: glibc's functions are not
+  correctly rounded everywhere, the original's are), the fraction that differs reported; the
+  sums (``_SUM_OPS``) under the floating types by §21's sums' metric, both of its parts as
+  checks (the cases of ``EXPECTED_DIVERGENCES`` may miss its share of voxels within 4 units in
+  the last place only, each with its reason); ``-roc``'s printed area and quartiles within
+  1e-5 absolute and its curve file's numbers to 5 significant digits (half a unit of the 5th
+  digit), its other words identical; other files byte for byte;
+- the D13 fix pass: a defect named exactly when the default's outputs differ from
+  ``reproduce``.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+from larmorx_validation.parity import defects
+from larmorx_validation.parity import fsl_maths_replica as rep
+from larmorx_validation.parity.harness import (
+    BOTH_ERROR,
+    EXPECTED,
+    SKIPPED,
+    Case,
+    CheckList,
+    Outcome,
+    Suite,
+)
+
+SUITE = "fsl-maths"
+PROGRAM = "fslmaths"
+#: The original's thread count in the cases.
+LX_THREADS = 4
+#: The voxelwise functions that run in double precision through glibc's maths in FSL.
+_DOUBLE_FUNCTIONS = ("-exp", "-log", "-sin", "-cos", "-tan", "-asin", "-acos", "-atan", "-pow")
+#: The operations whose order of sums the original may choose (§21): their floating outputs are
+#: compared by the sums' metric, not bit for bit (bit-identity welcome, not required).
+_SUM_OPS = (
+    "-s",
+    "-fmean",
+    "-fmeanu",
+    "-dilM",
+    "-dilall",
+    "-edge",
+    "-subsamp2",
+    "-subsamp2offc",
+    "-inm",
+    "-ing",
+    "-Tmean",
+    "-Xmean",
+    "-Ymean",
+    "-Zmean",
+    "-Tstd",
+    "-Xstd",
+    "-Ystd",
+    "-Zstd",
+    "-Tar1",
+    "-Xar1",
+    "-Yar1",
+    "-Zar1",
+    "-ranknorm",
+    "-bptf",
+    "-ztop",
+    "-ptoz",
+)
+#: The sums' metric: the largest difference at most this fraction of FSL's largest magnitude...
+SUM_RELATIVE = 1e-5
+#: ... and at least this fraction of the voxels within ``SUM_ULPS`` units in the last place.
+SUM_SHARE = 0.99
+SUM_ULPS = 4
+#: The name of the share's check (the one an expected divergence may miss).
+SUM_SHARE_CHECK = "the sums' share of voxels within 4 ulp"
+#: -roc (§21): the printed area and quartiles within this absolute difference...
+ROC_PRINTED = 1e-5
+#: ... and the curve file's numbers to this many significant digits.
+ROC_DIGITS = 5
+_FFT = (
+    "FSL's single-precision FFT convolution against the original's direct sum (where FSL takes "
+    "its FFT, its products added in double precision and rounded once): the FFT's rounding is "
+    "relative to the image's largest values, not to each voxel's own last place; against the "
+    "exact result (float64) FSL's FFT lies within 6.9e-8 to 1.0e-7 of the largest value on these "
+    "cases, the original within 4.1e-8 to 6.3e-8 (findings 8 and 31; spec question 14)"
+)
+_SUBSAMPLING = (
+    "FSL's arithmetic of -subsamp2offc's 2 x 2 x 2 means, which no order of a single or double "
+    "sum of the eight values gives (findings 13 and 29; spec question 13), against the spec's "
+    "mean: the voxels beyond 4 ulp are those whose value cancels to near 0"
+)
+#: Cases expected to miss §21's share of voxels within 4 ulp (only that check), and why: their
+#: largest difference stays inside the bound (1e-5 of FSL's largest magnitude), checked.
+EXPECTED_DIVERGENCES: dict[str, str] = {
+    **dict.fromkeys(
+        ("conv/fft-double", "conv/fft-4d", "orig/fft-asym"),
+        _FFT,
+    ),
+    **dict.fromkeys(
+        ("sub/subsamp2offc", "sub/subsamp2offc-double"),
+        _SUBSAMPLING,
+    ),
+}
+
+
+# ------------------------------------------------------------------------------------------------
+# The original
+
+
+def original_command() -> list[str]:
+    """The original's command line: ``LARMORX_MATHS_BIN`` (a ``larmorx`` binary), else this
+    Python's ``larmorx`` package."""
+    exe = os.environ.get("LARMORX_MATHS_BIN")
+    return [exe] if exe else [sys.executable, "-m", "larmorx"]
+
+
+def run_original(
+    args: list[str],
+    *,
+    cwd: Path,
+    settings: dict[str, str | None],
+    mode: str,
+    threads: int | None = None,
+) -> rep.Completed:
+    env = rep._environment(settings)
+    env[defects.ENV] = mode
+    env["OMP_NUM_THREADS"] = str(threads or LX_THREADS)
+    env["LARMORX_IMPLEMENTATION"] = "original"
+    for k, v in os.environ.items():
+        if k in ("PYTHONPATH", "VIRTUAL_ENV"):
+            env[k] = v
+    p = subprocess.run(
+        [*original_command(), "fsl", PROGRAM, *args],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+        timeout=3600,
+    )
+    return rep.Completed(p.returncode, p.stdout, p.stderr)
+
+
+# ------------------------------------------------------------------------------------------------
+# Comparison
+
+
+def _own(text: str, d: Path) -> str:
+    """The text without the original's own lines, its run directory replaced."""
+    keep = [
+        ln
+        for ln in text.split("\n")
+        if not ln.startswith(("larmorx: ", "larmorx fsl ")) and not ln.endswith("(larmorx)")
+    ]
+    return "\n".join(keep).replace(str(d), "<dir>")
+
+
+def _files(d: Path, before: set[str]) -> dict[str, Path]:
+    return {
+        str(p.relative_to(d)): p
+        for p in sorted(d.rglob("*"))
+        if p.is_file() and str(p.relative_to(d)) not in before
+    }
+
+
+_COMPRESSED = ("", ".gz", ".bz2", ".zst")
+
+
+def _is_image(name: str) -> bool:
+    return name.endswith(tuple(e + c for e in (".nii", ".hdr") for c in _COMPRESSED))
+
+
+def _is_pair_data(name: str) -> bool:
+    return name.endswith(tuple(".img" + c for c in _COMPRESSED))
+
+
+def _load(path: Path):
+    """An image written by FSL or the original; a zstd-compressed one decompressed by FSL's own
+    ``zstd`` program (this Python has no zstd module, which nibabel needs)."""
+    import nibabel as nib
+
+    if path.name.endswith(".zst"):
+        raw = subprocess.run(
+            [str(rep.fsldir() / "bin" / "zstd"), "-dcq", str(path)],
+            capture_output=True,
+            check=True,
+        ).stdout
+        if path.name.endswith(".nii.zst"):
+            cls = nib.Nifti2Image if raw[:4] == (540).to_bytes(4, "little") else nib.Nifti1Image
+            return cls.from_bytes(raw)
+        raise ValueError(f"{path.name}: a zstd-compressed image pair is not read here")
+    try:
+        return nib.load(str(path))
+    except ValueError as e:
+        if "w2 should be positive" not in str(e):
+            raise
+        # a NIfTI-2 quaternion whose double components exceed 1 by float rounding (FSL writes
+        # the float quaternion's doubles): nibabel's float tolerance for it, as NIfTI-1 has
+        old = nib.Nifti2Header.quaternion_threshold
+        nib.Nifti2Header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+        try:
+            return nib.load(str(path))
+        finally:
+            nib.Nifti2Header.quaternion_threshold = old
+
+
+def _header_block(img) -> bytes:
+    h = img.header.copy()
+    h["descrip"] = b""
+    return bytes(h.binaryblock)
+
+
+def _bits(a: np.ndarray) -> np.ndarray:
+    if a.dtype == np.float32:
+        return a.view(np.int32).astype(np.int64)
+    if a.dtype == np.float64:
+        return a.view(np.int64)
+    return a.astype(np.int64)
+
+
+def _ulps(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """The distance in units in the last place of two float arrays of one type (NaN equal to
+    NaN of the same bits; values of opposite signs far apart)."""
+    xi, yi = _bits(x), _bits(y)
+    same_sign = (xi < 0) == (yi < 0)
+    with np.errstate(over="ignore"):
+        d = np.where(same_sign, np.abs(xi - yi), np.iinfo(np.int64).max)
+    return d
+
+
+def _double_ulps(args: list[str]) -> int:
+    """The units in the last place allowed for a case's double-precision values: one per
+    double-precision function of the chain (each may differ by one, GLIBC-07)."""
+    return sum(a in _DOUBLE_FUNCTIONS for a in args)
+
+
+def compare(
+    checks: CheckList,
+    oracle: rep.Completed,
+    ours: rep.Completed,
+    a: Path,
+    b: Path,
+    before: set[str],
+    args: list[str],
+) -> None:
+    """Compares the original's run with FSL's (§21's metrics as checks). FSL-75's heap
+    corruption (``-subsamp2``'s unused background value; the original names it in both modes):
+    FSL aborts, crashes or finishes after writing its outputs, depending on its heap, so where
+    FSL ended by a signal and the original finished naming FSL-75, the exit status and glibc's
+    message are not compared (the outputs are)."""
+
+    heap75 = _heap75(oracle, ours)
+    ok_exit = (
+        heap75
+        or oracle.code == ours.code
+        or (oracle.code != 0 and ours.code != 0 and (oracle.code < 0 or oracle.code > 128))
+    )
+    checks(
+        "exit status",
+        ok_exit,
+        metric="exact",
+        value=f"{ours.code} (FSL {oracle.code})",
+        threshold="the same (FSL's crash: 1)",
+    )
+    so, su = _own(oracle.stdout, a), _own(ours.stdout, b)
+    roc = "-roc" in args
+    if roc:
+        _roc_text(checks, "standard output", so, su, absolute=ROC_PRINTED)
+    else:
+        checks(
+            "standard output",
+            so == su,
+            detail="" if so == su else _first_diff(so, su),
+        )
+    eo, eu = _own(oracle.stderr, a), _own(ours.stderr, b)
+    if heap75:
+        eo = _HEAP_MESSAGE.sub("", eo)
+    checks(
+        "standard error",
+        eo == eu,
+        detail="" if eo == eu else _first_diff(eo, eu),
+    )
+    fa, fb = _files(a, before), _files(b, before)
+    checks(
+        "files written",
+        set(fa) == set(fb),
+        detail="" if set(fa) == set(fb) else f"FSL {sorted(fa)}, original {sorted(fb)}",
+    )
+    ulps = _double_ulps(args)
+    for name in sorted(set(fa) & set(fb)):
+        if _is_pair_data(name):
+            continue
+        if not _is_image(name):
+            if roc:
+                x = fa[name].read_text(encoding="utf-8", errors="replace")
+                y = fb[name].read_text(encoding="utf-8", errors="replace")
+                _roc_text(checks, f"{name}: the curve", x, y, digits=ROC_DIGITS)
+                continue
+            same = fa[name].read_bytes() == fb[name].read_bytes()
+            checks(f"{name}: bytes", same)
+            continue
+        ia, ib = _load(fa[name]), _load(fb[name])
+        ha, hb = _header_block(ia), _header_block(ib)
+        checks(
+            f"{name}: header (descrip left out)",
+            ha == hb,
+            detail="" if ha == hb else _header_diff(ia, ib),
+        )
+        x = np.asarray(ia.dataobj)
+        y = np.asarray(ib.dataobj)
+        if x.dtype != y.dtype or x.shape != y.shape:
+            checks(f"{name}: values", False, detail=f"{x.dtype}{x.shape} vs {y.dtype}{y.shape}")
+            continue
+        if x.dtype.kind == "f":
+            d = _ulps(x.ravel(), y.ravel())
+            differ = int(np.count_nonzero(d))
+            worst = int(d.max()) if d.size else 0
+            if differ and "-tensor_decomp" in args:
+                _tensor_check(checks, name, fa, fb, x, y)
+            elif differ and "-tfce" in args:
+                _tfce_check(checks, name, x.ravel(), y.ravel())
+            elif differ and any(a in _SUM_OPS for a in args):
+                _sum_check(checks, name, x.ravel(), y.ravel(), d)
+            elif ulps and x.dtype == np.float64:
+                checks(
+                    f"{name}: values (units in the last place)",
+                    worst <= ulps,
+                    metric="max ulp",
+                    value=worst,
+                    threshold=ulps,
+                    detail=f"{differ} of {d.size} voxels differ (GLIBC-07)",
+                )
+            else:
+                checks(
+                    f"{name}: values bit for bit",
+                    differ == 0,
+                    metric="differing voxels",
+                    value=differ,
+                    threshold=0,
+                    detail="" if differ == 0 else _value_diff(x, y),
+                )
+        else:
+            differ = int(np.count_nonzero(x != y))
+            checks(
+                f"{name}: values bit for bit",
+                differ == 0,
+                metric="differing voxels",
+                value=differ,
+                threshold=0,
+                detail="" if differ == 0 else _value_diff(x, y),
+            )
+
+
+def _number(word: str) -> float | None:
+    try:
+        v = float(word)
+    except ValueError:
+        return None
+    return v if np.isfinite(v) else None
+
+
+def _roc_text(
+    checks: CheckList,
+    name: str,
+    x: str,
+    y: str,
+    *,
+    absolute: float | None = None,
+    digits: int | None = None,
+) -> None:
+    """§21's -roc metric on a text, word by word: the same lines and words; finite numbers
+    within ``absolute`` of FSL's, or agreeing to ``digits`` significant digits (the difference
+    at most half a unit of the last of them, from the larger magnitude); every other word (NaN,
+    inf, text) identical."""
+    xs, ys = x.split("\n"), y.split("\n")
+    worst, bad = 0.0, ""
+    if len(xs) != len(ys):
+        bad = f"{len(xs)} vs {len(ys)} lines"
+    for k, (p, q) in enumerate(zip(xs, ys, strict=False)):
+        if bad:
+            break
+        pw, qw = p.split(), q.split()
+        if len(pw) != len(qw):
+            bad = f"line {k + 1}: FSL {p[:120]!r} / original {q[:120]!r}"
+            break
+        for u, v in zip(pw, qw, strict=True):
+            a, b = _number(u), _number(v)
+            if a is None or b is None:
+                if u != v:
+                    bad = f"line {k + 1}: FSL {u!r} / original {v!r}"
+                    break
+                continue
+            d = abs(a - b)
+            if absolute is not None:
+                allowed = absolute
+            else:
+                m = max(abs(a), abs(b))
+                allowed = 0.0 if m == 0 else 0.5 * 10 ** (np.floor(np.log10(m)) - (digits - 1))
+            worst = max(worst, d / allowed if allowed else (0.0 if d == 0 else np.inf))
+            if d > allowed:
+                bad = f"line {k + 1}: FSL {u} / original {v} (|diff| {d:.3g} > {allowed:.3g})"
+                break
+    rule = (
+        f"within {absolute:g} absolute" if absolute is not None else f"{digits} significant digits"
+    )
+    checks(
+        f"{name} ({rule})",
+        not bad,
+        metric="largest difference / its allowance",
+        value=float(f"{worst:.3g}"),
+        threshold=1,
+        detail=bad,
+    )
+
+
+def _sum_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray, ulp: np.ndarray) -> None:
+    """§21's metric for the sums, as two checks: the non-finite voxels identical and the largest
+    difference at most ``SUM_RELATIVE`` of FSL's largest magnitude; and at least ``SUM_SHARE`` of
+    the voxels within ``SUM_ULPS`` units in the last place. A case of
+    :data:`EXPECTED_DIVERGENCES` may miss the second only (its reason in the report)."""
+    fx, fy = np.isfinite(x), np.isfinite(y)
+    same_nonfinite = bool(np.array_equal(fx, fy) and np.array_equal(_bits(x[~fx]), _bits(y[~fy])))
+    both = fx & fy
+    scale = float(np.abs(x[both]).max()) if both.any() else 0.0
+    worst = (
+        float(np.abs(x[both].astype(np.float64) - y[both].astype(np.float64)).max())
+        if both.any()
+        else 0.0
+    )
+    share = float(np.count_nonzero(ulp <= SUM_ULPS)) / max(1, ulp.size)
+    checks(
+        f"{name}: values within the sums' bound",
+        same_nonfinite and worst <= SUM_RELATIVE * scale,
+        metric="max |diff| / max |FSL|",
+        value=f"{worst / scale if scale else worst:.3g}",
+        threshold=f"<= {SUM_RELATIVE:g}, the NaN and infinite voxels identical",
+        detail=(
+            f"{np.count_nonzero(ulp)} of {ulp.size} voxels differ"
+            + ("" if same_nonfinite else "; the NaN or infinite voxels differ")
+        ),
+    )
+    checks(
+        f"{name}: {SUM_SHARE_CHECK}",
+        share >= SUM_SHARE,
+        metric=f"voxels within {SUM_ULPS} ulp",
+        value=f"{share:.1%}",
+        threshold=f">= {SUM_SHARE:.0%}",
+        detail=f"max {int(ulp.max())} ulp",
+    )
+
+
+#: §21's -tensor_decomp metric: eigenvalues, FA, MD within 1e-5 relative, MO 1e-4 absolute,
+#: eigenvectors up to their sign (|cos| >= 0.9999) where the eigenvalues are distinct by more
+#: than 1e-4 relative.
+TENSOR_RELATIVE, TENSOR_MO, TENSOR_COS, TENSOR_DISTINCT = 1e-5, 1e-4, 0.9999, 1e-4
+#: §21's TFCE metric: the difference relative to the image's maximum enhancement.
+TFCE_RELATIVE = 1e-5
+
+
+def _tfce_check(checks: CheckList, name: str, x: np.ndarray, y: np.ndarray) -> None:
+    """§21's TFCE metric: the difference at most 1e-5 of the image's maximum enhancement (FSL's
+    largest magnitude), the non-finite voxels identical."""
+    fin = np.isfinite(x) & np.isfinite(y)
+    same_nonfinite = bool(np.array_equal(x[~fin], y[~fin], equal_nan=True)) and bool(
+        np.array_equal(np.isfinite(x), np.isfinite(y))
+    )
+    x64, y64 = x[fin].astype(np.float64), y[fin].astype(np.float64)
+    top = float(np.abs(x64).max()) if x64.size else 0.0
+    worst = float(np.abs(x64 - y64).max()) if x64.size else 0.0
+    rel = worst / top if top > 0 else (0.0 if worst == 0 else np.inf)
+    checks(
+        f"{name}: values within TFCE's bound",
+        rel <= TFCE_RELATIVE and same_nonfinite,
+        metric="max |diff| / max |FSL|",
+        value=f"{rel:.3g}",
+        threshold=f"<= {TFCE_RELATIVE:g}; non-finite voxels identical",
+        detail=f"{int(np.count_nonzero(x64 != y64))} of {x.size} voxels differ"
+        + ("" if same_nonfinite else "; the NaN or infinite voxels differ"),
+    )
+
+
+def _tensor_check(checks: CheckList, name: str, fa, fb, x: np.ndarray, y: np.ndarray) -> None:
+    """§21's metric for -tensor_decomp's outputs (FSL's eigenvectors' signs are LAPACK's)."""
+
+    x64, y64 = x.astype(np.float64), y.astype(np.float64)
+    stem = name
+    for ext in (e + c for c in _COMPRESSED for e in (".nii", ".hdr")):
+        stem = stem.removesuffix(ext)
+    kind = stem.rsplit("_", 1)[-1] if "_" in stem else "FA"
+    if kind in ("V1", "V2", "V3"):
+        k = int(kind[1]) - 1
+        # the eigenvalues on the vectors' grid (a single slice's are written 2D, the vectors 4D)
+        lam = [
+            np.asarray(_load(fa[name.replace(f"_{kind}", f"_L{j}")]).dataobj)
+            .astype(np.float64)
+            .reshape(x64.shape[:-1])
+            for j in (1, 2, 3)
+        ]
+        distinct = np.ones(lam[0].shape, bool)
+        for j in (k - 1, k + 1):
+            if 0 <= j < 3:
+                gap = np.abs(lam[k] - lam[j])
+                distinct &= gap > TENSOR_DISTINCT * np.maximum(np.abs(lam[k]), np.abs(lam[j]))
+        cos = np.abs(np.sum(x64 * y64, axis=-1))
+        zero = (np.abs(x64).sum(axis=-1) == 0) & (np.abs(y64).sum(axis=-1) == 0)
+        ok = zero | ~distinct | (cos >= TENSOR_COS)
+        checks(
+            f"{name}: eigenvectors up to their sign",
+            bool(ok.all()),
+            metric="min |cos| where the eigenvalues are distinct",
+            value=f"{float(cos[distinct & ~zero].min()) if (distinct & ~zero).any() else 1.0:.6f}",
+            threshold=f">= {TENSOR_COS}",
+            detail=f"{int((~ok).sum())} voxels outside; {int((~distinct).sum())} not distinct",
+        )
+        return
+    d = np.abs(x64 - y64)
+    if kind == "MO":
+        worst = float(d.max())
+        checks(
+            f"{name}: values (the mode)",
+            worst <= TENSOR_MO,
+            metric="max |diff|",
+            value=f"{worst:.3g}",
+            threshold=f"<= {TENSOR_MO:g}",
+        )
+        return
+    rel = d / np.maximum(np.maximum(np.abs(x64), np.abs(y64)), np.finfo(np.float64).tiny)
+    rel[d == 0] = 0.0
+    worst = float(rel.max())
+    checks(
+        f"{name}: values (relative)",
+        worst <= TENSOR_RELATIVE,
+        metric="max |diff| / |FSL|",
+        value=f"{worst:.3g}",
+        threshold=f"<= {TENSOR_RELATIVE:g}",
+        detail=f"{int(np.count_nonzero(d))} of {d.size} voxels differ",
+    )
+
+
+def _expected_divergence(checks: CheckList, name: str, reason: str | None = None) -> None:
+    """A case of :data:`EXPECTED_DIVERGENCES` (or given its ``reason``) whose only failures are
+    the sums' share checks ends as an expected divergence, its failing checks' numbers in the
+    reason."""
+    reason = reason or EXPECTED_DIVERGENCES.get(name)
+    failed = [c for c in checks.checks if not c.passed]
+    if reason is None or not failed or any(SUM_SHARE_CHECK not in c.name for c in failed):
+        return
+    worst = "; ".join(f"{c.name} {c.value} (threshold {c.threshold}, {c.detail})" for c in failed)
+    bound = "; ".join(
+        f"max |diff| {c.value} of max |FSL| (bound {SUM_RELATIVE:g})"
+        for c in checks.checks
+        if "values within the sums' bound" in c.name
+    )
+    raise Outcome(EXPECTED, f"{reason}. Inside the bound: {bound}. Outside the threshold: {worst}")
+
+
+def _first_diff(x: str, y: str) -> str:
+    xs, ys = x.split("\n"), y.split("\n")
+    for k, (p, q) in enumerate(zip(xs, ys, strict=False)):
+        if p != q:
+            return f"line {k + 1}: FSL {p[:160]!r} / original {q[:160]!r}"
+    return f"{len(xs)} vs {len(ys)} lines; FSL {x[-200:]!r} / original {y[-200:]!r}"
+
+
+def _header_diff(ia, ib) -> str:
+    out = []
+    for key in ia.header:
+        if key == "descrip":
+            continue
+        va, vb = ia.header[key], ib.header[key]
+        if np.asarray(va).tobytes() != np.asarray(vb).tobytes():
+            out.append(f"{key}: {va} / {vb}")
+    return "; ".join(out)[:400]
+
+
+def _value_diff(x: np.ndarray, y: np.ndarray) -> str:
+    xr, yr = x.ravel(), y.ravel()
+    if x.dtype.kind == "f":
+        bad = np.flatnonzero(_bits(xr) != _bits(yr))
+    else:
+        bad = np.flatnonzero(xr != yr)
+    k = bad[:3]
+    return f"{bad.size} differ; first at {k.tolist()}: FSL {xr[k].tolist()} / original {yr[k].tolist()}"
+
+
+def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reproduced, before):
+    """D13: the original's default run against its ``reproduce`` run."""
+
+    with tempfile.TemporaryDirectory(prefix="lx-maths-fix_") as name:
+        tmp = Path(name)
+        prepare(tmp)
+        r = run_original(args, cwd=tmp, settings=settings, mode=defects.FIX)
+        entries = defects.notices_in(r.stderr)
+        others = []
+        if r.code != reproduced.code:
+            others.append(f"exit {reproduced.code} -> {r.code}")
+        x, y = _files(reproduced_dir, before), _files(tmp, before)
+        if set(x) != set(y):
+            others.append(f"files {sorted(set(x) ^ set(y))[:4]}")
+        change = defects.Change(0, 0, 0.0)
+        for key in sorted(set(x) & set(y)):
+            if _is_image(key):
+                ix, iy = _load(x[key]), _load(y[key])
+                change = change + defects.Change.of(np.asarray(iy.dataobj), np.asarray(ix.dataobj))
+                if _header_block(ix) != _header_block(iy):
+                    others.append(f"{key} header")
+            elif x[key].read_bytes() != y[key].read_bytes():
+                others.append(key)
+        defects.add_fix_check(
+            checks, entries, change, other_changes="; ".join(others), silent_ok=rep._SILENT
+        )
+
+
+#: glibc's messages when it finds the heap corrupted (FSL-75), and the line they end.
+_HEAP_MESSAGE = re.compile(
+    r"^(?:double free or corruption|free\(\)|malloc\(\)|realloc\(\)|corrupted |munmap_chunk\(\))"
+    r".*\n?",
+    re.MULTILINE,
+)
+
+
+def _heap75(oracle: rep.Completed, ours: rep.Completed | None) -> bool:
+    """FSL ended by a signal where the original finished naming FSL-75 (:func:`compare`)."""
+    return (
+        ours is not None
+        and oracle.code < 0
+        and ours.code == 0
+        and "upstream defect FSL-75" in ours.stderr
+    )
+
+
+def _agree_on_errors(
+    checks: CheckList, oracle: rep.Completed, ours: rep.Completed | None = None
+) -> None:
+    if _heap75(oracle, ours):
+        return
+    if oracle.code != 0 and all(c.passed for c in checks.checks):
+        text = " ".join(oracle.stderr.split())[:160]
+        raise Outcome(
+            BOTH_ERROR,
+            f"fslmaths exits {oracle.code}; the same from the original."
+            + (f" {text}" if text else ""),
+        )
+
+
+# ------------------------------------------------------------------------------------------------
+# The original's own cases (paths the replica suite's inputs do not reach)
+
+
+def own_inputs() -> Path:
+    """The original's own synthetic inputs, made once (fixed bytes): ``ramp16`` (16 x 13 x 11,
+    ``x + 20 y + 400 z``), ``ramp25`` (25 x 25 x 25, ``x + 30 y + 900 z``), ``rampnan`` (its
+    first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel, ``1 + x + 3 y + 7 z``); for ``-roc``:
+    ``rocramp`` (6 x 5 x 4 x 2, ``x + 6 y + 30 z + 120 t``: its minimum lies in the truth's
+    region), ``roctruthx`` (1 where x < 3, else 0), ``roctruthneg5`` (the same with its x = 5
+    plane -0.0005: inside the mask, below 0); the sform's voxel sizes of ``fsl_maths_replica``."""
+    ws = rep.workspace()
+    base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
+    marker = base / "v3.done"
+    if marker.exists():
+        return base
+    base.mkdir(parents=True, exist_ok=True)
+    x, y, z = np.meshgrid(np.arange(16), np.arange(13), np.arange(11), indexing="ij")
+    ramp = (x + 20 * y + 400 * z).astype(np.float32)
+    rep._save(base / "ramp16.nii.gz", ramp, dtype=np.float32, affine=rep._affine(ramp.shape))
+    x, y, z = np.meshgrid(np.arange(25), np.arange(25), np.arange(25), indexing="ij")
+    ramp25 = (x + 30 * y + 900 * z).astype(np.float32)
+    rep._save(base / "ramp25.nii.gz", ramp25, dtype=np.float32, affine=rep._affine(ramp25.shape))
+    nan = ramp.copy()
+    nan[0, 0, 0] = np.nan
+    rep._save(base / "rampnan.nii.gz", nan, dtype=np.float32, affine=rep._affine(nan.shape))
+    x, y, z = np.meshgrid(np.arange(13), np.arange(11), np.arange(9), indexing="ij")
+    asym = (1 + x + 3 * y + 7 * z).astype(np.float32)
+    rep._save(base / "asym.nii.gz", asym, dtype=np.float32, affine=rep._affine(asym.shape))
+    x, y, z, t = np.meshgrid(*(np.arange(n) for n in (6, 5, 4, 2)), indexing="ij")
+    rr = (x + 6 * y + 30 * z + 120 * t).astype(np.float32)
+    rep._save(base / "rocramp.nii.gz", rr, dtype=np.float32, affine=rep._affine(rr.shape[:3]))
+    tx = np.zeros((6, 5, 4), np.float32)
+    tx[:3] = 1.0
+    rep._save(base / "roctruthx.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
+    tx[5] = -0.0005
+    rep._save(base / "roctruthneg5.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
+    marker.write_text("1\n", encoding="utf-8")
+    return base
+
+
+def _prepare(run: rep.Run, tmp: Path) -> list[str]:
+    """The run's arguments in ``tmp``: ``@orig:<name>`` one of :func:`own_inputs`, the rest as
+    the replica suite prepares them."""
+    if not any(a.startswith("@orig:") for a in run.args):
+        return rep._prepare(run, tmp)
+    out: list[str] = []
+    for a in run.args:
+        if a.startswith("@orig:"):
+            src = own_inputs() / f"{a[len('@orig:') :]}.nii.gz"
+            shutil.copy(src, tmp / src.name)
+            out.append(src.name)
+        else:
+            out.extend(rep._prepare(rep._r(a), tmp))
+    return out
+
+
+def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
+    T = "standard"
+    return {
+        "orig/fft-asym": (
+            T,
+            "FSL-192: -kernel file (asymmetric, 13 x 11 x 9) -fmeanu of a 16 x 13 x 11 image "
+            "(FSL's FFT path: a true convolution, the kernel mirrored; the default keeps the "
+            "direct sum's orientation)",
+            rep._r("@orig:ramp16", "-kernel", "file", "@orig:asym", "-fmeanu", "out"),
+        ),
+        "orig/direct-asym": (
+            T,
+            "the same kernel -fmeanu of a 25 x 25 x 25 image (FSL's direct sum: a correlation, "
+            "the kernel as stored; FSL-192's reference orientation)",
+            rep._r("@orig:ramp25", "-kernel", "file", "@orig:asym", "-fmeanu", "out"),
+        ),
+        "orig/fft-nan-local": (
+            T,
+            "FSL-191: -kernel boxv 11 -fmeanu (FSL's FFT path) of an image with one NaN voxel "
+            "beyond the kernel's reach of most voxels",
+            rep._r("@orig:rampnan", "-kernel", "boxv", "11", "-fmeanu", "out", fixed="FSL-191"),
+        ),
+        "orig/roc-ramp": (
+            T,
+            "-roc -2 without a noise image: the rate never reaches 2 and the last true-positive "
+            "rate is below 1 (the image's minimum is a true voxel: the area's last rectangle)",
+            rep._r("@orig:rocramp", "-roc", "-2", "roc.txt", "@orig:roctruthx", "out"),
+        ),
+        "orig/roc-ramp-noise": (
+            T,
+            "-roc 2 with the same image as its noise: the FWE rate never reaches 2, the last "
+            "true-positive rate below 1",
+            rep._r(
+                "@orig:rocramp", "-roc", "2", "roc.txt", "@orig:rocramp", "@orig:roctruthx", "out"
+            ),
+        ),
+        "orig/roc-below-zero": (
+            T,
+            "-roc -0.5 with truth voxels of -0.0005 (inside the mask, below 0: false-positive "
+            "candidates)",
+            rep._r("@orig:rocramp", "-roc", "-0.5", "roc.txt", "@orig:roctruthneg5", "out"),
+        ),
+        "orig/roc-truth4d": (
+            T,
+            "-roc with a 4D truth image (its first volume, with the image library's warning)",
+            rep._r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise", "@rocim", "out"),
+        ),
+        "orig/roc-nodir": (
+            T,
+            "FSL-193: -roc with a curve file in a folder that does not exist (FSL writes no "
+            "curve and says nothing; the default stops with an error)",
+            rep._r("@rocim", "-roc", "-0.05", "nodir/roc.txt", "@roctruth", "out"),
+        ),
+    }
+
+
+# ------------------------------------------------------------------------------------------------
+# Cases
+
+
+def _run_case(run: rep.Run, checks: CheckList) -> None:
+    settings = dict(run.settings)
+    if run.undefined:
+        for mode in (defects.REPRODUCE, defects.FIX):
+            with tempfile.TemporaryDirectory(prefix="lx-maths-") as b_:
+                b = Path(b_)
+                args = _prepare(run, b)
+                r = run_original(args, cwd=b, settings=settings, mode=mode)
+                checks(
+                    f"{run.undefined}: the original refuses ({mode})",
+                    r.code == 1 and run.undefined in r.stderr,
+                    detail=f"exit {r.code}: {r.stderr[-200:]}",
+                )
+        return
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-maths-") as a_,
+        tempfile.TemporaryDirectory(prefix="lx-maths-") as b_,
+    ):
+        a, b = Path(a_), Path(b_)
+        args = _prepare(run, a)
+        _prepare(run, b)
+        before = set(_files(b, set()))
+        ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
+        oracle = rep.run_oracle(args, cwd=a, settings=settings)
+        compare(checks, oracle, ours, a, b, before, args)
+        if run.fix and ours.code == 0:
+            fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours, before)
+    _agree_on_errors(checks, oracle, ours)
+    if run.fixed:
+        with tempfile.TemporaryDirectory(prefix="lx-maths-") as c_:
+            c = Path(c_)
+            args = _prepare(run, c)
+            r = run_original(args, cwd=c, settings=settings, mode=defects.FIX)
+            checks(
+                f"{run.fixed}: the default gives an output and names the defect",
+                r.code == 0 and run.fixed in r.stderr and any(c.glob("out*")),
+                detail=f"exit {r.code}: {r.stderr[-200:]}",
+            )
+
+
+def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
+    run, node = payload
+    args = rep.fmriprep_args(run, Path(node))
+    missing = [x for x in args if x.startswith("/") and not Path(x).exists()]
+    if missing:
+        raise Outcome(SKIPPED, f"input not available: {missing[0]}")
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-maths-fp-") as a_,
+        tempfile.TemporaryDirectory(prefix="lx-maths-fp-") as b_,
+    ):
+        a, b = Path(a_), Path(b_)
+        oracle = rep.run_oracle(args, cwd=a, settings={})
+        ours = run_original(args, cwd=b, settings={}, mode=defects.REPRODUCE)
+        compare(checks, oracle, ours, a, b, set(), args)
+        if oracle.code == 0 and ours.code == 0:
+            fix_pass(checks, lambda t: None, args, {}, b, ours, set())
+    _agree_on_errors(checks, oracle)
+
+
+def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
+    import json
+
+    run, node = payload
+    base = rep._goodvoxels_chain(run)
+    if base is None:
+        raise Outcome(SKIPPED, f"the oracle run {run} is not available")
+    values = json.loads((base / "values.json").read_text(encoding="utf-8"))
+    files = {"bold": rep._goodvoxels_sources(run)[0], "ribbon": base / "ribbon.nii.gz"}
+    for n, prog, _ in rep.GOODVOXELS_STEPS:
+        if prog == "fslmaths":
+            files[n] = base / n / f"{n}.nii.gz"
+    template = next(t for n, _, t in rep.GOODVOXELS_STEPS if n == node)
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-maths-gv-") as a_,
+        tempfile.TemporaryDirectory(prefix="lx-maths-gv-") as b_,
+    ):
+        a, b = Path(a_), Path(b_)
+        args = [*rep._goodvoxels_args(template, files, values, a), f"{node}.nii.gz"]
+        rep._goodvoxels_args(template, files, values, b)
+        before = set(_files(b, set()))
+        ours = run_original(args, cwd=b, settings={}, mode=defects.REPRODUCE)
+        oracle = rep.run_oracle(args, cwd=a, settings={})
+        compare(checks, oracle, ours, a, b, before, args)
+        if oracle.code == 0 and ours.code == 0:
+
+            def prepare(t: Path) -> None:
+                rep._goodvoxels_args(template, files, values, t)
+
+            fix_pass(checks, prepare, args, {}, b, ours, before)
+    _agree_on_errors(checks, oracle)
+
+
+def cases(tier: str) -> list[Case]:
+    from larmorx_validation.parity.harness import in_tier
+
+    out = list(rep.cases(tier))
+    for name, (t, desc, _run) in _own_cases().items():
+        if in_tier(t, tier):
+            out.append(Case(name, "orig", desc, ("own", name)))
+    return out
+
+
+def run_case(case: Case, checks: CheckList) -> None:
+    kind, payload, *expected = case.payload
+    if kind == "fmriprep":
+        _fmriprep_case(payload, checks)
+    elif kind == "goodvoxels":
+        _goodvoxels_case(payload, checks)
+    elif kind == "direct":
+        _run_case(payload, checks)
+    elif kind == "own":
+        _run_case(_own_cases()[payload][2], checks)
+    else:
+        _run_case(rep._cases()[payload][2], checks)
+    # a permanent case of random testing expected to diverge carries its reason
+    _expected_divergence(checks, case.id, expected[0] if expected else None)
+
+
+def suite() -> Suite:
+    import larmorx
+
+    return Suite(
+        name=SUITE,
+        title="fslmaths (clean-room original)",
+        tool=f"`larmorx fsl fslmaths` (larmorx {larmorx.__version__}, crate larmorx-fsl: the "
+        "clean-room original written from specs/fslmaths.md, Apache-2.0)",
+        reference="fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6), the conda build at "
+        "`~/fsl-6.0.7.23`, as built: glibc 2.35's maths",
+        thresholds=[
+            ("Exit status", "the same (FSL's crash or abort: the original exits 1)"),
+            (
+                "Standard output and error",
+                "identical (the run directory replaced; the original's `larmorx` lines left out)",
+            ),
+            ("Files written", "the same names"),
+            ("Headers", "byte for byte (`descrip` left out)"),
+            (
+                "Values",
+                "bit for bit; double-precision functions within one unit in the last place per "
+                "function of the chain (GLIBC-07); the sums (-s, -fmean, -fmeanu, -dilM, "
+                "-dilall, -edge, -subsamp2, -subsamp2offc, -inm, -ing, means, standard "
+                "deviations, ar1, -ranknorm, -bptf, -ztop, -ptoz) in floating types: the largest "
+                "difference at most 1e-5 of FSL's largest magnitude and 99 % of the voxels within "
+                "4 units in the last place, the NaN and infinite voxels identical (§21); "
+                "-tensor_decomp's eigenvalues, FA and MD within 1e-5 relative, its mode 1e-4 "
+                "absolute, its eigenvectors up to their sign (|cos| >= 0.9999) where the "
+                "eigenvalues are distinct by more than 1e-4 relative; -roc's printed area and "
+                "quartiles within 1e-5 absolute, its curve's numbers to 5 significant digits",
+            ),
+            (
+                "TFCE",
+                "-tfce's values within 1e-5 of FSL's largest enhancement, the NaN and infinite "
+                "voxels identical (§21); -tfceS bit for bit",
+            ),
+            (
+                "FSL-75's heap corruption",
+                "where FSL ended by a signal (-subsamp2's unused background value corrupts its "
+                "heap for some sizes) and the original finished naming FSL-75: the outputs "
+                "compared, the exit status and glibc's message not",
+            ),
+            ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
+        ],
+        cases=cases,
+        run_case=run_case,
+        packages=("nibabel",),
+        notes=(
+            "The cases are the replica suite's (`fsl-maths-replica`); FSL's runs are served from "
+            "the oracle cache under that suite's keys. The original is compared in `reproduce` "
+            "mode (D13) and its default `fix` pass against the reproduced run. The goodvoxels "
+            "chain's ribbon is a stand-in: the segmentation's grey matter (the no-reconall runs "
+            "have no FreeSurfer ribbon).\n\n"
+            "Random testing (one trial, 2026-11-03, "
+            "`<workspace>/oracles/difftest/2026-11-03-fsl-maths-original`: 20 minutes on 13 "
+            "workers, realistic cases only, FSL through the oracle cache): 150,000 chains of "
+            "fslmaths operations, 143,191 identical, 804 differing only by a named correction, "
+            "6,005 differing. Each of these re-run with the final build and triaged by category "
+            "(`validation/investigations/cleanroom-maths/trial_triage.json`, one reproducer per "
+            "category): 4,623 larmorx mistakes fixed (findings 24 to 30 of "
+            "`docs/findings/fsl-maths-original.md`; their 17 permanent cases in "
+            "`validation/difftest/cases/fsl-maths-original/`) and 58 chains those fixes reach; 96 "
+            "corrections of the suite's checks; 1,178 explained (-tensor_decomp of degenerate "
+            "tensors, the header's offsets after a grid change within 6 units in the last place, "
+            "-subsamp2's last bits under the floating types, the last bits of Φ and Φ⁻¹ in "
+            "-ztop, -ptoz and double -randn, -dog_edge's crossings at exact ties, sums cancelling "
+            "to near 0, signed zeros); 33 expected (-subsamp2offc's means, as this suite's two "
+            "cases); 7 registered (FSL-75: FSL's heap corruption ends it before it writes; the "
+            "original names it); **10 open**: 8 display ranges (`cal_min`, `cal_max`) after "
+            "-range that differ in their last bits (4 under `-dt double`, 1 under `-dt input`, 2 "
+            "after a sum; e.g. `fsl-maths-trial-41014-original`) or where FSL writes "
+            "-2147483648 and the original NaN (`fsl-maths-trial-100080-original`), and 2 of "
+            "-roc's curve numbers 5e-7 and 2.4e-7 from FSL's, beyond half a unit of the 5th "
+            "digit (`fsl-maths-trial-54988-original`, `fsl-maths-trial-76339-original`); the "
+            "findings' files are in the trial's `findings/fsl-maths-original/`."
+        ),
+    )
+
+
+__all__ = ["suite"]

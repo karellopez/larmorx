@@ -39,6 +39,43 @@ pub fn f(v: f64) -> String {
     format!("{v:.6}")
 }
 
+/// A double as nlohmann/json writes it (§6.2 of `specs/fslstats.md`): the shortest decimal
+/// that reads back to the same double; fixed notation from 1e-4 to below 1e15 (an integral
+/// value with `.0`), else `d.ddde+XX` (at least two exponent digits); `null` for NaN and the
+/// infinities.
+pub fn json(v: f64) -> String {
+    if !v.is_finite() {
+        return "null".into();
+    }
+    if v == 0.0 {
+        return if v.is_sign_negative() { "-0.0" } else { "0.0" }.into();
+    }
+    // the shortest round-trip digits and the decimal exponent: v = 0.d1d2... x 10^n
+    let sci = format!("{:e}", v.abs());
+    let (mant, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let digits: String = mant.chars().filter(char::is_ascii_digit).collect();
+    let n = exp.parse::<i32>().unwrap_or(0) + 1;
+    let k = digits.len() as i32;
+    let sign = if v < 0.0 { "-" } else { "" };
+    let body = if k <= n && n <= 15 {
+        format!("{digits}{}.0", "0".repeat((n - k) as usize))
+    } else if 0 < n && n <= 15 {
+        format!("{}.{}", &digits[..n as usize], &digits[n as usize..])
+    } else if -4 < n && n <= 0 {
+        format!("0.{}{digits}", "0".repeat((-n) as usize))
+    } else {
+        let e = n - 1;
+        let es = if e < 0 { '-' } else { '+' };
+        let m = if k == 1 {
+            digits.clone()
+        } else {
+            format!("{}.{}", &digits[..1], &digits[1..])
+        };
+        format!("{m}e{es}{:02}", e.abs())
+    };
+    format!("{sign}{body}")
+}
+
 fn strip(s: &str) -> &str {
     if s.contains('.') {
         s.trim_end_matches('0').trim_end_matches('.')
@@ -61,5 +98,16 @@ mod tests {
         assert_eq!(g(1e-5), "1e-05");
         assert_eq!(g(f64::NAN), "nan");
         assert_eq!(f(157.874776), "157.874776");
+        // nlohmann's forms (specs/fslstats.md §6.2; values fslstats -json printed, observed)
+        assert_eq!(json(7.13116826237859), "7.13116826237859");
+        assert_eq!(json(f64::from(-1.129_077_f32)), "-1.1290769577026367");
+        assert_eq!(json(3150.0), "3150.0");
+        assert_eq!(json(16842496.0), "16842496.0");
+        assert_eq!(json(1e20), "1e+20");
+        assert_eq!(json(1.5e-5), "1.5e-05");
+        assert_eq!(json(1e-4), "0.0001");
+        assert_eq!(json(1e15), "1e+15");
+        assert_eq!(json(123456789012345.0), "123456789012345.0");
+        assert_eq!(json(f64::NAN), "null");
     }
 }

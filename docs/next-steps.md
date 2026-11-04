@@ -568,6 +568,32 @@ The items below keep their history.
    series, GLIBC-07 on a real image, every option of fslstats on a real image.
    `specs/fslmaths.md` and `specs/fslstats.md` for the clean-room originals. The full tier, the
    data panel and long random testing wait for the final validation phase.
+   **fslmaths and fslstats: the clean-room originals done (2026-11-04, relays 1 to 7 and 6b).**
+   `crates/larmorx-fsl`'s `maths` (fslmaths' kernels, filters, reductions, statistics, ROC,
+   TFCE, the tensor) and `cli::fslmaths`, `cli::fslstats`, from `specs/fslmaths.md`,
+   `specs/fslstats.md`, FSL's usage texts and black-box runs (no FSL source): every operation,
+   option, data type, message, exit status and failure case of both programs; `lx.fsl.fslmaths`,
+   `lx.fsl.fslstats` and their typed wrappers with `implementation="original"` (and `auto`
+   without `larmorx-nc`). Built for speed: rows of voxels in parallel, fixed-order sums (the same
+   bits at any thread count), one copy of the image, the direct sum where FSL takes its FFT (its
+   products in double precision there); goodvoxels' chain 4.5 times FSL's speed with half its
+   memory, the heavy operations 1.8 to 28 times on one thread and up to 268 times on 14
+   ([benchmark](benchmarks/fsl-maths.md)). Records
+   [fsl-maths](validation/fsl-maths.md): 442 cases, 374 within §21's thresholds (358 FSL's values
+   in every file, fMRIPrep's four combine_masks calls and the goodvoxels mask's fourteen
+   included), 63 rejected by both, 5 expected divergences (FSL's single-precision FFT on 3
+   kernels, `-subsamp2offc` on 2);
+   [fsl-stats](validation/fsl-stats.md): 162 cases, 125 identical, BET's `-C` within §10's bound
+   (6.1e-8), 36 rejected by both. New defects from black-box runs: FSL-191 (FSL's FFT path makes
+   a volume NaN), FSL-192 (its kernel mirrored), FSL-193 (`-roc`'s unwritable curve, rule B);
+   FSL-187's switch in BET's and FLIRT's originals. One trial (20 minutes, 300,000 cases, FSL
+   through the cache): 5,168 of the original's mistakes fixed (21 permanent cases), 10 open;
+   golden: 9 cases (224 outputs); memory: 6 calls; thread test: every parallel path. topup's
+   Windows file names done (below). Site pages with both implementations; findings 1 to 31 of
+   `docs/findings/fsl-maths-original.md` (31: on a large kernel a single-precision direct sum
+   is less accurate than FSL's FFT, beyond §21's bound on the page's real call; the original's
+   double sums there, 2026-11-04, lie closer to the exact result than FSL's FFT, 2.0e-7 of FSL's
+   largest value from FSL's output).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -754,7 +780,10 @@ The items below keep their history.
   (the suite's `_random_band`, through the oracle cache: about 80 runs of seconds) would classify
   them. Its record's notes still say that options the original does not take are skipped (0 are):
   the suite's text, to correct when the record is next made.
-- **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge): the replica
+- **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge; **done**
+  2026-11-03 by fslmaths' clean-room part, relay 6: `cli::common::name_start`, `\` a separator on
+  Windows only in topup's default stem, its configuration's directory test and applytopup's
+  extension test, unit tests under a folder whose name holds a dot): the replica
   treats `\` as a directory separator on Windows only (ccd50d0, `docs/api/fsl-topup.md`); the original
   splits `--imain`'s default output stem and the configuration's "has a directory" test at `/` only, and
   applytopup's "has an extension" test treats `\` as a separator on Linux and macOS too, where FSL does
@@ -779,11 +808,24 @@ The items below keep their history.
     `reproduce` (the record's `fn/double-tan` and the permanent case `fft-twiddles-glibc-sincos`
     then pass bit for bit). "glibc's bits" means the FMA builds (decided 2026-11-03; the other
     build differs, a variant to note); `exp`, `log` and `pow` already reproduce them.
-  - **The clean-room originals of fslmaths and fslstats** from `specs/fslmaths.md` and
-    `specs/fslstats.md` (the roadmap's next FSL step, beside the next replica); and BET's and
-    FLIRT's clean-room originals checked for FSL-187's behaviour (a value far above the robust
-    range's histogram counted in its first bin): the corrected last bin by default, FSL's with
-    `reproduce`, as the replicas do.
+  - **The clean-room originals of fslmaths and fslstats**: done 2026-11-04 (item 7), with
+    FSL-187's switch and notice in BET's and FLIRT's clean-room originals (their defaults
+    unchanged; no record input reaches it).
+  - **Their follow-ups** (2026-11-04; the first one found, the direct sum in double precision
+    where FSL takes its FFT, findings 31, done in the part's relay 7b with the record re-made):
+    (1) the original's `reproduce` gives glibc's `exp`, `log` and `pow` bits
+    as §19 asks (Arm's Optimized Routines, MIT: a port into `larmorx_core::math`), today
+    correctly rounded in both modes; (2) correctly rounded `erf` and `erfc` in
+    `larmorx_core::math` (the original's `-ztop` uses the `libm` crate's, within rule 5);
+    (3) larmorx-io's parallel gzip writer holds two 256 KiB blocks and their outputs per worker
+    (about 3 MiB each): 4D outputs at 32 threads exceed FSL's memory allowance (one block per
+    worker would halve it); (4) runtime SIMD dispatch in `larmorx-fsl` (an audited `unsafe`
+    module: 1.26 to 1.34 times on the large convolutions, measured with an x86-64-v3 build);
+    (5) the replica's `-bptf` is 2.9 times slower than FSL (5.26 s against 1.82); (6) the replica
+    follow-ups FSL-191, FSL-192, FSL-193 (its default to correct, `reproduce` FSL's); (7) the
+    replica suite's `fsltest/` cases (FSL's own tests, in its source tree) against the original
+    at a merge (a check outside the clean room), if wanted; (8) the spec questions of the
+    part's handoff (13, 14, 20, 26 to 38) for a spec-answers part.
   - **goodvoxels with a real ribbon:** the goodvoxels calls ran with a stand-in for the cortical
     ribbon (the segmentation's grey matter); re-check them once an fMRIPrep oracle run with
     FreeSurfer's reconstruction exists.

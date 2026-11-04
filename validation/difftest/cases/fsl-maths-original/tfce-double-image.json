@@ -1,0 +1,153 @@
+{
+ "defect": null,
+ "description": "-tfce of a float64 image: FSL's single-precision result (findings 26)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.zst: values bit for bit: 351 differ; first at [128, 141, 145]: FSL [203.34616088867188, 264.9856262207031, 106.91120147705078] / original [203.3458251953125, 264.9853515625, 106.9110336303711]",
+  "n": 2984,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.zst: values bit for bit"
+  ]
+ },
+ "id": "tfce-double-image",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_ZST",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "double",
+   "-odt": false,
+   "-tfceS": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_ZST",
+   "chain": 1,
+   "content": "noise",
+   "dtype": "float64",
+   "extreme": false,
+   "family": "tfce",
+   "kind": "zmap",
+   "offset": 120.0,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": 10.25,
+   "origin1": -40.5,
+   "origin2": 13.75,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "negative",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "12x20x6",
+   "size0": 12,
+   "size1": 20,
+   "size2": 6,
+   "spacing0": 1.5,
+   "spacing1": 1.2,
+   "spacing2": 1.0,
+   "suffix": ".nii.gz",
+   "tfce": 0,
+   "units": "unknown",
+   "zmap dtype": "float64"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "double"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-tfce",
+     "2",
+     "0.5",
+     "6"
+    ],
+    "name": "-tfce",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "seed": 928401558,
+     "type": "noise"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      10.25,
+      -40.5,
+      13.75
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      -1,
+      1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.5,
+      1.2,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     20,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": -2.5,
+     "scale": 0.05
+    }
+   }
+  },
+  "n": 2984,
+  "options": [
+   "-dt double",
+   "-tfce",
+   "FSLOUTPUTTYPE=NIFTI_ZST",
+   "kind zmap"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

@@ -15,10 +15,39 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 under the FSL Licence's terms; translated from FSL's source with the image library's arithmetic,
 statistics, kernels, filters, FFT and probability functions in `larmorx-nc-core`:
 [PROVENANCE](../../crates-nc/larmorx-nc-avwutils/PROVENANCE.md)), done (2026-11-03), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/fslmaths.md`](../../specs/fslmaths.md). Until then every function runs the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
+clean-room **original** in the main package (Apache-2.0, `crates/larmorx-fsl`'s `maths`,
+written from [`specs/fslmaths.md`](../../specs/fslmaths.md), FSL's documentation and black-box
+runs of FSL's program: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in progress since
+2026-11-03: it takes the command line, every data type, the binary operations, thresholds,
+masks, voxelwise functions, `-rand`, `-seed`, `-index` and `-grid` (relay 1), the kernels, the
+morphological filters, `-dilall`, the convolutions (`-s`, `-fmean`, `-fmeanu`), `-subsamp2`,
+`-subsamp2offc`, `-edge`, `-dog_edge`, `-fillh`, `-fillh26`, `-inm` and `-ing` (relay 2), the
+reductions along T, X, Y, Z, `-roi`, `-bptf`, `-ztop`, `-ptoz`, `-pval`, `-pval0`, `-cpval`,
+`-rank`, `-ranknorm`, `-randn`, TFCE (`-tfce`, `-tfceS`, `-tfce_minT`, `-tfce_delta`) and
+`-tensor_decomp` (relay 3; its eigenvectors' signs are its own: each one's largest component
+positive, where FSL's are LAPACK's) and `-roc` (relay 4): every operation of the usage text and
+the hidden ones. Random testing (relay 6) corrected the geometry of a new grid along x
+(`-subsamp2`, `-subsamp2offc` and the reductions along X of an image FSL holds mirrored, or with
+a matrix unset), the morphological filters with a kernel image (FSL's off-centre warning goes by
+the kernel's sizes; a kernel without a value at or above 0.5 leaves every voxel as it is,
+silently), TFCE's checks in FSL's order, `-edge`'s and the subsampling's sums under the integer
+types (C's promoted arithmetic: they do not wrap), `-roc`'s false-positive candidates (the
+mask's voxels below the true voxels' bound) and `-ptoz`'s NaN (its sign flipped, as FSL's), and
+names FSL-154 for every uint8 image computed unsigned, FSL-157 for every int8 image written with
+`-odt input`, FSL-165 for `-fillh` and `-fillh26` of every image with an axis of size 1, and
+FSL-75 (below) in both modes ([findings](../findings/fsl-maths-original.md) 24 to 30). Where FSL
+convolves a large kernel by
+its FFT, the original computes the convolution by the direct sum (faster than FSL's FFT on
+every kernel the benchmarks measured), its products added in double precision and the sum
+rounded once there (where FSL sums directly, FSL's single-precision sum, bit for bit), in the
+direct sum's orientation by default (FSL-192) and FSL's mirrored one with `reproduce` (then
+within 2.0e-7 of FSL's largest value on the record's cases and on the site's real call `-kernel
+sphere 21 -fmean` of a BOLD mean, 1,313 kernel voxels; closer to the exact result than FSL's
+single-precision FFT: 7.9e-8 of its largest value against FSL's 1.5e-7 there, findings 31).
+`implementation="auto"`
+(the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
+`"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
+original in this process on `n_threads` threads (its results the same at any count). The
 command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
@@ -40,6 +69,31 @@ fixes, but one, an FFT convolution of a 30 x 1 x 3 image one unit in the last pl
 voxels (the FFT's twiddle factors, which FSL takes from glibc's `sincos`: GLIBC-07, below; with
 FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of a correction
 whose effect a later operation of the chain removed.
+
+The original against FSL 6.0.7.23 (the parity suite `fsl-maths`, record
+[fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-04, §21's thresholds): 442 cases
+(the replica suite's cases, the original's own `orig/` cases and 17 permanent cases of random
+testing), 374 within the thresholds, 63 rejected by both alike, 5 expected divergences, 0
+failures. Of the 374, 358 identical to FSL's outputs (data, header, messages, exit status):
+fMRIPrep's mask combination on its three oracle runs and its 14 goodvoxels calls on ds005040
+among them (the `-s 5` at 3 × 3 × 3.3 mm too; the ribbon a stand-in, as above); 3 of
+`-tensor_decomp` identical but for the eigenvectors' signs (the original's own convention,
+compared up to the sign); 13 within the thresholds: 11 sums (FSL's FFT path on four kernels,
+`-subsamp2` under the floating types, the double `-ztop` and `-ranknorm`) at most 2.0e-7 of
+FSL's largest value, `fn/double-tan` one unit in the last place in its double values (glibc's
+`tan`, GLIBC-07), one `-roc` area 1e-7 from FSL's. The 5 expected divergences (FSL's
+single-precision FFT convolution against the original's double sums on 3 kernels,
+`-subsamp2offc`'s means on 2 cases) stay inside the sums' bound (at most 1.1e-7 of FSL's
+largest value) and miss only its share of voxels within 4 units in the last place (spec
+questions 13 and 14), each with its reason in the record; on the FFT cases the original lies
+closer to the exact result than FSL's FFT (findings 31). Before the double sums of 2026-11-04
+(the record of 2026-11-03), 372 within the thresholds and 7 expected divergences, the FFT cases
+up to 2.6e-6 of FSL's largest value. Random testing's trial (2026-11-03, 20 minutes: 150,000 realistic chains): 143,191
+identical, 804 differing only by a named correction; of the 6,005 others, 4,681 fixed by the
+part's corrections (above), 96 by corrections of the suite's checks, 1,178 explained, 33
+expected (`-subsamp2offc`), 7 FSL-75's heap corruption in FSL, and 10 open (8 display ranges
+after `-range` in their last bits, 2 `-roc` curve numbers 2.4e-7 and 5e-7 from FSL's: the
+record's notes name their reproducers).
 
 ## Quick start
 
@@ -125,7 +179,7 @@ unless said:
 | `-tensor_decomp` | `tensor_decomp(image)` → `TensorDecomposition` (`image`, `l1`, `l2`, `l3`, `fa`, `md`, `mo`, `v1`, `v2`, `v3`) | eigenvalues, FA, MD, mode and eigenvectors of a 6-volume tensor image |
 | `-dt <type>`, `-odt <type>` | `dt=`, `odt=` (`DATATYPES`: `"char"`, `"short"`, `"int"`, `"float"`, `"double"`, `"input"`) | the type the chain computes in (float, or double for a double image) and the output's (float, or double) |
 | `-save`, `-restart`, `-pow`, `-invbin`, chains | `fslmaths(image, *operations)` | any command line |
-| | `implementation` | `"auto"`, `"replica"` (`"original"`: not yet) |
+| | `implementation` | `"auto"`, `"replica"`, `"original"` (the original's operations so far: above) |
 | | `upstream_defects` | `"fix"` (default) or `"reproduce"`: FSL's defects as FSL has them (below) |
 
 The typed wrappers check their arguments (`ValueError`: an unknown name, a non-finite number, a
@@ -215,14 +269,38 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   support's arrays and a voxel outside the image: corrected or refused.
 - **FSL-179**, **FSL-180**: `-roc` with a noise image of another size, or without true or noise
   voxels: errors.
+- **FSL-193** (the clean-room original's black-box runs): `-roc` with a curve file that cannot be
+  written (a folder that does not exist) writes no curve and says nothing: an error.
+- **FSL-191** (the clean-room original's black-box runs): with a kernel large enough for FSL's
+  FFT convolution, `-fmean` and `-fmeanu` make the whole volume NaN when one voxel is NaN or
+  infinite: NaN only within the kernel's reach, as FSL's direct sum for smaller kernels gives.
+- **FSL-192** (the clean-room original's black-box runs): with a kernel large enough for FSL's
+  FFT convolution, `-fmean` and `-fmeanu` apply the kernel mirrored along every axis, where FSL's
+  direct sum (smaller kernels, larger images) applies it as stored: the direct sum's orientation
+  at every size (kernels that are not point-symmetric, or of an even size, only).
 - **FSL-187** (shared with fslstats, BET and FLIRT): the robust range counts a value far above a
   histogram's range in its first bin: the last (none of fMRIPrep's inputs reaches it, measured).
+- **FSL-75** (shared with FLIRT and mcflirt): `-subsamp2` and `-subsamp2offc` compute a background
+  value they never use, which for some sizes (3 voxels along x and 2 or more along y or z, ...)
+  corrupts FSL's memory: FSL then aborts (`double free or corruption`), crashes or finishes after
+  writing its output, depending on its heap. No output voxel depends on it: the original names it
+  in both modes and writes the output.
 - **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle
   factors, are not correctly rounded (above).
 
 ## Not yet
 
-- The clean-room original (`implementation="original"`), from `specs/fslmaths.md`.
+- The clean-room original's 10 open differences of random testing (the record's notes) and
+  the spec questions of its findings.
+- The clean-room original's reproduce mode computes `exp`, `log` and `pow` correctly rounded as
+  its default does, where `specs/fslmaths.md` §19 asks glibc's bits of it (GLIBC-07): its
+  double outputs then differ from FSL's by one unit in the last place in a few values (110 of
+  136,400 for `exp` and 15 for `log` on the site's real image), within its record's threshold.
+  glibc 2.35's `exp`, `log` and `pow` are Arm's Optimized Routines (MIT): a follow-up. Its speed: the
+  [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 28 times faster than FSL on one thread, up to
+  268 times on 14; the direct sum, in double precision where FSL takes its FFT, outruns FSL's
+  FFT on every kernel measured, so the original has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)
+  is a follow-up.
 - zstd and bzip2 inputs (FSL 6.0.7.23's newer formats) are decompressed whole before they are
   read, so they take about twice the memory of gzip ones (fMRIPrep writes neither).
 - The goodvoxels mask with a real cortical ribbon (it needs a FreeSurfer oracle run), the full

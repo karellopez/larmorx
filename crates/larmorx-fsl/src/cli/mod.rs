@@ -22,6 +22,8 @@ pub mod extracttxt;
 pub mod fast;
 pub mod flirt;
 pub mod fmt;
+pub mod fslmaths;
+pub mod fslstats;
 pub mod makerot;
 pub mod midtrans;
 pub mod options;
@@ -59,6 +61,8 @@ pub const TOOLS: &[&str] = &[
     "fast",
     "topup",
     "applytopup",
+    "fslmaths",
+    "fslstats",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -183,6 +187,8 @@ pub fn run_with(
         "fast" => Some(fast::main(args, settings, out, err)),
         "topup" => Some(topup::main(args, settings, out, err)),
         "applytopup" => Some(applytopup::main(args, settings, out, err)),
+        "fslmaths" => Some(fslmaths::main(args, settings, out, err)),
+        "fslstats" => Some(fslstats::main(args, settings, out, err)),
         _ => None,
     }
 }

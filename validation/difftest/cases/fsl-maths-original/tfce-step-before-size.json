@@ -1,0 +1,172 @@
+{
+ "defect": null,
+ "description": "-tfce of a thin image without positive values: the step's message first (findings 26)",
+ "expect": "pass",
+ "found": {
+  "detail": "standard error: line 1: FSL 'ERROR: TFCE failed, please check your file for valid sizes and voxel values.Error: tfce requires a positive deltaT input.' / original 'ERROR: TFCE failed, please check your file for valid sizes and voxel values.Error: tfce currently requires an input with at least 3 voxe",
+  "n": 681,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "standard error"
+  ]
+ },
+ "id": "tfce-step-before-size",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": true,
+   "-dt value": "float",
+   "-odt": false,
+   "-tfceS": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.9,
+   "axis1": 1.15,
+   "axis2": 0.8,
+   "blobs": 2,
+   "centre0": -3.5,
+   "centre1": -0.5,
+   "centre2": -4.5,
+   "chain": 1,
+   "content": "blobs",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "tfce",
+   "kind": "general",
+   "one slice": true,
+   "orientation": "axes+oblique",
+   "origin0": 9.25,
+   "origin1": 53.5,
+   "origin2": 51.75,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "7x26x1",
+   "size": 8.5,
+   "size0": 7,
+   "size1": 26,
+   "size2": 25,
+   "spacing0": 1.0,
+   "spacing1": 0.5,
+   "spacing2": 1.0,
+   "specials": false,
+   "suffix": ".nii",
+   "tfce": 2,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-dt",
+     "float"
+    ],
+    "name": "-dt",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-tfce",
+     "1",
+     "0.5",
+     "18"
+    ],
+    "name": "-tfce",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      0.9,
+      1.15,
+      0.8
+     ],
+     "centre": [
+      -3.5,
+      -0.5,
+      -4.5
+     ],
+     "n": 2,
+     "seed": 359072279,
+     "size": 8.5,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      9.25,
+      53.5,
+      51.75
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      44,
+      32,
+      -40,
+      -40
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.0,
+      0.5,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     26,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 681,
+  "options": [
+   "-dt float",
+   "-tfce",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind general"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

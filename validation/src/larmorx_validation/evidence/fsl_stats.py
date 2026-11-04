@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""fslstats' evidence (the larmorx-nc replica, FSL Licence; the clean-room original is still to
-be written from ``specs/fslstats.md``). fslstats prints numbers, so its evidence is text, not
-images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
+"""fslstats' evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
+crate larmorx-fsl, Apache-2.0, written from ``specs/fslstats.md``: its parts in
+``fsl_maths_original``). fslstats prints numbers, so its evidence is text, not images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
 call (``fslstats <T1w> -l 0.001 -C``), every option once on a real image (FSL's mean of
 ds005040's BOLD series in T1w space, fMRIPrep's brain mask, a label image of its segmentation),
 per volume (``-t``), per label (``-K``) and as JSON (``-json``), each printed text compared byte
-for byte with FSL 6.0.7.23's (through the oracle-output cache); every case of the record with its
-verdict; random testing's trial (shared with fslmaths).
+for byte with FSL 6.0.7.23's (through the oracle-output cache), by the replica and by the
+clean-room original; every case of both records with its verdict; random testing's trials
+(shared with fslmaths), the original's with its triage; the speed of the benchmark report.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import numpy as np
 
 from larmorx_validation.evidence import common, core
 from larmorx_validation.evidence import fsl_maths as fm
+from larmorx_validation.evidence import fsl_maths_original as fo
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -201,9 +203,33 @@ def _first(text: str, n: int = 90) -> str:
     return common.clip(line, n)
 
 
+def _orig_cell(text: str, fsl: str, args: list[str], named: list[str]) -> tuple[dict, bool]:
+    """The original's printed text against FSL's: identical, or within specs/fslstats.md
+    §10's bound (the suite's comparison, its largest relative difference), or not."""
+    from larmorx_validation.parity import fsl_stats as so
+    from larmorx_validation.parity.harness import CheckList
+
+    if text == fsl:
+        return common.cell("identical"), True
+    checks = CheckList()
+    if "-json" in args[:4] and fsl.strip().endswith("}"):
+        so._compare_json(checks, fsl, text, args)
+    else:
+        so._compare_text(checks, fsl, text, args)
+    c = checks.checks[-1]
+    if named:  # the default mode's correction, named (its size beside it)
+        size = f": {c.value} relative" if c.passed and c.value else ""
+        return common.cell(f"differs ({', '.join(named)}{size})"), False
+    if c.passed:
+        return common.cell(f"within §10's bound ({c.value} relative)"), False
+    return common.cell(f"differs ({c.detail[:80]})"), False
+
+
 def _options_table(ctx: core.Context) -> tuple[dict, fcache.Entry]:
     e = options_entry(ctx)
     info = e.info()
+    eo = fo.entry(ctx, TOOL, "options")
+    oinfo = eo.info()
     files = {k: Path(v.split(" (sha256")[0]) for k, v in info["inputs"].items()}
     rows = []
     for rid, (what, _a) in CALLS.items():
@@ -212,27 +238,39 @@ def _options_table(ctx: core.Context) -> tuple[dict, fcache.Entry]:
         lines = fsl.rstrip("\n").count("\n") + 1 if fsl.strip() else 0
         args, _used = call_args(rid, files)
         named = info.get("named", {}).get(f"replica-fix-{rid}", [])
+        po = oinfo["printed"][rid]
+        oc, o_same = _orig_cell(po["original"], fsl, args, [])
+        ofc, _ = _orig_cell(po["original-fix"], fsl, args,
+                            oinfo.get("named", {}).get(f"original-fix-{rid}", []))  # fmt: skip
         rows.append({
             "head": what,
             "sub": "`fslstats " + " ".join(args) + "`",
             "cells": [common.cell(_first(fsl)), common.cell(lines, "count"),
                       common.cell("identical" if rep == fsl else "differs"),
                       common.cell("identical" if fix == fsl else
-                                  f"differs ({', '.join(named) or 'unnamed'})")],
-            "verdict": "bit-identical" if rep == fsl else "open",
+                                  f"differs ({', '.join(named) or 'unnamed'})"),
+                      oc, ofc,
+                      common.cell("identical" if po["original-1"] == po["original"] else
+                                  "differs")],
+            "verdict": "bit-identical" if rep == fsl and o_same else "open",
         })  # fmt: skip
     table = common.table(
         "options",
         "Every option on a real image, against FSL 6.0.7.23",
         ["Call", "FSL prints (first line)", {"label": "Lines", "num": True},
-         "Replica (reproduce)", "Replica (default)"],
+         "Replica (reproduce)", "Replica (default)", "Clean-room original (reproduce)",
+         "Clean-room original (default)", "Original, 1 thread against 14"],
         rows,
         note="`mean.nii.gz` and `std.nii.gz` are FSL's -Tmean and -Tstd of ds005040's BOLD "
         "series in T1w space (fMRIPrep's output, `bold.nii.gz`: 63 volumes), `mask.nii.gz` "
         "fMRIPrep's brain mask of it, `labels.nii.gz` fMRIPrep's segmentation at each BOLD "
         "voxel (1 grey matter, 2 white matter, 3 CSF), `t1w.nii.gz` fMRIPrep's preprocessed "
         "T1w. Each printed text compared byte for byte with FSL's (through the oracle cache): "
-        "*identical*, every character of every line.",
+        "*identical*, every character of every line. The clean-room original (14 threads, and "
+        "at one: the same text) is held to specs/fslstats.md §10: counts, extremes, "
+        "coordinates, the robust range, percentiles, histograms, -w and the masked means and "
+        "standard deviations identical, the other numbers (the unmasked means and standard "
+        "deviations, -D, the entropies, the centres of gravity) within 1e-6 relative.",
     )  # fmt: skip
     return table, e
 
@@ -240,22 +278,33 @@ def _options_table(ctx: core.Context) -> tuple[dict, fcache.Entry]:
 def _goodvoxels_table(ctx: core.Context) -> tuple[dict, fcache.Entry]:
     e = goodvoxels_entry(ctx)
     info = e.info()
+    oprinted = fo.entry(ctx, TOOL, "goodvoxels").info()["printed"]
     rows = []
     for node, prog, template in fm._suite().GOODVOXELS_STEPS:
         if prog != "fslstats":
             continue
         p = info["printed"][node]
+        o = oprinted[node]
+        same = p["fsl"] == p["replica"] == p["replica-fix"] == o["original"] == o["original-fix"]
         rows.append({
             "head": node,
             "sub": f"`fslstats <{template[0][1:-1]}> {' '.join(template[1:])}`",
             "cells": [common.cell(p["fsl"].strip()), common.cell(p["replica"].strip()),
-                      common.cell(p["replica-fix"].strip())],
-            "verdict": "bit-identical" if p["fsl"] == p["replica"] == p["replica-fix"] else "open",
+                      common.cell(p["replica-fix"].strip()), common.cell(o["original"].strip()),
+                      common.cell(o["original-fix"].strip())],
+            "verdict": "bit-identical" if same else "open",
         })  # fmt: skip
     table = common.table(
         "goodvoxels",
         "fMRIPrep's goodvoxels mask: fslstats' four calls",
-        ["Node", "FSL 6.0.7.23 prints", "Replica (reproduce)", "Replica (default)"],
+        [
+            "Node",
+            "FSL 6.0.7.23 prints",
+            "Replica (reproduce)",
+            "Replica (default)",
+            "Clean-room original (reproduce)",
+            "Clean-room original (default)",
+        ],
         rows,
         note="fMRIPrep 25.2.6's goodvoxels workflow (`--project-goodvoxels`; not in the oracle "
         "runs) built from its code on ds005040's BOLD series in T1w space; each call on FSL's "
@@ -280,19 +329,24 @@ def export(ctx: core.Context) -> dict:
     defs = fm._stats_case_table()
     ne = named_entry(ctx)
     cs = fm.cases(rec, defs, {}, ne.info().get("default_mode", {}), program="fslstats")
+    rec_o, de = fo.add_cases(ctx, cs, "fslstats", {})
     gt, ge = _goodvoxels_table(ctx)
     ot, oe = _options_table(ctx)
     tt, tprov = fm.trial(ctx, TOOL)
+    to, toprov = fo.trial(ctx, TOOL)
+    bench, chart, bt = fo.speed(ctx, "fslstats")
+    entries = [ge, oe, ne, fo.entry(ctx, TOOL, "goodvoxels"), fo.entry(ctx, TOOL, "options"), de]
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "fslstats",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
-            "benchmarks": [],
-            "cache": [fcache.provenance(x) for x in (ge, oe, ne)],
+            "records": rec.source() + rec_o.source(),
+            "benchmarks": bench,
+            "cache": [fcache.provenance(x) for x in entries],
             "difftest": tprov,
+            "difftest_original": toprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -304,21 +358,27 @@ def export(ctx: core.Context) -> dict:
                 f"docs/validation/{RECORD}.md",
                 "experimental",
             ),
+            fo.implementation(cs, "fslstats"),
         ],
         "cases": cs,
         "cases_total": len(cs),
-        "tables": [gt, ot, tt],
+        "speed": chart,
+        "tables": [gt, ot, tt, *to, bt],
         "examples": [],
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only: [goodvoxels|options|named]
+if __name__ == "__main__":  # compute the cache entries only:
+    # [goodvoxels|options|named|original-goodvoxels|original-options|original-default]
     import sys
 
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     what = sys.argv[1:] or ["goodvoxels", "options", "named"]
-    fns = {"goodvoxels": goodvoxels_entry, "options": options_entry, "named": named_entry}
+    fns = {"goodvoxels": goodvoxels_entry, "options": options_entry, "named": named_entry,
+           "original-goodvoxels": lambda x: fo.entry(x, TOOL, "goodvoxels"),
+           "original-options": lambda x: fo.entry(x, TOOL, "options"),
+           "original-default": lambda x: fo.default_entry(x, "fslstats")}  # fmt: skip
     for w in what:
-        print("done", fns[w](c).dir)
+        print("done", fns[w](c).dir, flush=True)

@@ -134,20 +134,40 @@ fn triple(v: &Volume) -> Volume {
 }
 
 /// The robust range an image is clamped to (§4.1), of the image as prepared (a single slice
-/// made three): read from the data itself, no copy of a volume.
-fn clamp_range(v: &mut Volume) -> (f32, f32) {
+/// made three): read from the data itself, no copy of a volume. FSL-187 (a value far above a
+/// histogram pass's range counted in its first bin) is corrected by default and reproduced
+/// with `reproduce`; the correction is named where it moves the range (`which`: the image).
+fn clamp_range(
+    v: &mut Volume,
+    mode: UpstreamDefects,
+    which: &str,
+    notices: &mut Vec<Notice>,
+) -> (f32, f32) {
     if v.shape[2] == 1 {
         let mut t = triple(v);
-        return clamp_range(&mut t);
+        return clamp_range(&mut t, mode, which, notices);
     }
     let vol = crate::bet::Vol::new(
         v.shape,
         v.voxel_size.map(f64::from),
         std::mem::take(&mut v.data),
     );
-    let (lo, hi) = crate::bet::params::robust_range(&vol);
+    let r = crate::bet::params::robust_range_in(&vol, mode);
     v.data = vol.data;
-    (lo as f32, hi as f32)
+    let (lo, hi) = (r.t2 as f32, r.t98 as f32);
+    if let Some((f2, f98)) = r.fsl {
+        let (f2, f98) = (f2 as f32, f98 as f32);
+        if (f2, f98) != (lo, hi) {
+            notices.push(Notice::new(
+                &defects::FSL_187,
+                mode,
+                format!(
+                    "{which}'s clamping range (its robust range) counts a value far above a histogram pass's range in its last bin: {lo} to {hi} (FSL counts it in its first: {f2} to {f98})"
+                ),
+            ));
+        }
+    }
+    (lo, hi)
 }
 
 /// Clamping to the range `(lo, hi)` (§4.1), in place.
@@ -736,8 +756,8 @@ fn run_inner(
         None
     } else {
         Some((
-            clamp_range(&mut reference.vols[0]),
-            clamp_range(&mut input.vols[0]),
+            clamp_range(&mut reference.vols[0], ctx.mode, "the reference", notices),
+            clamp_range(&mut input.vols[0], ctx.mode, "the input", notices),
         ))
     };
     if !applying && trace.at(2) {
@@ -2895,4 +2915,40 @@ fn apply(
     )?;
     write_omat();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FSL-187 in the clamping range: an image of values on [0, 1) with one at 10^12; the
+    /// default's range is corrected and FSL's named, `reproduce` gives FSL's without a notice;
+    /// a 2D image (made three slices) the same.
+    #[test]
+    fn fsl_187_clamping_range() {
+        for shape in [[10usize, 10, 1], [5, 4, 5]] {
+            let mut data: Vec<f32> = (0..99).map(|i| i as f32 / 99.0).collect();
+            data.push(1e12);
+            let vol = || Volume::new(shape, [2.0; 3], data.clone());
+            let mut notices = Vec::new();
+            let fix = clamp_range(&mut vol(), UpstreamDefects::Fix, "the input", &mut notices);
+            assert_eq!(notices.len(), 1, "{shape:?}");
+            assert_eq!(notices[0].defect.id, "FSL-187");
+            let mut none = Vec::new();
+            let rep = clamp_range(
+                &mut vol(),
+                UpstreamDefects::Reproduce,
+                "the input",
+                &mut none,
+            );
+            assert!(none.is_empty());
+            assert_ne!(fix, rep);
+            let fsl = format!("its first: {} to {})", rep.0, rep.1);
+            assert!(notices[0].detail.contains(&fsl), "{}", notices[0].detail);
+            // the data are kept
+            let mut v = vol();
+            clamp_range(&mut v, UpstreamDefects::Fix, "the input", &mut Vec::new());
+            assert_eq!(v.data, data);
+        }
+    }
 }

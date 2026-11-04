@@ -1,0 +1,244 @@
+{
+ "defect": null,
+ "description": "-kernel file with values below 0.5: no empty-mask message (findings 25)",
+ "expect": "pass",
+ "found": {
+  "detail": "standard error: line 1: FSL '' / original 'ERROR:: Empty mask image'",
+  "n": 1213,
+  "seed": "fsl-maths-trial",
+  "shrink_moves": [],
+  "signature": [
+   "standard error"
+  ]
+ },
+ "id": "kernel-file-below-half",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-kernel": true,
+   "-odt": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.05,
+   "axis1": 0.85,
+   "axis2": 1.25,
+   "blobs": 2,
+   "centre0": -6.0,
+   "centre1": 0.5,
+   "centre2": 1.5,
+   "chain": 2,
+   "content": "blobs",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "zp",
+   "filter": "-dilM",
+   "kernel": "file",
+   "kernel 0": "3",
+   "kernel 1": "1",
+   "kernel 2": "1",
+   "kind": "zmap",
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": 12.25,
+   "origin1": -50.75,
+   "origin2": -17.25,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "repeat": false,
+   "sform": "other",
+   "sform_code": 2,
+   "shape": "8x26x21",
+   "shear0": -0.1,
+   "shear1": 0.05,
+   "shear2": 0.0,
+   "size": 23.5,
+   "size0": 8,
+   "size1": 26,
+   "size2": 21,
+   "spacing0": 1.5,
+   "spacing1": 0.8,
+   "spacing2": 2.0,
+   "suffix": ".nii",
+   "units": "mm",
+   "zmap dtype": "float32",
+   "zp": "-ztop"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-kernel",
+     "file",
+     "{in:i1}"
+    ],
+    "name": "-kernel",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dilM"
+    ],
+    "name": "-dilM",
+    "optional": true
+   },
+   {
+    "args": [
+     "-ztop"
+    ],
+    "name": "-ztop",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "i1": {
+    "content": {
+     "axes": [
+      1.05,
+      0.85,
+      1.25
+     ],
+     "centre": [
+      -6.0,
+      0.5,
+      1.5
+     ],
+     "n": 2,
+     "seed": 84557032,
+     "size": 23.5,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "img": {
+    "content": {
+     "axes": [
+      1.25,
+      0.85,
+      1.0
+     ],
+     "centre": [
+      -1.5,
+      -1.5,
+      6.0
+     ],
+     "n": 6,
+     "seed": 1231757237,
+     "size": 11.5,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      12.25,
+      -50.75,
+      -17.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 2,
+     "shear": [
+      -0.1,
+      0.05,
+      0.0
+     ],
+     "spacing": [
+      1.5,
+      0.8,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     8,
+     26,
+     21
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": -2.5,
+     "scale": 0.05
+    }
+   }
+  },
+  "n": 1213,
+  "options": [
+   "-dilM",
+   "-kernel",
+   "-ztop",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind zmap"
+  ],
+  "seed": "fsl-maths-trial",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "standard",
+ "tool": "fsl-maths-original"
+}

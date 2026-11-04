@@ -5,7 +5,8 @@ pass their operations as the command line has them (in-memory images written in 
 type, numbers as their shortest text), in the caller's working directory, with FSL's settings and
 D13's choice of this call; the typed wrappers build the command lines they stand for; fslstats'
 printed numbers are read per volume and per label; a failure carries fslmaths' message without
-its usage text; without the program they refuse clearly (no clean-room original yet). The
+its usage text; without the program fslmaths and fslstats run their clean-room originals in
+this process. The
 replicas themselves are checked by their golden tests (``crates-nc/larmorx-nc-cli/tests/
 golden.rs``) and by the parity suites against FSL."""
 
@@ -112,12 +113,138 @@ def image(dtype=np.float32, shape=(5, 4, 3)) -> tuple[np.ndarray, np.ndarray]:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fslmaths"):
-        lx.fsl.fslmaths(image(), "-abs")
-    with pytest.raises(NotImplementedError, match="larmorx-nc"):
-        lx.fsl.fslmaths(image(), "-abs", implementation="original")
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fslstats"):
-        lx.fsl.image_mean(image())
+    # fslmaths' clean-room original runs ("auto" without larmorx-nc, and "original")
+    data, affine = image()
+    for impl in ("auto", "original"):
+        r = lx.fsl.fslmaths((data - 30, affine), "-abs", "-thr", 5, implementation=impl)
+        want = np.abs(data - 30)
+        assert np.array_equal(np.asarray(r.data), np.where(want >= 5, want, 0))
+        assert np.asarray(r.data).dtype == np.float32
+    mask = ((data > 20).astype(np.uint8), affine)
+    m = lx.fsl.fslmaths((data, affine), "-mul", mask, n_threads=3)
+    assert np.array_equal(np.asarray(m.data), data * (data > 20))
+    with pytest.raises(RuntimeError, match="unknown option"):
+        lx.fsl.fslmaths(image(), "-nosuchop", implementation="original")
+    # fslstats' clean-room original: the typed wrappers and the generic call, -t and -K
+    a = data.astype(np.float64)
+    for impl in ("auto", "original"):
+        assert lx.fsl.image_mean((data, affine), implementation=impl) == pytest.approx(
+            a.mean(), abs=1e-6
+        )
+    nz = a[a != 0]
+    assert lx.fsl.image_std((data, affine), nonzero=True, n_threads=2) == pytest.approx(
+        nz.std(ddof=1), rel=1e-6
+    )
+    text = lx.fsl.fslstats((data, affine), "-R", "-p", 50, "-w", implementation="original")
+    words = text.split()
+    assert float(words[0]) == data.min() and float(words[1]) == data.max()
+    assert words[3:] == ["0", "5", "0", "4", "0", "3", "0", "1"]
+    labels = (np.where(data > 30, 2, 1).astype(np.int16), affine)
+    per = lx.fsl.fslstats((data, affine), "-M", index_mask=labels, json=True)
+    assert '"-M"' in per and per.count('"-M"') == 2
+    with pytest.raises(RuntimeError, match="Unrecognised option: -q"):
+        lx.fsl.fslstats(image(), "-q", implementation="original")
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-186"),
+        pytest.raises(RuntimeError, match="FSL-186"),
+    ):
+        lx.fsl.fslstats(image(), "-H", 5, 3, 3, implementation="original")
+
+
+def test_the_originals_filters(scripts):
+    # sub-task 2's operations through the typed wrappers and fslmaths' clean-room original
+    data, affine = image(shape=(6, 5, 4))
+    orig = {"implementation": "original"}
+    r = lx.fsl.spatial_filter((data, affine), "dilF", **orig)
+    padded = np.pad(data, 1, constant_values=-np.inf)
+    want = np.max(
+        [
+            padded[a : a + 6, b : b + 5, c : c + 4]
+            for a in range(3)
+            for b in range(3)
+            for c in range(3)
+        ],
+        axis=0,
+    )
+    assert np.array_equal(np.asarray(r.data), want)
+    e = lx.fsl.spatial_filter((data, affine), "eroF", kernel=("boxv3", 1, 1, 3), **orig)
+    assert np.array_equal(
+        np.asarray(e.data)[:, :, 1:3], np.minimum(data[:, :, :2], data[:, :, 1:3])
+    )
+    s = lx.fsl.smooth((data, affine), 2.0, n_threads=2, **orig)
+    assert np.asarray(s.data).shape == data.shape and np.all(np.isfinite(np.asarray(s.data)))
+    sub = lx.fsl.subsample2((data, affine), **orig)
+    assert np.asarray(sub.data).shape == (3, 3, 2)
+    cube = np.ones((5, 5, 5), np.uint8)
+    cube[2, 2, 2] = 0
+    cube[0, 0, 0] = 0
+    f = np.asarray(lx.fsl.unary((cube, affine), "fillh", **orig).data)
+    assert (f[2, 2, 2], f[0, 0, 0]) == (1, 0)
+    n = np.asarray(lx.fsl.normalise_intensity((data + 1, affine), 100.0, **orig).data)
+    assert abs(float(n.mean()) - 100.0) < 1e-3
+    d = np.asarray(lx.fsl.dog_edge((data, affine), 1.0, 1.6, **orig).data)
+    assert set(np.unique(d)) <= {0.0, 1.0}
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-160"):
+        z = lx.fsl.smooth((data, affine), 0.0, **orig)
+    assert np.array_equal(np.asarray(z.data), data)
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-161"),
+        pytest.raises(RuntimeError, match="FSL-161"),
+    ):
+        lx.fsl.spatial_filter((data, affine), "dilM", kernel=("boxv", 0), **orig)
+
+
+def test_the_originals_reductions_and_statistics(scripts):
+    # sub-task 3's operations through the typed wrappers and fslmaths' clean-room original
+    rng = np.random.default_rng(3)
+    series = rng.integers(0, 50, (4, 3, 2, 7)).astype(np.float32)
+    affine = np.diag([2.0, 2.0, 2.0, 1.0])
+    orig = {"implementation": "original"}
+    m = np.asarray(lx.fsl.collapse((series, affine), "mean", **orig).data)
+    assert m.shape == (4, 3, 2) and np.allclose(m, series.mean(axis=3), rtol=1e-6)
+    mx = np.asarray(lx.fsl.collapse((series, affine), "max", axis="X", **orig).data)
+    assert np.array_equal(mx[0], series.max(axis=0))
+    md = np.asarray(lx.fsl.collapse((series, affine), "median", n_threads=2, **orig).data)
+    assert np.array_equal(md, np.sort(series, axis=3)[..., 3])
+    r = np.asarray(lx.fsl.statistical((series, affine), "rank", **orig).data)
+    assert np.array_equal(np.sort(r, axis=3)[0, 0, 0], np.arange(1, 8))
+    p = np.asarray(lx.fsl.statistical((series, affine), "pval", **orig).data)
+    assert p.shape == (4, 3, 2) and np.all((p > 0) & (p <= 1))
+    z = np.asarray(
+        lx.fsl.statistical((np.full((2, 2, 2), 0.025, np.float32), affine), "ptoz", **orig).data
+    )
+    assert np.allclose(z, 1.959964, atol=1e-5)
+    box = np.asarray(lx.fsl.roi((series, affine), x=(1, 2), t=(0, 1), **orig).data)
+    assert np.count_nonzero(box[[0, 3]]) == 0 and np.count_nonzero(box[..., 1:]) == 0
+    bp = np.asarray(lx.fsl.bandpass_temporal_filter((series, affine), 2.0, -1.0, **orig).data)
+    assert np.allclose(bp.mean(axis=3), 0.0, atol=1e-4)
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-167"):
+        s = lx.fsl.collapse((series[..., :1], affine), "std", **orig)
+    assert np.array_equal(np.asarray(s.data), np.zeros((4, 3, 2), np.float32))
+
+
+def test_the_originals_roc(scripts):
+    # -roc through the typed wrapper and fslmaths' clean-room original: a ramp whose minimum
+    # is a true voxel, with and without a noise image (the clean-room suite's orig/roc-ramp)
+    x, y, z, t = np.meshgrid(*(np.arange(n) for n in (6, 5, 4, 2)), indexing="ij")
+    ramp = (x + 6 * y + 30 * z + 120 * t).astype(np.float32)
+    truth = np.zeros((6, 5, 4), np.float32)
+    truth[:3] = 1.0
+    affine = np.diag([2.0, 2.0, 2.0, 1.0])
+    orig = {"implementation": "original"}
+    r = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, **orig)
+    # FSL 6.0.7.23 prints 0.739618 0.610417 0.868819 (the area never reaches 2: the last
+    # rectangle at the last true-positive rate)
+    assert np.allclose([r.aroc, *r.aroc_quartiles], [0.739618, 0.610417, 0.868819], atol=1e-5)
+    assert r.curve.shape == (2004, 3) and np.array_equal(np.asarray(r.image.data), ramp)
+    n = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, noise=(ramp, affine), n_threads=2, **orig)
+    assert np.allclose([n.aroc, *n.aroc_quartiles], [0.620833, 0.491667, 0.75], atol=1e-5)
+    assert n.curve.shape == (1002, 5)
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-180"),
+        pytest.raises(RuntimeError, match="FSL-180"),
+    ):
+        lx.fsl.roc((ramp, affine), (np.ones_like(truth), affine), 0.05, **orig)
 
 
 def test_the_generic_fslmaths(scripts, monkeypatch, tmp_path):

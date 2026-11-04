@@ -266,3 +266,12 @@ pub fn print_notices(err: &mut dyn Write, notices: &[Notice]) {
         let _ = writeln!(err, "larmorx: {}", n.line());
     }
 }
+
+/// Where a file name's last part begins: just past its last directory separator (0 when it
+/// has none). FSL splits at the last `/`; on Windows, where FSL does not run, `\` separates
+/// directories as well; on Linux and macOS it stays an ordinary character, as in FSL
+/// (`docs/api/fsl-topup.md`, "File names on Windows").
+pub fn name_start(name: &str) -> usize {
+    let separators: &[char] = if cfg!(windows) { &['/', '\\'] } else { &['/'] };
+    name.rfind(separators).map_or(0, |i| i + 1)
+}

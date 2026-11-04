@@ -14,11 +14,12 @@ takes its ribbon's nonzero means and standard deviations (``image_mean(..., nonz
 (``centre_of_gravity(..., lower=t, voxels=True)``). ``fslstats(..., json=True)`` gives the full
 precision.
 
-They run the bit-exact replica from ``larmorx-nc`` as a separate program
-(``docs/licensing.md``); the clean-room original is to be written from ``specs/fslstats.md``, so
-``implementation="auto"`` needs ``larmorx-nc`` installed (and ``"original"`` is not available
-yet). FSL's deterministic defects are corrected by default (D13, ``docs/api/fsl-stats.md``);
-``upstream_defects="reproduce"`` gives FSL's results. fslstats runs on one thread.
+``implementation="auto"`` (the default) runs the bit-exact replica from ``larmorx-nc`` as a
+separate program when it is installed (``docs/licensing.md``), else the clean-room original
+(``larmorx fsl fslstats``, written from ``specs/fslstats.md``) in this process on ``n_threads``
+threads (its results the same at any count); ``"replica"`` and ``"original"`` choose one. FSL's
+deterministic defects are corrected by default (D13, ``docs/api/fsl-stats.md``);
+``upstream_defects="reproduce"`` gives FSL's results. FSL's fslstats runs on one thread.
 """
 
 from __future__ import annotations
@@ -69,12 +70,12 @@ def _run(
     upstream_defects: UpstreamDefectsName,
     tmp: str,
 ) -> tuple[str, str]:
-    """``fslstats [-t] [-K labels] [-json] image options...`` by the replica in the caller's
-    working directory: its standard output and the input's path as the program read it."""
+    """``fslstats [-t] [-K labels] [-json] image options...`` by the replica (or the clean-room
+    original) in the caller's working directory: its standard output and the input's path as
+    the program read it."""
     _defects.check(upstream_defects)
     n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "fslstats", implementation)
-    assert selected is not None  # no clean-room original yet: select raises otherwise
     args: list[str] = []
     if timeseries:
         args.append("-t")
@@ -85,6 +86,20 @@ def _run(
     path = _input(image, tmp, "lx-in", n_threads)
     args.append(path)
     args += [_operand(v, i, tmp, n_threads) for i, v in enumerate(options)]
+    if selected is None:
+        # the clean-room original, in this process (its notices become warnings)
+        env = [("FSLOUTPUTTYPE", "NIFTI"), (_defects.ENV, upstream_defects)]
+        if n_threads > 0:
+            env.append(("OMP_NUM_THREADS", str(n_threads)))
+        code, stdout, stderr = _core.fsl_run_original("fslstats", args, env, os.getcwd())
+        _warn_lines(stderr)
+        if code != 0:
+            message = "\n".join(s for s in (stderr.strip(), _clean_stdout(stdout)) if s)
+            raise RuntimeError(
+                f"larmorx fsl fslstats (the clean-room original) failed with exit code {code}"
+                + (f":\n{message}" if message else "")
+            )
+        return stdout, path
     try:
         process = _replica.run(
             selected,
@@ -131,8 +146,9 @@ def fslstats(
     label 1..n of the 3D label image), ``json`` ``-json`` (the numbers in JSON, at full
     precision; NaN and the infinities as ``null``).
 
-    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when fslstats
-    fails (its messages are in the error), and :class:`larmorx.ReplicaNotFoundError` without
+    Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
+    fails (its messages are in the error), ``RuntimeError`` when the clean-room original does,
+    and :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
     ``larmorx-nc``.
     """
     with tempfile.TemporaryDirectory(prefix="larmorx-fslstats-") as tmp:

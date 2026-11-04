@@ -1,17 +1,51 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The robust intensity range and BET's initial parameters (`specs/bet.md` §4.2, §4.3).
 
+use larmorx_core::defects::UpstreamDefects;
 use rayon::prelude::*;
 
 use super::Vol;
 
+/// A robust range and FSL-187's part in it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Robust {
+    pub t2: f64,
+    pub t98: f64,
+    /// FSL's range where FSL-187 moved it: with the correction (the default) only, when a value
+    /// far above a pass's range (its bin beyond `int`'s range) went into the last bin and FSL's
+    /// first bin gives other limits.
+    pub fsl: Option<(f64, f64)>,
+}
+
 /// The robust range `(t2, t98)`: the 2nd and 98th percentiles from histograms of 1000 bins,
-/// narrowed while a few voxels dominate the range (§4.2).
+/// narrowed while a few voxels dominate the range (§4.2), corrected for FSL-187.
 pub fn robust_range(v: &Vol) -> (f64, f64) {
+    let r = robust_range_in(v, UpstreamDefects::Fix);
+    (r.t2, r.t98)
+}
+
+/// [`robust_range`] in a mode of `upstream_defects`: FSL-187 (a value whose bin number does not
+/// fit in an `int`, more than about two billion bin widths above a pass's range, counted in the
+/// first bin, as x86-64's conversion gives `INT_MIN`) is corrected by default (the last bin)
+/// and reproduced with `reproduce`; with the correction FSL's range is computed beside it only
+/// where such a value occurred.
+pub fn robust_range_in(v: &Vol, mode: UpstreamDefects) -> Robust {
+    let (t2, t98, far) = robust_pass(v, mode.fix());
+    let fsl = (mode.fix() && far)
+        .then(|| {
+            let (a, b, _) = robust_pass(v, false);
+            (a, b)
+        })
+        .filter(|&r| r != (t2, t98));
+    Robust { t2, t98, fsl }
+}
+
+fn robust_pass(v: &Vol, last_bin: bool) -> (f64, f64, bool) {
     let (lo0, hi0) = min_max(&v.data);
     if lo0 == hi0 || v.data.is_empty() {
-        return (f64::from(lo0), f64::from(hi0));
+        return (f64::from(lo0), f64::from(hi0), false);
     }
+    let mut far = false;
     let total = v.data.len();
     let (mut lo, mut hi) = (lo0, hi0);
     let (mut t2, mut t98) = (lo0, hi0);
@@ -27,7 +61,8 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
         // §4.2's exact arithmetic: w = hi − lo in float; the bin `trunc(A x + B)` with
         // A = 1000/w, B = (1000·(−lo))/w in double
         let w = f64::from(hi - lo);
-        let hist = histogram(&v.data, f64::from(lo), w);
+        let (hist, f) = histogram(&v.data, f64::from(lo), w, last_bin);
+        far |= f;
         let (first, end) = if ends_out {
             (1usize, 998usize)
         } else {
@@ -73,7 +108,7 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
             full = true;
         }
     }
-    (f64::from(t2), f64::from(t98))
+    (f64::from(t2), f64::from(t98), far)
 }
 
 fn min_max(d: &[f32]) -> (f32, f32) {
@@ -94,25 +129,35 @@ pub fn range(v: &Vol) -> (f32, f32) {
     min_max(&v.data)
 }
 
-fn histogram(d: &[f32], lo: f64, width: f64) -> Vec<usize> {
+/// The 1000-bin histogram: bin `trunc(A x + B)` clamped to [0, 999]; a bin at or beyond 2^31
+/// (FSL-187: `int`'s range, where FSL's bin is x86-64's `INT_MIN`, so its first) in the last
+/// bin when `last_bin`, else in the first; and whether such a value occurred.
+fn histogram(d: &[f32], lo: f64, width: f64, last_bin: bool) -> (Vec<usize>, bool) {
     let a = 1000.0 / width;
     let b = 1000.0 * (-lo) / width;
     d.par_chunks(1 << 16)
         .map(|c| {
             let mut h = vec![0usize; 1000];
+            let mut far = false;
             for &x in c {
-                let k = (f64::from(x) * a + b) as i64;
-                h[k.clamp(0, 999) as usize] += 1;
+                let y = f64::from(x) * a + b;
+                let k = if y >= 2_147_483_648.0 {
+                    far = true;
+                    if last_bin { 999 } else { 0 }
+                } else {
+                    (y as i64).clamp(0, 999)
+                };
+                h[k as usize] += 1;
             }
-            h
+            (h, far)
         })
         .reduce(
-            || vec![0usize; 1000],
-            |mut x, y| {
+            || (vec![0usize; 1000], false),
+            |(mut x, fx), (y, fy)| {
                 for (a, b) in x.iter_mut().zip(y) {
                     *a += b;
                 }
-                x
+                (x, fx || fy)
             },
         )
 }
@@ -130,13 +175,20 @@ pub struct Initial {
     pub median: f64,
     /// Whether the radius was taken from a slab along two axes ("Image appears to be 1D").
     pub one_d: bool,
+    /// FSL's robust range where FSL-187 moved it (with the correction only; [`Robust::fsl`]).
+    pub fsl_187: Option<(f64, f64)>,
 }
 
 /// The initial parameters: thresholds, radius (unless given), centre of gravity (unless
-/// given, in mm) and the median within-brain intensity.
-pub fn initial(v: &Vol, radius: Option<f64>, centre: Option<[f64; 3]>) -> Initial {
+/// given, in mm) and the median within-brain intensity, the robust range in `mode` (FSL-187).
+pub fn initial(
+    v: &Vol,
+    radius: Option<f64>,
+    centre: Option<[f64; 3]>,
+    mode: UpstreamDefects,
+) -> Initial {
     let (min, max) = range(v);
-    let (t2, t98) = robust_range(v);
+    let Robust { t2, t98, fsl } = robust_range_in(v, mode);
     let t = t2 + 0.1 * (t98 - t2);
     let [nx, ny, nz] = v.shape;
     let [dx, dy, dz] = v.voxel;
@@ -191,6 +243,7 @@ pub fn initial(v: &Vol, radius: Option<f64>, centre: Option<[f64; 3]>) -> Initia
         centre: c,
         median,
         one_d,
+        fsl_187: fsl,
     }
 }
 
@@ -268,5 +321,25 @@ mod tests {
         // the bin holding the 20th value from each end (n / 50 = 20), bins 0.999 wide
         assert!((t2 - 18.981).abs() < 1e-4, "{t2}");
         assert!((t98 - 980.019).abs() < 1e-3, "{t98}");
+    }
+
+    /// FSL-187 (the register's smallest trigger: 99 values on [0, 1) and one at 10^12): the
+    /// default counts the far value in the last bin and gives FSL's range beside it, which
+    /// `reproduce` gives; without the far value nothing is named.
+    #[test]
+    fn fsl_187_far_value() {
+        let mut data: Vec<f32> = (0..99).map(|i| i as f32 / 99.0).collect();
+        let near = Vol::new([11, 9, 1], [1.0; 3], data.clone());
+        let fix = robust_range_in(&near, UpstreamDefects::Fix);
+        assert_eq!(fix.fsl, None);
+        assert_eq!(fix, robust_range_in(&near, UpstreamDefects::Reproduce));
+        data.push(1e12);
+        let far = Vol::new([10, 10, 1], [1.0; 3], data);
+        let fix = robust_range_in(&far, UpstreamDefects::Fix);
+        assert_eq!((fix.t2, fix.t98), robust_range(&far));
+        let fsl = fix.fsl.expect("FSL-187 moves this range");
+        assert_ne!(fsl, (fix.t2, fix.t98));
+        let rep = robust_range_in(&far, UpstreamDefects::Reproduce);
+        assert_eq!(((rep.t2, rep.t98), rep.fsl), (fsl, None));
     }
 }

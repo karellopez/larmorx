@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""fslmaths' evidence (the larmorx-nc replica, FSL Licence; the clean-room original is still to
-be written from ``specs/fslmaths.md``): fMRIPrep's own call (niworkflows' ``combine_masks``:
+"""fslmaths' evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
+crate larmorx-fsl, Apache-2.0, written from ``specs/fslmaths.md``: its parts in
+``fsl_maths_original``): fMRIPrep's own call (niworkflows' ``combine_masks``:
 ``fslmaths <mask> -mul <mask> <out>`` in every BOLD reference's brain mask; the record's four
 calls on three oracle runs) with the masks drawn over the reference they were made from;
 fMRIPrep's goodvoxels mask (``--project-goodvoxels``: its fourteen fslmaths calls in the
 workflow's order on ds005040's BOLD series in T1w space, the cortical ribbon a stand-in: the
 segmentation's grey matter); one call per operation family on the same real series (the direct
 and the FFT convolutions among them); GLIBC-07 on a real image (glibc 2.35's double functions
-against the correctly rounded ones); every case of the record with its verdict; random testing's
-trial.
+against the correctly rounded ones); every case of both records with its verdict; random
+testing's two trials, the original's with its triage; the speed of the benchmark report.
 
 Every run of FSL goes through the oracle-output cache (``use`` mode; fslmaths is
 single-threaded and deterministic); the replica runs as a separate program, nothing here imports
@@ -30,6 +31,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import fsl_maths_original as fo
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -240,13 +242,15 @@ def combine_entry(ctx: core.Context) -> fcache.Entry:
     )  # fmt: skip
 
 
-def _combine_calls_table(rec) -> dict:
-    """The record's combine_masks calls: each run's two masks, their product, and the record's
-    result (FSL's file, fMRIPrep's own)."""
+def _combine_calls_table(rec, rec_o) -> dict:
+    """The records' combine_masks calls: each run's two masks, their product, and the records'
+    results (FSL's file, fMRIPrep's own; the clean-room original's record beside the
+    replica's)."""
     import nibabel as nib
 
     fs = _suite()
     by = {r["case"]: r for r in rec.results}
+    by_o = {r["case"]: r for r in rec_o.results}
     seen: set[str] = set()
     rows = []
     for run, node in fs.fmriprep_calls():
@@ -266,6 +270,8 @@ def _combine_calls_table(rec) -> dict:
                 else "coregistration reference (BET's two passes)")  # fmt: skip
         rep = {**r.get("reported", {}), **r.get("measured", {})}
         same_own = rep.get("fMRIPrep's own mask (its container's FSL 6.0.7.x) has the same values")
+        ro = by_o.get(cid)
+        o_same = ro is not None and ro["status"] == "pass" and not fo._differs(ro["measured"])
         rows.append({
             "head": run.split("-noreconall")[0],
             "sub": kind,
@@ -275,23 +281,26 @@ def _combine_calls_table(rec) -> dict:
                 common.cell(int(b.sum()), "count"),
                 common.cell(int(prod.sum()), "count"),
                 common.cell("identical" if r["status"] == "pass" else r["status"]),
+                common.cell("identical" if o_same else ro["status"] if ro else "–"),
                 common.cell("the same values" if same_own == "yes" else "differs"),
             ],
-            "verdict": "bit-identical" if r["status"] == "pass" else "open",
+            "verdict": "bit-identical" if r["status"] == "pass" and o_same else "open",
         })  # fmt: skip
     return common.table(
         "combine-calls",
-        "fMRIPrep's combine_masks calls of the record",
+        "fMRIPrep's combine_masks calls of the records",
         ["Run", "Grid", {"label": "Mask A voxels", "num": True},
          {"label": "Mask B voxels", "num": True}, {"label": "Product voxels", "num": True},
-         "Replica against FSL 6.0.7.23", "fMRIPrep's own output"],
+         "Replica against FSL 6.0.7.23", "Clean-room original against FSL 6.0.7.23",
+         "fMRIPrep's own output"],
         rows,
         note="The record's four calls on three oracle runs: ds000005 (single-band 3 T), ds005040 "
         "(both kinds: the head-motion reference's mask, BET's first pass times the template's "
         "brain mask on the reference, and the coregistration reference's, BET's first pass "
         "times its second) and ds003592 (multi-echo). Voxels counted where the mask is not 0. "
         "*Identical*: every file fslmaths writes byte for byte (decompressed, `descrip` aside), "
-        "with FSL's exit status and messages; fMRIPrep's own output is the node's file in the "
+        "with FSL's exit status and messages (the clean-room original's record: its values bit "
+        "for bit and its header byte for byte); fMRIPrep's own output is the node's file in the "
         "run's working directory (fslmaths in fMRIPrep 25.2.6's image).",
     )  # fmt: skip
 
@@ -327,6 +336,11 @@ def _example_combine(ctx: core.Context, rec) -> dict:
     arrays = {pid: {"mask": common.load(str(e.dir / pid / name))} for pid, *_ in PANELS}
     for pid, role, label, sub in PANELS:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    eo = fo.entry(ctx, TOOL, "combine")
+    oinfo = eo.info()
+    oarrays = {pid: {"mask": common.load(str(eo.dir / pid / name))} for pid, *_ in fo.PANELS}
+    for pid, role, label, sub in fo.PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, oarrays[pid], overlay=over))
     own = {"mask": common.load(str(node / name))}
     ex.add(exm.Panel("own", "fmriprep", "fMRIPrep 25.2.6's own output",
                      "the node's file in the run's working directory (fslmaths in fMRIPrep's "
@@ -334,22 +348,34 @@ def _example_combine(ctx: core.Context, rec) -> dict:
     d = common.d
     diffs = [
         d("replica-fsl", "replica", "fsl", "main", "replica − FSL 6.0.7.23", common.ROLE_LX),
+        d("original-fsl", "original", "fsl", "main", "clean-room original − FSL 6.0.7.23",
+          common.ROLE_LX),
         d("replica-own", "replica", "own", "fmriprep", "replica − fMRIPrep's own output",
           common.ROLE_FMRIPREP),
+        d("original-own", "original", "own", "fmriprep",
+          "clean-room original − fMRIPrep's own output", common.ROLE_FMRIPREP),
         d("fix-replica", "replica-fix", "replica", "check", "replica, default − reproduce mode",
           common.ROLE_SELF),
+        d("original1-original", "original-1", "original", "check",
+          "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
+        d("ofix-original", "original-fix", "original", "check",
+          "clean-room original, default − reproduce mode", common.ROLE_SELF),
     ]  # fmt: skip
     outputs = [{"id": "mask", "label": "Combined mask (A × B)", "unit": ""}]
     common.compare_all(ex, diffs, outputs)
     same = common.identical(diffs)
     verdicts(diffs, same, info, "fslmaths")
+    result, _m = fo.outcome({"mask": arrays["fsl"]["mask"]}, {"mask": oarrays["original"]["mask"]},
+                            {"mask": "the combined mask"}, {}, "fslmaths writes")  # fmt: skip
+    fo.verdicts(diffs, same, oinfo.get("named", {}).get("original-fix", []), result,
+                same.get("replica-own"))  # fmt: skip
     at, _k = common.largest_in_slice(ex, "fsl", "replica", "mask", "axial")
     default = {
         "output": "mask",
         "plane": "axial",
         "voxel": at,
-        "panels": ["mask-a", "mask-b", "fsl", "replica"],
-        "diffs": ["replica-fsl"],
+        "panels": ["mask-a", "mask-b", "fsl", "replica", "original"],
+        "diffs": ["replica-fsl", "original-fsl"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(
@@ -363,9 +389,10 @@ def _example_combine(ctx: core.Context, rec) -> dict:
         "summary": "The combine_masks node fMRIPrep 25.2.6 ran on ds005040's head-motion "
         "reference: niworkflows multiplies the mask of BET's first pass by the template's "
         "brain mask brought onto the reference, and the product is the reference's brain mask. "
-        "Given to FSL 6.0.7.23 and to the larmorx-nc replica in its reproduce and default "
-        "modes; each mask is drawn over the reference it was computed from. Below the viewer, "
-        "every combine_masks call of the record, three oracle runs.",
+        "Given to FSL 6.0.7.23, to the larmorx-nc replica in its reproduce and default "
+        "modes, and to LARMORX's clean-room original in its reproduce mode at 14 threads and "
+        "at one and in its default mode; each mask is drawn over the reference it was computed "
+        "from. Below the viewer, every combine_masks call of both records, three oracle runs.",
         "facts": [
             {
                 "label": "Data",
@@ -378,7 +405,7 @@ def _example_combine(ctx: core.Context, rec) -> dict:
                 "label": "Command",
                 "text": "`fslmaths <BET's first-pass mask> -mul <the template's mask> <out>`",
             },
-            {"label": "Programs", "text": programs(info)},
+            {"label": "Programs", "text": programs(info) + "; " + fo.programs(oinfo)},
             {"label": "Grid", "text": common.describe_grid(ref_img, grid.shape)},
         ],
         **out,
@@ -386,11 +413,12 @@ def _example_combine(ctx: core.Context, rec) -> dict:
         "groups": [
             ["main", "LARMORX against FSL"],
             ["fmriprep", "LARMORX against fMRIPrep's own output"],
-            ["check", "LARMORX against itself: the modes"],
+            ["check", "LARMORX against itself: the threads and the modes"],
         ],
-        "tables": [_combine_calls_table(rec)],
-        "metrics_note": note(int(np.prod(ref.shape))),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "tables": [_combine_calls_table(rec, records.load(ctx.repo, fo.RECORD["fslmaths"]))],
+        "metrics_note": note(int(np.prod(ref.shape)), fo.note()),
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data])
+        + fo.provenance(oinfo, eo, [data]),
     }
 
 
@@ -476,32 +504,41 @@ def _stats_numbers_table(ctx: core.Context, values: dict) -> dict:
     from larmorx_validation.evidence import fsl_stats
 
     st = fsl_stats.goodvoxels_entry(ctx).info()
+    so = fo.entry(ctx, "fsl-stats", "goodvoxels").info()["printed"]
     rows = []
     for node, prog, template in _suite().GOODVOXELS_STEPS:
         if prog != "fslstats":
             continue
         f = st["printed"][node]
+        o = so[node]["original"]
         rows.append({
             "head": node,
             "sub": f"fslstats <{template[0][1:-1]}> {' '.join(template[1:])}",
             "cells": [common.cell(f["fsl"].strip()), common.cell(f["replica"].strip()),
-                      common.cell(float(values[node]), "sig6")],
-            "verdict": "bit-identical" if f["fsl"] == f["replica"] else "open",
+                      common.cell(o.strip()), common.cell(float(values[node]), "sig6")],
+            "verdict": "bit-identical" if f["fsl"] == f["replica"] == o else "open",
         })  # fmt: skip
     up = values["upper_thresh"]
     rows.append({
         "head": "upper_thresh",
         "sub": "mod_ribbon_mean + mod_ribbon_std × 0.5 (fMRIPrep's Python), given to -thr",
-        "cells": [common.cell(f"{up:.10f}"), common.cell(f"{up:.10f}"), common.cell(up, "sig6")],
+        "cells": [common.cell(f"{up:.10f}"), common.cell(f"{up:.10f}"), common.cell(f"{up:.10f}"),
+                  common.cell(up, "sig6")],
     })  # fmt: skip
     return common.table(
         "goodvoxels-stats",
         "The numbers between the steps: fslstats' four calls",
-        ["Node", "FSL 6.0.7.23 prints", "The replica prints", {"label": "As read", "num": True}],
+        [
+            "Node",
+            "FSL 6.0.7.23 prints",
+            "The replica prints",
+            "The clean-room original prints",
+            {"label": "As read", "num": True},
+        ],
         rows,
         note="Each fslstats call on FSL's output of the node before it (through the oracle "
-        "cache) and the larmorx-nc replica's on the same file: the printed text compared byte "
-        "for byte. fMRIPrep reads each number as Python's float, divides by the means and "
+        "cache) and the larmorx-nc replica's and the clean-room original's (reproduce mode, 14 "
+        "threads) on the same file: the printed text compared byte for byte. fMRIPrep reads each number as Python's float, divides by the means and "
         "passes the threshold to fslmaths as nipype formats them (`%.8f`, `%.10f`); the "
         "fsl-stats page has the four calls in its record.",
     )
@@ -543,11 +580,23 @@ def _example_goodvoxels(ctx: core.Context) -> dict:
               for pid, *_ in PANELS}  # fmt: skip
     for pid, role, label, sub in PANELS:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    eo = fo.entry(ctx, TOOL, "goodvoxels")
+    oinfo = eo.info()
+    oarrays = {pid: {n: common.load(str(eo.dir / f"{pid}-{n}" / f"{n}.nii.gz")) for n in nodes}
+               for pid, *_ in fo.PANELS}  # fmt: skip
+    for pid, role, label, sub in fo.PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, oarrays[pid], overlay=over))
     d = common.d
     diffs = [
         d("replica-fsl", "replica", "fsl", "main", "replica − FSL 6.0.7.23", common.ROLE_LX),
+        d("original-fsl", "original", "fsl", "main", "clean-room original − FSL 6.0.7.23",
+          common.ROLE_LX),
         d("fix-replica", "replica-fix", "replica", "check", "replica, default − reproduce mode",
           common.ROLE_SELF),
+        d("original1-original", "original-1", "original", "check",
+          "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
+        d("ofix-original", "original-fix", "original", "check",
+          "clean-room original, default − reproduce mode", common.ROLE_SELF),
     ]  # fmt: skip
     outputs = [{"id": n, "label": f"{k + 1}. {n}: {GOODVOXELS_TEXT[n]}", "unit": ""}
                for k, n in enumerate(nodes)]  # fmt: skip
@@ -556,14 +605,20 @@ def _example_goodvoxels(ctx: core.Context) -> dict:
     named = sorted({x for k, v in info.get("named", {}).items() if k.startswith("replica-fix")
                     for x in v})  # fmt: skip
     verdicts(diffs, same, {"named": {"replica-fix": named}}, "fslmaths")
+    onamed = sorted({x for k, v in oinfo.get("named", {}).items() if k.startswith("original-fix")
+                     for x in v})  # fmt: skip
+    result, _m = fo.outcome({n: arrays["fsl"][n] for n in nodes},
+                            {n: oarrays["original"][n] for n in nodes},
+                            {n: f"{n}" for n in nodes}, {}, "of the fourteen calls")  # fmt: skip
+    fo.verdicts(diffs, same, onamed, result)
     first = "goodvoxels_ribbon_mask"
     at, _k = common.largest_in_slice(ex, "fsl", "replica", first, "axial")
     default = {
         "output": first,
         "plane": "axial",
         "voxel": at,
-        "panels": ["mean", "ribbon", "fsl", "replica"],
-        "diffs": ["replica-fsl"],
+        "panels": ["mean", "ribbon", "fsl", "replica", "original"],
+        "diffs": ["replica-fsl", "original-fsl"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(
@@ -581,8 +636,9 @@ def _example_goodvoxels(ctx: core.Context) -> dict:
         "as the workflow makes them, in its order, its inputs FSL's outputs of the nodes before "
         "it, the numbers between them printed by fslstats. The runs have no FreeSurfer ribbon, "
         "so a stand-in takes its place: the anatomical segmentation's grey matter. Choose a "
-        "node above the panels; each was given to FSL 6.0.7.23 and to the larmorx-nc replica in "
-        "its reproduce and default modes.",
+        "node above the panels; each was given to FSL 6.0.7.23, to the larmorx-nc replica in "
+        "its reproduce and default modes, and to LARMORX's clean-room original in its "
+        "reproduce mode at 14 threads and at one and in its default mode.",
         "facts": [
             {
                 "label": "Data",
@@ -608,18 +664,19 @@ def _example_goodvoxels(ctx: core.Context) -> dict:
                 f"{values['mod_ribbon_std']}: the threshold {values['upper_thresh']:.10f} "
                 "(fslstats -M and -S, as the table below the viewer shows)",
             },
-            {"label": "Programs", "text": programs(info)},
+            {"label": "Programs", "text": programs(info) + "; " + fo.programs(oinfo)},
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
         ],
         **out,
         "chain": None,
         "groups": [
             ["main", "LARMORX against FSL"],
-            ["check", "LARMORX against itself: the modes"],
+            ["check", "LARMORX against itself: the threads and the modes"],
         ],
         "tables": [_stats_numbers_table(ctx, values)],
-        "metrics_note": note(int(np.prod(img.shape[:3]))),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "metrics_note": note(int(np.prod(img.shape[:3])), fo.note()),
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data])
+        + fo.provenance(oinfo, eo, [data]),
     }
 
 
@@ -657,6 +714,10 @@ FAMILIES: dict[str, tuple[str, tuple[str, ...], str]] = {
              ("{mean}", "-div", "{std}", "-mas", "{mask}", "-tfce", "2", "0.5", "6"),
              "TFCE of the temporal SNR (-tfce 2 0.5 6)"),
 }  # fmt: skip
+
+
+#: The families FSL convolves by its FFT (the original by the direct sum).
+FFT_FAMILIES = ("fmean-fft",)
 
 
 def _family_files() -> dict[str, Path]:
@@ -744,11 +805,23 @@ def _example_families(ctx: core.Context) -> dict:
                     for oid in FAMILIES} for pid, *_ in PANELS}  # fmt: skip
     for pid, role, label, sub in PANELS:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=mover))
+    eo = fo.entry(ctx, TOOL, "families")
+    oinfo = eo.info()
+    oarrays = {pid: {oid: common.load(str(eo.dir / f"{pid}-{oid}" / f"{oid}.nii.gz"))
+                     for oid in FAMILIES} for pid, *_ in fo.PANELS}  # fmt: skip
+    for pid, role, label, sub in fo.PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, oarrays[pid], overlay=mover))
     d = common.d
     diffs = [
         d("replica-fsl", "replica", "fsl", "main", "replica − FSL 6.0.7.23", common.ROLE_LX),
+        d("original-fsl", "original", "fsl", "main", "clean-room original − FSL 6.0.7.23",
+          common.ROLE_LX),
         d("fix-replica", "replica-fix", "replica", "check", "replica, default − reproduce mode",
           common.ROLE_SELF),
+        d("original1-original", "original-1", "original", "check",
+          "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
+        d("ofix-original", "original-fix", "original", "check",
+          "clean-room original, default − reproduce mode", common.ROLE_SELF),
     ]  # fmt: skip
     outputs = [{"id": oid, "label": f"{fam}: {label}", "unit": ""}
                for oid, (fam, _a, label) in FAMILIES.items()]  # fmt: skip
@@ -757,14 +830,42 @@ def _example_families(ctx: core.Context) -> dict:
     named = sorted({x for k, v in info.get("named", {}).items() if k.startswith("replica-fix")
                     for x in v})  # fmt: skip
     verdicts(diffs, same, {"named": {"replica-fix": named}}, "fslmaths")
+    onamed = sorted({x for k, v in oinfo.get("named", {}).items() if k.startswith("original-fix")
+                     for x in v})  # fmt: skip
+    result, ometrics = fo.outcome(
+        {oid: arrays["fsl"][oid] for oid in FAMILIES},
+        {oid: oarrays["original"][oid] for oid in FAMILIES},
+        {oid: f"`{' '.join(family_args(oid)[0][:-1])}`" for oid in FAMILIES},
+        {oid: "fft" for oid in FFT_FAMILIES},
+        "of the calls",
+    )
+    # the FFT family against the exact result (float64, §10.2's definition): which convolution
+    # lies closer to it (findings 31 of the original's)
+    oid = FFT_FAMILIES[0]
+    words = FAMILIES[oid][1]
+    kernel = fo.sphere_kernel(float(words[words.index("sphere") + 1]), img.header.get_zooms()[:3])
+    exact, _count = fo.exact_fmean(mean, kernel)
+    fe, oe_ = fo.against_exact(exact, arrays["fsl"][oid], oarrays["original"][oid])
+    closer = "closer" if oe_["max"] < fe["max"] else "less accurate"
+    vs_exact = (
+        f"against the exact result (computed in float64 from §10.2's definition; {kernel.shape[0]} "
+        f"× {kernel.shape[1]} × {kernel.shape[2]} kernel of {int(kernel.sum())} voxels) FSL's FFT "
+        f"lies within {fe['max']:.2g} of the largest value (median {fe['median']:.2g}), the "
+        f"original's direct sum (its products in double precision, rounded once) within "
+        f"{oe_['max']:.2g} (median {oe_['median']:.2g}): the original is the {closer} of the two "
+        "(findings 31)"
+    )
+    if oid in ometrics:
+        result = (result[0], common.clip(result[1].rstrip(".") + "; " + vs_exact + ".", 1400))
+    fo.verdicts(diffs, same, onamed, result)
     first = "smooth"
     at, _k = common.largest_in_slice(ex, "fsl", "replica", first, "axial")
     default = {
         "output": first,
         "plane": "axial",
         "voxel": at,
-        "panels": ["mean", "fsl", "replica", "replica-fix"],
-        "diffs": ["replica-fsl"],
+        "panels": ["mean", "fsl", "replica", "replica-fix", "original"],
+        "diffs": ["replica-fsl", "original-fsl"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(
@@ -782,6 +883,36 @@ def _example_families(ctx: core.Context) -> dict:
                       common.cell("–" if m["identical"] else m["max_abs"])],
             "verdict": "bit-identical" if m["identical"] else "open",
         })  # fmt: skip
+    orows = []
+    for oid, (fam, _a, _label) in FAMILIES.items():
+        args, _used = family_args(oid)
+        m = next(x for x in diffs if x["id"] == "original-fsl")["metrics"][oid]
+        sm = ometrics.get(oid)
+        orows.append({
+            "head": fam,
+            "sub": "`fslmaths " + " ".join(args) + "`",
+            "cells": [common.cell(m["voxels"], "count"), common.cell(m["differ"], "count"),
+                      common.cell("–" if m["identical"] else m["max_abs"]),
+                      common.cell("–" if sm is None else sm["relative"]),
+                      common.cell("–" if sm is None else f"{sm['share']:.1%}")],
+            "verdict": "bit-identical" if m["identical"] else "divergence"
+            if oid in FFT_FAMILIES and sm is not None and fo.fft_expected(sm) else "open",
+        })  # fmt: skip
+    otable = common.table(
+        "families-calls-original",
+        "The calls, the clean-room original against FSL 6.0.7.23",
+        ["Family", {"label": "Voxels", "num": True}, {"label": "Values that differ", "num": True},
+         {"label": "Largest |Δ|", "num": True},
+         {"label": "Largest |Δ| ÷ FSL's largest value (§21: ≤ 1e-5)", "num": True},
+         {"label": "Within 4 units in the last place (§21: ≥ 99 %)", "num": True}],
+        orows,
+        note="Each call's output by the clean-room original (reproduce mode, 14 threads; the "
+        "same bits at one thread) against FSL's, every voxel of the files; where a value differs, "
+        "specs/fslmaths.md §21's metric of the sums over every voxel (the non-finite voxels "
+        "identical). FSL convolves the 15 × 15 × 13 spherical kernel by its FFT in single "
+        "precision, the original by a direct sum whose products it adds in double precision and "
+        f"rounds once; {vs_exact}.",
+    )  # fmt: skip
     table = common.table(
         "families-calls",
         "The calls, against FSL 6.0.7.23",
@@ -803,8 +934,10 @@ def _example_families(ctx: core.Context) -> dict:
         "fMRIPrep's brain mask: arithmetic with images, the thresholds, the voxelwise functions, "
         "the reductions along time, morphology, the convolutions (separable, by the FFT, the "
         "median), edges, normalisation, temporal filtering, regions and the threshold-free "
-        "cluster enhancement. Choose a call above the panels; each was given to FSL 6.0.7.23 "
-        "and to the larmorx-nc replica in its reproduce and default modes.",
+        "cluster enhancement. Choose a call above the panels; each was given to FSL 6.0.7.23, "
+        "to the larmorx-nc replica in its reproduce and default modes, and to LARMORX's "
+        "clean-room original in its reproduce mode at 14 threads and at one and in its default "
+        "mode.",
         "facts": [
             {
                 "label": "Data",
@@ -812,18 +945,19 @@ def _example_families(ctx: core.Context) -> dict:
                 "25.2.6's preprocessed BOLD series in T1w space and its brain mask (out/); shown "
                 "inside that mask, dilated by 2 voxels, so no face shows",
             },
-            {"label": "Programs", "text": programs(info)},
+            {"label": "Programs", "text": programs(info) + "; " + fo.programs(oinfo)},
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
         ],
         **out,
         "chain": None,
         "groups": [
             ["main", "LARMORX against FSL"],
-            ["check", "LARMORX against itself: the modes"],
+            ["check", "LARMORX against itself: the threads and the modes"],
         ],
-        "tables": [table],
-        "metrics_note": note(int(np.prod(img.shape[:3]))),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "tables": [table, otable],
+        "metrics_note": note(int(np.prod(img.shape[:3])), fo.note()),
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data])
+        + fo.provenance(oinfo, eo, [data]),
     }
 
 
@@ -938,6 +1072,59 @@ def _glibc_table(ctx: core.Context) -> tuple[dict, dict]:
         "float differs after rounding.",
     )  # fmt: skip
     return table, fcache.provenance(e)
+
+
+def _glibc_table_original(ctx: core.Context) -> dict:
+    """The same calls by the clean-room original: correctly rounded in both modes (CORE-MATH's
+    functions), within the record's one unit in the last place per function."""
+    import nibabel as nib
+
+    e = glibc_entry(ctx)
+    eo = fo.entry(ctx, TOOL, "glibc")
+    oinfo = eo.info()
+    rows = []
+    for rid, (fn, _ops) in GLIBC_CALLS.items():
+        fsl = np.asarray(nib.load(str(e.dir / f"fsl-{rid}" / f"{rid}.nii.gz")).dataobj).ravel()
+        rep = np.asarray(nib.load(str(e.dir / f"replica-fix-{rid}" / f"{rid}.nii.gz")).dataobj)
+        org, ofix, one = (
+            np.asarray(nib.load(str(eo.dir / f"{lab}-{rid}" / f"{rid}.nii.gz")).dataobj).ravel()
+            for lab in ("original", "original-fix", "original-1")
+        )
+        finite = np.isfinite(fsl)
+        n_o, u_o = _ulps(fsl[finite], org[finite])
+        n_of, _u = _ulps(fsl[finite], ofix[finite])
+        assert np.array_equal(np.isnan(fsl), np.isnan(org)), rid
+        same_cr = org.tobytes() == rep.ravel().tobytes()
+        named = oinfo.get("named", {}).get(f"original-fix-{rid}", [])
+        rows.append({
+            "head": f"`{fn}`",
+            "sub": "`fslmaths " + " ".join(glibc_args(rid)) + "`",
+            "cells": [common.cell(int(finite.sum()), "count"), common.cell(n_o, "count"),
+                      common.cell(u_o, "count"), common.cell(n_of, "count"),
+                      common.cell(", ".join(named) or "–"),
+                      common.cell("identical" if same_cr else "differs"),
+                      common.cell("identical" if one.tobytes() == org.tobytes() else "differs")],
+            "verdict": "divergence" if n_o else "bit-identical",
+        })  # fmt: skip
+    return common.table(
+        "glibc-double-original",
+        "GLIBC-07 on a real image: the clean-room original",
+        ["Function", {"label": "Values", "num": True},
+         {"label": "Reproduce mode: values that differ from FSL's", "num": True},
+         {"label": "Largest distance (units in the last place)", "num": True},
+         {"label": "Default mode: values that differ from FSL's", "num": True},
+         "Named by the default", "Against the replica's default (correctly rounded)",
+         "1 thread against 14"],
+        rows,
+        note="The same calls by LARMORX's clean-room original (14 threads, and at one): its "
+        "double functions are CORE-MATH's correctly rounded ones (larmorx_core::math) in both "
+        "modes, the replica's default's bits. Its reproduce mode does not give glibc's bits for "
+        "exp, log and pow, which specs/fslmaths.md §19 asks of it (glibc 2.35 ships Arm's "
+        "Optimized Routines for them, MIT-licensed: a follow-up); its record holds the double "
+        "functions to one unit in the last place per function of the chain (§21), and every "
+        "differing value here is one unit away (GLIBC-07, an expected divergence). Float results "
+        "are FSL's.",
+    )  # fmt: skip
 
 
 # ------------------------------------------------------------------------------ shared texts
@@ -1325,20 +1512,27 @@ def export(ctx: core.Context) -> dict:
                      if r["case"].startswith("fmriprep-goodvoxels/")})  # fmt: skip
     ne = named_entry(ctx)
     cs = cases(rec, defs, examples, ne.info().get("default_mode", {}))
+    rec_o, de = fo.add_cases(ctx, cs, "fslmaths", examples)
     entries = [combine_entry(ctx), goodvoxels_entry(ctx), families_entry(ctx), glibc_entry(ctx),
                ne]  # fmt: skip
+    entries += [fo.entry(ctx, TOOL, w) for w in ("combine", "goodvoxels", "families", "glibc")]
+    entries.append(de)
     tt, tprov = trial(ctx, TOOL)
+    to, toprov = fo.trial(ctx, TOOL)
     gt, _gprov = _glibc_table(ctx)
+    gto = _glibc_table_original(ctx)
+    bench, chart, bt = fo.speed(ctx, "fslmaths")
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "fslmaths",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
-            "benchmarks": [],
+            "records": rec.source() + rec_o.source(),
+            "benchmarks": bench,
             "cache": [fcache.provenance(x) for x in entries],
             "difftest": tprov,
+            "difftest_original": toprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1350,10 +1544,12 @@ def export(ctx: core.Context) -> dict:
                 f"docs/validation/{RECORD}.md",
                 "experimental",
             ),
+            fo.implementation(cs, "fslmaths"),
         ],
         "cases": cs,
         "cases_total": len(cs),
-        "tables": [tt, gt],
+        "speed": chart,
+        "tables": [tt, gt, gto, *to, bt],
         "examples": [
             _example_combine(ctx, rec),
             _example_goodvoxels(ctx),
@@ -1362,9 +1558,8 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if (
-    __name__ == "__main__"
-):  # compute the cache entries only: [combine|goodvoxels|families|glibc|named]
+if __name__ == "__main__":  # compute the cache entries only:
+    # [combine|goodvoxels|families|glibc|named|original-<which>|original-default]
     import sys
 
     from larmorx_validation.figures.core import REPO, default_cache
@@ -1372,6 +1567,9 @@ if (
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     what = sys.argv[1:] or ["combine", "goodvoxels", "families", "glibc", "named"]
     fns = {"combine": combine_entry, "goodvoxels": goodvoxels_entry, "families": families_entry,
-           "glibc": glibc_entry, "named": named_entry}  # fmt: skip
+           "glibc": glibc_entry, "named": named_entry,
+           "original-default": lambda x: fo.default_entry(x, "fslmaths")}  # fmt: skip
+    for w in ("combine", "goodvoxels", "families", "glibc"):
+        fns[f"original-{w}"] = lambda x, w=w: fo.entry(x, TOOL, w)
     for w in what:
-        print("done", fns[w](c).dir)
+        print("done", fns[w](c).dir, flush=True)

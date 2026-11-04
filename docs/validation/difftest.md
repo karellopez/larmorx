@@ -127,6 +127,8 @@ and `::test_the_sizing_laws_and_a_case_predicted_over_the_limit`.
 | `fsl-maths` | `parity.fsl_maths_replica` (a `Run` of fslmaths' arguments; inputs as `@dt:` names) | replica vs fslmaths | six kinds of images (scan-like heads, series, masks, z and p maps, tensors) on grids of 6 to 32 voxels per axis; chains of one to four operations drawn for the current image from every family (arithmetic with numbers and images, thresholds, functions, kernels and filters, morphology, subsampling, edges, reductions along each dimension, statistical transforms, `-roi`, `-bptf`, TFCE, ROC, the tensor's decomposition), `-dt`, `-odt`, the output's name and `FSLOUTPUTTYPE` (not drawn: the record's refusals and crashes, `-rand`, `-randn` without `-seed`; since 2026-11-03) |
 | `fsl-stats` | `parity.fsl_stats_replica` (a `Run` of fslstats' arguments, the `direct` kind) | replica vs fslstats | the same kinds of images and masks; one to five options in order, or fMRIPrep's (goodvoxels' `-M`, `-S`) and BET's (`-l <t> -C`) forms, with `-t`, `-K` and `-json` (since 2026-11-03) |
 | `fsl-topup-original` | `parity.fsl_topup` (`difftest_case`; the replica's draws, `difftest/tools/fsl_topup_original.py`, from the `fsl-topup` stream, so the replica trial's seed serves every FSL run from the oracle cache; a random case's band: FSL with its read-out times changed in their last float bit, through the cache; the permanent cases in `validation/difftest/cases/fsl-topup-original/` (7)) | clean-room original vs topup and applytopup | the same as `fsl-topup` (since 2026-11-03; its trial with `LARMORX_DIFFTEST_CACHE_MODE=use`: 14,400 cases in 11 minutes, 7,401 agree, the 6,999 others triaged by category in `triage.toml`) |
+| `fsl-maths-original` | `parity.fsl_maths` (`difftest/tools/fsl_avwutils_original.py`: the replica's draws from the `fsl-maths` stream, so the replica trial's seed serves its FSL runs from the oracle cache; the suite's `direct` payloads; the permanent cases in `validation/difftest/cases/fsl-maths-original/` (17)) | clean-room original vs fslmaths | the same as `fsl-maths` (since 2026-11-03; its trial with `LARMORX_DIFFTEST_CACHE_MODE=use`: 150,000 cases, 143,191 agree, 804 differ only by a named correction, the 6,005 others re-run with the final build and triaged by category in `triage.toml`) |
+| `fsl-stats-original` | `parity.fsl_stats` (the same module, the `fsl-stats` stream; the permanent cases in `validation/difftest/cases/fsl-stats-original/` (4)) | clean-room original vs fslstats | the same as `fsl-stats` (since 2026-11-03; the same trial: 150,000 cases, 149,214 agree, 7 differ only by a named correction, the 779 others triaged in `triage.toml`) |
 | `resample-series` | `parity.resample_series` | port vs fMRIPrep's `ResampleSeries` | series, head motion, coregistration, targets, field maps, orders, modes |
 
 **Verdicts** (`difftest/core.py`): *agree* (the parity runner passed, or both programs rejected the
@@ -273,7 +275,16 @@ Random inputs must not make the cache grow without bound, and every finding must
   `oracles/difftest/2026-11-03-fsl-maths-replica`, seed `fsl-maths-trial`, 24 minutes, 13 jobs at
   one thread, 1.5 GiB per case: 183,983 cases, fslmaths 114,906 (one difference: GLIBC-07, the FFT's
   twiddle factors) and fslstats 69,077 (nine: the replica's, fixed), after a one-minute check run
-  of 5,186 cases (three of the replica's, fixed)).
+  of 5,186 cases (three of the replica's, fixed); their clean-room originals' trial of the same
+  day the fourth: `oracles/difftest/2026-11-03-fsl-maths-original`, seed `fsl-maths-trial` (the
+  replica trial's cases drawn again, then more), 20 minutes, 13 jobs at one thread, 1.5 GiB per
+  case: 300,000 cases; fslmaths 150,000 (143,191 agree, 804 a named correction only, 6,005
+  differ) and fslstats 150,000 (149,214, 7 and 779); every finding re-run with the final build
+  and put in one category (`validation/investigations/cleanroom-maths/trial_triage.json`): 5,168
+  the original's mistakes, fixed with 21 permanent cases, and 58 chains those fixes reach, 170
+  the suite's, 1,338 explained, 33
+  expected (`-subsamp2offc`'s means), 7 FSL-75 (registered), 10 open (8 display ranges after
+  `-range` in their last bits, 2 `-roc` curve numbers 2.4e-7 and 5e-7 from FSL's)).
 - a run whose original varies on its own machine is never cached, whatever the case's texts say:
   the cache applies ANTs' program-level rules to every ITK run (`policy.ants_never`: the
   velocity-field stages' clock-seeded sampling, ANTS-82; a smaller second image read past its

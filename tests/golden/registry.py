@@ -417,6 +417,45 @@ def blip_series() -> lx.Image:
     return _frozen(blip("up").with_data(np.asfortranarray(v)))
 
 
+# --- fslmaths' and fslstats' clean-room originals ----------------------------------------------
+
+
+@functools.cache
+def anat_nan() -> lx.Image:
+    """``signed`` with five non-finite voxels (NaN at three, +inf and -inf at one each): the
+    filters', reductions' and statistics' NaN paths (every NaN they make from numbers is x86-64's
+    default NaN on every platform)."""
+    v = signed().data.copy()
+    for at, x in (((3, 4, 5), np.nan), ((12, 10, 8), np.nan), ((16, 3, 10), np.nan),
+                  ((20, 15, 3), np.inf), ((5, 17, 12), -np.inf)):  # fmt: skip
+        v[at] = x
+    return _frozen(signed().with_data(v))
+
+
+@functools.cache
+def bold_nan() -> lx.Image:
+    """``bold`` with one voxel NaN in its second volume and one +inf in its third."""
+    v = bold().data.copy()
+    v[4, 5, 6, 1] = np.nan
+    v[10, 3, 2, 2] = np.inf
+    return _frozen(bold().with_data(np.asfortranarray(v)))
+
+
+@functools.cache
+def tensor6() -> lx.Image:
+    """``-tensor_decomp``'s input: six volumes (Dxx, Dxy, Dxz, Dyy, Dyz, Dzz) of 6 x 5 x 4
+    voxels (the operation needs six; 720 voxels in all), diagonally dominant, multiples of
+    1/1000; one voxel all zero."""
+    shape = (6, 5, 4)
+    diag = [(ints(40 + k, shape, 500, 3000) / 1000) for k in range(3)]
+    off = [(ints(43 + k, shape, -300, 300) / 1000) for k in range(3)]
+    v = np.stack([diag[0], off[0], off[1], diag[1], off[2], diag[2]], axis=-1)
+    v[0, 0, 0, :] = 0
+    aff = affine(shape, (2.0, 2.0, 2.0), oblique=False)
+    data = np.asfortranarray(v.astype(np.float32))
+    return _frozen(lx.Image(data, aff, header_for(data, aff)))
+
+
 def _write_analyze(path: Path) -> None:
     """A big-endian int16 ANALYZE 7.5 pair (12 x 10 x 8) whose voxel sizes' product is negative
     (-2, 2, 2: FSL reads it radiologically, without the x reversal) and whose scale field
@@ -644,6 +683,9 @@ _WRITERS: dict[str, Callable[[Path], None]] = {
     "blip_up.nii": lambda p: lx.save(blip("up"), p),
     "blip_down.nii": lambda p: lx.save(blip("down"), p),
     "blip_series.nii": lambda p: lx.save(blip_series(), p),
+    "anat_nan.nii": lambda p: lx.save(anat_nan(), p),
+    "bold_nan.nii": lambda p: lx.save(bold_nan(), p),
+    "tensor6.nii": lambda p: lx.save(tensor6(), p),
     "analyze_scaled.hdr": _write_analyze,
     "identity.mat": lambda p: p.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),
     "series.nii": _write_scaled_series,
@@ -1046,44 +1088,10 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
-#: and since 2026-11-03 FAST, topup and applytopup have theirs (``lx.fsl.fast``'s,
-#: ``lx.fsl.topup``'s and ``lx.fsl.applytopup``'s cases below); fslmaths and fslstats
-#: (2026-11-03: their generic functions and typed wrappers) have their replicas only, until
-#: their clean-room originals are written.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.add_noise": "fsl fslmaths",
-    "lx.fsl.apply_mask": "fsl fslmaths",
-    "lx.fsl.arithmetic": "fsl fslmaths",
-    "lx.fsl.bandpass_temporal_filter": "fsl fslmaths",
-    "lx.fsl.binarise": "fsl fslmaths",
-    "lx.fsl.collapse": "fsl fslmaths",
-    "lx.fsl.dog_edge": "fsl fslmaths",
-    "lx.fsl.fslmaths": "fsl fslmaths",
-    "lx.fsl.grid": "fsl fslmaths",
-    "lx.fsl.normalise_intensity": "fsl fslmaths",
-    "lx.fsl.roc": "fsl fslmaths",
-    "lx.fsl.roi": "fsl fslmaths",
-    "lx.fsl.smooth": "fsl fslmaths",
-    "lx.fsl.spatial_filter": "fsl fslmaths",
-    "lx.fsl.statistical": "fsl fslmaths",
-    "lx.fsl.subsample2": "fsl fslmaths",
-    "lx.fsl.tensor_decomp": "fsl fslmaths",
-    "lx.fsl.tfce": "fsl fslmaths",
-    "lx.fsl.tfce_support": "fsl fslmaths",
-    "lx.fsl.threshold": "fsl fslmaths",
-    "lx.fsl.unary": "fsl fslmaths",
-    "lx.fsl.bounding_roi": "fsl fslstats",
-    "lx.fsl.centre_of_gravity": "fsl fslstats",
-    "lx.fsl.extremum_position": "fsl fslstats",
-    "lx.fsl.fslstats": "fsl fslstats",
-    "lx.fsl.image_entropy": "fsl fslstats",
-    "lx.fsl.image_histogram": "fsl fslstats",
-    "lx.fsl.image_mean": "fsl fslstats",
-    "lx.fsl.image_percentile": "fsl fslstats",
-    "lx.fsl.image_range": "fsl fslstats",
-    "lx.fsl.image_std": "fsl fslstats",
-    "lx.fsl.image_volume": "fsl fslstats",
-}
+#: and since 2026-11-03 FAST, topup, applytopup, fslmaths and fslstats have theirs (the cases
+#: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
+#: functions below): no public function runs a replica-only tool now.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -4942,3 +4950,337 @@ def _(ctx: Context) -> dict[str, Any]:
     out = ctx.out("out")
     _flirt(ctx, "-in", a, "-ref", a, "-applyxfm", "-init", ctx.file("identity.mat"), "-out", out)
     return {"image": Nifti(f"{out}.nii.gz")}
+
+
+# --- fslmaths and fslstats (the clean-room originals) ------------------------------------------
+
+
+def _maths_files(ctx: Context) -> None:
+    """fslmaths' and fslstats' inputs in the case's directory, by their bare names."""
+    for name in ("anat.nii", "anat2.nii", "signed.nii", "mask.nii", "labels.nii", "bold.nii",
+                 "anat_nan.nii", "bold_nan.nii", "tensor6.nii"):  # fmt: skip
+        shutil.copy(ctx.file(name), ctx.dir / name)
+
+
+def _maths(ctx: Context, *argv: str, upstream_defects: str = "fix") -> str:
+    """``larmorx fsl fslmaths <argv...>`` (the clean-room original) in the case's directory, on
+    one thread; its standard output."""
+    return _in_dir(ctx, lambda: _fsl(ctx, "fslmaths", *argv, upstream_defects=upstream_defects))
+
+
+def _maths_status(ctx: Context, tool: str, *argv: str, upstream_defects: str = "fix"):
+    return _in_dir(ctx, lambda: _fsl_status(ctx, tool, *argv, upstream_defects=upstream_defects))
+
+
+@case("cli.fsl.fslmaths", covers=("cli:fsl fslmaths",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl fslmaths``: fMRIPrep's mask product; the voxelwise functions whose NaN
+    and infinities come from numbers (the square root and logarithm of negative values, 0 / 0
+    and x / 0, inf - inf and 0 * inf) in single and double precision; thresholds by value
+    and robust range, the binarisations, the hole filling and the index; the computing and
+    output types (``-dt``, ``-odt`` char, short, int), ``-seed`` with ``-rand`` and ``-randn``,
+    ``-grid``, ``-save`` and ``-restart``; FSL-151's conversion of values beyond char (the
+    infinities, the NaN) reproduced and corrected; the usage text and an unknown operation."""
+    _maths_files(ctx)
+    m = _maths
+    m(ctx, "mask.nii", "-mul", "mask.nii", "mul")
+    m(ctx, "signed.nii", "-sqrt", "sqrt")
+    m(ctx, "signed.nii", "-log", "log")
+    m(ctx, "signed.nii", "-div", "0", "div0")
+    # NaN made from numbers: inf - inf, 0 * inf (x86-64's default NaN on every platform)
+    m(ctx, "anat_nan.nii", "-sub", "anat_nan.nii", "nan_sub")
+    m(ctx, "anat_nan.nii", "-mul", "0", "nan_mul")
+    m(ctx, "-dt", "double", "anat_nan.nii", "-mul", "0", "nan_dbl", "-odt", "double")
+    m(ctx, "-dt", "double", "signed.nii", "-mul", "0.5", "-exp", "-sqrt", "-mul", "anat_nan.nii", "dbl", "-odt", "double")  # fmt: skip
+    m(ctx, "anat.nii", "-thr", "100", "-uthr", "400", "-bin", "-fillh", "-mas", "mask.nii", "thr", "-odt", "char")  # fmt: skip
+    m(ctx, "anat.nii", "-thrp", "20", "-uthrP", "90", "-binv", "-index", "idx", "-odt", "int")
+    m(ctx, "signed.nii", "-recip", "-abs", "-nan", "-sqr", "-div", "anat2.nii", "rec", "-odt", "short")  # fmt: skip
+    m(ctx, "anat.nii", "-seed", "7", "-rand", "-save", "rand", "-restart", "anat.nii", "-seed", "9", "-randn", "-grid", "50", "4", "randn")  # fmt: skip
+    m(ctx, "anat_nan.nii", "-nanm", "-add", "anat_nan.nii", "-sub", "1", "-rem", "7", "-max", "signed.nii", "-min", "300", "-range", "rng")  # fmt: skip
+    rep = _maths_status(ctx, "fslmaths", "anat_nan.nii", "-mul", "1000", "conv_rep", "-odt", "char", upstream_defects=REPRODUCE)  # fmt: skip
+    fix = _maths_status(ctx, "fslmaths", "anat_nan.nii", "-mul", "1000", "conv_fix", "-odt", "char")  # fmt: skip
+    usage = _maths_status(ctx, "fslmaths")
+    unknown = _maths_status(ctx, "fslmaths", "anat.nii", "-nonsense", "x")
+    return {
+        **_written(
+            ctx,
+            "mul",
+            "sqrt",
+            "log",
+            "div0",
+            "dbl",
+            "thr",
+            "idx",
+            "rec",
+            "rand",
+            "randn",
+            "rng",
+            "conv_",
+            "nan_",
+        ),
+        **_status_outputs("reproduce", rep),
+        **_status_outputs("fix", fix),
+        **_status_outputs("usage", usage),
+        **_status_outputs("unknown", unknown),
+    }
+
+
+@case("cli.fsl.fslmaths.filters")
+def _(ctx: Context) -> dict[str, Any]:
+    """fslmaths' kernels and filters on an image holding NaN and infinities (their fast paths
+    recompute NaN voxels by x86-64's rules): the separable Gaussian (``-s``) and box (``-fmean``
+    after ``-kernel boxv``), the direct sums of a sphere (``-fmean``, ``-fmeanu``), the
+    morphology (``-dilM``, ``-dilD``, ``-dilF``, ``-ero``, ``-eroF``, ``-dilall``, ``-fmedian``),
+    a kernel image, the subsamplings, ``-edge``, ``-dog_edge``, ``-inm`` and ``-ing``, and an
+    even kernel's off-centre warning."""
+    _maths_files(ctx)
+    m = _maths
+    m(ctx, "anat_nan.nii", "-s", "2", "s2")
+    m(ctx, "anat_nan.nii", "-kernel", "boxv", "3", "-fmean", "boxv")
+    m(ctx, "anat_nan.nii", "-kernel", "sphere", "4", "-fmean", "sph_fmean")
+    m(ctx, "anat_nan.nii", "-kernel", "sphere", "4", "-fmeanu", "sph_fmeanu")
+    m(ctx, "anat.nii", "-kernel", "box", "5", "-dilM", "-dilD", "-dilF", "morph1")
+    m(ctx, "anat_nan.nii", "-kernel", "3D", "-ero", "-eroF", "-fmedian", "morph2")
+    m(ctx, "anat.nii", "-mas", "mask.nii", "-dilall", "dilall")
+    m(ctx, "anat.nii", "-kernel", "gauss", "1.5", "-fmean", "gauss")
+    m(ctx, "tensor6.nii", "-Tmean", "kern")
+    m(ctx, "anat.nii", "-kernel", "file", "kern.nii.gz", "-fmeanu", "kfile")
+    m(ctx, "anat_nan.nii", "-subsamp2", "sub")
+    m(ctx, "anat.nii", "-subsamp2offc", "suboffc")
+    m(ctx, "anat_nan.nii", "-edge", "edge")
+    m(ctx, "anat.nii", "-dog_edge", "1", "2", "dog")
+    m(ctx, "bold.nii", "-inm", "1000", "inm")
+    m(ctx, "bold.nii", "-ing", "1000", "ing")
+    even = _maths_status(ctx, "fslmaths", "anat.nii", "-kernel", "boxv3", "4", "3", "3", "-dilM", "even")  # fmt: skip
+    return {
+        **_written(
+            ctx,
+            "s2",
+            "boxv",
+            "sph_",
+            "morph",
+            "dilall",
+            "gauss",
+            "kern",
+            "kfile",
+            "sub",
+            "edge",
+            "dog",
+            "inm",
+            "ing",
+            "even",
+        ),
+        **_status_outputs("even", even),
+    }
+
+
+@case("cli.fsl.fslmaths.series")
+def _(ctx: Context) -> dict[str, Any]:
+    """fslmaths on a series holding NaN and +inf: the reductions along T (``-Tmean``,
+    ``-Tstd``, ``-Tmedian``, ``-Tperc``, ``-Tar1``, ``-Tmaxn``, ``-Tmax``, ``-Tmin``) and along X,
+    Y, Z; ``-bptf`` (its blocks of voxels recompute NaN by x86-64's rules); ``-roi``; the
+    statistical transforms (``-ztop`` of the infinities, ``-ptoz``, ``-rank``, ``-ranknorm``,
+    ``-pval``, ``-pval0``, ``-cpval``); TFCE (``-tfce``, ``-tfceS``, ``-tfce_minT``,
+    ``-tfce_delta``); ``-roc`` (its curve and printed line); ``-tensor_decomp`` (nine images)."""
+    _maths_files(ctx)
+    m = _maths
+    for stat in ("mean", "std", "median", "ar1", "maxn", "max", "min"):
+        m(ctx, "bold_nan.nii", f"-T{stat}", f"rt_{stat}")
+    m(ctx, "bold_nan.nii", "-Tperc", "30", "rt_perc")
+    m(ctx, "anat_nan.nii", "-Xmax", "-Ymean", "-Zstd", "xyz")
+    m(ctx, "bold_nan.nii", "-bptf", "2", "1", "bptf")
+    m(ctx, "bold.nii", "-roi", "1", "10", "2", "8", "0", "-1", "1", "2", "roi")
+    m(ctx, "anat_nan.nii", "-div", "100", "-ztop", "ztop")
+    m(ctx, "anat.nii", "-div", "1000", "-ptoz", "ptoz")
+    m(ctx, "bold.nii", "-rank", "rank")
+    m(ctx, "bold.nii", "-ranknorm", "ranknorm")
+    for p in ("-pval", "-pval0", "-cpval"):
+        m(ctx, "bold.nii", p, f"pv_{p[1:]}")
+    m(ctx, "signed.nii", "-tfce", "2", "0.5", "6", "tfce")
+    m(ctx, "signed.nii", "-tfce_minT", "5", "-tfce_delta", "3", "-tfce", "2", "1", "26", "tfce2")
+    m(ctx, "signed.nii", "-tfceS", "2", "0.5", "18", "12", "10", "8", "200", "tfces")
+    roc = m(ctx, "signed.nii", "-div", "10", "-roc", "-0.05", "roc.txt", "mask.nii", "roc")
+    m(ctx, "tensor6.nii", "-tensor_decomp", "dti")
+    return {
+        **_written(
+            ctx, "rt_", "xyz", "bptf", "roi", "ztop", "ptoz", "rank", "pv_", "tfce", "roc", "dti"
+        ),
+        "roc:stdout": roc,
+    }
+
+
+@case("cli.fsl.fslstats", covers=("cli:fsl fslstats",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl fslstats``: every statistic on an image holding NaN and infinities (``-r``,
+    ``-R``, ``-m``, ``-M``, ``-s``, ``-S``, ``-v``, ``-V``, ``-x``, ``-X``, ``-c``, ``-C``,
+    ``-w``, ``-e``, ``-E``, ``-p``, ``-P``, ``-h``, ``-H``, ``-a``, ``-n``, the hidden ``-D``)
+    and with thresholds, a mask and a difference image; fMRIPrep's (``-M``, ``-S``) and BET's
+    (``-l 0.001 -C``) forms; ``-t`` on a series, ``-K`` with labels, ``-json``; the usage text
+    and an unknown option."""
+    _maths_files(ctx)
+    calls = {
+        "all": (
+            "anat_nan.nii",
+            "-r",
+            "-R",
+            "-m",
+            "-M",
+            "-s",
+            "-S",
+            "-v",
+            "-V",
+            "-x",
+            "-X",
+            "-c",
+            "-C",
+            "-w",
+            "-e",
+            "-E",
+            "-p",
+            "50",
+            "-P",
+            "90",
+            "-D",
+        ),
+        "finite": (
+            "anat_nan.nii",
+            "-n",
+            "-a",
+            "-m",
+            "-s",
+            "-h",
+            "8",
+            "-H",
+            "5",
+            "0",
+            "500",
+            "-l",
+            "10",
+            "-u",
+            "400",
+            "-M",
+            "-S",
+            "-k",
+            "mask.nii",
+            "-M",
+            "-S",
+            "-d",
+            "anat2.nii",
+            "-m",
+        ),
+        "bet": ("anat.nii", "-l", "0.001", "-C"),
+        "series": ("-t", "bold_nan.nii", "-M", "-S", "-r"),
+        "labels": ("-K", "labels.nii", "anat.nii", "-M", "-V"),
+        "json": ("-json", "-t", "bold.nii", "-M", "-p", "25", "-w"),
+        "usage": (),
+        "unknown": ("anat.nii", "-Q"),
+    }
+    out: dict[str, Any] = {}
+    for name, argv in calls.items():
+        out.update(_status_outputs(name, _maths_status(ctx, "fslstats", *argv)))
+    return out
+
+
+def _orig(fn: Callable[..., Any], *args: Any, **kw: Any) -> Any:
+    """A fslmaths or fslstats function through the clean-room original, on one thread, the
+    D13 notices it warns of silenced."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return fn(*args, implementation="original", **kw)
+
+
+@case("py.fsl.maths.voxelwise", covers=("lx.fsl.fslmaths", "lx.fsl.arithmetic", "lx.fsl.apply_mask", "lx.fsl.threshold", "lx.fsl.unary", "lx.fsl.binarise", "lx.fsl.add_noise", "lx.fsl.grid"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """fslmaths' generic function and its voxelwise wrappers through the original, on images in
+    memory: NaN and infinities from numbers (``sqrt``, ``log``, 0 / 0), image operands, the
+    robust-range thresholds, the inverted binarisation, seeded noise, the grid."""
+    f = lx.fsl
+    return {
+        "fslmaths": _orig(f.fslmaths, anat_nan(), "-sqrt", "-mul", 2).data,
+        "nan_mul": _orig(f.arithmetic, anat_nan(), "multiply", 0).data,
+        "nan_sub": _orig(f.arithmetic, anat_nan(), "subtract", anat_nan()).data,
+        "divide0": _orig(f.arithmetic, signed(), "divide", 0).data,
+        "multiply": _orig(f.arithmetic, anat(), "multiply", anat2(), odt="double").data,
+        "apply_mask": _orig(f.apply_mask, anat(), mask()).data,
+        "threshold": _orig(f.threshold, anat(), 100, 400).data,
+        "threshold_robust": _orig(f.threshold, anat(), 20, 80, of="robust_range").data,
+        "log": _orig(f.unary, signed(), "log").data,
+        "binv": _orig(f.binarise, anat(), invert=True).data,
+        "noise": _orig(f.add_noise, anat(), "gaussian", seed=3).data,
+        "grid": _orig(f.grid, anat(), 5, 4).data,
+    }
+
+
+@case("py.fsl.maths.filters", covers=("lx.fsl.smooth", "lx.fsl.spatial_filter", "lx.fsl.dog_edge", "lx.fsl.subsample2", "lx.fsl.normalise_intensity"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """The filter wrappers through the original: the Gaussian and a sphere's direct sum on an
+    image holding NaN and infinities, a box's mode, the difference of Gaussians, the centred
+    subsampling (its geometry) and the per-volume intensity normalisation."""
+    f = lx.fsl
+    sub = _orig(f.subsample2, anat(), centred=True)
+    return {
+        "smooth": _orig(f.smooth, anat_nan(), 2.0).data,
+        "fmeanu": _orig(f.spatial_filter, anat_nan(), "fmeanu", kernel=("sphere", 4)).data,
+        "dilD": _orig(f.spatial_filter, anat(), "dilD", kernel=("box", 5)).data,
+        "dog_edge": _orig(f.dog_edge, anat(), 1, 2).data,
+        **image_outputs("subsample2", sub, geometry=True),
+        "normalise": _orig(f.normalise_intensity, bold(), 1000, per_volume=True).data,
+    }
+
+
+@case("py.fsl.maths.series", covers=("lx.fsl.collapse", "lx.fsl.bandpass_temporal_filter", "lx.fsl.roi", "lx.fsl.statistical"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """The series wrappers through the original on a series holding NaN and +inf: the standard
+    deviation along T, a percentile, a maximum along X, the temporal band-pass filter, a region,
+    ``ztop`` of infinities and ``ranknorm``."""
+    f = lx.fsl
+    return {
+        "std": _orig(f.collapse, bold_nan(), "std").data,
+        "perc": _orig(f.collapse, bold(), "perc", percentile=30).data,
+        "xmax": _orig(f.collapse, anat_nan(), "max", axis="X").data,
+        "bptf": _orig(f.bandpass_temporal_filter, bold_nan(), 2, 1).data,
+        "roi": _orig(f.roi, bold(), x=(1, 10), y=(2, 8), t=(1, 2)).data,
+        "ztop": _orig(f.statistical, anat_nan(), "ztop").data,
+        "ranknorm": _orig(f.statistical, bold(), "ranknorm").data,
+    }
+
+
+@case("py.fsl.maths.special", covers=("lx.fsl.tfce", "lx.fsl.tfce_support", "lx.fsl.roc", "lx.fsl.tensor_decomp"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """TFCE and its support area, ``-roc``'s area, quartiles and curve, and the tensor's
+    decomposition (its nine images) through the original."""
+    f = lx.fsl
+    roc = _orig(f.roc, signed().with_data(signed().data / 10), mask(), 0.05)
+    t = _orig(f.tensor_decomp, tensor6())
+    return {
+        "tfce": _orig(f.tfce, signed(), 2.0, 0.5, 6).data,
+        "tfce_nan": _orig(f.tfce, anat_nan(), 2.0, 0.5, 6).data,
+        "tfce_support": _orig(f.tfce_support, signed(), (12, 10, 8), 200.0, 2.0, 0.5, 18).data,
+        "roc_aroc": roc.aroc,
+        "roc_quartiles": roc.aroc_quartiles,
+        "roc_curve": roc.curve,
+        **{k: getattr(t, k).data for k in ("l1", "l2", "l3", "fa", "md", "mo", "v1", "v2", "v3")},
+    }
+
+
+@case("py.fsl.stats", covers=("lx.fsl.fslstats", "lx.fsl.image_mean", "lx.fsl.image_std", "lx.fsl.image_percentile", "lx.fsl.image_range", "lx.fsl.image_entropy", "lx.fsl.image_volume", "lx.fsl.centre_of_gravity", "lx.fsl.extremum_position", "lx.fsl.bounding_roi", "lx.fsl.image_histogram"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """fslstats' generic function and its typed wrappers through the original: the JSON of an
+    image holding NaN and infinities, masked and per-volume means, the nonzero voxels' standard
+    deviation, a percentile, the robust range, the entropy, a mask's volume, the centre of
+    gravity, the maximum's position, the bounding box and a histogram with limits."""
+    f = lx.fsl
+    return {
+        "fslstats": _orig(f.fslstats, anat_nan(), "-r", "-R", "-m", "-s", "-x", json=True),
+        "mean_masked": _orig(f.image_mean, anat(), mask=mask()),
+        "mean_volumes": _orig(f.image_mean, bold_nan(), per_volume=True),
+        "std_nonzero": _orig(f.image_std, anat(), nonzero=True),
+        "percentile": _orig(f.image_percentile, anat(), 90),
+        "robust_range": _orig(f.image_range, anat(), robust=True),
+        "entropy": _orig(f.image_entropy, anat()),
+        "volume": _orig(f.image_volume, mask()),
+        "cog": _orig(f.centre_of_gravity, anat()),
+        "max_at": _orig(f.extremum_position, anat()),
+        "bounding": _orig(f.bounding_roi, mask()),
+        "histogram": _orig(f.image_histogram, anat(), 10, limits=(0, 500)),
+    }

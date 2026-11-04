@@ -739,7 +739,11 @@ the order given, `-v` among them with `-v`). Every temporary file is named `<out
 written in `FSLOUTPUTTYPE`'s format and is kept with `-d` (the cleanup, FSL-46, otherwise removes
 it); **(observed)** with `-d` the files listed below are exactly the ones FSL leaves. A program
 that fails makes the script fail (§5.1: `bet failed during command:<args>` on standard output,
-exit 1), unless said otherwise. The data types below are **(observed)** for an int16 input.
+exit 1), unless said otherwise. One exception in FSL: `standard_space_roi`, run with `-d`, ends
+with status 0 even when one of its own programs failed (it checks no step), so FSL's script goes
+on; larmorx's default stops `standard_space_roi` at its first failure with status 1 (its FSL-214),
+so the bet script fails there, FSL-214 named; `reproduce` goes on as FSL does. The data types below
+are **(observed)** for an int16 input.
 
 **`-S`: the eyes and optic nerves removed** (SIENA's cleanup; "disables -o" means only that the
 outline, and the mesh, reach the temporary run alone). In order:

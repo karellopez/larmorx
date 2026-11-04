@@ -368,8 +368,11 @@ in dc's decimal arithmetic; a mean or standard deviation that is not a number ha
 and writes its messages. The replica's dc follows GNU dc 1.4.1 for every character `fslstats`
 can print (numbers in the input base, `_`, `+ - * / ^`, `k`, `p`, `n`, `f`, `a`, `i`, the
 message of any other character; zero printed `0` at any scale), checked against GNU dc on 21
-expressions (`bet.rs`, `dc::tests`). Parity cases `defects/eyes-threshold-exponent` (a phantom ×
-3000) and `defects/eyes-threshold-nan` (NaN voxels in the brain).
+expressions (`bet.rs`, `dc::tests`). Parity case `defects/eyes-threshold-exponent` (a phantom ×
+3000: FSL's `fslmaths -uthr` fails on dc's words, the default computes the threshold). NaN voxels in
+the input reach FLIRT inside standard_space_roi first (FSL-14; `defects/eyes-nan`: its
+registration fails, `convert_xfm` aborts, the script goes on and bet2 aborts), so the NaN branch
+is checked by the unit test `bet::tests::eye_threshold_fsl_216`.
 
 ### The standard images the options read (FSL 6.0.7.23's fsl-data_standard 2208.0)
 

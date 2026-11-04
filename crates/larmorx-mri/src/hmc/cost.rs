@@ -11,7 +11,7 @@
 
 use rayon::prelude::*;
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 
 use super::interp::trilinear_inside;
 use super::kernels::sinc_cost;
@@ -1079,12 +1079,13 @@ impl Accumulator for MiRecord {
 
 /// `Σ −p·ln p` over the cells with a positive count, `p = count/n`, in index order, each term
 /// rounded to float32 (single-precision logarithm), and the sum of those counts.
-fn entropy(cells: &[f32], n: f32) -> (f32, f32) {
+/// The logarithms are `libm`'s (glibc's `logf` with `reproduce`, GLIBC-07).
+fn entropy(cells: &[f32], n: f32, libm: &Libm) -> (f32, f32) {
     let (mut h, mut total) = (0.0f32, 0.0f32);
     for &c in cells {
         if c > 0.0 {
             let p = c / n;
-            h += -p * math::logf(p);
+            h += -p * libm.logf(p);
             total += c;
         }
     }
@@ -1105,11 +1106,13 @@ pub fn mutual_info(
     bins: usize,
     normalised: bool,
     parallel: bool,
+    libm: &Libm,
 ) -> f32 {
-    mutual_info_weighted(bin_grid, test, b, bins, normalised, parallel, None)
+    mutual_info_weighted(bin_grid, test, b, bins, normalised, parallel, None, libm)
 }
 
 /// [`mutual_info`] with each point weighted by `weight` when one is given.
+#[allow(clippy::too_many_arguments)]
 pub fn mutual_info_weighted(
     bin_grid: &Volume,
     test: &TestVolume<'_>,
@@ -1118,6 +1121,7 @@ pub fn mutual_info_weighted(
     normalised: bool,
     parallel: bool,
     weight: Option<PointWeight<'_>>,
+    libm: &Libm,
 ) -> f32 {
     let test_bins = test
         .test_bins
@@ -1147,19 +1151,19 @@ pub fn mutual_info_weighted(
     }
     // N: every point of the reference grid, sampled or not, as float32.
     let n = bin_grid.len() as f32;
-    let (mut h_joint, _) = entropy(&h.joint, n);
-    let (mut h_ref, _) = entropy(&h.reference, n);
-    let (mut h_test, overlap) = entropy(&h.test, n);
+    let (mut h_joint, _) = entropy(&h.joint, n, libm);
+    let (mut h_ref, _) = entropy(&h.reference, n, libm);
+    let (mut h_test, overlap) = entropy(&h.test, n, libm);
     if overlap > 0.0 {
         // The entropies of N points corrected to the `overlap` points that overlap.
         let rho = n / overlap;
-        let ln_rho = math::logf(rho);
+        let ln_rho = libm.logf(rho);
         h_joint = rho * h_joint - ln_rho;
         h_ref = rho * h_ref - ln_rho;
         h_test = rho * h_test - ln_rho;
     } else {
         // No overlap: the values of a bad registration.
-        let ln_b = math::log(bins as f64);
+        let ln_b = libm.log(bins as f64);
         h_joint = (2.0 * ln_b) as f32;
         h_ref = ln_b as f32;
         h_test = ln_b as f32;
@@ -1229,8 +1233,9 @@ mod tests {
         assert!(woods(&bg, &test, &b0, 64, false) < woods(&bg, &test, &b1, 64, false));
         let bg = bin_grid_mi(&grid, 64, false);
         for normalised in [false, true] {
-            let m0 = mutual_info(&bg, &test, &b0, 64, normalised, false);
-            let m1 = mutual_info(&bg, &test, &b1, 64, normalised, false);
+            let l = Libm::default();
+            let m0 = mutual_info(&bg, &test, &b0, 64, normalised, false, &l);
+            let m1 = mutual_info(&bg, &test, &b1, 64, normalised, false, &l);
             assert!(m0 < m1, "{normalised}: {m0} {m1}");
             // Stage 1's parallel path gives the same bits, at any thread count.
             for threads in [1, 3, 8] {
@@ -1238,7 +1243,7 @@ mod tests {
                     .num_threads(threads)
                     .build()
                     .unwrap();
-                let par = pool.install(|| mutual_info(&bg, &test, &b1, 64, normalised, true));
+                let par = pool.install(|| mutual_info(&bg, &test, &b1, 64, normalised, true, &l));
                 assert_eq!(par.to_bits(), m1.to_bits(), "{normalised} {threads}");
             }
         }
@@ -1294,14 +1299,15 @@ mod tests {
         far[0][3] = 1000.0;
         let b = voxel_map(&far, v.voxel_size, grid.voxel_size);
         let ln16 = 16f64.ln();
-        let mi = mutual_info(&bg, &test, &b, 16, false, false);
+        let l = Libm::default();
+        let mi = mutual_info(&bg, &test, &b, 16, false, false, &l);
         assert_eq!(mi, -((ln16 as f32 + ln16 as f32) - (2.0 * ln16) as f32));
-        let nmi = mutual_info(&bg, &test, &b, 16, true, false);
+        let nmi = mutual_info(&bg, &test, &b, 16, true, false, &l);
         assert_eq!(nmi, -((ln16 as f32 + ln16 as f32) / (2.0 * ln16) as f32));
         let flat = Volume::new(v.shape, v.voxel_size, vec![7.0; v.len()]);
         let test = TestVolume::new(&flat, 1.0);
         let b = voxel_map(&IDENTITY, v.voxel_size, grid.voxel_size);
-        let c = mutual_info(&bg, &test, &b, 16, true, false);
+        let c = mutual_info(&bg, &test, &b, 16, true, false, &l);
         assert!(c.is_finite() && c < 0.0, "{c}");
     }
 

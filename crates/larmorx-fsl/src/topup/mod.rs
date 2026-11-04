@@ -78,6 +78,8 @@ pub struct Params {
     pub linear: bool,
     /// The field's B-spline order (`--splineorder`: 3 or 2).
     pub order: u8,
+    /// glibc's `exp` in the smoothing (`reproduce`, GLIBC-07); correctly rounded otherwise.
+    pub glibc: bool,
 }
 
 /// Whether the volumes are displaced along different sets of axes (FSL-146: the two modes'
@@ -220,6 +222,8 @@ pub struct Estimate {
     /// subsampled, else none (§6: a subsampled last level's smoothing and subsampling are
     /// removed; observed, `thr/openblas`: one level of FWHM 4 mm, FSL's `--iout` is smoothed).
     pub fwhm_out: f64,
+    /// The run's choice of `exp` (glibc's with `reproduce`).
+    pub glibc: bool,
 }
 
 /// Runs the estimation (§4) on `volumes` (each `dims`, x fastest, radiological frame) with voxel
@@ -275,7 +279,7 @@ pub fn estimate(
         let imgs = match &cached {
             Some((cs, cf, im)) if *cs == s && cf.to_bits() == spec.fwhm.to_bits() => im.clone(),
             _ => {
-                let im = images::level_images(&prepared, s, spec.fwhm);
+                let im = images::level_images(&prepared, s, spec.fwhm, params.glibc);
                 cached = Some((s, spec.fwhm, im.clone()));
                 im
             }
@@ -331,6 +335,7 @@ pub fn estimate(
         warpres_last: last.warpres,
         movements: mov,
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
+        glibc: params.glibc,
     })
 }
 
@@ -345,7 +350,7 @@ pub enum LevelError {
 /// when it was not subsampled, [`Estimate::fwhm_out`]) interpolated on the input's grid.
 pub fn full_resolution(est: &Estimate, scans: &[Scan], regmod: RegMod) -> (Level, Eval) {
     let p = &est.prepared;
-    let imgs = images::level_images(p, 1, est.fwhm_out);
+    let imgs = images::level_images(p, 1, est.fwhm_out, est.glibc);
     let level = Level::new(
         imgs,
         p.dims,

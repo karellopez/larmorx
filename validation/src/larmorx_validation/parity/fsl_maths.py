@@ -30,6 +30,7 @@ What is compared (``specs/fslmaths.md`` §21), each output against FSL's:
 
 from __future__ import annotations
 
+import itertools
 import os
 import re
 import shutil
@@ -606,6 +607,19 @@ def _value_diff(x: np.ndarray, y: np.ndarray) -> str:
     return f"{bad.size} differ; first at {k.tolist()}: FSL {xr[k].tolist()} / original {yr[k].tolist()}"
 
 
+#: fslmaths' operations that name no GLIBC-07 (filters combining many function values:
+#: :data:`defects.UNNAMED_GLIBC`); its voxelwise functions name it exactly.
+UNNAMED_OPS = ("-s", "-dog_edge", "-bptf", "-tfce", "-tfceS", "-roc")
+
+
+def unnamed_glibc(args: list[str]) -> bool:
+    """Whether ``args`` hold an operation whose default may change the outputs without
+    naming GLIBC-07 (:data:`UNNAMED_OPS`, ``-kernel gauss``)."""
+    return any(a in UNNAMED_OPS for a in args) or any(
+        a == "-kernel" and b == "gauss" for a, b in itertools.pairwise(args)
+    )
+
+
 def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reproduced, before):
     """D13: the original's default run against its ``reproduce`` run."""
 
@@ -630,7 +644,12 @@ def fix_pass(checks: CheckList, prepare, args, settings, reproduced_dir, reprodu
             elif x[key].read_bytes() != y[key].read_bytes():
                 others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=rep._SILENT
+            checks,
+            entries,
+            change,
+            other_changes="; ".join(others),
+            silent_ok=rep._SILENT,
+            unnamed_ok=defects.UNNAMED_GLIBC if unnamed_glibc(list(args)) else (),
         )
 
 
@@ -676,10 +695,15 @@ def own_inputs() -> Path:
     first voxel NaN), ``asym`` (a 13 x 11 x 9 kernel, ``1 + x + 3 y + 7 z``); for ``-roc``:
     ``rocramp`` (6 x 5 x 4 x 2, ``x + 6 y + 30 z + 120 t``: its minimum lies in the truth's
     region), ``roctruthx`` (1 where x < 3, else 0), ``roctruthneg5`` (the same with its x = 5
-    plane -0.0005: inside the mask, below 0); the sform's voxel sizes of ``fsl_maths_replica``."""
+    plane -0.0005: inside the mask, below 0); for glibc's functions (GLIBC-07, ``reproduce``:
+    inputs where they and the correctly rounded ones give other values): ``dbl32`` (32³
+    float64, uniform in [-20, 20)), ``dblpos32`` (32³ float64, uniform in [0.001, 1000)),
+    ``flt24`` (24³ float32, uniform in [0, 1000)), ``dbl4d`` (8 x 8 x 6 x 40 float64, uniform in
+    [0, 1000)), ``tstat`` (20 x 20 x 16 float32, normal with standard deviation 3), each from its own seeded
+    generator; the sform's voxel sizes of ``fsl_maths_replica``."""
     ws = rep.workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v3.done"
+    marker = base / "v4.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -703,6 +727,16 @@ def own_inputs() -> Path:
     rep._save(base / "roctruthx.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
     tx[5] = -0.0005
     rep._save(base / "roctruthneg5.nii.gz", tx, dtype=np.float32, affine=rep._affine(tx.shape))
+    glibc = {
+        "dbl32": (1, lambda g: g.uniform(-20.0, 20.0, (32, 32, 32)), np.float64),
+        "dblpos32": (2, lambda g: g.uniform(0.001, 1000.0, (32, 32, 32)), np.float64),
+        "flt24": (3, lambda g: g.uniform(0.0, 1000.0, (24, 24, 24)), np.float32),
+        "dbl4d": (4, lambda g: g.uniform(0.0, 1000.0, (8, 8, 6, 40)), np.float64),
+        "tstat": (5, lambda g: g.normal(0.0, 3.0, (20, 20, 16)), np.float32),
+    }
+    for name, (seed, draw, dtype) in glibc.items():
+        v = draw(np.random.default_rng(20261104 + seed)).astype(dtype)
+        rep._save(base / f"{name}.nii.gz", v, dtype=dtype, affine=rep._affine(v.shape[:3]))
     marker.write_text("1\n", encoding="utf-8")
     return base
 
@@ -769,6 +803,67 @@ def _own_cases() -> dict[str, tuple[str, str, rep.Run]]:
             T,
             "-roc with a 4D truth image (its first volume, with the image library's warning)",
             rep._r("@rocim", "-roc", "0.05", "roc.txt", "@rocnoise", "@rocim", "out"),
+        ),
+        # GLIBC-07 (specs/fslmaths.md §7, §19): inputs where glibc 2.35's functions (FSL's,
+        # reproduce) and the correctly rounded ones (the default) give other values, so these
+        # paths of reproduce are checked against FSL; the voxelwise functions and -edge name
+        # GLIBC-07 in the default exactly where its values differ, the filters name nothing
+        # (defects.UNNAMED_GLIBC). Their parameters were found by black-box runs of both modes
+        # (validation/investigations/cleanroom-glibc-dbl/case_search.py).
+        **{
+            f"orig/glibc-double{op}": (
+                T,
+                f"{op}{' ' + arg if arg else ''} of a 32³ double image in double (-dt double "
+                f"-odt double): glibc's {fn} where it is not correctly rounded (GLIBC-07)",
+                rep._r(
+                    "-dt",
+                    "double",
+                    f"@orig:{image}",
+                    op,
+                    *((arg,) if arg else ()),
+                    "out",
+                    "-odt",
+                    "double",
+                ),
+            )
+            for op, arg, fn, image in (
+                ("-sin", "", "sin", "dbl32"),
+                ("-cos", "", "cos", "dbl32"),
+                ("-exp", "", "exp", "dbl32"),
+                ("-log", "", "log", "dblpos32"),
+                ("-pow", "1.7", "pow", "dblpos32"),
+            )
+        },
+        "orig/edge-double": (
+            T,
+            "-edge of a 32³ double image in double (-dt double -odt double): FSL's squares are "
+            "exact products (§10.4's pow(x, 2), as FSL is compiled: no glibc pow) and its terms "
+            "are added from z to x (observed)",
+            rep._r("-dt", "double", "@orig:dbl32", "-edge", "out", "-odt", "double"),
+        ),
+        "orig/glibc-s": (
+            T,
+            "-s 3.95 of a 24³ float image: a Gaussian tap whose expf differs between glibc's "
+            "and the correctly rounded one (GLIBC-07; the default names nothing)",
+            rep._r("@orig:flt24", "-s", "3.95", "out"),
+        ),
+        "orig/glibc-kernel-gauss": (
+            T,
+            "-kernel gauss 4.8 -fmean: the same for -kernel gauss (another tap)",
+            rep._r("@orig:flt24", "-kernel", "gauss", "4.8", "-fmean", "out"),
+        ),
+        "orig/glibc-bptf": (
+            T,
+            "-bptf 1.73 -1 of a double 4D image (-dt double -odt double): a high-pass weight "
+            "exp(-1/(2·1.73²)) whose glibc exp differs (GLIBC-07; the default names nothing)",
+            rep._r("-dt", "double", "@orig:dbl4d", "-bptf", "1.73", "-1", "out", "-odt", "double"),
+        ),
+        "orig/glibc-tfce": (
+            T,
+            "-tfce_delta 0.01 -tfce 1.7 0.5 6: about 1,170 thresholds, among them powers "
+            "(powf(h, 1.7), pow(s, 0.5)) where glibc's differ (GLIBC-07; the default names "
+            "nothing)",
+            rep._r("@orig:tstat", "-tfce_delta", "0.01", "-tfce", "1.7", "0.5", "6", "out"),
         ),
         "orig/roc-nodir": (
             T,

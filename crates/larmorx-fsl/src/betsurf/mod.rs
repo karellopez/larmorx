@@ -779,7 +779,14 @@ pub fn votes(
 /// The separable Gaussian of σ = `sigma` mm (§6.5): per axis σ in voxels `sigma/d`, the kernel
 /// of half-width `2 trunc(σ − 0.001) + 3` voxels and weights `exp(−j²/(2σ²))` normalised to sum
 /// 1, outside the grid 0; along x, then y, then z.
-pub fn smooth(data: Vec<f32>, shape: [usize; 3], voxel: [f64; 3], sigma: f64) -> Vec<f32> {
+/// The weights' `exp` is `libm`'s (glibc's with `reproduce`, GLIBC-07).
+pub fn smooth(
+    data: Vec<f32>,
+    shape: [usize; 3],
+    voxel: [f64; 3],
+    sigma: f64,
+    libm: &larmorx_core::math::Libm,
+) -> Vec<f32> {
     let [nx, ny, nz] = shape;
     let plane = nx * ny;
     let mut cur = data;
@@ -792,7 +799,7 @@ pub fn smooth(data: Vec<f32>, shape: [usize; 3], voxel: [f64; 3], sigma: f64) ->
         let s = sigma / voxel[a];
         let half = 2 * (s - 0.001).trunc().max(0.0) as i64 + 3;
         let mut w: Vec<f64> = (-half..=half)
-            .map(|j| larmorx_core::math::exp(-((j * j) as f64) / (2.0 * s * s)))
+            .map(|j| libm.exp(-((j * j) as f64) / (2.0 * s * s)))
             .collect();
         let total: f64 = w.iter().sum();
         for x in &mut w {
@@ -1022,7 +1029,13 @@ mod tests {
         let shape = [21, 21, 21];
         let mut v = vec![0.0f32; 21 * 21 * 21];
         v[(10 * 21 + 10) * 21 + 10] = 1.0;
-        let s = smooth(v, shape, [1.0; 3], 3.0);
+        let s = smooth(
+            v,
+            shape,
+            [1.0; 3],
+            3.0,
+            &larmorx_core::math::Libm::default(),
+        );
         let total: f64 = s.iter().map(|&x| f64::from(x)).sum();
         assert!((total - 1.0).abs() < 1e-5, "{total}");
     }

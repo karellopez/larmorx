@@ -5,7 +5,7 @@
 - **Validated:** `larmorx fsl fslstats` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/fslstats.md, Apache-2.0)
 - **Reference:** fslstats from FSL 6.0.7.23 (fsl-avwutils 2209.6), the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-stats --tier standard`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-stats --tier standard`
 - **Original programs:** 162 runs: 157 from the oracle cache, 5 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
@@ -77,7 +77,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (8ce1c6adf070) |
+| larmorx | 0.0.1 (be3db916dce3) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

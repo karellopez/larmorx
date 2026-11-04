@@ -674,15 +674,46 @@ def _compute_cases_original(e: fcache.Entry) -> None:
     )
 
 
+CASES_ORIGINAL_TEXT = (
+    "Every case of the clean-room original's record: its default mode, and each passing case's "
+    "files against FSL and FSL with correctly rounded maths"
+)
+
+
 def cases_original_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-original",
-        "Every case of the clean-room original's record: its default mode, and each passing "
-        "case's files against FSL and FSL with correctly rounded maths",
+        ctx.figures_context(), TOOL, "cases-original", CASES_ORIGINAL_TEXT,
         _compute_cases_original,
-    )
+    )  # fmt: skip
+
+
+def _emptied(d: Path) -> None:
+    """The outputs of a run directory being made again (the run writes the same files)."""
+    for f in d.iterdir():
+        shutil.rmtree(f) if f.is_dir() else f.unlink()
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIGINAL_RUNS`) of every
+    example's entry already computed made again, in their working directories with their
+    inputs (FSL's run with correctly rounded maths kept: the original's change does not touch
+    it), and every case of its record classified again (the ``cases-original`` entry, FSL's runs
+    served by the oracle-output cache)."""
+    fctx = ctx.figures_context()
+    for source in [run for _i, run, _v, _w in FMRIPREP] + list(REAL.values()):
+        name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+        e = fcache.Entry(fctx, TOOL, f"original-{name}", "")
+        if not e.done:
+            continue
+        info = e.info()
+        args, put, settings, _never, _ins = _source(source)
+        e.runs, e.extra = [], {}
+        for label, mode, n in ORIGINAL_RUNS:
+            _emptied(e.dir / label)
+            _original_run(e, label, args, put, settings, mode, n)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(fctx, TOOL, "cases-original", CASES_ORIGINAL_TEXT, _compute_cases_original,
+                     why)  # fmt: skip
 
 
 # ------------------------------------------------------------------------- the files
@@ -789,9 +820,10 @@ def _files_table(
     if counted:
         note += (
             " For the clean-room original, where the values are not the same, how many of the "
-            "file's values differ: from FSL's file, and in the last column from the file of FSL "
-            "with correctly rounded maths (the record holds them to specs/fast.md §11's "
-            "thresholds, not to FSL's bytes)."
+            "file's values differ: from FSL's file, and in the last two columns from the file of "
+            "FSL with correctly rounded maths (the record holds them to specs/fast.md §11's "
+            "thresholds, not to FSL's bytes; since 2026-11-04 its reproduce mode computes exp, "
+            "log, expf and logf as glibc 2.35 does and its default correctly rounded, GLIBC-07)."
         )
     return common.table(
         tid,
@@ -931,6 +963,8 @@ def _diffs_original(own: bool) -> list[dict]:
           common.ROLE_LX),
         d("original-cr", "original", "fsl-cr", "main",
           "clean-room original − FSL, correctly rounded maths", common.ROLE_LX),
+        d("ofix-cr", "original-fix", "fsl-cr", "main",
+          "clean-room original, default − FSL, correctly rounded maths", common.ROLE_LX),
         d("original1-original", "original-1", "original", "check",
           "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
         d("ofix-original", "original-fix", "original", "check",
@@ -989,7 +1023,10 @@ def _verdicts_original(
     diffs: list[dict], same: dict[str, bool], what: str, oinfo: dict, labels: dict[str, str]
 ):
     """The clean-room original's comparisons: verdicts from the metrics, against FSL as built,
-    FSL with correctly rounded maths and FSL's own last-bit band (``cr-fsl``)."""
+    FSL with correctly rounded maths and FSL's own last-bit band (``cr-fsl``). Since 2026-11-04
+    its reproduce mode computes exp, log, expf and logf as glibc 2.35 does and its default
+    correctly rounded (GLIBC-07, not named): the reproduce mode is held to FSL as built, the
+    default to FSL with correctly rounded maths."""
     by = {x["id"]: x for x in diffs}
     named = [n for n in oinfo.get("named", {}).get("original-fix", []) if n.startswith("FSL-")]
     shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
@@ -1018,17 +1055,59 @@ def _verdicts_original(
                 "original-cr": "With correctly rounded maths FSL computes exactly the clean-room "
                 f"original's values in every image FAST writes on {what}: the original follows "
                 "FAST's arithmetic, with correctly rounded exp and log.",
+                "ofix-cr": "With correctly rounded maths FSL computes exactly the clean-room "
+                f"original's default values in every image FAST writes on {what}: the default "
+                "follows FAST's arithmetic with exp, log, expf and logf correctly rounded on "
+                "every platform"
+                + (
+                    ", and no correction of the register applies to this call."
+                    if not shown
+                    else "."
+                ),
                 "original1-original": "The thread count changes nothing: the clean-room "
                 "original's parallel sweeps (a pipeline of planes in the serial order), blocked "
                 "sums and sorts give its one-thread result bit for bit at any thread count.",
                 "ofix-original": _fix_same(named),
             }.get(i, "The same values, every one.")
-        elif i == "ofix-original" and shown:
+        elif i in ("ofix-original", "ofix-cr") and shown:
             x["verdict"] = "d13"
             x["reason"] = " ".join(
                 ORIGINAL_FIX.get(n, f"{n}, corrected by default.") for n in shown
+            ) + (
+                " It also computes exp, log, expf and logf correctly rounded (GLIBC-07, not named)."
+                if i == "ofix-original"
+                else ""
             )
             x["links"] += [{"label": n, "href": REGISTER} for n in shown]
+        elif i == "ofix-original":
+            x["verdict"] = "d13"
+            x["reason"] = common.glibc07("exp, log, expf and logf", "FAST", named=False) + (
+                " The default gives FSL's values with correctly rounded maths bit for bit and "
+                "the reproduce mode FSL's as built (the rows above), so this row is FSL's own "
+                "last-bit band, value for value (the yardstick row)."
+                if same.get("ofix-cr") and same.get("original-fsl")
+                else " "
+                + _counts(
+                    x, [o for o, m in x["metrics"].items() if not m["identical"]], labels, band
+                )
+                + "."
+            )
+            x["links"].append({"label": "GLIBC-07", "href": REGISTER})
+        elif i == "ofix-cr":
+            beyond = _beyond(x, band)
+            diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
+            x["verdict"] = "open" if beyond else "within-variability"
+            x["reason"] = (
+                "The default against FSL with correctly rounded maths: "
+                + _counts(x, beyond or diff_out, labels, band)
+                + (
+                    "; further than FSL as built is from it."
+                    if beyond
+                    else "; no further, in any output, than FSL as built is from it (FSL's own "
+                    "last-bit band)."
+                )
+            )
+            x["links"].append({"label": "findings", "href": FINDINGS})
         elif i == "original-own" and not same.get("replica-own"):
             x["verdict"] = "open"
             x["reason"] = "fMRIPrep's own output is not FSL's here (see the replica's row)."
@@ -1086,21 +1165,41 @@ def _verdicts_original(
                     "classes; it can still be improved."
                 )
                 x["links"].append({"label": "findings", "href": FINDINGS})
+        elif i == "original-cr" and same["original-fsl"]:
+            x["verdict"] = "within-variability"
+            x["reason"] = (
+                "The reproduce mode computes exp, log, expf and logf as glibc 2.35 does, as FSL's "
+                "build, so it gives FSL's values as built, every one (the row above); against "
+                "FSL with correctly rounded maths its differences are therefore FSL's own "
+                "last-bit band, value for value (the yardstick row)."
+            )
+            x["links"].append({"label": "FSL's own last-bit band", "href": FINDINGS})
         elif i == "original-cr":
-            beyond = _beyond(x, band)
+            # the reproduce mode computes glibc's functions (since 2026-11-04), so it is held to
+            # FSL as built: from FSL with correctly rounded maths it may differ by FSL's own band
+            # and its own differences from FSL as built together
+            of = by["original-fsl"]["metrics"]
+            beyond = [
+                o
+                for o, m in x["metrics"].items()
+                if o in band["metrics"]
+                and m["differ"] > band["metrics"][o]["differ"] + of.get(o, {}).get("differ", 0)
+            ]
             diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
             if not beyond:
                 x["verdict"] = "within-variability"
                 x["reason"] = (
-                    "Not the same bits as FSL with correctly rounded maths, but no further from it, "
-                    "in any output, than FSL as built is (the yardstick row): "
-                    + _counts(x, diff_out, labels, band)
-                    + "."
+                    "The reproduce mode computes exp, log, expf and logf as glibc 2.35 does, as "
+                    "FSL's build (since 2026-11-04), so it is held to FSL as built (the row "
+                    "above); from FSL with correctly rounded maths it differs by no more than "
+                    "FSL's own last-bit band (the yardstick row) and its own differences from FSL "
+                    "as built together: " + _counts(x, diff_out, labels, band) + "."
                 )
             else:
                 x["verdict"] = "open"
                 x["reason"] = (
-                    "Further from FSL with correctly rounded maths than FSL as built is, in "
+                    "Further from FSL with correctly rounded maths than FSL's own last-bit band "
+                    "and the original's differences from FSL as built together, in "
                     f"{len(beyond)} output(s): " + _counts(x, beyond, labels, band) + "."
                 )
             x["links"].append({"label": "findings", "href": FINDINGS})
@@ -1183,7 +1282,9 @@ def _counted(e: fcache.Entry, o: fcache.Entry) -> dict[str, tuple[Path, Path]]:
         "original (reproduce)": (o.dir / "original", e.dir / "fsl"),
         "original (default)": (o.dir / "original-fix", e.dir / "fsl"),
         "original − FSL, correctly rounded maths": (o.dir / "original", o.dir / "fsl-cr"),
-    }
+        "original (default) − FSL, correctly rounded maths": (o.dir / "original-fix",
+                                                               o.dir / "fsl-cr"),
+    }  # fmt: skip
 
 
 def _provenance(info: dict, e: fcache.Entry, oinfo: dict, o: fcache.Entry, data: list) -> list:
@@ -1259,7 +1360,7 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "fsl", "replica", "original"],
-        "diffs": ["replica-fsl", "original-fsl"],
+        "diffs": ["replica-fsl", "original-fsl", "ofix-original"],
         "compare": {"a": "fsl", "b": "original"},
     }
     agree = (
@@ -1456,12 +1557,12 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         out_id, a, b = "bias", "fsl", "original"
         panels = ["in1", "fsl", "replica", "original"]
         what_differs = "bias field"
-        shown_diffs = ["replica-fsl", "original-fsl"]
+        shown_diffs = ["replica-fsl", "original-fsl", "ofix-original"]
     else:
         out_id, a, b = "seg", "fsl", "original"
         panels = ["in1", "in2", "in3", "fsl", "replica", "original"]
         what_differs = "classes"
-        shown_diffs = ["replica-fsl", "original-fsl"]
+        shown_diffs = ["replica-fsl", "original-fsl", "ofix-original"]
     at = _default_view(ex, "volume", a, b, out_id)
     if ex_id != "priors":
         cap = (
@@ -1694,6 +1795,16 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
                 else f" The clean-room original's default mode ends with exit status {code}, "
                 f"naming {', '.join(named)}."
             )
+        if r["case"] == "opt/nan-first":
+            why = (
+                "Outside the record, a follow-up of the clean-room original: an image whose first "
+                "voxel is NaN, whose extrema FAST takes as NaN and whose brain mask is then empty, "
+                "so its k-means stops with exit status 255 (FSL-203, registered with the "
+                "specification's answers of 2026-11-03); the original passes the case's "
+                "other checks against FSL (5 of 6), and its default finishes (exit status 0) but "
+                "names FSL-103 where the record asks for FSL-203 (FSL-203 follows in the "
+                "original's next part). " + why
+            )
         if r["case"] == "multi/s5":
             why = (
                 "Outside §11's thresholds, explained: five channels of which the first is nearly "
@@ -1711,10 +1822,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     fix = rep.get("D13 fix pass")
     shown = [n for n in named if n not in ("FSL-96", "FSL-97")]
     if isinstance(fix, int) and fix:
-        notes.append(
-            f"in its default mode the clean-room original corrects {', '.join(shown or named)} "
-            f"and names it: {fix:,} values change"
-        )
+        notes.append(common.fix_note(fix, shown or named, "exp, log, expf and logf"))
     elif named and code not in (0, None):
         notes.append(
             f"its default mode refuses the call (exit {code}), naming {', '.join(named)}: an "
@@ -1742,9 +1850,18 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
         if x["orig_cr"][0] > x["cr_fsl"][0] or x["orig_cr"][1] > x["cr_fsl"][1]
     }
     if not of:
+        cr = [k for k, x in files.items() if x["cr_fsl"][0]]
         return "bit-identical", common.clip(
             f"Every value of all {n} images FSL writes, with FSL's exit status and messages (the "
-            "record checks the headers' grid, forms and data types)" + tail,
+            "record checks the headers' grid, forms and data types)"
+            + (
+                f"; FSL with correctly rounded maths differs in {len(cr)} of them, so glibc's "
+                "last bits matter here: the reproduce mode computes exp, log, expf and logf as "
+                "glibc 2.35 does (since 2026-11-04)"
+                if cr
+                else ""
+            )
+            + tail,
             700,
         )
     if not oc:
@@ -1755,7 +1872,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
             "record's thresholds" + tail,
             700,
         )
-    near = _near_cr(oc, "multi" in r["case"])
+    near = _near_fsl(of, "multi" in r["case"])
     if not beyond:
         return "within-variability", common.clip(
             f"In each of the {n} images the clean-room original differs from FSL in no more "
@@ -1781,13 +1898,12 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     )
 
 
-def _near_cr(oc: dict[str, dict], multi: bool) -> str:
-    """What the original's differences from FSL with correctly rounded maths are."""
-    total = sum(x["orig_cr"][0] for x in oc.values())
-    text = (
-        f"it equals FSL with correctly rounded maths but in {total:,} values of {len(oc)} image(s)"
-    )
-    if all(x["kind"] == "pve" and x["orig_cr"][1] <= 0.0100001 for x in oc.values()):
+def _near_fsl(of: dict[str, dict], multi: bool) -> str:
+    """What the original's differences from FSL as built are (its reproduce mode computes
+    glibc's exp, log, expf and logf since 2026-11-04, so FSL as built is its reference)."""
+    total = sum(x["orig_fsl"][0] for x in of.values())
+    text = f"it equals FSL as built but in {total:,} values of {len(of)} image(s)"
+    if all(x["kind"] == "pve" and x["orig_fsl"][1] <= 0.0100001 for x in of.values()):
         text += (
             ", each a partial volume one fraction step (0.01) away: near ties between "
             "neighbouring fractions, decided by last bits"
@@ -1956,7 +2072,8 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica)
+if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica;
+    # ``refresh-original WHY``: refresh_original)
     import sys
 
     from larmorx_validation.figures.core import REPO, default_cache
@@ -1964,6 +2081,9 @@ if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: r
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     if sys.argv[1:2] == ["refresh"]:
         refresh_replica(c, " ".join(sys.argv[2:]))
+        sys.exit(0)
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, " ".join(sys.argv[2:]))
         sys.exit(0)
     for _i, run, _v, _w in FMRIPREP:
         print("done", fmriprep_entry(c, run).dir)

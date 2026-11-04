@@ -22,6 +22,7 @@
 //! the estimation ends with an error saying how ([`McflirtEnd`]).
 
 use larmorx_core::defects::{self, Defect, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
 use larmorx_core::parallel::{self, ThreadPoolError};
 use rayon::prelude::*;
 
@@ -390,6 +391,8 @@ struct Stage<'a> {
     /// Leave non-finite values out of the cost (FSL-14 corrected).
     skip_non_finite: bool,
     count: NormCorrCount,
+    /// The run's C library functions (GLIBC-07: the histogram costs' logarithms).
+    libm: &'a Libm,
 }
 
 /// The cost of matrix `m` for test volume `tv` in `stage`.
@@ -402,8 +405,10 @@ fn evaluate(stage: &Stage<'_>, tv: &TestVolume<'_>, m: &Mat4) -> f32 {
         CostFunction::LeastSquares => cost::least_squares(grid, tv, &b, par),
         CostFunction::CorrRatio => cost::corr_ratio(grid, tv, &b, stage.bins, par),
         CostFunction::Woods => cost::woods(grid, tv, &b, stage.bins, par),
-        CostFunction::MutualInfo => cost::mutual_info(grid, tv, &b, stage.bins, false, par),
-        CostFunction::NormMi => cost::mutual_info(grid, tv, &b, stage.bins, true, par),
+        CostFunction::MutualInfo => {
+            cost::mutual_info(grid, tv, &b, stage.bins, false, par, stage.libm)
+        }
+        CostFunction::NormMi => cost::mutual_info(grid, tv, &b, stage.bins, true, par, stage.libm),
     }
 }
 
@@ -577,6 +582,10 @@ fn run_stages(
     let dof = params.dof.clamp(6, 12);
     let mode = params.upstream_defects;
     let fix = mode.fix();
+    // quiet: the histogram costs' logf (glibc's with `reproduce`, `specs/mcflirt.md` appendix
+    // B) name no GLIBC-07: a fit cannot tell whether a last bit moved the matrices (the user's
+    // decision of 2026-11-04)
+    let libm = Libm::quiet(mode);
     let mut matrices = vec![IDENTITY; n];
     let mut notices = Vec::new();
     let registered: Vec<usize> = (0..n).filter(|&v| Some(v) != ref_index).collect();
@@ -685,6 +694,7 @@ fn run_stages(
             parallel: true,
             skip_non_finite,
             count: params.normcorr_count,
+            libm: &libm,
         };
         let mut stage_notices = Vec::new();
         if ip1 {
@@ -760,6 +770,7 @@ fn run_stages(
                 parallel: false,
                 skip_non_finite,
                 count: params.normcorr_count,
+                libm: &libm,
             };
             let out: Vec<Mat4> = registered
                 .par_iter()

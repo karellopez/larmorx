@@ -6,7 +6,7 @@
 //! Written from the spec and black-box runs of FSL 6.0.7.23's programs (the findings in
 //! `docs/findings/fsl-flirt-original.md`, "FLIRT's other programs"), never from FSL's source.
 
-use larmorx_core::math;
+use larmorx_core::math::{self, Libm};
 use larmorx_mri::hmc::rigid::{self, Params};
 
 use super::cost::Log;
@@ -89,7 +89,9 @@ pub struct Avscale {
 
 /// The decomposition of `m` about `centre` (§15.1): `Err` with FSL's message when a scale is 0
 /// or an entry of the top three rows is not finite.
-pub fn avscale(m: &Mat4, centre: [f64; 3]) -> Result<Avscale, &'static str> {
+/// The angles and the rotation are `libm`'s (glibc's `atan2f`, `sinf`, `cosf` with
+/// `reproduce`, GLIBC-07).
+pub fn avscale(m: &Mat4, centre: [f64; 3], libm: &Libm) -> Result<Avscale, &'static str> {
     if m.iter().take(3).flatten().any(|v| !v.is_finite()) {
         return Err(INVERSE_PROBLEM);
     }
@@ -97,8 +99,8 @@ pub fn avscale(m: &Mat4, centre: [f64; 3]) -> Result<Avscale, &'static str> {
     if s.contains(&0.0) {
         return Err(INVERSE_PROBLEM);
     }
-    let params = single_scales(param::euler_decompose(m, centre));
-    let rotation_translation = param::euler_compose(&params, 6, [0.0; 3]);
+    let params = single_scales(param::euler_decompose(m, centre, libm));
+    let rotation_translation = param::euler_compose(&params, 6, [0.0; 3], libm);
     let average_scale = (((params[6] + params[7]) + params[8]) / 3.0) as f32;
     Ok(Avscale {
         params,
@@ -111,21 +113,23 @@ pub fn avscale(m: &Mat4, centre: [f64; 3]) -> Result<Avscale, &'static str> {
 /// The half transforms of `m` (§15.1): the forward half (the matrix's square root) and the
 /// backward half (the forward times `m⁻¹`); `Err` with FSL's message when `m` (or the
 /// translation's system) is singular.
-pub fn half_transforms(m: &Mat4, det: f64) -> Result<(Mat4, Mat4), &'static str> {
+/// `libm`'s functions (glibc's with `reproduce`; the arcsine correctly rounded in both modes).
+pub fn half_transforms(m: &Mat4, det: f64, libm: &Libm) -> Result<(Mat4, Mat4), &'static str> {
     let mp = if det < 0.0 {
         mat::mul(m, &mat::diagonal([-1.0, 1.0, 1.0]))
     } else {
         *m
     };
-    let p = single_scales(param::decompose(AngleRep::Quaternion, &mp, [0.0; 3]));
+    let p = single_scales(param::decompose(AngleRep::Quaternion, &mp, [0.0; 3], libm));
     let norm = ((p[0] * p[0] + p[1] * p[1]) + p[2] * p[2]).sqrt();
     let t = math::asin(norm);
-    let f = 1.0 / (2.0 * math::cos(t / 2.0));
+    let f = 1.0 / (2.0 * libm.cos(t / 2.0));
     let mut half = rigid::IDENTITY_PARAMS;
     for k in 0..3 {
         half[k] = p[k] * f;
     }
     let r = param::compose(AngleRep::Quaternion, &half, 3, [0.0; 3], &Log::default());
+    // (the quaternion's rotation has no sine or cosine: the log's own functions are not used)
     let k = skew([p[9] / 2.0, p[10] / 2.0, p[11] / 2.0]);
     let s = mat::diagonal([p[6].sqrt(), p[7].sqrt(), p[8].sqrt()]);
     let (Some(si), Some(ki), Some(ri)) = (mat::inverse(&s), mat::inverse(&k), mat::inverse(&r))
@@ -455,7 +459,8 @@ pub fn axis_length(a: [f64; 3]) -> f64 {
 /// `makerot`'s matrix (§15.4): a rotation by `theta` degrees (single precision) about `axis`
 /// through `centre`. The axis is divided by its length, or with `fsl76` by the square root of
 /// its length as FSL divides it (FSL-76). The axis must not be zero ([`axis_length`]).
-pub fn makerot(theta: f32, axis: [f64; 3], centre: [f64; 3], fsl76: bool) -> Mat4 {
+/// The cosine and sine are `libm`'s (glibc's `cosf` and `sinf` with `reproduce`, GLIBC-07).
+pub fn makerot(theta: f32, axis: [f64; 3], centre: [f64; 3], fsl76: bool, libm: &Libm) -> Mat4 {
     use sse::{div, matvec, mul, norm, sub};
     let len = norm(axis);
     let scale = if fsl76 { sse::sqrt(len) } else { len };
@@ -483,7 +488,7 @@ pub fn makerot(theta: f32, axis: [f64; 3], centre: [f64; 3], fsl76: bool) -> Mat
     let nv = norm(v);
     let v = v.map(|x| div(x, nv));
     let (c, s) = if angle.is_finite() {
-        (math::cosf(angle), math::sinf(angle))
+        (libm.cosf(angle), libm.sinf(angle))
     } else {
         let d = sse::to_f32(sub(a, a));
         (d, d)
@@ -591,28 +596,43 @@ mod tests {
             ),
         ];
         for (theta, axis, centre, want) in cases {
-            let m = makerot(theta, axis, centre, true);
+            let m = makerot(theta, axis, centre, true, &Libm::default());
             assert!(close(&m, &want, 6e-10), "{theta} {axis:?}: {m:?}");
             assert_eq!(mat::g(m[2][3], 10), mat::g(want[2][3], 10));
         }
         // below 1e-8 radians: the identity
-        assert_eq!(makerot(5.7e-7, [0.0, 0.0, 1.0], [0.0; 3], true), IDENTITY);
+        assert_eq!(
+            makerot(5.7e-7, [0.0, 0.0, 1.0], [0.0; 3], true, &Libm::default()),
+            IDENTITY
+        );
         // FSL-76 corrected: 30 degrees about (0, 0, 4) is 30 degrees
-        let m = makerot(30.0, [0.0, 0.0, 4.0], [0.0; 3], false);
+        let m = makerot(30.0, [0.0, 0.0, 4.0], [0.0; 3], false, &Libm::default());
         assert!((m[0][0] - f64::from(30f32.to_radians().cos())).abs() < 1e-7);
     }
 
     #[test]
     fn makerot_nan_signs() {
         // FSL: a NaN axis component (observed: rows 1, 2 `nan`, row 3 `-nan`)
-        let m = makerot(30.0, [f64::NAN, 1.0, 1.0], [1.0, 2.0, 3.0], true);
+        let m = makerot(
+            30.0,
+            [f64::NAN, 1.0, 1.0],
+            [1.0, 2.0, 3.0],
+            true,
+            &Libm::default(),
+        );
         for j in 0..4 {
             assert!(m[0][j].is_nan() && m[0][j].is_sign_positive());
             assert!(m[1][j].is_nan() && m[1][j].is_sign_positive());
             assert!(m[2][j].is_nan() && m[2][j].is_sign_negative());
         }
         // an infinite angle (observed: rows 1, 2 `-nan`, row 3 `nan`)
-        let m = makerot(f32::INFINITY, [0.0, 0.0, 1.0], [1.0, 2.0, 3.0], true);
+        let m = makerot(
+            f32::INFINITY,
+            [0.0, 0.0, 1.0],
+            [1.0, 2.0, 3.0],
+            true,
+            &Libm::default(),
+        );
         for j in 0..4 {
             assert!(m[0][j].is_nan() && m[0][j].is_sign_negative(), "{m:?}");
             assert!(m[1][j].is_nan() && m[1][j].is_sign_negative());

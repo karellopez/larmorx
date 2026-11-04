@@ -138,6 +138,17 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
   and, with one channel, its mask is empty (exit 255): the extrema of the values that are not NaN
   by default (the replica since 2026-11-03).
 
+### glibc's maths functions (GLIBC-07)
+
+FSL's FAST calls glibc 2.35's `exp`, `log`, `expf` and `logf` (the class likelihoods, the Markov
+random field, the bias field and the partial volumes; `specs/fast.md` §8), which are not correctly
+rounded. The clean-room original computes them correctly rounded by default and takes glibc's with
+`upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
+against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). The
+segmentation is an iterative fit: one function value's last bit can move a probability's or the bias
+field's last bits, rarely a voxel's class, and FAST cannot tell without segmenting twice, so neither
+mode names GLIBC-07: the default's correctly rounded functions can move a segmentation's last bits.
+
 ## The clean-room original
 
 `larmorx fsl fast` with `LARMORX_IMPLEMENTATION=original` (`implementation="original"`, and

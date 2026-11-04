@@ -1,0 +1,61 @@
+# The glibc maths part, second half (2026-11-04): the exact changes to the shared documents that
+# can be anchored without opening a restricted file. The register's GLIBC-07 row, its API page,
+# the decision log, CLAUDE.md, docs/status.md and the site's Roadmap are in HANDOFF.md as text
+# (the register has restricted sections the clean-room implementer does not open).
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = """
+  every other checksum unchanged.
+- **The spec answers' switches in the FSL replicas**"""
+new = """
+  every other checksum unchanged.
+- **glibc's functions in the clean-room originals' `reproduce` mode** (2026-11-04, five cases in
+  `tests/golden/registry.py`; the glibc maths part, second half): each call checked to differ
+  between the two modes, so the six platforms check the `*_glibc` functions of
+  `larmorx_core::math` through the programs: `cli.afni.3dTshift.wsinc` (`-wsinc5` and `-wsinc9`
+  on slice times whose weights glibc's `sinf` and `cosf` give other last bits, reproduce, and the
+  default's exact GLIBC-07 list; 6 outputs), `cli.fsl.flirt.reproduce` (6 dof with the
+  correlation ratio, 6 dof with mutual information over a narrow search, the default 12 dof:
+  `sinf`, `cosf`, `atan2f`, `exp`, `logf` move the matrices; 3 outputs),
+  `cli.fsl.fslmaths.reproduce` (the double-precision `-sin`, `-cos`, `-exp`, `-log` and `-pow`,
+  `-s 3.95`, `-bptf 1.73 -1` on a double image, and the default's exact notice; 17 outputs),
+  `cli.fsl.makerot.reproduce` (makerot `-t 20.7` about z, avscale of a matrix whose printed
+  report moves, the default's exact notices; 8 outputs), `cli.fsl.mcflirt.reproduce` (`-cost
+  mutualinfo`: `logf` moves the matrices, named by neither mode; 6 outputs). Recorded from
+  be3db91 (committed as bcaae7a), the parity smoke tier's marker of the same commit and build
+  reused (2,758 passed): 5 cases and 40 outputs added (223 cases and 1,583 outputs before, 228
+  and 1,623 after), every other checksum unchanged.
+- **The spec answers' switches in the FSL replicas**"""
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = """
+- **From the glibc maths part, second half (2026-11-04).**
+  - *Clean-room originals, failing on main's code too* (cases main's replica suites gained after the
+    originals' last records; the originals' records of FLIRT, FAST and topup were older than main's
+    suites and are now re-made): FAST's `opt/nan-first` (the default should name FSL-203; it names
+    FSL-103), FLIRT's `programs/pointflirt-no-points` (pointflirt should refuse naming FSL-204; it
+    stops with FSL's message, unnamed), topup's `opt/fsl145-one-coefficient` (FSL stops after
+    FSL-145 lays one coefficient, "Error occurred when preparing to run topup", exit 1; the
+    original's reproduce mode runs on). Each a small part of its original.
+  - *Spec questions for a spec writer* (relay 2b): fslmaths §10.4 (`-edge` on a double image: FSL
+    computes `pow(x, 2)` as `x · x` and adds the squares z, y, x; black-box `edge_forms.py`), §19's
+    GLIBC-07 row and §7 (sin and cos are now glibc's in the original's reproduce mode too); FLIRT
+    §3 and §8.1 step 9 (the arithmetic of the skews, `x0 · z` and `y0 · z`, for a near-orthonormal
+    matrix under gimbal lock: `real/weights-empty-refweight` parts from FSL's trace there).
+  - *The replica side, step (b)*: the replicas take up `larmorx_core::math`'s new `sin_glibc`,
+    `cos_glibc` and `sincos_glibc` where FSL's build calls glibc's double `sin`, `cos` and `sincos`
+    (fslmaths' `-dt double -sin` and `-cos`, the FFT's twiddle factors: the record's
+    `difftest/fft-twiddles-glibc-sincos` and its FSL-side probe).
+  - *Harness*: the `mri-hmc` record must be made with `--jobs 1` (its report's tables of fMRIPrep's
+    runs, the ground truth and the D13 summary come from module-level per-case metrics that
+    `--jobs` workers do not return), or the metrics carried with the results.
+  - *The FLIRT original's `bbr/type-local_abs`*: 0.3647 → 0.0268 mm from FSL's matrix, now within
+    the 0.1 mm threshold, where the record does not measure FSL's band (it does beyond the
+    threshold only), so the site calls it *open* where it was *within the original's own
+    variability*; measuring FSL's band for every registration would keep such cases labelled by
+    their band."""

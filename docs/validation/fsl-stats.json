@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "8ce1c6adf070",
+  "larmorx_commit": "be3db916dce3",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -41,7 +41,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.191,
    "status": "pass"
   },
   {
@@ -58,7 +58,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.229,
    "status": "pass"
   },
   {
@@ -75,7 +75,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.074,
+   "seconds": 0.069,
    "status": "pass"
   },
   {
@@ -109,7 +109,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.116,
+   "seconds": 1.982,
    "status": "pass"
   },
   {
@@ -126,7 +126,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.097,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -143,7 +143,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -160,7 +160,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.077,
    "status": "both-error"
   },
   {
@@ -177,7 +177,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -194,7 +194,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.059,
+   "seconds": 0.089,
    "status": "both-error"
   },
   {
@@ -211,7 +211,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.112,
    "status": "both-error"
   },
   {
@@ -228,7 +228,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.07,
+   "seconds": 0.15,
    "status": "both-error"
   },
   {
@@ -245,7 +245,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -262,7 +262,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.095,
+   "seconds": 0.107,
    "status": "both-error"
   },
   {
@@ -279,7 +279,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.18,
    "status": "both-error"
   },
   {
@@ -296,7 +296,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.102,
    "status": "both-error"
   },
   {
@@ -313,7 +313,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.088,
    "status": "both-error"
   },
   {
@@ -330,7 +330,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.087,
    "status": "both-error"
   },
   {
@@ -347,7 +347,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.151,
    "status": "both-error"
   },
   {
@@ -364,7 +364,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.21,
    "status": "both-error"
   },
   {
@@ -381,7 +381,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -398,7 +398,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.141,
    "status": "both-error"
   },
   {
@@ -415,7 +415,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -432,7 +432,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.145,
    "status": "both-error"
   },
   {
@@ -449,7 +449,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.185,
    "status": "both-error"
   },
   {
@@ -466,7 +466,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.177,
    "status": "both-error"
   },
   {
@@ -483,7 +483,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.105,
    "status": "both-error"
   },
   {
@@ -500,7 +500,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.127,
    "status": "both-error"
   },
   {
@@ -517,7 +517,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -534,7 +534,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.092,
    "status": "both-error"
   },
   {
@@ -551,7 +551,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.115,
    "status": "both-error"
   },
   {
@@ -568,7 +568,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.04,
+   "seconds": 0.13,
    "status": "both-error"
   },
   {
@@ -585,7 +585,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.129,
    "status": "both-error"
   },
   {
@@ -602,7 +602,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.14,
    "status": "both-error"
   },
   {
@@ -619,7 +619,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -636,7 +636,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -653,7 +653,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -670,7 +670,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.209,
    "status": "pass"
   },
   {
@@ -687,7 +687,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -704,7 +704,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -721,7 +721,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.194,
    "status": "pass"
   },
   {
@@ -738,7 +738,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -755,7 +755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.197,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.04,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -789,7 +789,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -806,7 +806,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -823,7 +823,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.221,
    "status": "pass"
   },
   {
@@ -840,7 +840,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.174,
    "status": "pass"
   },
   {
@@ -857,7 +857,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
@@ -874,7 +874,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -891,7 +891,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -908,7 +908,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -925,7 +925,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.04,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -942,7 +942,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -959,7 +959,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.263,
    "status": "pass"
   },
   {
@@ -976,7 +976,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -993,7 +993,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -1010,7 +1010,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.133,
    "status": "pass"
   },
   {
@@ -1027,7 +1027,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1044,7 +1044,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1061,7 +1061,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1078,7 +1078,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -1095,7 +1095,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1112,7 +1112,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -1129,7 +1129,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1146,7 +1146,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -1163,7 +1163,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -1180,7 +1180,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -1197,7 +1197,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.149,
    "status": "pass"
   },
   {
@@ -1214,7 +1214,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -1231,7 +1231,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -1248,7 +1248,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.041,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -1265,7 +1265,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.136,
    "status": "pass"
   },
   {
@@ -1282,7 +1282,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -1299,7 +1299,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -1316,7 +1316,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1333,7 +1333,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1350,7 +1350,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -1367,7 +1367,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.194,
    "status": "pass"
   },
   {
@@ -1384,7 +1384,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.162,
    "status": "pass"
   },
   {
@@ -1401,7 +1401,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -1418,7 +1418,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -1435,7 +1435,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.126,
    "status": "pass"
   },
   {
@@ -1452,7 +1452,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1469,7 +1469,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1486,7 +1486,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -1503,7 +1503,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.17,
    "status": "pass"
   },
   {
@@ -1520,7 +1520,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.137,
    "status": "pass"
   },
   {
@@ -1537,7 +1537,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -1554,7 +1554,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -1571,7 +1571,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -1588,7 +1588,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -1605,7 +1605,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.222,
    "status": "pass"
   },
   {
@@ -1622,7 +1622,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
@@ -1639,7 +1639,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -1656,7 +1656,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.164,
    "status": "pass"
   },
   {
@@ -1673,7 +1673,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1690,7 +1690,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -1707,7 +1707,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.178,
    "status": "pass"
   },
   {
@@ -1724,7 +1724,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.188,
    "status": "pass"
   },
   {
@@ -1741,7 +1741,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.193,
    "status": "pass"
   },
   {
@@ -1758,7 +1758,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.18,
    "status": "pass"
   },
   {
@@ -1775,7 +1775,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -1792,7 +1792,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -1809,7 +1809,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -1826,7 +1826,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -1843,7 +1843,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.176,
    "status": "pass"
   },
   {
@@ -1860,7 +1860,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -1877,7 +1877,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.255,
    "status": "pass"
   },
   {
@@ -1894,7 +1894,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -1911,7 +1911,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -1928,7 +1928,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -1945,7 +1945,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.16,
    "status": "pass"
   },
   {
@@ -1962,7 +1962,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -1979,7 +1979,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1996,7 +1996,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -2013,7 +2013,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -2030,7 +2030,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -2047,7 +2047,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -2064,7 +2064,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.162,
    "status": "pass"
   },
   {
@@ -2081,7 +2081,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2098,7 +2098,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.163,
    "status": "pass"
   },
   {
@@ -2115,7 +2115,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -2132,7 +2132,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.217,
    "status": "pass"
   },
   {
@@ -2149,7 +2149,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.201,
    "status": "pass"
   },
   {
@@ -2166,7 +2166,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.223,
    "status": "pass"
   },
   {
@@ -2183,7 +2183,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -2200,7 +2200,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.208,
    "status": "pass"
   },
   {
@@ -2217,7 +2217,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.234,
    "status": "pass"
   },
   {
@@ -2234,7 +2234,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -2251,7 +2251,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.144,
    "status": "pass"
   },
   {
@@ -2268,7 +2268,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.043,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -2285,7 +2285,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.044,
+   "seconds": 0.231,
    "status": "both-error"
   },
   {
@@ -2302,7 +2302,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.048,
+   "seconds": 0.174,
    "status": "both-error"
   },
   {
@@ -2319,7 +2319,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.15,
    "status": "both-error"
   },
   {
@@ -2333,7 +2333,7 @@
     "standard output": 0.0
    },
    "reason": "fslstats exits -11; the same from the original. calculateExtrema: mask is empty",
-   "seconds": 0.067,
+   "seconds": 0.296,
    "status": "both-error"
   },
   {
@@ -2347,7 +2347,7 @@
     "standard output": 0.0
    },
    "reason": "fslstats exits -11; the same from the original. calculateExtrema: mask is empty",
-   "seconds": 0.074,
+   "seconds": 0.262,
    "status": "both-error"
   },
   {
@@ -2361,7 +2361,7 @@
     "standard output": 0.0
    },
    "reason": "fslstats exits -8; the same from the original.",
-   "seconds": 0.083,
+   "seconds": 0.222,
    "status": "both-error"
   },
   {
@@ -2375,7 +2375,7 @@
     "standard output": 0.0
    },
    "reason": "fslstats exits -8; the same from the original.",
-   "seconds": 0.08,
+   "seconds": 0.177,
    "status": "both-error"
   },
   {
@@ -2392,7 +2392,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -2409,7 +2409,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.059,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -2426,7 +2426,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -2443,7 +2443,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -2460,7 +2460,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.164,
    "status": "pass"
   },
   {
@@ -2477,7 +2477,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
@@ -2494,7 +2494,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.055,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -2511,7 +2511,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.315,
+   "seconds": 0.626,
    "status": "pass"
   },
   {
@@ -2528,7 +2528,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.347,
+   "seconds": 0.745,
    "status": "pass"
   },
   {
@@ -2545,7 +2545,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.314,
+   "seconds": 0.434,
    "status": "pass"
   },
   {
@@ -2562,7 +2562,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -2579,7 +2579,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.061,
+   "seconds": 0.115,
    "status": "pass"
   },
   {
@@ -2596,7 +2596,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -2613,7 +2613,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.052,
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -2630,7 +2630,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.215,
    "status": "pass"
   },
   {
@@ -2647,7 +2647,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -2661,7 +2661,7 @@
     "standard output": 0.0
    },
    "reason": "fslstats exits -8; the same from the original. findHistogram: mask is empty",
-   "seconds": 0.089,
+   "seconds": 0.148,
    "status": "both-error"
   },
   {
@@ -2678,7 +2678,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.054,
+   "seconds": 0.186,
    "status": "pass"
   },
   {
@@ -2695,7 +2695,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -2712,7 +2712,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.168,
+   "seconds": 0.326,
    "status": "pass"
   },
   {
@@ -2729,7 +2729,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.152,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -2746,7 +2746,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.154,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -2763,7 +2763,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.148,
+   "seconds": 0.128,
    "status": "pass"
   }
  ],

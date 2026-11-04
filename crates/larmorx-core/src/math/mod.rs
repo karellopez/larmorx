@@ -16,6 +16,7 @@ mod atanf_glibc;
 mod cbrt;
 mod cbrtf;
 mod cbrtf_glibc;
+mod choice;
 mod cos;
 pub(crate) mod dint;
 mod exp;
@@ -32,6 +33,8 @@ mod powf;
 mod powf_glibc;
 mod powi;
 mod sin;
+mod sincos_glibc;
+mod sincos_glibc_tables;
 mod sincosf_glibc;
 mod sinf;
 mod tan;
@@ -41,6 +44,11 @@ mod tanhf;
 mod x86_nan;
 
 pub use powi::powi;
+
+/// The C library functions of one call of a clean-room original, with the last bits its mode
+/// asks for: correctly rounded by default, glibc 2.35's with `reproduce` (GLIBC-07), and the
+/// witness its notices name (`choice.rs`).
+pub use choice::Libm;
 
 /// `tanh(x)` for `f32`, correctly rounded (CORE-MATH's `cr_tanhf`; its only fused
 /// multiply-adds are explicit `mul_add` calls on tiny arguments, so it has no FMA-compiled
@@ -71,7 +79,10 @@ pub use tanh_glibc::tanh_glibc;
 // and AFNI replicas (`larmorx-nc-core`, `larmorx-afni-replica`), which call them. Proved equal to
 // glibc 2.35 itself (exhaustively for the one-argument float functions, on more than 10^9
 // arguments for the others): `validation/investigations/glibc-maths/`. glibc's double `sin`,
-// `cos`, `tan`, `asin`, `acos`, `atan` (IBM's LGPL code) are not here (GLIBC-07).
+// `cos`, `tan`, `asin`, `acos`, `atan` (IBM's LGPL code) are not among them (GLIBC-07): `sin`,
+// `cos` and `sincos` with glibc's bits are a clean-room implementation of `specs/glibc-dbl.md`
+// (`sin_glibc`, `cos_glibc`, `sincos_glibc` below); `tan`, `asin`, `acos` and `atan` stay
+// correctly rounded in `reproduce` too (the user's decision of 2026-11-04, spec §9).
 
 /// The arctangent for `f32` with glibc 2.35's bits (fdlibm's `atanf`, Sun's notice; no fused
 /// multiply-adds, one build on x86-64). FSL's `fslmaths -atan` on float images.
@@ -106,6 +117,37 @@ macro_rules! glibc_dispatch {
         }
     };
 }
+
+glibc_dispatch!(
+    /// The sine with glibc 2.35's bits (x86-64, the FMA build glibc runs on CPUs with FMA and
+    /// AVX2), not correctly rounded (GLIBC-07; [`sin`] is, and is larmorx's default), for
+    /// `reproduce` only. A clean-room implementation (Apache-2.0) of `specs/glibc-dbl.md`: glibc
+    /// 2.35's bits on every argument tested (the black-box record's 3.2 × 10^9 arguments and its
+    /// special ones, and fresh arguments against the system's `sin`:
+    /// `validation/investigations/cleanroom-glibc-dbl/`), with the spec's one theoretical
+    /// exception (§5.3: table `R` by its definition, 18 low parts not glibc's; a different
+    /// result is possible about once in 2^53 evaluations reading those rows, none is known).
+    /// glibc's `tan`, `asin`, `acos`, `atan` stay correctly rounded in `reproduce` ([`tan`],
+    /// [`asin`], [`acos`], [`atan2`]; spec §9, §10.3: they differ from glibc's on 0.05 to 0.25 %
+    /// of results).
+    sincos_glibc::sin_glibc(x: f64) -> f64
+);
+glibc_dispatch!(
+    /// The cosine with glibc 2.35's bits (x86-64, the FMA build), for `reproduce` only: as
+    /// [`sin_glibc`] (GLIBC-07; [`cos`] is the default).
+    sincos_glibc::cos_glibc(x: f64) -> f64
+);
+
+/// `(sin x, cos x)` with glibc 2.35's bits (x86-64, `sincos`'s single build, without fused
+/// multiply-adds; its own paths, so its sine differs from [`sin_glibc`]'s on some arguments in
+/// `[0.85546875, 2.43)`), for `reproduce` only: as [`sin_glibc`]. No fused operation, so no
+/// FMA-compiled copy.
+pub use sincos_glibc::sincos_glibc;
+
+/// The sine and cosine as glibc 2.35's x86-64 build without FMA computes them (glibc's choice
+/// on x86-64 CPUs without FMA and AVX2): [`sin_glibc`] and [`cos_glibc`] with every fused
+/// operation of the spec a rounded product then a rounded sum (spec §1, §11.2).
+pub use sincos_glibc::{cos_glibc_sse2, sin_glibc_sse2};
 
 glibc_dispatch!(
     /// The sine for `f32` with glibc 2.35's bits (x86-64, FMA build: `__sinf_fma`, Arm's
@@ -341,6 +383,8 @@ mod fma {
             }
         };
     }
+    fma_glibc!(sincos_glibc::sin_glibc(x: f64) -> f64);
+    fma_glibc!(sincos_glibc::cos_glibc(x: f64) -> f64);
     fma_glibc!(sincosf_glibc::sinf_glibc(y: f32) -> f32);
     fma_glibc!(sincosf_glibc::cosf_glibc(y: f32) -> f32);
     fma_glibc!(sincosf_glibc::sincosf_glibc(y: f32) -> (f32, f32));
@@ -495,6 +539,15 @@ mod tests {
             for (a, b) in [
                 (super::exp_glibc(w), super::exp_glibc::exp_glibc(w)),
                 (super::exp_glibc(x), super::exp_glibc::exp_glibc(x)),
+                (super::sin_glibc(x), super::sincos_glibc::sin_glibc(x)),
+                (super::cos_glibc(x), super::sincos_glibc::cos_glibc(x)),
+                (super::sin_glibc(w), super::sincos_glibc::sin_glibc(w)),
+                (super::cos_glibc(w), super::sincos_glibc::cos_glibc(w)),
+                (super::sin_glibc(u), super::sincos_glibc::sin_glibc(u)),
+                (
+                    super::cos_glibc(u + 0.8),
+                    super::sincos_glibc::cos_glibc(u + 0.8),
+                ),
                 (super::log_glibc(x), super::log_glibc::log_glibc(x)),
                 (
                     super::log_glibc(u + 0.95),

@@ -3063,6 +3063,24 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"out": Nifti(out)}
 
 
+@case("cli.afni.3dTshift.wsinc")
+def _(ctx: Context) -> dict[str, Any]:
+    """3dTshift's weighted sinc with ``reproduce``: glibc 2.35's ``sinf`` and ``cosf`` (spec
+    §5.3, GLIBC-07; the default's are correctly rounded) on slice times whose weights the two
+    give other last bits (``-wsinc5``, ``-wsinc9``); the default names GLIBC-07 exactly where
+    its values differ."""
+    src = ctx.out("series_f32.nii")
+    lx.save(series(), src)
+    out: dict[str, Any] = {}
+    for method, times in (("-wsinc5", "0 0.567 1.409 1.372 0.416"), ("-wsinc9", "0 0.003 1.85 0.567 0.597")):  # fmt: skip
+        o = ctx.out(f"{method[1:]}.nii")
+        cli("afni", "3dTshift", method, "-tpattern", f"@1D: {times}", "-prefix", o, src, upstream_defects=REPRODUCE)  # fmt: skip
+        out[method[1:]] = Nifti(o)
+    code, named = cli_status("afni", "3dTshift", "-wsinc5", "-tpattern", "@1D: 0 0.567 1.409 1.372 0.416", "-prefix", ctx.out("fix.nii"), src)  # fmt: skip
+    out["fix:status"], out["fix:named"] = code, " ".join(named)
+    return out
+
+
 @case("py.afni.tshift.reproduce", covers=("lx.afni.tshift",))
 def _(ctx: Context) -> dict[str, Any]:
     """``py.afni.tshift.options``' uint8 series without detrending, reproduced: every voxel
@@ -3464,6 +3482,27 @@ def _hmc_outputs(name: str, r: lx.mri.HmcResult) -> dict[str, Any]:
     if r.mean is not None:
         out[f"{name}.mean"] = r.mean.data
     return out
+
+
+@case("cli.fsl.mcflirt.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """mcflirt's mutual-information cost with ``reproduce``: the histogram costs' ``logf`` is
+    glibc 2.35's (``specs/mcflirt.md`` appendix B, GLIBC-07), whose last bits move the
+    matrices; named by neither mode (an iterative fit)."""
+    out = ctx.out("out")
+    previous = os.environ.get("FSLOUTPUTTYPE")
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    try:
+        cli("fsl", "mcflirt", "-in", ctx.file("bold.nii"), "-out", out, "-refvol", "0", "-mats", "-cost", "mutualinfo", upstream_defects=REPRODUCE)  # fmt: skip
+    finally:
+        if previous is None:
+            del os.environ["FSLOUTPUTTYPE"]
+        else:
+            os.environ["FSLOUTPUTTYPE"] = previous
+    result: dict[str, Any] = {"out": Nifti(f"{out}.nii.gz")}
+    for t in range(SHAPE4[3]):
+        result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
+    return result
 
 
 @case(
@@ -4163,6 +4202,25 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"matrix": File(f"{out}.mat"), "image": Nifti(f"{out}.nii.gz"), "stdout": stdout}
 
 
+@case("cli.fsl.flirt.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """FLIRT with ``reproduce``: glibc 2.35's ``sinf``, ``cosf``, ``atan2f``, ``exp`` and
+    ``logf`` (``specs/flirt.md`` §3, §5, §9.2, §12; GLIBC-07), whose last bits move the
+    registration: 6 dof with corratio and with mutual information (a narrow search), the
+    default schedule's 12 dof."""
+    narrow = ("-searchrx", "-10", "10", "-searchry", "-10", "10", "-searchrz", "-10", "10")
+    out: dict[str, Any] = {}
+    for name, extra in (
+        ("corratio6", ("-dof", "6")),
+        ("mutualinfo6", ("-dof", "6", "-cost", "mutualinfo", "-searchcost", "mutualinfo", *narrow)),
+        ("default12", ()),
+    ):
+        m = ctx.out(f"{name}.mat")
+        _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", m, *extra, upstream_defects=REPRODUCE)  # fmt: skip
+        out[name] = File(m)
+    return out
+
+
 @case("cli.fsl.flirt.costs")
 def _(ctx: Context) -> dict[str, Any]:
     """Every cost function once (6 dof, a narrow search), weights, ``-2D`` on a plane, and the
@@ -4429,6 +4487,31 @@ def _fsldir(ctx: Context) -> str:
     for k in (1, 2, 3):
         (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
     return os.fspath(ctx.dir / "fsl")
+
+
+#: An affine matrix whose avscale report glibc's ``atan2f``, ``sinf`` and ``cosf`` change in a
+#: printed digit (found by runs of both modes).
+_AVSCALE_GLIBC = (
+    "0.715118 -0.076689 -0.281790 -6.231573\n-0.226265 1.280289 0.094656 3.611639\n"
+    "-0.043068 0.014244 1.223686 7.347375\n0.000000 0.000000 0.000000 1.000000\n"
+)
+
+
+@case("cli.fsl.makerot.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """makerot and avscale with ``reproduce``: glibc 2.35's ``cosf``, ``sinf`` and ``atan2f``
+    (``specs/flirt.md`` §12, §15.1, §15.4; GLIBC-07) where they and the correctly rounded
+    functions print other digits: a rotation about a unit axis (makerot), a matrix's
+    parameters (avscale); the default names GLIBC-07 exactly there."""
+    m = ctx.dir / "glibc.mat"
+    m.write_text(_AVSCALE_GLIBC)
+    rot = ("-t", "20.7", "-a", "0,0,1", "-c", "4,5,6")
+    return {
+        "makerot": _fsl(ctx, "makerot", *rot, upstream_defects=REPRODUCE),
+        "avscale": _fsl(ctx, "avscale", "--allparams", str(m), upstream_defects=REPRODUCE),
+        **_status_outputs("makerot_fix", _fsl_status(ctx, "makerot", *rot)),
+        **_status_outputs("avscale_fix", _fsl_status(ctx, "avscale", "--allparams", str(m))),
+    }
 
 
 @case("cli.fsl.midtrans", covers=("cli:fsl midtrans",))
@@ -5023,6 +5106,29 @@ def _(ctx: Context) -> dict[str, Any]:
         **_status_outputs("usage", usage),
         **_status_outputs("unknown", unknown),
     }
+
+
+@case("cli.fsl.fslmaths.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """fslmaths with ``reproduce``: glibc 2.35's functions where ``specs/fslmaths.md`` names
+    them (§7, §19, GLIBC-07; the default's are correctly rounded), on values where the two give
+    other results: the double-precision ``-sin``, ``-cos``, ``-exp``, ``-log`` and ``-pow``,
+    ``-s``'s single-precision Gaussian taps (``expf``) and ``-bptf``'s weights (``exp``); the
+    default's notice, named exactly for a voxelwise function."""
+    _maths_files(ctx)
+
+    def m(*argv: str) -> None:
+        _maths(ctx, *argv, upstream_defects=REPRODUCE)
+
+    m("-dt", "double", "signed.nii", "-mul", "0.0371", "-sin", "g_sin", "-odt", "double")
+    m("-dt", "double", "signed.nii", "-mul", "0.0731", "-cos", "g_cos", "-odt", "double")
+    m("-dt", "double", "signed.nii", "-div", "11", "-exp", "g_exp", "-odt", "double")
+    m("-dt", "double", "anat.nii", "-mul", "anat2.nii", "-add", "1", "-log", "g_log", "-odt", "double")  # fmt: skip
+    m("-dt", "double", "anat.nii", "-div", "13", "-pow", "2.3", "g_pow", "-odt", "double")
+    m("anat.nii", "-s", "3.95", "g_s")
+    m("-dt", "double", "bold.nii", "-bptf", "1.73", "-1", "g_bptf", "-odt", "double")
+    fix = _maths_status(ctx, "fslmaths", "-dt", "double", "signed.nii", "-mul", "0.0371", "-sin", "f_sin", "-odt", "double")  # fmt: skip
+    return {**_written(ctx, "g_"), **_status_outputs("fix", fix)}
 
 
 @case("cli.fsl.fslmaths.filters")

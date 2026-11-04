@@ -3,6 +3,9 @@
 
 use std::io::Write;
 
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
+
 use super::Settings;
 use crate::flirt::mat::{self, Mat4, Stream};
 use crate::flirt::xfm;
@@ -115,7 +118,34 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             show(out, &mut stream, "Initial matrix:", &m);
             show(out, &mut stream, "Fix Scale-Skew matrix:", &s);
         }
-        m = xfm::fix_scale_skew(&m, &s);
+        let mode = match settings.defects() {
+            Ok(m) => m,
+            Err(e) => {
+                let _ = writeln!(err, "larmorx fsl convert_xfm: {e}");
+                return 2;
+            }
+        };
+        let fixed = xfm::fix_scale_skew(&m, &s, &Libm::new(mode));
+        // GLIBC-07 (§10, §3): named where the other choice of arctangent, sine and cosine
+        // writes another matrix
+        let other = if mode.fix() {
+            UpstreamDefects::Reproduce
+        } else {
+            UpstreamDefects::Fix
+        };
+        let fixed2 = xfm::fix_scale_skew(&m, &s, &Libm::new(other));
+        if mat::file_text(&fixed) != mat::file_text(&fixed2) {
+            let detail = if mode.fix() {
+                "-fixscaleskew's matrix from the correctly rounded functions, where glibc's \
+                 atan2f, sinf and cosf (FSL's) write another"
+            } else {
+                "-fixscaleskew's matrix from glibc's atan2f, sinf and cosf, as FSL, where the \
+                 correctly rounded functions write another"
+            };
+            let n = Notice::new(&defects::GLIBC_07, mode, detail);
+            super::common::print_notices(err, &[n]);
+        }
+        m = fixed;
     }
     if let Some(c) = &concat {
         let Some(s) = read(settings, c, err) else {

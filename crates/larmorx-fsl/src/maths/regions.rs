@@ -6,7 +6,7 @@
 //! half-width is not a valid `int`.
 
 use larmorx_core::defects::{self, Notices};
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::image::Img;
@@ -84,16 +84,17 @@ fn active(sigma: f64) -> bool {
 }
 
 /// The weight `exp(−Δ² / (2σ²))`, evaluated as `exp(−0.5 Δ² / (σ σ))` (Δ² a 32-bit integer;
-/// the two give the same values on the black-box probes of findings 15).
+/// the two give the same values on the black-box probes of findings 15); `libm`'s `exp`
+/// (glibc's with `reproduce`, GLIBC-07).
 #[inline]
-fn weight(d2: i32, sigma: f64) -> f64 {
-    math::exp(-0.5 * f64::from(d2) / (sigma * sigma))
+fn weight(d2: i32, sigma: f64, libm: &Libm) -> f64 {
+    libm.exp(-0.5 * f64::from(d2) / (sigma * sigma))
 }
 
 /// The weights for `|Δ|` up to `n`.
-fn weights(sigma: f64, n: usize) -> Vec<f64> {
+fn weights(sigma: f64, n: usize, libm: &Libm) -> Vec<f64> {
     (0..=n)
-        .map(|d| weight((d as i32).wrapping_mul(d as i32), sigma))
+        .map(|d| weight((d as i32).wrapping_mul(d as i32), sigma, libm))
         .collect()
 }
 
@@ -318,6 +319,9 @@ impl Filters {
 /// `-bptf hp lp` (§13.2): the high-pass, then the low-pass, of every voxel's series.
 pub fn bptf<T: Num>(img: &mut Img<T>, hp: f64, lp: f64, notices: &mut Notices) -> Result<(), Stop> {
     let fix = notices.fix();
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     let nt = img.dims[3].max(1);
     let per = img.per_volume();
     let mut width = |sigma: f64,
@@ -365,14 +369,14 @@ pub fn bptf<T: Num>(img: &mut Img<T>, hp: f64, lp: f64, notices: &mut Notices) -
     let mh = width(hp, 3.0, 0, "high-pass")?;
     let ml = width(lp, 20.0, 2, "low-pass")?;
     let span = nt - 1;
-    let wh = mh.map(|m| weights(hp, m.min(span)));
+    let wh = mh.map(|m| weights(hp, m.min(span), &libm));
     let wl = ml.map(|m| {
         // normalised by their total over −m..m, in that order
         let mut total = 0.0f64;
         for d in -(m as i64)..=(m as i64) {
-            total += weight((d as i32).wrapping_mul(d as i32), lp);
+            total += weight((d as i32).wrapping_mul(d as i32), lp, &libm);
         }
-        weights(lp, m.min(span))
+        weights(lp, m.min(span), &libm)
             .into_iter()
             .map(|w| w / total)
             .collect::<Vec<f64>>()
@@ -498,13 +502,13 @@ mod tests {
             let mh = active(hp).then(|| half_width(3.0 * hp, 0).unwrap() as usize);
             let ml = active(lp).then(|| half_width(20.0 * lp, 2).unwrap() as usize);
             let span = nt - 1;
-            let wh = mh.map(|m| weights(hp, m.min(span)));
+            let wh = mh.map(|m| weights(hp, m.min(span), &Libm::default()));
             let wl = ml.map(|m| {
                 let mut total = 0.0f64;
                 for d in -(m as i64)..=(m as i64) {
-                    total += weight((d as i32).wrapping_mul(d as i32), lp);
+                    total += weight((d as i32).wrapping_mul(d as i32), lp, &Libm::default());
                 }
-                weights(lp, m.min(span))
+                weights(lp, m.min(span), &Libm::default())
                     .into_iter()
                     .map(|w| w / total)
                     .collect::<Vec<_>>()
@@ -548,7 +552,7 @@ mod tests {
     fn a_high_passed_line_is_zero() {
         // a straight line is its own local line: c0 + x - c is c0, minus the mean: 0
         let mut x: Vec<f64> = (0..9).map(|t| 2.0 + 3.0 * f64::from(t)).collect();
-        let w = weights(2.0, 6);
+        let w = weights(2.0, 6, &Libm::default());
         high_pass(&mut x, &w, 6);
         assert!(x.iter().all(|v| v.abs() < 1e-12), "{x:?}");
     }

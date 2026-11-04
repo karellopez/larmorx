@@ -221,17 +221,28 @@ def merge_rerun(e: Entry, info: dict, why: str) -> dict:
 
 
 def recompute(
-    ctx: Context, tool: str, case: str, description: str, compute: Callable[[Entry], None]
+    ctx: Context,
+    tool: str,
+    case: str,
+    description: str,
+    compute: Callable[[Entry], None],
+    why: str | None = None,
 ) -> Entry:
     """The cache entry ``tool/case`` computed again by ``compute(entry)`` (an entry whose
     every run is larmorx's, after a change of larmorx), as :func:`entry` computes a missing
-    one."""
+    one; with ``why``, ``RUN_INFO.json`` also records why and the larmorx commit of the entry
+    it replaced (``recomputed``)."""
     e = Entry(ctx, tool, case, description)
+    previous = e.info().get("larmorx_commit") if e.done else None
     ctx.log(f"computing {tool}/{case} again into {e.dir}")
     e.start()
     compute(e)
     if not e.done:
         e.finish()
+    if why is not None:
+        info = e.info()
+        info["recomputed"] = {"previous_larmorx_commit": previous, "why": why}
+        e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
     return e
 
 

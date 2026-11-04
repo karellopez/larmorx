@@ -211,7 +211,9 @@ pub fn sample_op_of(xs: &[f64], n: usize, deriv: bool, linear: bool) -> Op1 {
 
 /// The Gaussian smoothing of a volume (§4.4): FWHM `fwhm` mm, voxel sizes `voxel`, separable,
 /// periodic.
-pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
+/// The taps' `exp` is glibc's with `glibc` (`reproduce`, GLIBC-07), correctly rounded
+/// otherwise (named by neither: topup's fit cannot tell whether a tap's last bit moved it).
+pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3], glibc: bool) -> Grid {
     // FWHM 0 is no smoothing; so is a negative one (FSL-125 reproduced; observed: FSL's first
     // cost with --fwhm=-8 is that of no smoothing, probe P)
     if !(fwhm > 0.0) || !fwhm.is_finite() {
@@ -224,12 +226,16 @@ pub fn smooth(g: &Grid, fwhm: f64, voxel: [f64; 3]) -> Grid {
         let sv = sigma / voxel[a];
         let r = 2 * ((sv - 0.001).trunc() as i64) + 3;
         let r = r.max(0);
-        let mut k: Vec<f64> = (-r..=r)
-            .map(|j| {
-                let v = larmorx_core::math::exp(-((j * j) as f64) / (2.0 * sv * sv));
-                f64::from(v as f32)
-            })
-            .collect();
+        let tap = |j: i64, glibc: bool| {
+            let q = -((j * j) as f64) / (2.0 * sv * sv);
+            let v = if glibc {
+                larmorx_core::math::exp_glibc(q)
+            } else {
+                larmorx_core::math::exp(q)
+            };
+            f64::from(v as f32)
+        };
+        let mut k: Vec<f64> = (-r..=r).map(|j| tap(j, glibc)).collect();
         let s: f64 = k.iter().sum();
         for v in &mut k {
             *v /= s;
@@ -400,7 +406,8 @@ pub struct LevelImages {
     pub coef: Vec<Grid>,
 }
 
-pub fn level_images(p: &Prepared, s: usize, fwhm: f64) -> LevelImages {
+/// The smoothing's `exp` is glibc's with `glibc` (`reproduce`).
+pub fn level_images(p: &Prepared, s: usize, fwhm: f64, glibc: bool) -> LevelImages {
     let voxel = [
         p.reg_voxel[0] * s as f64,
         p.reg_voxel[1] * s as f64,
@@ -410,7 +417,7 @@ pub fn level_images(p: &Prepared, s: usize, fwhm: f64) -> LevelImages {
         .volumes
         .iter()
         .map(|v| {
-            let g = smooth(&subsample(v, s), fwhm, voxel);
+            let g = smooth(&subsample(v, s), fwhm, voxel, glibc);
             if g.linear { g } else { prefilter(&g) }
         })
         .collect();

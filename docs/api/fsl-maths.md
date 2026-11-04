@@ -200,14 +200,26 @@ are unsigned bytes (uint8). See `specs/fslmaths.md` §2.4 and §3.3 for every ru
 ### Maths functions and GLIBC-07
 
 `-exp`, `-log`, `-sin`, `-cos`, `-tan`, `-asin`, `-acos`, `-atan` and `-pow` compute in double
-precision. FSL calls glibc 2.35's functions, which are not correctly rounded; larmorx computes
-them correctly rounded (`larmorx_core::math`, CORE-MATH's). Rounded to float (the default `float`
-computing type) no difference survives in 6.7 × 10⁷ measured arguments of any function, so a
-float image's result is FSL's. Under `-dt double` a few voxels differ in the last place (0.02 %
-for `log` to 0.21 % for `tan`); with `upstream_defects="reproduce"` the replica gives glibc's bits
-for `exp`, `log` and `pow` and names GLIBC-07 where they change a voxel, while `sin`, `cos`,
-`tan`, `asin`, `acos` and `atan` stay correctly rounded in both modes (glibc's code for them is
-LGPL and is not translated).
+precision. FSL calls glibc 2.35's functions, which are not correctly rounded; larmorx's default
+computes them correctly rounded (`larmorx_core::math`, CORE-MATH's). Rounded to float (the default
+`float` computing type) no difference survives in 6.7 × 10⁷ measured arguments of any function, so
+a float image's result is FSL's. Under `-dt double` a few voxels differ in the last place (0.02 %
+for `log` to 0.21 % for `tan`). With `upstream_defects="reproduce"` the clean-room original gives
+glibc's bits for `exp`, `log`, `pow`, `sin` and `cos` (`larmorx_core::math`'s `*_glibc`
+functions, written from permissive code and from `specs/glibc-dbl.md`, proved bit for bit against
+glibc 2.35), the replica for `exp`, `log` and `pow`; `tan`, `asin`, `acos` and `atan` stay
+correctly rounded in both modes (the user's decision of 2026-11-04). The original names GLIBC-07,
+in both modes, exactly where the other choice stores another value in a voxel.
+
+The original makes the same choice wherever `specs/fslmaths.md` names glibc's functions: `-s`'s and
+`-kernel gauss`'s single-precision taps (`expf`), `-dog_edge`'s Gaussians and `-bptf`'s weights
+(`exp`), `-tfce`'s and `-tfceS`'s powers (`pow`, `powf`) and `-roc`'s logarithms and exponentials:
+`reproduce` gives FSL's (glibc's) bits, the default the correctly rounded ones. These filters
+combine many function values, so whether one last bit changed a voxel cannot be told without
+filtering twice: they name nothing, and the default's correctly rounded functions can move a
+filtered value's last bit (the record's cases `orig/glibc-s`, `-kernel-gauss`, `-bptf`, `-tfce` show
+where). `-edge` calls no glibc function: FSL's `pow(x, 2)` for its squares is compiled as the exact
+product (observed: FSL's double `-edge` is the exact squares added from z to x, bit for bit).
 
 The FFT convolution (`-fmeanu`, and `-fmean` with a `3D`, `2D`, `sphere` or `file` kernel, when
 the image and the kernel are large enough) meets the same difference in its twiddle factors: FSL
@@ -285,18 +297,16 @@ memory it never wrote, both modes refuse with a message (exit status 1).
   corrupts FSL's memory: FSL then aborts (`double free or corruption`), crashes or finishes after
   writing its output, depending on its heap. No output voxel depends on it: the original names it
   in both modes and writes the output.
-- **GLIBC-07**: glibc's double-precision maths functions, and `sincos` in the FFT's twiddle
-  factors, are not correctly rounded (above).
+- **GLIBC-07**: glibc's maths functions, and `sincos` in the FFT's twiddle factors, are not
+  correctly rounded (above): `reproduce` gives glibc's bits where the spec names them (not the
+  twiddles: the original has no FFT); named exactly for the voxelwise functions, not for the
+  filters.
 
 ## Not yet
 
 - The clean-room original's 10 open differences of random testing (the record's notes) and
   the spec questions of its findings.
-- The clean-room original's reproduce mode computes `exp`, `log` and `pow` correctly rounded as
-  its default does, where `specs/fslmaths.md` §19 asks glibc's bits of it (GLIBC-07): its
-  double outputs then differ from FSL's by one unit in the last place in a few values (110 of
-  136,400 for `exp` and 15 for `log` on the site's real image), within its record's threshold.
-  glibc 2.35's `exp`, `log` and `pow` are Arm's Optimized Routines (MIT): a follow-up. Its speed: the
+- The original's speed: the
   [benchmarks](../benchmarks/fsl-maths.md) (1.8 to 28 times faster than FSL on one thread, up to
   268 times on 14; the direct sum, in double precision where FSL takes its FFT, outruns FSL's
   FFT on every kernel measured, so the original has no FFT of its own); runtime SIMD dispatch (about 1.3 times more on the large convolutions)

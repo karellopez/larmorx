@@ -237,6 +237,18 @@ and AFNI 26.3.05's header slice code 2 and `-no_detrend` since 2026-10-29. Warni
 colour codes, also into files and pipes (AFNI-21, messages only); larmorx does so in
 `reproduce` mode only.
 
+### glibc's maths functions (GLIBC-07)
+
+`-wsinc5` and `-wsinc9` take their weights' sines and cosines from glibc 2.35's `sinf` and `cosf` in
+AFNI (spec §5.3), which are not correctly rounded: about 1 % of the weights differ in their last bit
+from the correctly rounded ones. The clean-room original computes them correctly rounded by default
+(the double functions rounded to float32) and takes glibc's with `upstream_defects="reproduce"`
+(`larmorx_core::math`'s `*_glibc` functions, proved bit for bit against glibc 2.35; the user's
+decision of 2026-11-04: glibc's bits for `reproduce` only). The weights are computed once per slice:
+where the other choice gives other weights, the original shifts the slice's series with both and
+names GLIBC-07, in both modes, exactly where the other choice stores another value (the record's
+`methods/glibc-sinf-wsinc5` and `-wsinc9`).
+
 ## AFNI's global options and environment variables
 
 AFNI programs take *global options* out of the command line before reading their own, wherever

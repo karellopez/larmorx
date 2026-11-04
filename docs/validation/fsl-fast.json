@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "f0dd88b671b6",
+  "larmorx_commit": "be3db916dce3",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -19,14 +19,14 @@
    "ended by a signal, SIGABRT (never stored)": 11,
    "ended by a signal, SIGSEGV (never stored)": 1,
    "never cached: FSL crashes (FSL-101)": 3,
-   "never cached: FSL's _prob_* files hold memory it never writes outside the mask": 7,
+   "never cached: FSL's _prob_* files hold memory it never writes outside the mask": 5,
    "never cached: with -N FSL never writes the multi-channel bias field it saves": 1
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 23,
-  "saved_seconds": 871.8,
-  "served": 77
+  "ran": 21,
+  "saved_seconds": 724.4,
+  "served": 67
  },
  "reference": "fast from FSL 6.0.7.23 (fsl-fast4 2111.3), the conda build at `~/fsl-6.0.7.23`",
  "results": [
@@ -38,15 +38,15 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-01_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 5.3e-06, p99.9 0, total 2.3e-05",
-    "Probabilities (_prob_n): mean difference": "sub-01_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 1.7e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-01_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 0.99999, Dice 0.99998"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-01_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "sub-01_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-01_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 2067654
    },
-   "seconds": 7.375,
+   "seconds": 18.963,
    "status": "pass"
   },
   {
@@ -57,15 +57,15 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 6.2e-06, p99.9 0, total 3.1e-06",
-    "Probabilities (_prob_n): mean difference": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 2.7e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 0.99991, Dice 0.99976"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-pixar008_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 3454629
    },
-   "seconds": 8.284,
+   "seconds": 22.223,
    "status": "pass"
   },
   {
@@ -76,15 +76,15 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 5.9e-05, p99.9 0.01, total 0.00037",
-    "Probabilities (_prob_n): mean difference": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 8.2e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 0.99973, Dice 0.99800"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "sub-RS001_ses-1_T1w_noise_corrected_corrected_xform_masked_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 4652151
    },
-   "seconds": 18.47,
+   "seconds": 35.1,
    "status": "pass"
   },
   {
@@ -95,15 +95,15 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 1.3e-05, p99.9 0, total 5.7e-05",
-    "Probabilities (_prob_n): mean difference": "t1_half_prob_0.nii.gz: mean 1.5e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 0.99995, Dice 0.99988"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "t1_half_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 256879
    },
-   "seconds": 1.495,
+   "seconds": 3.908,
    "status": "pass"
   },
   {
@@ -113,18 +113,18 @@
    "checks_total": 11,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 1.5e-06",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 9.3e-05, p99.9 0.01, total 0.00023",
-    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 9.5e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99994, Dice 0.99865"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.3e-07, p99.9 0, total 1.1e-07",
+    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 2345055,
+    "D13 fix pass": 3236053,
     "FSL's voxels never written (outside the mask) set to 0": "1"
    },
-   "seconds": 56.511,
+   "seconds": 72.505,
    "status": "pass"
   },
   {
@@ -135,14 +135,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2.1e-05, p99.9 0, total 5.3e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99958, Dice 0.99923"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-08, p99.9 0, total 4e-07",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 3003
    },
-   "seconds": 1.92,
+   "seconds": 7.85,
    "status": "pass"
   },
   {
@@ -152,16 +152,16 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 1.2e-07",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2e-05, p99.9 0, total 4.7e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99964, Dice 0.99898"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.3e-08, p99.9 0, total 3.6e-07",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 19888
    },
-   "seconds": 4.223,
+   "seconds": 12.059,
    "status": "pass"
   },
   {
@@ -172,16 +172,16 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.7e-07, p99.9 0, total 1.6e-06",
-    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 1.7e-06",
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 8.5e-08, p99.9 0, total 4.7e-07",
+    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 0",
     "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 275942,
     "FSL's voxels never written (outside the mask) set to 0": "1"
    },
-   "seconds": 26.001,
+   "seconds": 63.84,
    "status": "pass"
   },
   {
@@ -192,14 +192,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.5e-05, p99.9 0.01, total 2.5e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99920, Dice 0.99851"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-08, p99.9 0, total 5.3e-07",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 3564
    },
-   "seconds": 3.611,
+   "seconds": 13.716,
    "status": "pass"
   },
   {
@@ -210,13 +210,13 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "mni_t1_seg.nii.gz: identical 0.99990, Dice 0.99990"
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "mni_t1_seg.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 23
    },
-   "seconds": 0.956,
+   "seconds": 6.604,
    "status": "pass"
   },
   {
@@ -228,15 +228,15 @@
    "measured": {
     "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 5.6e-06, p99.9 0, total 1.6e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99993, Dice 0.99979"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 544,
     "FSL's bias field never written (-N): its values set to the defined ones": "4"
    },
-   "seconds": 21.125,
+   "seconds": 48.407,
    "status": "pass"
   },
   {
@@ -247,14 +247,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.6e-05, p99.9 0, total 9.5e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99987, Dice 0.99961"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.3e-07, p99.9 0, total 1.2e-06",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 569
    },
-   "seconds": 1.877,
+   "seconds": 8.695,
    "status": "pass"
   },
   {
@@ -270,9 +270,9 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 32
    },
-   "seconds": 1.55,
+   "seconds": 4.876,
    "status": "pass"
   },
   {
@@ -282,16 +282,16 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 8e-07",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2e-05, p99.9 0, total 4.9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99990, Dice 0.99932"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 105262
    },
-   "seconds": 0.391,
+   "seconds": 2.731,
    "status": "pass"
   },
   {
@@ -301,12 +301,12 @@
    "checks_total": 9,
    "failed_checks": [
     {
-     "detail": "seg_mixeltype.nii.gz: identical 0.95852, Dice 0.90695; seg_pveseg.nii.gz: identical 0.97892, Dice 0.97265; seg_seg.nii.gz: identical 0.98555, Dice 0.98201",
+     "detail": "seg_mixeltype.nii.gz: identical 0.95850, Dice 0.90691; seg_pveseg.nii.gz: identical 0.97891, Dice 0.97265; seg_seg.nii.gz: identical 0.98555, Dice 0.98201",
      "metric": "per file",
      "name": "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels",
      "passed": false,
      "threshold": "Dice >= 0.999, identical >= 99.9%, outside identical",
-     "value": "seg_mixeltype.nii.gz: identical 0.95852, Dice 0.90695"
+     "value": "seg_mixeltype.nii.gz: identical 0.95850, Dice 0.90691"
     },
     {
      "detail": "seg_pve_0.nii.gz: mean 0.0064, p99.9 0.81, total 0.00058; seg_pve_1.nii.gz: mean 0.021, p99.9 1, total 0.0023; seg_pve_2.nii.gz: mean 0.017, p99.9 0.91, total 0.0025",
@@ -329,13 +329,13 @@
     "Bias field and restored image: relative difference (p99.9)": "seg_bias_1.nii.gz: rel p99.9 0.041",
     "Image headers: the same grid, forms and data types": "0",
     "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0.0064, p99.9 0.81, total 0.00058",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.95852, Dice 0.90695"
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.95850, Dice 0.90691"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 47614
    },
-   "seconds": 5.928,
+   "seconds": 15.998,
    "status": "fail"
   },
   {
@@ -353,7 +353,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.386,
+   "seconds": 11.87,
    "status": "pass"
   },
   {
@@ -366,7 +366,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. At least 2 channels required for Multi Channel Segmentation",
-   "seconds": 0.013,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -376,16 +376,16 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 6.2e-05",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.9e-05, p99.9 0.01, total 9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 190418
    },
-   "seconds": 1.4,
+   "seconds": 5.585,
    "status": "pass"
   },
   {
@@ -396,14 +396,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 1.2e-05, p99.9 0, total 2.3e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 471
    },
-   "seconds": 1.689,
+   "seconds": 5.386,
    "status": "pass"
   },
   {
@@ -414,14 +414,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 2.8e-05, p99.9 0, total 6.1e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 0.99992, Dice 0.99987"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "t1_half_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 198
    },
-   "seconds": 1.026,
+   "seconds": 2.98,
    "status": "pass"
   },
   {
@@ -432,16 +432,16 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2.6e-05, p99.9 0, total 0.00017",
-    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 2.7e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99972, Dice 0.99932"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 343214,
     "FSL's voxels never written (outside the mask) set to 0": "0"
    },
-   "seconds": 7.613,
+   "seconds": 15.895,
    "status": "pass"
   },
   {
@@ -459,7 +459,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.927,
+   "seconds": 2.972,
    "status": "pass"
   },
   {
@@ -469,15 +469,15 @@
    "checks_total": 8,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_restore.nii.gz: rel p99.9 6.2e-05",
+    "Bias field and restored image: relative difference (p99.9)": "seg_restore.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_seg.nii.gz: identical 0.99996, Dice 0.99995"
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_seg.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95006
    },
-   "seconds": 0.813,
+   "seconds": 2.643,
    "status": "pass"
   },
   {
@@ -487,16 +487,16 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 6.1e-06",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 3.3e-05, p99.9 0, total 0.00011",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99971"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 93165
    },
-   "seconds": 0.921,
+   "seconds": 2.831,
    "status": "pass"
   },
   {
@@ -507,14 +507,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 5.7e-05, p99.9 0.01, total 5.1e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99964, Dice 0.99659"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 547
    },
-   "seconds": 1.25,
+   "seconds": 2.758,
    "status": "pass"
   },
   {
@@ -525,14 +525,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 5.2e-05, p99.9 0.01, total 0.00019",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99975, Dice 0.99965"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 480
    },
-   "seconds": 1.753,
+   "seconds": 2.474,
    "status": "pass"
   },
   {
@@ -543,14 +543,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2.6e-05, p99.9 0.01, total 0.00012",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99991, Dice 0.99984"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 476
    },
-   "seconds": 0.98,
+   "seconds": 3.623,
    "status": "pass"
   },
   {
@@ -561,14 +561,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 3.8e-05, p99.9 0.01, total 0.00017",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99987, Dice 0.99980"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 610
    },
-   "seconds": 1.697,
+   "seconds": 5.265,
    "status": "pass"
   },
   {
@@ -579,14 +579,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.9e-05, p99.9 0.01, total 9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 453
    },
-   "seconds": 0.987,
+   "seconds": 3.784,
    "status": "pass"
   },
   {
@@ -597,14 +597,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.9e-05, p99.9 0.01, total 9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 453
    },
-   "seconds": 0.983,
+   "seconds": 4.607,
    "status": "pass"
   },
   {
@@ -614,16 +614,16 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 3.7e-05",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0.00015, p99.9 0.01, total 0.00063",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99934, Dice 0.99761"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 6070
    },
-   "seconds": 0.08,
+   "seconds": 0.316,
    "status": "pass"
   },
   {
@@ -634,14 +634,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.9e-05, p99.9 0.01, total 9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 453
    },
-   "seconds": 0.979,
+   "seconds": 3.566,
    "status": "pass"
   },
   {
@@ -654,7 +654,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 255; the same from the original. ",
-   "seconds": 0.068,
+   "seconds": 0.27,
    "status": "both-error"
   },
   {
@@ -664,17 +664,39 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_restore.nii.gz: rel p99.9 1.2e-05",
+    "Bias field and restored image: relative difference (p99.9)": "seg_restore.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.2e-05, p99.9 0, total 4.9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99989, Dice 0.99985"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 94316
    },
-   "seconds": 1.16,
+   "seconds": 3.447,
    "status": "pass"
+  },
+  {
+   "case": "opt/nan-first",
+   "category": "opt",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "exit 0: FSL-103",
+     "metric": "exact",
+     "name": "the default run finishes and names FSL-203",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "measured": {
+    "Image headers: the same grid, forms and data types": "0"
+   },
+   "reason": "",
+   "seconds": 1.606,
+   "status": "fail"
   },
   {
    "case": "opt/nan",
@@ -683,18 +705,18 @@
    "checks_total": 11,
    "failed_checks": [],
    "measured": {
-    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 8.6e-05",
+    "Bias field and restored image: relative difference (p99.9)": "seg_bias.nii.gz: rel p99.9 0",
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.7e-05, p99.9 0.01, total 0.00021",
-    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 5.9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99984, Dice 0.99886"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Probabilities (_prob_n): mean difference": "seg_prob_0.nii.gz: mean 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 449016,
     "FSL's voxels never written (outside the mask) set to 0": "0"
    },
-   "seconds": 13.673,
+   "seconds": 13.272,
    "status": "pass"
   },
   {
@@ -705,14 +727,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 7.8e-06, p99.9 0, total 2.1e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99996, Dice 0.99993"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 66
    },
-   "seconds": 1.203,
+   "seconds": 4.137,
    "status": "pass"
   },
   {
@@ -723,14 +745,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 8.2e-05, p99.9 0.01, total 0.0002",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99970, Dice 0.99886"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 10439
+    "D13 fix pass": 10463
    },
-   "seconds": 1.81,
+   "seconds": 3.439,
    "status": "pass"
   },
   {
@@ -741,14 +763,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.hdr: mean 4.9e-05, p99.9 0.01, total 9e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.hdr: identical 0.99984, Dice 0.99970"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.hdr: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.hdr: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 922
    },
-   "seconds": 0.561,
+   "seconds": 3.371,
    "status": "pass"
   },
   {
@@ -759,13 +781,13 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_seg.nii.gz: identical 0.99992, Dice 0.99988"
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "t1_half_seg.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 8
    },
-   "seconds": 0.338,
+   "seconds": 1.203,
    "status": "pass"
   },
   {
@@ -778,7 +800,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optional arguments (You may optionally specify one or more of): -n,--class number of tiss",
-   "seconds": 0.002,
+   "seconds": 0.095,
    "status": "both-error"
   },
   {
@@ -791,7 +813,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optional arguments (You may optionally specify one or more of): -n,--class number of tiss",
-   "seconds": 0.002,
+   "seconds": 0.099,
    "status": "both-error"
   },
   {
@@ -804,7 +826,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optional arguments (You may optionally specify one or more of): -n,--class number of tiss",
-   "seconds": 0.011,
+   "seconds": 0.08,
    "status": "both-error"
   },
   {
@@ -817,7 +839,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optional arguments (You may optionally specify one or more of): -n,--class number of tiss",
-   "seconds": 0.002,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -830,7 +852,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optional arguments (You may optionally specify one or more of): -n,--class number of tiss",
-   "seconds": 0.011,
+   "seconds": 0.088,
    "status": "both-error"
   },
   {
@@ -843,7 +865,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 1; the same from the original. ERROR: Segmentation smoothness must be positive. Exiting",
-   "seconds": 0.011,
+   "seconds": 0.111,
    "status": "both-error"
   },
   {
@@ -854,14 +876,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0.00037, p99.9 0.03, total 0.00094",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99780, Dice 0.96774"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.2,
+   "seconds": 0.565,
    "status": "pass"
   },
   {
@@ -879,7 +901,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.12,
+   "seconds": 0.479,
    "status": "pass"
   },
   {
@@ -897,7 +919,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.189,
+   "seconds": 0.635,
    "status": "pass"
   },
   {
@@ -915,7 +937,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.192,
+   "seconds": 0.468,
    "status": "pass"
   },
   {
@@ -926,14 +948,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.4e-05, p99.9 0, total 5.2e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99976, Dice 0.99936"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.196,
+   "seconds": 0.411,
    "status": "pass"
   },
   {
@@ -946,7 +968,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::invalid_argument' what(): Mixeltype exceeds allowed types",
-   "seconds": 0.285,
+   "seconds": 0.544,
    "status": "both-error"
   },
   {
@@ -959,7 +981,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::length_error' what(): vector::_M_fill_insert",
-   "seconds": 0.057,
+   "seconds": 0.178,
    "status": "both-error"
   },
   {
@@ -972,7 +994,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): Mat::init(): requested size is too large",
-   "seconds": 0.061,
+   "seconds": 0.196,
    "status": "both-error"
   },
   {
@@ -989,7 +1011,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.07,
+   "seconds": 0.292,
    "status": "pass"
   },
   {
@@ -1002,7 +1024,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::length_error' what(): vector::_M_default_append",
-   "seconds": 0.066,
+   "seconds": 0.197,
    "status": "both-error"
   },
   {
@@ -1020,7 +1042,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.122,
+   "seconds": 0.557,
    "status": "pass"
   },
   {
@@ -1033,7 +1055,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. Image Exception : #63 :: No image files match: nothere Image Exception : #22 :: Failed to read volume nothere.nii.gz Error : No image files match: nothere terminate called after throwing an instance o",
-   "seconds": 0.016,
+   "seconds": 0.183,
    "status": "both-error"
   },
   {
@@ -1046,7 +1068,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. Image Exception : #63 :: No image files match: 2 Image Exception : #22 :: Failed to read volume 2 Error : No image files match: 2 terminate called after throwing an instance of 'std::runtime_error' wh",
-   "seconds": 0.03,
+   "seconds": 0.244,
    "status": "both-error"
   },
   {
@@ -1059,7 +1081,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 255; the same from the original. ",
-   "seconds": 0.033,
+   "seconds": 0.181,
    "status": "both-error"
   },
   {
@@ -1072,7 +1094,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits 255; the same from the original. ",
-   "seconds": 0.005,
+   "seconds": 0.149,
    "status": "both-error"
   },
   {
@@ -1085,7 +1107,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null is not valid",
-   "seconds": 0.186,
+   "seconds": 0.621,
    "status": "both-error"
   },
   {
@@ -1098,7 +1120,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null is not valid",
-   "seconds": 0.049,
+   "seconds": 0.174,
    "status": "both-error"
   },
   {
@@ -1111,7 +1133,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -11; the same from the original. sh: 1: Syntax error: word unexpected sh: 1: Syntax error: word unexpected sh: 1: Syntax error: word unexpected csf prior image not transformed correctly! priors are not used!",
-   "seconds": 1.005,
+   "seconds": 2.467,
    "status": "both-error"
   },
   {
@@ -1124,7 +1146,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. Image Exception : #3 :: mask and vol have different sizes in calc_percentiles terminate called after throwing an instance of 'std::runtime_error' what(): mask and vol have different sizes in calc_perc",
-   "seconds": 0.27,
+   "seconds": 0.594,
    "status": "both-error"
   },
   {
@@ -1134,7 +1156,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "undefined behaviour of FSL's (FSL-104); refused",
-   "seconds": 0.029,
+   "seconds": 0.272,
    "status": "expected-divergence"
   },
   {
@@ -1147,7 +1169,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. Image Exception : #63 :: No image files match: 4 Image Exception : #22 :: Failed to read volume 4 Error : No image files match: 4 terminate called after throwing an instance of 'std::runtime_error' wh",
-   "seconds": 0.066,
+   "seconds": 0.223,
    "status": "both-error"
   },
   {
@@ -1158,14 +1180,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-05, p99.9 0, total 0.00021",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99980, Dice 0.99971"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 194
    },
-   "seconds": 0.207,
+   "seconds": 0.884,
    "status": "pass"
   },
   {
@@ -1176,14 +1198,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-05, p99.9 0, total 0.00021",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99980, Dice 0.99971"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 194
    },
-   "seconds": 0.221,
+   "seconds": 0.922,
    "status": "pass"
   },
   {
@@ -1194,14 +1216,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 3e-07, p99.9 0, total 2.6e-07",
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
     "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 496965
+    "D13 fix pass": 496961
    },
-   "seconds": 2.97,
+   "seconds": 5.749,
    "status": "pass"
   },
   {
@@ -1221,7 +1243,7 @@
     "D13 fix pass": 1189247,
     "FSL's voxels never written (outside the mask) set to 0": "0"
    },
-   "seconds": 12.869,
+   "seconds": 22.362,
    "status": "pass"
   },
   {
@@ -1239,7 +1261,7 @@
    "reported": {
     "D13 fix pass": 480789
    },
-   "seconds": 1.546,
+   "seconds": 3.66,
    "status": "pass"
   },
   {
@@ -1257,7 +1279,7 @@
    "reported": {
     "D13 fix pass": 498481
    },
-   "seconds": 1.435,
+   "seconds": 3.314,
    "status": "pass"
   },
   {
@@ -1268,14 +1290,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0.00022, p99.9 0.01, total 0.0012",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99732, Dice 0.99573"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 15698
    },
-   "seconds": 2.422,
+   "seconds": 3.935,
    "status": "pass"
   },
   {
@@ -1293,7 +1315,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.451,
+   "seconds": 4.371,
    "status": "pass"
   },
   {
@@ -1304,14 +1326,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 7.7e-05, p99.9 0.01, total 0.00025",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99950, Dice 0.99925"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 2493
    },
-   "seconds": 1.77,
+   "seconds": 3.723,
    "status": "pass"
   },
   {
@@ -1322,14 +1344,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-05, p99.9 0, total 0.00021",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99980, Dice 0.99971"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 194
    },
-   "seconds": 0.216,
+   "seconds": 0.614,
    "status": "pass"
   },
   {
@@ -1340,14 +1362,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 7.7e-05, p99.9 0.01, total 0.00025",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99950, Dice 0.99925"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 2493
    },
-   "seconds": 1.961,
+   "seconds": 3.536,
    "status": "pass"
   },
   {
@@ -1360,7 +1382,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -11; the same from the original. Could not open matrix file nothere.mat matrix multiplication: incompatible matrix dimensions: 4x4 and 0x0 Could not open matrix file nothere.mat matrix multiplication: incompatible matrix dimensions: ",
-   "seconds": 0.864,
+   "seconds": 2.144,
    "status": "both-error"
   },
   {
@@ -1373,7 +1395,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -11; the same from the original. Unrecognised option s Unrecognised option s Unrecognised option s csf prior image not transformed correctly! priors are not used!",
-   "seconds": 0.241,
+   "seconds": 0.736,
    "status": "both-error"
   },
   {
@@ -1384,14 +1406,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 2.5e-05, p99.9 0, total 5.8e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99993, Dice 0.99933"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 4.2e-08, p99.9 0, total 1.6e-07",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 496027
+    "D13 fix pass": 496225
    },
-   "seconds": 2.102,
+   "seconds": 4.341,
    "status": "pass"
   },
   {
@@ -1402,14 +1424,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.1e-06, p99.9 0, total 3.1e-07",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 0.99999"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 8.5e-08, p99.9 0, total 6.2e-07",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 482465
+    "D13 fix pass": 482450
    },
-   "seconds": 1.75,
+   "seconds": 3.791,
    "status": "pass"
   },
   {
@@ -1428,7 +1450,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.055,
+   "seconds": 0.262,
    "status": "pass"
   },
   {
@@ -1439,14 +1461,14 @@
    "failed_checks": [],
    "measured": {
     "Image headers: the same grid, forms and data types": "0",
-    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 1.8e-05, p99.9 0, total 9.2e-05",
-    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 0.99998, Dice 0.99941"
+    "Partial volumes (_pve_n): mean and p99.9 differences, totals": "seg_pve_0.nii.gz: mean 0, p99.9 0, total 0",
+    "Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels": "seg_mixeltype.nii.gz: identical 1.00000, Dice 1.00000"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 1127078
+    "D13 fix pass": 1127059
    },
-   "seconds": 2.065,
+   "seconds": 4.355,
    "status": "pass"
   },
   {
@@ -1465,7 +1487,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.198,
    "status": "pass"
   },
   {
@@ -1478,7 +1500,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -11; the same from the original. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
-   "seconds": 0.515,
+   "seconds": 0.874,
    "status": "both-error"
   },
   {
@@ -1491,7 +1513,7 @@
     "Image headers: the same grid, forms and data types": "0"
    },
    "reason": "fast exits -6; the same from the original. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
-   "seconds": 0.065,
+   "seconds": 0.145,
    "status": "both-error"
   },
   {
@@ -1509,7 +1531,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.064,
+   "seconds": 0.416,
    "status": "pass"
   }
  ],
@@ -1517,7 +1539,7 @@
  "summary": {
   "both-error": 25,
   "expected-divergence": 1,
-  "fail": 1,
+  "fail": 2,
   "pass": 60,
   "skipped": 0
  },

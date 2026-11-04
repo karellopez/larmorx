@@ -413,9 +413,9 @@ pub fn optimise(
     s: &Settings,
     subset: Option<&Subset>,
 ) -> Result<(Mat4, f32), String> {
-    let x0: Params = param::decompose(s.rep, start, centre);
     let quiet = Log::default();
     let log = s.log.as_deref().unwrap_or(&quiet);
+    let x0: Params = param::decompose(s.rep, start, centre, log.libm());
     let shown = if s.at(5).is_some() {
         param::compose(s.rep, &x0, 12, centre, log)
     } else {

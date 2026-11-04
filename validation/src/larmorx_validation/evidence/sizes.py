@@ -35,6 +35,15 @@ PAGE_BUDGETS: dict[str, tuple[int, str]] = {
         "examples (2026-10-26: fMRIPrep's N4 of a multiband-8 BOLD reference as a whole "
         "volume, 4.8 MB, and five images as three full-resolution slices each, about 13 MB)",
     ),
+    "fsl-flirt": (
+        50_000_000,
+        "fMRIPrep's boundary-based registration (about 33 MB) is a whole volume with the "
+        "registered images of FSL, the replica and the clean-room original in both modes; since "
+        "2026-11-04 the original's reproduce mode computes sinf, cosf, atan2f, cos, exp and logf "
+        "as glibc 2.35 does and its default correctly rounded (GLIBC-07), so its two modes end "
+        "at slightly different matrices and the default's image is stored in full beside the "
+        "reproduce mode's, no longer as the same values (the page went from 36 to about 42 MB)",
+    ),
 }
 
 

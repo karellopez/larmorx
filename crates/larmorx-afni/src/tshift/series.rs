@@ -5,7 +5,7 @@
 //! each step notes its precision. Samples outside the series count as 0.
 
 use larmorx_core::Complex;
-use larmorx_core::math::{cos, sin};
+use larmorx_core::math::{cos, cosf_glibc, sin, sinf_glibc};
 
 use super::{Method, Restore};
 use crate::fft::Fft;
@@ -346,8 +346,10 @@ impl Lagrange {
 const PI_F32: f32 = std::f32::consts::PI;
 
 /// The weight of a sample at distance `x` from the source position: `sinc(x)·W(u)`, zero
-/// beyond the radius; all in float32 (the sine and cosine rounded to float32).
-fn wsinc_weight(x: f32, radius: i64) -> f32 {
+/// beyond the radius; all in float32 (the sine and cosine rounded to float32). The sine and
+/// cosine are glibc 2.35's `sinf` and `cosf` with `glibc` (`reproduce`: AFNI's, spec §5.3,
+/// GLIBC-07), else the correctly rounded double ones rounded to float32 (the default).
+fn wsinc_weight(x: f32, radius: i64, glibc: bool) -> f32 {
     let x = x.abs();
     if x > radius as f32 {
         return 0.0;
@@ -359,19 +361,29 @@ fn wsinc_weight(x: f32, radius: i64) -> f32 {
         1.0 - PI2_6 * (x * x)
     } else {
         let px = PI_F32 * x;
-        sin(f64::from(px)) as f32 / px
+        let s = if glibc {
+            sinf_glibc(px)
+        } else {
+            sin(f64::from(px)) as f32
+        };
+        s / px
+    };
+    let cosine = |a: f32| {
+        if glibc {
+            cosf_glibc(a)
+        } else {
+            cos(f64::from(a)) as f32
+        }
     };
     let scale: f32 = if radius == 5 { 0.19999 } else { 0.11111 };
     let u = scale * x;
     let pu = PI_F32 * u;
-    let window = 0.424_380_1
-        + 0.497_340_6 * cos(f64::from(pu)) as f32
-        + 0.078_279_3 * cos(f64::from(2.0 * pu)) as f32;
+    let window = 0.424_380_1 + 0.497_340_6 * cosine(pu) + 0.078_279_3 * cosine(2.0 * pu);
     sinc * window
 }
 
 /// Weighted-sinc weights for one slice.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Wsinc {
     radius: i64,
     /// The integer part of the source offset (floored).
@@ -383,10 +395,11 @@ pub struct Wsinc {
 }
 
 impl Wsinc {
-    /// The weights that shift by `s` samples with `radius` 5 or 9. The fraction is taken once
-    /// from the slice's offset `d = −s` (observed: computing it per output sample from
-    /// `n + d` in float32 does not match AFNI).
-    pub fn new(s: f32, radius: i64) -> Wsinc {
+    /// The weights that shift by `s` samples with `radius` 5 or 9, from glibc's `sinf` and
+    /// `cosf` with `glibc` ([`wsinc_weight`]). The fraction is taken once from the slice's
+    /// offset `d = −s` (observed: computing it per output sample from `n + d` in float32 does
+    /// not match AFNI).
+    pub fn new(s: f32, radius: i64, glibc: bool) -> Wsinc {
         let d = -s;
         let i0 = d.floor() as i64;
         let f = d - i0 as f32;
@@ -394,7 +407,7 @@ impl Wsinc {
             radius,
             i0,
             weights: (-(radius - 1)..=radius)
-                .map(|j| wsinc_weight(j as f32 - f, radius))
+                .map(|j| wsinc_weight(j as f32 - f, radius, glibc))
                 .collect(),
             unchanged: s.abs() < 0.0001,
         }
@@ -533,7 +546,7 @@ mod tests {
         let exact = sine(m, -0.4);
         for radius in [5, 9] {
             let mut v = sine(m, 0.0);
-            Wsinc::new(-0.4, radius).apply(&mut v, &mut Vec::new());
+            Wsinc::new(-0.4, radius, false).apply(&mut v, &mut Vec::new());
             for n in 12..m - 12 {
                 assert!((v[n] - exact[n]).abs() < 2e-2, "radius {radius} at {n}");
             }

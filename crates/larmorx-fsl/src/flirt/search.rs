@@ -131,6 +131,9 @@ pub fn search(
     };
     let settings = &euler;
     let at = |l: i32| settings.at(l);
+    // the run's C library functions (GLIBC-07), through its log
+    let quiet_grid = super::cost::Log::default();
+    let libm = settings.log.as_deref().unwrap_or(&quiet_grid).libm();
     // the lines of each grid point interleave with the evaluations': one point after the other
     let n_threads_parallel = n_threads_parallel && at(4).is_none();
     if let Some(t) = at(4) {
@@ -260,7 +263,7 @@ pub fn search(
     let mut costs: Vec<f32> = if n_threads_parallel {
         let c: Vec<f32> = fine_params
             .par_iter()
-            .map(|p| eval(&super::param::euler_compose(p, 12, centre)))
+            .map(|p| eval(&super::param::euler_compose(p, 12, centre, libm)))
             .collect();
         stars(nfine, fz);
         c
@@ -269,7 +272,7 @@ pub fn search(
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let c = eval(&super::param::euler_compose(p, 12, centre));
+                let c = eval(&super::param::euler_compose(p, 12, centre, libm));
                 if let Some(t) = at(5) {
                     t.evaluation(c, p);
                 }
@@ -439,9 +442,9 @@ pub fn search(
                 }
                 super::param::compose(rep, &fine_params[i], free, centre, log)
             } else {
-                super::param::euler_compose(&fine_params[i], free, centre)
+                super::param::euler_compose(&fine_params[i], free, centre, log.libm())
             };
-            let x = super::param::decompose(rep, &m, centre);
+            let x = super::param::decompose(rep, &m, centre, log.libm());
             let m = super::param::compose(rep, &x, free, centre, log);
             if let Some(msg) = &dof_message {
                 log.push(msg.as_str());
@@ -461,13 +464,13 @@ pub fn search(
         tr.line(&format!(
             "{} ::: {}",
             tr.num(f64::from(c)),
-            tr.nums(super::param::decompose(rep, m, centre))
+            tr.nums(super::param::decompose(rep, m, centre, log.libm()))
         ));
     };
     let run_free = |k: usize| -> Result<(Mat4, f32, f32), String> {
         let (x, c) = optimise::optimise_params(
             eval,
-            super::param::decompose(rep, &starts[k], centre),
+            super::param::decompose(rep, &starts[k], centre, log.libm()),
             centre,
             free,
             4,

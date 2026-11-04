@@ -742,15 +742,40 @@ def _compute_cases_original(e: fcache.Entry) -> None:
     )
 
 
+CASES_ORIGINAL_TEXT = (
+    "Every case of the clean-room original's record: its default mode, and each passing case's "
+    "files against FSL's, with FSL's own thread band where the record measures it"
+)
+
+
 def cases_original_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
-        ctx.figures_context(),
-        TOOL,
-        "cases-original",
-        "Every case of the clean-room original's record: its default mode, and each passing "
-        "case's files against FSL's, with FSL's own thread band where the record measures it",
+        ctx.figures_context(), TOOL, "cases-original", CASES_ORIGINAL_TEXT,
         _compute_cases_original,
-    )
+    )  # fmt: skip
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIGINAL_RUNS`) of every
+    example's entry already computed made again, in their working directories with their inputs
+    (an entry not computed yet is computed whole by the export), and every case of its record
+    run again (the ``cases-original`` entry, FSL's runs served by the oracle-output cache)."""
+    fctx = ctx.figures_context()
+    for source in [run for _i, run, _f in FMRIPREP] + list(REAL.values()):
+        name = f"fmriprep-{source}" if source.startswith("ds") else source.replace("/", "-")
+        e = fcache.Entry(fctx, TOOL, f"original-{name}", "")
+        if not e.done:
+            continue
+        info = e.info()
+        args, put, settings, program = _original_source(source)
+        e.runs, e.extra = [], {}
+        for label, mode, n in ORIGINAL_RUNS:
+            for f in (e.dir / label).iterdir():  # the outputs being made again
+                shutil.rmtree(f) if f.is_dir() else f.unlink()
+            _original_run(e, label, args, put, settings, mode, n, program)
+        fcache.merge_rerun(e, info, why)
+    fcache.recompute(fctx, TOOL, "cases-original", CASES_ORIGINAL_TEXT, _compute_cases_original,
+                     why)  # fmt: skip
 
 
 # ------------------------------------------------------------------------- the files
@@ -1163,6 +1188,11 @@ ORIGINAL_FIX["FSL-146"] = (
 )
 
 
+#: The C library's function the clean-room original computes as glibc 2.35 does in its
+#: reproduce mode since 2026-11-04, correctly rounded by default (GLIBC-07, not named).
+GLIBC_FUNCTIONS = "exp (the smoothing's Gaussian)"
+
+
 def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: dict,
                        what: str) -> None:  # fmt: skip
     """The clean-room original's comparisons: against FSL (from the case's classification), with
@@ -1194,7 +1224,8 @@ def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: 
                 "original's parallel loops (fixed blocks of lines, planes and coefficients, "
                 "sums in a fixed order) give its one-thread result bit for bit at 14 threads.",
                 "ofix-original": "No correction of the register applies to this call: both "
-                "modes give the same values."
+                "modes give the same values (the smoothing's exp, glibc's in the reproduce mode "
+                "and correctly rounded by default, GLIBC-07, gives the same result here)."
                 if not named
                 else "No correction of the register changes this call's values: the default "
                 f"mode names {', '.join(named)}, with the same values in both modes.",
@@ -1204,6 +1235,18 @@ def _verdicts_original(diffs: list[dict], same: dict[str, bool], c: dict, info: 
             x["reason"] = " ".join(ORIGINAL_FIX.get(n, f"{n}, corrected by default.")
                                    for n in named)  # fmt: skip
             x["links"] += [{"label": n, "href": REGISTER} for n in named]
+        elif i == "ofix-original":
+            x["verdict"] = "d13"
+            moved = [f"{o}: {m['differ']:,} values (at most {m['max_abs']:.3g})"
+                     for o, m in x["metrics"].items() if not m["identical"]]  # fmt: skip
+            x["reason"] = (
+                common.glibc07(GLIBC_FUNCTIONS, "topup", named=False)
+                + " Here: "
+                + "; ".join(moved[:3])
+                + (f"; {len(moved) - 3} more" if len(moved) > 3 else "")
+                + "."
+            )
+            x["links"].append({"label": "GLIBC-07", "href": REGISTER})
         else:
             x["verdict"] = "open"
             x["reason"] = "Not accounted for by the other runs of this example (see the record)."
@@ -1890,6 +1933,14 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     v = common.outcome_verdict(r)
     if v is not None:
         verdict, why = v
+        if r["case"] == "opt/fsl145-one-coefficient":
+            why = (
+                "Outside the record, a follow-up of the clean-room original: --splineorder=2 at "
+                "--subsamp=2 with z shorter than one knot spacing, where FSL-145 gives one "
+                "coefficient whose refit stops FSL ('Error occurred when preparing to run "
+                "topup', exit status 1); the original's reproduce mode runs on (FSL's stop "
+                "follows in its next part). " + why
+            )
         if verdict == "both-reject" and named:
             why += (
                 f" The clean-room original's default mode finishes instead (exit status 0), "
@@ -1903,10 +1954,7 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
     fix = r.get("reported", {}).get("D13 fix pass")
     notes = []
     if isinstance(fix, int) and fix:
-        notes.append(
-            f"in its default mode the clean-room original corrects "
-            f"{', '.join(named) or 'a register entry'} and names it: {fix:,} values change"
-        )
+        notes.append(common.fix_note(fix, named, GLIBC_FUNCTIONS))
     elif named and code not in (0, None):
         notes.append(f"its default mode refuses the call (exit {code}), naming {', '.join(named)}")
     elif named:
@@ -2284,6 +2332,9 @@ if __name__ == "__main__":  # compute the cache entries only:
     what = sys.argv[1:] or ["all"]
     if what[0] == "refresh":  # refresh_replica, the reason given
         refresh_replica(c, " ".join(what[1:]))
+        sys.exit(0)
+    if what[0] == "refresh-original":  # refresh_original, the reason given
+        refresh_original(c, " ".join(what[1:]))
         sys.exit(0)
     if what[0] in ("fmriprep", "all"):
         for _i, run, _f in FMRIPREP:

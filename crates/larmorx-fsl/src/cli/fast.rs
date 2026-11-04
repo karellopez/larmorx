@@ -6,6 +6,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::files;
 
 use super::Settings;
@@ -717,6 +718,7 @@ pub fn run(
             &channels,
             &Outputs::Empty(zeros, o.pve && multi),
             notices,
+            &Libm::quiet(mode),
             err,
         );
     }
@@ -811,6 +813,9 @@ pub fn run(
         priors: priors.take(),
         priors_throughout: o.priors_throughout,
         fsl98_pairing: !fix,
+        // quiet: FAST names no GLIBC-07 (its iterations cannot tell whether a last bit of its
+        // functions moved the segmentation; the user's decision of 2026-11-04)
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     let result = larmorx_core::parallel::with_threads(n_threads, || {
         let mut text: Vec<u8> = Vec::new();
@@ -901,7 +906,16 @@ pub fn run(
             ));
         }
     }
-    write_outputs(o, settings, mode, &channels, &what, notices, err)
+    write_outputs(
+        o,
+        settings,
+        mode,
+        &channels,
+        &what,
+        notices,
+        &params.libm,
+        err,
+    )
 }
 
 /// What a run writes.
@@ -927,6 +941,7 @@ struct Parts<'a> {
 }
 
 /// Writes the outputs (§3.2, §3.3) in FAST's order, then the notices.
+#[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
     settings: &Settings,
@@ -934,6 +949,7 @@ fn write_outputs(
     channels: &[Channel],
     what: &Outputs,
     mut notices: Vec<Notice>,
+    libm: &Libm,
     err: &mut dyn Write,
 ) -> u8 {
     let ot = match settings.get("FSLOUTPUTTYPE") {
@@ -1143,10 +1159,10 @@ fn write_outputs(
     // the correction exp(-b) of channel c: 1 without a bias field; outside the mask exp(-b) of
     // b's value there (1, or NaN when the field's mean is not finite: FSL's NaN then reaches the
     // whole image, §4.5's b · M)
-    let outside = larmorx_core::math::expf(-parts.bias_outside);
+    let outside = libm.expf(-parts.bias_outside);
     let correction = |c: usize, i: usize| -> f32 {
         match &parts.bias {
-            Some(b) => larmorx_core::math::expf(-b[c][i]),
+            Some(b) => libm.expf(-b[c][i]),
             None => 1.0,
         }
     };

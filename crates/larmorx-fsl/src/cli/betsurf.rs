@@ -551,7 +551,9 @@ fn run_in(
     }
     let gshape = grid.shape;
     let gvox = grid.voxel;
-    let smoothed = |v: Vec<f32>| in_pool(n_threads, v, |v| bs::smooth(v, gshape, gvox, 3.0));
+    // quiet: betsurf names no GLIBC-07 (its fit cannot tell whether a weight's last bit moved it)
+    let libm = larmorx_core::math::Libm::quiet(mode);
+    let smoothed = |v: Vec<f32>| in_pool(n_threads, v, |v| bs::smooth(v, gshape, gvox, 3.0, &libm));
     let inner_s = smoothed(votes.inner);
     let scalp_s = smoothed(votes.scalp);
     let mut outer_counts = votes.outer;

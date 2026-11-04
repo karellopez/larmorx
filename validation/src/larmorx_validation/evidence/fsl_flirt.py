@@ -417,6 +417,30 @@ def orig_real_entry(ctx: core.Context, case: str) -> fcache.Entry:
     )
 
 
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs (:data:`ORIG_RUNS`) of every
+    example's entry already computed made again, in their working directories with their inputs
+    (an entry not computed yet is computed whole by the export); FSL's run on a perturbed input
+    (FSL's own variability) is kept: the original's change does not touch it."""
+    fctx = ctx.figures_context()
+    fp = _suite()
+    sources = [(f"fmriprep-{run}-original", fp.fmriprep_args(run, _bbr_node(run)), {})
+               for _i, run, _v, _w in BBR]  # fmt: skip
+    for case in REAL.values():
+        sources.append((case.replace("/", "-") + "-original", *_real_args(case)))
+    for name, args, inputs in sources:
+        e = fcache.Entry(fctx, TOOL, name, "")
+        if not e.done:
+            continue
+        info = e.info()
+        e.runs, e.extra = [], {}
+        for label, _m, _t in ORIG_RUNS:  # the outputs being made again
+            for f in (e.dir / label).iterdir():
+                shutil.rmtree(f) if f.is_dir() else f.unlink()
+        _original(e, args, inputs)
+        fcache.merge_rerun(e, info, why)
+
+
 # ------------------------------------------------------------------------- matrices
 
 
@@ -620,6 +644,12 @@ def _orig_diffs() -> list[dict]:
     ]  # fmt: skip
 
 
+#: The C library's functions FLIRT's clean-room original computes as glibc 2.35 does in its
+#: reproduce mode since 2026-11-04 (the rotations, the decomposition, the blurs, the sinc
+#: kernel, the mutual information), correctly rounded by default (GLIBC-07).
+GLIBC_FUNCTIONS = "sinf, cosf, atan2f, cos, exp and logf"
+
+
 def _named(o: fcache.Entry, label: str) -> list[str]:
     """The register entries the run ``label`` of ``o`` named on its standard error."""
     log = o.dir / f"{label}.log"
@@ -635,12 +665,14 @@ def _orig_verdicts(
     band: dict | None,
     threshold: float,
     background: float | None = None,
+    fix_shift: dict | None = None,
 ) -> None:
     """The clean-room original's comparisons: its matrix against FSL's beside FSL's own
     variability (``shift``: the original's displacement from FSL's matrix, ``band``: FSL's on a
     perturbed input, both over the reference's brain; ``None`` for ``-applyxfm``, where both use
-    the given matrix), its threads and its two modes; ``background``: FSL's output outside the
-    input's field of view (its first voxel), to say where the images differ most."""
+    the given matrix), its threads and its two modes (``fix_shift``: the default's matrix
+    against the reproduce mode's); ``background``: FSL's output outside the input's field of
+    view (its first voxel), to say where the images differ most."""
     for x in diffs:
         i = x["id"]
         if not i.startswith("orig"):
@@ -717,13 +749,32 @@ def _orig_verdicts(
                     "No correction of the register applies to this call: both modes give the "
                     "same values."
                 )
-            else:
+            elif names:
                 x["verdict"] = "d13"
                 x["reason"] = (
                     "The default corrects FSL's deterministic defects and names them: "
-                    + (", ".join(names) or "none named")
-                    + "; reproduce mode gives FSL's behaviour."
+                    + ", ".join(names)
+                    + f"; it also computes {GLIBC_FUNCTIONS} correctly rounded (GLIBC-07, not "
+                    "named); reproduce mode gives FSL's behaviour."
                 )
+                x["links"] += [{"label": n, "href": common.GLIBC07_REGISTER} for n in names]
+            else:
+                x["verdict"] = "d13"
+                moved = (
+                    f" Here the two modes' matrices part by {fix_shift['p95']:.3g} mm at the "
+                    f"95th percentile of the brain (at most {fix_shift['max']:.3g} mm)"
+                    + (
+                        f", against FSL's own {band['p95']:.3g} mm on a perturbed input"
+                        if band is not None
+                        else ""
+                    )
+                    + ": the fit's sensitivity to the C library's last bits."
+                    if fix_shift is not None
+                    else " Here the two modes' images differ in "
+                    f"{m.get('share', 0):.1%} of their values."
+                )
+                x["reason"] = common.glibc07(GLIBC_FUNCTIONS, "FLIRT", named=False) + moved
+                x["links"].append({"label": "GLIBC-07", "href": common.GLIBC07_REGISTER})
 
 
 def _flirt_threshold(args: list[str]) -> float:
@@ -806,7 +857,8 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     m["init"] = np.loadtxt(Path(_arg(args, "-init")))
     o_shift = displacement(m["orig"], m["fsl"], ref, brain)
     o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
-    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]))
+    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]),
+                   displacement(m["orig-fix"], m["orig"], ref, brain))  # fmt: skip
     if view == "slices":
         at = common.slice_voxel(ex, "fsl", "init", "registered")
     else:
@@ -816,7 +868,7 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", "wm-init", "wm-fsl", "fsl", "replica", "orig"],
-        "diffs": ["replica-fsl", "orig-fsl", "fsl-init"],
+        "diffs": ["replica-fsl", "orig-fsl", "origfix-orig", "fsl-init"],
         "compare": {"a": "fsl", "b": "init"},
     }
     out = common.finish(
@@ -1020,7 +1072,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
     same = common.identical(diffs)
     tables = []
     mats_same = True
-    o_shift = o_band = None
+    o_shift = o_band = fix_shift = None
     if "-omat" in args:
         mats = {pid: e.dir / pid / _arg(args, "-omat") for pid, *_ in PANELS}
         mats.update({pid: o.dir / pid / _arg(args, "-omat") for pid, *_ in ORIG_PANELS})
@@ -1029,6 +1081,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         m = {k: np.loadtxt(p) for k, p in mats.items()}
         o_shift = displacement(m["orig"], m["fsl"], ref, brain)
         o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
+        fix_shift = displacement(m["orig-fix"], m["orig"], ref, brain)
         tables = [
             _matrix_table(
                 f"{ex_id}-matrices",
@@ -1070,6 +1123,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         o_band,
         _flirt_threshold(args),
         float(arrays["fsl"]["registered"].flat[0]),
+        fix_shift,
     )
     at, _k = common.centre_view(ex)
     default = {
@@ -1077,7 +1131,7 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
         "plane": "axial",
         "voxel": at,
         "panels": ["t1w", *(["wm-fsl"] if not four_d else []), "fsl", "replica", "orig"],
-        "diffs": ["replica-fsl", "fix-replica", "orig-fsl"],
+        "diffs": ["replica-fsl", "fix-replica", "orig-fsl", "origfix-orig"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(
@@ -1238,6 +1292,17 @@ def _zero(x) -> bool:
     return x == "yes" or (isinstance(x, (int, float)) and not isinstance(x, bool) and x == 0)
 
 
+#: Failing cases of the original's record that came from the replica's suite after the
+#: original's last part, and what follows for them.
+FOLLOW_UPS = {
+    "programs/pointflirt-no-points": "Outside the record, a follow-up of the clean-room original: "
+    "pointflirt given two coordinate files that do not exist (no points), where FSL crashes "
+    "(FSL-204, registered on 2026-11-03); the record asks the original to refuse naming "
+    "FSL-204, and it exits with status 1 and FSL's message but names nothing yet (FSL-204 "
+    "follows in its next part).",
+}
+
+
 def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str, str]:
     """A case's verdict for the clean-room original: its record holds it to specs/flirt.md §13's
     thresholds (exit status and messages FSL's; files identical, matrices within a displacement,
@@ -1248,14 +1313,15 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
     from larmorx_validation.parity import fsl_flirt as fo
 
     v = common.outcome_verdict(r)
+    if v is not None and r["case"] in FOLLOW_UPS:
+        return v[0], common.clip(FOLLOW_UPS[r["case"]] + " " + v[1], 600)
     if v is not None:
         return v
     rep_ = r.get("reported", {})
     named = sorted(set(re.findall(r"\b(FSL-\d+)\b", desc)))
     fix = rep_.get("D13 fix pass")
     note = (
-        f" In its default mode the original corrects {', '.join(named) or 'a defect of the register'} and "
-        f"names it: {fix:,} values change."
+        " I" + common.fix_note(fix, named, GLIBC_FUNCTIONS)[1:] + "."
         if isinstance(fix, int) and fix
         else ""
     )
@@ -1281,9 +1347,20 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
             + note,
             600,
         )
-    if disp and band is not None and max(disp) <= band["p95"]:
+    # every displacement the record measured, a zero one included (a matrix within the record's
+    # printed precision of FSL's, where only the printed digits differ)
+    measured = [
+        x
+        for k, x in r.get("measured", {}).items()
+        if "displacement" in k and isinstance(x, (int, float))
+    ]
+    if measured and band is not None and max(measured) <= band["p95"]:
+        at = (
+            "" if disp else f"; the matrix {max(measured):g} mm from FSL's (the record's precision)"
+        )
         return "within-variability", common.clip(
-            f"{parts}; within FSL's own variability on this call, measured for the worked "
+            f"{parts}{at}"
+            + f"; within FSL's own variability on this call, measured for the worked "
             f"example: {band['p95']:.3g} mm at the 95th percentile (its input perturbed by "
             "noise of half an intensity unit)." + note,
             600,
@@ -1481,10 +1558,14 @@ def export(ctx: core.Context) -> dict:
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only
+if __name__ == "__main__":  # compute the cache entries only (``refresh-original WHY``:
+    # refresh_original)
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, " ".join(sys.argv[2:]))
+        sys.exit(0)
     for _i, run, _v, _w in BBR:
         print("done", bbr_entry(c, run).dir)
     for case in REAL.values():

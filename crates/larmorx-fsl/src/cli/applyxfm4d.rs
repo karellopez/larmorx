@@ -178,6 +178,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         settings,
         mode,
         n_threads: settings.threads(),
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     let result = larmorx_core::parallel::with_threads(ctx.n_threads, || {
         let (mut o_buf, mut e_buf, mut notices) = (Vec::new(), Vec::new(), Vec::new());
@@ -337,8 +338,8 @@ fn run(
     // the sinc kernel: blackman of width 7, or with -3D the rectangular window of width 9 it asks
     // for (FSL-80: FSL uses the first)
     let fsl80 = o.three_d && o.interp == Interp::Sinc;
-    let asked = SincKernel::new(9.0, SincWindow::Rectangular);
-    let first = SincKernel::new(7.0, SincWindow::Blackman);
+    let asked = SincKernel::new(9.0, SincWindow::Rectangular, &ctx.libm);
+    let first = SincKernel::new(7.0, SincWindow::Blackman, &ctx.libm);
     let (kernel, other_kernel) = if fsl80 && mode.fix() {
         (&asked, &first)
     } else {

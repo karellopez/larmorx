@@ -915,7 +915,14 @@ def fix_pass(
             elif x[key].read_bytes() != y[key].read_bytes():
                 others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=rep.SILENT
+            checks,
+            entries,
+            change,
+            other_changes="; ".join(others),
+            silent_ok=rep.SILENT,
+            # topup names no GLIBC-07 (an iterative fit; defects.UNNAMED_GLIBC); applytopup
+            # calls none of glibc's functions
+            unnamed_ok=defects.UNNAMED_GLIBC if program == PROGRAM else (),
         )
 
 

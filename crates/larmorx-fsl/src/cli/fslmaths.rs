@@ -15,6 +15,7 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
 use larmorx_core::element::DataType;
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::image::ImageError;
 
 use super::Settings;
@@ -696,7 +697,9 @@ fn step<T: Num>(
         "-kernel" => kernel_step(ctx, st, i, notices, err),
         "-s" => {
             let sigma = strtod(arg(1).unwrap_or("")).0;
-            st.kernel = Kernel::gauss(sigma, st.img.voxel());
+            // quiet: a filter names no GLIBC-07 (§18; the user's decision of 2026-11-04)
+            let libm = Libm::quiet(notices.mode());
+            st.kernel = Kernel::gauss(sigma, st.img.voxel(), &libm);
             filters::smooth(&mut st.img, &st.kernel, notices, err)
                 .map_err(|s| refuse_stop(err, s))?;
             Ok(1)
@@ -1062,7 +1065,11 @@ fn kernel_step<T: Num>(
                 4,
             )
         }
-        "gauss" => (Kernel::gauss(x, vox), 2),
+        "gauss" => {
+            // quiet: the kernel's filters name no GLIBC-07 (§18; the user's decision of
+            // 2026-11-04)
+            (Kernel::gauss(x, vox, &Libm::quiet(notices.mode())), 2)
+        }
         "sphere" => (Kernel::sphere(x, vox), 2),
         "file" => {
             let mut ns = Vec::new();

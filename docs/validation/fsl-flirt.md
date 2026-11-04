@@ -1,12 +1,12 @@
 # Parity: FLIRT (clean-room original)
 
-**8 case(s) fail.** 305 cases on the `standard` tier: 206 pass, 85 rejected by both, 6 expected divergences, 8 failures.
+**7 case(s) fail.** 308 cases on the `standard` tier: 210 pass, 85 rejected by both, 6 expected divergences, 7 failures.
 
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
-- **Original programs:** 314 runs: 300 from the oracle cache, 14 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
+- **Original programs:** 308 runs: 294 from the oracle cache, 14 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -28,42 +28,30 @@
 | debug | 2 | 2 | 0 | 0 | 0 |
 | edge | 35 | 9 | 19 | 6 | 1 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| programs | 129 | 79 | 50 | 0 | 0 |
-| real | 61 | 54 | 0 | 0 | 7 |
+| programs | 132 | 81 | 50 | 0 | 1 |
+| real | 61 | 56 | 0 | 0 | 5 |
 | schedule | 29 | 22 | 7 | 0 | 0 |
 | verbose | 19 | 19 | 0 | 0 | 0 |
 
 ## Failures
 
-### `real/cost-normmi`
-
--cost normmi (and -searchcost corratio)
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 1.5996, threshold 0.5 or FSL's own variability): maximum 1.9198 mm, RMS deviation 3.8287 mm; FSL's own p95 on a perturbed input 1.2445 mm
-
 ### `real/cost-leastsq`
 
 -cost leastsq (and -searchcost corratio)
 
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 81.8069, threshold 0.5 or FSL's own variability): maximum 95.6303 mm, RMS deviation 93.6118 mm; FSL's own p95 on a perturbed input 46.7560 mm
+- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 82.0821, threshold 0.5 or FSL's own variability): maximum 96.0874 mm, RMS deviation 93.3762 mm; FSL's own p95 on a perturbed input 46.7560 mm
 
 ### `real/weights-normcorr`
 
 weights with -cost normcorr
 
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 0.5785, threshold 0.1 or FSL's own variability): maximum 0.7099 mm, RMS deviation 1.2748 mm; FSL's own p95 on a perturbed input 0.1879 mm
-
-### `real/weights-normmi`
-
-weights with -cost normmi
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 10.151, threshold 0.1 or FSL's own variability): maximum 12.1231 mm, RMS deviation 14.0621 mm; FSL's own p95 on a perturbed input 10.0584 mm
+- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 0.5083, threshold 0.1 or FSL's own variability): maximum 0.6078 mm, RMS deviation 1.3187 mm; FSL's own p95 on a perturbed input 0.1879 mm
 
 ### `real/weights-woods`
 
 weights with -cost woods
 
-- **stderr: the same lines (numbers aside)** (identical = no, threshold the same text, numbers read as numbers): line 4004: FSL '<end>', original 'WARNING: Woods is not implemented with cost function weighting'
+- **stderr: the same lines (numbers aside)** (identical = no, threshold the same text, numbers read as numbers): line 4003: FSL 'WARNING: Woods is not implemented with cost function weighting', original '<end>'
 
 ### `real/weights-empty-refweight`
 
@@ -82,6 +70,13 @@ an empty -inweight (every voxel 0): refused by default (FSL-91)
 a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its search; refused by default (FSL-92)
 
 - **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 131.933, threshold 0.5): maximum 159.0868 mm, RMS deviation 303.8605 mm; FSL's own p95 on a perturbed input 0.0000 mm
+
+### `programs/pointflirt-no-points`
+
+two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes)
+
+- **the original refuses naming FSL-204 (reproduce)**: exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)
+- **the original refuses naming FSL-204 (fix)**: exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)
 
 ## Expected divergences
 
@@ -188,7 +183,7 @@ a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact o
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (f0dd88b671b6) |
+| larmorx | 0.0.1 (be3db916dce3) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -210,34 +205,34 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `fmriprep/ds005040-sub-002-noreconall/bold_task_clip_run_1_wf` | pass | 8/8 | fMRIPrep's BBR call |
 | `real/anglerep-quaternion` | pass | 5/5 | -anglerep quaternion: the rotations as a quaternion's last three components (12 dof) |
 | `real/anglerep-quaternion-dof6` | pass | 6/6 | -anglerep quaternion at 6 dof, -out, verbose (the parameters printed) |
-| `real/default` | pass | 7/7 | the default (12 dof, corratio) with -out and -omat |
-| `real/default-full` | pass | 6/6 | the full-size T1w as reference |
-| `real/dof6` | pass | 6/6 | -dof 6 |
-| `real/dof7` | pass | 6/6 | -dof 7 |
-| `real/dof9` | pass | 6/6 | -dof 9 |
-| `real/cost-mutualinfo` | pass | 6/6 | -cost mutualinfo (and -searchcost corratio) |
-| `real/cost-normmi` | fail | 5/6 | -cost normmi (and -searchcost corratio) |
+| `real/default` | pass | 6/6 | the default (12 dof, corratio) with -out and -omat |
+| `real/default-full` | pass | 5/5 | the full-size T1w as reference |
+| `real/dof6` | pass | 5/5 | -dof 6 |
+| `real/dof7` | pass | 5/5 | -dof 7 |
+| `real/dof9` | pass | 5/5 | -dof 9 |
+| `real/cost-mutualinfo` | pass | 5/5 | -cost mutualinfo (and -searchcost corratio) |
+| `real/cost-normmi` | pass | 5/5 | -cost normmi (and -searchcost corratio) |
 | `real/cost-normcorr` | pass | 6/6 | -cost normcorr (and -searchcost corratio) |
 | `real/cost-leastsq` | fail | 5/6 | -cost leastsq (and -searchcost corratio) |
-| `real/cost-woods` | pass | 6/6 | -cost woods (and -searchcost corratio) |
+| `real/cost-woods` | pass | 5/5 | -cost woods (and -searchcost corratio) |
 | `real/cost-labeldiff` | pass | 6/6 | -cost labeldiff (and -searchcost corratio) |
-| `real/searchcost-normmi` | pass | 6/6 | -searchcost normmi |
-| `real/nosearch` | pass | 6/6 | -nosearch |
+| `real/searchcost-normmi` | pass | 5/5 | -searchcost normmi |
+| `real/nosearch` | pass | 5/5 | -nosearch |
 | `real/searchr` | pass | 6/6 | -searchrx/ry/rz with narrow ranges |
-| `real/coarse-fine` | pass | 6/6 | -coarsesearch 30 -finesearch 10 |
-| `real/init` | pass | 6/6 | -init (fMRIPrep's initial matrix) |
-| `real/usesqform` | pass | 6/6 | -usesqform |
+| `real/coarse-fine` | pass | 5/5 | -coarsesearch 30 -finesearch 10 |
+| `real/init` | pass | 5/5 | -init (fMRIPrep's initial matrix) |
+| `real/usesqform` | pass | 5/5 | -usesqform |
 | `real/bins64` | pass | 6/6 | -bins 64 |
-| `real/noresample` | pass | 6/6 | -noresample |
-| `real/noclamp` | pass | 6/6 | -noclamp |
-| `real/minsampling` | pass | 6/6 | -minsampling 4 |
+| `real/noresample` | pass | 5/5 | -noresample |
+| `real/noclamp` | pass | 5/5 | -noclamp |
+| `real/minsampling` | pass | 5/5 | -minsampling 4 |
 | `real/forcescaling` | pass | 5/5 | -forcescaling |
 | `real/weights` | pass | 6/6 | -refweight and -inweight |
 | `real/weights-normcorr` | fail | 5/6 | weights with -cost normcorr |
 | `real/weights-leastsq` | pass | 6/6 | weights with -cost leastsq |
-| `real/weights-normmi` | fail | 5/6 | weights with -cost normmi |
+| `real/weights-normmi` | pass | 5/5 | weights with -cost normmi |
 | `real/weights-mutualinfo` | pass | 6/6 | weights with -cost mutualinfo |
-| `real/weights-woods` | fail | 5/6 | weights with -cost woods |
+| `real/weights-woods` | fail | 4/5 | weights with -cost woods |
 | `real/weights-empty-refweight` | fail | 5/6 | an empty -refweight (every voxel 0): refused by default (FSL-91) |
 | `real/weights-empty-inweight` | fail | 5/6 | an empty -inweight (every voxel 0): refused by default (FSL-91) |
 | `real/applyxfm-nan-border` | pass | 6/6 | -applyxfm of a BOLD reference with NaN voxels in its border and an infinite one: the padding's background value (FSL-22… |
@@ -264,10 +259,10 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/applyisoxfm-4d-blur-setbackground` | pass | 6/6 | -applyisoxfm 6 with -setbackground (the blur's outside a constant) |
 | `real/applyxfm-usesqform` | pass | 6/6 | -applyxfm -usesqform |
 | `real/out-only` | pass | 6/6 | a registration with -out and no -omat (the matrix printed) |
-| `real/basescale-small` | pass | 6/6 | 0.6 mm voxels (the base scale from the voxel size) |
-| `real/basescale-small-init` | pass | 6/6 | 0.6 mm voxels with -init (the initial matrix in the base scale's millimetres) |
-| `real/basescale-big` | pass | 6/6 | 14 mm voxels (the base scale from the voxel size) |
-| `real/basescale-forced` | pass | 6/6 | -basescale 2 |
+| `real/basescale-small` | pass | 5/5 | 0.6 mm voxels (the base scale from the voxel size) |
+| `real/basescale-small-init` | pass | 5/5 | 0.6 mm voxels with -init (the initial matrix in the base scale's millimetres) |
+| `real/basescale-big` | pass | 5/5 | 14 mm voxels (the base scale from the voxel size) |
+| `real/basescale-forced` | pass | 5/5 | -basescale 2 |
 | `bbr/default` | pass | 7/7 | BBR (FSL's bbr.sch) with -cost bbr |
 | `bbr/fmriprep-form` | pass | 6/6 | fMRIPrep's form: -searchcost bbr -basescale 1 |
 | `bbr/type-global_abs` | pass | 6/6 | -bbrtype global_abs |
@@ -279,29 +274,29 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `bbr/fieldmap-mask` | pass | 6/6 | -fieldmapmask -pedir -2 |
 | `bbr/weights` | pass | 6/6 | BBR with -refweight |
 | `bbr/bad-type` | pass | 5/5 | -bbrtype unknown (FSL's exception) |
-| `schedule/simple3D.sch` | pass | 6/6 | FSL's simple3D.sch |
+| `schedule/simple3D.sch` | pass | 5/5 | FSL's simple3D.sch |
 | `schedule/xyztrans.sch` | pass | 5/5 | FSL's xyztrans.sch |
 | `schedule/ytransonly.sch` | pass | 5/5 | FSL's ytransonly.sch |
 | `schedule/ztransonly.sch` | pass | 5/5 | FSL's ztransonly.sch |
 | `schedule/sch3Dtrans_3dof` | pass | 5/5 | FSL's sch3Dtrans_3dof |
 | `schedule/measurecost1.sch` | pass | 5/5 | FSL's measurecost1.sch |
-| `schedule/pairreg1.sch` | pass | 6/6 | FSL's pairreg1.sch |
-| `schedule/pairreg2.sch` | pass | 6/6 | FSL's pairreg2.sch |
-| `schedule/pairreg3.sch` | pass | 6/6 | FSL's pairreg3.sch |
+| `schedule/pairreg1.sch` | pass | 5/5 | FSL's pairreg1.sch |
+| `schedule/pairreg2.sch` | pass | 5/5 | FSL's pairreg2.sch |
+| `schedule/pairreg3.sch` | pass | 5/5 | FSL's pairreg3.sch |
 | `schedule/sch2D_3dof` | pass | 5/5 | FSL's sch2D_3dof on one slice |
 | `schedule/sch2D_4dof` | pass | 6/6 | FSL's sch2D_4dof on one slice |
 | `schedule/sch2D_5dof` | pass | 5/5 | FSL's sch2D_5dof on one slice |
 | `schedule/sch2D_6dof` | pass | 6/6 | FSL's sch2D_6dof on one slice |
 | `real/2d` | pass | 6/6 | -2D's default schedule on one slice, with -out |
-| `verbose/v` | pass | 6/6 | -v |
-| `verbose/2` | pass | 6/6 | -verbose 2 |
-| `verbose/3` | pass | 6/6 | -verbose 3 |
-| `verbose/5` | pass | 6/6 | -verbose 5 |
+| `verbose/v` | pass | 5/5 | -v |
+| `verbose/2` | pass | 5/5 | -verbose 2 |
+| `verbose/3` | pass | 5/5 | -verbose 3 |
+| `verbose/5` | pass | 5/5 | -verbose 5 |
 | `verbose/printinit` | pass | 5/5 | -printinit |
-| `verbose/debugsave` | pass | 6/6 | -debugsave -verbose 4 (the search's volumes saved) |
-| `verbose/debug` | pass | 12/12 | -debug: the pyramid's volumes and weights saved (no weights: the one-voxel weight) |
-| `verbose/debug-weights` | pass | 16/16 | -debug with -refweight and -inweight (the weights' levels saved) |
-| `schedule/every-command` | both-error | 5/5 | a schedule using every command and option |
+| `verbose/debugsave` | pass | 5/5 | -debugsave -verbose 4 (the search's volumes saved) |
+| `verbose/debug` | pass | 11/11 | -debug: the pyramid's volumes and weights saved (no weights: the one-voxel weight) |
+| `verbose/debug-weights` | pass | 15/15 | -debug with -refweight and -inweight (the weights' levels saved) |
+| `schedule/every-command` | both-error | 4/4 | a schedule using every command and option |
 | `schedule/args-copy` | both-error | 4/4 | a schedule: copy U |
 | `schedule/args-optimise` | both-error | 4/4 | a schedule: optimise 6 U |
 | `schedule/bad-if` | both-error | 4/4 | a schedule: if 1 =< 2 |
@@ -369,20 +364,22 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `edge/basescale-0` | expected-divergence | 2/2 | -basescale 0: every voxel size infinite, FLIRT never finishes (FSL-93) |
 | `convert_xfm/missing-concat` | both-error | 4/4 | -concat with a file that does not exist |
 | `programs/applyxfm4D-usage` | both-error | 4/4 | applyxfm4D without arguments (its usage, exit 255) |
-| `programs/applyxfm4D-default` | pass | 7/7 | a 4D int16 series, a matrix per volume (MAT_0000n), sinc |
+| `programs/applyxfm4D-default` | pass | 6/6 | a 4D int16 series, a matrix per volume (MAT_0000n), sinc |
 | `programs/applyxfm4D-single-trilinear` | pass | 6/6 | -singlematrix with trilinear interpolation, verbose |
 | `programs/applyxfm4D-fourdigit-nn` | pass | 6/6 | --fourdigit (MAT_000n) with nearest neighbour (nn) |
 | `programs/applyxfm4D-userprefix-spline` | pass | 7/7 | -userprefix with spline on an integer series (FSL-79) |
-| `programs/applyxfm4D-float-sinc` | pass | 7/7 | a float input (one volume), -singlematrix, sinc |
-| `programs/applyxfm4D-3d` | pass | 7/7 | -3D (the rectangular sinc of width 9) on a float volume |
+| `programs/applyxfm4D-float-sinc` | pass | 6/6 | a float input (one volume), -singlematrix, sinc |
+| `programs/applyxfm4D-3d` | pass | 6/6 | -3D (the rectangular sinc of width 9) on a float volume |
 | `programs/applyxfm4D-3d-spline-float` | pass | 7/7 | -3D with spline on a float volume |
 | `programs/applyxfm4D-int8` | pass | 6/6 | an int8 input (FSL-09: written as uint8), trilinear |
+| `programs/applyxfm4D-uint8` | pass | 6/6 | a uint8 input, trilinear (FSL-111: its values 128 to 255 read as signed bytes; read as stored by default) |
+| `programs/applyxfm4D-uint8-3d-spline` | pass | 7/7 | -3D spline on a uint8 volume (FSL-111 with FSL-79's coefficients in the type) |
 | `programs/applyxfm4D-double-sinc` | pass | 7/7 | a double series (sinc sums in double precision; the background value kept in double precision where the mask sets it) |
 | `programs/applyxfm4D-double-3d-spline` | pass | 7/7 | -3D spline on a double volume (its coefficients in double precision) |
 | `programs/applyxfm4D-double-nn` | pass | 6/6 | a double volume, nearest neighbour (values through float) |
 | `programs/applyxfm4D-3d-spline-int` | pass | 7/7 | -3D spline on an int16 volume (FSL-79: coefficients and values in the type) |
 | `programs/applyxfm4D-nan-border` | pass | 6/6 | NaN voxels in the input's border and an infinite one: the background value's NaN order (FSL-22), spline coefficients th… |
-| `programs/applyxfm4D-nan-border-3d` | pass | 7/7 | the same with -3D and sinc |
+| `programs/applyxfm4D-nan-border-3d` | pass | 6/6 | the same with -3D and sinc |
 | `programs/applyxfm4D-metres` | pass | 6/6 | an input whose header gives metres (a nonsense header): read as FSL reads it |
 | `programs/applyxfm4D-bad-interp` | both-error | 4/4 | an unknown interpolation (its message, exit 1) |
 | `programs/applyxfm4D-userprefix-last` | both-error | 4/4 | -userprefix as the last word (std::string of null) |
@@ -428,6 +425,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `programs/pointflirt-count` | both-error | 4/4 | files with different numbers of points (its error, exit 255) |
 | `programs/pointflirt-many` | pass | 5/5 | twenty points (x·xᵀ by BLAS dsyrk) |
 | `programs/pointflirt-missing` | both-error | 4/4 | a coordinate file that does not exist (FSL aborts) |
+| `programs/pointflirt-no-points` | fail | 0/2 | two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes) |
 | `programs/pointflirt-three` | pass | 5/5 | three points: a square file is read with points as columns |
 | `programs/pointflirt-two` | both-error | 4/4 | two points (two rows of three: FSL reads past its rows, aborts) |
 | `programs/pointflirt-four-columns` | both-error | 4/4 | points of four coordinates (FSL's block sizes clash, aborts) |
@@ -498,7 +496,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `programs/makerot-out-unwritable` | pass | 6/6 | an output file that cannot be written (the message, exit 0) |
 | `programs/makerot-token` | both-error | 5/5 | a word that is not an option (unrecognised token, exit 1) |
 | `verbose/6-search-debugsave` | pass | 10/10 | -verbose 6 -debugsave on the search alone: its inner level 4 and the grids it saves |
-| `verbose/7` | pass | 6/6 | -verbose 7 on the default schedule: the search's evaluations, starts and tolerances |
+| `verbose/7` | pass | 5/5 | -verbose 7 on the default schedule: the search's evaluations, starts and tolerances |
 | `verbose/5-optimisers` | pass | 5/5 | -verbose 5: gridmeasurecost, Brent, Powell's correction, a parameter subset |
 | `verbose/7-subset` | pass | 5/5 | -verbose 7: Brent's and a subset's starts, tolerances and doubled evaluations |
 | `verbose/3-scales-options` | pass | 5/5 | -verbose 3: forced and input-only scales (the evaluation counts), every setoption echoed, a short tolerance list's inde… |

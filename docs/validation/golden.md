@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 121 cases, 679 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 228 cases, 1,623 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 42 cases, 94 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 121 cases, 679 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -246,6 +246,22 @@ What the coverage test enumerates:
   479e9b3 (committed as 01d8d98), the parity smoke tier's marker of the same commit and build
   reused (2,754 passed): 9 cases and 224 outputs added (44, 37, 66, 24, 12, 7, 7, 15 and 12),
   every other checksum unchanged.
+- **glibc's functions in the clean-room originals' `reproduce` mode** (2026-11-04, five cases in
+  `tests/golden/registry.py`; the glibc maths part, second half): each call checked to differ
+  between the two modes, so the six platforms check the `*_glibc` functions of
+  `larmorx_core::math` through the programs: `cli.afni.3dTshift.wsinc` (`-wsinc5` and `-wsinc9`
+  on slice times whose weights glibc's `sinf` and `cosf` give other last bits, reproduce, and the
+  default's exact GLIBC-07 list; 6 outputs), `cli.fsl.flirt.reproduce` (6 dof with the
+  correlation ratio, 6 dof with mutual information over a narrow search, the default 12 dof:
+  `sinf`, `cosf`, `atan2f`, `exp`, `logf` move the matrices; 3 outputs),
+  `cli.fsl.fslmaths.reproduce` (the double-precision `-sin`, `-cos`, `-exp`, `-log` and `-pow`,
+  `-s 3.95`, `-bptf 1.73 -1` on a double image, and the default's exact notice; 17 outputs),
+  `cli.fsl.makerot.reproduce` (makerot `-t 20.7` about z, avscale of a matrix whose printed
+  report moves, the default's exact notices; 8 outputs), `cli.fsl.mcflirt.reproduce` (`-cost
+  mutualinfo`: `logf` moves the matrices, named by neither mode; 6 outputs). Recorded from
+  be3db91 (committed as bcaae7a), the parity smoke tier's marker of the same commit and build
+  reused (2,758 passed): 5 cases and 40 outputs added (223 cases and 1,583 outputs before, 228
+  and 1,623 after), every other checksum unchanged.
 - **The spec answers' switches in the FSL replicas** (2026-11-03, four cases added in
   `crates-nc/larmorx-nc-cli/tests/golden.rs`): `applyxfm4D.uint8` (FSL-111: a uint8 image read as
   stored by default), `fast.fsl203` (FSL-203: an input whose first voxel is NaN segmented by

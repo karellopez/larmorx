@@ -9,6 +9,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::filters::{EMPTY_MASK, abort_lines};
@@ -244,7 +245,13 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                     let i = x + nx * (y + ny * z);
                     let steps = [1, nx, plane];
                     let mut sum = 0.0f64;
-                    for a in 0..axes {
+                    // The squares are exact products `d · d` and the terms are added from the
+                    // last axis to the first (observed, black-box runs of FSL on a double
+                    // image: §10.4's `pow(x, 2)` is FSL's compiled `x · x`, never glibc's pow,
+                    // and only this order gives FSL's bits; `validation/investigations/
+                    // cleanroom-glibc-dbl/edge_forms.py`); a float or integer image's sum is
+                    // the same in any order once stored.
+                    for a in (0..axes).rev() {
                         let (p, m) = (vol[i + steps[a]], vol[i - steps[a]]);
                         // C's arithmetic: char and short differences as int, not wrapped to
                         // the type (random testing, findings 29)
@@ -253,7 +260,8 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                             _ => p.diff(m),
                         };
                         // x86-64's NaN rules (a voxel size of 0: 0 / 0, inf / inf)
-                        let (dd, vv) = (d * d, vox[a] * vox[a]);
+                        let dd = d * d;
+                        let vv = vox[a] * vox[a];
                         let q = num::nan64(dd, vv, dd / vv);
                         sum = num::nan64(sum, q, sum + q);
                     }
@@ -272,8 +280,9 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
 // ------------------------------------------------------------------------------------------
 // -dog_edge (§10.5)
 
-/// The 2D Gaussian of `-dog_edge` of radius `r` (in voxels), normalised by `1 / Σ`.
-fn dog_gauss(sigma: f64, r: i64) -> Vec<f32> {
+/// The 2D Gaussian of `-dog_edge` of radius `r` (in voxels), normalised by `1 / Σ`; `libm`'s
+/// `exp` (glibc's with `reproduce`, GLIBC-07; not named: `-dog_edge` is a filter).
+fn dog_gauss(sigma: f64, r: i64, libm: &Libm) -> Vec<f32> {
     let n = (2 * r + 1) as usize;
     let mut g = vec![0.0f32; n * n];
     if sigma <= 1e-6 {
@@ -283,7 +292,7 @@ fn dog_gauss(sigma: f64, r: i64) -> Vec<f32> {
             for i in 0..n {
                 let (di, dj) = (i as i64 - r, j as i64 - r);
                 let q = -((di * di + dj * dj) as f64) / (2.0 * sigma * sigma);
-                g[i + n * j] = num::to_f32(larmorx_core::math::exp(q));
+                g[i + n * j] = num::to_f32(libm.exp(q));
             }
         }
     }
@@ -317,8 +326,11 @@ pub fn dog_edge<T: Num>(
     }
     let [nx, ny, nz, nt] = img.dims;
     let per = nx * ny * nz;
+    // quiet: GLIBC-07 is named only where a voxel's value is a function of its own (§18;
+    // the user's decision of 2026-11-04): a filter cannot tell without running twice
+    let libm = Libm::quiet(notices.mode());
     let kernel = if r >= 0 {
-        let (g1, g2) = (dog_gauss(s1, r), dog_gauss(s2, r));
+        let (g1, g2) = (dog_gauss(s1, r, &libm), dog_gauss(s2, r, &libm));
         let data: Vec<f32> = g2
             .iter()
             .zip(&g1)

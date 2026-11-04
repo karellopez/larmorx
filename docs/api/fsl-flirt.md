@@ -313,6 +313,21 @@ cannot take leaves the previous level in place with the unblurred input). FSL-14
 an input holds NaN or infinite voxels; FSL-09 whenever an integer output is not an integer or out
 of its type's range.
 
+### glibc's maths functions (GLIBC-07)
+
+FSL's FLIRT calls glibc 2.35's `sinf`, `cosf` and `atan2f` (the rotations' compositions and
+decompositions), `exp` (the pyramid's and BBR's Gaussians), `cos` (the sinc window) and `logf` (the
+mutual-information costs), which are not correctly rounded (`specs/flirt.md` §3, §5, §9.2, §12). The
+clean-room original computes them correctly rounded by default and takes glibc's with
+`upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
+against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). A
+registration is an iterative fit: one function value's last bit can move its matrix's last digits,
+or where costs tie another grid point wins, and FLIRT cannot tell without registering twice, so
+neither mode names GLIBC-07 there (nor applyxfm4D's resampling): the default's correctly rounded
+functions can move a registration's last bits. avscale, makerot and `convert_xfm -fixscaleskew`
+compute both choices and name GLIBC-07, in both modes, exactly where the other choice prints or
+writes another result.
+
 ## Not yet
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are

@@ -1160,7 +1160,7 @@ mod tests {
             },
         ];
         let p = prepare(&volumes, dims, voxel, false, None, false);
-        let images = level_images(&p, 1, 2.0);
+        let images = level_images(&p, 1, 2.0, false);
         let field: [Axis; 3] = std::array::from_fn(|a| Axis::of_order(dims[a], 3, 3));
         let mut l = Level::new(
             images,

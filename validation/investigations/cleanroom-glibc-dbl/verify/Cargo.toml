@@ -1,0 +1,17 @@
+[package]
+name = "cleanroom-glibc-dbl-verify"
+description = "larmorx_core::math's clean-room sin_glibc, cos_glibc and sincos_glibc (specs/glibc-dbl.md) against the black-box record and the system's glibc (a black box)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a verification tool, never part of larmorx's build (it calls the C library's
+# functions through dlopen, as a black box).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

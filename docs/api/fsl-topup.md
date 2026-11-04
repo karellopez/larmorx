@@ -206,6 +206,17 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   elsewhere than the cost's minimum: the exact derivatives by default (both implementations; the
   replica since 2026-11-03; fMRIPrep's calls, which estimate no movements, unchanged).
 
+### glibc's maths functions (GLIBC-07)
+
+FSL's topup takes its smoothing's Gaussian taps from glibc 2.35's `exp` (`specs/topup.md` §4), which
+is not correctly rounded. The clean-room original computes it correctly rounded by default and takes
+glibc's with `upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit
+for bit against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only).
+The estimate is an iterative fit: a tap's last bit can move the field's and the movements' last
+bits, and topup cannot tell without estimating twice, so neither mode names GLIBC-07 (the taps are
+rounded to single precision, where the two choices practically never differ). applytopup calls none
+of glibc's functions.
+
 ## Not yet
 
 - The original: two open differences of random testing (finding 36): the regulariser's

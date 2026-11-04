@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
+use larmorx_core::math::Libm;
 use larmorx_io::nifti::NiftiHeader;
 
 use larmorx_mri::hmc::rigid;
@@ -52,6 +53,9 @@ pub struct Ctx<'a> {
     pub settings: &'a Settings,
     pub mode: UpstreamDefects,
     pub n_threads: usize,
+    /// The run's C library functions (GLIBC-07: correctly rounded by default, glibc's with
+    /// `reproduce`), quiet: FLIRT names no GLIBC-07 ([`Libm::quiet`] of `mode`).
+    pub libm: Arc<Libm>,
 }
 
 /// An image as FLIRT holds it: its first volume (or every volume), its header and order.
@@ -443,7 +447,7 @@ impl State<'_> {
         }
         let pair = self.pair()?;
         let c = pair.centre;
-        let mut x = param::decompose(self.opt.rep, m, c);
+        let mut x = param::decompose(self.opt.rep, m, c, self.log.libm());
         let d = self.deltas(dof);
         for (i, &pi) in p.iter().enumerate() {
             if i >= 12 {
@@ -1081,7 +1085,7 @@ fn register(
     } else {
         let s = min_sampling;
         let (l1, w1) = filt(&ref0, &ref_weight, &|v| {
-            pyramid::isotropic(&pyramid::blur(v, s), s)
+            pyramid::isotropic(&pyramid::blur(v, s, &ctx.libm), s)
         });
         let halve = |v: &Volume,
                      w: &Option<Volume>,
@@ -1130,7 +1134,7 @@ fn register(
     let mut st = State {
         o,
         ctx,
-        log: Arc::new(Log::default()),
+        log: Arc::new(Log::sharing(Arc::clone(&ctx.libm))),
         trace: trace.clone(),
         sampling: {
             let vs = input.vols[0].voxel_size;
@@ -1407,7 +1411,7 @@ fn command(
             let c = st.pair()?.centre;
             let mut s = String::new();
             for (k, r) in rows.iter().enumerate() {
-                let p = param::decompose(st.opt.rep, &r.m, c);
+                let p = param::decompose(st.opt.rep, &r.m, c, st.log.libm());
                 let cost = if cmd == "saveparams" && k == 0 {
                     mat::g(r.cost, 6)
                 } else {
@@ -1964,10 +1968,11 @@ fn set_scale(
         // the input blurred to the scale (also with -noresample, observed)
         let (inp, w) = match &inw {
             Some(wt) => {
-                let (a, b) = pyramid::weighted(&input, wt, |v: &Volume| pyramid::blur(v, s));
+                let (a, b) =
+                    pyramid::weighted(&input, wt, |v: &Volume| pyramid::blur(v, s, &st.ctx.libm));
                 (a, Some(b))
             }
-            None => (pyramid::blur(&input, s), None),
+            None => (pyramid::blur(&input, s, &st.ctx.libm), None),
         };
         let level = [(1.0f32, 0usize), (2.0, 1), (4.0, 2), (8.0, 3)]
             .iter()
@@ -1976,7 +1981,7 @@ fn set_scale(
         let (refl, refw) = match level {
             Some(i) => (st.levels[i].clone(), st.level_weights[i].clone()),
             None => {
-                let f = |v: &Volume| pyramid::isotropic(&pyramid::blur(v, s), s);
+                let f = |v: &Volume| pyramid::isotropic(&pyramid::blur(v, s, &st.ctx.libm), s);
                 let (a, b) = match &st.ref_weight {
                     Some(w) => {
                         let (a, b) = pyramid::weighted(&st.reference, w, f);
@@ -2103,7 +2108,8 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
     let centre = st.pair()?.centre;
     if st.subset.is_some() {
         // a subset optimisation's x₀ (the row's own parameters) stays in force (§8.1 step 2)
-        st.ref_x0.set(param::decompose(st.opt.rep, m, centre));
+        st.ref_x0
+            .set(param::decompose(st.opt.rep, m, centre, st.log.libm()));
     }
     optimise::optimise(&eval, m, centre, dof, maxit, &st.opt, st.subset.as_ref())
         .map_err(End::Error)
@@ -2716,7 +2722,7 @@ fn resample_one(
         (true, None) => output::Edge::Extraslice(raw_pad),
     };
     let blurred = if blur {
-        output::blur_with_edge(src, ref_min, edge)
+        output::blur_with_edge(src, ref_min, edge, &ctx.libm)
     } else {
         src.clone()
     };
@@ -2731,7 +2737,8 @@ fn resample_one(
             }
         }
     };
-    let kernel = (o.interp == Interp::Sinc).then(|| SincKernel::new(o.sinc_width, o.sinc_window));
+    let kernel =
+        (o.interp == Interp::Sinc).then(|| SincKernel::new(o.sinc_width, o.sinc_window, &ctx.libm));
     let padding = if o.two_d {
         o.padding.max(1.0)
     } else {
@@ -2779,7 +2786,7 @@ fn apply(
     let mut ref_input = reference.input.clone();
     let mut quaternion_final = false;
     if let Some(s) = o.apply_iso {
-        refv = pyramid::isotropic(&pyramid::blur(&refv, s), s);
+        refv = pyramid::isotropic(&pyramid::blur(&refv, s, &ctx.libm), s);
         // the header follows the resampling (§9.3, §4.1): each form as FSL holds it, a
         // neurological file's swapped by the read grid (`W·D⁻¹·F⁻¹·D`, the field of view in
         // single precision), a set form composed with `diag(st)` (`st = s/d` in single

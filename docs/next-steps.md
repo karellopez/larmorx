@@ -615,13 +615,18 @@ The items below keep their history.
    argument, NaN bits included). The user decided the table's definition (422 of glibc's 440
    numbers; the 18 others changed no result on 1.9 × 10^10 arguments per function) and that
    `tan`, `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too (their tables are
-   searched and fitted data). **The second half** (next; two roles, one after the other): (a) a
-   clean-room implementer who never read glibc writes `sin_glibc`, `cos_glibc` and
-   `sincos_glibc` in `larmorx_core::math` from `specs/glibc-dbl.md` alone (its §12: the record's
-   768 blocks and the special arguments, both readings of the fused operations, golden cases) and
-   wires the clean-room originals' `reproduce` to the `*_glibc` functions wherever their specs
-   name glibc's (fslmaths, fslstats, FLIRT, FAST, topup, BET, the head-motion correction),
-   re-making the records that move; (b) a replica-side step (an agent that may read
+   searched and fitted data). **The second half:** (a) *done* (2026-11-04, the clean-room
+   implementer, relays 1 to 3; `docs/parts/2026-11-04-glibc-maths-2/`): `sin_glibc`, `cos_glibc`
+   and `sincos_glibc` in `larmorx_core::math` from `specs/glibc-dbl.md` alone (768 of 768 blocks
+   and 184 special arguments of the record per function; 1.18 × 10^10 fresh arguments per
+   function against the system's glibc, 0 differ; 1.6 to 2.9 times CORE-MATH's time), and
+   `larmorx_core::math::Libm` choosing per call in every clean-room original whose spec names
+   glibc's functions (fslmaths, fslstats, FLIRT and its programs, mcflirt's mutual information,
+   FAST, topup's smoothing, bet2, betsurf, 3dTshift's weighted sinc): in `reproduce` FAST's
+   fMRIPrep calls and 41 FLIRT cases now give FSL's bytes, FLIRT's `cost-normmi` and
+   `weights-normmi` fail → pass; GLIBC-07 named exactly in the pointwise programs only (the
+   user's decision); 8 records re-made, golden 223 → 228 cases (no checksum moved); the eight
+   tools' site pages re-exported; (b) *next*: a replica-side step (an agent that may read
    `crates-nc/`) wires the FSL replicas' `reproduce` to the new `sin_glibc`, `cos_glibc` and
    `sincos_glibc` (fslmaths' `-sin` and `-cos`, the Kiss FFT's twiddle factors, the kernels'
    windows, avscale's `sqrtaff`) and re-makes their records (random testing's permanent case
@@ -644,6 +649,31 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From the glibc maths part, second half (2026-11-04).**
+  - *Clean-room originals, failing on main's code too* (cases main's replica suites gained after the
+    originals' last records; the originals' records of FLIRT, FAST and topup were older than main's
+    suites and are now re-made): FAST's `opt/nan-first` (the default should name FSL-203; it names
+    FSL-103), FLIRT's `programs/pointflirt-no-points` (pointflirt should refuse naming FSL-204; it
+    stops with FSL's message, unnamed), topup's `opt/fsl145-one-coefficient` (FSL stops after
+    FSL-145 lays one coefficient, "Error occurred when preparing to run topup", exit 1; the
+    original's reproduce mode runs on). Each a small part of its original.
+  - *Spec questions for a spec writer* (relay 2b): fslmaths §10.4 (`-edge` on a double image: FSL
+    computes `pow(x, 2)` as `x · x` and adds the squares z, y, x; black-box `edge_forms.py`), §19's
+    GLIBC-07 row and §7 (sin and cos are now glibc's in the original's reproduce mode too); FLIRT
+    §3 and §8.1 step 9 (the arithmetic of the skews, `x0 · z` and `y0 · z`, for a near-orthonormal
+    matrix under gimbal lock: `real/weights-empty-refweight` parts from FSL's trace there).
+  - *The replica side, step (b)*: the replicas take up `larmorx_core::math`'s new `sin_glibc`,
+    `cos_glibc` and `sincos_glibc` where FSL's build calls glibc's double `sin`, `cos` and `sincos`
+    (fslmaths' `-dt double -sin` and `-cos`, the FFT's twiddle factors: the record's
+    `difftest/fft-twiddles-glibc-sincos` and its FSL-side probe).
+  - *Harness*: the `mri-hmc` record must be made with `--jobs 1` (its report's tables of fMRIPrep's
+    runs, the ground truth and the D13 summary come from module-level per-case metrics that
+    `--jobs` workers do not return), or the metrics carried with the results.
+  - *The FLIRT original's `bbr/type-local_abs`*: 0.3647 → 0.0268 mm from FSL's matrix, now within
+    the 0.1 mm threshold, where the record does not measure FSL's band (it does beyond the
+    threshold only), so the site calls it *open* where it was *within the original's own
+    variability*; measuring FSL's band for every registration would keep such cases labelled by
+    their band.
 
 - **The site: a page "Why Rust and Python"** (the user, 2026-10-31: "At some point we should clearly
   explain [on] the website why we choose rust + python and explain all these points"). Before the

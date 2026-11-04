@@ -331,6 +331,9 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         settings,
         mode,
         n_threads: settings.threads(),
+        // quiet: a registration names no GLIBC-07 (it cannot tell whether a last bit of its
+        // functions moved the result; the user's decision of 2026-11-04)
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     engine::run(&o, &ctx, out, err)
 }

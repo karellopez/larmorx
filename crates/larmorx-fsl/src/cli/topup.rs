@@ -552,7 +552,11 @@ fn run(
             let _ = std::fs::write(settings.path(name), text);
         }
         match est {
-            Ok(est) => write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf),
+            Ok(est) => {
+                // GLIBC-07 is not named: an iterative fit cannot tell whether the smoothing's
+                // last bits moved its results (the user's decision of 2026-11-04)
+                write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
+            }
             Err(topup::LevelError::Subsampling(l)) => {
                 print_notices(&mut ebuf, &ns);
                 // the first level's preparation is topup's own (observed: --subsamp=2,3)
@@ -873,6 +877,7 @@ fn settle(
         fsl146: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
+        glibc: mode == UpstreamDefects::Reproduce,
     };
     // FSL-117: named on every Levenberg-Marquardt level with the membrane energy and λ ≠ 0
     if params.regmod == RegMod::Membrane

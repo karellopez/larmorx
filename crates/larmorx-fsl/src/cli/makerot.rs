@@ -5,6 +5,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
 
 use super::Settings;
 use super::common::{self, abort, print_notices};
@@ -151,9 +152,20 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     // named only where FSL's rotation differs from the corrected one (D13: a zero angle, or one
     // whose two scalings give the same matrix, changes nothing); the rotation decides it, the
     // translation following from it about any centre
+    // the run's C library functions (GLIBC-07)
+    let libm = Libm::new(mode);
     let bits = |m: mat::Mat4| m.map(|row| row.map(f64::to_bits));
     let changes = || {
-        let at = |fsl76| bits(programs::makerot(theta as f32, axis, [0.0; 3], fsl76));
+        let check = Libm::new(mode);
+        let at = |fsl76| {
+            bits(programs::makerot(
+                theta as f32,
+                axis,
+                [0.0; 3],
+                fsl76,
+                &check,
+            ))
+        };
         at(true) != at(false)
     };
     if len != 1.0 && changes() {
@@ -188,7 +200,24 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             }
         }
     }
-    let m = programs::makerot(theta as f32, axis, centre, mode.reproduce());
+    let m = programs::makerot(theta as f32, axis, centre, mode.reproduce(), &libm);
+    // GLIBC-07 (§15.4): named where the other choice of cosine and sine writes another matrix
+    let other = Libm::new(if mode.fix() {
+        UpstreamDefects::Reproduce
+    } else {
+        UpstreamDefects::Fix
+    });
+    let m2 = programs::makerot(theta as f32, axis, centre, mode.reproduce(), &other);
+    if mat::file_text(&m) != mat::file_text(&m2) || mat::print_text(&m) != mat::print_text(&m2) {
+        let detail = if mode.fix() {
+            "the rotation's cosine and sine correctly rounded, where glibc's cosf and sinf (FSL's) \
+             write another matrix"
+        } else {
+            "the rotation's cosine and sine from glibc's cosf and sinf, as FSL, where the correctly \
+             rounded ones write another matrix"
+        };
+        defects::push_once(&mut notices, Notice::new(&defects::GLIBC_07, mode, detail));
+    }
     match text(4).last() {
         Some(name) => {
             if std::fs::write(settings.path(name), mat::file_text(&m)).is_err() {

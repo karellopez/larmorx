@@ -2,7 +2,7 @@
 //! Sums and percentiles over a mask (`specs/fast.md` §8.3), the class statistics of one channel
 //! (§4.4) and the negative log Gaussian (§8.2).
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 /// π in single precision (`3.14159265` read as a float), as FAST's Gaussian uses it.
@@ -152,12 +152,13 @@ pub struct Gauss {
 }
 
 impl Gauss {
-    pub fn new(mean: f32, var: f32) -> Gauss {
+    /// The normalisation's `log` is `libm`'s (glibc's with `reproduce`, GLIBC-07).
+    pub fn new(mean: f32, var: f32, libm: &Libm) -> Gauss {
         let t = 2.0 * f64::from(PI_F32) * f64::from(var);
         Gauss {
             mean,
             var,
-            a: math::log(t.sqrt()) as f32,
+            a: libm.log(t.sqrt()) as f32,
         }
     }
 

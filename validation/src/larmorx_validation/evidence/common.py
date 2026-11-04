@@ -514,6 +514,46 @@ def implementation(
     }
 
 
+#: GLIBC-07 in the clean-room originals since 2026-11-04 (the register; the glibc maths part):
+#: the reproduce mode computes the C library's functions as glibc 2.35 does (FSL's build), with
+#: larmorx_core::math's ``*_glibc`` functions, the default correctly rounded on every platform.
+GLIBC07_REGISTER = "docs/findings/upstream-defects.md"
+
+
+def glibc07(functions: str, program: str, named: bool, why: str | None = None) -> str:
+    """Why a clean-room original's default and reproduce modes differ by GLIBC-07 alone: which
+    functions (``functions``, e.g. ``"exp, log, expf and logf"``), and whether ``program``
+    names it (exactly, where its values differ) or not (``why``; by default: an iterative
+    program cannot tell whether its result moved: the user's decision of 2026-11-04)."""
+    return (
+        f"GLIBC-07, a correction by default: the default computes {functions} correctly rounded "
+        "on every platform, where the reproduce mode computes them as glibc 2.35 does, as FSL's "
+        "build (LARMORX's glibc functions, since 2026-11-04); "
+        + (
+            f"{program} names it exactly where the default's values differ."
+            if named
+            else f"{program} names it nowhere: "
+            + (why or "an iterative fit cannot tell whether its result moved with those last bits")
+            + " (the user's decision of 2026-11-04)."
+        )
+    )
+
+
+def fix_note(fix: int, named: list[str], functions: str) -> str:
+    """The note of a case whose default mode changes ``fix`` values (the record's D13 fix pass),
+    naming ``named`` (none: GLIBC-07 alone, which the iterative programs do not name)."""
+    if named:
+        return (
+            f"in its default mode the clean-room original corrects {', '.join(named)} and names "
+            f"it: {fix:,} values change"
+        )
+    return (
+        f"in its default mode {fix:,} values change, from {functions} computed correctly "
+        "rounded where reproduce computes them as glibc 2.35 does (GLIBC-07, not named: the "
+        "user's decision of 2026-11-04 for the iterative programs)"
+    )
+
+
 def outcome_verdict(r: dict) -> tuple[str, str] | None:
     """The verdict of a case that is not compared: rejected by both, an expected divergence, a
     failure (open)."""
@@ -524,7 +564,9 @@ def outcome_verdict(r: dict) -> tuple[str, str] | None:
         return "divergence", clip(r["reason"])
     if st == "fail":
         why = "; ".join(
-            f"{c['name']}: {c.get('value')} (threshold {c.get('threshold')})"
+            f"{c['name']}: {c.get('detail')}"
+            if c.get("value") is None and c.get("detail")
+            else f"{c['name']}: {c.get('value')} (threshold {c.get('threshold')})"
             for c in r.get("failed_checks", [])
         )
         return "open", clip(why or r["reason"])

@@ -6,7 +6,10 @@
 //! A cost evaluation samples the reference grid's rows; with `parallel` its slices run in
 //! parallel, each with its own sums, folded in slice order: the same bits at any thread count.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+
+use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::math::Libm;
 
 use larmorx_mri::hmc::cost::{
     self as hcost, Accumulator, CorrSlice, NormCorrCount, PointWeight, TestBins, TestVolume,
@@ -60,9 +63,37 @@ impl Cost {
 pub struct Log {
     lines: Mutex<Vec<String>>,
     fatal: Mutex<Option<String>>,
+    /// The run's C library functions (GLIBC-07: correctly rounded by default, glibc's with
+    /// `reproduce`; quiet, FLIRT names no GLIBC-07), shared with the run's quiet logs.
+    libm: Arc<Libm>,
 }
 
 impl Log {
+    /// The log of a run in `mode` (its functions [`Libm::quiet`]'s).
+    pub fn new(mode: UpstreamDefects) -> Log {
+        Log {
+            libm: Arc::new(Libm::quiet(mode)),
+            ..Log::default()
+        }
+    }
+    /// A log whose functions are `libm` (a run's, shared).
+    pub fn sharing(libm: Arc<Libm>) -> Log {
+        Log {
+            libm,
+            ..Log::default()
+        }
+    }
+    /// A log whose messages are dropped, with this log's functions.
+    pub fn quiet(&self) -> Log {
+        Log {
+            libm: Arc::clone(&self.libm),
+            ..Log::default()
+        }
+    }
+    /// The run's C library functions.
+    pub fn libm(&self) -> &Libm {
+        &self.libm
+    }
     pub fn push(&self, line: impl Into<String>) {
         if let Ok(mut l) = self.lines.lock() {
             l.push(line.into());
@@ -285,6 +316,7 @@ impl Pair {
                 cost == Cost::NormMi,
                 parallel,
                 weight,
+                log.libm(),
             ),
             Cost::LabelDiff => self.labeldiff(&tv, &b, parallel, weight),
             Cost::Bbr => unreachable!(),

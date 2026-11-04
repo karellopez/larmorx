@@ -252,10 +252,13 @@ pub fn edge<T: Num>(img: &mut Img<T>, notices: &mut Notices) {
                             Kind::Float | Kind::Double => p.sub(m).to_f64(),
                             _ => p.diff(m),
                         };
-                        let q = d * d / (vox[a] * vox[a]);
+                        // x86-64's NaN rules (a voxel size of 0: 0 / 0, inf / inf)
+                        let (dd, vv) = (d * d, vox[a] * vox[a]);
+                        let q = num::nan64(dd, vv, dd / vv);
                         sum = num::nan64(sum, q, sum + q);
                     }
-                    let (v, c) = T::convert(sum.sqrt() / den, fix);
+                    let r = super::reduce::sqrt64(sum);
+                    let (v, c) = T::convert(num::nan64(r, den, r / den), fix);
                     ch |= c;
                     o[x + nx * y] = v;
                 }
@@ -669,6 +672,20 @@ mod tests {
         assert_eq!(im.data[0].to_bits(), num::DEFAULT_NAN_32);
         assert_eq!(im.data[1], f32::NEG_INFINITY);
         assert_eq!(String::from_utf8(err).unwrap(), format!("{EMPTY_MASK}\n"));
+    }
+
+    #[test]
+    fn edge_with_a_zero_voxel_size_gives_x86_64s_default_nan() {
+        // a flat image (0 / 0) and a step (inf / inf), voxel size 0 along x: the default NaN
+        // (sign set) on every platform
+        let mut flat = img([3, 3, 3, 1], vec![1.0f32; 27]);
+        flat.header.pixdim[1] = 0.0;
+        edge(&mut flat, &mut Notices::new(UpstreamDefects::Fix));
+        assert_eq!(flat.data[13].to_bits(), num::DEFAULT_NAN_32);
+        let mut step = img([3, 3, 3, 1], (0..27).map(|i| (i % 3) as f32).collect());
+        step.header.pixdim[1] = 0.0;
+        edge(&mut step, &mut Notices::new(UpstreamDefects::Fix));
+        assert_eq!(step.data[13].to_bits(), num::DEFAULT_NAN_32);
     }
 
     #[test]

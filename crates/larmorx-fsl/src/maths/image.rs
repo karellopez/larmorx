@@ -20,7 +20,7 @@ use larmorx_mri::hmc::files::{self, ImageFiles};
 use larmorx_mri::hmc::image::{ImageError, is_neurological, read_stored_files};
 use rayon::prelude::*;
 
-use super::num::{Kind, Num};
+use super::num::{self, Kind, Num};
 use crate::bet::image::{self as bimage, Output, Values};
 use crate::cli::Settings;
 
@@ -241,11 +241,20 @@ fn convert_array<S: RealElement + Sync, T: Num>(
         }
     };
     let double = S::DATA_TYPE == DataType::F64;
+    // x86-64's NaN rules on every platform (a 0 value times an infinite slope: the default NaN)
     let value = |s: S| -> f64 {
         match scale {
             None => s.to_f64(),
-            Some((m, b)) if double => s.to_f64() * m + b,
-            Some((m, b)) => super::num::to_f64(s.to_f32() * m as f32 + b as f32),
+            Some((m, b)) if double => {
+                let x = s.to_f64();
+                let p = num::nan64(x, m, x * m);
+                num::nan64(p, b, p + b)
+            }
+            Some((m, b)) => {
+                let (x, m, b) = (s.to_f32(), m as f32, b as f32);
+                let p = num::nan32(x, m, x * m);
+                num::to_f64(num::nan32(p, b, p + b))
+            }
         }
     };
     let mut out = vec![T::default(); src.len()];
@@ -603,4 +612,27 @@ pub fn fsl151(notices: &mut Notices, what: &str) {
         }
     };
     notices.add(&defects::FSL_151, detail);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::ndarray::{ArrayD, IxDyn};
+
+    #[test]
+    fn scaling_makes_x86_64s_default_nan() {
+        // 0 times an infinite slope: the default NaN (sign set) on every platform, in single
+        // and double precision; a NaN value passes on with its sign
+        let a = ArrayD::from_shape_vec(IxDyn(&[3, 1, 1]), vec![0.0f32, 2.0, f32::NAN]).unwrap();
+        let (v, _) = convert_array::<f32, f32>(&a, 3, false, Some((f64::INFINITY, 1.0)), true);
+        assert_eq!(v[0].to_bits(), num::DEFAULT_NAN_32);
+        assert_eq!(v[1], f32::INFINITY);
+        assert_eq!(v[2].to_bits(), f32::NAN.to_bits());
+        let d = ArrayD::from_shape_vec(IxDyn(&[2, 1, 1]), vec![0.0f64, -2.0]).unwrap();
+        let (v, _) = convert_array::<f64, f64>(&d, 2, false, Some((f64::INFINITY, 0.0)), true);
+        assert_eq!(
+            (v[0].to_bits(), v[1]),
+            (num::DEFAULT_NAN_64, f64::NEG_INFINITY)
+        );
+    }
 }

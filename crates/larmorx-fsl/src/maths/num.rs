@@ -162,7 +162,8 @@ pub trait Num:
     /// `self / o`; for the integer types `o` is never 0 (nor `INT_MIN / -1`).
     fn div(self, o: Self) -> Self;
     /// `self - o` as the robust range takes a difference of limits (§6.4): in the type's
-    /// arithmetic (an `int` for `char` and `short`, wrapping for `int`), as a double.
+    /// arithmetic (an `int` for `char` and `short`, wrapping for `int`), as a double; x86-64's
+    /// NaN rules for the floating types (`inf - inf`: the default NaN on every platform).
     fn diff(self, o: Self) -> f64;
     fn is_nan(self) -> bool;
     /// Whether the value is NaN or infinite.
@@ -317,7 +318,7 @@ impl Num for f32 {
     }
     #[inline]
     fn diff(self, o: Self) -> f64 {
-        to_f64(self - o)
+        to_f64(nan32(self, o, self - o))
     }
     #[inline]
     fn is_nan(self) -> bool {
@@ -377,7 +378,7 @@ impl Num for f64 {
     }
     #[inline]
     fn diff(self, o: Self) -> f64 {
-        self - o
+        nan64(self, o, self - o)
     }
     #[inline]
     fn is_nan(self) -> bool {
@@ -421,5 +422,17 @@ mod tests {
             DEFAULT_NAN_64
         );
         assert_eq!(to_f32(f64::NAN).to_bits(), 0x7fc0_0000);
+    }
+
+    #[test]
+    fn differences_make_x86_64s_default_nan() {
+        // inf - inf: the default NaN (sign set) in both floating types, on every platform
+        assert_eq!(f32::INFINITY.diff(f32::INFINITY).to_bits(), DEFAULT_NAN_64);
+        assert_eq!(f64::INFINITY.diff(f64::INFINITY).to_bits(), DEFAULT_NAN_64);
+        // a NaN operand passes on with its sign and payload
+        let pos = f32::from_bits(0x7fc0_0001);
+        assert_eq!(pos.diff(1.0).to_bits(), to_f64(pos).to_bits());
+        assert_eq!(1.0f64.diff(f64::NAN).to_bits(), f64::NAN.to_bits());
+        assert_eq!(2.0f32.diff(0.5), 1.5);
     }
 }

@@ -479,9 +479,9 @@ fn one_option(
             }),
             "-v" | "-V" => {
                 let n = count(pass, o == "-V");
-                let [dx, dy, dz] = voxel(ctx.input);
-                let vol = n as f32 * dx * dy * dz;
-                p.text.push_str(&format!("{n} {} ", fmt::f(f64::from(vol))));
+                let vol = volume(n, voxel(ctx.input));
+                p.text
+                    .push_str(&format!("{n} {} ", fmt::f(num::to_f64(vol))));
                 let single = f64::from(n as f32);
                 if ctx.json {
                     // FSL-189: named when the rounded count survives into the document
@@ -490,7 +490,7 @@ fn one_option(
                 }
                 let c = if fix { n as f64 } else { single };
                 p.json
-                    .insert(o.into(), J::A(vec![J::F(c), J::F(f64::from(vol))]));
+                    .insert(o.into(), J::A(vec![J::F(c), J::F(num::to_f64(vol))]));
             }
             "-m" | "-M" | "-s" | "-S" => {
                 let v = mean_std(pass, o, notices, ctx.json, err);
@@ -504,7 +504,7 @@ fn one_option(
             "-R" => {
                 let mask = pass.mask.as_ref();
                 match extremes(&pass.img, mask, fix, notices, o, ctx.json) {
-                    Some(e) => p.numbers(o, &[f64::from(e.lo), f64::from(e.hi)]),
+                    Some(e) => p.numbers(o, &[num::to_f64(e.lo), num::to_f64(e.hi)]),
                     None => {
                         let _ = writeln!(err, "{EXTREMA_EMPTY}\n{EXTREMA_EMPTY}");
                         p.numbers(o, &[0.0, 0.0]);
@@ -547,7 +547,7 @@ fn one_option(
                         }
                     }
                 }
-                p.numbers(o, &[f64::from(lo), f64::from(hi)]);
+                p.numbers(o, &[num::to_f64(lo), num::to_f64(hi)]);
             }
             "-p" | "-P" => {
                 let n = atof(need(1, err)?) as f32;
@@ -566,7 +566,7 @@ fn one_option(
                 };
                 let vals = kept(&pass.img, m);
                 let v = percentile(vals, n / 100.0, notices, o, ctx.json, err)?;
-                p.number(o, f64::from(v));
+                p.number(o, num::to_f64(v));
             }
             "-h" => {
                 let Some(a) = arg(1) else {
@@ -677,6 +677,14 @@ fn shown64(json: bool, x: f64, y: f64) -> bool {
 /// The voxel sizes in single precision.
 fn voxel(img: &Image) -> [f32; 3] {
     [1, 2, 3].map(|k| (img.header.pixdim[k] as f32).abs())
+}
+
+/// `-v`'s volume: the count times the voxel sizes in single precision, in order, with x86-64's
+/// NaN rules (no voxel and an infinite size: 0 · inf, the default NaN on every platform).
+fn volume(n: usize, voxel: [f32; 3]) -> f32 {
+    voxel
+        .iter()
+        .fold(n as f32, |acc, &d| num::nan32(acc, d, acc * d))
 }
 
 /// `-v`'s (`-V`'s) count: the mask's (nonzero mask's) voxels, else every value (every value
@@ -1021,10 +1029,13 @@ fn histogram(c: &HistCall<'_>, lo: f32, hi: f32, skip_nan: bool, last_bin: bool)
     if hi <= lo {
         return Hist::None;
     }
-    let w = f64::from(num::nan32(hi, lo, hi - lo));
+    // x86-64's NaN rules (an infinite range: inf / inf); a NaN bin position is the first bin
+    // whatever its sign (x86-64's conversion gives INT_MIN)
+    let w = num::to_f64(num::nan32(hi, lo, hi - lo));
     let nb = nbins as f64;
-    let a = nb / w;
-    let b = nb * (-f64::from(lo)) / w;
+    let a = num::nan64(nb, w, nb / w);
+    let nl = nb * (-num::to_f64(lo));
+    let b = num::nan64(nl, w, nl / w);
     const B: usize = 1 << 15;
     let parts: Vec<Vec<u64>> = c
         .img
@@ -1325,7 +1336,8 @@ fn centre(input: &Image, pass: &Pass, mm: bool, err: &mut dyn Write) -> [f64; 3]
         num::nan64(s, total, s / total)
     });
     if input.flipped {
-        c[0] = (nx as f64 - 1.0) - c[0];
+        let last = nx as f64 - 1.0;
+        c[0] = num::nan64(last, c[0], last - c[0]);
     }
     if !mm {
         return c;
@@ -1338,12 +1350,20 @@ fn centre(input: &Image, pass: &Pass, mm: bool, err: &mut dyn Write) -> [f64; 3]
     } else {
         None
     };
+    to_mm(m, voxel(input), c)
+}
+
+/// `-C`'s millimetres: the voxel-to-world matrix times the centre (in order, the translation
+/// last), else the voxel sizes times it; x86-64's NaN rules (0 · inf, inf - inf).
+fn to_mm(m: Option<[[f64; 4]; 4]>, voxel: [f32; 3], c: [f64; 3]) -> [f64; 3] {
+    let mul = |a: f64, b: f64| num::nan64(a, b, a * b);
+    let add = |a: f64, b: f64| num::nan64(a, b, a + b);
     match m {
-        Some(m) => [0, 1, 2].map(|r| m[r][0] * c[0] + m[r][1] * c[1] + m[r][2] * c[2] + m[r][3]),
-        None => {
-            let v = voxel(input);
-            [0, 1, 2].map(|k| f64::from(v[k]) * c[k])
-        }
+        Some(m) => [0, 1, 2].map(|r| {
+            let s = add(mul(m[r][0], c[0]), mul(m[r][1], c[1]));
+            add(add(s, mul(m[r][2], c[2])), m[r][3])
+        }),
+        None => [0, 1, 2].map(|k| mul(num::to_f64(voxel[k]), c[k])),
     }
 }
 
@@ -1520,6 +1540,40 @@ fn value(s: &mut String, v: &J, depth: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn numbers_made_from_numbers_are_x86_64s_default_nan() {
+        let default = num::DEFAULT_NAN_64;
+        // -v: no voxel times an infinite size (0 · inf)
+        assert_eq!(
+            volume(0, [f32::INFINITY, 1.0, 1.0]).to_bits(),
+            num::DEFAULT_NAN_32
+        );
+        assert_eq!(volume(4, [0.5, 2.0, 3.0]), 12.0);
+        // -C: inf - inf (an infinite centre and translation), a zero matrix entry times an
+        // infinite centre (0 · inf); the voxel sizes' form likewise; a NaN centre passes on
+        // with its sign
+        let mut m = [[0.0f64; 4]; 4];
+        m[0] = [1.0, 0.0, 0.0, f64::NEG_INFINITY];
+        m[1] = [0.0, 1.0, 0.0, 0.0];
+        m[2] = [1.0, 0.0, 0.0, 0.0];
+        let c = [f64::INFINITY, 1.0, 2.0];
+        let r = to_mm(Some(m), [1.0; 3], c);
+        assert_eq!(
+            r[..2].iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            [default; 2]
+        );
+        assert_eq!(r[2], f64::INFINITY);
+        let r = to_mm(None, [0.0, 1.0, 1.0], c);
+        assert_eq!(r[0].to_bits(), default);
+        let r = to_mm(None, [1.0; 3], [f64::NAN, 1.0, 1.0]);
+        assert_eq!(r[0].to_bits(), f64::NAN.to_bits());
+        // -r and -e's robust range of a volume with +inf: the lower limit min + 0 · inf
+        let mut v: Vec<f32> = (0..60).map(|k| k as f32).collect();
+        v[5] = f32::INFINITY;
+        let (lo, hi) = ops::robust_range::<f32>(&v, None, true).fix.unwrap();
+        assert_eq!((num::to_f64(lo).to_bits(), hi), (default, f32::INFINITY));
+    }
 
     #[test]
     fn blocks_and_json() {

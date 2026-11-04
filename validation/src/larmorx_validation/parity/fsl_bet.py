@@ -2296,8 +2296,8 @@ def highlights(results: list[CaseResult]) -> list[str]:
         f"- **{passed} of {n} cases bit-identical to FSL** (exit status, messages, every file); "
         f"{both} where both refuse or FSL crashes and the replica refuses; {filled} where FSL "
         "crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure "
-        f"cases: deterministic, named; the default refuses or corrects); {pending} pending (options that "
-        "run FSL programs larmorx does not replicate yet).",
+        f"cases: deterministic, named; the default refuses or corrects); {pending} pending (steps of FSL's "
+        "larmorx does not replicate yet).",
         f"- **{same} of {files} files** written byte for byte as FSL writes them.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
@@ -2333,15 +2333,18 @@ def suite(implementation: str = "replica") -> Suite:
     if implementation == "original":
         return _original_suite()
     tool = (
-        f"`larmorx-nc fsl bet`, `bet2` and `betsurf` ({replica_version()}; crate larmorx-nc-bet, the "
-        f"replica translated from FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
-        "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`"
+        f"`larmorx-nc fsl bet` (every variation), `bet2`, `betsurf`, `standard_space_roi` and `fslroi` "
+        f"({replica_version()}; crates larmorx-nc-bet, -flirt and -avwutils, the replicas translated from "
+        f"FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
+        "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf` / `lx.fsl.standard_space_roi` / "
+        "`lx.fsl.fslroi`"
     )
     return Suite(
         name="fsl-bet-replica",
         title="BET (replica)",
         tool=tool,
-        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
+        reference=f"bet, bet2, betsurf, standard_space_roi and fslroi (with the programs bet's options run) "
+        f"from {fsl_version()}, the conda installation in "
         f"`~/{fsl_versions.INSTALLS.get(fsl_versions.selected('replica'), 'fsl')}`",
         thresholds=[
             (
@@ -2366,8 +2369,10 @@ def suite(implementation: str = "replica") -> Suite:
             "(FSL never on it), `FSLDIR` set, an empty `HOME` and the case's `FSLOUTPUTTYPE`. The replica is "
             "compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also compare the "
             "replica with fMRIPrep's own outputs of the node and run FSL again and fMRIPrep 25.2.6's FSL (FSL's "
-            "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does "
-            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing. "
+            "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run their programs in the "
+            "replica's process (FLIRT, standard_space_roi, FAST, fslmaths, fslstats, betsurf, fslpy's `immv`, "
+            "GNU dc's arithmetic), with FSL's standard images from `FSLDIR` (the files larmorx-nc ships); the "
+            "cases of standard_space_roi and fslroi are in this record. "
             + fsl_versions.record_line("replica")
         ),
     )
@@ -2459,8 +2464,8 @@ def _original_suite() -> Suite:
             "variability) and report the original's agreement with fMRIPrep's own outputs. "
             "betsurf's real images (the full tier's for the replica) run in this standard tier, "
             "on bet2's meshes and FLIRT's matrices made by FSL. The `-S`, `-B`, `-A` and `-A2` variations of "
-            "`bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): "
-            "the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
+            "`bet` have no clean-room original yet (the replica runs them; the original's catch-up, from "
+            "`specs/bet.md` §5.3): the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
             "`--fsl-version` default)."
         ),
     )

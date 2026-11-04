@@ -261,9 +261,18 @@ NaNs, so no checksum changes).
 
 **glibc's LGPL functions are not here.** glibc 2.35's double `sin`, `cos`, `sincos`, `tan`, `asin`,
 `acos` and `atan` are IBM's Accurate Mathematical Library (LGPL-2.1-or-later) and are never copied
-or translated (GLIBC-07); their bits come by the route `cbrtf` took: a behaviour spec
-(`specs/glibc-dbl.md`) and a clean-room implementation from it. The replicas' verification tools
-that keep earlier translations of glibc's LGPL code stay in `crates-gpl/tools/`.
+or translated (GLIBC-07). For `sin`, `cos` and `sincos` the bits come by the route `cbrtf` took:
+a behaviour spec, `specs/glibc-dbl.md` (2026-11-04: the method as mathematics, its table of sines
+and cosines of N/128 from its definition, proved by a model written from the text alone on
+3.2 × 10^9 arguments of a black-box record of glibc's results), and a clean-room implementation
+from it (next). The table's definition gives 422 of glibc's 440 numbers; the user decided to keep
+it (2026-11-04, decision log "GLIBC-07's tables"): no number from glibc's code, and the 18 low
+parts that differ changed no result on 1.9 × 10^10 arguments per function (spec §5.3, §11.3). `tan`,
+`asin`, `acos` and `atan` stay correctly rounded in `reproduce` too (the same decision): their
+tables in glibc are searched points and fitted polynomials, about 4,000 numbers no definition
+reproduces, and they differ from glibc only in the last bit, on 0.05 to 0.25 % of arguments (spec
+§9, §10.3). The replicas' verification tools that keep earlier translations of glibc's LGPL code,
+and the spec writer's model (`glibc-dbl-model`), stay in `crates-gpl/tools/`.
 
 ## Making ANTs correctly rounded: the preload library
 

@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "4e1f7fcd09fa8e73c0490e082e5d547c961a2c66 and 87e1bb8ae4f44c09aaa9fc4f315f742c99fca74b, merged (re-record from the merge)", "date": "2026-11-04", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "04c878b7c91c9071948fcfc87c0e64348acef0d6", "date": "2026-11-04", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},

@@ -6,6 +6,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::math::Libm;
 use larmorx_mri::hmc::files;
 
 use super::Settings;
@@ -717,6 +718,7 @@ pub fn run(
             &channels,
             &Outputs::Empty(zeros, o.pve && multi),
             notices,
+            &Libm::new(mode),
             err,
         );
     }
@@ -811,6 +813,7 @@ pub fn run(
         priors: priors.take(),
         priors_throughout: o.priors_throughout,
         fsl98_pairing: !fix,
+        libm: std::sync::Arc::new(larmorx_core::math::Libm::new(mode)),
     };
     let result = larmorx_core::parallel::with_threads(n_threads, || {
         let mut text: Vec<u8> = Vec::new();
@@ -901,7 +904,16 @@ pub fn run(
             ));
         }
     }
-    write_outputs(o, settings, mode, &channels, &what, notices, err)
+    write_outputs(
+        o,
+        settings,
+        mode,
+        &channels,
+        &what,
+        notices,
+        &params.libm,
+        err,
+    )
 }
 
 /// What a run writes.
@@ -926,7 +938,25 @@ struct Parts<'a> {
     bias_outside: f32,
 }
 
+/// GLIBC-07 (§8): FAST's `exp`, `log`, `expf` and `logf` are glibc's; named where `libm`'s
+/// witness saw the other choice give another value (whether the segmentation then changes, the
+/// iterations cannot tell).
+fn note_glibc(notices: &mut Vec<Notice>, mode: UpstreamDefects, libm: &Libm) {
+    if !libm.differed() {
+        return;
+    }
+    let detail = if mode.fix() {
+        "the exponentials and logarithms correctly rounded, where glibc's (FSL's) give other last \
+         bits on some arguments, which may move the segmentation"
+    } else {
+        "the exponentials and logarithms are glibc's, as FSL's, where the correctly rounded ones \
+         give other last bits on some arguments"
+    };
+    defects::push_once(notices, Notice::new(&defects::GLIBC_07, mode, detail));
+}
+
 /// Writes the outputs (§3.2, §3.3) in FAST's order, then the notices.
+#[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
     settings: &Settings,
@@ -934,8 +964,10 @@ fn write_outputs(
     channels: &[Channel],
     what: &Outputs,
     mut notices: Vec<Notice>,
+    libm: &Libm,
     err: &mut dyn Write,
 ) -> u8 {
+    note_glibc(&mut notices, mode, libm);
     let ot = match settings.get("FSLOUTPUTTYPE") {
         None => {
             print_notices(err, &notices);
@@ -1143,10 +1175,10 @@ fn write_outputs(
     // the correction exp(-b) of channel c: 1 without a bias field; outside the mask exp(-b) of
     // b's value there (1, or NaN when the field's mean is not finite: FSL's NaN then reaches the
     // whole image, §4.5's b · M)
-    let outside = larmorx_core::math::expf(-parts.bias_outside);
+    let outside = libm.expf(-parts.bias_outside);
     let correction = |c: usize, i: usize| -> f32 {
         match &parts.bias {
-            Some(b) => larmorx_core::math::expf(-b[c][i]),
+            Some(b) => libm.expf(-b[c][i]),
             None => 1.0,
         }
     };
@@ -1186,6 +1218,7 @@ fn write_outputs(
             }
         }
     }
+    note_glibc(&mut notices, mode, libm);
     print_notices(err, &notices);
     0
 }

@@ -552,7 +552,23 @@ fn run(
             let _ = std::fs::write(settings.path(name), text);
         }
         match est {
-            Ok(est) => write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf),
+            Ok(est) => {
+                // GLIBC-07: the smoothing's taps, where the other choice of exp gives others
+                if est.glibc_differed {
+                    let detail = if mode.fix() {
+                        "the smoothing's taps from the correctly rounded exp, where glibc's \
+                         (FSL's) gives other single-precision taps"
+                    } else {
+                        "the smoothing's taps from glibc's exp, as FSL, where the correctly \
+                         rounded exp gives other single-precision taps"
+                    };
+                    larmorx_core::defects::push_once(
+                        &mut ns,
+                        Notice::new(&larmorx_core::defects::GLIBC_07, mode, detail),
+                    );
+                }
+                write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
+            }
             Err(topup::LevelError::Subsampling(l)) => {
                 print_notices(&mut ebuf, &ns);
                 // the first level's preparation is topup's own (observed: --subsamp=2,3)
@@ -873,6 +889,7 @@ fn settle(
         fsl146: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
+        glibc: mode == UpstreamDefects::Reproduce,
     };
     // FSL-117: named on every Levenberg-Marquardt level with the membrane energy and λ ≠ 0
     if params.regmod == RegMod::Membrane

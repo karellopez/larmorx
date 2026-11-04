@@ -10,7 +10,7 @@
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering::Relaxed;
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::grid::Grid;
@@ -57,7 +57,7 @@ struct Mix {
     log_var: f32,
 }
 
-fn mixes(classes: &[Gauss], a: usize, b: usize, deltas: &[f32]) -> Vec<Mix> {
+fn mixes(classes: &[Gauss], a: usize, b: usize, deltas: &[f32], libm: &Libm) -> Vec<Mix> {
     let (ga, gb) = (classes[a], classes[b]);
     deltas
         .iter()
@@ -68,8 +68,8 @@ fn mixes(classes: &[Gauss], a: usize, b: usize, deltas: &[f32]) -> Vec<Mix> {
             Mix {
                 delta: d,
                 rest,
-                gauss: Gauss::new(mean, var),
-                log_var: math::logf(var),
+                gauss: Gauss::new(mean, var, libm),
+                log_var: libm.logf(var),
             }
         })
         .collect()
@@ -84,6 +84,7 @@ pub fn estimate(
     n: usize,
     mixel_weight: f32,
     len: usize,
+    libm: &Libm,
 ) -> Pve {
     let nm = grid.len();
     let pairs = mixtures(n);
@@ -98,12 +99,12 @@ pub fn estimate(
     }
     let classes: Vec<Gauss> = stats::class_stats(post, x, n, len)
         .into_iter()
-        .map(|(m, v)| Gauss::new(m, v))
+        .map(|(m, v)| Gauss::new(m, v, libm))
         .collect();
     let deltas = fractions();
     let tables: Vec<Vec<Mix>> = pairs
         .iter()
-        .map(|&(a, b)| mixes(&classes, a, b, &deltas))
+        .map(|&(a, b)| mixes(&classes, a, b, &deltas, libm))
         .collect();
     // the types' likelihoods (§4.8.5)
     // a batch of voxels at a time: each term's `exp` for the whole batch at once
@@ -119,7 +120,7 @@ pub fn estimate(
                 for (gl, &xi) in g.iter_mut().zip(xs) {
                     *gl = -f64::from(cl.neg_log(xi));
                 }
-                math::exp_in_place(&mut g[..k]);
+                libm.exp_in_place(&mut g[..k]);
                 for (row, &e) in rows.chunks_exact_mut(nt).zip(&g[..k]) {
                     row[c] = e as f32;
                 }
@@ -130,7 +131,7 @@ pub fn estimate(
                     for (gl, &xi) in g.iter_mut().zip(xs) {
                         *gl = -f64::from(m.gauss.neg_log(xi));
                     }
-                    math::exp_in_place(&mut g[..k]);
+                    libm.exp_in_place(&mut g[..k]);
                     for (sl, &e) in s.iter_mut().zip(&g[..k]) {
                         *sl = (f64::from(*sl) + e * 0.01) as f32;
                     }
@@ -140,7 +141,7 @@ pub fn estimate(
                 }
             }
         });
-    let types = icm(grid, &like, n, &pairs, mixel_weight);
+    let types = icm(grid, &like, n, &pairs, mixel_weight, libm);
     // the fractions (§4.8.8)
     let mut frac = vec![0f32; nm * n];
     frac.par_chunks_mut(n)
@@ -183,6 +184,7 @@ pub fn icm(
     n: usize,
     pairs: &[(usize, usize)],
     r_weight: f32,
+    libm: &Libm,
 ) -> Vec<u8> {
     let nm = grid.len();
     let nt = n + pairs.len();
@@ -229,7 +231,7 @@ pub fn icm(
             let row = &like[i * nt..(i + 1) * nt];
             let (mut high, mut best) = (-1f32, cells[i].load(Relaxed));
             for (t, (&l, &kt)) in row.iter().zip(&k).enumerate() {
-                let v = l * math::expf(r_weight * kt);
+                let v = l * libm.expf(r_weight * kt);
                 if v > high {
                     high = v;
                     best = t as u8;

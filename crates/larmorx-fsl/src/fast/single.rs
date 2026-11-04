@@ -12,7 +12,7 @@ use std::io::Write;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::Relaxed;
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::bias;
@@ -60,6 +60,9 @@ pub struct Params {
     pub priors_throughout: bool,
     /// Several channels: FSL-98's pairing of the sorted classes (`reproduce`).
     pub fsl98_pairing: bool,
+    /// The C library functions (GLIBC-07, §8: correctly rounded by default, glibc's with
+    /// `reproduce`) and their witness.
+    pub libm: std::sync::Arc<Libm>,
 }
 
 impl Default for Params {
@@ -82,6 +85,7 @@ impl Default for Params {
             priors: None,
             priors_throughout: false,
             fsl98_pairing: false,
+            libm: std::sync::Arc::default(),
         }
     }
 }
@@ -178,8 +182,8 @@ pub fn in_mask(v: f32) -> bool {
 
 /// `log(I + 1)` (§4.1), double precision rounded to single.
 #[inline]
-pub fn log1(v: f32) -> f32 {
-    math::log(f64::from(v) + 1.0) as f32
+pub fn log1(v: f32, libm: &Libm) -> f32 {
+    libm.log(f64::from(v) + 1.0) as f32
 }
 
 /// The member probabilities (§4.9): `max(p, 0)` normalised by its single-precision sum when the
@@ -231,6 +235,7 @@ struct Mrf<'a> {
     n: usize,
     post: Vec<f32>,
     weights: [f64; 18],
+    libm: &'a Libm,
 }
 
 /// Posteriors as the in-place sweeps share them between threads (the bits of each `f32`).
@@ -264,6 +269,7 @@ fn mrf_voxel(
     i: usize,
     u: &mut [f64],
     e: &mut [f32],
+    libm: &Libm,
 ) {
     let n = u.len();
     let nb = grid.neighbours(i);
@@ -276,7 +282,7 @@ fn mrf_voxel(
     }
     let mut s = 0f64;
     for c in 0..n {
-        let mut v = math::exp(b * u[c] - neg_g[i * n + c]) as f32;
+        let mut v = libm.exp(b * u[c] - neg_g[i * n + c]) as f32;
         if let Some(pr) = priors {
             v *= pr[i * n + c];
         }
@@ -303,7 +309,9 @@ fn mrf_sweep(
     b: f64,
     priors: Option<&[f32]>,
     n: usize,
+    libm: &Libm,
 ) {
+    #[allow(clippy::too_many_arguments)]
     fn fixed<const N: usize>(
         grid: &Grid,
         w: &[f64; 18],
@@ -311,22 +319,23 @@ fn mrf_sweep(
         neg_g: &[f64],
         b: f64,
         priors: Option<&[f32]>,
+        libm: &Libm,
     ) {
         grid.gauss_seidel(|r| {
             let (mut u, mut e) = ([0f64; N], [0f32; N]);
             for i in r {
-                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e);
+                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e, libm);
             }
         });
     }
     match n {
-        2 => fixed::<2>(grid, w, cells, neg_g, b, priors),
-        3 => fixed::<3>(grid, w, cells, neg_g, b, priors),
-        4 => fixed::<4>(grid, w, cells, neg_g, b, priors),
+        2 => fixed::<2>(grid, w, cells, neg_g, b, priors, libm),
+        3 => fixed::<3>(grid, w, cells, neg_g, b, priors, libm),
+        4 => fixed::<4>(grid, w, cells, neg_g, b, priors, libm),
         _ => grid.gauss_seidel(|r| {
             let (mut u, mut e) = (vec![0f64; n], vec![0f32; n]);
             for i in r {
-                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e);
+                mrf_voxel(grid, w, cells, neg_g, b, priors, i, &mut u, &mut e, libm);
             }
         }),
     }
@@ -377,7 +386,16 @@ impl Mrf<'_> {
         let b = f64::from(beta);
         let cells = to_cells(std::mem::take(&mut self.post));
         for sweep in 0..5 {
-            mrf_sweep(self.grid, &self.weights, &cells, &neg_g, b, priors, n);
+            mrf_sweep(
+                self.grid,
+                &self.weights,
+                &cells,
+                &neg_g,
+                b,
+                priors,
+                n,
+                self.libm,
+            );
             if verbose {
                 let total = weights_total(self.grid, &self.weights, n, |k| cell(&cells, k));
                 let _ = writeln!(
@@ -421,17 +439,17 @@ pub(crate) fn with_pool<R: Send>(threads: usize, f: impl FnOnce() -> R + Send) -
 }
 
 /// The classes' Gaussians from their statistics.
-fn gaussians(s: &[(f32, f32)]) -> Vec<Gauss> {
-    s.iter().map(|&(m, v)| Gauss::new(m, v)).collect()
+fn gaussians(s: &[(f32, f32)], libm: &Libm) -> Vec<Gauss> {
+    s.iter().map(|&(m, v)| Gauss::new(m, v, libm)).collect()
 }
 
 /// `-v`'s line of the classes' means and standard deviations (§4.10).
-fn class_line(out: &mut dyn Write, s: &[(f32, f32)]) {
+fn class_line(out: &mut dyn Write, s: &[(f32, f32)], libm: &Libm) {
     let mut line = String::new();
     for (c, &(m, v)) in s.iter().enumerate() {
         let sd = v.sqrt();
-        let mean = math::expf(m);
-        let spread = (math::expf(m + sd) - math::expf(m - sd)) / 2.0;
+        let mean = libm.expf(m);
+        let spread = (libm.expf(m + sd) - libm.expf(m - sd)) / 2.0;
         line.push_str(&format!(
             " CLASS {} MEAN {} STDDEV {}",
             c + 1,
@@ -483,8 +501,8 @@ fn bias_field(
 }
 
 /// The bias field's kernels for one channel (§4.5): `σ = 0.51 l / d` voxels along each axis.
-pub fn kernels(lowpass: f32, voxel: [f32; 3]) -> [Vec<f64>; 3] {
-    voxel.map(|d| bias::kernel(((0.51 * f64::from(lowpass)) / f64::from(d)) as f32))
+pub fn kernels(lowpass: f32, voxel: [f32; 3], libm: &Libm) -> [Vec<f64>; 3] {
+    voxel.map(|d| bias::kernel(((0.51 * f64::from(lowpass)) / f64::from(d)) as f32, libm))
 }
 
 /// Segments one channel. `data` is the image after §4.1's negative-value rule (radiological
@@ -502,7 +520,11 @@ pub fn segment(
     let n = p.n_classes;
     let nm = grid.len();
     let len = stats::block_len(grid.voxels());
-    let y: Vec<f32> = grid.index.iter().map(|&i| log1(data[i as usize])).collect();
+    let y: Vec<f32> = grid
+        .index
+        .iter()
+        .map(|&i| log1(data[i as usize], &p.libm))
+        .collect();
     // FSL's masked sums over an empty mask (each prints a message)
     let mut sums = 0usize;
     let mut post = vec![0f32; (nm + 1) * n];
@@ -561,7 +583,7 @@ fn initialise(
     out: &mut dyn Write,
 ) -> Result<Vec<(f32, f32)>, Stop> {
     let means: Vec<f32> = match &p.manual {
-        Some(s) if s.len() == n => s.iter().map(|&v| math::logf(v)).collect(),
+        Some(s) if s.len() == n => s.iter().map(|&v| p.libm.logf(v)).collect(),
         _ => {
             let sorted = stats::sorted(y.to_vec());
             let step = 1.0 / (n as f32 + 1.0);
@@ -609,14 +631,14 @@ fn initialise(
         }
         stats_now = stats::class_stats(&post[..nm * n], y, n, len);
         *sums += 4 * n;
-        let gs = gaussians(&stats_now);
+        let gs = gaussians(&stats_now, &p.libm);
         post[..nm * n]
             .par_chunks_mut(n)
             .zip(y.par_iter())
             .for_each(|(row, &yi)| {
                 let mut s = 0f32;
                 for (pc, c) in row.iter_mut().zip(&gs) {
-                    let l = math::expf(-c.neg_log(yi));
+                    let l = p.libm.expf(-c.neg_log(yi));
                     *pc = if l < 0.0 { 0.0 } else { l };
                     s += *pc;
                 }
@@ -648,7 +670,7 @@ fn finish(
 ) -> Result<Single, Stop> {
     let n = p.n_classes;
     let nm = grid.len();
-    let kernels = kernels(p.lowpass, voxel);
+    let kernels = kernels(p.lowpass, voxel, &p.libm);
     let mut bias: Option<Vec<f32>> = None;
     let bias_outside = std::cell::Cell::new(0f32);
     let mut yb = y.clone();
@@ -675,6 +697,7 @@ fn finish(
         n,
         post,
         weights: grid.weights.map(f64::from),
+        libm: &p.libm,
     };
     let mut rng = GlibcRand::new(FAST_SEED);
     let pr = pri.as_deref().filter(|_| p.priors_throughout);
@@ -689,7 +712,7 @@ fn finish(
         }
         mrf.iterate(
             &yb,
-            &gaussians(&stats_now),
+            &gaussians(&stats_now, &p.libm),
             beta,
             &mut rng,
             pr,
@@ -697,7 +720,7 @@ fn finish(
             p.verbose,
         );
         if p.verbose {
-            class_line(out, &stats_now);
+            class_line(out, &stats_now, &p.libm);
         }
         if !p.no_bias {
             bias = Some(estimate(&mrf.post, &stats_now, &mut yb));
@@ -716,7 +739,7 @@ fn finish(
         }
         mrf.iterate(
             &yb,
-            &gaussians(&stats_now),
+            &gaussians(&stats_now, &p.libm),
             beta,
             &mut rng,
             pr,
@@ -724,7 +747,7 @@ fn finish(
             p.verbose,
         );
         if p.verbose {
-            class_line(out, &stats_now);
+            class_line(out, &stats_now, &p.libm);
         }
         beta = if p.hyper.is_nan() {
             // FSL-99 (reproduce): a NaN -H passes FAST's check for a negative value and β is
@@ -791,8 +814,8 @@ fn finish(
             let _ = writeln!(out, " Starting Partial Volume Estimation ");
         }
         let q = members(&sorted_post, n, nm);
-        let x: Vec<f32> = yb.par_iter().map(|&v| math::expf(v)).collect();
-        let r = pve::estimate(&grid, &sorted_post, &x, n, p.mixel, len);
+        let x: Vec<f32> = yb.par_iter().map(|&v| p.libm.expf(v)).collect();
+        let r = pve::estimate(&grid, &sorted_post, &x, n, p.mixel, len, &p.libm);
         sums += 5 * n;
         let volumes: Vec<f64> = (0..n)
             .map(|c| stats::sum_par(nm, len, |i| f64::from(r.frac[i * n + c])) * vox)

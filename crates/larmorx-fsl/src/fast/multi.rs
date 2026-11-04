@@ -15,7 +15,7 @@ use std::io::Write;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::Relaxed;
 
-use larmorx_core::math;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::bias;
@@ -138,8 +138,8 @@ pub fn two_pi(s: usize) -> f32 {
 
 impl Class {
     /// The likelihood's normalisation `log(sqrt(|det C (2π)^S|))` (double).
-    fn norm(&self, tp: f32) -> f64 {
-        math::log((self.det * f64::from(tp)).abs().sqrt())
+    fn norm(&self, tp: f32, libm: &Libm) -> f64 {
+        libm.log((self.det * f64::from(tp)).abs().sqrt())
     }
 
     /// `G = ½ dᵀ C⁻¹ d + norm` (§5.4) at the channels `y`: `d` in double, the quadratic form
@@ -249,10 +249,10 @@ pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class
 }
 
 /// `G_c` of every mask voxel and class (§5.4).
-fn neg_logs(classes: &[Class], y: &[f32], s: usize, nm: usize) -> Vec<f32> {
+fn neg_logs(classes: &[Class], y: &[f32], s: usize, nm: usize, libm: &Libm) -> Vec<f32> {
     let n = classes.len();
     let tp = two_pi(s);
-    let norms: Vec<f64> = classes.iter().map(|c| c.norm(tp)).collect();
+    let norms: Vec<f64> = classes.iter().map(|c| c.norm(tp, libm)).collect();
     let mut out = vec![0f32; nm * n];
     out.par_chunks_mut(n.max(1))
         .zip(y.par_chunks(s))
@@ -269,10 +269,10 @@ fn neg_logs(classes: &[Class], y: &[f32], s: usize, nm: usize) -> Vec<f32> {
 
 /// The likelihoods `exp(-G_c)` (double `exp`) normalised over the classes (single), 0 where
 /// their sum is not above 0 (§5.2).
-fn likelihoods(classes: &[Class], y: &[f32], s: usize, post: &mut [f32]) {
+fn likelihoods(classes: &[Class], y: &[f32], s: usize, post: &mut [f32], libm: &Libm) {
     let n = classes.len();
     let nm = y.len() / s;
-    let gs = neg_logs(classes, y, s, nm);
+    let gs = neg_logs(classes, y, s, nm, libm);
     // a batch of voxels at a time (`math::exp_in_place`: the same bits as one by one)
     const BATCH: usize = 64;
     post[..nm * n]
@@ -290,7 +290,7 @@ fn likelihoods(classes: &[Class], y: &[f32], s: usize, post: &mut [f32]) {
             for (v, &gc) in e.iter_mut().zip(gr) {
                 *v = -f64::from(gc);
             }
-            math::exp_in_place(e);
+            libm.exp_in_place(e);
             for (row, er) in rows.chunks_exact_mut(n).zip(e.chunks_exact(n)) {
                 let mut t = 0f32;
                 for (p, &ec) in row.iter_mut().zip(er) {
@@ -323,8 +323,8 @@ pub fn weights(voxel: [f32; 3]) -> [f32; 18] {
 }
 
 /// The multi-channel bias field's kernels (§5.1): `σ = sqrt(l / d)` in single precision.
-pub fn kernels(lowpass: f32, voxel: [f32; 3]) -> [Vec<f64>; 3] {
-    voxel.map(|d| bias::kernel((lowpass / d).sqrt()))
+pub fn kernels(lowpass: f32, voxel: [f32; 3], libm: &Libm) -> [Vec<f64>; 3] {
+    voxel.map(|d| bias::kernel((lowpass / d).sqrt(), libm))
 }
 
 /// One voxel's update of the multi-channel MRF (§5.6): `p_c ← expf(β U_c - G_c)` (single,
@@ -342,6 +342,7 @@ fn sweep_voxel(
     i: usize,
     u: &mut [f64],
     e: &mut [f32],
+    libm: &Libm,
 ) {
     let n = u.len();
     let nb = grid.neighbours(i);
@@ -353,7 +354,7 @@ fn sweep_voxel(
     }
     let mut t = 0f32;
     for c in 0..n {
-        let mut v = math::expf(beta * (u[c] as f32) - gs[i * n + c]);
+        let mut v = libm.expf(beta * (u[c] as f32) - gs[i * n + c]);
         if let Some(pr) = priors {
             v *= pr[i * n + c];
         }
@@ -376,7 +377,9 @@ fn sweeps(
     beta: f32,
     priors: Option<&[f32]>,
     n: usize,
+    libm: &Libm,
 ) {
+    #[allow(clippy::too_many_arguments)]
     fn fixed<const N: usize>(
         grid: &Grid,
         w: &[f64; 18],
@@ -384,11 +387,12 @@ fn sweeps(
         gs: &[f32],
         beta: f32,
         priors: Option<&[f32]>,
+        libm: &Libm,
     ) {
         grid.gauss_seidel(|r| {
             let (mut u, mut e) = ([0f64; N], [0f32; N]);
             for i in r {
-                sweep_voxel(grid, w, cells, gs, beta, priors, i, &mut u, &mut e);
+                sweep_voxel(grid, w, cells, gs, beta, priors, i, &mut u, &mut e, libm);
             }
         });
     }
@@ -396,13 +400,13 @@ fn sweeps(
     let cells = to_cells(std::mem::take(post));
     for _ in 0..5 {
         match n {
-            2 => fixed::<2>(grid, &w, &cells, gs, beta, priors),
-            3 => fixed::<3>(grid, &w, &cells, gs, beta, priors),
-            4 => fixed::<4>(grid, &w, &cells, gs, beta, priors),
+            2 => fixed::<2>(grid, &w, &cells, gs, beta, priors, libm),
+            3 => fixed::<3>(grid, &w, &cells, gs, beta, priors, libm),
+            4 => fixed::<4>(grid, &w, &cells, gs, beta, priors, libm),
             _ => grid.gauss_seidel(|r| {
                 let (mut u, mut e) = (vec![0f64; n], vec![0f32; n]);
                 for i in r {
-                    sweep_voxel(grid, &w, &cells, gs, beta, priors, i, &mut u, &mut e);
+                    sweep_voxel(grid, &w, &cells, gs, beta, priors, i, &mut u, &mut e, libm);
                 }
             }),
         }
@@ -463,17 +467,17 @@ fn bias_fields(
 
 /// `-v`'s lines of the classes (§5.6): per channel ` CHANNEL i` and each class's `MEAN e^μ
 /// STDDEV (e^(μ+σ) - e^(μ-σ))/2` (double).
-fn class_lines(out: &mut dyn Write, classes: &[Class], s: usize) {
+fn class_lines(out: &mut dyn Write, classes: &[Class], s: usize, libm: &Libm) {
     for i in 0..s {
         let mut line = format!(" CHANNEL {}", i + 1);
         for (c, cl) in classes.iter().enumerate() {
             let m = cl.mean[i];
             let sd = cl.cov[i * s + i].sqrt();
-            let spread = (math::exp(m + sd) - math::exp(m - sd)) / 2.0;
+            let spread = (libm.exp(m + sd) - libm.exp(m - sd)) / 2.0;
             line.push_str(&format!(
                 " CLASS {} MEAN {} STDDEV {}",
                 c + 1,
-                g(math::exp(m)),
+                g(libm.exp(m)),
                 g(spread)
             ));
         }
@@ -504,7 +508,7 @@ pub fn segment(
         .zip(grid.index.par_iter())
         .for_each(|(row, &idx)| {
             for (i, v) in row.iter_mut().enumerate() {
-                *v = log1(channels[i][idx as usize]);
+                *v = log1(channels[i][idx as usize], &p.libm);
             }
         });
     let mut post = vec![0f32; (nm + 1) * n];
@@ -526,7 +530,7 @@ pub fn segment(
             match given {
                 Some(v) => {
                     for (c, mc) in m.iter_mut().enumerate() {
-                        *mc = f64::from(math::logf(v[i * n + c]));
+                        *mc = f64::from(p.libm.logf(v[i * n + c]));
                     }
                 }
                 None => {
@@ -588,15 +592,15 @@ pub fn segment(
             if p.verbose {
                 let _ = writeln!(out, "KMeans Iteration {it}");
             }
-            likelihoods(&classes, &y, s, &mut post);
+            likelihoods(&classes, &y, s, &mut post, &p.libm);
         }
         q = members(&post, n, nm);
         classes = class_stats(&q, &y, n, s)?;
-        likelihoods(&classes, &y, s, &mut post);
+        likelihoods(&classes, &y, s, &mut post, &p.libm);
         q = members(&post, n, nm);
     }
     // §5.6: the main loop
-    let k = kernels(p.lowpass, voxel);
+    let k = kernels(p.lowpass, voxel, &p.libm);
     let mut yb = y.clone();
     let mut bias: Option<Vec<Vec<f32>>> = None;
     let estimate = |q: &[f32], classes: &[Class], yb: &mut Vec<f32>| -> Vec<Vec<f32>> {
@@ -625,10 +629,10 @@ pub fn segment(
                 p.bias_iterations
             );
         }
-        let gs = neg_logs(&classes, &yb, s, nm);
-        sweeps(&grid, &mut post, &gs, beta, pr, n);
+        let gs = neg_logs(&classes, &yb, s, nm, &p.libm);
+        sweeps(&grid, &mut post, &gs, beta, pr, n, &p.libm);
         if p.verbose {
-            class_lines(out, &classes, s);
+            class_lines(out, &classes, s, &p.libm);
         }
         q = members(&post, n, nm);
         if !p.no_bias {
@@ -644,10 +648,10 @@ pub fn segment(
                 p.fixed_iterations
             );
         }
-        let gs = neg_logs(&classes, &yb, s, nm);
-        sweeps(&grid, &mut post, &gs, beta, pr, n);
+        let gs = neg_logs(&classes, &yb, s, nm, &p.libm);
+        sweeps(&grid, &mut post, &gs, beta, pr, n, &p.libm);
         if p.verbose {
-            class_lines(out, &classes, s);
+            class_lines(out, &classes, s, &p.libm);
         }
         q = members(&post, n, nm);
         beta = if p.hyper.is_nan() {
@@ -727,7 +731,7 @@ pub fn segment(
         if p.verbose {
             let _ = writeln!(out, "Partial Volume Estimation ");
         }
-        Some(partial_volumes(&grid, &yb, &sorted, n, s, p.mixel))
+        Some(partial_volumes(&grid, &yb, &sorted, n, s, p.mixel, &p.libm))
     } else {
         None
     };
@@ -784,8 +788,8 @@ pub fn fractions() -> Vec<f32> {
 
 /// `G'`'s normalisation in single precision: `logf(sqrtf(|det · (2π)^S|))`.
 #[inline]
-fn norm_single(det: f32, tp: f32) -> f32 {
-    math::logf((det * tp).abs().sqrt())
+fn norm_single(det: f32, tp: f32, libm: &Libm) -> f32 {
+    libm.logf((det * tp).abs().sqrt())
 }
 
 /// The partial volumes of several channels (§5.8) in the log domain with the last statistics.
@@ -796,6 +800,7 @@ fn partial_volumes(
     n: usize,
     s: usize,
     mixel: f32,
+    libm: &Libm,
 ) -> Pve {
     let nm = grid.len();
     if n <= 1 {
@@ -831,17 +836,17 @@ fn partial_volumes(
                         rest,
                         mean,
                         inv,
-                        norm: norm_single(det, tp),
-                        log_det: math::logf(det),
+                        norm: norm_single(det, tp, libm),
+                        log_det: libm.logf(det),
                     }
                 })
                 .collect()
         })
         .collect();
-    let pure_norm: Vec<f64> = classes.iter().map(|c| c.norm(tp)).collect();
+    let pure_norm: Vec<f64> = classes.iter().map(|c| c.norm(tp, libm)).collect();
     let pure_single: Vec<f32> = classes
         .iter()
-        .map(|c| norm_single(c.det as f32, tp))
+        .map(|c| norm_single(c.det as f32, tp, libm))
         .collect();
     // a batch of voxels at a time: each term's `exp` for the whole batch at once
     // (`math::exp_in_place`, the same bits as one by one), each voxel's sum in fraction order
@@ -866,7 +871,7 @@ fn partial_volumes(
                         };
                         *gl = -f64::from(gc);
                     }
-                    math::exp_in_place(&mut g[..k]);
+                    libm.exp_in_place(&mut g[..k]);
                     for (row, &e) in rows.chunks_exact_mut(nt).zip(&g[..k]) {
                         row[c] = e as f32;
                     }
@@ -881,7 +886,7 @@ fn partial_volumes(
                             let gp = 0.5 * (quad(&f.inv, d) as f32) + f.norm;
                             *gl = -f64::from(gp);
                         }
-                        math::exp_in_place(&mut g[..k]);
+                        libm.exp_in_place(&mut g[..k]);
                         for (al, &e) in acc.iter_mut().zip(&g[..k]) {
                             *al = (f64::from(*al) + e * f64::from(step)) as f32;
                         }
@@ -892,7 +897,7 @@ fn partial_volumes(
                 }
             },
         );
-    let types = pve::icm(grid, &like, n, &pairs, mixel);
+    let types = pve::icm(grid, &like, n, &pairs, mixel, libm);
     let mut frac = vec![0f32; nm * n];
     frac.par_chunks_mut(n)
         .zip(types.par_iter())

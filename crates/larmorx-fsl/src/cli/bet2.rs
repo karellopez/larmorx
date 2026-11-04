@@ -579,6 +579,17 @@ pub fn run(
         (found.init.t2, found.init.t98),
         found.init.fsl_187,
     );
+    // GLIBC-07 (§8): the radius' and the fractional threshold's powers
+    if found.glibc_differed {
+        let detail = if mode.fix() {
+            "the radius' and the threshold's powers correctly rounded, where glibc's pow (FSL's) \
+             gives another last bit, which may move the surface"
+        } else {
+            "the radius' and the threshold's powers from glibc's pow, as FSL, where the correctly \
+             rounded pow gives another last bit"
+        };
+        defects::push_once(&mut notices, Notice::new(&defects::GLIBC_07, mode, detail));
+    }
     if found.init.one_d {
         let _ = writeln!(err, "Warning: Image appears to be 1D");
     }

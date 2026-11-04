@@ -2,6 +2,7 @@
 //! The robust intensity range and BET's initial parameters (`specs/bet.md` §4.2, §4.3).
 
 use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::Vol;
@@ -186,6 +187,7 @@ pub fn initial(
     radius: Option<f64>,
     centre: Option<[f64; 3]>,
     mode: UpstreamDefects,
+    libm: &Libm,
 ) -> Initial {
     let (min, max) = range(v);
     let Robust { t2, t98, fsl } = robust_range_in(v, mode);
@@ -202,7 +204,7 @@ pub fn initial(
                 .with_min_len(1 << 16)
                 .filter(|&&x| f64::from(x) > t)
                 .count() as f64;
-            let mut r = larmorx_core::math::pow(
+            let mut r = libm.pow(
                 (((0.75 * count) * dx) * dy) * dz / std::f64::consts::PI,
                 1.0 / 3.0,
             );
@@ -217,10 +219,7 @@ pub fn initial(
             ];
             for (n, d, area) in dims {
                 if f64::from(n as f32 * d) < r {
-                    r = larmorx_core::math::pow(
-                        (f64::from(area) / std::f64::consts::PI) / n as f64,
-                        0.5,
-                    );
+                    r = libm.pow((f64::from(area) / std::f64::consts::PI) / n as f64, 0.5);
                     slabs += 1;
                 }
             }

@@ -205,6 +205,7 @@ pub fn deform(
     init: &Initial,
     opts: &Deformation,
     pass: u32,
+    libm: &larmorx_core::math::Libm,
 ) -> Vec<V3> {
     let r = init.radius;
     let mut spacing = vol.voxel;
@@ -217,7 +218,8 @@ pub fn deform(
     }
     let ds = spacing.iter().copied().fold(1.0f64, f64::min);
     let sampler = Sampler { vol, spacing, ds };
-    let bt = larmorx_core::math::pow(opts.frac, 0.275);
+    // glibc's pow with `reproduce` (§8, GLIBC-07)
+    let bt = libm.pow(opts.frac, 0.275);
     // the options are floats (§8.1): rmin in double, rmax's product in float
     let rmin = 3.33 * opts.smoothness;
     let rmax = f64::from(10.0f32 * opts.smoothness as f32);

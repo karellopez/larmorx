@@ -4,7 +4,7 @@
 //! on its line, so lines and slices run in parallel with results independent of the thread
 //! count.
 
-use larmorx_core::math;
+use larmorx_core::math::{self, Libm};
 use rayon::prelude::*;
 
 /// A normalised Gaussian kernel of `sigma` voxels: radius `2 trunc(σ)`, taps
@@ -13,7 +13,9 @@ use rayon::prelude::*;
 /// in double precision (observed: rounding them to single moves 0.05 % of a bias field's voxels
 /// by one unit in the last place against FSL with correctly rounded maths; kept in double, the
 /// field is bit-identical: `docs/findings/fsl-fast-original.md`).
-pub fn kernel(sigma: f32) -> Vec<f64> {
+/// The taps' `exp` is `libm`'s (glibc's with `reproduce`, GLIBC-07; the witness compares the
+/// single-precision taps).
+pub fn kernel(sigma: f32, libm: &Libm) -> Vec<f64> {
     if sigma <= 1e-6 {
         return vec![1.0];
     }
@@ -27,7 +29,8 @@ pub fn kernel(sigma: f32) -> Vec<f64> {
     let taps: Vec<f32> = (0..=2 * r)
         .map(|k| {
             let j = k as f64 - r as f64;
-            math::exp(-(j * j) / (2.0 * s * s)) as f32
+            let q = -(j * j) / (2.0 * s * s);
+            libm.choose32(|| math::exp(q) as f32, || math::exp_glibc(q) as f32)
         })
         .collect();
     let total = taps.iter().fold(0f32, |a, &b| a + b);
@@ -113,9 +116,10 @@ mod tests {
 
     #[test]
     fn kernels_and_smoothing() {
-        assert_eq!(kernel(0.0), vec![1.0]);
-        assert_eq!(kernel(0.5), vec![1.0]);
-        let k = kernel(10.2);
+        let l = Libm::default();
+        assert_eq!(kernel(0.0, &l), vec![1.0]);
+        assert_eq!(kernel(0.5, &l), vec![1.0]);
+        let k = kernel(10.2, &l);
         assert_eq!(k.len(), 41);
         let s: f64 = k.iter().sum();
         assert!((s - 1.0).abs() < 1e-6);
@@ -123,7 +127,7 @@ mod tests {
         let shape = [9, 7, 5];
         let mut v = vec![0f32; 9 * 7 * 5];
         v[(2 * 7 + 3) * 9 + 4] = 1.0;
-        let kx = kernel(1.0);
+        let kx = kernel(1.0, &l);
         let out = smooth(v, shape, [&kx, &kx, &kx]);
         assert_eq!(kx.len(), 5);
         let at = |x: usize, y: usize, z: usize| out[(z * 7 + y) * 9 + x];

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "be3db916dce3",
+  "larmorx_commit": "6bb746fc6a7e",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,8 +22,8 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 21,
-  "saved_seconds": 255.6,
-  "served": 164
+  "saved_seconds": 264.2,
+  "served": 173
  },
  "reference": "topup from FSL 6.0.7.23 (fsl-topup 2203.5), the conda build at `~/fsl-6.0.7.23`, one thread",
  "results": [
@@ -35,25 +35,25 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02305,
-    "--fout (Hz): |d| inside the brain, mean": 0.004277,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02313,
+    "--fout (Hz): |d| inside the brain, mean": 0.004292,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02304,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004277,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02313,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004292,
     "jac_01: |d| inside the brain, 99th percentile": 0.0006512,
-    "jac_01: |d| inside the brain, mean": 0.0001118,
-    "jac_02: |d| inside the brain, 99th percentile": 0.0008018,
-    "jac_02: |d| inside the brain, mean": 0.0001377,
+    "jac_01: |d| inside the brain, mean": 0.0001121,
+    "jac_02: |d| inside the brain, 99th percentile": 0.0008016,
+    "jac_02: |d| inside the brain, mean": 0.000138,
     "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_base_movpar.txt: rotations": 0.0,
     "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_base_movpar.txt: translations": 0.0,
-    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected.nii.gz_mean: mean |d| / mean intensity inside the brain": 2.902e-05,
-    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected.nii.gz_mean: relative difference inside the brain, 99th percentile": 0.0006067,
-    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected: mean |d| / mean intensity inside the brain": 0.0001258,
-    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected: relative difference inside the brain, 99th percentile": 0.001081,
-    "warpfield_01 (mm): |d| inside the brain, 99th percentile": 0.002395,
-    "warpfield_01 (mm): |d| inside the brain, mean": 0.0004446,
-    "warpfield_02 (mm): |d| inside the brain, 99th percentile": 0.002949,
-    "warpfield_02 (mm): |d| inside the brain, mean": 0.0005474,
+    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected.nii.gz_mean: mean |d| / mean intensity inside the brain": 2.91e-05,
+    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected.nii.gz_mean: relative difference inside the brain, 99th percentile": 0.0006084,
+    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected: mean |d| / mean intensity inside the brain": 0.000126,
+    "sub-1_dir-PA_epi_average_regrid001_merged_sliced_volreg_corrected: relative difference inside the brain, 99th percentile": 0.001082,
+    "warpfield_01 (mm): |d| inside the brain, 99th percentile": 0.002405,
+    "warpfield_01 (mm): |d| inside the brain, mean": 0.0004461,
+    "warpfield_02 (mm): |d| inside the brain, 99th percentile": 0.002961,
+    "warpfield_02 (mm): |d| inside the brain, mean": 0.0005493,
     "xfm_01.mat: rotations": 0.0,
     "xfm_01.mat: translations": 0.0,
     "xfm_02.mat: rotations": 0.0,
@@ -63,7 +63,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 56.982,
+   "seconds": 10.155,
    "status": "pass"
   },
   {
@@ -102,7 +102,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 29.502,
+   "seconds": 6.065,
    "status": "pass"
   },
   {
@@ -114,7 +114,7 @@
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
     "--fout (Hz): |d| inside the brain, 99th percentile": 3.433e-05,
-    "--fout (Hz): |d| inside the brain, mean": 8.601e-06,
+    "--fout (Hz): |d| inside the brain, mean": 8.602e-06,
     "-v: the final cost": 0.0,
     "-v: the first cost (the prepared images)": 0.0,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
@@ -131,7 +131,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.264,
+   "seconds": 1.675,
    "status": "pass"
   },
   {
@@ -141,27 +141,27 @@
    "checks_total": 25,
    "failed_checks": [],
    "measured": {
-    "-v: the final cost": 3.66e-06,
+    "-v: the final cost": 2.44e-06,
     "-v: the first cost (the prepared images)": 0.0,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01749,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004285,
-    "mov_corr: mean |d| / mean intensity inside the brain": 3.932e-05,
-    "mov_corr: relative difference inside the brain, 99th percentile": 0.0007326,
-    "mov_corr_mean: mean |d| / mean intensity inside the brain": 3.489e-05,
-    "mov_corr_mean: relative difference inside the brain, 99th percentile": 0.0004569,
-    "mov_movpar.txt: rotations": 3.859e-05,
-    "mov_movpar.txt: translations": 0.0001327,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01191,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.003369,
+    "mov_corr: mean |d| / mean intensity inside the brain": 2.646e-05,
+    "mov_corr: relative difference inside the brain, 99th percentile": 0.0004577,
+    "mov_corr_mean: mean |d| / mean intensity inside the brain": 2.203e-05,
+    "mov_corr_mean: relative difference inside the brain, 99th percentile": 0.0002743,
+    "mov_movpar.txt: rotations": 2.744e-05,
+    "mov_movpar.txt: translations": 0.0001619,
     "mov_xfm_01.mat: rotations": 0.0,
     "mov_xfm_01.mat: translations": 0.0,
-    "mov_xfm_02.mat: rotations": 3.859e-05,
-    "mov_xfm_02.mat: translations": 0.003113
+    "mov_xfm_02.mat: rotations": 2.745e-05,
+    "mov_xfm_02.mat: translations": 0.00266
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 772643
    },
-   "seconds": 3.777,
+   "seconds": 1.328,
    "status": "pass"
   },
   {
@@ -172,8 +172,8 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 4.149e-06,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 5.294e-07,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 4.161e-06,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 5.284e-07,
     "o_movpar.txt: rotations": 0.0,
     "o_movpar.txt: translations": 0.0
    },
@@ -181,7 +181,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.259,
+   "seconds": 0.955,
    "status": "pass"
   },
   {
@@ -192,16 +192,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02089,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006013,
-    "o_movpar.txt: rotations": 8.429e-05,
-    "o_movpar.txt: translations": 0.0003057
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02334,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006701,
+    "o_movpar.txt: rotations": 0.0001278,
+    "o_movpar.txt: translations": 0.0004862
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 4693
    },
-   "seconds": 0.78,
+   "seconds": 0.31,
    "status": "pass"
   },
   {
@@ -212,13 +212,13 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02089,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006013,
-    "o_movpar.txt: rotations": 8.429e-05,
-    "o_movpar.txt: translations": 0.0003057
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02334,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006701,
+    "o_movpar.txt: rotations": 0.0001278,
+    "o_movpar.txt: translations": 0.0004862
    },
    "reason": "",
-   "seconds": 1.272,
+   "seconds": 0.873,
    "status": "pass"
   },
   {
@@ -238,7 +238,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.602,
+   "seconds": 0.28,
    "status": "pass"
   },
   {
@@ -248,51 +248,51 @@
    "checks_total": 47,
    "failed_checks": [
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00144",
      "metric": "p99 relative |d|",
      "name": "c: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.001247
+     "value": 0.00164
     }
    ],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02091,
-    "--fout (Hz): |d| inside the brain, mean": 0.00607,
-    "-v: the final cost": 0.00015,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02335,
+    "--fout (Hz): |d| inside the brain, mean": 0.006726,
+    "-v: the final cost": 0.000161,
     "-v: the first cost (the prepared images)": 0.0,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02091,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00607,
-    "c: mean |d| / mean intensity inside the brain": 6.709e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.001247,
-    "c_mean: mean |d| / mean intensity inside the brain": 5.826e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0007632,
-    "d_01 (mm): |d| inside the brain, 99th percentile": 0.001731,
-    "d_01 (mm): |d| inside the brain, mean": 0.0005024,
-    "d_02 (mm): |d| inside the brain, 99th percentile": 0.001731,
-    "d_02 (mm): |d| inside the brain, mean": 0.0005024,
-    "feat_fieldmap_mag: mean |d| / mean intensity inside the brain": 5.826e-05,
-    "feat_fieldmap_mag: relative difference inside the brain, 99th percentile": 0.0007632,
-    "feat_fieldmap_rads (rad/s): |d| inside the brain, 99th percentile": 0.1314,
-    "feat_fieldmap_rads (rad/s): |d| inside the brain, mean": 0.03814,
-    "j_01: |d| inside the brain, 99th percentile": 7.246e-05,
-    "j_01: |d| inside the brain, mean": 1.338e-05,
-    "j_02: |d| inside the brain, 99th percentile": 7.246e-05,
-    "j_02: |d| inside the brain, mean": 1.338e-05,
-    "o_movpar.txt: rotations": 8.429e-05,
-    "o_movpar.txt: translations": 0.0003057,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02335,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006726,
+    "c: mean |d| / mean intensity inside the brain": 8.498e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.00164,
+    "c_mean: mean |d| / mean intensity inside the brain": 7.489e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0009963,
+    "d_01 (mm): |d| inside the brain, 99th percentile": 0.001932,
+    "d_01 (mm): |d| inside the brain, mean": 0.0005567,
+    "d_02 (mm): |d| inside the brain, 99th percentile": 0.001932,
+    "d_02 (mm): |d| inside the brain, mean": 0.0005567,
+    "feat_fieldmap_mag: mean |d| / mean intensity inside the brain": 7.489e-05,
+    "feat_fieldmap_mag: relative difference inside the brain, 99th percentile": 0.0009963,
+    "feat_fieldmap_rads (rad/s): |d| inside the brain, 99th percentile": 0.1467,
+    "feat_fieldmap_rads (rad/s): |d| inside the brain, mean": 0.04226,
+    "j_01: |d| inside the brain, 99th percentile": 7.816e-05,
+    "j_01: |d| inside the brain, mean": 1.471e-05,
+    "j_02: |d| inside the brain, 99th percentile": 7.812e-05,
+    "j_02: |d| inside the brain, mean": 1.471e-05,
+    "o_movpar.txt: rotations": 0.0001278,
+    "o_movpar.txt: translations": 0.0004862,
     "r_01.mat: rotations": 0.0,
     "r_01.mat: translations": 0.0,
-    "r_02.mat: rotations": 8.445e-05,
-    "r_02.mat: translations": 0.01234
+    "r_02.mat: rotations": 0.0001282,
+    "r_02.mat: translations": 0.01104
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.001247 (threshold 0.001)",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.0010 to 0.0020 from its unperturbed run (the corrected images' p99), the original's reproduce runs 1.7e-5 to 0.0018; the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.00164 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 202957
    },
-   "seconds": 1.126,
+   "seconds": 0.677,
    "status": "expected-divergence"
   },
   {
@@ -303,44 +303,53 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.008064,
-    "--fout (Hz): |d| inside the brain, mean": 0.001934,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01089,
+    "--fout (Hz): |d| inside the brain, mean": 0.002875,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.008064,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.001935,
-    "o_movpar.txt: rotations": 3.178e-05,
-    "o_movpar.txt: translations": 0.0003006
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01089,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002875,
+    "o_movpar.txt: rotations": 3.018e-05,
+    "o_movpar.txt: translations": 6.295e-05
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 21998
    },
-   "seconds": 1.381,
+   "seconds": 0.382,
    "status": "pass"
   },
   {
    "case": "opt/interp-linear",
    "category": "opt",
-   "checks_passed": 18,
+   "checks_passed": 17,
    "checks_total": 18,
-   "failed_checks": [],
+   "failed_checks": [
+    {
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.000561",
+     "metric": "p99 relative |d|",
+     "name": "c: relative difference inside the brain, 99th percentile",
+     "passed": false,
+     "threshold": 0.001,
+     "value": 0.00103
+    }
+   ],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.03383,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.009172,
-    "c: mean |d| / mean intensity inside the brain": 5.129e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.0008963,
-    "c_mean: mean |d| / mean intensity inside the brain": 4.076e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0005856,
-    "o_movpar.txt: rotations": 0.0001091,
-    "o_movpar.txt: translations": 0.0003442
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.04154,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01237,
+    "c: mean |d| / mean intensity inside the brain": 6.249e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.00103,
+    "c_mean: mean |d| / mean intensity inside the brain": 5.385e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0007042,
+    "o_movpar.txt: rotations": 0.000175,
+    "o_movpar.txt: translations": 0.001111
    },
-   "reason": "",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.00056 to 0.0021 from its unperturbed run (the corrected images' p99), the original's reproduce runs 0.0010 to 0.0020; the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.00103 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 56528
    },
-   "seconds": 1.514,
-   "status": "pass"
+   "seconds": 0.456,
+   "status": "expected-divergence"
   },
   {
    "case": "opt/membrane-lm",
@@ -350,19 +359,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 3.384e-06,
-    "--fout (Hz): |d| inside the brain, mean": 1.013e-06,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 2.771e-06,
+    "--fout (Hz): |d| inside the brain, mean": 8.053e-07,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 3.384e-06,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 1.014e-06,
-    "o_movpar.txt: rotations": 2.123e-05,
-    "o_movpar.txt: translations": 1.444e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 2.771e-06,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 8.052e-07,
+    "o_movpar.txt: rotations": 1.478e-05,
+    "o_movpar.txt: translations": 1.035e-05
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 22001
    },
-   "seconds": 1.05,
+   "seconds": 0.366,
    "status": "pass"
   },
   {
@@ -385,7 +394,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.41,
+   "seconds": 0.272,
    "status": "pass"
   },
   {
@@ -396,19 +405,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.008946,
-    "--fout (Hz): |d| inside the brain, mean": 0.00247,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.005909,
+    "--fout (Hz): |d| inside the brain, mean": 0.001773,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.008945,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00247,
-    "o_movpar.txt: rotations": 3.478e-05,
-    "o_movpar.txt: translations": 0.0002363
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.005909,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.001773,
+    "o_movpar.txt: rotations": 4.841e-05,
+    "o_movpar.txt: translations": 0.0002402
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 21998
    },
-   "seconds": 0.826,
+   "seconds": 0.389,
    "status": "pass"
   },
   {
@@ -419,11 +428,11 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.05948,
-    "--fout (Hz): |d| inside the brain, mean": 0.00594,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 4.53e-06,
+    "--fout (Hz): |d| inside the brain, mean": 8.827e-07,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.05948,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00594,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 4.675e-06,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 8.554e-07,
     "o_movpar.txt: rotations": 0.0,
     "o_movpar.txt: translations": 0.0
    },
@@ -431,46 +440,18 @@
    "reported": {
     "D13 fix pass": 20580
    },
-   "seconds": 0.581,
+   "seconds": 0.172,
    "status": "pass"
   },
   {
    "case": "opt/fsl145-one-coefficient",
    "category": "opt",
-   "checks_passed": 4,
-   "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "FSL 1, the original 0",
-     "metric": "exact",
-     "name": "Exit status",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "FSL only [], original only ['f.nii.gz', 'o_fieldcoef.nii.gz', 'o_movpar.txt']",
-     "metric": "exact",
-     "name": "Files written",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "3 lines, the original 1; line 1: 'Error occurred when preparing to run topup' / ''",
-     "metric": "exact",
-     "name": "Standard error (the original's own lines left out)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 20544
-   },
-   "seconds": 0.389,
-   "status": "fail"
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Mat::operator(): index out of bounds",
+   "seconds": 0.106,
+   "status": "both-error"
   },
   {
    "case": "opt/scale",
@@ -480,20 +461,20 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01022,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002852,
-    "c: mean |d| / mean intensity inside the brain": 2.426e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.0004754,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.136e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0002904,
-    "o_movpar.txt: rotations": 4.893e-05,
-    "o_movpar.txt: translations": 5.223e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.0071,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002335,
+    "c: mean |d| / mean intensity inside the brain": 2.377e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0004693,
+    "c_mean: mean |d| / mean intensity inside the brain": 2.144e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0002799,
+    "o_movpar.txt: rotations": 6.472e-05,
+    "o_movpar.txt: translations": 0.0003542
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 56388
    },
-   "seconds": 1.539,
+   "seconds": 0.395,
    "status": "pass"
   },
   {
@@ -504,19 +485,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.002821,
-    "--fout (Hz): |d| inside the brain, mean": 0.0009296,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.002484,
+    "--fout (Hz): |d| inside the brain, mean": 0.0006341,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.002821,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.0009296,
-    "o_movpar.txt: rotations": 0.000257,
-    "o_movpar.txt: translations": 0.00149
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.002484,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.0006341,
+    "o_movpar.txt: rotations": 0.0001016,
+    "o_movpar.txt: translations": 0.000348
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 22001
    },
-   "seconds": 1.351,
+   "seconds": 0.342,
    "status": "pass"
   },
   {
@@ -527,19 +508,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02123,
-    "--fout (Hz): |d| inside the brain, mean": 0.005531,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02101,
+    "--fout (Hz): |d| inside the brain, mean": 0.006041,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02123,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.005531,
-    "o_movpar.txt: rotations": 0.0001013,
-    "o_movpar.txt: translations": 0.0005507
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02101,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006041,
+    "o_movpar.txt: rotations": 0.0001344,
+    "o_movpar.txt: translations": 0.0005124
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 25172
    },
-   "seconds": 0.821,
+   "seconds": 0.355,
    "status": "pass"
   },
   {
@@ -559,65 +540,32 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.173,
+   "seconds": 0.203,
    "status": "pass"
   },
   {
    "case": "opt/scg-movements",
    "category": "opt",
-   "checks_passed": 12,
+   "checks_passed": 16,
    "checks_total": 16,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "max |d| mm",
-     "name": "o_movpar.txt: translations",
-     "passed": false,
-     "threshold": 0.05,
-     "value": 0.2498
-    },
-    {
-     "detail": "",
-     "metric": "max |d|",
-     "name": "o_movpar.txt: rotations",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.004863
-    },
-    {
-     "detail": "",
-     "metric": "max |d| mm",
-     "name": "r_02.mat: translations",
-     "passed": false,
-     "threshold": 0.20095694083360355,
-     "value": 1.033
-    },
-    {
-     "detail": "",
-     "metric": "max |d|",
-     "name": "r_02.mat: rotations",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.004863
-    }
-   ],
+   "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.00124,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.0003952,
-    "o_movpar.txt: rotations": 0.004863,
-    "o_movpar.txt: translations": 0.2498,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 4.348e-06,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 1.388e-06,
+    "o_movpar.txt: rotations": 0.0008245,
+    "o_movpar.txt: translations": 0.0008964,
     "r_01.mat: rotations": 0.0,
     "r_01.mat: translations": 0.0,
-    "r_02.mat: rotations": 0.004863,
-    "r_02.mat: translations": 1.033
+    "r_02.mat: rotations": 0.0008268,
+    "r_02.mat: translations": 0.05836
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: o_movpar.txt: translations 0.2498 (threshold 0.05); o_movpar.txt: rotations 0.004863 (threshold 0.001); r_02.mat: translations 1.033 (threshold 0.20095694083360355)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 0.535,
-   "status": "expected-divergence"
+   "seconds": 0.25,
+   "status": "pass"
   },
   {
    "case": "opt/acqp",
@@ -627,16 +575,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 1.184,
+   "seconds": 0.374,
    "status": "pass"
   },
   {
@@ -647,16 +595,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 1.191,
+   "seconds": 0.336,
    "status": "pass"
   },
   {
@@ -667,153 +615,169 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01528,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004099,
-    "c: mean |d| / mean intensity inside the brain": 3.421e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.0006406,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.98e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0004081,
-    "d_01 (mm): |d| inside the brain, 99th percentile": 0.001265,
-    "d_01 (mm): |d| inside the brain, mean": 0.0003393,
-    "d_02 (mm): |d| inside the brain, 99th percentile": 0.001265,
-    "d_02 (mm): |d| inside the brain, mean": 0.0003393,
-    "j_01: |d| inside the brain, 99th percentile": 3.338e-05,
-    "j_01: |d| inside the brain, mean": 8.661e-06,
-    "j_02: |d| inside the brain, 99th percentile": 3.338e-05,
-    "j_02: |d| inside the brain, mean": 8.661e-06,
-    "o_movpar.txt: rotations": 6.383e-05,
-    "o_movpar.txt: translations": 0.0001416,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02347,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006371,
+    "c: mean |d| / mean intensity inside the brain": 5.062e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0008604,
+    "c_mean: mean |d| / mean intensity inside the brain": 4.42e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0005682,
+    "d_01 (mm): |d| inside the brain, 99th percentile": 0.001942,
+    "d_01 (mm): |d| inside the brain, mean": 0.0005273,
+    "d_02 (mm): |d| inside the brain, 99th percentile": 0.001942,
+    "d_02 (mm): |d| inside the brain, mean": 0.0005273,
+    "j_01: |d| inside the brain, 99th percentile": 4.436e-05,
+    "j_01: |d| inside the brain, mean": 1.25e-05,
+    "j_02: |d| inside the brain, 99th percentile": 4.437e-05,
+    "j_02: |d| inside the brain, mean": 1.25e-05,
+    "o_movpar.txt: rotations": 0.0001127,
+    "o_movpar.txt: translations": 0.0006448,
     "r_01.mat: rotations": 0.0,
     "r_01.mat: translations": 0.0,
-    "r_02.mat: rotations": 6.438e-05,
-    "r_02.mat: translations": 0.005041
+    "r_02.mat: rotations": 0.0001127,
+    "r_02.mat: translations": 0.01041
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 138124
    },
-   "seconds": 1.755,
+   "seconds": 0.502,
    "status": "pass"
   },
   {
    "case": "opt/four-volumes",
    "category": "opt",
-   "checks_passed": 41,
+   "checks_passed": 39,
    "checks_total": 50,
    "failed_checks": [
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.026",
      "metric": "p99 relative |d|",
      "name": "c: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.03348
+     "value": 0.04577
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00134",
      "metric": "mean |d| / mean",
      "name": "c: mean |d| / mean intensity inside the brain",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.001622
+     "value": 0.002637
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.0107",
      "metric": "p99 relative |d|",
      "name": "c_mean: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.01773
+     "value": 0.02538
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.000967",
      "metric": "mean |d| / mean",
      "name": "c_mean: mean |d| / mean intensity inside the brain",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.001439
+     "value": 0.002155
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00354",
      "metric": "max |d|",
      "name": "o_movpar.txt: rotations",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.005073
+     "value": 0.00687
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.122",
+     "metric": "max |d| mm",
+     "name": "r_02.mat: translations",
+     "passed": false,
+     "threshold": 0.20095694083360355,
+     "value": 0.4716
+    },
+    {
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00271",
+     "metric": "max |d|",
+     "name": "r_02.mat: rotations",
+     "passed": false,
+     "threshold": 0.001,
+     "value": 0.003409
+    },
+    {
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.105",
      "metric": "max |d| mm",
      "name": "r_03.mat: translations",
      "passed": false,
      "threshold": 0.20095694083360355,
-     "value": 0.4237
+     "value": 0.4896
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00094",
      "metric": "max |d|",
      "name": "r_03.mat: rotations",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.003711
+     "value": 0.004676
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.417",
      "metric": "max |d| mm",
      "name": "r_04.mat: translations",
      "passed": false,
      "threshold": 0.20095694083360355,
-     "value": 0.4651
+     "value": 0.5947
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00354",
      "metric": "max |d|",
      "name": "r_04.mat: rotations",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.005064
+     "value": 0.006872
     }
    ],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.05478,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01708,
-    "c: mean |d| / mean intensity inside the brain": 0.001622,
-    "c: relative difference inside the brain, 99th percentile": 0.03348,
-    "c_mean: mean |d| / mean intensity inside the brain": 0.001439,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.01773,
-    "d_01 (mm): |d| inside the brain, 99th percentile": 0.004534,
-    "d_01 (mm): |d| inside the brain, mean": 0.001414,
-    "d_02 (mm): |d| inside the brain, 99th percentile": 0.004534,
-    "d_02 (mm): |d| inside the brain, mean": 0.001414,
-    "d_03 (mm): |d| inside the brain, 99th percentile": 0.004534,
-    "d_03 (mm): |d| inside the brain, mean": 0.001414,
-    "d_04 (mm): |d| inside the brain, 99th percentile": 0.004534,
-    "d_04 (mm): |d| inside the brain, mean": 0.001414,
-    "j_01: |d| inside the brain, 99th percentile": 9.141e-05,
-    "j_01: |d| inside the brain, mean": 3.202e-05,
-    "j_02: |d| inside the brain, 99th percentile": 9.146e-05,
-    "j_02: |d| inside the brain, mean": 3.202e-05,
-    "j_03: |d| inside the brain, 99th percentile": 0.0001003,
-    "j_03: |d| inside the brain, mean": 4.2e-05,
-    "j_04: |d| inside the brain, 99th percentile": 0.0001003,
-    "j_04: |d| inside the brain, mean": 4.2e-05,
-    "o_movpar.txt: rotations": 0.005073,
-    "o_movpar.txt: translations": 0.03409,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08253,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.03683,
+    "c: mean |d| / mean intensity inside the brain": 0.002637,
+    "c: relative difference inside the brain, 99th percentile": 0.04577,
+    "c_mean: mean |d| / mean intensity inside the brain": 0.002155,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.02538,
+    "d_01 (mm): |d| inside the brain, 99th percentile": 0.006831,
+    "d_01 (mm): |d| inside the brain, mean": 0.003049,
+    "d_02 (mm): |d| inside the brain, 99th percentile": 0.006831,
+    "d_02 (mm): |d| inside the brain, mean": 0.003049,
+    "d_03 (mm): |d| inside the brain, 99th percentile": 0.006831,
+    "d_03 (mm): |d| inside the brain, mean": 0.003049,
+    "d_04 (mm): |d| inside the brain, 99th percentile": 0.006831,
+    "d_04 (mm): |d| inside the brain, mean": 0.003049,
+    "j_01: |d| inside the brain, 99th percentile": 0.0001614,
+    "j_01: |d| inside the brain, mean": 5.168e-05,
+    "j_02: |d| inside the brain, 99th percentile": 0.0001614,
+    "j_02: |d| inside the brain, mean": 5.167e-05,
+    "j_03: |d| inside the brain, 99th percentile": 0.000133,
+    "j_03: |d| inside the brain, mean": 5.144e-05,
+    "j_04: |d| inside the brain, 99th percentile": 0.000133,
+    "j_04: |d| inside the brain, mean": 5.144e-05,
+    "o_movpar.txt: rotations": 0.00687,
+    "o_movpar.txt: translations": 0.04401,
     "r_01.mat: rotations": 0.0,
     "r_01.mat: translations": 0.0,
-    "r_02.mat: rotations": 0.0004246,
-    "r_02.mat: translations": 0.03164,
-    "r_03.mat: rotations": 0.003711,
-    "r_03.mat: translations": 0.4237,
-    "r_04.mat: rotations": 0.005064,
-    "r_04.mat: translations": 0.4651
+    "r_02.mat: rotations": 0.003409,
+    "r_02.mat: translations": 0.4716,
+    "r_03.mat: rotations": 0.004676,
+    "r_03.mat: translations": 0.4896,
+    "r_04.mat: rotations": 0.006872,
+    "r_04.mat: translations": 0.5947
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.03348 (threshold 0.001); c: mean |d| / mean intensity inside the brain 0.001622 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.01773 (threshold 0.001)",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.021 to 0.047 (also 64 and 1024 last bits) from its unperturbed run (the corrected images' p99), the original's reproduce runs 0.043 to 0.057; the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.04577 (threshold 0.001); c: mean |d| / mean intensity inside the brain 0.002637 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.02538 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 251815
+    "D13 fix pass": 249713
    },
-   "seconds": 1.98,
+   "seconds": 1.081,
    "status": "expected-divergence"
   },
   {
@@ -824,8 +788,8 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 4.828e-06,
-    "--fout (Hz): |d| inside the brain, mean": 2.938e-06,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 4.832e-06,
+    "--fout (Hz): |d| inside the brain, mean": 2.939e-06,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
     "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 4.932e-06,
     "_fieldcoef (its field, Hz): |d| inside the brain, mean": 2.946e-06,
@@ -836,7 +800,7 @@
    "reported": {
     "D13 fix pass": 22001
    },
-   "seconds": 1.512,
+   "seconds": 0.417,
    "status": "pass"
   },
   {
@@ -847,24 +811,24 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01858,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.0132,
-    "d_01 (mm): |d| inside the brain, 99th percentile": 0.001231,
-    "d_01 (mm): |d| inside the brain, mean": 0.000874,
-    "d_02 (mm): |d| inside the brain, 99th percentile": 0.001231,
-    "d_02 (mm): |d| inside the brain, mean": 0.000874,
-    "j_01: |d| inside the brain, 99th percentile": 2.517e-05,
-    "j_01: |d| inside the brain, mean": 3.708e-06,
-    "j_02: |d| inside the brain, 99th percentile": 2.511e-05,
-    "j_02: |d| inside the brain, mean": 3.707e-06,
-    "o_movpar.txt: rotations": 2.559e-05,
-    "o_movpar.txt: translations": 0.001391
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02613,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.009138,
+    "d_01 (mm): |d| inside the brain, 99th percentile": 0.00173,
+    "d_01 (mm): |d| inside the brain, mean": 0.0006051,
+    "d_02 (mm): |d| inside the brain, 99th percentile": 0.00173,
+    "d_02 (mm): |d| inside the brain, mean": 0.0006051,
+    "j_01: |d| inside the brain, 99th percentile": 4.924e-05,
+    "j_01: |d| inside the brain, mean": 8.925e-06,
+    "j_02: |d| inside the brain, 99th percentile": 4.924e-05,
+    "j_02: |d| inside the brain, mean": 8.925e-06,
+    "o_movpar.txt: rotations": 5.719e-05,
+    "o_movpar.txt: translations": 0.001156
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 124217
    },
-   "seconds": 1.542,
+   "seconds": 0.561,
    "status": "pass"
   },
   {
@@ -875,128 +839,47 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01441,
-    "--fout (Hz): |d| inside the brain, mean": 0.003648,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.005944,
+    "--fout (Hz): |d| inside the brain, mean": 0.001745,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01441,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.003648,
-    "o_movpar.txt: rotations": 6.161e-05,
-    "o_movpar.txt: translations": 9.563e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.005944,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.001745,
+    "o_movpar.txt: rotations": 3.239e-05,
+    "o_movpar.txt: translations": 6.239e-05
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 22000
    },
-   "seconds": 2.488,
+   "seconds": 0.357,
    "status": "pass"
   },
   {
    "case": "opt/zero-readout",
    "category": "opt",
-   "checks_passed": 12,
+   "checks_passed": 22,
    "checks_total": 22,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.06429
-    },
-    {
-     "detail": "",
-     "metric": "mean |d| / mean",
-     "name": "c: mean |d| / mean intensity inside the brain",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.004861
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c_mean: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.0451
-    },
-    {
-     "detail": "",
-     "metric": "mean |d| / mean",
-     "name": "c_mean: mean |d| / mean intensity inside the brain",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.004438
-    },
-    {
-     "detail": "",
-     "metric": "p99 |d|",
-     "name": "--fout (Hz): |d| inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.5,
-     "value": 6.262
-    },
-    {
-     "detail": "",
-     "metric": "mean |d|",
-     "name": "--fout (Hz): |d| inside the brain, mean",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 2.285
-    },
-    {
-     "detail": "",
-     "metric": "correlation",
-     "name": "--fout (Hz): correlation inside the brain",
-     "passed": false,
-     "threshold": 0.999,
-     "value": 0.9904
-    },
-    {
-     "detail": "",
-     "metric": "p99 |d|",
-     "name": "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.5,
-     "value": 6.262
-    },
-    {
-     "detail": "",
-     "metric": "mean |d|",
-     "name": "_fieldcoef (its field, Hz): |d| inside the brain, mean",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 2.285
-    },
-    {
-     "detail": "",
-     "metric": "correlation",
-     "name": "_fieldcoef (its field, Hz): correlation inside the brain",
-     "passed": false,
-     "threshold": 0.999,
-     "value": 0.9904
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "--fout (Hz): correlation inside the brain": 0.9904,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 6.262,
-    "--fout (Hz): |d| inside the brain, mean": 2.285,
-    "_fieldcoef (its field, Hz): correlation inside the brain": 0.9904,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 6.262,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 2.285,
-    "c: mean |d| / mean intensity inside the brain": 0.004861,
-    "c: relative difference inside the brain, 99th percentile": 0.06429,
-    "c_mean: mean |d| / mean intensity inside the brain": 0.004438,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0451,
-    "o_movpar.txt: rotations": 0.0001249,
-    "o_movpar.txt: translations": 0.04308
+    "--fout (Hz): correlation inside the brain": 1.0,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.008605,
+    "--fout (Hz): |d| inside the brain, mean": 0.001854,
+    "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.008604,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.001854,
+    "c: mean |d| / mean intensity inside the brain": 1.087e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0001774,
+    "c_mean: mean |d| / mean intensity inside the brain": 9.767e-06,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0001209,
+    "o_movpar.txt: rotations": 1.943e-05,
+    "o_movpar.txt: translations": 4.559e-05
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.06429 (threshold 0.001); c: mean |d| / mean intensity inside the brain 0.004861 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.0451 (threshold 0.001)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 75981
+    "D13 fix pass": 76901
    },
-   "seconds": 1.894,
-   "status": "expected-divergence"
+   "seconds": 0.395,
+   "status": "pass"
   },
   {
    "case": "opt/same-direction",
@@ -1006,19 +889,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.03739,
-    "--fout (Hz): |d| inside the brain, mean": 0.01416,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01405,
+    "--fout (Hz): |d| inside the brain, mean": 0.004802,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.03739,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01416,
-    "o_movpar.txt: rotations": 0.0003522,
-    "o_movpar.txt: translations": 0.0015
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01405,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004802,
+    "o_movpar.txt: rotations": 1.577e-05,
+    "o_movpar.txt: translations": 5.229e-05
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 22001
    },
-   "seconds": 1.213,
+   "seconds": 0.263,
    "status": "pass"
   },
   {
@@ -1028,32 +911,41 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupScan::TopupScan: third element of pevec must be zero",
-   "seconds": 0.137,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
    "case": "opt/int16",
    "category": "opt",
-   "checks_passed": 18,
+   "checks_passed": 17,
    "checks_total": 18,
-   "failed_checks": [],
+   "failed_checks": [
+    {
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00088",
+     "metric": "p99 relative |d|",
+     "name": "c: relative difference inside the brain, 99th percentile",
+     "passed": false,
+     "threshold": 0.001,
+     "value": 0.001054
+    }
+   ],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01821,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004741,
-    "c: mean |d| / mean intensity inside the brain": 3.671e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.0006372,
-    "c_mean: mean |d| / mean intensity inside the brain": 3.189e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.000416,
-    "o_movpar.txt: rotations": 7.886e-05,
-    "o_movpar.txt: translations": 0.0003237
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02871,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.007343,
+    "c: mean |d| / mean intensity inside the brain": 5.772e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.001054,
+    "c_mean: mean |d| / mean intensity inside the brain": 5.041e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0006757,
+    "o_movpar.txt: rotations": 0.0001128,
+    "o_movpar.txt: translations": 0.000264
    },
-   "reason": "",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.00084 to 0.00089 from its unperturbed run (the corrected images' p99), the original's reproduce runs 2.1e-5 to 0.00105; the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.001054 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 56447
    },
-   "seconds": 1.185,
-   "status": "pass"
+   "seconds": 0.45,
+   "status": "expected-divergence"
   },
   {
    "case": "opt/one-volume",
@@ -1072,7 +964,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.31,
+   "seconds": 0.192,
    "status": "pass"
   },
   {
@@ -1083,16 +975,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "half_movpar.txt: rotations": 4.72e-05,
-    "half_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "half_movpar.txt: rotations": 6.02e-05,
+    "half_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 0.705,
+   "seconds": 0.374,
    "status": "pass"
   },
   {
@@ -1103,23 +995,23 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "--fout (Hz): |d| inside the brain, mean": 0.002817,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "--fout (Hz): |d| inside the brain, mean": 0.002138,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "feat_fieldmap_mag: mean |d| / mean intensity inside the brain": 1.844e-05,
-    "feat_fieldmap_mag: relative difference inside the brain, 99th percentile": 0.000221,
-    "feat_fieldmap_rads (rad/s): |d| inside the brain, 99th percentile": 0.06618,
-    "feat_fieldmap_rads (rad/s): |d| inside the brain, mean": 0.0177,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "feat_fieldmap_mag: mean |d| / mean intensity inside the brain": 1.753e-05,
+    "feat_fieldmap_mag: relative difference inside the brain, 99th percentile": 0.0002002,
+    "feat_fieldmap_rads (rad/s): |d| inside the brain, 99th percentile": 0.04133,
+    "feat_fieldmap_rads (rad/s): |d| inside the brain, mean": 0.01343,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 62917
    },
-   "seconds": 1.518,
+   "seconds": 0.348,
    "status": "pass"
   },
   {
@@ -1130,19 +1022,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "--fout (Hz): |d| inside the brain, mean": 0.002817,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "--fout (Hz): |d| inside the brain, mean": 0.002138,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 21999
    },
-   "seconds": 1.407,
+   "seconds": 0.253,
    "status": "pass"
   },
   {
@@ -1153,23 +1045,23 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01065,
-    "--fout (Hz): |d| inside the brain, mean": 0.002898,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.006646,
+    "--fout (Hz): |d| inside the brain, mean": 0.002161,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01065,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002898,
-    "c: mean |d| / mean intensity inside the brain": 2.41e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.000471,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.124e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0002934,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006646,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002161,
+    "c: mean |d| / mean intensity inside the brain": 2.205e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0004399,
+    "c_mean: mean |d| / mean intensity inside the brain": 1.992e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0002609,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 76905
    },
-   "seconds": 1.638,
+   "seconds": 0.427,
    "status": "pass"
   },
   {
@@ -1180,19 +1072,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "--fout (Hz): |d| inside the brain, mean": 0.002817,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "--fout (Hz): |d| inside the brain, mean": 0.002138,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 43998
    },
-   "seconds": 1.121,
+   "seconds": 0.28,
    "status": "pass"
   },
   {
@@ -1203,20 +1095,20 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01065,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002898,
-    "c.nii.gz_mean: mean |d| / mean intensity inside the brain": 2.124e-05,
-    "c.nii.gz_mean: relative difference inside the brain, 99th percentile": 0.0002934,
-    "c: mean |d| / mean intensity inside the brain": 2.41e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.000471,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006646,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002161,
+    "c.nii.gz_mean: mean |d| / mean intensity inside the brain": 1.992e-05,
+    "c.nii.gz_mean: relative difference inside the brain, 99th percentile": 0.0002609,
+    "c: mean |d| / mean intensity inside the brain": 2.205e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0004399,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 56427
    },
-   "seconds": 1.483,
+   "seconds": 0.397,
    "status": "pass"
   },
   {
@@ -1227,16 +1119,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 1.026,
+   "seconds": 0.838,
    "status": "pass"
   },
   {
@@ -1256,7 +1148,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.533,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
@@ -1266,85 +1158,85 @@
    "checks_total": 17,
    "failed_checks": [
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 182",
      "metric": "p99 |d|",
      "name": "--fout (Hz): |d| inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.5,
-     "value": 200.1
+     "value": 222.3
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 54.2",
      "metric": "mean |d|",
      "name": "--fout (Hz): |d| inside the brain, mean",
      "passed": false,
      "threshold": 0.1,
-     "value": 53.49
+     "value": 60.85
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.807",
      "metric": "correlation",
      "name": "--fout (Hz): correlation inside the brain",
      "passed": false,
      "threshold": 0.999,
-     "value": 0.7821
+     "value": 0.725
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 182",
      "metric": "p99 |d|",
      "name": "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.5,
-     "value": 200.1
+     "value": 222.3
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 54.2",
      "metric": "mean |d|",
      "name": "_fieldcoef (its field, Hz): |d| inside the brain, mean",
      "passed": false,
      "threshold": 0.1,
-     "value": 53.49
+     "value": 60.85
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.807",
      "metric": "correlation",
      "name": "_fieldcoef (its field, Hz): correlation inside the brain",
      "passed": false,
      "threshold": 0.999,
-     "value": 0.7821
+     "value": 0.725
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.384",
      "metric": "max |d| mm",
      "name": "o_movpar.txt: translations",
      "passed": false,
      "threshold": 0.05,
-     "value": 0.4322
+     "value": 0.4754
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.031",
      "metric": "max |d|",
      "name": "o_movpar.txt: rotations",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.0254
+     "value": 0.03457
     }
    ],
    "measured": {
-    "--fout (Hz): correlation inside the brain": 0.7821,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 200.1,
-    "--fout (Hz): |d| inside the brain, mean": 53.49,
-    "_fieldcoef (its field, Hz): correlation inside the brain": 0.7821,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 200.1,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 53.49,
-    "o_movpar.txt: rotations": 0.0254,
-    "o_movpar.txt: translations": 0.4322
+    "--fout (Hz): correlation inside the brain": 0.725,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 222.3,
+    "--fout (Hz): |d| inside the brain, mean": 60.85,
+    "_fieldcoef (its field, Hz): correlation inside the brain": 0.725,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 222.3,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 60.85,
+    "o_movpar.txt: rotations": 0.03457,
+    "o_movpar.txt: translations": 0.4754
    },
-   "reason": "FSL-126 reproduced: a negative weight rewards a rough field, both minimisations diverge. Outside the thresholds: --fout (Hz): |d| inside the brain, 99th percentile 200.1 (threshold 0.5); --fout (Hz): |d| inside the brain, mean 53.49 (threshold 0.1); --fout (Hz): correlation inside the brain 0.7821 (threshold 0.999)",
+   "reason": "FSL-126 reproduced: a negative weight rewards a rough field, both minimisations diverge. Outside the thresholds: --fout (Hz): |d| inside the brain, 99th percentile 222.3 (threshold 0.5); --fout (Hz): |d| inside the brain, mean 60.85 (threshold 0.1); --fout (Hz): correlation inside the brain 0.725 (threshold 0.999)",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.537,
+   "seconds": 0.599,
    "status": "expected-divergence"
   },
   {
@@ -1355,19 +1247,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.08691,
-    "--fout (Hz): |d| inside the brain, mean": 0.008882,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.04926,
+    "--fout (Hz): |d| inside the brain, mean": 0.006237,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08691,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.008882,
-    "o_movpar.txt: rotations": 1.395e-05,
-    "o_movpar.txt: translations": 6.449e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.04926,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006237,
+    "o_movpar.txt: rotations": 3.405e-05,
+    "o_movpar.txt: translations": 0.0002103
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.096,
+   "seconds": 0.367,
    "status": "pass"
   },
   {
@@ -1377,52 +1269,35 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL-124: refused; FSL is not run: its knot spacing of about 4e9 voxels needs more memory than the machine holds (2026-11-03: killed in a 24 GiB memory box)",
-   "seconds": 0.166,
+   "seconds": 0.087,
    "status": "expected-divergence"
   },
   {
    "case": "cfg/b02b0",
    "category": "cfg",
-   "checks_passed": 20,
+   "checks_passed": 22,
    "checks_total": 22,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.002251
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c_mean: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.0015
-    }
-   ],
+   "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.0922,
-    "--fout (Hz): |d| inside the brain, mean": 0.01482,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.08765,
+    "--fout (Hz): |d| inside the brain, mean": 0.01159,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.0922,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01482,
-    "c: mean |d| / mean intensity inside the brain": 0.0001247,
-    "c: relative difference inside the brain, 99th percentile": 0.002251,
-    "c_mean: mean |d| / mean intensity inside the brain": 9.959e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0015,
-    "o_movpar.txt: rotations": 0.0001468,
-    "o_movpar.txt: translations": 0.0007081
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08765,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01159,
+    "c: mean |d| / mean intensity inside the brain": 7.38e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.001441,
+    "c_mean: mean |d| / mean intensity inside the brain": 4.707e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0009263,
+    "o_movpar.txt: rotations": 5.767e-05,
+    "o_movpar.txt: translations": 0.0007249
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.002251 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.0015 (threshold 0.001)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95982
    },
-   "seconds": 2.314,
-   "status": "expected-divergence"
+   "seconds": 0.79,
+   "status": "pass"
   },
   {
    "case": "cfg/b02b0_1",
@@ -1432,68 +1307,51 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01523,
-    "--fout (Hz): |d| inside the brain, mean": 0.002413,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.03142,
+    "--fout (Hz): |d| inside the brain, mean": 0.005032,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01523,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002413,
-    "c: mean |d| / mean intensity inside the brain": 1.61e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.0002841,
-    "c_mean: mean |d| / mean intensity inside the brain": 1.344e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0002259,
-    "o_movpar.txt: rotations": 1.587e-05,
-    "o_movpar.txt: translations": 7.781e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.03142,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.005032,
+    "c: mean |d| / mean intensity inside the brain": 3.707e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.000661,
+    "c_mean: mean |d| / mean intensity inside the brain": 3.245e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0005334,
+    "o_movpar.txt: rotations": 3.268e-05,
+    "o_movpar.txt: translations": 0.0001497
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95947
    },
-   "seconds": 3.342,
+   "seconds": 1.253,
    "status": "pass"
   },
   {
    "case": "cfg/b02b0_2",
    "category": "cfg",
-   "checks_passed": 20,
+   "checks_passed": 22,
    "checks_total": 22,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.002251
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "c_mean: relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.0015
-    }
-   ],
+   "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.0922,
-    "--fout (Hz): |d| inside the brain, mean": 0.01482,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.08765,
+    "--fout (Hz): |d| inside the brain, mean": 0.01159,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.0922,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01482,
-    "c: mean |d| / mean intensity inside the brain": 0.0001247,
-    "c: relative difference inside the brain, 99th percentile": 0.002251,
-    "c_mean: mean |d| / mean intensity inside the brain": 9.959e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0015,
-    "o_movpar.txt: rotations": 0.0001468,
-    "o_movpar.txt: translations": 0.0007081
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08765,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01159,
+    "c: mean |d| / mean intensity inside the brain": 7.38e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.001441,
+    "c_mean: mean |d| / mean intensity inside the brain": 4.707e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0009263,
+    "o_movpar.txt: rotations": 5.767e-05,
+    "o_movpar.txt: translations": 0.0007249
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.002251 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.0015 (threshold 0.001)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95982
    },
-   "seconds": 1.818,
-   "status": "expected-divergence"
+   "seconds": 0.77,
+   "status": "pass"
   },
   {
    "case": "cfg/b02b0_4",
@@ -1502,41 +1360,41 @@
    "checks_total": 22,
    "failed_checks": [
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00189",
      "metric": "p99 relative |d|",
      "name": "c: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.001684
+     "value": 0.003247
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00134",
      "metric": "p99 relative |d|",
      "name": "c_mean: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.001108
+     "value": 0.002313
     }
    ],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.07604,
-    "--fout (Hz): |d| inside the brain, mean": 0.01064,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.1525,
+    "--fout (Hz): |d| inside the brain, mean": 0.01856,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.07604,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01064,
-    "c: mean |d| / mean intensity inside the brain": 9.064e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.001684,
-    "c_mean: mean |d| / mean intensity inside the brain": 7.324e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.001108,
-    "o_movpar.txt: rotations": 9.106e-05,
-    "o_movpar.txt: translations": 0.0005006
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.1525,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01856,
+    "c: mean |d| / mean intensity inside the brain": 0.0001684,
+    "c: relative difference inside the brain, 99th percentile": 0.003247,
+    "c_mean: mean |d| / mean intensity inside the brain": 0.0001384,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.002313,
+    "o_movpar.txt: rotations": 0.0001417,
+    "o_movpar.txt: translations": 0.0009782
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.001684 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.001108 (threshold 0.001)",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.0019 to 0.0033 from its unperturbed run (the corrected images' p99), the original's reproduce runs 0.0013 to 0.0037; the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.003247 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.002313 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95976
    },
-   "seconds": 1.356,
+   "seconds": 0.657,
    "status": "expected-divergence"
   },
   {
@@ -1546,41 +1404,41 @@
    "checks_total": 22,
    "failed_checks": [
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00165",
      "metric": "p99 relative |d|",
      "name": "c: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.006691
+     "value": 0.01052
     },
     {
-     "detail": "",
+     "detail": "FSL's own band (its read-out times changed in their last float bit): 0.00106",
      "metric": "p99 relative |d|",
      "name": "c_mean: relative difference inside the brain, 99th percentile",
      "passed": false,
      "threshold": 0.001,
-     "value": 0.004121
+     "value": 0.006276
     }
    ],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.2648,
-    "--fout (Hz): |d| inside the brain, mean": 0.04176,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.4101,
+    "--fout (Hz): |d| inside the brain, mean": 0.06027,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.2648,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.04176,
-    "c: mean |d| / mean intensity inside the brain": 0.0003349,
-    "c: relative difference inside the brain, 99th percentile": 0.006691,
-    "c_mean: mean |d| / mean intensity inside the brain": 0.0002694,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.004121,
-    "o_movpar.txt: rotations": 0.0003967,
-    "o_movpar.txt: translations": 0.001483
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.4101,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.06027,
+    "c: mean |d| / mean intensity inside the brain": 0.0004924,
+    "c: relative difference inside the brain, 99th percentile": 0.01052,
+    "c_mean: mean |d| / mean intensity inside the brain": 0.0004042,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.006276,
+    "o_movpar.txt: rotations": 0.0006204,
+    "o_movpar.txt: translations": 0.001584
    },
-   "reason": "the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.006691 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.004121 (threshold 0.001)",
+   "reason": "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determined beyond its inputs' last bits: FSL's own runs with the read-out times changed by 1 to 256 last bits lie 0.0017 to 0.0054 from its unperturbed run (the corrected images' p99), the original's reproduce runs 0.0079 to 0.0105 (its -v costs follow FSL's to 4 or 5 digits level by level, the final within 3e-4); the original's first gradients agree with FSL's to 1e-6 (findings 37), its default (the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes. Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.01052 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.006276 (threshold 0.001)",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 95997
    },
-   "seconds": 1.604,
+   "seconds": 0.748,
    "status": "expected-divergence"
   },
   {
@@ -1592,13 +1450,13 @@
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
     "--fout (Hz): |d| inside the brain, 99th percentile": 6.314e-05,
-    "--fout (Hz): |d| inside the brain, mean": 1.34e-05,
+    "--fout (Hz): |d| inside the brain, mean": 1.338e-05,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 6.331e-05,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 1.339e-05,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 6.321e-05,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 1.337e-05,
     "c: mean |d| / mean intensity inside the brain": 3.103e-07,
     "c: relative difference inside the brain, 99th percentile": 6.324e-06,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.749e-07,
+    "c_mean: mean |d| / mean intensity inside the brain": 2.75e-07,
     "c_mean: relative difference inside the brain, 99th percentile": 5.705e-06,
     "o_movpar.txt: rotations": 0.0,
     "o_movpar.txt: translations": 0.0
@@ -1607,7 +1465,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.113,
+   "seconds": 0.333,
    "status": "pass"
   },
   {
@@ -1618,16 +1476,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08505,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01375,
-    "o_movpar.txt: rotations": 0.0001468,
-    "o_movpar.txt: translations": 0.0007081
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.08374,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01102,
+    "o_movpar.txt: rotations": 5.767e-05,
+    "o_movpar.txt: translations": 0.0007249
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 20480
    },
-   "seconds": 2.434,
+   "seconds": 0.545,
    "status": "pass"
   },
   {
@@ -1638,19 +1496,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02179,
-    "--fout (Hz): |d| inside the brain, mean": 0.00627,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.0367,
+    "--fout (Hz): |d| inside the brain, mean": 0.009742,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02179,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00627,
-    "o_movpar.txt: rotations": 8.853e-05,
-    "o_movpar.txt: translations": 0.0003416
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.0367,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.009742,
+    "o_movpar.txt: rotations": 0.0001413,
+    "o_movpar.txt: translations": 0.0007631
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 25171
    },
-   "seconds": 1.092,
+   "seconds": 0.312,
    "status": "pass"
   },
   {
@@ -1661,19 +1519,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02179,
-    "--fout (Hz): |d| inside the brain, mean": 0.00627,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.0367,
+    "--fout (Hz): |d| inside the brain, mean": 0.009742,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02179,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00627,
-    "o_movpar.txt: rotations": 8.853e-05,
-    "o_movpar.txt: translations": 0.0003416
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.0367,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.009742,
+    "o_movpar.txt: rotations": 0.0001413,
+    "o_movpar.txt: translations": 0.0007631
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 25171
    },
-   "seconds": 0.556,
+   "seconds": 0.28,
    "status": "pass"
   },
   {
@@ -1684,19 +1542,19 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01507,
-    "--fout (Hz): |d| inside the brain, mean": 0.004127,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.009942,
+    "--fout (Hz): |d| inside the brain, mean": 0.002553,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01507,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.004127,
-    "o_movpar.txt: rotations": 7.415e-05,
-    "o_movpar.txt: translations": 0.0004279
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.009942,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002553,
+    "o_movpar.txt: rotations": 1.148e-05,
+    "o_movpar.txt: translations": 0.0001854
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 22000
    },
-   "seconds": 0.678,
+   "seconds": 0.24,
    "status": "pass"
   },
   {
@@ -1716,7 +1574,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.569,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -1726,7 +1584,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Cannot find config-file nothere",
-   "seconds": 0.075,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -1736,7 +1594,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Cannot find config-file ./nothere",
-   "seconds": 0.074,
+   "seconds": 0.056,
    "status": "both-error"
   },
   {
@@ -1746,7 +1604,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. basic_string: construction from null is not valid",
-   "seconds": 0.107,
+   "seconds": 0.091,
    "status": "both-error"
   },
   {
@@ -1756,7 +1614,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.088,
+   "seconds": 0.054,
    "status": "both-error"
   },
   {
@@ -1779,7 +1637,7 @@
    "reported": {
     "D13 fix pass": 25173
    },
-   "seconds": 0.828,
+   "seconds": 0.209,
    "status": "pass"
   },
   {
@@ -1789,7 +1647,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.049,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -1799,7 +1657,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.041,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -1809,7 +1667,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.119,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -1819,7 +1677,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.166,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -1829,7 +1687,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.057,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -1839,7 +1697,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.067,
+   "seconds": 0.037,
    "status": "both-error"
   },
   {
@@ -1849,7 +1707,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Image Exception : #63 :: No image files match: nothere Image Exception : #22 :: Failed to read volume nothere.nii.gz Error : No image files match: nothere Part of FSL (ID: 2412.6-dirty) topup Usage: t",
-   "seconds": 0.071,
+   "seconds": 0.038,
    "status": "both-error"
   },
   {
@@ -1859,7 +1717,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Image Exception : #63 :: No image files match: acq.txt Image Exception : #22 :: Failed to read volume acq.txt Error : No image files match: acq.txt Part of FSL (ID: 2412.6-dirty) topup Usage: topup --",
-   "seconds": 0.1,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -1869,7 +1727,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.126,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -1879,7 +1737,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.087,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -1889,7 +1747,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Could not open matrix file nothere.txt Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compul",
-   "seconds": 0.066,
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
@@ -1899,7 +1757,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.119,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -1909,7 +1767,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.103,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -1919,7 +1777,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.155,
+   "seconds": 0.058,
    "status": "both-error"
   },
   {
@@ -1929,7 +1787,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.186,
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
@@ -1939,7 +1797,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.205,
+   "seconds": 0.096,
    "status": "both-error"
   },
   {
@@ -1949,7 +1807,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.185,
+   "seconds": 0.064,
    "status": "both-error"
   },
   {
@@ -1959,7 +1817,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.118,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -1969,7 +1827,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.144,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -1979,7 +1837,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.086,
+   "seconds": 0.055,
    "status": "both-error"
   },
   {
@@ -1989,7 +1847,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.083,
+   "seconds": 0.059,
    "status": "both-error"
   },
   {
@@ -1999,7 +1857,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.085,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -2009,7 +1867,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.069,
+   "seconds": 0.057,
    "status": "both-error"
   },
   {
@@ -2019,7 +1877,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Error occurred when preparing to run level 2 of topup Exception thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor",
-   "seconds": 0.583,
+   "seconds": 0.219,
    "status": "both-error"
   },
   {
@@ -2029,7 +1887,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.119,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -2039,7 +1897,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.106,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -2049,7 +1907,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.088,
+   "seconds": 0.05,
    "status": "both-error"
   },
   {
@@ -2059,7 +1917,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.125,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -2069,7 +1927,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
-   "seconds": 0.109,
+   "seconds": 0.045,
    "status": "both-error"
   },
   {
@@ -2079,7 +1937,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupCF::SetDebug: Debug level out of range",
-   "seconds": 0.113,
+   "seconds": 0.051,
    "status": "both-error"
   },
   {
@@ -2089,7 +1947,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupCF::SetDebug: Debug level out of range",
-   "seconds": 0.105,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -2109,7 +1967,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.385,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -2119,7 +1977,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. Error occured while writing output from topup Exception thrown with message: Error: cant open file nodir/o_fieldcoef.nii.gz",
-   "seconds": 0.658,
+   "seconds": 0.145,
    "status": "both-error"
   },
   {
@@ -2130,13 +1988,13 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "topup exits 1; the same from the original. Error occured while writing output from topup Exception thrown with message: Error: cant open file nodir/c.nii.gz",
-   "seconds": 0.958,
+   "seconds": 0.169,
    "status": "both-error"
   },
   {
@@ -2147,16 +2005,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 0.84,
+   "seconds": 0.354,
    "status": "pass"
   },
   {
@@ -2167,16 +2025,16 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01053,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002817,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006578,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002138,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1521
    },
-   "seconds": 1.488,
+   "seconds": 0.363,
    "status": "pass"
   },
   {
@@ -2186,7 +2044,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. ",
-   "seconds": 0.195,
+   "seconds": 0.085,
    "status": "both-error"
   },
   {
@@ -2196,7 +2054,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
-   "seconds": 0.763,
+   "seconds": 0.165,
    "status": "both-error"
   },
   {
@@ -2206,7 +2064,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "topup exits 1; the same from the original. ERROR:: Environment variable FSLOUTPUTTYPE is not set! Please make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile). e.g. bash or sh users add the",
-   "seconds": 0.758,
+   "seconds": 0.15,
    "status": "both-error"
   },
   {
@@ -2217,23 +2075,23 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02091,
-    "--fout (Hz): |d| inside the brain, mean": 0.00607,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.02335,
+    "--fout (Hz): |d| inside the brain, mean": 0.006726,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02091,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00607,
-    "c: mean |d| / mean intensity inside the brain": 6.709e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.001247,
-    "c_mean: mean |d| / mean intensity inside the brain": 5.826e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0007632,
-    "o_movpar.txt: rotations": 8.429e-05,
-    "o_movpar.txt: translations": 0.0003057
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.02335,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.006726,
+    "c: mean |d| / mean intensity inside the brain": 8.498e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.00164,
+    "c_mean: mean |d| / mean intensity inside the brain": 7.489e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0009963,
+    "o_movpar.txt: rotations": 0.0001278,
+    "o_movpar.txt: translations": 0.0004862
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 80181
    },
-   "seconds": 0.949,
+   "seconds": 0.498,
    "status": "pass"
   },
   {
@@ -2244,23 +2102,23 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01065,
-    "--fout (Hz): |d| inside the brain, mean": 0.002898,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.006646,
+    "--fout (Hz): |d| inside the brain, mean": 0.002161,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01065,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002898,
-    "c: mean |d| / mean intensity inside the brain": 2.41e-05,
-    "c: relative difference inside the brain, 99th percentile": 0.000471,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.124e-05,
-    "c_mean: relative difference inside the brain, 99th percentile": 0.0002934,
-    "o_movpar.txt: rotations": 4.72e-05,
-    "o_movpar.txt: translations": 7.939e-05
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.006646,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002161,
+    "c: mean |d| / mean intensity inside the brain": 2.205e-05,
+    "c: relative difference inside the brain, 99th percentile": 0.0004399,
+    "c_mean: mean |d| / mean intensity inside the brain": 1.992e-05,
+    "c_mean: relative difference inside the brain, 99th percentile": 0.0002609,
+    "o_movpar.txt: rotations": 6.02e-05,
+    "o_movpar.txt: translations": 0.0003322
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 76905
    },
-   "seconds": 0.934,
+   "seconds": 0.48,
    "status": "pass"
   },
   {
@@ -2278,7 +2136,7 @@
     "_fieldcoef (its field, Hz): |d| inside the brain, mean": 3.641e-06,
     "c: mean |d| / mean intensity inside the brain": 2.531e-07,
     "c: relative difference inside the brain, 99th percentile": 3.644e-06,
-    "c_mean: mean |d| / mean intensity inside the brain": 2.237e-07,
+    "c_mean: mean |d| / mean intensity inside the brain": 2.236e-07,
     "c_mean: relative difference inside the brain, 99th percentile": 2.716e-06,
     "o_movpar.txt: rotations": 0.0,
     "o_movpar.txt: translations": 0.0
@@ -2287,7 +2145,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.518,
+   "seconds": 0.372,
    "status": "pass"
   },
   {
@@ -2304,7 +2162,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.342,
+   "seconds": 0.269,
    "status": "pass"
   },
   {
@@ -2321,7 +2179,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.358,
+   "seconds": 0.283,
    "status": "pass"
   },
   {
@@ -2338,7 +2196,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.242,
+   "seconds": 0.278,
    "status": "pass"
   },
   {
@@ -2351,7 +2209,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.425,
+   "seconds": 0.26,
    "status": "pass"
   },
   {
@@ -2368,7 +2226,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.227,
+   "seconds": 0.268,
    "status": "pass"
   },
   {
@@ -2385,7 +2243,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.249,
+   "seconds": 0.289,
    "status": "pass"
   },
   {
@@ -2395,14 +2253,14 @@
    "checks_total": 8,
    "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 2.013e-05,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.0002243
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 1.086e-06,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.827e-05
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 4942
    },
-   "seconds": 0.321,
+   "seconds": 0.166,
    "status": "pass"
   },
   {
@@ -2419,7 +2277,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.379,
+   "seconds": 0.157,
    "status": "pass"
   },
   {
@@ -2437,7 +2295,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.37,
+   "seconds": 0.527,
    "status": "pass"
   },
   {
@@ -2455,7 +2313,7 @@
    "reported": {
     "D13 fix pass": 18851
    },
-   "seconds": 2.007,
+   "seconds": 0.494,
    "status": "pass"
   },
   {
@@ -2473,139 +2331,79 @@
    "reported": {
     "D13 fix pass": 18851
    },
-   "seconds": 1.681,
+   "seconds": 0.646,
    "status": "pass"
   },
   {
    "case": "at/lsr-long",
    "category": "at",
-   "checks_passed": 7,
+   "checks_passed": 8,
    "checks_total": 8,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "hifi (applytopup's output): relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.01522
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 0.0004815,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.01522
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 2.085e-07,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.714e-06
    },
-   "reason": "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes (exact for lines of 32 voxels, where FSL's wrap is circular). Outside the thresholds: hifi (applytopup's output): relative difference inside the brain, 99th percentile 0.01522 (threshold 0.001)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 470
    },
-   "seconds": 0.17,
-   "status": "expected-divergence"
+   "seconds": 0.116,
+   "status": "pass"
   },
   {
    "case": "at/vb2d-long",
    "category": "at",
-   "checks_passed": 7,
+   "checks_passed": 9,
    "checks_total": 9,
-   "failed_checks": [
-    {
-     "detail": "value 329 of 918: FSL 7.32113e-08, the original 8.69432e-08",
-     "metric": "max relative difference",
-     "name": "vb: the printed phi, lambda and their ratio",
-     "passed": false,
-     "threshold": "4 significant digits",
-     "value": 0.158
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "hifi (applytopup's output): relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.01567
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 0.0008932,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.01567,
-    "vb: the printed phi, lambda and their ratio": 0.158
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 1.906e-07,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.489e-06,
+    "vb: the printed phi, lambda and their ratio": 9.57e-06
    },
-   "reason": "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes (exact for lines of 32 voxels, where FSL's wrap is circular). Outside the thresholds: vb: the printed phi, lambda and their ratio 0.158 (threshold 4 significant digits); hifi (applytopup's output): relative difference inside the brain, 99th percentile 0.01567 (threshold 0.001)",
+   "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 5277
    },
-   "seconds": 1.739,
-   "status": "expected-divergence"
+   "seconds": 0.961,
+   "status": "pass"
   },
   {
    "case": "at/vb3d-long",
    "category": "at",
-   "checks_passed": 7,
+   "checks_passed": 9,
    "checks_total": 9,
-   "failed_checks": [
-    {
-     "detail": "value 58 of 60: FSL -0.00393582, the original -0.00336824",
-     "metric": "max relative difference",
-     "name": "vb: the printed phi, lambda and their ratio",
-     "passed": false,
-     "threshold": "4 significant digits",
-     "value": 0.144
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "hifi (applytopup's output): relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.01444
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 0.0009753,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.01444,
-    "vb: the printed phi, lambda and their ratio": 0.144
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 2.074e-07,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.811e-06,
+    "vb: the printed phi, lambda and their ratio": 5.53e-06
    },
-   "reason": "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes (exact for lines of 32 voxels, where FSL's wrap is circular). Outside the thresholds: vb: the printed phi, lambda and their ratio 0.144 (threshold 4 significant digits); hifi (applytopup's output): relative difference inside the brain, 99th percentile 0.01444 (threshold 0.001)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 5277
    },
-   "seconds": 1.72,
-   "status": "expected-divergence"
+   "seconds": 0.562,
+   "status": "pass"
   },
   {
    "case": "at/vb4d-long",
    "category": "at",
-   "checks_passed": 7,
+   "checks_passed": 9,
    "checks_total": 9,
-   "failed_checks": [
-    {
-     "detail": "value 58 of 60: FSL -0.00393582, the original -0.00336824",
-     "metric": "max relative difference",
-     "name": "vb: the printed phi, lambda and their ratio",
-     "passed": false,
-     "threshold": "4 significant digits",
-     "value": 0.144
-    },
-    {
-     "detail": "",
-     "metric": "p99 relative |d|",
-     "name": "hifi (applytopup's output): relative difference inside the brain, 99th percentile",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.01444
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 0.0009753,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.01444,
-    "vb: the printed phi, lambda and their ratio": 0.144
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 2.074e-07,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.811e-06,
+    "vb: the printed phi, lambda and their ratio": 5.53e-06
    },
-   "reason": "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes (exact for lines of 32 voxels, where FSL's wrap is circular). Outside the thresholds: vb: the printed phi, lambda and their ratio 0.144 (threshold 4 significant digits); hifi (applytopup's output): relative difference inside the brain, 99th percentile 0.01444 (threshold 0.001)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 5277
    },
-   "seconds": 1.348,
-   "status": "expected-divergence"
+   "seconds": 0.565,
+   "status": "pass"
   },
   {
    "case": "at/vb3d-4d",
@@ -2622,7 +2420,7 @@
    "reported": {
     "D13 fix pass": 37702
    },
-   "seconds": 2.332,
+   "seconds": 0.79,
    "status": "pass"
   },
   {
@@ -2632,7 +2430,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 3.221e-05,
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 3.22e-05,
     "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 6.495e-05,
     "vb: the printed phi, lambda and their ratio": 0.000128
    },
@@ -2640,7 +2438,7 @@
    "reported": {
     "D13 fix pass": 37702
    },
-   "seconds": 2.274,
+   "seconds": 0.817,
    "status": "pass"
   },
   {
@@ -2658,7 +2456,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.408,
+   "seconds": 0.537,
    "status": "pass"
   },
   {
@@ -2668,15 +2466,15 @@
    "checks_total": 9,
    "failed_checks": [],
    "measured": {
-    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 5.188e-05,
-    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 9.698e-05,
-    "vb: the printed phi, lambda and their ratio": 0.000188
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 5.192e-05,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 9.704e-05,
+    "vb: the printed phi, lambda and their ratio": 0.000191
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 18851
    },
-   "seconds": 1.503,
+   "seconds": 0.638,
    "status": "pass"
   },
   {
@@ -2703,7 +2501,7 @@
    "reported": {
     "D13 fix pass": 18853
    },
-   "seconds": 1.411,
+   "seconds": 0.683,
    "status": "expected-divergence"
   },
   {
@@ -2730,7 +2528,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.272,
+   "seconds": 0.562,
    "status": "expected-divergence"
   },
   {
@@ -2740,7 +2538,7 @@
    "checks_total": 7,
    "failed_checks": [
     {
-     "detail": "value 72 of 120: FSL 8.59398e-206, the original 8.73706e-206",
+     "detail": "value 72 of 120: FSL 8.59398e-206, the original 8.73705e-206",
      "metric": "max relative difference",
      "name": "vb: the printed phi, lambda and their ratio",
      "passed": false,
@@ -2755,7 +2553,7 @@
    "reported": {
     "D13 fix pass": 17263
    },
-   "seconds": 3.275,
+   "seconds": 0.994,
    "status": "expected-divergence"
   },
   {
@@ -2782,7 +2580,7 @@
    "reported": {
     "D13 fix pass": 18851
    },
-   "seconds": 2.203,
+   "seconds": 0.563,
    "status": "expected-divergence"
   },
   {
@@ -2800,7 +2598,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.421,
+   "seconds": 0.535,
    "status": "pass"
   },
   {
@@ -2810,7 +2608,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
-   "seconds": 0.241,
+   "seconds": 0.128,
    "status": "both-error"
   },
   {
@@ -2820,7 +2618,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::MoveMatrix: Index i out of bound",
-   "seconds": 0.277,
+   "seconds": 0.188,
    "status": "both-error"
   },
   {
@@ -2830,7 +2628,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour)",
-   "seconds": 0.13,
+   "seconds": 0.079,
    "status": "expected-divergence"
   },
   {
@@ -2847,7 +2645,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.294,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -2862,9 +2660,9 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 18838
+    "D13 fix pass": 18851
    },
-   "seconds": 0.292,
+   "seconds": 0.191,
    "status": "pass"
   },
   {
@@ -2881,7 +2679,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.213,
+   "seconds": 0.206,
    "status": "pass"
   },
   {
@@ -2898,7 +2696,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.216,
+   "seconds": 0.177,
    "status": "pass"
   },
   {
@@ -2915,7 +2713,7 @@
    "reported": {
     "D13 fix pass": 18851
    },
-   "seconds": 0.22,
+   "seconds": 0.163,
    "status": "pass"
   },
   {
@@ -2932,7 +2730,7 @@
    "reported": {
     "D13 fix pass": 20478
    },
-   "seconds": 0.244,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -2949,7 +2747,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.213,
+   "seconds": 0.137,
    "status": "pass"
   },
   {
@@ -2966,7 +2764,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.195,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2983,7 +2781,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.189,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -3000,7 +2798,7 @@
    "reported": {
     "D13 fix pass": 19134
    },
-   "seconds": 0.254,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -3014,7 +2812,7 @@
     "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 0.0
    },
    "reason": "",
-   "seconds": 0.223,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -3031,7 +2829,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.302,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -3048,7 +2846,7 @@
    "reported": {
     "D13 fix pass": 18117
    },
-   "seconds": 0.315,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -3065,7 +2863,7 @@
    "reported": {
     "D13 fix pass": 18349
    },
-   "seconds": 0.235,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -3082,7 +2880,7 @@
    "reported": {
     "D13 fix pass": 18333
    },
-   "seconds": 0.35,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -3099,7 +2897,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.262,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -3116,7 +2914,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.232,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -3133,7 +2931,7 @@
    "reported": {
     "D13 fix pass": 16763
    },
-   "seconds": 0.241,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -3150,7 +2948,7 @@
    "reported": {
     "D13 fix pass": 12788
    },
-   "seconds": 0.222,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -3167,7 +2965,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.249,
+   "seconds": 0.127,
    "status": "pass"
   },
   {
@@ -3184,7 +2982,7 @@
    "reported": {
     "D13 fix pass": 20480
    },
-   "seconds": 0.173,
+   "seconds": 0.118,
    "status": "pass"
   },
   {
@@ -3194,7 +2992,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -i,--imain comma separated list of names of input image (to be corrected) -a,--datain name of te",
-   "seconds": 0.114,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -3204,7 +3002,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
-   "seconds": 0.068,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -3214,7 +3012,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
-   "seconds": 0.081,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -3224,7 +3022,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
-   "seconds": 0.099,
+   "seconds": 0.054,
    "status": "both-error"
   },
   {
@@ -3234,7 +3032,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -o,--out basename for output (warped) image *************************************************** ",
-   "seconds": 0.106,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -3244,7 +3042,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Unknown interpolation type cubic",
-   "seconds": 0.184,
+   "seconds": 0.07,
    "status": "both-error"
   },
   {
@@ -3254,7 +3052,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Mismatched --in and --inindex lists",
-   "seconds": 0.162,
+   "seconds": 0.092,
    "status": "both-error"
   },
   {
@@ -3264,7 +3062,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Unknown data type long",
-   "seconds": 0.141,
+   "seconds": 0.106,
    "status": "both-error"
   },
   {
@@ -3274,7 +3072,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. Image Exception : #63 :: No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): No image files match: nothere",
-   "seconds": 0.174,
+   "seconds": 0.111,
    "status": "both-error"
   },
   {
@@ -3284,7 +3082,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. Image Exception : #63 :: No image files match: nothere Image Exception : #22 :: Failed to read volume nothere.nii.gz Error : No image files match: nothere terminate called after throwing an instance o",
-   "seconds": 0.128,
+   "seconds": 0.119,
    "status": "both-error"
   },
   {
@@ -3294,7 +3092,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Mismatched input files crop_dn.nii.gz and half_up.nii.gz",
-   "seconds": 0.172,
+   "seconds": 0.205,
    "status": "both-error"
   },
   {
@@ -3304,7 +3102,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. Could not open matrix file nothere.txt terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupDatafileReader:: error reading file nothere.txt",
-   "seconds": 0.171,
+   "seconds": 0.141,
    "status": "both-error"
   },
   {
@@ -3314,7 +3112,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupDatafileReader:: phase-encode vectors must be unity length",
-   "seconds": 0.144,
+   "seconds": 0.187,
    "status": "both-error"
   },
   {
@@ -3324,7 +3122,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid entry in --inindex list",
-   "seconds": 0.104,
+   "seconds": 0.18,
    "status": "both-error"
   },
   {
@@ -3334,7 +3132,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid entry in --inindex list",
-   "seconds": 0.153,
+   "seconds": 0.179,
    "status": "both-error"
   },
   {
@@ -3344,7 +3142,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::TopupFileReader: Filename must be given without extension, fname=tu.nii.gz",
-   "seconds": 0.173,
+   "seconds": 0.182,
    "status": "both-error"
   },
   {
@@ -3354,7 +3152,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::TopupFileReader: Unable to read file nothere",
-   "seconds": 0.155,
+   "seconds": 0.174,
    "status": "both-error"
   },
   {
@@ -3364,7 +3162,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid phase-encode vector for least-squares restoration",
-   "seconds": 0.294,
+   "seconds": 0.184,
    "status": "both-error"
   },
   {
@@ -3374,7 +3172,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
-   "seconds": 0.279,
+   "seconds": 0.168,
    "status": "both-error"
   },
   {
@@ -3384,7 +3182,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
-   "seconds": 0.215,
+   "seconds": 0.154,
    "status": "both-error"
   },
   {
@@ -3394,7 +3192,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applytopup exits 1; the same from the original. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
-   "seconds": 0.148,
+   "seconds": 0.083,
    "status": "both-error"
   },
   {
@@ -3407,7 +3205,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.369,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
@@ -3417,7 +3215,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::MoveMatrix: Index i out of bound",
-   "seconds": 0.276,
+   "seconds": 0.134,
    "status": "both-error"
   },
   {
@@ -3427,18 +3225,25 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "applytopup exits -6; the same from the original. Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to copydata with non-matching sizes",
-   "seconds": 0.22,
+   "seconds": 0.121,
    "status": "both-error"
   },
   {
    "case": "at/jac-other-shape",
    "category": "at",
-   "checks_passed": 2,
-   "checks_total": 2,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
-   "reason": "FSL-134: refused by the original in both modes: FSL lays a field of as many voxels as the images in another shape on the images' grid; how it does is not known from the spec and the black-box runs (findings 22)",
-   "seconds": 0.131,
-   "status": "expected-divergence"
+   "measured": {
+    "hifi (applytopup's output): mean |d| / mean intensity inside the brain": 1.059e-07,
+    "hifi (applytopup's output): relative difference inside the brain, 99th percentile": 1.513e-06
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.139,
+   "status": "pass"
   },
   {
    "case": "at/lsr-other-grid",
@@ -3447,7 +3252,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour)",
-   "seconds": 0.116,
+   "seconds": 0.081,
    "status": "expected-divergence"
   },
   {
@@ -3458,20 +3263,20 @@
    "failed_checks": [],
    "measured": {
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.07761,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.01894,
-    "jac_01: |d| inside the brain, 99th percentile": 0.0002447,
-    "jac_01: |d| inside the brain, mean": 4.507e-05,
-    "jac_02: |d| inside the brain, 99th percentile": 0.0002448,
-    "jac_02: |d| inside the brain, mean": 4.507e-05,
-    "o_movpar.txt: rotations": 0.0001979,
-    "o_movpar.txt: translations": 0.002496
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01767,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.005737,
+    "jac_01: |d| inside the brain, 99th percentile": 5.543e-05,
+    "jac_01: |d| inside the brain, mean": 2.04e-05,
+    "jac_02: |d| inside the brain, 99th percentile": 5.543e-05,
+    "jac_02: |d| inside the brain, mean": 2.04e-05,
+    "o_movpar.txt: rotations": 2.303e-05,
+    "o_movpar.txt: translations": 8.09e-05
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 13042
    },
-   "seconds": 0.386,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
@@ -3482,56 +3287,47 @@
    "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.01384,
-    "--fout (Hz): |d| inside the brain, mean": 0.005361,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 6.255e-05,
+    "--fout (Hz): |d| inside the brain, mean": 4.971e-05,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01384,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.005361,
-    "iout_test: mean |d| / mean intensity inside the brain": 2.612e-05,
-    "iout_test: relative difference inside the brain, 99th percentile": 0.0001619,
-    "iout_test_mean: mean |d| / mean intensity inside the brain": 0.0001378,
-    "iout_test_mean: relative difference inside the brain, 99th percentile": 0.0004399,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 6.238e-05,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 4.954e-05,
+    "iout_test: mean |d| / mean intensity inside the brain": 1.393e-07,
+    "iout_test: relative difference inside the brain, 99th percentile": 1.111e-06,
+    "iout_test_mean: mean |d| / mean intensity inside the brain": 8.574e-08,
+    "iout_test_mean: relative difference inside the brain, 99th percentile": 2.977e-07,
     "my_topup_movpar.txt: rotations": 0.0,
     "my_topup_movpar.txt: translations": 0.0
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 1291
+    "D13 fix pass": 1286
    },
-   "seconds": 0.25,
+   "seconds": 0.153,
    "status": "pass"
   },
   {
    "case": "difftest/fsl145-short-axis",
    "category": "difftest",
-   "checks_passed": 15,
+   "checks_passed": 16,
    "checks_total": 16,
-   "failed_checks": [
-    {
-     "detail": "FSL's own band (its read-out times changed in their last float bit): 6.4e-10",
-     "metric": "max |d|",
-     "name": "o_movpar.txt: rotations",
-     "passed": false,
-     "threshold": 0.001,
-     "value": 0.002174
-    }
-   ],
+   "failed_checks": [],
    "measured": {
     "--fout (Hz): correlation inside the brain": 1.0,
-    "--fout (Hz): |d| inside the brain, 99th percentile": 0.008782,
-    "--fout (Hz): |d| inside the brain, mean": 0.002073,
+    "--fout (Hz): |d| inside the brain, 99th percentile": 0.00942,
+    "--fout (Hz): |d| inside the brain, mean": 0.00224,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.009267,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.002252,
-    "o_movpar.txt: rotations": 0.002174,
-    "o_movpar.txt: translations": 0.004168
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01004,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.00244,
+    "o_movpar.txt: rotations": 5.947e-08,
+    "o_movpar.txt: translations": 3.568e-07
    },
-   "reason": "the movements' rotations differ (finding 14: FSL's movement derivatives); the coefficients' layout and every exact check agree. Outside the thresholds: o_movpar.txt: rotations 0.002174 (threshold 0.001)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 3152
    },
-   "seconds": 0.271,
-   "status": "expected-divergence"
+   "seconds": 0.137,
+   "status": "pass"
   },
   {
    "case": "difftest/fsl146-mixed-axes",
@@ -3553,7 +3349,7 @@
    "reported": {
     "D13 fix pass": 19020
    },
-   "seconds": 0.963,
+   "seconds": 0.163,
    "status": "pass"
   },
   {
@@ -3563,15 +3359,15 @@
    "checks_total": 21,
    "failed_checks": [],
    "measured": {
-    "-v: the final cost": 0.000184,
+    "-v: the final cost": 0.0,
     "-v: the first cost (the prepared images)": 0.0,
     "_fieldcoef (its field, Hz): correlation inside the brain": 1.0,
-    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.01607,
-    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 0.003312,
-    "corrected: mean |d| / mean intensity inside the brain": 2.067e-05,
-    "corrected: relative difference inside the brain, 99th percentile": 0.0003124,
-    "corrected_mean: mean |d| / mean intensity inside the brain": 3.642e-06,
-    "corrected_mean: relative difference inside the brain, 99th percentile": 4.948e-05,
+    "_fieldcoef (its field, Hz): |d| inside the brain, 99th percentile": 0.000148,
+    "_fieldcoef (its field, Hz): |d| inside the brain, mean": 2.214e-05,
+    "corrected: mean |d| / mean intensity inside the brain": 2.89e-07,
+    "corrected: relative difference inside the brain, 99th percentile": 3.56e-06,
+    "corrected_mean: mean |d| / mean intensity inside the brain": 1.485e-07,
+    "corrected_mean: relative difference inside the brain, 99th percentile": 1.548e-06,
     "o_movpar.txt: rotations": 0.0,
     "o_movpar.txt: translations": 0.0
    },
@@ -3579,7 +3375,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.568,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -3610,7 +3406,7 @@
    "reported": {
     "D13 fix pass": 43175
    },
-   "seconds": 0.813,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -3636,16 +3432,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.347,
+   "seconds": 0.139,
    "status": "pass"
   }
  ],
  "suite": "fsl-topup",
  "summary": {
-  "both-error": 66,
-  "expected-divergence": 22,
-  "fail": 1,
-  "pass": 94,
+  "both-error": 67,
+  "expected-divergence": 14,
+  "fail": 0,
+  "pass": 102,
   "skipped": 0
  },
  "tier": "standard"

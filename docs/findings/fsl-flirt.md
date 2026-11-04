@@ -757,6 +757,19 @@ fslroi program applies FSL-215.
 | FSL-214 | no step's status is checked: after a failure (FLIRT refusing an option, an image that cannot be written) the script runs the rest on missing files and exits with the cleanup's status, 0 when its temporary files exist, mostly without an output | B | stops at the first failed program, exit 1, temporary files removed unless `-d` / goes on |
 | FSL-215 | fslroi exits 0 after the errors it reports | A | exit 1 / exit 0 |
 
+**FSL-217 (found 2026-11-04, sub-task 5, rule A; the replica's correction pending):** fslroi
+reads an image in newimage's closest templated type, which for int8 (`DT_INT8`) is
+`DT_UNSIGNED_CHAR` (`closestTemplatedType`), and saves it so: the bytes are kept and the type
+becomes uint8, so every negative value becomes 128 to 255 (the replica, a translation, gives
+−64 → 192 in both modes today; FSL's own output to be confirmed by a parity case). The same
+mapping is in `fslmerge` (the first input's type), which `bet -Z` runs on the slices fslroi cut,
+and in `bet -F`'s first-volume fslroi: bet2 then runs on the wrapped values. fslmaths has the
+same mapping for `-odt input` (FSL-157, corrected there). The default should keep int8 and its
+values (named when a value is negative), as FSL-157's correction does; `reproduce` FSL's uint8.
+uint16 → int32 keeps every value (rule C, FSL's design, as for fslmaths); uint32, int64 and uint64
+→ float32 round integers beyond 2^24 (rule C, the type's design; documented in
+`specs/standard_space_roi.md` §3.2).
+
 **Not replicated yet:** fslpy's `imcp` of a source whose file type (nibabel's class and the
 extension: NIfTI-1, NIfTI-2 or ANALYZE, single or pair, compressed or not) is not
 `$FSLOUTPUTTYPE`'s: fslpy loads it with nibabel 5.4.2 and saves it in the output type (the header

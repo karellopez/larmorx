@@ -35,7 +35,7 @@ the bits", following it keeps the original closest to FSL.
 
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-40,
--42 to -48, -50, -51, -53 to -56, -63, -216 (spec writer, 2026-11-04; and the defects of the
+-42 to -48, -50, -51, -53 to -56, -63, -216, -217 (spec writer, 2026-11-04; and the defects of the
 programs `-S`, `-B`, `-A`, `-A2` run, in their own specs). §9 lists what the default does for each. Where FSL crashes
 on what it leaves undefined (FSL-41, -52, and FSL-43's fill far outside the image), the default
 refuses with a clear message, and `reproduce` keeps everything FSL defines and fills the rest
@@ -1305,6 +1305,7 @@ on nine real T1w images, NIfTI-1 and NIfTI-2 outputs alike (18 of 18).
 | FSL-63 | `bet -R` passes bet2's options through bash's `echo`, which takes leading `-n`, `-e`, `-E` words as its own: a leading `-e` (the mesh) is dropped, escapes read after it; (spec writer, 2026-11-04) `-B -s` too, whose removal of `-s` also removes `-s` inside other words | the options as given (with `-B -s`, the word `-s` removed) | FSL's `echo` and removal |
 | FSL-45 | `-Z` crops with `imglob`, called without `${FSLDIR}/bin`: off the PATH the outputs stay padded; on it, other images named like the output are cropped too | crops exactly its outputs | FSL's behaviour for the PATH given |
 | FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own (spec writer, 2026-11-04: with §5.3, every `<out>_tmp...` file the run's programs wrote, FAST's and standard_space_roi's included: the files that did not exist before the run or changed during it) | removes all |
+| FSL-217 | (spec writer, 2026-11-04) `-F`'s and `-Z`'s fslroi and `-Z`'s fslmerge write an int8 input as uint8 with the same bytes (negative values become 128 to 255), so bet2 runs on other values (`specs/standard_space_roi.md` §3.2; from the source, parity cases to add) | int8 kept, its values unchanged; named | FSL's uint8 |
 | FSL-216 | (spec writer, 2026-11-04) `-S`'s eye threshold is computed by dc from the printed mean and deviation (§5.3 step 9): a number with an exponent has its `e` and sign read as dc's commands (dc's message lands in the threshold and fslmaths fails), a negative mean is read as a subtraction, `nan` and `inf` are commands (the threshold is garbage) | rule A: the numbers read as numbers (§5.3 step 9; named when the result differs from FSL's); rule B: a mean or deviation that is not a number refused (exit 1) | what GNU dc 1.4.1 prints for FSL's text, its messages too (`dc: ` on standard error, the rest on standard output, so in the threshold); named |
 | FSL-47 | `--t1only`'s scalp mask is filled from the outer skull surface's centre in the working grid | fills from the scalp surface's | FSL's |
 | FSL-48 | a T2 on another grid is sampled at the T1's voxel coordinates | refuses | samples it so |

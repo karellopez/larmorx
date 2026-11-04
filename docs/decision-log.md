@@ -1939,3 +1939,7 @@ together at the end.
   fMRIPrep's templates through TemplateFlow, pretrained weights) is fetched on first use from its official source,
   checksum-verified and cached, with a command to fetch ahead for offline machines; bundling them is to be
   discussed later.
+- **Follow-up asked the same day:** the repository's rule is no image data in git, and the package build would
+  otherwise download FSL's whole data package (about 196 MB) for 1.5 MB of it. **User decision:** "yes": the small
+  FSL standard files `larmorx-nc` ships are committed under `crates-nc/` (with FSL's Licence, MNI's notice and a
+  manifest of origin and SHA-256), the one exception to the rule (CLAUDE.md, "Working on this machine").

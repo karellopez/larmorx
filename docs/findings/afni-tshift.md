@@ -259,7 +259,9 @@ the output if it is done any other way; the replica does each as AFNI does.
   functions, so the weighted-sinc output is AFNI's on every platform larmorx supports.
   (AFNI itself, run on an x86-64 CPU without FMA, would use the SSE2 build and could differ
   from this in the last bit of a weight, for 34 inputs in all.) **Since 2026-10-29** (the move
-  into the main package) the replica's `sinf`/`cosf` are `sincosf.rs`, translated afresh from
+  into the main package) the replica's `sinf`/`cosf` are `sincosf.rs` (since 2026-11-04 a re-export of the same
+  translation in `larmorx_core::math`, `sinf_glibc`/`cosf_glibc`, proved equal on all inputs:
+  `validation/investigations/glibc-maths/`), translated afresh from
   Arm's Optimized Routines v19.11 (MIT), the code glibc 2.35 ships (`s_sinf.c`, `s_cosf.c`,
   `s_sincosf.h` and `sysdeps/x86/fpu/sincosf_poly.h` are Arm's `sinf.c`, `cosf.c`, `sincosf.h`
   with glibc's x86 table pairing its constants for the vector form, the same eleven numbers): the

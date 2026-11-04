@@ -300,7 +300,9 @@ preload (`oracles/core-math-preload`; the probe is
 `validation/investigations/fsl-mcflirt-replica/crm_compare.py`). The replica therefore
 carries glibc 2.35's float functions as the FMA build computes them, translated from Arm's
 Optimized Routines v19.11 (MIT; glibc's are the same code: identical expressions and
-constants) with every `a + b*c` a fused multiply-add (`larmorx-nc-core/src/glibc_float.rs`):
+constants) with every `a + b*c` a fused multiply-add (`larmorx-nc-core/src/glibc_float.rs`; since
+2026-11-04 the same translation lives in `larmorx_core::math`'s `*_glibc`, which `glibc_float`
+re-exports, proved equal on all inputs: `validation/investigations/glibc-maths/`):
 bit-identical to the C library on all 2^32 inputs of `sinf`, `cosf`, both outputs of
 `sincosf`, and `logf`. *Verified* (2026-10-24). On a CPU without FMA glibc selects its SSE2
 build, which differs on 12 `sinf` and 22 `cosf` inputs (GLIBC-03): there mcflirt's own results

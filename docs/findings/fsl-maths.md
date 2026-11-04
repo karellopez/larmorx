@@ -746,7 +746,8 @@ How `fslstats.cc` computes, and what decides the bits:
   arguments of any function: a float image's result is FSL's. The replica computes every one
   correctly rounded by default (`larmorx_core::math`; CORE-MATH's `tan` was ported for it,
   2026-11-03). With `reproduce` it gives glibc's bits for `exp`, `log` and `pow` (Arm's
-  Optimized Routines, the code glibc 2.35 ships, in `larmorx_nc_core::glibc_double`), and names
+  Optimized Routines, the code glibc 2.35 ships, in `larmorx_nc_core::glibc_double`; since
+  2026-11-04 a re-export of `larmorx_core::math`'s `exp_glibc`, `log_glibc`, `pow_glibc`), and names
   GLIBC-07 where they change a voxel; `sin`, `cos`, `tan`, `asin`, `acos` and `atan` are IBM's
   Accurate Mathematical Library in glibc (LGPL): their code is never read or translated, so
   they are correctly rounded in both modes and a double image differs from FSL's in the last

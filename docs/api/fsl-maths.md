@@ -52,11 +52,12 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-maths-replica`, record [fsl-maths-replica](../validation/fsl-maths-replica.md), standard
-tier, 2026-11-03: 358 of 360 compared cases bit-identical, the other two differing in the last
-place as glibc does (GLIBC-07, below): `fn/double-tan` in 3 of its 210 double-precision values
-(glibc's `tan`) and random testing's `fft-twiddles-glibc-sincos` in 1 of its 90 float voxels
-(glibc's `sincos` in the FFT's twiddle factors); 61 more rejected by both alike; random
-testing's permanent cases among them): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
+tier, 2026-11-04: 359 of 360 compared cases bit-identical, the other one, `fn/double-tan`,
+differing in the last place in 3 of its 210 double-precision values as glibc's `tan` does
+(GLIBC-07, below; random testing's `fft-twiddles-glibc-sincos`, an expected divergence on
+2026-11-03, is FSL's bit for bit since the replica's `reproduce` takes glibc's `sincos` for the
+FFT's twiddle factors); 61 more rejected by both alike; random testing's permanent cases among
+them): fMRIPrep's mask combination (`fslmaths <a> -mul <b>`)
 bit-identical on three oracle runs (ds000005, ds005040 in two kinds, ds003592), fMRIPrep's 14
 goodvoxels calls bit-identical in their workflow's order on ds005040's BOLD series (the ribbon a
 stand-in: the segmentation's grey matter, as the no-reconall oracle runs have no FreeSurfer
@@ -67,8 +68,9 @@ by file (data and header). Random testing (2026-11-03, 24 minutes: 114,906 reali
 one to four operations on drawn images of every stored type): every one identical after three
 fixes, but one, an FFT convolution of a 30 x 1 x 3 image one unit in the last place in 1 of 90
 voxels (the FFT's twiddle factors, which FSL takes from glibc's `sincos`: GLIBC-07, below; with
-FSL's own factors the replica's output is FSL's bit for bit), and 595 notices of a correction
-whose effect a later operation of the chain removed.
+FSL's own factors the replica's output is FSL's bit for bit, and so it is with `reproduce` since
+2026-11-04), and 595 notices of a correction whose effect a later operation of the chain
+removed.
 
 The original against FSL 6.0.7.23 (the parity suite `fsl-maths`, record
 [fsl-maths](../validation/fsl-maths.md), standard tier, 2026-11-04, §21's thresholds): 442 cases

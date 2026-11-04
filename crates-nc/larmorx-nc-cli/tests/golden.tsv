@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from c7ac8936aec5293ba6801357db8a8bd2f68440c9 on 2026-11-03 (Linux x86_64)
+# Recorded from 9a6a77a08d243c406137d110e93baec1a546b33a on 2026-11-04 (Linux x86_64)
 # case	output	sha256	type	sample
 aff2rigid.default	rigid.mat	7d8900a15c14c36e92cc26c3a1ebe371d32655cb54b9b5dd2d365f00d50ecb20	-	-
 applytopup.jac-quadratic	hifi.nii.data	e42647c0bdd27aac09d5fd2e8dec3666b7f84b913253ba98bdee55e742bd5bda	float32	ef0260413aa56f41426ec041c11be4c005e6cd4475c3bec06075a0410df08f41
@@ -34,6 +34,7 @@ applyxfm4D.series	out.nii.header	086bf860d5dd01c7c68a3072610e80a2947b3c68821dff1
 applyxfm4D.uint8	out.nii.data	06e7ecdae62289afd6ee8e1f56b2327a095decca76802fad7ed5d474782228d3	uint8	0000000000000000
 applyxfm4D.uint8	out.nii.header	e300728d87627dc1580aba20d80e0384ed985768f14b5d310c817555287174f2	-	-
 avscale.allparams	stdout.txt	2268384b9c7b54fe5a9ce2c1db4dbb2edc22278f7f093eaf5ca15599e9f0a47b	-	-
+avscale.allparams.reproduce	stdout.txt	2268384b9c7b54fe5a9ce2c1db4dbb2edc22278f7f093eaf5ca15599e9f0a47b	-	-
 bet.fmri	out.nii.data	fdb80b59230e2a6935591185abccce90349f1b3f64fa343f210c8a99bfa7abf4	float32	0000008000000000000000000000000000000000000000000000008000000000
 bet.fmri	out.nii.header	b219a1a8be7ebc37ac08f7769e7cb523d4693ce806053da5ddb326e38e78c057	-	-
 bet.fmri	out_mask.nii.data	6c25fe88cd518a48b9ea50bce466232fd9977a2e799472ea7758b9ba323ae661	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -243,6 +244,8 @@ flirt.applyisoxfm-4d-spline	out.nii.data	05326648c5feca84007d5754dfb3334043e0ff9
 flirt.applyisoxfm-4d-spline	out.nii.header	d3a6eacfcae1fb9312ead6f1faa61c84230a320497a92f20e0be6b570f7648d5	-	-
 flirt.applyxfm-sinc	out.nii.data	1d86df8994933a3a2e00456af0be2ab855ce781b6dcf4ce9fb5d81b821395807	float32	0000c0c0c82b533f017438c285e09242bd806043196ca641b0a29a420000c0c0
 flirt.applyxfm-sinc	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
+flirt.applyxfm-sinc.reproduce	out.nii.data	1d86df8994933a3a2e00456af0be2ab855ce781b6dcf4ce9fb5d81b821395807	float32	0000c0c0c82b533f017438c285e09242bd806043196ca641b0a29a420000c0c0
+flirt.applyxfm-sinc.reproduce	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
 flirt.bbr	out.mat	2b26e756dbada28c69df44b40eab73f6f36a3870406c1315fc617b41ec7247db	-	-
 flirt.bbr	out.nii.gz.data	42696acdfcfea0d4fa6398a3fc0b1b8c5e462cce44b65a4f7ecacf94342a09c8	float32	0000c0c077b299418aafef4068137040f08766447e139941b37892430000c0c0
 flirt.bbr	out.nii.gz.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
@@ -311,6 +314,12 @@ fslmaths.filters	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495
 fslmaths.filters-fft	out.nii.data	f27afb829027c65ac07500bcf6f8bf9b74820f45a2ced95621ee23cf3838f424	float32	5936b93fd5af394354700c435d1d0b435d2941434ed417434fec144344a7d43f
 fslmaths.filters-fft	out.nii.header	b8badadec1fbffb162fe32422fc63174764b825f3db26977ca5f80775b4edc13	-	-
 fslmaths.filters-fft	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+fslmaths.filters-fft-twiddles	out.nii.data	a9e5b1a4138217728d8623a6d93f6c3f05e4cda007ec1de1ff1d1246d3cd15d0	float32	d9a1163bf2ca953b858c953bf002b23bf002b23b5ffe983bb831993b28fe3b3b
+fslmaths.filters-fft-twiddles	out.nii.header	264de2c66326281f60ddbb16242eb0ab6a2907f18eede212e1764ee5ab90d72c	-	-
+fslmaths.filters-fft-twiddles	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+fslmaths.filters-fft-twiddles.reproduce	out.nii.data	05a64a7208af1015838bec25e566929b78a5b6556674bb1f17c138ab5b337e72	float32	d9a1163bf2ca953b858c953bf002b23bf002b23b5ffe983bb831993b28fe3b3b
+fslmaths.filters-fft-twiddles.reproduce	out.nii.header	264de2c66326281f60ddbb16242eb0ab6a2907f18eede212e1764ee5ab90d72c	-	-
+fslmaths.filters-fft-twiddles.reproduce	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
 fslmaths.fsl160	out.nii.data	e68c0896ccc80495543ebc5d72ee1b776927534dcb3d7516b39310d81c4b1b80	float32	0000604100009041000000c1000040400000b24300009841000000c10000a841
 fslmaths.fsl160	out.nii.header	b8badadec1fbffb162fe32422fc63174764b825f3db26977ca5f80775b4edc13	-	-
 fslmaths.fsl160	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
@@ -417,7 +426,7 @@ fslmaths.unary	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599
 fslmaths.unary-double	out.nii.data	12001dab3f3d0d2de1d36cb59a4f077f1816db01c17b0770d7a62b9fa35d64ee	float64	c34cf75ace3fe13fad6b552f8744e13f1c3f8d1afb25e13f118081f2dc32e13f063a110faafce23ff7c308bab545e13f1c3f8d1afb25e13f7ab4d4361348e13f
 fslmaths.unary-double	out.nii.header	4fac651b5b6292180d492bc8a54295ea0866049247f3133999e35fa2270db70b	-	-
 fslmaths.unary-double	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
-fslmaths.unary-double.reproduce	out.nii.data	12001dab3f3d0d2de1d36cb59a4f077f1816db01c17b0770d7a62b9fa35d64ee	float64	c34cf75ace3fe13fad6b552f8744e13f1c3f8d1afb25e13f118081f2dc32e13f063a110faafce23ff7c308bab545e13f1c3f8d1afb25e13f7ab4d4361348e13f
+fslmaths.unary-double.reproduce	out.nii.data	b72ce775f03fa3cedf7aefbab82416030763461d1b9e38ca65203b51400dfec7	float64	c34cf75ace3fe13fad6b552f8744e13f1c3f8d1afb25e13f118081f2dc32e13f063a110faafce23ff7c308bab545e13f1c3f8d1afb25e13f7ab4d4361348e13f
 fslmaths.unary-double.reproduce	out.nii.header	4fac651b5b6292180d492bc8a54295ea0866049247f3133999e35fa2270db70b	-	-
 fslmaths.unary-double.reproduce	stdout.txt	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
 fslstats.fsl182	stdout.txt	3cf576b964233309b063babba59176db1b34c5bb839d6047a417285198d1b429	-	-

@@ -107,8 +107,11 @@ fn ssroi(
     larmorx_nc_flirt::standard_space_roi(a, s, m, t, o, e)
 }
 
-/// Runs `f` in this process: its exit status, or, where an exception nothing in it catches ends
-/// it (FSL's process aborts), what it wrote on standard error from the throw on.
+/// Runs `f` in this process: its exit status, or, where FSL's process aborts, what remains to
+/// print on standard error before bash's report (an exception nothing in the program catches:
+/// what FSL printed from the throw on; a program that printed FSL's text and its own abort
+/// line, as FLIRT's do: nothing more). A script (`standard_space_roi`) reports its own
+/// programs' aborts and goes on: its lines are not watched.
 fn call(
     run: &Run,
     f: Program,
@@ -117,9 +120,16 @@ fn call(
     err: &mut dyn Write,
 ) -> Result<u8, String> {
     let (fsl, mode, threads) = (run.fsl, run.mode, run.threads);
-    let r = exception::catch(|| f(args, fsl, mode, threads, out, err));
+    let script = std::ptr::fn_addr_eq(f, ssroi as Program);
+    let mut watch = exception::AbortWatch::new(err);
+    let r = exception::catch(|| f(args, fsl, mode, threads, out, &mut watch));
+    let aborted = watch.aborted() && !script;
     let _ = out.flush();
-    r.map_err(|e| e.stderr_text())
+    match r {
+        Ok(_) if aborted => Err(String::new()),
+        Ok(c) => Ok(c),
+        Err(e) => Err(e.stderr_text()),
+    }
 }
 
 /// How the script stops.

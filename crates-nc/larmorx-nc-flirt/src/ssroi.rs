@@ -264,20 +264,32 @@ impl Script<'_, '_> {
         args: Vec<String>,
     ) -> Result<u8, Stop> {
         let (fsl, mode, threads) = (self.fsl, self.mode, self.threads);
-        let r = {
+        let (r, aborted) = {
             let (out, err) = (&mut *self.out, &mut *self.err);
-            exception::catch(|| f(&args, fsl, mode, threads, out, err))
+            // a program of FLIRT's that ends where FSL's process aborts says so on its own line
+            let mut watch = exception::AbortWatch::new(err);
+            let r = exception::catch(|| f(&args, fsl, mode, threads, out, &mut watch));
+            let aborted = watch.aborted();
+            (r, aborted)
+        };
+        let report = |s: &mut Self| {
+            let _ = writeln!(
+                s.err,
+                "{NAME}: line {}: {:>5} Aborted                 {source}",
+                reported_line(line),
+                std::process::id()
+            );
         };
         let code = match r {
+            Ok(_) if aborted => {
+                // its text is printed; bash's report of the aborted command follows
+                report(self);
+                134
+            }
             Ok(code) => code,
             Err(e) => {
                 let _ = write!(self.err, "{}", e.stderr_text());
-                let _ = writeln!(
-                    self.err,
-                    "{NAME}: line {}: {:>5} Aborted                 {source}",
-                    reported_line(line),
-                    std::process::id()
-                );
+                report(self);
                 134
             }
         };

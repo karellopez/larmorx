@@ -1,0 +1,18 @@
+[package]
+name = "glibc-maths-verify"
+description = "larmorx_core::math's functions with glibc's bits against the system's (a black box) and the AFNI replicas' earlier translation"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a verification tool, never part of larmorx's build (it calls the C
+# library's functions through dlopen, as a black box).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+larmorx-afni-replica = { path = "../../../../crates/larmorx-afni-replica", features = ["verification"] }
+
+[profile.release]
+debug = false

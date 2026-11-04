@@ -12,24 +12,33 @@
 mod acos;
 mod asin;
 mod atan2;
+mod atanf_glibc;
 mod cbrt;
 mod cbrtf;
 mod cbrtf_glibc;
 mod cos;
 pub(crate) mod dint;
 mod exp;
+mod exp_glibc;
 mod expf;
+mod expf_glibc;
 mod log;
+mod log_glibc;
 mod logf;
+mod logf_glibc;
 mod pow;
+mod pow_glibc;
 mod powf;
+mod powf_glibc;
 mod powi;
 mod sin;
+mod sincosf_glibc;
 mod sinf;
 mod tan;
 mod tanh;
 mod tanh_glibc;
 mod tanhf;
+mod x86_nan;
 
 pub use powi::powi;
 
@@ -53,6 +62,92 @@ pub use cbrtf_glibc::cbrtf_glibc;
 /// depends on glibc's last bit (`bet2`'s smoothness weight, `specs/bet.md` §8.1). No fused
 /// multiply-adds: the same bits on every platform.
 pub use tanh_glibc::tanh_glibc;
+
+// glibc 2.35's own functions from permissive code (Arm's Optimized Routines, MIT; fdlibm, Sun's
+// notice), translated from those originals: the bits of glibc's x86-64 build (on a CPU with FMA,
+// the build the oracles run) on every platform, NaN results included (SSE's, `x86_nan`). They are
+// not correctly rounded, so larmorx's default is the correctly rounded functions above; these
+// serve `reproduce`, where an original program's result depends on glibc's last bit, and the FSL
+// and AFNI replicas (`larmorx-nc-core`, `larmorx-afni-replica`), which call them. Proved equal to
+// glibc 2.35 itself (exhaustively for the one-argument float functions, on more than 10^9
+// arguments for the others): `validation/investigations/glibc-maths/`. glibc's double `sin`,
+// `cos`, `tan`, `asin`, `acos`, `atan` (IBM's LGPL code) are not here (GLIBC-07).
+
+/// The arctangent for `f32` with glibc 2.35's bits (fdlibm's `atanf`, Sun's notice; no fused
+/// multiply-adds, one build on x86-64). FSL's `fslmaths -atan` on float images.
+pub use atanf_glibc::atanf_glibc;
+
+/// `atan2(y, x)` for `f32` with glibc 2.35's bits (fdlibm's `atan2f`). FSL's `rotmat2euler`
+/// (mcflirt's and FLIRT's Euler angles) calls `atan2` with `float` arguments.
+pub use atanf_glibc::atan2f_glibc;
+
+#[doc(hidden)]
+pub use atanf_glibc::atanf_glibc_with_at0;
+
+/// The sine and cosine for `f32` as glibc 2.35's x86-64 build without FMA computes them
+/// (`__sinf_sse2`, `__cosf_sse2`, `__sincosf_sse2`: glibc's choice on x86-64 CPUs without FMA):
+/// each product and sum rounded, no fused multiply-adds. [`sinf_glibc`], [`cosf_glibc`] and
+/// [`sincosf_glibc`] are the FMA build, the oracles'.
+pub use sincosf_glibc::{cosf_glibc_sse2, sincosf_glibc_sse2, sinf_glibc_sse2};
+
+/// The same function with its kernel compiled with FMA on x86-64 CPUs that have it (the results
+/// are identical: `mul_add` is correctly rounded on both paths; only speed differs).
+macro_rules! glibc_dispatch {
+    ($(#[$doc:meta])* $module:ident :: $name:ident ($($arg:ident : $t:ty),*) -> $ret:ty) => {
+        $(#[$doc])*
+        #[inline]
+        #[must_use]
+        pub fn $name($($arg: $t),*) -> $ret {
+            #[cfg(target_arch = "x86_64")]
+            if std::arch::is_x86_feature_detected!("fma") {
+                return fma::$name($($arg),*);
+            }
+            $module::$name($($arg),*)
+        }
+    };
+}
+
+glibc_dispatch!(
+    /// The sine for `f32` with glibc 2.35's bits (x86-64, FMA build: `__sinf_fma`, Arm's
+    /// `sinf.c`; at most 0.56 ulp). AFNI's weighted sinc (3dTshift), mcflirt's sinc kernels.
+    sincosf_glibc::sinf_glibc(y: f32) -> f32
+);
+glibc_dispatch!(
+    /// The cosine for `f32` with glibc 2.35's bits (x86-64, FMA build: `__cosf_fma`).
+    sincosf_glibc::cosf_glibc(y: f32) -> f32
+);
+glibc_dispatch!(
+    /// `(sin y, cos y)` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__sincosf_fma`),
+    /// the same bits as [`sinf_glibc`] and [`cosf_glibc`]. mcflirt's and FLIRT's rotation
+    /// matrices.
+    sincosf_glibc::sincosf_glibc(y: f32) -> (f32, f32)
+);
+glibc_dispatch!(
+    /// The natural logarithm for `f32` with glibc 2.35's bits (x86-64, FMA build: `__logf_fma`,
+    /// the current symbol `logf@@GLIBC_2.27`; 0.82 ulp).
+    logf_glibc::logf_glibc(x: f32) -> f32
+);
+glibc_dispatch!(
+    /// `e^x` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__expf_fma`; 0.502 ulp).
+    expf_glibc::expf_glibc(x: f32) -> f32
+);
+glibc_dispatch!(
+    /// `x^y` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__powf_fma`; 0.82 ulp).
+    powf_glibc::powf_glibc(x: f32, y: f32) -> f32
+);
+glibc_dispatch!(
+    /// `e^x` with glibc 2.35's bits (x86-64, FMA build: `__exp_fma`, Arm's `exp.c`; 0.511 ulp).
+    exp_glibc::exp_glibc(x: f64) -> f64
+);
+glibc_dispatch!(
+    /// The natural logarithm with glibc 2.35's bits (x86-64, FMA build: `__log_fma`, Arm's
+    /// `log.c`, the current symbol `log@@GLIBC_2.29`; 0.519 ulp).
+    log_glibc::log_glibc(x: f64) -> f64
+);
+glibc_dispatch!(
+    /// `x^y` with glibc 2.35's bits (x86-64, FMA build: `__pow_fma`, Arm's `pow.c`; 0.52 ulp).
+    pow_glibc::pow_glibc(x: f64, y: f64) -> f64
+);
 
 // Speed: without hardware FMA in the generated code (baseline x86-64), every `mul_add` in the
 // kernels is a call into the platform's `fma`. On x86-64 CPUs with FMA, a copy of each kernel
@@ -231,6 +326,30 @@ mod fma {
         // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
         unsafe { kernel(x, y) }
     }
+
+    /// The FMA copy of a glibc function of `super::$module` (`glibc_dispatch!`).
+    macro_rules! fma_glibc {
+        ($module:ident :: $name:ident ($($arg:ident : $t:ty),*) -> $ret:ty) => {
+            #[inline]
+            pub(super) fn $name($($arg: $t),*) -> $ret {
+                #[target_feature(enable = "fma")]
+                fn kernel($($arg: $t),*) -> $ret {
+                    super::$module::$name($($arg),*)
+                }
+                // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
+                unsafe { kernel($($arg),*) }
+            }
+        };
+    }
+    fma_glibc!(sincosf_glibc::sinf_glibc(y: f32) -> f32);
+    fma_glibc!(sincosf_glibc::cosf_glibc(y: f32) -> f32);
+    fma_glibc!(sincosf_glibc::sincosf_glibc(y: f32) -> (f32, f32));
+    fma_glibc!(logf_glibc::logf_glibc(x: f32) -> f32);
+    fma_glibc!(expf_glibc::expf_glibc(x: f32) -> f32);
+    fma_glibc!(powf_glibc::powf_glibc(x: f32, y: f32) -> f32);
+    fma_glibc!(exp_glibc::exp_glibc(x: f64) -> f64);
+    fma_glibc!(log_glibc::log_glibc(x: f64) -> f64);
+    fma_glibc!(pow_glibc::pow_glibc(x: f64, y: f64) -> f64);
 }
 
 #[cfg(test)]
@@ -275,6 +394,119 @@ mod tests {
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),
                     "{x:e}"
                 );
+            }
+        }
+    }
+
+    /// The glibc functions of two arguments and of doubles give glibc 2.35's results on 65,536
+    /// seeded arguments each (hashes recorded from the system's functions on Linux x86-64 by
+    /// `validation/investigations/glibc-maths/`, `hashes`): SplitMix64 of the index, the even
+    /// ones random bit patterns, the odd ones in the functions' common ranges.
+    #[test]
+    fn glibc_functions_match_glibc_on_seeded_arguments() {
+        fn splitmix64(i: u64) -> u64 {
+            let mut z = i.wrapping_add(0x9e37_79b9_7f4a_7c15);
+            z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+            z ^ (z >> 31)
+        }
+        let unit = |r: u64| (r >> 11) as f64 * (1.0 / (1u64 << 53) as f64);
+        let fnv = |h: u64, v: u64| (h ^ v).wrapping_mul(0x0100_0000_01b3);
+        let mut h = [0xcbf2_9ce4_8422_2325u64; 5];
+        for k in 0..65_536u64 {
+            let r = splitmix64(k);
+            let r2 = splitmix64(r);
+            let odd = k & 1 == 1;
+            let (ex, lg, px, py, fx, fy, ay, ax) = if odd {
+                (
+                    unit(r) * 1500.0 - 750.0,
+                    unit(r) * 0.2 + 0.9,
+                    unit(r) * 1e3,
+                    unit(r2) * 8.0 - 4.0,
+                    unit(r) as f32 * 100.0,
+                    unit(r2) as f32 * 20.0 - 10.0,
+                    unit(r) as f32 * 2.0 - 1.0,
+                    unit(r2) as f32 * 2.0 - 1.0,
+                )
+            } else {
+                let (lo, hi) = (f32::from_bits(r as u32), f32::from_bits((r >> 32) as u32));
+                (
+                    f64::from_bits(r),
+                    f64::from_bits(r & 0x7fff_ffff_ffff_ffff),
+                    f64::from_bits(r),
+                    f64::from_bits(r2),
+                    lo,
+                    hi,
+                    lo,
+                    hi,
+                )
+            };
+            h[0] = fnv(h[0], super::exp_glibc(ex).to_bits());
+            h[1] = fnv(h[1], super::log_glibc(lg).to_bits());
+            h[2] = fnv(h[2], super::pow_glibc(px, py).to_bits());
+            h[3] = fnv(h[3], u64::from(super::powf_glibc(fx, fy).to_bits()));
+            h[4] = fnv(h[4], u64::from(super::atan2f_glibc(ay, ax).to_bits()));
+        }
+        assert_eq!(
+            h,
+            [
+                0x30b1_722a_0e68_e056, // exp
+                0x05ec_df9c_1dd2_0062, // log
+                0x4693_03ea_60fd_f797, // pow
+                0xed13_9943_3568_1cda, // powf
+                0x0a7f_b675_4721_8aff, // atan2f
+            ]
+        );
+    }
+
+    /// The FMA copies of the glibc functions give the same bits as the portable kernels, NaNs
+    /// included.
+    #[test]
+    fn glibc_fma_copies_are_bit_identical() {
+        let mut s = 0x6a09_e667_f3bc_c909u64;
+        for k in 0..300_000u64 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            let x = f64::from_bits(s);
+            let u = (s >> 11) as f64 / (1u64 << 53) as f64;
+            let f = f32::from_bits(s as u32);
+            let g = f32::from_bits((s >> 32) as u32);
+            // Moderate arguments too, where the main paths run.
+            let m = (u * 200.0 - 100.0) as f32;
+            for (a, b) in [
+                (super::sinf_glibc(f), super::sincosf_glibc::sinf_glibc(f)),
+                (super::cosf_glibc(m), super::sincosf_glibc::cosf_glibc(m)),
+                (
+                    super::sincosf_glibc(f).1,
+                    super::sincosf_glibc::sincosf_glibc(f).1,
+                ),
+                (super::logf_glibc(f), super::logf_glibc::logf_glibc(f)),
+                (super::expf_glibc(m), super::expf_glibc::expf_glibc(m)),
+                (
+                    super::powf_glibc(f.abs(), m / 20.0),
+                    super::powf_glibc::powf_glibc(f.abs(), m / 20.0),
+                ),
+                (super::powf_glibc(f, g), super::powf_glibc::powf_glibc(f, g)),
+            ] {
+                assert_eq!(a.to_bits(), b.to_bits(), "{k}: {f:e} {m:e}");
+            }
+            let w = u * 1500.0 - 750.0;
+            for (a, b) in [
+                (super::exp_glibc(w), super::exp_glibc::exp_glibc(w)),
+                (super::exp_glibc(x), super::exp_glibc::exp_glibc(x)),
+                (super::log_glibc(x), super::log_glibc::log_glibc(x)),
+                (
+                    super::log_glibc(u + 0.95),
+                    super::log_glibc::log_glibc(u + 0.95),
+                ),
+                (super::pow_glibc(x, w), super::pow_glibc::pow_glibc(x, w)),
+                (
+                    super::pow_glibc(u * 1e3, 1.0 / 3.0),
+                    super::pow_glibc::pow_glibc(u * 1e3, 1.0 / 3.0),
+                ),
+            ] {
+                assert_eq!(a.to_bits(), b.to_bits(), "{k}: {x:e} {w:e}");
             }
         }
     }

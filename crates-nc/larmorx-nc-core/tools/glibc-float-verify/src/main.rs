@@ -19,13 +19,27 @@
 //!
 //! `expf` (FAST: `larmorx_nc_core::glibc_float::expf`) is compared on all 2^32 inputs too.
 //!
+//! `copy` (2026-11-04) compares the copies of these functions in `larmorx_core::math`
+//! (`sinf_glibc`, ..., `pow_glibc`, the Apache-2.0 home of the same Arm and fdlibm translations)
+//! with this crate's: every float input of the one-argument float functions, and for `powf`,
+//! `atan2f`, `exp`, `log` and `pow` the sampled families and special values of
+//! `validation/investigations/glibc-maths/verifier/src/samples.rs` (more than 10^9 arguments per
+//! function), bit for bit. It proves the copy before this crate's functions became re-exports of
+//! the core's (commit "the copy" of the glibc maths part); afterwards both sides are the same
+//! function. Not part of the default run.
+//!
 //! Usage: `glibc-float-verify [--threads N] [kernel] [sinf] [cosf] [sincosf] [logf] [expf]
-//! [atanf] [atan2f]` (all when none is named). Exits 0 when the port matches the platform everywhere.
+//! [atanf] [atan2f] [copy]` (all but `copy` when none is named). Exits 0 when the port matches the
+//! platform everywhere.
 #![deny(unsafe_code)]
 
 use larmorx_core::math;
-use larmorx_nc_core::{fdlibm, glibc_float, kernel};
+use larmorx_nc_core::{fdlibm, glibc_double, glibc_float, kernel};
 use rayon::prelude::*;
+
+#[path = "../../../../../validation/investigations/glibc-maths/verifier/src/samples.rs"]
+#[allow(dead_code)]
+mod samples;
 
 #[allow(unsafe_code)]
 mod libc {
@@ -305,6 +319,149 @@ fn atan2f_report() -> bool {
     ok
 }
 
+/// `copy`: `larmorx_core::math`'s copies against this crate's translations, bit for bit (NaN
+/// bits included). Returns whether every result is identical.
+fn copy_report() -> bool {
+    // Every float input of the one-argument functions.
+    type Pair = (&'static str, fn(f32) -> u64, fn(f32) -> u64);
+    let unary: [Pair; 8] = [
+        (
+            "sinf",
+            |x| u64::from(glibc_float::sinf(x).to_bits()),
+            |x| u64::from(math::sinf_glibc(x).to_bits()),
+        ),
+        (
+            "cosf",
+            |x| u64::from(glibc_float::cosf(x).to_bits()),
+            |x| u64::from(math::cosf_glibc(x).to_bits()),
+        ),
+        (
+            "sincosf",
+            |x| {
+                let (s, c) = glibc_float::sincosf(x);
+                u64::from(s.to_bits()) << 32 | u64::from(c.to_bits())
+            },
+            |x| {
+                let (s, c) = math::sincosf_glibc(x);
+                u64::from(s.to_bits()) << 32 | u64::from(c.to_bits())
+            },
+        ),
+        (
+            "logf",
+            |x| u64::from(glibc_float::logf(x).to_bits()),
+            |x| u64::from(math::logf_glibc(x).to_bits()),
+        ),
+        (
+            "expf",
+            |x| u64::from(glibc_float::expf(x).to_bits()),
+            |x| u64::from(math::expf_glibc(x).to_bits()),
+        ),
+        (
+            "atanf",
+            |x| u64::from(fdlibm::atanf(x).to_bits()),
+            |x| u64::from(math::atanf_glibc(x).to_bits()),
+        ),
+        (
+            "atanf with aT[0] = 0x3eaaaaaa",
+            |x| u64::from(fdlibm::atanf_with_at0(x, f32::from_bits(0x3eaa_aaaa)).to_bits()),
+            |x| u64::from(math::atanf_glibc_with_at0(x, f32::from_bits(0x3eaa_aaaa)).to_bits()),
+        ),
+        (
+            "logf_compat over logf_glibc",
+            |x| u64::from(glibc_float::logf_compat(x).to_bits()),
+            |x| {
+                // The wrapper's rule (x <= 0: -inf or C's NAN) over the core's logf.
+                let v = if x <= 0.0 {
+                    if x == 0.0 {
+                        f32::NEG_INFINITY
+                    } else {
+                        f32::from_bits(0x7fc0_0000)
+                    }
+                } else {
+                    math::logf_glibc(x)
+                };
+                u64::from(v.to_bits())
+            },
+        ),
+    ];
+    let mut ok = true;
+    for (name, ours, core) in unary {
+        let (n, bad) = (0u32..=u32::MAX >> 16)
+            .into_par_iter()
+            .map(|hi| {
+                let mut bad = 0u64;
+                for lo in 0..=0xffffu32 {
+                    let x = f32::from_bits((hi << 16) | lo);
+                    if ours(x) != core(x) {
+                        bad += 1;
+                        if bad <= 2 {
+                            println!("copy {name}: differs at {:#010x}", x.to_bits());
+                        }
+                    }
+                }
+                (1u64 << 16, bad)
+            })
+            .reduce(|| (0, 0), |a, c| (a.0 + c.0, a.1 + c.1));
+        println!("copy {name}: {bad} of {n} inputs differ (larmorx_core::math against this crate)");
+        ok &= bad == 0;
+    }
+    // The sampled families and special values of the glibc-maths verifier.
+    fn families<T: Copy + Sync + Send>(
+        name: &str,
+        g: u64,
+        fams: &[samples::Family<T>],
+        specials: &[T],
+        differ: impl Fn(T) -> bool + Sync,
+    ) -> bool {
+        let mut ok = true;
+        for (f, fam) in fams.iter().enumerate() {
+            let bad: u64 = (0..fam.count >> 16)
+                .into_par_iter()
+                .map(|c| {
+                    (c << 16..(c + 1) << 16)
+                        .filter(|&i| differ((fam.arg)(samples::random(g, f as u64, i))))
+                        .count() as u64
+                })
+                .sum();
+            println!("copy {name}, {}: {bad} of {} differ", fam.name, fam.count);
+            ok &= bad == 0;
+        }
+        let bad = specials.iter().filter(|&&a| differ(a)).count();
+        println!(
+            "copy {name}, special values: {bad} of {} differ",
+            specials.len()
+        );
+        ok && bad == 0
+    }
+    let pairs = |v: &[f32]| -> Vec<(f32, f32)> {
+        v.iter()
+            .flat_map(|&a| v.iter().map(move |&c| (a, c)))
+            .collect()
+    };
+    let s32 = pairs(&samples::special_f32());
+    let s64 = samples::special_f64();
+    let p64: Vec<(f64, f64)> = s64
+        .iter()
+        .flat_map(|&a| s64.iter().map(move |&c| (a, c)))
+        .collect();
+    ok &= families("powf", 1, &samples::POWF, &s32, |(x, y)| {
+        glibc_float::powf(x, y).to_bits() != math::powf_glibc(x, y).to_bits()
+    });
+    ok &= families("atan2f", 2, &samples::ATAN2F, &s32, |(y, x)| {
+        fdlibm::atan2f(y, x).to_bits() != math::atan2f_glibc(y, x).to_bits()
+    });
+    ok &= families("exp", 3, &samples::EXP, &s64, |x| {
+        glibc_double::exp(x).to_bits() != math::exp_glibc(x).to_bits()
+    });
+    ok &= families("log", 4, &samples::LOG, &s64, |x| {
+        glibc_double::log(x).to_bits() != math::log_glibc(x).to_bits()
+    });
+    ok &= families("pow", 5, &samples::POW, &p64, |(x, y)| {
+        glibc_double::pow(x, y).to_bits() != math::pow_glibc(x, y).to_bits()
+    });
+    ok
+}
+
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mut threads = 0;
@@ -315,6 +472,9 @@ fn main() {
     let _ = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build_global();
+    if args.iter().any(|a| a == "copy") {
+        std::process::exit(i32::from(!copy_report()));
+    }
     let all = args.is_empty();
     let want = |s: &str| all || args.iter().any(|a| a == s);
     let angles = |x: f32| x.abs() <= 0.5;

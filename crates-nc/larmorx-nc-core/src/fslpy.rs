@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-FSL AND Apache-2.0
 // Translated to Rust from fslpy 3.27.0 (FSL 6.0.7.23): fsl/scripts/imcp.py, immv.py,
 // fsl/utils/imcp.py, the file-name functions of fsl/utils/path.py and fsl/data/image.py.
 // Copyright the University of Oxford (Paul McCarthy), Apache-2.0. Rust translation Copyright 2026
@@ -78,12 +78,16 @@ Recognised file extensions: .nii.gz, .nii.zst, .nii.bz2, .nii, .img, .hdr, .img.
 pub struct Failure {
     pub text: String,
     pub warning: Option<String>,
+    /// fslpy's conversion of another file type, which the replica does not do (`text` is the
+    /// replica's refusal, not fslpy's).
+    pub unsupported: bool,
 }
 
 fn fail(text: impl Into<String>) -> Failure {
     Failure {
         text: text.into(),
         warning: None,
+        unsupported: false,
     }
 }
 
@@ -140,6 +144,7 @@ pub fn add_ext(prefix: &str) -> Result<String, Failure> {
                 return Err(Failure {
                     warning: Some(text.clone()),
                     text,
+                    unsupported: false,
                 });
             }
             Ok(format!("{prefix}{}", FILE_GROUPS[matches[0]][0]))
@@ -345,11 +350,15 @@ fn imcp_one(src: &str, dest: &str, fsl: &Settings, mv: bool) -> Result<(), Failu
         return Err(fail(format!("imcp error - cannot move from {src}")));
     }
     if src_type != dest_type {
-        return Err(fail(format!(
-            "{src}: fslpy's imcp converts a {src_type} image to the output type {dest_type} with \
-             nibabel; the larmorx-nc replica does not convert file types (set FSLOUTPUTTYPE to \
-             {src_type}, or convert the image first) (larmorx)"
-        )));
+        return Err(Failure {
+            text: format!(
+                "imcp of {src}: fslpy converts a {src_type} image to the output type {dest_type} \
+                 with nibabel; converting file types is pending in the larmorx-nc replica (set \
+                 FSLOUTPUTTYPE to {src_type}, or convert the image first) (larmorx)"
+            ),
+            warning: None,
+            unsupported: true,
+        });
     }
     let exts = file_group(&src, true)?;
     let pairs: Vec<(String, String)> = exts
@@ -399,7 +408,7 @@ pub fn copy(src: &str, dest: &str, fsl: &Settings, mv: bool) -> Result<(), Failu
 
 /// `imcp <src> <dest>` (or `immv`) as a script runs it: the program's output and exit status
 /// (`print(str(e))` on standard output and status 1 after a failure, fslpy's logged warning on
-/// standard error first).
+/// standard error first; the replica's refusal of a conversion on standard error).
 pub fn run(
     src: &str,
     dest: &str,
@@ -410,6 +419,10 @@ pub fn run(
 ) -> u8 {
     match copy(src, dest, fsl, mv) {
         Ok(()) => 0,
+        Err(f) if f.unsupported => {
+            let _ = writeln!(err, "larmorx-nc: error: {}", f.text);
+            1
+        }
         Err(f) => {
             if let Some(w) = &f.warning {
                 let _ = writeln!(err, "{w}");

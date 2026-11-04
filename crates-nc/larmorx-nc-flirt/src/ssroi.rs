@@ -93,23 +93,22 @@ enum Name {
 type Program =
     fn(&[String], &Settings, UpstreamDefects, usize, &mut dyn Write, &mut dyn Write) -> u8;
 
+/// The line bash names in its report of a crashed command: the command's own at the top
+/// level, the end (`fi`) of the `if` block it runs in.
+fn reported_line(line: u32) -> u32 {
+    match line {
+        219..=229 => 229,
+        232..=242 => 242,
+        _ => line,
+    }
+}
+
 /// The words of a shell word that holds unquoted expansions (IFS: blank, tab, newline).
 fn split_words(v: &str) -> Vec<String> {
     v.split([' ', '\t', '\n'])
         .filter(|w| !w.is_empty())
         .map(str::to_owned)
         .collect()
-}
-
-/// The result of the script's `[ _$x = _ ]` and `[ _$1 != _ ]` tests on a value.
-#[derive(PartialEq, Eq)]
-enum Test {
-    /// The value is empty (the test's word is `_` alone).
-    Empty,
-    /// One word.
-    Word,
-    /// More: `[` prints "too many arguments" and fails.
-    TooMany,
 }
 
 struct Script<'a, 'w> {
@@ -162,22 +161,23 @@ impl Script<'_, '_> {
         Stop::Exit(1)
     }
 
-    /// `[ _$v = _ ]` (and the loop's `[ _$1 != _ ]`): the value's words as the test sees them
-    /// (by default the value as one word).
-    fn test(&mut self, v: &str, line: u32) -> Test {
+    /// The script's `[ <prefix>$v <op> <rhs> ]`: by default the value as one word; in
+    /// `reproduce` its words as bash's `test` sees them (FSL-211), with `[`'s message and its
+    /// line where they make no test (the test is then false).
+    fn sh_test(&mut self, prefix: &str, v: &str, op: &str, rhs: &str, line: u32) -> bool {
         if !self.reproduce() {
-            return if v.is_empty() {
-                Test::Empty
-            } else {
-                Test::Word
-            };
+            let word = format!("{prefix}{v}");
+            return if op == "=" { word == rhs } else { word != rhs };
         }
-        let w = split_words(&format!("_{v}"));
-        if w.len() > 1 {
-            let _ = writeln!(self.err, "{NAME}: line {line}: [: too many arguments");
-            return Test::TooMany;
+        let mut w = split_words(&format!("{prefix}{v}"));
+        w.extend([op.to_owned(), rhs.to_owned()]);
+        match crate::shtest::test(&w) {
+            Ok(v) => v,
+            Err(m) => {
+                let _ = writeln!(self.err, "{NAME}: line {line}: [: {m}");
+                false
+            }
         }
-        if w[0] == "_" { Test::Empty } else { Test::Word }
     }
 
     /// The words of an unquoted `$name` (FSL-211): split at blanks in `reproduce`, the name as
@@ -221,10 +221,35 @@ impl Script<'_, '_> {
         }
     }
 
+    /// The words of `$v` without a notice: split in `reproduce`, the value by default.
+    fn words_quiet(&self, v: &str) -> Vec<String> {
+        if self.reproduce() {
+            split_words(v)
+        } else {
+            vec![v.to_owned()]
+        }
+    }
+
     /// `[ `imtest $v` = 0 ]`: imtest prints 0 unless it gets exactly one word naming an image.
+    /// FSL-211 is named where the split changes the answer.
     fn imtest(&mut self, v: &str, what: &str) -> bool {
-        let w = self.words(v, what);
-        w.len() == 1 && avw::imtest(&w[0])
+        let whole = avw::imtest(v);
+        let split = split_words(v);
+        let pieces = split.len() == 1 && avw::imtest(&split[0]);
+        if whole != pieces {
+            let detail = if self.reproduce() {
+                format!(
+                    "{what} '{v}' split into {} word(s): not valid, as the script finds",
+                    split.len()
+                )
+            } else {
+                format!(
+                    "{what} '{v}' read as one name (the script splits it into words and finds it not valid)"
+                )
+            };
+            self.notices.add(&defects::FSL_211, detail);
+        }
+        if self.reproduce() { pieces } else { whole }
     }
 
     /// Runs one of the script's programs in this process: its own messages, its exit status;
@@ -249,7 +274,8 @@ impl Script<'_, '_> {
                 let _ = write!(self.err, "{}", e.stderr_text());
                 let _ = writeln!(
                     self.err,
-                    "{NAME}: line {line}: {:>5} Aborted                 {source}",
+                    "{NAME}: line {}: {:>5} Aborted                 {source}",
+                    reported_line(line),
                     std::process::id()
                 );
                 134
@@ -297,11 +323,13 @@ impl Script<'_, '_> {
         }
         let arg = |k: usize| a.get(k).map_or("", String::as_str);
         // [ _$2 = _ ] && Usage
-        if self.test(arg(1), 112) == Test::Empty {
+        if self.sh_test("_", arg(1), "=", "_", 112) {
             return Err(self.usage());
         }
         // in=`${FSLDIR}/bin/remove_ext $1`
-        let in_words = self.words(arg(0), "the input");
+        let in_words = self.words_quiet(arg(0));
+        // (an empty input: remove_ext prints its usage, which the script takes as the input's
+        // name in `reproduce`; both modes refuse it, only the message differs: no notice)
         let input = if in_words.is_empty() {
             REMOVE_EXT_USAGE.to_owned()
         } else {
@@ -316,7 +344,7 @@ impl Script<'_, '_> {
             return Err(Stop::Exit(1));
         }
         // out=`${FSLDIR}/bin/remove_ext $1` (the second argument)
-        let out_words = self.words(arg(1), "the output");
+        let out_words = self.words_quiet(arg(1));
         let output = out_words
             .iter()
             .map(|w| avw::remove_ext(w))
@@ -336,17 +364,37 @@ impl Script<'_, '_> {
         let mut i = 2;
         while i < a.len() {
             let o = arg(i);
-            if self.test(o, 133) != Test::Word {
+            if !self.sh_test("_", o, "!=", "_", 133) {
                 break;
             }
             let value = |s: &mut Self, line: u32| -> Result<String, Stop> {
                 let v = arg(i + 1);
-                if s.test(v, line) == Test::Empty {
+                if s.sh_test("_", v, "=", "_", line) {
                     return Err(s.usage());
                 }
                 Ok(v.to_owned())
             };
-            match o {
+            // the if/elif chain: `[ $1 = -d ]`, `[ $1 = -b ]`, ...: the first that holds
+            const CHAIN: [(&str, u32); 10] = [
+                ("-d", 135),
+                ("-b", 138),
+                ("-ssref", 144),
+                ("-altinput", 152),
+                ("-roiFOV", 161),
+                ("-roiMASK", 164),
+                ("-roiNONE", 173),
+                ("-maskFOV", 177),
+                ("-maskMASK", 180),
+                ("-maskNONE", 189),
+            ];
+            let mut chosen = "";
+            for (opt, line) in CHAIN {
+                if self.sh_test("", o, "=", opt, line) {
+                    chosen = opt;
+                    break;
+                }
+            }
+            match chosen {
                 "-d" => {
                     debug = true;
                     i += 1;
@@ -732,10 +780,21 @@ impl Script<'_, '_> {
                 let dest = words.pop().unwrap_or_default();
                 let mut code = 0;
                 for src in &words {
-                    let (out, err) = (&mut *self.out, &mut *self.err);
-                    code = fslpy::run(src, &dest, self.fsl, false, out, err);
-                    if code != 0 {
-                        break;
+                    match fslpy::copy(src, &dest, self.fsl, false) {
+                        Ok(()) => {}
+                        Err(f) if f.unsupported => {
+                            // the replica's refusal (fslpy converts with nibabel): it stops
+                            let _ = writeln!(self.err, "{PREFIX}: error: {NAME}: {}", f.text);
+                            return Err(Stop::Exit(1));
+                        }
+                        Err(f) => {
+                            if let Some(w) = &f.warning {
+                                let _ = writeln!(self.err, "{w}");
+                            }
+                            let _ = writeln!(self.out, "{}", f.text);
+                            code = 1;
+                            break;
+                        }
                     }
                 }
                 code
@@ -800,12 +859,12 @@ impl Script<'_, '_> {
                 Err(_) => {
                     let _ = writeln!(
                         self.err,
-                        "rm: cannot remove '{f}': No such file or directory"
+                        "/bin/rm: cannot remove '{f}': No such file or directory"
                     );
                     status = 1;
                 }
                 Ok(m) if m.is_dir() => {
-                    let _ = writeln!(self.err, "rm: cannot remove '{f}': Is a directory");
+                    let _ = writeln!(self.err, "/bin/rm: cannot remove '{f}': Is a directory");
                     status = 1;
                 }
                 Ok(_) => {
@@ -813,7 +872,8 @@ impl Script<'_, '_> {
                         removed_others.push(f.clone());
                     }
                     if std::fs::remove_file(p).is_err() {
-                        let _ = writeln!(self.err, "rm: cannot remove '{f}': Permission denied");
+                        let _ =
+                            writeln!(self.err, "/bin/rm: cannot remove '{f}': Permission denied");
                         status = 1;
                     }
                 }

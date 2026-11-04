@@ -25,7 +25,7 @@ product).
 
 - **FSL** (fsl-avwutils 2209.6): "FMRIB Software Library, Release 6.0 (c) 2018, The University of
   Oxford", the FSL Licence (non-commercial). fslmaths: "Copyright (C) 2000-2008 University of
-  Oxford"; fslstats: "Copyright (C) 2003-2009 University of Oxford".
+  Oxford"; fslstats: "Copyright (C) 2003-2009 University of Oxford"; fslroi: the FSL Licence's notice.
 
 Every source file starts with an SPDX header naming its licence; each module's documentation says
 what it translates.
@@ -38,6 +38,7 @@ what it translates.
 | `fslmaths::stats` | fsl-avwutils `fslmaths.cc` | `inputParser`'s dimensionality reduction (`-T`, `-X`, `-Y`, `-Z` and any other capital with `max`, `min`, `mean`, `std`, `maxn`, `median`, `perc`, `ar1`; its message), `-pval`, `-pval0`, `-cpval`, `-ztop`, `-ptoz`, `-rank`, `-ranknorm`, `-roi`, `-bptf` (on `larmorx-nc-core`'s `vstats`, `cprob` and `filters::bandpass_temporal_filter`) |
 | `fslmaths::tfce` | fsl-avwutils `fslmaths.cc`; fsl-newimage 2601.0 `newimagefns.h` | `-tfce` (its `catch` and message), `-tfceS` (the voxel through `niftivox2newimagevox_mat`), `-roc` (the log transforms, the true and false positive rates, the curve file, the area and its quartiles); `tfce` (the sorted interior voxels, the flood fill per threshold, `edsta`'s connectivity classes, `powf(h, H)` and `pow(size, E)`), `tfce_support` (`connected_components` per threshold, the arrays `Clusters`/`Thresholds`, the sum from the top) (on `larmorx-nc-core`'s `filters::connected_components`, `glibc_float::powf`, `miscmaths::mean_col`, `var_col`, `quantile_col`) |
 | `usage` | fsl-avwutils `fslmaths.cc` | `printUsage`'s text |
+| `fslroi` | fsl-avwutils `fslroi.cc` (2026-11-04) | `print_usage`, `main` (its argument counts, its `catch` and falling off `main`: FSL-215 with its switch); `fmrib_main` is the core's `avwutils::fslroi` (with 2, 6 or 8 numbers, the 32-bit sums, the time index's bounds and the allocation) |
 | `cli` | – | the command lines as `larmorx-nc fsl fslmaths` and `larmorx-nc fsl fslstats` run them (`fslstats`: `larmorx_nc_core::fslstats::main`, translated from fsl-avwutils `fslstats.cc` in the core: its `PROVENANCE.md`) |
 
 ## Changes from the originals

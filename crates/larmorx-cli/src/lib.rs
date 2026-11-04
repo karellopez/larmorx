@@ -39,7 +39,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
 /// FLIRT's, FAST's, topup's, applytopup's, fslmaths' and fslstats' programs are
-/// `larmorx_fsl::cli`; a test checks the list).
+/// `larmorx_fsl::cli`; a test checks the list); `fslroi` and `standard_space_roi` have only
+/// their replicas yet (2026-11-04).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -64,6 +65,8 @@ const FSL_TOOLS: &[&str] = &[
     "applytopup",
     "fslmaths",
     "fslstats",
+    "fslroi",
+    "standard_space_roi",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -414,7 +417,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats, fslroi, standard_space_roi"),
             "{out}"
         );
         assert!(
@@ -422,9 +425,18 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(replica::replica_only("fsl").count(), 0);
-        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
+        // fslroi and standard_space_roi: their replicas only (2026-11-04)
+        assert_eq!(
+            replica::replica_only("fsl").collect::<Vec<_>>(),
+            ["fslroi", "standard_space_roi"]
+        );
+        // every FSL tool but mcflirt (`mri hmc`) and the replicas without an original is
+        // larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
+        assert_eq!(
+            &FSL_TOOLS[FSL_TOOLS.len() - 2..],
+            ["fslroi", "standard_space_roi"]
+        );
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()

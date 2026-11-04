@@ -29,8 +29,10 @@ use crate::options::{AngleRep, EXIT_MINUS_ONE, Interp, Options, Parsed, Window, 
 use crate::pair::{BinsFailure, CostMessages, Pair, RefSlot};
 use crate::schedule::{self, BadName, MatName, Scalars};
 
-/// The `descrip` field of the images the replica writes (FLIRT writes FSL's build string).
-pub const DESCRIP: &[u8] = b"larmorx-nc fsl flirt";
+/// The `descrip` field of the images the replica writes: newimage's build string, as FLIRT
+/// writes it (`larmorx-nc fsl flirt` until 2026-11-04, when `standard_space_roi`'s comparison of
+/// FLIRT's temporary files with FSL's showed the difference).
+pub const DESCRIP: &[u8] = larmorx_nc_core::volume::BUILDSTRING.as_bytes();
 
 /// How a run stops before `main` returns normally.
 #[derive(Debug)]

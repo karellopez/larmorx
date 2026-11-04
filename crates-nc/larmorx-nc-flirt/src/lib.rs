@@ -32,6 +32,7 @@ pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
 pub mod scripts;
+pub mod shtest;
 pub mod ssroi;
 
 use std::io::Write;

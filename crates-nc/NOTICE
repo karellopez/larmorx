@@ -144,9 +144,10 @@ LAPACK 3.12.0 (reference LAPACK, as OpenBLAS 0.3.33 bundles it: DGETRI) - modifi
   Translated in larmorx-nc-core/src/lapack.rs, modified from the originals.
 
 fslpy 3.27.0 (the file-name rules of imtest, remove_ext and imglob, which FSL's bet script
-runs) - Apache License, Version 2.0
+runs, and imcp and immv, which FSL's standard_space_roi and bet scripts run) - Apache License,
+Version 2.0
   Copyright 2016-2024 University of Oxford, Oxford, UK (Paul McCarthy).
-  Translated in larmorx-nc-core/src/avwutils.rs, modified from the originals. The licence text
+  Translated in larmorx-nc-core/src/avwutils.rs and fslpy.rs, modified from the originals. The licence text
   is LICENSES/Apache-2.0.txt.
 
 fdlibm, as the GNU C Library 2.35 ships its float functions (atan2f, atanf) and tanh and expm1

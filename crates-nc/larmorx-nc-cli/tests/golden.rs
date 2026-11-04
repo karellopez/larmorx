@@ -1668,12 +1668,53 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-182"],
         output_type: "NIFTI",
     },
+    // fslroi (2026-11-04): a box and a range of volumes of the 4D head (x, y, z, t), the
+    // spatial form on the 3D head with a size of -1
     BetCase {
-        id: "fslstats.fsl182.reproduce",
-        tool: "fsl fslstats",
-        args: &["{one}", "-s", "-S"],
-        mode: "reproduce",
-        named: &["FSL-182"],
+        id: "fslroi.box",
+        tool: "fsl fslroi",
+        args: &["{4d}", "out", "2", "20", "1", "-1", "3", "12", "1", "2"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslroi.spatial",
+        tool: "fsl fslroi",
+        args: &["{t1}", "out", "4", "-1", "0", "16", "5", "9"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // standard_space_roi (2026-11-04): the T2-like head to the T1-like one as the reference
+    // (-ssref: no FSL data needed), the default FOV mask and cut; the masks given (-maskMASK,
+    // -roiMASK) with the temporary files kept (-d)
+    BetCase {
+        id: "standard_space_roi.fov",
+        tool: "fsl standard_space_roi",
+        args: &["{t2}", "out", "-ssref", "{t1}", "-dof", "6"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "standard_space_roi.masks",
+        tool: "fsl standard_space_roi",
+        args: &[
+            "{t2}",
+            "out",
+            "-ssref",
+            "{t1}",
+            "-maskMASK",
+            "{mask}",
+            "-roiMASK",
+            "{mask}",
+            "-d",
+            "-dof",
+            "6",
+        ],
+        mode: "fix",
+        named: &[],
         output_type: "NIFTI",
     },
 ];
@@ -2709,6 +2750,8 @@ fn run_bet(
         .current_dir(cwd)
         .env_remove("FSLDIR")
         .env_remove("FSL_LOAD_NIFTI_EXTENSIONS")
+        .env_remove("LARMORX_FSL_DATA")
+        .env_remove("maskthr")
         .env("PATH", "")
         .env("FSLOUTPUTTYPE", output_type)
         .env("LARMORX_UPSTREAM_DEFECTS", mode)

@@ -780,6 +780,12 @@ The items below keep their history.
   (the suite's `_random_band`, through the oracle cache: about 80 runs of seconds) would classify
   them. Its record's notes still say that options the original does not take are skipped (0 are):
   the suite's text, to correct when the record is next made.
+- **The originals' suites hold the spec answers' new cases** (seen at the merge verification of 2026-11-04): the
+  replicas' suites gained cases for the switches of 2026-11-03, and the originals' suites run them too. Two fail on
+  the clean-room originals today, as the answers predict: topup's `opt/fsl145-one-coefficient` (the original's
+  FSL-145 `reproduce` lays two coefficients where FSL lays one) and FLIRT's `programs/pointflirt-no-points` (FSL-204's
+  refusal is not in the original yet); `at/jac-z` checks 8 things where the record has 9. The records `fsl-topup`
+  (0 failures) and `fsl-flirt` predate these cases: the clean-room follow-up part closes both and re-makes them.
 - **topup's clean-room original: file names on Windows** (2026-11-03, seen at the merge; **done**
   2026-11-03 by fslmaths' clean-room part, relay 6: `cli::common::name_start`, `\` a separator on
   Windows only in topup's default stem, its configuration's directory test and applytopup's

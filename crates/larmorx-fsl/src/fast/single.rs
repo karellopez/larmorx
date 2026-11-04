@@ -301,6 +301,7 @@ fn mrf_voxel(
 
 /// One in-place sweep (§4.6) over the mask in storage order ([`Grid::gauss_seidel`]); the
 /// usual class counts with their scratch on the stack (the same operations).
+#[allow(clippy::too_many_arguments)]
 fn mrf_sweep(
     grid: &Grid,
     w: &[f64; 18],

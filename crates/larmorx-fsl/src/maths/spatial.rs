@@ -9,7 +9,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
-use larmorx_core::math::{self, Libm};
+use larmorx_core::math::Libm;
 use rayon::prelude::*;
 
 use super::filters::{EMPTY_MASK, abort_lines};
@@ -292,14 +292,7 @@ fn dog_gauss(sigma: f64, r: i64, libm: &Libm) -> Vec<f32> {
             for i in 0..n {
                 let (di, dj) = (i as i64 - r, j as i64 - r);
                 let q = -((di * di + dj * dj) as f64) / (2.0 * sigma * sigma);
-                let e = |glibc: bool| {
-                    num::to_f32(if glibc {
-                        math::exp_glibc(q)
-                    } else {
-                        math::exp(q)
-                    })
-                };
-                g[i + n * j] = e(libm.is_glibc());
+                g[i + n * j] = num::to_f32(libm.exp(q));
             }
         }
     }

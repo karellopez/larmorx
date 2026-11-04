@@ -586,10 +586,13 @@ fn robust_pass<T: Num>(
         }
         let ends_out = last || full;
         full = false;
+        // x86-64's NaN rules on every platform: an infinite range gives inf / inf and 0 · inf,
+        // the default NaN (sign set) that FSL prints as -nan
         let w = hi.diff(lo);
         let lof = lo.to_f64();
-        let a = 1000.0 / w;
-        let b = 1000.0 * (-lof) / w;
+        let a = num::nan64(1000.0, w, 1000.0 / w);
+        let nl = 1000.0 * (-lof);
+        let b = num::nan64(nl, w, nl / w);
         let (hist, f) = histogram(data, &keep, a, b, last_bin);
         far |= f;
         let (first, end) = if ends_out {
@@ -615,8 +618,12 @@ fn robust_pass<T: Num>(
             u -= 1;
             count += hist[u as usize];
         }
-        let delta = w / 1000.0;
-        let at = |k: i64| lo.add(T::from_f64_c(k as f64 * delta));
+        let delta = num::nan64(w, 1000.0, w / 1000.0);
+        // bin 0 of an infinite range: 0 · inf
+        let at = |k: i64| {
+            let k = k as f64;
+            lo.add(T::from_f64_c(num::nan64(k, delta, k * delta)))
+        };
         t2 = at(bl);
         t98 = at(u + 1);
         if last || !(t98.diff(t2) < w / 10.0) {
@@ -624,8 +631,13 @@ fn robust_pass<T: Num>(
         }
         let b1 = (bl - 1).max(0) as f64;
         let u1 = ((u + 1).min(999) + 1) as f64;
-        lo = T::from_f64_c(lof + (b1 / 1000.0) * w);
-        hi = T::from_f64_c(lof + (u1 / 1000.0) * w);
+        let limit = |j: f64| {
+            let f = j / 1000.0;
+            let s = num::nan64(f, w, f * w);
+            T::from_f64_c(num::nan64(lof, s, lof + s))
+        };
+        lo = limit(b1);
+        hi = limit(u1);
         if lo == hi {
             full = true;
         }
@@ -701,7 +713,10 @@ pub fn percent_limit<T: Num>(
     }
     let limit = |r: Option<(T, T)>, notices: &mut Notices| -> T {
         let (rmin, rmax) = r.unwrap_or((T::zero(), T::zero()));
-        let lim = rmin.to_f64() + (p / 100.0) * rmax.diff(rmin);
+        // x86-64's NaN rules (an infinite range: 0 · inf, inf - inf)
+        let (r0, f, d) = (rmin.to_f64(), p / 100.0, rmax.diff(rmin));
+        let s = num::nan64(f, d, f * d);
+        let lim = num::nan64(r0, s, r0 + s);
         let (x, changed) = T::convert(lim, fix);
         note151(notices, changed, "the threshold");
         x
@@ -952,6 +967,36 @@ mod tests {
         // the sign of a zero maximum: the first zero
         let (_, hi) = extremes(&[-0.0f32, 0.0], false).unwrap();
         assert!(hi.is_sign_negative());
+    }
+
+    #[test]
+    fn an_infinite_robust_range_gives_x86_64s_default_nan() {
+        // -inf .. +inf: the bins' width inf, the lower limit -inf + 0 · inf, the upper
+        // -inf + k · inf: both the default NaN (sign set: FSL prints -nan) on every platform
+        let mut v: Vec<f32> = (0..100).map(|k| k as f32).collect();
+        v[3] = f32::NEG_INFINITY;
+        v[7] = f32::INFINITY;
+        let (lo, hi) = robust_range(&v, None, true).fix.unwrap();
+        assert_eq!(
+            (lo.to_bits(), hi.to_bits()),
+            (num::DEFAULT_NAN_32, num::DEFAULT_NAN_32)
+        );
+        // a finite minimum and +inf: the lower limit min + 0 · inf, the upper +inf
+        v[3] = 1.0;
+        let (lo, hi) = robust_range(&v, None, true).fix.unwrap();
+        assert_eq!((lo.to_bits(), hi), (num::DEFAULT_NAN_32, f32::INFINITY));
+        // the same in double precision, and FSL's form (reproduce)
+        let d: Vec<f64> = v.iter().map(|&x| f64::from(x)).collect();
+        let (lo, hi) = robust_range(&d, None, false).fix.unwrap();
+        assert_eq!((lo.to_bits(), hi), (num::DEFAULT_NAN_64, f64::INFINITY));
+        // fewer than 50 values: the limits -inf and +inf; -thrp 0's limit -inf + 0 · inf
+        let v = [1.0f32, 2.0, f32::INFINITY];
+        let range = robust_range(&v, None, true).fix.unwrap();
+        assert_eq!(range, (f32::NEG_INFINITY, f32::INFINITY));
+        let mut ns = Notices::new(defects::UpstreamDefects::Fix);
+        let mut err = Vec::new();
+        let r = percent_limit(&v, 0.0, false, &mut ns, &mut err);
+        assert_eq!(r.fix.to_bits(), num::DEFAULT_NAN_32);
     }
 
     #[test]

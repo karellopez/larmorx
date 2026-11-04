@@ -275,8 +275,9 @@ Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Br
 [findings/fsl-bet-original.md](../findings/fsl-bet-original.md)). Since 2026-10-30: `bet2`
 complete (every option, message, exit status and failure case of the spec, with the D13
 switches of FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's default, `-R`
-(FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending,
-as the replica does. Since 2026-10-31: **`betsurf`** complete (spec §6: every option of §6.1,
+(FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending
+(the replica runs them since 2026-11-04; their original, from `specs/bet.md` §5.3-5.4, is the
+clean-room catch-up part's). Since 2026-10-31: **`betsurf`** complete (spec §6: every option of §6.1,
 `-p`'s retessellation, the VTK, OFF and FreeSurfer meshes, `manual_input`, every message; the
 D13 switches of FSL-43, -47, -48, -50 to -55 and -58, FSL-49 and FSL-57 kept as FSL's), so
 `implementation="auto"` without `larmorx-nc` runs the original for every BET program.

@@ -415,6 +415,11 @@ def case(
     # FSL-43's notice is about where a fill starts, whose effect the outputs may not show (a
     # constant image; as the record's single-slice case): named without a change is no finding
     kw.setdefault("silent_ok", ("FSL-43",))
+    if recipe["extra"]["tool"] == "bet" and {"-S", "-B"} & set(recipe["options"]):
+        # -S's and -B's corrections of FLIRT's integer output inside standard_space_roi
+        # (FSL-09) and of fslstats -S (FSL-182) change intermediate values only, as in the
+        # record's -S and -B cases
+        kw["silent_ok"] = (*kw["silent_ok"], "FSL-09", "FSL-182")
     s = fb.Scenario(
         recipe["extra"]["tool"],
         tuple(words),

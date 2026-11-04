@@ -1716,6 +1716,10 @@ def named_entry(run: Run) -> str | None:
 
 #: bet's variations with a replica only (2026-11-04): the clean-room original refuses them.
 REPLICA_ONLY_VARIATIONS = ("-S", "-B", "-A", "-A2")
+#: The programs of this suite with no clean-room original yet (the clean-room catch-up part's,
+#: from ``specs/standard_space_roi.md``): left out of the original's suite; a random case the
+#: original's descriptor draws for them expects larmorx's refusal.
+REPLICA_ONLY_TOOLS = ("fslroi", "standard_space_roi")
 
 
 def replica_only_variation(s: Scenario) -> bool:
@@ -1751,6 +1755,15 @@ def _run_case(case: Case, checks: CheckList) -> None:
         # is to be written from specs/bet.md)
         s = replace(s, expect="pending")
     env = environment(s.output_type, s.env)
+    if original() and s.tool in REPLICA_ONLY_TOOLS:
+        # no clean-room original of the program yet: larmorx says so (exit 127)
+        with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
+            ours = run_larmorx(s.tool, args, "reproduce", env, Path(tmp))
+        refused = ours.code == 127 and "no clean-room original" in ours.err
+        checks("refused: no clean-room original yet", refused, detail=larmorx_err_line(ours))
+        raise Outcome(
+            EXPECTED, f"{s.tool} has no clean-room original yet: {larmorx_err_line(ours)}"
+        )
     inputs = tuple(name for name, _ in s.files)
     with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
         root = option_free(Path(tmp))
@@ -2360,7 +2373,7 @@ def _original_cases(tier: str) -> list[Case]:
     """The suite's cases, and from the standard tier on also betsurf's real images (the full
     tier's for the replica): fMRIPrep does not call betsurf, so its real cases are the ones
     that show the original on real heads (bet2's mesh and FLIRT's matrices made by FSL)."""
-    cases = cases_of(tier)
+    cases = [c for c in cases_of(tier) if c.payload.tool not in REPLICA_ONLY_TOOLS]
     if TIERS.index(tier) >= TIERS.index("standard"):
         have = {c.id for c in cases}
         for cid, category, desc, s in _scenarios():

@@ -160,6 +160,37 @@ def _bet(doc: dict) -> dict[str, int]:
     }
 
 
+def _maths_original(doc: dict) -> dict[str, int]:
+    """fslmaths' and fslstats' clean-room originals: fMRIPrep's calls (as BET's) and the passing
+    cases whose every measured value shows no difference from FSL (``identical``: a count of
+    differing values 0, a bound 0, an absolute or relative difference 0; the eigenvectors'
+    check, up to their sign, never counts as identical)."""
+
+    def zero(v) -> bool:
+        return v in (0, 0.0, "0", "0.0", "100.0%")
+
+    def same(r: dict) -> bool:
+        m = r.get("measured", {})
+        for k, v in m.items():
+            if k == "exit status":
+                continue
+            if k.endswith("share of voxels within 4 ulp"):
+                bound = k.replace(
+                    "the sums' share of voxels within 4 ulp", "values within the sums' bound"
+                )
+                if zero(m.get(bound)):
+                    continue
+            if k.endswith("eigenvectors up to their sign") or not zero(v):
+                return False
+        return True
+
+    res = doc["results"]
+    return {
+        **_bet(doc),
+        "identical": sum(r["status"] == "pass" and same(r) for r in res),
+    }
+
+
 #: record -> its metrics beyond the common ones.
 METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "ants-apply-transforms": _bit_identical(),
@@ -192,6 +223,9 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     # fslmaths and fslstats (2026-11-03): fMRIPrep's calls counted as BET's
     "fsl-maths-replica": _bet,
     "fsl-stats-replica": _bet,
+    # their clean-room originals (2026-11-04): fMRIPrep's calls and the identical cases
+    "fsl-maths": _maths_original,
+    "fsl-stats": _maths_original,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
     # standard records.
     "ants-apply-transforms-panel": _bit_identical(),

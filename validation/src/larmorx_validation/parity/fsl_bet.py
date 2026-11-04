@@ -1411,7 +1411,9 @@ def _phantoms() -> dict[str, Path]:
     p["head-i16"] = _save(np.round(t1).astype(np.int16), d / "head-i16.nii.gz")
     p["head-u8"] = _save(np.clip(np.round(t1 / 4), 0, 255).astype(np.uint8), d / "head-u8.nii.gz")
     p["head-i8"] = _save(np.clip(np.round(t1 / 8), -128, 127).astype(np.int8), d / "head-i8.nii.gz")
-    p["head-i8-positive"] = _save(np.clip(np.round(t1 / 8), 0, 127).astype(np.int8), d / "head-i8p.nii.gz")
+    p["head-i8-positive"] = _save(
+        np.clip(np.round(t1 / 8), 0, 127).astype(np.int8), d / "head-i8p.nii.gz"
+    )
     p["head-u16"] = _save(np.round(t1 * 10).astype(np.uint16), d / "head-u16.nii.gz")
     p["head-i32"] = _save(np.round(t1 * 1000).astype(np.int32), d / "head-i32.nii.gz")
     p["head-f64"] = _save(t1.astype(np.float64), d / "head-f64.nii.gz")
@@ -1435,7 +1437,9 @@ def _phantoms() -> dict[str, Path]:
     )
     p["head-2d"] = _save(t1[:, :, 42:43], d / "head-2d.nii.gz")
     p["slab"] = _save(t1[:, :, 27:57], d / "slab.nii.gz")
-    p["slab-i8"] = _save(np.clip(np.round(t1[:, :, 27:57] / 8), -128, 127).astype(np.int8), d / "slab-i8.nii.gz")
+    p["slab-i8"] = _save(
+        np.clip(np.round(t1[:, :, 27:57] / 8), -128, 127).astype(np.int8), d / "slab-i8.nii.gz"
+    )
     p["constant"] = _save(np.full((40, 40, 30), 100.0, dtype=np.float32), d / "constant.nii.gz")
     ct = np.where(truth > 0, 40.0, -1000.0).astype(np.float32)
     ct[(t1 > 700) & (truth == 0)] = 1200.0

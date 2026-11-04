@@ -2012,7 +2012,12 @@ def _fix_pass(
         )
         return
     if ours.code != 0 and fixed.code != 0:
-        defects.add_fix_check(checks, entries, defects.Change(0, 0, 0.0), silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES))
+        defects.add_fix_check(
+            checks,
+            entries,
+            defects.Change(0, 0, 0.0),
+            silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES),
+        )
         return
     a, b = _images(r_dir, inputs), _images(fix_dir, inputs)
     change = defects.Change(0, 0, 0.0)
@@ -2033,7 +2038,11 @@ def _fix_pass(
     if kept_r != kept_f:
         others.append(f"the files present before the run: {kept_r} kept, {kept_f} by the default")
     defects.add_fix_check(
-        checks, entries, change, other_changes="; ".join(others), silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES)
+        checks,
+        entries,
+        change,
+        other_changes="; ".join(others),
+        silent_ok=(*s.silent_ok, *defects.CONDITION_NOTICES),
     )
 
 

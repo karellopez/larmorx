@@ -1259,7 +1259,7 @@ const BET_CASES: &[BetCase] = &[
     // (`{t1}` int16, `{t2}` float32, `{4d}` int16, 4 volumes; `{mask}` float32, `{mask8}` its
     // uint8 brain mask; `{labels}` labels 1 and 3, 2 missing; `{sparse}` one voxel in nine;
     // `{i8}` int8), a z-like map and its partner (`{zmap}`, `{zmap2}`, 16 x 16 x 12), a truth
-    // for -roc (`{truth}`), a kernel file (`{kern}`) and a tensor of six volumes on 8 x 8 x 6
+    // for -roc (`{truth}`), a kernel file (`{kern}`), a 30 x 1 x 3 checkerboard (`{chk}`) and a tensor of six volumes on 8 x 8 x 6
     // (`{tensor}`): niworkflows' combination of two masks; the binary operations with numbers
     // and images (a 3D image cloned over the 4D one; an integer output); the thresholds; the
     // maths functions (float, and double); masks; the seeded noise; the kernels and filters
@@ -1378,12 +1378,21 @@ const BET_CASES: &[BetCase] = &[
         named: &[],
         output_type: "NIFTI",
     },
-    // the FFT's twiddle factors from glibc's sincos (GLIBC-07, reproduce only; a filter: named
-    // nothing)
+    // the FFT's twiddle factors (a 60-point transform of `{chk}`): correctly rounded by default,
+    // glibc's sincos with reproduce (GLIBC-07; a filter: named nothing); the two outputs differ
+    // in one voxel
     BetCase {
-        id: "fslmaths.filters-fft.reproduce",
+        id: "fslmaths.filters-fft-twiddles",
         tool: "fsl fslmaths",
-        args: &["{t2}", "-kernel", "boxv", "13", "-fmeanu", "out"],
+        args: &["{chk}", "-recip", "-kernel", "gauss", "3", "-fmeanu", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslmaths.filters-fft-twiddles.reproduce",
+        tool: "fsl fslmaths",
+        args: &["{chk}", "-recip", "-kernel", "gauss", "3", "-fmeanu", "out"],
         mode: "reproduce",
         named: &[],
         output_type: "NIFTI",
@@ -2346,6 +2355,16 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     add("truth", &[zx, zy, zz], 16, 32, f32_bytes(&truth));
     let kern: Vec<i64> = (1..=27).collect();
     add("kern", &[3, 3, 3], 16, 32, f32_bytes(&kern));
+    // a 30 x 1 x 3 checkerboard of 100 and 20 (random testing's case fft-twiddles-glibc-sincos):
+    // its FFT convolution transforms 60 points, whose twiddle factors glibc's sincos and the
+    // correctly rounded functions give differently
+    let mut chk = Vec::new();
+    for k in 0..3i64 {
+        for i in 0..30i64 {
+            chk.push(if (i / 2 + k / 2) % 2 == 0 { 100 } else { 20 });
+        }
+    }
+    add("chk", &[30, 1, 3], 16, 32, f32_bytes(&chk));
     let (tx, ty, tz) = (8i64, 8i64, 6i64);
     let mut tensor = Vec::new();
     for c in 0..6i64 {

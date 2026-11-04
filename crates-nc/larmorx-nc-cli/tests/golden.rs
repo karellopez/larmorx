@@ -968,6 +968,38 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-45"],
         output_type: "NIFTI",
     },
+    // -S, -B, -A2 (2026-11-04) on the generated standard images (LARMORX_FSL_DATA, see
+    // `FSL_DATA`): the eyes removed (FLIRT and standard_space_roi's mask, the eye mask, the
+    // threshold of the brain's statistics), the bias field (FAST) and neck cleanup with the skull
+    // (FSL-63's echo, immv), the surfaces from the T1 and the T2 (FLIRT to the template and of the
+    // T2 to the T1, bet2's mesh, betsurf). Not separate cases, to keep CI's time (about 14 s in
+    // the tests' build): -A (betsurf.t1only covers its betsurf; its other steps are -A2's), -S in
+    // `reproduce` (GNU dc's reading differs from the default only for the numbers FSL-216 names:
+    // the unit tests)
+    BetCase {
+        id: "bet.eyes",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-S", "-m"],
+        mode: "fix",
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.bias",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-B", "-s"],
+        mode: "fix",
+        named: &["FSL-09", "FSL-100", "FSL-202"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.surfaces-t2",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-A2", "{t2}"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
     BetCase {
         id: "betsurf.t1only",
         tool: "fsl betsurf",
@@ -1692,6 +1724,24 @@ const BET_CASES: &[BetCase] = &[
         args: &["{t1}", "out", "4", "-1", "0", "16", "5", "9"],
         mode: "fix",
         named: &[],
+        output_type: "NIFTI",
+    },
+    // FSL-217 (2026-11-04): an int8 image with negative values, written as int8 by default and
+    // as FSL's uint8 (the same bytes) in `reproduce`
+    BetCase {
+        id: "fslroi.int8",
+        tool: "fsl fslroi",
+        args: &["{i8}", "out", "2", "20", "0", "-1", "3", "12"],
+        mode: "fix",
+        named: &["FSL-217"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fslroi.int8.reproduce",
+        tool: "fsl fslroi",
+        args: &["{i8}", "out", "2", "20", "0", "-1", "3", "12"],
+        mode: "reproduce",
+        named: &["FSL-217"],
         output_type: "NIFTI",
     },
     // standard_space_roi (2026-11-04): the T2-like head to the T1-like one as the reference
@@ -2427,8 +2477,39 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         }
     }
     add("tensor", &[tx, ty, tz, 6], 16, 32, tenths(&tensor));
+    // FSL's standard images for bet -S, -B, -A and -A2 (2026-11-04), small and synthetic, in a
+    // directory laid out as $FSLDIR/data (LARMORX_FSL_DATA, [`FSL_DATA`]): the "template" a head
+    // of other noise on the head's grid (int16, as MNI152_T1_2mm), its dilated brain mask and an
+    // eye mask (a block in front of the brain), both uint8
+    let std_dir = dir.join(FSL_DATA).join("standard");
+    std::fs::create_dir_all(&std_dir).unwrap();
+    let mut standard = |name: &str, datatype: i16, bitpix: i16, data: Vec<u8>| {
+        let p = std_dir.join(format!("{name}.nii"));
+        std::fs::write(&p, bet_nifti(&[nx, ny, nz], datatype, bitpix, &data)).unwrap();
+    };
+    let template = bet_head_values(T1_LEVELS, 7);
+    standard("MNI152_T1_2mm", 4, 16, i16_bytes(&template));
+    let mut dil = Vec::with_capacity(template.len());
+    let mut eye = Vec::with_capacity(template.len());
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let (x, y, z) = (2 * i - 31, 2 * j - 31, 2 * k - 23);
+                dil.push(i64::from(x * x + y * y + 2 * z * z < 400));
+                eye.push(i64::from(
+                    (12..20).contains(&i) && (24..28).contains(&j) && (8..12).contains(&k),
+                ));
+            }
+        }
+    }
+    standard("MNI152_T1_2mm_brain_mask_dil", 2, 8, u8_bytes(&dil));
+    standard("MNI152_T1_2mm_eye_mask", 2, 8, u8_bytes(&eye));
     paths
 }
+
+/// The generated FSL data directory's name in the BET inputs' directory (`LARMORX_FSL_DATA` of
+/// the cases of `bet -S`, `-B`, `-A` and `-A2`).
+const FSL_DATA: &str = "fsl-data";
 
 // ------------------------------------------------------------------------------------------------
 // Fingerprints
@@ -2764,6 +2845,16 @@ fn run_bet(
         .env("FSLOUTPUTTYPE", output_type)
         .env("LARMORX_UPSTREAM_DEFECTS", mode)
         .env("OMP_NUM_THREADS", "2");
+    // bet's variations that read FSL's standard images: the generated ones (no FSL data and
+    // not larmorx-nc's own copy, 91 x 109 x 91)
+    if tool == "bet"
+        && args
+            .iter()
+            .any(|a| ["-S", "-B", "-A", "-A2"].contains(&a.as_str()))
+    {
+        let data = cwd.parent().unwrap().join("bet-inputs").join(FSL_DATA);
+        command.env("LARMORX_FSL_DATA", data);
+    }
     // FAST reads FSLDIR before it segments (FSL-100): its run directory, which holds no priors,
     // except where the case is FSLDIR unset
     if tool == "fast" && !cwd.ends_with("fast.fsldir-unset") {

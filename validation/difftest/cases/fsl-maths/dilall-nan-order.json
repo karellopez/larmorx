@@ -1,0 +1,178 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-04): -dilall of a 7 x 13 x 3 float image holding NaN, inf and -inf, written as double: 42 of 273 voxels NaN of the other sign; FSL's build adds each neighbour with the neighbour's value as the destination register, so of a NaN neighbour and the default NaN of an earlier inf + -inf it passes on the neighbour's; the replica added the sum first; fixed (filters::dilall takes the neighbour first)",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.nii.gz: header differs",
+  "n": 65830,
+  "seed": "bet-options-1-sincos",
+  "shrink_moves": [
+   "img: axis 0 14 -> 7 voxels",
+   "img: axis 1 27 -> 13 voxels",
+   "img: axis 2 7 -> 3 voxels",
+   "img (and its grid): plumb orientation",
+   "img (and its grid): unit spacing",
+   "img (and its grid): origin at 0",
+   "img (and its grid): sform = qform",
+   "img: content sparse -> blobs"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "dilall-nan-order",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-kernel": false,
+   "-odt": true,
+   "-odt value": "double",
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 1,
+   "content": "sparse",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "filter",
+   "filter": "-dilall",
+   "kind": "general",
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": -12.0,
+   "origin1": -20.0,
+   "origin2": -21.75,
+   "output": "out",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "14x27x7",
+   "shear0": -0.05,
+   "shear1": -0.1,
+   "shear2": -0.1,
+   "size0": 14,
+   "size1": 27,
+   "size2": 7,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 3.0,
+   "sparse": 0.05,
+   "specials": 3,
+   "suffix": ".nii",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-dilall"
+    ],
+    "name": "-dilall",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-odt",
+     "double"
+    ],
+    "name": "-odt",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 2047409501,
+     "size": 12.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     13,
+     3
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "nan",
+      "inf",
+      "-inf"
+     ]
+    }
+   }
+  },
+  "n": 65830,
+  "options": [
+   "-dilall",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind general"
+  ],
+  "seed": "bet-options-1-sincos",
+  "tool": "fsl-maths"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths-replica",
+ "tier": "standard",
+ "tool": "fsl-maths"
+}

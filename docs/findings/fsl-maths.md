@@ -885,6 +885,16 @@ realistic cases, 114,906 fslmaths and 69,077 fslstats). What they found:
   later refusal (FSL-184's `-X` of an empty mask) dropped an earlier correction's notice (FSL-185);
   the notices of the options before an error are now printed. Permanent case
   `json-notices-before-refusal`.
+- **`-dilall`'s NaN order** (fixed 2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` part, relay 1; random
+  testing's trial of that day, 69,962 cases, its one difference): `-dilall` of a float image
+  holding NaN, `inf` and `-inf` (written as double) gave 42 of 273 voxels a NaN of the other sign.
+  FSL's build adds each neighbour to the running sum with the neighbour's converted value as the
+  destination register (`dilateval`'s `sum += im(x, y, z)`), so of a NaN neighbour and the default
+  NaN an earlier `inf + -inf` left in the sum, SSE passes on the neighbour's; the replica added the
+  sum first. Now `filters::dilall` adds the neighbour first (`sse::add_f64`), unit test
+  `dilall_passes_on_the_neighbours_nan_first`; main's build at 4e1f7fc gives the same difference
+  (not from the part's change). Permanent case `dilall-nan-order`; the probe
+  `validation/investigations/replica-glibc-dbl/finding_diff.py` shows a finding value by value.
 - **A NaN's sign through `expx2`** (fixed 2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` part, relay 1):
   the record re-made at 36ccf0c failed `stat/ztop`, `stat/ztop-double`, `stat/ztop-ptoz` and
   `d13/ztop-inf` ("header differs": the data block of a NaN voxel), and so did main's own build

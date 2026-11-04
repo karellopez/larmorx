@@ -3009,3 +3009,16 @@ signature = ["standard output (JSON)"]
 status = "fixed"
 explanation = "Trial 2026-11-03-fsl-maths-original (seed fsl-maths-trial), 275 finding(s) with these checks, each re-run with the part's final build and triaged by category (validation/investigations/cleanroom-maths/trial_triage.json): larmorx mistake, fixed: fslstats' histograms without a histogram (findings 28) (272); explained: fslstats' last printed digit at §10's bound (or bounded words unattributed) (3). Reproducer: fsl-maths-trial-00163-original."
 link = "docs/findings/fsl-maths-original.md"
+
+# fslmaths' replica after its reproduce took glibc's sin, cos and sincos (BET's -S/-B/-A/-A2 part, relay 1):
+# the short trial of 2026-11-04 (seed bet-options-1-sincos, 9 min, 24 jobs, 69,962 cases with -sin and -cos
+# drawn in double precision, the oracle cache in use mode; oracles/difftest/2026-11-04-bet-options-1-fsl-maths):
+# one difference, fixed; the notices without a visible change as in the trial of 2026-11-03 (GLIBC-07 in 77
+# cases: a double -exp, -log, -sin or -cos whose value a later operation or a float output removes)
+[[difference]]
+tool = "fsl-maths"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "-dilall of a 7 x 13 x 3 float image holding NaN, inf and -inf, written as double: 42 of 273 voxels a NaN of the other sign. FSL's build adds each neighbour with the neighbour's converted value as the destination register (dilateval's sum += im(x, y, z)), so of a NaN neighbour and the default NaN an earlier inf + -inf left in the sum it passes on the neighbour's; the replica added the sum first. Fixed: filters::dilall takes the neighbour first (sse::add_f64), unit test dilall_passes_on_the_neighbours_nan_first; main's build gives the same difference (not from this part's change)"
+link = "validation/difftest/cases/fsl-maths/dilall-nan-order.json"

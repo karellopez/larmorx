@@ -19,7 +19,16 @@ unit tests and ignored probes in the crates; this folder keeps the tools that fo
   `expx2`'s operations are `larmorx_nc_core::sse`'s, unit test
   `cprob::tests::a_nan_keeps_fsls_sign_through_expx2_and_ndtr`.
 
+- `finding_diff.py`: a random-testing finding of fslmaths' replica value by value (FSL against
+  the replica, the input's value at each differing voxel, every value's bits). The trial of
+  2026-11-04 (69,962 cases, `-sin` and `-cos` drawn in double precision for the first time) had
+  one difference, `-dilall` of an image with NaN, `inf` and `-inf`: 42 voxels a NaN of the other
+  sign, because FSL's build adds each neighbour first (the destination register) and the replica
+  added the sum first. Fixed (`filters::dilall`), permanent case `dilall-nan-order`.
+
 ```bash
+FSLDIR=<FSL 6.0.7.23> python -P validation/investigations/replica-glibc-dbl/finding_diff.py \
+    crates-nc/target/release/larmorx-nc <a trial>/findings/fsl-maths/<finding>.json
 python -P validation/investigations/replica-glibc-dbl/trigcalls.py \
     <workspace>/oracles/afni-26.3.05/bin/3dTshift <workspace>/oracles/afni-26.3.05/bin/3dUnifize
 FSLDIR=<FSL 6.0.7.23> python -P validation/investigations/replica-glibc-dbl/ztop_nan.py \

@@ -1322,6 +1322,7 @@ def case_verdict(r: dict, desc: str, s, d13: dict[str, list[str]] | None = None)
     """A case's verdict: the record compares the replica in reproduce mode with FSL (every file
     byte for byte, exit status, messages); the fix pass, fMRIPrep's own outputs and FSL's
     variability are reported."""
+    import re
 
     from larmorx_validation.parity.fsl_bet import FILLED, PENDING
 
@@ -1345,6 +1346,8 @@ def case_verdict(r: dict, desc: str, s, d13: dict[str, list[str]] | None = None)
         )
     if st == "expected-divergence" and r["reason"].startswith(FILLED):
         status = r["reason"].removeprefix(FILLED).split(")", 1)[0]
+        # a random case names its entry in the record's reason only
+        refuses = refuses or next(iter(re.findall(r"names (FSL-\d+)", r["reason"])), "FSL")
         return "divergence", common.clip(
             f"FSL crashes here (status {status}) on what it leaves undefined ({refuses}). The "
             "replica's default refuses with the reason; with reproduce it keeps every part FSL "
@@ -1377,7 +1380,7 @@ def case_verdict(r: dict, desc: str, s, d13: dict[str, list[str]] | None = None)
     if v is not None:
         note = _d13_note(r["case"], desc, fix, refuses, d13)
         if v[0] == "both-reject" and note:
-            return v[0], common.clip(f"{v[1]} {note[0].upper()}{note[1:]}.", 600)
+            return v[0], common.clip(f"{v[1].rstrip('.')}. {note[0].upper()}{note[1:]}.", 600)
         return v
     rep = {**r.get("reported", {}), **r.get("measured", {})}
     notes = ["every file FSL writes, byte for byte, with FSL's exit status and messages"]
@@ -1422,7 +1425,7 @@ def case_verdict_orig(r: dict, desc: str, s, d13: dict | None = None) -> tuple[s
         why = why.replace(
             "every file FSL writes, byte for byte",
             "every value of every file FSL writes, its headers but for the program's name in "
-            "`descrip`, with FSL's exit status and messages",
+            "`descrip`",
         )
         return v, why
     shown = "; ".join(f"{k}: {x}" for k, x in list(differ.items())[:4])

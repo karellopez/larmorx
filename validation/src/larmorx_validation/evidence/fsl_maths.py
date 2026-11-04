@@ -1267,15 +1267,16 @@ DIVERGENCE_REASONS = {
     "fn/double-tan": "GLIBC-07: with -dt double, glibc 2.35's tan (IBM's code in glibc, LGPL) "
     "is not always correctly rounded and the replica's is, in both modes: here 3 of 210 double "
     "values one unit in the last place from FSL's (tan differs on 0.21 % of image intensities). "
-    "No permissive code gives glibc's bits; an exact reproduction is planned by a clean-room "
-    "implementation of glibc's behaviour.",
+    "No permissive code gives glibc's tan, and tan, asin, acos and atan stay correctly rounded "
+    "in both modes (the user's decision of 2026-11-04).",
     "difftest/fft-twiddles-glibc-sincos": "GLIBC-07, from random testing: fslmaths convolves "
     "this kernel by the FFT, whose twiddle factors FSL's library takes from glibc's sincos "
     "(IBM's code, LGPL, not always correctly rounded: 0.148 % of the angles), while the "
     "replica computes them correctly rounded, in both modes: 1 of 90 float voxels one unit in "
     "the last place. Given FSL's own factors the replica's output is FSL's bit for bit (the FFT "
     "probe: every length from 1 to 256, and this case). Never met on fMRIPrep's calls (they "
-    "convolve by separable sums).",
+    "convolve by separable sums). LARMORX's own implementation of glibc's sincos (2026-11-04, "
+    "from a behavioural specification) can give the replica FSL's factors: a follow-up.",
 }
 
 

@@ -195,3 +195,29 @@ python -P validation/investigations/cleanroom-glibc-dbl/record_moves.py hmc \
 (inside `scripts/orchestration/boxed.sh 24`, with `PYTHONPATH=<worktree>/python:<worktree>/validation/src`
 and `LARMORX_ORACLE_CACHE_MODE=use`: about 9 minutes for FLIRT's, whose bands run FSL on noisy
 inputs, 1.5 for mcflirt's; the output, one JSON line per case, is `record-moves-2026-11-04.jsonl`.)
+
+## The site's evidence after the change (relay 3, 2026-11-04)
+
+The documentation site's pages of FLIRT, FAST, topup, fslmaths, fslstats, 3dTshift, the head-motion
+correction and BET were exported again from this branch. What was computed again, and the two checks
+behind it:
+
+- `refresh_original` (in `larmorx_validation.evidence.fsl_flirt`, `fsl_fast`, `fsl_topup`;
+  `fsl_maths_original.refresh` for fslmaths and fslstats; run as `python -m
+  larmorx_validation.evidence.<module> refresh-original "<why>"`): the clean-room original's runs of
+  every example entry of the figures cache made again in their working directories, FSL's runs kept
+  (FSL with correctly rounded maths, FSL on a perturbed input), and the original's case entries
+  (`cases-original`, `original-cases-default-mode`) computed again with FSL served by the
+  oracle-output cache; each entry records why (`rerun`, `recomputed`). fslmaths' and fslstats'
+  entries only where glibc's functions reach their calls (`GLIBC_REACHED`: `-s`, `-bptf`, `-tfce`,
+  the double functions, `-e`, `-E`); combine_masks and fslstats' goodvoxels calls use none.
+- `evidence_unchanged.py`: the entries not computed again (3dTshift's two examples, Fourier
+  interpolation; the head-motion correction's two, the normalised correlation; BET's three) checked
+  instead: each original run made again from its recorded command by this build, into a scratch
+  directory, its outputs compared with the entry's byte for byte after decompression. Result
+  (`evidence-unchanged-2026-11-04.json`): 19 of 19 runs give the same bytes.
+- `site_inventory.py`: the site's inventory page by page (every built page's words, headings,
+  paragraphs, tables and rows, images, figures, links, viewers and numbers carrying a JSON pointer;
+  every evidence file's lists and mappings, examples, cases, tables, leaves and blobs), before and
+  after an export, and the counts that fell (`--compare`), for the rule that the site's evidence only
+  ever improves.

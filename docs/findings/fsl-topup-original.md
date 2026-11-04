@@ -434,6 +434,107 @@ is a question for the spec writer (the part's handoff).
     falls on a voxel?). Case 7283 (`--regrid=0`, a level of 4 x 4 x 4 voxels) differs from the
     first cost on, as finding 27's short axes do.
 
+## The clean-room catch-up (2026-11-04): the spec answers of 2026-11-03
+
+The original brought up to `specs/topup.md`'s answers (§13's table, lines marked "spec writer,
+2026-11-03"): every FSL run through the oracle cache (`use` mode); the probes in
+[`validation/investigations/cleanroom-topup/`](../../validation/investigations/cleanroom-topup/README.md)
+(`catchup_probes.py`, `fsl201_spread.py`). Nothing here comes from FSL's source or the replica.
+
+37. **FSL-201's `reproduce`** (§4.3, §4.6): the movements sampled through FSL's matrices
+    (single-precision angle, glibc's `cosf` and `sinf` of it, the axis entry `q²`, each elementary
+    rotation about the level image's centre with its product `(n − 1) v` in single precision,
+    `M⁻¹` in double precision) and their derivatives FSL's forward differences of the sampling
+    positions (steps 1e-4 mm and 1e-5 rad, the sum with the image's derivative rounded to single
+    precision, divided by the step and rounded again, times the Jacobian); `--rbmout` writes FSL's
+    matrices about the regridded image's centre. The first gradients agree with FSL's
+    `TopupDebugGradient` files: `debug/movements` −298.408089, 54.363663, 14.391515 against FSL's
+    −298.408083, 54.363534, 14.391763 (2e-5; the exact derivatives 0.4 to 15 % off), and all 17
+    movement entries of the four-volume case's to 1e-6. The default (the exact derivatives) names
+    FSL-201 on every run that estimates the movements; `reproduce` names it reproduced.
+    **FSL's path is not determined beyond its inputs' last bits** (`fsl201_spread.py`): a
+    rotation's gradient entry moves by about 2 % of its lever-weighted sum when the rounding of its
+    angle to single precision flips by one unit (the four-volume case's second gradient: three of
+    nine rotation entries 40 to 70 apart from FSL's, the other six within 1e-4, where the
+    movements after the first step agree to 5e-10 rad). Changing every read-out time by 1, 16 and
+    256 units of its last float bit moves FSL's own corrected images by (p99 relative, inside the
+    brain) 0.00084 to 0.0021 (`opt/int16`, `opt/interp-linear`, `opt/levels`), 0.0017 to 0.0054
+    (`cfg/b02b0_4`, `cfg/b02b0_7T`) and 0.021 to 0.047 (`opt/four-volumes`, 1 to 1024 bits); the
+    original's `reproduce` runs with the same changes lie as far from FSL's unperturbed run
+    (2.1e-5 to 0.0037; `opt/int16`'s k = 1 and `opt/levels`' k = 16 within 2e-5 of FSL's: the
+    same path), except `cfg/b02b0_7T` (0.0079 to 0.0105, its `-v` costs following FSL's to 4 or 5
+    digits level by level, the final within 3e-4) and `opt/four-volumes` (0.043 to 0.057). The
+    default moves by 1e-7 to 1.4e-5 under the same changes (`cfg/b02b0_7T`): proportional to the
+    change, as an objective's minimum should. The record lists the six as expected divergences
+    with these numbers; `opt/scg-movements`, `opt/zero-readout`, `cfg/b02b0`, `cfg/b02b0_2`,
+    `opt/defaults` and `difftest/fsl145-short-axis` pass. The suite takes FSL's own last-bit band
+    (its run with the read-out times changed by one bit) for every case whose `reproduce` run
+    names FSL-201.
+
+38. **The mask follows the encoding, and the moved volumes keep the frame** (§4.3, spec writer
+    2026-11-03): (a) a volume with a read-out time of 0 was framed as if encoded along no axis
+    (the frame decided by the displacement `t p`, not by the encoding `p`): `opt/zero-readout`'s
+    `-v` counted `n = 16200` where FSL's is 17280; with the encoding deciding, its costs follow
+    FSL's to 5 digits and its movements to 2e-5 (the case passes, an expected divergence before).
+    The same choice now decides FSL-146's trigger and `reproduce` (§4.6: FSL leaves out of an
+    axis' Jacobian term only the volumes whose encoding along it is 0, whatever their read-out
+    time: brief item 8; the case named FSL-146 where FSL's gradient is the cost's). (b) a moved
+    volume's validity checked the moved position strictly inside the level's target grid and set
+    no frame, so its mask grew where FSL's shrinks (`opt/four-volumes`: 16740 after the first step
+    against FSL's 16200, then 16128 and 15947); now the frame by the voxel's index always and the
+    sampling position within `[0, n − 1]` of the image interpolated, to 1e-8, along every axis but
+    the one the image wraps along: the second cost equals FSL's to 6 digits.
+
+39. **FSL-145's counts and its error** (§4.2): `reproduce` lays FSL's count, 1 coefficient when
+    `n < k`, 2 when `k ≤ n < 2k` at `k ≥ 3`, the general count at `k = 2` from `n = 2` on (FSL's
+    test: no coefficient added while `floor(n / k) k < floor(K / 2)`), and stops as FSL does where a
+    refit has a single coefficient along an axis: at level 1 when it is subsampled (`Error occurred
+    when preparing to run topup`), at a later level (`... level <l> of topup`), and at the outputs'
+    refit after a subsampled last level, which a black-box run showed: `Error occured while
+    writing output from topup` / `Exception thrown with message: Mat::operator(): index out of
+    bounds`, exit 1, only the log written (`catchup_probes.py final-single`: 6 slices, `--warpres=44
+    --subsamp=2`). `opt/fsl145-one-coefficient` is rejected by both alike. applytopup: the default
+    reads a coefficient file of either count (naming FSL-145 when it reads the general count on a
+    short axis), `reproduce` only FSL's: FSL aborts on the other (`terminate called after throwing
+    an instance of 'TOPUP::TopupFileIOException'` / `what(): TopupFileIO::TopupFileReader::
+    TopupFileReader: Unable to read file tu`, signal 6; `catchup_probes.py general-count` on the
+    original's default `_fieldcoef` of `opt/fsl145-short-axis`).
+
+40. **The regulariser's sampling of quadratic B-splines** (§4.6): each basis function sampled at
+    the offsets inside its open support, the second derivative at an even spacing's inner knots
+    the mean of its one-sided values (`-1 / (2 k²)`), the outer knots not sampled (both modes):
+    random testing's reproducer 10753 agrees (the open item of finding 36).
+
+41. **The spline prefilter's truncated start** (§4.5, §9.4; both modes): the recursive prefilter
+    with initial sums of `min(N, 15)` terms and no normalisation, periodic for the images and
+    mirrored for a field image's Jacobian (§7.3): reproducer 7283 (`--regrid=0`, a level of 4 x 4 x
+    4 voxels) agrees; for `N ≥ 15` the coefficients are the exact ones to 1e-9.
+
+42. **applytopup `lsr`'s matrices row by row** (§7.4; both modes): each observed voxel's extent
+    mapped back by FSL's walk, the columns wrapping circularly: reproducer 8089 (lines of 16 voxels
+    whose mapping folds) agrees. **FSL-133's `reproduce`**: the mapping at an index `k < 0` takes
+    the field of voxel `(k + 2³²) mod n`: `at/lsr-long`, `at/vb2d-long`, `at/vb3d-long`,
+    `at/vb4d-long` and reproducer 5 pass (expected divergences before); both modes name FSL-133
+    where a restored line read the wrap-around and the two reads take different field values.
+
+43. **FSL-134's field of another shape** (§7.3, `reproduce`): a coefficient field laid onto the
+    images' grid in storage order for the displacement, its Jacobian from its own grid written at
+    the same indices and 0 beyond: `at/jac-other-shape` passes (refused in both modes before; the
+    default still refuses other grids); a field image of another shape is laid the same way, its
+    Jacobian's spline derivatives evaluated at the images' voxels with zeros beyond its own grid
+    (no case reaches it). The coefficient field's Jacobian takes §7.3's scales, the image's voxel
+    size over the field's (1 on its own grid: no case changes); a field image's `reproduce` scales
+    are FSL's, `dx / fx` and `dx / fy` (`dx` the image's x voxel size, `fx`, `fy` the field image's),
+    the default's 1 (the field indexed as the image is: the Jacobian of the mapping applied).
+
+44. **Random testing's reproducers of the spec answers, replayed** (`difftest --replay`, FSL from
+    the cache): 10753, 8089, 7283, 5, 10280, 2724, 1142, 13346, 7321, 11095, 12 agree; 6, 12118
+    and 3693 differ by the minimisations' paths of findings 31 and 37, 275 by FSL-143's divergence
+    (finding 26), 2150 by `--debug`'s attempt files (the path). Two replays (6 and 27) report
+    differences that the same cases run directly through the suite (`run_case`) do not show (6:
+    `feat_fieldmap_mag`'s p99; 27: `jac_N: the same grid`): a difference of the replay's
+    environment, to understand before the next trial (sub-task 6).
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

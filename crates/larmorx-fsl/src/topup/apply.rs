@@ -669,6 +669,10 @@ pub(super) fn moved_images(s: &Settings, images: &[Image]) -> (Vec<Vec<Vec<f64>>
     (moved, mask)
 }
 
+/// One line of a restoration: its first voxel, its restored volumes (`None`: skipped) and
+/// whether its matrices read the wrap-around where FSL-133's read differs.
+type RestoredLine = (usize, Option<Vec<Vec<f64>>>, bool);
+
 /// The lines along `axis` (x or y) of a grid `dims`: their first voxels in storage order (the
 /// other in-plane axis fastest, then z) and the stride along a line.
 pub(super) fn line_starts(dims: [usize; 3], axis: usize) -> (Vec<usize>, usize) {
@@ -707,7 +711,7 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
             .iter()
             .map(|&k| images[k].scan.pe[axis] * images[k].scan.t)
             .collect();
-        let lines: Vec<(usize, Option<Vec<Vec<f64>>>, bool)> = starts
+        let lines: Vec<RestoredLine> = starts
             .par_iter()
             .map(|&s0| {
                 if (0..n).any(|j| !mask[s0 + j * stride]) {

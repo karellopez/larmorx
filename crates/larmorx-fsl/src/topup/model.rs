@@ -630,12 +630,17 @@ impl Level {
             // displaced along more than one axis (an oblique phase encoding): no axis wraps; a
             // sample outside the level image along a displaced axis marks the voxel invalid
             // (observed: first_step.py, FSL's debug masks; findings 32)
+            // the validity of a sampling position (§4.3, spec writer 2026-11-03): every axis but
+            // the one the image wraps along (the encoding's, when it is along x alone or y
+            // alone; none for an oblique encoding) within [0, n - 1] of the image interpolated,
+            // to 1e-8 voxel; the voxel frame of `inside_static` besides, moved or not (observed:
+            // `-v`'s counts of opt/four-volumes, its mask shrinking as the movements grow)
             let enc = self.enc[i];
             let oblique = enc.iter().filter(|x| **x).count() > 1;
+            let wraps: [bool; 3] = std::array::from_fn(|a| enc[a] && !oblique);
             let n_img = self.images.dims;
             let on_grid = |p: [f64; 3]| {
-                !oblique
-                    || (0..3).all(|a| !enc[a] || (p[a] >= 0.0 && p[a] <= (n_img[a] - 1) as f64))
+                (0..3).all(|a| wraps[a] || (p[a] >= -1e-8 && p[a] <= (n_img[a] - 1) as f64 + 1e-8))
             };
             // per voxel (each value independent), slice by slice, written in place
             let slices = Slices::split(
@@ -734,14 +739,8 @@ impl Level {
                             Some(mo) => {
                                 let q = mo.apply(self.position(v));
                                 let pm: [f64; 3] = std::array::from_fn(|a| q[a] + hv * e_mm[a]);
-                                let valid = (0..3).all(|a| {
-                                    enc[a] || {
-                                        let r = pm[a] / self.vt[a];
-                                        r > 0.0 && r < (self.nt[a] - 1) as f64
-                                    }
-                                });
                                 let p = std::array::from_fn(|a| pm[a] / self.images.voxel[a]);
-                                (p, valid && on_grid(p))
+                                (p, inside_static([x, y, z], self.nt, enc) && on_grid(p))
                             }
                         };
                         let (f, d) = interp(&self.images.coef[i], p, want);

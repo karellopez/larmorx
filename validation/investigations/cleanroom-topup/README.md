@@ -136,3 +136,16 @@ original's files compared with FSL's value by value, the record's metrics and FS
 band where the record measures it); `python -m larmorx_validation.evidence.fsl_topup original`
 or `cases-original` computes them alone. Every page counted before and after with
 `../cleanroom-bet/site_inventory.py count <site> <page>` and compared with its `compare`.
+
+## The clean-room catch-up (2026-11-04, the spec answers of 2026-11-03)
+
+Findings 37 to 44 of `docs/findings/fsl-topup-original.md`. FSL only through the oracle cache, the
+original named by `LARMORX_TOPUP_BIN`; every run inside `scripts/orchestration/boxed.sh`.
+
+| Script | What it does |
+|---|---|
+| `catchup_probes.py` | `final-single <dir>`: topup with `--splineorder=2` on 6 slices whose last level is subsampled, so the outputs' refit has a single coefficient along z (FSL: `Error occured while writing output from topup`, FSL-145); `general-count <dir> <coef dir>`: applytopup `--method=jac` on a coefficient file of the general quadratic count on a short axis (FSL aborts: `Unable to read file`) |
+| `fsl201_spread.py` | one suite case with every read-out time changed by `k` units of its last float bit: FSL's runs (`fsl`), the original's `reproduce` runs (`lx`) against FSL's unperturbed run, and the original's default runs against its own unperturbed default (`fix`): FSL-201 makes FSL's path depend on its inputs' last bits (finding 37). `fsl201_spread.py <case> <new dir> 1,16,256 fsl,lx` |
+| `lsr_speed.py` | applytopup `lsr` on ds005040's pair with FSL's topup result: the original's wall time at the given thread counts and its output against FSL's (0.13 s on one thread, 0.03 s on 14; FSL 0.42 s, `docs/benchmarks/fsl-topup.md`) |
+
+`mine.py` takes the original's binary from `LARMORX_BIN` (default `target/release/larmorx`).

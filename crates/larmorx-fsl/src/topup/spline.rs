@@ -153,7 +153,11 @@ impl Axis {
     /// `3k` for an odd one): every `n < k`, and `k <= n < 2k` from `k = 3` on.
     fn fsl_stops_short(&self) -> bool {
         let k = self.k;
-        let sampled = if k % 2 == 0 { 3 * k - 1 } else { 3 * k };
+        let sampled = if k.is_multiple_of(2) {
+            3 * k - 1
+        } else {
+            3 * k
+        };
         (self.n / k) * k < sampled / 2
     }
 

@@ -93,13 +93,42 @@ NOT_YET = "is not implemented yet in the clean-room original"
 BAND_THREADS = 4
 #: The original's thread count in the cases (random testing sets its worker's).
 LX_THREADS = 4
+#: FSL-201's forward differences make FSL's own path depend on the last bits of its inputs
+#: (``validation/investigations/cleanroom-topup/fsl201_spread.py``, the clean-room catch-up of
+#: 2026-11-04): the corrected images' p99 relative difference from FSL's unperturbed run, of FSL's
+#: runs with every read-out time changed by 1, 16 and 256 units of its last float bit, and of the
+#: original's ``reproduce`` runs with the same changes.
+_FSL201_SPREAD = {
+    "opt/int16": ("0.00084 to 0.00089", "2.1e-5 to 0.00105"),
+    "opt/interp-linear": ("0.00056 to 0.0021", "0.0010 to 0.0020"),
+    "opt/levels": ("0.0010 to 0.0020", "1.7e-5 to 0.0018"),
+    "opt/four-volumes": ("0.021 to 0.047 (also 64 and 1024 last bits)", "0.043 to 0.057"),
+    "cfg/b02b0_4": ("0.0019 to 0.0033", "0.0013 to 0.0037"),
+    "cfg/b02b0_7T": (
+        "0.0017 to 0.0054",
+        "0.0079 to 0.0105 (its -v costs follow FSL's to 4 or 5 digits level by level, the final "
+        "within 3e-4)",
+    ),
+}
 #: Cases whose metrics are expected outside the thresholds, and why (their exit status, files,
-#: messages and headers are still compared): FSL-126's negative weight, which makes both
-#: minimisations diverge; FSL-143's indefinite prior, whose diverging iterations amplify the
-#: moved images' float-level differences; vb2D's transients. (The movements' cases of findings 14
-#: pass since FSL-201's ``reproduce`` takes FSL's forward differences, and the long lines since
-#: FSL-133's ``reproduce`` reads FSL's wrap-around: the clean-room catch-up, 2026-11-04.)
+#: messages and headers are still compared): the movements estimated and not converged, where
+#: FSL-201's ``reproduce`` gives FSL's derivatives but FSL's path is not determined beyond its
+#: inputs' last bits (``_FSL201_SPREAD``; the other cases of findings 14 pass since the catch-up);
+#: FSL-126's negative weight, which makes both minimisations diverge; FSL-143's indefinite prior,
+#: whose diverging iterations amplify the moved images' float-level differences; vb2D's transients.
+#: (The long lines pass since FSL-133's ``reproduce`` reads FSL's wrap-around.)
 EXPECTED_DIVERGENCES: dict[str, str] = {
+    **{
+        name: "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation "
+        "derivatives are forward differences of single-precision matrices, so each gradient "
+        "entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single "
+        "precision flips, and FSL's own path is not determined beyond its inputs' last bits: "
+        f"FSL's own runs with the read-out times changed by 1 to 256 last bits lie {fsl} from "
+        f"its unperturbed run (the corrected images' p99), the original's reproduce runs {lx}; "
+        "the original's first gradients agree with FSL's to 1e-6 (findings 37), its default "
+        "(the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes"
+        for name, (fsl, lx) in _FSL201_SPREAD.items()
+    },
     "opt/lambda-negative": "FSL-126 reproduced: a negative weight rewards a rough field, both "
     "minimisations diverge",
     **{
@@ -1032,6 +1061,14 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "", random_case: bool
         )
         if _not_yet(ours):
             raise Outcome(SKIPPED, f"the original does not take this yet: {_not_yet(ours)}")
+        # FSL-201: with the movements estimated, FSL's rotation derivatives are forward
+        # differences of single-precision matrices, so its path depends on the last bits of its
+        # movement parameters (each angle's rounding to single precision: about 2 % in the
+        # rotations' gradient entries, specs/topup.md §4.6); FSL's own last-bit band is the
+        # allowance of such a case, as of a random one
+        last_bit = random_case or (band is None and run.single is None and "FSL-201" in ours.stderr)
+        if last_bit and band is None:
+            band = _random_band(run, node, settings, stack)
         compare(
             checks,
             oracle,
@@ -1043,7 +1080,7 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "", random_case: bool
             band,
             program=prog,
             band_name="its read-out times changed in their last float bit"
-            if random_case
+            if last_bit
             else f"--nthr={BAND_THREADS} against 1",
         )
         if run.fix and ours.code == 0 and not run.profile:

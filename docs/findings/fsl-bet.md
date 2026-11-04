@@ -296,12 +296,94 @@ release build with AArch64's default NaN emulated (`libnan_trap.so`).
   to FSL's wherever FSL finishes (FSL crashed in 18; those are compared among the
   replica's builds). BET's golden files and every parity case were unchanged by the fix.
 
-## Pending (not replicated yet)
+## `bet -S`, `-B`, `-A`, `-A2` (BET's options part, 2026-11-04)
 
-`bet -S` (standard_space_roi, FLIRT, fslmaths' morphology, fslstats), `-B` (standard_space_roi,
-FAST), `-A` and `-A2` (FLIRT, then betsurf): the replica refuses them with exit 1, naming the
-missing FSL program. They become possible as FLIRT and FAST are replicated (docs/next-steps.md,
-the FSL item). `robustfov` (in fsl-bet2) is not translated either.
+Translated from the script (`bet:269-399`, fsl-bet2 2111.9, unchanged since 2111.8) once FLIRT,
+standard_space_roi (`findings/fsl-flirt.md`), FAST, fslmaths and fslstats had their replicas:
+each program the script runs is the replica's, called in the same process with the words bash
+would give it (`bet.rs`: `eyes`, `bias`, `surfaces`). `robustfov` (in fsl-bet2) is not
+translated (no script of FSL's that BET runs calls it).
+
+- **`-S`** (`bet:269-298`): `bet2 $IN ${OUT}_tmp_betraw -s $bet2opts`, `standard_space_roi $IN
+  ${OUT}_tmp_premask -b -d`, `bet2 ${OUT}_tmp_premask ${OUT}_tmp_premask_bet -n -m -f 0.4
+  $bet2opts` (a later `-f` of the user's wins: bet2's parser keeps the last), FLIRT of
+  `MNI152_T1_2mm_eye_mask` through standard_space_roi's `_tmp_to_std_inv.mat` (`-applyxfm
+  -datatype float`), the fslmaths chains, `Mean` and `SD` from `fslstats -M` and `-S`, `thr` from
+  `dc`, the brain, `${OUT}_mask` (always), `${OUT}_skull` (always, from the raw run's skull). The
+  usage's "disables -o option" is only that `-o` (and `-e`) reach the temporary raw run alone.
+  With `-n` the raw brain is not written and `fslmaths ${OUT}_tmp_betraw ...` aborts (newimage's
+  `No image files match`, an uncaught `std::runtime_error`): bash reports the abort at line 399
+  (the variations block's `fi`, where its parser stood; observed), then the `ERR` trap's line,
+  exit 1. Not a defect of the script's own (the program's message names the missing file); the
+  replica prints the same in both modes.
+- **`-B`** (`bet:372-399`): `standard_space_roi -b -d`, `fast -b ${OUT}_tmp_premask >/dev/null
+  2>&1` (FAST's messages discarded: the replica forwards only its own `larmorx-nc:` lines, the
+  notices and refusals), `fslmaths $IN -div ${OUT}_tmp_premask_bias`, with `-s` (`skull=1`)
+  `standard_space_roi ... -maskFOV -roiNONE -d` (`maskthr` from the environment applies there:
+  FSL-213), `bet2` and fslpy's `immv`, then `standard_space_roi -b -d` again and
+  `${FSLDIR}/bin/bet ${OUT}_tmp_unbiased_premask $OUT -m $bet2opts -R -d`: the script again (its
+  own `ERR` trap's message before the outer one's when it fails; one set of notices). Its `-R`
+  removes `-n`, so the brain is always written. `bet2opts=\`echo $bet2opts | sed 's/-s//g'\``
+  (`bet:388`) meets FSL-63 as `-R`'s does (`bet -B -e -s`: the robust run gets no `-e`, no mesh;
+  the sed also removes `-s` inside other words). The replica's `echo_sed` serves both.
+- **`-A`, `-A2`** (`bet:343-369`): FLIRT to `MNI152_T1_2mm` (the matrix only), `-A2` first the T2
+  to the input (`-interp sinc`; `$IN2` unquoted and not passed through `remove_ext`: FSL-44),
+  `bet2 $IN $OUT -e $bet2opts`, `betsurf [--t1only] -o -m -s`; betsurf's notices join the
+  script's (`betsurf::main_with`).
+- **`standard_space_roi -d`'s status inside `bet`**: the script (bash, no `-e`) ends with `if [
+  $debug = 0 ] ...; fi`, whose status is 0 with `-d`, so in FSL a program failing inside it
+  never fires bet's `ERR` trap (only its usage and its invalid-input exits do). The replica's
+  default stops standard_space_roi at the first failure with status 1 (FSL-214), so `bet`'s
+  trap then fires: the default's stop, FSL-214 named.
+- **The cleanup** (`rm -f ${OUT}_tmp*`, FSL-46): the programs write many temporary files
+  (FAST's `_seg`, `_pve_*`, `_mixeltype`, `_pveseg`, `_bias`; standard_space_roi's with `-d`);
+  the default removes the files named `${OUT}_tmp...` that did not exist before the run or
+  changed during it, and those it registered.
+- **First comparisons** (2026-11-04, `reproduce`, the oracle FSL 6.0.7.23, before the suite's
+  cases): `bet -S -d` and `-S -m -v` on ds000005's T1w, `-S -n` (the abort), `-B -d` (24 files:
+  FAST's and standard_space_roi's), `-B -s -m`, `-A -d` (13 files), `-A2 <T2> -d` on ds000256's
+  T1w and T2w (15 files): exit statuses, both streams and every file identical (the headers'
+  `descrip` aside). Times (FSL single-threaded; the replica with 4 threads): 41 / 32 s (`-S`), 106
+  / 61 s (`-B`), 32 / 28 s (`-A`), 134 / 97 s (`-A2`). The default differs only where FSL-09
+  (FLIRT's integer output inside standard_space_roi) and FSL-202 (FAST's variances, `-B`) are
+  named.
+
+### FSL-216: `-S`'s eye threshold through `dc` (rule A; NaN and infinity rule B)
+
+`thr=\`echo "10 k 3.5 $SD * $Mean + p" | dc\`` (`bet:290`): `Mean` and `SD` are what `fslstats
+-M` and `-S` print with `cout`'s default format (6 significant digits), so `dc` reads them as its
+own text. A mean of 1,000,000 or more (or below 0.0001) prints with an exponent (`2.1e+06`):
+dc pushes `2.1`, prints its message for `e` (GNU dc 1.4.1 writes `dc: ` on standard error and
+`'e' (0145) unimplemented` on standard output, which the command substitution takes into
+`thr`), adds, pushes `06` and adds again: `thr` is several words (a mean of `2.1e+06` and a deviation of `81.2345`: `'e' (0145)
+unimplemented 292.42075`) and `fslmaths -uthr` fails on them (the `ERR` trap). A negative mean (`-12.5`) is a
+subtraction (`dc: stack empty`), so the threshold is 3.5 standard deviations plus 12.5. `nan`
+and `inf` (NaN or infinite voxels in the brain) are commands (`n` prints and pops, `a` makes a
+string, `i` sets the input base, `f` prints the stack): `thr` is garbage, the eye cleanup cuts
+the brain at an arbitrary value. The input makes sense in the first two (a float image of large
+values; a brain with negative values): **rule A**, the default reads the numbers as numbers
+(written in dc's notation: `_` for the minus, the exponent applied) and computes the threshold
+in dc's decimal arithmetic; a mean or standard deviation that is not a number has no threshold:
+**rule B**, the default refuses (exit 1, naming FSL-216). `reproduce` gives what FSL's dc prints
+and writes its messages. The replica's dc follows GNU dc 1.4.1 for every character `fslstats`
+can print (numbers in the input base, `_`, `+ - * / ^`, `k`, `p`, `n`, `f`, `a`, `i`, the
+message of any other character; zero printed `0` at any scale), checked against GNU dc on 21
+expressions (`bet.rs`, `dc::tests`). Parity cases `defects/eyes-threshold-exponent` (a phantom ×
+3000) and `defects/eyes-threshold-nan` (NaN voxels in the brain).
+
+### The standard images the options read (FSL 6.0.7.23's fsl-data_standard 2208.0)
+
+| File (`${FSLDIR}/data/standard/`) | Read by | Bytes | SHA-256 |
+|---|---|---|---|
+| `MNI152_T1_2mm.nii.gz` | `-S`, `-B` (standard_space_roi's reference), `-A`, `-A2` (FLIRT's reference) | 1,406,977 | `0585cd056bf5ccfb8bf97a5f6a66082d4e7caad525718fc11e40d80a827fcb92` |
+| `MNI152_T1_2mm_brain_mask_dil.nii.gz` | `-S`, `-B` (standard_space_roi `-b`) | 11,132 | `342d41e1c445d87a812ca288786a116306e96a5595a198e46ba7e7515d4f221c` |
+| `MNI152_T1_2mm_eye_mask.nii.gz` | `-S` (FLIRT `-applyxfm`) | 2,788 | `5ce2da5f524da4562d2274192010c69e152b83166f214ac75dbcc5a778493ad5` |
+
+1,420,897 bytes in all; FAST `-b` without `-a` reads no tissue priors, and betsurf reads none.
+The package: `fsl-data_standard-2208.0-0.tar.bz2` from FSL's conda channel (its conda record:
+SHA-256 `2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a`, no licence field).
+The replica finds them through `larmorx_nc_core::fsldata` (`LARMORX_FSL_DATA`, `$FSLDIR/data`,
+larmorx-nc's own copy) and refuses before running anything when one is nowhere.
 
 ## FSL 6.0.7.23 (the version update, 2026-10-29)
 

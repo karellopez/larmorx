@@ -34,6 +34,7 @@ with open(here / "calls.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS"),
                         "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS"),
                         "path": os.environ.get("PATH"), "cwd": os.getcwd(),
+                        "data": os.environ.get("LARMORX_FSL_DATA"),
                         "fsl": {k: v for k, v in os.environ.items()
                                 if k.upper().startswith("FSL")}}) + "\\n")
 if args == ["--version"]:
@@ -49,13 +50,20 @@ tool, rest = args[1], args[2:]
 if tool in ("bet2", "bet"):
     source, out = rest[0], rest[1]
     names = [""]
-    for option, name in (("-m", "_mask"), ("-o", "_overlay"), ("-s", "_skull"), ("-F", "_mask")):
+    for option, name in (("-m", "_mask"), ("-o", "_overlay"), ("-s", "_skull"), ("-F", "_mask"),
+                         ("-S", "_mask"), ("-S", "_skull"), ("-B", "_mask")):
         if option in rest:
             names.append(name)
     for name in names:
         shutil.copyfile(source, out + name + ".nii")
-    if "-e" in rest:
+    if "-e" in rest or "-A" in rest or "-A2" in rest:
         Path(out + "_mesh.vtk").write_text(mesh)
+    if "-A" in rest or "-A2" in rest:
+        for s in ("inskull", "outskull", "outskin"):
+            Path(out + "_" + s + "_mesh.vtk").write_text(mesh)
+            shutil.copyfile(source, out + "_" + s + "_mask.nii")
+            shutil.copyfile(source, out + "_" + s + "_mesh.nii")
+        shutil.copyfile(source, out + "_skull_mask.nii")
 else:
     files = [a for a in rest if not a.startswith("-") and not a.isdigit()]
     t1, out = files[0], files[-1]
@@ -172,10 +180,10 @@ def test_the_original_runs_in_process(scripts, tmp_path):
     assert code == 0, err
     m = np.asanyarray(lx.load(out / "o_mask.nii").data)
     assert np.array_equal(m, np.asarray(r.mask.data))
-    # FSL's refusals: a fractional threshold out of range, the pending variations
+    # FSL's refusals: a fractional threshold out of range; the variations with a replica only
     with pytest.raises(ValueError, match="frac"):
         lx.fsl.bet(path, frac=2.0, implementation="original")
-    with pytest.raises(NotImplementedError, match="does not replicate yet"):
+    with pytest.raises(NotImplementedError, match="has only its replica"):
         lx.fsl.bet(path, variation="eyes", implementation="original")
 
 
@@ -190,15 +198,26 @@ def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
         {"variation": "robust", "smoothness": 2.0},
         {"variation": "small_fov", "head_ct": True},
         {"variation": "fmri", "mesh": True},
+        {"variation": "eyes", "outline": True},
+        {"variation": "eyes", "mesh": True},
+        {"variation": "eyes", "brain": False},
+        {"variation": "surfaces_t2"},
+        {"variation": "surfaces", "t2": path},
+        {"t2": path},
         {"n_threads": -1},
     ):
         with pytest.raises(ValueError):
             lx.fsl.bet(path, **kwargs)
     with pytest.raises(TypeError):
         lx.fsl.bet(path, radius="large")
+    # without larmorx-nc, the variations with a replica only refuse ("auto" and "original")
     for variation in ("eyes", "bias", "surfaces", "surfaces_t2"):
-        with pytest.raises(NotImplementedError, match="does not replicate yet"):
-            lx.fsl.bet(path, variation=variation)
+        t2 = path if variation == "surfaces_t2" else None
+        for implementation in ("auto", "original"):
+            with pytest.raises(NotImplementedError, match="has only its replica"):
+                lx.fsl.bet(path, variation=variation, t2=t2, implementation=implementation)
+        with pytest.raises(NotImplementedError, match="has only its replica"):
+            lx.fsl.bet(path, variation=variation, t2=t2, tanh="correctly-rounded")
     with pytest.raises(ValueError, match="upstream_defects"):
         lx.fsl.bet(path, upstream_defects="exact")
     with pytest.raises(ValueError, match="precision"):
@@ -273,6 +292,36 @@ def test_bet_variations_run_the_script(scripts, tmp_path):
         assert (r.mask is not None) == (variation == "fmri")
     r = lx.fsl.bet(path, variation="fmri", brain=False)
     assert r.brain is None and r.mask is not None
+
+
+def test_bet_replica_only_variations(scripts, tmp_path):
+    """-S, -B, -A and -A2 run the replica's script with the standard images' directory
+    (``fsl_data``); -A and -A2 return betsurf's surfaces, -A2 passes the T2."""
+    program = stub(scripts)
+    path = volume(tmp_path)
+    data = tmp_path / "fsl data"
+    r = lx.fsl.bet(path, variation="eyes", mask=True, skull=True, fsl_data=data)
+    call = calls(program)[-1]
+    assert call["args"][:2] == ["fsl", "bet"] and "-S" in call["args"], call["args"]
+    assert Path(call["data"]) == data.resolve()
+    assert r.brain is not None and r.mask is not None and r.skull is not None
+    r = lx.fsl.bet(path, variation="bias", brain=False, mask=True)
+    args = calls(program)[-1]["args"]
+    assert "-B" in args and "-n" not in args, args
+    assert r.brain is None and r.mask is not None
+    r = lx.fsl.bet(path, variation="surfaces", mesh=True)
+    args = calls(program)[-1]["args"]
+    assert "-A" in args and "-e" not in args, args
+    assert r.mesh is not None and r.surfaces is not None
+    assert r.surfaces.inskull_mask is not None and r.surfaces.skull_mask is not None
+    assert r.surfaces.outskin_outline is not None
+    (tmp_path / "t2").mkdir()
+    t2 = volume(tmp_path / "t2")
+    r = lx.fsl.bet(path, variation="surfaces_t2", t2=t2)
+    args = calls(program)[-1]["args"]
+    i = args.index("-A2")
+    assert Path(args[i + 1]) == t2.resolve(), args
+    assert r.surfaces is not None and r.mesh is None
 
 
 def test_bet_turns_notices_and_warnings_into_python_warnings(tmp_path, scripts):

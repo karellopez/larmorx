@@ -1120,10 +1120,35 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("small-fov-verbose", "bet", "-Z -v -s", S("bet", ("{0}", "out", "-Z", "-m", "-v", "-s"), ("slab",), tier="standard"))
     add("small-fov-large", "bet", "-Z on an image already 100 mm high: no padding", S("bet", ("{0}", "out", "-Z", "-m"), (h,), tier="standard"))
     add("debug", "bet", "-d: the temporary files kept", S("bet", ("{0}", "out", "-Z", "-d"), ("slab",), tier="standard"))
-    for v, need in (("-S", "eyes"), ("-B", "bias"), ("-A", "surfaces")):
-        add(f"pending{v}", "bet", f"{v}: needs FSL programs larmorx does not replicate yet ({need})",
-            S("bet", ("{0}", "out", v), (h,), expect="pending", tier="standard"))
-    add("pending-A2", "bet", "-A2 <T2>: pending (FLIRT)", S("bet", ("{0}", "out", "-A2", "{1}"), (h, "head-t2"), expect="pending", tier="standard"))
+    # -S, -B, -A, -A2 (2026-11-04): standard_space_roi, FLIRT, FAST, fslmaths, fslstats and
+    # betsurf run by the script, MNI152's standard images from FSLDIR
+    add("eyes", "bet", "-S: the eyes and optic nerves removed (standard_space_roi -b, FLIRT, fslmaths, fslstats, dc)",
+        S("bet", ("{0}", "out", "-S", "-m"), (h,), python=("bet", {"variation": "eyes", "mask": True}, {"out.nii.gz": "brain", "out_mask.nii.gz": "mask", "out_skull.nii.gz": "skull"})))
+    add("eyes-debug", "bet", "-S -d: every temporary file kept (standard_space_roi's too)", S("bet", ("{0}", "out", "-S", "-d"), (h,), tier="standard"))
+    add("eyes-verbose", "bet", "-S -v -t -f 0.4: the options passed to both bet2 runs (the later -f wins)", S("bet", ("{0}", "out", "-S", "-v", "-t", "-f", "0.4"), (h,), tier="standard"))
+    add("eyes-outline-mesh", "bet", "-S -o -e: the outline and mesh only in the temporary bet2 run", S("bet", ("{0}", "out", "-S", "-o", "-e", "-m"), (h,), tier="standard"))
+    add("eyes-no-brain", "bet", "-S -n: the raw brain is not written and fslmaths aborts (the ERR trap)", S("bet", ("{0}", "out", "-S", "-n"), (h,), expect="error", tier="standard"))
+    add("eyes-pair", "bet", "-S with FSLOUTPUTTYPE=NIFTI_PAIR (every program's output a pair)", S("bet", ("{0}", "out", "-S"), (h,), output_type="NIFTI_PAIR", tier="standard"))
+    add("bias", "bet", "-B: FAST's bias field removed, the neck cut (standard_space_roi -b twice), bet -R",
+        S("bet", ("{0}", "out", "-B"), (h,), python=("bet", {"variation": "bias", "mask": True}, {"out.nii.gz": "brain", "out_mask.nii.gz": "mask"})))
+    add("bias-debug", "bet", "-B -d: FAST's and standard_space_roi's files kept", S("bet", ("{0}", "out", "-B", "-d"), (h,), tier="standard"))
+    add("bias-skull", "bet", "-B -s -v: the skull from standard_space_roi -maskFOV -roiNONE and bet2, immv", S("bet", ("{0}", "out", "-B", "-s", "-v"), (h,), tier="standard"))
+    add("bias-n", "bet", "-B -n -o: the robust run removes -n (the brain written)", S("bet", ("{0}", "out", "-B", "-n", "-o"), (h,), tier="standard"))
+    add("surfaces", "bet", "-A: FLIRT to MNI152, bet2 -e, betsurf --t1only -o -m -s",
+        S("bet", ("{0}", "out", "-A"), (h,), python=("bet", {"variation": "surfaces"}, {"out.nii.gz": "brain", "out_inskull_mask.nii.gz": "surfaces.inskull_mask", "out_skull_mask.nii.gz": "surfaces.skull_mask"})))
+    add("surfaces-debug", "bet", "-A -d -m: FLIRT's matrix kept", S("bet", ("{0}", "out", "-A", "-d", "-m"), (h,), tier="standard"))
+    add("surfaces-t2", "bet", "-A2 <T2>: FLIRT of the T2 (sinc), FLIRT to MNI152, bet2 -e, betsurf -o -m -s",
+        S("bet", ("{0}", "out", "-A2", "{1}"), (h, "head-t2"), python=("bet", {"variation": "surfaces_t2", "t2": "{1}"}, {"out.nii.gz": "brain", "out_outskin_mask.nii.gz": "surfaces.outskin_mask"})))
+    add("surfaces-t2-debug", "bet", "-A2 <T2> -d -v", S("bet", ("{0}", "out", "-A2", "{1}", "-d", "-v"), (h, "head-t2"), tier="standard"))
+    add("surfaces-t2-missing", "bet", "-A2 of a T2 that does not exist: FLIRT fails (the ERR trap)", S("bet", ("{0}", "out", "-A2", "/nonexistent/t2"), (h,), expect="error", tier="standard"))
+    add("surfaces-t2-no-value", "bet", "-A2 as the last argument: the usage", S("bet", ("{0}", "out", "-A2"), (h,), expect="error", tier="standard"))
+    add("last-variation", "bet", "-B -R -S -A: the last variation given (-A)", S("bet", ("{0}", "out", "-B", "-R", "-S", "-A"), (h,), tier="standard"))
+    add("eyes-threshold-exponent", "defects", "-S on intensities above 1e6: fslstats prints 2.1e+06 and dc reads the exponent as commands (FSL-216)",
+        S("bet", ("{0}", "out", "-S", "-m"), ("head-large",), tier="standard"))
+    add("eyes-threshold-nan", "defects", "-S with NaN voxels in the brain: fslstats prints nan and dc reads it as commands (FSL-216)",
+        S("bet", ("{0}", "out", "-S"), ("head-nan",), fix_refuses="FSL-216", tier="standard"))
+    add("bias-skull-echo", "defects", "-B -e -s: the skull's sed passes bet2's options through echo, which takes -e (FSL-63)",
+        S("bet", ("{0}", "out", "-B", "-e", "-s"), (h,), tier="standard"))
     add("usage", "bet", "bet without an output", S("bet", ("{0}",), (h,), expect="error"))
     add("no-input", "bet", "an input that does not exist", S("bet", ("/nonexistent/in", "out"), (), expect="error"))
     add("unknown-option", "bet", "an unknown option", S("bet", ("{0}", "out", "-w", "2"), (h,), expect="error"))
@@ -1174,6 +1199,13 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
         add(f"{name}-surf-t2", "real", f"{desc}: betsurf -o -m -s with the T2 FLIRT registered", S("betsurf", ("-o", "-m", "-s", "{0}", "{1}", "{2}", "{3}", "out"),
                                                                                                   (f"real:{name}", f"t2:{name}", f"mesh:{name}", f"mat:{name}"), tier="full"))
     add("bold-F", "real", "a BOLD series (ds000005): bet -F", S("bet", ("{0}", "out", "-F"), ("real:bold-ds000005",), tier="standard"))
+    # bet -S, -B, -A, -A2 on real heads (SIENA's and the skull surfaces' calls; 2026-11-04)
+    add("adult-ds000005-S", "real", "an adult (ds000005): bet -S -m (the eyes removed)", S("bet", ("{0}", "out", "-S", "-m"), ("real:adult-ds000005",), tier="standard"))
+    add("tumour-S", "real", "a tumour (ds005003): bet -S", S("bet", ("{0}", "out", "-S"), ("real:tumour",), tier="standard"))
+    add("child-3y-B", "real", "a 3.5-year-old (ds000228): bet -B -m (the bias field, the neck)", S("bet", ("{0}", "out", "-B", "-m"), ("real:child-3y",), tier="standard"))
+    add("older-82y-B", "real", "an adult of 82 years with the neck (ds003592): bet -B -s", S("bet", ("{0}", "out", "-B", "-s"), ("real:older-82y",), tier="standard"))
+    add("older-75y-A", "real", "an adult of 75 years at 1.5 T (ds002422): bet -A", S("bet", ("{0}", "out", "-A"), ("real:older-75y",), tier="standard"))
+    add("child-7y-A2", "real", "a child of 7.5 years with motion (ds000256): bet -A2 with its T2w", S("bet", ("{0}", "out", "-A2", "{1}", "-m"), ("real:child-7y", "real:t2:child-7y"), tier="standard"))
     add("bold-first", "real", "a BOLD series (ds000005): bet2 on its first volume (FSL's warning)", S("bet2", ("{0}", "out", "-f", "0.3", "-m"), ("real:bold-ds000005",), tier="standard"))
 
     # --- fslroi (2026-11-04: the program; bet's -F and -Z and standard_space_roi run it) ---------
@@ -1389,6 +1421,13 @@ def _phantoms() -> dict[str, Path]:
     p["head-ext"] = d / "head-ext.nii"
     small, _ = _head(T2_LEVELS, 4, shape=(80, 96, 70))
     p["head-t2-small"] = _save(small, d / "head-t2-small.nii.gz")
+    # bet -S's threshold (FSL-216): intensities whose brain mean fslstats prints with an
+    # exponent, and NaN voxels inside the brain (its mean printed nan)
+    p["head-large"] = _save((t1 * 3000).astype(np.float32), d / "head-large.nii.gz")
+    nan = t1.copy()
+    c = tuple(n // 2 for n in HEAD_SHAPE)
+    nan[c[0] - 2 : c[0] + 2, c[1] - 2 : c[1] + 2, c[2] - 2 : c[2] + 2] = np.nan
+    p["head-nan"] = _save(nan, d / "head-nan.nii.gz")
     # betsurf's inputs: FSL's own bet2 mesh of the head, and a matrix to MNI152's 2 mm grid
     mesh_dir = d / "mesh"
     mesh_dir.mkdir(exist_ok=True)
@@ -2128,6 +2167,13 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
     import larmorx as lx
 
     function, kwargs, outputs = s.python  # type: ignore[misc]
+    # an input named as the case's ({k}); bet's standard images from the oracle's FSLDIR
+    kwargs = {
+        k: str(paths[int(v[1:-1])]) if isinstance(v, str) and v[:1] == "{" else v
+        for k, v in kwargs.items()
+    }
+    if function == "bet" and kwargs.get("variation") in ("eyes", "bias", "surfaces", "surfaces_t2"):
+        kwargs["fsl_data"] = str(fsl_dir() / "data")
     env = dict(os.environ, LARMORX_NC_BIN=str(replica_binary()))
     impl = "original" if original() else "auto"
     with process_environment(env), warnings.catch_warnings():
@@ -2149,7 +2195,9 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
                 **kwargs,
             )
     for name, attr in outputs.items():
-        img = getattr(result, attr)
+        img = result
+        for part in attr.split("."):
+            img = getattr(img, part)
         theirs = image_data(f_dir / name)
         same = (
             img is not None

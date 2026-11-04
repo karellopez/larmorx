@@ -1937,3 +1937,131 @@ pub mod dc {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_bet(settings: &Settings, args: &[&str]) -> (u8, String, String) {
+        let run = Run {
+            fsl: settings,
+            mode: UpstreamDefects::Fix,
+            threads: 1,
+            fill: true,
+        };
+        let argv: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = main(&argv, &run, &mut out, &mut err);
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    /// `-S`, `-B`, `-A` and `-A2` refuse before running anything when a standard image they
+    /// read is nowhere (here: not in `LARMORX_FSL_DATA`), naming it.
+    #[test]
+    fn missing_standard_images_are_refused_first() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = d.path().to_string_lossy().into_owned();
+        let input = format!("{dir}/in.nii.gz");
+        std::fs::write(&input, b"not read").unwrap();
+        let data = d.path().join("data");
+        std::fs::create_dir_all(data.join("standard")).unwrap();
+        let s = Settings::new()
+            .with(fsldata::ENV, &data.to_string_lossy())
+            .with("FSLOUTPUTTYPE", "NIFTI_GZ");
+        let out = format!("{dir}/out");
+        for v in [&["-S"][..], &["-B"], &["-A"], &["-A2", "t2"]] {
+            let mut args = vec!["bet", input.as_str(), out.as_str()];
+            args.extend_from_slice(v);
+            let (code, stdout, stderr) = run_bet(&s, &args);
+            assert_eq!(code, 1, "{v:?}: {stderr}");
+            assert!(stdout.is_empty(), "{v:?}: {stdout}");
+            assert!(
+                stderr.starts_with(
+                    "larmorx-nc: error: bet: FSL's data image standard/MNI152_T1_2mm is not in \
+                     LARMORX_FSL_DATA="
+                ),
+                "{v:?}: {stderr}"
+            );
+        }
+        // with MNI152 and its dilated mask there, -S names the eye mask
+        for f in ["MNI152_T1_2mm", "MNI152_T1_2mm_brain_mask_dil"] {
+            std::fs::write(data.join("standard").join(format!("{f}.nii.gz")), b"x").unwrap();
+        }
+        let (code, _, stderr) = run_bet(&s, &["bet", &input, &out, "-S"]);
+        assert_eq!(code, 1);
+        assert!(
+            stderr.contains("FSL's data image standard/MNI152_T1_2mm_eye_mask is not in"),
+            "{stderr}"
+        );
+        let mut left: Vec<String> = std::fs::read_dir(d.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["data", "in.nii.gz"], "nothing written");
+    }
+
+    /// `-S`'s threshold (FSL-216): plain numbers as FSL's dc computes them; an exponent read
+    /// as a number by default, as dc's commands in `reproduce`; a NaN refused by default.
+    #[test]
+    fn eye_threshold_fsl_216() {
+        let s = Settings::new();
+        let thr = |mode: UpstreamDefects, mean: &str, sd: &str| {
+            let run = Run {
+                fsl: &s,
+                mode,
+                threads: 1,
+                fill: false,
+            };
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut sc = Script {
+                run: &run,
+                out: &mut out,
+                err: &mut err,
+                notices: Notices::new(mode),
+                args: Vec::new(),
+                created: Vec::new(),
+                before: Vec::new(),
+            };
+            let r = sc.eye_threshold(mean, sd).ok();
+            let named = sc.notices.contains(&defects::FSL_216);
+            (r, named, String::from_utf8(err).unwrap())
+        };
+        let (fix, re) = (UpstreamDefects::Fix, UpstreamDefects::Reproduce);
+        assert_eq!(
+            thr(fix, "523.418 ", "81.2345 "),
+            (Some("807.73875".into()), false, String::new())
+        );
+        assert_eq!(
+            thr(re, "523.418 ", "81.2345 "),
+            (Some("807.73875".into()), false, String::new())
+        );
+        assert_eq!(
+            thr(fix, "2.1e+06 ", "81.2345 "),
+            (Some("2100284.32075".into()), true, String::new())
+        );
+        assert_eq!(
+            thr(re, "2.1e+06 ", "81.2345 "),
+            (
+                Some("'e' (0145) unimplemented\n292.42075".into()),
+                true,
+                "dc: ".into()
+            )
+        );
+        assert_eq!(
+            thr(fix, "-12.5 ", "2 "),
+            (Some("-5.5".into()), true, String::new())
+        );
+        let (r, named, err) = thr(fix, "nan ", "nan ");
+        assert!(
+            r.is_none() && named && err.contains("is not a number"),
+            "{err}"
+        );
+        let (r, named, _) = thr(re, "nan ", "nan ");
+        assert_eq!((r.as_deref(), named), (Some("3.5"), true));
+    }
+}

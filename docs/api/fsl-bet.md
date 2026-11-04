@@ -54,7 +54,7 @@ larmorx fsl bet2 T1w.nii.gz T1w_brain -e
 larmorx fsl betsurf --t1only -o -m -s T1w.nii.gz T1w_brain_mesh.vtk T1w_to_MNI152.mat T1w
 ```
 
-## `lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, brain=True, mask=False, outline=False, skull=False, mesh=False, tanh="glibc", n_threads=1, implementation="auto", upstream_defects="fix")`
+## `lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, t2=None, brain=True, mask=False, outline=False, skull=False, mesh=False, tanh="glibc", fsl_data=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmri"`), `mask`
 (int16, 1 inside), `outline` (float32), `skull` (int16) and `mesh` (a `Surface`: `vertices`
@@ -62,8 +62,14 @@ Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmr
 `image` is a path (any image FSL reads: NIfTI-1 or -2, single file or pair, gzipped or not,
 ANALYZE) or an in-memory image. Without `variation` it runs `bet2`; with `"robust"` (`-R`),
 `"small_fov"` (`-Z`) or `"fmri"` (`-F`) the `bet` script; `"eyes"` (`-S`), `"bias"` (`-B`),
-`"surfaces"` (`-A`) and `"surfaces_t2"` (`-A2`) need FSL programs larmorx does not replicate yet
-(`NotImplementedError`, naming them). The arguments are checked first (`ValueError`); FSL's
+`"surfaces"` (`-A`) and `"surfaces_t2"` (`-A2`, with `t2`) run the script with FLIRT,
+standard_space_roi, FAST, fslmaths, fslstats and betsurf, and have only their replica yet
+(since 2026-11-04; `implementation="original"`, or `"auto"` without `larmorx-nc`:
+`NotImplementedError`); `"surfaces"` and `"surfaces_t2"` also return betsurf's surfaces
+(`BetResult.surfaces`, a `BetsurfResult` with the masks, the skull's mask and the outlines). They
+read FSL's standard images from `fsl_data` (a directory laid out as `$FSLDIR/data`; the variable
+`LARMORX_FSL_DATA` otherwise), else `$FSLDIR/data`, else the copy `larmorx-nc` carries. The
+arguments are checked first (`ValueError`); FSL's
 settings are the call's: the outputs are written as NIfTI-1 and read back, `FSLOUTPUTTYPE`,
 `FSL_LOAD_NIFTI_EXTENSIONS` and every other `FSL*` variable of the process are never passed, and no
 FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
@@ -98,7 +104,11 @@ FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 | `-R` | `"robust"` | bet2 again from the brain's centre until it moves less than a voxel (at most 11 runs); `-n` ignored |
 | `-Z` | `"small_fov"` | pads the image to 100 mm in z with copies of its end slices, crops back (FSL-45) |
 | `-F` | `"fmri"` | the first volume's mask (`-f 0.3`, then the user's `-f`), dilated, applied to every volume |
-| `-S`, `-B`, `-A`, `-A2 <T2>` | `"eyes"`, `"bias"`, `"surfaces"`, `"surfaces_t2"` | pending: standard_space_roi, FLIRT, FAST |
+| `-S` | `"eyes"` | SIENA's eye and optic nerve cleanup: `bet2 -s`; `standard_space_roi -b -d` and `bet2 -n -m -f 0.4` on its result; MNI152's eye mask taken into the input (FLIRT `-applyxfm` through standard_space_roi's inverse matrix), dilated (`-dilF`, 7 more in 2D) and removed from the brain mask, the premask's brain added; what is brighter than 3.5 standard deviations above the brain's mean (`fslstats -M`, `-S`, GNU `dc`: FSL-216) removed with a little morphology; the mask (`_mask`) and the skull without the eyes (`_skull`) always written; no outline or mesh (`-o`, `-e` only in its temporary run); with `-n` it fails (`brain=False` refused) |
+| `-B` | `"bias"` | SIENA's bias field and neck cleanup: `standard_space_roi -b -d`, FAST's bias field (`fast -b`, its messages discarded), the input divided by it; with `-s` the skull from `standard_space_roi -maskFOV -roiNONE -d` and `bet2`, moved by fslpy's `immv` (and `-s` removed from the options through `echo`: FSL-63); `standard_space_roi -b -d` again and `bet -m -R -d` on its result (the brain and mask always written: `-R` removes `-n`) |
+| `-A` | `"surfaces"` | FLIRT to `MNI152_T1_2mm` (the matrix), `bet2 -e`, `betsurf --t1only -o -m -s`: the brain, its mesh, the three surfaces, their masks and outlines, the skull's mask |
+| `-A2 <T2>` | `"surfaces_t2"`, `t2` | the T2 registered to the input by FLIRT (`-interp sinc`), then as `-A` with `betsurf -o -m -s` on the registered T2 |
+| (the last of `-R`, `-S`, `-Z`, `-F`, `-A`, `-A2`, `-B` given) | | the variation run |
 | `-d` | (command line only) | keeps the temporary files |
 
 ## `lx.fsl.betsurf(t1, brain_surface, t1_to_standard, *, t2=None, masks=True, skull_mask=False, outlines=False, precision=0, n_threads=1, implementation="auto", upstream_defects="fix")`
@@ -206,8 +216,17 @@ surface's last bits. bet2's `tanh` is a separate choice (GLIBC-06, `tanh=`, abov
   (with `-v`); the replica's goes on.
 - The `bet` script's messages name the script by its path (`$0`: `<FSLDIR>/bin/bet failed during
   command:...`); the replica names it `bet`.
-- The replica needs no `FSLDIR` and runs none of FSL's programs; `bet -S`, `-B`, `-A`, `-A2`
-  are refused as pending.
+- The replica needs no FSL installation and runs none of FSL's programs: what `bet -S`, `-B`,
+  `-A` and `-A2` run (FLIRT, standard_space_roi, FAST, fslmaths, fslstats, betsurf, fslpy's
+  `immv`, GNU `dc`, the script itself for `-B`'s robust run) are the replicas', in its process.
+  The standard images they read (`MNI152_T1_2mm`, `MNI152_T1_2mm_brain_mask_dil`,
+  `MNI152_T1_2mm_eye_mask`) are looked for in `LARMORX_FSL_DATA` (a directory laid out as
+  `$FSLDIR/data`; when set, only there), else `$FSLDIR/data`, else `larmorx-nc`'s own copy
+  (`<prefix>/share/larmorx-nc/fsl-data`); when one is nowhere, the script refuses (exit 1)
+  before it runs anything, naming it and every place looked.
+- A program the script runs that aborts (fslmaths on an image that is not there, as `bet -S -n`
+  meets) prints FSL's text and bash's report (`bet: line 399: <pid> Aborted ...`), then the
+  `ERR` trap's line, exit 1, as FSL's script.
 
 ## Known last-bit differences
 

@@ -1,0 +1,211 @@
+[
+ {
+  "entry": "afni-tshift/fmriprep-ds005040-clip-1",
+  "label": "original",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "afni-tshift/fmriprep-ds005040-clip-1",
+  "label": "original-1",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "afni-tshift/fmriprep-ds005040-clip-1",
+  "label": "original-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "afni-tshift/fmriprep-ds005040-clip-1",
+  "label": "neg-original",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "afni-tshift/fmriprep-ds005040-clip-1",
+  "label": "neg-original-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "afni-tshift/ds005040-sub-002-clip-1",
+  "label": "larmorx-original",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 1,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "mri-hmc/fmriprep-ds000005-run-01",
+  "label": "larmorx",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 241,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "mri-hmc/fmriprep-ds000005-run-01",
+  "label": "larmorx-1",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 241,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "mri-hmc/fmriprep-ds000005-run-01",
+  "label": "larmorx-fix",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 241,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "mri-hmc/ds000005-sub-01-run-1",
+  "label": "reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 246,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "mri-hmc/ds000005-sub-01-run-1",
+  "label": "fix",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 246,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/fmriprep-ds000005-run-01-original",
+  "label": "orig",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/fmriprep-ds000005-run-01-original",
+  "label": "orig-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/fmriprep-ds000005-run-01-original",
+  "label": "t1-orig",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/fmriprep-ds000005-run-01-original",
+  "label": "t1-orig-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/panel-ds000228-pixar008-original",
+  "label": "orig",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/panel-ds000228-pixar008-original",
+  "label": "orig-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 2,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/betsurf-synthetic-head-original",
+  "label": "orig",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 10,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ },
+ {
+  "entry": "fsl-bet/betsurf-synthetic-head-original",
+  "label": "orig-reproduce",
+  "exit": 0,
+  "recorded_exit": 0,
+  "files": 10,
+  "differ": [],
+  "not_in_entry": [],
+  "status": "same",
+  "stderr_tail": ""
+ }
+]

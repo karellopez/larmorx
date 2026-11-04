@@ -11,8 +11,9 @@ The entries (3dTshift's two examples, the head-motion correction's two, BET's th
 original's runs of calls the part's wiring does not reach (3dTshift's Fourier interpolation,
 mcflirt's normalised correlation, bet2's ``-f``/``-R`` runs on images where the record shows no
 change): a run whose outputs now differ means the entry must be computed again before an
-export. Paths inside the entry's directory are rewritten: an input given with ``@`` (a slice
-timing file) is copied to the scratch directory, every other one is an output. The recorded
+export. Paths inside the entry's directory are rewritten into the scratch directory: an output
+is named after its run's label (``original-reproduce.nii.gz``, ``larmorx/out_mcf.nii.gz``), and
+any other file (a slice timing file, a re-stored input) is an input, copied there. The recorded
 ``PYTHONPATH`` and ``HOME`` are replaced (this checkout's package, a scratch home).
 """
 
@@ -66,11 +67,11 @@ def _one(cache: Path, entry: str, label: str, out: Path, threads: int, pythonpat
         if path.startswith(str(edir) + "/"):
             rel = Path(path).relative_to(edir)
             new = work / rel
-            if at:
-                new.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy(edir / rel, new)
+            new.parent.mkdir(parents=True, exist_ok=True)
+            if at or not rel.parts[0].startswith(label):
+                shutil.copy(edir / rel, new)  # an input kept in the entry
             else:
-                outputs.append(rel)
+                outputs.append(rel)  # an output: named after its run's label
             argv.append(("@" if at else "") + str(new))
         else:
             if path.startswith("/") and not Path(path).exists() and "python" not in path:
@@ -86,11 +87,10 @@ def _one(cache: Path, entry: str, label: str, out: Path, threads: int, pythonpat
     env.update({"PYTHONPATH": pythonpath, "HOME": str(home)})
     env.setdefault("OMP_NUM_THREADS", str(threads))
     p = subprocess.run(argv, env=env, cwd=work, capture_output=True, text=True, timeout=3600)
-    made = sorted(q.relative_to(work) for q in work.rglob("*") if q.is_file())
+    made = sorted(q.relative_to(work) for q in work.rglob("*")
+                  if q.is_file() and q.relative_to(work).parts[0].startswith(label))  # fmt: skip
     differ, absent = [], []
     for rel in made:
-        if (work / rel).suffix == ".1D" and rel.name == "slice_timing.1D":
-            continue
         ref = edir / rel
         if not ref.is_file():
             absent.append(str(rel))

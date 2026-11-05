@@ -744,7 +744,9 @@ mod tests {
         let got = find(&s, &cat, &f.images[0], &mut log).unwrap();
         assert_eq!(got.place, DATA_ENV);
         assert!(got.file.ends_with("standard/REF.nii"));
-        assert!(got.stem.ends_with("standard/REF"));
+        // the stem carries the platform's separator (a name the programs open): compared by
+        // components, as the file is
+        assert_eq!(Path::new(&got.stem), named.join("standard").join("REF"));
         // nothing else is searched when it is given: FSLDIR's MASK not taken
         let e = find(&s, &cat, &f.images[1], &mut log).unwrap_err();
         assert_eq!(e.looked.len(), 1, "{e}");

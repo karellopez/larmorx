@@ -4737,11 +4737,17 @@ def _standard_space_roi_case(ctx: Context) -> dict[str, Any]:
         else:
             os.environ["LARMORX_FSL_DATA"] = saved
     names = ("", "_tmp_to_std", "_tmp_standard_mask", "_tmp_standard_mask_to_in", "_tmp_masked")
+    # a temporary directory with a blank adds FSL-211's notice (the script would split the
+    # names into words): left out, so the case holds wherever the run's directory is
+    notice = "larmorx: upstream defect FSL-211 (standard_space_roi) "
+    stderr = "".join(
+        line for line in refused[2].splitlines(keepends=True) if not line.startswith(notice)
+    )
     return {
         **{f"roi{n}": Nifti(f"{out}{n}.nii.gz") for n in names},
         "matrix": File(f"{out}_tmp_to_std.mat"),
         "inverse": File(f"{out}_tmp_to_std_inv.mat"),
-        **_status_outputs("no-data", (refused[0], refused[1], refused[2].replace("\\", "/"))),
+        **_status_outputs("no-data", (refused[0], refused[1], stderr.replace("\\", "/"))),
         **_status_outputs("usage", _fsl_status(ctx, "standard_space_roi", a)),
     }
 

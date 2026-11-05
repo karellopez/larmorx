@@ -100,6 +100,13 @@ impl Log {
             l.push(line.into());
         }
     }
+    /// `lines` pushed together, so the lines of one evaluation stay together when evaluations
+    /// run in parallel (the boundary-based cost's set-up lines with `-debug`, §9.4).
+    pub fn push_all<S: Into<String>>(&self, lines: impl IntoIterator<Item = S>) {
+        if let Ok(mut l) = self.lines.lock() {
+            l.extend(lines.into_iter().map(Into::into));
+        }
+    }
     pub fn take(&self) -> Vec<String> {
         self.lines
             .lock()
@@ -298,9 +305,7 @@ impl Pair {
                     1.0 - hcost::correlation(&slices, tv.weighted(), NormCorrCount::Mcflirt).abs()
                 }
             }
-            Cost::LeastSq => {
-                hcost::least_squares_weighted(&self.reference, &tv, &b, parallel, weight)
-            }
+            Cost::LeastSq => self.least_squares(&tv, &b, parallel, weight),
             Cost::CorrRatio => hcost::corr_ratio_of(&hcost::bin_moments(
                 self.reference_bins(),
                 &tv,
@@ -336,6 +341,47 @@ impl Pair {
             ),
             Cost::LabelDiff => self.labeldiff(&tv, &b, parallel, weight),
             Cost::Bbr => unreachable!(),
+        }
+    }
+
+    /// `leastsq` (§6.2, spec writer 2026-11-03): over the contributing points in the sampling
+    /// order, `δ = r − y` in single precision; without smoothing or weights `δ·δ` and the count,
+    /// otherwise `(w·δ)·δ` and `w`; three levels of single-precision sums (row, slice, total);
+    /// the total over the weight (the count) when that is above 1, else `(max − min)²` of both
+    /// images.
+    fn least_squares(
+        &self,
+        tv: &TestVolume<'_>,
+        b: &[[f32; 4]; 3],
+        parallel: bool,
+        weight: Option<PointWeight<'_>>,
+    ) -> f32 {
+        let smoothed = tv.weighted() || weight.is_some();
+        let slices =
+            hcost::sample_weighted(&self.reference, tv, b, parallel, weight, || SquaresSlice {
+                smoothed,
+                row: (0.0, 0.0),
+                slice: (0.0, 0.0),
+                points: 0,
+            });
+        let (mut num, mut den) = (0.0f32, 0.0f32);
+        let mut points = 0u64;
+        for s in &slices {
+            num += s.slice.0;
+            den += s.slice.1;
+            points += s.points;
+        }
+        let empty = |(lo, hi): (f32, f32)| (hi - lo) * (hi - lo);
+        if smoothed {
+            if den <= 1.0 {
+                return empty(self.extremes);
+            }
+            num / den
+        } else {
+            if points <= 1 {
+                return empty(self.extremes);
+            }
+            num / points as f32
         }
     }
 
@@ -375,6 +421,35 @@ impl Pair {
             }
             num / points as f32
         }
+    }
+}
+
+/// The sums of one slice of `leastsq` (§6.2): `Σ δ·δ` (or `Σ (w·δ)·δ` and `Σ w`) per row, per
+/// slice, in single precision.
+struct SquaresSlice {
+    smoothed: bool,
+    row: (f32, f32),
+    slice: (f32, f32),
+    points: u64,
+}
+
+impl Accumulator for SquaresSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let d = g - v;
+        if self.smoothed {
+            self.row.0 += (w * d) * d;
+            self.row.1 += w;
+        } else {
+            self.row.0 += d * d;
+        }
+        self.points += 1;
+    }
+
+    fn end_row(&mut self) {
+        self.slice.0 += self.row.0;
+        self.slice.1 += self.row.1;
+        self.row = (0.0, 0.0);
     }
 }
 

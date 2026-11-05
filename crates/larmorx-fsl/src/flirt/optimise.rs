@@ -402,6 +402,18 @@ fn minimise(
     (v, best)
 }
 
+/// `x0` with each NaN parameter replaced by the identity's (rotations, translations and skews 0,
+/// scales 1): where FSL's optimiser starts from such parameters (observed, 2026-11-05).
+fn finite_start(x0: &Params) -> Params {
+    std::array::from_fn(|i| {
+        if x0[i].is_nan() {
+            if (6..9).contains(&i) { 1.0 } else { 0.0 }
+        } else {
+            x0[i]
+        }
+    })
+}
+
 /// One optimisation of the trial matrix `start` (§8.2): its parameters about `centre`, the first
 /// `dof` optimised (or, with `subset`, the subset's variables from `start`'s own parameters),
 /// `maxit` sweeps. `eval` is the cost of a trial matrix. Returns the matrix and its cost.
@@ -417,8 +429,12 @@ pub fn optimise(
     let quiet = Log::default();
     let log = s.log.as_deref().unwrap_or(&quiet);
     let x0: Params = param::decompose(s.rep, start, centre, log.libm());
+    // the matrix the optimisation starts from: its first `dof` parameters composed (observed,
+    // 2026-11-05: a scaled start optimised at 6 dof shows the rigid matrix, at 7 its first
+    // scale), a NaN parameter replaced by the identity's
     let shown = if s.at(5).is_some() {
-        param::compose(s.rep, &x0, 12, centre, log)
+        let n = if subset.is_some() { 12 } else { dof };
+        param::compose(s.rep, &finite_start(&x0), n, centre, log)
     } else {
         IDENTITY
     };
@@ -466,6 +482,10 @@ pub fn optimise_params(
             if let Some(t) = s.at(5) {
                 starting(t);
             }
+            // a parameter that is NaN (a start decomposed about a NaN centre, FSL-14 reproduced)
+            // starts from the identity's value (observed, 2026-11-05: FSL prints the NaN
+            // parameters, then evaluates from rotations and translations 0, scales 1, skews 0)
+            let x0 = finite_start(&x0);
             let compose = |v: &[f64]| {
                 let mut x = x0;
                 x[..dof].copy_from_slice(v);

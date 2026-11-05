@@ -7,7 +7,6 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
-use larmorx_mri::hmc::kernels::Spline;
 use larmorx_mri::hmc::volume::Volume;
 
 use super::Settings;
@@ -15,7 +14,7 @@ use super::common::{self, TRUNCATED, abort, print_notices};
 use crate::bet::image;
 use crate::flirt::engine::{self, Ctx, End, Look};
 use crate::flirt::mat::{self, Mat4};
-use crate::flirt::output::{self, Resampling, SincKernel};
+use crate::flirt::output::{self, FlirtSpline, Resampling, SincKernel};
 use crate::flirt::{Interp, SincWindow, pyramid};
 
 /// The usage text (observed: standard error; the program names itself as it was called).
@@ -438,13 +437,18 @@ fn run(
                          kernel: &SincKernel|
          -> Option<Vec<f32>> {
             let st = store_type(signed);
+            // §9.3's spline (§15.7): a float image's passes in single precision, a double
+            // image's values read and filtered in double, an integer image's passes in its type
+            // with FSL-79 reproduced
             let spline = (o.interp == Interp::Spline).then(|| {
                 if fsl79 && reproduce79 {
-                    Spline::with_store(vol, &|c| x86_convert(c + 0.5, st))
-                } else if double {
-                    Spline::new(vol)
+                    let values = vol.data.iter().map(|&v| f64::from(v)).collect();
+                    FlirtSpline::with_store(vol.shape, values, &|c| x86_convert(c + 0.5, st))
+                } else if let (true, Some(all)) = (double, src.doubles.as_ref()) {
+                    let part = all[m * vol.len()..(m + 1) * vol.len()].to_vec();
+                    FlirtSpline::with_store(vol.shape, part, &|c| c)
                 } else {
-                    Spline::with_store(vol, &|c| f64::from(c as f32))
+                    FlirtSpline::new(vol)
                 }
             });
             let r = Resampling {

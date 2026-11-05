@@ -33,7 +33,21 @@ pub struct BbrSource {
     pub slope: f32,
     /// The field map mask's distance map ([`mask_distance`]), made when first needed.
     pub mask_distance: std::sync::OnceLock<Vec<u16>>,
+    /// `-debug`: the set-up's lines around its error at each evaluation without boundary points
+    /// (§9.4).
+    pub debug: bool,
 }
+
+/// `-debug`'s lines before the boundary's set-up (§9.4).
+pub const DEBUG_PRE: [&str; 4] = [
+    "Setting bbr seg 1",
+    "Cost is set to 8",
+    "Cost == BBR is 1",
+    "Result (pre) of is_bbr_set is 0",
+];
+
+/// The boundary set-up's error without boundary points (§6.5).
+pub const NO_POINTS: &str = "ERROR::set_bbr_seg: could not find any boundary points!";
 
 /// The boundary's point pairs in reference scaled mm: the grey-matter side and the white-matter
 /// side of each boundary point.
@@ -385,21 +399,16 @@ pub fn field_shift<'a>(
     })
 }
 
-/// FSL's set-up of a pair's boundary-based cost (observed, 2026-11-02): without a boundary
-/// voxel its error is printed `times` times (once each time a pair is made with the cost: a
-/// `setscale` makes it twice; once at `setoption costfunction bbr`), before any evaluation.
-pub fn setup_errors(pair: &Pair, log: &Log, times: usize) {
+/// Whether the pair's boundary has no point (its points made when first needed); `false`
+/// without a boundary source or when the points cannot be made.
+pub fn no_points(pair: &Pair, log: &Log) -> bool {
     let Some(src) = pair.bbr_source.as_ref() else {
-        return;
+        return false;
     };
     let pts = pair
         .bbr
         .get_or_init(|| points(src, pair.reference.voxel_size, log.libm()));
-    if pts.as_ref().is_ok_and(|p| p.gm.is_empty()) {
-        for _ in 0..times {
-            log.push("ERROR::set_bbr_seg: could not find any boundary points!");
-        }
-    }
+    pts.as_ref().is_ok_and(|p| p.gm.is_empty())
 }
 
 /// The boundary-based cost of `a` (reference mm → input mm through `a⁻¹`, §6.5).
@@ -428,10 +437,22 @@ pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f
         }
     };
     if pts.gm.is_empty() {
-        log.push("ERROR::set_bbr_seg: could not find any boundary points!");
+        // the boundary counts as not set, so FLIRT sets it again before every evaluation, with
+        // `-debug`'s lines around its error (§9.4, observed)
         // 0 / 0 over no pairs: the default NaN (its sign set, printed -nan), warned as every
-        // NaN cost is (observed)
-        log.push("WARNING:: Found NaN in BBR cost (2)");
+        // NaN cost is (observed); one evaluation's lines together
+        const NAN: &str = "WARNING:: Found NaN in BBR cost (2)";
+        if src.debug {
+            let post = "Result (post) of is_bbr_set is 0";
+            log.push_all(DEBUG_PRE.into_iter().chain([NO_POINTS, post, NAN]));
+        } else {
+            log.push_all([NO_POINTS, NAN]);
+        }
+        // `-debug`'s volume: two volumes on the reference level's grid, zero (no pairs, §9.4)
+        if let Some(v) = debug {
+            v.clear();
+            v.resize(2 * pair.reference.len(), 0.0);
+        }
         return -f32::NAN;
     }
     let Some(ainv) = mat::inverse(a) else {

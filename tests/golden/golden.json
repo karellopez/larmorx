@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "6b0eb8e705d38c1d1580e62944d9e89fd821badb", "date": "2026-11-05", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "0483e0c57bc22bd2aa6cf38a085d2a01f7fb36f2", "date": "2026-11-05", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -1318,7 +1318,7 @@
    "roi_tmp_to_std:header": {"bytes": 352, "sha256": "92a26b3a3f0ba65b73ca910574000d81f0352b8c399f78c1ffa0d52b1e28ef35"},
    "usage:status": {"dtype": "<f8", "sample": "000000000000f03f", "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712", "shape": [], "sum": "1.0"},
    "usage:stderr": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
-   "usage:stdout": {"bytes": 1357, "sha256": "231f3f51243adf28746ce2245357bcd621b8ff5bd9c9eda567f422f4453a6b72"}
+   "usage:stdout": {"bytes": 1325, "sha256": "3dfceaea749289386cb2bc0e19b8a089146daab95a3088d55767aeefb164cfe0"}
   },
   "cli.fsl.std2imgcoord": {
    "mm": {"bytes": 781, "sha256": "df8178f4a82f953dce5367f5dccd7ebf79ceefe56d3ec8a2b02a630d96143412"},

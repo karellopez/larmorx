@@ -3725,3 +3725,75 @@ signature = ["files written"]
 status = "harness"
 explanation = "Trial 2026-11-05-catchup-hmc: 6,363 findings where mcflirt wrote no .mat directory and the original (FSL-13 reproduced) did: each a run with -rmsrel or -rmsabs without -mats served from the oracle cache, which keeps a run's files and not its empty directories (the first run of the same cases, mcflirt live, had none of them). Fixed in the descriptor: such mcflirt runs go live, the cache off (difftest/tools/mri_hmc.py, validation/tests/test_mri_hmc_descriptor.py); the cache itself keeping empty directories is for the orchestrator"
 link = "validation/tests/test_mri_hmc_descriptor.py"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat: Nth-percentile displacement over the reference's brain", "pair.mat: Nth-percentile displacement over the reference's brain"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-flirt, after relay 10 (2026-11-05): FLIRT's search kept its starting points in the order it found them (the specification's list, each new entry after every entry of lower or equal cost), where FSL then sorts the search's list by cost with libstdc++'s std::sort, which is not stable, before appending it to S and P (observed: a pair whose 829 starting points all cost 1 gives FSL's S and P exactly that permutation of the list FLIRT prints; with 20 rows in S before the search they stay first). On the trial's small random pairs many costs tie at the coarse scales, so another starting point came first. Fixed (flirt/search.rs, a unit test of the observed permutation; permanent cases search-equal-costs-sorted, pairreg-search-equal-costs-sorted). Replayed with the final build and with the build before the fix (catchup_replay.py; trial_catchup_replay_sorted.txt, trial_catchup_replay_before_sort.txt): of the 1,471 findings of the path classes (the entries above), 873 agree now and differed before (755 registrations, 101 pairreg runs, 17 message counts; 1 agreed before), 338 registrations, 236 message counts and 23 pairreg runs still differ (open, as those entries say). The record fsl-flirt re-made: real/weights-empty-refweight, real/weights-empty-inweight and edge/one-voxel-input (equal costs) pass"
+link = "validation/difftest/cases/fsl-flirt-original/search-equal-costs-sorted.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_tmp_to_std.mat", "out_tmp_to_std_inv.mat"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-bet, triaged by relay 10: standard_space_roi's FLIRT matrices 37 to 303 mm (RMS) from FSL's on small heads (10 x 10 x 22 to 31 x 32 x 17 voxels, the MNI152 or a phantom reference), every other file within the record's thresholds and, given FSL's matrix, FSL's. FSL's own flirt measured both final matrices (trial_ssroi_matrices.py: measurecost at 8, 4, 2 and 1 mm): on most pairs every cost is 1 (corratio of no information, the identity's too), so the search's starting points tied and their order decided; FSL sorts them with std::sort, the original kept the order found. Fixed in FLIRT's search (the FLIRT entry above); replayed with the final build (trial_catchup_replay.jsonl): 15 of the trial's standard_space_roi and bet -B findings agree (9, 49, 121, 174, 218, 285, 339, 531, 578, 601, ...), and 5 output boxes that followed the matrix (106, 108, 123, 184, 683). Permanent case original-ssroi-search-equal-costs"
+link = "validation/difftest/cases/fsl-bet/original-ssroi-search-equal-costs.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_tmp_premask_tmp_to_std.mat", "out_tmp_premask_tmp_to_std_inv.mat"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-bet: bet -B's inner standard_space_roi (out_tmp_premask) on small heads, its FLIRT matrices apart from FSL's (and in 121 and 285 the standard mask brought into the head, 411 and 389 voxels): the search's starting points of equal cost (every cost 1 at every scale, FSL's own measure of both matrices), now sorted as FSL sorts them (the FLIRT entry above). Replayed with the final build: 121, 218, 285, 839 and 531 (where FSL finished and the original's script had failed midway) agree. Permanent case original-bet-B-search-equal-costs"
+link = "validation/difftest/cases/fsl-bet/original-bet-B-search-equal-costs.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.nii: header"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet: standard_space_roi's output header against FSL's when both are given FSL's matrix, every value FSL's: the cut's translation one float unit in the last place from FSL's (407: qoffset_z 8.25 against 8.250000954; 744: qoffset_x -18.25 against -18.249998, qoffset_z 9 against 8.999999; trial_ssroi_matrices.py's stage runs), as fslroi's corner of the entry above (a question for the spec writer, specs/standard_space_roi.md §3.2). Of the trial's 16 such header findings after the fix (trial_catchup_categories.py): 9 one float unit, 4 a form's translation whole voxels from FSL's where the input's qform and sform differ (189, 313, 315, 456: the box, its values and the other form FSL's; which form FSL's fslroi moves by which corner is the spec's question), 2 NIfTI-2 outputs (543, 567: FSL's matrices in single precision, and a sform of code 0 moved too), 1 fslpy's conversion (222). Open, for BET's next clean-room part and the spec writer"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.hdr: header"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet: standard_space_roi -maskNONE -roiNONE (or -b -maskNONE) of an input in another format than FSLOUTPUTTYPE's (657: a NIfTI-1 .nii into NIFTI_PAIR; 222: scl_slope FSL 1 against 0): fslpy's imcp converts it with nibabel, whose header has pixdim[4..7] 1 where the input's are 0 and scl_slope 1, and NIfTI-2 for a NIFTI2 type (88), where the original converts the layout and keeps the input's header (specs/standard_space_roi.md §2.5: pending until its bytes are checked). Open, for BET's next clean-room part"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.hdr.bzN: header", "out_tmp_to_std.mat", "out_tmp_to_std_inv.mat"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet, finding 88 (standard_space_roi -b -maskNONE -d, 25 x 28 x 12 voxels, FSLOUTPUTTYPE=NIFTI2_PAIR_BZ2): after the search's fix the original's FLIRT still ends 183 mm (RMS) from FSL's matrix, at a lower cost by FSL's own measure (0.964919 against FSL's 0.967734 at 1 mm, trial_ssroi_matrices.py): another minimum of an ill-posed registration, as good; and imcp's conversion into NIfTI-2 (FSL's header NIfTI-2 with pixdim[4..7] 1, the original's NIfTI-1 with 0; the entry above). Open"
+link = "validation/investigations/cleanroom-bet/trial_ssroi_matrices.py"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.nii: header", "out_tmp_masked.nii", "out_tmp_standard_mask_to_in.nii", "out_tmp_standard_roi_to_in.nii", "out_tmp_to_std.mat", "out_tmp_to_std_inv.mat"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet, finding 114 (standard_space_roi -ssref -maskFOV -d -searchrx -30 30, 11 x 14 x 28 voxels): after the search's fix the original's FLIRT still ends 6.9 mm (RMS) from FSL's matrix, at a higher cost by FSL's own measure (0.989526 against 0.985458 at 1 mm; at 4 mm 0.674786 against 0.803613: the paths part at the coarse scales), its masks within the record's thresholds; given FSL's matrix the header one float unit apart (qoffset_z -1.2463388 against -1.2463379). Open, for FLIRT's next clean-room part (the registrations of entry 448); 803 alike (110 mm, its box)"
+link = "validation/investigations/cleanroom-bet/trial_ssroi_matrices.py"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.nii: header", "out_tmp_standard_mask_to_in.nii", "out_tmp_to_std.mat", "out_tmp_to_std_inv.mat"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet, finding 545 (standard_space_roi -b -roiMASK -altinput -d): its matrix FSL's after the search's fix (RMS 0); given FSL's matrix the header's translation one float unit from FSL's (qoffset_x 43 against 42.999996), the class of the out.nii header entry above. Open"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.nii.gz: header"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet, relay 10's refinement of relay 8's entry for these findings (replayed with the final build, the stage runs' header fields read by trial_ssroi_matrices.py): of the 16 standard_space_roi header findings left, 9 are the cut's translation one float unit from FSL's (128, 151, 165, 395, 619, 870, 407, 545, 744), 4 a form's translation whole voxels from FSL's where the input's qform and sform differ (189: qoffset_x -14.25 against -38.25; 313, 315, 456), 2 NIfTI-2 outputs whose matrices FSL holds in single precision and whose sform of code 0 it moves too (543: -44.40308380 against -44.40308296; 567: srow_x's translation -1.2412 against the input's 51.25), and 222 fslpy's conversion (scl_slope 1 against 0). Questions for the spec writer (specs/standard_space_roi.md §3.2, §2.5); open"
+link = "docs/findings/fsl-bet-original.md"

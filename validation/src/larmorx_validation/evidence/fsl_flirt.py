@@ -1509,6 +1509,18 @@ CATCHUP_TRIAGE = "validation/investigations/cleanroom-flirt/trial_catchup_triage
 #: The catch-up trial's categories: category -> (what the page says, the verdict of the row, or
 #: None for a mistake fixed after the trial).
 CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
+    "fixed: the search's starting points of equal cost (std::sort)": (
+        "Fixed after the trial (relay 10), with permanent cases: FLIRT's search kept its "
+        "starting points of equal cost in the order it found them, where FSL sorts the list by "
+        "cost with libstdc++'s std::sort, which is not stable, before it enters S and P. On these "
+        "random pairs many costs tie (an input or a pair that carries no information at the "
+        "coarse scales: every cost 1), so another starting point came first and the registration "
+        "ended elsewhere, or its messages followed another path. Each of these agrees on replay "
+        "with the final build and differed with the build before the fix (catchup_replay.py; "
+        "trial_catchup_replay_sorted.txt, trial_catchup_replay_before_sort.txt): 755 "
+        "registrations, 101 pairreg runs and 17 message counts",
+        None,
+    ),
     "a registration ends elsewhere": (
         "A registration ends elsewhere than FSL's (its matrix beyond the record's threshold, or "
         "only the image written from it) on the trial's random, often ill-posed pairs: small "
@@ -1622,7 +1634,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "drawn again and further, FSL's runs served by the oracle cache where they had run), each "
         "compared as the record compares (specs/flirt.md §13: exit status and messages FSL's, "
         "files identical, matrices within a displacement over the reference's brain, images from "
-        f"the original's own matrix by their correlation). The build: larmorx `{commit}`; three "
+        f"the original's own matrix by their correlation). The build: larmorx `{commit}`; four "
         f"classes were fixed after it, from its findings. The notices: {notices} cases. Every "
         f"case in a memory box of {s['memory']['case']} (peaks below {peaks:.2f} GiB).",
     )
@@ -1656,7 +1668,8 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         note="Every differing case of the trial in one category by its program, its failed "
         "checks and their details (`validation/investigations/cleanroom-flirt/"
         f"trial_catchup_categories.py`, its output `{CATCHUP_TRIAGE}`), each category's cause "
-        "established by replaying findings and by probes (`catchup_finding.py`, "
+        "established by replaying findings (`catchup_replay.py`, with the final build and with "
+        "the build before the search's sort) and by probes (`catchup_finding.py`, "
         "`catchup8_int_nn.py`; `docs/findings/fsl-flirt-original.md`); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
         "(`difftest --replay`).",

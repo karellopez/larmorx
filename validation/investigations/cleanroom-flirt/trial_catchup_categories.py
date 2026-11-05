@@ -12,7 +12,14 @@ header findings whose messages still differ; the three header findings with a me
 counted with the messages (two of them differ there on replay). Prints the counts and
 a reproducer per category (the lowest finding number), writes --json.
 
-    python -P trial_catchup_categories.py <workspace>/oracles/difftest/2026-11-05-catchup-flirt --json out.json
+Relay 10 (2026-11-05): with ``--fixed <replay log> --base <replay log>`` (``catchup_replay.py``'s
+output with the final build and with the build before FLIRT's search sorted its starting points),
+the findings of the three path classes (registrations, messages, pairreg's paths) that agree on
+replay with the final build and differed with the build before are counted in the class that fix
+closed: the search's starting points of equal cost, which FSL sorts with libstdc++'s std::sort.
+
+    python -P trial_catchup_categories.py <workspace>/oracles/difftest/2026-11-05-catchup-flirt \
+        [--fixed <log> --base <log>] --json out.json
 """
 
 import collections, json, re, sys
@@ -54,13 +61,36 @@ def category(doc):
     return "other"
 
 
+SORTED = "fixed: the search's starting points of equal cost (std::sort)"
+PATHS = ("a registration ends elsewhere", "messages whose number follows the path",
+         "pairreg: its registrations' paths")
+
+
+def replays(path):
+    out = {}
+    for ln in Path(path).read_text().splitlines():
+        m = re.match(r"^(\d+) (\w+): (.*)", ln)
+        if m:
+            out[int(m.group(1))] = "agree" if " agree" in m.group(3) else "differ"
+    return out
+
+
+def arg(name):
+    return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else None
+
+
 trial = Path(sys.argv[1])
+fixed = replays(arg("--fixed")) if arg("--fixed") else {}
+base = replays(arg("--base")) if arg("--base") else {}
 cats = collections.Counter()
 first = {}
 members = collections.defaultdict(list)
 for p in sorted(trial.glob("findings/*/*.json")):
     doc = json.loads(p.read_text())
     c = category(doc)
+    n = int(p.stem.split("-")[1])
+    if c in PATHS and fixed.get(n) == "agree" and base.get(n) == "differ":
+        c = SORTED
     cats[c] += 1
     first.setdefault(c, p.stem)
     members[c].append(int(p.stem.split("-")[1]))

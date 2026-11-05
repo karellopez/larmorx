@@ -21,6 +21,8 @@ against it and FSL's own step from 6.0.7.17. The case explorer shows the full-ti
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import os
 import shlex
 import sys
@@ -28,7 +30,13 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core, fsl_bet_options, fsl_step
+from larmorx_validation.evidence import (
+    common,
+    core,
+    fsl_bet_options,
+    fsl_bet_options_original,
+    fsl_step,
+)
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1528,6 +1536,215 @@ def speed(ctx: core.Context):
     return bench, chart
 
 
+#: The clean-room catch-up's trial of the original and the replica (2026-11-05), and the
+#: original's findings in categories (``validation/investigations/cleanroom-bet/
+#: trial_catchup_categories.py``'s ``--json`` output, with the replay of every finding by the
+#: final build).
+TRIAL_CATCHUP = "2026-11-05-catchup-bet"
+CATCHUP_TRIAGE = "validation/investigations/cleanroom-bet/trial_catchup_triage.json"
+#: category -> (what the page says, the verdict of the row; None: fixed after the trial).
+CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
+    "fixed: FLIRT's search, starting points of equal cost (std::sort)": (
+        "Fixed after the trial (relay 10), with permanent cases: standard_space_roi's FLIRT (and "
+        "bet -B's, inside its standard_space_roi) ended 7 to 300 mm (RMS) from FSL's matrix on "
+        "small heads whose costs tie at the coarse scales (every cost 1, FSL's own measure of "
+        "both matrices): FLIRT's search kept its starting points of equal cost in the order "
+        "found, where FSL sorts them with libstdc++'s std::sort (trial_ssroi_matrices.py); each "
+        "agrees on replay with the final build",
+        None,
+    ),
+    "fixed: the output's box, from FLIRT's matrix (the search's equal costs)": (
+        "Fixed after the trial by the same change: standard_space_roi's output box, which follows "
+        "the region brought back by FLIRT's matrix, a few voxels from FSL's on small heads; each "
+        "agrees on replay with the final build",
+        None,
+    ),
+    "betsurf: agrees with the final build": (
+        "betsurf's surfaces (betsurf, bet -A, -A2) that agree on replay with the final build",
+        None,
+    ),
+    "betsurf's surfaces on small heads: the scalp's deformation": (
+        "betsurf's surfaces on small synthetic heads (betsurf, bet -A, -A2): the profiles are "
+        "decided as FSL decides them (162 of 164 images' shares of profiles set aside FSL's), "
+        "the skulls follow; the scalp's deformation settles a little elsewhere (0.24 to 3.4 mm on "
+        "a clean testbed), relay 7's open class, for BET's next clean-room part",
+        "open",
+    ),
+    "standard_space_roi: FSL's FLIRT crashes (FSL-75)": (
+        "standard_space_roi runs whose FLIRT crashes in FSL (Segmentation fault, free(): invalid "
+        "pointer or size: FSL-75's corrupted heap, undefined behaviour never reproduced), so "
+        "FSL's later steps run on missing files (fslroi's usage), where the original registers "
+        "and goes on",
+        "divergence",
+    ),
+    "standard_space_roi: FLIRT's registration ends elsewhere": (
+        "After the fix, a registration of a small head that still ends elsewhere than FSL's: "
+        "88 at a lower cost than FSL's by FSL's own measure (0.964919 against 0.967734 at 1 mm), "
+        "114 at a higher one (0.989526 against 0.985458), for FLIRT's next clean-room part",
+        "open",
+    ),
+    "standard_space_roi: the cut's translation one float unit from FSL's": (
+        "standard_space_roi's output header, FSL's matrix given: the cut's translation one float "
+        "unit in the last place from FSL's (e.g. qoffset_z 8.25 against 8.250000954), as fslroi's "
+        "corner below: a question for the specification (specs/standard_space_roi.md §3.2)",
+        "open",
+    ),
+    "standard_space_roi: fslpy's imcp conversion (nibabel)": (
+        "-maskNONE -roiNONE (or -b -maskNONE) on an input in another format than "
+        "FSLOUTPUTTYPE's: fslpy's imcp converts it with nibabel, whose header has pixdim[4..7] 1 "
+        "where the input's are 0, and NIfTI-2 for a NIFTI2 type; the original converts the "
+        "layout and keeps the header (specs/standard_space_roi.md §2.5: pending until its bytes "
+        "are checked)",
+        "open",
+    ),
+    "standard_space_roi: the output's box on tiny images": (
+        "standard_space_roi's output box a voxel or more from FSL's on tiny images, after the "
+        "fix: open, for BET's next clean-room part",
+        "open",
+    ),
+    "fslroi: the corner's translation one float unit from FSL's": (
+        "fslroi's boxes of a neurologically stored oblique image reaching its last x voxel: the "
+        "corner's translation one float unit in the last place from FSL's (FSL's equals the "
+        "double product of the matrix and the corner rounded once): a question for the "
+        "specification (specs/standard_space_roi.md §3.2)",
+        "open",
+    ),
+    "bet -B, -A2: FSL fails or crashes midway": (
+        "bet -B and -A2 on small heads where FSL's script fails or crashes midway (Error: input "
+        "image ... not found; a program crashing) and the original's messages or exit status "
+        "differ: not yet looked at, for BET's next clean-room part",
+        "open",
+    ),
+    "bet with -R or -c on a neurologically stored image: the centre": (
+        "bet with -R or -c on a neurologically stored image: the centre's conversion into FSL's "
+        "radiological frame starts bet2 a few bits elsewhere (the specification's question of "
+        "cases 622 and 677)",
+        "open",
+    ),
+}
+
+
+def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
+    """The clean-room catch-up's random-testing trial of both implementations (its
+    ``summary.json``) and the original's findings in categories (``trial_catchup_triage.json``):
+    two tables, and their provenance."""
+    path = common.oracles() / "difftest" / TRIAL_CATCHUP / "summary.json"
+    raw = path.read_bytes()
+    s = json.loads(raw)
+    t = s["tools"]["fsl-bet"]
+    o = t["options"]
+    orig = t["implementations"]["original"]
+    rep = t["implementations"]["replica"]
+    types = sum(v for k, v in o.items() if k.startswith("FSLOUTPUTTYPE=")) - o.get(
+        "FSLOUTPUTTYPE=NIFTI_GZ", 0
+    )
+    rows = [
+        ("Random cases, each run by FSL 6.0.7.23 and both implementations", t["cases"]),
+        ("the original: within the record's thresholds, every exact check passed",
+         orig.get("agree", 0)),
+        ("the original: differing (each one in a category below)", orig.get("differ", 0)),
+        ("the original: a register entry named in one mode only (a notice)", orig.get("notice", 0)),
+        ("the original: undefined (FSL's values depend on memory it never wrote)",
+         orig.get("undefined", 0)),
+        ("the replica: FSL's bytes", rep.get("agree", 0)),
+        ("the replica: differing (FSL's FLIRT crashing inside standard_space_roi: FSL-75)",
+         rep.get("differ", 0)),
+        ("bet2, bet, betsurf", [o.get(k, 0) for k in ("bet2", "bet", "betsurf")]),
+        ("standard_space_roi, fslroi", [o.get(k, 0) for k in ("standard_space_roi", "fslroi")]),
+        ("bet's variations -S, -B, -A, -A2", [o.get(k, 0) for k in ("-S", "-B", "-A", "-A2")]),
+        ("bet's -R, -F, -Z", [o.get(k, 0) for k in ("-R", "-F", "-Z")]),
+        ("an output type other than NIFTI_GZ", types),
+        ("distinct options and settings drawn", t["options_covered"]),
+        (f"length (minutes; {s['jobs']} jobs at one thread each)", round(s["elapsed_s"] / 60, 1)),
+    ]  # fmt: skip
+    out_rows = []
+    for head, v in rows:
+        if isinstance(v, list):
+            cell = common.cell(" / ".join(f"{x:,}" for x in v))
+        elif isinstance(v, float):
+            cell = common.cell(v, "sig")
+        else:
+            cell = common.cell(int(v), "count")
+        out_rows.append({"head": head, "cells": [cell]})
+    peaks = max(float(p.split()[0]) for p in s["memory"]["peaks"])
+    commit = s["larmorx_commit"].removesuffix("-dirty")
+    summary = common.table(
+        "trial-catchup",
+        f"Random testing after the clean-room catch-up: the trial of {s['date']}",
+        ["", {"label": "Cases", "num": True}],
+        out_rows,
+        note=f"Differential random testing's trial of both implementations after the clean-room "
+        f"original gained bet's variations, standard_space_roi and fslroi (seed `{s['seed']}`: "
+        "the BET part's trial of 2026-11-04 drawn again and further, FSL's runs served by the "
+        "oracle cache where they had run), each case compared as the records compare (the "
+        "replica: FSL's bytes; the original: specs/bet.md §11 and §11.1, "
+        "specs/standard_space_roi.md §8). The build: larmorx "
+        f"`{commit}`; two classes were fixed after it, from its findings. Every case in a memory "
+        f"box of {s['memory']['case']} (peaks below {peaks:.2f} GiB).",
+    )
+    tpath = ctx.repo / CATCHUP_TRIAGE
+    traw = tpath.read_bytes()
+    tri = json.loads(traw)
+    counts = tri["counts"]
+    if sum(counts.values()) != orig.get("differ", 0):
+        raise ValueError(
+            f"{CATCHUP_TRIAGE}: {sum(counts.values())} findings, the trial {orig['differ']}"
+        )
+    trows = []
+    for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        text, verdict = CATCHUP_TEXT[cat]
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "fixed: agrees on replay with the final build"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
+                                       common.cell(tri["reproducers"][cat])]}  # fmt: skip
+        if verdict:
+            row["verdict"] = verdict
+        trows.append(row)
+    triage = common.table(
+        "trial-catchup-triage",
+        "The original's differing cases, each in one category",
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
+        trows,
+        note="Every differing case of the clean-room original in one category by its program, "
+        "its failed checks and their details, and by its replay with the final build "
+        "(`validation/investigations/cleanroom-bet/trial_catchup_categories.py`, its output "
+        f"`{CATCHUP_TRIAGE}`; the replays: `replay_trial.py`), each category's cause established "
+        "by replaying findings and by probes (`trial_ssroi_matrices.py`, `finding_dirs.py`, "
+        "`betsurf_shares.py`; `docs/findings/fsl-bet-original.md`); the triage's entries: "
+        "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
+        "(`difftest --replay`).",
+    )
+    prov = {
+        "trial": f"oracles/difftest/{TRIAL_CATCHUP}/summary.json",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "triage": CATCHUP_TRIAGE,
+        "triage_sha256": hashlib.sha256(traw).hexdigest(),
+    }
+    return [summary, triage], prov
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its entries (every run in them is the
+    original's) computed again: fMRIPrep's call and bet -R on ds000005, the data panel's child,
+    betsurf on the synthetic head, and its runs of the variations' examples
+    (:mod:`fsl_bet_options_original`)."""
+    fctx = ctx.figures_context()
+    for case, what, compute in (
+        (CASE, "the clean-room original on fMRIPrep's BET call (ds000005 sub-01 run 1) and bet "
+         "-R -m on the subject's T1w, default and reproduce", _compute_orig),
+        (PANEL_CASE, "the clean-room original on fMRIPrep's BET call on the BOLD reference of the "
+         "data panel's ds000228 sub-pixar008 (3.5 years)", _compute_panel_orig),
+        ("betsurf-synthetic-head", "betsurf -o -m -s with the T2 on the synthetic head: the "
+         "clean-room original", _compute_surf_orig),
+    ):  # fmt: skip
+        fcache.recompute(fctx, TOOL, f"{case}-original", what, compute, why)
+    fsl_bet_options_original.refresh(ctx, why)
+
+
 def export(ctx: core.Context) -> dict:
     from larmorx_validation.parity.fsl_bet import _scenarios
 
@@ -1552,6 +1769,8 @@ def export(ctx: core.Context) -> dict:
     n, sn, pn = entry_new(ctx), surf_entry_new(ctx), panel_entry_new(ctx)
     o, so, po = entry_orig(ctx), surf_entry_orig(ctx), panel_entry_orig(ctx)
     opts = fsl_bet_options.entries(ctx)
+    opts_orig = fsl_bet_options_original.entries(ctx)
+    tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     return {
         "schema": 1,
@@ -1561,7 +1780,10 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source() + rec_new.source() + rec_orig.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(x) for x in (e, s, pe, n, sn, pn, o, so, po, *opts)],
+            "cache": [
+                fcache.provenance(x) for x in (e, s, pe, n, sn, pn, o, so, po, *opts, *opts_orig)
+            ],
+            "difftest_catchup": tcprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1593,20 +1815,27 @@ def export(ctx: core.Context) -> dict:
         "cases": cs,
         "cases_total": len(cs),
         "speed": chart,
+        "tables": tc,
         "examples": [
             _example_fmriprep(ctx, e, n, o),
             _example_t1(ctx, e, n, o),
             _example_surf(ctx, s, sn, so),
             _example_panel(ctx, pe, pn, po),
-            *fsl_bet_options.examples(ctx, rec_new),
+            # the replica's examples of the variations, each with the clean-room original's
+            # panels (fsl_bet_options_original)
+            *fsl_bet_options_original.examples(ctx, rec_new, rec_orig),
         ],
     }
 
 
-if __name__ == "__main__":  # compute the cache entries only
+if __name__ == "__main__":  # compute the cache entries only; refresh-original <why>
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, sys.argv[2])
+        print("refreshed", [x.dir for x in fsl_bet_options_original.entries(c)])
+        raise SystemExit(0)
     print("done", entry(c).dir, surf_entry(c).dir, panel_entry(c).dir)
     print("done", entry_new(c).dir, surf_entry_new(c).dir, panel_entry_new(c).dir)
     print("done", entry_orig(c).dir, surf_entry_orig(c).dir, panel_entry_orig(c).dir)

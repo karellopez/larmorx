@@ -421,3 +421,17 @@ inputs were:
 | `cli::bet` | the standard images found before anything runs, the temporary images uncompressed when not kept, a failed run's temporary files left (rewritten in the run's format), FSL-46's cleanup by the files created or changed, `-R`'s centre by `fslstats -l 0.001 -C`, `-F`'s and `-Z`'s temporary images in fslroi's types (FSL-217) | spec §5.1 to §5.4, §9; `specs/standard_space_roi.md` §3.2; `specs/fslstats.md` §5.7 |
 | `bet::params` (`min_max`) | of equal extremes the first kept (a zero's sign) | black-box (findings) |
 | `cli::ssroi` | fslpy's `Could not find a supported file with prefix "<name>"`; the status 0 with `-d` in `reproduce` | `specs/standard_space_roi.md` §2.4; black-box |
+
+### The clean-room catch-up, relay 7 (2026-11-05): betsurf's profiles, bet -Z's doubles, bet2's zero centre
+
+| Input | What it gave |
+|---|---|
+| Black-box runs of FSL 6.0.7.23's `betsurf` on single profiles (a 0.2 mm triangle casting one profile; `-v`'s share; through the oracle cache, `validation/investigations/cleanroom-bet/profile_oracle_cached.py`) on the BET options part's random-testing images, and its whole runs (`betsurf_shares.py`, `replay_trial.py`) | the four readings of `specs/bet.md` §6.4 of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "The BET part's random-testing differences" |
+| Black-box runs of FSL's `bet -Z -d` (case 330 of that trial) and `bet2 -c` on an empty brain's `fslstats -C` centre (the permanent cases `original-bet-R-*`) | `-Z`'s float64 temporaries; a centre of zeros in the radiological frame is "not given" |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `betsurf::profile` | the backward searches never read a profile's first sample; the T1-only scan for `b` starts at the second sample when `a` is the first; step 5's first bright sample strictly within 10 mm, each of its searches after the previous one's sample; an empty outer-skull search range counts the scalp only | spec §6.4; black-box (findings) |
+| `cli::betsurf` | FSL-50's stop not reproduced (FSL observed to run on) | black-box (findings) |
+| `cli::bet` (`-Z`) | a float64 input's slices and padded image kept double | black-box (findings) |
+| `cli::bet2` (`centre_mm`) | `-c` of three zeros after the conversion into the radiological frame is the centre of gravity | spec §3.2; black-box (findings) |

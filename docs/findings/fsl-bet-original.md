@@ -553,5 +553,18 @@ shrunk reproducers agree.
   The record's other surface cases keep their status (the 82-year-old's scalp 0.55 → 0.30 mm, the
   adult's 0.66 → 1.36 mm: the scalp phase is sensitive to the vote image's last details).
 
+**A regression of the branch, found by the permanent cases and corrected** (2026-11-05): the
+part 2b cases `original-bet-R-centre-zero` and `original-bet-R-negative-image-bet2-crash` (both on
+neurologically stored images) agreed on main and differed with relay 6's build. Since relay 6, `bet
+-R`'s centre is the original's `fslstats -l 0.001 -C`, FSL's text: for an empty first-pass brain
+it prints `7.000000 0.000000 0.000000` on an 8-voxel-wide neurologically stored image (both
+programs print it, with the COG warning), and FSL's `bet2 -c 7.000000 0.000000 0.000000` there uses
+the centre of gravity (`c-of-g 3.50629 5.57614 6.83629 mm`, black box), where the original used the
+voxel `(0, 0, 0)`. So **a centre of three zeros is "not given" in FSL's radiological frame, after the
+conversion of §3.2** (`nx − 1 − x` on a mirrored image), not as typed: `-c 0 0 0` on a
+radiologically stored image (case 1608 of part 2b) and `-c nx−1 0 0` on a neurologically stored one
+both mean the centre of gravity (`larmorx_fsl::cli::bet2::centre_mm`; the three `-R` permanent
+cases agree again).
+
 The probes: `replay_trial.py`, `finding_dirs.py`, `betsurf_shares.py`, `profile_oracle_cached.py`
 ([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)).

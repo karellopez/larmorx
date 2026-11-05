@@ -179,7 +179,9 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-48** (B): a T2 on another grid than the T1 is sampled at the T1's voxel coordinates; the
   default refuses.
 - **FSL-50** (A): one skull profile with an empty search range ends betsurf (status 255, no
-  message, no output); the default drops that profile.
+  message, no output); the default drops that profile. (The clean-room original, since
+  2026-11-05: FSL 6.0.7.23 was seen to run on and count such a profile's scalp on all 43 images
+  where it occurred, so the original counts the scalp in both modes and never stops.)
 - **FSL-51**: a profile search can read past the profile's samples, into memory FSL never set;
   the default drops such profiles, `reproduce` reads "nothing there" and warns.
 - **FSL-53** (B): a matrix file with fewer than the 12 numbers betsurf uses; the default refuses.
@@ -332,13 +334,15 @@ five real heads with bet2's meshes and FLIRT's matrices made by FSL).
 alone; the share of profiles set aside within 0.06 % of FSL's on the record's real images. Where
 the votes are dense the surfaces are FSL's (the phantom's inner and outer skull to the file's 6
 decimals, also with `-p 1`); where few profiles vote (a skull base where nearly every profile is
-set aside) the inner skull settles elsewhere by up to 11 mm on a few vertices, and the scalp
-differs a little everywhere (95 % of the vertices within 0.2 to 3 mm on real heads). The record
+set aside) the inner skull settled elsewhere by up to 11 mm on a few vertices until step 5's
+rules were found (2026-11-05: ds002603's inner skull now within 0.026 mm of FSL's, 95th
+percentile), and the scalp differs a little everywhere (95 % of the vertices within 0.3 to 3 mm on
+real heads). The record
 holds betsurf to its masks (Dice >= 0.99 and the boundary distance's 95th percentile <= 1 voxel,
 specs/bet.md §11): 14 of its 67 masks and outlines
 are FSL's bit for bit and 51 more within these thresholds; on the five real heads the masks'
-Dice coefficients are 0.9907 to 0.9997 (the inner skull 0.9989 to 0.9997, the scalp 0.9938 to
-0.9987), and the scalp of ds002603 with its T2 misses the boundary threshold (its 95th
+Dice coefficients are 0.9935 to 0.9998 (the record of 2026-11-05: the inner skull 0.9990 to
+0.9998, the scalp 0.9935 to 0.9991), and the scalp of ds002603 with its T2 misses the boundary threshold (its 95th
 percentile 2 voxels): one of the record's two failures. The other (since 2026-11-05):
 `real/child-3y-B`, a 3.5-year-old's `bet -B`, every `-d` file FSL's (both `standard_space_roi` runs,
 FAST's bias field and the unbiased images) but the robust run's second bet2 pass, whose `-c` (FSL's
@@ -365,6 +369,23 @@ open with the spec writer. betsurf: 221 of 353 agree, 6 are FSL-51's (undefined)
 on small synthetic images (11 to 32 voxels per side) where the profiles' decisions differ (case
 36: FSL sets aside 96.8 % of its profiles, the original 87.8 %), and in 2 FSL-50's `reproduce`
 stops where FSL runs on: both for the spec writer (findings, "Random testing, part 2b").
+
+**Random testing, the BET options part's trial** (2026-11-04, `oracles/difftest/2026-11-04-bet-options-6b`,
+2,699 cases; its 176 differing cases of the original judged again on 2026-11-05 in the clean-room
+catch-up, findings: "The BET part's random-testing differences"): most began at the profiles'
+decisions on these small heads, which single profiles (5,290 of 11 images, FSL's `-v` saying whether
+it set each aside) traced to four readings of §6.4, now FSL's: the backward searches and the
+T1-only scan never read a profile's first sample; step 5's first bright sample lies strictly within
+10 mm of the inner skull, and each of its searches starts after the sample the previous one found;
+an outer-skull search range with no sample counts the profile's scalp only, and FSL runs on
+(**FSL-50's stop**, as the spec states it, was seen on none of the 43 images where its condition
+occurs, so the original no longer stops in `reproduce`). With them the share of profiles set aside
+is FSL's on 162 of the 164 images (74 before), 25 of the 176 cases agree, and ds002603's inner
+skull is FSL's to 0.026 mm (95th percentile; it was 0.95 mm, up to 11 mm). What still differs, for
+the spec writer: the scalp's deformation (§6.5: 0.24 to 3.4 mm on images whose skulls are FSL's
+exactly), `-p` on a mesh collapsed to one point (another sharing of midpoints), and `bet -R`/`-c` on
+neurologically stored images (the centre's conversion, cases 622 and 677). `bet -Z -d` of a float64
+image now keeps the doubles in its temporary images (FSL's are float64).
 
 **Built for speed:** bet2's vertices of each iteration are updated in parallel (each from the
 previous iteration's positions only), the self-intersection measure finds close pairs in a grid

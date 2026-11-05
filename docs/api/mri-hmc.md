@@ -354,6 +354,23 @@ aligned worse until the exact histogram costs (median ratio 1.051 against mcflir
 evaluation, on 22 of 30 phantoms; the others part after 19 to 224 evaluations in the last
 decimals, as with `normcorr`.
 
+**Centres of mass** (the clean-room catch-up, 2026-11-05; `specs/mcflirt.md` §6.1): both of
+mcflirt's centres, each test volume's (the rotations' centre) and the reference's (the `.par`
+file's), are FLIRT's blocked sums (`v − v_min` in single precision, double running sums in z, y, x
+order flushed into the totals every `max(1000, trunc(√N)) + 1` voxels; a total below 1e−5 in
+magnitude counts 1); before, one running sum (the same bits wherever the sums are exact, as on
+integer images). A centre whose total is below
+1e−5 (a constant volume) prints mcflirt's `WARNING::in calculating COG, total = 0.0` on standard
+error as often as mcflirt does (black box,
+`validation/investigations/cleanroom-align/cog_warning_probe.py`, 8 of 8 calls alike): once per
+registration of such a test volume (three with the default stages, four with `-stages 4`, six with
+`-meanvol`) and once per `.par` line when the reference is such a volume (`-plots`). The
+decomposition's arctangent is `larmorx_core::math::atan2` (correctly rounded, double) since the same
+day, the `libm` crate's before; mcflirt's is glibc's single-precision `atan2f`, a later part's
+`reproduce` item. On the record (`mri-hmc`, re-made 2026-11-05) nothing moves: the real runs are
+integer images, whose centres are the same bit for bit either way, and fMRIPrep's calls give the
+same matrices as text; the golden cases' random series move with `atan2`.
+
 **Better algorithms (decision D11).** None is the default: the uncentred correlation, the
 single sweep and the tolerance quantisation decide mcflirt's numbers, and changing them moves
 the results beyond mcflirt's band. `fudge=True` (mcflirt's `-fudge`) starts every volume's

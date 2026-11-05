@@ -3092,3 +3092,421 @@ signature = ["out_outskin_mask.nii.gz"]
 status = "open"
 explanation = "Trial 2026-11-04-bet-options-6b (the clean-room original, not this part's code): betsurf on small random heads, 190 cases over some 50 signatures of its masks, meshes and messages (outskin and skull masks most: 42 + 22 + 15 cases; 5 exit status 255 where FSL finishes; 5 undefined FSL-51), bet's skull (-s, 6) and -Z's temporary files of int8 slabs (330, 2254: FSL-217, the original's gap), bet -Z -n's FSL-45 notice without a change (1983); the same kinds as the open betsurf entries above (the profiles' search and the mask's fill on tiny heads). For the clean-room catch-up part. Reproducers: fsl-bet:bet-options-6:<n> (results.jsonl of the trial)."
 link = "docs/findings/fsl-bet-original.md"
+
+# The clean-room catch-up, relay 7 (2026-11-05): the original's differences of the BET options part's trial, by signature
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["exit status", "files written"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 5 case(s), reproducer 278), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 3 of 5 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 2 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["exit status", "files written", "messages: FSL's, byte for byte"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 364), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): an outer-skull search range holding no sample counts the profile's scalp only and FSL runs on (FSL-50's stop not seen: the original's reproduce had ended with status 255)"
+link = "validation/difftest/cases/fsl-bet/original-betsurf-empty-range-scalp-only.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, betsurf, 5 case(s), reproducer 1156), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 3 of 3 agree now (the profile rules of §6.4 corrected, permanent case original-betsurf-t1only-first-sample and its three siblings); bet and bet2: 2 still differ, each a neurologically stored image (qform or sform of positive determinant) with -R or -c: the conversion of a centre in voxels into FSL's radiological frame, the open question of cases 622 and 677 (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_outskin_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 976), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_outskin_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 2538), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_outskin_mesh.nii", "out_outskull_mesh.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 538), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_skull_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 2249), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1351), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out.nii", "out_mask.nii"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 2468), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): every case agrees with relay 6's build (the options in the original, bet2's extremes, -R's centre by fslstats)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mask.nii", "out_outskin_mask.nii"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 737), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): every case agrees: the backward searches and the T1-only scan never read a profile's first sample (the shares of profiles set aside FSL's)"
+link = "validation/difftest/cases/fsl-bet/original-betsurf-t1only-first-sample.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mask.nii.gz", "out_outskin_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 192), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer); cases 192: the two images whose shares still differ (a constant saturated int16 image, four profiles; two profiles of one run)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mesh.nii", "out_outskin_mask.nii", "out_outskin_mesh.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 214), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mesh.nii.gz", "out_outskin_mask.nii.gz", "out_outskin_mesh.nii.gz", "out_outskull_mesh.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1750), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mesh.nii.gz", "out_outskin_mesh.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1300), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mesh.nii.zst", "out_outskin_mask.nii.zst", "out_outskin_mesh.nii.zst", "out_outskull_mesh.nii.zst"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 466), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_inskull_mesh.vtk"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 8 case(s), reproducer 120), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 8 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 8 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer); -p with every profile set aside: FSL's retessellation of an inner skull collapsed to one point shares its midpoints otherwise (782 points against 1,026)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.hdr"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 7 case(s), reproducer 1922), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 7 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 7 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.hdr", "out_outskin_mesh.hdr"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1972), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.hdr", "out_outskull_mask.hdr"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 451), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.hdr.bzN"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 453), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.hdr.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 2 case(s), reproducer 1576), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 2 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 2 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 22 case(s), reproducer 256), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 2 of 22 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 20 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer); cases 1389: the two images whose shares still differ (a constant saturated int16 image, four profiles; two profiles of one run)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii", "out_outskin_mesh.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1955), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii", "out_outskull_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 2001), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii", "out_skull_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 2 case(s), reproducer 2586), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 2 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 2 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 42 case(s), reproducer 169), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 2 of 42 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 40 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_outskin_mesh.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 6 case(s), reproducer 2160), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 6 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 6 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_outskin_mesh.nii.gz", "out_outskull_mesh.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 980), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_outskin_mesh.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 2 case(s), reproducer 1543), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 2 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 2 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_outskull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1627), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_outskull_mask.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 756), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 5 case(s), reproducer 1831), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 5 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 5 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.zst", "out_outskin_mesh.nii.zst"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 2625), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mesh.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 4 case(s), reproducer 367), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 4 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 4 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mesh.nii", "out_outskull_mesh.nii"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 617), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): every case agrees: step 5's strict 10 mm and its searches each after the previous one's sample, an empty range's scalp counted"
+link = "validation/difftest/cases/fsl-bet/original-betsurf-gap-strictly-within-10mm.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mesh.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 4 case(s), reproducer 488), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 4 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 4 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mesh.nii.gz", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 2 case(s), reproducer 546), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 1 of 2 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mesh.nii.zst", "out_outskull_mesh.nii.zst"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1043), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskull_mask.hdr"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1497), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskull_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1570), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 1396), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskull_mesh.nii.zst", "out_skull_mask.nii.zst"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 2347), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_overlay.hdr"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 2502), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): every case agrees with relay 6's build (the options in the original, bet2's extremes, -R's centre by fslstats)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 2 case(s), reproducer 1292), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet and bet2: 2 still differ, each a neurologically stored image (qform or sform of positive determinant) with -R or -c: the conversion of a centre in voxels into FSL's radiological frame, the open question of cases 622 and 677 (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, bet2, 3 case(s), reproducer 462), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet and bet2: 1 agree now; bet and bet2: 2 still differ, each a neurologically stored image (qform or sform of positive determinant) with -R or -c: the conversion of a centre in voxels into FSL's radiological frame, the open question of cases 622 and 677 (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull.nii.zst"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 1775), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet and bet2: 1 still differ, each a neurologically stored image (qform or sform of positive determinant) with -R or -c: the conversion of a centre in voxels into FSL's radiological frame, the open question of cases 622 and 677 (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull_mask.hdr.bzN"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 534), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull_mask.hdr.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 1 case(s), reproducer 835), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 0 of 1 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 1 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull_mask.nii"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 6 case(s), reproducer 47), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 1 of 6 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 5 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_skull_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 15 case(s), reproducer 207), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 5 of 15 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 10 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_tmp.nii", "out_tmp_bottom.nii", "out_tmp_top.nii"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 2254), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet -Z -d keeps a float64 input's doubles in its temporary images, and relay 6's fslroi types for the others"
+link = "validation/difftest/cases/fsl-bet/original-bet-Z-d-float64-tmp.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_tmp.nii.gz", "out_tmp_bottom.nii.gz", "out_tmp_top.nii.gz"]
+status = "fixed"
+explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 330), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet -Z -d keeps a float64 input's doubles in its temporary images, and relay 6's fslroi types for the others"
+link = "validation/difftest/cases/fsl-bet/original-bet-Z-d-float64-tmp.json"

@@ -825,3 +825,17 @@ see a list), all in `validation/investigations/cleanroom-flirt/`.
   (Woods' warning one line more) part at the 4 mm stage: evaluation 47 (`0.050021` against
   `0.050056`, the costs equal to their 6 printed digits) and 356 (`0.948010` against `0.947916` at
   the same printed parameters), the weighted costs' last bits.
+
+**The record** (`fsl-flirt`, re-made from `23710fe`, standard tier; `compare_records.py` against
+main's, made from `be3db91`): 333 cases (308 before): 229 pass, 89 rejected by both, 10 expected
+divergences, 5 failures. `real/cost-leastsq` passes (82 mm before); `programs/pointflirt-no-points`
+is an expected divergence (FSL-204, relay 3); `real/cost-leastsq`, `real/bins64` (0.0692 mm before)
+and `real/weights` (0.3059 mm) now write FSL's matrices as text; fMRIPrep's three calls 0.0000,
+0.0002 and 0.0113 mm (ds005040's 0.0065 before: its boundary-based path, whose costs are not FSL's
+to the last bit, parts elsewhere since a perturbed row keeps its scales); 25 new cases (relay 3's
+14, relay 4's 3 and its 8 permanent cases, all passing but `nan-matrices-forcescaling`, rejected by
+both). The five failures are the "Still open" list above. Memory: the changed paths
+(`applyxfm4D-spline`, the registrations) stay within the memory test's bounds (5 calls); golden:
+`cli.fsl.flirt`, `.costs`, `.reproduce`, `.schedule` and `cli.fsl.applyxfm4D` move (the
+perturbations' twelve parameters, `leastsq`'s sums, the spline), to be re-recorded once with the
+part's other moves.

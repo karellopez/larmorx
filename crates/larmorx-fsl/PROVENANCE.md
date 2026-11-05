@@ -185,6 +185,27 @@ opened). Its only inputs were:
 | `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
 | `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |
 
+## FLIRT's clean-room catch-up (relays 3 and 4, 2026-11-05)
+
+Written by clean-room implementers under the same rules (FSL's source, the replica crates, the
+source-derived findings, the register's restricted sections, `docs/parts/` and
+`validation/probes/` not opened; the slips are recorded in the part's notes). Their only inputs
+were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §14's answers of 2026-11-03 (§2.3, §6.2, §8.1 step 9, §8.2, §9.2 to §9.4, §12, §15.1, §15.2, §15.5 to §15.8) | items 1 to 13 of `docs/next-steps.md`'s list for the original |
+| Black-box runs of FSL 6.0.7.23 through the oracle cache (`validation/investigations/cleanroom-flirt/catchup_*.py`: the suite's cases with `-verbose 7`, the random-testing findings' shrunk cases, schedules of the probes' own written from FSL's `-v` echo) | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "The clean-room catch-up" (both relays) |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::cost` (`least_squares`, `SquaresSlice`) | `leastsq`'s three-level single-precision sums | §6.2 |
+| `flirt::output::FlirtSpline` (`with_store`), `cli::applyxfm4d` | applyxfm4D's spline as FLIRT's (a double image filtered in double, a float image's passes in single, FSL-79's integer passes) | §9.3, §15.7 |
+| `flirt::engine` (`resampled_header`, `level_header`, `debug_files`, `bbr_setup`), `flirt::bbr` (`no_points`, `cost_and_debug`) | `-debug`'s levels' headers (also `-applyisoxfm`'s), `global_refweight1`, `-noresample`'s levels and `testvol`'s held voxel sizes (observed), the boundary set-up's lines and error at every evaluation without boundary points, the zero `debug` volume, the first pair's set-up after the verbose centres (observed) | §9.4, §6.5; black-box |
+| `flirt::engine` (`State::perturb`), `flirt::optimise` (`finite_start`, the starting matrix), `flirt::search` (`P` composed once, the grids' starting matrix, a NaN fine-grid scale) | a perturbation composed with all twelve parameters, an optimisation's start shown at its dof, NaN parameters started from the identity's (observed), the search's `P` | §8.1 step 9, §8.3; black-box |
+| `flirt::output::{resample, padded}` | a NaN pre-image outside the input (observed) | black-box |
+| relay 3: `flirt::param`, `flirt::search`, `flirt::mat`, `cli::{midtrans, pointflirt, coords, convert_xfm, pairreg}`, `flirt::schedule::PAIRREG_1..3` | items 1 to 8 (quaternion starts, FSL-90's messages, midtrans and FSL-241, FSL-204, `-warp`, the inverse on NaN matrices, `-fixscaleskew`'s abort, pairreg's schedules from FSL's `-v` echo) | §8.1, §12, §15; black-box |
+
 ## FAST (`fast`; relays 1 to 4, 2026-11-03)
 
 `fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command

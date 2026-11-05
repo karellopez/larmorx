@@ -16,8 +16,9 @@ written from [`specs/fast.md`](../../specs/fast.md), the FAST paper, FSL's docum
 black-box runs of FSL's program ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), done
 (2026-11-03): it segments one channel and several (any number: `-S 9` and more
 too, which the replica refuses), with the tissue priors (`-a` registered by larmorx's own FLIRT in
-this process, `-A`, `-P`), every option, message and failure case and FSL-96 to FSL-104 in both
-modes (fMRIPrep's call within the thresholds of `specs/fast.md` §11 on its oracle runs).
+this process, `-A`, `-P`), every option, message and failure case and FSL-96 to FSL-104,
+FSL-202 and FSL-203 in both modes (the last two since 2026-11-05; fMRIPrep's call within the
+thresholds of `specs/fast.md` §11 on its oracle runs).
 `implementation="auto"` (the default) runs the replica when `larmorx-nc` is installed,
 else the original; `"replica"` needs `larmorx-nc` (`pip install larmorx-nc`; otherwise
 `ReplicaNotFoundError`); `"original"` runs the original. The command line chooses alike
@@ -30,12 +31,20 @@ FAST writes, its standard output and error; every option, 2 to 8 channels, the p
 inputs and every message, exit status and failure case of the command line: 59 of 59 compared
 cases bit-identical, 26 rejected by both alike, 1 refused where FSL reads past a smaller channel
 (FSL-104). The original against FSL 6.0.7.23 ([record](../validation/fsl-fast.md), standard
-tier, `specs/fast.md` §11's thresholds): 60 of 61 compared cases within the thresholds, fMRIPrep's
-three calls included (13 bit-identical to FSL, 36 bit-identical to FSL run with correctly rounded
-`exp` and `log`, fMRIPrep's three among them, 10 within FSL's own difference between the two, 1
-a few partial volumes beyond it, each one fraction step away); 25 rejected by both alike, 1
-refused (FSL-104); the one outside, `multi/s5`, is explained (five channels with nearly singular
-covariances, decided by the matrix arithmetic's last bits). The evidence (fMRIPrep's call on three
+tier, `specs/fast.md` §11's thresholds, 2026-11-05): 64 of 65 compared cases within the
+thresholds, fMRIPrep's three calls included (with `reproduce`, as FSL is built with glibc's
+functions, fMRIPrep's calls and every single-channel case FSL's values bit for bit, two to eight
+channels FSL's segmentations); 35 rejected by both alike (every abort and message of FSL's,
+the lines of standard output an abort loses among them), 2 expected divergences (FSL-104's
+refusal; below); the one outside, `multi/s5`, is explained (five channels with nearly singular
+covariances, decided by the matrix arithmetic's last bits). Its default is held to the replica's
+default (the same corrections): with glibc's functions it is the replica's default bit for bit on
+every single-channel case, and with its correctly rounded functions it stays within the narrow
+band of FSL-202's corrected variance on one channel (fMRIPrep's calls: the same labels as the
+replica's default); several channels have no FSL-202, so there the two defaults lie FSL's own
+last-bit band apart (`multi/s3`, `multi/s2-n4`: to every digit FSL against FSL with correctly
+rounded maths), and `multi/s2-manualseg-cycle`, whose defaults both correct FSL-98's cycle, is
+the expected divergence measured in [the findings](../findings/fsl-fast-original.md). The evidence (fMRIPrep's call on three
 T1w brains in an image viewer with both implementations, the bias field, the priors, three
 channels, every case with its verdict, the speed) is FAST's page on the documentation site.
 
@@ -131,12 +140,13 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
 - **FSL-202**: with one channel, each class's variance subtracts the single-precision square of
   the single-precision mean, which cancels most of its digits in the log domain (up to about
   0.3 % off on white matter): the mean's square in double precision by default (the replica since
-  2026-11-03; the clean-room original follows in a later part). fMRIPrep's FAST call is affected:
+  2026-11-03, the clean-room original since 2026-11-05: with glibc's functions the two defaults
+  are the same bits). fMRIPrep's FAST call is affected:
   its default labels move towards those of the exactly computed statistics (ds000005: 54 `_seg`
   and 112 `_mixeltype` voxels); `reproduce` gives FSL's.
 - **FSL-203**: an input whose first voxel is NaN has NaN extrema: FAST keeps its negative values
   and, with one channel, its mask is empty (exit 255): the extrema of the values that are not NaN
-  by default (the replica since 2026-11-03).
+  by default (the replica since 2026-11-03, the clean-room original since 2026-11-05).
 
 ### glibc's maths functions (GLIBC-07)
 
@@ -157,10 +167,15 @@ single-channel segmentation (§4: the mask, the log image, the initialisation, t
 with FSL's random numbers, the bias field, the class order and every output of §3.3 with the
 partial volumes), the multi-channel segmentation (§5: any number of channels, larmorx's own LU
 for the covariances), the tissue priors (§6: `-a` with FSL's standard priors or `-A`'s,
-registered by larmorx's FLIRT in this process, `-P`), `-v`'s messages, FSL-96 to FSL-104 in both
-modes (with `reproduce`: FAST's estimate of β for a NaN `-H`, FSL-98's pairing, FSL-101's runs
-on an empty mask and its aborts, FSL-102's shell splitting, FSL-104's corner reads and abort). It is compared with FSL by its own parity suite (`fsl-fast`,
-the replica suite's cases, `specs/fast.md` §11's thresholds); the observations of FSL's behaviour
+registered by larmorx's FLIRT in this process, `-P`), `-v`'s messages, FSL-96 to FSL-104,
+FSL-202 and FSL-203 in both modes (with `reproduce`: FAST's estimate of β for a NaN `-H`,
+FSL-98's pairing, FSL-101's runs on an empty mask and its aborts, FSL-102's shell splitting,
+FSL-104's corner reads and abort, FSL-202's single-precision square of the mean, FSL-203's NaN
+extrema; FAST's loops without a class for `-n 0`). Its standard output is written as FAST's C
+library buffers it: where FAST aborts, the lines it had not flushed (the k-means lines, the
+partial-volume heading) are lost there too (`specs/fast.md` §7). It is compared with FSL by its
+own parity suite (`fsl-fast`, the replica suite's cases and its own, `specs/fast.md` §11's
+thresholds), and its default with the replica's default; the observations of FSL's behaviour
 that the spec does not state are in [the findings](../findings/fsl-fast-original.md). Built for
 speed (`specs/fast.md` §10; [the benchmark](../benchmarks/fsl-fast.md)): every per-voxel quantity
 is kept for the brain mask's voxels only; the steps where voxels are independent run in parallel

@@ -264,4 +264,80 @@ nothing, the user's decision of 2026-11-04). `multi/s5` still fails (identical v
 0.95850 in `_mixeltype`): its five channels' nearly singular covariance, above, not the C
 library. New in the record (main's suite gained it after main's record; the same with main's
 code): `opt/nan-first`, where the default should name FSL-203 and names FSL-103: FSL-203 is not
-yet in the original (a follow-up).
+yet in the original (a follow-up; done 2026-11-05, below).
+
+## The catch-up of 2026-11-05 (the spec answers of 2026-11-03)
+
+The clean-room catch-up's relay 2 brought the original up to `specs/fast.md` §12's answers
+(black-box runs through the oracle cache, `fsl_streams.py`, `probe.py`; the replica's program run
+as a black box where the spec's validation plan compares the default with it):
+
+- **FSL-202** (§4.4): the default subtracts the square of the double-precision mean (the mean
+  itself still rounded to single for every other use), in the class statistics and the partial
+  volumes' statistics; `reproduce` FAST's single-precision square; named in both modes when a
+  class's variance differs between the two (nearly every run). **The default is the replica's
+  default exactly where the functions are the same:** the original built with
+  `glibc_default.patch` (`LXM_GLIBC=1`: its default calls glibc's `exp`, `log`, `expf`, `logf`,
+  as `reproduce` does) gives the replica's default bit for bit, standard output and every image,
+  on every single-channel case of the suite (`glibc_default.py`: fMRIPrep's three calls,
+  `real/fmriprep-call-half`, 34 `opt/` and `priors/` cases, the two NaN cases below), so the two
+  corrections are the same arithmetic. With its correctly rounded functions the default stays
+  within the narrow band of the corrected variance (§11): fMRIPrep's call on ds000005 `_mixeltype`
+  identical to the replica's default, partial volumes 3.5e-7 apart on average.
+- **Several channels have no FSL-202**, so their default's band is FSL's own: with glibc's
+  functions their labels are the replica's default's exactly and only the partial volumes move
+  (larmorx's own LU and quadratic forms, §8.6); with the correctly rounded functions `multi/s3`
+  lands at `_mixeltype` Dice 0.99898 (identical 0.99964) and `multi/s2-n4` at 0.99851 (0.99920)
+  from the replica's default: **the same numbers, to every digit, as FSL against FSL with
+  correctly rounded maths** (`band.py`). The suite allows that band where several channels
+  correct nothing compared (FSL with correctly rounded maths is then the default's arithmetic
+  with its functions); `multi/s2-manualseg-cycle` (both defaults correct FSL-98's cycle, a path
+  FSL never runs) is an expected divergence with this reason (`_mixeltype` 0.99880; FSL's own
+  band on its uncorrected order 0.99941). For a spec writer: §11's "the default compared with the
+  replica's default, a narrow band" holds for one channel.
+- **FSL-203** (§4.1.2): FAST's extrema from the first voxel (a NaN never replaces them) with
+  `reproduce`, the values that are not NaN by default; named in both modes when an input's first
+  voxel is NaN (`opt/nan-first`'s default now names FSL-203, and FSL-103's count uses the
+  corrected maximum, so it no longer names FSL-103 there).
+- **`_restore` at NaN voxels** (§4.1.1): the rule for negative values sets to 0 every value not
+  within `[0, max]` by both comparisons (NaN voxels too) in its second branch only; `_restore` is
+  the image after the rule times the correction, so a NaN voxel stays NaN unless that branch ran.
+  Two cases of the original's own (`original/nan-no-negative`: no negative value, the rule
+  skipped; `original/nan-offset`: the background at -40, the minimum subtracted) agree with FSL;
+  `opt/nan` (one tiny negative value: the second branch) keeps FSL's 0.
+- **Standard output at an abort** (§7): the original writes standard output as FAST's C library
+  buffers it (`fast::Buffered`): the lines FAST flushes survive an abort, the others written since
+  the last flush (the k-means lines, the partial-volume heading) are lost. Observed besides the
+  spec, each now the original's: (1) `Starting Single Image Segmentation` / `Starting Multi Image
+  Segmentation` is printed **before the images are read** (with an image that cannot be read,
+  standard output holds that line alone; with `-S 0` it precedes the channels' error);
+  (2) FSL-100's abort (FSLDIR unset) comes **after the image lines** (`T1-weighted image`,
+  `Imagesize`, `Pixelsize`, the empty line; several channels: after the heading); (3) fewer than
+  0 classes abort after the image is read and those lines are printed, and after FSL-100's abort
+  (FSLDIR unset with `-n -1` gives FSL-100's message); (4) **`-n 0` runs FAST's loops without a
+  class**: one channel prints its `-O + -W` k-means lines, each main-loop heading, five
+  `MRFWeightsTotal=0` lines and an empty class line per iteration, ` BETA` after each `-O`
+  iteration (with `-H nan` FSL-99's ` TOTAL 0 RHS ...` and its pairs first), then aborts in the
+  partial volumes, ` Starting Partial Volume Estimation ` lost (standard output ends at ` BETA
+  0.1`), or with `--nopve` ends with `\n total tissue 0`; several channels print `-W` k-means
+  lines, the headings, an empty ` CHANNEL i` line per channel, ` BETA`, and with partial volumes
+  `Partial Volume Estimation ` and `\n total tissue 0` (exit 0). Eleven cases of the original's
+  own (`original/`) hold these, every one identical to FSL (standard output and status; the
+  aborts exit 1 where FSL exits 134).
+- **Several channels' class without weight** (§5.3, random testing 1840): its means are the plain
+  sums `Σ q y` (0, or NaN once the corrected channels are NaN), its covariance `0 / 0` as
+  x86-64's NaN in every entry; FSL's `MEAN 1 STDDEV -nan`, then `MEAN -nan` from the next
+  iteration, are now the original's (permanent case `multi-class-without-weight`).
+- **Confirmed**: §10's pipeline of planes with a lag of 2 is the original's sweep order (its
+  test `pipelined_sweeps_are_serial_sweeps`); §5.8's one-step near ties of several channels'
+  partial volumes stay expected (§11's thresholds unchanged); the noise-free and rank-deficient
+  random cases stay explained (§8.6) and `multi/s5` stays (ill-conditioned).
+
+The relay-4 trial's 182 findings replayed with this build (`replay_findings.py`, FSL's runs served
+by the cache): 178 agree. The four left: 2215 and 2311 (two noise-free channels), 5605 (the
+rank-deficient covariance: the original's LU meets a zero pivot), all three explained before
+(above), and 3544, the new comparison with the replica's default on a 32 x 20 x 1 slice with
+four classes (`-t 2 -H 0 -N --nopve -v`): a `-v` standard deviation 1.72904 against 1.72799
+(6e-4 relative); with glibc's functions the original's default is the replica's default bit for
+bit there too: the correctly rounded functions' last bits, amplified by four classes on 256
+brain voxels.

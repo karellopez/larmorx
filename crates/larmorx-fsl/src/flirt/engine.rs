@@ -2814,13 +2814,17 @@ fn write_registered(
         let dims = [d[0], d[1], d[2], reference.input.header.pixdim[4]];
         trace.info("Transformed testvol", refv.shape, dims, 1, &values);
     }
-    let (like, quaternion_final) = match formless_forms(&reference.input, &input.input, m) {
+    let (mut like, quaternion_final) = match formless_forms(&reference.input, &input.input, m) {
         Some(f) => (f, true),
         None => (
             completed_forms(&reference.input),
             qform_completed(&reference.input),
         ),
     };
+    // the display range 0 and 0, whatever the reference's (observed, 2026-11-05: FSL 6.0.7.23's
+    // -out of a registration, -applyxfm, -applyisoxfm, every interpolation)
+    like.header.cal_min = 0.0;
+    like.header.cal_max = 0.0;
     write_image_as(
         ctx,
         stem,
@@ -3005,6 +3009,9 @@ fn apply(
             &values,
         );
     }
+    // the display range 0 and 0, whatever the reference's (observed, 2026-11-05)
+    ref_input.header.cal_min = 0.0;
+    ref_input.header.cal_max = 0.0;
     write_image_as(
         ctx,
         stem,

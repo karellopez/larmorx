@@ -19,6 +19,9 @@ libm.workspace = true
 # backend), as FSL does
 flate2.workspace = true
 bzip2.workspace = true
+# FSL's standard images checked by their SHA-256 (specs/bet.md §5.4: larmorx-nc's copy, the
+# cached download of FSL's data package)
+sha2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

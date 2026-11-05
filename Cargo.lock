@@ -282,6 +282,7 @@ dependencies = [
  "larmorx-mri",
  "libm",
  "rayon",
+ "sha2",
  "tempfile",
 ]
 

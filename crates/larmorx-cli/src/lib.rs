@@ -38,9 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's, FAST's, topup's, applytopup's, fslmaths' and fslstats' programs are
-/// `larmorx_fsl::cli`; a test checks the list); `fslroi` and `standard_space_roi` have only
-/// their replicas yet (2026-11-04).
+/// FLIRT's, FAST's, topup's, applytopup's, fslmaths', fslstats', fslroi's and
+/// standard_space_roi's programs are `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -222,6 +221,20 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
+            "standard_space_roi" | "bet" => {
+                // FSL's standard images may be read from larmorx-nc's installed copy, as data
+                // (`specs/bet.md` §5.4): its program found as the replica search finds it
+                let mut settings = larmorx_fsl::cli::Settings::from_process();
+                if !settings.vars.contains_key(larmorx_fsl::data::NC_ENV)
+                    && let Ok(Some(p)) = replica::find(&replica::LARMORX_NC, &options.replica_dirs)
+                {
+                    settings.vars.insert(
+                        larmorx_fsl::data::NC_ENV.to_owned(),
+                        p.to_string_lossy().into_owned(),
+                    );
+                }
+                larmorx_fsl::cli::run_with(tool, args, &settings, out, err)
+            }
             _ => larmorx_fsl::cli::run(tool, args, out, err),
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
@@ -425,18 +438,10 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        // fslroi and standard_space_roi: their replicas only (2026-11-04)
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["fslroi", "standard_space_roi"]
-        );
-        // every FSL tool but mcflirt (`mri hmc`) and the replicas without an original is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
-        assert_eq!(
-            &FSL_TOOLS[FSL_TOOLS.len() - 2..],
-            ["fslroi", "standard_space_roi"]
-        );
+        // every FSL tool has its clean-room original (fslroi and standard_space_roi since
+        // 2026-11-05); every one but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -473,6 +478,17 @@ mod tests {
         assert_eq!(code, 1);
         assert!(
             out.starts_with("Usage: fslstats [preoptions] <input> [options]\n"),
+            "{out}"
+        );
+        // fslroi and standard_space_roi run their clean-room originals (2026-11-05): the
+        // usages on standard output (exit 1)
+        let (code, out, _) = run_options(&["lx", "fsl", "fslroi"], &original);
+        assert_eq!(code, 1);
+        assert!(out.starts_with("\nUsage: fslroi <input> <output>"), "{out}");
+        let (code, out, _) = run_options(&["lx", "fsl", "standard_space_roi"], &original);
+        assert_eq!(code, 1);
+        assert!(
+            out.starts_with("\nUsage: standard_space_roi <input> <output>"),
             "{out}"
         );
         // FLIRT's other programs and scripts run their clean-room originals (part 2).

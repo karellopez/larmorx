@@ -31,68 +31,63 @@ impl Grid {
     }
 }
 
-/// Solves the periodic system `(c[i-1] + 4 c[i] + c[i+1]) / 6 = s[i]` in place (the cubic
-/// B-spline coefficients of periodic samples).
-pub fn periodic_prefilter_line(s: &mut [f64], work: &mut Vec<f64>) {
-    let n = s.len();
-    match n {
-        0 | 1 => {}
-        2 => {
-            // (4 c0 + 2 c1) / 6 = s0, (2 c0 + 4 c1) / 6 = s1
-            let (a, b) = (s[0], s[1]);
-            s[0] = (4.0 * a - 2.0 * b) * 0.5;
-            s[1] = (4.0 * b - 2.0 * a) * 0.5;
-        }
-        _ => {
-            // the cyclic tridiagonal system by Sherman-Morrison on a Thomas solve
-            let (a, b, c) = (1.0 / 6.0, 4.0 / 6.0, 1.0 / 6.0);
-            let gamma = -b;
-            work.clear();
-            work.resize(3 * n, 0.0);
-            let (cp, rest) = work.split_at_mut(n);
-            let (x, z) = rest.split_at_mut(n);
-            let diag = |i: usize| {
-                if i == 0 {
-                    b - gamma
-                } else if i == n - 1 {
-                    b - a * c / gamma
-                } else {
-                    b
-                }
-            };
-            let thomas = |rhs: &dyn Fn(usize) -> f64, out: &mut [f64], cp: &mut [f64]| {
-                let mut m = diag(0);
-                cp[0] = c / m;
-                out[0] = rhs(0) / m;
-                for i in 1..n {
-                    m = diag(i) - a * cp[i - 1];
-                    cp[i] = c / m;
-                    out[i] = (rhs(i) - a * out[i - 1]) / m;
-                }
-                for i in (0..n - 1).rev() {
-                    out[i] -= cp[i] * out[i + 1];
-                }
-            };
-            let sv: &[f64] = s;
-            thomas(&|i| sv[i], x, cp);
-            thomas(
-                &|i| {
-                    if i == 0 {
-                        gamma
-                    } else if i == n - 1 {
-                        c
-                    } else {
-                        0.0
-                    }
-                },
-                z,
-                cp,
-            );
-            let fact = (x[0] + a * x[n - 1] / gamma) / (1.0 + z[0] + a * z[n - 1] / gamma);
-            for i in 0..n {
-                s[i] = x[i] - fact * z[i];
-            }
-        }
+/// The cubic B-spline's prefilter pole, `z = √3 − 2` (`sqrt` is correctly rounded: the same
+/// bits everywhere).
+pub fn pole() -> f64 {
+    3f64.sqrt() - 2.0
+}
+
+/// The number of terms of the prefilter's initial sums: `trunc(ln 1e-8 / ln |z| + 1.5)` = 15
+/// (`specs/topup.md` §4.5).
+pub const HORIZON: usize = 15;
+
+/// `z^k` by repeated products, as the sums take their terms.
+pub fn pole_power(k: usize) -> f64 {
+    let z = pole();
+    let mut p = 1.0;
+    for _ in 0..k {
+        p *= z;
+    }
+    p
+}
+
+/// The periodic cubic B-spline coefficients of a line, in place (`specs/topup.md` §4.5, spec
+/// writer 2026-11-03, observed): the recursive prefilter (pole `z`, gain 6) whose two initial
+/// values are periodic sums **truncated** at `n = min(N, 15)` terms, without the closed form's
+/// normalisation: forward `c⁺[0] = Σ_{i<n} z^i f[(−i) mod N]`, `c⁺[i] = f[i] + z c⁺[i − 1]`;
+/// backward `c⁻[N − 1] = (z c⁺[N − 1] + Σ_{1≤i<n} z^{i+1} c⁺[i − 1]) / (z^{n+1} − 1)`,
+/// `c⁻[i] = z (c⁻[i + 1] − c⁺[i])`; the coefficients `6 c⁻`. For `N ≥ 15` these are the exact
+/// periodic coefficients to about 1e-9 relative; on shorter lines the spline does not pass
+/// through the samples (by about `|z|^N` of the values), as FSL's (both modes).
+pub fn periodic_prefilter_line(s: &mut [f64]) {
+    let nn = s.len();
+    if nn < 2 {
+        return;
+    }
+    let z = pole();
+    let n = nn.min(HORIZON);
+    let mut zi = 1.0;
+    let mut c0 = 0.0;
+    for i in 0..n {
+        c0 += zi * s[(nn - i) % nn];
+        zi *= z;
+    }
+    s[0] = c0;
+    for i in 1..nn {
+        s[i] += z * s[i - 1];
+    }
+    let mut num = z * s[nn - 1];
+    let mut zi = z * z;
+    for i in 1..n {
+        num += zi * s[i - 1];
+        zi *= z;
+    }
+    s[nn - 1] = num / (pole_power(n + 1) - 1.0);
+    for i in (0..nn - 1).rev() {
+        s[i] = z * (s[i + 1] - s[i]);
+    }
+    for v in s.iter_mut() {
+        *v *= 6.0;
     }
 }
 
@@ -101,19 +96,15 @@ pub fn prefilter(g: &Grid) -> Grid {
     let [nx, ny, nz] = g.dims;
     let mut d = g.data.clone();
     // x lines
-    d.par_chunks_mut(nx).for_each(|line| {
-        let mut w = Vec::new();
-        periodic_prefilter_line(line, &mut w);
-    });
+    d.par_chunks_mut(nx).for_each(periodic_prefilter_line);
     // y lines, per slice
     d.par_chunks_mut(nx * ny).for_each(|slice| {
-        let mut w = Vec::new();
         let mut line = vec![0.0; ny];
         for x in 0..nx {
             for y in 0..ny {
                 line[y] = slice[y * nx + x];
             }
-            periodic_prefilter_line(&mut line, &mut w);
+            periodic_prefilter_line(&mut line);
             for y in 0..ny {
                 slice[y * nx + x] = line[y];
             }
@@ -125,9 +116,8 @@ pub fn prefilter(g: &Grid) -> Grid {
         let cols: Vec<Vec<f64>> = (0..plane)
             .into_par_iter()
             .map(|i| {
-                let mut w = Vec::new();
                 let mut line: Vec<f64> = (0..nz).map(|z| d[z * plane + i]).collect();
-                periodic_prefilter_line(&mut line, &mut w);
+                periodic_prefilter_line(&mut line);
                 line
             })
             .collect();
@@ -469,15 +459,32 @@ mod tests {
 
     #[test]
     fn prefilter_inverts_the_spline() {
-        for n in [1usize, 2, 3, 5, 8] {
+        // from 15 voxels on, the truncated sums are the exact periodic coefficients to ~1e-9
+        for n in [15usize, 16, 20, 33] {
             let s: Vec<f64> = (0..n).map(|i| ((i * 7 + 3) % 5) as f64).collect();
             let mut c = s.clone();
-            let mut w = Vec::new();
-            periodic_prefilter_line(&mut c, &mut w);
+            periodic_prefilter_line(&mut c);
             for i in 0..n {
                 let v = (c[(i + n - 1) % n] + 4.0 * c[i] + c[(i + 1) % n]) / 6.0;
-                assert!((v - s[i]).abs() < 1e-12, "n {n} i {i}");
+                assert!((v - s[i]).abs() < 1e-7, "n {n} i {i}: {v} {}", s[i]);
             }
+        }
+        // on shorter lines they are not, by about |z|^N of the values (FSL's, both modes)
+        for n in [2usize, 3, 4, 8, 10] {
+            let s: Vec<f64> = (0..n).map(|i| ((i * 7 + 3) % 5) as f64 + 1.0).collect();
+            let mut c = s.clone();
+            periodic_prefilter_line(&mut c);
+            let worst = (0..n)
+                .map(|i| {
+                    let v = (c[(i + n - 1) % n] + 4.0 * c[i] + c[(i + 1) % n]) / 6.0;
+                    (v - s[i]).abs()
+                })
+                .fold(0.0f64, f64::max);
+            let bound = 10.0 * pole().abs().powi(n as i32) * 5.0;
+            assert!(
+                worst > 0.0 && worst < bound,
+                "n {n}: {worst} (bound {bound})"
+            );
         }
     }
 }

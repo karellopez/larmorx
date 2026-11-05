@@ -121,3 +121,11 @@ point's edge weight and `TestVolume::edge_factors` gives its three factors (FLIR
 Part 2 of FLIRT's clean-room original, relay 5 (2026-11-02): `hmc::image::to_f32_vec` converts the
 stored array where it lies (no copy of it first): one full-size array less at the reading's peak,
 the values the same (FLIRT's avscale and midtrans with a 0.8 mm volume within FSL's memory).
+
+The clean-room catch-up, relay 7 (2026-11-05): `hmc::volume::Volume::centre_counted` computes both
+of mcflirt's centres of mass as FLIRT's blocked sums (`specs/mcflirt.md` §6.1, the spec writer's
+answer of 2026-11-03; `specs/flirt.md` §8.1 step 3), and `hmc::estimate` and the command line print
+mcflirt's `WARNING::in calculating COG, total = 0.0` as often as mcflirt 6.0.7.23 does (observed
+with `validation/investigations/cleanroom-align/cog_warning_probe.py`, through the oracle cache:
+once per registration of a constant test volume, once per `.par` line of a constant reference).
+`hmc::rigid`'s `atan2` is `larmorx_core::math::atan2` (rule 5; the `libm` crate's before).

@@ -105,9 +105,11 @@ pub struct Axis {
     pub n: usize,
     pub k: usize,
     pub order: u8,
-    /// FSL-145 reproduced: quadratic B-splines on an axis shorter than two knot spacings get two
-    /// coefficients, as FSL's (which cannot represent a field over the whole axis).
-    pub two_when_short: bool,
+    /// FSL-145 reproduced: quadratic B-splines on an axis shorter than two knot spacings get
+    /// FSL's count (one coefficient when the axis is shorter than one spacing, two when it is
+    /// shorter than two at a spacing of 3 or more), which cannot represent a field over the whole
+    /// axis.
+    pub fsl145: bool,
 }
 
 impl Axis {
@@ -123,43 +125,62 @@ impl Axis {
             n,
             k: k.max(1),
             order,
-            two_when_short: false,
+            fsl145: false,
         }
     }
 
     /// The axis with FSL-145 reproduced (`on`) or not.
     #[must_use]
     pub fn with_fsl145(self, on: bool) -> Axis {
-        Axis {
-            two_when_short: on,
-            ..self
-        }
+        Axis { fsl145: on, ..self }
     }
 
     /// The same order on another grid or spacing (FSL-145's choice kept).
     pub fn like(&self, n: usize, k: usize) -> Axis {
-        Axis::of_order(n, k, self.order).with_fsl145(self.two_when_short)
+        Axis::of_order(n, k, self.order).with_fsl145(self.fsl145)
     }
 
-    /// Quadratic B-splines on an axis shorter than two knot spacings (FSL-145: FSL lays two
-    /// coefficients there).
+    /// The quadratic B-splines' general count, `ceil((2n + k - 4) / (2k)) + 2` (observed: FSL's
+    /// `_fieldcoef` of 45 grids in random testing's trial of 2026-11-03,
+    /// `docs/findings/fsl-topup-original.md`; `specs/topup.md` §4.2).
+    fn quadratic_count(&self) -> usize {
+        (2 * self.n + self.k).saturating_sub(4).div_ceil(2 * self.k) + 2
+    }
+
+    /// FSL's quadratic count stops at its start, `floor(n / k) + 1` (FSL-145, `specs/topup.md`
+    /// §4.2, spec writer 2026-11-03): when the start's last function is centred before half the
+    /// sampled width, `floor(n / k) k < floor(K / 2)` (`K = 3k - 1` offsets for an even `k`,
+    /// `3k` for an odd one): every `n < k`, and `k <= n < 2k` from `k = 3` on.
+    fn fsl_stops_short(&self) -> bool {
+        let k = self.k;
+        let sampled = if k.is_multiple_of(2) {
+            3 * k - 1
+        } else {
+            3 * k
+        };
+        (self.n / k) * k < sampled / 2
+    }
+
+    /// Quadratic B-splines on an axis where FSL's count is not the general one (FSL-145: FSL
+    /// lays one coefficient when `n < k`, two when `k <= n < 2k` at `k >= 3`).
     pub fn short_quadratic(&self) -> bool {
-        self.order == 2 && self.k > 1 && self.n < 2 * self.k
+        self.order == 2
+            && self.k > 1
+            && self.fsl_stops_short()
+            && self.n / self.k + 1 != self.quadratic_count()
     }
 
-    /// The number of coefficients: `ceil((n + 1) / k) + 2` for cubic B-splines; for quadratic
-    /// ones `ceil((2n + k - 4) / (2k)) + 2` (observed: FSL's `_fieldcoef` of 45 grids in random
-    /// testing's trial of 2026-11-03, `docs/findings/fsl-topup-original.md`), FSL's two on an
-    /// axis shorter than two spacings with FSL-145 reproduced; the voxels themselves when `k`
-    /// is 1.
+    /// The number of coefficients: `ceil((n + 1) / k) + 2` for cubic B-splines, the general
+    /// count for quadratic ones ([`Axis::quadratic_count`]; FSL's on a short axis with FSL-145
+    /// reproduced); the voxels themselves when `k` is 1.
     pub fn ncoef(&self) -> usize {
         if self.k == 1 {
             self.n
         } else if self.order == 2 {
-            if self.two_when_short && self.short_quadratic() {
-                2
+            if self.fsl145 && self.fsl_stops_short() {
+                self.n / self.k + 1
             } else {
-                (2 * self.n + self.k).saturating_sub(4).div_ceil(2 * self.k) + 2
+                self.quadratic_count()
             }
         } else {
             (self.n + 1).div_ceil(self.k) + 2
@@ -186,6 +207,26 @@ impl Axis {
             } else {
                 b3n(t, d)
             } / scale;
+        }
+        (i0, w)
+    }
+
+    /// [`Axis::weights`] as the regulariser samples the basis functions (`specs/topup.md` §4.6,
+    /// spec writer 2026-11-03): where a quadratic B-spline's second derivative jumps on a sampled
+    /// offset (an even `k`: the inner knots, `|t| = 1/2`) the mean of its one-sided values,
+    /// `-1 / (2 k^2)`; the outer knots (`|t| = 3/2`) are not sampled (0). Every other value is
+    /// [`Axis::weights`]'s (the cubic's derivatives are continuous at its knots).
+    pub fn regulariser_weights(&self, x: f64, d: usize) -> (isize, [f64; 4]) {
+        let (i0, mut w) = self.weights(x, d);
+        if self.order == 2 && d == 2 {
+            let k = self.k as f64;
+            let u = (x - self.offset()) / k;
+            for (j, wj) in w.iter_mut().enumerate() {
+                let t = u - (i0 + j as isize) as f64;
+                if t.abs() == 0.5 {
+                    *wj = -0.5 / (k * k);
+                }
+            }
         }
         (i0, w)
     }
@@ -527,7 +568,8 @@ fn ipow(mut x: f64, mut n: u32) -> f64 {
 
 /// The 1D Gram matrix of the basis' `d`-th derivatives (per mm: `voxel` mm per voxel) summed at
 /// the integer voxel positions covering every coefficient's support (§4.6; observed: the
-/// regularisation `-v` prints is this sum, not the integral), banded (`|i - j| ≤ 3`).
+/// regularisation `-v` prints is this sum, not the integral), each basis function sampled at
+/// the offsets inside its open support ([`Axis::regulariser_weights`]), banded (`|i - j| ≤ 3`).
 pub fn gram(axis: Axis, d: usize, voxel: f64) -> Vec<[f64; 7]> {
     let nc = axis.ncoef();
     let k = axis.k as f64;
@@ -536,7 +578,7 @@ pub fn gram(axis: Axis, d: usize, voxel: f64) -> Vec<[f64; 7]> {
     let scale = 1.0 / ipow(voxel, 2 * d as u32);
     let mut g = vec![[0.0; 7]; nc];
     for x in lo..=hi {
-        let (i0, w) = axis.weights(x as f64, d);
+        let (i0, w) = axis.regulariser_weights(x as f64, d);
         for p in 0..4 {
             let i = i0 + p as isize;
             if i < 0 || i as usize >= nc || w[p] == 0.0 {
@@ -631,6 +673,52 @@ mod tests {
             assert_eq!(Axis::of_order(n, k, 2).ncoef(), 4, "n {n} k {k}");
         }
         assert_eq!(Axis::of_order(10, 6, 3).with_fsl145(true).ncoef(), 4);
+        // FSL-145's counts (`specs/topup.md` §4.2, observed by quad_count.py): one coefficient
+        // when n < k (24 x 16 x 14 at 40, 40, 25), two when k <= n < 2k at k >= 3 (24 x 16 x 14
+        // at 20, 20, 13: 2 x 1 x 2), the general count at k = 2 from n = 2 on (32 x 32 x 2 and
+        // x 3 at 2, 2, 2: 3), 2 at n = 3, k = 3 (32 x 32 x 3 at 3, 3, 3: 13 x 13 x 2)
+        for (n, k, fsl, general) in [
+            (24, 40, 1, 4),
+            (16, 40, 1, 3),
+            (14, 25, 1, 3),
+            (24, 20, 2, 4),
+            (16, 20, 1, 4),
+            (14, 13, 2, 4),
+            (2, 2, 3, 3),
+            (3, 2, 3, 3),
+            (1, 2, 1, 2),
+            (3, 3, 2, 3),
+            (32, 3, 13, 13),
+        ] {
+            let a = Axis::of_order(n, k, 2);
+            assert_eq!(a.with_fsl145(true).ncoef(), fsl, "FSL's: n {n} k {k}");
+            assert_eq!(a.ncoef(), general, "general: n {n} k {k}");
+            assert_eq!(a.short_quadratic(), fsl != general, "n {n} k {k}");
+        }
+    }
+
+    #[test]
+    fn the_quadratic_regulariser_takes_the_mean_at_the_inner_knots() {
+        // an even spacing: the inner knots fall on voxels, where the second derivative's
+        // one-sided values are -2 and 1 (per k^2): their mean; the outer knots are not sampled
+        let a = Axis::of_order(40, 4, 2);
+        let k2 = 16.0;
+        // coefficient 5 is centred at voxel 16: its inner knots at 14 and 18, outer at 10 and 22
+        let at = |x: f64| {
+            let (i0, w) = a.regulariser_weights(x, 2);
+            (0..4).find(|&j| i0 + j as isize == 5).map_or(0.0, |j| w[j])
+        };
+        assert_eq!(at(16.0), -2.0 / k2);
+        assert_eq!(at(14.0), -0.5 / k2);
+        assert_eq!(at(18.0), -0.5 / k2);
+        assert_eq!(at(12.0), 1.0 / k2);
+        assert_eq!(at(10.0), 0.0);
+        assert_eq!(at(22.0), 0.0);
+        // an odd spacing: no knot on a voxel, the weights' own values
+        let b = Axis::of_order(40, 3, 2);
+        for x in 0..40 {
+            assert_eq!(b.regulariser_weights(x as f64, 2), b.weights(x as f64, 2));
+        }
     }
 
     #[test]

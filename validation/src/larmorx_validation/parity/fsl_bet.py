@@ -782,8 +782,19 @@ def _kind(name: str) -> str:
     return "brain"
 
 
-def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> None:
-    """One file FSL wrote against the clean-room original's, by specs/bet.md §11's metrics."""
+#: ``(Dice, boundary distance p95, max)`` of the masks and brains: bet2's (``specs/bet.md`` §11)
+#: and, for ``bet -S``, ``-B``, ``-A``, ``-A2`` where FLIRT's matrices or FAST's bias field are not
+#: FSL's bits, §11.1's (Dice >= 0.99, p95 <= 1 voxel, max <= 3 voxels).
+MASK_LIMITS = (MASK_DICE, BOUNDARY_P95, BOUNDARY_MAX)
+OPTION_LIMITS = (0.99, 1.0, 3.0)
+
+
+def compare_original_file(
+    checks: CheckList, label: str, pa: Path, pb: Path, limits: tuple = MASK_LIMITS
+) -> None:
+    """One file FSL wrote against the clean-room original's, by specs/bet.md §11's metrics
+    (``limits``: the masks' and brains' thresholds)."""
+    mask_dice, boundary_p95, boundary_max = limits
     name = pa.name
     if name.endswith(".vtk"):
         try:
@@ -924,10 +935,10 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
     inside = int(np.count_nonzero((fa != fb) & both))
     checks(
         f"{label}{name}",
-        d >= MASK_DICE and p95 <= BOUNDARY_P95 and mx <= BOUNDARY_MAX and inside == 0,
+        d >= mask_dice and p95 <= boundary_p95 and mx <= boundary_max and inside == 0,
         metric="Dice; boundary distance p95 / max (voxels)",
         value=f"{d:.6f}; {p95:.2f} / {mx:.2f}",
-        threshold=f">= {MASK_DICE}; <= {BOUNDARY_P95} / {BOUNDARY_MAX}"
+        threshold=f">= {mask_dice}; <= {boundary_p95} / {boundary_max}"
         + ("" if kind == "mask" else "; values identical inside both"),
         detail=f"{differing} of {da.size} values differ"
         + ("" if kind == "mask" else f", {inside} inside both"),
@@ -935,7 +946,12 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
 
 
 def compare_dirs_original(
-    checks: CheckList, a: Path, b: Path, inputs: tuple[str, ...] = (), label: str = ""
+    checks: CheckList,
+    a: Path,
+    b: Path,
+    inputs: tuple[str, ...] = (),
+    label: str = "",
+    limits: tuple = MASK_LIMITS,
 ) -> None:
     """Every file FSL wrote in ``a`` against the clean-room original's in ``b``."""
     fa, fb = written(a, inputs), written(b, inputs)
@@ -944,7 +960,7 @@ def compare_dirs_original(
     )
     for name in fa:
         if name in fb:
-            compare_original_file(checks, label, a / name, b / name)
+            compare_original_file(checks, label, a / name, b / name, limits)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1171,6 +1187,8 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("last-variation", "bet", "-B -R -S -A: the last variation given (-A)", S("bet", ("{0}", "out", "-B", "-R", "-S", "-A"), (h,), tier="standard"))
     add("eyes-threshold-exponent", "defects", "-S on intensities above 1e6: fslstats prints 2.1e+06 and dc reads the exponent as commands (FSL-216)",
         S("bet", ("{0}", "out", "-S", "-m"), ("head-large",), tier="standard", silent_ok=s_ok))
+    add("eyes-negative-mean", "defects", "-S on a head whose brain has a negative mean: dc reads fslstats' minus sign as its subtraction, with too few numbers on its stack (FSL-216)",
+        S("bet", ("{0}", "out", "-S", "-m"), ("head-negative",), tier="standard", silent_ok=s_ok))
     add("eyes-nan", "defects", "-S with NaN voxels in the brain: FLIRT inside standard_space_roi fails (FSL-14; convert_xfm aborts, the script goes on), bet2 then aborts (FSL-216's threshold is not reached)",
         S("bet", ("{0}", "out", "-S"), ("head-nan",), fix_refuses="FSL-14", tier="standard"))
     add("bias-skull-echo", "defects", "-B -e -s: the skull's sed passes bet2's options through echo, which takes -e (FSL-63)",
@@ -1458,6 +1476,9 @@ def _phantoms() -> dict[str, Path]:
     # bet -S's threshold (FSL-216): intensities whose brain mean fslstats prints with an
     # exponent, and NaN voxels inside the brain (its mean printed nan)
     p["head-large"] = _save((t1 * 3000).astype(np.float32), d / "head-large.nii.gz")
+    # (2026-11-05) a head whose brain has a negative mean: dc reads the printed minus sign as
+    # its subtraction (FSL-216)
+    p["head-negative"] = _save((t1 - 1000).astype(np.float32), d / "head-negative.nii.gz")
     nan = t1.copy()
     c = tuple(n // 2 for n in HEAD_SHAPE)
     nan[c[0] - 2 : c[0] + 2, c[1] - 2 : c[1] + 2, c[2] - 2 : c[2] + 2] = np.nan
@@ -1714,16 +1735,22 @@ def named_entry(run: Run) -> str | None:
     return next((d for d in FILL_DEFECTS if f"upstream defect {d} (" in run.err), None)
 
 
-#: bet's variations with a replica only (2026-11-04): the clean-room original refuses them.
-REPLICA_ONLY_VARIATIONS = ("-S", "-B", "-A", "-A2")
-#: The programs of this suite with no clean-room original yet (the clean-room catch-up part's,
-#: from ``specs/standard_space_roi.md``): left out of the original's suite; a random case the
-#: original's descriptor draws for them expects larmorx's refusal.
-REPLICA_ONLY_TOOLS = ("fslroi", "standard_space_roi")
-#: Cases of FSL-217 (bet -F and -Z of an int8 image with negative values), which the clean-room
-#: original does not reproduce yet (the register's gap "original": the clean-room catch-up part's):
-#: left out of the original's suite until then.
-ORIGINAL_PENDING_CASES = ("bet/fmri-int8", "bet/small-fov-int8", "bet/small-fov-int8-debug")
+#: bet's variations with a replica only: none since 2026-11-05 (``-S``, ``-B``, ``-A``, ``-A2``
+#: have their clean-room original, the clean-room catch-up); a variation listed here would be
+#: refused by the original as pending.
+REPLICA_ONLY_VARIATIONS: tuple[str, ...] = ()
+#: The programs of this suite with no clean-room original yet: left out of the original's
+#: suite; a random case the original's descriptor draws for them expects larmorx's refusal.
+#: None since 2026-11-05 (fslroi and standard_space_roi, the clean-room catch-up).
+REPLICA_ONLY_TOOLS: tuple[str, ...] = ()
+#: Where the clean-room original's default refuses naming another defect than the replica's:
+#: ``bet -S`` of a head with NaN voxels: the original's FLIRT leaves the NaN voxels out of its
+#: costs by default (``specs/flirt.md``'s FSL-14), the script goes on, and the brain's mean is
+#: printed ``nan``, refused by FSL-216's rule B (the replica's FLIRT refuses the NaN input).
+ORIGINAL_FIX_REFUSES = {"defects/eyes-nan": "FSL-216"}
+#: Cases the clean-room original's suite leaves out until the original has their behaviour: none
+#: since 2026-11-05 (FSL-217 inside bet -F and -Z, the clean-room catch-up).
+ORIGINAL_PENDING_CASES: tuple[str, ...] = ()
 
 
 def replica_only_variation(s: Scenario) -> bool:
@@ -1755,10 +1782,17 @@ def _run_case(case: Case, checks: CheckList) -> None:
         raise Outcome("skipped", f"input not available: {e}") from e
     args = _arguments(s, paths)
     if original() and s.expect != "error" and replica_only_variation(s):
-        # bet -S, -B, -A, -A2: the clean-room original refuses them as pending (their original
-        # is to be written from specs/bet.md)
+        # a variation with no clean-room original: the original refuses it as pending (none
+        # since 2026-11-05)
         s = replace(s, expect="pending")
+    if original() and case.id in ORIGINAL_FIX_REFUSES:
+        s = replace(s, fix_refuses=ORIGINAL_FIX_REFUSES[case.id])
     env = environment(s.output_type, s.env)
+    if original() and s.tool == "standard_space_roi" and s.expect == "pending":
+        # imcp's conversion with nibabel (-maskNONE -roiNONE of an input in another format):
+        # the replica's pending case, which the original converts (specs/standard_space_roi.md
+        # §2.5)
+        s = replace(s, expect="pass")
     if original() and s.tool in REPLICA_ONLY_TOOLS:
         # no clean-room original of the program yet: larmorx says so (exit 127)
         with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
@@ -1822,7 +1856,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
         elif original() and not (filled or crash):
             # the clean-room original: by its thresholds, also where FSL-43's fill reads memory
             # beyond the volume (its outputs are FSL's there or the case fails)
-            compare_dirs_original(checks, f_dir, r_dir, inputs)
+            _compare_original(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
         elif reads_memory(ours) and not crash:
             # FSL's fill read memory beyond the volume (FSL-43): where its outputs differ from
             # the replica's, they depend on that memory (the replica reads it as not part of
@@ -1845,7 +1879,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
                     detail=memory[:600],
                 )
         elif original():
-            compare_dirs_original(checks, f_dir, r_dir, inputs)
+            _compare_original(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
         else:
             compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
@@ -1887,6 +1921,348 @@ def _run_case(case: Case, checks: CheckList) -> None:
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
         if fsl.code != 0 and not crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"both refuse (exit {fsl.code}) with {last_line(fsl)}")
+
+
+#: standard_space_roi's matrices against FSL's where they are not its bits: FLIRT's threshold
+#: for its 12-dof runs (``specs/flirt.md`` §13: the RMS deviation over a sphere of 80 mm about
+#: the input's centre, mm), and the output's box (voxels on each side,
+#: ``specs/standard_space_roi.md`` §8).
+SSROI_MATRIX_MM = 0.5
+SSROI_BOX = 1
+#: The stage-by-stage check's name: FSL's matrix given to the original (``-applyxfm -init``).
+SSROI_STAGE = "given FSL's matrix (-applyxfm -init): "
+
+
+def _compare_original(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    r_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """The clean-room original's files against FSL's: standard_space_roi by
+    ``specs/standard_space_roi.md`` §8 (:func:`_compare_ssroi`), every other program by
+    ``specs/bet.md`` §11 (:func:`compare_dirs_original`)."""
+    if s.tool == "standard_space_roi":
+        _compare_ssroi(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
+    elif s.tool == "bet" and _variation(s.args) in OPTION_VARIATIONS:
+        _compare_options(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
+    else:
+        compare_dirs_original(checks, f_dir, r_dir, inputs)
+
+
+#: bet's variations that run FSL's other programs (``specs/bet.md`` §5.3, §11.1).
+OPTION_VARIATIONS = ("-S", "-B", "-A", "-A2")
+#: The files of their -d runs made by a program whose output may differ from FSL's bits within
+#: its own thresholds (FLIRT's matrices, FAST's bias field and what FLIRT resamples): the stage
+#: where §11.1's thresholds take over.
+OPTION_SOURCES = (
+    "_tmp_to_std.mat",
+    "_tmp_to_std_inv.mat",
+    "_tmp_T1_to_std.mat",
+    "_tmp_T2_to_T1.mat",
+    "_tmp_T2_to_T1",
+    "_tmp_to_std",
+    "_tmp_premask_bias",
+)
+#: The name of §11.1's stage-by-stage check.
+OPTION_STAGE = "stage by stage (-d): the first file that differs"
+
+
+def _variation(args: tuple[str, ...]) -> str | None:
+    """The variation bet runs: the last of its variation options."""
+    last = None
+    for a in args[2:]:
+        if a in ("-R", "-S", "-Z", "-F", "-A", "-A2", "-B"):
+            last = a
+    return last
+
+
+def _compare_options(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    r_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """bet -S, -B, -A, -A2 (``specs/bet.md`` §11.1): every output bit for bit (bet2's thresholds)
+    where the original's programs give FSL's files; else stage by stage, from both programs'
+    -d runs (FSL's from its own run when the case has -d), the first file in the script's order
+    that is not FSL's: when it is a FLIRT matrix, FAST's bias field or an image FLIRT resampled,
+    the outputs are held to §11.1's thresholds (masks Dice >= 0.99, boundary distance p95 <= 1,
+    max <= 3 voxels, the brain FSL's values inside both); otherwise the program that made it is
+    the difference (a failure)."""
+    sub = CheckList()
+    compare_dirs_original(sub, f_dir, r_dir, inputs)
+    if all(c.passed for c in sub.checks) or fsl.code != 0:
+        for c in sub.checks:
+            checks.add(c)
+        return
+    if "-d" in args[2:]:
+        fd, rd = f_dir, r_dir
+    else:
+        fd, rd = root / "fsl-d", root / "larmorx-d"
+        for d in (fd, rd):
+            _prepare(d, s)
+        with_d = [*args, "-d"]
+        oracle_run(s.tool, with_d, env, fd, never=case_never(s))
+        run_larmorx(s.tool, with_d, "reproduce", env, rd)
+    names = sorted(
+        (p for p in rd.iterdir() if p.name in written(rd, inputs) and "_tmp" in p.name),
+        key=lambda p: (p.stat().st_mtime_ns, p.name),
+    )
+    first = None
+    for p in names:
+        q = fd / p.name
+        if not q.is_file():
+            first = (p.name, "FSL has no such file")
+            break
+        one = CheckList()
+        compare_original_file(one, "", q, p)
+        if not all(c.passed for c in one.checks):
+            first = (p.name, "; ".join(f"{c.name}: {c.detail}" for c in one.checks if not c.passed))
+            break
+    stem = first[0].split(".nii")[0].split(".hdr")[0] if first else ""
+    upstream = first is not None and stem.endswith(OPTION_SOURCES)
+    checks(
+        OPTION_STAGE,
+        upstream,
+        metric="file",
+        value=first[0] if first else "none",
+        threshold="FLIRT's matrices, FAST's bias field or FLIRT's resampled images "
+        "(their programs' own thresholds); else the step that made it",
+        detail=(first[1][:400] if first else "every temporary file FSL's"),
+    )
+    if upstream:
+        compare_dirs_original(checks, f_dir, r_dir, inputs, limits=OPTION_LIMITS)
+    else:
+        for c in sub.checks:
+            checks.add(c)
+
+
+def _mat(path: Path) -> np.ndarray | None:
+    try:
+        rows = [
+            [float(x) for x in ln.split()] for ln in path.read_text().splitlines() if ln.strip()
+        ]
+        m = np.array(rows, dtype=np.float64)
+        return m if m.shape == (4, 4) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _ssroi_centre(args: list[str]) -> np.ndarray:
+    """The input's centre in FLIRT's millimetres (its voxel sizes times the middle voxel)."""
+    import nibabel as nib
+
+    try:
+        img = nib.load(str(input_file(args[0])))
+        shape = np.array(img.shape[:3], dtype=np.float64)
+        zooms = np.abs(np.array(img.header.get_zooms()[:3], dtype=np.float64))
+        return (shape - 1.0) / 2.0 * zooms
+    except Exception:
+        return np.zeros(3)
+
+
+def input_file(name: str) -> Path:
+    """An image name as FSL completes it (the name itself, or with FSL's extensions)."""
+    p = Path(name)
+    if p.is_file():
+        return p
+    for e in IMAGE_EXTENSIONS:
+        q = Path(name + e)
+        if q.is_file():
+            return q
+    return p
+
+
+def _compare_ssroi(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    r_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """standard_space_roi's files (``specs/standard_space_roi.md`` §8): bit for bit where the
+    original's FLIRT gives FSL's matrix; else the matrices within FLIRT's threshold, the masks
+    in the input's space Dice >= 0.995, the output's box within one voxel of FSL's on each side
+    and the values identical inside both; then stage by stage, FSL's matrix given, every file
+    bit for bit."""
+    import nibabel as nib
+
+    sub = CheckList()
+    compare_dirs_original(sub, f_dir, r_dir, inputs)
+    if all(c.passed for c in sub.checks):
+        for c in sub.checks:
+            checks.add(c)
+        return
+    fa, fb = written(f_dir, inputs), written(r_dir, inputs)
+    checks(FILES, fa == fb, detail=", ".join(fa) if fa == fb else f"FSL {fa}, larmorx {fb}")
+    centre = _ssroi_centre(args)
+    for name in fa:
+        if name not in fb:
+            continue
+        pa, pb = f_dir / name, r_dir / name
+        if name.endswith(".mat"):
+            ma, mb = _mat(pa), _mat(pb)
+            if ma is None or mb is None:
+                checks(
+                    name, content(pa) == content(pb), metric="bytes", detail="not a 4 x 4 matrix"
+                )
+                continue
+            from larmorx_validation.stages.compare import rms_deviation
+
+            d = rms_deviation(ma, mb, centre) if np.isfinite(mb).all() else float("inf")
+            checks(
+                name,
+                d <= SSROI_MATRIX_MM,
+                metric="RMS deviation over 80 mm (mm)",
+                value=f"{d:.4f}",
+                threshold=f"<= {SSROI_MATRIX_MM} (FLIRT's 12-dof runs)",
+                detail="the same text"
+                if content(pa) == content(pb)
+                else f"RMS deviation {d:.4f} mm",
+            )
+            continue
+        if not is_image(name) or name.endswith((".img", ".img.gz", ".img.zst", ".img.bz2")):
+            if not is_image(name):
+                checks(name, content(pa) == content(pb), metric="bytes")
+            continue
+        stem = name.split(".")[0]
+        if stem.endswith(("_tmp_standard_mask", "_tmp_standard_roi")):
+            # on the reference's grid, independent of the matrix: FSL's bits
+            compare_original_file(checks, "", pa, pb)
+            continue
+        try:
+            ia, ib = nib.load(str(pa)), nib.load(str(pb))
+            da = np.asanyarray(ia.dataobj).astype(np.float64)
+            db = np.asanyarray(ib.dataobj).astype(np.float64)
+        except Exception as e:
+            checks(name, False, detail=f"not readable ({type(e).__name__})")
+            continue
+        if stem.endswith("_tmp_to_std"):
+            # the input resampled on the reference's grid by the original's own matrix: reported
+            ok = da.shape == db.shape
+            if ok and da.std() > 0 and db.std() > 0:
+                ncc = float(np.corrcoef(da.ravel(), db.ravel())[0, 1])
+            else:
+                ncc = float("nan")
+            checks(
+                name,
+                ok,
+                metric="NCC with FSL's",
+                value=f"{ncc:.6f}",
+                threshold="reported (the matrices are the threshold)",
+            )
+            continue
+        if stem.endswith(("_to_in", "_tmp_masked")):
+            ok = da.shape == db.shape
+            d = dice(da > 0, db > 0) if ok else 0.0
+            both = (da != 0) & (db != 0) if ok else np.zeros(1, bool)
+            inside = int(np.count_nonzero((da != db) & both)) if stem.endswith("_tmp_masked") else 0
+            checks(
+                name,
+                ok and d >= MASK_DICE and inside == 0,
+                metric="Dice of the voxels above 0",
+                value=f"{d:.6f}",
+                threshold=f">= {MASK_DICE}"
+                + ("; the values identical inside both" if stem.endswith("_tmp_masked") else ""),
+                detail=f"{inside} values differ inside both"
+                if ok
+                else f"FSL {da.shape}, larmorx {db.shape}",
+            )
+            continue
+        # the output: its box within a voxel of FSL's on each side, the values identical inside
+        # both at the same positions
+        try:
+            corner = np.linalg.solve(ia.affine, ib.affine[:, 3])[:3]
+        except np.linalg.LinAlgError:
+            corner = np.full(3, np.nan)
+        off = np.rint(corner).astype(int) if np.isfinite(corner).all() else np.zeros(3, int)
+        start = off
+        end = off + np.array(db.shape[:3]) - np.array(da.shape[:3])
+        box = bool(
+            np.isfinite(corner).all()
+            and np.abs(start).max() <= SSROI_BOX
+            and np.abs(end).max() <= SSROI_BOX
+        )
+        lo = np.maximum(0, off)
+        hi = np.minimum(np.array(da.shape[:3]), off + np.array(db.shape[:3]))
+        inside = 0
+        if box and (hi > lo).all():
+            a = da[lo[0] : hi[0], lo[1] : hi[1], lo[2] : hi[2]]
+            b = db[
+                lo[0] - off[0] : hi[0] - off[0],
+                lo[1] - off[1] : hi[1] - off[1],
+                lo[2] - off[2] : hi[2] - off[2],
+            ]
+            inside = int(np.count_nonzero((a != b) & (a != 0) & (b != 0)))
+        same_type = ia.get_data_dtype() == ib.get_data_dtype()
+        checks(
+            name,
+            box and inside == 0 and same_type,
+            metric="box (voxels, start / end per axis)",
+            value=f"{start.tolist()} / {end.tolist()}",
+            threshold=f"|start|, |end| <= {SSROI_BOX}; the same type; values identical inside both",
+            detail=f"FSL {da.shape} {ia.get_data_dtype()}, larmorx {db.shape} "
+            f"{ib.get_data_dtype()}; {inside} values differ inside both",
+        )
+    _ssroi_stage(checks, s, args, env, fsl, f_dir, root, inputs)
+
+
+def _ssroi_stage(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """Stage by stage (``specs/standard_space_roi.md`` §8): FSL's matrix (its ``-d`` run's) given
+    to both programs (``-d``, ``-applyxfm -init``, after the script's options), every file of
+    the original's run against FSL's by the original's comparison: the values bit for bit, the
+    headers but for ``descrip``. (FSL's own run from the matrix's text can differ from its
+    optimising run in the input resampled on the reference's grid: the matrix's last digits.)"""
+    if fsl.code != 0 or len(args) < 2:
+        return
+    with_d = args if "-d" in args[2:] else [args[0], args[1], "-d", *args[2:]]
+    mat = f_dir / "out_tmp_to_std.mat"
+    if with_d is not args:
+        d_dir = root / "fsl-d"
+        _prepare(d_dir, s)
+        oracle_run(s.tool, with_d, env, d_dir, never=case_never(s))
+        mat = d_dir / "out_tmp_to_std.mat"
+    if not mat.is_file():
+        return
+    given = "fsl-matrix.mat"
+    stage = [*with_d, "-applyxfm", "-init", given]
+    f_st, r_st = root / "fsl-stage", root / "stage"
+    for d in (f_st, r_st):
+        _prepare(d, s)
+        shutil.copyfile(mat, d / given)
+    theirs = oracle_run(s.tool, stage, env, f_st, never=case_never(s))
+    ours = run_larmorx(s.tool, stage, "reproduce", env, r_st)
+    checks(
+        f"{SSROI_STAGE}{EXIT}",
+        ours.code == theirs.code,
+        detail=f"FSL {theirs.code}, larmorx {ours.code}"
+        + (f": {larmorx_err_line(ours)}" if ours.code else ""),
+    )
+    compare_dirs_original(checks, f_st, r_st, (*inputs, given), label=SSROI_STAGE)
 
 
 def _descrip_only(a: Path, b: Path) -> bool:
@@ -2402,12 +2778,14 @@ def _original_suite() -> Suite:
         name="fsl-bet",
         title="BET (clean-room original)",
         tool=(
-            f"`larmorx fsl bet2`, `bet` and `betsurf` (larmorx {larmorx.__version__}, crate "
-            "larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in "
-            "process, and `lx.fsl.bet` / `lx.fsl.betsurf(..., implementation='original')`"
+            f"`larmorx fsl bet2`, `bet`, `betsurf`, `standard_space_roi` and `fslroi` (larmorx "
+            f"{larmorx.__version__}, crate larmorx-fsl: the clean-room originals written from "
+            "specs/bet.md and specs/standard_space_roi.md, Apache-2.0), in process, and "
+            "`lx.fsl.bet` / `lx.fsl.betsurf` / `lx.fsl.standard_space_roi` / "
+            "`lx.fsl.fslroi(..., implementation='original')`"
         ),
-        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
-        "`~/fsl-6.0.7.23`",
+        reference=f"bet, bet2, betsurf, standard_space_roi and fslroi from {fsl_version()}, the "
+        "conda installation in `~/fsl-6.0.7.23`",
         thresholds=[
             (
                 "Exit status",

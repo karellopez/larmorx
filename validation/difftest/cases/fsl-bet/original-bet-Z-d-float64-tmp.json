@@ -1,0 +1,186 @@
+{
+ "defect": null,
+ "description": "bet -Z -d on a float64 image: fslroi's slices and fslmerge's padded image keep the double values (FSL's temporary files are float64)",
+ "expect": "pass",
+ "found": {
+  "detail": "out_tmp.nii.gz: FSL (31, 9, 101) float64, larmorx (31, 9, 101) float32; out_tmp_bottom.nii.gz: FSL (31, 9) float64, larmorx (31, 9) float32; out_tmp_top.nii.gz: FSL (31, 9) float64, larmorx (31, 9) float32",
+  "n": 330,
+  "seed": "bet-options-6",
+  "shrink_moves": [],
+  "signature": [
+   "out_tmp.nii.gz",
+   "out_tmp_bottom.nii.gz",
+   "out_tmp_top.nii.gz"
+  ]
+ },
+ "id": "original-bet-Z-d-float64-tmp",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": true,
+   "-e": false,
+   "-f": true,
+   "-g": true,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "content": "crop",
+   "corner0": 26,
+   "corner1": 36,
+   "corner2": 20,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 2,
+   "dtype": "float64",
+   "extreme": false,
+   "f": "0.3",
+   "g": "0.5",
+   "nx": 31,
+   "ny": 9,
+   "nz": 7,
+   "orientation": "oblique",
+   "origin0": 35.25,
+   "origin1": -17.5,
+   "origin2": -49.25,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 2,
+   "spacing0": 1.5,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "suffix": ".nii.gz",
+   "tool": "bet",
+   "units": "unknown",
+   "variation": "-Z"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-Z"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-f",
+     "0.3"
+    ],
+    "name": "-f",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g",
+     "0.5"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   },
+   {
+    "args": [
+     "-d"
+    ],
+    "name": "-d",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "corner": [
+      26,
+      36,
+      20
+     ],
+     "seed": 1113966999,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 2,
+     "type": "crop"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      35.25,
+      -17.5,
+      -49.25
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      31,
+      -3,
+      -3,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.5,
+      1.0,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     31,
+     9,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 330,
+  "options": [
+   "-Z",
+   "-d",
+   "-f",
+   "-g",
+   "-m",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "bet-options-6",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

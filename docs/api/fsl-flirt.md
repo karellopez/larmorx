@@ -109,7 +109,8 @@ r = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6))      # 4 x 4, 30 degree
 | `makerot -t angle [-a ax,ay,az] [-c cx,cy,cz] [--cov=image] [-o file]` | `larmorx fsl makerot` | `makerot(theta, axis=None, centre=None, *, cov=None)` → 4 × 4 | a rotation by `theta` degrees about the axis through the centre (or the image's centre); the axis divided by its length (FSL by its square root: **FSL-76**, corrected by default); an axis or centre of other than three values refused (**FSL-77**) |
 
 The coordinate programs' `-warp` (a FNIRT warp field) is refused until FNIRT is ported (an
-unreadable file gives FSL's messages and exit status 1, as FSL); matrices other than 4 × 4 where
+unreadable file, or an image of other than three volumes, gives FSL's messages and exit status 1,
+as FSL: `specs/flirt.md` §15.2); matrices other than 4 × 4 where
 FSL would invert them beyond 4 × 4 are refused (FSL prints part of its output, then aborts).
 
 ## FLIRT's other programs and scripts (part 3)
@@ -171,8 +172,8 @@ repeated-triple end, the terminal refusal), FSL-76 (corrected by default, FSL's 
 `reproduce`, named), FSL-77 (refused by default, FSL's reading with `reproduce`, named in both
 modes) and FSL-14 for a NaN volume's centre of gravity (left out by default). Refused, as the spec
 says: matrices of 4 rows that are not 4 × 4 where FSL aborts at a determinant, an inverse or a
-product (FSL prints part of its output first), and every readable `-warp` (FNIRT's warp fields are
-not ported). The fsl-flirt suite's 66 cases of these programs: 39 identical to FSL in every byte of
+product (FSL prints part of its output first), and a `-warp` of three volumes (FNIRT's warp fields
+are not ported; other images get FSL's read error, since the catch-up of 2026-11-05). The fsl-flirt suite's 66 cases of these programs: 39 identical to FSL in every byte of
 text and file, 27 more where both refuse or abort alike; one more matrix of the findings
 (a reflection's `--inverteddies` check) differs in the sign of a 1e-10 residual
 ([findings](../findings/fsl-flirt-original.md), "FLIRT's other programs").
@@ -189,13 +190,13 @@ precision, FSL-09, FSL-75, FSL-79 (the spline's coefficients per pass in the ima
 by default) and FSL-111 (a uint8 image's values read as stored by default, as signed char with
 `reproduce`); with a reference that has neither form, the output carries the input's form through
 the first matrix (as a registration's `-out` does, observed); `pairreg` as three
-runs of the original's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's
-schedules read from `$FSLDIR/etc/flirtsch` as the script reads them (FSLDIR unset: refused);
+runs of the original's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's three
+schedules carried by the original (since 2026-11-05: no `$FSLDIR` needed; `-v` echoes FSL's lines);
 `extracttxt` with its own POSIX basic regular expressions (GNU grep's extensions) and the script's
 dc and sed arithmetic, messages included (GNU sed's usage text, which a range read as sed's options
 prints, is not reproduced: one larmorx line instead); `aff2rigid`'s matrix computed by default
-(FSL-81), FSL 6.0.7.23's traceback with `reproduce`. Refused, as the spec says (rule B): non-finite
-coordinates (`pointflirt`), averages beyond double precision (`midtrans`), arguments the scripts'
+(FSL-81), FSL 6.0.7.23's traceback with `reproduce`. Refused, as the spec says (rule B): averages
+beyond double precision (`midtrans`, **FSL-241** since 2026-11-05), arguments the scripts'
 shell would split or expand, non-integer counts and starts, files with NUL bytes. The fsl-flirt
 suite's 63 cases of these programs: 40 identical to FSL (the fits within 1e-9 of FSL's matrices
 in every element, `applyxfm4D`'s nearest-neighbour and trilinear images bit for bit, its sinc and
@@ -219,8 +220,13 @@ the matrices differ in their last digits. The suite's 22 cases of these options 
 original's own): every line, exit status and file FSL's.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
-(the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
-more rejected by both alike, 4 where FLIRT crashes or never finishes. fMRIPrep's three
+(the replica suite's cases, the original's own and its permanent cases, against FSL 6.0.7.23;
+re-made 2026-11-05 from `a835ddd`): 238 of 240 compared cases within thresholds, 89 more rejected
+by both alike, 10 where FLIRT crashes or never finishes or writes what the specification cannot
+define; the 2 it misses are two weighted registrations whose paths part at their costs' last bits
+(since 2026-11-05 the search orders its starting points of equal cost as FSL does, with
+libstdc++'s `std::sort`: an empty weight or a one-voxel input, where every cost ties, now gives
+FSL's matrix). fMRIPrep's three
 boundary-based calls within 0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053,
 0.011 and 0.030 mm), their images' correlation with FSL's 0.9993 to 0.99996; `-applyxfm` with
 trilinear and nearest neighbour FSL's images bit for bit, sinc and spline within 1e-5 of the
@@ -258,6 +264,46 @@ as 1 for the base scale; refused with `reproduce`, where FLIRT never finishes; `
 refused in both modes), each named in both modes. `lx.mri.hmc`'s `-cost corratio` and `-cost
 woods` now use the same sums (`specs/mcflirt.md` appendix A).
 
+**The clean-room catch-up, programs and messages (2026-11-05).** `specs/flirt.md` §14's answers
+of 2026-11-03 (items 1 to 8 of `docs/next-steps.md`'s list for the original): the search's free
+optimisations print at its lowered level (confirmed: `verbose/5`, `verbose/7`); with `-anglerep
+quaternion` and `reproduce` a starting point outside the unit ball is composed once and keeps only
+its scale (the identity at 6 dof: no translations), FSL-90's message prints at every such
+composition, the evaluations' included, and each start's composition, its dof message and its
+optimisation's messages follow one another start by start (each free optimisation writes its own
+log, passed on in order whatever runs in parallel): FSL's 8 messages at 6 dof, 4 at 12, the 102
+dof messages at 3 interleaved as FSL's (`real/anglerep-quaternion-dof3`); avscale's check signs
+(the 82 avscale findings of the 2026-11-02 trial now FSL's text); `midtrans` uses a transform whose
+determinant is not finite (FSL's test is `|det| < 1e-6`) and refuses its averages (FSL-241);
+`pointflirt` refuses no points (FSL-204) after FSL's lines, reads a `nan` word as 0 (the fit of the
+points as read) and stops on an overflow as FSL's SVD does; `-warp` takes exactly three volumes;
+FSL's 4 × 4 inverse fails only on an exact zero (NaN and infinite matrices are inverted, and with
+`reproduce` FLIRT goes on with its NaN matrices and writes them: 37 of the trials' 57 findings
+that stopped at `inv(): matrix is singular` now FSL's; the sign of a NaN can differ, below);
+`convert_xfm -fixscaleskew` aborts where its decomposition does not solve, as avscale (a zero
+scale or a non-finite entry); `pairreg`'s schedules carried, and a step that aborts followed by
+the shell's `Aborted` line. Found on the way (FSL's verbose lines): the centres' COG warning
+where `-verbose 3` measures them, the levels' fourth size (the image's TR as read, FSL's 0 for
+images without one), the sampling and initial matrices in scaled millimetres with a base scale
+([findings](../findings/fsl-flirt-original.md), "The clean-room catch-up").
+
+**The clean-room catch-up, numerics and `-debug` (2026-11-05).** Items 9 to 13 of the list:
+`leastsq` sums in three single-precision levels (`real/cost-leastsq` passes); applyxfm4D's spline
+is FLIRT's own (§9.3: a double image filtered in double; the 5,177 voxels of five trial findings
+that differed are FSL's); `-debug`'s levels take their headers from the resampling's steps (only
+set forms composed, a neurological reference's forms swapped back with each level's grid,
+`-noresample`'s levels the reference's own forms), `global_refweight1`'s qfac and `pixdim[4..7]`
+are 1, and with the boundary-based cost and no boundary point the set-up's lines and error come at
+every evaluation and FLIRT goes on to write `debug`, `-omat` and `-out` (123 of the trial's 161
+`-debug` findings agree, 52 before); a perturbed row is composed with all twelve parameters (its
+scales and skews kept whatever the command's dof); the search's `P` keeps each start composed
+once; with `reproduce` and NaN centres (FSL-14) an optimisation starts from the identity's
+parameters where its own are NaN, and a NaN pre-image is outside (the background value): 52 of
+the 57 trial findings with non-finite voxels agree (37 before). Open: FSL-91's and FSL-92's
+`reproduce` traces part at the sign of a zero skew under gimbal lock, and the weighted `normcorr`
+and `woods` registrations at their costs' last bits
+([findings](../findings/fsl-flirt-original.md), "numerics, `-debug` and NaN centres").
+
 ## Upstream defects (D13)
 
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
@@ -292,7 +338,11 @@ finishes, so `reproduce` refuses; `-basescale 0` refused in both modes). Each na
 Refused in both modes (FLIRT's behaviour is undefined): **FSL-204** (`pointflirt` with two
 coordinate files both empty or missing: FSL crashes after its `Could not open matrix file` lines;
 `larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1; the replica
-since 2026-11-03, the clean-room original in a later part), FSL-21/FSL-66 (`-bins` giving no or negative
+since 2026-11-03, the clean-room original since 2026-11-05 after `-v`'s headings, as FSL prints
+them), **FSL-241** (`midtrans` with transforms whose averages reach beyond double precision, a scale
+of 1e200 or a translation of 1e300: FSL writes rows of NaN, or reports its failed decomposition as a
+matrix-size error, and exits 0; the clean-room original refuses, exit 1, since 2026-11-05: rule B,
+FSL's values not specified), FSL-21/FSL-66 (`-bins` giving no or negative
 bins at a scale), FSL-70 (a schedule matrix name FLIRT cannot interpret), FSL-71 (`bbrstep` below 1
 with BBR: FLIRT never finishes), FSL-72 (a schedule `read` of a file that is not numbers: FLIRT reads
 for ever), FSL-73 (`-pedir` without a field map read), the background value of a single voxel
@@ -341,7 +391,7 @@ stage-4 cost's sinc table is the same with either `cos` (all 201 entries), so it
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported). Known difference (part 3's random testing): with NaN or
-infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
-(`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
-the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.
+ported). Known differences: with NaN or infinite input voxels in `reproduce` mode (FSL-14), the sign of
+NaN results can differ from FSL's (`nan` against `-nan`; the values are NaN in both); FSL-91's and
+FSL-92's `reproduce` runs (every cost equal) and the weighted `normcorr` and `woods`
+registrations of the record part from FSL's paths (the catch-up's findings, above).

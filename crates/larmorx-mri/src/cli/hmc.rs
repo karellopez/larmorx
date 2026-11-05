@@ -26,7 +26,7 @@ use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
-use crate::hmc::estimate::{EstimateError, EstimateParams, InPlane, refused_bins};
+use crate::hmc::estimate::{COG_WARNING, EstimateError, EstimateParams, InPlane, refused_bins};
 use crate::hmc::files::{self as image_files, ImageFiles};
 use crate::hmc::image::{
     self, Series, output_name, output_type, read_reference_files, read_series_files,
@@ -739,6 +739,11 @@ fn execute(
         }
         Err(e) => return Err(e.to_string().into()),
     };
+    // mcflirt's line for each registration whose test volume's centre of mass had a total below
+    // 1e-5 (§6.1; observed: three for a constant volume with the default three stages)
+    for _ in 0..result.estimate.cog_warnings {
+        let _ = writeln!(err, "{COG_WARNING}");
+    }
     for n in &result.estimate.notices {
         print_notice(err, n);
     }
@@ -1117,6 +1122,10 @@ fn write_outputs(
                 write_text(d.join(format!("MAT_{t:04}")), &mat_text(&est.matrices[t]))?;
             }
             if let Some(f) = par.as_mut() {
+                // each line's decomposition measures the reference's centre (§6.1)
+                if result.par_cog_zero {
+                    let _ = writeln!(err, "{COG_WARNING}");
+                }
                 write_handle(f, &par_name, &par_text(&result.params[t..=t]))?;
             }
         }
@@ -1169,7 +1178,12 @@ fn write_outputs(
                 write_text(d.join(format!("MAT_{t:04}")), &text)?;
             }
             match par.as_mut() {
-                Some(Ok(f)) => write_handle(f, &par_name, &par_text(&result.params[t..=t]))?,
+                Some(Ok(f)) => {
+                    if result.par_cog_zero {
+                        let _ = writeln!(err, "{COG_WARNING}");
+                    }
+                    write_handle(f, &par_name, &par_text(&result.params[t..=t]))?
+                }
                 Some(Err(u)) => {
                     let _ = writeln!(err, "error: unable to open output file!");
                     notices.push(Notice::new(

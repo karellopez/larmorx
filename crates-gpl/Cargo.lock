@@ -117,7 +117,6 @@ name = "larmorx-core"
 version = "0.0.1"
 dependencies = [
  "bytemuck",
- "libm",
  "ndarray",
  "num-complex",
  "rayon",
@@ -139,7 +138,6 @@ name = "larmorx-interp"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
- "libm",
  "rayon",
  "thiserror",
 ]

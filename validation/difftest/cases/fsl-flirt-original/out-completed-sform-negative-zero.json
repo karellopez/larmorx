@@ -1,0 +1,237 @@
+{
+ "defect": null,
+ "description": "-out with a qform-only reference of qfac -1: the sform completed from the qform keeps its negative zeros, as FSL writes them",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii bit-identical: the headers differ",
+  "n": 11635,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii bit-identical"
+  ]
+ },
+ "id": "out-completed-sform-negative-zero",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": false,
+   "-debug": false,
+   "-dof": false,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": false,
+   "-interp": true,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.9,
+   "axis1": 0.9,
+   "axis2": 0.85,
+   "bbr": false,
+   "bias0": 0.005,
+   "bias1": -0.005,
+   "bias2": -0.01,
+   "bias3": -0.0075,
+   "centre0": -1.5,
+   "centre1": -1.0,
+   "centre2": -6.0,
+   "content": "head",
+   "corner0": 40,
+   "corner1": 33,
+   "corner2": 30,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dtype": "float32",
+   "extreme": false,
+   "interp": "trilinear",
+   "kind": "register",
+   "noise": 3.0,
+   "orientation": "axes+oblique",
+   "origin0": -32.75,
+   "origin1": 36.75,
+   "origin2": -56.5,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "10x30x19",
+   "size": 21.0,
+   "spacing0": 3.0,
+   "spacing1": 0.5,
+   "spacing2": 2.0,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   },
+   {
+    "args": [
+     "-interp",
+     "trilinear"
+    ],
+    "name": "-interp",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "corner": [
+      40,
+      33,
+      30
+     ],
+     "seed": 1630324526,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -32.75,
+      36.75,
+      -56.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      -4,
+      2,
+      33,
+      27
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      3.0,
+      0.5,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     30,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "corner": [
+      40,
+      33,
+      30
+     ],
+     "seed": 1466583782,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      16.5,
+      50.25,
+      7.25
+     ],
+     "qfac": -1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      1.5,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     22,
+     21
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 11635,
+  "options": [
+   "-interp",
+   "-out",
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

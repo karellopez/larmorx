@@ -192,10 +192,9 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         gradient: num(GRAD, 0.0),
         radius: num(RADIUS, 0.0),
         smoothness: num(SMOOTH, 1.0),
-        // observed (FSL 6.0.7.23, black box, random testing 2026-10-31 case 1608): `-c 0 0 0` is
-        // bet2's "not given", the centre of gravity (`bet -R` passes it when the brain is empty)
+        // a centre of three zeros in FSL's radiological frame is "not given" (`centre_mm`)
         centre: match &given[CENTRE] {
-            Some(Given::Numbers(v)) if v[..3].iter().any(|&x| x != 0.0) => Some([v[0], v[1], v[2]]),
+            Some(Given::Numbers(v)) => Some([v[0], v[1], v[2]]),
             _ => None,
         },
         threshold: flag(THRESHOLD),
@@ -287,6 +286,22 @@ fn meaningless(o: &Options) -> Option<String> {
         return Some("a search depth (--parameter_d1, --parameter_d2) is not finite".into());
     }
     None
+}
+
+/// `-c x y z` (voxels of the file as stored) in the algorithm's millimetres (§3.2: `x` becomes
+/// `nx − 1 − x` on a mirrored image), or `None` where FSL takes it as not given: a centre of
+/// three zeros **in its radiological frame**, after that conversion (observed, FSL 6.0.7.23,
+/// black box: random testing 2026-10-31 case 1608, `-c 0 0 0` on a radiologically stored image;
+/// 2026-11-05, the permanent cases `original-bet-R-centre-zero` and
+/// `original-bet-R-negative-image-bet2-crash`: `bet -R` passes `fslstats -C`'s `nx − 1 0 0` for
+/// an empty brain of a neurologically stored image, and FSL's bet2 uses the centre of gravity).
+pub fn centre_mm(c: [f64; 3], flipped: bool, v: &bet::Vol) -> Option<[f64; 3]> {
+    let nx = v.shape[0] as f64;
+    let x = if flipped { nx - 1.0 - c[0] } else { c[0] };
+    if x == 0.0 && c[1] == 0.0 && c[2] == 0.0 {
+        return None;
+    }
+    Some([x * v.voxel[0], c[1] * v.voxel[1], c[2] * v.voxel[2]])
 }
 
 /// FSL-40: bet2's names (the first `.hdr` removed, again when `.img` remains; `None`: FSL
@@ -554,16 +569,9 @@ pub fn run(
     // the image the surface is found on: the source, converted for --ct (a copy only then)
     let cormack = |v: &bet::Vol| v.with_data(v.data.iter().map(|&x| bet::cormack(x)).collect());
     let work_owned = o.ct.then(|| cormack(&source.vol));
-    let centre_mm = o.centre.map(|c| {
-        let v = &source.vol;
-        let nx = v.shape[0] as f64;
-        let x = if source.flipped {
-            nx - 1.0 - c[0]
-        } else {
-            c[0]
-        };
-        [x * v.voxel[0], c[1] * v.voxel[1], c[2] * v.voxel[2]]
-    });
+    let centre_mm = o
+        .centre
+        .and_then(|c| centre_mm(c, source.flipped, &source.vol));
     // -r 0 (the default) asks for the estimate; any other value is used (FSL-42 reproduced)
     let radius = (o.radius != 0.0).then_some(o.radius);
     let found = bet::find_surface(
@@ -881,11 +889,23 @@ mod tests {
 
     #[test]
     fn a_centre_of_zeros_is_not_given() {
-        // observed: FSL's bet2 takes `-c 0 0 0` as no centre (the centre of gravity)
-        assert_eq!(centre(&["-c", "0", "0", "0"]), None);
-        assert_eq!(centre(&["-c", "-0.000000", "0", "0"]), None);
+        // observed: FSL's bet2 takes a centre of zeros in its radiological frame as no centre
+        // (the centre of gravity): `-c 0 0 0` on a radiologically stored image, `-c nx-1 0 0`
+        // on a neurologically stored one
         assert_eq!(centre(&[]), None);
         assert_eq!(centre(&["-c", "0", "0", "1"]), Some([0.0, 0.0, 1.0]));
+        let v = bet::Vol::new([8, 12, 15], [2.0, 1.0, 0.5], vec![0.0; 8 * 12 * 15]);
+        let zeros = centre(&["-c", "0", "0", "0"]).unwrap();
+        assert_eq!(centre_mm(zeros, false, &v), None);
+        let minus = centre(&["-c", "-0.000000", "0", "0"]).unwrap();
+        assert_eq!(centre_mm(minus, false, &v), None);
+        assert_eq!(centre_mm(zeros, true, &v), Some([14.0, 0.0, 0.0]));
+        assert_eq!(centre_mm([7.0, 0.0, 0.0], true, &v), None);
+        assert_eq!(
+            centre_mm([7.0, 0.0, 0.0], false, &v),
+            Some([14.0, 0.0, 0.0])
+        );
+        assert_eq!(centre_mm([0.0, 0.0, 1.0], false, &v), Some([0.0, 0.0, 0.5]));
     }
 
     /// FSL-187 through bet2's notice: an image of values on [0, 1) with one at 10^12; the

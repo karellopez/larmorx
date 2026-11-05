@@ -10,7 +10,7 @@ use std::f64::consts::PI;
 
 use larmorx_core::math::Libm;
 use larmorx_mri::hmc::interp::{floor, trilinear_extended};
-use larmorx_mri::hmc::kernels::{Spline, nearest};
+use larmorx_mri::hmc::kernels::nearest;
 use larmorx_mri::hmc::volume::Volume;
 use rayon::prelude::*;
 
@@ -234,8 +234,8 @@ pub struct Resampling<'a> {
     /// `-paddingsize` (voxels).
     pub padding: f32,
     /// The spline's coefficients when the caller computed them (`applyxfm4D`'s, §15.7), else
-    /// the shared engine's of the input.
-    pub spline: Option<&'a Spline>,
+    /// FLIRT's of the input (§9.3).
+    pub spline: Option<&'a FlirtSpline>,
     /// `-setbackground`: neighbours outside the input read `pad` (not the extraslice rule).
     pub constant: bool,
 }
@@ -263,21 +263,16 @@ pub fn resample(
                 let xf = x as f32;
                 let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
                 for y in 0..ny {
+                    // a NaN position (a NaN matrix, FSL-14 reproduced) is outside: the padding
+                    // value (observed, 2026-11-05)
                     let pad_out =
-                        (0..3).any(|k| p[k] < -r.padding || p[k] > n[k] - 1.0 + r.padding);
+                        (0..3).any(|k| !(p[k] >= -r.padding && p[k] <= n[k] - 1.0 + r.padding));
                     if !pad_out {
                         let extended = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
                         let v = if r.interp == Interp::Spline {
-                            match (r.spline, own.as_ref()) {
-                                (Some(s), _) => {
-                                    if extended {
-                                        s.value(p, r.pad)
-                                    } else {
-                                        r.pad
-                                    }
-                                }
-                                (None, Some(s)) => s.value(p, r.pad, r.constant),
-                                (None, None) => r.pad,
+                            match r.spline.or(own.as_ref()) {
+                                Some(s) => s.value(p, r.pad, r.constant),
+                                None => r.pad,
                             }
                         } else if r.constant && r.interp == Interp::Trilinear {
                             trilinear_constant(src, p, r.pad)
@@ -333,45 +328,85 @@ fn trilinear_constant(vol: &Volume, p: [f32; 3], c: f32) -> f32 {
 }
 
 /// FLIRT's cubic spline (§9.3, exactly): the coefficients along x, then y, then z (axes of
-/// one voxel skipped), each column in double, stored in single after each axis; at a position the
-/// four weights per axis from `⌈p⌉ − 2`, the value `Σ (c·w_x)·(w_z·w_y)` in double, z outer.
+/// one voxel skipped), each column in double, stored after each axis (in single precision for
+/// FLIRT and for applyxfm4D's float images, in double for its double images, in the image's
+/// type with FSL-79 reproduced, §15.7); at a position the four weights per axis from
+/// `⌈p⌉ − 2`, the value `Σ (c·w_x)·(w_z·w_y)` in double, z outer, rounded to single.
 pub struct FlirtSpline {
     shape: [usize; 3],
-    coef: Vec<f32>,
+    coef: Coef,
+}
+
+/// The coefficients as each pass stores them.
+enum Coef {
+    F32(Vec<f32>),
+    F64(Vec<f64>),
+}
+
+/// Every axis of `c` (of `shape`) filtered column by column in double (§9.3's prefilter), each
+/// column's results stored through `from` after its axis.
+fn prefilter_axes<T: Copy + Send + Sync>(
+    shape: [usize; 3],
+    c: &mut [T],
+    to: impl Fn(T) -> f64 + Sync,
+    from: impl Fn(f64) -> T + Sync,
+) {
+    let [nx, ny, nz] = shape;
+    let strides = [1, nx, nx * ny];
+    for axis in 0..3 {
+        let len = shape[axis];
+        if len < 2 {
+            continue;
+        }
+        let st = strides[axis];
+        let others: Vec<usize> = (0..nx * ny * nz).filter(|&i| (i / st) % len == 0).collect();
+        let cols: Vec<Vec<T>> = others
+            .par_iter()
+            .map(|&start| {
+                let mut col: Vec<f64> = (0..len).map(|k| to(c[start + k * st])).collect();
+                spline_column(&mut col);
+                col.into_iter().map(&from).collect()
+            })
+            .collect();
+        for (&start, col) in others.iter().zip(cols) {
+            for (k, v) in col.into_iter().enumerate() {
+                c[start + k * st] = v;
+            }
+        }
+    }
 }
 
 impl FlirtSpline {
+    /// The coefficients of `vol`, each pass stored in single precision.
     pub fn new(vol: &Volume) -> FlirtSpline {
-        let [nx, ny, nz] = vol.shape;
         let mut c = vol.data.clone();
-        let strides = [1, nx, nx * ny];
-        for axis in 0..3 {
-            let len = vol.shape[axis];
-            if len < 2 {
-                continue;
-            }
-            let others: Vec<usize> = (0..nx * ny * nz)
-                .filter(|&i| (i / strides[axis]) % len == 0)
-                .collect();
-            let st = strides[axis];
-            let cols: Vec<Vec<f32>> = others
-                .par_iter()
-                .map(|&start| {
-                    let mut col: Vec<f64> =
-                        (0..len).map(|k| f64::from(c[start + k * st])).collect();
-                    spline_column(&mut col);
-                    col.into_iter().map(|v| v as f32).collect()
-                })
-                .collect();
-            for (&start, col) in others.iter().zip(cols) {
-                for (k, v) in col.into_iter().enumerate() {
-                    c[start + k * st] = v;
-                }
-            }
-        }
+        prefilter_axes(vol.shape, &mut c, f64::from, |v| v as f32);
         FlirtSpline {
             shape: vol.shape,
-            coef: c,
+            coef: Coef::F32(c),
+        }
+    }
+
+    /// The coefficients of `values` (of `shape`, read in double), each pass's results stored
+    /// through `store` (applyxfm4D, §15.7: kept in double for a double image, the image's type
+    /// with FSL-79 reproduced).
+    pub fn with_store(
+        shape: [usize; 3],
+        mut values: Vec<f64>,
+        store: &(dyn Fn(f64) -> f64 + Sync),
+    ) -> FlirtSpline {
+        prefilter_axes(shape, &mut values, |v| v, store);
+        FlirtSpline {
+            shape,
+            coef: Coef::F64(values),
+        }
+    }
+
+    #[inline(always)]
+    fn coefficient(&self, i: usize) -> f64 {
+        match &self.coef {
+            Coef::F32(c) => f64::from(c[i]),
+            Coef::F64(c) => c[i],
         }
     }
 
@@ -414,7 +449,7 @@ impl FlirtSpline {
                 y.clamp(0, n[1] - 1),
                 z.clamp(0, n[2] - 1),
             );
-            f64::from(self.coef[(x + n[0] * (y + n[1] * z)) as usize])
+            self.coefficient((x + n[0] * (y + n[1] * z)) as usize)
         };
         let mut sum = 0.0f64;
         for (dz, &wz) in w[2].iter().enumerate() {
@@ -440,7 +475,9 @@ impl FlirtSpline {
 fn spline_column(c: &mut [f64]) {
     let len = c.len();
     let z = 3.0f64.sqrt() - 2.0;
-    let horizon = ((1e-8f64.ln() / z.abs().ln() + 1.5) as usize).min(len);
+    // `trunc(ln(1e-8)/ln|z| + 1.5)` = 15 (§9.3), with the correctly rounded logarithm (rule 5)
+    let ln = larmorx_core::math::log;
+    let horizon = ((ln(1e-8) / ln(z.abs()) + 1.5) as usize).min(len);
     let last = c[len - 1];
     let mut zi = z;
     let mut sum = c[0];
@@ -485,7 +522,7 @@ pub fn padded(
                 let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
                 for y in 0..ny {
                     slab[x + nx * y] =
-                        (0..3).any(|k| p[k] < -padding || p[k] > n[k] - 1.0 + padding);
+                        (0..3).any(|k| !(p[k] >= -padding && p[k] <= n[k] - 1.0 + padding));
                     p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
                 }
             }
@@ -532,4 +569,62 @@ pub fn resample_shifted(
             }
         });
     Some(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ramp(shape: [usize; 3]) -> Vec<f64> {
+        let n = shape[0] * shape[1] * shape[2];
+        (0..n)
+            .map(|i| 1.0 + (i as f64) / 3.0 + 1e-9 * i as f64)
+            .collect()
+    }
+
+    /// §15.7: a double image's spline keeps its passes in double (its values not rounded to
+    /// single), a float image's are stored in single after each pass; the two stores part.
+    #[test]
+    fn the_double_spline_keeps_double_passes() {
+        let shape = [5, 4, 3];
+        let values = ramp(shape);
+        let vol = Volume::new(shape, [1.0; 3], values.iter().map(|&v| v as f32).collect());
+        let single = FlirtSpline::new(&vol);
+        let rounded = FlirtSpline::with_store(
+            shape,
+            values.iter().map(|&v| f64::from(v as f32)).collect(),
+            &|c| f64::from(c as f32),
+        );
+        let double = FlirtSpline::with_store(shape, values, &|c| c);
+        let p = [1.3, 2.1, 0.7];
+        // the single-precision store from the rounded values is FlirtSpline::new's
+        assert_eq!(
+            single.value(p, 0.0, false).to_bits(),
+            rounded.value(p, 0.0, false).to_bits()
+        );
+        let differ = (0..60).any(|k| {
+            let q = [0.05 * k as f32, 0.03 * k as f32 + 0.2, 0.02 * k as f32];
+            single.value(q, 0.0, false).to_bits() != double.value(q, 0.0, false).to_bits()
+        });
+        assert!(differ, "the double passes give other last bits somewhere");
+    }
+
+    /// A NaN matrix (FSL-14 reproduced): every pre-image is NaN, so outside: the padding value.
+    #[test]
+    fn a_nan_matrix_pads_every_voxel() {
+        let src = Volume::new([4, 4, 4], [2.0; 3], (0..64).map(|i| i as f32).collect());
+        let mut m = mat::IDENTITY;
+        m[0][3] = f64::NAN;
+        let r = Resampling {
+            interp: Interp::Trilinear,
+            sinc: None,
+            pad: 7.5,
+            padding: 0.0,
+            spline: None,
+            constant: false,
+        };
+        if let Some(v) = resample(&src, &m, [3, 3, 3], [2.0; 3], &r) {
+            assert!(v.iter().all(|&x| x == 7.5), "{v:?}");
+        }
+    }
 }

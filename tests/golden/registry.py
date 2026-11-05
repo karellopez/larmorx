@@ -1090,12 +1090,10 @@ def image_math_operations() -> list[str]:
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
 #: and since 2026-11-03 FAST, topup, applytopup, fslmaths and fslstats have theirs (the cases
 #: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
-#: functions below). Since 2026-11-04 ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` run
-#: tools with only their replicas (FSL's fslroi, FLIRT's standard_space_roi script).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.fslroi": "fsl fslroi",
-    "lx.fsl.standard_space_roi": "fsl standard_space_roi",
-}
+#: functions below). ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` had only their
+#: replicas from 2026-11-04 to 2026-11-05, when their clean-room originals came (their cases
+#: below).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -3453,6 +3451,36 @@ def _(ctx: Context) -> dict[str, Any]:
     return result
 
 
+@case("cli.mri.hmc.cog", covers=("cli:mri hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A series whose second volume is 0 everywhere (``specs/mcflirt.md`` §6.1): its centre of
+    mass has a total below 1e-5, so each registration of it to the middle volume prints
+    mcflirt's ``WARNING::in calculating COG, total = 0.0`` on standard error (counted); the
+    matrices and ``.par`` lines of the others as usual."""
+    v = np.array(bold().data, dtype=np.float32)
+    v[..., 1] = 0
+    series = ctx.dir / "zero-volume.nii"
+    lx.save(bold().with_data(np.asfortranarray(v)), series)
+    out = ctx.out("o")
+    saved = dict(os.environ)
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    os.environ["LARMORX_UPSTREAM_DEFECTS"] = "fix"
+    try:
+        code, _, err = _core.cli_main(["larmorx", "mri", "hmc", "-in", os.fspath(series), "-out", out, "-mats", "-plots"], [], "original")  # fmt: skip
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    result: dict[str, Any] = {
+        "status": code,
+        "cog_warnings": err.count("WARNING::in calculating COG, total = 0.0"),
+        "out": Nifti(f"{out}.nii.gz"),
+        "par": File(f"{out}.par"),
+    }
+    for t in range(SHAPE4[3]):
+        result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
+    return result
+
+
 @case("cli.fsl.mcflirt", covers=("cli:fsl mcflirt",))
 def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl mcflirt``: mcflirt's command line, run by the clean-room original of
@@ -4066,6 +4094,79 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+def _fsl_data(ctx: Context) -> str:
+    """A directory laid out as FSL's ``data`` with stand-ins for FSL's three standard images
+    (``specs/bet.md`` §5.4: FSL's data, which larmorx never ships): ``anat2`` as
+    ``MNI152_T1_2mm``, an ellipsoid within its head as the dilated brain mask, two boxes in
+    front as the eyes (integer arithmetic only)."""
+    d = ctx.dir / "fsl-data"
+    std = d / "standard"
+    std.mkdir(parents=True, exist_ok=True)
+    lx.save(anat2(), std / "MNI152_T1_2mm.nii.gz")
+    brain = ellipsoid(SHAPE3, 8, 10, shift=1).astype(np.uint8)
+    lx.save(anat2().with_data(brain), std / "MNI152_T1_2mm_brain_mask_dil.nii.gz")
+    eyes = np.zeros(SHAPE3, np.uint8)
+    eyes[7:10, 15:18, 5:8] = 1
+    eyes[14:17, 15:18, 5:8] = 1
+    lx.save(anat2().with_data(eyes), std / "MNI152_T1_2mm_eye_mask.nii.gz")
+    return os.fspath(d)
+
+
+def _bet_with_data(ctx: Context, *argv: str) -> str:
+    """``_fsl(ctx, "bet", ...)`` with ``LARMORX_FSL_DATA`` naming the stand-in standard images
+    (the only place searched), the run's folders replaced in what it prints."""
+    data = _fsl_data(ctx)
+    saved = os.environ.get("LARMORX_FSL_DATA")
+    os.environ["LARMORX_FSL_DATA"] = data
+    try:
+        stdout = _fsl(ctx, "bet", *argv)
+    finally:
+        if saved is None:
+            os.environ.pop("LARMORX_FSL_DATA", None)
+        else:
+            os.environ["LARMORX_FSL_DATA"] = saved
+    for folder, mark in ((os.path.dirname(ctx.file("anat.nii")), "<in>"), (os.fspath(ctx.dir), "<dir>")):  # fmt: skip
+        stdout = stdout.replace(folder + os.sep, mark + "/").replace(folder, mark)
+    return stdout
+
+
+@case("cli.fsl.bet.cleanup")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet's ``-S`` (bet2, the input registered to the standard image by FLIRT, the eyes'
+    mask brought back and thresholded with dc's arithmetic, bet2 again: FSL-216's threshold
+    corrected) and ``-B`` (standard_space_roi ``-b``, FAST's bias field, the robust run of
+    bet2) with FSL's standard images found in the named directory (``specs/bet.md`` §5.3,
+    §5.4); verbose."""
+    s, b = ctx.out("s"), ctx.out("b")
+    stdout = _bet_with_data(ctx, ctx.file("anat.nii"), s, "-S", "-m", "-s", "-v")
+    _bet_with_data(ctx, ctx.file("anat.nii"), b, "-B", "-m")
+    return {
+        **{f"eyes{n}": Nifti(f"{s}{n}.nii.gz") for n in ("", "_mask", "_skull")},
+        **{f"neck{n}": Nifti(f"{b}{n}.nii.gz") for n in ("", "_mask")},
+        "eyes:stdout": stdout,
+        "files": files_under(str(ctx.dir)),
+    }
+
+
+@case("cli.fsl.bet.surfaces")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet's ``-A`` (bet2's mesh, the input registered to the standard image, betsurf from the
+    T1 alone) and ``-A2`` (the T2 registered to the T1 by FLIRT first, betsurf with both) with
+    FSL's standard images in the named directory (``specs/bet.md`` §5.3, §5.4)."""
+    a, a2 = ctx.out("a"), ctx.out("a2")
+    _bet_with_data(ctx, ctx.file("anat.nii"), a, "-A")
+    _bet_with_data(ctx, ctx.file("anat.nii"), a2, "-A2", ctx.file("anat2.nii"))
+    out: dict[str, Any] = {}
+    for tag, o in (("t1", a), ("t2", a2)):
+        out[f"{tag}:brain"] = Nifti(f"{o}.nii.gz")
+        out[f"{tag}:skull_mask"] = Nifti(f"{o}_skull_mask.nii.gz")
+        for surface in ("inskull", "outskull", "outskin"):
+            out[f"{tag}:{surface}_mask"] = Nifti(f"{o}_{surface}_mask.nii.gz")
+            out[f"{tag}:{surface}_mesh"] = File(f"{o}_{surface}_mesh.vtk")
+            out[f"{tag}:{surface}_mesh_image"] = Nifti(f"{o}_{surface}_mesh.nii.gz")
+    return {**out, "files": files_under(str(ctx.dir))}
+
+
 #: A matrix to MNI152 for betsurf's golden cases (it only decides which profiles cross the eyes).
 _BETSURF_MATRIX = "1 0 0 -8\n0 1 0 4\n0 0 1 -12\n0 0 0 1\n"
 
@@ -4462,12 +4563,21 @@ def _(ctx: Context) -> dict[str, Any]:
 
 
 _POINTS = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n"
-#: A schedule of FLIRT's language for pairreg's three runs (the golden case's own: FSL's
-#: pairreg1.sch to pairreg3.sch are FSL's files, not on the CI's machines).
+#: A schedule of FLIRT's language in the stand-in ``$FSLDIR`` (FAST's case needs the variable set;
+#: pairreg no longer reads it: the original carries FSL's three schedules).
 _PAIRREG_SCHEDULE = (
     "setscale 2 force\nsetrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
     "optimise 6 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 rel 2\nsort U\n"
 )
+
+
+def _fsldir(ctx: Context) -> str:
+    """A directory standing for ``$FSLDIR`` (with three schedule files, as before)."""
+    d = ctx.dir / "fsl" / "etc" / "flirtsch"
+    d.mkdir(parents=True, exist_ok=True)
+    for k in (1, 2, 3):
+        (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
+    return os.fspath(ctx.dir / "fsl")
 
 
 def _points(ctx: Context) -> tuple[str, str]:
@@ -4482,15 +4592,6 @@ def _points(ctx: Context) -> tuple[str, str]:
     a.write_text(_POINTS)
     b.write_text("".join(" ".join(repr(float(v)) for v in r) + "\n" for r in mapped))
     return str(a), str(b)
-
-
-def _fsldir(ctx: Context) -> str:
-    """A directory standing for ``$FSLDIR`` with pairreg's three schedules."""
-    d = ctx.dir / "fsl" / "etc" / "flirtsch"
-    d.mkdir(parents=True, exist_ok=True)
-    for k in (1, 2, 3):
-        (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
-    return os.fspath(ctx.dir / "fsl")
 
 
 #: An affine matrix whose avscale report glibc's ``atan2f``, ``sinf`` and ``cosf`` change in a
@@ -4578,19 +4679,99 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("cli.fsl.pairreg", covers=("cli:fsl pairreg",))
 def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl pairreg`` (§15.8): three FLIRT runs and one ``convert_xfm -fixscaleskew``
-    with the case's own schedules standing for FSL's; its usage."""
-    saved = os.environ.get("FSLDIR")
-    os.environ["FSLDIR"] = _fsldir(ctx)
+    with FSL's three schedules, which the original carries (no ``$FSLDIR``); its usage."""
+    o = ctx.out("pair.mat")
+    b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    _fsl(ctx, "pairreg", b1, b2, b1, b2, o, "-dof 6")
+    return {"matrix": File(o), **_status_outputs("usage", _fsl_status(ctx, "pairreg", "a"))}
+
+
+@case("cli.fsl.fslroi", covers=("cli:fsl fslroi",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl fslroi`` (``specs/standard_space_roi.md`` §3): a box reaching outside an
+    oblique image (zeros there, the transforms moved to its corner), volumes of the scaled
+    int16 series (float32), all ten numbers on the BOLD series; an invalid region (FSL-215:
+    exit 1) and the usage."""
+    a, series_in, b = ctx.file("anat.nii"), ctx.file("series.nii"), ctx.file("bold.nii")
+    o1, o2, o3 = ctx.out("box"), ctx.out("volumes"), ctx.out("both")
+    _fsl(ctx, "fslroi", a, o1, "-2", "10", "3", "-1", "0", "5")
+    _fsl(ctx, "fslroi", series_in, o2, "1", "2")
+    _fsl(ctx, "fslroi", b, o3, "1", "5", "0", "4", "1", "-1", "2", "-1")
+    return {
+        "box": Nifti(f"{o1}.nii.gz"),
+        "volumes": Nifti(f"{o2}.nii.gz"),
+        "both": Nifti(f"{o3}.nii.gz"),
+        **_status_outputs("invalid", _fsl_status(ctx, "fslroi", a, ctx.out("bad"), "0", "0")),
+        **_status_outputs("usage", _fsl_status(ctx, "fslroi", a)),
+    }
+
+
+@case("cli.fsl.standard_space_roi", covers=("cli:fsl standard_space_roi",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl standard_space_roi`` (``specs/standard_space_roi.md`` §2): one image
+    registered to the other as its reference (``-ssref``, FLIRT's ``-dof 6``), the field of
+    view's mask and cut with ``-d``'s files; ``-b`` refused when FSL's standard images are found
+    nowhere (``LARMORX_FSL_DATA`` an empty directory, the only place searched); the usage (which
+    names ``$FSLDIR``'s standard image: ``FSLDIR`` and ``LARMORX_NC_BIN`` are unset for the case, as
+    in CI)."""
+    hidden = {k: os.environ.pop(k) for k in ("FSLDIR", "LARMORX_NC_BIN") if k in os.environ}
     try:
-        o = ctx.out("pair.mat")
-        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
-        _fsl(ctx, "pairreg", b1, b2, b1, b2, o, "-dof 6")
+        return _standard_space_roi_case(ctx)
+    finally:
+        os.environ.update(hidden)
+
+
+def _standard_space_roi_case(ctx: Context) -> dict[str, Any]:
+    a, a2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    out = ctx.out("roi")
+    _fsl(ctx, "standard_space_roi", a2, out, "-ssref", a, "-d", "-dof", "6")
+    empty = ctx.dir / "no-fsl-data"
+    empty.mkdir(exist_ok=True)
+    saved = os.environ.get("LARMORX_FSL_DATA")
+    os.environ["LARMORX_FSL_DATA"] = os.fspath(empty)
+    try:
+        refused = _fsl_status(ctx, "standard_space_roi", a2, ctx.out("b"), "-b")
     finally:
         if saved is None:
-            os.environ.pop("FSLDIR", None)
+            os.environ.pop("LARMORX_FSL_DATA", None)
         else:
-            os.environ["FSLDIR"] = saved
-    return {"matrix": File(o), **_status_outputs("usage", _fsl_status(ctx, "pairreg", "a"))}
+            os.environ["LARMORX_FSL_DATA"] = saved
+    names = ("", "_tmp_to_std", "_tmp_standard_mask", "_tmp_standard_mask_to_in", "_tmp_masked")
+    return {
+        **{f"roi{n}": Nifti(f"{out}{n}.nii.gz") for n in names},
+        "matrix": File(f"{out}_tmp_to_std.mat"),
+        "inverse": File(f"{out}_tmp_to_std_inv.mat"),
+        **_status_outputs("no-data", (refused[0], refused[1], refused[2].replace("\\", "/"))),
+        **_status_outputs("usage", _fsl_status(ctx, "standard_space_roi", a)),
+    }
+
+
+@case("cli.fetch")
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fetch fsl-standard <package>`` (FSL's standard images fetched ahead into the
+    data cache, ``specs/bet.md`` §5.4): a file that is not FSL's package is refused by its size
+    before anything is kept (the cache ``LARMORX_DATA_DIR`` names gets no image); the usage."""
+    bad = ctx.dir / "not-the-package.tar.bz2"
+    bad.write_bytes(b"not FSL's package")
+    saved = dict(os.environ)
+    os.environ["LARMORX_DATA_DIR"] = os.fspath(ctx.dir / "cache")
+    os.environ.pop("LARMORX_FSL_DATA_PACKAGE", None)
+    try:
+        refused = _core.cli_main(["larmorx", "fetch", "fsl-standard", os.fspath(bad)], [], "original")  # fmt: skip
+        usage = _core.cli_main(["larmorx", "fetch"], [], "original")
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    d = os.fspath(ctx.dir)
+
+    def plain(r: tuple[int, str, str]) -> tuple[int, str, str]:
+        return r[0], r[1].replace(d, "<dir>").replace("\\", "/"), r[2].replace(d, "<dir>").replace("\\", "/")  # fmt: skip
+
+    return {
+        **_status_outputs("refused", plain(refused)),
+        **_status_outputs("usage", plain(usage)),
+        "files": files_under(d),
+    }
 
 
 @case("cli.fsl.extracttxt", covers=("cli:fsl extracttxt",))
@@ -4711,18 +4892,29 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.fsl.pairreg", covers=("lx.fsl.pairreg",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``lx.fsl.pairreg`` with the clean-room original and the case's own schedules."""
-    saved = os.environ.get("FSLDIR")
-    os.environ["FSLDIR"] = _fsldir(ctx)
-    try:
-        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
-        m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
-    finally:
-        if saved is None:
-            os.environ.pop("FSLDIR", None)
-        else:
-            os.environ["FSLDIR"] = saved
+    """``lx.fsl.pairreg`` with the clean-room original and FSL's schedules it carries."""
+    b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
     return {"matrix": m}
+
+
+@case("py.fsl.fslroi", covers=("lx.fsl.fslroi",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.fslroi`` with the clean-room original: a box of an in-memory image (an axis not
+    given whole) and two volumes of the BOLD series."""
+    box = lx.fsl.fslroi(anat(), x=(2, 10), z=(1, -1), implementation="original")
+    vols = lx.fsl.fslroi(ctx.file("bold.nii"), t=(1, 2), implementation="original")
+    return {"box": box.data, "box_affine": box.affine, "volumes": vols.data}
+
+
+@case("py.fsl.standard_space_roi", covers=("lx.fsl.standard_space_roi",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.standard_space_roi`` with the clean-room original: an image registered to
+    another as its reference (FLIRT's ``-dof 6``), masked and cut by the field of view."""
+    r = lx.fsl.standard_space_roi(
+        anat2(), reference=anat(), flirt_args=["-dof", "6"], implementation="original"
+    )
+    return {"image": r.image.data, "to_standard": r.to_standard, "from_standard": r.from_standard}
 
 
 @case("py.fsl.extracttxt", covers=("lx.fsl.extracttxt",))

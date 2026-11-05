@@ -1,0 +1,199 @@
+{
+ "defect": null,
+ "description": "pairreg on a small random pair (shrunk from 20261103-00125): its FLIRT search's starting points of equal cost sorted as FSL sorts them (std::sort); pair.mat had ended 102 mm (RMS) from FSL's",
+ "expect": "pass",
+ "found": {
+  "detail": "pair.mat: 95th-percentile displacement over the reference's brain: maximum 35.1915 mm, RMS deviation 101.7481 mm",
+  "n": 125,
+  "seed": "20261103",
+  "shrink_moves": [
+   "dropped -dof (-dof 7)",
+   "ref: axis 2 30 -> 15 voxels",
+   "ref: axis 1 28 -> 14 voxels",
+   "ref: axis 0 24 -> 12 voxels",
+   "ref: axis 2 15 -> 7 voxels",
+   "ref: axis 1 14 -> 7 voxels",
+   "ref: axis 0 12 -> 6 voxels",
+   "ref: axis 2 7 -> 3 voxels",
+   "ref: axis 2 3 -> 1 voxels",
+   "in: axis 0 20 -> 10 voxels",
+   "in: axis 1 15 -> 7 voxels",
+   "in: axis 2 13 -> 6 voxels",
+   "in: axis 1 7 -> 3 voxels",
+   "dropped -cost (-cost normcorr)",
+   "in: axis 0 10 -> 5 voxels",
+   "in: axis 2 6 -> 3 voxels",
+   "in: axis 0 5 -> 2 voxels",
+   "in: axis 1 3 -> 1 voxels",
+   "in: axis 2 3 -> 1 voxels",
+   "in: axis 0 2 -> 1 voxels",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref: content crop -> constant",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0",
+   "in: float32 storage",
+   "in: plain value range",
+   "in: content crop -> constant"
+  ],
+  "signature": [
+   "pair.mat: Nth-percentile displacement over the reference's brain"
+  ]
+ },
+ "id": "pairreg-search-equal-costs-sorted",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "pairreg"
+  },
+  "features": {
+   "-cost": true,
+   "-dof": true,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "content": "crop",
+   "corner0": 38,
+   "corner1": 23,
+   "corner2": 41,
+   "cost": "normcorr",
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dof": "7",
+   "dtype": "int16",
+   "extreme": false,
+   "kind": "pairreg",
+   "orientation": "oblique",
+   "origin0": -46.0,
+   "origin1": 49.0,
+   "origin2": -35.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "quantize": 25.0,
+   "range": "steps",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "20x15x13",
+   "spacing0": 2.0,
+   "spacing1": 0.8,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:ref}",
+     "{in:in}",
+     "{in:ref}",
+     "{in:in}",
+     "pair.mat"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 1409372891,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "seed": 1854777005,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      4.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     6,
+     7,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 125,
+  "options": [
+   "-cost normcorr",
+   "-dof 7",
+   "FSLOUTPUTTYPE=NIFTI",
+   "pairreg"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "smoke",
+ "tool": "fsl-flirt-original"
+}

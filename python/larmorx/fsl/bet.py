@@ -16,9 +16,12 @@ MNI152.
 The variations ``-S``, ``-B``, ``-A`` and ``-A2`` run FLIRT, ``standard_space_roi``, FAST,
 ``fslmaths`` and ``fslstats`` (``bet`` does, in FSL) and read FSL's standard images
 (``MNI152_T1_2mm``, its dilated brain mask, the eye mask): from ``fsl_data`` (a directory laid
-out as ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise), else ``$FSLDIR/data``,
-else the copy larmorx-nc carries. They have only their replica yet; their clean-room original is
-to be written from ``specs/bet.md``.
+out as ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise; when given, the only
+place). Otherwise the clean-room original reads them from the copy larmorx-nc installs (read as
+data), else ``$FSLDIR/data``, else from larmorx's data cache, filled once by a checksum-verified
+download of FSL's ``fsl-data_standard`` package (``larmorx fetch fsl-standard`` fetches it ahead);
+the replica reads ``$FSLDIR/data``, else its own copy. They are FSL's data under the FSL Licence
+(non-commercial use): this package never ships them.
 
 FSL's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``);
 ``upstream_defects="reproduce"`` gives FSL's output. FSL's environment variables are settings of
@@ -50,7 +53,7 @@ __all__ = ["VARIATIONS", "BetResult", "BetsurfResult", "Surface", "bet", "betsur
 #: ``"eyes"`` (``-S``: the eyes and optic nerves removed, through MNI152's eye mask),
 #: ``"bias"`` (``-B``: FAST's bias field removed and the neck cut off, then ``"robust"``),
 #: ``"surfaces"`` (``-A``: also betsurf's skull and scalp surfaces) and ``"surfaces_t2"``
-#: (``-A2``: the same with a T2, ``t2``). The last four have only their replica yet.
+#: (``-A2``: the same with a T2, ``t2``).
 VARIATIONS = ("robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2")
 
 Variation = Literal["robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2"]
@@ -70,8 +73,19 @@ _FLAGS = {
     "surfaces": "-A",
     "surfaces_t2": "-A2",
 }
-#: The variations with a replica only (their clean-room original is to be written).
-_REPLICA_ONLY = ("eyes", "bias", "surfaces", "surfaces_t2")
+#: The variations that run FSL's other programs and read FSL's standard images.
+_STANDARD = ("eyes", "bias", "surfaces", "surfaces_t2")
+
+#: The variables the original's search of FSL's standard images reads (``specs/bet.md`` §5.4):
+#: larmorx's data cache and the package's source, the user's cache directories, ``PATH`` for
+#: the download's ``curl`` or ``wget``.
+_DATA_VARIABLES = (
+    "LARMORX_DATA_DIR",
+    "LARMORX_FSL_DATA_PACKAGE",
+    "HOME",
+    "XDG_CACHE_HOME",
+    "LOCALAPPDATA",
+)
 
 #: The environment variable of larmorx-nc's data directory (``larmorx_nc_core::fsldata``).
 FSL_DATA_ENV = "LARMORX_FSL_DATA"
@@ -278,15 +292,21 @@ def _run_original(
     *,
     n_threads: int,
     upstream_defects: str,
+    data: dict[str, str | None] | None = None,
 ) -> None:
     """Runs the clean-room original of ``fsl tool`` in this process, in ``tmp``, with FSL's
-    settings of this call (NIfTI-1 outputs; no FSL program on the ``PATH``); its notices and
-    FSL's warnings become Python warnings; a failure raises :class:`RuntimeError`."""
+    settings of this call (NIfTI-1 outputs; no FSL program on the ``PATH``; ``data``: where FSL's
+    standard images are, for ``-S``, ``-B``, ``-A``, ``-A2``, which find no FSL program there
+    either); its notices and FSL's warnings become Python warnings; a failure raises
+    :class:`RuntimeError`."""
     env = [
         ("FSLOUTPUTTYPE", "NIFTI"),
-        ("PATH", tmp),
         (_defects.ENV, upstream_defects),
     ]
+    if data is None:
+        env.append(("PATH", tmp))
+    else:
+        env += [(k, v) for k, v in data.items() if v is not None]
     if n_threads > 0:
         env.append(("OMP_NUM_THREADS", str(n_threads)))
     code, _out, err = _core.fsl_run_original(tool, list(args), env, tmp)
@@ -351,10 +371,7 @@ def bet(
     head_ct
         The input is a CT in Hounsfield units (``--ct``; bet2 only).
     variation
-        One of :data:`VARIATIONS`, or ``None`` for bet2 itself. ``"eyes"``, ``"bias"``,
-        ``"surfaces"`` and ``"surfaces_t2"`` have only their replica yet (with
-        ``implementation="original"``, or ``"auto"`` without larmorx-nc:
-        :class:`NotImplementedError`).
+        One of :data:`VARIATIONS`, or ``None`` for bet2 itself.
     t2
         The T2-weighted image of ``"surfaces_t2"`` (``-A2``; not brain-extracted: it is
         registered to the input with FLIRT).
@@ -376,7 +393,9 @@ def bet(
     fsl_data
         Where ``"eyes"``, ``"bias"``, ``"surfaces"`` and ``"surfaces_t2"`` read FSL's standard
         images: a directory laid out as ``$FSLDIR/data`` (default: the variable
-        ``LARMORX_FSL_DATA``, else ``$FSLDIR/data``, else the copy larmorx-nc carries).
+        ``LARMORX_FSL_DATA``; else, for the clean-room original, larmorx-nc's copy, then
+        ``$FSLDIR/data``, then larmorx's data cache, filled once by a checksum-verified download;
+        for the replica ``$FSLDIR/data``, then its own copy).
     implementation
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
         clean-room original (always the original with ``tanh="correctly-rounded"``);
@@ -406,19 +425,13 @@ def bet(
     n_threads = _threads(n_threads)
     if variation is not None and variation not in VARIATIONS:
         raise ValueError(f"variation must be one of {VARIATIONS} or None, not {variation!r}")
-    replica_only = variation in _REPLICA_ONLY
+    standard = variation in _STANDARD
     if (variation == "surfaces_t2") != (t2 is not None):
         raise ValueError("t2 is the T2 of variation='surfaces_t2' (-A2), and it needs one")
     if variation == "eyes" and (outline or mesh or not brain):
         raise ValueError(
             "variation='eyes' (bet -S) writes no outline or mesh (its bet2 runs are temporary) "
             "and needs the brain (bet -S -n fails)"
-        )
-    if replica_only and (implementation == "original" or tanh != "glibc"):
-        raise NotImplementedError(
-            f"bet's variation {variation!r} ({_FLAGS[variation]}) has only its replica yet "
-            "(larmorx-nc, implementation='replica' or 'auto', tanh='glibc'): its clean-room "
-            "original is to be written from specs/bet.md"
         )
     f, g = float(frac), float(gradient)
     if f < 0.0 or f > 1.0:
@@ -480,20 +493,28 @@ def bet(
         implementation = "original"
         options.append(f"--tanh={tanh}")
     selected = _replica.select("fsl", tool, implementation)
-    if selected is None and replica_only:
-        raise NotImplementedError(
-            f"bet's variation {variation!r} ({_FLAGS[variation]}) has only its replica, and "
-            "larmorx-nc is not installed: its clean-room original is to be written from "
-            "specs/bet.md"
-        )
     impl = _replica.ORIGINAL if selected is None else selected.implementation()
     env: dict[str, str | None] = {}
-    if replica_only:
+    original_data: dict[str, str | None] | None = None
+    if standard:
         data = fsl_data if fsl_data is not None else os.environ.get(FSL_DATA_ENV)
         if data:
             env[FSL_DATA_ENV] = os.path.abspath(os.fspath(data))
         if os.environ.get("FSLDIR"):
             env["FSLDIR"] = os.environ["FSLDIR"]
+        if selected is None:
+            # the original's search reads larmorx-nc's copy as data when its program is found,
+            # and its cache; PATH for the download's curl or wget (no FSL program is run from it)
+            original_data = dict(env)
+            try:
+                program = _replica.find("fsl", "bet")
+            except ValueError:
+                program = None
+            if program is not None:
+                original_data["LARMORX_NC_BIN"] = str(program)
+            for k in (*_DATA_VARIABLES, "PATH"):
+                if os.environ.get(k):
+                    original_data[k] = os.environ[k]
     with tempfile.TemporaryDirectory(prefix="larmorx-bet-", ignore_cleanup_errors=True) as tmp:
         source = _write_image(image, tmp, "input", n_threads)
         if variation == "surfaces_t2":
@@ -505,6 +526,7 @@ def bet(
                 tmp,
                 n_threads=n_threads,
                 upstream_defects=upstream_defects,
+                data=original_data,
             )
         else:
             _run(

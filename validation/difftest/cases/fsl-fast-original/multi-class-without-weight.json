@@ -1,0 +1,306 @@
+{
+ "defect": null,
+ "description": "two channels, four classes, -v: a class without weight zeroes every posterior and its covariance is 0/0; the bias weights 0 / NaN make the field and then every mean NaN (FSL prints MEAN 1, then MEAN -nan; specs/fast.md \u00a75.3)",
+ "expect": "pass",
+ "found": {
+  "detail": "Standard output (numbers to 4 significant digits): line 29: -nan / 1",
+  "n": 1840,
+  "seed": "cleanroom-fast",
+  "shrink_moves": [],
+  "signature": [
+   "Standard output (numbers to N significant digits)"
+  ]
+ },
+ "id": "multi-class-without-weight",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 2,
+   "classes": 4,
+   "nobias": false,
+   "output_type": "NIFTI_GZ",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": false,
+   "-H": true,
+   "-H long": false,
+   "-H value": "0.4",
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-R": false,
+   "-S long": true,
+   "-W": false,
+   "-a": false,
+   "-b": false,
+   "-f": false,
+   "-g": true,
+   "-g long": false,
+   "-l": false,
+   "-n": true,
+   "-n long": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-t long": true,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.8,
+   "axis1": 1.25,
+   "axis2": 0.75,
+   "basename": "t1_brain",
+   "bias0": 0.005,
+   "bias1": -0.0075,
+   "bias2": -0.01,
+   "bias3": 0.0025,
+   "brain centre0": 0.02,
+   "brain centre1": -0.06,
+   "brain centre2": -0.08,
+   "brain fraction": 0.45,
+   "centre0": 3.0,
+   "centre1": 5.5,
+   "centre2": -6.0,
+   "channels": 2,
+   "content": "head",
+   "dtype": "uint8",
+   "extreme": false,
+   "field of view": 64.0,
+   "isotropic": false,
+   "kind": "multi",
+   "n": "4",
+   "noise": 1.0,
+   "orientation": "plumb",
+   "origin0": -59.25,
+   "origin1": 39.75,
+   "origin2": 4.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "16x32x32",
+   "size": 18.0,
+   "spacing0": 4.0,
+   "spacing1": 1.0,
+   "spacing2": 0.8,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "tissues2": "t1",
+   "units": "mm",
+   "whole head": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-n",
+     "4"
+    ],
+    "name": "-n",
+    "optional": true
+   },
+   {
+    "args": [
+     "--type=2"
+    ],
+    "name": "-t",
+    "optional": true
+   },
+   {
+    "args": [
+     "-H",
+     "0.4"
+    ],
+    "name": "-H",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "t1_brain"
+    ],
+    "name": "-o",
+    "optional": true
+   },
+   {
+    "args": [
+     "--channels=2"
+    ],
+    "name": "-S",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:ch2}",
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      1.25,
+      1.2,
+      1.25
+     ],
+     "bias": [
+      -0.005,
+      0.00375,
+      0.0,
+      0.00016666666666666666
+     ],
+     "brain": true,
+     "centre": [
+      0.5,
+      -1.5,
+      -2.0
+     ],
+     "noise": 3.0,
+     "seed": 573427890,
+     "size": 11.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      -30.0,
+      -15.5,
+      -12.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      1.0,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     16,
+     32,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ch2": {
+    "content": {
+     "axes": [
+      1.25,
+      1.2,
+      1.25
+     ],
+     "bias": [
+      -0.005,
+      0.00375,
+      0.0,
+      0.00016666666666666666
+     ],
+     "brain": true,
+     "centre": [
+      0.5,
+      -1.5,
+      -2.0
+     ],
+     "noise": 1.0,
+     "seed": 369150888,
+     "size": 11.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -30.0,
+      -15.5,
+      -12.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      1.0,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     16,
+     32,
+     32
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1840,
+  "options": [
+   "-H",
+   "-S",
+   "-g",
+   "-n",
+   "-o",
+   "-t",
+   "-v",
+   "2 channels",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "cleanroom-fast",
+  "tool": "fsl-fast-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast",
+ "tier": "standard",
+ "tool": "fsl-fast-original"
+}

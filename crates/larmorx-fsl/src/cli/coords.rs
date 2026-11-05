@@ -347,9 +347,17 @@ fn run(
         }
     }
     if let Some(w) = &o.warp {
-        return match read(w, notices) {
+        // FSL reads the warp as a 4D image and takes exactly three volumes (a FNIRT coefficient
+        // file or a displacement field, §15.2): any other image is its read error, exit 1
+        let volumes = common::read_header_volumes(settings, w, mode, notices)
+            .map_err(|e| common::image_exception(w, &e));
+        return match volumes {
             Err((lines, _)) => {
                 let _ = writeln!(err, "{lines}An error occured while reading file: {w}");
+                1
+            }
+            Ok(n) if n != 3 => {
+                let _ = writeln!(err, "An error occured while reading file: {w}");
                 1
             }
             Ok(_) => common::refuse(
@@ -602,5 +610,61 @@ mod tests {
             String::from_utf8(err).unwrap(),
             "Lacking argument to option -\n"
         );
+    }
+
+    /// `-warp` (§15.2): FSL takes exactly three volumes; any other image is its read error, exit
+    /// 1, after the verbose lines (observed: a 3D image, 1, 2 and 4 volumes); three volumes are
+    /// refused until FNIRT's warp fields are ported.
+    #[test]
+    fn warp_volumes() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{NiftiHeader, NiftiVersion};
+        let dir = tempfile::tempdir().unwrap();
+        let write = |name: &str, shape: &[usize]| {
+            let h = NiftiHeader::new(NiftiVersion::V1, shape, DataType::F32).unwrap();
+            let mut bytes = h.to_bytes();
+            bytes.resize(352 + 4 * shape.iter().product::<usize>(), 0);
+            std::fs::write(dir.path().join(name), bytes).unwrap();
+        };
+        write("a.nii", &[5, 4, 3]);
+        write("w3d.nii", &[5, 4, 3]);
+        write("w1.nii", &[5, 4, 3, 1]);
+        write("w4.nii", &[5, 4, 3, 4]);
+        write("w3.nii", &[5, 4, 3, 3]);
+        std::fs::write(dir.path().join("c.txt"), "1 2 3\n").unwrap();
+        let settings = Settings {
+            dir: Some(dir.path().to_path_buf()),
+            ..Settings::default()
+        };
+        let run = |warp: &str| {
+            let args: Vec<String> = [
+                "-src", "a.nii", "-dest", "a.nii", "-warp", warp, "-v", "c.txt",
+            ]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let c = main(Program::Img2Img, &args, &settings, &mut out, &mut err);
+            (
+                c,
+                String::from_utf8(out).unwrap(),
+                String::from_utf8(err).unwrap(),
+            )
+        };
+        for w in ["w3d.nii", "w1.nii", "w4.nii"] {
+            let (c, out, err) = run(w);
+            assert_eq!(
+                (c, err),
+                (1, format!("An error occured while reading file: {w}\n"))
+            );
+            assert!(
+                out.starts_with("Destination Volume:: SIZE = 5 x 4 x 3\n"),
+                "{out}"
+            );
+            assert!(!out.contains("Coordinates in"), "{out}");
+        }
+        let (c, _, err) = run("w3.nii");
+        assert_eq!(c, 1);
+        assert!(err.contains("not in larmorx yet"), "{err}");
     }
 }

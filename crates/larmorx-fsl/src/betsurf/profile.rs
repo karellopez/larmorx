@@ -15,7 +15,13 @@
 //! 330 profiles agree, `docs/findings/fsl-bet-original.md`, "betsurf"): a region that ends at a
 //! position holds the sample there; step 5's "more than one" counts the bright samples found;
 //! step 7's scan includes `a`; step 6's fallback is the region's start; a T1-only profile is not
-//! kept when its outer skull lies inside its inner skull.
+//! kept when its outer skull lies inside its inner skull. And from single profiles of the
+//! random-testing trial of 2026-11-04 (tiny heads, 2026-11-05): the backward searches never
+//! read a profile's first sample, and neither does the T1-only scan for the outer skull (3,284 of
+//! 3,288 T1-only profiles of eight images as FSL decides); in step 5 each search starts after
+//! the sample the previous one found, a first bright sample must lie less than 10 mm from the
+//! inner skull, and an outer-skull search range holding no sample counts the scalp only (2,002
+//! of 2,002 T1-and-T2 profiles of three images away from the eyes).
 
 /// What a search gives when it finds nothing.
 pub const NONE: f64 = -500.0;
@@ -146,15 +152,14 @@ impl Profile {
             }
             k = self.values.len() - 1;
         }
+        // observed: the profile's first sample is never reached (a search whose only match is
+        // there finds nothing)
         loop {
-            if k < self.lo {
+            if k < self.lo || k == 0 {
                 return NONE;
             }
             if test(f64::from(self.values[k])) {
                 return self.position(k);
-            }
-            if k == 0 {
-                return NONE;
             }
             k -= 1;
         }
@@ -196,7 +201,8 @@ pub enum Estimate {
     Scalp(f64),
     /// The inner skull, the outer skull and the scalp.
     Kept { inner: f64, outer: f64, scalp: f64 },
-    /// FSL ends the program here (FSL-50, reproduced).
+    /// FSL ends the program here (FSL-50 as `specs/bet.md` §6.4 step 7 states it; not observed
+    /// in black-box runs, so the command line never asks for it).
     Stop,
 }
 
@@ -265,8 +271,10 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     // sample after it included
     let mut brights = 0usize;
     let mut gaps = 0usize;
+    // observed (single profiles, 2026-11-05): each search of the alternation starts after the
+    // sample the previous one found (a flat region's samples are bright and dark at once)
     while gaps < 6 {
-        let b = t2.first_ge(pos, bright);
+        let b = t2.first_ge(if gaps == 0 { pos } else { pos + STEP }, bright);
         if b == NONE {
             break;
         }
@@ -274,7 +282,7 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         if first_bright == NONE {
             first_bright = b;
         }
-        let g = t2.first_le(b, dark);
+        let g = t2.first_le(b + STEP, dark);
         if g == NONE {
             break;
         }
@@ -284,7 +292,9 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         gaps += 1;
         pos = g;
     }
-    let from = if brights > 1 && within_10(first_bright, is) {
+    // observed (single profiles, 2026-11-05): "within 10 mm" of the inner skull is strict here
+    // (a first bright sample exactly 10 mm away does not count)
+    let from = if brights > 1 && (first_bright - is).abs() < 10.0 {
         first_gap
     } else {
         is + 0.5
@@ -297,13 +307,13 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         // observed: the outer skull search's start
         os2 = t1.region_start();
     }
-    // 7.
+    // 7. (observed: a search range holding no sample counts the scalp only, FSL running on)
     let a = t1.first_le(t1.region_start(), t1.th(0.30));
     if a == NONE {
         return if fsl50 {
             Estimate::Stop
         } else {
-            Estimate::Dropped
+            Estimate::Scalp(s)
         };
     }
     let (up, low) = (t1.th(0.25), t1.th(0.15));
@@ -378,7 +388,10 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
     let (stop, mid) = (t1.th(0.60), t1.th(0.15));
     let mut counter = 0u32;
     let mut b = a;
-    for (pos, v) in t1.samples_from(a) {
+    // observed (single profiles, 2026-11-05): the scan does not read the profile's first
+    // sample, though `a` may be there (`b` starts at `a`)
+    let from = if a <= t1.start { t1.start + STEP } else { a };
+    for (pos, v) in t1.samples_from(from) {
         if v > stop {
             break;
         }
@@ -441,7 +454,11 @@ mod tests {
         assert_eq!(p.first_ge(-3.0, 5.0), -3.0 + 5.0 * 0.5);
         assert_eq!(p.first_le(-1.0, 1.0), -3.0 + 18.0 * 0.5);
         assert_eq!(p.last_ge(p.last_position(), 8.0), -3.0 + 11.0 * 0.5);
-        assert_eq!(p.last_le(0.0, 0.5), -3.0);
+        // the first sample is never read backwards (observed): its only match finds nothing
+        assert_eq!(p.last_le(0.0, 0.5), NONE);
+        assert_eq!(p.last_le(0.0, 1.0), -2.5);
+        // forwards it is
+        assert_eq!(p.first_le(-3.0, 0.5), -3.0);
         assert!(!p.overrun);
         assert_eq!(p.last_ge(100.0, 8.0), -3.0 + 11.0 * 0.5);
         assert!(p.overrun);
@@ -449,6 +466,68 @@ mod tests {
         p.set_end(0.0);
         assert_eq!(p.first_le(-1.0, -1.0), NONE);
         assert_eq!(p.th(1.0), 6.0);
+    }
+
+    /// Single profiles of the random-testing trial of 2026-11-04 (case 1156, profile 0;
+    /// case 678, profile 120), decided as FSL 6.0.7.23 decides them.
+    #[test]
+    fn t1only_profiles_set_aside_and_kept_as_fsl() {
+        // an inner and outer skull both at the first sample: FSL sets it aside (only the
+        // backward search's match is there)
+        let v = vec![
+            0.0f32, 32.3, 96.2, 95.2, 94.1, 93.1, 92.0, 90.8, 89.7, 88.5, 87.3, 86.1, 85.0, 83.8,
+            82.6, 81.5, 80.5, 79.4, 63.0,
+        ];
+        let mut v = v;
+        v.extend([0.0f32; 107]);
+        assert_eq!(t1only(&mut Profile::new(-3.0, v)), Estimate::Scalp(6.0));
+        // noise where `a` is the first sample: the scan from the second one finds the outer
+        // skull at 6.0 (from the first it would stop at 3.5 and set the profile aside)
+        let mut v = vec![
+            0.616f32, 0.919, 0.838, 1.091, 1.036, 0.697, 0.219, 0.638, 0.617, 0.682, 1.082, 0.942,
+            0.708, 0.718, 0.407, 0.529, 0.466, 0.38, 0.856, 1.961, 1.316, 1.268, 0.83, 0.709,
+            0.576, 0.823, 0.829, 0.59, 1.331, 1.185, 0.691, 0.718, 0.663, 0.623, 0.931, 1.394,
+            0.705, 0.111,
+        ];
+        v.extend([0.0f32; 88]);
+        match t1only(&mut Profile::new(-3.0, v)) {
+            Estimate::Kept { outer, scalp, .. } => assert_eq!((outer, scalp), (5.5, 15.0)),
+            e => panic!("{e:?}"),
+        }
+    }
+
+    /// T1-and-T2 profiles of the random-testing trial of 2026-11-04 that FSL 6.0.7.23 sets
+    /// aside (single-profile runs): case 1746's profile (a first bright T2 sample exactly 10 mm
+    /// past the inner skull) and case 617's flat one (T1 and T2 alike, 161 to 159, then air).
+    #[test]
+    fn t1t2_profiles_set_aside_as_fsl() {
+        let pad = |mut v: Vec<f32>| {
+            let mut w = vec![0.0f32; 54];
+            w.append(&mut v);
+            w.resize(180, 0.0);
+            w
+        };
+        let t1 = pad(vec![
+            0.6, 0.6, 0.7, 0.7, 0.9, 1.2, 1.4, 1.1, 0.9, 0.7, 0.8, 1.1, 1.4, 1.6, 1.7, 1.5, 1.0,
+            0.6, 30.1, 63.8, 97.2, 96.4, 63.5, 16.1, 41.7, 73.9, 106.6, 138.8, 171.0, 166.7, 124.1,
+            104.0, 113.3, 143.2, 168.4, 165.6, 163.7, 162.3, 151.5, 152.7, 157.4, 124.1, 101.0,
+            97.9, 123.7, 149.1, 143.1, 109.2, 93.9, 92.0, 70.7, 26.8, 0.4, 0.2, 0.0, 0.1,
+        ]);
+        let t2 = pad(vec![
+            0.9, 1.0, 0.9, 0.8, 0.9, 1.2, 1.6, 1.3, 1.1, 1.1, 0.8, 0.4, 0.2, 0.3, 0.3, 0.4, 1.0,
+            1.8, 21.2, 43.0, 65.0, 64.4, 42.7, 11.5, 28.6, 49.9, 71.3, 92.3, 113.4, 110.5, 82.2,
+            68.5, 74.5, 94.5, 112.7, 110.1, 108.9, 107.3, 99.6, 100.5, 104.3, 83.0, 68.3, 66.8,
+            84.3, 101.4, 96.9, 73.7, 63.6, 62.7, 48.2, 18.3, 0.4, 0.5, 0.5, 0.3,
+        ]);
+        let (mut p1, mut p2) = (Profile::new(-30.0, t1), Profile::new(-30.0, t2));
+        assert_eq!(t1t2(&mut p1, &mut p2, false), Estimate::Scalp(22.0));
+        let mut flat = vec![0.0f32; 53];
+        flat.extend([161.0f32; 11]);
+        flat.extend([160.0f32; 13]);
+        flat.extend([159.0f32; 5]);
+        flat.resize(180, 0.0);
+        let (mut p1, mut p2) = (Profile::new(-30.0, flat.clone()), Profile::new(-30.0, flat));
+        assert_eq!(t1t2(&mut p1, &mut p2, false), Estimate::Scalp(10.5));
     }
 
     #[test]

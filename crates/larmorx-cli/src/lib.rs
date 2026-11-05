@@ -38,9 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
-/// FLIRT's, FAST's, topup's, applytopup's, fslmaths' and fslstats' programs are
-/// `larmorx_fsl::cli`; a test checks the list); `fslroi` and `standard_space_roi` have only
-/// their replicas yet (2026-11-04).
+/// FLIRT's, FAST's, topup's, applytopup's, fslmaths', fslstats', fslroi's and
+/// standard_space_roi's programs are `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -135,6 +134,10 @@ where
     let (code, written) = match (first.as_deref(), family) {
         (Some("-V" | "--version"), _) => (0, writeln!(out, "larmorx {}", larmorx_core::VERSION)),
         (Some("-h" | "--help"), _) => (0, out.write_all(usage(&prog).as_bytes())),
+        (Some("fetch"), None) => {
+            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            (fetch(&prog, &rest, out, err), Ok(()))
+        }
         (None, _) => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
         (Some(_), Some((family, tools))) => {
             let tool = args.next().map(|a| a.as_ref().to_owned());
@@ -222,11 +225,86 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
+            "standard_space_roi" | "bet" => {
+                // FSL's standard images may be read from larmorx-nc's installed copy, as data
+                // (`specs/bet.md` §5.4): its program found as the replica search finds it
+                let mut settings = larmorx_fsl::cli::Settings::from_process();
+                if !settings.vars.contains_key(larmorx_fsl::data::NC_ENV)
+                    && let Ok(Some(p)) = replica::find(&replica::LARMORX_NC, &options.replica_dirs)
+                {
+                    settings.vars.insert(
+                        larmorx_fsl::data::NC_ENV.to_owned(),
+                        p.to_string_lossy().into_owned(),
+                    );
+                }
+                larmorx_fsl::cli::run_with(tool, args, &settings, out, err)
+            }
             _ => larmorx_fsl::cli::run(tool, args, out, err),
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
         _ => None,
     }
+}
+
+/// `larmorx fetch fsl-standard [<package>]`: FSL's standard images fetched ahead into larmorx's
+/// data cache (`larmorx_fsl::data`, `specs/bet.md` §5.4), from FSL's site or from `<package>` (a
+/// copy of FSL's `fsl-data_standard` package, a file or a URL; else `LARMORX_FSL_DATA_PACKAGE`),
+/// checksum-verified; prints the directory that holds them.
+fn fetch(prog: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let settings = larmorx_fsl::cli::Settings::from_process();
+    fetch_with(prog, args, &settings, out, err)
+}
+
+/// [`fetch`] with the environment given.
+fn fetch_with(
+    prog: &str,
+    args: &[String],
+    settings: &larmorx_fsl::cli::Settings,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    use larmorx_fsl::data;
+    let usage = format!(
+        "Usage: {prog} fetch fsl-standard [<package>]\n\nFetches FSL's standard images (MNI152_T1_2mm, its dilated brain mask, its eye mask: FSL's data,\nunder the FSL Licence, non-commercial use) once into larmorx's data cache ({}), from\nFSL's site or from <package>, a copy of {}.tar.bz2 (a file or a URL);\nstandard_space_roi and bet's -S, -B, -A, -A2 read them there.\n",
+        data::CACHE_ENV,
+        data::PACKAGE.name
+    );
+    let (Some(what), extra) = (args.first(), args.get(1..).unwrap_or_default()) else {
+        let _ = err.write_all(usage.as_bytes());
+        return EXIT_USAGE;
+    };
+    if what != "fsl-standard" || extra.len() > 1 {
+        let _ = err.write_all(usage.as_bytes());
+        return EXIT_USAGE;
+    }
+    let Some(cache) = data::cache_dir(settings) else {
+        let _ = writeln!(
+            err,
+            "error: no data cache: set {} (no home directory found)",
+            data::CACHE_ENV
+        );
+        return 1;
+    };
+    let dir = data::package_dir(&cache, &data::PACKAGE);
+    let have = data::IMAGES.iter().all(|i| {
+        let f = dir.join("standard").join(format!("{}.nii.gz", i.name));
+        data::sha256_file(&f).is_ok_and(|h| h == i.sha256)
+    });
+    if !have {
+        let source = extra.first().cloned().or_else(|| {
+            settings
+                .get(data::PACKAGE_ENV)
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+        });
+        let source = source.unwrap_or_else(|| data::PACKAGE.url.to_owned());
+        if let Err(e) = data::fetch(settings, &data::FSL, &source, &cache, err) {
+            let _ = writeln!(err, "error: {e}");
+            return 1;
+        }
+    }
+    let _ = writeln!(out, "{}", dir.display());
+    0
 }
 
 /// Entry point of the standalone `larmorx` and `lx` binaries. Replica programs are also looked
@@ -301,6 +379,9 @@ Tools:
 Options:
   -h, --help     Print this help
   -V, --version  Print the version
+
+Data:
+  {prog} fetch fsl-standard [<package>]   FSL's standard images, fetched ahead into the data cache
 
 Bit-exact replicas (docs/licensing.md):
 {replicas}
@@ -425,18 +506,10 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        // fslroi and standard_space_roi: their replicas only (2026-11-04)
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["fslroi", "standard_space_roi"]
-        );
-        // every FSL tool but mcflirt (`mri hmc`) and the replicas without an original is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 2], larmorx_fsl::cli::TOOLS);
-        assert_eq!(
-            &FSL_TOOLS[FSL_TOOLS.len() - 2..],
-            ["fslroi", "standard_space_roi"]
-        );
+        // every FSL tool has its clean-room original (fslroi and standard_space_roi since
+        // 2026-11-05); every one but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
@@ -473,6 +546,17 @@ mod tests {
         assert_eq!(code, 1);
         assert!(
             out.starts_with("Usage: fslstats [preoptions] <input> [options]\n"),
+            "{out}"
+        );
+        // fslroi and standard_space_roi run their clean-room originals (2026-11-05): the
+        // usages on standard output (exit 1)
+        let (code, out, _) = run_options(&["lx", "fsl", "fslroi"], &original);
+        assert_eq!(code, 1);
+        assert!(out.starts_with("\nUsage: fslroi <input> <output>"), "{out}");
+        let (code, out, _) = run_options(&["lx", "fsl", "standard_space_roi"], &original);
+        assert_eq!(code, 1);
+        assert!(
+            out.starts_with("\nUsage: standard_space_roi <input> <output>"),
             "{out}"
         );
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
@@ -594,6 +678,41 @@ mod tests {
                 r.tool
             );
         }
+    }
+
+    #[test]
+    fn fetch_refuses_a_wrong_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let bad = dir.path().join("not-the-package.tar.bz2");
+        std::fs::write(&bad, b"not FSL's package").unwrap();
+        let (code, out, err) = run_capture(&["lx", "fetch"]);
+        assert_eq!((code, out.as_str()), (EXIT_USAGE, ""));
+        assert!(err.starts_with("Usage: lx fetch fsl-standard"), "{err}");
+        // the cache the environment names: a wrong package is refused by its size, nothing kept
+        let cache = dir.path().join("cache");
+        let settings = larmorx_fsl::cli::Settings {
+            vars: [(
+                larmorx_fsl::data::CACHE_ENV.to_owned(),
+                cache.to_string_lossy().into_owned(),
+            )]
+            .into(),
+            dir: None,
+            stdin: None,
+        };
+        let args = [
+            "fsl-standard".to_owned(),
+            bad.to_string_lossy().into_owned(),
+        ];
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let code = fetch_with("lx", &args, &settings, &mut o, &mut e);
+        let err = String::from_utf8(e).unwrap();
+        assert_eq!(code, 1, "{err}");
+        assert!(err.contains("not FSL's fsl-data_standard"), "{err}");
+        assert!(
+            !larmorx_fsl::data::package_dir(&cache, &larmorx_fsl::data::PACKAGE)
+                .join("standard/MNI152_T1_2mm.nii.gz")
+                .exists()
+        );
     }
 
     #[test]

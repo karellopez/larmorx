@@ -178,6 +178,10 @@ pub fn members(post: &[f32], n: usize, nm: usize) -> Vec<f32> {
 /// the products `q y` in single summed in double; the covariances in double; a singular one
 /// stops (FAST aborts). Every sum runs over the voxels in order; the sums are independent of
 /// each other, so they run in parallel (one task each), with the serial bits.
+///
+/// A class left without weight (`Σ q = 0`, §5.3) keeps the plain sums `Σ q y` as its means (0,
+/// or NaN once the corrected channels are NaN: `0 · NaN`) and gets the covariance `0 / 0`, NaN
+/// in every entry (x86-64's `-nan`), whose inverse and determinant are NaN without an error.
 pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class>, Stop> {
     let nm = y.len().checked_div(s).unwrap_or(0);
     // Σ q_c (single) and Σ q_c y_ci (double) of each class
@@ -207,7 +211,7 @@ pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class
             (0..s)
                 .map(|i| {
                     let t = first[c * (1 + s) + 1 + i];
-                    if sw == 0.0 { 0.0 } else { t / sw }
+                    if sw == 0.0 { t } else { t / sw }
                 })
                 .collect()
         })
@@ -235,7 +239,7 @@ pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class
             let sw = first[c * (1 + s)];
             let cov: Vec<f64> = second[c * s * s..(c + 1) * s * s]
                 .iter()
-                .map(|&v| v / sw)
+                .map(|&v| stats::div_sse(v, sw))
                 .collect();
             let (det, inv) = invert(&cov, s).ok_or(Stop::Singular)?;
             Ok(Class {
@@ -482,6 +486,7 @@ fn class_lines(out: &mut dyn Write, classes: &[Class], s: usize, libm: &Libm) {
             ));
         }
         let _ = writeln!(out, "{line}");
+        let _ = out.flush();
     }
 }
 
@@ -518,6 +523,7 @@ pub fn segment(
     if let Some(pr) = &pri {
         if p.verbose {
             let _ = writeln!(out, "Beginning prior-based initialisation");
+            let _ = out.flush();
         }
         post[..nm * n].copy_from_slice(pr);
         q = members(&post, n, nm);
@@ -546,8 +552,10 @@ pub fn segment(
                 }
             }
             if p.verbose {
+                // these lines flush standard output (§7)
                 for (c, mc) in m.iter().enumerate() {
                     let _ = writeln!(out, "{} {} {}", i + 1, c + 1, g(*mc));
+                    let _ = out.flush();
                 }
             }
         }
@@ -588,7 +596,8 @@ pub fn segment(
             q = members(&post, n, nm);
             classes = class_stats(&q, &y, n, s)?;
             // printed once the iteration's covariances are inverted: where one is singular FAST
-            // aborts without this line (observed)
+            // aborts without this line (observed); not flushed, so at an abort the earlier
+            // iterations' lines are lost too (§5.2.3, §7)
             if p.verbose {
                 let _ = writeln!(out, "KMeans Iteration {it}");
             }
@@ -628,6 +637,7 @@ pub fn segment(
                 "Tanaka Iteration {it} bias field {}",
                 p.bias_iterations
             );
+            let _ = out.flush();
         }
         let gs = neg_logs(&classes, &yb, s, nm, &p.libm);
         sweeps(&grid, &mut post, &gs, beta, pr, n, &p.libm);
@@ -647,6 +657,7 @@ pub fn segment(
                 "Tanaka Iteration {it} hyperparameter {}",
                 p.fixed_iterations
             );
+            let _ = out.flush();
         }
         let gs = neg_logs(&classes, &yb, s, nm, &p.libm);
         sweeps(&grid, &mut post, &gs, beta, pr, n, &p.libm);
@@ -664,6 +675,7 @@ pub fn segment(
         };
         if p.verbose {
             let _ = writeln!(out, " BETA {}", g(f64::from(beta)));
+            let _ = out.flush();
         }
         classes = class_stats(&q, &yb, n, s)?;
     }
@@ -729,6 +741,7 @@ pub fn segment(
     let vox = f64::from(voxel[0]) * f64::from(voxel[1]) * f64::from(voxel[2]);
     let pve_out = if p.pve {
         if p.verbose {
+            // not flushed (§7)
             let _ = writeln!(out, "Partial Volume Estimation ");
         }
         Some(partial_volumes(&grid, &yb, &sorted, n, s, p.mixel, &p.libm))
@@ -808,6 +821,7 @@ fn partial_volumes(
             frac: vec![0.0; nm * n],
             seg: vec![1; nm],
             mixel: vec![0; nm],
+            variance_differs: false,
         };
     }
     let pairs = pve::mixtures(n);
@@ -932,6 +946,7 @@ fn partial_volumes(
         frac,
         seg,
         mixel: types,
+        variance_differs: false,
     }
 }
 
@@ -953,5 +968,25 @@ mod tests {
         assert_eq!(two_pi(1), 2.0 * PI_F32);
         let f = fractions();
         assert!(f.len() == 100 || f.len() == 101);
+    }
+
+    #[test]
+    fn a_class_without_weight() {
+        // two channels, two classes; class 2 has no weight (§5.3, random testing 1840)
+        let q = [1.0f32, 0.0, 0.5, 0.0, 0.25, 0.0];
+        let y = [1.0f32, 2.0, 1.5, 2.5, 3.0, 1.0];
+        let cs = class_stats(&q, &y, 2, 2).unwrap();
+        assert_eq!(cs[1].mean, vec![0.0, 0.0], "the plain sums: 0");
+        assert!(
+            cs[1]
+                .cov
+                .iter()
+                .all(|v| v.to_bits() == 0xfff8_0000_0000_0000)
+        );
+        assert!(cs[1].inv.iter().all(|v| v.is_nan()) && cs[1].det.is_nan());
+        // once the corrected channels are NaN, the plain sums 0 · NaN are NaN
+        let yn = [f32::NAN; 6];
+        let cs = class_stats(&q, &yn, 2, 2).unwrap();
+        assert!(cs[1].mean.iter().all(|v| v.is_nan()));
     }
 }

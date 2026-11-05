@@ -8,6 +8,9 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
-libm.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+# the test of the error function against an independent erf
+libm.workspace = true

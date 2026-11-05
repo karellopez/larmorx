@@ -626,6 +626,45 @@ pub fn read_f64_series(files: &ImageFiles, n_threads: usize) -> Option<Vec<f64>>
     Some(data)
 }
 
+/// An unscaled int32 image's (or series') values exactly, in double, in FSL's order (a
+/// neurological file's rows reversed), when it is a plain NIfTI file: what FSL holds of it (single
+/// precision rounds values beyond 2^24). `None` for any other image.
+pub fn read_i32_series(files: &ImageFiles, n_threads: usize) -> Option<Vec<f64>> {
+    use larmorx_mri::hmc::image::is_neurological;
+    let plain = |c: Compression| matches!(c, Compression::None | Compression::Gzip);
+    let compression = |p: &Path| Compression::of_file(p).unwrap_or(Compression::None);
+    let standard = files.standard_names()
+        && plain(compression(&files.header))
+        && files.data.as_deref().is_none_or(|d| plain(compression(d)));
+    if !standard || analyze_header(files) {
+        return None;
+    }
+    let img = nifti::read(
+        &files.header,
+        &larmorx_io::nifti::ReadOptions {
+            scaling: larmorx_io::nifti::Scaling::Raw,
+            n_threads,
+        },
+    )
+    .ok()?;
+    let h = img.header;
+    let (slope, inter) = (h.scl_slope, h.scl_inter);
+    if (slope != 0.0 && slope != 1.0) || inter != 0.0 {
+        return None;
+    }
+    let larmorx_core::DynArray::I32(a) = img.data else {
+        return None;
+    };
+    let nx = a.shape().first().copied().unwrap_or(1);
+    let mut data: Vec<f64> = a.t().iter().map(|&v| f64::from(v)).collect();
+    if is_neurological(&h) && nx > 1 {
+        for row in data.chunks_exact_mut(nx) {
+            row.reverse();
+        }
+    }
+    Some(data)
+}
+
 pub fn read_series_lean(
     files: &ImageFiles,
     n_threads: usize,

@@ -6,8 +6,8 @@ The cases are the replica suite's (``fsl_topup_replica``: fMRIPrep's two field-m
 the debug runs, every option, FSL's configurations, the messages and failures, the thread
 counts, applytopup), run here against the original. Every FSL run goes through the
 oracle-output cache with the replica suite's keys and policies, so the runs that suite made are
-served from it. The options the original does not take yet (it refuses them, naming them) are
-skipped.
+served from it. The original takes every option of both programs (an option it did not take
+would be skipped, naming its refusal: none is).
 
 What is compared (``specs/topup.md`` §12), each output against FSL's:
 
@@ -93,38 +93,44 @@ NOT_YET = "is not implemented yet in the clean-room original"
 BAND_THREADS = 4
 #: The original's thread count in the cases (random testing sets its worker's).
 LX_THREADS = 4
+#: FSL-201's forward differences make FSL's own path depend on the last bits of its inputs
+#: (``validation/investigations/cleanroom-topup/fsl201_spread.py``, the clean-room catch-up of
+#: 2026-11-04): the corrected images' p99 relative difference from FSL's unperturbed run, of FSL's
+#: runs with every read-out time changed by 1, 16 and 256 units of its last float bit, and of the
+#: original's ``reproduce`` runs with the same changes.
+_FSL201_SPREAD = {
+    "opt/int16": ("0.00084 to 0.00089", "2.1e-5 to 0.00105"),
+    "opt/interp-linear": ("0.00056 to 0.0021", "0.0010 to 0.0020"),
+    "opt/levels": ("0.0010 to 0.0020", "1.7e-5 to 0.0018"),
+    "opt/four-volumes": ("0.021 to 0.047 (also 64 and 1024 last bits)", "0.043 to 0.057"),
+    "cfg/b02b0_4": ("0.0019 to 0.0033", "0.0013 to 0.0037"),
+    "cfg/b02b0_7T": (
+        "0.0017 to 0.0054",
+        "0.0079 to 0.0105 (its -v costs follow FSL's to 4 or 5 digits level by level, the final "
+        "within 3e-4)",
+    ),
+}
 #: Cases whose metrics are expected outside the thresholds, and why (their exit status, files,
-#: messages and headers are still compared): the original's movement derivatives are the exact
-#: derivatives of the cost, FSL's rotation derivatives are not (findings 14), so where the
-#: movements are estimated and not converged the two paths part (each case with the movements
-#: off agrees: probes N and O); and FSL-126's negative weight, which makes both minimisations
-#: diverge.
+#: messages and headers are still compared): the movements estimated and not converged, where
+#: FSL-201's ``reproduce`` gives FSL's derivatives but FSL's path is not determined beyond its
+#: inputs' last bits (``_FSL201_SPREAD``; the other cases of findings 14 pass since the catch-up);
+#: FSL-126's negative weight, which makes both minimisations diverge; FSL-143's indefinite prior,
+#: whose diverging iterations amplify the moved images' float-level differences; vb2D's transients.
+#: (The long lines pass since FSL-133's ``reproduce`` reads FSL's wrap-around.)
 EXPECTED_DIVERGENCES: dict[str, str] = {
     **{
-        name: "the movements estimated, not converged: FSL's rotation derivatives are not its "
-        "cost's (findings 14)"
-        for name in (
-            "opt/levels",
-            "opt/scg-movements",
-            "opt/four-volumes",
-            "opt/oblique-phase-encoding",
-            "opt/zero-readout",
-            "cfg/b02b0",
-            "cfg/b02b0_2",
-            "cfg/b02b0_4",
-            "cfg/b02b0_7T",
-        )
+        name: "FSL-201 reproduced, the movements estimated and not converged: FSL's rotation "
+        "derivatives are forward differences of single-precision matrices, so each gradient "
+        "entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single "
+        "precision flips, and FSL's own path is not determined beyond its inputs' last bits: "
+        f"FSL's own runs with the read-out times changed by 1 to 256 last bits lie {fsl} from "
+        f"its unperturbed run (the corrected images' p99), the original's reproduce runs {lx}; "
+        "the original's first gradients agree with FSL's to 1e-6 (findings 37), its default "
+        "(the exact derivatives) moves by 1e-7 to 1.4e-5 under the same changes"
+        for name, (fsl, lx) in _FSL201_SPREAD.items()
     },
     "opt/lambda-negative": "FSL-126 reproduced: a negative weight rewards a rough field, both "
     "minimisations diverge",
-    **{
-        name: "FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose "
-        "length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their "
-        "ends, outside the brain) is not known from the spec and the black-box probes (findings "
-        "21); the original wraps circularly in both modes (exact for lines of 32 voxels, where "
-        "FSL's wrap is circular)"
-        for name in ("at/lsr-long", "at/vb2d-long", "at/vb3d-long", "at/vb4d-long")
-    },
     **{
         name: "FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations "
         "diverge (lambda below 0 in the first iterations, then phi and lambda fall towards "
@@ -141,20 +147,14 @@ EXPECTED_DIVERGENCES: dict[str, str] = {
     "26)",
 }
 #: Cases whose FSL behaviour the original does not reproduce and refuses in ``reproduce`` mode
-#: too (its refusal must name the entry), and why.
-ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {
-    "at/jac-other-shape": (
-        "FSL-134",
-        "FSL lays a field of as many voxels as the images in another shape on the images' grid; "
-        "how it does is not known from the spec and the black-box runs (findings 22)",
-    ),
-}
+#: too (its refusal must name the entry), and why: none since the clean-room catch-up
+#: (``at/jac-other-shape``, FSL-134's field of another shape, is reproduced from
+#: ``specs/topup.md`` §7.3).
+ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {}
 #: Cases whose default run the original refuses where the replica suite's case does not say so
-#: (defects found by the original's part, rule B), with the entry its refusal names.
-FIX_REFUSES: dict[str, str] = {
-    # jac with a phase encoding along z, which topup refuses: FSL leaves the component out
-    "at/jac-z": "FSL-144",
-}
+#: (defects found by the original's part, rule B), with the entry its refusal names: none since
+#: the replica suite's ``at/jac-z`` names FSL-144 itself.
+FIX_REFUSES: dict[str, str] = {}
 #: The checks of an expected divergence that must still pass (everything but §12's metrics).
 _EXACT_KINDS = (
     "Exit status",
@@ -379,9 +379,26 @@ def _stem(name: str) -> str:
 
 
 def _load(p: Path):
+    """The image at ``p``. A NIfTI-2 quaternion whose double components exceed 1 by float rounding
+    (FSL and the original write the float quaternion's doubles: ``w2`` a few 1e-9 below 0) is
+    read with nibabel's float tolerance, as NIfTI-1's (random testing's topup-trial-04796: an
+    exception in the comparison, as FAST's and fslmaths' suites met before)."""
     import nibabel as nib
 
-    return nib.load(str(p))
+    try:
+        img = nib.load(str(p))
+    except ValueError as e:
+        if "w2 should be positive" not in str(e):
+            raise
+        old = nib.Nifti2Header.quaternion_threshold
+        nib.Nifti2Header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+        try:
+            img = nib.load(str(p))
+        finally:
+            nib.Nifti2Header.quaternion_threshold = old
+    if isinstance(img.header, nib.Nifti2Header):
+        img.header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+    return img
 
 
 def _data(img) -> np.ndarray:
@@ -577,7 +594,17 @@ def brain_mask(
     return img > BRAIN * np.percentile(img, 99)
 
 
+def _spatial(x: np.ndarray) -> np.ndarray:
+    """An image with at least its three spatial axes: NIfTI's ``dim[0]`` drops trailing axes of
+    one voxel (FSL and the original write a 1 x 1 x 1 image's Jacobian with ``dim[0] = 1``, which
+    nibabel reads as shape ``(1,)``), where the brain mask keeps all three (the random-testing
+    trial's finding topup-trial-00027, shrunk to one voxel: the same files reported as another
+    grid)."""
+    return x.reshape(x.shape + (1,) * (3 - x.ndim)) if x.ndim < 3 else x
+
+
 def _field_measures(tag: str, fa: np.ndarray, fb: np.ndarray, mask, scale: float = 1.0):
+    fa, fb = _spatial(fa), _spatial(fb)
     if mask is None or fa.shape[:3] != mask.shape or fa.shape != fb.shape:
         return [Measure(f"{tag}: the same grid", float("inf"), 0.0, "shape")]
     x, y = fa[mask], fb[mask]
@@ -613,6 +640,7 @@ def _field_measures(tag: str, fa: np.ndarray, fb: np.ndarray, mask, scale: float
 
 
 def _intensity_measures(tag: str, ia: np.ndarray, ib: np.ndarray, mask):
+    ia, ib = _spatial(ia), _spatial(ib)
     if mask is None or ia.shape[:3] != mask.shape or ia.shape != ib.shape:
         return [Measure(f"{tag}: the same grid", float("inf"), 0.0, "shape")]
     vols = [(ia, ib)] if ia.ndim == 3 else [(ia[..., i], ib[..., i]) for i in range(ia.shape[3])]
@@ -1061,6 +1089,14 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "", random_case: bool
         )
         if _not_yet(ours):
             raise Outcome(SKIPPED, f"the original does not take this yet: {_not_yet(ours)}")
+        # FSL-201: with the movements estimated, FSL's rotation derivatives are forward
+        # differences of single-precision matrices, so its path depends on the last bits of its
+        # movement parameters (each angle's rounding to single precision: about 2 % in the
+        # rotations' gradient entries, specs/topup.md §4.6); FSL's own last-bit band is the
+        # allowance of such a case, as of a random one
+        last_bit = random_case or (band is None and run.single is None and "FSL-201" in ours.stderr)
+        if last_bit and band is None:
+            band = _random_band(run, node, settings, stack)
         compare(
             checks,
             oracle,
@@ -1072,7 +1108,7 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "", random_case: bool
             band,
             program=prog,
             band_name="its read-out times changed in their last float bit"
-            if random_case
+            if last_bit
             else f"--nthr={BAND_THREADS} against 1",
         )
         if run.fix and ours.code == 0 and not run.profile:
@@ -1246,7 +1282,7 @@ def suite() -> Suite:
         notes=(
             "The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served from "
             "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run. The options the "
-            "original does not take yet are skipped until its next sub-tasks."
+            "mode (D13) and its default `fix` pass against the reproduced run. The original "
+            "takes every option of both programs (none is skipped)."
         ),
     )

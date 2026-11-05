@@ -555,6 +555,20 @@ fn run(
             Ok(est) => {
                 // GLIBC-07 is not named: an iterative fit cannot tell whether the smoothing's
                 // last bits moved its results (the user's decision of 2026-11-04)
+                if est.fsl242_met {
+                    ns.push(Notice::new(
+                        &defects::FSL_242,
+                        mode,
+                        match mode {
+                            UpstreamDefects::Fix => {
+                                "a level of scaled conjugate gradients whose last iteration was rejected ends at the lowest cost it found (FSL ends at the rejected step's worse point)"
+                            }
+                            UpstreamDefects::Reproduce => {
+                                "a level of scaled conjugate gradients whose last iteration was rejected ends at that rejected step's point, as FSL's"
+                            }
+                        },
+                    ));
+                }
                 write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
             }
             Err(topup::LevelError::Subsampling(l)) => {
@@ -568,6 +582,28 @@ fn run(
                 let _ = writeln!(
                     ebuf,
                     "Error occurred when preparing to run {what}\nException thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor"
+                );
+                1
+            }
+            Err(topup::LevelError::SingleCoefficient(l)) => {
+                // FSL-145 reproduced: the refit of a single quadratic coefficient stops FSL
+                // while it prepares the level (observed: quad_count.py, `--subsamp=2`)
+                print_notices(&mut ebuf, &ns);
+                let what = if l == 1 {
+                    "preparing to run topup".to_owned()
+                } else if l <= s.params.levels.len() {
+                    format!("preparing to run level {l} of topup")
+                } else {
+                    "writing output from topup".to_owned()
+                };
+                let verb = if l > s.params.levels.len() {
+                    "Error occured while"
+                } else {
+                    "Error occurred when"
+                };
+                let _ = writeln!(
+                    ebuf,
+                    "{verb} {what}\nException thrown with message: Mat::operator(): index out of bounds"
                 );
                 1
             }
@@ -875,6 +911,8 @@ fn settle(
         membrane_hessian_mm: mode == UpstreamDefects::Reproduce,
         fsl145: mode == UpstreamDefects::Reproduce,
         fsl146: mode == UpstreamDefects::Reproduce,
+        fsl201: mode == UpstreamDefects::Reproduce,
+        fsl242: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
         glibc: mode == UpstreamDefects::Reproduce,
@@ -895,6 +933,21 @@ fn settle(
                 }
                 UpstreamDefects::Reproduce => {
                     "Levenberg-Marquardt's Hessian of the membrane energy in mm, as FSL's (its cost in voxels)"
+                }
+            },
+        ));
+    }
+    // FSL-201: named on every run that estimates the movements (specs/topup.md §10.1)
+    if params.levels.iter().any(|l| l.estmov) {
+        notices.push(Notice::new(
+            &defects::FSL_201,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => {
+                    "the movements' derivatives exact (FSL's rotation derivatives are forward differences of single-precision rotation matrices, not its cost's)"
+                }
+                UpstreamDefects::Reproduce => {
+                    "the movements through FSL's single-precision rotation matrices, their derivatives forward differences of them, as FSL's"
                 }
             },
         ));
@@ -1431,10 +1484,20 @@ fn write_outputs(
     if let Some(rbm) = given.get("rbmout") {
         for i in 0..n_vols {
             let name = format!("{rbm}_{:02}.mat", i + 1);
-            // about the input's centre (observed: FSL's matrices, findings)
-            let centre: [f64; 3] =
-                std::array::from_fn(|a| (dims[a] as f64 - 1.0) * input.vol.voxel[a] / 2.0);
-            let m = topup::movement::matrix(est.movements[i], centre);
+            // about the input's centre (observed: FSL's matrices, findings); with FSL-201
+            // reproduced FSL's own matrices, about the regridded image's centre with its product
+            // in single precision (specs/topup.md §4.3)
+            let m = if est.fsl201 {
+                let p = &est.prepared;
+                let centre: [f64; 3] = std::array::from_fn(|a| {
+                    f64::from((p.reg_dims[a] as f32 - 1.0) * p.reg_voxel[a] as f32) / 2.0
+                });
+                topup::movement::fsl_matrix(est.movements[i], centre)
+            } else {
+                let centre: [f64; 3] =
+                    std::array::from_fn(|a| (dims[a] as f64 - 1.0) * input.vol.voxel[a] / 2.0);
+                topup::movement::matrix(est.movements[i], centre)
+            };
             let text: String = m
                 .iter()
                 .map(|row| {

@@ -956,7 +956,10 @@ mod bspline {
                 c[0] = sum;
             } else {
                 let iz = 1.0 / z;
-                let mut z2n = libm::pow(z, (n - 1) as f64);
+                // the correctly rounded pow (rule 5): glibc 2.35's, so ITK's on Linux, on all 91
+                // (pole, line length) pairs that reach here (the `libm` crate's differed on 6:
+                // orders 4 and 5, lines of 12, 13, 17, 20 and 21 samples)
+                let mut z2n = math::pow(z, (n - 1) as f64);
                 let mut sum = c[0] + z2n * c[n - 1];
                 z2n *= z2n * iz;
                 for v in c.iter().take(n - 1).skip(1) {

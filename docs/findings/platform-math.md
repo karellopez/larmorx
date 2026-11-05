@@ -116,8 +116,8 @@ to 2,599 or underflow), all below 1e-100, where they cannot change a coefficient
 `larmorx_core::math::powi` gives the correctly rounded value by raising the mantissa to the
 power exactly as a big integer and rounding once (0 mismatches on 26,000 checked values,
 subnormals, underflow and overflow included). It is original code, not a CORE-MATH port.
-The ITK B-spline prefilter (`larmorx-interp`'s `bspline`) still uses the `libm` crate's `pow`.
-*Verified*.
+The ITK B-spline prefilter (`larmorx-interp`'s `bspline`) still uses the `libm` crate's `pow`
+(2026-11-05: no longer, see "The `libm` crate's last uses" below). *Verified*.
 
 **Fused multiply-adds.** numpy's matrix products go through BLAS, whose x86-64 (Haswell and
 later) and aarch64 kernels fuse multiply-adds, so fMRIPrep's coordinates carry fused results
@@ -302,3 +302,24 @@ this way in all 54 outputs of the standard tier ([ants-n4](../validation/ants-n4
 the binary without the library, in 30 of 54. DenoiseImage: 52 of 52 outputs with the library,
 9 of 52 without ([ants-denoise](../validation/ants-denoise.md)). ANTs' own code is not changed. Calls that GCC inlines or
 evaluates at compile time are not affected. *Verified* (2026-10-11).
+
+## The `libm` crate's last uses (2026-11-05)
+
+The four calls of the `libm` crate that were left in the Apache crates are now
+`larmorx_core::math`'s correctly rounded functions (rule 5). Each was measured first on the inputs
+it meets, against `larmorx_core::math` and against glibc 2.35 (the C library as a black box,
+through Rust's `std`), by `validation/investigations/libm-last-uses` (*Verified*):
+
+| Call | Inputs | `libm` crate vs glibc | `larmorx_core::math` vs glibc | What changes |
+|---|---|---|---|---|
+| `acos` in AFNI's oblique angle (`larmorx-afni`, `geometry::oblique_angle`: `acos(m)·180/π` rounded to float32) | every float32 in [0, 1] (1,065,353,217) | 0 angles differ | 0 angles differ (the double `acos` itself on 25,402) | nothing: the angle AFNI prints is glibc's with either |
+| `acos` in `Affine::obliquity` (nibabel's `obliquity`; no tool calls it) | 2·10⁷ random doubles in [0, 1) | 5.5 % | 0.11 % | the last bit, closer to numpy on Linux |
+| `atan2` in the head-motion correction's decomposition (`larmorx-mri`, `hmc::rigid::euler`) | 2·10⁷ random float pairs in [−1, 1]²; 2·10⁷ near-identity rotations | 17.8 % of the random pairs (and 24.9 % of the near-identity ones differ from `larmorx_core::math`) | 0.087 %; 0.027 % | the last bit of a double angle (none of the random ones once rounded to float); measured on the `mri-hmc` record (`docs/findings/mri-hmc-original.md`) |
+| `pow` in the B-spline prefilter (`larmorx-interp`, `z^(n−1)` for lines no longer than the pole's horizon) | ITK's six poles of orders 2 to 5, every line length that reaches it (91 pairs) | 6 pairs (orders 4 and 5, lines of 12, 13, 17, 20, 21) | 0 | glibc's, so ANTs' on Linux, on all 91: B-spline orders 4 and 5 on short lines |
+
+mcflirt's own arctangent is glibc's single-precision `atan2f` (`specs/flirt.md` §3's decomposition,
+which `specs/mcflirt.md` §4.4 shares), neither of these: the head-motion correction's `reproduce`
+has no glibc trigonometry yet (a later part's). The `libm` crate stays a dependency of
+`larmorx-fsl` (`erf`, `erfc`: `larmorx_core::math` has no correctly rounded ones yet, a follow-up),
+`larmorx-transform` (declared, unused) and, for one test, `larmorx-interp`.
+

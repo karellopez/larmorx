@@ -76,6 +76,9 @@ pub struct HmcOutput {
     /// Per volume: `[rx, ry, rz, tx, ty, tz]` (radians, mm) about the reference's
     /// intensity-weighted centre, mcflirt's `.par` convention.
     pub params: Vec<[f64; 6]>,
+    /// Whether the reference's centre of mass (the `.par` file's, §10.3) has a total below 1e-5:
+    /// mcflirt prints its COG warning once for each `.par` line it writes.
+    pub par_cog_zero: bool,
     /// mcflirt's RMS displacements (radius 80 mm): from the reference and from the previous
     /// volume (one fewer).
     pub rms_abs: Vec<f64>,
@@ -142,6 +145,10 @@ pub fn run(
         &est.reference,
         options.estimate.upstream_defects.fix(),
     );
+    let par_cog_zero = est
+        .reference
+        .centre_counted(options.estimate.upstream_defects.fix())
+        .1;
     let (rms_abs, rms_rel) = rms_series(&est.matrices, &est.reference);
     let ras = est
         .matrices
@@ -210,6 +217,7 @@ pub fn run(
         estimate: est,
         reference_geometry,
         params,
+        par_cog_zero,
         rms_abs,
         rms_rel,
         ras,

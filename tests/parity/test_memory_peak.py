@@ -233,15 +233,19 @@ BET_CASES = [
     ("bet", "{in} out -R -m"),
     ("bet", "{in4d} out -F"),
     ("betsurf", "--t1only -m -s {in} {mesh} {mat} out"),
-]
-#: The replica's alone until the clean-room catch-up part writes their original
-#: (``specs/bet.md`` §5.3, ``specs/standard_space_roi.md``).
-REPLICA_ONLY_BET_CASES = [
+    # standard_space_roi (its original since 2026-11-05, every program in its process, one
+    # after the other) and fslroi (a box and volumes of the int16 series)
+    ("standard_space_roi", "{head} out -b"),
+    ("fslroi", "{in4d} out 10 30 12 30 5 30 2 20"),
+    # bet -S, -B, -A2 (the original's since 2026-11-05, its programs in its process, one after
+    # the other as the script runs them)
     ("bet", "{head} out -S -m"),
     ("bet", "{head} out -B"),
     ("bet", "{head} out -A2 {head2}"),
-    ("standard_space_roi", "{head} out -b"),
 ]
+#: Calls measured for the replica alone: none since 2026-11-05 (the clean-room catch-up wrote
+#: bet -S, -B, -A, -A2's original).
+REPLICA_ONLY_BET_CASES: list[tuple[str, str]] = []
 
 
 def _bet_inputs(tmp: Path, fb) -> dict[str, Path]:
@@ -880,9 +884,11 @@ def _blanked(d: Path) -> dict[str, bytes]:
     return out
 
 
-#: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30; betsurf's since 2026-10-31)
-#: on the same calls: the original's outputs are FSL's within the thresholds of its record
-#: (``docs/validation/fsl-bet.md``), its memory similar to FSL's.
+#: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30; betsurf's since 2026-10-31;
+#: standard_space_roi's, fslroi's and bet -S, -B, -A2's since 2026-11-05) on the same calls: the
+#: original's outputs
+#: are FSL's within the thresholds of its record (``docs/validation/fsl-bet.md``), its memory
+#: similar to FSL's.
 ORIGINAL_BET_CASES = list(BET_CASES)
 
 

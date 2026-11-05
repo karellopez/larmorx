@@ -58,7 +58,8 @@ impl Cost {
 }
 
 /// Messages a cost prints on standard error as it evaluates (identical lines, so their order
-/// across parallel evaluations does not matter).
+/// across parallel evaluations does not matter; the search's free optimisations, whose lines
+/// differ, each write a [`Log::child`] passed on in their order).
 #[derive(Debug, Default)]
 pub struct Log {
     lines: Mutex<Vec<String>>,
@@ -99,11 +100,33 @@ impl Log {
             l.push(line.into());
         }
     }
+    /// `lines` pushed together, so the lines of one evaluation stay together when evaluations
+    /// run in parallel (the boundary-based cost's set-up lines with `-debug`, §9.4).
+    pub fn push_all<S: Into<String>>(&self, lines: impl IntoIterator<Item = S>) {
+        if let Ok(mut l) = self.lines.lock() {
+            l.extend(lines.into_iter().map(Into::into));
+        }
+    }
     pub fn take(&self) -> Vec<String> {
         self.lines
             .lock()
             .map(|mut l| std::mem::take(&mut *l))
             .unwrap_or_default()
+    }
+    /// A new log with this log's functions, for one part of a run whose lines must keep their
+    /// order (a free optimisation of the search, which may run beside others): its lines are
+    /// passed on with [`Log::absorb`].
+    pub fn child(&self) -> Log {
+        self.quiet()
+    }
+    /// `other`'s lines appended in their order, and its fatal error kept if this log has none.
+    pub fn absorb(&self, other: &Log) {
+        for line in other.take() {
+            self.push(line);
+        }
+        if let Some(f) = other.fatal_error() {
+            self.fatal(f);
+        }
     }
     /// An error that ends the run (FSL's exception, e.g. a singular matrix): the first is kept.
     pub fn fatal(&self, message: impl Into<String>) {
@@ -282,9 +305,7 @@ impl Pair {
                     1.0 - hcost::correlation(&slices, tv.weighted(), NormCorrCount::Mcflirt).abs()
                 }
             }
-            Cost::LeastSq => {
-                hcost::least_squares_weighted(&self.reference, &tv, &b, parallel, weight)
-            }
+            Cost::LeastSq => self.least_squares(&tv, &b, parallel, weight),
             Cost::CorrRatio => hcost::corr_ratio_of(&hcost::bin_moments(
                 self.reference_bins(),
                 &tv,
@@ -320,6 +341,47 @@ impl Pair {
             ),
             Cost::LabelDiff => self.labeldiff(&tv, &b, parallel, weight),
             Cost::Bbr => unreachable!(),
+        }
+    }
+
+    /// `leastsq` (§6.2, spec writer 2026-11-03): over the contributing points in the sampling
+    /// order, `δ = r − y` in single precision; without smoothing or weights `δ·δ` and the count,
+    /// otherwise `(w·δ)·δ` and `w`; three levels of single-precision sums (row, slice, total);
+    /// the total over the weight (the count) when that is above 1, else `(max − min)²` of both
+    /// images.
+    fn least_squares(
+        &self,
+        tv: &TestVolume<'_>,
+        b: &[[f32; 4]; 3],
+        parallel: bool,
+        weight: Option<PointWeight<'_>>,
+    ) -> f32 {
+        let smoothed = tv.weighted() || weight.is_some();
+        let slices =
+            hcost::sample_weighted(&self.reference, tv, b, parallel, weight, || SquaresSlice {
+                smoothed,
+                row: (0.0, 0.0),
+                slice: (0.0, 0.0),
+                points: 0,
+            });
+        let (mut num, mut den) = (0.0f32, 0.0f32);
+        let mut points = 0u64;
+        for s in &slices {
+            num += s.slice.0;
+            den += s.slice.1;
+            points += s.points;
+        }
+        let empty = |(lo, hi): (f32, f32)| (hi - lo) * (hi - lo);
+        if smoothed {
+            if den <= 1.0 {
+                return empty(self.extremes);
+            }
+            num / den
+        } else {
+            if points <= 1 {
+                return empty(self.extremes);
+            }
+            num / points as f32
         }
     }
 
@@ -359,6 +421,35 @@ impl Pair {
             }
             num / points as f32
         }
+    }
+}
+
+/// The sums of one slice of `leastsq` (§6.2): `Σ δ·δ` (or `Σ (w·δ)·δ` and `Σ w`) per row, per
+/// slice, in single precision.
+struct SquaresSlice {
+    smoothed: bool,
+    row: (f32, f32),
+    slice: (f32, f32),
+    points: u64,
+}
+
+impl Accumulator for SquaresSlice {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let d = g - v;
+        if self.smoothed {
+            self.row.0 += (w * d) * d;
+            self.row.1 += w;
+        } else {
+            self.row.0 += d * d;
+        }
+        self.points += 1;
+    }
+
+    fn end_row(&mut self) {
+        self.slice.0 += self.row.0;
+        self.slice.1 += self.row.1;
+        self.row = (0.0, 0.0);
     }
 }
 
@@ -429,6 +520,13 @@ fn mismatch(v: &Volume, p: [f32; 3], x: f32) -> f32 {
 /// With `finite_only` (FSL-14 corrected) NaN and infinite voxels are left out of the minimum and
 /// the sums (they still count in the blocks' lengths).
 pub fn centre_of_mass(v: &Volume, finite_only: bool) -> [f64; 3] {
+    centre_of_mass_counted(v, finite_only).0
+}
+
+/// [`centre_of_mass`], and whether its total was below 1e-5 in magnitude (counted as 1: FSL
+/// prints `WARNING::in calculating COG, total = 0.0` each time it measures such a centre; a NaN
+/// total is not below).
+pub fn centre_of_mass_counted(v: &Volume, finite_only: bool) -> ([f64; 3], bool) {
     let [nx, ny, nz] = v.shape;
     let vmin = if finite_only {
         let mut it = v.data.iter().copied().filter(|x| x.is_finite());
@@ -469,13 +567,65 @@ pub fn centre_of_mass(v: &Volume, finite_only: bool) -> [f64; 3] {
         tot[k] += part[k];
     }
     let mut total = tot[3];
-    if total.abs() < 1e-5 {
+    let zero = total.abs() < 1e-5;
+    if zero {
         total = 1.0;
     }
     let d = v.voxel_size.map(f64::from);
-    [
-        d[0] * (tot[0] / total),
-        d[1] * (tot[1] / total),
-        d[2] * (tot[2] / total),
-    ]
+    (
+        [
+            d[0] * (tot[0] / total),
+            d[1] * (tot[1] / total),
+            d[2] * (tot[2] / total),
+        ],
+        zero,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// §6.2's `leastsq` sums: without smoothing `δ·δ` and the count; with smoothing `(w·δ)·δ`
+    /// and `w`; each row's sums added to the slice's at the row's end, in single precision.
+    #[test]
+    fn leastsq_sums_by_rows() {
+        let mut plain = SquaresSlice {
+            smoothed: false,
+            row: (0.0, 0.0),
+            slice: (0.0, 0.0),
+            points: 0,
+        };
+        let mut weighted = SquaresSlice {
+            smoothed: true,
+            row: (0.0, 0.0),
+            slice: (0.0, 0.0),
+            points: 0,
+        };
+        let rows: [&[(f32, f32, f32)]; 2] = [
+            &[(1e8, 0.5, 0.25), (3.0, 1.0, 0.5)],
+            &[(2.0, 0.1, 1.0), (1e-3, 0.0, 0.75)],
+        ];
+        let (mut want_p, mut want_w) = (0.0f32, (0.0f32, 0.0f32));
+        for row in rows {
+            let (mut rp, mut rw) = (0.0f32, (0.0f32, 0.0f32));
+            for &(g, v, w) in row {
+                plain.point(g, v, w);
+                weighted.point(g, v, w);
+                let d = g - v;
+                rp += d * d;
+                rw.0 += (w * d) * d;
+                rw.1 += w;
+            }
+            plain.end_row();
+            weighted.end_row();
+            want_p += rp;
+            want_w.0 += rw.0;
+            want_w.1 += rw.1;
+        }
+        assert_eq!(plain.slice.0.to_bits(), want_p.to_bits());
+        assert_eq!(plain.points, 4);
+        assert_eq!(weighted.slice.0.to_bits(), want_w.0.to_bits());
+        assert_eq!(weighted.slice.1.to_bits(), want_w.1.to_bits());
+    }
 }

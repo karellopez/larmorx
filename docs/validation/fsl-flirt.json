@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "be3db916dce3",
+  "larmorx_commit": "a835ddd3a69f",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -17,14 +17,14 @@
  "oracle_cache": {
   "differences": 0,
   "fresh": {
-   "ended by a signal, SIGABRT (never stored)": 13,
+   "ended by a signal, SIGABRT (never stored)": 14,
    "ended by a signal, SIGSEGV (never stored)": 1
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 14,
-  "saved_seconds": 664.1,
-  "served": 294
+  "ran": 15,
+  "saved_seconds": 761.3,
+  "served": 318
  },
  "reference": "flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`",
  "results": [
@@ -45,7 +45,7 @@
     "D13 fix pass": 3265591,
     "fMRIPrep's own matrix (its container's FSL): displacement": 0.0
    },
-   "seconds": 23.781,
+   "seconds": 20.293,
    "status": "pass"
   },
   {
@@ -62,10 +62,10 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5140205,
+    "D13 fix pass": 5140511,
     "fMRIPrep's own matrix (its container's FSL): displacement": 0.0002
    },
-   "seconds": 43.258,
+   "seconds": 42.385,
    "status": "pass"
   },
   {
@@ -77,15 +77,15 @@
    "measured": {
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ",
-    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0065,
-    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999999
+    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0113,
+    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999978
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6691566,
-    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0065
+    "D13 fix pass": 6689565,
+    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0113
    },
-   "seconds": 54.335,
+   "seconds": 53.275,
    "status": "pass"
   },
   {
@@ -100,9 +100,9 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 12
    },
-   "seconds": 6.391,
+   "seconds": 4.883,
    "status": "pass"
   },
   {
@@ -119,7 +119,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.464,
+   "seconds": 3.999,
    "status": "pass"
   },
   {
@@ -136,7 +136,7 @@
    "reported": {
     "D13 fix pass": 866828
    },
-   "seconds": 5.692,
+   "seconds": 5.076,
    "status": "pass"
   },
   {
@@ -153,7 +153,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 7.861,
+   "seconds": 6.184,
    "status": "pass"
   },
   {
@@ -170,7 +170,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 4.367,
+   "seconds": 3.129,
    "status": "pass"
   },
   {
@@ -187,7 +187,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 6.253,
+   "seconds": 4.648,
    "status": "pass"
   },
   {
@@ -204,7 +204,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 5.803,
+   "seconds": 3.941,
    "status": "pass"
   },
   {
@@ -221,7 +221,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 13.741,
+   "seconds": 7.483,
    "status": "pass"
   },
   {
@@ -238,7 +238,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 10.955,
+   "seconds": 7.105,
    "status": "pass"
   },
   {
@@ -256,35 +256,25 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 6.957,
+   "seconds": 4.778,
    "status": "pass"
   },
   {
    "case": "real/cost-leastsq",
    "category": "real",
    "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 96.0874 mm, RMS deviation 93.3762 mm; FSL's own p95 on a perturbed input 46.7560 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.5 or FSL's own variability",
-     "value": 82.0821
-    }
-   ],
+   "checks_total": 5,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 82.0821,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 12
+    "D13 fix pass": 11
    },
-   "seconds": 6.524,
-   "status": "fail"
+   "seconds": 4.11,
+   "status": "pass"
   },
   {
    "case": "real/cost-woods",
@@ -300,7 +290,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 16.679,
+   "seconds": 13.145,
    "status": "pass"
   },
   {
@@ -318,7 +308,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 7.951,
+   "seconds": 8.445,
    "status": "pass"
   },
   {
@@ -335,7 +325,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 5.481,
+   "seconds": 6.128,
    "status": "pass"
   },
   {
@@ -352,7 +342,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 4.83,
+   "seconds": 3.906,
    "status": "pass"
   },
   {
@@ -370,7 +360,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.219,
+   "seconds": 3.926,
    "status": "pass"
   },
   {
@@ -387,7 +377,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 5.237,
+   "seconds": 4.275,
    "status": "pass"
   },
   {
@@ -404,7 +394,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 6.627,
+   "seconds": 7.645,
    "status": "pass"
   },
   {
@@ -421,17 +411,16 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 8.169,
+   "seconds": 5.465,
    "status": "pass"
   },
   {
    "case": "real/bins64",
    "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0692,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -439,7 +428,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 7.201,
+   "seconds": 7.152,
    "status": "pass"
   },
   {
@@ -456,7 +445,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 113.825,
+   "seconds": 106.086,
    "status": "pass"
   },
   {
@@ -473,7 +462,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 7.782,
+   "seconds": 6.906,
    "status": "pass"
   },
   {
@@ -490,7 +479,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 21.382,
+   "seconds": 17.17,
    "status": "pass"
   },
   {
@@ -507,17 +496,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 26.927,
+   "seconds": 23.107,
    "status": "pass"
   },
   {
    "case": "real/weights",
    "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.3059,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -525,7 +513,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 21.249,
+   "seconds": 20.104,
    "status": "pass"
   },
   {
@@ -552,17 +540,16 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 11.518,
+   "seconds": 9.367,
    "status": "fail"
   },
   {
    "case": "real/weights-leastsq",
    "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1458,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -570,7 +557,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 10.285,
+   "seconds": 7.651,
    "status": "pass"
   },
   {
@@ -587,17 +574,16 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 10.33,
+   "seconds": 10.184,
    "status": "pass"
   },
   {
    "case": "real/weights-mutualinfo",
    "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -605,7 +591,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 8.787,
+   "seconds": 8.384,
    "status": "pass"
   },
   {
@@ -615,7 +601,7 @@
    "checks_total": 5,
    "failed_checks": [
     {
-     "detail": "line 4003: FSL 'WARNING: Woods is not implemented with cost function weighting', original '<end>'",
+     "detail": "line 4004: FSL '<end>', original 'WARNING: Woods is not implemented with cost function weighting'",
      "metric": "identical",
      "name": "stderr: the same lines (numbers aside)",
      "passed": false,
@@ -631,26 +617,16 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 5.736,
+   "seconds": 5.857,
    "status": "fail"
   },
   {
    "case": "real/weights-empty-refweight",
    "category": "real",
    "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 371.6170 mm, RMS deviation 83.9047 mm; FSL's own p95 on a perturbed input 0.0001 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.5,
-     "value": 330.6537
-    }
-   ],
+   "checks_total": 5,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 330.6537,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -658,26 +634,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.106,
-   "status": "fail"
+   "seconds": 4.608,
+   "status": "pass"
   },
   {
    "case": "real/weights-empty-inweight",
    "category": "real",
    "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 172.9050 mm, RMS deviation 113.3139 mm; FSL's own p95 on a perturbed input 0.0000 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.5,
-     "value": 133.6991
-    }
-   ],
+   "checks_total": 5,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 133.6991,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -685,8 +651,8 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 6.374,
-   "status": "fail"
+   "seconds": 4.643,
+   "status": "pass"
   },
   {
    "case": "real/applyxfm-nan-border",
@@ -702,7 +668,7 @@
    "reported": {
     "D13 fix pass": 1149794
    },
-   "seconds": 0.884,
+   "seconds": 0.635,
    "status": "pass"
   },
   {
@@ -721,25 +687,24 @@
    "reported": {
     "D13 fix pass": 4
    },
-   "seconds": 38.89,
+   "seconds": 45.322,
    "status": "pass"
   },
   {
    "case": "real/known-motion",
    "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0002,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 10
    },
-   "seconds": 35.245,
+   "seconds": 44.039,
    "status": "pass"
   },
   {
@@ -756,7 +721,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.882,
+   "seconds": 0.709,
    "status": "pass"
   },
   {
@@ -773,7 +738,7 @@
    "reported": {
     "D13 fix pass": 32052
    },
-   "seconds": 1.524,
+   "seconds": 1.298,
    "status": "pass"
   },
   {
@@ -790,7 +755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.022,
+   "seconds": 1.008,
    "status": "pass"
   },
   {
@@ -807,7 +772,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.789,
+   "seconds": 0.652,
    "status": "pass"
   },
   {
@@ -824,7 +789,7 @@
    "reported": {
     "D13 fix pass": 21767
    },
-   "seconds": 0.924,
+   "seconds": 1.247,
    "status": "pass"
   },
   {
@@ -841,7 +806,7 @@
    "reported": {
     "D13 fix pass": 47524
    },
-   "seconds": 1.257,
+   "seconds": 1.399,
    "status": "pass"
   },
   {
@@ -858,7 +823,7 @@
    "reported": {
     "D13 fix pass": 756121
    },
-   "seconds": 0.54,
+   "seconds": 0.566,
    "status": "pass"
   },
   {
@@ -875,7 +840,7 @@
    "reported": {
     "D13 fix pass": 560026
    },
-   "seconds": 0.641,
+   "seconds": 0.851,
    "status": "pass"
   },
   {
@@ -892,7 +857,7 @@
    "reported": {
     "D13 fix pass": 416242
    },
-   "seconds": 0.831,
+   "seconds": 0.921,
    "status": "pass"
   },
   {
@@ -909,7 +874,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.713,
+   "seconds": 0.562,
    "status": "pass"
   },
   {
@@ -926,7 +891,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.051,
+   "seconds": 1.072,
    "status": "pass"
   },
   {
@@ -943,7 +908,7 @@
    "reported": {
     "D13 fix pass": 416491
    },
-   "seconds": 0.583,
+   "seconds": 0.737,
    "status": "pass"
   },
   {
@@ -960,7 +925,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.849,
+   "seconds": 0.908,
    "status": "pass"
   },
   {
@@ -977,7 +942,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.898,
+   "seconds": 0.844,
    "status": "pass"
   },
   {
@@ -994,7 +959,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.896,
+   "seconds": 0.804,
    "status": "pass"
   },
   {
@@ -1011,7 +976,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.677,
+   "seconds": 0.704,
    "status": "pass"
   },
   {
@@ -1028,7 +993,7 @@
    "reported": {
     "D13 fix pass": 128674
    },
-   "seconds": 4.145,
+   "seconds": 4.744,
    "status": "pass"
   },
   {
@@ -1045,7 +1010,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.731,
+   "seconds": 0.843,
    "status": "pass"
   },
   {
@@ -1062,7 +1027,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.803,
+   "seconds": 0.823,
    "status": "pass"
   },
   {
@@ -1079,7 +1044,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.836,
+   "seconds": 0.847,
    "status": "pass"
   },
   {
@@ -1097,7 +1062,7 @@
    "reported": {
     "D13 fix pass": 839947
    },
-   "seconds": 4.436,
+   "seconds": 5.854,
    "status": "pass"
   },
   {
@@ -1114,7 +1079,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 1.0,
+   "seconds": 1.333,
    "status": "pass"
   },
   {
@@ -1131,7 +1096,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 0.843,
+   "seconds": 0.762,
    "status": "pass"
   },
   {
@@ -1148,7 +1113,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 0.9,
+   "seconds": 0.944,
    "status": "pass"
   },
   {
@@ -1165,7 +1130,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.355,
+   "seconds": 2.529,
    "status": "pass"
   },
   {
@@ -1184,7 +1149,7 @@
    "reported": {
     "D13 fix pass": 841077
    },
-   "seconds": 16.173,
+   "seconds": 18.154,
    "status": "pass"
   },
   {
@@ -1202,7 +1167,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 14.672,
+   "seconds": 19.774,
    "status": "pass"
   },
   {
@@ -1220,7 +1185,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 15.551,
+   "seconds": 18.73,
    "status": "pass"
   },
   {
@@ -1238,7 +1203,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 11.517,
+   "seconds": 16.154,
    "status": "pass"
   },
   {
@@ -1261,9 +1226,9 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22923
+    "D13 fix pass": 22922
    },
-   "seconds": 16.013,
+   "seconds": 19.742,
    "status": "pass"
   },
   {
@@ -1281,7 +1246,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 12.086,
+   "seconds": 17.75,
    "status": "pass"
   },
   {
@@ -1299,7 +1264,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 1.448,
+   "seconds": 2.473,
    "status": "pass"
   },
   {
@@ -1318,7 +1283,7 @@
    "reported": {
     "D13 fix pass": 985605
    },
-   "seconds": 15.114,
+   "seconds": 20.537,
    "status": "pass"
   },
   {
@@ -1336,7 +1301,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 86.857,
+   "seconds": 96.026,
    "status": "pass"
   },
   {
@@ -1346,7 +1311,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0035,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0045,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1354,7 +1319,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 25.499,
+   "seconds": 31.328,
    "status": "pass"
   },
   {
@@ -1371,7 +1336,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.417,
+   "seconds": 0.533,
    "status": "pass"
   },
   {
@@ -1388,7 +1353,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 0.942,
+   "seconds": 1.238,
    "status": "pass"
   },
   {
@@ -1405,7 +1370,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.512,
+   "seconds": 1.574,
    "status": "pass"
   },
   {
@@ -1422,7 +1387,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.235,
+   "seconds": 0.688,
    "status": "pass"
   },
   {
@@ -1439,7 +1404,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.716,
+   "seconds": 0.791,
    "status": "pass"
   },
   {
@@ -1456,7 +1421,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.301,
+   "seconds": 1.952,
    "status": "pass"
   },
   {
@@ -1473,7 +1438,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.591,
+   "seconds": 0.375,
    "status": "pass"
   },
   {
@@ -1490,7 +1455,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 6.965,
+   "seconds": 7.53,
    "status": "pass"
   },
   {
@@ -1507,7 +1472,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 0.624,
+   "seconds": 0.597,
    "status": "pass"
   },
   {
@@ -1524,7 +1489,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 0.666,
+   "seconds": 0.576,
    "status": "pass"
   },
   {
@@ -1541,7 +1506,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.626,
+   "seconds": 0.67,
    "status": "pass"
   },
   {
@@ -1559,7 +1524,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.789,
+   "seconds": 1.186,
    "status": "pass"
   },
   {
@@ -1576,17 +1541,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.088,
+   "seconds": 1.183,
    "status": "pass"
   },
   {
    "case": "schedule/sch2D_6dof",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2607,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1594,7 +1558,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.558,
+   "seconds": 1.242,
    "status": "pass"
   },
   {
@@ -1611,7 +1575,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.505,
+   "seconds": 0.747,
    "status": "pass"
   },
   {
@@ -1628,7 +1592,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.047,
+   "seconds": 3.367,
    "status": "pass"
   },
   {
@@ -1645,7 +1609,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.259,
+   "seconds": 4.029,
    "status": "pass"
   },
   {
@@ -1662,7 +1626,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.977,
+   "seconds": 3.894,
    "status": "pass"
   },
   {
@@ -1679,7 +1643,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 4.047,
+   "seconds": 3.823,
    "status": "pass"
   },
   {
@@ -1696,7 +1660,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.396,
+   "seconds": 0.211,
    "status": "pass"
   },
   {
@@ -1713,7 +1677,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.118,
+   "seconds": 4.138,
    "status": "pass"
   },
   {
@@ -1736,7 +1700,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.629,
+   "seconds": 3.382,
    "status": "pass"
   },
   {
@@ -1763,7 +1727,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 9.441,
+   "seconds": 12.797,
    "status": "pass"
   },
   {
@@ -1777,7 +1741,7 @@
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to SETOPTION",
-   "seconds": 0.53,
+   "seconds": 0.526,
    "status": "both-error"
   },
   {
@@ -1791,7 +1755,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to COPY",
-   "seconds": 0.422,
+   "seconds": 0.225,
    "status": "both-error"
   },
   {
@@ -1805,7 +1769,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to OPTIMISE",
-   "seconds": 0.391,
+   "seconds": 0.219,
    "status": "both-error"
   },
   {
@@ -1819,7 +1783,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Cannot recognise operator =< in IF statement",
-   "seconds": 0.353,
+   "seconds": 0.176,
    "status": "both-error"
   },
   {
@@ -1836,7 +1800,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.673,
+   "seconds": 0.355,
    "status": "pass"
   },
   {
@@ -1853,7 +1817,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.376,
+   "seconds": 0.555,
    "status": "pass"
   },
   {
@@ -1867,7 +1831,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function: nope",
-   "seconds": 0.249,
+   "seconds": 0.235,
    "status": "both-error"
   },
   {
@@ -1881,7 +1845,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits -11; the same from the original. Can only accept UA to UZ, not Uq",
-   "seconds": 0.809,
+   "seconds": 0.852,
    "status": "both-error"
   },
   {
@@ -1898,7 +1862,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.691,
+   "seconds": 0.545,
    "status": "pass"
   },
   {
@@ -1915,7 +1879,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.142,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -1932,7 +1896,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.68,
+   "seconds": 0.432,
    "status": "pass"
   },
   {
@@ -1949,7 +1913,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.265,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1963,7 +1927,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to ALIGNPAXES",
-   "seconds": 0.276,
+   "seconds": 0.312,
    "status": "both-error"
   },
   {
@@ -1980,7 +1944,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.638,
+   "seconds": 0.536,
    "status": "pass"
   },
   {
@@ -1997,7 +1961,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.484,
+   "seconds": 0.41,
    "status": "pass"
   },
   {
@@ -2014,7 +1978,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.08,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -2028,7 +1992,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ",
-   "seconds": 0.034,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -2045,7 +2009,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.113,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -2062,7 +2026,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.103,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -2076,7 +2040,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 2; the same from the original. ERROR:: Input volume filename not found",
-   "seconds": 0.13,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -2090,7 +2054,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 2; the same from the original. ERROR:: Reference volume filename not found",
-   "seconds": 0.104,
+   "seconds": 0.022,
    "status": "both-error"
   },
   {
@@ -2104,7 +2068,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised option e",
-   "seconds": 0.096,
+   "seconds": 0.024,
    "status": "both-error"
   },
   {
@@ -2118,7 +2082,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -frob",
-   "seconds": 0.064,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -2132,7 +2096,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.049,
+   "seconds": 0.013,
    "status": "both-error"
   },
   {
@@ -2146,7 +2110,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -ref",
-   "seconds": 0.037,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -2160,7 +2124,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -searchrx",
-   "seconds": 0.047,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -2174,7 +2138,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function type: nope",
-   "seconds": 0.103,
+   "seconds": 0.078,
    "status": "both-error"
   },
   {
@@ -2188,7 +2152,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function type: nope",
-   "seconds": 0.066,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -2202,7 +2166,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised interpolation method: cubic",
-   "seconds": 0.139,
+   "seconds": 0.088,
    "status": "both-error"
   },
   {
@@ -2216,7 +2180,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised data type: long",
-   "seconds": 0.122,
+   "seconds": 0.1,
    "status": "both-error"
   },
   {
@@ -2230,7 +2194,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised sinc window: gauss",
-   "seconds": 0.112,
+   "seconds": 0.11,
    "status": "both-error"
   },
   {
@@ -2244,7 +2208,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised angle representation: rodrigues",
-   "seconds": 0.098,
+   "seconds": 0.094,
    "status": "both-error"
   },
   {
@@ -2258,7 +2222,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised argument to pedir (0) - it should be a number between -3 and 3 (not 0)",
-   "seconds": 0.145,
+   "seconds": 0.081,
    "status": "both-error"
   },
   {
@@ -2275,7 +2239,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.223,
+   "seconds": 0.177,
    "status": "pass"
   },
   {
@@ -2292,7 +2256,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.12,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2309,7 +2273,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.256,
+   "seconds": 0.181,
    "status": "pass"
   },
   {
@@ -2323,7 +2287,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Could not open filenone.sch",
-   "seconds": 0.317,
+   "seconds": 0.278,
    "status": "both-error"
   },
   {
@@ -2340,7 +2304,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.325,
+   "seconds": 0.223,
    "status": "pass"
   },
   {
@@ -2354,7 +2318,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. Coordinate and Normal matrices wmcoords.txt and n.txt are either zero size or different sizes",
-   "seconds": 0.151,
+   "seconds": 0.141,
    "status": "both-error"
   },
   {
@@ -2368,7 +2332,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ERROR:: Environment variable FSLOUTPUTTYPE is not set! Please make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile). e.g. bash or sh users add the",
-   "seconds": 0.215,
+   "seconds": 0.205,
    "status": "both-error"
   },
   {
@@ -2385,7 +2349,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.543,
+   "seconds": 0.56,
    "status": "pass"
   },
   {
@@ -2402,7 +2366,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.594,
+   "seconds": 0.5,
    "status": "pass"
   },
   {
@@ -2419,7 +2383,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.96,
+   "seconds": 0.716,
    "status": "pass"
   },
   {
@@ -2433,7 +2397,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
-   "seconds": 0.202,
+   "seconds": 0.2,
    "status": "both-error"
   },
   {
@@ -2447,7 +2411,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 1; the same from the original. ",
-   "seconds": 0.149,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -2464,7 +2428,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.166,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2481,7 +2445,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.129,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -2498,7 +2462,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.148,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2515,7 +2479,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.131,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -2532,7 +2496,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.126,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -2549,7 +2513,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.133,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -2566,7 +2530,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -2580,7 +2544,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 254; the same from the original. Could not open matrix file none.mat Cannot read input-matrix",
-   "seconds": 0.069,
+   "seconds": 0.065,
    "status": "both-error"
   },
   {
@@ -2594,7 +2558,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 254; the same from the original. Cannot read input-matrix",
-   "seconds": 0.076,
+   "seconds": 0.025,
    "status": "both-error"
   },
   {
@@ -2608,7 +2572,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Input matrix filename not found",
-   "seconds": 0.091,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -2622,7 +2586,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Unknown option x.mat",
-   "seconds": 0.08,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -2636,7 +2600,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.058,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -2650,7 +2614,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Lacking argument to option -omat",
-   "seconds": 0.07,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -2664,7 +2628,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits -6; the same from the original. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
-   "seconds": 0.119,
+   "seconds": 0.155,
    "status": "both-error"
   },
   {
@@ -2674,7 +2638,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-71: undefined behaviour); the original refuses in both modes",
-   "seconds": 1.879,
+   "seconds": 1.614,
    "status": "expected-divergence"
   },
   {
@@ -2684,7 +2648,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-72: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.645,
+   "seconds": 0.418,
    "status": "expected-divergence"
   },
   {
@@ -2694,7 +2658,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL crashes (FSL-75: undefined behaviour); the original finishes naming it",
-   "seconds": 0.575,
+   "seconds": 0.336,
    "status": "expected-divergence"
   },
   {
@@ -2704,26 +2668,16 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL crashes (FSL-75: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.193,
+   "seconds": 0.039,
    "status": "expected-divergence"
   },
   {
    "case": "edge/one-voxel-input",
    "category": "edge",
    "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 159.0868 mm, RMS deviation 303.8605 mm; FSL's own p95 on a perturbed input 0.0000 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.5,
-     "value": 131.933
-    }
-   ],
+   "checks_total": 5,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 131.933,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -2731,8 +2685,8 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.908,
-   "status": "fail"
+   "seconds": 3.439,
+   "status": "pass"
   },
   {
    "case": "edge/zero-voxel-size",
@@ -2741,7 +2695,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-93: undefined behaviour); the original corrects it by default and refuses with reproduce",
-   "seconds": 9.186,
+   "seconds": 10.91,
    "status": "expected-divergence"
   },
   {
@@ -2751,7 +2705,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-93: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.227,
+   "seconds": 0.177,
    "status": "expected-divergence"
   },
   {
@@ -2765,7 +2719,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 253; the same from the original. Could not open matrix file none.mat Cannot read concat-matrix",
-   "seconds": 0.081,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -2775,7 +2729,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applyxfm4D exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/dir> --interp, -interp <nearestneighbour (or nn), trilinear, spline, sinc (defau",
-   "seconds": 0.106,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -2788,7 +2742,7 @@
    "reported": {
     "D13 fix pass": 13770
    },
-   "seconds": 0.855,
+   "seconds": 1.0,
    "status": "pass"
   },
   {
@@ -2801,7 +2755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.556,
+   "seconds": 0.608,
    "status": "pass"
   },
   {
@@ -2814,23 +2768,20 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.493,
+   "seconds": 0.43,
    "status": "pass"
   },
   {
    "case": "programs/applyxfm4D-userprefix-spline",
    "category": "programs",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "measured": {
-    "out.nii.gz: correlation with FSL's values (spline)": 1.0
-   },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.886,
+   "seconds": 0.776,
    "status": "pass"
   },
   {
@@ -2843,7 +2794,7 @@
    "reported": {
     "D13 fix pass": 25096
    },
-   "seconds": 1.29,
+   "seconds": 1.221,
    "status": "pass"
   },
   {
@@ -2856,23 +2807,20 @@
    "reported": {
     "D13 fix pass": 147498
    },
-   "seconds": 0.569,
+   "seconds": 0.618,
    "status": "pass"
   },
   {
    "case": "programs/applyxfm4D-3d-spline-float",
    "category": "programs",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "measured": {
-    "out.nii.gz: correlation with FSL's values (spline)": 1.0
-   },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.401,
+   "seconds": 0.179,
    "status": "pass"
   },
   {
@@ -2885,7 +2833,7 @@
    "reported": {
     "D13 fix pass": 163840
    },
-   "seconds": 0.296,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -2898,7 +2846,7 @@
    "reported": {
     "D13 fix pass": 63871
    },
-   "seconds": 0.325,
+   "seconds": 0.177,
    "status": "pass"
   },
   {
@@ -2914,7 +2862,7 @@
    "reported": {
     "D13 fix pass": 84972
    },
-   "seconds": 0.525,
+   "seconds": 0.602,
    "status": "pass"
   },
   {
@@ -2930,23 +2878,20 @@
    "reported": {
     "D13 fix pass": 13588
    },
-   "seconds": 1.475,
+   "seconds": 1.457,
    "status": "pass"
   },
   {
    "case": "programs/applyxfm4D-double-3d-spline",
    "category": "programs",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "measured": {
-    "out.nii.gz: correlation with FSL's values (spline)": 1.0
-   },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.555,
+   "seconds": 0.438,
    "status": "pass"
   },
   {
@@ -2959,23 +2904,20 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.043,
+   "seconds": 0.958,
    "status": "pass"
   },
   {
    "case": "programs/applyxfm4D-3d-spline-int",
    "category": "programs",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "measured": {
-    "out.nii.gz: correlation with FSL's values (spline)": 1.0
-   },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.545,
+   "seconds": 0.243,
    "status": "pass"
   },
   {
@@ -2988,7 +2930,7 @@
    "reported": {
     "D13 fix pass": 16342
    },
-   "seconds": 0.291,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
@@ -3001,7 +2943,7 @@
    "reported": {
     "D13 fix pass": 163429
    },
-   "seconds": 0.549,
+   "seconds": 0.463,
    "status": "pass"
   },
   {
@@ -3014,7 +2956,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.249,
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -3024,7 +2966,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applyxfm4D exits 1; the same from the original. interpolation method: cubic is not a valid choice. Please choose from nearestneighbour, trilinear, sinc, or spline.",
-   "seconds": 0.084,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -3034,7 +2976,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applyxfm4D exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null is not valid",
-   "seconds": 0.187,
+   "seconds": 0.102,
    "status": "both-error"
   },
   {
@@ -3044,7 +2986,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applyxfm4D exits -6; the same from the original. Could not open matrix file none/MAT_00000 terminate called after throwing an instance of 'std::logic_error' what(): matrix multiplication: incompatible matrix dimensions: 0x0 and 4x4",
-   "seconds": 0.241,
+   "seconds": 0.149,
    "status": "both-error"
   },
   {
@@ -3054,7 +2996,7 @@
    "checks_total": 4,
    "failed_checks": [],
    "reason": "applyxfm4D exits -6; the same from the original. Image Exception : #63 :: No image files match: none terminate called after throwing an instance of 'std::runtime_error' what(): No image files match: none",
-   "seconds": 0.16,
+   "seconds": 0.078,
    "status": "both-error"
   },
   {
@@ -3068,7 +3010,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "aff2rigid exits 1; the same from the original. ",
-   "seconds": 0.363,
+   "seconds": 0.275,
    "status": "both-error"
   },
   {
@@ -3083,7 +3025,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "aff2rigid exits 1; the same from the original. Traceback (most recent call last): File \"~/fsl-6.0.7.23/bin/aff2rigid\", line 105, in <module> v41=mat(zeros((4,1))) ^^^ NameError: name 'mat' is not defined",
-   "seconds": 0.414,
+   "seconds": 0.257,
    "status": "both-error"
   },
   {
@@ -3098,7 +3040,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "aff2rigid exits 1; the same from the original. Traceback (most recent call last): File \"~/fsl-6.0.7.23/bin/aff2rigid\", line 105, in <module> v41=mat(zeros((4,1))) ^^^ NameError: name 'mat' is not defined",
-   "seconds": 0.421,
+   "seconds": 0.362,
    "status": "both-error"
   },
   {
@@ -3108,7 +3050,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "extracttxt exits 2; the same from the original. ~/fsl-6.0.7.23/bin/extracttxt: 68: exit: Illegal number: -1",
-   "seconds": 0.374,
+   "seconds": 0.261,
    "status": "both-error"
   },
   {
@@ -3121,7 +3063,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.345,
+   "seconds": 0.275,
    "status": "pass"
   },
   {
@@ -3134,7 +3076,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.175,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -3147,7 +3089,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.155,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -3160,7 +3102,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.146,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -3173,7 +3115,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.138,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -3183,7 +3125,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "extracttxt exits 1; the same from the original. sed: -e expression #1, char 4: invalid usage of line address 0",
-   "seconds": 0.134,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -3193,7 +3135,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "extracttxt exits 1; the same from the original. dc: stack empty sed: invalid option -- '2' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]... -n, --quiet, --silent suppress automatic printing of pattern space --debug annotate p",
-   "seconds": 0.071,
+   "seconds": 0.064,
    "status": "both-error"
   },
   {
@@ -3203,7 +3145,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "extracttxt exits 1; the same from the original. sed: invalid option -- '1' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]... -n, --quiet, --silent suppress automatic printing of pattern space --debug annotate program execution",
-   "seconds": 0.091,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -3216,7 +3158,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.14,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -3229,7 +3171,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.143,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -3242,7 +3184,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.204,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -3256,35 +3198,16 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "pairreg exits 1; the same from the original. ",
-   "seconds": 0.095,
+   "seconds": 0.073,
    "status": "both-error"
   },
   {
    "case": "programs/pairreg-default",
    "category": "programs",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "pair.mat: 95th-percentile displacement over the reference's brain": 0.0001,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 23.764,
-   "status": "pass"
-  },
-  {
-   "case": "programs/pairreg-metres",
-   "category": "programs",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "pair.mat: 95th-percentile displacement over the reference's brain": 0.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -3292,7 +3215,24 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 2.991,
+   "seconds": 30.703,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pairreg-metres",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 3.074,
    "status": "pass"
   },
   {
@@ -3306,7 +3246,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "midtrans exits 1; the same from the original. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 trans",
-   "seconds": 0.102,
+   "seconds": 0.064,
    "status": "both-error"
   },
   {
@@ -3320,7 +3260,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "midtrans exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 transform2 ... transformN e.g. midtrans -o temp2mid.mat A2temp.mat",
-   "seconds": 0.077,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -3334,7 +3274,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "midtrans exits 1; the same from the original. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 trans",
-   "seconds": 0.138,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -3351,7 +3291,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.127,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -3369,7 +3309,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.107,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -3386,7 +3326,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.209,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -3403,7 +3343,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.114,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -3420,7 +3360,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -3434,7 +3374,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "midtrans exits 1; the same from the original. Could not read matrix sing.mat",
-   "seconds": 0.077,
+   "seconds": 0.058,
    "status": "both-error"
   },
   {
@@ -3451,7 +3391,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.148,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -3468,7 +3408,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.176,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3485,7 +3425,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.165,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -3499,7 +3439,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -i filename of input volume coordinates -r filename of reference volume coordinates ************",
-   "seconds": 0.107,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -3516,7 +3456,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.147,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -3533,7 +3473,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.136,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -3550,7 +3490,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.28,
+   "seconds": 0.161,
    "status": "pass"
   },
   {
@@ -3567,7 +3507,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.144,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -3581,7 +3521,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits 2; the same from the original. ERROR: need to specify --invol and --refvol to use --vox",
-   "seconds": 0.037,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -3598,7 +3538,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -3612,7 +3552,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits 255; the same from the original. ERROR: Different number of coordinates in the two files",
-   "seconds": 0.049,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -3629,7 +3569,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.152,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -3643,35 +3583,18 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits 255; the same from the original. Could not open matrix file none.txt ERROR: Different number of coordinates in the two files",
-   "seconds": 0.041,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
    "case": "programs/pointflirt-no-points",
    "category": "programs",
-   "checks_passed": 0,
+   "checks_passed": 2,
    "checks_total": 2,
-   "failed_checks": [
-    {
-     "detail": "exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)",
-     "metric": "exact",
-     "name": "the original refuses naming FSL-204 (reproduce)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    },
-    {
-     "detail": "exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)",
-     "metric": "exact",
-     "name": "the original refuses naming FSL-204 (fix)",
-     "passed": false,
-     "threshold": null,
-     "value": null
-    }
-   ],
-   "reason": "",
-   "seconds": 0.112,
-   "status": "fail"
+   "failed_checks": [],
+   "reason": "FSL crashes (FSL-204: undefined behaviour); the original refuses in both modes",
+   "seconds": 0.01,
+   "status": "expected-divergence"
   },
   {
    "case": "programs/pointflirt-three",
@@ -3687,7 +3610,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.169,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3701,7 +3624,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 2x1",
-   "seconds": 0.123,
+   "seconds": 0.06,
    "status": "both-error"
   },
   {
@@ -3715,7 +3638,7 @@
     "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
    },
    "reason": "pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 4x1",
-   "seconds": 0.11,
+   "seconds": 0.055,
    "status": "both-error"
   },
   {
@@ -3725,7 +3648,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "avscale exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/avscale [--allparams/--inverteddies] matrixfile [non-reference-volume]",
-   "seconds": 0.104,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -3738,7 +3661,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.164,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -3751,7 +3674,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.235,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -3764,7 +3687,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.176,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -3777,7 +3700,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.118,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
@@ -3787,7 +3710,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "avscale exits -6; the same from the original. matrix multiplication: problem with matrix inverse; suggest to use solve() instead terminate called after throwing an instance of 'std::runtime_error' what(): matrix multiplication: problem with matri",
-   "seconds": 0.177,
+   "seconds": 0.072,
    "status": "both-error"
   },
   {
@@ -3797,7 +3720,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "avscale exits 254; the same from the original. Could not open matrix file none.mat",
-   "seconds": 0.09,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -3810,7 +3733,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.254,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -3820,7 +3743,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "avscale exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none Failed to read volume none.nii.gz Error : No image fil",
-   "seconds": 0.154,
+   "seconds": 0.052,
    "status": "both-error"
   },
   {
@@ -3830,7 +3753,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2imgcoord exits 1; the same from the original. ",
-   "seconds": 0.165,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -3843,7 +3766,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.215,
+   "seconds": 0.121,
    "status": "pass"
   },
   {
@@ -3856,7 +3779,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.393,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -3869,7 +3792,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.182,
+   "seconds": 0.152,
    "status": "pass"
   },
   {
@@ -3882,7 +3805,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.199,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -3892,7 +3815,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2imgcoord exits 255; the same from the original. Could not open matrix file none.txt",
-   "seconds": 0.122,
+   "seconds": 0.057,
    "status": "both-error"
   },
   {
@@ -3905,7 +3828,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.251,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -3918,7 +3841,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.299,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -3928,7 +3851,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2imgcoord exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.158,
+   "seconds": 0.085,
    "status": "both-error"
   },
   {
@@ -3938,7 +3861,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2imgcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
-   "seconds": 0.246,
+   "seconds": 0.112,
    "status": "both-error"
   },
   {
@@ -3948,7 +3871,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "std2imgcoord exits 1; the same from the original. ",
-   "seconds": 0.109,
+   "seconds": 0.035,
    "status": "both-error"
   },
   {
@@ -3961,7 +3884,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.274,
+   "seconds": 0.124,
    "status": "pass"
   },
   {
@@ -3974,7 +3897,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.227,
+   "seconds": 0.124,
    "status": "pass"
   },
   {
@@ -3987,7 +3910,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.253,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -4000,7 +3923,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.196,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -4010,7 +3933,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "std2imgcoord exits 255; the same from the original. Could not open matrix file none.txt",
-   "seconds": 0.124,
+   "seconds": 0.121,
    "status": "both-error"
   },
   {
@@ -4023,7 +3946,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.161,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -4036,7 +3959,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.242,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -4046,7 +3969,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "std2imgcoord exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.141,
+   "seconds": 0.066,
    "status": "both-error"
   },
   {
@@ -4056,7 +3979,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "std2imgcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
-   "seconds": 0.145,
+   "seconds": 0.092,
    "status": "both-error"
   },
   {
@@ -4066,7 +3989,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2stdcoord exits 1; the same from the original. ",
-   "seconds": 0.08,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -4079,7 +4002,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.259,
+   "seconds": 0.146,
    "status": "pass"
   },
   {
@@ -4092,7 +4015,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.288,
+   "seconds": 0.165,
    "status": "pass"
   },
   {
@@ -4105,7 +4028,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.186,
+   "seconds": 0.205,
    "status": "pass"
   },
   {
@@ -4118,7 +4041,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.264,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -4128,7 +4051,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2stdcoord exits 255; the same from the original. Could not open matrix file none.txt",
-   "seconds": 0.084,
+   "seconds": 0.196,
    "status": "both-error"
   },
   {
@@ -4141,7 +4064,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.254,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -4154,7 +4077,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.259,
+   "seconds": 0.175,
    "status": "pass"
   },
   {
@@ -4164,7 +4087,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2stdcoord exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.143,
+   "seconds": 0.129,
    "status": "both-error"
   },
   {
@@ -4174,7 +4097,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2stdcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
-   "seconds": 0.192,
+   "seconds": 0.108,
    "status": "both-error"
   },
   {
@@ -4187,7 +4110,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.216,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -4200,7 +4123,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.228,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -4213,7 +4136,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.197,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -4223,7 +4146,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "std2imgcoord exits -6; the same from the original. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
-   "seconds": 0.264,
+   "seconds": 0.122,
    "status": "both-error"
   },
   {
@@ -4236,7 +4159,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.257,
+   "seconds": 0.11,
    "status": "pass"
   },
   {
@@ -4246,7 +4169,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "img2stdcoord exits 1; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none An error occured while reading file: none.nii.gz",
-   "seconds": 0.192,
+   "seconds": 0.057,
    "status": "both-error"
   },
   {
@@ -4256,7 +4179,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "rmsdiff exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/rmsdiff matrixfile1 matrixfile2 refvol [mask] Outputs rms deviation between matrices (in mm)",
-   "seconds": 0.118,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -4269,7 +4192,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.244,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -4282,7 +4205,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.335,
+   "seconds": 0.209,
    "status": "pass"
   },
   {
@@ -4295,7 +4218,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.236,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -4305,7 +4228,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "rmsdiff exits 251; the same from the original. WARNING:: matrix 2 has low determinant 1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 RMS_DEVIATION ERR",
-   "seconds": 0.144,
+   "seconds": 0.049,
    "status": "both-error"
   },
   {
@@ -4315,7 +4238,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "rmsdiff exits 254; the same from the original. Could not open matrix file none.mat Could not read matrix none.mat",
-   "seconds": 0.13,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -4328,7 +4251,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.148,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -4338,7 +4261,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -t,--theta angle of rotation (in degrees) *************************************************** Pa",
-   "seconds": 0.063,
+   "seconds": 0.035,
    "status": "both-error"
   },
   {
@@ -4348,7 +4271,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
-   "seconds": 0.061,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -4361,7 +4284,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.099,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -4374,7 +4297,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.102,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -4387,7 +4310,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.136,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -4400,7 +4323,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.15,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -4410,7 +4333,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
-   "seconds": 0.153,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -4420,7 +4343,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits 1; the same from the original. ERROR:: Axis cannot be zero",
-   "seconds": 0.053,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -4433,7 +4356,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.106,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -4446,7 +4369,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.159,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -4456,7 +4379,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
-   "seconds": 0.049,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -4469,7 +4392,7 @@
    "reported": {
     "D13 fix pass": 9
    },
-   "seconds": 0.138,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -4482,7 +4405,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.189,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -4492,7 +4415,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
-   "seconds": 0.07,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -4514,7 +4437,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.212,
+   "seconds": 1.124,
    "status": "pass"
   },
   {
@@ -4531,7 +4454,7 @@
    "reported": {
     "D13 fix pass": 12
    },
-   "seconds": 3.382,
+   "seconds": 4.76,
    "status": "pass"
   },
   {
@@ -4548,7 +4471,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.654,
+   "seconds": 0.965,
    "status": "pass"
   },
   {
@@ -4565,7 +4488,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.763,
+   "seconds": 0.726,
    "status": "pass"
   },
   {
@@ -4582,7 +4505,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.447,
+   "seconds": 0.647,
    "status": "pass"
   },
   {
@@ -4599,7 +4522,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.391,
+   "seconds": 0.614,
    "status": "pass"
   },
   {
@@ -4616,7 +4539,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.581,
+   "seconds": 0.528,
    "status": "pass"
   },
   {
@@ -4633,7 +4556,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.89,
+   "seconds": 0.775,
    "status": "pass"
   },
   {
@@ -4651,7 +4574,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.25,
+   "seconds": 1.147,
    "status": "pass"
   },
   {
@@ -4668,7 +4591,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.164,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -4691,7 +4614,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.885,
+   "seconds": 0.699,
    "status": "pass"
   },
   {
@@ -4714,7 +4637,215 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.954,
+   "seconds": 0.987,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/2-basescale-tr",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.401,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/3-empty-reference",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.381,
+   "status": "pass"
+  },
+  {
+   "case": "real/anglerep-quaternion-dof3",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.311,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-no-points-verbose",
+   "category": "programs",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL crashes (FSL-204: undefined behaviour); the original refuses in both modes",
+   "seconds": 0.012,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "programs/pointflirt-nan-word",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-overflow",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds",
+   "seconds": 0.052,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-warp-3d",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2imgcoord exits 1; the same from the original. An error occured while reading file: epi.nii",
+   "seconds": 0.101,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-warp-4d",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits 1; the same from the original. An error occured while reading file: bold4.nii",
+   "seconds": 0.1,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pairreg-verbose",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12
+   },
+   "seconds": 38.328,
+   "status": "pass"
+  },
+  {
+   "case": "debug/bbr-no-boundary",
+   "category": "debug",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.098,
+   "status": "pass"
+  },
+  {
+   "case": "debug/noresample",
+   "category": "debug",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.629,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/perturb-scaled",
+   "category": "schedule",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.556,
+   "status": "pass"
+  },
+  {
+   "case": "out/display-range",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.591,
    "status": "pass"
   },
   {
@@ -4737,16 +4868,324 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.436,
+   "seconds": 1.97,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-overflow",
+   "category": "programs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "midtrans writes rows of NaN with exit status 0 (FSL-241, rule B); the original refuses in both modes",
+   "seconds": 0.012,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "programs/midtrans-overflow-svd",
+   "category": "programs",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "midtrans reports its failed decomposition as a matrix-size error with exit status 0 (FSL-241, rule B); the original refuses in both modes",
+   "seconds": 0.014,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "difftest/applyxfm4d-int32-padding",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2286
+   },
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/applyxfm4d-spline-double",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.171,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/applyxfm4d-spline-float",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/debug-bbr-first-pair",
+   "category": "difftest",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "debug.nii.zst: correlation with FSL's image inside the reference's mask": 1.0,
+    "global_refweight1.nii.zst: the same header, values within 1e-6 of the image's range": 0.0,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0,
+    "refvol.nii.zst: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.zst: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.zst: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.zst: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.zst: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.582,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/debug-bbr-no-boundary",
+   "category": "difftest",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.hdr: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 13586
+   },
+   "seconds": 0.381,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/debug-empty-weight-qfac",
+   "category": "difftest",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.hdr: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.hdr: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2568
+   },
+   "seconds": 0.24,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/debug-neurological-levels",
+   "category": "difftest",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.735,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/debug-noresample",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.269,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/nan-matrices-char-dof7",
+   "category": "difftest",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 16
+   },
+   "seconds": 0.422,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/nan-matrices-forcescaling",
+   "category": "difftest",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "flirt exits 1; the same from the original. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
+   "seconds": 0.585,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/nan-matrices-subset",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 16
+   },
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/nan-matrix-padded",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5898
+   },
+   "seconds": 0.328,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/out-completed-sform-negative-zero",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 191
+   },
+   "seconds": 0.69,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/pairreg-search-equal-costs-sorted",
+   "category": "difftest",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.386,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/search-cost-minima-fallback",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.164,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/search-equal-costs-sorted",
+   "category": "difftest",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.145,
    "status": "pass"
   }
  ],
  "suite": "fsl-flirt",
  "summary": {
-  "both-error": 85,
-  "expected-divergence": 6,
-  "fail": 7,
-  "pass": 210,
+  "both-error": 89,
+  "expected-divergence": 10,
+  "fail": 2,
+  "pass": 238,
   "skipped": 0
  },
  "tier": "standard"

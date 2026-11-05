@@ -282,3 +282,345 @@ The probes: `night_case.py`, `compare.py` and `retrial.py`
 ([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)), and for the
 reading beyond the image a temporary build (not kept: three variants of the sample at a point
 outside the image, chosen by an environment variable).
+
+## standard_space_roi and fslroi (the clean-room catch-up, relay 5, 2026-11-05)
+
+The clean-room originals of FLIRT's `standard_space_roi` script and of `fslroi`
+(`larmorx_fsl::cli::ssroi`, `::fslroi`), written from
+[`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) and `specs/bet.md` §5.4 (FSL's
+standard images, `larmorx_fsl::data`), and these black-box runs of FSL 6.0.7.23 through the
+oracle-output cache (`ssroi_fsl_runs.py`, `ssroi_stage_probe.py`, `fit_translate.py` in
+[`validation/investigations/cleanroom-bet/`](../../validation/investigations/cleanroom-bet/README.md)).
+The BET suite's 57 cases of the two programs (`ssroi/`, `fslroi/` and the six `defects/` cases of
+FSL-211 to FSL-214) all pass or are refused by both: every `standard_space_roi` case is FSL's
+**bit for bit**, the six real images included (an adult, a 3.5-year-old with `-b -d`, an
+82-year-old with `-maskFOV -roiNONE -d`, a tumour with `-roiMASK`, a Philips T1w with `-b
+-maskMASK`, a T2w): the original's FLIRT gives FSL's matrices on every one, and every later file
+follows.
+
+- **fslroi's matrices** (§3.2; `fit_translate.py`): FSL computes the box's new sform and qform in
+  the frame it holds the image in. For an image held mirrored (stored neurologically) the matrix
+  of that frame, `M·F(nx)`, has its translation `M₀·(nx − 1) + M₃` in single precision (the
+  product and the sum each rounded); the output's translation is that matrix applied, in double,
+  to the held voxel of the box's first file voxel, `(nx − 1 − x₀, y₀, z₀)`, then stored in
+  single precision. The direct `t + M·corner` in double is one unit in the last place away on
+  ds005003's T1w (x: −70.20059204 against −70.20058441); a single-precision chain through the
+  three products is one unit away on ds000256's oblique T2w (y). The model fits all twelve rows
+  (both matrices of both images) and every phantom of the suite. A matrix whose code is 0 is kept
+  (`fslroi/type-head-noxform`).
+- **fslroi's messages**: an exception is two lines on standard error, `Image Exception : #<n> ::
+  <what>` then `<what>` (#21 `Invalid ROI dimensions`, #5 `Out of Bounds (time index)`, #63 `No
+  image files match: <name without extension>`).
+- **FLIRT's `-out`** (found here, corrected in the FLIRT original; the case
+  `out/display-range` of FLIRT's suite): FSL writes the display range `cal_min = cal_max = 0`
+  whatever the reference's (MNI152_T1_2mm has 3000 and 8000): in a registration's `-out`,
+  `-applyxfm`, `-applyisoxfm`, every interpolation, `-datatype float` or not. The original kept the
+  reference's; `standard_space_roi -d`'s `<out>_tmp_to_std` showed it.
+- **The script's tests** (FSL-211, `reproduce`): an output name with blanks makes the script's
+  test of its second argument print `standard_space_roi: line 112: [: too many arguments`, as
+  `[ X$2 = X ]` does; an option with blanks ends the options with `line 133: [: syntax error:
+  `-maskNONE' unexpected`, as `[ _$1 != _ ]` does (the options' loop). These forms are inferred from
+  the messages (the script was not read); the original evaluates them with GNU bash 5.2's `test`
+  rules (its argument-count cases, `-a`, `-o`, `!`, parentheses, the unary and binary operators;
+  a leftover argument gives `syntax error: `<it>' unexpected` when it starts with `-`, else `too
+  many arguments`). An input, reference or mask name with blanks is "not valid" (FSL's `imtest`
+  of several words). For a spec writer: whether the script tests other names unquoted (the
+  replica's `[` messages for other options with blanks were not observed).
+- **The cascade** (FSL-214, `reproduce`): after FLIRT refuses an option, FSL's script goes on and
+  every later program prints its own failure: FLIRT's `Could not open matrix file
+  <out>_tmp_to_std.mat` and `Cannot read input-matrix`, `convert_xfm`'s `matrix multiplication:
+  incompatible matrix dimensions: 4x4 and 0x0`, fslmaths' abort with bash's report (`<script>:
+  line 229: <pid> Aborted` and the command as the script writes it), `fslstats -w` silent on
+  standard output so that `fslroi` prints its usage, then the cleanup. The original's programs
+  print FSL's text in each of these places: the cases `defects/flirt-refuses`,
+  `defects/option-blank` and `defects/output-blank` are FSL's byte for byte.
+- **FSL given its own matrix** (the suite's stage check): `standard_space_roi ... -applyxfm -init
+  <its own -d matrix>` gives FSL's `-d` files exactly on a phantom, but not in general: on the
+  3.5-year-old's T1w the input resampled on MNI152's grid (`<out>_tmp_to_std`) differs in 4,122
+  of 902,629 voxels near the field of view's edges (the matrix's text against FLIRT's own
+  double-precision matrix). The stage check therefore compares the original with FSL's own run
+  from the same matrix's text.
+- **imcp's conversion** (§2.5): FSL's (fslpy's, through nibabel) `.nii` copy of a `.nii.gz`
+  input is the input's decompressed bytes (`ssroi/phantom-none-convert`); the original converts
+  by the files' layout (the same header and data; a pair's magic and offset where the layout
+  changes) and passes. The replica refuses that case (pending).
+- **FSL's standard images** (§5.4): the original's download of FSL's `fsl-data_standard`
+  2208.0-0 (196,312,969 bytes from FSL's site, once, with `curl`) took 17 s on the main machine,
+  13.6 MB of memory (the package checked by its size and SHA-256, its bzip2 tar read only until
+  the three images, each checked): the three files are FSL 6.0.7.23's byte for byte. CI never
+  downloads: the unit tests serve a package of their own as a local file
+  (`LARMORX_FSL_DATA_PACKAGE`), with a changed byte, another size and another member refused.
+- **Speed** (§7; the adult's T1w of ds000005 to MNI152 2 mm with the defaults, the main
+  machine): FSL 21.3 s (one thread, the oracle cache's run), the replica 15.5 s at 1 thread and
+  14.6 s at 16, the original 11.5 s at 1 thread and 2.6 s at 16 (its FLIRT's threads), the same
+  output. The registration is almost all of it; the original also writes its temporary images
+  uncompressed without `-d` and resamples the field of view once when it is both the mask and
+  the region. Memory (`tests/parity/test_memory_peak.py`, the suite's 96 × 112 × 84 head with
+  `-b`): the original 58 MiB, FSL 67 MiB (its largest program); `fslroi` of the 30-volume int16
+  series 69 MiB against FSL's 61 (the input and the box; the allowance 81).
+
+Left for relay 6 (BET's options): `bet -F` and `-Z` of an int8 image (FSL-217 inside bet: the
+suite's `bet/fmri-int8`, `bet/small-fov-int8`, `bet/small-fov-int8-debug`, still in
+`ORIGINAL_PENDING_CASES`), and `bet -S`, `-B`, `-A`, `-A2`, which run these programs: done, below.
+
+## bet -S, -B, -A, -A2 (the clean-room catch-up, relay 6, 2026-11-05)
+
+`larmorx_fsl::cli::bet_script`, written from `specs/bet.md` §5.3, §5.4, §7, §9 to §11.1, runs each
+variation as the script's sequence of the original's own programs, in this process (bet2,
+`standard_space_roi`, FLIRT, `fslmaths`, `fslstats`, FAST, betsurf, and the bet script itself for
+`-B`'s robust run), with the arguments the spec names; FSL's standard images are found before
+anything runs (`larmorx_fsl::data`, relay 5). These black-box runs of FSL 6.0.7.23 (through the
+oracle cache: `ssroi_fsl_runs.py` with `-d` and `-v` added, `fsl_program.py`) and of GNU dc
+1.4.1 (`dc_probe.py`) showed what the spec leaves open:
+
+- **dc's threshold** (§5.3 step 9, FSL-216): FSL 6.0.7.23's `fslstats -M` and `-S` print six
+  decimals (`1951833.117037 ` for `defects/eyes-threshold-exponent`'s brain, whose mean is about
+  2 × 10⁶): **no exponent ever reaches dc**, so the spec's first kind of misreading (`2.1e+06`) does
+  not occur with this release (that case passes without any dc message). A brain with a negative
+  mean (the new case `defects/eyes-negative-mean`, the phantom less 1000: mean `-349.436360`, SD
+  `158.050544`) makes FSL print exactly one `dc: stack empty` on standard error and use the
+  magnitude, `349.436360 + 3.5 × 158.050544`: the minus sign is dc's subtraction with too few
+  numbers on its stack, whatever the order of the expression's words. `reproduce` gives that
+  (the case FSL's bit for bit, its message included); the default uses the number, `-349.436360 +
+  553.1769040 = 203.740544`, and names FSL-216. dc prints its messages in two pieces, `dc: ` on
+  standard error and the rest on standard output (`'e' (0145) unimplemented`), so in FSL's script
+  an unimplemented command's text would land in the threshold. `nan` and `inf` (NaN or infinite
+  voxels in the brain) are refused in both modes: FSL's script never reaches the threshold with
+  them (its FLIRT's NaN matrix ends `standard_space_roi`'s steps; `defects/eyes-nan`), and dc's
+  reading of the words `nan` and `inf` as commands (`n`, `a`, `i`, `f`) depends on the script's
+  exact expression, which the spec does not give (a question for the spec writer).
+- **The threshold's arithmetic**: dc's product `3.5 × SD` at scale 10 keeps `min(1 + s,
+  max(10, s))` decimals of an SD with `s` decimals, truncated; the sum is exact; the text has no
+  leading zero (`.5`), keeps its scale's zeros (`100.0`), and zero is `0` (`dc_probe.py`, the unit
+  tests of `bet_script`).
+- **A failed run leaves its temporary files** (`bet/eyes-no-brain`: FSL's 12 `out_tmp_*` files;
+  `defects/eyes-nan`: 5): bash's `ERR` trap exits before the script's cleanup. The original does
+  the same in both modes (rule C: the files show what failed); a run whose temporary images were
+  written uncompressed (no `-d`) rewrites them in `FSLOUTPUTTYPE`'s format before it ends, so
+  that the files left are FSL's.
+- **bash's reports** of an abort inside `bet` all name line 399 (fslmaths in `-S`'s step 7, bet2
+  in its step 3, betsurf in `-A2`), each with the command as the script writes it: `${FSLDIR}/bin/
+  bet2 ${OUT}_tmp_premask ${OUT}_tmp_premask_bet -n -m -f 0.4 $bet2opts`, `${FSLDIR}/bin/betsurf
+  -o -m -s $IN ${OUT}_tmp_T2_to_T1 ${OUT}_mesh.vtk ${OUT}_tmp_T1_to_std.mat $OUT` (observed); the
+  other commands' texts follow the same form (not observed: they do not abort on the suite's
+  inputs).
+- **`-A2` with a T2 that does not exist** (`bet/surfaces-t2-missing`): FSL's FLIRT prints its
+  image errors and exits 0 (FLIRT's FSL-68), the script goes on (the registration to MNI152, bet2
+  `-e`), and betsurf aborts on the missing `<out>_tmp_T2_to_T1`: its messages, bash's report and the
+  failure line. `reproduce` gives exactly that (refused by both alike); the default's FLIRT exits 1
+  there, so the script fails at once.
+- **`bet -S` with NaN voxels** (`defects/eyes-nan`, `reproduce`): FSL's FLIRT writes a NaN matrix,
+  `convert_xfm -inverse` aborts (`inv(): matrix is singular`), the later steps fail on missing
+  files, fslpy's `imcp` prints `Could not find a supported file with prefix
+  "out_tmp_premask_tmp_masked"` (standard output) and `standard_space_roi -d` ends with status 0;
+  bet2 then aborts on the missing premask. Found here and corrected in the original's
+  `standard_space_roi`: fslpy's message for a missing source (it printed the image layer's) and
+  the status 0 with `-d` in `reproduce` (it returned imcp's 1). In the default the original's FLIRT
+  leaves the NaN voxels out of its costs (`specs/flirt.md`'s FSL-14), the script goes on, the brain's
+  mean is printed `nan` and the threshold refuses it (FSL-216's rule B): the default refuses, as the
+  replica's (whose FLIRT refuses the input). The spec's §5.3 says "FSL-14 of FLIRT: the default
+  refuses there", which `specs/flirt.md` does not say (a question for the spec writer); and the
+  original's FLIRT does not name FSL-14 when it leaves NaN voxels out of a registration's costs (it
+  names it for the centres of gravity only): a gap of FLIRT's notices, for its next part.
+- **The sign of bet2's zero minimum** (`bet/eyes-verbose`, `bet/bias-skull`, `-v`): `standard_space_roi
+  -b`'s premasked image holds +0 and −0 (fslmaths' `-mas` makes a negative value outside the mask
+  −0, `specs/fslmaths.md` §6.3); its first voxel is +0 and FSL's bet2 prints `min 0`. The original
+  combined its parallel chunks' minima with `f32::min`, which can return either zero, and printed
+  `min -0`; its extremes now keep the first of equal values in every chunk and between chunks (a
+  scan from the first voxel), at any thread count.
+- **`-R`'s centre** is now `fslstats <brain> -l 0.001 -C` run in this process (`specs/fslstats.md`
+  §5.7: FSL's block sums, every value less the minimum; the script's own call, `specs/fslstats.md`
+  §1), its six decimals passed on as text; the earlier sum of its own gave the same text on every
+  record case. fslstats' centre now computes each weight as it sums it (no copy of the volume in
+  double precision: `bet -R`'s memory call, 130 MiB against an allowance of 127, came back under
+  it).
+- **The 3.5-year-old with `-B`** (`real/child-3y-B`, the record's failure): every temporary file of
+  the `-d` runs is FSL's bit for bit (both `standard_space_roi` runs, FAST's bias field and its six
+  other files, the unbiased images); the difference is the robust run's second bet2 pass, `bet2
+  <unbiased premask> -c 85.061718 75.366898 129.742609` (the first pass and its centre FSL's
+  exactly): FSL's self-intersection total 123.412, the original's 124.668, the mask's Dice 0.9983,
+  the boundary distance's 95th percentile 1.0 and its maximum 2.24 voxels (bet2's threshold 2; the
+  brain's values FSL's inside both). The image is stored neurologically (its qform a rotation of
+  positive determinant): `-c` on such an image is the open question of random testing's cases 622
+  and 677 (the conversion of a centre given in voxels between the storage and FSL's radiological
+  frame, through FSL's 4 × 4 inverse), for the spec writer.
+
+**What agrees.** The suite's 31 new cases of relay 6 (the record of 2026-11-05): `-S` and `-B` FSL's
+**bit for bit** in every case but the 3.5-year-old (every output and every `-d` file, the real
+adult, tumour and 82-year-old included; `-S` with `-n`, a NaN head, an int16 pair output), `-A` and
+`-A2` with bet2's brain and mesh and FLIRT's matrices FSL's and betsurf's masks within betsurf's
+thresholds (the 75-year-old's and the 7.5-year-old's Dice 0.993 to 0.9995, as betsurf's own record);
+`-F` and `-Z` of int8 heads (FSL-217) FSL's in `reproduce`. Messages and statuses FSL's byte for
+byte in every case (bash's process IDs masked).
+
+**Built for speed.** The programs are the original's (parallel inside); the temporary images are
+written uncompressed when they are not kept; the eye threshold in exact decimal arithmetic. Wall
+times on the main machine (`bench_options.py`, one run at a time; FSL's from the oracle cache's
+record of its single-threaded run, made beside other suite cases): `-S -m` on the adult T1w of
+ds000005 FSL 27.6 s, the replica 20.8 s (one thread), the original 15.6 s on one thread, 5.7 s on
+4, 3.4 s on 28; `-B -m` 85.8, 57.5, 29.2, 10.3 and 6.2 s; `-A` 19.0, 18.6, 13.5, 4.9 and 3.0 s;
+`-A2 -m` on the 7.5-year-old's T1w and T2w 108.3, 91.6, 79.1, 23.4 and 11.0 s (the original 1.4 to
+2.9 times FSL's speed on one thread, 6 to 14 times on 28). The steps run one after the
+other, as the script runs them: two at once (§10 allows `-S`'s raw bet2 beside its
+`standard_space_roi`, `-A`'s FLIRT beside bet2) would hold both programs' images, and larmorx's
+peak memory is held to FSL's, whose peak is its largest program's (CLAUDE.md). Memory
+(`tests/parity/test_memory_peak.py`, the suite's head with FSL's standard images): `-S -m` 62 MiB
+against FSL's 67, `-B` 61 against 115, `-A2` 58 against 72.
+
+## The BET part's random-testing differences and ds002603's scalp (the clean-room catch-up, relay 7, 2026-11-05)
+
+The BET options part's trial on the original (`oracles/difftest/2026-11-04-bet-options-6b`, seed
+`bet-options-6`, 2,699 cases) kept 176 differing cases of the original: 164 betsurf, 11 `bet`, 1
+`bet2`. Judged again as black-box cases with relay 6's build (`replay_trial.py`: each finding's
+recipe and its shrunk reproducer, FSL from the oracle cache, each case in its own 3 GiB leaf of
+the memory box), 172 still differed. `betsurf_shares.py` ran every betsurf finding again with
+`-v`: the share of profiles set aside (`removed profiles`) was FSL's on only 74 of the 164 images,
+and 82 of the 90 others were `--t1only`. So most differences began at the profiles' decisions.
+`profile_oracle_cached.py` (`betsurf_profile_oracle.py`'s single profiles, FSL through the cache;
+the profiles' voxels, normals and samples from a temporary probe build of the original, never
+kept) then gave FSL's decision on every profile of eight T1-only and three T1-and-T2 images
+(5,290 single profiles), and `t1model.py`-style readings of the rules were tried against them.
+Four readings of `specs/bet.md` §6.4 were the original's own mistakes (rule A: the original now
+follows FSL; none is a defect of FSL):
+
+- **A profile's first sample is never read backwards** (T1 only): the backward searches (the
+  scalp, `S'`, the outer skull's two searches) stop before the profile's first sample, and the
+  T1-only scan for `b` starts at the second sample when `a` is the first (`b` itself starts at
+  `a`). A profile whose inner and outer skull both fell on its first sample (−3 mm) is set aside
+  by FSL (case 1156: FSL sets aside 63 of 64 profiles, the original kept 7 more; case 678's
+  profile 120: the scan from the first sample stopped at 3.5 mm, from the second it finds the
+  outer skull at 6.0 mm as FSL). The forward searches do read the first sample (11 mismatches of
+  604 profiles otherwise). 3,284 of 3,288 T1-only profiles now decided as FSL decides them.
+- **Step 5's "within 10 mm" is strict**: a first bright T2 sample exactly 10 mm past the inner skull
+  does not count (case 2530: three such profiles; case 1746: three).
+- **Step 5's alternation**: each search starts after the sample the previous one found (case
+  617's profile 74: a flat region, 159 on T1 and T2 alike, whose one sample is bright and dark at
+  once; FSL sets it aside).
+- **An empty outer-skull search range** (step 7: `a` finds nothing) **counts the scalp only, and
+  FSL runs on.** The spec's FSL-50 (FSL ends with status 255 there) was never seen: on the 43
+  images of the two trials where such a profile occurs (41 of this trial's with these rules, 278,
+  913, 1746, 1924 and 2557 among them, and cases 216 and 635 of 2026-10-31) FSL runs to the end
+  (status 0; case 364 fails later at its output type, as the original does). Counting only the scalp is what FSL does: on case 617 (719
+  such profiles, a ramp whose inner skull lies at its scalp) the scalp mesh is 0.41 mm from FSL's
+  (95th percentile) when they count the scalp and 5.76 mm when they are dropped, the shares equal
+  either way. The original therefore no longer stops in `reproduce` (`larmorx_fsl::cli::betsurf`:
+  the `fsl50` switch of `betsurf::votes` is off); when FSL ends (FSL-50) is a question for the spec
+  writer.
+
+With these, **162 of the 164 images' shares are FSL's** (74 before); the two left: case 192 (four
+profiles of a constant int16 image, every value 32767, whose two outer searches find nothing in
+a two-sample region at the profile's end: FSL keeps them, the rule `OS2 ≥ IS` sets them aside)
+and case 1389 (two profiles more set aside in the whole run, though each of its 319 profiles alone
+is decided as FSL decides it). And **`bet -Z -d` on a float64 image** (case 330) now keeps the
+input's double values in `<out>_tmp`, `<out>_tmp_bottom` and `<out>_tmp_top` (FSL's are float64;
+the original wrote float32), as `-F`'s first volume does. Permanent cases (`validation/difftest/
+cases/fsl-bet/`): `original-betsurf-t1only-first-sample` (1156),
+`original-betsurf-gap-strictly-within-10mm` (2530), `original-betsurf-flat-region-gaps` (617),
+`original-betsurf-empty-range-scalp-only` (1746), `original-bet-Z-d-float64-tmp` (330); their
+shrunk reproducers agree.
+
+**What still differs** (all 176 judged again with the final build: 25 agree, 151 differ):
+
+- `bet` (6) and `bet2` (1): every one a neurologically stored image (a qform or sform of positive
+  determinant) with `-R` or `-c` (the skull image in 5, the self-intersection total in 2: 6.54282e+06
+  against 6.3927e+06, 20.1978 against 20.1488): the class of cases 622 and 677, the conversion of a
+  centre in voxels into FSL's radiological frame (open with the spec writer).
+- betsurf (144): the decisions are FSL's, the surfaces are not exactly. Per image, the 95th
+  percentile of the vertex distance to FSL's mesh: the inner skull exactly FSL's on 6 images and
+  within 0.1 mm on 122 of 156 (median 0.047 mm), the outer skull median 0.82 mm, the scalp median
+  3.6 mm (13 of 163 within 0.1 mm). The failing checks: the scalp's mask or outline alone in 88
+  cases, the skull mask alone in 19 and with the scalp in 15, the inner skull in 8, the outer
+  skull with the scalp in 7. On these images of 10 to 32 voxels per side the masks are a few
+  hundred voxels (the skull masks of case 47: 2 and 8 voxels; Dice 0.4 for 6 voxels), so
+  betsurf's thresholds (Dice ≥ 0.99, boundary p95 ≤ 1 voxel) fail on a voxel or two.
+  - **The scalp's deformation**: on the four images where every profile is the scalp's only and the
+    inner and outer skull are FSL's exactly (cases 1504, 651, 180, 2101: the skulls shrink to 1 to
+    2 mm, the scalp's sphere grows from there to 50 to 70 mm, far outside the working grid), the
+    scalp is 0.24, 1.58, 1.95 and 3.43 mm from FSL's (95th percentile). Reading the counting image
+    outside the grid as its nearest edge value instead of 0, or as 0 beyond `[0, n − 1]`, makes it
+    worse on all four (6.2 to 49.6 mm and 1.2 to 7.9 mm). These four are the cleanest inputs for
+    the spec writer's question about the scalp phase (§6.5).
+  - **`-p` with every profile set aside** (8 cases): the inner skull shrinks to one point (every
+    vertex `(20.25, 23.25, 7.5)` on case 1974), and FSL's retessellation of that collapsed mesh
+    writes 782 points where the original's (each edge's midpoint once) writes 1,026, with the same
+    first faces: how FSL shares midpoints between edges of coincident points is open (the
+    coordinates are the same point either way).
+- **ds002603 with its T2** (`real/philips-surf-t2`, the record's failure): with the corrected
+  profile rules its inner skull is FSL's to 0.026 mm (95th percentile; maximum 1.22 mm) where it
+  was 0.95 mm (maximum 11.0 mm: the "few profiles vote" region of part 2b, now explained by step
+  5's rules), its outer skull 0.20 mm (0.56); the scalp stays 2.86 mm (3.18; maximum 16.9 mm), its
+  mask's Dice 0.9935 and boundary p95 2.0 voxels (the threshold 1): the scalp's deformation above.
+  The record's other surface cases keep their status (the 82-year-old's scalp 0.55 → 0.30 mm, the
+  adult's 0.66 → 1.36 mm: the scalp phase is sensitive to the vote image's last details).
+
+**A regression of the branch, found by the permanent cases and corrected** (2026-11-05): the
+part 2b cases `original-bet-R-centre-zero` and `original-bet-R-negative-image-bet2-crash` (both on
+neurologically stored images) agreed on main and differed with relay 6's build. Since relay 6, `bet
+-R`'s centre is the original's `fslstats -l 0.001 -C`, FSL's text: for an empty first-pass brain
+it prints `7.000000 0.000000 0.000000` on an 8-voxel-wide neurologically stored image (both
+programs print it, with the COG warning), and FSL's `bet2 -c 7.000000 0.000000 0.000000` there uses
+the centre of gravity (`c-of-g 3.50629 5.57614 6.83629 mm`, black box), where the original used the
+voxel `(0, 0, 0)`. So **a centre of three zeros is "not given" in FSL's radiological frame, after the
+conversion of §3.2** (`nx − 1 − x` on a mirrored image), not as typed: `-c 0 0 0` on a
+radiologically stored image (case 1608 of part 2b) and `-c nx−1 0 0` on a neurologically stored one
+both mean the centre of gravity (`larmorx_fsl::cli::bet2::centre_mm`; the three `-R` permanent
+cases agree again).
+
+The probes: `replay_trial.py`, `finding_dirs.py`, `betsurf_shares.py`, `profile_oracle_cached.py`
+([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)).
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-bet` (seed `bet-options-6`, the BET part's trial drawn again;
+30 minutes, 14 jobs at one thread, 3 GiB a case, both implementations, the oracle cache in `use`
+mode): 909 cases; the original 792 agree, 114 differ, 2 notices (FSL-51), 1 undefined; the replica
+896 agree, 13 differ, every one where FSL's FLIRT crashes inside standard_space_roi (FSL-75). The
+original's: 53 betsurf surfaces (`-A`, `-A2`, betsurf: the scalp's deformation on small heads,
+relay 7's open class); about 27 standard_space_roi runs whose FLIRT crashes in FSL
+(`Segmentation fault`, `free(): invalid pointer`: FSL-75, never reproduced; FSL-214: the script
+goes on) where the original registers; 19 standard_space_roi headers that differ from FSL's even
+given FSL's matrix (of four materialised: an input converted to another format by `-maskNONE
+-roiNONE`'s copy, FSL's `pixdim[4..7]` 1 where the input's are 0, §2.5's pending conversion,
+`bet-options-6-00657`; the cut's translation one float unit in the last place, `00407`; a box a voxel
+or more apart on tiny images, `00114`, `00165`) and 14 FLIRT matrices that part (`00009`): open; 6
+fslroi boxes of a neurologically stored oblique image reaching its last x voxel, whose corner
+translation is one float unit in the last place from FSL's (`00796`: FSL's equals the double
+product `M·(20, 4, 4)` rounded once, where §3.2's held frame rounds its translation first: a
+question for the spec writer); 5 `-B` and `-A2` runs where FSL fails midway and the messages part
+(`00225`, `00409`: open).
+
+
+## The trial's last differences triaged (relay 10, 2026-11-05)
+
+Every one of the trial's 114 differences of the original replayed with the final build
+(`replay_trial.py`, the drawn recipes: `trial_catchup_replay.jsonl`) and put in a category
+(`trial_catchup_categories.py`, its output `trial_catchup_triage.json`); the standard_space_roi
+findings measured with `trial_ssroi_matrices.py` (each call with `-d`, FSL's own `flirt` measuring
+both final matrices' costs at 8, 4, 2 and 1 mm, and the output header given FSL's matrix:
+`trial_ssroi_matrices.jsonl`).
+
+- **Fixed: FLIRT's search, starting points of equal cost** (15 findings, and 5 output boxes that
+  followed the matrix): standard_space_roi's matrices 37 to 303 mm (RMS) from FSL's and `bet -B`'s
+  inner ones, on small heads whose every cost is 1 at the coarse scales (FSL's own measure of both
+  matrices and of the identity): the search's starting points tied, and FSL sorts them with
+  `std::sort` (`docs/findings/fsl-flirt-original.md`, "The search's starting points of equal
+  cost"). All 20 agree on replay; `bet -B` 531, where FSL finished and the original's script had
+  failed midway, among them. Permanent cases `original-ssroi-search-equal-costs`,
+  `original-bet-B-search-equal-costs`.
+- **Open, a registration that still ends elsewhere** (3): 88 at a lower cost than FSL's by FSL's
+  measure (0.964919 against 0.967734 at 1 mm, 183 mm apart), 114 at a higher one (0.989526
+  against 0.985458; 0.674786 against 0.803613 at 4 mm), 803 (110 mm, its output box).
+- **Open, standard_space_roi's output header given FSL's matrix** (17): 9 the cut's translation
+  one float unit in the last place (407: `qoffset_z` 8.25 against 8.250000954); 4 a form's
+  translation whole voxels from FSL's where the input's qform and sform differ (189:
+  `qoffset_x` −14.25 against −38.25; 313, 315, 456; the box, its values and the other form are
+  FSL's: which form FSL's fslroi moves by which corner is a question for the spec writer,
+  §3.2); 2 NIfTI-2 outputs of a NIfTI-1 input (543: FSL's matrices in single precision,
+  −44.40308380 against −44.40308296; 567: FSL moves a sform of code 0 too, its translation
+  −1.2412 where the original keeps the input's 51.25); 2 fslpy's conversion (657: `pixdim[4..7]`
+  1 against 0; 222: `scl_slope` 1 against 0; 88 also NIfTI-2 for a NIFTI2 type against the
+  original's NIfTI-1: §2.5's pending conversion).
+- **Unchanged**: 53 betsurf surfaces (the scalp's deformation, relay 7's open class), 8
+  standard_space_roi runs whose FLIRT crashes in FSL (FSL-75), 6 fslroi corners one float unit
+  apart (relay 8's question), 5 `-B`/`-A2` runs where FSL fails midway (not yet looked at), 2
+  `-R`/`-c` centres on neurologically stored images (the question of cases 622 and 677).

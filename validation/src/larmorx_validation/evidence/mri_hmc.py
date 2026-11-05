@@ -15,9 +15,11 @@ FSL's source or imports the replica.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -1247,6 +1249,134 @@ def _replica_source(ctx: core.Context) -> list:
     return out
 
 
+#: The clean-room catch-up's trial of the original (2026-11-05), and its findings in categories
+#: (``validation/investigations/cleanroom-fixes/trial_catchup_hmc_categories.py``'s output).
+TRIAL_CATCHUP = "2026-11-05-catchup-hmc"
+CATCHUP_TRIAGE = "validation/investigations/cleanroom-fixes/trial_catchup_hmc_triage.json"
+#: category -> (what the page says, the verdict of the row; None: the harness's, fixed).
+CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
+    "a registration ends elsewhere": (
+        "The registrations of small phantoms with large motions end elsewhere than mcflirt's, as "
+        "well aligned: 400 sampled findings measured (hmc_alignment.py: the corrected series' "
+        "temporal standard deviation in the phantom, LARMORX's over mcflirt's, in reproduce mode "
+        "as the trial compares): median 1.000, 5 and 95 % quantiles 0.933 and 1.041, 279 within "
+        "1 %, 67 lower, 54 higher (mcflirt's own residual against the input's: median 1.41); in "
+        "4,065 of them mcflirt's run also lacks its empty .mat directory (the class below). The "
+        "default mode's ratio has a longer tail (above 1.05 in 102 of the 400), for the "
+        "head-motion correction's next part",
+        "within-variability",
+    ),
+    "files written only: mcflirt's empty .mat directory from the cache": (
+        "Only the files written differ: runs with -rmsrel or -rmsabs without -mats, where mcflirt "
+        "makes an empty .mat directory (FSL-13) and its run was served by the oracle cache, which "
+        "keeps a run's files and not its empty directories (the trial's first run, mcflirt live, "
+        "had none of them): the harness's, fixed in the descriptor (such mcflirt runs go live, "
+        "validation/tests/test_mri_hmc_descriptor.py); four replayed: the files agree",
+        None,
+    ),
+}
+
+
+def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
+    """The clean-room catch-up's random-testing trial of the original (its ``summary.json``)
+    and its findings in categories: two tables, and their provenance."""
+    path = common.oracles() / "difftest" / TRIAL_CATCHUP / "summary.json"
+    raw = path.read_bytes()
+    s = json.loads(raw)
+    t = s["tools"]["mri-hmc"]
+    o = t["options"]
+    impl = t["implementations"]["original"]
+    costs = ("corratio", "mutualinfo", "normmi", "normcorr", "leastsquares")
+    rows = [
+        ("Random cases, each compared with FSL 6.0.7.23's mcflirt", t["cases"]),
+        ("within the record's thresholds, every exact check passed", impl.get("agree", 0)),
+        ("differing (each one in a category below)", impl.get("differ", 0)),
+        ("a register entry named in one mode only (a notice)", impl.get("notice", 0)),
+        ("-mats, -plots, -rmsrel, -rmsabs", [o.get(k, 0) for k in ("-mats", "-plots", "-rmsrel",
+                                                                    "-rmsabs")]),
+        ("-meanvol, -stats, -reffile, -refvol", [o.get(k, 0) for k in ("-meanvol", "-stats",
+                                                                        "-reffile", "-refvol")]),
+        ("-sinc_final, -spline_final, -nn_final", [o.get(k, 0) for k in ("-sinc_final",
+                                                                          "-spline_final",
+                                                                          "-nn_final")]),
+        ("each cost (" + ", ".join(costs) + ")", [o.get(f"-cost {c}", 0) for c in costs]),
+        ("6, 7, 9, 12 dof", [o.get(f"-dof {n}", 0) for n in (6, 7, 9, 12)]),
+        ("1, 2, 3, 4 stages", [o.get(f"-stages {n}", 0) for n in (1, 2, 3, 4)]),
+        ("distinct options and settings drawn", t["options_covered"]),
+        (f"length (minutes; {s['jobs']} jobs at one thread each)", round(s["elapsed_s"] / 60, 1)),
+    ]  # fmt: skip
+    out_rows = []
+    for head, v in rows:
+        if isinstance(v, list):
+            cell = common.cell(" / ".join(f"{x:,}" for x in v))
+        elif isinstance(v, float):
+            cell = common.cell(v, "sig")
+        else:
+            cell = common.cell(int(v), "count")
+        out_rows.append({"head": head, "cells": [cell]})
+    peaks = max(float(p.split()[0]) for p in s["memory"]["peaks"])
+    commit = s["larmorx_commit"].removesuffix("-dirty")
+    summary = common.table(
+        "trial-catchup",
+        f"Random testing of the clean-room original after the catch-up: the trial of {s['date']}",
+        ["", {"label": "Cases", "num": True}],
+        out_rows,
+        note="Differential random testing's trial of the clean-room original after the "
+        "catch-up's change of its centres of mass (mcflirt's blocked sums, specs/mcflirt.md §6.1) "
+        f"and of atan2 (larmorx_core::math), seed `{s['seed']}`: the 2026-10-30 trial's cases "
+        "drawn again and further, mcflirt's runs served by the oracle cache where they had run; "
+        "each case compared as the record compares it, in reproduce mode. The build: larmorx "
+        f"`{commit}`. Every case in a memory box of {s['memory']['case']} (peaks below "
+        f"{peaks:.2f} GiB).",
+    )
+    tpath = ctx.repo / CATCHUP_TRIAGE
+    traw = tpath.read_bytes()
+    tri = json.loads(traw)
+    counts = tri["counts"]
+    if sum(counts.values()) != impl.get("differ", 0):
+        raise ValueError(
+            f"{CATCHUP_TRIAGE}: {sum(counts.values())} findings, the trial {impl['differ']}"
+        )
+    trows = []
+    for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        text, verdict = CATCHUP_TEXT[cat]
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "the harness's, fixed: the files agree on replay"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
+                                       common.cell(tri["reproducers"][cat])]}  # fmt: skip
+        if verdict:
+            row["verdict"] = verdict
+        trows.append(row)
+    triage = common.table(
+        "trial-catchup-triage",
+        "The trial's differing cases, each in one category",
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
+        trows,
+        note="Every differing case of the trial in one category by its failed checks "
+        "(`validation/investigations/cleanroom-fixes/trial_catchup_hmc_categories.py`, its output "
+        f"`{CATCHUP_TRIAGE}`); the alignment measured by `hmc_alignment.py` on 400 sampled "
+        "findings; the triage's entries: `validation/difftest/triage.toml`. The reproducer is a "
+        "finding of the trial (`difftest --replay`).",
+    )
+    prov = {
+        "trial": f"oracles/difftest/{TRIAL_CATCHUP}/summary.json",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "triage": CATCHUP_TRIAGE,
+        "triage_sha256": hashlib.sha256(traw).hexdigest(),
+    }
+    return [summary, triage], prov
+
+
+def refresh_original(ctx: core.Context, why: str) -> None:
+    """After a change of the clean-room original: its runs of fMRIPrep's call (``larmorx``,
+    ``larmorx-1``, ``larmorx-fix``) made again with their recorded commands; mcflirt's runs and
+    its perturbation band kept."""
+    fcache.rerun(entry(ctx), ["larmorx", "larmorx-1", "larmorx-fix"], why)
+
+
 def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
@@ -1277,6 +1407,7 @@ def export(ctx: core.Context) -> dict:
         "CPUs).",
     )
     e = entry(ctx)
+    tc, tcprov = trial_catchup(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
@@ -1290,6 +1421,7 @@ def export(ctx: core.Context) -> dict:
                 fcache.provenance(replica_entry(ctx)),
                 fcache.provenance(entry_new(ctx)),
             ],
+            "difftest_catchup": tcprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1333,15 +1465,18 @@ def export(ctx: core.Context) -> dict:
             ),
         ],
         "cases": cases,
-        "tables": [open_table],
+        "tables": [open_table, *tc],
         "cases_total": len(cases),
         "speed": speed,
         "examples": [_example(ctx, reg)],
     }
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # compute the cache entry; refresh-original <why>
     from larmorx_validation.figures.core import REPO, default_cache
 
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
-    print("done", entry(core.Context(repo=REPO, site=Path("."), cache=default_cache())).dir)
+    c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if sys.argv[1:2] == ["refresh-original"]:
+        refresh_original(c, sys.argv[2])
+    print("done", entry(c).dir)

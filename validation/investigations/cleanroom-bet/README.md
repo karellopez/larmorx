@@ -19,6 +19,9 @@ environment (FSL never on the `PATH`), and larmorx's clean-room original (`LARMO
 | `quatern_probe.py <dir> <inputs...>` | FSL's rewritten quaternion against the standard's conversions in several precisions |
 | `bench.py --larmorx <bin> [--replica <bin>] --threads 1,16 [--tool betsurf --args "..."] [--json <report>] <name>=<file>[,<file>...]...` | the benchmark of [docs/benchmarks/fsl-bet.md](../../../docs/benchmarks/fsl-bet.md): FSL 6.0.7.23, the replica and the original on the same calls, the median of `--repeat` runs, a JSON report in the form of `docs/benchmarks/*.json` |
 | `site_inventory.py count <site> fsl-bet`, `compare <before> <after>` | the site page's evidence counted (examples, panels, comparisons, arrays, blobs and their bytes, cases per implementation, speed rows), and the proof that an export lost nothing (after >= before) |
+| `ssroi_fsl_runs.py <dir> <case regex> [--args "..."] [--env NAME=VALUE]` | FSL 6.0.7.23's runs of the BET suite's `ssroi/`, `fslroi/` and `defects/` cases through the oracle cache: exit status, both streams, the files written (the clean-room catch-up, relay 5, 2026-11-05) |
+| `ssroi_stage_probe.py <dir> <case id>` | a standard_space_roi case run stage by stage: FSL's `-d` matrix given to FSL and to the original (`-d -applyxfm -init`), every image's differing header fields and values |
+| `fit_translate.py <root>` | which arithmetic gives FSL's fslroi translations on two neurologically stored real images (the frame, each product's precision, the terms' order): the model of `larmorx_fsl::cli::fslroi::translate` (`docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi") |
 
 The reruns' probes (`variants.py`, `variants2.py` in the part's notes) needed a temporary build
 with each candidate rule; their results are listed in the findings ("Reruns").
@@ -75,3 +78,30 @@ build of commit `f1f9a35` (`crates/larmorx-fsl/src/betsurf/`, environment knobs 
 in `095818a`); the decision rules found with them are in the findings ("betsurf (§6), part 2b"):
 330 of 330 single profiles decided as FSL decides, 127 of 128 T1-and-T2 triangles and 64 of 64
 T1-only triangles alike.
+
+## The clean-room catch-up, relay 6 (2026-11-05): `bet -S`, `-B`, `-A`, `-A2`
+
+| Script | What it shows |
+|---|---|
+| `ssroi_fsl_runs.py <out> '<case regex>' [--args=<words>]` | (relay 5's, used again) FSL's runs of the BET suite's option cases (`bet/eyes*`, `bet/bias*`, `bet/surfaces*`, `defects/eyes-*`, `real/*-S`, ...), with `-d` or `-v` added: the files a failed run leaves (`bet/eyes-no-brain`: 12), bash's reports of an abort and their commands' texts, a negative mean's `dc: stack empty` (`defects/eyes-negative-mean`) |
+| `fsl_program.py <dir> <program> <args...>` | one FSL program through the cache: `fslstats <prebrain> -M` and `-S` on FSL's own `-S -d` files print six decimals (`1951833.117037`: never an exponent); bet2 with `-c` on `-B`'s unbiased image of the 3.5-year-old (the robust run's second pass: FSL's self-intersection total 123.412, the original's 124.668) |
+| `dc_probe.py` | GNU dc 1.4.1 (this machine's) on `10 k <mean> 3.5 <sd> * + p`, both streams apart: the unit tests' expected texts of the eye threshold (FSL-216) |
+
+## The clean-room catch-up, relay 7 (2026-11-05): the BET part's random-testing differences
+
+| Script | What it shows |
+|---|---|
+| `replay_trial.py <trial> <out.jsonl> [--jobs 16] [--only n,...] [--which recipe,shrunk]` | every finding of the original judged again with the current build, as black-box cases (FSL from the oracle cache), each worker in its own leaf of the memory box with the trial's case limit; every check written (run inside `scripts/orchestration/boxed.sh`) |
+| `finding_dirs.py <finding.json> <dir> [recipe\|shrunk] [--mode fix\|reproduce] [--extra='-v']` | one finding's call run by FSL (cache) in `<dir>/fsl` and the original in `<dir>/lx`, both kept |
+| `betsurf_shares.py <trial> <out.jsonl> [--mode reproduce\|fix] [--only ...]` | every betsurf finding with `-v` added: FSL's and the original's share of profiles set aside, each mesh's vertex distance and each mask's differing voxels, so that a difference is placed at the profiles or after them (2026-11-04-bet-options-6b: 74 of 164 shares FSL's before the corrections, 162 after) |
+| `profile_oracle_cached.py <t1> <t2\|-> <matrix> <dir> <dump> [--jobs 16] [i ...]` | `betsurf_profile_oracle.py`'s single profiles with FSL through the cache, in parallel, and the original on the same files: FSL's decision on each profile of a whole image (5,290 profiles of 11 images: the four readings of §6.4 in the findings) |
+
+The profiles' voxels, normals and samples (`<dump>`) came from a temporary build of the original
+that wrote one `DUMP {...}` line per profile into the file `LX_BETSURF_DUMP` names (a patch of
+`betsurf::votes` applied to a scratch build and reverted; the product has no such switch).
+
+## The clean-room catch-up, relay 10 (2026-11-05): the trial's last BET differences
+
+| Script | What it shows |
+|---|---|
+| `trial_ssroi_matrices.py <trial> <work> <n,...> [--jobs 8]` | the random-testing findings of standard_space_roi and of `bet -B`'s inner standard_space_roi whose FLIRT matrix parts from FSL's: each drawn call run with `-d` by FSL (cache) and the original (`reproduce`); FSL's own `flirt` measures both final matrices' costs at 8, 4, 2 and 1 mm (`-init` the matrix, a `measurecost 12` schedule of the script's own) and the identity's; the input's size, the matrices' RMS deviation, the outputs' values and, given FSL's matrix, the output header fields that still differ. On the trial's 15 such findings (2026-11-05-catchup-bet) before the fix: both matrices cost 1 at every scale on most pairs, the search's starting points tied; after FLIRT's search sorts them as FSL does (libstdc++'s `std::sort`, `flirt/search.rs`), 13 matrices are FSL's (RMS 0), 88 ends at a lower cost than FSL's by FSL's measure (0.964919 against 0.967734 at 1 mm) and 114 at a higher one (0.989526 against 0.985458) |

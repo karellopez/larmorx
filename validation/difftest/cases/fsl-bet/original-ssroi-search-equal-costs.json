@@ -1,0 +1,170 @@
+{
+ "defect": null,
+ "description": "standard_space_roi -d -dof 6 on a small head whose every FLIRT cost at 8 and 4 mm is 1: the search's starting points of equal cost sorted by libstdc++'s std::sort before they enter S and P, as FSL sorts them (the original had kept the order it found them in: its matrix 303 mm from FSL's)",
+ "expect": "pass",
+ "found": {
+  "detail": "out_tmp_to_std.mat: RMS deviation 303.1650 mm; out_tmp_to_std_inv.mat: RMS deviation 99.1384 mm",
+  "n": 174,
+  "seed": "bet-options-6",
+  "shrink_moves": [],
+  "signature": [
+   "out_tmp_to_std.mat",
+   "out_tmp_to_std_inv.mat"
+  ]
+ },
+ "id": "original-ssroi-search-equal-costs",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI2_GZ",
+   "tool": "standard_space_roi"
+  },
+  "features": {
+   "-altinput": false,
+   "-b": false,
+   "-d": true,
+   "-ssref": false,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "axis0": 1.05,
+   "axis1": 1.1,
+   "axis2": 0.85,
+   "bias0": -0.0025,
+   "bias1": -0.005,
+   "bias2": 0.0,
+   "bias3": -0.005,
+   "centre0": 6.0,
+   "centre1": -5.0,
+   "centre2": -0.5,
+   "content": "head",
+   "dtype": "int32",
+   "extreme": false,
+   "flirt option": 0,
+   "flirt options": true,
+   "mask": false,
+   "noise": 3.0,
+   "orientation": "axes+oblique",
+   "origin0": -8.75,
+   "origin1": -32.75,
+   "origin2": -46.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "roi": false,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "10x10x22",
+   "size": 25.5,
+   "spacing0": 0.5,
+   "spacing1": 3.0,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tool": "standard_space_roi",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-d"
+    ],
+    "name": "-d",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dof",
+     "6"
+    ],
+    "name": "flirt",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.05,
+      1.1,
+      0.85
+     ],
+     "bias": [
+      -0.0025,
+      -0.005,
+      0.0,
+      -0.005
+     ],
+     "centre": [
+      6.0,
+      -5.0,
+      -0.5
+     ],
+     "noise": 3.0,
+     "seed": 1543999436,
+     "size": 25.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      -8.75,
+      -32.75,
+      -46.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      36,
+      2,
+      40,
+      -4
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     10,
+     22
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 174,
+  "options": [
+   "-d",
+   "-dof",
+   "FSLOUTPUTTYPE=NIFTI2_GZ",
+   "standard_space_roi"
+  ],
+  "seed": "bet-options-6",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

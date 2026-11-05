@@ -6,7 +6,8 @@ series, by FSL 6.0.7.23, by the replica and by the clean-room original, each in 
 ``reproduce`` and default modes (and at one thread); FSL's own variability (its input perturbed
 by noise of half an intensity unit, the record's band) for each registration the original is
 shown on; the matrices as text with fMRIPrep's own, the displacement each pair of matrices gives
-over the reference's brain, every case of both records and the benchmark's speed.
+over the reference's brain, every case of both records, random testing's trial of the original
+after the clean-room catch-up (2026-11-05) with its triage, and the benchmark's speed.
 
 Every run of FSL is a run of the parity record (``parity.fsl_flirt_replica``), with the same
 arguments, environment and inputs, through the oracle-output cache: the page computes no
@@ -21,6 +22,8 @@ reference's brain mask (fMRIPrep's masked T1w), dilated by two voxels: no face c
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import os
 import re
 import shlex
@@ -1295,11 +1298,10 @@ def _zero(x) -> bool:
 #: Failing cases of the original's record that came from the replica's suite after the
 #: original's last part, and what follows for them.
 FOLLOW_UPS = {
-    "programs/pointflirt-no-points": "Outside the record, a follow-up of the clean-room original: "
-    "pointflirt given two coordinate files that do not exist (no points), where FSL crashes "
-    "(FSL-204, registered on 2026-11-03); the record asks the original to refuse naming "
-    "FSL-204, and it exits with status 1 and FSL's message but names nothing yet (FSL-204 "
-    "follows in its next part).",
+    "programs/pointflirt-no-points": "pointflirt given two coordinate files that do not exist "
+    "(no points), where FSL crashes (FSL-204, registered on 2026-11-03): since 2026-11-05 the "
+    "clean-room original refuses the call in both modes, naming FSL-204 (outside the record "
+    "before).",
 }
 
 
@@ -1500,6 +1502,187 @@ def speed(ctx: core.Context):
     return bench, chart
 
 
+#: The clean-room catch-up's trial of the original (2026-11-05), and its findings in categories
+#: (``validation/investigations/cleanroom-flirt/trial_catchup_categories.py``'s ``--json`` output).
+TRIAL_CATCHUP = "2026-11-05-catchup-flirt"
+CATCHUP_TRIAGE = "validation/investigations/cleanroom-flirt/trial_catchup_triage.json"
+#: The catch-up trial's categories: category -> (what the page says, the verdict of the row, or
+#: None for a mistake fixed after the trial).
+CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
+    "fixed: the search's starting points of equal cost (std::sort)": (
+        "Fixed after the trial (relay 10), with permanent cases: FLIRT's search kept its "
+        "starting points of equal cost in the order it found them, where FSL sorts the list by "
+        "cost with libstdc++'s std::sort, which is not stable, before it enters S and P. On these "
+        "random pairs many costs tie (an input or a pair that carries no information at the "
+        "coarse scales: every cost 1), so another starting point came first and the registration "
+        "ended elsewhere, or its messages followed another path. Each of these agrees on replay "
+        "with the final build and differed with the build before the fix (catchup_replay.py; "
+        "trial_catchup_replay_sorted.txt, trial_catchup_replay_before_sort.txt): 755 "
+        "registrations, 101 pairreg runs and 17 message counts",
+        None,
+    ),
+    "a registration ends elsewhere": (
+        "A registration ends elsewhere than FSL's (its matrix beyond the record's threshold, or "
+        "only the image written from it) on the trial's random, often ill-posed pairs: small "
+        "synthetic heads and blobs, odd orientations and voxel sizes, where FSL's own "
+        "variability is often 0. The costs follow FSL's arithmetic within their last bits and "
+        "the optimiser's path then parts; left for FLIRT's next clean-room part and the final "
+        "validation phase",
+        "open",
+    ),
+    "messages whose number follows the path": (
+        "Messages whose number follows the optimiser's path, printed a different number of "
+        "times: mcflirt-style COG warnings, FSL-90's 'Parameters do not form a valid axis', "
+        "'Erroneous dof', Woods' warning, -verbose's lines",
+        "open",
+    ),
+    "pairreg: its registrations' paths": (
+        "pairreg's three registrations: their paths part as a registration's do",
+        "open",
+    ),
+    "pairreg: FSL corrupts its heap (FSL-75)": (
+        "pairreg where FSL itself corrupts its heap (Segmentation fault, free(): invalid size or "
+        "pointer, double free: FSL-75, undefined behaviour never reproduced) and the clean-room "
+        "original registers and finishes",
+        "divergence",
+    ),
+    "fixed: -out's header, a completed sform's negative zeros": (
+        "Fixed after the trial, with a permanent case: -out's header where a reference with a "
+        "qform only and qfac −1 has its sform completed from the qform, whose zeros times −1 are "
+        "negative zeros that FSL writes (the original wrote zeros); each agrees on replay with the "
+        "final build",
+        None,
+    ),
+    "fixed: the overall minimum on FSL's Cost minima line alone": (
+        "Fixed after the trial, with a permanent case: a verbose search on a one-point grid "
+        "(-nosearch) finds no local minimum, so FSL lists the overall minimum only on its Cost "
+        "minima line, without a COST line; each agrees on replay with the final build",
+        None,
+    ),
+    "a test volume without intensity range: FSL's sub-threshold costs": (
+        "A test volume with no intensity range at a scale (Testvol intensity clamped between 0 "
+        "and 0): FSL prints 'WARNING: Found 0 or less sub-threshold costs' and makes every grid "
+        "point a minimum, where the original evaluates the fine grid's costs (corratio's cost of "
+        "no variance, 1): a question for the specification (specs/flirt.md §8.1 steps 6 and 7)",
+        "open",
+    ),
+    "a resampled image's last bits (sinc, spline)": (
+        "-applyxfm and -applyisoxfm images from the same matrix: the windowed sinc's and the "
+        "nearest neighbour's last bits on small images",
+        "open",
+    ),
+    "aff2rigid's corrected matrix": (
+        "aff2rigid's corrected matrix (FSL-81) against the replica's: not yet looked at",
+        "open",
+    ),
+    "fixed: applyxfm4D's int32 padding": (
+        "Fixed after the trial, with a permanent case: applyxfm4D of an int32 image of "
+        "2147483647, whose padding FSL writes exactly in the type (and its interpolated voxels "
+        "through single precision: FSL-09); it agrees on replay with the final build",
+        None,
+    ),
+}
+
+
+def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
+    """The clean-room catch-up's random-testing trial of the original (its ``summary.json``)
+    and its findings in categories (``trial_catchup_triage.json``): two tables, and their
+    provenance."""
+    path = common.oracles() / "difftest" / TRIAL_CATCHUP / "summary.json"
+    raw = path.read_bytes()
+    s = json.loads(raw)
+    t = s["tools"]["fsl-flirt-original"]
+    o = t["options"]
+    impl = t["implementations"]["original"]
+    others = ("aff2rigid", "alignpaxes", "avscale", "convert_xfm", "extracttxt", "img2imgcoord",
+              "img2stdcoord", "makerot", "midtrans", "pointflirt", "rmsdiff", "std2imgcoord")  # fmt: skip
+    costs = ("corratio", "mutualinfo", "normmi", "normcorr", "leastsq", "woods", "labeldiff", "bbr")
+    notices = ", ".join(f"{k} {v['cases']}" for k, v in sorted(t.get("notices", {}).items()))
+    rows = [
+        ("Random cases, each compared with FSL 6.0.7.23", t["cases"]),
+        ("within the record's thresholds (§13), every exact check passed", impl.get("agree", 0)),
+        ("differing (each one in a category below)", impl.get("differ", 0)),
+        ("a register entry named in one mode only (a notice)", impl.get("notice", 0)),
+        ("flirt, applyxfm4D, pairreg", [o.get(k, 0) for k in ("flirt", "applyxfm4D", "pairreg")]),
+        ("the other programs (convert_xfm, avscale, midtrans, ...)", sum(o.get(k, 0) for k in others)),
+        ("each cost (" + ", ".join(costs) + ")", [o.get(f"-cost {c}", 0) for c in costs]),
+        ("3, 6, 7, 9, 12 dof", [o.get(f"-dof {n}", 0) for n in (3, 6, 7, 9, 12)]),
+        ("-applyxfm, -applyisoxfm", [o.get("-applyxfm", 0), o.get("-applyisoxfm", 0)]),
+        ("-debug, -verbose", [o.get("-debug", 0), o.get("-verbose", 0)
+                               + sum(o.get(f"-verbose {n}", 0) for n in (2, 3, 4, 5, 7))]),
+        ("distinct options and settings drawn", t["options_covered"]),
+        (f"length (minutes; {s['jobs']} jobs at one thread each)", round(s["elapsed_s"] / 60, 1)),
+    ]  # fmt: skip
+    out_rows = []
+    for head, v in rows:
+        if isinstance(v, list):
+            cell = common.cell(" / ".join(f"{x:,}" for x in v))
+        elif isinstance(v, float):
+            cell = common.cell(v, "sig")
+        else:
+            cell = common.cell(int(v), "count")
+        out_rows.append({"head": head, "cells": [cell]})
+    peaks = max(float(p.split()[0]) for p in s["memory"]["peaks"])
+    commit = s["larmorx_commit"].removesuffix("-dirty")
+    summary = common.table(
+        "trial-catchup",
+        f"Random testing of the clean-room original after the catch-up: the trial of {s['date']}",
+        ["", {"label": "Cases", "num": True}],
+        out_rows,
+        note=f"Differential random testing's trial of the clean-room original after the "
+        f"specification's answers of 2026-11-03 (seed `{s['seed']}`: the 2026-11-02 trials' cases "
+        "drawn again and further, FSL's runs served by the oracle cache where they had run), each "
+        "compared as the record compares (specs/flirt.md §13: exit status and messages FSL's, "
+        "files identical, matrices within a displacement over the reference's brain, images from "
+        f"the original's own matrix by their correlation). The build: larmorx `{commit}`; four "
+        f"classes were fixed after it, from its findings. The notices: {notices} cases. Every "
+        f"case in a memory box of {s['memory']['case']} (peaks below {peaks:.2f} GiB).",
+    )
+    tpath = ctx.repo / CATCHUP_TRIAGE
+    traw = tpath.read_bytes()
+    tri = json.loads(traw)
+    counts = tri["counts"]
+    if sum(counts.values()) != impl.get("differ", 0):
+        raise ValueError(
+            f"{CATCHUP_TRIAGE}: {sum(counts.values())} findings, the trial {impl['differ']}"
+        )
+    trows = []
+    for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        text, verdict = CATCHUP_TEXT[cat]
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "fixed: agrees on replay with the final build"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
+                                       common.cell(tri["reproducers"][cat])]}  # fmt: skip
+        if verdict:
+            row["verdict"] = verdict
+        trows.append(row)
+    triage = common.table(
+        "trial-catchup-triage",
+        "The trial's differing cases, each in one category",
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
+        trows,
+        note="Every differing case of the trial in one category by its program, its failed "
+        "checks and their details (`validation/investigations/cleanroom-flirt/"
+        f"trial_catchup_categories.py`, its output `{CATCHUP_TRIAGE}`), each category's cause "
+        "established by replaying findings (`catchup_replay.py`, with the final build and with "
+        "the build before the search's sort) and by probes (`catchup_finding.py`, "
+        "`catchup8_int_nn.py`; `docs/findings/fsl-flirt-original.md`); the triage's entries: "
+        "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
+        "(`difftest --replay`).",
+    )
+    prov = {
+        "trial": f"oracles/difftest/{TRIAL_CATCHUP}/summary.json",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "triage": CATCHUP_TRIAGE,
+        "triage_sha256": hashlib.sha256(traw).hexdigest(),
+    }
+    return [summary, triage], prov
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     rec_orig = records.load(ctx.repo, ORIG_RECORD)
@@ -1516,6 +1699,7 @@ def export(ctx: core.Context) -> dict:
     entries += [real_entry(ctx, case) for case in REAL.values()]
     entries += [orig_bbr_entry(ctx, run) for _i, run, _v, _w in BBR]
     entries += [orig_real_entry(ctx, case) for case in REAL.values()]
+    tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     status = "experimental"
     return {
@@ -1527,6 +1711,7 @@ def export(ctx: core.Context) -> dict:
             "records": rec.source() + rec_orig.source(),
             "benchmarks": bench.source() if bench else [],
             "cache": [fcache.provenance(x) for x in entries],
+            "difftest_catchup": tcprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1550,6 +1735,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cs,
         "cases_total": len(cs),
         "speed": chart,
+        "tables": tc,
         "examples": [
             _example_bbr(ctx, ex_id, run, view, words) for ex_id, run, view, words in BBR[:1]
         ]

@@ -13,6 +13,7 @@ pub mod applyxfm4d;
 pub mod avscale;
 pub mod bet;
 pub mod bet2;
+pub mod bet_script;
 pub mod betsurf;
 pub mod bre;
 pub mod common;
@@ -23,6 +24,7 @@ pub mod fast;
 pub mod flirt;
 pub mod fmt;
 pub mod fslmaths;
+pub mod fslroi;
 pub mod fslstats;
 pub mod makerot;
 pub mod midtrans;
@@ -30,6 +32,7 @@ pub mod options;
 pub mod pairreg;
 pub mod pointflirt;
 pub mod rmsdiff;
+pub mod ssroi;
 pub mod topup;
 pub mod topup_debug;
 
@@ -63,6 +66,8 @@ pub const TOOLS: &[&str] = &[
     "applytopup",
     "fslmaths",
     "fslstats",
+    "fslroi",
+    "standard_space_roi",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -189,6 +194,8 @@ pub fn run_with(
         "applytopup" => Some(applytopup::main(args, settings, out, err)),
         "fslmaths" => Some(fslmaths::main(args, settings, out, err)),
         "fslstats" => Some(fslstats::main(args, settings, out, err)),
+        "fslroi" => Some(fslroi::main(args, settings, out, err)),
+        "standard_space_roi" => Some(ssroi::main(args, settings, out, err)),
         _ => None,
     }
 }

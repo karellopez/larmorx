@@ -1,0 +1,355 @@
+{
+ "defect": null,
+ "description": "-debug -cost bbr at -verbose 3: the first pair's set-up lines after the verbose centres' COG warning (observed; trial 2026-11-02 #1308; the clean-room catch-up, relay 4)",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr: the same lines (numbers aside): line 1: FSL 'WARNING::in calculating COG, total = 0.0', original 'Setting bbr seg 1'; files written: only FSL ['debug.nii.zst'], only the original []; global_refweight1.nii.zst: the same header, values within 1e-6 of the image's range: the headers differ: pixdim",
+  "n": 1308,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "files written",
+   "global_refweightN.nii.zst: the same header, values within Ne-N of the image's range",
+   "stderr: the same lines (numbers aside)"
+  ]
+ },
+ "id": "debug-bbr-first-pair",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_ZST",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": true,
+   "-bbrslope": false,
+   "-bbrtype": false,
+   "-datatype": true,
+   "-debug": true,
+   "-interp": false,
+   "-noclamp": false,
+   "-out": false,
+   "-paddingsize": true,
+   "-setbackground": false,
+   "-v": false,
+   "-verbose": true,
+   "FSLOUTPUTTYPE": "NIFTI_ZST",
+   "axis0": 1.0,
+   "axis1": 1.05,
+   "axis2": 0.9,
+   "bbr": true,
+   "bias0": 0.0075,
+   "bias1": -0.0025,
+   "bias2": 0.0,
+   "bias3": 0.005,
+   "centre0": 2.0,
+   "centre1": 6.0,
+   "centre2": 0.0,
+   "content": "head",
+   "corner0": 53,
+   "corner1": 48,
+   "corner2": 48,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "datatype": "char",
+   "dtype": "float64",
+   "extreme": false,
+   "kind": "register",
+   "noise": 3.0,
+   "orientation": "plumb",
+   "origin0": -46.25,
+   "origin1": -19.0,
+   "origin2": -32.0,
+   "pad": "0.5",
+   "q0": 28,
+   "q1": 2,
+   "q2": 0,
+   "q3": 3,
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1",
+   "scale1": "0.95",
+   "scale2": "0.95",
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "23x18x19",
+   "shear0": -0.025,
+   "shear1": -0.075,
+   "shear2": 0.05,
+   "shift0": "-2",
+   "shift1": "0",
+   "shift2": "1.5",
+   "size": 17.0,
+   "spacing0": 1.2,
+   "spacing1": 1.0,
+   "spacing2": 0.8,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "units": "unknown",
+   "verbose level": "3"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-cost",
+     "bbr",
+     "-wmseg",
+     "{in:wm}",
+     "-schedule",
+     "@fslsch:bbr.sch"
+    ],
+    "name": "bbr",
+    "optional": false
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": false
+   },
+   {
+    "args": [
+     "-anglerep",
+     "quaternion"
+    ],
+    "name": "-anglerep",
+    "optional": true
+   },
+   {
+    "args": [
+     "-datatype",
+     "char"
+    ],
+    "name": "-datatype",
+    "optional": true
+   },
+   {
+    "args": [
+     "-paddingsize",
+     "0.5"
+    ],
+    "name": "-paddingsize",
+    "optional": true
+   },
+   {
+    "args": [
+     "-verbose",
+     "3"
+    ],
+    "name": "-verbose",
+    "optional": true
+   },
+   {
+    "args": [
+     "-debug"
+    ],
+    "name": "-debug",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "corner": [
+      53,
+      48,
+      48
+     ],
+     "seed": 869120713,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -46.25,
+      -19.0,
+      -32.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      1.2,
+      1.0,
+      0.8
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     23,
+     18,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9774153074 -0.200250941 0.01430363864 -2\n0.2107904642 0.9190087829 -0.1335006274 0\n0.01505646173 0.1335006274 0.9404642409 1.5\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "corner": [
+      53,
+      48,
+      48
+     ],
+     "seed": 115428960,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -52.25,
+      5.75,
+      -59.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "sform": "other",
+     "sform_code": 0,
+     "shear": [
+      -0.025,
+      -0.075,
+      0.05
+     ],
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     31,
+     31,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "wm": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 703568712,
+     "size": 14.0,
+     "type": "labels"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -52.25,
+      5.75,
+      -59.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "sform": "other",
+     "sform_code": 0,
+     "shear": [
+      -0.025,
+      -0.075,
+      0.05
+     ],
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     31,
+     31,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1308,
+  "options": [
+   "-anglerep quaternion",
+   "-cost bbr",
+   "-datatype",
+   "-debug",
+   "-init",
+   "-paddingsize",
+   "-verbose 3",
+   "FSLOUTPUTTYPE=NIFTI_ZST",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

@@ -25,4 +25,53 @@ pub mod rng;
 pub mod single;
 pub mod stats;
 
-pub use single::{Params, Single, Stop, segment};
+pub use single::{Params, Single, Stop, segment, zero_classes};
+
+/// Standard output as FAST's C library buffers it when it is not a terminal (`specs/fast.md`
+/// §7): the lines FAST flushes (written with [`std::io::Write::flush`] after them) survive an
+/// abort, the others written since the last flush are lost. A run that ends normally (exit 0,
+/// 1 or 255) writes [`Buffered::all`], one that aborts where FAST does [`Buffered::flushed`].
+#[derive(Clone, Debug, Default)]
+pub struct Buffered {
+    buf: Vec<u8>,
+    flushed: usize,
+}
+
+impl Buffered {
+    /// Everything written.
+    pub fn all(&self) -> &[u8] {
+        &self.buf
+    }
+
+    /// What was written up to the last flush.
+    pub fn flushed(&self) -> &[u8] {
+        &self.buf[..self.flushed]
+    }
+}
+
+impl std::io::Write for Buffered {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.buf.extend_from_slice(b);
+        Ok(b.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.flushed = self.buf.len();
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    #[test]
+    fn buffered_keeps_the_flushed_lines() {
+        let mut b = super::Buffered::default();
+        let _ = writeln!(b, "flushed");
+        let _ = b.flush();
+        let _ = writeln!(b, "KMeans Iteration 0");
+        assert_eq!(b.flushed(), b"flushed\n");
+        assert_eq!(b.all(), b"flushed\nKMeans Iteration 0\n");
+    }
+}

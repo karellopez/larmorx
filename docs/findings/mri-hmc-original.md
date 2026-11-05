@@ -193,3 +193,57 @@ FSL is the size of the fit's own sensitivity to the C library's last bits: the d
 `reproduce` is 0.0109 mm (`validation/investigations/cleanroom-glibc-dbl/record_moves.py`); the
 default against FSL stays 0.0108 mm, main's number. The interpolation and the sums are not FSL's
 bit for bit, so the paths still part.
+
+## The centres of mass as mcflirt's blocked sums, its COG warning and `atan2` (the clean-room catch-up, relay 7, 2026-11-05)
+
+Both of mcflirt's centres of mass, each test volume's (the rotations' centre) and the reference's
+(the `.par` file's), are now FLIRT's blocked sums (`specs/mcflirt.md` §6.1, the spec writer's
+answer of 2026-11-03; `hmc::volume::Volume::centre_counted`): `v − v_min` in single precision, double
+running sums over the voxels in z, y, x order flushed into the totals every `max(1000, trunc(√N)) +
+1` voxels, a total below 1e−5 in magnitude counted as 1. Before, one running sum.
+
+- **What it changes: nothing on the record's inputs.** `centre_bits.py` computed every volume's
+  centre both ways: the nine real runs are integer images (int16, uint16, int32, no scaling), whose
+  weighted sums are exact in double either way (ds000005's 240 centres identical), and the record's
+  synthetic series give 0 differing centres too (their values sum exactly as well). The blocks matter
+  only where the sums round, as on the golden cases' random float series; even there no golden
+  checksum of the head-motion correction moves with the blocks alone (the main build, the blocks
+  alone and the final build compared on the nine golden cases: the two that move, `py.mri.hmc` and
+  `py.mri.hmc.options`, move with `atan2`, below).
+- **mcflirt's COG warning** (`WARNING::in calculating COG, total = 0.0` on standard error, §6.1):
+  `cog_warning_probe.py` ran mcflirt 6.0.7.23 (through the oracle cache) on small series holding
+  constant volumes: it prints the line once per registration of a constant test volume (three with
+  the default three stages, four with `-stages 4`, six with `-meanvol`'s two passes, three with
+  `-fudge`), once per `.par` line when the reference is constant (`-plots`: one per volume), and
+  never for a constant reference without `-plots` (its centre is measured only for the `.par`
+  file). The original now prints it as often (`Estimate::cog_warnings`, `HmcOutput::par_cog_zero`):
+  8 of 8 calls alike. The suite does not compare messages; the unit test
+  `cog_warnings_per_registration` holds the count.
+- **`atan2`** in the decomposition is `larmorx_core::math::atan2` (correctly rounded, double),
+  the `libm` crate's before (the libm crate's last uses, `docs/findings/platform-math.md`): it
+  differs from the old one in the last bit of 25 % of near-identity rotations; the start parameters
+  of each registration carry it. mcflirt's own is glibc's single-precision `atan2f` (`specs/flirt.md`
+  §3's decomposition, which §4.4 shares), for a later part's `reproduce`.
+- **The record** (`mri-hmc`, standard tier, `--jobs 1`, from 0842fbd): 169 cases, 145 pass, 20 rejected by both, 3 expected divergences, 1 failure (`real/ds003345/default`, as main's); against main's record (`compare_records.py`) no status and no detail differs. Below the record's printed precision, `centre_moves.py` ran fMRIPrep's call on four real runs (ds000005, ds000117, ds005040, ds006010) and `-cost normmi`, `-meanvol` and `-dof 12` on ds000005 with main's build, the blocks alone and the final build (`reproduce`, the `.par` file added): the 1,344 matrices and `.par` lines are the same text in all three.
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-hmc` (seed `20261030`, the 2026-10-30 trial's drawn again and
+further; 30 minutes, 12 jobs at one thread, 3 GiB a case, the oracle cache in `use` mode): 83,244
+cases, 31,552 agree, 51,681 differ, 11 notices (FSL-01, -09, -59). A first run of the same trial
+overlapped two rebuilds of the extension (its numbers, kept in `...-overlapped-rebuild`, are not
+used). The registrations of small phantoms with large motions end elsewhere than mcflirt's, as in
+the earlier trials (37 % agreeing on 2026-10-30, 38 % now), and are as well aligned:
+`validation/investigations/cleanroom-fixes/hmc_alignment.py` on 400 findings (the corrected series'
+temporal standard deviation in the phantom, larmorx over mcflirt) gives in `reproduce` mode, as the
+trial compares, a median of 1.000 (5 and 95 % quantiles 0.933 and 1.041; 279 within 1 %, 67 lower,
+54 higher; mcflirt's own residual against the input's 1.41). The default (FSL-01, -03 and the other
+corrections on) has a longer tail: median 1.002, above 1.05 in 102 of the 400 (`reproduce`: 18), a
+question for the head-motion correction's next part.
+
+6,363 findings were the harness's: a run with `-rmsrel` or `-rmsabs` without `-mats` makes
+mcflirt create an empty `.mat` directory (FSL-13, which `reproduce` follows), and the oracle-output
+cache keeps a run's files, not its empty directories, so the trial's replays from the cache lacked
+it (the first run, mcflirt live, had no such difference). The descriptor runs those mcflirt calls
+live now (`difftest/tools/mri_hmc.py`'s `makes_empty_directory`;
+`validation/tests/test_mri_hmc_descriptor.py`).

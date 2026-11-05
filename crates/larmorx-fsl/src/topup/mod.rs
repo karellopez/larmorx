@@ -69,11 +69,18 @@ pub struct Params {
     pub single: bool,
     /// FSL-117 reproduced: the membrane energy's Levenberg-Marquardt Hessian per mm.
     pub membrane_hessian_mm: bool,
-    /// FSL-145 reproduced: two quadratic coefficients on an axis shorter than two knot spacings.
+    /// FSL-145 reproduced: FSL's quadratic count on an axis shorter than two knot spacings (one
+    /// or two coefficients), and FSL's error when a level refits a single coefficient.
     pub fsl145: bool,
-    /// FSL-146 reproduced: each axis' Jacobian term of the gradient over the volumes displaced
+    /// FSL-146 reproduced: each axis' Jacobian term of the gradient over the volumes encoded
     /// along that axis only.
     pub fsl146: bool,
+    /// FSL-201 reproduced: the movements through FSL's matrices, their derivatives FSL's forward
+    /// differences.
+    pub fsl201: bool,
+    /// FSL-242 reproduced: a level of scaled conjugate gradients whose last iteration is rejected
+    /// ends at that iteration's point (else at the current point).
+    pub fsl242: bool,
     /// Trilinear interpolation of the images (`--interp=linear`).
     pub linear: bool,
     /// The field's B-spline order (`--splineorder`: 3 or 2).
@@ -82,13 +89,23 @@ pub struct Params {
     pub glibc: bool,
 }
 
-/// Whether the volumes are displaced along different sets of axes (FSL-146: the two modes'
-/// gradients differ): some axis along which one volume is displaced and another is not.
+/// Whether the volumes are encoded along different sets of axes (FSL-146: the two modes'
+/// gradients differ): some axis along which one volume's phase encoding has a component and
+/// another's has none (the encoding decides, whatever the read-out time: FSL leaves out of an
+/// axis' Jacobian term only the volumes whose encoding along it is 0, `specs/topup.md` §4.6).
 pub fn meets_fsl146(scans: &[Scan]) -> bool {
     (0..3).any(|a| {
-        let on = |s: &Scan| s.t * s.pe[a] != 0.0;
+        let on = |s: &Scan| s.pe[a] != 0.0;
         scans.iter().any(on) && !scans.iter().all(on)
     })
+}
+
+/// Whether FSL refits onto a grid of `axes` that has a single quadratic coefficient along some
+/// axis (FSL-145 reproduced: the refit's two wrap-around rows need two coefficients, and FSL
+/// stops with `Mat::operator(): index out of bounds`; `specs/topup.md` §4.2).
+fn single_coefficient(axes: &[Axis; 3]) -> bool {
+    axes.iter()
+        .any(|a| a.order == 2 && a.fsl145 && a.ncoef() == 1)
 }
 
 /// Whether a level's or the output's layout has quadratic B-splines on an axis shorter than two
@@ -224,6 +241,11 @@ pub struct Estimate {
     pub fwhm_out: f64,
     /// The run's choice of `exp` (glibc's with `reproduce`).
     pub glibc: bool,
+    /// FSL-201 reproduced: the outputs' predictions moved through FSL's matrices.
+    pub fsl201: bool,
+    /// Some level of scaled conjugate gradients ended on a rejected iteration (FSL-242: the two
+    /// modes' results differ).
+    pub fsl242_met: bool,
 }
 
 /// Runs the estimation (§4) on `volumes` (each `dims`, x fastest, radiological frame) with voxel
@@ -247,6 +269,7 @@ pub fn estimate(
     let mut field: Option<Field> = None;
     let mut prev: Option<LevelSpec> = None;
     let mut cached: Option<(usize, f64, LevelImages)> = None;
+    let mut fsl242_met = false;
     let mut mov = vec![[0.0; 6]; scans.len()];
     for (l, spec) in params.levels.iter().enumerate() {
         let s = spec.subsamp.max(1);
@@ -263,18 +286,36 @@ pub fn estimate(
                 let mut f = f;
                 if p.subsamp != s {
                     let step = s as f64 / p.subsamp as f64;
-                    f = f.regrid(nt, step, knot_spacing(p.warpres, vt));
+                    let kp = knot_spacing(p.warpres, vt);
+                    let to: [Axis; 3] = std::array::from_fn(|a| f.axes[a].like(nt[a], kp[a]));
+                    if single_coefficient(&to) {
+                        return Err(LevelError::SingleCoefficient(l + 1));
+                    }
+                    f = f.regrid(nt, step, kp);
                 }
                 // refitted when the resolution changes, even to the same knot spacing (observed:
                 // the regularisation `-v` prints at the next level's start)
                 if f.axes.map(|a| a.k) != k || p.warpres.to_bits() != spec.warpres.to_bits() {
+                    let to: [Axis; 3] = std::array::from_fn(|a| f.axes[a].like(nt[a], k[a]));
+                    if single_coefficient(&to) {
+                        return Err(LevelError::SingleCoefficient(l + 1));
+                    }
                     f = f.respace(k);
                 }
                 f
             }
-            _ => Field::zeros(std::array::from_fn(|a| {
-                Axis::of_order(nt[a], k[a], params.order).with_fsl145(params.fsl145)
-            })),
+            _ => {
+                let axes: [Axis; 3] = std::array::from_fn(|a| {
+                    Axis::of_order(nt[a], k[a], params.order).with_fsl145(params.fsl145)
+                });
+                // the first level's field is made on the input's grid and, when the level is
+                // subsampled, refitted onto the level's (§4.4): it stays 0, but FSL's refit of a
+                // single coefficient stops it there (FSL-145)
+                if s > 1 && single_coefficient(&axes) {
+                    return Err(LevelError::SingleCoefficient(1));
+                }
+                Field::zeros(axes)
+            }
         };
         let imgs = match &cached {
             Some((cs, cf, im)) if *cs == s && cf.to_bits() == spec.fwhm.to_bits() => im.clone(),
@@ -300,6 +341,7 @@ pub fn estimate(
         level.single = params.single;
         level.membrane_hessian_mm = params.membrane_hessian_mm;
         level.fsl146 = params.fsl146;
+        level.fsl201 = params.fsl201;
         progress.level_started(l);
         let mut rep = LevelReport {
             progress: &mut *progress,
@@ -311,7 +353,15 @@ pub fn estimate(
                 minimise::levenberg_marquardt(&level, theta, spec.miter, &mut rep)
             }
             Minimiser::ScaledConjugateGradients => {
-                minimise::scaled_conjugate_gradients(&level, theta, spec.miter, &mut rep)
+                let end = minimise::scaled_conjugate_gradients(
+                    &level,
+                    theta,
+                    spec.miter,
+                    params.fsl242,
+                    &mut rep,
+                );
+                fsl242_met |= end.last_rejected;
+                end.x
             }
         };
         mov = level.movements(&theta);
@@ -324,6 +374,10 @@ pub fn estimate(
     let mut f = field.expect("at least one level");
     if last.subsamp > 1 {
         let k = knot_spacing(last.warpres, voxel);
+        let to: [Axis; 3] = std::array::from_fn(|a| f.axes[a].like(dims[a], k[a]));
+        if single_coefficient(&to) {
+            return Err(LevelError::SingleCoefficient(params.levels.len() + 1));
+        }
         f = f.regrid(dims, 1.0 / last.subsamp as f64, k);
         if f.axes.map(|a| a.k) != k {
             f = f.respace(k);
@@ -336,6 +390,8 @@ pub fn estimate(
         movements: mov,
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
         glibc: params.glibc,
+        fsl201: params.fsl201,
+        fsl242_met,
     })
 }
 
@@ -344,6 +400,9 @@ pub fn estimate(
 pub enum LevelError {
     /// The level (1-based) whose subsampling does not divide the regridded grid (FSL-118).
     Subsampling(usize),
+    /// The level (1-based; one past the last: the outputs' grid) whose refit has a single
+    /// quadratic coefficient along an axis (FSL-145 reproduced).
+    SingleCoefficient(usize),
 }
 
 /// The predictions at full resolution (§6): the regridded volumes (smoothed as the last level's
@@ -364,6 +423,8 @@ pub fn full_resolution(est: &Estimate, scans: &[Scan], regmod: RegMod) -> (Level
         &est.movements,
         false,
     );
+    let mut level = level;
+    level.fsl201 = est.fsl201;
     let ev = level.eval(&est.field.coef);
     (level, ev)
 }

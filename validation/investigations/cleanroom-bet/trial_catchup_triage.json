@@ -1,0 +1,170 @@
+{
+ "counts": {
+  "fixed: FLIRT's search, starting points of equal cost (std::sort)": 15,
+  "betsurf's surfaces on small heads: the scalp's deformation": 53,
+  "standard_space_roi: FSL's FLIRT crashes (FSL-75)": 8,
+  "standard_space_roi: FLIRT's registration ends elsewhere": 3,
+  "fixed: the output's box, from FLIRT's matrix (the search's equal costs)": 5,
+  "standard_space_roi: the cut's translation one float unit from FSL's": 9,
+  "standard_space_roi: the cut's corner whole voxels from FSL's": 4,
+  "fslroi: the corner's translation one float unit from FSL's": 6,
+  "standard_space_roi: fslpy's imcp conversion (nibabel)": 2,
+  "bet -B, -A2: FSL fails or crashes midway": 5,
+  "bet with -R or -c on a neurologically stored image: the centre": 2,
+  "standard_space_roi: a NIfTI-2 output's matrices": 2
+ },
+ "reproducers": {
+  "fixed: FLIRT's search, starting points of equal cost (std::sort)": "bet-options-6-00009-original",
+  "betsurf's surfaces on small heads: the scalp's deformation": "bet-options-6-00023-original",
+  "standard_space_roi: FSL's FLIRT crashes (FSL-75)": "bet-options-6-00060-original",
+  "standard_space_roi: FLIRT's registration ends elsewhere": "bet-options-6-00088-original",
+  "fixed: the output's box, from FLIRT's matrix (the search's equal costs)": "bet-options-6-00106-original",
+  "standard_space_roi: the cut's translation one float unit from FSL's": "bet-options-6-00128-original",
+  "standard_space_roi: the cut's corner whole voxels from FSL's": "bet-options-6-00189-original",
+  "fslroi: the corner's translation one float unit from FSL's": "bet-options-6-00203-original",
+  "standard_space_roi: fslpy's imcp conversion (nibabel)": "bet-options-6-00222-original",
+  "bet -B, -A2: FSL fails or crashes midway": "bet-options-6-00225-original",
+  "bet with -R or -c on a neurologically stored image: the centre": "bet-options-6-00462-original",
+  "standard_space_roi: a NIfTI-2 output's matrices": "bet-options-6-00543-original"
+ },
+ "members": {
+  "fixed: FLIRT's search, starting points of equal cost (std::sort)": [
+   9,
+   49,
+   121,
+   174,
+   218,
+   285,
+   339,
+   531,
+   578,
+   601,
+   612,
+   652,
+   787,
+   839,
+   898
+  ],
+  "betsurf's surfaces on small heads: the scalp's deformation": [
+   23,
+   47,
+   78,
+   120,
+   169,
+   180,
+   192,
+   214,
+   256,
+   275,
+   307,
+   309,
+   329,
+   356,
+   367,
+   385,
+   386,
+   397,
+   438,
+   441,
+   444,
+   449,
+   451,
+   453,
+   458,
+   466,
+   469,
+   475,
+   488,
+   534,
+   538,
+   546,
+   551,
+   592,
+   605,
+   622,
+   638,
+   651,
+   676,
+   678,
+   698,
+   700,
+   729,
+   750,
+   751,
+   756,
+   763,
+   798,
+   835,
+   858,
+   864,
+   865,
+   907
+  ],
+  "standard_space_roi: FSL's FLIRT crashes (FSL-75)": [
+   60,
+   378,
+   388,
+   440,
+   555,
+   615,
+   628,
+   645
+  ],
+  "standard_space_roi: FLIRT's registration ends elsewhere": [
+   88,
+   114,
+   803
+  ],
+  "fixed: the output's box, from FLIRT's matrix (the search's equal costs)": [
+   106,
+   108,
+   123,
+   184,
+   683
+  ],
+  "standard_space_roi: the cut's translation one float unit from FSL's": [
+   128,
+   151,
+   165,
+   395,
+   407,
+   545,
+   619,
+   744,
+   870
+  ],
+  "standard_space_roi: the cut's corner whole voxels from FSL's": [
+   189,
+   313,
+   315,
+   456
+  ],
+  "fslroi: the corner's translation one float unit from FSL's": [
+   203,
+   212,
+   418,
+   442,
+   523,
+   796
+  ],
+  "standard_space_roi: fslpy's imcp conversion (nibabel)": [
+   222,
+   657
+  ],
+  "bet -B, -A2: FSL fails or crashes midway": [
+   225,
+   409,
+   603,
+   725,
+   894
+  ],
+  "bet with -R or -c on a neurologically stored image: the centre": [
+   462,
+   503
+  ],
+  "standard_space_roi: a NIfTI-2 output's matrices": [
+   543,
+   567
+  ]
+ }
+}

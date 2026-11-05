@@ -1,12 +1,12 @@
 # Parity: topup (clean-room original)
 
-**1 case(s) fail.** 183 cases on the `standard` tier: 94 pass, 66 rejected by both, 22 expected divergences, 1 failures.
+**All cases agree.** 185 cases on the `standard` tier: 104 pass, 67 rejected by both, 14 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl topup` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/topup.md, Apache-2.0)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5), the conda build at `~/fsl-6.0.7.23`, one thread
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
-- **Original programs:** 185 runs: 164 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
+- **Original programs:** 196 runs: 175 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -27,56 +27,39 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| at | 74 | 38 | 25 | 11 | 0 |
-| cfg | 16 | 8 | 4 | 4 | 0 |
+| at | 74 | 43 | 25 | 6 | 0 |
+| cfg | 16 | 10 | 4 | 2 | 0 |
 | debug | 5 | 5 | 0 | 0 | 0 |
-| difftest | 7 | 6 | 0 | 1 | 0 |
+| difftest | 9 | 9 | 0 | 0 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
 | fmriprep | 2 | 2 | 0 | 0 | 0 |
-| opt | 37 | 29 | 1 | 6 | 1 |
+| opt | 37 | 29 | 2 | 6 | 0 |
 | thr | 3 | 3 | 0 | 0 | 0 |
-
-## Failures
-
-### `opt/fsl145-one-coefficient`
-
---splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; the default runs)
-
-- **Exit status**: FSL 1, the original 0
-- **Files written**: FSL only [], original only ['f.nii.gz', 'o_fieldcoef.nii.gz', 'o_movpar.txt']
-- **Standard error (the original's own lines left out)**: 3 lines, the original 1; line 1: 'Error occurred when preparing to run topup' / ''
 
 ## Expected divergences
 
 | Case | Reason |
 |---|---|
-| `opt/levels` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.001247 (threshold 0.001) |
-| `opt/scg-movements` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: o_movpar.txt: translations 0.2498 (threshold 0.05); o_movpar.txt: rotations 0.004863 (threshold 0.001); r_02.mat: translations 1.033 (threshold 0.20095694083360355) |
-| `opt/four-volumes` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.03348 (threshold 0.001); c: mean \|d\| / mean intensity inside the brain 0.001622 (threshold 0.001); c_mean: relative… |
-| `opt/zero-readout` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.06429 (threshold 0.001); c: mean \|d\| / mean intensity inside the brain 0.004861 (threshold 0.001); c_mean: relative… |
-| `opt/lambda-negative` | FSL-126 reproduced: a negative weight rewards a rough field, both minimisations diverge. Outside the thresholds: --fout (Hz): \|d\| inside the brain, 99th percentile 200.1 (threshold 0.5); --fout (Hz): \|d\| inside the brain, mean 53.49 (threshold 0.1); --fout (Hz): correlation inside the brain 0.7821 … |
+| `opt/levels` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
+| `opt/interp-linear` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
+| `opt/four-volumes` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
+| `opt/int16` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
+| `opt/lambda-negative` | FSL-126 reproduced: a negative weight rewards a rough field, both minimisations diverge. Outside the thresholds: --fout (Hz): \|d\| inside the brain, 99th percentile 222.3 (threshold 0.5); --fout (Hz): \|d\| inside the brain, mean 60.85 (threshold 0.1); --fout (Hz): correlation inside the brain 0.725 (… |
 | `opt/warpres-negative` | FSL-124: refused; FSL is not run: its knot spacing of about 4e9 voxels needs more memory than the machine holds (2026-11-03: killed in a 24 GiB memory box) |
-| `cfg/b02b0` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.002251 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.0015 (threshold 0.001) |
-| `cfg/b02b0_2` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.002251 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.0015 (threshold 0.001) |
-| `cfg/b02b0_4` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.001684 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.001108 (threshold 0.001) |
-| `cfg/b02b0_7T` | the movements estimated, not converged: FSL's rotation derivatives are not its cost's (findings 14). Outside the thresholds: c: relative difference inside the brain, 99th percentile 0.006691 (threshold 0.001); c_mean: relative difference inside the brain, 99th percentile 0.004121 (threshold 0.001) |
-| `at/lsr-long` | FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes … |
-| `at/vb2d-long` | FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes … |
-| `at/vb3d-long` | FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes … |
-| `at/vb4d-long` | FSL-133 is not reproduced by the original: FSL's wrap-around of lines whose length does not divide 2^32 (96 voxels here; at/lsr-crop's lines of 30 differ at their ends, outside the brain) is not known from the spec and the black-box probes (findings 21); the original wraps circularly in both modes … |
+| `cfg/b02b0_4` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
+| `cfg/b02b0_7T` | FSL-201 reproduced, the movements estimated and not converged: FSL's rotation derivatives are forward differences of single-precision matrices, so each gradient entry moves by about 2 % of its lever-weighted sum when its angle's rounding to single precision flips, and FSL's own path is not determin… |
 | `at/vb3d-aniso` | FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations diverge (lambda below 0 in the first iterations, then phi and lambda fall towards 1e-23 to 1e-206, the image following their ratio): the divergence amplifies the moved images' float-level differences in the printed values (… |
 | `at/vb2d-aniso` | the printed phi and lambda of the top slices (few voxels in the brain) part from FSL's in the 4th digit during the iterations (8e-4) and meet again (their final values within 1e-5): the iterations amplify the moved images' float-level differences there; the image within 1e-5 (p99), and the same aga… |
 | `at/vb4d-four` | FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations diverge (lambda below 0 in the first iterations, then phi and lambda fall towards 1e-23 to 1e-206, the image following their ratio): the divergence amplifies the moved images' float-level differences in the printed values (… |
 | `at/vb3d-three` | FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations diverge (lambda below 0 in the first iterations, then phi and lambda fall towards 1e-23 to 1e-206, the image following their ratio): the divergence amplifies the moved images' float-level differences in the printed values (… |
 | `at/vb-other-grid` | FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour) |
-| `at/jac-other-shape` | FSL-134: refused by the original in both modes: FSL lays a field of as many voxels as the images in another shape on the images' grid; how it does is not known from the spec and the black-box runs (findings 22) |
 | `at/lsr-other-grid` | FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour) |
-| `difftest/fsl145-short-axis` | the movements' rotations differ (finding 14: FSL's movement derivatives); the coefficients' layout and every exact check agree. Outside the thresholds: o_movpar.txt: rotations 0.002174 (threshold 0.001) |
 
 ## Rejected by both
 
 | Case | What it tests | Errors |
 |---|---|---|
+| `opt/fsl145-one-coefficient` | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; the default runs) | topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Mat::operator(): index out of bounds |
 | `opt/z-phase-encoding` | phase encoding along z | topup exits 1; the same from the original. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupScan::TopupScan: third element… |
 | `cfg/not-found` | a configuration that does not exist | topup exits 1; the same from the original. Cannot find config-file nothere |
 | `cfg/not-found-path` | a configuration with a path that does not exist | topup exits 1; the same from the original. Cannot find config-file ./nothere |
@@ -148,7 +131,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (be3db916dce3) |
+| larmorx | 0.0.1 (5a44c8f498f9) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -158,7 +141,7 @@
 
 ## Notes
 
-The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served from the oracle cache under that suite's keys. The original is compared in `reproduce` mode (D13) and its default `fix` pass against the reproduced run. The options the original does not take yet are skipped until its next sub-tasks.
+The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served from the oracle cache under that suite's keys. The original is compared in `reproduce` mode (D13) and its default `fix` pass against the reproduced run. The original takes every option of both programs (none is skipped).
 
 ## All cases
 
@@ -174,28 +157,28 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `opt/defaults` | pass | 12/12 | every default (warpres 10, fwhm 8, five LM iterations, movements) |
 | `opt/levels` | expected-divergence | 46/47 | two levels: subsampling 2 with Levenberg-Marquardt and the movements, then full resolution with scaled conjugate gradie… |
 | `opt/numprec-float` | pass | 16/16 | --numprec=float |
-| `opt/interp-linear` | pass | 18/18 | --interp=linear |
+| `opt/interp-linear` | expected-divergence | 17/18 | --interp=linear |
 | `opt/membrane-lm` | pass | 16/16 | --regmod=membrane_energy with Levenberg-Marquardt (the energy's Hessian) |
 | `opt/membrane-scg` | pass | 16/16 | --regmod=membrane_energy with scaled conjugate gradients (the energy's gradient) |
 | `opt/splineorder-2` | pass | 16/16 | --splineorder=2 |
 | `opt/fsl145-short-axis` | pass | 16/16 | --splineorder=2 with z shorter than two knot spacings (FSL-145: 2 coefficients) |
-| `opt/fsl145-one-coefficient` | fail | 4/7 | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; t… |
+| `opt/fsl145-one-coefficient` | both-error | 6/6 | --splineorder=2 at --subsamp=2 with z shorter than one knot spacing (FSL-145: one coefficient, whose refit stops FSL; t… |
 | `opt/scale` | pass | 18/18 | --scale=1: each volume scaled to the mean |
 | `opt/ssqlambda-0` | pass | 16/16 | --ssqlambda=0: lambda as given |
 | `opt/regrid-0` | pass | 16/16 | --regrid=0: the image's own grid, two levels |
 | `opt/scg` | pass | 12/12 | --minmet=1 without movements |
-| `opt/scg-movements` | expected-divergence | 12/16 | --minmet=1 with the movements: FSL's warning |
+| `opt/scg-movements` | pass | 16/16 | --minmet=1 with the movements: FSL's warning |
 | `opt/acqp` | pass | 12/12 | --acqp instead of --datain |
 | `opt/datain-transposed` | pass | 12/12 | an acquisition-parameter file of four rows |
 | `opt/x-phase-encoding` | pass | 34/34 | phase encoding along x (the translation along x left out), the movements |
-| `opt/four-volumes` | expected-divergence | 41/50 | four volumes along x and y: six movement parameters for each moving scan |
+| `opt/four-volumes` | expected-divergence | 39/50 | four volumes along x and y: six movement parameters for each moving scan |
 | `opt/fsl146-four-axes` | pass | 16/16 | four volumes along y and x without the movements (FSL-146: each axis' Jacobian term of the gradient over the volumes en… |
 | `opt/oblique-phase-encoding` | pass | 24/24 | a phase-encoding vector along x and y (the Jacobian of both displacements) |
 | `opt/readout-times` | pass | 16/16 | different read-out times |
-| `opt/zero-readout` | expected-divergence | 12/22 | one read-out time of 0 (a synthesised undistorted image) |
+| `opt/zero-readout` | pass | 22/22 | one read-out time of 0 (a synthesised undistorted image) |
 | `opt/same-direction` | pass | 16/16 | both volumes with the same phase encoding |
 | `opt/z-phase-encoding` | both-error | 5/5 | phase encoding along z |
-| `opt/int16` | pass | 18/18 | a 16-bit integer image |
+| `opt/int16` | expected-divergence | 17/18 | a 16-bit integer image |
 | `opt/one-volume` | pass | 12/12 | a single 3D volume |
 | `opt/no-out` | pass | 12/12 | no --out: the base name from --imain |
 | `opt/intent` | pass | 22/22 | an image with intent parameters: the field's header |
@@ -208,9 +191,9 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `opt/lambda-negative` | expected-divergence | 9/17 | a negative --lambda |
 | `opt/fwhm-negative` | pass | 17/17 | a negative --fwhm |
 | `opt/warpres-negative` | expected-divergence | 2/2 | a negative --warpres |
-| `cfg/b02b0` | expected-divergence | 20/22 | FSL's b02b0.cnf by name, one iteration per level |
+| `cfg/b02b0` | pass | 22/22 | FSL's b02b0.cnf by name, one iteration per level |
 | `cfg/b02b0_1` | pass | 22/22 | FSL's b02b0_1.cnf by name, one iteration per level |
-| `cfg/b02b0_2` | expected-divergence | 20/22 | FSL's b02b0_2.cnf by name, one iteration per level |
+| `cfg/b02b0_2` | pass | 22/22 | FSL's b02b0_2.cnf by name, one iteration per level |
 | `cfg/b02b0_4` | expected-divergence | 20/22 | FSL's b02b0_4.cnf by name, one iteration per level |
 | `cfg/b02b0_7T` | expected-divergence | 20/22 | FSL's b02b0_7T.cnf by name, one iteration per level |
 | `cfg/test_acqp` | pass | 22/22 | FSL's test_acqp.cnf by name, one iteration per level |
@@ -277,10 +260,10 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `at/vb2d-y` | pass | 9/9 | --method=vb2D: phi and lambda per slice |
 | `at/vb3d-y` | pass | 9/9 | --method=vb3D: phi and lambda per volume |
 | `at/vb4d-y` | pass | 9/9 | --method=vb4D: one phi and lambda |
-| `at/lsr-long` | expected-divergence | 7/8 | --method=lsr on lines of 96 voxels along y (the long-line pair) |
-| `at/vb2d-long` | expected-divergence | 7/9 | --method=vb2D on lines of 96 voxels along y (the long-line pair) |
-| `at/vb3d-long` | expected-divergence | 7/9 | --method=vb3D on lines of 96 voxels along y (the long-line pair) |
-| `at/vb4d-long` | expected-divergence | 7/9 | --method=vb4D on lines of 96 voxels along y (the long-line pair) |
+| `at/lsr-long` | pass | 8/8 | --method=lsr on lines of 96 voxels along y (the long-line pair) |
+| `at/vb2d-long` | pass | 9/9 | --method=vb2D on lines of 96 voxels along y (the long-line pair) |
+| `at/vb3d-long` | pass | 9/9 | --method=vb3D on lines of 96 voxels along y (the long-line pair) |
+| `at/vb4d-long` | pass | 9/9 | --method=vb4D on lines of 96 voxels along y (the long-line pair) |
 | `at/vb3d-4d` | pass | 9/9 | --method=vb3D of two volumes (each on its own) |
 | `at/vb4d-4d` | pass | 9/9 | --method=vb4D of two volumes (together) |
 | `at/vb2d-x` | pass | 9/9 | --method=vb2D along x |
@@ -338,12 +321,14 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `at/method-unknown` | pass | 6/6 | an unknown --method (FSL-135: FSL writes nothing and exits 0) |
 | `at/lsr-no-movements` | both-error | 5/5 | --method=lsr with a field image, which has no movements (FSL-135) |
 | `at/jac-other-grid` | both-error | 5/5 | --method=jac with a field on another grid (FSL-134: another number of voxels) |
-| `at/jac-other-shape` | expected-divergence | 2/2 | --method=jac with a field of as many voxels as the images in another shape (FSL-134) |
+| `at/jac-other-shape` | pass | 9/9 | --method=jac with a field of as many voxels as the images in another shape (FSL-134) |
 | `at/lsr-other-grid` | expected-divergence | 2/2 | --method=lsr with a field on another grid (FSL-134) |
 | `difftest/acquisition-transposed` | pass | 18/18 | an acquisition file of four rows and one column per volume (read transposed): the suite's own reading fixed (the drawn … |
 | `difftest/configuration-outputs` | pass | 22/22 | outputs named by a configuration file (FSL's test_acqp names --fout and --iout): the suite compares them under their co… |
-| `difftest/fsl145-short-axis` | expected-divergence | 15/16 | FSL-145: --splineorder=2 on an axis shorter than two knot spacings (two coefficients; reproduce FSL's, the default the … |
+| `difftest/fsl145-short-axis` | pass | 16/16 | FSL-145: --splineorder=2 on an axis shorter than two knot spacings (two coefficients; reproduce FSL's, the default the … |
 | `difftest/fsl146-mixed-axes` | pass | 24/24 | FSL-146: volumes encoded along y and x (FSL's gradient leaves the volumes not encoded along an axis out of its Jacobian… |
 | `difftest/quadratic-count` | pass | 21/21 | topup --splineorder=2: FSL's quadratic B-spline count ceil((2n + k - 4) / (2k)) + 2 (the original had taken the cubic's… |
+| `difftest/scg-every-iteration-counts` | pass | 12/12 | --miter counts every iteration of the scaled conjugate gradients, the rejected ones too (a level of 3 iterations whose … |
 | `difftest/scg-regulariser-weight` | pass | 28/28 | scaled conjugate gradients at a level whose start has Reg > 0: the gradient at x + sigma d takes the current point's re… |
+| `difftest/scg-rejected-last-step` | pass | 13/13 | a level of scaled conjugate gradients (--miter=1) whose one step is rejected: FSL counts it and ends the level at the r… |
 | `difftest/trace-verbose` | pass | 22/22 | --trace with -v: FSL prints a stage's Entering line inside a cost line; the suite takes the stages out |

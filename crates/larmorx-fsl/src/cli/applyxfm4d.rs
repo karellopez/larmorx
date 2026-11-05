@@ -7,7 +7,6 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
-use larmorx_mri::hmc::kernels::Spline;
 use larmorx_mri::hmc::volume::Volume;
 
 use super::Settings;
@@ -15,7 +14,7 @@ use super::common::{self, TRUNCATED, abort, print_notices};
 use crate::bet::image;
 use crate::flirt::engine::{self, Ctx, End, Look};
 use crate::flirt::mat::{self, Mat4};
-use crate::flirt::output::{self, Resampling, SincKernel};
+use crate::flirt::output::{self, FlirtSpline, Resampling, SincKernel};
 use crate::flirt::{Interp, SincWindow, pyramid};
 
 /// The usage text (observed: standard error; the program names itself as it was called).
@@ -241,9 +240,22 @@ fn read(
     if !all && image.volumes > 1 {
         let _ = writeln!(err, "{TRUNCATED}");
     }
-    let doubles = (image.header.data_type() == Ok(DataType::F64))
-        .then(|| image::read_f64_series(&files, ctx.n_threads))
-        .flatten();
+    // a double image's values; an int32 image's exactly when some lie beyond single precision's
+    // integers (2^24): FSL holds them as stored, so its background value (the padding) is
+    // written exactly (observed, random testing's 20261103-03732 of 2026-11-05: an image of
+    // 2147483647, whose padding FSL writes as 2147483647 while its interpolated voxels wrap
+    // through single precision, FSL-09)
+    let doubles = match image.header.data_type() {
+        Ok(DataType::F64) => image::read_f64_series(&files, ctx.n_threads),
+        Ok(DataType::I32)
+            if vols
+                .iter()
+                .any(|v| v.data.iter().any(|x| x.abs() > 16_777_216.0)) =>
+        {
+            image::read_i32_series(&files, ctx.n_threads)
+        }
+        _ => None,
+    };
     image.vol.data = Vec::new();
     let vols = vols
         .into_iter()
@@ -327,6 +339,8 @@ fn run(
         other => other,
     };
     let double = t == DataType::F64 && src.doubles.is_some();
+    // an int32 image's padding written exactly in its type (its interpolated voxels as usual)
+    let exact_pad = t == DataType::I32 && src.doubles.is_some();
     let mut nv = src.vols.len();
     if !o.three_d && nv > MAX_VOLUMES {
         let _ = writeln!(
@@ -388,7 +402,8 @@ fn run(
     };
     let per_volume = refv.len();
     let mut values = Vec::with_capacity(per_volume * nv);
-    let mut doubles: Option<Vec<f64>> = double.then(|| Vec::with_capacity(per_volume * nv));
+    let mut doubles: Option<Vec<f64>> =
+        (double || exact_pad).then(|| Vec::with_capacity(per_volume * nv));
     let mut first_mat: Option<Mat4> = None;
     let mut fsl111_changes = false;
     let name111 = |notices: &mut Vec<Notice>| {
@@ -438,13 +453,18 @@ fn run(
                          kernel: &SincKernel|
          -> Option<Vec<f32>> {
             let st = store_type(signed);
+            // §9.3's spline (§15.7): a float image's passes in single precision, a double
+            // image's values read and filtered in double, an integer image's passes in its type
+            // with FSL-79 reproduced
             let spline = (o.interp == Interp::Spline).then(|| {
                 if fsl79 && reproduce79 {
-                    Spline::with_store(vol, &|c| x86_convert(c + 0.5, st))
-                } else if double {
-                    Spline::new(vol)
+                    let values = vol.data.iter().map(|&v| f64::from(v)).collect();
+                    FlirtSpline::with_store(vol.shape, values, &|c| x86_convert(c + 0.5, st))
+                } else if let (true, Some(all)) = (double, src.doubles.as_ref()) {
+                    let part = all[m * vol.len()..(m + 1) * vol.len()].to_vec();
+                    FlirtSpline::with_store(vol.shape, part, &|c| c)
                 } else {
-                    Spline::with_store(vol, &|c| f64::from(c as f32))
+                    FlirtSpline::new(vol)
                 }
             });
             let r = Resampling {

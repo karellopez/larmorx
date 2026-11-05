@@ -183,8 +183,15 @@ pub struct Level {
     pub e: Vec<[f64; 3]>,
     /// The axes along which some volume is displaced.
     pe_axes: [bool; 3],
+    /// Per volume: the axes its phase encoding has a component along (whatever its read-out
+    /// time): they decide which axes wrap and which are framed in the mask (§4.3) and FSL-146's
+    /// volumes (§4.6), as FSL's encoding does.
+    enc: Vec<[bool; 3]>,
     /// The centre (mm) of the images interpolated: the movements rotate about it.
     centre: [f64; 3],
+    /// That centre as FSL computes it, the product `(n - 1) v` in single precision (§4.3:
+    /// FSL-201's `reproduce`).
+    centre_fsl: [f64; 3],
     /// Per volume: its movement (`None`: none estimated and none fixed).
     motions: Vec<Option<Motion>>,
     /// The movement parameters estimated, `(volume, parameter)`, after the coefficients.
@@ -201,8 +208,11 @@ pub struct Level {
     /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
     pub single: bool,
     /// FSL-146 reproduced: each axis' Jacobian term of the gradient summed over the volumes
-    /// displaced along that axis only.
+    /// encoded along that axis only.
     pub fsl146: bool,
+    /// FSL-201 reproduced: the movements sampled through FSL's matrices and their derivatives
+    /// FSL's forward differences (§4.3, §4.6).
+    pub fsl201: bool,
     /// The large arrays kept for reuse by the level's evaluations.
     pool: Pool,
 }
@@ -301,11 +311,13 @@ impl<'a> Slices<'a> {
     }
 }
 
-/// Whether voxel `p` lies strictly inside the grid `nt` along every axis volume `e` is not
-/// displaced along (§4.3; observed, findings 2).
+/// Whether voxel `p` lies strictly inside the grid `nt` along every axis the volume's phase
+/// encoding `enc` has no component along (§4.3; observed, findings 2; the encoding decides, not
+/// the displacement: a volume with a read-out time of 0 is framed as its encoding says, as FSL's
+/// `-v` counts show on `opt/zero-readout`).
 #[inline]
-fn inside_static(p: [usize; 3], nt: [usize; 3], e: [f64; 3]) -> bool {
-    (0..3).all(|a| e[a] != 0.0 || (p[a] > 0 && p[a] + 1 < nt[a]))
+fn inside_static(p: [usize; 3], nt: [usize; 3], enc: [bool; 3]) -> bool {
+    (0..3).all(|a| enc[a] || (p[a] > 0 && p[a] + 1 < nt[a]))
 }
 
 impl Level {
@@ -350,6 +362,13 @@ impl Level {
         }
         let centre: [f64; 3] =
             std::array::from_fn(|a| (images.dims[a] as f64 - 1.0) * images.voxel[a] / 2.0);
+        let centre_fsl: [f64; 3] = std::array::from_fn(|a| {
+            f64::from((images.dims[a] as f32 - 1.0) * images.voxel[a] as f32) / 2.0
+        });
+        let enc: Vec<[bool; 3]> = scans
+            .iter()
+            .map(|sc| std::array::from_fn(|a| sc.pe[a] != 0.0))
+            .collect();
         let free = if estimate {
             free_parameters(&scans.iter().map(|s| s.pe).collect::<Vec<_>>())
         } else {
@@ -413,7 +432,9 @@ impl Level {
             scale,
             e,
             pe_axes,
+            enc,
             centre,
+            centre_fsl,
             motions,
             free,
             estimated,
@@ -424,6 +445,7 @@ impl Level {
             membrane_hessian_mm: false,
             single: false,
             fsl146: false,
+            fsl201: false,
             pool: Pool::default(),
         }
     }
@@ -556,6 +578,15 @@ impl Level {
         std::array::from_fn(|a| p[a] as f64 * self.vt[a])
     }
 
+    /// The movement `p` as the level samples it: FSL's matrices with FSL-201 reproduced.
+    fn motion(&self, p: [f64; 6]) -> Motion {
+        if self.fsl201 {
+            Motion::fsl(p, self.centre_fsl)
+        } else {
+            Motion::new(p, self.centre)
+        }
+    }
+
     /// Evaluates the cost at `theta` (the coefficients, then the free movement parameters).
     pub fn eval(&self, theta: &[f64]) -> Eval {
         let nc = self.n_coef();
@@ -565,7 +596,7 @@ impl Level {
             .motions
             .iter()
             .zip(&mov)
-            .map(|(m, p)| m.map(|_| Motion::new(*p, self.centre)))
+            .map(|(m, p)| m.map(|_| self.motion(*p)))
             .collect();
         let (h, dh) = self.fields(c);
         let [nx, ny, _] = self.nt;
@@ -599,12 +630,17 @@ impl Level {
             // displaced along more than one axis (an oblique phase encoding): no axis wraps; a
             // sample outside the level image along a displaced axis marks the voxel invalid
             // (observed: first_step.py, FSL's debug masks; findings 32)
-            let oblique = ev.iter().filter(|x| **x != 0.0).count() > 1;
+            // the validity of a sampling position (§4.3, spec writer 2026-11-03): every axis but
+            // the one the image wraps along (the encoding's, when it is along x alone or y
+            // alone; none for an oblique encoding) within [0, n - 1] of the image interpolated,
+            // to 1e-8 voxel; the voxel frame of `inside_static` besides, moved or not (observed:
+            // `-v`'s counts of opt/four-volumes, its mask shrinking as the movements grow)
+            let enc = self.enc[i];
+            let oblique = enc.iter().filter(|x| **x).count() > 1;
+            let wraps: [bool; 3] = std::array::from_fn(|a| enc[a] && !oblique);
             let n_img = self.images.dims;
             let on_grid = |p: [f64; 3]| {
-                !oblique
-                    || (0..3)
-                        .all(|a| ev[a] == 0.0 || (p[a] >= 0.0 && p[a] <= (n_img[a] - 1) as f64))
+                (0..3).all(|a| wraps[a] || (p[a] >= -1e-8 && p[a] <= (n_img[a] - 1) as f64 + 1e-8))
             };
             // per voxel (each value independent), slice by slice, written in place
             let slices = Slices::split(
@@ -651,7 +687,7 @@ impl Level {
                             if let Some(arr) = &mut fd_a {
                                 arr[k] = df * sa;
                             }
-                            if !inside_static([x, y, z], self.nt, *ev) {
+                            if !inside_static([x, y, z], self.nt, enc) {
                                 o.mask[k] = false;
                             }
                         }
@@ -689,7 +725,7 @@ impl Level {
                         }
                         let mut d = [0.0; 3];
                         d[a] = df * self.scale[a];
-                        (f, d, [0.0; 3], inside_static([x, y, z], self.nt, *ev))
+                        (f, d, [0.0; 3], inside_static([x, y, z], self.nt, enc))
                     } else {
                         let (p, valid) = match &motion {
                             None => {
@@ -698,19 +734,13 @@ impl Level {
                                     (y as f64 + hv * ev[1]) * self.scale[1],
                                     (z as f64 + hv * ev[2]) * self.scale[2],
                                 ];
-                                (p, inside_static([x, y, z], self.nt, *ev) && on_grid(p))
+                                (p, inside_static([x, y, z], self.nt, enc) && on_grid(p))
                             }
                             Some(mo) => {
                                 let q = mo.apply(self.position(v));
                                 let pm: [f64; 3] = std::array::from_fn(|a| q[a] + hv * e_mm[a]);
-                                let valid = (0..3).all(|a| {
-                                    ev[a] != 0.0 || {
-                                        let r = pm[a] / self.vt[a];
-                                        r > 0.0 && r < (self.nt[a] - 1) as f64
-                                    }
-                                });
                                 let p = std::array::from_fn(|a| pm[a] / self.images.voxel[a]);
-                                (p, valid && on_grid(p))
+                                (p, inside_static([x, y, z], self.nt, enc) && on_grid(p))
                             }
                         };
                         let (f, d) = interp(&self.images.coef[i], p, want);
@@ -812,7 +842,11 @@ impl Level {
         (ev.jac[i][v] * alpha, beta)
     }
 
-    /// `∂u_i / ∂p` of each free movement parameter, masked (0 outside the mask).
+    /// `∂u_i / ∂p` of each free movement parameter, masked (0 outside the mask): the exact
+    /// derivative of the sampling position by default; with FSL-201 reproduced FSL's (§4.6): the
+    /// forward difference of FSL's sampling positions ([`Motion::fsl_difference`]) times the
+    /// image's derivative, summed in double precision and rounded to single, divided by the step
+    /// and rounded to single, times the Jacobian.
     fn movement_derivatives(&self, ev: &Eval) -> Vec<Vec<f64>> {
         self.free
             .iter()
@@ -820,6 +854,28 @@ impl Level {
                 let (Some(fm), Some(mo)) = (&ev.fm[i], ev.motions[i]) else {
                     return vec![0.0; ev.h.len()];
                 };
+                if self.fsl201 {
+                    let step = Motion::fsl_step(k);
+                    let mut q = mo.p;
+                    q[k] += step;
+                    let ahead = Motion::fsl(q, self.centre_fsl);
+                    let [nx, ny, _] = self.nt;
+                    let vt: [f64; 3] = self.vt.map(|v| f64::from(v as f32));
+                    return (0..ev.h.len())
+                        .into_par_iter()
+                        .map(|v| {
+                            if !ev.mask[v] {
+                                return 0.0;
+                            }
+                            let x = [v % nx, (v / nx) % ny, v / (nx * ny)];
+                            let pos = std::array::from_fn(|a| x[a] as f64 * vt[a]);
+                            let dp = mo.fsl_difference(&ahead, pos);
+                            let s = (fm[0][v] * dp[0] + fm[1][v] * dp[1] + fm[2][v] * dp[2]) as f32;
+                            let d = (f64::from(s) / step) as f32;
+                            ev.jac[i][v] * f64::from(d)
+                        })
+                        .collect();
+                }
                 (0..ev.h.len())
                     .into_par_iter()
                     .map(|v| {
@@ -849,10 +905,12 @@ impl Level {
     pub fn gradient(&self, ev: &Eval, c: &[f64]) -> Vec<f64> {
         let nvox = ev.h.len();
         let m = self.e.len();
-        // FSL-146 reproduced on the axes along which some volumes are displaced and others not
-        // (elsewhere its term is 0 but for rounding, which would change the default's bits)
+        // FSL-146 reproduced on the axes along which some volumes are encoded and others not
+        // (elsewhere its term is 0 but for rounding, which would change the default's bits); FSL
+        // leaves out the volumes whose encoding along the axis is 0, so a volume encoded along it
+        // with a read-out time of 0 keeps its term (§4.6)
         let fsl146: [bool; 3] = std::array::from_fn(|a| {
-            self.fsl146 && self.e.iter().any(|e| e[a] != 0.0) && !self.e.iter().all(|e| e[a] != 0.0)
+            self.fsl146 && self.enc.iter().any(|e| e[a]) && !self.enc.iter().all(|e| e[a])
         });
         let fsl146_any = fsl146.iter().any(|&b| b);
         let mut wa = self.pool.zeros(nvox);
@@ -903,7 +961,7 @@ impl Level {
                             }
                             if fsl146_any {
                                 for a in 0..3 {
-                                    if fsl146[a] && self.e[i][a] != 0.0 {
+                                    if fsl146[a] && self.enc[i][a] {
                                         rs[a] += r;
                                         bs[a] += beta[a];
                                     }
@@ -1127,12 +1185,12 @@ impl Level {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::images::{level_images, prepare};
     use super::*;
 
     /// Two smooth volumes (plain arithmetic) encoded along y and x, and a small random field.
-    fn level(fsl146: bool) -> (Level, Vec<f64>) {
+    pub(in super::super) fn level(fsl146: bool) -> (Level, Vec<f64>) {
         let dims = [12, 10, 4];
         let voxel = [2.0, 2.0, 3.0];
         let vol = |sx: f64, sy: f64| -> Vec<f32> {

@@ -185,6 +185,27 @@ opened). Its only inputs were:
 | `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
 | `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |
 
+## FLIRT's clean-room catch-up (relays 3 and 4, 2026-11-05)
+
+Written by clean-room implementers under the same rules (FSL's source, the replica crates, the
+source-derived findings, the register's restricted sections, `docs/parts/` and
+`validation/probes/` not opened; the slips are recorded in the part's notes). Their only inputs
+were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §14's answers of 2026-11-03 (§2.3, §6.2, §8.1 step 9, §8.2, §9.2 to §9.4, §12, §15.1, §15.2, §15.5 to §15.8) | items 1 to 13 of `docs/next-steps.md`'s list for the original |
+| Black-box runs of FSL 6.0.7.23 through the oracle cache (`validation/investigations/cleanroom-flirt/catchup_*.py`: the suite's cases with `-verbose 7`, the random-testing findings' shrunk cases, schedules of the probes' own written from FSL's `-v` echo) | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "The clean-room catch-up" (both relays) |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::cost` (`least_squares`, `SquaresSlice`) | `leastsq`'s three-level single-precision sums | §6.2 |
+| `flirt::output::FlirtSpline` (`with_store`), `cli::applyxfm4d` | applyxfm4D's spline as FLIRT's (a double image filtered in double, a float image's passes in single, FSL-79's integer passes) | §9.3, §15.7 |
+| `flirt::engine` (`resampled_header`, `level_header`, `debug_files`, `bbr_setup`), `flirt::bbr` (`no_points`, `cost_and_debug`) | `-debug`'s levels' headers (also `-applyisoxfm`'s), `global_refweight1`, `-noresample`'s levels and `testvol`'s held voxel sizes (observed), the boundary set-up's lines and error at every evaluation without boundary points, the zero `debug` volume, the first pair's set-up after the verbose centres (observed) | §9.4, §6.5; black-box |
+| `flirt::engine` (`State::perturb`), `flirt::optimise` (`finite_start`, the starting matrix), `flirt::search` (`P` composed once, the grids' starting matrix, a NaN fine-grid scale) | a perturbation composed with all twelve parameters, an optimisation's start shown at its dof, NaN parameters started from the identity's (observed), the search's `P` | §8.1 step 9, §8.3; black-box |
+| `flirt::output::{resample, padded}` | a NaN pre-image outside the input (observed) | black-box |
+| relay 3: `flirt::param`, `flirt::search`, `flirt::mat`, `cli::{midtrans, pointflirt, coords, convert_xfm, pairreg}`, `flirt::schedule::PAIRREG_1..3` | items 1 to 8 (quaternion starts, FSL-90's messages, midtrans and FSL-241, FSL-204, `-warp`, the inverse on NaN matrices, `-fixscaleskew`'s abort, pairreg's schedules from FSL's `-v` echo) | §8.1, §12, §15; black-box |
+
 ## FAST (`fast`; relays 1 to 4, 2026-11-03)
 
 `fast` (FAST's tissue segmentation of one channel and several, the tissue priors, its command
@@ -223,6 +244,7 @@ the history of replica and spec-writer commits. Its only inputs were:
 | `larmorx_core::math::exp_in_place` (relay 3) | the correctly rounded `exp`'s fast path four values at a time (vectorised with AVX2 and FMA through the core's audited dispatch), `exp` itself for the values it leaves: `exp`'s bits for every value; used by the partial volumes' likelihoods and the multi-channel initialisation | §10; CORE-MATH's `exp` (MIT, the core's port) |
 | `flirt::engine::apply` (relay 3) | `-applyxfm`'s TR: the input's, as FSL reads it (its absolute value; 1 for a time axis with TR 0) | `specs/flirt.md` §9.3; FLIRT's findings (black-box) |
 | `fast` (relay 4: random testing) | the bias field outside the mask `(0 - mean) · 0` (NaN over the image when the mean is not finite); several channels' `KMeans Iteration` line once the covariances are inverted; FSL-101's `-v` line before the crash's refusal; the outputs' expansion and the negative-value rule on the call's own pool (`Grid::expand_on`) | §4.5, §5.2, §9.1; findings, "Random testing" (black-box) |
+| `fast::stats`, `fast::single`, `fast::pve`, `fast::multi`, `fast::Buffered`, `cli::fast` (the clean-room catch-up, 2026-11-05) | the spec answers of 2026-11-03 (`specs/fast.md` §12): FSL-202's variance (the double-precision mean's square by default, FAST's single-precision square with `reproduce`, in the class statistics and the partial volumes'), FSL-203's extrema (from the first voxel with `reproduce`, over the values that are not NaN by default), the rule for negative values clearing NaN voxels in its second branch only (`_restore` NaN elsewhere), standard output as FAST buffers it (the unflushed lines lost at an abort: the k-means lines, the partial-volume heading), several channels' class without weight (its means the plain sums, its covariance `0 / 0` as x86-64's NaN); from black-box runs: the heading before the images are read, FSL-100's and fewer than 0 classes' aborts after the image lines, the loops without a class (`-n 0`) and their lines | `specs/fast.md` §4.1, §4.4, §5.2, §5.3, §7, §9.1, §12; findings, "The catch-up of 2026-11-05" (black-box: `fsl_streams.py`, `probe.py`, `glibc_default.py`); the replica's code and FSL's source not opened, nor the spec writer's models (`validation/investigations/spec-answers-3/`: neither read nor run) |
 
 ## topup and applytopup (`topup`; relays 1 to 4, 2026-11-03)
 
@@ -262,6 +284,7 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | `topup::vb` | the undocumented `--method=vb2D`, `vb3D`, `vb4D`: the mean-field variational-Bayes restoration (Gamma priors on the noise and smoothness precisions, the squared-second-difference prior weighted by the voxel sizes, Gauss-Seidel over the lines, its printed iterations), FSL-141 to FSL-143 | §7.5, §10; findings 23 to 27 |
 | `cli::applytopup` | the command line (long and short options), the usage and the compulsory options' block, the checks in FSL's order with FSL's aborts (exit 1), `--topup`'s files, `--datatype` (FSL-09), the output, FSL-132 to FSL-135 and FSL-141 to FSL-144 | §7, §8, §10; findings 17 to 28 |
 | `topup::model`, `topup::minimise`, `cli::topup_debug` (relay 5b: random testing) | FSL-146's reproduce (each axis' Jacobian term over the volumes displaced along it), the mask of an oblique phase encoding (no axis wraps), the scaled conjugate gradients' second gradient with the current point's regulariser weight, `--debug`'s images in FSL's order | findings 32 to 35 (black-box: `first_step.py`) |
+| `topup::movement`, `topup::model`, `topup::spline`, `topup::images`, `topup::apply`, `topup::vb`, `cli::topup`, `cli::applytopup` (the clean-room catch-up, 2026-11-04) | the spec answers of 2026-11-03 (`specs/topup.md` §13): FSL-201's `reproduce` (FSL's single-precision rotation matrices, with glibc's `cosf` and `sinf` from `larmorx_core::math`, and their forward differences; `--rbmout` FSL's matrices), FSL-145's counts and its single-coefficient errors, FSL-146 and the mask decided by the encoding, the moved volumes' frame and the image's bounds, the regulariser's sampling of quadratic B-splines, the spline prefilter's truncated start (periodic and mirrored), applytopup's matrices row by row by FSL's walk with FSL-133's `reproduce`, FSL-134's field of another shape and its Jacobian's scales, applytopup's FSL-only coefficient counts in `reproduce` | `specs/topup.md` §4.2 to §4.6, §7.3, §7.4, §9.4, §10.1, §13; findings 37 to 44 (black-box: `catchup_probes.py`, `fsl201_spread.py`, the cache's `--debug` runs); the replica's code and FSL's source not opened, nor the spec writer's models (`validation/investigations/spec-answers-3/`: only their README) |
 
 ## fslmaths (`maths`, `cli::fslmaths`; relay 1, 2026-11-03)
 
@@ -354,3 +377,61 @@ and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row
 | Module | What changed | From |
 |---|---|---|
 | `maths::filters` (`direct_volume`, `convolve_in_place`) | where FSL convolves by its FFT (§10.2's criterion), the direct sum's products in double precision added to a double-precision sum, rounded once to single precision (FSL's direct path keeps §10.2's single-precision sum); the same order of taps, NaN rules and bits at any thread count | findings 31 (the page's `-kernel sphere 21 -fmean` against its exact result; `fft_cases_reference.py` on the record's FFT cases) |
+
+## standard_space_roi and fslroi (the clean-room catch-up, relay 5, 2026-11-05)
+
+Written by a clean-room implementer under the same rules (FSL's source, the scripts' text in
+`~/fsl-6.0.7.23/bin`, the replica crates (`crates-nc/` with its `wheel-data/` and manifest
+scripts), the source-derived findings, the register's restricted sections, `docs/parts/` and
+`validation/probes/` not opened; FSL's standard images read only as data files, by path). Its
+only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) (FSL 6.0.7.23's `standard_space_roi`, fsl-flirt 2111.4, and `fslroi`, fsl-avwutils 2209.6) | the command lines, the usages, the work's steps and their files, the messages and statuses, bash's report of an abort (its lines and commands), fslpy's `imcp`, the types and the region, FSL-211 to FSL-215 and FSL-217 |
+| [`specs/bet.md`](../../specs/bet.md) §5.4 | FSL's standard images: their sizes and SHA-256, FSL's package (its address, size and SHA-256, its members), the order of the search, the refusal |
+| Black-box runs of FSL 6.0.7.23's `standard_space_roi`, `fslroi` and `flirt` through the oracle cache (`validation/investigations/cleanroom-bet/ssroi_fsl_runs.py`, `ssroi_stage_probe.py`, `fit_translate.py`; the BET suite's cases) | the observations of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "standard_space_roi and fslroi": fslroi's matrices through the held frame, the script's two tests' forms, FLIRT's `-out` display range |
+| GNU bash 5.2's `test` builtin run on this machine (its messages for argument lists with extra words) | `[`'s evaluation and messages for names split at blanks (FSL-211, `reproduce`) |
+| One download of FSL's `fsl-data_standard-2208.0-0.tar.bz2` from FSL's site (2026-11-05) | the package's tar layout (its members `data/standard/<image>.nii.gz`) and the three images' bytes, checked against the spec's checksums; not kept in the repository |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::fslroi` | `fslroi`'s three forms, `atoi`'s numbers, the region (sizes of −1, a box outside the image, the time range), the output type (`-odt input`'s rule), the matrices moved to the box's corner (FSL's held-frame arithmetic), the messages, FSL-215, FSL-217 | spec §3, black-box (`fit_translate.py`) |
+| `cli::ssroi` | the script's options, usage and checks, the five steps run in this process with the original's programs (their messages, bash's `Aborted` report), the field of view resampled once where it is both the mask and the region, the temporary images uncompressed without `-d`, fslpy's `imcp` (a copy, or the layout converted), the cleanup; FSL-211 (bash's splitting and `[`'s messages), FSL-212, FSL-213, FSL-214 | spec §2, §6, §7, black-box |
+| `data` | FSL's standard images found as §5.4 says: the named directory, larmorx-nc's copy read as data (checked), `$FSLDIR`, larmorx's data cache filled once by a checksum-verified download (`curl`, else `wget`) of FSL's package, only its three images kept with a manifest; the refusal naming every place looked | `specs/bet.md` §5.4; the decision log, 2026-11-04 |
+| `flirt::engine` (the `-out` writers) | `-out`'s display range 0 and 0 | black-box (findings) |
+
+## bet -S, -B, -A, -A2 (the clean-room catch-up, relay 6, 2026-11-05)
+
+Written by a clean-room implementer under the same rules (FSL's source, FSL's `bet` and
+`standard_space_roi` scripts' text, the replica crates, the source-derived findings, the
+register's restricted sections, `docs/parts/` and `validation/probes/` not opened). Its only
+inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/bet.md`](../../specs/bet.md) §5.3, §5.4, §7, §9 to §11.1 | each variation's programs, their arguments, files and types, the eye threshold in dc's decimal arithmetic, the standard images, the messages and statuses, FSL-44, FSL-46, FSL-63, FSL-216, FSL-217 |
+| [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) §2.4, §3.2; [`specs/fslstats.md`](../../specs/fslstats.md) §4, §5.7 | standard_space_roi's status 0 with `-d`; fslroi's types (FSL-217); `fslstats -l -C` (the robust run's centre) |
+| Black-box runs of FSL 6.0.7.23's `bet` (the suite's option cases, with `-d` and `-v` added), `bet2`, `fslstats` through the oracle cache (`validation/investigations/cleanroom-bet/ssroi_fsl_runs.py`) | the observations of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "bet -S, -B, -A, -A2": fslstats' six decimals, a negative mean's `dc: stack empty`, the files a failed run leaves, the commands' texts in bash's reports, fslpy's message for a missing image, the sign of bet2's zero minimum |
+| GNU dc 1.4.1 run on this machine (`10 k <mean> 3.5 <sd> * + p`, its two streams) | the threshold's text (scales, truncation, `.5`, `0`, `-`), dc's messages split between standard error (`dc: `) and standard output |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::bet_script` | `-S`, `-B`, `-A`, `-A2` as the script's sequences of the original's programs in this process (bet2, standard_space_roi, FLIRT, fslmaths, fslstats, FAST with its streams discarded, betsurf, the script itself), bash's `Aborted` report and the `ERR` trap's line, fslpy's `immv`, the eye threshold (`Decimal`: dc's `*` and `+` at scale 10, its text), FSL-63's removal of `-s`, FSL-216 | spec §5.3, §9; black-box (findings) |
+| `cli::bet` | the standard images found before anything runs, the temporary images uncompressed when not kept, a failed run's temporary files left (rewritten in the run's format), FSL-46's cleanup by the files created or changed, `-R`'s centre by `fslstats -l 0.001 -C`, `-F`'s and `-Z`'s temporary images in fslroi's types (FSL-217) | spec §5.1 to §5.4, §9; `specs/standard_space_roi.md` §3.2; `specs/fslstats.md` §5.7 |
+| `bet::params` (`min_max`) | of equal extremes the first kept (a zero's sign) | black-box (findings) |
+| `cli::ssroi` | fslpy's `Could not find a supported file with prefix "<name>"`; the status 0 with `-d` in `reproduce` | `specs/standard_space_roi.md` §2.4; black-box |
+
+### The clean-room catch-up, relay 7 (2026-11-05): betsurf's profiles, bet -Z's doubles, bet2's zero centre
+
+| Input | What it gave |
+|---|---|
+| Black-box runs of FSL 6.0.7.23's `betsurf` on single profiles (a 0.2 mm triangle casting one profile; `-v`'s share; through the oracle cache, `validation/investigations/cleanroom-bet/profile_oracle_cached.py`) on the BET options part's random-testing images, and its whole runs (`betsurf_shares.py`, `replay_trial.py`) | the four readings of `specs/bet.md` §6.4 of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "The BET part's random-testing differences" |
+| Black-box runs of FSL's `bet -Z -d` (case 330 of that trial) and `bet2 -c` on an empty brain's `fslstats -C` centre (the permanent cases `original-bet-R-*`) | `-Z`'s float64 temporaries; a centre of zeros in the radiological frame is "not given" |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `betsurf::profile` | the backward searches never read a profile's first sample; the T1-only scan for `b` starts at the second sample when `a` is the first; step 5's first bright sample strictly within 10 mm, each of its searches after the previous one's sample; an empty outer-skull search range counts the scalp only | spec §6.4; black-box (findings) |
+| `cli::betsurf` | FSL-50's stop not reproduced (FSL observed to run on) | black-box (findings) |
+| `cli::bet` (`-Z`) | a float64 input's slices and padded image kept double | black-box (findings) |
+| `cli::bet2` (`centre_mm`) | `-c` of three zeros after the conversion into the radiological frame is the centre of gravity | spec §3.2; black-box (findings) |

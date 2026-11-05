@@ -233,7 +233,10 @@ fn quaternion_rotation(x: f64, y: f64, z: f64) -> Option<[[f64; 3]; 3]> {
 }
 
 /// The matrix of the first `n` parameters of `p` about `centre` (§3), with `rep`'s rotation.
-/// The quaternion's messages go to `log`.
+/// The quaternion's messages go to `log`: at every composition whose vector part lies outside
+/// the unit ball (§8.1 step 9), which then keeps only its scales and skews about the centre (the
+/// rotation the identity, the translations never added: observed, the invalid starts of
+/// `real/anglerep-quaternion-dof6` start from the identity).
 pub fn compose(rep: AngleRep, p: &Params, n: usize, centre: [f64; 3], log: &Log) -> Mat4 {
     if rep == AngleRep::Euler {
         return euler_compose(p, n, centre, log.libm());
@@ -241,13 +244,16 @@ pub fn compose(rep: AngleRep, p: &Params, n: usize, centre: [f64; 3], log: &Log)
     if n < 3 {
         log.push(format!("Can only do 3 or more, not {n}"));
     }
-    let r = quaternion_rotation(p[0], p[1], p[2]).unwrap_or_else(|| {
+    let rotation = quaternion_rotation(p[0], p[1], p[2]);
+    let valid = rotation.is_some();
+    let r = rotation.unwrap_or_else(|| {
         log.push("Parameters do not form a valid axis - greater than unity");
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
     });
     let l = rigid::with_scales_skews(&r, p, n);
     let mut m = rigid::IDENTITY;
     let translations = match n {
+        _ if !valid => 0,
         0..=3 => 3,
         4..=6 => n - 3,
         _ => 3,
@@ -329,12 +335,20 @@ mod tests {
             assert!((p[k] - q[k]).abs() < 1e-5, "{k}: {} {}", p[k], q[k]);
         }
         assert!(log.take().is_empty());
-        let bad: Params = [0.9, 0.9, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0];
+        let bad: Params = [0.9, 0.9, 0.0, 3.0, -2.0, 1.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0];
         let m = compose(AngleRep::Quaternion, &bad, 6, c, &log);
-        assert_eq!(m[0][0], 1.0);
+        // the identity: no translations (§8.1 step 9)
+        assert_eq!(m, IDENTITY);
         assert_eq!(
             log.take(),
             ["Parameters do not form a valid axis - greater than unity"]
         );
+        // with 7 parameters the scale about the centre only
+        let mut scaled = bad;
+        scaled[6] = 1.1;
+        let m = compose(AngleRep::Quaternion, &scaled, 7, c, &log);
+        assert_eq!(m[0][0], 1.1);
+        assert!((m[0][3] - (c[0] - 1.1 * c[0])).abs() < 1e-12, "{m:?}");
+        assert_eq!(log.take().len(), 1);
     }
 }

@@ -231,6 +231,19 @@ fn world(input: &Input) -> Option<Mat4> {
     Some(mat::mul(&mat::mul(&mat::mul(&a, &di), &f), &dm))
 }
 
+/// The input's sampling matrix, which a level of 2 prints (§2.3): its voxel sizes as prepared
+/// (a single slice's 8 mm, then divided by the base scale `b`; observed: 0.5 mm voxels print 1).
+fn sampling_matrix(v: &Volume, b: f32) -> Mat4 {
+    let mut vs = v.voxel_size;
+    if v.shape[2] == 1 {
+        vs[2] = 8.0;
+    }
+    if (b - 1.0).abs() > 1e-5 {
+        vs = vs.map(|d| d / b);
+    }
+    mat::diagonal(vs.map(f64::from))
+}
+
 /// The scaled-mm conversion of a matrix (§3): `S M S⁻¹`, `S = diag(1/b)`.
 fn scale_in(m: &Mat4, b: f32) -> Mat4 {
     if (b - 1.0).abs() <= 1e-5 {
@@ -318,6 +331,10 @@ struct State<'a> {
     /// The input's sampling matrix and raw range, which a level of 2 prints at each `setscale`.
     sampling: Mat4,
     raw_input: (f32, f32),
+    /// The reference's and the input's `pixdim[4]` as read, which a level's description (a
+    /// level of 2, `-debug`) prints as its fourth size (observed: FSL prints 0 for images whose
+    /// TR is 0).
+    tr: [f64; 2],
     /// `-debug`: the current pair's boundary-based cost set up (its lines printed, §9.4); the
     /// final debug call's evaluation, which saves BBR's volume `debug`.
     bbr_set: bool,
@@ -330,6 +347,10 @@ struct State<'a> {
     in_weight0: Option<Volume>,
     /// The pyramid's levels (1, 2, 4, 8 mm) and their weights.
     levels: [Volume; 4],
+    /// The reference's voxel sizes as FLIRT holds them (scaled by the base scale, §3).
+    ref_held: [f32; 3],
+    /// The first pair is being made (its boundary-based cost set up after the verbose centres).
+    first_pair: bool,
     level_weights: [Option<Volume>; 4],
     one_replaced: bool,
     bbr: Arc<BbrSource>,
@@ -455,7 +476,10 @@ impl State<'_> {
             }
             x[i] += if abs { pi } else { pi * d[i] };
         }
-        Ok(param::compose(self.opt.rep, &x, dof.max(6), c, &self.log))
+        // composed again with all twelve parameters, whatever the command's dof (observed,
+        // 2026-11-05: `measurecost 6` of a scaled and skewed row keeps its scales and skew, and
+        // `measurecost 7` with a scale perturbation changes only the first scale)
+        Ok(param::compose(self.opt.rep, &x, 12, c, &self.log))
     }
 }
 
@@ -474,69 +498,138 @@ fn evaluate(pair: &Pair, t: &Mat4, cost: Cost, log: &Log, trace: &Trace) -> f32 
     pair.cost_of(t, cost, parallel, log)
 }
 
-/// `-debug`'s lines when a pair's boundary-based cost is set up (§9.4, observed): a new pair
-/// with that cost, or `setoption costfunction bbr` on a pair without it.
-fn announce_bbr(st: &mut State<'_>) {
-    if !st.o.debug || st.bbr_set {
+/// The set-up of a pair's boundary-based cost (a new pair with that cost, or `setoption
+/// costfunction bbr` on a pair without it): without a boundary point §6.5's error; with `-debug`
+/// its lines around the set-up (§9.4, observed), once the boundary is set, and again at every
+/// set-up while it is not (no boundary point: `Result (post) of is_bbr_set is 0`).
+fn bbr_setup(st: &mut State<'_>) {
+    let Some(p) = st.pair.clone() else {
+        return;
+    };
+    let empty = super::bbr::no_points(&p, &st.log);
+    if !st.o.debug {
+        if empty {
+            st.log.push(super::bbr::NO_POINTS);
+        }
         return;
     }
-    st.bbr_set = true;
-    for line in [
-        "Setting bbr seg 1",
-        "Cost is set to 8",
-        "Cost == BBR is 1",
-        "Result (pre) of is_bbr_set is 0",
-        "Result (post) of is_bbr_set is 1",
-    ] {
+    if st.bbr_set {
+        return;
+    }
+    for line in super::bbr::DEBUG_PRE {
         st.log.push(line);
     }
+    if empty {
+        st.log.push(super::bbr::NO_POINTS);
+    }
+    st.log.push(format!(
+        "Result (post) of is_bbr_set is {}",
+        if empty { 0 } else { 1 }
+    ));
+    st.bbr_set = !empty;
 }
 
-/// The header of a level of the reference pyramid (§5, observed in `-debug`'s volumes): the
-/// reference's, its voxel sizes the level's and its sform and qform following the grid
-/// (`W' = W·F_n·D·F_n'`, `D` the ratio of the voxel sizes, `F` FSL's x flip of each grid).
-fn level_header(reference: &Input, shape0: [usize; 3], level: &Volume) -> Input {
+/// The header of a grid resampled from `reference` (§9.3, §9.4): each form as FLIRT holds it (a
+/// neurological file's swapped by the read grid, `W·D⁻¹·F⁻¹·D`, the field of view in single
+/// precision), a set form (code ≠ 0) composed with `diag(step)`, both swapped back with the new
+/// grid's `n_x` and voxel size `d1`, every element rounded to single precision; the qform's
+/// quaternion then from that matrix (§3's conversion, final). `n0` is the read grid's `n_x`.
+fn resampled_header(
+    reference: &Input,
+    n0: usize,
+    step: [f64; 3],
+    n1: usize,
+    d1: [f64; 3],
+) -> (Input, bool) {
     let mut out = reference.clone();
     let h = &mut out.header;
-    let old = [h.pixdim[1], h.pixdim[2], h.pixdim[3]];
-    let flip = |n: usize| -> Mat4 {
+    let flipped = reference.flipped;
+    let swap = |m: &Mat4, d: [f64; 3], n: usize| -> Mat4 {
+        if !flipped {
+            return *m;
+        }
         let mut f = IDENTITY;
-        if reference.flipped {
-            f[0][0] = -1.0;
-            f[0][3] = n as f64 - 1.0;
-        }
-        f
+        f[0][0] = -1.0;
+        f[0][3] = f64::from((n as f32 - 1.0) * (d[0] as f32));
+        let di = mat::diagonal(d.map(|v| 1.0 / v));
+        mat::mul(&mat::mul(&mat::mul(m, &di), &f), &mat::diagonal(d))
     };
-    let scale = mat::diagonal([0, 1, 2].map(|j| {
-        if old[j] != 0.0 {
-            f64::from(level.voxel_size[j]) / old[j].abs()
-        } else {
-            1.0
+    let d0 = reference.vol.voxel.map(|v| f64::from(v.abs() as f32));
+    let scale = mat::diagonal(step);
+    let through = |m: &Mat4, set: bool| -> Mat4 {
+        let mut a = swap(m, d0, n0);
+        if set {
+            a = mat::mul(&a, &scale);
         }
-    }));
-    let step = mat::mul(&mat::mul(&flip(shape0[0]), &scale), &flip(level.shape[0]));
+        swap(&a, d1, n1).map(|row| row.map(|v| f64::from(v as f32)))
+    };
     let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
-    let new_s = if h.sform_code > 0 {
-        mat::mul(&srow, &step)
-    } else {
-        mat::mul(&mat::mul(&srow, &flip(shape0[0])), &flip(level.shape[0]))
-    };
+    let new_s = through(&srow, h.sform_code > 0);
     h.srow_x = new_s[0];
     h.srow_y = new_s[1];
     h.srow_z = new_s[2];
-    if h.qform_code > 0
-        && let Ok(q) = h.qform()
-    {
-        let nq = mat::mul(q.rows(), &step);
+    let mut quaternion_final = false;
+    if h.qform().is_ok() {
+        let r = crate::bet::quatern::quatern_to_mat(
+            h.quatern_b,
+            h.quatern_c,
+            h.quatern_d,
+            [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
+        );
+        let off = [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| f64::from(v as f32));
+        let q: Mat4 = [
+            [r[0][0], r[0][1], r[0][2], off[0]],
+            [r[1][0], r[1][1], r[1][2], off[1]],
+            [r[2][0], r[2][1], r[2][2], off[2]],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let nq = through(&q, h.qform_code > 0);
+        let rot = [0, 1, 2].map(|i| [nq[i][0], nq[i][1], nq[i][2]]);
+        let ([b, c, d], qfac) = crate::bet::quatern::mat_to_quatern(&rot);
+        h.quatern_b = b;
+        h.quatern_c = c;
+        h.quatern_d = d;
+        h.pixdim[0] = qfac;
         h.qoffset_x = nq[0][3];
         h.qoffset_y = nq[1][3];
         h.qoffset_z = nq[2][3];
+        quaternion_final = true;
     }
-    for j in 0..3 {
-        h.pixdim[1 + j] = f64::from(level.voxel_size[j]);
+    h.pixdim[1..4].copy_from_slice(&d1);
+    (out, quaternion_final)
+}
+
+/// The header of a level of the reference pyramid (§9.4): the reference resampled isotropically
+/// to the minimum sampling `m` (the steps `st = m/d`, single precision, `d` the reference's voxel
+/// sizes as FLIRT holds them, scaled by the base scale) and subsampled by 2 to the level's voxel
+/// size, so a set form is composed with `diag(st)` and each subsampling's `diag(2)`
+/// ([`resampled_header`]): the step `level/d` in single precision (`m·2^k/d`, exact). With
+/// `-noresample` the levels are the reference itself: its forms as read, its voxel sizes as held
+/// (observed, 2026-11-05). Returns the header and whether its quaternion is final.
+fn level_header(
+    reference: &Input,
+    shape0: [usize; 3],
+    held: [f32; 3],
+    resampled: bool,
+    level: &Volume,
+) -> (Input, bool) {
+    let d1 = level.voxel_size.map(f64::from);
+    if !resampled {
+        let mut out = reference.clone();
+        out.header.pixdim[1..4].copy_from_slice(&d1);
+        out.vol.shape = level.shape;
+        return (out, false);
     }
+    let step = [0, 1, 2].map(|j| {
+        if held[j] != 0.0 {
+            f64::from(level.voxel_size[j] / held[j].abs())
+        } else {
+            1.0
+        }
+    });
+    let (mut out, q) = resampled_header(reference, shape0[0], step, level.shape[0], d1);
     out.vol.shape = level.shape;
-    out
+    (out, q)
 }
 
 /// `-debug`'s volumes once the images are prepared (§9.4): the reference pyramid's levels and
@@ -552,21 +645,26 @@ fn debug_files(
 ) -> Result<(), End> {
     let ctx = st.ctx;
     let shape0 = reference.vol.shape;
-    let save =
-        |name: &str, like: &Input, v: &Volume, err: &mut dyn Write, notices: &mut Vec<Notice>| {
-            write_image(
-                ctx,
-                name,
-                like,
-                v.shape,
-                1,
-                None,
-                v.data.clone(),
-                DataType::F32,
-                err,
-                notices,
-            )
-        };
+    let (held, resampled) = (st.ref_held, !st.o.no_resample);
+    let save = |name: &str,
+                (like, q): &(Input, bool),
+                v: &Volume,
+                err: &mut dyn Write,
+                notices: &mut Vec<Notice>| {
+        write_image_as(
+            ctx,
+            name,
+            like,
+            v.shape,
+            1,
+            None,
+            v.data.clone(),
+            DataType::F32,
+            *q,
+            err,
+            notices,
+        )
+    };
     for (name, k) in [
         ("refvol_8", 3),
         ("refvol_4", 2),
@@ -574,7 +672,13 @@ fn debug_files(
         ("refvol", 0),
     ] {
         let v = &st.levels[k];
-        save(name, &level_header(reference, shape0, v), v, err, notices)?;
+        save(
+            name,
+            &level_header(reference, shape0, held, resampled, v),
+            v,
+            err,
+            notices,
+        )?;
     }
     if st.level_weights.iter().any(Option::is_some) {
         for (name, k) in [
@@ -584,12 +688,19 @@ fn debug_files(
             ("global_refweight8", 3),
         ] {
             if let Some(w) = &st.level_weights[k] {
-                save(name, &level_header(reference, shape0, w), w, err, notices)?;
+                save(
+                    name,
+                    &level_header(reference, shape0, held, resampled, w),
+                    w,
+                    err,
+                    notices,
+                )?;
             }
         }
-    } else {
+    } else if resampled {
         // the filtering of an empty weight: one voxel of 0 at the minimum sampling, no sform
-        // or qform (observed)
+        // or qform (observed); with -noresample nothing is filtered and nothing written
+        // (observed, 2026-11-05)
         let m = f64::from(st.min_sampling);
         let mut like = reference.clone();
         let h = &mut like.header;
@@ -598,6 +709,10 @@ fn debug_files(
         h.pixdim[1] = m;
         h.pixdim[2] = m;
         h.pixdim[3] = m;
+        // pixdim[4..7] 1, not 0 (§9.4, observed), and qfac 1 (observed, 2026-11-05)
+        for k in [0, 4, 5, 6, 7] {
+            h.pixdim[k] = 1.0;
+        }
         h.srow_x = [1.0, 0.0, 0.0, 0.0];
         h.srow_y = [0.0, 1.0, 0.0, 0.0];
         h.srow_z = [0.0, 0.0, 1.0, 0.0];
@@ -609,12 +724,17 @@ fn debug_files(
         h.qoffset_z = 0.0;
         like.flipped = false;
         let one = Volume::new([1, 1, 1], [st.min_sampling; 3], vec![0.0]);
-        save("global_refweight1", &like, &one, err, notices)?;
+        save("global_refweight1", &(like, false), &one, err, notices)?;
     }
-    // the input's header as read: its sform's negative zeros kept (observed)
+    // the input's header as read: its sform's negative zeros kept, its voxel sizes as FLIRT
+    // holds them (scaled by the base scale; observed, 2026-11-05)
     let as_read = |name: &str, v: &Volume, err: &mut dyn Write, notices: &mut Vec<Notice>| {
+        let mut held = input.clone();
+        for j in 0..3 {
+            held.header.pixdim[1 + j] = f64::from(v.voxel_size[j].abs());
+        }
         let look = Look {
-            reference: input,
+            reference: &held,
             shape: v.shape,
             volumes: 1,
             tr: None,
@@ -708,14 +828,22 @@ fn run_inner(
     let in_name = o.input.clone().unwrap_or_default();
     let ref_name = o.reference.clone().unwrap_or_default();
     let applying = o.apply_xfm || o.apply_iso.is_some();
+    // FSL's warning for a 4D image read as a 3D volume (§3): a registration reads both images
+    // twice, the second time after the sform lines (observed, 2026-11-05: two warnings for each
+    // 4D image, the sform warning between them); -applyxfm reads the reference once
+    const MULTIPLE_TIMEPOINTS: &str = "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release.";
     let mut reference = read(ctx, &ref_name, false, notices)?;
-    if reference.input.volumes > 1 && applying {
-        let _ = writeln!(
-            err,
-            "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release."
-        );
+    if reference.input.volumes > 1 {
+        let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
     }
     let mut input = read(ctx, &in_name, applying, notices)?;
+    let four_d = [
+        reference.input.volumes > 1,
+        input.input.volumes > 1 && !applying,
+    ];
+    if four_d[1] {
+        let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
+    }
     // FSL-92: an image of one voxel cannot measure an alignment (§4.1): refused by default
     if !applying {
         let one = |im: &Image| im.vols[0].shape == [1, 1, 1];
@@ -784,13 +912,10 @@ fn run_inner(
             ),
         };
         trace.line(&between("Refvol", 0));
-        let vs = input.vols[0].voxel_size;
-        let z = if input.vols[0].shape[2] == 1 {
-            8.0
-        } else {
-            vs[2]
-        };
-        let sampling = mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)]);
+        let sampling = sampling_matrix(
+            &input.vols[0],
+            base_scale(o, &reference.vols[0], &input.vols[0]),
+        );
         trace.write(&format!(
             "Testvol sampling matrix =\n{}\n",
             trace.matrix(&sampling)
@@ -812,6 +937,11 @@ fn run_inner(
             "WARNING: Both reference and input images have an sform matrix set"
         );
     }
+    if !applying {
+        for _ in four_d.iter().filter(|&&d| d) {
+            let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
+        }
+    }
     // the initial matrix
     let q_unscaled = qsform(&reference.input, &input.input);
     let init_unscaled = if let Some(name) = &o.init {
@@ -822,11 +952,14 @@ fn run_inner(
     } else {
         IDENTITY
     };
+    // the initial matrix printed in scaled mm (observed: 0.5 mm voxels, a base scale of 0.5,
+    // print an -init translation of 1.5 as 3)
+    let init_shown = scale_in(
+        &init_unscaled,
+        base_scale(o, &reference.vols[0], &input.vols[0]),
+    );
     if trace.at(2) {
-        trace.write(&format!(
-            "Init Matrix = \n{}\n",
-            trace.matrix(&init_unscaled)
-        ));
+        trace.write(&format!("Init Matrix = \n{}\n", trace.matrix(&init_shown)));
     }
     if trace.at(1) {
         if ref_sform {
@@ -837,10 +970,7 @@ fn run_inner(
         }
     }
     if trace.at(1) || o.print_init {
-        trace.write(&format!(
-            "Init Matrix = \n{}\n",
-            trace.matrix(&init_unscaled)
-        ));
+        trace.write(&format!("Init Matrix = \n{}\n", trace.matrix(&init_shown)));
     }
     if applying {
         return apply(
@@ -996,6 +1126,7 @@ fn register(
         echo_spacing: o.echo_spacing,
         bbr_type: o.bbr_type.clone(),
         slope: o.bbr_slope,
+        debug: o.debug,
         ..BbrSource::default()
     };
     if let Some(n) = &o.wmseg {
@@ -1136,19 +1267,17 @@ fn register(
         ctx,
         log: Arc::new(Log::sharing(Arc::clone(&ctx.libm))),
         trace: trace.clone(),
-        sampling: {
-            let vs = input.vols[0].voxel_size;
-            let z = if input.vols[0].shape[2] == 1 {
-                8.0
-            } else {
-                vs[2]
-            };
-            mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)])
-        },
+        sampling: sampling_matrix(&input.vols[0], b),
         raw_input: prepared.raw.map_or((0.0, 0.0), |r| r[1].range),
+        tr: [
+            reference.input.header.pixdim[4],
+            input.input.header.pixdim[4],
+        ],
         bbr_set: false,
         debug_bbr: false,
         debug_volume: None,
+        ref_held: ref0.voxel_size,
+        first_pair: false,
         reference: ref0,
         input0: in0,
         ref_weight,
@@ -1186,6 +1315,7 @@ fn register(
     st.opt.level = o.verbose;
     // the schedule
     let text = match &o.schedule {
+        _ if o.schedule_text.is_some() => o.schedule_text.unwrap_or_default().to_owned(),
         Some(name) => match std::fs::read_to_string(ctx.settings.path(name)) {
             Ok(t) => t,
             Err(_) => {
@@ -1196,18 +1326,32 @@ fn register(
         None if o.two_d => schedule::DEFAULT_2D.to_owned(),
         None => schedule::DEFAULT_3D.to_owned(),
     };
-    let lines: Vec<&str> = if o.schedule.is_some() {
+    let lines: Vec<&str> = if o.schedule.is_some() || o.schedule_text.is_some() {
         text.split('\n').collect()
     } else {
         text.lines().collect()
     };
-    // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale
+    // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale;
+    // its boundary-based cost set up after the verbose centres' lines (observed, 2026-11-05:
+    // their COG warnings come before the set-up's lines and its error)
+    st.first_pair = true;
     set_scale(&mut st, 8.0, true, false, err)?;
+    st.first_pair = false;
     st.flush(err);
     if trace.at(3) {
-        let c = |v: &Volume| trace.nums(cost::centre_of_mass(v, false));
-        trace.line(&format!("CoG for refvol is:  {}", c(&st.reference)));
-        trace.line(&format!("CoG for testvol is:  {}", c(&st.input0)));
+        // each centre measured for its line, its total's warning on standard error (observed:
+        // an empty reference prints it between `CoG for refvol is:` and its numbers)
+        for (name, v) in [("refvol", &st.reference), ("testvol", &st.input0)] {
+            let (c, zero) = cost::centre_of_mass_counted(v, false);
+            if zero {
+                let _ = writeln!(err, "WARNING::in calculating COG, total = 0.0");
+            }
+            trace.line(&format!("CoG for {name} is:  {}", trace.nums(c)));
+        }
+    }
+    if st.cost == Cost::Bbr {
+        bbr_setup(&mut st);
+        st.flush(err);
     }
     let testvol = if o.no_resample {
         st.input0.clone()
@@ -1221,9 +1365,9 @@ fn register(
                 "Resampling refvol isotropically: {}",
                 trace.num(f64::from(st.min_sampling))
             ));
-            trace.volume_info("Refvol", &st.levels[0]);
+            trace.volume_info("Refvol", &st.levels[0], st.tr[0]);
         }
-        trace.volume_info("TESTVOL", &testvol);
+        trace.volume_info("TESTVOL", &testvol, st.tr[1]);
     }
     if o.debug {
         debug_files(&st, &reference.input, &input.input, &testvol, err, notices)?;
@@ -1265,8 +1409,14 @@ fn register(
         st.check()?;
         if let Some(values) = st.debug_volume.take() {
             let pair = st.pair()?.clone();
-            let like = level_header(&reference.input, reference.vols[0].shape, &pair.reference);
-            write_image(
+            let (like, q) = level_header(
+                &reference.input,
+                reference.vols[0].shape,
+                st.ref_held,
+                !st.o.no_resample,
+                &pair.reference,
+            );
+            write_image_as(
                 ctx,
                 "debug",
                 &like,
@@ -1275,6 +1425,7 @@ fn register(
                 None,
                 values,
                 DataType::F32,
+                q,
                 err,
                 notices,
             )?;
@@ -1837,10 +1988,7 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
                 st.cost = c;
                 st.search_cost = c;
                 if c == Cost::Bbr && st.pair.is_some() {
-                    announce_bbr(st);
-                    if let Some(p) = st.pair.as_ref() {
-                        super::bbr::setup_errors(p, &st.log, 1);
-                    }
+                    bbr_setup(st);
                 }
             }
             None => {
@@ -1932,7 +2080,7 @@ fn set_scale(
                 mat::g(f64::from(st.min_sampling), 6)
             );
             if let Some(p) = &st.pair {
-                trace.volume_info("testvol DEBUG", &p.input);
+                trace.volume_info("testvol DEBUG", &p.input, st.tr[1]);
             }
         }
         if trace.at(2) {
@@ -2031,11 +2179,8 @@ fn set_scale(
         }
         st.pair = Some(Arc::new(pair));
         st.bbr_set = false;
-        if st.cost == Cost::Bbr {
-            announce_bbr(st);
-            if let Some(p) = st.pair.as_ref() {
-                super::bbr::setup_errors(p, &st.log, 1);
-            }
+        if st.cost == Cost::Bbr && !st.first_pair {
+            bbr_setup(st);
         }
     } else if let Some(p) = st.pair.take() {
         // only the input reset (§7.2)
@@ -2120,10 +2265,10 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
 fn run_search(st: &mut State<'_>, dof: usize, err: &mut dyn Write) -> Result<(), End> {
     check_bbr_step(st, st.search_cost)?;
     let pair = st.pair()?.clone();
-    let log = st.log.clone();
     let cost = st.search_cost;
     let tr = st.trace.clone();
-    let eval = |t: &Mat4| evaluate(&pair, t, cost, &log, &tr);
+    // the log each evaluation writes to: the run's for the grids, a free optimisation's own
+    let eval = |t: &Mat4, lg: &super::cost::Log| evaluate(&pair, t, cost, lg, &tr);
     let mut opt = st.opt.clone();
     opt.level = st.o.verbose - 2;
     // the search measures both centres again (observed: one more warning for an empty
@@ -2555,8 +2700,17 @@ pub(crate) fn write_values(
     };
     let v = match larmorx_mri::hmc::image::integer_range(t) {
         Some((lo, hi)) => {
-            let (data, conv) =
+            let (mut data, conv) =
                 larmorx_mri::hmc::image::convert_values(&values, mode, lo, hi, |i| i as f64, |f| f);
+            // values held exactly (applyxfm4D's int32 padding): those single precision rounds
+            // written as they are, in the type's range
+            if let Some(d) = &doubles {
+                for ((x, &e), &v) in data.iter_mut().zip(d).zip(&values) {
+                    if e.to_bits() != f64::from(v).to_bits() && (lo..=hi).contains(&e) {
+                        *x = e;
+                    }
+                }
+            }
             if conv.rounded + conv.out_of_range > 0 {
                 defects::push_once(
                     notices,
@@ -2669,26 +2823,34 @@ fn write_registered(
         let dims = [d[0], d[1], d[2], reference.input.header.pixdim[4]];
         trace.info("Transformed testvol", refv.shape, dims, 1, &values);
     }
-    let (like, quaternion_final) = match formless_forms(&reference.input, &input.input, m) {
+    let (mut like, quaternion_final) = match formless_forms(&reference.input, &input.input, m) {
         Some(f) => (f, true),
         None => (
             completed_forms(&reference.input),
             qform_completed(&reference.input),
         ),
     };
-    write_image_as(
-        ctx,
-        stem,
-        &like,
-        refv.shape,
-        1,
-        None,
-        values,
-        t,
+    // the display range 0 and 0, whatever the reference's (observed, 2026-11-05: FSL 6.0.7.23's
+    // -out of a registration, -applyxfm, -applyisoxfm, every interpolation)
+    like.header.cal_min = 0.0;
+    like.header.cal_max = 0.0;
+    // a sform completed from the reference's qform keeps the negative zeros of its products
+    // (qfac -1 times a zero entry) unless the reference is stored neurologically (its swap's
+    // products make them positive); a stored sform's are written as zeros (observed, random
+    // testing's 20261103-11635 and -01058 of 2026-11-05: a qform-only reference with qfac -1)
+    let h = &reference.input.header;
+    let completed_from_qform = h.sform_code == 0 && h.qform_code > 0;
+    let look = Look {
+        reference: &like,
+        shape: refv.shape,
+        volumes: 1,
+        tr: None,
+        cal: None,
+        descrip: "larmorx fsl flirt",
+        positive_zeros: !completed_from_qform || reference.input.flipped,
         quaternion_final,
-        err,
-        notices,
-    )
+    };
+    write_values(ctx, stem, &look, values, None, t, err, notices)
 }
 
 /// One volume resampled as §9.2 says; `pad` the padding value when given (else the blurred
@@ -2788,74 +2950,27 @@ fn apply(
     if let Some(s) = o.apply_iso {
         refv = pyramid::isotropic(&pyramid::blur(&refv, s, &ctx.libm), s);
         // the header follows the resampling (§9.3, §4.1): each form as FSL holds it, a
-        // neurological file's swapped by the read grid (`W·D⁻¹·F⁻¹·D`, the field of view in
-        // single precision), a set form composed with `diag(st)` (`st = s/d` in single
-        // precision), swapped back with the new grid's `n_x` and `s`, every element rounded to
-        // single precision; the qform's quaternion then from that matrix (§3's conversion)
-        let h = &mut ref_input.header;
-        let old = [h.pixdim[1], h.pixdim[2], h.pixdim[3]];
-        let scale = mat::diagonal([0, 1, 2].map(|j| {
+        // neurological file's swapped by the read grid, a set form composed with `diag(st)`
+        // (`st = s/d` in single precision), swapped back with the new grid's `n_x` and `s`,
+        // every element rounded to single precision; the qform's quaternion then from that
+        // matrix (§3's conversion)
+        let old = [0, 1, 2].map(|j| ref_input.header.pixdim[1 + j]);
+        let step = [0, 1, 2].map(|j| {
             if old[j] != 0.0 {
                 f64::from(s / old[j].abs() as f32)
             } else {
                 1.0
             }
-        }));
-        let flipped = reference.input.flipped;
-        let swap = |m: &Mat4, d: [f64; 3], n: usize| -> Mat4 {
-            if !flipped {
-                return *m;
-            }
-            let mut f = IDENTITY;
-            f[0][0] = -1.0;
-            f[0][3] = f64::from((n as f32 - 1.0) * (d[0] as f32));
-            let di = mat::diagonal(d.map(|v| 1.0 / v));
-            mat::mul(&mat::mul(&mat::mul(m, &di), &f), &mat::diagonal(d))
-        };
-        let d0 = reference.input.vol.voxel.map(|v| f64::from(v.abs() as f32));
-        let d1 = [f64::from(s); 3];
-        let (n0, n1) = (reference.vols[0].shape[0], refv.shape[0]);
-        let through = |m: &Mat4, set: bool| -> Mat4 {
-            let mut a = swap(m, d0, n0);
-            if set {
-                a = mat::mul(&a, &scale);
-            }
-            swap(&a, d1, n1).map(|row| row.map(|v| f64::from(v as f32)))
-        };
-        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
-        let new_s = through(&srow, h.sform_code > 0);
-        h.srow_x = new_s[0];
-        h.srow_y = new_s[1];
-        h.srow_z = new_s[2];
-        if h.qform().is_ok() {
-            let r = crate::bet::quatern::quatern_to_mat(
-                h.quatern_b,
-                h.quatern_c,
-                h.quatern_d,
-                [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
-            );
-            let off = [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| f64::from(v as f32));
-            let q: Mat4 = [
-                [r[0][0], r[0][1], r[0][2], off[0]],
-                [r[1][0], r[1][1], r[1][2], off[1]],
-                [r[2][0], r[2][1], r[2][2], off[2]],
-                [0.0, 0.0, 0.0, 1.0],
-            ];
-            let nq = through(&q, h.qform_code > 0);
-            let rot = [0, 1, 2].map(|i| [nq[i][0], nq[i][1], nq[i][2]]);
-            let ([b, c, d], qfac) = crate::bet::quatern::mat_to_quatern(&rot);
-            h.quatern_b = b;
-            h.quatern_c = c;
-            h.quatern_d = d;
-            h.pixdim[0] = qfac;
-            h.qoffset_x = nq[0][3];
-            h.qoffset_y = nq[1][3];
-            h.qoffset_z = nq[2][3];
-            quaternion_final = true;
-        }
-        h.pixdim[1] = f64::from(s);
-        h.pixdim[2] = f64::from(s);
-        h.pixdim[3] = f64::from(s);
+        });
+        let (h, q) = resampled_header(
+            &reference.input,
+            reference.vols[0].shape[0],
+            step,
+            refv.shape[0],
+            [f64::from(s); 3],
+        );
+        ref_input = h;
+        quaternion_final = q;
         ref_input.vol.shape = refv.shape;
     }
     // the image first, then the matrix (observed: an output type FSL cannot write ends the run
@@ -2907,6 +3022,9 @@ fn apply(
             &values,
         );
     }
+    // the display range 0 and 0, whatever the reference's (observed, 2026-11-05)
+    ref_input.header.cal_min = 0.0;
+    ref_input.header.cal_max = 0.0;
     write_image_as(
         ctx,
         stem,

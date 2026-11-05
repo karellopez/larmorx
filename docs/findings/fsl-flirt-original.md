@@ -664,3 +664,243 @@ compared with main's case by case:
   `real/weights-normcorr` (0.5785 to 0.5083, toward FSL; FSL's own 0.1879), FSL-91's and FSL-92's
   three. New in the record (main's suite gained it after main's record; the same with main's
   code): `programs/pointflirt-no-points`, FSL-204, not yet in the original (a follow-up).
+
+## The clean-room catch-up: programs and messages (relay 3, 2026-11-05)
+
+`specs/flirt.md` §14's answers of 2026-11-03, items 1 to 8 of `docs/next-steps.md`'s list for the
+original, and what black-box runs of FSL 6.0.7.23 showed on the way. Every FSL run went through
+the oracle-output cache (`use`); the probes are committed in
+`validation/investigations/cleanroom-flirt/` (`catchup_probe.py`: FLIRT's programs on given
+files and seeded images; `catchup_finding.py`: a random-testing finding's shrunk case, FSL against
+the original in both modes, with extra words such as `-verbose 7`; `catchup_merged.py`: the same
+with standard output and error merged through `sh`, to place a warning between verbose lines;
+`catchup_replay.py`: a trial's findings replayed by program).
+
+- **The free optimisations' verbose level** (§2.3): the code already ran them at the search's
+  lowered level; `verbose/5` and `verbose/7` confirm it (FSL's lines).
+- **Quaternion starts** (§8.1 step 9, FSL-90 with `reproduce`): a composition whose vector part
+  lies outside the unit ball keeps only its scales and skews about the centre (no translations: the
+  invalid starts at 6 dof start from the identity), composed once (the second composition at 6 dof
+  is gone). FSL's messages at every such composition, evaluations included, were already the
+  original's; their **order** was not: FSL composes a start, prints its dof message (`-dof` below 6)
+  and runs its optimisation, start by start, where the original composed every start first. Each
+  free optimisation now writes its own log, passed on in the starts' order (deterministic at any
+  thread count; the grids' evaluations, whose lines are all alike, still write to the run's log).
+  With `-dof 3`: the 8 validity messages and the 102 dof messages interleaved exactly as FSL's
+  (`real/anglerep-quaternion-dof3`); with 6 and 12 dof FSL's 8 and 4; the matrices FSL's text at 3
+  and 6 dof. The `-verbose 7` traces at 6 and 12 dof are FSL's through about 5,050 lines and part at
+  the 4 mm stage, at a near-zero skew's sign (`0.000000` against FSL's `-0.000000`): item 13's
+  question.
+- **avscale's check signs** (§15.1, §12): the 82 avscale findings of the 2026-11-02 trial are FSL's
+  text with the current code (§12's inverse and glibc's `atan2f`, both in place since part 2 and the
+  glibc maths part): nothing left.
+- **midtrans' determinant test** is `|det| < 1e-6`: a determinant that overflows (a scale of 1e200)
+  passes it and the transform is used (the original read it as unreadable). FSL then writes rows of
+  NaN with exit status 0, and a translation of 1e300 makes its decomposition fail, reported as
+  `matrix multiplication: incompatible matrix dimensions: 0x0 and 3x1` with exit status 0: **FSL-241**
+  (new, rule B: the transforms cannot be averaged; FSL's values are not specified, so the original
+  refuses in both modes). The replica, run as a black box on the same files, writes FSL's NaN rows
+  and refuses the failed decomposition, in both modes.
+- **pointflirt** (§15.6): no points at all (both files empty, missing or of words only) is FSL-204:
+  FSL prints its `Could not open matrix file` lines and, with `-v`, its two headings with empty
+  matrices, then crashes; the original prints the same and refuses (exit status 1), in both modes;
+  `--vox` without its volumes still gives `--vox`'s own error first (FSL's order). A `nan` word reads
+  0 (the fit of the points as read: the same bytes as with 0). An overflow (`1e400` times a voxel
+  size above 1, or `1e200`, whose square overflows) stops as FSL's SVD does (`Mat::operator():
+  index out of bounds`, FSL killed by signal 6, the original exit 1): the original refused before.
+- **`-warp`** (§15.2): FSL accepts exactly three volumes; a 3D image, one, two or four volumes print
+  `An error occured while reading file: <name>`, exit 1, after the verbose lines so far (observed on
+  all four). The original reads the volume count from the header; three volumes are refused until
+  FNIRT's warp fields are ported.
+- **FSL's 4 × 4 inverse fails only on an exact zero** (§12): NaN and infinite matrices are inverted
+  (the LU's `(−1)·t + y` and `x_k·(−1)` as products, so a NaN keeps its sign there), the subsets'
+  `x₀ − x₀` computed as written (a NaN parameter's own NaN, x86-64's default NaN for an infinite
+  one), and with `reproduce` FLIRT goes on with its NaN centres and matrices and writes them: 37 of
+  the 57 findings of the two 2026-11-02 trials that stopped at `inv(): matrix is singular` now agree
+  (three permanent cases, `validation/difftest/cases/fsl-flirt-original/nan-matrices-*.json`). The
+  signs of the NaN matrices still differ (FSL `-nan` in every element, the original `nan` in the top
+  rows: finding 2905's trace parts first at a subset optimisation's start; §14's open question 2).
+  Of the other 20: 16 registrations with NaN or infinite input voxels whose matrices or images
+  still differ (the one studied, finding 5009: FSL's free optimisations end at rotations 0,
+  translations NaN, and FLIRT's final matrix is its `-init` matrix, where the original's
+  compositions carry the NaN centre into every element: how FSL's arithmetic keeps the 3 × 3 part
+  finite is a question for a spec writer or for item 13), 3 ill-posed paths (displacement beyond the
+  thresholds) and pairreg's finding 2381 (FSL's heap corruption, FSL-75, in its first run).
+- **`convert_xfm -fixscaleskew`** aborts where its decomposition does not solve, as avscale's (a
+  zero scale or a non-finite entry: `matrix multiplication: problem with matrix inverse; suggest to
+  use solve() instead`, signal 6): a matrix file of `-nan` words reads as zeros (§2.2), which FLIRT's
+  NaN matrices in pairreg's third step are (observed: both argument orders). In `pairreg` a step that
+  aborts is followed by the shell's `Aborted` line, as FSL's script prints it (findings 3569, 5082,
+  9483 now agree).
+- **pairreg's schedules** (§15.8) are carried by the original (`flirt::schedule::PAIRREG_1` to `_3`,
+  their text taken from FSL's `-v` echo, one black-box run: every line, blanks and comments as FSL
+  prints them, `pairreg3.sch` with two final empty lines); `pairreg` runs without `$FSLDIR` (FSL's
+  matrix and `-v` text, `programs/pairreg-verbose`).
+- **Verbose lines found on the way** (FSL's observed, now the original's): `-verbose 3` measures
+  each centre for its `CoG for ... is:` line and prints the COG warning there (an all-zero
+  reference: `verbose/3-empty-reference`); a level's fourth size in `Refvol::`, `TESTVOL::` and
+  `testvol DEBUG::` is the image's `pixdim[4]` as read (FSL prints 0 for images without a TR; the
+  original printed 1); the `Testvol sampling matrix` and `Init Matrix` print in scaled millimetres
+  (0.5 mm voxels and a base scale of 0.5 print 1 and an `-init` translation of 1.5 as 3); a 4D image
+  in a registration is warned about twice (`An input intended to be a single 3D volume has multiple
+  timepoints ...`), the second time after the sform warning (FSL reads both images twice), the
+  reference included (`verbose/2-basescale-tr`).
+
+## The clean-room catch-up: numerics, `-debug` and NaN centres (relay 4, 2026-11-05)
+
+Items 9 to 13 of `docs/next-steps.md`'s list for the original (`specs/flirt.md` §14's answers of
+2026-11-03), and what black-box runs of FSL 6.0.7.23 showed on the way. Every FSL run went through
+the oracle-output cache (`use`); the probes are the catch-up's (`catchup_finding.py`,
+`catchup_probe.py`, `catchup_replay.py`) and `catchup_schedule.py` (FLIRT on a finding's inputs
+with a schedule of the probe's own, its lines written from FSL's `-v` echo, `print` lines added to
+see a list), all in `validation/investigations/cleanroom-flirt/`.
+
+- **`leastsq`** (§6.2, item 12): three levels of single-precision sums (row, slice, total) of
+  `δ·δ` and the count without smoothing or weights, of `(w·δ)·δ` and `w` otherwise; the quotient
+  single when the weight (count) is above 1, else `(max − min)²`. `real/cost-leastsq` passes (it
+  failed at 82 mm with double sums).
+- **applyxfm4D's spline** (§15.7, item 11) is FLIRT's own (§9.3) instead of mcflirt's: a float
+  image's passes stored in single precision, a double image's values read and filtered in double
+  (each value still rounded to single). The five trial findings the spec writer modelled (#368,
+  #4718, #3494, #6140 float, #6013 double) differed in 47, 4,430, 177, 342 and 181 voxels, 5,177
+  in all: 0 now (permanent cases `applyxfm4d-spline-float`, `-double`).
+- **`-debug`'s volumes** (§9.4, item 9): each level's header from the reference by the
+  resampling's steps, `level/d` per axis in single precision (`d` the voxel sizes as FLIRT holds
+  them, scaled by the base scale), composing only a set form, every form of a neurological
+  reference (an unset one too) swapped back with the level's grid, the elements in single
+  precision and the quaternion computed from them, as `-applyisoxfm`'s header (one function now
+  serves both); `global_refweight1` without weights has `pixdim[0]` (qfac) and `pixdim[4..7]` 1.
+  Observed beyond the spec: with `-noresample` the levels are the reference itself (its forms as
+  read, the held voxel sizes as `pixdim`) and, without weights, no `global_refweight1` is written;
+  `testvol`'s `pixdim` are the input's held voxel sizes (scaled by the base scale; trial #175).
+  With the boundary-based cost and no boundary point, `-debug`'s five lines surround the set-up
+  and its error (`Result (post) of is_bbr_set is 0`), the boundary counts as not set, so the
+  set-up, its lines and its error come again before every evaluation (then the NaN warning); the
+  final call writes `debug` (zeros), and FSL goes on to `-omat` (the `-init` matrix) and `-out`.
+  One evaluation's lines are pushed together (the grids' evaluations run in parallel). The first
+  pair's set-up comes after `-verbose 3`'s centres (their COG warnings first; trial #1308).
+  The 161 `-debug` findings of the 2026-11-02 trial: 52 agreed before, 123 now.
+- **A perturbation is composed with all twelve parameters** (observed, `schedule/perturb-scaled`):
+  `measurecost 6` of a scaled and skewed row keeps its scales and skew, `measurecost 7` with a
+  scale perturbation changes only the first scale (`1.2 → 1.3`, the others kept): the row is
+  decomposed, perturbed and composed again whatever the command's dof (the original composed the
+  command's dof, at least 6, before: a row's non-rigid parameters were lost). An optimisation's
+  `Starting with :` matrix is its start's first `dof` parameters composed (a scaled start at 6
+  dof shows the rigid matrix, at 7 its first scale), its `Starting with` line the start's twelve.
+- **The search's `P`** keeps each start as composed once (§8.1 step 9: "the starting matrix kept
+  in `P` is the composed start itself"), its cost that matrix's; the free optimisation starts from
+  its decomposition. Under gimbal lock the two differ (FSL's 84.266223 against the original's
+  84.266231 before, on `real/weights-normcorr`, whose `-verbose 7` trace now follows FSL's to line
+  7,556 instead of 7,467).
+- **NaN centres** (FSL-14 reproduced: NaN or infinite input voxels), item 13: FSL prints an
+  optimisation's NaN starting parameters, then evaluates from the identity's (rotations,
+  translations and skews 0, scales 1: `1 : -nan :: 0.000000 ...`), so a 6-dof optimisation
+  composes the identity exactly and a 12-dof one (its skew and scale about the NaN centre) all
+  NaN; the original now does the same. The coarse and threshold grids' `Starting with :` shows the
+  identity's parameters composed about the centre (the identity, all NaN about a NaN centre); a NaN
+  fine-grid scale is not outside `[0.5, 2]`, so it is kept; a NaN pre-image (a NaN matrix) is
+  outside the input: the output voxel is the background value (FSL's whole image one value,
+  the original's NaN before). Of the 57 findings of the two 2026-11-02 trials that stopped at
+  `inv(): matrix is singular` (37 agreed after relay 3), 52 agree now; left: #1760 (an
+  ill-posed path: FSL's own variability 22 mm), #3788 (a registration 211 mm away, not studied),
+  #7221 (the
+  `normmi` cost of a translation whose overlap reaches the NaN voxels, `-1.305830` against FSL's
+  `-1.000000` at evaluation 119,956 of 120,000, every earlier line FSL's), #4404 (its image's
+  correlation, not studied) and pairreg's #2381 (FSL's heap corruption, FSL-75). Finding #2424 (BBR, no
+  boundary, infinite voxels, `-debug`) is FSL's in every file and line but the cost object's
+  address (permanent case `debug-bbr-no-boundary`).
+- **The C library's functions in `reproduce`** (item 10): wired since the glibc maths part
+  (`sinf`, `cosf`, `atan2f`, `exp`, `cos`, `logf`); the spline's horizon now uses the correctly
+  rounded logarithm (`larmorx_core::math::log`; the platform's `ln` before; the same 15 terms).
+- **Still open** (for a spec writer; the record's failures): FSL-91's and FSL-92's `reproduce`
+  traces (`real/weights-empty-refweight`, `-inweight`, `edge/one-voxel-input`, every cost equal)
+  are FSL's through line 66,124 of 140,494 and part at a free optimisation's final line, the sign
+  of a zero third skew under gimbal lock (`r_y = −π/2`: FSL `-0.000000`, the original `0.000000`),
+  after which the next start's angle differs in its 6th digit (`-0.327782` against `-0.327783`);
+  the compositions and decompositions of 50 gimbal-lock angle triples through `setrowparams`
+  and `measurecost` print FSL's rows exactly (probes `gimbal.sch`, `gimbal2.sch`), so the sign
+  comes from a step the spec does not state. FSL's first evaluated vector also differs from its
+  printed start in a zero's sign (`Starting with 0 -0 -0 ...`, first evaluation `0 0 -0`; probe
+  `shown.sch`). `real/weights-normcorr` (0.5083 mm, FSL's own 0.1879) and `real/weights-woods`
+  (Woods' warning one line more) part at the 4 mm stage: evaluation 47 (`0.050021` against
+  `0.050056`, the costs equal to their 6 printed digits) and 356 (`0.948010` against `0.947916` at
+  the same printed parameters), the weighted costs' last bits.
+
+**The record** (`fsl-flirt`, re-made from `23710fe`, standard tier; `compare_records.py` against
+main's, made from `be3db91`): 333 cases (308 before): 229 pass, 89 rejected by both, 10 expected
+divergences, 5 failures. `real/cost-leastsq` passes (82 mm before); `programs/pointflirt-no-points`
+is an expected divergence (FSL-204, relay 3); `real/cost-leastsq`, `real/bins64` (0.0692 mm before)
+and `real/weights` (0.3059 mm) now write FSL's matrices as text; fMRIPrep's three calls 0.0000,
+0.0002 and 0.0113 mm (ds005040's 0.0065 before: its boundary-based path, whose costs are not FSL's
+to the last bit, parts elsewhere since a perturbed row keeps its scales); 25 new cases (relay 3's
+14, relay 4's 3 and its 8 permanent cases, all passing but `nan-matrices-forcescaling`, rejected by
+both). The five failures are the "Still open" list above. Memory: the changed paths
+(`applyxfm4D-spline`, the registrations) stay within the memory test's bounds (5 calls); golden:
+`cli.fsl.flirt`, `.costs`, `.reproduce`, `.schedule` and `cli.fsl.applyxfm4D` move (the
+perturbations' twelve parameters, `leastsq`'s sums, the spline), to be re-recorded once with the
+part's other moves.
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-flirt` (seed `20261103`, the 2026-11-02 trial's, so its first
+4,240 cases are that trial's drawn again; 30 minutes, 14 jobs at one thread, 3 GiB a case, the
+oracle cache in `use` mode): 13,907 cases, 12,334 agree, 1,560 differ, 13 notices (FSL-09, -79,
+-80, -111, -187). Of the 1,140 differences of the cases drawn again, 696 agree now; 46 cases that
+agreed then differ now (36 registrations' paths, 7 the headers below, 2 `labeldiff`, 1 pairreg).
+Fixed (each with a permanent case, `validation/difftest/cases/fsl-flirt-original/`):
+
+- **The search's minima on a one-point grid** (17 cases, `search-cost-minima-fallback`): with no
+  local minimum (`-nosearch`: the grid's only point is the last index on every axis) the overall
+  minimum is listed only on FSL's `Cost minima at` line, without a `COST minima at` line
+  (observed, `-verbose 7`); the original listed both.
+- **A sform completed from a qform-only reference keeps its negative zeros** (25 cases,
+  `out-completed-sform-negative-zero`): with `qfac` −1 the qform's zero entries times −1 are
+  negative zeros, which FSL's `-out` writes; a stored sform's negative zeros are still written as
+  zeros (relay 3's observation), and a neurologically stored reference's are positive (its swap's
+  products).
+- **applyxfm4D's padding of an int32 image** (1 case, `applyxfm4d-int32-padding`): FSL writes the
+  background value exactly in the type (2147483647) and the interpolated voxels through single
+  precision (2³¹, wrapped to −2147483648: FSL-09), observed with `catchup8_int_nn.py` (FLIRT's
+  `-applyxfm` pads through single precision: unchanged); the original keeps an int32 image's
+  values when some lie beyond 2²⁴ (`bet::image::read_i32_series`) and writes the padding from them.
+
+Open (in `validation/difftest/triage.toml`): 941 registrations ending elsewhere on the trial's
+random, often ill-posed pairs and 51 with `labeldiff`; messages whose count follows the path (166
+COG warnings, 172 FSL-90 quaternion messages); 110 pairreg paths and 12 runs where FSL crashes
+(FSL-75); and, for the spec writer, 9 searches whose test volume has no intensity range at a scale
+(`Testvol intensity clamped between 0 and 0`): FSL prints `WARNING: Found 0 or less
+sub-threshold costs`, its fine grid's costs and parameters print as 0 and every point becomes a
+minimum, where §8.1 steps 6 and 7 give the cost of no variance (1) and an optimisation of every
+point (`20261103-08267`, `03733`).
+
+
+## The search's starting points of equal cost (relay 10, 2026-11-05)
+
+Found through BET's trial (standard_space_roi's matrices 37 to 303 mm from FSL's on small heads):
+FLIRT's search builds its list of starting points as §8.1 step 9 says (each new entry after every
+entry of lower or equal cost), and FSL then **sorts that list by cost with libstdc++'s `std::sort`**
+before appending it to `S` and `P`; `std::sort` is an introsort, not stable, so starting points of
+equal cost take its order, not the order found. Observed (`trial_ssroi_matrices.py`, a schedule of
+our own: `search`, then `print S` and `print P`): on a pair whose 829 starting points all cost 1
+(a test volume clamped between 0 and 0 at every scale; FSL's own `measurecost` gives 1 for both
+programs' matrices and for the identity), FSL's `S` and `P` are exactly the introsort's permutation
+of the list as `-verbose` prints it (`P` permuted alike); with 20 rows put in `S` before the search,
+those 20 stay first and only the search's rows are permuted. The original kept the order found;
+it now sorts the search's results with `schedule::std_sort` after printing them
+(`flirt/search.rs`; unit test `std_sort_orders_equal_costs_as_fsl_orders_its_search`, the observed
+first 16 and last 20 places; permanent cases `search-equal-costs-sorted`,
+`pairreg-search-equal-costs-sorted`, which differ with the build before).
+
+What it changes: on random pairs that carry little information at the coarse scales many costs
+tie. Replayed (`catchup_replay.py`, the trial's findings of the three path classes with the final
+build and with the build before the fix; `trial_catchup_replay_sorted.txt`,
+`trial_catchup_replay_before_sort.txt`): 873 of the 1,471 findings agree now and differed before
+(755 registrations ending elsewhere, 101 pairreg runs, 17 message counts; one agreed before); 338
+registrations, 236 message counts and 23 pairreg runs still differ. The record `fsl-flirt` re-made
+from `a835ddd`: 339 cases, 238 pass, 89 both refuse, 10 expected divergences, 2 fail; three cases
+move from fail to pass (`real/weights-empty-refweight`, `real/weights-empty-inweight`,
+`edge/one-voxel-input`: an empty weight or a one-voxel input makes every cost equal: the order of the equal
+costs decided their matrices, whatever the zero's sign where relay 4's traces part), and two difftest cases'
+displacement checks are no longer needed (their matrices FSL's). The two failures left are the
+weighted `normcorr` and `woods` costs' last bits (relay 4). FAST's record (its `-a` priors
+registered by this FLIRT) and BET's are unchanged.

@@ -123,7 +123,9 @@ impl Affine {
             let best = (0..3)
                 .map(|j| (self.m[i][j] / zooms[j]).abs())
                 .fold(0.0f64, f64::max);
-            libm::acos(best.min(1.0))
+            // the correctly rounded acos (rule 5): numpy's `arccos` is the C library's, which
+            // it matches on all but 0.11 % of doubles in [0, 1) (the `libm` crate's differs on 5.5 %)
+            crate::math::acos(best.min(1.0))
         })
     }
 

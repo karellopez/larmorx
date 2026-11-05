@@ -25,6 +25,9 @@ pub struct Pve {
     pub seg: Vec<u8>,
     /// The mixel type (0..n-1 the pure classes, then the mixtures).
     pub mixel: Vec<u8>,
+    /// A class's variance in the intensity domain differs between FSL-202's two forms
+    /// ([`stats::class_stats`]).
+    pub variance_differs: bool,
 }
 
 /// The mixel types of `n` classes (§4.8.4): `(a, b)` (0-based classes) of each mixed type after
@@ -76,7 +79,9 @@ fn mixes(classes: &[Gauss], a: usize, b: usize, deltas: &[f32], libm: &Libm) -> 
 }
 
 /// The partial volumes of the mask voxels of `grid` whose (bias-corrected) intensities are `x`,
-/// from the sorted posteriors `post` (`n` per voxel); `mixel_weight` is `-R`.
+/// from the sorted posteriors `post` (`n` per voxel); `mixel_weight` is `-R`; `fsl_variance`
+/// reproduces FSL-202's variance in the classes' statistics (§4.8.3).
+#[allow(clippy::too_many_arguments)]
 pub fn estimate(
     grid: &Grid,
     post: &[f32],
@@ -84,6 +89,7 @@ pub fn estimate(
     n: usize,
     mixel_weight: f32,
     len: usize,
+    fsl_variance: bool,
     libm: &Libm,
 ) -> Pve {
     let nm = grid.len();
@@ -95,9 +101,11 @@ pub fn estimate(
             frac: vec![1.0; nm * n],
             seg: vec![if n == 0 { 0 } else { 1 }; nm],
             mixel: vec![0; nm],
+            variance_differs: false,
         };
     }
-    let classes: Vec<Gauss> = stats::class_stats(post, x, n, len)
+    let (stats_x, variance_differs) = stats::class_stats(post, x, n, len, fsl_variance);
+    let classes: Vec<Gauss> = stats_x
         .into_iter()
         .map(|(m, v)| Gauss::new(m, v, libm))
         .collect();
@@ -172,6 +180,7 @@ pub fn estimate(
         frac,
         seg,
         mixel: types,
+        variance_differs,
     }
 }
 

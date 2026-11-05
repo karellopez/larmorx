@@ -15,6 +15,7 @@ by its suite's comparator (``larmorx_validation.parity.fsl_mcflirt_replica``).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -204,6 +205,32 @@ def _args_for(recipe: dict, prefix: str, run_dir: Path, copy_inputs: bool) -> li
     return out
 
 
+def makes_empty_directory(args: list[str]) -> bool:
+    """Whether mcflirt's run makes an empty ``.mat`` directory: ``-rmsrel`` or ``-rmsabs``
+    without ``-mats`` (FSL-13). The oracle-output cache keeps a run's files, not its empty
+    directories, so a replay from it lacks the directory (the catch-up's trial of 2026-11-05: 6,363
+    findings of "files written" when its cases were drawn again from the cache)."""
+    return bool({"-rmsrel", "-rmsabs"} & set(args)) and "-mats" not in args
+
+
+@contextlib.contextmanager
+def _cache_off_for_empty_directory(args: list[str]):
+    """The oracle cache off (``LARMORX_ORACLE_CACHE_MODE=off``: mcflirt runs live, nothing
+    stored) for a run that :func:`makes_empty_directory`."""
+    if not makes_empty_directory(args):
+        yield
+        return
+    saved = os.environ.get("LARMORX_ORACLE_CACHE_MODE")
+    os.environ["LARMORX_ORACLE_CACHE_MODE"] = "off"
+    try:
+        yield
+    finally:
+        if saved is None:
+            os.environ.pop("LARMORX_ORACLE_CACHE_MODE", None)
+        else:
+            os.environ["LARMORX_ORACLE_CACHE_MODE"] = saved
+
+
 def _run_original(case, checks) -> None:
     """mcflirt runs live into a recorded run of a temporary oracle directory, which the
     record's runner (``parity.mri_hmc.run_case``) replays larmorx against."""
@@ -220,7 +247,8 @@ def _run_original(case, checks) -> None:
         run_dir.mkdir(parents=True)
         args = _args_for(p["recipe"], p["prefix"], run_dir, copy_inputs=True)
         settings: dict[str, str | None] = {}
-        done = rep.run_oracle(args, cwd=run_dir, settings=settings, version=version)
+        with _cache_off_for_empty_directory(args):
+            done = rep.run_oracle(args, cwd=run_dir, settings=settings, version=version)
         (run_dir / "stdout0.txt").write_text(done.stdout, encoding="utf-8")
         (run_dir / "stderr0.txt").write_text(done.stderr, encoding="utf-8")
         env = rep._environment(settings, version)

@@ -1,0 +1,325 @@
+{
+ "defect": null,
+ "description": "with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts them (only an exact zero pivot fails, specs/flirt.md \u00a712), so FLIRT goes on and writes its NaN matrix (trial 2026-11-02 #8361; the clean-room catch-up)",
+ "expect": "pass",
+ "found": {
+  "detail": "stdout: the same lines (numbers aside): line 15: FSL ' >> # 4mm scale', original '<end>'; stderr: the same lines (numbers aside): line 2: FSL '<end>', original 'inv(): matrix is singular'; files written: only FSL ['out.mat'], only the original []; D13 fix pass: no defect named: no values; files ['out.mat'] changed",
+  "n": 8361,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass",
+   "files written",
+   "stderr: the same lines (numbers aside)",
+   "stdout: the same lines (numbers aside)"
+  ]
+ },
+ "id": "nan-matrices-char-dof7",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": true,
+   "-coarsesearch": false,
+   "-cost": true,
+   "-datatype": true,
+   "-debug": false,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": true,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": false,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": true,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.0,
+   "axis1": 1.0,
+   "axis2": 0.75,
+   "bbr": false,
+   "bias0": -0.0025,
+   "bias1": -0.0025,
+   "bias2": 0.0075,
+   "bias3": -0.005,
+   "bins": "128",
+   "centre0": -4.0,
+   "centre1": 1.0,
+   "centre2": 5.5,
+   "content": "labels",
+   "cost": "corratio",
+   "datatype": "char",
+   "dof": "7",
+   "dtype": "float64",
+   "extreme": false,
+   "kind": "register",
+   "labels": 8,
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": -32.75,
+   "origin1": 19.5,
+   "origin2": -13.5,
+   "q0": 40,
+   "q1": 2,
+   "q2": -3,
+   "q3": -3,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "23x10x32",
+   "shear0": -0.1,
+   "shear1": -0.1,
+   "shear2": 0.0,
+   "shift0": "0",
+   "shift1": "0",
+   "shift2": "0",
+   "size": 29.5,
+   "spacing0": 1.0,
+   "spacing1": 2.5,
+   "spacing2": 1.0,
+   "specials": 1,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-cost",
+     "corratio"
+    ],
+    "name": "-cost",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dof",
+     "7"
+    ],
+    "name": "-dof",
+    "optional": true
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": true
+   },
+   {
+    "args": [
+     "-bins",
+     "128"
+    ],
+    "name": "-bins",
+    "optional": true
+   },
+   {
+    "args": [
+     "-datatype",
+     "char"
+    ],
+    "name": "-datatype",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      0.9,
+      1.15
+     ],
+     "bias": [
+      -0.0025,
+      -0.0025,
+      0.0075,
+      -0.005
+     ],
+     "centre": [
+      -3.5,
+      -1.0,
+      8.5
+     ],
+     "noise": 3.0,
+     "seed": 1202887457,
+     "size": 16.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -32.75,
+      19.5,
+      -13.5
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.0,
+      2.5,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     23,
+     10,
+     32
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "-inf"
+     ]
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9778051788 0.140567201 -0.1553637485 0\n-0.1553637485 0.9839704069 -0.08754623921 0\n0.140567201 0.1097410604 0.9839704069 0\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      1.0,
+      0.9,
+      1.15
+     ],
+     "bias": [
+      -0.0025,
+      -0.0025,
+      0.0075,
+      -0.005
+     ],
+     "centre": [
+      -5.0,
+      0.5,
+      5.5
+     ],
+     "noise": 3.0,
+     "seed": 203730518,
+     "size": 16.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      21.75,
+      -50.0,
+      -56.75
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 1,
+     "shear": [
+      -0.1,
+      -0.1,
+      0.0
+     ],
+     "spacing": [
+      2.0,
+      1.5,
+      1.2
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     24,
+     14,
+     24
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 8361,
+  "options": [
+   "-bins",
+   "-cost corratio",
+   "-datatype",
+   "-dof 7",
+   "-init",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

@@ -9,7 +9,8 @@ original's own last-bit band), by the replica in its ``reproduce`` and default m
 thread) and by the clean-room original in its ``reproduce`` and default modes at 14 threads and
 one; every file FAST writes, the tissue volumes the partial-volume maps give, fMRIPrep's own
 outputs, every case of both records with its verdict (the original's classified against FSL with
-correctly rounded maths), and the benchmark.
+correctly rounded maths), random testing's trial of the original after the clean-room catch-up
+(2026-11-05) with its triage, and the benchmark.
 
 Every run of FSL goes through the oracle-output cache (``use`` mode) with the parity suites'
 keys (``parity.fsl_fast_replica``), so the runs the records made are served; FSL with the
@@ -22,6 +23,8 @@ from __future__ import annotations
 
 import copy
 import gzip
+import hashlib
+import json
 import os
 import re
 import shlex
@@ -605,7 +608,8 @@ def _classify_case(r: dict, payloads: dict, nodes: dict, lib: Path) -> tuple[str
         run = payload if kind == "direct" else fs._all_cases()[payload][2]
 
         def prepare(d: Path) -> list[str]:
-            return fs._prepare(run, d)
+            # the original suite's preparation: its own cases' inputs (``%name``) copied too
+            return orig._prepare(run, d)
 
         settings = dict(run.settings)
         never, unwritten, no_bias = run.never, run.unwritten, run.no_bias_field
@@ -965,6 +969,8 @@ def _diffs_original(own: bool) -> list[dict]:
           "clean-room original − FSL, correctly rounded maths", common.ROLE_LX),
         d("ofix-cr", "original-fix", "fsl-cr", "main",
           "clean-room original, default − FSL, correctly rounded maths", common.ROLE_LX),
+        d("ofix-rfix", "original-fix", "replica-fix", "check",
+          "clean-room original, default − replica, default", common.ROLE_SELF),
         d("original1-original", "original-1", "original", "check",
           "clean-room original, 1 thread − 14 threads", common.ROLE_SELF),
         d("ofix-original", "original-fix", "original", "check",
@@ -1004,8 +1010,24 @@ def _counts(x: dict, outputs: list[str], labels: dict[str, str], y: dict | None 
 
 FINDINGS = "docs/findings/fsl-fast-original.md"
 REGISTER = "docs/findings/upstream-defects.md"
+#: The clean-room catch-up's trial of the original (2026-11-05), and its findings in categories
+#: (``validation/investigations/cleanroom-fast/trial_catchup_categories.py``'s ``--json`` output).
+TRIAL_CATCHUP = "2026-11-05-catchup-fast"
+CATCHUP_TRIAGE = "validation/investigations/cleanroom-fast/trial_catchup_triage.json"
 #: The corrections the clean-room original's default mode names, as it makes them.
 ORIGINAL_FIX = {
+    "FSL-202": "FSL-202, corrected by default with a notice (since 2026-11-05): with one "
+    "channel, FAST takes each class's variance in the logarithm of the intensities as the mean "
+    "of the squares minus the square of the mean, that square of a single-precision mean "
+    "rounded to single precision, so most of its digits cancel; the default subtracts the square "
+    "of the double-precision mean. With glibc's functions in place of the correctly rounded "
+    "ones the default gives the replica's default bit for bit on every single-channel case of "
+    "the suite (glibc_default.py): the two corrections are the same arithmetic. Its reproduce "
+    "mode follows FSL.",
+    "FSL-203": "FSL-203, corrected by default with a notice (since 2026-11-05): when the "
+    "image's first voxel is NaN, FAST's intensity extrema become NaN, its rule for negative "
+    "values is skipped and its brain mask is empty, so it stops with exit status 255; the "
+    "default takes the extrema over the values that are numbers. Its reproduce mode follows FSL.",
     "FSL-09": "FSL-09, corrected by default with a notice: FAST registers FSL's tissue priors "
     "(8-bit integers) onto the image with FLIRT, which writes its resampled values in that "
     "integer type truncated toward zero; the clean-room original's default (FLIRT's clean-room "
@@ -1068,7 +1090,31 @@ def _verdicts_original(
                 "original's parallel sweeps (a pipeline of planes in the serial order), blocked "
                 "sums and sorts give its one-thread result bit for bit at any thread count.",
                 "ofix-original": _fix_same(named),
+                "ofix-rfix": "The clean-room original's default gives the replica's default "
+                f"values, every one, in every image FAST writes on {what}: the two make the same "
+                "corrections with the same arithmetic.",
             }.get(i, "The same values, every one.")
+        elif i == "ofix-rfix":
+            # since 2026-11-05 the record holds the original's default to the replica's (the
+            # replica's default computes glibc's exp, log, expf and logf, the original's correctly
+            # rounded): with glibc's functions the two are the same bits (glibc_default.py)
+            beyond = _beyond(x, band)
+            diff_out = [o for o, m in x["metrics"].items() if not m["identical"]]
+            x["verdict"] = "open" if beyond else "within-variability"
+            x["reason"] = (
+                "The two defaults make the same corrections; the replica's computes exp, log, "
+                "expf and logf as glibc does, the original's correctly rounded (with glibc's "
+                "functions in its default the two give the same bits: glibc_default.py). "
+                + _counts(x, beyond or diff_out, labels, band)
+                + (
+                    "; further than FSL itself moves when only those functions' last bits change "
+                    "(the yardstick row)."
+                    if beyond
+                    else "; no further, in any output, than FSL itself moves when only those "
+                    "functions' last bits change (the yardstick row)."
+                )
+            )
+            x["links"].append({"label": "findings", "href": FINDINGS})
         elif i in ("ofix-original", "ofix-cr") and shown:
             x["verdict"] = "d13"
             x["reason"] = " ".join(
@@ -1797,13 +1843,10 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
             )
         if r["case"] == "opt/nan-first":
             why = (
-                "Outside the record, a follow-up of the clean-room original: an image whose first "
-                "voxel is NaN, whose extrema FAST takes as NaN and whose brain mask is then empty, "
-                "so its k-means stops with exit status 255 (FSL-203, registered with the "
-                "specification's answers of 2026-11-03); the original passes the case's "
-                "other checks against FSL (5 of 6), and its default finishes (exit status 0) but "
-                "names FSL-103 where the record asks for FSL-203 (FSL-203 follows in the "
-                "original's next part). " + why
+                "An image whose first voxel is NaN, whose extrema FAST takes as NaN and whose "
+                "brain mask is then empty, so its k-means stops with exit status 255 (FSL-203); "
+                "since 2026-11-05 the clean-room original's reproduce mode stops alike and its "
+                "default names FSL-203 (outside the record before). " + why
             )
         if r["case"] == "multi/s5":
             why = (
@@ -2016,6 +2059,136 @@ def speed(ctx: core.Context) -> tuple[list[dict], dict | None]:
     return source, chart
 
 
+#: The catch-up trial's categories (``trial_catchup_categories.py``): category -> (what the page
+#: says, the verdict of the row).
+CATCHUP_TEXT: dict[str, tuple[str, str]] = {
+    "default-replica: glibc's functions give the replica's bits": (
+        "Only where the record holds the default to the replica's default (a label image's Dice "
+        "0.988 to 0.999, or a -v line in its 4th digit): with glibc's exp, log, expf and logf in "
+        "the default in place of the correctly rounded ones (glibc_default.patch), the replica's "
+        "default bit for bit, so the two defaults differ only by those functions' last bits",
+        "identical-cr",
+    ),
+    "default-replica: not measured with glibc's functions": (
+        "The same check, two channels with -a priors: not measured with glibc's functions (the "
+        "patched build predates FLIRT's changes)",
+        "open",
+    ),
+    "several channels: the reproduce run parts": (
+        "Several channels whose reproduce run itself parts from FSL's (Dice 0.88 to 0.999): open, "
+        "for FAST's next clean-room part",
+        "open",
+    ),
+    "several channels: noise-free channels": (
+        "Several channels of which two are noise-free, so each class's covariance is "
+        "ill-conditioned: the partial volumes move with the matrix arithmetic's last bits "
+        "(explained before the catch-up; following LAPACK's and OpenBLAS's operation order is "
+        "the replica's job, specs/fast.md §8.6)",
+        "open",
+    ),
+    "singular covariance: the original aborts": (
+        "A class covariance singular in exact arithmetic: the matrix arithmetic's last bits "
+        "decide which program aborts on inv(): matrix is singular, here the original (FSL "
+        "finishes)",
+        "open",
+    ),
+    "singular covariance: FSL aborts": (
+        "A class covariance singular in exact arithmetic, where FSL aborts on inv(): matrix is "
+        "singular (exit status -6) and the original's arithmetic leaves it invertible and goes "
+        "on (with FSLOUTPUTTYPE=ANALYZE to its output type's refusal)",
+        "divergence",
+    ),
+}
+
+
+def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
+    """The clean-room catch-up's random-testing trial of the original (its ``summary.json``)
+    and its findings in categories (``trial_catchup_triage.json``): two tables, and their
+    provenance."""
+    path = common.oracles() / "difftest" / TRIAL_CATCHUP / "summary.json"
+    raw = path.read_bytes()
+    s = json.loads(raw)
+    t = s["tools"]["fsl-fast-original"]
+    o = t["options"]
+    impl = t["implementations"]["original"]
+    types = sum(v for k, v in o.items() if k.startswith("FSLOUTPUTTYPE=")) - o.get(
+        "FSLOUTPUTTYPE=NIFTI_GZ", 0
+    )
+    rows = [
+        ("Random cases, each compared with FSL 6.0.7.23", t["cases"]),
+        ("within the record's thresholds (§11), every exact check passed", impl.get("agree", 0)),
+        ("differing (each one in a category below)", impl.get("differ", 0)),
+        ("fMRIPrep's call (-I 0 -N -p -g -S 1)", o.get("fMRIPrep's call", 0)),
+        ("two, three, four channels", [o.get(f"{n} channels", 0) for n in (2, 3, 4)]),
+        ("FSL's tissue priors (-a)", o.get("-a", 0)),
+        ("the bias field written (-b, -B)", [o.get("-b", 0), o.get("-B", 0)]),
+        ("-v", o.get("-v", 0)),
+        ("an output type other than NIFTI_GZ", types),
+        ("distinct options and settings drawn", t["options_covered"]),
+        (f"length (minutes; {s['jobs']} jobs at one thread each)", round(s["elapsed_s"] / 60, 1)),
+    ]
+    out_rows = []
+    for head, v in rows:
+        if isinstance(v, list):
+            cell = common.cell(" / ".join(f"{x:,}" for x in v))
+        elif isinstance(v, float):
+            cell = common.cell(v, "sig")
+        else:
+            cell = common.cell(int(v), "count")
+        out_rows.append({"head": head, "cells": [cell]})
+    peaks = max(float(p.split()[0]) for p in s["memory"]["peaks"])
+    commit = s["larmorx_commit"].removesuffix("-dirty")
+    summary = common.table(
+        "trial-catchup",
+        f"Random testing of the clean-room original after the catch-up: the trial of {s['date']}",
+        ["", {"label": "Cases", "num": True}],
+        out_rows,
+        note=f"Differential random testing's trial of the clean-room original after the "
+        f"specification's answers of 2026-11-03 (seed `{s['seed']}`: the 2026-11-03 trial's cases "
+        "drawn again and further, FSL's runs served by the oracle cache where they had run), each "
+        "compared as the record compares (specs/fast.md §11: reproduce mode against FSL, the "
+        "default against the replica's default where one channel corrects FSL-202). The build: "
+        f"larmorx `{commit}`. Every case in a memory box of {s['memory']['case']} (peaks below "
+        f"{peaks:.2f} GiB).",
+    )
+    tpath = ctx.repo / CATCHUP_TRIAGE
+    traw = tpath.read_bytes()
+    tri = json.loads(traw)
+    counts = tri["counts"]
+    if sum(counts.values()) != impl.get("differ", 0):
+        raise ValueError(
+            f"{CATCHUP_TRIAGE}: {sum(counts.values())} findings, the trial {impl['differ']}"
+        )
+    trows = []
+    for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        text, verdict = CATCHUP_TEXT[cat]
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
+        trows.append({"head": text, "verdict": verdict,
+                      "cells": [common.cell(int(n), "count"), {"verdict": verdict},
+                                common.cell(tri["reproducers"][cat])]})  # fmt: skip
+    triage = common.table(
+        "trial-catchup-triage",
+        "The trial's differing cases, each in one category",
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
+        trows,
+        note="Every differing case of the trial in one category by its failed checks "
+        "(`validation/investigations/cleanroom-fast/trial_catchup_categories.py`, its output "
+        f"`{CATCHUP_TRIAGE}`), each category's cause established by replaying the findings "
+        "(`replay_findings.py`, with glibc's functions in the default: `glibc_default.patch`) and "
+        'by probes (`probe.py --finding --diff`; `docs/findings/fsl-fast-original.md`, "The '
+        "catch-up's random-testing trial\"); the triage's entries: "
+        "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
+        "(`difftest --replay`).",
+    )
+    prov = {
+        "trial": f"oracles/difftest/{TRIAL_CATCHUP}/summary.json",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "triage": CATCHUP_TRIAGE,
+        "triage_sha256": hashlib.sha256(traw).hexdigest(),
+    }
+    return [summary, triage], prov
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     examples = {
@@ -2033,6 +2206,7 @@ def export(ctx: core.Context) -> dict:
     entries += [original_entry(ctx, run) for _i, run, _v, _w in FMRIPREP]
     entries += [original_entry(ctx, case) for case in REAL.values()]
     entries.append(co)
+    tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     return {
         "schema": 1,
@@ -2043,6 +2217,7 @@ def export(ctx: core.Context) -> dict:
             "records": rec.source() + rec_orig.source(),
             "benchmarks": bench,
             "cache": [fcache.provenance(x) for x in entries],
+            "difftest_catchup": tcprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -2066,6 +2241,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cs,
         "cases_total": len(cs),
         "speed": chart,
+        "tables": tc,
         "examples": [_example_fmriprep(ctx, *FMRIPREP[0])]
         + [_example_real(ctx, ex_id) for ex_id in REAL]
         + [_example_fmriprep(ctx, *x) for x in FMRIPREP[1:]],

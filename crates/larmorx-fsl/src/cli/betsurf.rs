@@ -502,7 +502,13 @@ fn run_in(
             &matrix,
             &grid,
             mode.fix(),
-            mode.reproduce(),
+            // FSL-50 (FSL ends at a profile whose outer-skull search range is empty,
+            // specs/bet.md §6.4 step 7) is not reproduced: on every image where such a profile
+            // was seen (43 images of the random-testing trials of 2026-10-31 and 2026-11-04, one
+            // with FSL's own failure at its output type) FSL 6.0.7.23 runs on and counts only the
+            // profile's scalp, as the default does; when FSL ends is a question for the spec
+            // writer (docs/findings/fsl-bet-original.md)
+            false,
         )
     });
     // the images are not needed any more (the outputs take the T1's header only)

@@ -1,0 +1,277 @@
+{
+ "defect": null,
+ "description": "-verbose 7 with a one-point search grid: no local minimum, the overall minimum listed only on FSL's Cost minima line (no COST line)",
+ "expect": "pass",
+ "found": {
+  "detail": "stdout: the same lines (numbers aside): line 158: FSL 'Cost minima at : 0,0,0', original 'COST minima at : 0,0,0'",
+  "n": 7259,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "stdout: the same lines (numbers aside)"
+  ]
+ },
+ "id": "search-cost-minima-fallback",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": false,
+   "-debug": false,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": false,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": true,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "-verbose": true,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.8,
+   "axis1": 0.75,
+   "axis2": 1.05,
+   "bbr": false,
+   "bias0": -0.0025,
+   "bias1": 0.005,
+   "bias2": -0.0025,
+   "bias3": -0.01,
+   "centre0": 6.0,
+   "centre1": 4.5,
+   "centre2": 3.5,
+   "content": "head",
+   "dof": "9",
+   "dtype": "float32",
+   "extreme": false,
+   "kind": "register",
+   "noise": 1.0,
+   "orientation": "axes+oblique",
+   "origin0": 48.5,
+   "origin1": 28.0,
+   "origin2": 45.5,
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "plain",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "20x27x12",
+   "shift0": 1.5,
+   "shift1": 2.0,
+   "shift2": 3.0,
+   "size": 22.5,
+   "spacing0": 0.5,
+   "spacing1": 3.0,
+   "spacing2": 3.0,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "units": "mm",
+   "verbose level": "7"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-dof",
+     "9"
+    ],
+    "name": "-dof",
+    "optional": true
+   },
+   {
+    "args": [
+     "-nosearch"
+    ],
+    "name": "-nosearch",
+    "optional": true
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   },
+   {
+    "args": [
+     "-verbose",
+     "7"
+    ],
+    "name": "-verbose",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.75,
+      0.95,
+      0.95
+     ],
+     "bias": [
+      -0.005,
+      0.005,
+      0.0025,
+      -0.005
+     ],
+     "centre": [
+      3.5,
+      4.0,
+      -1.0
+     ],
+     "noise": 0.0,
+     "seed": 201116840,
+     "size": 29.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      48.5,
+      28.0,
+      45.5
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      3,
+      2,
+      33,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     27,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      0.75,
+      0.95,
+      0.95
+     ],
+     "bias": [
+      -0.005,
+      0.005,
+      0.0025,
+      -0.005
+     ],
+     "centre": [
+      2.0,
+      2.0,
+      -4.0
+     ],
+     "noise": 0.0,
+     "seed": 941753837,
+     "size": 29.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -27.75,
+      5.75,
+      -51.5
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      0.5,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     22,
+     14,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 7259,
+  "options": [
+   "-dof 9",
+   "-nosearch",
+   "-out",
+   "-verbose 7",
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

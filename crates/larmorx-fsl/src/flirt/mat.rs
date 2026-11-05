@@ -12,7 +12,7 @@ pub const SINGULAR: &str = "inv(): matrix is singular";
 
 /// The LU decomposition of `a` with partial pivoting (rows exchanged for the largest magnitude
 /// in each column, the first on ties): the packed factors and the row order; `None` when a
-/// pivot is exactly zero or not finite.
+/// pivot is exactly zero (§12: a NaN or infinite pivot is not, and the factors carry it).
 fn lu(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
     lu_pivots(a).map(|(m, perm, _)| (m, perm))
 }
@@ -31,7 +31,7 @@ fn lu_pivots(a: &Mat4) -> Option<(Mat4, [usize; 4], [usize; 4])> {
                 p = i;
             }
         }
-        if best == 0.0 || !best.is_finite() {
+        if best == 0.0 {
             return None;
         }
         ipiv[k] = p;
@@ -81,17 +81,27 @@ fn substitute(lu: &Mat4, perm: &[usize; 4], b: [f64; 4]) -> [f64; 4] {
     x
 }
 
+/// −1 as a multiplier the compiler keeps a multiplication (§12's `(−1)·t + y` and `x_k·(−1)`:
+/// a product passes a NaN on with its sign, where a negation would flip it; `x * -1.0` may
+/// otherwise be compiled as a negation).
+#[inline(always)]
+fn minus_one() -> f64 {
+    std::hint::black_box(-1.0)
+}
+
 /// `inv(a)` (§12, "the 4 × 4 inverse exactly"): a diagonal matrix by reciprocals, an upper
 /// triangle by the triangle's inverse ([`upper_inverse`]), any other by the left-looking LU
 /// factorisation with partial pivoting, the inverse of `U`, the solve against `L` and the
-/// column interchanges; `None` when `a` is singular. (Observed: so the signs of FSL's zeros,
-/// e.g. convert_xfm -inverse's `-0`.)
+/// column interchanges; `None` when `a` is singular: only on an exact zero (a zero pivot, a zero
+/// on the diagonal of a diagonal or triangular matrix; §12, "When an inverse fails": a matrix
+/// with NaN or infinite entries is inverted, NaN in the entries they reach, as FSL's inverse
+/// does). (Observed: so the signs of FSL's zeros, e.g. convert_xfm -inverse's `-0`.)
 pub fn inverse(a: &Mat4) -> Option<Mat4> {
     let diagonal = (0..4).all(|i| (0..4).all(|j| i == j || a[i][j] == 0.0));
     if diagonal {
         let mut out = [[0.0; 4]; 4];
         for i in 0..4 {
-            if a[i][i] == 0.0 || !a[i][i].is_finite() {
+            if a[i][i] == 0.0 {
                 return None;
             }
             out[i][i] = 1.0 / a[i][i];
@@ -100,7 +110,7 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
     }
     let upper = (0..4).all(|i| (0..i).all(|j| a[i][j] == 0.0));
     if upper {
-        if (0..4).any(|i| a[i][i] == 0.0 || !a[i][i].is_finite()) {
+        if (0..4).any(|i| a[i][i] == 0.0) {
             return None;
         }
         let mut m = *a;
@@ -128,7 +138,7 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
         }
         if k < 4 {
             for row in m.iter_mut() {
-                row[j] += row[k] * -work[k];
+                row[j] += row[k] * (work[k] * minus_one());
             }
         }
     }
@@ -173,7 +183,7 @@ fn upper_inverse(m: &mut Mat4) {
 /// a_kj` (the sum from 0 in order, then `+ 0`); the entries on and below it `y - A·x` (`t` summed from 0 in
 /// order, then `(-1)·t + y`); the pivot the first entry of largest magnitude, the rows
 /// interchanged (the columns so far), the entries below it multiplied by the pivot's
-/// reciprocal. `None` when a pivot is exactly zero or not finite.
+/// reciprocal. `None` when a pivot is exactly zero (a NaN pivot is not 0: the factors carry it).
 fn lu_left_looking(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
     let mut m = *a;
     let mut ipiv = [0, 1, 2, 3];
@@ -197,7 +207,11 @@ fn lu_left_looking(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
             for k in 0..j {
                 t += m[r][k] * m[k][j];
             }
-            m[r][j] += -t;
+            // `(−1)·t + y` in this order (§12): the product the first operand
+            #[allow(clippy::assign_op_pattern)]
+            {
+                m[r][j] = minus_one() * t + m[r][j];
+            }
         }
         let mut p = j;
         let mut best = m[j][j].abs();
@@ -207,7 +221,7 @@ fn lu_left_looking(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
                 p = i;
             }
         }
-        if best == 0.0 || !best.is_finite() {
+        if best == 0.0 {
             return None;
         }
         ipiv[j] = p;
@@ -588,6 +602,30 @@ mod tests {
         let mut sing = a;
         sing[2] = sing[1];
         assert!(inverse(&sing).is_none());
+        // §12: only an exact zero fails; NaN and infinite matrices are inverted (NaN where they
+        // reach), the diagonal and triangular shortcuts included
+        let mut n = a;
+        n[0][3] = f64::NAN;
+        let ni = inverse(&n).expect("a NaN entry is not a zero pivot");
+        assert!(ni[0][3].is_nan());
+        n[1][1] = f64::NAN;
+        assert!(inverse(&n).unwrap()[1][1].is_nan());
+        assert!(solve_vec(&n, [1.0, 2.0, 3.0, 1.0]).is_some());
+        let nan_all = [[f64::NAN; 4]; 4];
+        assert!(
+            inverse(&nan_all)
+                .unwrap()
+                .iter()
+                .flatten()
+                .all(|v| v.is_nan())
+        );
+        let mut d = IDENTITY;
+        d[2][2] = f64::INFINITY;
+        assert_eq!(inverse(&d).unwrap()[2][2], 0.0);
+        let mut u = IDENTITY;
+        u[0][1] = 2.0;
+        u[1][1] = f64::NAN;
+        assert!(inverse(&u).unwrap()[1][1].is_nan());
     }
 
     #[test]

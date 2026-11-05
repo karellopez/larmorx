@@ -33,16 +33,20 @@ oblique phase encodings, four volumes, a zero read-out time, `--debug`, `--trace
 each compared file by file with FSL's.
 
 The original against FSL 6.0.7.23 (the parity suite `fsl-topup`, record
-[fsl-topup](../validation/fsl-topup.md), 2026-11-03, §12's thresholds): 180 cases of the
-standard tier (the replica suite's cases, fMRIPrep's two calls and 7 permanent cases of random
-testing), 92 within the thresholds, 66 rejected by both alike, 22 expected divergences (each
-with its reason in the record: 9 cases whose movements are estimated and not converged, where
-FSL's rotation derivatives are not its cost's; FSL-133's lines, which the original restores
-correctly; FSL-143's diverging iterations; vb2D's transients; FSL-126's negative weight, with
-which both minimisations diverge; the inputs refused for FSL-124 and FSL-134), 0 failures. fMRIPrep's calls: ds001600 within the thresholds, ds005040 within FSL's
-own band of a last-bit change (the field's p99 0.61 Hz against FSL at `--nthr=4`'s 0.64). Random
-testing's trial (14,400 cases, the replica trial's draws) is triaged case by case in
-[the findings](../findings/fsl-topup-original.md) (finding 36).
+[fsl-topup](../validation/fsl-topup.md), 2026-11-05, §12's thresholds, compared in `reproduce`
+mode): 185 cases of the standard tier (the replica suite's cases, fMRIPrep's two calls and 9
+permanent cases of random testing), 104 within the thresholds, 67 rejected by both alike, 14
+expected divergences (each with its reason in the record: 6 cases whose movements are estimated
+and not converged, where FSL's own path is not determined beyond its inputs' last bits (FSL-201's
+forward differences: FSL's runs with the read-out times changed in their last bits spread as far,
+finding 37); FSL-143's diverging iterations; vb2D's transients; FSL-126's negative weight, with
+which both minimisations diverge; the inputs refused for FSL-124 and FSL-134), 0 failures.
+fMRIPrep's calls: ds001600 within the thresholds, ds005040 within FSL's own band of a last-bit
+change (the field's p99 0.61 Hz against FSL at `--nthr=4`'s 0.64). Random testing's trial (14,400
+cases, the replica trial's draws) is triaged case by case in
+[the findings](../findings/fsl-topup-original.md) (finding 36; its open items closed by the
+catch-up of 2026-11-04, findings 37 to 44); the catch-up's trial of 2026-11-05 (17,535 cases,
+13,300 agree) and FSL-242 in findings 45 to 47.
 
 ## Quick start
 
@@ -154,14 +158,19 @@ the thread count (`n_threads`, `--nthr`: deterministic sums), and correctly roun
 |---|---|---|---|---|
 | fMRIPrep's topup, ds005040 | 32.6 s | 29.7 s | 2.8 s | 0.8 s |
 | fMRIPrep's topup, ds001600 | 77.4 s | 71.4 s | 7.7 s | 2.0 s |
-| applytopup `lsr`, ds005040's pair | 0.42 s | 3.47 s | 0.13 s | 0.04 s |
+| applytopup `lsr`, ds005040's pair | 0.42 s | 3.47 s | 0.13 s | 0.04 s (0.03 s with the matrices row by row, 2026-11-04: `lsr_speed.py`) |
 
 Where the spec leaves a convention open, the original follows FSL's as measured: an oblique
 phase encoding wraps along no axis; the scaled conjugate gradients' second gradient keeps the
-current point's regulariser weight; `--debug`'s images are written in FSL's order. It differs
-from FSL by design where FSL's derivatives of the movements are not its cost's (the original's
-are exact: estimated movements that have not converged end elsewhere) and where FSL-133 makes
-FSL's restoration wrong.
+current point's regulariser weight; `--debug`'s images are written in FSL's order; the mask's
+frame follows each volume's phase encoding (a volume with a read-out time of 0 included) and
+holds for moved volumes too. Both modes follow FSL's spline prefilter (its truncated start, which
+decides the interpolation on axes shorter than 15 voxels), its regulariser's sampling of quadratic
+B-splines and applytopup's resampling matrices built row by row. By default it corrects FSL where
+FSL's derivatives of the movements are not its cost's (FSL-201: the original's are exact, and its
+result moves in proportion to a change of its inputs' last bits, where FSL's jumps by up to 1e-2)
+and where FSL-133 makes FSL's restoration wrong; `reproduce` gives FSL's derivatives and FSL's
+read.
 
 ## Upstream defects (D13)
 
@@ -184,9 +193,12 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   smoothing) or `--lambda`: refused.
 - **FSL-132**: applytopup resamples the first volume trilinearly whatever `--interp` asks: corrected.
 - **FSL-133**: applytopup's restoration wraps a line wrongly for lengths that do not divide 2³²:
-  corrected.
+  corrected (`reproduce`: FSL's read, the field of voxel `(k + 2³²) mod n` before a line's first
+  voxel, in both implementations since 2026-11-04).
 - **FSL-134**: applytopup with a field image scales the y displacement by the x voxel size, and
-  takes fields on other grids: corrected, refused.
+  takes fields on other grids: corrected, refused (`reproduce`: FSL's scales, and a field of as
+  many voxels as the images in another shape laid as stored, its Jacobian at the same indices;
+  in the original since 2026-11-04).
 - **FSL-135**: an unknown `--method` writes nothing and exits 0; a restoration without movements
   aborts: refused clearly.
 - **FSL-141** to **FSL-143**: the vb methods' counts in 32-bit integers, `vb3D`/`vb4D`'s count of
@@ -195,16 +207,25 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   leaves the image uncorrected silently: refused (both implementations; the replica since
   2026-11-03).
 - **FSL-145**: `--splineorder=2` lays two coefficients on an axis shorter than two knot
-  spacings (one on an axis shorter than one spacing, whose refit between levels stops topup),
-  so the field is forced towards 0 at its far end: the full count by default (both
-  implementations; the replica since 2026-11-03, which also reads a coefficient file laid so in
-  applytopup).
+  spacings (one on an axis shorter than one spacing, whose refit between levels or for the
+  outputs stops topup), so the field is forced towards 0 at its far end: the full count by
+  default (both implementations; applytopup reads a coefficient file of either count by default
+  and FSL's only with `reproduce`, where FSL aborts on the other).
 - **FSL-146**: with volumes encoded along different axes (AP, PA, LR, RL) the gradient is not
-  the cost's: corrected, the cost's own (both implementations; the replica since 2026-11-03).
+  the cost's: corrected, the cost's own (both implementations; the volumes left out are those
+  whose encoding along the axis is 0, whatever their read-out time).
 - **FSL-201**: with the movements estimated, the derivatives with respect to the rotations are
   forward differences of rotation matrices built in single precision, so the minimisers end
-  elsewhere than the cost's minimum: the exact derivatives by default (both implementations; the
-  replica since 2026-11-03; fMRIPrep's calls, which estimate no movements, unchanged).
+  elsewhere than the cost's minimum and FSL's path depends on the last bits of its inputs: the
+  exact derivatives by default (both implementations; `reproduce` FSL's matrices and forward
+  differences, in the original since 2026-11-04; fMRIPrep's calls, which estimate no movements,
+  unchanged).
+- **FSL-242**: with `--minmet=1` (scaled conjugate gradients), a level whose last iteration's
+  step is rejected (its cost above the current point's) ends at that rejected, worse point, from
+  which the next level or the outputs start: the lowest cost the level found by default
+  (the clean-room original since 2026-11-05; `reproduce` FSL's; named on every run where it
+  happens). `--miter` counts every iteration, the rejected ones too, in both modes (FSL's, observed
+  with `-v`).
 
 ### glibc's maths functions (GLIBC-07)
 
@@ -219,9 +240,6 @@ of glibc's functions.
 
 ## Not yet
 
-- The original: two open differences of random testing (finding 36): the regulariser's
-  Levenberg-Marquardt Hessian of quadratic B-splines at an even knot spacing (47 trial cases),
-  and 8 `lsr` cases on lines that divide 2^32.
 - applytopup's restorations of lines of fewer than 8 or more than 256 voxels along the phase
   encoding, and band systems that need LAPACK's blocked band factorisation, are refused in both
   modes with a clear message (`larmorx-nc: ... not replicated`): FSL's arithmetic there follows

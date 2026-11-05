@@ -109,6 +109,9 @@ pub struct Options {
     pub omat: Option<String>,
     pub init: Option<String>,
     pub schedule: Option<String>,
+    /// A schedule the original carries (`pairreg`'s, §15.8), read as a schedule file's text in
+    /// place of `-schedule`'s file.
+    pub schedule_text: Option<&'static str>,
     pub ref_weight: Option<String>,
     pub in_weight: Option<String>,
     pub wmseg: Option<String>,
@@ -162,6 +165,7 @@ impl Default for Options {
             omat: None,
             init: None,
             schedule: None,
+            schedule_text: None,
             ref_weight: None,
             in_weight: None,
             wmseg: None,

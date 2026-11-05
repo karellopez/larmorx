@@ -3,15 +3,20 @@
 ``standard_space_roi`` script (an image masked and cut down to a standard space's field of
 view or mask, taken into the image's space through FLIRT), FSL 6.0.7.23's.
 
-Both have only their bit-exact replicas yet (``larmorx-nc``, FSL Licence, run as a separate
-program): their clean-room originals are to be written from their specs. ``implementation``
-is ``"auto"`` or ``"replica"`` (``"original"`` raises ``NotImplementedError``). A run that fails
-raises :class:`RuntimeError` with its messages.
+Both have two implementations (``docs/licensing.md``): the clean-room original (since
+2026-11-05, ``larmorx_fsl::cli``, written from ``specs/standard_space_roi.md``, in this
+process) and the bit-exact replica (``larmorx-nc``, FSL Licence, run as a separate program).
+``implementation="auto"`` runs the replica when its program is found, else the original. A run
+that fails raises :class:`RuntimeError` with its messages.
 
 ``standard_space_roi`` reads FSL's standard images (``MNI152_T1_2mm`` and, for
-``betpremask``, ``MNI152_T1_2mm_brain_mask_dil``) unless ``reference`` and the masks are given:
-from ``fsl_data`` (a directory laid out as ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA``
-otherwise), else ``$FSLDIR/data``, else the copy larmorx-nc carries.
+``betpremask``, ``MNI152_T1_2mm_brain_mask_dil``) unless ``reference`` and the masks are given.
+The original finds them (``specs/bet.md`` §5.4) in ``fsl_data`` (a directory laid out as
+``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise; when given, the only place), else
+in the copy larmorx-nc installs (read as data), else ``$FSLDIR/data``, else in larmorx's data
+cache, filled once by a checksum-verified download of FSL's ``fsl-data_standard`` package
+(``LARMORX_DATA_DIR``: the cache; ``LARMORX_FSL_DATA_PACKAGE``: a local copy of the package).
+The replica reads ``fsl_data``, else ``$FSLDIR/data``, else its own copy.
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.fsl.bet import _read_image, _write_image
@@ -38,6 +43,19 @@ FSL_DATA_ENV = "LARMORX_FSL_DATA"
 Region = tuple[int, int] | None
 
 
+#: The variables the original's search of FSL's standard images reads (``specs/bet.md`` §5.4):
+#: larmorx's data cache and the package's source, the user's cache directories, ``PATH`` for
+#: the download's ``curl`` or ``wget``.
+_DATA_VARIABLES = (
+    "LARMORX_DATA_DIR",
+    "LARMORX_FSL_DATA_PACKAGE",
+    "HOME",
+    "XDG_CACHE_HOME",
+    "LOCALAPPDATA",
+    "PATH",
+)
+
+
 def _run(
     tool: str,
     args: list[str],
@@ -46,8 +64,27 @@ def _run(
     upstream_defects: str,
     env: dict[str, str | None],
 ):
+    """Runs ``fsl tool`` (the original in this process, or the replica's program) in ``tmp``;
+    returns the implementation and ``(exit status, standard output, standard error)``."""
+    _defects.check(upstream_defects)
     selected = _replica.select("fsl", tool, implementation)
-    assert selected is not None  # neither tool has a clean-room original yet
+    if selected is None:
+        table = [("FSLOUTPUTTYPE", "NIFTI"), (_defects.ENV, upstream_defects)]
+        table += [(k, v) for k, v in env.items() if v is not None]
+        if tool == "standard_space_roi":
+            # the data search reads larmorx-nc's copy as data when its program is found
+            try:
+                program = _replica.find("fsl", tool)
+            except ValueError:
+                program = None
+            if program is not None:
+                table.append(("LARMORX_NC_BIN", str(program)))
+            table += [(k, os.environ[k]) for k in _DATA_VARIABLES if os.environ.get(k)]
+        else:
+            table.append(("PATH", tmp))
+        code, stdout, stderr = _core.fsl_run_original(tool, list(args), table, tmp)
+        _warn(stderr)
+        return _replica.ORIGINAL, (code, stdout, stderr)
     process = _replica.run(
         selected,
         args,
@@ -58,7 +95,7 @@ def _run(
         exclude=lambda name: name.upper().startswith("FSL") or name in ("maskthr", FSL_DATA_ENV),
     )
     _warn(process.stderr)
-    return selected, process
+    return selected.implementation(), (process.returncode, process.stdout, process.stderr)
 
 
 def fslroi(
@@ -88,12 +125,12 @@ def fslroi(
     with tempfile.TemporaryDirectory(prefix="larmorx-fslroi-") as tmp:
         src = _write_image(image, tmp, "in", 1)
         out = os.path.join(tmp, "roi.nii")
-        selected, process = _run(
+        impl, (code, _stdout, stderr) = _run(
             "fslroi", [src, out, *map(str, numbers)], tmp, implementation, upstream_defects, {}
         )
-        if process.returncode != 0 or not os.path.exists(out):
-            raise RuntimeError(f"fslroi failed (exit {process.returncode}):\n{process.stderr}")
-        return _read_image(out, 1, selected.implementation())
+        if code != 0 or not os.path.exists(out):
+            raise RuntimeError(f"fslroi failed (exit {code}):\n{stderr}")
+        return _read_image(out, 1, impl)
 
 
 @dataclass(frozen=True)
@@ -152,7 +189,7 @@ def standard_space_roi(
         if os.environ.get("FSLDIR"):
             env["FSLDIR"] = os.environ["FSLDIR"]
         out = os.path.join(tmp, "out")
-        selected, process = _run(
+        impl, (code, stdout, stderr) = _run(
             "standard_space_roi",
             [src, out, *args, *(flirt_args or [])],
             tmp,
@@ -161,13 +198,10 @@ def standard_space_roi(
             env,
         )
         image_out = out + ".nii"
-        if process.returncode != 0 or not os.path.exists(image_out):
-            raise RuntimeError(
-                f"standard_space_roi failed (exit {process.returncode}):\n"
-                f"{process.stdout}{process.stderr}"
-            )
+        if code != 0 or not os.path.exists(image_out):
+            raise RuntimeError(f"standard_space_roi failed (exit {code}):\n{stdout}{stderr}")
         return StandardSpaceRoiResult(
-            image=_read_image(image_out, 1, selected.implementation()),
+            image=_read_image(image_out, 1, impl),
             to_standard=np.loadtxt(out + "_tmp_to_std.mat"),
             from_standard=np.loadtxt(out + "_tmp_to_std_inv.mat"),
         )

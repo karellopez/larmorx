@@ -136,3 +136,33 @@ original's files compared with FSL's value by value, the record's metrics and FS
 band where the record measures it); `python -m larmorx_validation.evidence.fsl_topup original`
 or `cases-original` computes them alone. Every page counted before and after with
 `../cleanroom-bet/site_inventory.py count <site> <page>` and compared with its `compare`.
+
+## The clean-room catch-up (2026-11-04, the spec answers of 2026-11-03)
+
+Findings 37 to 44 of `docs/findings/fsl-topup-original.md`. FSL only through the oracle cache, the
+original named by `LARMORX_TOPUP_BIN`; every run inside `scripts/orchestration/boxed.sh`.
+
+| Script | What it does |
+|---|---|
+| `catchup_probes.py` | `final-single <dir>`: topup with `--splineorder=2` on 6 slices whose last level is subsampled, so the outputs' refit has a single coefficient along z (FSL: `Error occured while writing output from topup`, FSL-145); `general-count <dir> <coef dir>`: applytopup `--method=jac` on a coefficient file of the general quadratic count on a short axis (FSL aborts: `Unable to read file`) |
+| `fsl201_spread.py` | one suite case with every read-out time changed by `k` units of its last float bit: FSL's runs (`fsl`), the original's `reproduce` runs (`lx`) against FSL's unperturbed run, and the original's default runs against its own unperturbed default (`fix`): FSL-201 makes FSL's path depend on its inputs' last bits (finding 37). `fsl201_spread.py <case> <new dir> 1,16,256 fsl,lx` |
+| `lsr_speed.py` | applytopup `lsr` on ds005040's pair with FSL's topup result: the original's wall time at the given thread counts and its output against FSL's (0.13 s on one thread, 0.03 s on 14; FSL 0.42 s, `docs/benchmarks/fsl-topup.md`) |
+
+`mine.py` takes the original's binary from `LARMORX_BIN` (default `target/release/larmorx`).
+
+### The catch-up's random-testing trial (2026-11-05)
+
+| Script | What it does |
+|---|---|
+| `trial_replay_vs_direct.py` | a finding of `fsl-topup-original` run as `difftest --replay` does (`judge_once`) and directly through the suite (`run_case`), on its drawn and its shrunk recipe: the replay runs the shrunk one (`trial_replay_vs_direct.py <finding .json>`, `LXT` the threads) |
+| `trial_f6_probe.py` | finding topup-trial-00006's shrunk case (1 x 1 x 3 voxels, 3 volumes) on FSL and the original with `--iout` and `--featout`: the default, `--fwhm=0`, `--estmov=0`, both (`trial_f6_probe.py <dir with pair.nii.gz and acq.txt> <out>`) |
+| `trial_f6_probe2.py` | the same pair tiled (x and y to 4 voxels, z to 24): which short axis makes the smoothed magnitude differ (confounded: FSL then estimates a field) |
+| `trial_spread.py` | FSL's own spread beside the original's distance on trial findings: FSL (cache, `use`) with the read-out times changed by `k` last bits and the original's `reproduce` run, each against FSL's unperturbed run, the finding's failed metrics over their thresholds (`LARMORX_TOPUP_BIN=<larmorx> trial_spread.py <out> 16,256 <finding .json> ...`) |
+| `trial_modes.py` | a finding's drawn case run by the original in both modes with extra words (`-v`), the `.par` lines printed, the streams kept (`trial_modes.py <finding .json> <out> -v`) |
+| `trial_fsl_verbose.py` | the same case run by FSL through the oracle cache with extra words (`-v`): the cost lines per level beside the original's (what showed `--miter`'s count of rejected iterations and FSL-242) |
+| `trial_recheck.py` | the trial's findings with a scaled-conjugate-gradient level (and every 25th other) re-checked with the current build (`recheck.replay`, drawn recipes); counts by minimiser and movements |
+| `trial_categories.py` | every finding of the trial in one category (its recipe and how far its failed metrics lie from FSL's own one-bit band); counts, a reproducer per category, `--json` (`trial_categories.py <trial> <this folder> --json out.json`) |
+| `trial_catchup_triage.json` | `trial_categories.py`'s output on the catch-up trial (`trial_categories.py <workspace>/oracles/difftest/2026-11-05-catchup-topup . --json trial_catchup_triage.json`): the 4,223 differing cases' counts per category, the lowest finding of each and every category's findings; topup's page reads it for the catch-up trial's triage table (`evidence/fsl_topup.py`, `trial_catchup`; relay 9) |
+| `trial_band_ratios.py` | per group, the failed metrics over FSL's one-bit band: median, 90th percentile, the findings whose band is 0 |
+| `trial_quadratic.py` | the trial's `--splineorder=2` cases without movements, agreeing and differing, by whether an axis is shorter than two knot spacings at some level (FSL-145's layout) |
+

@@ -20,9 +20,7 @@ use super::fmt;
 use super::options::atof;
 use crate::bet::image::{self, Output, Values};
 use crate::topup::Scan;
-use crate::topup::apply::{
-    self, Corrected, FieldOnGrid, Image, Interp, LsrError, Sampling, wrap_axis,
-};
+use crate::topup::apply::{self, Corrected, FieldOnGrid, Image, Interp, LsrError, Sampling};
 use crate::topup::vb::{self, VbError, VbMethod, VbOptions, VbResult};
 
 /// The usage text (standard error).
@@ -433,20 +431,30 @@ fn run(
                 // on the call's thread pool (its lines' prefilters run in parallel)
                 let coefficients = as_stored(&c);
                 let shape = c.input.vol.shape;
+                // FSL-145 reproduced: FSL's own quadratic count only (FSL aborts on a file of
+                // the general count on a short axis: observed, catchup_probes.py general-count)
+                let fsl_only = mode == UpstreamDefects::Reproduce;
                 let evaluated = larmorx_core::parallel::with_threads(settings.threads(), || {
-                    apply::coefficient_field(&coefficients, shape, n, k, order)
+                    apply::coefficient_field(&coefficients, shape, n, k, order, fsl_only)
                 });
                 let field = match evaluated {
                     Ok(f) => f,
                     Err(e) => return Err(refuse(err, notices, &e.to_string())),
                 };
-                let Some(field) = field else {
+                let Some((field, general_on_short)) = field else {
                     return Err(reader_fail(
                         err,
                         notices,
                         &format!("Unable to read file {tu}"),
                     ));
                 };
+                if general_on_short {
+                    notices.push(Notice::new(
+                        &defects::FSL_145,
+                        mode,
+                        "a coefficient file of the general quadratic count on an axis shorter than two knot spacings read (FSL's count there is one or two coefficients: FSL refuses the file)",
+                    ));
+                }
                 let movpar = format!("{tu}_movpar.txt");
                 let rows = read_rows(settings, &movpar, err).unwrap_or_default();
                 let movements = if !rows.is_empty() && rows.iter().all(|r| r.len() == 6) {
@@ -539,7 +547,7 @@ fn run(
     let first = &reads[0];
     let dims = first.input.vol.shape;
     let voxel = first.input.vol.voxel;
-    let (field, field_voxel, movements, field_image) = match topup {
+    let (mut field, field_voxel, movements, field_image) = match topup {
         Topup::Coefficients {
             field,
             voxel,
@@ -555,40 +563,59 @@ fn run(
             field.dims[0], field.dims[1], field.dims[2], dims[0], dims[1], dims[2]
         );
         let n = Notice::new(&defects::FSL_134, mode, what.clone());
-        return Err(match (mode, lsr, same_count) {
-            (UpstreamDefects::Fix, _, _) => refuse(
-                err,
-                &[n],
-                &format!("--topup={tu}: {what} (FSL-134: FSL does not refuse it)"),
-            ),
-            (UpstreamDefects::Reproduce, true, _) => refuse(
-                err,
-                &[n],
-                &format!(
-                    "--topup={tu}: {what}; with --method={method} FSL reads the field's lines past their end (FSL-134: refused in both modes)"
-                ),
-            ),
+        match (mode, lsr, same_count) {
+            (UpstreamDefects::Fix, _, _) => {
+                return Err(refuse(
+                    err,
+                    &[n],
+                    &format!("--topup={tu}: {what} (FSL-134: FSL does not refuse it)"),
+                ));
+            }
+            (UpstreamDefects::Reproduce, true, _) => {
+                return Err(refuse(
+                    err,
+                    &[n],
+                    &format!(
+                        "--topup={tu}: {what}; with --method={method} FSL reads the field's lines past their end (FSL-134: refused in both modes)"
+                    ),
+                ));
+            }
             (UpstreamDefects::Reproduce, false, false) => {
                 print_notices(err, &[n]);
                 let _ = writeln!(
                     err,
                     "Image Exception : #2 :: Attempted to copydata with non-matching sizes"
                 );
-                abort(
+                return Err(abort(
                     err,
                     "applytopup",
                     RUNTIME,
                     "Attempted to copydata with non-matching sizes",
-                )
+                ));
             }
-            (UpstreamDefects::Reproduce, false, true) => refuse(
-                err,
-                &[n],
-                &format!(
-                    "--topup={tu}: {what}: FSL lays the field on the images' grid as it is stored; not reproduced by the clean-room original (FSL-134)"
-                ),
-            ),
-        });
+            (UpstreamDefects::Reproduce, false, true) => {
+                // FSL's layout (specs/topup.md §7.3, observed): the field laid as stored for the
+                // displacement, its Jacobian at the same voxel indices
+                let laid = if field_image {
+                    larmorx_core::parallel::with_threads(settings.threads(), || {
+                        apply::image_field_on(field.h.clone(), field.dims, dims)
+                    })
+                } else {
+                    Ok(field.laid_onto(dims))
+                };
+                field = match laid {
+                    Ok(f) => f,
+                    Err(e) => return Err(refuse(err, &[n], &e.to_string())),
+                };
+                notices.push(Notice::new(
+                    &defects::FSL_134,
+                    mode,
+                    format!(
+                        "{what}: the field laid on the images' grid as it is stored (its Jacobian at the same voxel indices, 0 beyond its own grid), as FSL's"
+                    ),
+                ));
+            }
+        }
     }
     // the images' movements (about the field's centre)
     let centre: [f64; 3] =
@@ -697,12 +724,21 @@ fn run(
             },
         ));
     }
-    // FSL-134: a field image's Jacobian in units of its x voxel size along y
-    let mut jac_y_scale = 1.0;
+    // the Jacobian's scales (specs/topup.md §7.3): a coefficient field's derivatives per voxel
+    // of the field's grid times the image's voxel size over the field's (1 on its own grid); a
+    // field image's per voxel of the images' grid (1), or FSL's (FSL-134 reproduced: both
+    // displacements in units of the image's x voxel size, divided by the field image's own
+    // voxel sizes)
+    let mut jac_scale = if field_image {
+        [1.0, 1.0]
+    } else {
+        [voxel[0] / field_voxel[0], voxel[1] / field_voxel[1]]
+    };
+    let fsl_scale = [voxel[0] / field_voxel[0], voxel[0] / field_voxel[1]];
     if field_image
         && !lsr
-        && images.iter().any(|i| i.scan.pe[1] != 0.0)
-        && field_voxel[0] != field_voxel[1]
+        && ((images.iter().any(|i| i.scan.pe[0] != 0.0) && fsl_scale[0] != 1.0)
+            || (images.iter().any(|i| i.scan.pe[1] != 0.0) && fsl_scale[1] != 1.0))
     {
         notices.push(Notice::new(
             &defects::FSL_134,
@@ -713,7 +749,7 @@ fn run(
             },
         ));
         if mode == UpstreamDefects::Reproduce {
-            jac_y_scale = field_voxel[0] / field_voxel[1];
+            jac_scale = fsl_scale;
         }
     }
     let s = apply::Settings {
@@ -721,7 +757,8 @@ fn run(
         voxel,
         interp,
         first_trilinear: mode == UpstreamDefects::Reproduce,
-        jac_y_scale,
+        jac_scale,
+        fsl133: mode == UpstreamDefects::Reproduce,
     };
     let n_threads = settings.threads();
     let vb_options = vb_method.map(|m| VbOptions {
@@ -810,34 +847,21 @@ fn run(
             ));
         }
     }
-    // FSL-133: the lines' wrap-around (lengths that do not divide 2^32)
-    if lsr {
-        let lengths: std::collections::BTreeSet<usize> = images
-            .iter()
-            .filter_map(|i| wrap_axis(i.scan.pe))
-            .map(|a| dims[a])
-            .filter(|n| !n.is_power_of_two())
-            .collect();
-        for n in lengths {
+    // FSL-133: a restored line read the mapping before its first voxel where FSL's read and the
+    // circular one take different field values (line lengths that do not divide 2^32)
+    if corrected.wrap_read_differs {
+        notices.push(Notice::new(
+            &defects::FSL_133,
+            mode,
             match mode {
-                UpstreamDefects::Fix => defects::push_once(
-                    notices,
-                    Notice::new(
-                        &defects::FSL_133,
-                        mode,
-                        format!(
-                            "the lines of {n} voxels wrap around circularly (FSL reads the displacement before a line's first voxel from the middle of the line)"
-                        ),
-                    ),
-                ),
-                UpstreamDefects::Reproduce => {
-                    let _ = writeln!(
-                        err,
-                        "larmorx fsl applytopup: FSL-133 is not reproduced by the clean-room original: the lines of {n} voxels wrap around circularly (larmorx)"
-                    );
+                UpstreamDefects::Fix => {
+                    "the lines wrap around circularly (FSL reads the displacement before a line's first voxel from the middle of the line)"
                 }
-            }
-        }
+                UpstreamDefects::Reproduce => {
+                    "the displacement before a line's first voxel read from voxel (k + 2^32) mod n, as FSL's"
+                }
+            },
+        ));
     }
     write_output(
         get("out").unwrap_or_default(),

@@ -118,10 +118,14 @@ command-line binary. Code from different families is never linked into one binar
   `MNI152_T1_2mm` (FSL's MNI152, the MNI ICBM 152 non-linear 6th generation average made for FSL by
   Andrew Janke) also carries the McConnell Brain Imaging Centre's permissive notice (copies keep
   it). They are the one exception to the repository's rule of no image data in git (CLAUDE.md).
-  The clean-room original reads the same files as input data at run time: `larmorx-nc`'s copy when
-  installed, else `$FSLDIR/data`, else a checksum-verified download from FSL's package site, cached
-  (`specs/bet.md`, `specs/standard_space_roi.md`); FSL's terms then bind the files' use, in either
-  implementation.
+  The clean-room original (since 2026-11-05, `larmorx_fsl::data`) reads the same files as input
+  data at run time: from the directory the call names (`fsl_data=`, `LARMORX_FSL_DATA`), else
+  `larmorx-nc`'s copy when installed (read as data, checked against FSL's SHA-256; nothing of
+  larmorx-nc is run or linked), else `$FSLDIR/data`, else larmorx's data cache, filled once by a
+  checksum-verified download of FSL's package from FSL's site of which only the three images are
+  kept (`larmorx fetch fsl-standard` fetches ahead; `specs/bet.md` §5.4,
+  `specs/standard_space_roi.md`); the main package ships none of them, and FSL's terms then bind
+  the files' use, in either implementation.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root): the originals and the AFNI replicas

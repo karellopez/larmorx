@@ -60,6 +60,9 @@ pub struct Params {
     pub priors_throughout: bool,
     /// Several channels: FSL-98's pairing of the sorted classes (`reproduce`).
     pub fsl98_pairing: bool,
+    /// One channel: FSL-202's class variance (`reproduce`): `μ²` the single-precision square of
+    /// the single-precision mean (§4.4); by default the double-precision mean's square.
+    pub fsl_variance: bool,
     /// The C library functions (GLIBC-07, §8: correctly rounded by default, glibc's with
     /// `reproduce`) and their witness.
     pub libm: std::sync::Arc<Libm>,
@@ -85,6 +88,7 @@ impl Default for Params {
             priors: None,
             priors_throughout: false,
             fsl98_pairing: false,
+            fsl_variance: false,
             libm: std::sync::Arc::default(),
         }
     }
@@ -127,22 +131,44 @@ pub struct Single {
     /// image`, §8.3): 4 per class for each class statistics, 1 per bias field estimate, 1 per
     /// class for the tissue volumes (observed).
     pub empty_sums: usize,
+    /// A class's variance differed between FSL-202's two forms in some class statistics.
+    pub variance_differs: bool,
+}
+
+/// The image's extrema (§4.1): with `fsl` FAST's (from the first voxel, then each value
+/// strictly above the running maximum or else strictly below the running minimum: a NaN never
+/// replaces them, so a NaN first voxel makes both NaN, FSL-203); otherwise over the voxels that
+/// are not NaN (FSL-203 corrected; both NaN when every voxel is).
+pub fn extrema(data: &[f32], fsl: bool) -> (f32, f32) {
+    let start = if fsl {
+        data.first().copied()
+    } else {
+        data.iter().copied().find(|v| !v.is_nan())
+    };
+    let Some(first) = start else {
+        return if data.is_empty() {
+            (0.0, 0.0)
+        } else {
+            (f32::NAN, f32::NAN)
+        };
+    };
+    let (mut lo, mut hi) = (first, first);
+    for &v in data {
+        if v > hi {
+            hi = v;
+        } else if v < lo {
+            lo = v;
+        }
+    }
+    (lo, hi)
 }
 
 /// §4.1's rule for negative values, in place: when the minimum is below 0, the minimum is
-/// subtracted if the 2nd percentile of all voxels is below 0, else the negative values are set
-/// to 0.
-pub fn negative_rule(data: &mut [f32]) {
-    let Some(&first) = data.first() else { return };
-    let (mut lo, mut hi) = (first, first);
-    for &v in data.iter() {
-        if v < lo {
-            lo = v;
-        }
-        if v > hi {
-            hi = v;
-        }
-    }
+/// subtracted if the 2nd percentile of all voxels is below 0, else every value not within `[0,
+/// max]` by both comparisons is set to 0 (NaN voxels too: spec §4.1.1, observed); the extrema
+/// as [`extrema`] finds them (`fsl`: FAST's, FSL-203).
+pub fn negative_rule(data: &mut [f32], fsl: bool) {
+    let (lo, hi) = extrema(data, fsl);
     if !(lo < 0.0) {
         return;
     }
@@ -150,22 +176,16 @@ pub fn negative_rule(data: &mut [f32]) {
         data.par_iter_mut().for_each(|v| *v -= lo);
     } else {
         data.par_iter_mut().for_each(|v| {
-            if *v < 0.0 || *v > hi {
+            if !(*v >= 0.0 && *v <= hi) {
                 *v = 0.0;
             }
         });
     }
 }
 
-/// The image's maximum as FAST finds it (the first voxel, then every larger one).
-pub fn maximum(data: &[f32]) -> f32 {
-    let mut hi = data.first().copied().unwrap_or(0.0);
-    for &v in data {
-        if v > hi {
-            hi = v;
-        }
-    }
-    hi
+/// The image's maximum as [`extrema`] finds it.
+pub fn maximum(data: &[f32], fsl: bool) -> f32 {
+    extrema(data, fsl).1
 }
 
 /// FAST's mask (§4.1): `0 < v < max + 1`, the bound in single precision.
@@ -405,6 +425,7 @@ impl Mrf<'_> {
                     g(f64::from(total as f32)),
                     g(f64::from(beta))
                 );
+                let _ = out.flush();
             }
         }
         self.post = from_cells(cells);
@@ -459,6 +480,7 @@ fn class_line(out: &mut dyn Write, s: &[(f32, f32)], libm: &Libm) {
         ));
     }
     let _ = writeln!(out, "{line}");
+    let _ = out.flush();
 }
 
 /// One bias field estimate (§4.5): `b` per mask voxel, from the uncorrected log image `y`, and
@@ -506,6 +528,107 @@ pub fn kernels(lowpass: f32, voxel: [f32; 3], libm: &Libm) -> [Vec<f64>; 3] {
     voxel.map(|d| bias::kernel(((0.51 * f64::from(lowpass)) / f64::from(d)) as f32, libm))
 }
 
+/// `-n 0` (FSL-99 reproduced): FAST runs its loops without a class (observed, every line below
+/// on standard output, the numbers 0): one channel's `-O + -W` k-means lines, each main-loop
+/// iteration's heading, five sweeps' `MRFWeightsTotal=0` lines and an empty class line, ` BETA`
+/// after each `-O` iteration (with `-H nan` FSL-99's ` TOTAL 0 RHS ...` line and its pairs on
+/// standard error first), then without partial volumes `\n total tissue 0`; several channels
+/// (`channels` above 1) print `-W` k-means lines, the headings, an empty ` CHANNEL i` line per
+/// channel, ` BETA`, and with partial volumes `Partial Volume Estimation ` and `\n total tissue
+/// 0`. With one channel and partial volumes FAST then aborts (`Mixeltype exceeds allowed
+/// types`) after ` Starting Partial Volume Estimation `, which is not flushed (§7).
+pub fn zero_classes(p: &Params, channels: usize, out: &mut dyn Write, err: &mut dyn Write) {
+    let multi = channels > 1;
+    let v = p.verbose;
+    let kmeans = if multi {
+        p.init_iterations
+    } else {
+        p.fixed_iterations + p.init_iterations
+    };
+    if v {
+        for it in 0..kmeans.max(0) {
+            let _ = writeln!(out, "KMeans Iteration {it}");
+        }
+    }
+    let mut beta = p.f_hard;
+    let iteration = |out: &mut dyn Write, beta: f32| {
+        if !v {
+            return;
+        }
+        if multi {
+            for i in 1..=channels {
+                let _ = writeln!(out, " CHANNEL {i}");
+                let _ = out.flush();
+            }
+        } else {
+            for k in 0..5 {
+                let _ = writeln!(
+                    out,
+                    "Tanaka-inner-loop-iteration={k} MRFWeightsTotal=0 beta={}",
+                    g(f64::from(beta))
+                );
+                let _ = out.flush();
+            }
+            let _ = writeln!(out);
+            let _ = out.flush();
+        }
+    };
+    for it in 0..p.bias_iterations.max(0) {
+        if v {
+            let _ = writeln!(
+                out,
+                "Tanaka Iteration {it} bias field {}",
+                p.bias_iterations
+            );
+            let _ = out.flush();
+        }
+        iteration(out, beta);
+    }
+    for it in 0..p.fixed_iterations.max(0) {
+        if v {
+            let _ = writeln!(
+                out,
+                "Tanaka Iteration {it} hyperparameter {}",
+                p.fixed_iterations
+            );
+            let _ = out.flush();
+        }
+        iteration(out, beta);
+        beta = if p.hyper.is_nan() {
+            if !multi {
+                let _ = writeln!(out, " TOTAL 0 RHS {}", "0 ".repeat(15));
+                let _ = out.flush();
+                for k in 1..=14 {
+                    let b = g(f64::from(k as f32 * 0.05));
+                    let _ = writeln!(err, "{b} {b}");
+                }
+            }
+            0.0
+        } else {
+            p.hyper
+        };
+        if v {
+            let _ = writeln!(out, " BETA {}", g(f64::from(beta)));
+            let _ = out.flush();
+        }
+    }
+    if v {
+        match (multi, p.pve) {
+            (false, true) => {
+                let _ = writeln!(out, " Starting Partial Volume Estimation ");
+            }
+            (false, false) => {
+                let _ = writeln!(out, "\n total tissue 0");
+            }
+            (true, true) => {
+                let _ = writeln!(out, "Partial Volume Estimation ");
+                let _ = writeln!(out, "\n total tissue 0");
+            }
+            (true, false) => {}
+        }
+    }
+}
+
 /// Segments one channel. `data` is the image after §4.1's negative-value rule (radiological
 /// frame, x fastest), `in_mask` its mask; messages go to `out` (standard output).
 pub fn segment(
@@ -528,6 +651,8 @@ pub fn segment(
         .collect();
     // FSL's masked sums over an empty mask (each prints a message)
     let mut sums = 0usize;
+    // a class's variance differed between FSL-202's two forms
+    let mut differs = false;
     let mut post = vec![0f32; (nm + 1) * n];
     let stats_now: Vec<(f32, f32)>;
     let mut init_members: Option<Vec<f32>> = None;
@@ -536,9 +661,12 @@ pub fn segment(
         // §6.6: the initialisation from the priors, no iterations
         if p.verbose {
             let _ = writeln!(out, "Beginning prior-based initialisation");
+            let _ = out.flush();
         }
         post[..nm * n].copy_from_slice(pr);
-        stats_now = stats::class_stats(&post[..nm * n], &y, n, len);
+        let (st, d) = stats::class_stats(&post[..nm * n], &y, n, len, p.fsl_variance);
+        stats_now = st;
+        differs |= d;
         sums += 4 * n;
     } else {
         stats_now = initialise(
@@ -550,6 +678,7 @@ pub fn segment(
             &mut post,
             &mut init_members,
             &mut sums,
+            &mut differs,
             out,
         )?;
     }
@@ -562,7 +691,7 @@ pub fn segment(
         stats_now,
         init_members,
         pri,
-        sums,
+        (sums, differs),
         voxel,
         out,
         err,
@@ -581,6 +710,7 @@ fn initialise(
     post: &mut [f32],
     init_members: &mut Option<Vec<f32>>,
     sums: &mut usize,
+    differs: &mut bool,
     out: &mut dyn Write,
 ) -> Result<Vec<(f32, f32)>, Stop> {
     let means: Vec<f32> = match &p.manual {
@@ -594,8 +724,10 @@ fn initialise(
         }
     };
     if p.verbose {
+        // these lines flush standard output (§7)
         for (c, m) in means.iter().enumerate() {
             let _ = writeln!(out, "{} {}", c + 1, g(f64::from(*m)));
+            let _ = out.flush();
         }
     }
     for a in 0..n {
@@ -625,12 +757,15 @@ fn initialise(
     let init = (p.fixed_iterations + p.init_iterations).max(0);
     for it in 0..init {
         if p.verbose {
+            // not flushed (§7: lost at an abort until a later line flushes it)
             let _ = writeln!(out, "KMeans Iteration {it}");
         }
         if !p.pve && p.probabilities && it == init - 1 {
             *init_members = Some(members(post, n, nm));
         }
-        stats_now = stats::class_stats(&post[..nm * n], y, n, len);
+        let (st, d) = stats::class_stats(&post[..nm * n], y, n, len, p.fsl_variance);
+        stats_now = st;
+        *differs |= d;
         *sums += 4 * n;
         let gs = gaussians(&stats_now, &p.libm);
         post[..nm * n]
@@ -664,7 +799,7 @@ fn finish(
     mut stats_now: Vec<(f32, f32)>,
     init_members: Option<Vec<f32>>,
     pri: Option<Vec<f32>>,
-    mut sums: usize,
+    (mut sums, mut differs): (usize, bool),
     voxel: [f32; 3],
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -691,6 +826,7 @@ fn finish(
     for &(m, v) in &stats_now {
         if m.is_nan() || v.is_nan() {
             let _ = writeln!(out, "MeaNsK variance nan");
+            let _ = out.flush();
         }
     }
     let mut mrf = Mrf {
@@ -710,6 +846,7 @@ fn finish(
                 "Tanaka Iteration {it} bias field {}",
                 p.bias_iterations
             );
+            let _ = out.flush();
         }
         mrf.iterate(
             &yb,
@@ -727,7 +864,9 @@ fn finish(
             bias = Some(estimate(&mrf.post, &stats_now, &mut yb));
             sums += 1;
         }
-        stats_now = stats::class_stats(&mrf.post[..nm * n], &yb, n, len);
+        let (st, d) = stats::class_stats(&mrf.post[..nm * n], &yb, n, len, p.fsl_variance);
+        stats_now = st;
+        differs |= d;
         sums += 4 * n;
     }
     for it in 0..p.fixed_iterations.max(0) {
@@ -737,6 +876,7 @@ fn finish(
                 "Tanaka Iteration {it} hyperparameter {}",
                 p.fixed_iterations
             );
+            let _ = out.flush();
         }
         mrf.iterate(
             &yb,
@@ -760,6 +900,7 @@ fn finish(
                 g(f64::from(total)),
                 "0 ".repeat(15)
             );
+            let _ = out.flush();
             for k in 1..=14 {
                 let v = g(f64::from(k as f32 * 0.05));
                 let _ = writeln!(err, "{v} {v}");
@@ -770,8 +911,11 @@ fn finish(
         };
         if p.verbose {
             let _ = writeln!(out, " BETA {}", g(f64::from(beta)));
+            let _ = out.flush();
         }
-        stats_now = stats::class_stats(&mrf.post[..nm * n], &yb, n, len);
+        let (st, d) = stats::class_stats(&mrf.post[..nm * n], &yb, n, len, p.fsl_variance);
+        stats_now = st;
+        differs |= d;
         sums += 4 * n;
     }
     let post = mrf.post;
@@ -812,11 +956,22 @@ fn finish(
     let vox = f64::from(voxel[0]) * f64::from(voxel[1]) * f64::from(voxel[2]);
     let (members_out, pve, volumes) = if p.pve {
         if p.verbose {
+            // not flushed (§7)
             let _ = writeln!(out, " Starting Partial Volume Estimation ");
         }
         let q = members(&sorted_post, n, nm);
         let x: Vec<f32> = yb.par_iter().map(|&v| p.libm.expf(v)).collect();
-        let r = pve::estimate(&grid, &sorted_post, &x, n, p.mixel, len, &p.libm);
+        let r = pve::estimate(
+            &grid,
+            &sorted_post,
+            &x,
+            n,
+            p.mixel,
+            len,
+            p.fsl_variance,
+            &p.libm,
+        );
+        differs |= r.variance_differs;
         sums += 5 * n;
         let volumes: Vec<f64> = (0..n)
             .map(|c| stats::sum_par(nm, len, |i| f64::from(r.frac[i * n + c])) * vox)
@@ -847,5 +1002,97 @@ fn finish(
         bias_outside: bias_outside.get(),
         volumes,
         empty_sums: if nm == 0 { sums } else { 0 },
+        variance_differs: differs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extrema_and_negative_values() {
+        let nan = f32::NAN;
+        // FAST's extrema start from the first voxel: a NaN first voxel makes both NaN (FSL-203)
+        let v = [nan, 3.0, -1.0, 5.0];
+        let (lo, hi) = extrema(&v, true);
+        assert!(lo.is_nan() && hi.is_nan());
+        assert_eq!(extrema(&v, false), (-1.0, 5.0));
+        assert!(extrema(&[nan, nan], false).0.is_nan());
+        assert_eq!(extrema(&[], true), (0.0, 0.0));
+        // reproduced, the rule for negative values is skipped
+        let mut a = v;
+        negative_rule(&mut a, true);
+        assert!(a[0].is_nan() && a[2] == -1.0);
+        // corrected: the second branch (the 2nd percentile not negative) sets NaN to 0 too
+        let mut b: Vec<f32> = (0..200).map(|i| i as f32).collect();
+        b[0] = nan;
+        b[7] = -1.0;
+        b[9] = nan;
+        negative_rule(&mut b, false);
+        assert_eq!((b[0], b[7], b[9]), (0.0, 0.0, 0.0));
+        // the first branch (many negative values) leaves NaN voxels NaN
+        let mut c: Vec<f32> = (0..200).map(|i| i as f32 - 10.0).collect();
+        c[5] = nan;
+        negative_rule(&mut c, false);
+        assert!(c[5].is_nan() && c[0] == 0.0 && c[199] == 199.0);
+        // no negative value: NaN kept
+        let mut d = [1.0, nan, 2.0];
+        negative_rule(&mut d, false);
+        assert!(d[1].is_nan());
+        assert_eq!(maximum(&[nan, 2.0, 7.0], false), 7.0);
+        assert!(maximum(&[nan, 2.0, 7.0], true).is_nan());
+    }
+
+    #[test]
+    fn zero_classes_lines() {
+        let p = Params {
+            n_classes: 0,
+            bias_iterations: 1,
+            fixed_iterations: 1,
+            init_iterations: 0,
+            verbose: true,
+            pve: false,
+            ..Params::default()
+        };
+        let mut out = crate::fast::Buffered::default();
+        let mut err = Vec::new();
+        zero_classes(&p, 1, &mut out, &mut err);
+        let text = String::from_utf8(out.all().to_vec()).unwrap();
+        let inner = |b: &str| {
+            (0..5)
+                .map(|k| format!("Tanaka-inner-loop-iteration={k} MRFWeightsTotal=0 beta={b}\n"))
+                .collect::<String>()
+        };
+        let want = format!(
+            "KMeans Iteration 0\nTanaka Iteration 0 bias field 1\n{}\nTanaka Iteration 0 hyperparameter 1\n{}\n BETA 0.1\n\n total tissue 0\n",
+            inner("0.02"),
+            inner("0.02")
+        );
+        assert_eq!(text, want);
+        // with partial volumes, the heading is the only line not flushed
+        let mut out = crate::fast::Buffered::default();
+        zero_classes(
+            &Params {
+                pve: true,
+                ..p.clone()
+            },
+            1,
+            &mut out,
+            &mut err,
+        );
+        let all = String::from_utf8(out.all().to_vec()).unwrap();
+        let flushed = String::from_utf8(out.flushed().to_vec()).unwrap();
+        assert!(all.ends_with(" BETA 0.1\n Starting Partial Volume Estimation \n"));
+        assert!(flushed.ends_with(" BETA 0.1\n"));
+        // several channels
+        let mut out = crate::fast::Buffered::default();
+        zero_classes(&Params { pve: true, ..p }, 2, &mut out, &mut err);
+        let text = String::from_utf8(out.all().to_vec()).unwrap();
+        assert_eq!(
+            text,
+            "Tanaka Iteration 0 bias field 1\n CHANNEL 1\n CHANNEL 2\nTanaka Iteration 0 hyperparameter 1\n CHANNEL 1\n CHANNEL 2\n BETA 0.1\nPartial Volume Estimation \n\n total tissue 0\n"
+        );
+        assert!(err.is_empty());
+    }
 }

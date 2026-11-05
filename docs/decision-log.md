@@ -1962,3 +1962,22 @@ together at the end.
   round integers beyond 2^24), FSL's design as for fslmaths.
 - **Not replicated yet, refused clearly:** fslpy's conversion of an image's file type in `imcp`
   (nibabel); one record case pending.
+
+## 2026-11-05: The clean-room catch-up (the decisions by the rules, and the data cache)
+- **The data cache and the command that fetches ahead** (the orchestrator, within the user's decision of 2026-11-04,
+  "The data the programs read", which asked for both and named neither): data fetched on first use is kept in
+  `LARMORX_DATA_DIR`, else the platform's user cache directory with `larmorx` in it (`$XDG_CACHE_HOME` or
+  `~/.cache` on Linux, `~/Library/Caches` on macOS, `%LOCALAPPDATA%\larmorx\cache` on Windows), one directory per
+  source and version (FSL's standard images under `fsl/fsl-data_standard-2208.0-0/`); `larmorx fetch <data set>`
+  fetches ahead for offline machines (`larmorx fetch fsl-standard [<package file or URL>]` first;
+  `LARMORX_FSL_DATA_PACKAGE` names a local copy of FSL's package). The download runs the platform's `curl`, else
+  `wget`, as a child process (Windows 10 and later, macOS and Linux ship one), so no TLS library is linked (rule 5:
+  pure-Rust dependencies); every file is checked against its SHA-256 before use. The later data sets (FreeSurfer's
+  atlases, TemplateFlow's templates, pretrained weights) use the same cache and command.
+- **By the rules, each with the `reproduce` switch:** FSL-241 (`midtrans` writes rows of NaN, or a matrix-size error,
+  with exit status 0 when its averages reach beyond double precision; rule B: the original refuses in both modes);
+  FSL-242 (topup's scaled conjugate gradients: a level whose last iteration is rejected ends at that worse point;
+  rule A: the default keeps the lowest cost).
+- **FSL's design, not a defect:** FLIRT sorts its search's starting points with libstdc++'s unstable `std::sort`
+  before they enter S and P (observed on 829 tied points); the clean-room original follows it.
+- **Measured, not reproduced:** FSL-50's stop in betsurf was seen on none of 43 images, so neither mode stops there.

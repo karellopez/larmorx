@@ -586,7 +586,8 @@ pub fn near_eyes(x: V3, n: V3, m: &Matrix) -> bool {
 /// clamped T1; `t2` the T2 on the T1's grid (FSL-48: sampled at the T1's voxel coordinates
 /// whatever its grid). `drop_overruns`: a profile whose search reads past its last sample is
 /// dropped (FSL-51's default) instead of read as "nothing there"; `fsl50`: a profile with an
-/// empty search range ends the run (FSL-50 reproduced) instead of being dropped.
+/// empty search range ends the run (FSL-50 as the spec states it) instead of counting its scalp
+/// only, as FSL 6.0.7.23 was observed to do.
 #[allow(clippy::too_many_arguments)]
 pub fn votes(
     mesh: &Mesh,

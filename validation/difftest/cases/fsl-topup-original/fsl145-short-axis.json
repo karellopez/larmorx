@@ -1,7 +1,7 @@
 {
  "defect": "FSL-145",
  "description": "FSL-145: --splineorder=2 on an axis shorter than two knot spacings (two coefficients; reproduce FSL's, the default the full count)",
- "expect": "divergence",
+ "expect": "pass",
  "found": {
   "detail": "o_fieldcoef.nii.gz: header: shape (2, 2, 5) / (4, 4, 5); --fout (Hz): |d| inside the brain, 99th percentile: ; --fout (Hz): |d| inside the brain, mean: ; --fout (Hz): correlation inside the brain: ; o_movpar.txt: translations: ; o_movpar.txt: rotations: ",
   "n": 601,
@@ -20,7 +20,7 @@
  "implementations": [
   "original"
  ],
- "reason": "the movements' rotations differ (finding 14: FSL's movement derivatives); the coefficients' layout and every exact check agree",
+ "reason": "",
  "recipe": {
   "extra": {
    "output_type": "NIFTI_GZ",

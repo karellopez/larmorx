@@ -64,12 +64,18 @@ Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmr
 ANALYZE) or an in-memory image. Without `variation` it runs `bet2`; with `"robust"` (`-R`),
 `"small_fov"` (`-Z`) or `"fmri"` (`-F`) the `bet` script; `"eyes"` (`-S`), `"bias"` (`-B`),
 `"surfaces"` (`-A`) and `"surfaces_t2"` (`-A2`, with `t2`) run the script with FLIRT,
-standard_space_roi, FAST, fslmaths, fslstats and betsurf, and have only their replica yet
-(since 2026-11-04; `implementation="original"`, or `"auto"` without `larmorx-nc`:
-`NotImplementedError`); `"surfaces"` and `"surfaces_t2"` also return betsurf's surfaces
+standard_space_roi, FAST, fslmaths, fslstats and betsurf (the replica since 2026-11-04, the
+clean-room original since 2026-11-05: each implementation runs its own programs, in its
+process); `"surfaces"` and `"surfaces_t2"` also return betsurf's surfaces
 (`BetResult.surfaces`, a `BetsurfResult` with the masks, the skull's mask and the outlines). They
-read FSL's standard images from `fsl_data` (a directory laid out as `$FSLDIR/data`; the variable
-`LARMORX_FSL_DATA` otherwise), else `$FSLDIR/data`, else the copy `larmorx-nc` carries. The
+read FSL's standard images (FSL's data under the FSL Licence, which this package never ships)
+from `fsl_data` (a directory laid out as `$FSLDIR/data`; the variable `LARMORX_FSL_DATA`
+otherwise; when given, the only place looked). Otherwise the original reads them from the copy
+`larmorx-nc` installs (as data), else `$FSLDIR/data`, else larmorx's data cache, filled once by
+a checksum-verified download of FSL's `fsl-data_standard` package (`larmorx fetch fsl-standard`
+fetches it ahead; [fsl-roi.md](fsl-roi.md), "FSL's standard images"); the replica reads
+`$FSLDIR/data`, else its own copy. An image found nowhere is refused before anything runs
+(`RuntimeError` from the original, naming the image and every place looked). The
 arguments are checked first (`ValueError`); FSL's
 settings are the call's: the outputs are written as NIfTI-1 and read back, `FSLOUTPUTTYPE`,
 `FSL_LOAD_NIFTI_EXTENSIONS` and every other `FSL*` variable of the process are never passed, and no
@@ -164,13 +170,18 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-45** (A): `bet -Z` crops its outputs with `imglob` called without `${FSLDIR}/bin`: with
   FSL off the `PATH` (always so in Python) FSL leaves them padded; the default crops exactly its
   outputs.
-- **FSL-46** (A): `bet`'s cleanup removes every `<output>_tmp*` file; the default only its own.
+- **FSL-46** (A): `bet`'s cleanup removes every `<output>_tmp*` file; the default only its own
+  (every `<output>_tmp...` file the run's programs created or changed, `standard_space_roi`'s and
+  FAST's in `-S` and `-B` included). A step that fails ends the script before its cleanup, in
+  both modes (FSL's `ERR` trap: its temporary files are left, observed).
 - **FSL-47** (A): `betsurf --t1only` fills the scalp mask from the outer skull surface's centre in
   its padded grid; the default from the scalp's (named only when the mask changes).
 - **FSL-48** (B): a T2 on another grid than the T1 is sampled at the T1's voxel coordinates; the
   default refuses.
 - **FSL-50** (A): one skull profile with an empty search range ends betsurf (status 255, no
-  message, no output); the default drops that profile.
+  message, no output); the default drops that profile. (The clean-room original, since
+  2026-11-05: FSL 6.0.7.23 was seen to run on and count such a profile's scalp on all 43 images
+  where it occurred, so the original counts the scalp in both modes and never stops.)
 - **FSL-51**: a profile search can read past the profile's samples, into memory FSL never set;
   the default drops such profiles, `reproduce` reads "nothing there" and warns.
 - **FSL-53** (B): a matrix file with fewer than the 12 numbers betsurf uses; the default refuses.
@@ -183,7 +194,13 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-216** (A; B for a number that is not one): `bet -S` computes its eye threshold with GNU
   `dc` from what `fslstats` prints, which `dc` misreads for a number with an exponent, a minus
   sign, `nan` or `inf`; the default reads the numbers as numbers and refuses a mean or deviation
-  that is not a number; `reproduce` gives what `dc` prints, its messages too.
+  that is not a number; `reproduce` gives what `dc` prints, its messages too. (The clean-room
+  original, observed on FSL 6.0.7.23: `fslstats -M` and `-S` print six decimals, never an
+  exponent; a brain with a negative mean gives FSL's threshold `|mean| + 3.5 × SD` and one
+  `dc: stack empty` on standard error, which `reproduce` gives (case
+  `defects/eyes-negative-mean`); `nan` and `inf`, which only NaN or infinite voxels make and
+  which FSL's script never reaches with them, are refused in both modes, `reproduce` saying that
+  dc's commands are not reproduced.)
 - **FSL-217** (A): `bet -F` and `-Z` cut the input with fslroi (and `-Z` joins the slices with
   fslmerge), which write an int8 image as uint8 with the same bytes: bet2 then runs on negative
   values turned into 128 to 255. The default keeps int8 and its values, named where the result
@@ -276,17 +293,30 @@ Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Br
 [findings/fsl-bet-original.md](../findings/fsl-bet-original.md)). Since 2026-10-30: `bet2`
 complete (every option, message, exit status and failure case of the spec, with the D13
 switches of FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's default, `-R`
-(FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending
-(the replica runs them since 2026-11-04; their original, from `specs/bet.md` §5.3-5.4, is the
-clean-room catch-up part's). Since 2026-10-31: **`betsurf`** complete (spec §6: every option of §6.1,
+(FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46. Since 2026-11-05 (the clean-room catch-up): **`-S`, `-B`, `-A`, `-A2`**
+(`specs/bet.md` §5.3, §5.4; `larmorx_fsl::cli::bet_script`), each the script's sequence of the
+original's own programs in one process (bet2, `standard_space_roi`, FLIRT, `fslmaths`, `fslstats`,
+FAST, betsurf, and the script itself for `-B`'s robust run), FSL's standard images found before
+anything runs (an image found nowhere refused, naming every place looked), bash's reports of an
+abort and the `ERR` trap's line where a program fails (a failed run's temporary files left, as FSL
+leaves them), FSL-216 (the eye threshold in dc's exact decimal arithmetic), FSL-63 for `-B -s` and
+FSL-46 with the programs' files; FSL-217 inside `-F` and `-Z` (fslroi's types: an int8 input's
+temporary images uint8 with the same bytes in `reproduce`). Since 2026-10-31: **`betsurf`** complete (spec §6: every option of §6.1,
 `-p`'s retessellation, the VTK, OFF and FreeSurfer meshes, `manual_input`, every message; the
 D13 switches of FSL-43, -47, -48, -50 to -55 and -58, FSL-49 and FSL-57 kept as FSL's), so
 `implementation="auto"` without `larmorx-nc` runs the original for every BET program.
 
 **Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
-6.0.7.23, re-made 2026-10-31 in part 2b: **127 of the 128 compared cases within the thresholds**, the
-other missing one threshold (below); of its 168 cases 30 more are rejected by both alike, 6 are where
-`reproduce` fills what FSL leaves undefined, 4 pending): exit statuses and messages FSL's byte
+6.0.7.23, re-made 2026-11-05 in the clean-room catch-up: **198 of the 200 compared cases within the
+thresholds**, the other two missing one (below); of its 252 cases 46 more are rejected by both
+alike, 6 are where `reproduce` fills what FSL leaves undefined, none pending; the 164 cases kept
+from part 2b's record (2026-10-31, 168 cases) unchanged in status and details, the 88 new ones
+`standard_space_roi`'s and `fslroi`'s 57 (45 within the thresholds, every one FSL's bit for bit, 12
+rejected by both: [fsl-roi.md](fsl-roi.md)) and the options' 31: `-S` and `-B` FSL's bit for bit on
+every case (every output and every `-d` file; an adult, a tumour, an 82-year-old with the neck,
+`-S -n`, a NaN head, a pair output) but a 3.5-year-old's `-B`, `-A` and `-A2` with bet2's outputs and
+FLIRT's matrices FSL's and betsurf's masks within its thresholds, `-F` and `-Z` of int8 heads FSL's;
+part 2b's numbers follow): exit statuses and messages FSL's byte
 for byte; 217 of 217
 brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's (part 2a's record
 counted 12 reported Dice values with phantoms' known brains among them, as "within the
@@ -304,14 +334,22 @@ five real heads with bet2's meshes and FLIRT's matrices made by FSL).
 alone; the share of profiles set aside within 0.06 % of FSL's on the record's real images. Where
 the votes are dense the surfaces are FSL's (the phantom's inner and outer skull to the file's 6
 decimals, also with `-p 1`); where few profiles vote (a skull base where nearly every profile is
-set aside) the inner skull settles elsewhere by up to 11 mm on a few vertices, and the scalp
-differs a little everywhere (95 % of the vertices within 0.2 to 3 mm on real heads). The record
+set aside) the inner skull settled elsewhere by up to 11 mm on a few vertices until step 5's
+rules were found (2026-11-05: ds002603's inner skull now within 0.026 mm of FSL's, 95th
+percentile), and the scalp differs a little everywhere (95 % of the vertices within 0.3 to 3 mm on
+real heads). The record
 holds betsurf to its masks (Dice >= 0.99 and the boundary distance's 95th percentile <= 1 voxel,
 specs/bet.md §11): 14 of its 67 masks and outlines
 are FSL's bit for bit and 51 more within these thresholds; on the five real heads the masks'
-Dice coefficients are 0.9907 to 0.9997 (the inner skull 0.9989 to 0.9997, the scalp 0.9938 to
-0.9987), and the scalp of ds002603 with its T2 misses the boundary threshold (its 95th
-percentile 2 voxels): the record's one failure. The questions for the spec writer are in the findings.
+Dice coefficients are 0.9935 to 0.9998 (the record of 2026-11-05: the inner skull 0.9990 to
+0.9998, the scalp 0.9935 to 0.9991), and the scalp of ds002603 with its T2 misses the boundary threshold (its 95th
+percentile 2 voxels): one of the record's two failures. The other (since 2026-11-05):
+`real/child-3y-B`, a 3.5-year-old's `bet -B`, every `-d` file FSL's (both `standard_space_roi` runs,
+FAST's bias field and the unbiased images) but the robust run's second bet2 pass, whose `-c` (FSL's
+centre, given in voxels) falls on a neurologically stored image: the mask's Dice 0.9983, its
+boundary distance's 95th percentile 1.0 and its maximum 2.24 voxels (bet2's threshold 2), the
+open question of random testing's cases 622 and 677. The questions for the spec writer are in the
+findings.
 
 **`tanh`** (GLIBC-06, the user's decision of 2026-10-31): the smoothness weight's `tanh` is glibc
 2.35's by default (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to the system's on
@@ -332,6 +370,23 @@ on small synthetic images (11 to 32 voxels per side) where the profiles' decisio
 36: FSL sets aside 96.8 % of its profiles, the original 87.8 %), and in 2 FSL-50's `reproduce`
 stops where FSL runs on: both for the spec writer (findings, "Random testing, part 2b").
 
+**Random testing, the BET options part's trial** (2026-11-04, `oracles/difftest/2026-11-04-bet-options-6b`,
+2,699 cases; its 176 differing cases of the original judged again on 2026-11-05 in the clean-room
+catch-up, findings: "The BET part's random-testing differences"): most began at the profiles'
+decisions on these small heads, which single profiles (5,290 of 11 images, FSL's `-v` saying whether
+it set each aside) traced to four readings of §6.4, now FSL's: the backward searches and the
+T1-only scan never read a profile's first sample; step 5's first bright sample lies strictly within
+10 mm of the inner skull, and each of its searches starts after the sample the previous one found;
+an outer-skull search range with no sample counts the profile's scalp only, and FSL runs on
+(**FSL-50's stop**, as the spec states it, was seen on none of the 43 images where its condition
+occurs, so the original no longer stops in `reproduce`). With them the share of profiles set aside
+is FSL's on 162 of the 164 images (74 before), 25 of the 176 cases agree, and ds002603's inner
+skull is FSL's to 0.026 mm (95th percentile; it was 0.95 mm, up to 11 mm). What still differs, for
+the spec writer: the scalp's deformation (§6.5: 0.24 to 3.4 mm on images whose skulls are FSL's
+exactly), `-p` on a mesh collapsed to one point (another sharing of midpoints), and `bet -R`/`-c` on
+neurologically stored images (the centre's conversion, cases 622 and 677). `bet -Z -d` of a float64
+image now keeps the doubles in its temporary images (FSL's are float64).
+
 **Built for speed:** bet2's vertices of each iteration are updated in parallel (each from the
 previous iteration's positions only), the self-intersection measure finds close pairs in a grid
 of cells instead of over all pairs, the fill is a stack fill over the grid, and no image is held
@@ -340,7 +395,10 @@ vertex order), smooths each axis in parallel with exact weights in two buffers, 
 its three surfaces with every vertex's step computed in parallel from the previous positions. Every parallel step runs in the call's own pool of `n_threads` (the
 command line: `OMP_NUM_THREADS`, else every core) with the same result at any thread count.
 Memory: betsurf's peak is below FSL's on the memory test's call (144 MiB against 175: the T1
-clamped in place, the images freed after the profiles). Timings:
+clamped in place, the images freed after the profiles); `bet -S`, `-B`, `-A2` 58 to 62 MiB against
+FSL's 67 to 115 (their programs one after the other, as the script runs them). `-S`, `-B`, `-A`,
+`-A2` (2026-11-05, the main machine, a real adult and a child): 1.4 to 2.9 times FSL's speed on one
+thread, 6 to 14 times on 28 (`-B -m` 6.2 s against FSL's 85.8; the findings give each time). Timings:
 [benchmarks/fsl-bet.md](../benchmarks/fsl-bet.md) (the original 2.5 to 2.9 times FSL's speed on one thread for bet2 and bet, 3.0 to 3.6 for betsurf; 6.5 to 11.6 and 10.7 to 13.5 times on 24 threads).
 
 **Deliberate differences of the original:** its images' `descrip` is `larmorx fsl bet2` (betsurf's

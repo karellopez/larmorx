@@ -1,0 +1,269 @@
+{
+ "defect": null,
+ "description": "with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts them (only an exact zero pivot fails, specs/flirt.md \u00a712), so FLIRT goes on and writes its NaN matrix (trial 2026-11-02 #704; the clean-room catch-up)",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: 1 vs 0; stderr: the same lines (numbers aside): line 1: FSL 'ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE', original 'inv(): matrix is singular'; files written: only FSL ['out.mat'], only the original []; D13 fix pass: no defect named: no values; exit 0 -> 1; files ['out.mat'] changed",
+  "n": 704,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass",
+   "exit status",
+   "files written",
+   "stderr: the same lines (numbers aside)"
+  ]
+ },
+ "id": "nan-matrices-forcescaling",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "ANALYZE",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": false,
+   "-debug": false,
+   "-dof": false,
+   "-finesearch": false,
+   "-forcescaling": true,
+   "-init": false,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 1.25,
+   "axis1": 1.0,
+   "axis2": 1.1,
+   "bbr": false,
+   "bias0": 0.005,
+   "bias1": 0.0,
+   "bias2": 0.005,
+   "bias3": -0.005,
+   "blobs": 5,
+   "centre0": 5.5,
+   "centre1": 5.5,
+   "centre2": 5.0,
+   "content": "blobs",
+   "dtype": "float32",
+   "extreme": false,
+   "kind": "register",
+   "noise": 6.0,
+   "orientation": "axes+oblique",
+   "origin0": 23.0,
+   "origin1": -35.0,
+   "origin2": 15.5,
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "12x11x9",
+   "shift0": -0.5,
+   "shift1": -3.0,
+   "shift2": -2.0,
+   "size": 22.0,
+   "spacing0": 1.0,
+   "spacing1": 3.0,
+   "spacing2": 1.0,
+   "specials": 2,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-forcescaling"
+    ],
+    "name": "-forcescaling",
+    "optional": true
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.15,
+      0.9,
+      1.1
+     ],
+     "bias": [
+      0.005,
+      0.0,
+      0.005,
+      -0.005
+     ],
+     "centre": [
+      1.0,
+      1.5,
+      -8.0
+     ],
+     "noise": 6.0,
+     "seed": 1203445818,
+     "size": 12.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      23.0,
+      -35.0,
+      15.5
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      23,
+      -23,
+      -4,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     11,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "-inf",
+      "-0"
+     ]
+    }
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      1.15,
+      0.9,
+      1.1
+     ],
+     "bias": [
+      0.005,
+      0.0,
+      0.005,
+      -0.005
+     ],
+     "centre": [
+      1.5,
+      4.5,
+      -6.0
+     ],
+     "noise": 6.0,
+     "seed": 238108991,
+     "size": 12.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      35.75,
+      -22.5,
+      -43.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      3.0,
+      4.0,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     10,
+     31
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "nan"
+     ]
+    }
+   }
+  },
+  "n": 704,
+  "options": [
+   "-forcescaling",
+   "-out",
+   "FSLOUTPUTTYPE=ANALYZE",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

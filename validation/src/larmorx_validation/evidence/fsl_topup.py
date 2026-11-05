@@ -11,7 +11,8 @@ modes (and at four threads) and by the clean-room original in its reproduce and 
 Levenberg-Marquardt); applytopup's least-squares restoration, Jacobian modulation and vb3D on
 topup's own result (FSL-132, FSL-142 and FSL-143 corrected by default); every case of both
 records with its verdict (the original's classified from its files against FSL's, and against
-FSL's own thread band where the record measures it); random testing's two trials, the original's
+FSL's own thread band where the record measures it); random testing's trials, the replica's and
+the original's two (2026-11-03, and the clean-room catch-up's of 2026-11-05), each of the original's
 with its triage; the speed.
 
 Every run of FSL is a run of the parity records (``parity.fsl_topup_replica``, whose keys the
@@ -89,6 +90,10 @@ ORIGINAL_PANELS = [
 #: one category, ``validation/investigations/cleanroom-topup/triage_counts.py``).
 TRIAL_ORIG = "2026-11-03-topup-original"
 TRIAGE = "validation/investigations/cleanroom-topup/trial_triage.json"
+#: The clean-room catch-up's trial of the original (2026-11-05, after the specification's answers of
+#: 2026-11-03), and its findings in categories (``trial_categories.py``'s ``--json`` output).
+TRIAL_CATCHUP = "2026-11-05-catchup-topup"
+CATCHUP_TRIAGE = "validation/investigations/cleanroom-topup/trial_catchup_triage.json"
 FINDINGS = "docs/findings/fsl-topup-original.md"
 REGISTER = "docs/findings/upstream-defects.md"
 
@@ -1173,12 +1178,41 @@ ORIGINAL_FIX = {
     .replace("the replica gives", "the original gives")
     for k, v in FIX_REASONS.items()
 }
-# the clean-room original computes the exact rotation derivatives in both modes (no notice)
-ORIGINAL_FIX.pop("FSL-201")
+# the clean-room original's own texts where its reproduce mode came to follow FSL (2026-11-05)
+ORIGINAL_FIX["FSL-201"] = (
+    "FSL-201, corrected by default with a notice: with the movements estimated, FSL's derivatives "
+    "of the cost with respect to the rotations are forward differences (steps of 10⁻⁵ rad) of "
+    "rotation matrices built from single-precision angles, cosines and sines, so its gradient "
+    "and Gauss-Newton Hessian of the movements are not the cost's, and its minimisers end "
+    "elsewhere than the cost's minimum; the default computes the exact derivatives. Its "
+    "reproduce mode takes FSL's forward differences (since 2026-11-05: the first gradients of "
+    "FSL's --debug files to 2 × 10⁻⁵ and 10⁻⁶), but FSL's own path depends on its inputs' last "
+    "bits, so where the movements do not converge the record holds that mode to FSL's own spread."
+)
 ORIGINAL_FIX["FSL-145"] = (
     "FSL-145, corrected by default with a notice: with --splineorder=2, an axis shorter than two "
-    "knot spacings gets two coefficients, which force the field towards 0 at its far end; the "
-    "default lays the general count. Its reproduce mode lays FSL's two."
+    "knot spacings gets two coefficients (one on an axis shorter than one spacing), which force "
+    "the field towards 0 at its far end; the default lays the general count. Its reproduce mode "
+    "lays FSL's count exactly and, where a level refits a single coefficient, stops with FSL's "
+    "error (since 2026-11-05)."
+)
+ORIGINAL_FIX["FSL-133"] = (
+    "FSL-133, corrected by default with a notice: the least-squares restoration takes the field "
+    "of the voxel before a line's first one at index (k + 2³²) modulo the line's length, wrong "
+    "for lengths that do not divide 2³² (30, 96, ...); the default wraps the line around. Its "
+    "reproduce mode follows FSL's index (since 2026-11-05)."
+)
+ORIGINAL_FIX["FSL-134"] = (
+    "FSL-134, corrected by default with a notice: applytopup lays a field of the images' voxel "
+    "count but another shape on their grid as it is stored (and with a field image scales the y "
+    "displacement by the x voxel size); the default refuses a field on another grid. Its "
+    "reproduce mode lays it as FSL does (since 2026-11-05)."
+)
+ORIGINAL_FIX["FSL-242"] = (
+    "FSL-242, corrected by default with a notice (found by the clean-room catch-up's random "
+    "testing, 2026-11-05): with --minmet=1 (scaled conjugate gradients), a level whose last "
+    "iteration's step is rejected ends at that rejected, worse point; the default ends the level "
+    "at the lowest cost it found. Its reproduce mode ends where FSL does."
 )
 ORIGINAL_FIX["FSL-146"] = (
     "FSL-146, corrected by default with a notice: with volumes encoded along different axes, "
@@ -1554,8 +1588,10 @@ REAL_TEXT = {
         "corrects FSL-201 (FSL's rotation derivatives are not its cost's) and so takes other "
         "steps: the difference *replica, default − reproduce mode* shows what that changes, and "
         "the movement table below the viewer the movements each run estimated. The clean-room "
-        "original computes the cost's own derivatives in both modes, so its record holds this "
-        "case as an expected divergence from FSL.",
+        "original's default computes the cost's own derivatives too; since 2026-11-05 its "
+        "reproduce mode takes FSL's forward differences, but FSL's path here depends on its "
+        "inputs' last bits, so its record holds this case as an expected divergence from FSL, "
+        "measured against FSL's own spread.",
     ),
     "lsr": (
         "applytopup: least-squares restoration of the pair (the default method)",
@@ -1704,10 +1740,9 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
                               {"label": "findings", "href": FINDINGS}]  # fmt: skip
                 if "FSL-201" in (info.get("named", {}).get("replica-fix") or []):
                     x["reason"] = common.clip(
-                        x["reason"].rstrip(".") + ". Since 2026-11-03 the specification states "
-                        "what FSL computes (FSL-201, specs/topup.md §4.6): the original's "
-                        "derivatives are the cost's, as the replica's default mode now computes "
-                        "them; its reproduce mode is to follow FSL's.",
+                        x["reason"].rstrip(".") + ". The original's reproduce mode takes FSL's "
+                        "forward differences since 2026-11-05 (specs/topup.md §4.6, FSL-201); its "
+                        "default computes the cost's own derivatives, as the replica's does.",
                         700,
                     )
     out_id = next(iter(outs))
@@ -1744,8 +1779,8 @@ def _example_real(ctx: core.Context, ex_id: str, classified: dict[str, dict]) ->
     summary += (
         " LARMORX's clean-room original runs the same call in its reproduce mode (at 14 threads "
         "and at one) and its default mode"
-        + (", the same derivatives in both." if ex_id == "movements" else
-           ", which makes the same correction.")
+        + (", FSL's forward differences in the first and the exact derivatives in the second."
+           if ex_id == "movements" else ", which makes the same correction.")
     )  # fmt: skip
     data = common.DS005040
     return {
@@ -1935,11 +1970,9 @@ def case_verdict_original(r: dict, c: dict) -> tuple[str, str]:
         verdict, why = v
         if r["case"] == "opt/fsl145-one-coefficient":
             why = (
-                "Outside the record, a follow-up of the clean-room original: --splineorder=2 at "
-                "--subsamp=2 with z shorter than one knot spacing, where FSL-145 gives one "
-                "coefficient whose refit stops FSL ('Error occurred when preparing to run "
-                "topup', exit status 1); the original's reproduce mode runs on (FSL's stop "
-                "follows in its next part). " + why
+                "--splineorder=2 at --subsamp=2 with z shorter than one knot spacing, where "
+                "FSL-145 gives one coefficient whose refit stops FSL; the clean-room original's "
+                "reproduce mode stops alike since 2026-11-05 (outside the record before). " + why
             )
         if verdict == "both-reject" and named:
             why += (
@@ -2258,6 +2291,165 @@ def trial_original(ctx: core.Context) -> tuple[list[dict], dict]:
     return [summary, triage], prov
 
 
+#: The catch-up trial's categories (``trial_categories.py``): category -> (what the page says, the
+#: verdict of the row, or None for a mistake fixed since).
+CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
+    "explained: FSL-201's path (movements; within 10 times FSL's own band)": (
+        "FSL-201's path: the movements estimated, within 10 times FSL's own band (FSL's run with "
+        "the read-out times changed in their last float bit; median 2.2 times). FSL's forward "
+        "differences of single-precision rotation matrices make its path depend on its inputs' "
+        "last bits; the original's reproduce mode takes the same differences, and FSL's runs "
+        "with 16 and 256 last bits changed spread as far on sampled findings (the record's "
+        "expected divergences)",
+        "divergence",
+    ),
+    "open: movements, beyond 10 times FSL's own band": (
+        "The movements estimated, beyond 10 times FSL's own band: of 14 sampled, 6 within FSL's "
+        "spread at 16 and 256 last bits; 179 run away (159 with a scaled-conjugate-gradient "
+        "level, which FSL warns against): measured with `--debug`, FSL-201's forward differences "
+        "part by 1.5 % at the second gradient, which the scaled conjugate gradients divide by "
+        "their small step sigma",
+        "open",
+    ),
+    "explained: FSL-143 (vb3D/vb4D's indefinite prior, reproduced; its divergence)": (
+        "FSL-143 reproduced: applytopup vb3D's and vb4D's indefinite prior makes the iterations "
+        "diverge, which amplifies the moved images' last bits (the record's expected "
+        "divergences)",
+        "divergence",
+    ),
+    "explained: no movements, within 10 times FSL's own band": (
+        "Without movements, within 10 times FSL's own band, most just past a threshold (0.00102 "
+        "for 0.001): fits the data hardly determine, whose path FSL's own last bits move as far",
+        "open",
+    ),
+    "explained: --debug's attempt files (the minimisation's path)": (
+        "`--debug`'s attempt files: how many Levenberg-Marquardt attempts a level makes follows "
+        "the minimisation's path, so the files written differ",
+        "open",
+    ),
+    "open: cubic splines without movements, beyond 10 times FSL's own band": (
+        "Cubic splines without movements, beyond 10 times FSL's own band: of 10 sampled, 6 "
+        "within FSL's spread at 16 and 256 last bits; two (FSL-242 and the iteration count) "
+        "fixed during the trial's triage; open: topup-trial-07557 and 10619",
+        "open",
+    ),
+    "open: quadratic splines without movements, an axis shorter than two knot spacings "
+    "(FSL-145's layout)": (
+        "Quadratic splines without movements on an axis shorter than two knot spacings at some "
+        "level (FSL-145's layout), deterministic (FSL's band 10⁻⁷ to 10⁻⁵), which differ far more "
+        "often than the other quadratic cases (trial_quadratic.py): the bending energy on that "
+        "layout, a question for the specification (specs/topup.md §4.6)",
+        "open",
+    ),
+    "open: quadratic splines without movements": (
+        "Quadratic splines without movements, no axis that short, deterministic too: the same "
+        "question",
+        "open",
+    ),
+    "open: applytopup lsr": (
+        "The suite's own mistake, fixed with a test: a NIfTI-2 quaternion a float rounding above "
+        "1, refused by nibabel's double tolerance (an exception in the comparison); it agrees on "
+        "replay with the final build",
+        None,
+    ),
+}
+
+
+def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
+    """The clean-room catch-up's random-testing trial of the original (its ``summary.json``)
+    and its findings in categories (``trial_catchup_triage.json``): two tables, and their
+    provenance."""
+    path = common.oracles() / "difftest" / TRIAL_CATCHUP / "summary.json"
+    raw = path.read_bytes()
+    s = json.loads(raw)
+    t = s["tools"]["fsl-topup-original"]
+    o = t["options"]
+    impl = t["implementations"]["original"]
+    notices = ", ".join(f"{k} {v['cases']}" for k, v in sorted(t.get("notices", {}).items()))
+    rows = [
+        ("Random cases, each compared with FSL 6.0.7.23", t["cases"]),
+        ("within the record's thresholds (§12), every exact check passed", impl.get("agree", 0)),
+        ("differing (each one in a category below)", impl.get("differ", 0)),
+        ("a register entry named in one mode only (a notice)", impl.get("notice", 0)),
+        ("fMRIPrep's call (sdcflows' b02b0.cnf, every output)", o.get("fMRIPrep's call", 0)),
+        ("a configuration file (`--config`)", o.get("--config", 0)),
+        ("one, two or three levels", [o.get(f"{n} levels", 0) for n in (1, 2, 3)]),
+        ("`--debug`, `--trace`", [o.get("--debug", 0), o.get("--trace", 0)]),
+        ("applytopup `--method=jac`, `lsr`", [o.get("--method=jac", 0), o.get("--method=lsr", 0)]),
+        ("applytopup `vb2D`, `vb3D`, `vb4D`", [o.get(f"--method=vb{d}D", 0) for d in (2, 3, 4)]),
+        ("distinct options and settings drawn", t["options_covered"]),
+        (f"length (minutes; {s['jobs']} jobs at one thread each)", round(s["elapsed_s"] / 60, 1)),
+    ]
+    out_rows = []
+    for head, v in rows:
+        if isinstance(v, list):
+            cell = common.cell(" / ".join(f"{x:,}" for x in v))
+        elif isinstance(v, float):
+            cell = common.cell(v, "sig")
+        else:
+            cell = common.cell(int(v), "count")
+        out_rows.append({"head": head, "cells": [cell]})
+    peaks = max(float(p.split()[0]) for p in s["memory"]["peaks"])
+    commit = s["larmorx_commit"].removesuffix("-dirty")
+    summary = common.table(
+        "trial-catchup",
+        f"Random testing of the clean-room original after the catch-up: the trial of {s['date']}",
+        ["", {"label": "Cases", "num": True}],
+        out_rows,
+        note=f"Differential random testing's trial of the clean-room original after the "
+        f"specification's answers of 2026-11-03 (seed `{s['seed']}`: the earlier trials' cases "
+        "drawn again and further, FSL's runs served by the oracle cache where they had run), each "
+        "compared as the record compares (specs/topup.md §12's thresholds, the exact checks, "
+        "FSL's band of a last-bit change of its read-out times where a metric is beyond its "
+        f"threshold). The build: larmorx `{commit}`; FSL-242 and the scaled conjugate gradients' "
+        f"iteration count were fixed after it, from its findings. The notices: {notices} cases. "
+        f"Every case in a memory box of {s['memory']['case']} (peaks below {peaks:.2f} GiB).",
+    )
+    tpath = ctx.repo / CATCHUP_TRIAGE
+    traw = tpath.read_bytes()
+    tri = json.loads(traw)
+    counts = tri["counts"]
+    if sum(counts.values()) != impl.get("differ", 0):
+        raise ValueError(
+            f"{CATCHUP_TRIAGE}: {sum(counts.values())} findings, the trial {impl['differ']}"
+        )
+    trows = []
+    for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        text, verdict = CATCHUP_TEXT[cat]
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "fixed: agrees on replay with the final build"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
+                                       common.cell(tri["reproducers"][cat])]}  # fmt: skip
+        if verdict:
+            row["verdict"] = verdict
+        trows.append(row)
+    triage = common.table(
+        "trial-catchup-triage",
+        "The catch-up trial's differing cases, each in one category",
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
+        trows,
+        note="Every differing case of the trial in one category by its recipe and how far its "
+        "failed metrics lie from FSL's own one-bit band "
+        "(`validation/investigations/cleanroom-topup/trial_categories.py`, its output "
+        f"`{CATCHUP_TRIAGE}`), each category's cause established by probes and samples "
+        "(`trial_spread.py`, `trial_fsl_verbose.py`, `trial_quadratic.py`; "
+        "`docs/findings/fsl-topup-original.md`, findings 45 to 47); the triage's entries: "
+        "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
+        "(`difftest --replay`).",
+    )
+    prov = {
+        "trial": f"oracles/difftest/{TRIAL_CATCHUP}/summary.json",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "triage": CATCHUP_TRIAGE,
+        "triage_sha256": hashlib.sha256(traw).hexdigest(),
+    }
+    return [summary, triage], prov
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     examples = {
@@ -2278,6 +2470,7 @@ def export(ctx: core.Context) -> dict:
     entries.append(co)
     tt, tprov = trial(ctx)
     to, toprov = trial_original(ctx)
+    tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     return {
         "schema": 1,
@@ -2290,6 +2483,7 @@ def export(ctx: core.Context) -> dict:
             "cache": [fcache.provenance(x) for x in entries],
             "difftest": tprov,
             "difftest_original": toprov,
+            "difftest_catchup": tcprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -2313,7 +2507,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cs,
         "cases_total": len(cs),
         "speed": chart,
-        "tables": [tt, *to],
+        "tables": [tt, *to, *tc],
         "examples": [
             _example_fmriprep(ctx, *FMRIPREP[0], classified),
             _example_fmriprep(ctx, *FMRIPREP[1], classified),

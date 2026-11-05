@@ -48,9 +48,9 @@ _OUTPUT_TYPES = (
 
 
 def _call(tool: str, args: list[str], tmp: str, implementation: str, upstream_defects: str):
-    """``tool`` with ``args`` in ``tmp`` (its replica or its original, :func:`_run`; the
-    original's ``pairreg`` reads FSL's schedules from ``$FSLDIR``); a failure (exit status not
-    0) raises :class:`RuntimeError` with its messages."""
+    """``tool`` with ``args`` in ``tmp`` (its replica or its original, :func:`_run`; ``FSLDIR``
+    passed on when set, the original's ``pairreg`` carrying FSL's schedules itself); a failure
+    (exit status not 0) raises :class:`RuntimeError` with its messages."""
     selected = _replica.select("fsl", tool, implementation)
     extra = (("FSLDIR", os.environ["FSLDIR"]),) if os.environ.get("FSLDIR") else ()
     process = _run(selected, args, tmp, 1, upstream_defects, program=tool, extra_env=extra)
@@ -209,8 +209,9 @@ def pairreg(
 ) -> np.ndarray:
     """FSL's ``pairreg``: the matrix from ``brain2`` to ``brain1`` (``brain1`` and ``skull1``
     the references), found with the brains, refined with the skulls and finished with the
-    brains (three FLIRT runs with FSL's ``pairreg*.sch`` schedules, read from ``$FSLDIR``'s
-    ``etc/flirtsch``); ``flirt_args`` are passed to every FLIRT run."""
+    brains (three FLIRT runs with FSL's ``pairreg1.sch`` to ``pairreg3.sch`` schedules, which the
+    clean-room original carries: no ``$FSLDIR`` needed); ``flirt_args`` are passed to every FLIRT
+    run."""
     with tempfile.TemporaryDirectory(prefix="larmorx-pairreg-") as tmp:
         out = os.path.join(tmp, "pair.mat")
         files = [os.path.abspath(os.fspath(p)) for p in (brain1, brain2, skull1, skull2)]

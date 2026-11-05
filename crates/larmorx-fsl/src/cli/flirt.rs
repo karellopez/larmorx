@@ -316,6 +316,19 @@ pub fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parse
 
 /// `flirt` with FSL's arguments; returns the exit status.
 pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    main_carrying(args, &[], settings, out, err)
+}
+
+/// [`main`] where a `-schedule` word equal to one of `carried`'s names runs that carried text
+/// instead of reading a file (`pairreg`'s schedules, §15.8: no `$FSLDIR` needed). The last
+/// `-schedule` given decides, as FLIRT's parser does.
+pub fn main_carrying(
+    args: &[String],
+    carried: &[(&str, &'static str)],
+    settings: &Settings,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     let mode = match settings.defects() {
         Ok(m) => m,
         Err(e) => {
@@ -323,10 +336,17 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             return 2;
         }
     };
-    let o = match parse(args, out, err) {
+    let mut o = match parse(args, out, err) {
         Parsed::Run(o) => o,
         Parsed::Exit(c) => return c,
     };
+    if let Some(&(_, text)) = carried
+        .iter()
+        .find(|(name, _)| o.schedule.as_deref() == Some(*name))
+    {
+        o.schedule = None;
+        o.schedule_text = Some(text);
+    }
     let ctx = Ctx {
         settings,
         mode,

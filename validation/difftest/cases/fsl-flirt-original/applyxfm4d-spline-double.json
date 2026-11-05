@@ -1,0 +1,243 @@
+{
+ "defect": null,
+ "description": "applyxfm4D's spline of a double image (read and filtered in double, each value rounded to single, specs/flirt.md \u00a715.7): FSL's value at every voxel (trial 2026-11-02 #6013; the clean-room catch-up, relay 4)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the same header: qform_code, quatern_b, quatern_c, quatern_d, qoffset_x, qoffset_y, qoffset_z",
+  "n": 6013,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz: the same header"
+  ]
+ },
+ "id": "applyxfm4d-spline-double",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI2_GZ",
+   "tool": "applyxfm4D"
+  },
+  "features": {
+   "-3D": true,
+   "-interp": true,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "axis0": 1.0,
+   "axis1": 1.1,
+   "axis2": 0.9,
+   "bias0": 0.0075,
+   "bias1": -0.005,
+   "bias2": -0.005,
+   "bias3": -0.0075,
+   "centre0": -0.5,
+   "centre1": 3.0,
+   "centre2": -4.0,
+   "content": "crop",
+   "corner0": 59,
+   "corner1": 51,
+   "corner2": 26,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dtype": "float64",
+   "extreme": false,
+   "interp": "spline",
+   "kind": "applyxfm4D",
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": 30.0,
+   "origin1": -50.0,
+   "origin2": -28.5,
+   "q0": 20,
+   "q1": -1,
+   "q2": 1,
+   "q3": 3,
+   "qfac": -1,
+   "qform_code": 0,
+   "range": "plain",
+   "scale0": "0.95",
+   "scale1": "0.95",
+   "scale2": "1",
+   "sform": "other",
+   "sform_code": 3,
+   "shape": "13x13x11",
+   "shear0": 0.1,
+   "shear1": -0.05,
+   "shear2": 0.0,
+   "shift0": "-2",
+   "shift1": "1.5",
+   "shift2": "1.5",
+   "size": 20.0,
+   "spacing0": 2.0,
+   "spacing1": 1.0,
+   "spacing2": 1.2,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:in}",
+     "{in:ref}",
+     "out",
+     "{in:m}",
+     "-singlematrix"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-3D"
+    ],
+    "name": "-3D",
+    "optional": false
+   },
+   {
+    "args": [
+     "-interp",
+     "spline"
+    ],
+    "name": "-interp",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0075,
+      -0.005,
+      -0.005,
+      -0.0075
+     ],
+     "centre": [
+      -0.5,
+      3.0,
+      -4.0
+     ],
+     "noise": 3.0,
+     "seed": 161143690,
+     "size": 20.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      52.25,
+      -51.5,
+      -20.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      33,
+      1,
+      37,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      4.0,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     28,
+     26,
+     17
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "m": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9037712895 -0.2819951338 0.08272506083 -2\n0.2727493917 0.9037712895 0.1119221411 1.5\n-0.1063260341 -0.07858880779 0.9902676399 1.5\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "corner": [
+      59,
+      51,
+      26
+     ],
+     "seed": 1999668105,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      30.0,
+      -50.0,
+      -28.5
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      -1,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 3,
+     "shear": [
+      0.1,
+      -0.05,
+      0.0
+     ],
+     "spacing": [
+      2.0,
+      1.0,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     13,
+     13,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 6013,
+  "options": [
+   "-3D",
+   "-interp spline",
+   "FSLOUTPUTTYPE=NIFTI2_GZ",
+   "applyxfm4D"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

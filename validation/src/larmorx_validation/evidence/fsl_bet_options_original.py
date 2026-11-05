@@ -70,7 +70,19 @@ CORRECTED = {
     "FSL-214": "standard_space_roi stops at the first program that fails",
     "FSL-216": "-S's eye threshold read as numbers, not as dc commands",
     "FSL-217": "an int8 image kept as int8 by -F's and -Z's fslroi",
+    "FSL-182": "fslstats' -S (-S's eye threshold) without a mask: the masked forms' variance, "
+    "clamped at 0 and summed in double precision",
+    "FSL-51": "betsurf's profile searches stop at a profile's last sample, where FSL reads past "
+    "it into memory it never set",
 }
+#: The default's maths functions (GLIBC-07, named nowhere: the user's decision of 2026-11-04).
+GLIBC07 = (
+    "the default computes the C library's maths functions correctly rounded, the same on every "
+    "platform, where FSL takes glibc 2.35's (GLIBC-07, named nowhere by the user's decision of "
+    "2026-11-04); reproduce computes them as glibc does. Inside the script's programs (FLIRT's "
+    "rotations and windowed sinc, bet2's powf, betsurf's smoothing) their last bits move the "
+    "registration's or the surfaces' path a little"
+)
 
 
 def _source(ctx: core.Context, case: str) -> fcache.Entry:
@@ -251,13 +263,23 @@ def _counts(x: dict, ex, outputs: list[dict]) -> str:
     return "; ".join(parts)
 
 
+#: What the record says of a case the original misses.
+MISSES = {
+    "real/child-3y-B": "the record's failure: -B's last step, bet -R with -c from the robust "
+    "centre, starts bet2 a few bits from FSL's on this neurologically stored image (the "
+    "specification's open question of the trial's cases 622 and 677: the conversion of a centre "
+    "in voxels into FSL's radiological frame)",
+}
+
+
 def _record_note(rec_orig, case: str | None) -> str:
     r = next((x for x in rec_orig.results if x["case"] == case), None) if case else None
     if r is None:
         return ""
+    miss = f": {MISSES[case]}" if case in MISSES and r["status"] == "fail" else ""
     return (
         f" Its record case `{case}` (the original against FSL 6.0.7.23): {r['status']}, "
-        f"{r['checks_passed']} of {r['checks_total']} checks."
+        f"{r['checks_passed']} of {r['checks_total']} checks{miss}."
     )
 
 
@@ -296,46 +318,60 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
             }[i]
             continue
         counts = _counts(x, ex, outputs)
+        named_text = "; ".join(f"{d} ({CORRECTED[d]})" for d in fix_ids if d in CORRECTED)
+        why = (
+            "the default's corrections, each named as it is made: " + named_text + "; and "
+            if named_text
+            else ""
+        ) + GLIBC07
         if i == "orig-repro":
             x["verdict"] = "d13"
             x["reason"] = common.clip(
-                "The default's corrections, each named as it is made: "
-                + "; ".join(f"{d} ({CORRECTED.get(d, 'register')})" for d in fix_ids)
-                + f". What they change: {counts}.",
-                700,
+                f"{why[0].upper()}{why[1:]}. What they change: {counts}.",
+                900,
             )
-        elif i == "orig-fsl23" and same["orig-repro-fsl23"] and fix_ids:
+        elif i == "orig-fsl23" and same["orig-repro-fsl23"]:
             x["verdict"] = "d13"
             x["reason"] = common.clip(
-                "Deliberate corrections of FSL's defects in the programs the script runs, each "
-                "named: "
-                + "; ".join(f"{d} ({CORRECTED.get(d, 'register')})" for d in fix_ids)
-                + f". The reproduce mode gives FSL's values, every one. What they change: "
-                f"{counts}." + rec,
-                700,
+                f"Deliberate in the default: {why}. The reproduce mode gives FSL's values, every "
+                f"one. What the default changes: {counts}." + rec,
+                900,
             )
         elif i == "orig-replica23":
             x["verdict"] = "d13" if same["orig-repro-fsl23"] else "open"
             x["reason"] = common.clip(
                 (
-                    "The two defaults make their corrections each with its own arithmetic (the "
-                    f"original names {', '.join(fix_ids) or 'none'}; the replica's are named in "
-                    "its run); both reproduce modes give FSL's values. "
+                    "Both reproduce modes give FSL's values; the two defaults differ in their "
+                    "corrections' arithmetic (the original names "
+                    f"{', '.join(fix_ids) or 'none'}; the replica's are named in its run) and in "
+                    "the maths functions: the original's default computes them correctly "
+                    "rounded (GLIBC-07), the replica's as glibc does. "
                     if same["orig-repro-fsl23"]
-                    else ""
+                    else "The original's reproduce mode is not FSL's here (the comparison above); "
+                    "the replica's is. "
                 )
                 + f"Where they differ: {counts}.",
-                700,
+                900,
             )
         else:
+            surf = any(o["id"] in ("inskull", "outskull", "outskin", "skullmask") for o in outputs)
             x["verdict"] = "open"
             x["reason"] = common.clip(
-                f"Not FSL 6.0.7.23's values: {counts}. The clean-room original runs the script's "
-                "programs as its own clean-room programs (FLIRT, FAST, fslmaths, fslstats, bet2, "
-                "betsurf), each held to its record's thresholds where it is not bit-identical."
+                f"Not FSL 6.0.7.23's values: {counts}. "
+                + (
+                    "bet2's brain and every step before betsurf are FSL's; betsurf decides its "
+                    "profiles as FSL does (relay 7's rules) and its surfaces settle a little "
+                    "elsewhere, the scalp most (docs/findings/fsl-bet-original.md, betsurf), "
+                    "held to its masks' thresholds (Dice >= 0.99, boundary p95 <= 1 voxel)."
+                    if surf
+                    else "The clean-room original runs the script's programs as its own "
+                    "clean-room programs (FLIRT, FAST, fslmaths, fslstats, bet2), each held to "
+                    "its record's thresholds where it is not bit-identical."
+                )
+                + (" In the default also: " + GLIBC07 + "." if i == "orig-fsl23" else "")
                 + rec
                 + " The difference is not closed: the original could still give FSL's files.",
-                700,
+                900,
             )
 
 

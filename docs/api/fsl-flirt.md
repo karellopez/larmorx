@@ -220,8 +220,13 @@ the matrices differ in their last digits. The suite's 22 cases of these options 
 original's own): every line, exit status and file FSL's.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
-(the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
-more rejected by both alike, 4 where FLIRT crashes or never finishes. fMRIPrep's three
+(the replica suite's cases, the original's own and its permanent cases, against FSL 6.0.7.23;
+re-made 2026-11-05 from `a835ddd`): 238 of 240 compared cases within thresholds, 89 more rejected
+by both alike, 10 where FLIRT crashes or never finishes or writes what the specification cannot
+define; the 2 it misses are two weighted registrations whose paths part at their costs' last bits
+(since 2026-11-05 the search orders its starting points of equal cost as FSL does, with
+libstdc++'s `std::sort`: an empty weight or a one-voxel input, where every cost ties, now gives
+FSL's matrix). fMRIPrep's three
 boundary-based calls within 0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053,
 0.011 and 0.030 mm), their images' correlation with FSL's 0.9993 to 0.99996; `-applyxfm` with
 trilinear and nearest neighbour FSL's images bit for bit, sinc and spline within 1e-5 of the

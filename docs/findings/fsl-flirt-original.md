@@ -873,3 +873,34 @@ sub-threshold costs`, its fine grid's costs and parameters print as 0 and every 
 minimum, where §8.1 steps 6 and 7 give the cost of no variance (1) and an optimisation of every
 point (`20261103-08267`, `03733`).
 
+
+## The search's starting points of equal cost (relay 10, 2026-11-05)
+
+Found through BET's trial (standard_space_roi's matrices 37 to 303 mm from FSL's on small heads):
+FLIRT's search builds its list of starting points as §8.1 step 9 says (each new entry after every
+entry of lower or equal cost), and FSL then **sorts that list by cost with libstdc++'s `std::sort`**
+before appending it to `S` and `P`; `std::sort` is an introsort, not stable, so starting points of
+equal cost take its order, not the order found. Observed (`trial_ssroi_matrices.py`, a schedule of
+our own: `search`, then `print S` and `print P`): on a pair whose 829 starting points all cost 1
+(a test volume clamped between 0 and 0 at every scale; FSL's own `measurecost` gives 1 for both
+programs' matrices and for the identity), FSL's `S` and `P` are exactly the introsort's permutation
+of the list as `-verbose` prints it (`P` permuted alike); with 20 rows put in `S` before the search,
+those 20 stay first and only the search's rows are permuted. The original kept the order found;
+it now sorts the search's results with `schedule::std_sort` after printing them
+(`flirt/search.rs`; unit test `std_sort_orders_equal_costs_as_fsl_orders_its_search`, the observed
+first 16 and last 20 places; permanent cases `search-equal-costs-sorted`,
+`pairreg-search-equal-costs-sorted`, which differ with the build before).
+
+What it changes: on random pairs that carry little information at the coarse scales many costs
+tie. Replayed (`catchup_replay.py`, the trial's findings of the three path classes with the final
+build and with the build before the fix; `trial_catchup_replay_sorted.txt`,
+`trial_catchup_replay_before_sort.txt`): 873 of the 1,471 findings agree now and differed before
+(755 registrations ending elsewhere, 101 pairreg runs, 17 message counts; one agreed before); 338
+registrations, 236 message counts and 23 pairreg runs still differ. The record `fsl-flirt` re-made
+from `a835ddd`: 339 cases, 238 pass, 89 both refuse, 10 expected divergences, 2 fail; three cases
+move from fail to pass (`real/weights-empty-refweight`, `real/weights-empty-inweight`,
+`edge/one-voxel-input`: an empty weight or a one-voxel input makes every cost equal: the order of the equal
+costs decided their matrices, whatever the zero's sign where relay 4's traces part), and two difftest cases'
+displacement checks are no longer needed (their matrices FSL's). The two failures left are the
+weighted `normcorr` and `woods` costs' last bits (relay 4). FAST's record (its `-a` priors
+registered by this FLIRT) and BET's are unchanged.

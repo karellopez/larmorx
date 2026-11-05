@@ -589,3 +589,38 @@ product `M·(20, 4, 4)` rounded once, where §3.2's held frame rounds its transl
 question for the spec writer); 5 `-B` and `-A2` runs where FSL fails midway and the messages part
 (`00225`, `00409`: open).
 
+
+## The trial's last differences triaged (relay 10, 2026-11-05)
+
+Every one of the trial's 114 differences of the original replayed with the final build
+(`replay_trial.py`, the drawn recipes: `trial_catchup_replay.jsonl`) and put in a category
+(`trial_catchup_categories.py`, its output `trial_catchup_triage.json`); the standard_space_roi
+findings measured with `trial_ssroi_matrices.py` (each call with `-d`, FSL's own `flirt` measuring
+both final matrices' costs at 8, 4, 2 and 1 mm, and the output header given FSL's matrix:
+`trial_ssroi_matrices.jsonl`).
+
+- **Fixed: FLIRT's search, starting points of equal cost** (15 findings, and 5 output boxes that
+  followed the matrix): standard_space_roi's matrices 37 to 303 mm (RMS) from FSL's and `bet -B`'s
+  inner ones, on small heads whose every cost is 1 at the coarse scales (FSL's own measure of both
+  matrices and of the identity): the search's starting points tied, and FSL sorts them with
+  `std::sort` (`docs/findings/fsl-flirt-original.md`, "The search's starting points of equal
+  cost"). All 20 agree on replay; `bet -B` 531, where FSL finished and the original's script had
+  failed midway, among them. Permanent cases `original-ssroi-search-equal-costs`,
+  `original-bet-B-search-equal-costs`.
+- **Open, a registration that still ends elsewhere** (3): 88 at a lower cost than FSL's by FSL's
+  measure (0.964919 against 0.967734 at 1 mm, 183 mm apart), 114 at a higher one (0.989526
+  against 0.985458; 0.674786 against 0.803613 at 4 mm), 803 (110 mm, its output box).
+- **Open, standard_space_roi's output header given FSL's matrix** (17): 9 the cut's translation
+  one float unit in the last place (407: `qoffset_z` 8.25 against 8.250000954); 4 a form's
+  translation whole voxels from FSL's where the input's qform and sform differ (189:
+  `qoffset_x` −14.25 against −38.25; 313, 315, 456; the box, its values and the other form are
+  FSL's: which form FSL's fslroi moves by which corner is a question for the spec writer,
+  §3.2); 2 NIfTI-2 outputs of a NIfTI-1 input (543: FSL's matrices in single precision,
+  −44.40308380 against −44.40308296; 567: FSL moves a sform of code 0 too, its translation
+  −1.2412 where the original keeps the input's 51.25); 2 fslpy's conversion (657: `pixdim[4..7]`
+  1 against 0; 222: `scl_slope` 1 against 0; 88 also NIfTI-2 for a NIFTI2 type against the
+  original's NIfTI-1: §2.5's pending conversion).
+- **Unchanged**: 53 betsurf surfaces (the scalp's deformation, relay 7's open class), 8
+  standard_space_roi runs whose FLIRT crashes in FSL (FSL-75), 6 fslroi corners one float unit
+  apart (relay 8's question), 5 `-B`/`-A2` runs where FSL fails midway (not yet looked at), 2
+  `-R`/`-c` centres on neurologically stored images (the question of cases 622 and 677).

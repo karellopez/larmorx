@@ -1559,10 +1559,6 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
         "agrees on replay with the final build",
         None,
     ),
-    "betsurf: agrees with the final build": (
-        "betsurf's surfaces (betsurf, bet -A, -A2) that agree on replay with the final build",
-        None,
-    ),
     "betsurf's surfaces on small heads: the scalp's deformation": (
         "betsurf's surfaces on small synthetic heads (betsurf, bet -A, -A2): the profiles are "
         "decided as FSL decides them (162 of 164 images' shares of profiles set aside FSL's), "
@@ -1580,26 +1576,37 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     "standard_space_roi: FLIRT's registration ends elsewhere": (
         "After the fix, a registration of a small head that still ends elsewhere than FSL's: "
         "88 at a lower cost than FSL's by FSL's own measure (0.964919 against 0.967734 at 1 mm), "
-        "114 at a higher one (0.989526 against 0.985458), for FLIRT's next clean-room part",
+        "114 at a higher one (0.989526 against 0.985458), 803 (its output box following the "
+        "matrix; given FSL's matrix every file FSL's): for FLIRT's next clean-room part",
         "open",
     ),
     "standard_space_roi: the cut's translation one float unit from FSL's": (
-        "standard_space_roi's output header, FSL's matrix given: the cut's translation one float "
-        "unit in the last place from FSL's (e.g. qoffset_z 8.25 against 8.250000954), as fslroi's "
-        "corner below: a question for the specification (specs/standard_space_roi.md §3.2)",
+        "standard_space_roi's output header, FSL's matrix given, every value FSL's: the cut's "
+        "translation one float unit in the last place from FSL's (e.g. qoffset_z 8.25 against "
+        "8.250000954), as fslroi's corner below: a question for the specification "
+        "(specs/standard_space_roi.md §3.2)",
         "open",
     ),
     "standard_space_roi: fslpy's imcp conversion (nibabel)": (
         "-maskNONE -roiNONE (or -b -maskNONE) on an input in another format than "
         "FSLOUTPUTTYPE's: fslpy's imcp converts it with nibabel, whose header has pixdim[4..7] 1 "
-        "where the input's are 0, and NIfTI-2 for a NIFTI2 type; the original converts the "
-        "layout and keeps the header (specs/standard_space_roi.md §2.5: pending until its bytes "
-        "are checked)",
+        "where the input's are 0 and scl_slope 1 where it is 0, and NIfTI-2 for a NIFTI2 type; "
+        "the original converts the layout and keeps the header (specs/standard_space_roi.md "
+        "§2.5: pending until its bytes are checked)",
         "open",
     ),
-    "standard_space_roi: the output's box on tiny images": (
-        "standard_space_roi's output box a voxel or more from FSL's on tiny images, after the "
-        "fix: open, for BET's next clean-room part",
+    "standard_space_roi: the cut's corner whole voxels from FSL's": (
+        "standard_space_roi's output header, FSL's matrix given, on inputs whose qform and sform "
+        "differ: one form's translation whole voxels from FSL's (e.g. qoffset_x -14.25 against "
+        "-38.25), the box, its values and the other form FSL's: which form FSL's fslroi moves "
+        "by which corner is a question for the specification (specs/standard_space_roi.md §3.2)",
+        "open",
+    ),
+    "standard_space_roi: a NIfTI-2 output's matrices": (
+        "standard_space_roi's NIfTI-2 output of a NIfTI-1 input, FSL's matrix given: FSL's "
+        "matrices in single precision (-44.40308380 against the original's -44.40308296), and a "
+        "sform of code 0 moved by the cut too (its translation -1.2412 where the original keeps "
+        "the input's 51.25): a question for the specification (specs/standard_space_roi.md §3.2)",
         "open",
     ),
     "fslroi: the corner's translation one float unit from FSL's": (

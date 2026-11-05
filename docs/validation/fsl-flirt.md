@@ -1,12 +1,12 @@
 # Parity: FLIRT (clean-room original)
 
-**7 case(s) fail.** 308 cases on the `standard` tier: 210 pass, 85 rejected by both, 6 expected divergences, 7 failures.
+**5 case(s) fail.** 333 cases on the `standard` tier: 229 pass, 89 rejected by both, 10 expected divergences, 5 failures.
 
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
-- **Original programs:** 308 runs: 294 from the oracle cache, 14 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
+- **Original programs:** 332 runs: 317 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -25,21 +25,16 @@
 |---|---|---|---|---|---|
 | bbr | 11 | 11 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
-| debug | 2 | 2 | 0 | 0 | 0 |
+| debug | 4 | 4 | 0 | 0 | 0 |
+| difftest | 11 | 10 | 1 | 0 | 0 |
 | edge | 35 | 9 | 19 | 6 | 1 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| programs | 132 | 81 | 50 | 0 | 1 |
-| real | 61 | 56 | 0 | 0 | 5 |
-| schedule | 29 | 22 | 7 | 0 | 0 |
-| verbose | 19 | 19 | 0 | 0 | 0 |
+| programs | 140 | 83 | 53 | 4 | 0 |
+| real | 62 | 58 | 0 | 0 | 4 |
+| schedule | 30 | 23 | 7 | 0 | 0 |
+| verbose | 21 | 21 | 0 | 0 | 0 |
 
 ## Failures
-
-### `real/cost-leastsq`
-
--cost leastsq (and -searchcost corratio)
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 82.0821, threshold 0.5 or FSL's own variability): maximum 96.0874 mm, RMS deviation 93.3762 mm; FSL's own p95 on a perturbed input 46.7560 mm
 
 ### `real/weights-normcorr`
 
@@ -51,7 +46,7 @@ weights with -cost normcorr
 
 weights with -cost woods
 
-- **stderr: the same lines (numbers aside)** (identical = no, threshold the same text, numbers read as numbers): line 4003: FSL 'WARNING: Woods is not implemented with cost function weighting', original '<end>'
+- **stderr: the same lines (numbers aside)** (identical = no, threshold the same text, numbers read as numbers): line 4004: FSL '<end>', original 'WARNING: Woods is not implemented with cost function weighting'
 
 ### `real/weights-empty-refweight`
 
@@ -71,13 +66,6 @@ a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact o
 
 - **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 131.933, threshold 0.5): maximum 159.0868 mm, RMS deviation 303.8605 mm; FSL's own p95 on a perturbed input 0.0000 mm
 
-### `programs/pointflirt-no-points`
-
-two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes)
-
-- **the original refuses naming FSL-204 (reproduce)**: exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)
-- **the original refuses naming FSL-204 (fix)**: exit 1: ogic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 0x1 larmorx fsl pointflirt: FSL aborts here (signal 6); exit status 1 (larmorx)
-
 ## Expected divergences
 
 | Case | Reason |
@@ -88,6 +76,10 @@ two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused
 | `edge/background-empty` | FSL crashes (FSL-75: undefined behaviour); the original refuses in both modes |
 | `edge/zero-voxel-size` | FSL never finishes (FSL-93: undefined behaviour); the original corrects it by default and refuses with reproduce |
 | `edge/basescale-0` | FSL never finishes (FSL-93: undefined behaviour); the original refuses in both modes |
+| `programs/pointflirt-no-points` | FSL crashes (FSL-204: undefined behaviour); the original refuses in both modes |
+| `programs/pointflirt-no-points-verbose` | FSL crashes (FSL-204: undefined behaviour); the original refuses in both modes |
+| `programs/midtrans-overflow` | midtrans writes rows of NaN with exit status 0 (FSL-241, rule B); the original refuses in both modes |
+| `programs/midtrans-overflow-svd` | midtrans reports its failed decomposition as a matrix-size error with exit status 0 (FSL-241, rule B); the original refuses in both modes |
 
 ## Rejected by both
 
@@ -178,12 +170,16 @@ two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused
 | `programs/makerot-zero-axis` | a zero axis (its error, exit 1) | makerot exits 1; the same from the original. ERROR:: Axis cannot be zero |
 | `programs/makerot-bad-theta` | a theta that is not a number (Couldn't set_value, exit 1) | makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [op… |
 | `programs/makerot-token` | a word that is not an option (unrecognised token, exit 1) | makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [op… |
+| `programs/pointflirt-overflow` | a coordinate whose square overflows: FSL's SVD fails (signal 6; the original exits 1) | pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::out_of_range' what(): Mat::operator(): index out of bounds |
+| `programs/img2imgcoord-warp-3d` | img2imgcoord -warp of a 3D image, verbose: the lines so far, FSL's read error, exit 1 (§15.2: exactly three volumes) | img2imgcoord exits 1; the same from the original. An error occured while reading file: epi.nii |
+| `programs/std2imgcoord-warp-4d` | std2imgcoord -warp of a 4-volume series: FSL's read error, exit 1 | std2imgcoord exits 1; the same from the original. An error occured while reading file: bold4.nii |
+| `difftest/nan-matrices-forcescaling` | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts them (only an exact zero pivot fails, specs/flirt.md §12), so FLIRT goes on and writes its NaN matrix (trial 2026-11-02 #704; the clean-room catch-up) | flirt exits 1; the same from the original. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFT… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (be3db916dce3) |
+| larmorx | 0.0.1 (23710fea9904) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -213,7 +209,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/cost-mutualinfo` | pass | 5/5 | -cost mutualinfo (and -searchcost corratio) |
 | `real/cost-normmi` | pass | 5/5 | -cost normmi (and -searchcost corratio) |
 | `real/cost-normcorr` | pass | 6/6 | -cost normcorr (and -searchcost corratio) |
-| `real/cost-leastsq` | fail | 5/6 | -cost leastsq (and -searchcost corratio) |
+| `real/cost-leastsq` | pass | 5/5 | -cost leastsq (and -searchcost corratio) |
 | `real/cost-woods` | pass | 5/5 | -cost woods (and -searchcost corratio) |
 | `real/cost-labeldiff` | pass | 6/6 | -cost labeldiff (and -searchcost corratio) |
 | `real/searchcost-normmi` | pass | 5/5 | -searchcost normmi |
@@ -222,22 +218,22 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/coarse-fine` | pass | 5/5 | -coarsesearch 30 -finesearch 10 |
 | `real/init` | pass | 5/5 | -init (fMRIPrep's initial matrix) |
 | `real/usesqform` | pass | 5/5 | -usesqform |
-| `real/bins64` | pass | 6/6 | -bins 64 |
+| `real/bins64` | pass | 5/5 | -bins 64 |
 | `real/noresample` | pass | 5/5 | -noresample |
 | `real/noclamp` | pass | 5/5 | -noclamp |
 | `real/minsampling` | pass | 5/5 | -minsampling 4 |
 | `real/forcescaling` | pass | 5/5 | -forcescaling |
-| `real/weights` | pass | 6/6 | -refweight and -inweight |
+| `real/weights` | pass | 5/5 | -refweight and -inweight |
 | `real/weights-normcorr` | fail | 5/6 | weights with -cost normcorr |
-| `real/weights-leastsq` | pass | 6/6 | weights with -cost leastsq |
+| `real/weights-leastsq` | pass | 5/5 | weights with -cost leastsq |
 | `real/weights-normmi` | pass | 5/5 | weights with -cost normmi |
-| `real/weights-mutualinfo` | pass | 6/6 | weights with -cost mutualinfo |
+| `real/weights-mutualinfo` | pass | 5/5 | weights with -cost mutualinfo |
 | `real/weights-woods` | fail | 4/5 | weights with -cost woods |
 | `real/weights-empty-refweight` | fail | 5/6 | an empty -refweight (every voxel 0): refused by default (FSL-91) |
 | `real/weights-empty-inweight` | fail | 5/6 | an empty -inweight (every voxel 0): refused by default (FSL-91) |
 | `real/applyxfm-nan-border` | pass | 6/6 | -applyxfm of a BOLD reference with NaN voxels in its border and an infinite one: the padding's background value (FSL-22… |
 | `real/labeldiff-dseg` | pass | 7/7 | -cost labeldiff on a label image |
-| `real/known-motion` | pass | 6/6 | a known rigid motion of the T1w (-dof 6) |
+| `real/known-motion` | pass | 5/5 | a known rigid motion of the T1w (-dof 6) |
 | `real/interp-nearestneighbour` | pass | 6/6 | -interp nearestneighbour for -out |
 | `real/interp-sinc` | pass | 6/6 | -interp sinc for -out |
 | `real/interp-spline` | pass | 6/6 | -interp spline for -out |
@@ -286,7 +282,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `schedule/sch2D_3dof` | pass | 5/5 | FSL's sch2D_3dof on one slice |
 | `schedule/sch2D_4dof` | pass | 6/6 | FSL's sch2D_4dof on one slice |
 | `schedule/sch2D_5dof` | pass | 5/5 | FSL's sch2D_5dof on one slice |
-| `schedule/sch2D_6dof` | pass | 6/6 | FSL's sch2D_6dof on one slice |
+| `schedule/sch2D_6dof` | pass | 5/5 | FSL's sch2D_6dof on one slice |
 | `real/2d` | pass | 6/6 | -2D's default schedule on one slice, with -out |
 | `verbose/v` | pass | 5/5 | -v |
 | `verbose/2` | pass | 5/5 | -verbose 2 |
@@ -367,17 +363,17 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `programs/applyxfm4D-default` | pass | 6/6 | a 4D int16 series, a matrix per volume (MAT_0000n), sinc |
 | `programs/applyxfm4D-single-trilinear` | pass | 6/6 | -singlematrix with trilinear interpolation, verbose |
 | `programs/applyxfm4D-fourdigit-nn` | pass | 6/6 | --fourdigit (MAT_000n) with nearest neighbour (nn) |
-| `programs/applyxfm4D-userprefix-spline` | pass | 7/7 | -userprefix with spline on an integer series (FSL-79) |
+| `programs/applyxfm4D-userprefix-spline` | pass | 6/6 | -userprefix with spline on an integer series (FSL-79) |
 | `programs/applyxfm4D-float-sinc` | pass | 6/6 | a float input (one volume), -singlematrix, sinc |
 | `programs/applyxfm4D-3d` | pass | 6/6 | -3D (the rectangular sinc of width 9) on a float volume |
-| `programs/applyxfm4D-3d-spline-float` | pass | 7/7 | -3D with spline on a float volume |
+| `programs/applyxfm4D-3d-spline-float` | pass | 6/6 | -3D with spline on a float volume |
 | `programs/applyxfm4D-int8` | pass | 6/6 | an int8 input (FSL-09: written as uint8), trilinear |
 | `programs/applyxfm4D-uint8` | pass | 6/6 | a uint8 input, trilinear (FSL-111: its values 128 to 255 read as signed bytes; read as stored by default) |
 | `programs/applyxfm4D-uint8-3d-spline` | pass | 7/7 | -3D spline on a uint8 volume (FSL-111 with FSL-79's coefficients in the type) |
 | `programs/applyxfm4D-double-sinc` | pass | 7/7 | a double series (sinc sums in double precision; the background value kept in double precision where the mask sets it) |
-| `programs/applyxfm4D-double-3d-spline` | pass | 7/7 | -3D spline on a double volume (its coefficients in double precision) |
+| `programs/applyxfm4D-double-3d-spline` | pass | 6/6 | -3D spline on a double volume (its coefficients in double precision) |
 | `programs/applyxfm4D-double-nn` | pass | 6/6 | a double volume, nearest neighbour (values through float) |
-| `programs/applyxfm4D-3d-spline-int` | pass | 7/7 | -3D spline on an int16 volume (FSL-79: coefficients and values in the type) |
+| `programs/applyxfm4D-3d-spline-int` | pass | 6/6 | -3D spline on an int16 volume (FSL-79: coefficients and values in the type) |
 | `programs/applyxfm4D-nan-border` | pass | 6/6 | NaN voxels in the input's border and an infinite one: the background value's NaN order (FSL-22), spline coefficients th… |
 | `programs/applyxfm4D-nan-border-3d` | pass | 6/6 | the same with -3D and sinc |
 | `programs/applyxfm4D-metres` | pass | 6/6 | an input whose header gives metres (a nonsense header): read as FSL reads it |
@@ -401,8 +397,8 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `programs/extracttxt-nomatch` | pass | 6/6 | a word that never matches (nothing printed, exit 0) |
 | `programs/extracttxt-missing` | pass | 6/6 | a file that does not exist (grep's message, exit 0) |
 | `programs/pairreg-usage` | both-error | 4/4 | pairreg with four arguments (its usage, exit 1) |
-| `programs/pairreg-default` | pass | 6/6 | pairreg of the T1w and its moved copy (brains and skulls the same) |
-| `programs/pairreg-metres` | pass | 6/6 | pairreg of images whose headers give metres (nonsense headers) |
+| `programs/pairreg-default` | pass | 5/5 | pairreg of the T1w and its moved copy (brains and skulls the same) |
+| `programs/pairreg-metres` | pass | 5/5 | pairreg of images whose headers give metres (nonsense headers) |
 | `programs/midtrans-usage` | both-error | 4/4 | midtrans without transforms (its message and usage, exit 1) |
 | `programs/midtrans-help` | both-error | 4/4 | midtrans -h (its usage, exit 1) |
 | `programs/midtrans-one` | both-error | 4/4 | one transform only (at least 2 needed, exit 1) |
@@ -425,7 +421,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `programs/pointflirt-count` | both-error | 4/4 | files with different numbers of points (its error, exit 255) |
 | `programs/pointflirt-many` | pass | 5/5 | twenty points (x·xᵀ by BLAS dsyrk) |
 | `programs/pointflirt-missing` | both-error | 4/4 | a coordinate file that does not exist (FSL aborts) |
-| `programs/pointflirt-no-points` | fail | 0/2 | two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes) |
+| `programs/pointflirt-no-points` | expected-divergence | 2/2 | two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes) |
 | `programs/pointflirt-three` | pass | 5/5 | three points: a square file is read with points as columns |
 | `programs/pointflirt-two` | both-error | 4/4 | two points (two rows of three: FSL reads past its rows, aborts) |
 | `programs/pointflirt-four-columns` | both-error | 4/4 | points of four coordinates (FSL's block sizes clash, aborts) |
@@ -507,4 +503,29 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `verbose/3-2d` | pass | 5/5 | -2D -verbose 3: the tripled slice, no sform messages |
 | `verbose/3-debug` | pass | 11/11 | -verbose 3 -debug: each setscale's debug lines before the input's |
 | `debug/scales` | pass | 11/11 | -debug over forced and input-only scales: the pair's input at each setscale |
+| `verbose/2-basescale-tr` | pass | 5/5 | -verbose 2 with a base scale (0.6 mm voxels) and a 4D input of TR 2: the sampling and initial matrices in scaled mm, th… |
+| `verbose/3-empty-reference` | pass | 5/5 | -verbose 3 with an all-zero reference: the centre's COG warning where its line prints |
+| `real/anglerep-quaternion-dof3` | pass | 5/5 | -anglerep quaternion at 3 dof: FSL-90's starts and the dof message start by start, the invalid starts the identity (§8.… |
+| `programs/pointflirt-no-points-verbose` | expected-divergence | 2/2 | pointflirt -v without points: FSL's lines and headings, then its crash (FSL-204; refused in both modes) |
+| `programs/pointflirt-nan-word` | pass | 5/5 | a nan word in a coordinate file reads 0 (§2.2): the fit of the points as read |
+| `programs/pointflirt-overflow` | both-error | 4/4 | a coordinate whose square overflows: FSL's SVD fails (signal 6; the original exits 1) |
+| `programs/img2imgcoord-warp-3d` | both-error | 5/5 | img2imgcoord -warp of a 3D image, verbose: the lines so far, FSL's read error, exit 1 (§15.2: exactly three volumes) |
+| `programs/std2imgcoord-warp-4d` | both-error | 5/5 | std2imgcoord -warp of a 4-volume series: FSL's read error, exit 1 |
+| `programs/pairreg-verbose` | pass | 5/5 | pairreg -v at 12 dof: every line of the three schedules the original carries (§15.8), echoed as FSL's |
+| `debug/bbr-no-boundary` | pass | 13/13 | -debug -cost bbr with an all-zero white-matter segmentation (the clean-room catch-up, relay 4): the set-up's lines and … |
+| `debug/noresample` | pass | 10/10 | -debug -noresample (the clean-room catch-up, relay 4): the levels are the reference itself, its forms as read; no globa… |
+| `schedule/perturb-scaled` | pass | 5/5 | measurecost and gridmeasurecost of a scaled and skewed row at 6, 7 and 12 dof (the clean-room catch-up, relay 4): a per… |
 | `debug/bbr-setoption` | pass | 11/11 | -debug -wmseg: the boundary-based cost set up by setoption and by a new pair |
+| `programs/midtrans-overflow` | expected-divergence | 3/3 | midtrans of a transform of 1e200 scales (its determinant overflows: used, §15.5): FSL writes rows of NaN; refused (FSL-… |
+| `programs/midtrans-overflow-svd` | expected-divergence | 3/3 | midtrans of a translation of 1e300: FSL's decomposition fails and it reports a matrix-size error, exit 0; refused (FSL-… |
+| `difftest/applyxfm4d-spline-double` | pass | 6/6 | applyxfm4D's spline of a double image (read and filtered in double, each value rounded to single, specs/flirt.md §15.7)… |
+| `difftest/applyxfm4d-spline-float` | pass | 6/6 | applyxfm4D's spline of a float image as specs/flirt.md §9.3 and §15.7 state it (each pass stored in single precision): … |
+| `difftest/debug-bbr-first-pair` | pass | 13/13 | -debug -cost bbr at -verbose 3: the first pair's set-up lines after the verbose centres' COG warning (observed; trial 2… |
+| `difftest/debug-bbr-no-boundary` | pass | 13/13 | -debug with the boundary-based cost and no boundary point (an all-zero white-matter segmentation) and infinite input vo… |
+| `difftest/debug-empty-weight-qfac` | pass | 12/12 | -debug without weights: global_refweight1's pixdim[0] (qfac) and pixdim[4..7] 1 (specs/flirt.md §9.4, observed; trial 2… |
+| `difftest/debug-neurological-levels` | pass | 13/13 | -debug's pyramid levels of a neurological 0.8 x 0.8 x 3 mm reference: only set forms composed, every form swapped back … |
+| `difftest/debug-noresample` | pass | 11/11 | -debug with -noresample: the levels are the reference itself (its forms as read, its voxel sizes as held), no global_re… |
+| `difftest/nan-matrices-char-dof7` | pass | 5/5 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
+| `difftest/nan-matrices-forcescaling` | both-error | 4/4 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
+| `difftest/nan-matrices-subset` | pass | 6/6 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
+| `difftest/nan-matrix-padded` | pass | 6/6 | reproduce with NaN input voxels: a NaN matrix's every pre-image is outside, so the -out image is the background value e… |

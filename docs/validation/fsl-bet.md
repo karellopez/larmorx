@@ -6,11 +6,11 @@
 - **Reference:** bet, bet2, betsurf, standard_space_roi and fslroi from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
-- **Original programs:** 343 runs: 329 from the oracle cache, 14 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 353 runs: 339 from the oracle cache, 14 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 - **198 of 252 cases within the thresholds** (exit status and messages identical, every file within its threshold); 46 where both refuse or FSL crashes and larmorx refuses; 6 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 0 pending (options that run FSL programs larmorx does not have yet).
 - **378 of 380 brains, masks and outlines with FSL's values, bit for bit**, 0 more within the thresholds; 11 of 11 meshes with FSL's vertices to the file's 6 decimals; 28 of 28 skull images bit-identical, 0 more within the masks' thresholds.
-- **betsurf: 34 of 116 masks and outlines with FSL's values, bit for bit**, 80 more within its thresholds (Dice >= 0.99, boundary p95 <= 1.0 voxel); its 63 meshes reported: vertex distance p95 0.0000 to 3.1828 mm, largest 12.23 mm.
+- **betsurf: 34 of 116 masks and outlines with FSL's values, bit for bit**, 80 more within its thresholds (Dice >= 0.99, boundary p95 <= 1.0 voxel); its 63 meshes reported: vertex distance p95 0.0000 to 2.8577 mm, largest 16.86 mm.
 - fMRIPrep's own BET outputs: 58 of 58 with the same values as the original's.
 - FSL run again: 38 of 38 runs bit-identical (FSL is deterministic).
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
@@ -83,8 +83,8 @@ a 3.5-year-old (ds000228): bet -B -m (the bias field, the neck)
 
 a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered
 
-- **out_outskin_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.993842; 2.00 / 11.22, threshold >= 0.99; p95 <= 1.0): 46698 of 16384000 values differ
-- **out_outskin_mesh.nii.gz** (drawn surface distance p95 / max (voxels) = 1.73 / 11.18, threshold p95 <= 1.0): 58632 of 16384000 values differ
+- **out_outskin_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.993521; 2.00 / 14.25, threshold >= 0.99; p95 <= 1.0): 49022 of 16384000 values differ
+- **out_outskin_mesh.nii.gz** (drawn surface distance p95 / max (voxels) = 1.73 / 14.25, threshold p95 <= 1.0): 56411 of 16384000 values differ
 
 ## Expected divergences
 
@@ -152,7 +152,7 @@ a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6907f6c4721b) |
+| larmorx | 0.0.1 (2b3db9eda759) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

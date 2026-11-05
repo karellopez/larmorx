@@ -5,7 +5,7 @@
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
+- **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
 - **Original programs:** 35 runs: 21 from the oracle cache, 14 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 **fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band: the worst of three noise realisations and the reverse order):
@@ -264,7 +264,7 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (be3db916dce3) |
+| larmorx | 0.0.1 (0842fbda23cd) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

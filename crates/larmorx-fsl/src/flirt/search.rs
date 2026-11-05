@@ -159,7 +159,14 @@ pub fn search(
         p
     };
     // from the sampled parameters themselves (observed: FSL's evaluations start at the angles
-    // it sampled, and the grid keeps the optimised translations and scale as they come)
+    // it sampled, and the grid keeps the optimised translations and scale as they come); the
+    // matrix their `Starting with :` shows is the identity's parameters composed about the
+    // centre (the identity, all NaN about a NaN centre: observed, 2026-11-05)
+    let shown = if at(5).is_some() {
+        super::param::euler_compose(&larmorx_mri::hmc::rigid::IDENTITY_PARAMS, 12, centre, libm)
+    } else {
+        IDENTITY
+    };
     let run = |p: &Params, kind: Kind| -> Result<(Params, f32), String> {
         optimise::optimise_params(
             eval,
@@ -170,7 +177,7 @@ pub fn search(
             settings,
             Some(&subset),
             kind,
-            &IDENTITY,
+            &shown,
         )
     };
     let par_map = |n: usize, f: &(dyn Fn(usize) -> Result<(Params, f32), String> + Sync)| {
@@ -253,7 +260,8 @@ pub fn search(
             let pos = [a as f32 * f[0], b as f32 * f[1], c as f32 * f[2]];
             let t = [interp(pos, 0), interp(pos, 1), interp(pos, 2)];
             let mut sc = interp(pos, 3);
-            if !(0.5..=2.0).contains(&sc) || dof <= 6 {
+            // a NaN scale is not outside the range: kept (observed, 2026-11-05)
+            if sc < 0.5 || sc > 2.0 || dof <= 6 {
                 sc = 1.0;
             }
             let mut p = point([fine[0][a], fine[1][b], fine[2][c]], t, sc);
@@ -431,10 +439,12 @@ pub fn search(
     // each start in turn, as FLIRT runs them (observed, 2026-11-05: with -dof 3 and -anglerep
     // quaternion the messages of a start's composition, its dof message and its optimisation's
     // evaluations follow one another start by start): the start composed (FSL-90's message for
-    // a vector part outside the unit ball), its decomposition composed again (FLIRT's `Starting
-    // with` and `P` show it, under gimbal lock other angles), a `-dof` below 6's message after
-    // the start's own messages (2026-11-02), then its optimisation; each start's lines go to its
-    // own log, passed on in the starts' order whatever runs in parallel
+    // a vector part outside the unit ball; this matrix, composed once, is the one `P` keeps,
+    // §8.1 step 9), its decomposition the optimisation's start (its first evaluation and its
+    // `Starting with` the decomposition composed again: under gimbal lock other angles), a
+    // `-dof` below 6's message after the start's own messages (2026-11-02), then its
+    // optimisation; each start's lines go to its own log, passed on in the starts' order
+    // whatever runs in parallel
     let dof_message = super::optimise::clamp_dof(free_dof as i64).1;
     let free_settings = Settings {
         tol_x0: None,
@@ -463,7 +473,7 @@ pub fn search(
             super::param::euler_compose(&fine_params[i], free, centre, own.libm())
         };
         let x = super::param::decompose(rep, &m, centre, own.libm());
-        let start = super::param::compose(rep, &x, free, centre, &own);
+        let start = super::param::compose(rep, &optimise::finite_start(&x), free, centre, &own);
         if let Some(msg) = &dof_message {
             own.push(msg.as_str());
         }
@@ -472,25 +482,16 @@ pub fn search(
             ..free_settings.clone()
         };
         let eval_k = |m: &Mat4| eval_logged(m, &own);
-        let (x, c) = optimise::optimise_params(
-            &eval_k,
-            super::param::decompose(rep, &start, centre, own.libm()),
-            centre,
-            free,
-            4,
-            &s_k,
-            None,
-            Kind::Free,
-            &start,
-        )?;
-        let m = super::param::compose(rep, &x, free, centre, &own);
-        // the start's own cost goes with it into `P`: evaluated after the optimisation
-        // (counted, not printed)
-        let c0 = eval_k(&start);
+        let (x, c) =
+            optimise::optimise_params(&eval_k, x, centre, free, 4, &s_k, None, Kind::Free, &start)?;
+        let opt = super::param::compose(rep, &x, free, centre, &own);
+        // the start's own cost goes with it into `P`: the composed start's (composed once),
+        // evaluated after the optimisation (counted, not printed)
+        let c0 = eval_k(&m);
         if !n_threads_parallel && let Some(tr) = at(1) {
-            freed_line(tr, c, &m);
+            freed_line(tr, c, &opt);
         }
-        Ok((m, start, c, c0, own))
+        Ok((opt, m, c, c0, own))
     };
     if let Some(tr) = at(1) {
         tr.line("After free optimisation, parameters are:");

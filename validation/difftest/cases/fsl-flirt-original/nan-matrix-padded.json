@@ -1,0 +1,298 @@
+{
+ "defect": null,
+ "description": "reproduce with NaN input voxels: a NaN matrix's every pre-image is outside, so the -out image is the background value everywhere (observed; trial 2026-11-02 #1678; the clean-room catch-up, relay 4)",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr: the same lines (numbers aside): line 1: FSL '<end>', original 'inv(): matrix is singular'; files written: only FSL ['out.mat', 'out.nii'], only the original []",
+  "n": 1678,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "files written",
+   "stderr: the same lines (numbers aside)"
+  ]
+ },
+ "id": "nan-matrix-padded",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": true,
+   "-debug": false,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": false,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": true,
+   "-searchrx": true,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.95,
+   "axis1": 0.85,
+   "axis2": 0.95,
+   "bbr": false,
+   "bias0": -0.01,
+   "bias1": -0.0075,
+   "bias2": -0.0025,
+   "bias3": -0.01,
+   "blobs": 1,
+   "centre0": -2.0,
+   "centre1": -3.0,
+   "centre2": -2.0,
+   "content": "blobs",
+   "datatype": "float",
+   "dof": "6",
+   "dtype": "float32",
+   "extreme": false,
+   "kind": "register",
+   "noise": 1.0,
+   "orientation": "plumb",
+   "origin0": 55.5,
+   "origin1": -23.25,
+   "origin2": -50.0,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "rx": 0,
+   "same content": true,
+   "searchcost": "corratio",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "22x30x26",
+   "shift0": 0.0,
+   "shift1": 0.5,
+   "shift2": 1.0,
+   "size": 16.5,
+   "spacing0": 2.5,
+   "spacing1": 3.0,
+   "spacing2": 1.5,
+   "specials": 3,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-searchcost",
+     "corratio"
+    ],
+    "name": "-searchcost",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dof",
+     "6"
+    ],
+    "name": "-dof",
+    "optional": true
+   },
+   {
+    "args": [
+     "-searchrx",
+     "-30",
+     "30"
+    ],
+    "name": "-searchrx",
+    "optional": true
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   },
+   {
+    "args": [
+     "-datatype",
+     "float"
+    ],
+    "name": "-datatype",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.75,
+      0.75,
+      1.25
+     ],
+     "bias": [
+      -0.01,
+      -0.0075,
+      -0.0025,
+      -0.01
+     ],
+     "centre": [
+      2.5,
+      3.0,
+      -1.5
+     ],
+     "noise": 1.0,
+     "seed": 1197838952,
+     "size": 12.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      55.5,
+      -23.25,
+      -50.0
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      3.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     22,
+     30,
+     26
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "nan",
+      "-0",
+      "outlier"
+     ]
+    }
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      0.75,
+      0.75,
+      1.25
+     ],
+     "bias": [
+      -0.01,
+      -0.0075,
+      -0.0025,
+      -0.01
+     ],
+     "centre": [
+      2.5,
+      2.5,
+      -2.5
+     ],
+     "noise": 1.0,
+     "seed": 473118190,
+     "size": 12.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -10.5,
+      -47.0,
+      52.25
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     24,
+     31,
+     12
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1678,
+  "options": [
+   "-datatype",
+   "-dof 6",
+   "-out",
+   "-searchcost corratio",
+   "-searchrx",
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

@@ -1,0 +1,308 @@
+{
+ "defect": null,
+ "description": "-debug's pyramid levels of a neurological 0.8 x 0.8 x 3 mm reference: only set forms composed, every form swapped back with the level's grid (specs/flirt.md \u00a79.4; trial 2026-11-02 #170; the clean-room catch-up, relay 4)",
+ "expect": "pass",
+ "found": {
+  "detail": "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range: the headers differ: pixdim; refvol.nii.gz: the same header, values within 1e-6 of the image's range: the headers differ: qoffset_x, srow_x; refvol_2.nii.gz: the same header, values within 1e-6 of the image's range: the headers differ: qoffset_x, srow_x; refvol_4.nii.gz: the same header, values within 1e-6 of the image's range: the headers differ: qoffset_x, srow_x",
+  "n": 170,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "global_refweightN.nii.gz: the same header, values within Ne-N of the image's range",
+   "refvol.nii.gz: the same header, values within Ne-N of the image's range",
+   "refvol_N.nii.gz: the same header, values within Ne-N of the image's range"
+  ]
+ },
+ "id": "debug-neurological-levels",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": true,
+   "-cost": false,
+   "-datatype": false,
+   "-debug": true,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": true,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": true,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.9,
+   "axis1": 1.2,
+   "axis2": 0.85,
+   "bbr": false,
+   "bias0": 0.0075,
+   "bias1": -0.005,
+   "bias2": 0.0075,
+   "bias3": 0.0,
+   "centre0": -6.0,
+   "centre1": -0.5,
+   "centre2": 5.0,
+   "coarse": "45",
+   "content": "head",
+   "dof": "7",
+   "dtype": "float32",
+   "extreme": false,
+   "kind": "register",
+   "noise": 3.0,
+   "orientation": "axes+oblique",
+   "origin0": 27.75,
+   "origin1": 2.25,
+   "origin2": 7.25,
+   "q0": 20,
+   "q1": 2,
+   "q2": -1,
+   "q3": 2,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1.05",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "20x16x11",
+   "shift0": "0",
+   "shift1": "1.5",
+   "shift2": "3.25",
+   "size": 14.0,
+   "spacing0": 0.8,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-dof",
+     "7"
+    ],
+    "name": "-dof",
+    "optional": true
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": true
+   },
+   {
+    "args": [
+     "-coarsesearch",
+     "45"
+    ],
+    "name": "-coarsesearch",
+    "optional": true
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   },
+   {
+    "args": [
+     "-debug"
+    ],
+    "name": "-debug",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.75,
+      1.25,
+      1.15
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      -0.0075,
+      0.0075
+     ],
+     "centre": [
+      4.0,
+      5.5,
+      -1.5
+     ],
+     "noise": 0.0,
+     "seed": 873418798,
+     "size": 13.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      27.75,
+      2.25,
+      7.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      26,
+      28,
+      32,
+      34
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     16,
+     11
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "1.024327628 -0.2053789731 -0.0782396088 0\n0.1951100244 0.9608801956 -0.2053789731 1.5\n0.1232273839 0.1858190709 0.9755501222 3.25\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      0.75,
+      1.25,
+      1.15
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      -0.0075,
+      0.0075
+     ],
+     "centre": [
+      6.0,
+      3.5,
+      0.5
+     ],
+     "noise": 0.0,
+     "seed": 1817332658,
+     "size": 13.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      1.75,
+      -19.25,
+      43.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      0.8,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     26,
+     32
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 170,
+  "options": [
+   "-coarsesearch",
+   "-debug",
+   "-dof 7",
+   "-init",
+   "-out",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

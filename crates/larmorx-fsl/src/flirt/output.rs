@@ -263,8 +263,10 @@ pub fn resample(
                 let xf = x as f32;
                 let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
                 for y in 0..ny {
+                    // a NaN position (a NaN matrix, FSL-14 reproduced) is outside: the padding
+                    // value (observed, 2026-11-05)
                     let pad_out =
-                        (0..3).any(|k| p[k] < -r.padding || p[k] > n[k] - 1.0 + r.padding);
+                        (0..3).any(|k| !(p[k] >= -r.padding && p[k] <= n[k] - 1.0 + r.padding));
                     if !pad_out {
                         let extended = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
                         let v = if r.interp == Interp::Spline {
@@ -473,7 +475,9 @@ impl FlirtSpline {
 fn spline_column(c: &mut [f64]) {
     let len = c.len();
     let z = 3.0f64.sqrt() - 2.0;
-    let horizon = ((1e-8f64.ln() / z.abs().ln() + 1.5) as usize).min(len);
+    // `trunc(ln(1e-8)/ln|z| + 1.5)` = 15 (§9.3), with the correctly rounded logarithm (rule 5)
+    let ln = larmorx_core::math::log;
+    let horizon = ((ln(1e-8) / ln(z.abs()) + 1.5) as usize).min(len);
     let last = c[len - 1];
     let mut zi = z;
     let mut sum = c[0];
@@ -518,7 +522,7 @@ pub fn padded(
                 let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
                 for y in 0..ny {
                     slab[x + nx * y] =
-                        (0..3).any(|k| p[k] < -padding || p[k] > n[k] - 1.0 + padding);
+                        (0..3).any(|k| !(p[k] >= -padding && p[k] <= n[k] - 1.0 + padding));
                     p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
                 }
             }
@@ -565,4 +569,62 @@ pub fn resample_shifted(
             }
         });
     Some(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ramp(shape: [usize; 3]) -> Vec<f64> {
+        let n = shape[0] * shape[1] * shape[2];
+        (0..n)
+            .map(|i| 1.0 + (i as f64) / 3.0 + 1e-9 * i as f64)
+            .collect()
+    }
+
+    /// §15.7: a double image's spline keeps its passes in double (its values not rounded to
+    /// single), a float image's are stored in single after each pass; the two stores part.
+    #[test]
+    fn the_double_spline_keeps_double_passes() {
+        let shape = [5, 4, 3];
+        let values = ramp(shape);
+        let vol = Volume::new(shape, [1.0; 3], values.iter().map(|&v| v as f32).collect());
+        let single = FlirtSpline::new(&vol);
+        let rounded = FlirtSpline::with_store(
+            shape,
+            values.iter().map(|&v| f64::from(v as f32)).collect(),
+            &|c| f64::from(c as f32),
+        );
+        let double = FlirtSpline::with_store(shape, values, &|c| c);
+        let p = [1.3, 2.1, 0.7];
+        // the single-precision store from the rounded values is FlirtSpline::new's
+        assert_eq!(
+            single.value(p, 0.0, false).to_bits(),
+            rounded.value(p, 0.0, false).to_bits()
+        );
+        let differ = (0..60).any(|k| {
+            let q = [0.05 * k as f32, 0.03 * k as f32 + 0.2, 0.02 * k as f32];
+            single.value(q, 0.0, false).to_bits() != double.value(q, 0.0, false).to_bits()
+        });
+        assert!(differ, "the double passes give other last bits somewhere");
+    }
+
+    /// A NaN matrix (FSL-14 reproduced): every pre-image is NaN, so outside: the padding value.
+    #[test]
+    fn a_nan_matrix_pads_every_voxel() {
+        let src = Volume::new([4, 4, 4], [2.0; 3], (0..64).map(|i| i as f32).collect());
+        let mut m = mat::IDENTITY;
+        m[0][3] = f64::NAN;
+        let r = Resampling {
+            interp: Interp::Trilinear,
+            sinc: None,
+            pad: 7.5,
+            padding: 0.0,
+            spline: None,
+            constant: false,
+        };
+        if let Some(v) = resample(&src, &m, [3, 3, 3], [2.0; 3], &r) {
+            assert!(v.iter().all(|&x| x == 7.5), "{v:?}");
+        }
+    }
 }

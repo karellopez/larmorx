@@ -404,7 +404,7 @@ fn minimise(
 
 /// `x0` with each NaN parameter replaced by the identity's (rotations, translations and skews 0,
 /// scales 1): where FSL's optimiser starts from such parameters (observed, 2026-11-05).
-fn finite_start(x0: &Params) -> Params {
+pub(crate) fn finite_start(x0: &Params) -> Params {
     std::array::from_fn(|i| {
         if x0[i].is_nan() {
             if (6..9).contains(&i) { 1.0 } else { 0.0 }
@@ -587,6 +587,20 @@ pub fn optimise_params(
 mod tests {
     use super::*;
     use larmorx_mri::hmc::rigid;
+
+    /// A NaN parameter starts from the identity's value (observed, 2026-11-05).
+    #[test]
+    fn nan_parameters_start_from_the_identity() {
+        let mut x = [f64::NAN; 12];
+        x[2] = 0.25;
+        let s = finite_start(&x);
+        assert_eq!(s[2], 0.25);
+        for (i, &v) in s.iter().enumerate() {
+            if i != 2 {
+                assert_eq!(v, if (6..9).contains(&i) { 1.0 } else { 0.0 }, "{i}");
+            }
+        }
+    }
 
     #[test]
     fn closed_form_pinv() {

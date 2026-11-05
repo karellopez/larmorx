@@ -581,3 +581,51 @@ pub fn centre_of_mass_counted(v: &Volume, finite_only: bool) -> ([f64; 3], bool)
         zero,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// §6.2's `leastsq` sums: without smoothing `δ·δ` and the count; with smoothing `(w·δ)·δ`
+    /// and `w`; each row's sums added to the slice's at the row's end, in single precision.
+    #[test]
+    fn leastsq_sums_by_rows() {
+        let mut plain = SquaresSlice {
+            smoothed: false,
+            row: (0.0, 0.0),
+            slice: (0.0, 0.0),
+            points: 0,
+        };
+        let mut weighted = SquaresSlice {
+            smoothed: true,
+            row: (0.0, 0.0),
+            slice: (0.0, 0.0),
+            points: 0,
+        };
+        let rows: [&[(f32, f32, f32)]; 2] = [
+            &[(1e8, 0.5, 0.25), (3.0, 1.0, 0.5)],
+            &[(2.0, 0.1, 1.0), (1e-3, 0.0, 0.75)],
+        ];
+        let (mut want_p, mut want_w) = (0.0f32, (0.0f32, 0.0f32));
+        for row in rows {
+            let (mut rp, mut rw) = (0.0f32, (0.0f32, 0.0f32));
+            for &(g, v, w) in row {
+                plain.point(g, v, w);
+                weighted.point(g, v, w);
+                let d = g - v;
+                rp += d * d;
+                rw.0 += (w * d) * d;
+                rw.1 += w;
+            }
+            plain.end_row();
+            weighted.end_row();
+            want_p += rp;
+            want_w.0 += rw.0;
+            want_w.1 += rw.1;
+        }
+        assert_eq!(plain.slice.0.to_bits(), want_p.to_bits());
+        assert_eq!(plain.points, 4);
+        assert_eq!(weighted.slice.0.to_bits(), want_w.0.to_bits());
+        assert_eq!(weighted.slice.1.to_bits(), want_w.1.to_bits());
+    }
+}

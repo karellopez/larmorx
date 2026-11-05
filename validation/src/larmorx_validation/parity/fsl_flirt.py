@@ -1401,6 +1401,73 @@ def _original_cases() -> list[tuple[str, str, rep.Run]]:
             ),
         ),
         (
+            "debug/bbr-no-boundary",
+            "-debug -cost bbr with an all-zero white-matter segmentation (the clean-room catch-up, "
+            "relay 4): the set-up's lines and error at every evaluation, NaN costs that move "
+            "nothing, the zero debug volume, -omat and -out written",
+            r(
+                "flirt",
+                (
+                    "-in",
+                    *base,
+                    "-cost",
+                    "bbr",
+                    "-wmseg",
+                    "@zero:wm.nii:zerowm.nii",
+                    "-debug",
+                    "-out",
+                    "out",
+                    *sch,
+                ),
+                files=_sched(
+                    "setscale 4",
+                    "clear U",
+                    "clear UU",
+                    "setrow UU 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1",
+                    "optimise 6 UU:1  0.0 0.0 0.0 0.0 0.0 0.0 0.0  rel 2",
+                    "sort U",
+                ),
+            ),
+        ),
+        (
+            "debug/noresample",
+            "-debug -noresample (the clean-room catch-up, relay 4): the levels are the reference "
+            "itself, its forms as read; no global_refweight1 without weights",
+            r(
+                "flirt",
+                ("-in", *base, "-noresample", "-debug", *sch),
+                files=_sched(
+                    "setscale 8",
+                    "clear U",
+                    "setrow U 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1",
+                ),
+            ),
+        ),
+        (
+            "schedule/perturb-scaled",
+            "measurecost and gridmeasurecost of a scaled and skewed row at 6, 7 and 12 dof (the "
+            "clean-room catch-up, relay 4): a perturbed row is composed again with all twelve "
+            "parameters, whatever the command's dof",
+            r(
+                "flirt",
+                ("-in", *base, *sch),
+                files=_sched(
+                    "setscale 4 force",
+                    "clear U",
+                    "clear UU",
+                    "setrow UU 1.2 0 0 0  0.1 1 0 0  0 0 0.9 0  0 0 0 1",
+                    "measurecost 6 UU:1  0.0 0.0 0.0 0.0 0.0 0.0 0.0  rel 8",
+                    "measurecost 6 UU:1  1.0 0.0 0.0 0.0 0.0 0.0 0.0  rel 8",
+                    "measurecost 7 UU:1  0.0 0.0 0.0 0.0 0.0 0.0 1.0  rel 8",
+                    "measurecost 12 UU:1  0.0 0.0 0.0 0.0 0.0 0.0 0.0  rel 8",
+                    "print U",
+                    "clear U",
+                    "optimise 7 UU:1  0.0 0.0 0.0 0.0 0.0 0.0 0.0  rel 1",
+                    "print U",
+                ),
+            ),
+        ),
+        (
             "debug/bbr-setoption",
             "-debug -wmseg: the boundary-based cost set up by setoption and by a new pair",
             r(

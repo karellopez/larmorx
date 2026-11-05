@@ -1,0 +1,310 @@
+{
+ "defect": null,
+ "description": "-debug without weights: global_refweight1's pixdim[0] (qfac) and pixdim[4..7] 1 (specs/flirt.md \u00a79.4, observed; trial 2026-11-02 #1223; the clean-room catch-up, relay 4)",
+ "expect": "pass",
+ "found": {
+  "detail": "global_refweight1.hdr: the same header, values within 1e-6 of the image's range: the headers differ: pixdim; refvol.hdr: the same header, values within 1e-6 of the image's range: the headers differ: quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; refvol_2.hdr: the same header, values within 1e-6 of the image's range: the headers differ: quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; refvol_4.hdr: the same header, values within 1e-6 of the image's range: the headers differ: quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z; refvol_8.hdr: the same header, values within 1e-6 of the image's range: the headers differ: quatern_b, quatern_c, quatern_d, srow_x, srow_y, srow_z",
+  "n": 1223,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "global_refweightN.hdr: the same header, values within Ne-N of the image's range",
+   "refvol.hdr: the same header, values within Ne-N of the image's range",
+   "refvol_N.hdr: the same header, values within Ne-N of the image's range"
+  ]
+ },
+ "id": "debug-empty-weight-qfac",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": true,
+   "-coarsesearch": false,
+   "-cost": true,
+   "-datatype": false,
+   "-debug": true,
+   "-dof": false,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": true,
+   "-interp": true,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "-verbose": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "axis0": 1.05,
+   "axis1": 0.8,
+   "axis2": 1.1,
+   "bbr": false,
+   "bias0": -0.005,
+   "bias1": 0.01,
+   "bias2": 0.0025,
+   "bias3": 0.01,
+   "bins": "64",
+   "centre0": -5.5,
+   "centre1": 1.5,
+   "centre2": 5.0,
+   "content": "head",
+   "cost": "leastsq",
+   "dtype": "float64",
+   "extreme": false,
+   "interp": "spline",
+   "kind": "register",
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": -31.25,
+   "origin1": -2.5,
+   "origin2": -55.25,
+   "q0": 29,
+   "q1": -3,
+   "q2": -1,
+   "q3": 2,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1.05",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "20x13x14",
+   "shift0": "-2",
+   "shift1": "3.25",
+   "shift2": "0",
+   "size": 20.0,
+   "spacing0": 2.0,
+   "spacing1": 1.5,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-cost",
+     "leastsq"
+    ],
+    "name": "-cost",
+    "optional": true
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": true
+   },
+   {
+    "args": [
+     "-bins",
+     "64"
+    ],
+    "name": "-bins",
+    "optional": true
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   },
+   {
+    "args": [
+     "-interp",
+     "spline"
+    ],
+    "name": "-interp",
+    "optional": true
+   },
+   {
+    "args": [
+     "-debug"
+    ],
+    "name": "-debug",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.95,
+      0.85,
+      1.2
+     ],
+     "bias": [
+      0.01,
+      0.01,
+      -0.0075,
+      0.005
+     ],
+     "centre": [
+      -3.5,
+      -4.5,
+      -7.5
+     ],
+     "noise": 6.0,
+     "seed": 682592339,
+     "size": 17.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -31.25,
+      -2.5,
+      -55.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      1.5,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     13,
+     14
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "1.037719298 -0.1286549708 -0.08187134503 -2\n0.1498245614 0.9695906433 0.1988304094 3.25\n0.05649122807 -0.2081871345 0.9766081871 0\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      0.95,
+      0.85,
+      1.2
+     ],
+     "bias": [
+      0.01,
+      0.01,
+      -0.0075,
+      0.005
+     ],
+     "centre": [
+      -3.5,
+      -4.0,
+      -4.5
+     ],
+     "noise": 6.0,
+     "seed": 1505474726,
+     "size": 17.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      13.25,
+      -23.25,
+      38.0
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      22,
+      1,
+      3,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      1.5,
+      1.5,
+      1.5
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     27,
+     22,
+     16
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1223,
+  "options": [
+   "-bins",
+   "-cost leastsq",
+   "-debug",
+   "-init",
+   "-interp",
+   "-out",
+   "FSLOUTPUTTYPE=NIFTI_PAIR",
+   "flirt"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

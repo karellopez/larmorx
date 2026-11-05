@@ -349,6 +349,8 @@ struct State<'a> {
     levels: [Volume; 4],
     /// The reference's voxel sizes as FLIRT holds them (scaled by the base scale, §3).
     ref_held: [f32; 3],
+    /// The first pair is being made (its boundary-based cost set up after the verbose centres).
+    first_pair: bool,
     level_weights: [Option<Volume>; 4],
     one_replaced: bool,
     bbr: Arc<BbrSource>,
@@ -711,8 +713,8 @@ fn debug_files(
         h.pixdim[1] = m;
         h.pixdim[2] = m;
         h.pixdim[3] = m;
-        // pixdim[4..7] 1, not 0 (§9.4, observed)
-        for k in 4..8 {
+        // pixdim[4..7] 1, not 0 (§9.4, observed), and qfac 1 (observed, 2026-11-05)
+        for k in [0, 4, 5, 6, 7] {
             h.pixdim[k] = 1.0;
         }
         h.srow_x = [1.0, 0.0, 0.0, 0.0];
@@ -1279,6 +1281,7 @@ fn register(
         debug_bbr: false,
         debug_volume: None,
         ref_held: ref0.voxel_size,
+        first_pair: false,
         reference: ref0,
         input0: in0,
         ref_weight,
@@ -1332,8 +1335,12 @@ fn register(
     } else {
         text.lines().collect()
     };
-    // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale
+    // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale;
+    // its boundary-based cost set up after the verbose centres' lines (observed, 2026-11-05:
+    // their COG warnings come before the set-up's lines and its error)
+    st.first_pair = true;
     set_scale(&mut st, 8.0, true, false, err)?;
+    st.first_pair = false;
     st.flush(err);
     if trace.at(3) {
         // each centre measured for its line, its total's warning on standard error (observed:
@@ -1345,6 +1352,10 @@ fn register(
             }
             trace.line(&format!("CoG for {name} is:  {}", trace.nums(c)));
         }
+    }
+    if st.cost == Cost::Bbr {
+        bbr_setup(&mut st);
+        st.flush(err);
     }
     let testvol = if o.no_resample {
         st.input0.clone()
@@ -2172,7 +2183,7 @@ fn set_scale(
         }
         st.pair = Some(Arc::new(pair));
         st.bbr_set = false;
-        if st.cost == Cost::Bbr {
+        if st.cost == Cost::Bbr && !st.first_pair {
             bbr_setup(st);
         }
     } else if let Some(p) = st.pair.take() {

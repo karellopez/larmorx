@@ -1546,7 +1546,7 @@ CATCHUP_TRIAGE = "validation/investigations/cleanroom-bet/trial_catchup_triage.j
 CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     "fixed: FLIRT's search, starting points of equal cost (std::sort)": (
         "Fixed after the trial (relay 10), with permanent cases: standard_space_roi's FLIRT (and "
-        "bet -B's, inside its standard_space_roi) ended 7 to 300 mm (RMS) from FSL's matrix on "
+        "bet -B's, inside its standard_space_roi) ended 37 to 303 mm (RMS) from FSL's matrix on "
         "small heads whose costs tie at the coarse scales (every cost 1, FSL's own measure of "
         "both matrices): FLIRT's search kept its starting points of equal cost in the order "
         "found, where FSL sorts them with libstdc++'s std::sort (trial_ssroi_matrices.py); each "

@@ -453,9 +453,14 @@ thresholds (the 75-year-old's and the 7.5-year-old's Dice 0.993 to 0.9995, as be
 `-F` and `-Z` of int8 heads (FSL-217) FSL's in `reproduce`. Messages and statuses FSL's byte for
 byte in every case (bash's process IDs masked).
 
-**Built for speed.** The programs are the original's (FLIRT about twice FSL's speed on one thread
-and parallel inside, bet2 and betsurf likewise); the temporary images are written uncompressed
-when they are not kept; the eye threshold in exact decimal arithmetic. The steps run one after the
+**Built for speed.** The programs are the original's (parallel inside); the temporary images are
+written uncompressed when they are not kept; the eye threshold in exact decimal arithmetic. Wall
+times on the main machine (`bench_options.py`, one run at a time; FSL's from the oracle cache's
+record of its single-threaded run, made beside other suite cases): `-S -m` on the adult T1w of
+ds000005 FSL 27.6 s, the replica 20.8 s (one thread), the original 15.6 s on one thread, 5.7 s on
+4, 3.4 s on 28; `-B -m` 85.8, 57.5, 29.2, 10.3 and 6.2 s; `-A` 19.0, 18.6, 13.5, 4.9 and 3.0 s;
+`-A2 -m` on the 7.5-year-old's T1w and T2w 108.3, 91.6, 79.1, 23.4 and 11.0 s (the original 1.4 to
+2.9 times FSL's speed on one thread, 6 to 14 times on 28). The steps run one after the
 other, as the script runs them: two at once (§10 allows `-S`'s raw bet2 beside its
 `standard_space_roi`, `-A`'s FLIRT beside bet2) would hold both programs' images, and larmorx's
 peak memory is held to FSL's, whose peak is its largest program's (CLAUDE.md). Memory

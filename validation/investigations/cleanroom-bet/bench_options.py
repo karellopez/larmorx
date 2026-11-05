@@ -17,7 +17,9 @@ from larmorx_validation.oracle_cache import core
 from larmorx_validation.parity import fsl_bet as b
 
 LX, NC, OUT = sys.argv[1], sys.argv[2], Path(sys.argv[3])
-THREADS = [int(t) for t in sys.argv[4:]] or [1, 28]
+#: ``--fsl-only``: FSL's times alone (served from the cache: no program runs)
+FSL_ONLY = "--fsl-only" in sys.argv[4:]
+THREADS = [int(t) for t in sys.argv[4:] if t != "--fsl-only"] or [1, 28]
 OUT.mkdir(parents=True, exist_ok=True)
 T1 = str(b.input_path("real:adult-ds000005"))
 C1, C2 = str(b.input_path("real:child-7y")), str(b.input_path("real:t2:child-7y"))
@@ -39,10 +41,17 @@ def timed(cmd: list[str], env: dict[str, str]) -> tuple[int, float]:
 env = {**os.environ, **b.environment()}
 for name, args in CALLS:
     d = Path(tempfile.mkdtemp(prefix="fsl_", dir=OUT))
-    before = core._case.tally.saved_seconds
+    # the cache's tally counts a served run's recorded time inside a case
+    core.begin_case(f"bench/{name}")
+    t0 = time.perf_counter()
     r = b.oracle_run("bet", args, env, d)
-    fsl = core._case.tally.saved_seconds - before
-    row = [f"bet {name}", f"FSL {fsl:.1f} s (exit {r.code})"]
+    ran = time.perf_counter() - t0
+    tally = core.end_case()
+    fsl = tally.saved_seconds if tally.served else ran
+    row = [f"bet {name}", f"FSL {fsl:.1f} s (exit {r.code}{', cached' if tally.served else ''})"]
+    if FSL_ONLY:
+        print(" | ".join(row), flush=True)
+        continue
     code, s = timed([NC, "fsl", "bet", *args], {**env, "OMP_NUM_THREADS": "1"})
     row.append(f"replica 1 thread {s:.1f} s ({code})")
     for n in THREADS:

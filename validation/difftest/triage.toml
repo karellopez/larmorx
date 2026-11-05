@@ -3617,8 +3617,8 @@ link = "docs/findings/fsl-fast-original.md"
 tool = "fsl-fast-original"
 implementation = "original"
 signature = ["Standard error (the original's own lines left out)"]
-status = "open"
-explanation = "Trial 2026-11-05-catchup-fast: two channels with FSLOUTPUTTYPE=ANALYZE (cleanroom-fast-14174, -t 2 -I 2 -o t1_brain -S 2): FSL's standard error starts with terminate called after throwing an instance of 'std::runtime_error' where the original prints the image layer's ERROR:: Unrecognised value (ANALYZE) line: the multi-channel path's failure, not yet looked at"
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-fast: two channels with FSLOUTPUTTYPE=ANALYZE (cleanroom-fast-14174, -t 2 -I 2 -o t1_brain -S 2): FSL aborts first on a singular class covariance (terminate called after throwing an instance of 'std::runtime_error', what(): inv(): matrix is singular, exit -6), where the original's arithmetic leaves the matrix invertible and it goes on to the output, refused with the image layer's ERROR:: Unrecognised value (ANALYZE) line (exit 1): the singular-covariance class above, which the matrix arithmetic's last bits decide (probe.py --finding --diff)"
 link = "docs/findings/fsl-fast-original.md"
 
 [[difference]]
@@ -3691,7 +3691,7 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["given FSL's matrix (-applyxfm -init): out.nii.gz: header"]
 status = "open"
-explanation = "Trial 2026-11-05-catchup-bet: 19 standard_space_roi -ssref cases whose output header differs from FSL's even when the original is given FSL's matrix (reproducers bet-options-6-00151, 00657; FLIRT's -out zeros of relay 8 do not change them), and 14 whose FLIRT matrix parts (out_tmp_to_std.mat, 00009): not yet looked at"
+explanation = "Trial 2026-11-05-catchup-bet: 19 standard_space_roi -ssref cases whose output header differs from FSL's even when the original is given FSL's matrix. Three kinds, from four materialised (finding_dirs.py): an input converted to another format by -maskNONE -roiNONE's copy (fslpy's imcp through nibabel: FSL's header has pixdim[4..7] 1 where the input's are 0; bet-options-6-00657; the spec's pending conversion, specs/standard_space_roi.md §2.5); the cut's translation one float unit in the last place (00407: qoffset_z 8.25 against 8.250000954, as fslroi's corner below); and a box one or more voxels apart on tiny images (00114: 2 x 1 x 2 against 1 x 1 x 2; 00165: 7 x 6 x 16 against 5 x 6 x 19). Also 14 FLIRT matrices that part inside standard_space_roi (out_tmp_to_std.mat, 00009). Open, for BET's next clean-room relay"
 link = "docs/findings/fsl-bet-original.md"
 
 [[difference]]

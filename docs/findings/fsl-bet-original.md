@@ -579,7 +579,10 @@ original's: 53 betsurf surfaces (`-A`, `-A2`, betsurf: the scalp's deformation o
 relay 7's open class); about 27 standard_space_roi runs whose FLIRT crashes in FSL
 (`Segmentation fault`, `free(): invalid pointer`: FSL-75, never reproduced; FSL-214: the script
 goes on) where the original registers; 19 standard_space_roi headers that differ from FSL's even
-given FSL's matrix and 14 FLIRT matrices that part (`bet-options-6-00151`, `00009`: open); 6
+given FSL's matrix (of four materialised: an input converted to another format by `-maskNONE
+-roiNONE`'s copy, FSL's `pixdim[4..7]` 1 where the input's are 0, §2.5's pending conversion,
+`bet-options-6-00657`; the cut's translation one float unit in the last place, `00407`; a box a voxel
+or more apart on tiny images, `00114`, `00165`) and 14 FLIRT matrices that part (`00009`): open; 6
 fslroi boxes of a neurologically stored oblique image reaching its last x voxel, whose corner
 translation is one float unit in the last place from FSL's (`00796`: FSL's equals the double
 product `M·(20, 4, 4)` rounded once, where §3.2's held frame rounds its translation first: a

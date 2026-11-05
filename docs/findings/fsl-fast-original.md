@@ -355,6 +355,7 @@ the correctly rounded functions' last bits; the 40th (`cleanroom-fast-02117`, tw
 singular in exact arithmetic, where the matrix arithmetic's last bits decide which program aborts
 (`12578`: FSL; `13533`, `05605`: the original). 6 of several channels part from FSL in
 `reproduce` (`02215` and `02311` explained before; open: `15057`, `16101`, `18394`, `19057`), and one
-two-channel run with `FSLOUTPUTTYPE=ANALYZE` prints the image layer's message where FSL's
-uncaught `std::runtime_error` prints `terminate called after throwing ...` (`14174`, open).
+two-channel run with `FSLOUTPUTTYPE=ANALYZE` (`14174`) is the singular class again: FSL aborts on
+`inv(): matrix is singular` before its output, where the original's matrix stays invertible and
+its output type is refused (`probe.py --finding --diff`).
 

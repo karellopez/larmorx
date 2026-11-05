@@ -1253,8 +1253,8 @@ def _replica_source(ctx: core.Context) -> list:
 #: (``validation/investigations/cleanroom-fixes/trial_catchup_hmc_categories.py``'s output).
 TRIAL_CATCHUP = "2026-11-05-catchup-hmc"
 CATCHUP_TRIAGE = "validation/investigations/cleanroom-fixes/trial_catchup_hmc_triage.json"
-#: category -> (what the page says, the verdict of the row).
-CATCHUP_TEXT: dict[str, tuple[str, str]] = {
+#: category -> (what the page says, the verdict of the row; None: the harness's, fixed).
+CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     "a registration ends elsewhere": (
         "The registrations of small phantoms with large motions end elsewhere than mcflirt's, as "
         "well aligned: 400 sampled findings measured (hmc_alignment.py: the corrected series' "
@@ -1272,7 +1272,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str]] = {
         "keeps a run's files and not its empty directories (the trial's first run, mcflirt live, "
         "had none of them): the harness's, fixed in the descriptor (such mcflirt runs go live, "
         "validation/tests/test_mri_hmc_descriptor.py); four replayed: the files agree",
-        "both-reject",
+        None,
     ),
 }
 
@@ -1340,9 +1340,16 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
     trows = []
     for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
         text, verdict = CATCHUP_TEXT[cat]
-        trows.append({"head": text, "verdict": verdict,
-                      "cells": [common.cell(int(n), "count"), {"verdict": verdict},
-                                common.cell(tri["reproducers"][cat])]})  # fmt: skip
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "the harness's, fixed: the files agree on replay"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
+                                       common.cell(tri["reproducers"][cat])]}  # fmt: skip
+        if verdict:
+            row["verdict"] = verdict
+        trows.append(row)
     triage = common.table(
         "trial-catchup-triage",
         "The trial's differing cases, each in one category",

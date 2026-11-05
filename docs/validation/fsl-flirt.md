@@ -1,12 +1,12 @@
 # Parity: FLIRT (clean-room original)
 
-**5 case(s) fail.** 337 cases on the `standard` tier: 233 pass, 89 rejected by both, 10 expected divergences, 5 failures.
+**2 case(s) fail.** 339 cases on the `standard` tier: 238 pass, 89 rejected by both, 10 expected divergences, 2 failures.
 
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
-- **Original programs:** 336 runs: 321 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 333 runs: 318 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -26,12 +26,12 @@
 | bbr | 11 | 11 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
 | debug | 4 | 4 | 0 | 0 | 0 |
-| difftest | 14 | 13 | 1 | 0 | 0 |
-| edge | 35 | 9 | 19 | 6 | 1 |
+| difftest | 16 | 15 | 1 | 0 | 0 |
+| edge | 35 | 10 | 19 | 6 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
 | out | 1 | 1 | 0 | 0 | 0 |
 | programs | 140 | 83 | 53 | 4 | 0 |
-| real | 62 | 58 | 0 | 0 | 4 |
+| real | 62 | 60 | 0 | 0 | 2 |
 | schedule | 30 | 23 | 7 | 0 | 0 |
 | verbose | 21 | 21 | 0 | 0 | 0 |
 
@@ -48,24 +48,6 @@ weights with -cost normcorr
 weights with -cost woods
 
 - **stderr: the same lines (numbers aside)** (identical = no, threshold the same text, numbers read as numbers): line 4004: FSL '<end>', original 'WARNING: Woods is not implemented with cost function weighting'
-
-### `real/weights-empty-refweight`
-
-an empty -refweight (every voxel 0): refused by default (FSL-91)
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 330.6537, threshold 0.5): maximum 371.6170 mm, RMS deviation 83.9047 mm; FSL's own p95 on a perturbed input 0.0001 mm
-
-### `real/weights-empty-inweight`
-
-an empty -inweight (every voxel 0): refused by default (FSL-91)
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 133.6991, threshold 0.5): maximum 172.9050 mm, RMS deviation 113.3139 mm; FSL's own p95 on a perturbed input 0.0000 mm
-
-### `edge/one-voxel-input`
-
-a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its search; refused by default (FSL-92)
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 131.933, threshold 0.5): maximum 159.0868 mm, RMS deviation 303.8605 mm; FSL's own p95 on a perturbed input 0.0000 mm
 
 ## Expected divergences
 
@@ -180,7 +162,7 @@ a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact o
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5a44c8f498f9) |
+| larmorx | 0.0.1 (a835ddd3a69f) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -230,8 +212,8 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/weights-normmi` | pass | 5/5 | weights with -cost normmi |
 | `real/weights-mutualinfo` | pass | 5/5 | weights with -cost mutualinfo |
 | `real/weights-woods` | fail | 4/5 | weights with -cost woods |
-| `real/weights-empty-refweight` | fail | 5/6 | an empty -refweight (every voxel 0): refused by default (FSL-91) |
-| `real/weights-empty-inweight` | fail | 5/6 | an empty -inweight (every voxel 0): refused by default (FSL-91) |
+| `real/weights-empty-refweight` | pass | 5/5 | an empty -refweight (every voxel 0): refused by default (FSL-91) |
+| `real/weights-empty-inweight` | pass | 5/5 | an empty -inweight (every voxel 0): refused by default (FSL-91) |
 | `real/applyxfm-nan-border` | pass | 6/6 | -applyxfm of a BOLD reference with NaN voxels in its border and an infinite one: the padding's background value (FSL-22… |
 | `real/labeldiff-dseg` | pass | 7/7 | -cost labeldiff on a label image |
 | `real/known-motion` | pass | 5/5 | a known rigid motion of the T1w (-dof 6) |
@@ -356,7 +338,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `edge/read-not-numbers` | expected-divergence | 2/2 | a schedule's read of a file holding a word that is not a number: FLIRT reads for ever, its memory growing (FSL-72) |
 | `edge/background-overflow` | expected-divergence | 2/2 | a 2 x 1 x 1 input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a 3-voxel-wide level, writing … |
 | `edge/background-empty` | expected-divergence | 2/2 | -applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75) |
-| `edge/one-voxel-input` | fail | 5/6 | a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its search; refused by default (FSL-9… |
+| `edge/one-voxel-input` | pass | 5/5 | a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its search; refused by default (FSL-9… |
 | `edge/zero-voxel-size` | expected-divergence | 2/2 | a header voxel size of 0 along z: FLIRT's base scale 0, every voxel size infinite, it never finishes; counted as 1 by d… |
 | `edge/basescale-0` | expected-divergence | 2/2 | -basescale 0: every voxel size infinite, FLIRT never finishes (FSL-93) |
 | `convert_xfm/missing-concat` | both-error | 4/4 | -concat with a file that does not exist |
@@ -526,11 +508,13 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `difftest/debug-bbr-first-pair` | pass | 13/13 | -debug -cost bbr at -verbose 3: the first pair's set-up lines after the verbose centres' COG warning (observed; trial 2… |
 | `difftest/debug-bbr-no-boundary` | pass | 13/13 | -debug with the boundary-based cost and no boundary point (an all-zero white-matter segmentation) and infinite input vo… |
 | `difftest/debug-empty-weight-qfac` | pass | 12/12 | -debug without weights: global_refweight1's pixdim[0] (qfac) and pixdim[4..7] 1 (specs/flirt.md §9.4, observed; trial 2… |
-| `difftest/debug-neurological-levels` | pass | 13/13 | -debug's pyramid levels of a neurological 0.8 x 0.8 x 3 mm reference: only set forms composed, every form swapped back … |
-| `difftest/debug-noresample` | pass | 11/11 | -debug with -noresample: the levels are the reference itself (its forms as read, its voxel sizes as held), no global_re… |
+| `difftest/debug-neurological-levels` | pass | 12/12 | -debug's pyramid levels of a neurological 0.8 x 0.8 x 3 mm reference: only set forms composed, every form swapped back … |
+| `difftest/debug-noresample` | pass | 10/10 | -debug with -noresample: the levels are the reference itself (its forms as read, its voxel sizes as held), no global_re… |
 | `difftest/nan-matrices-char-dof7` | pass | 5/5 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
 | `difftest/nan-matrices-forcescaling` | both-error | 4/4 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
 | `difftest/nan-matrices-subset` | pass | 6/6 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
 | `difftest/nan-matrix-padded` | pass | 6/6 | reproduce with NaN input voxels: a NaN matrix's every pre-image is outside, so the -out image is the background value e… |
 | `difftest/out-completed-sform-negative-zero` | pass | 6/6 | -out with a qform-only reference of qfac -1: the sform completed from the qform keeps its negative zeros, as FSL writes… |
+| `difftest/pairreg-search-equal-costs-sorted` | pass | 5/5 | pairreg on a small random pair (shrunk from 20261103-00125): its FLIRT search's starting points of equal cost sorted as… |
 | `difftest/search-cost-minima-fallback` | pass | 6/6 | -verbose 7 with a one-point search grid: no local minimum, the overall minimum listed only on FSL's Cost minima line (n… |
+| `difftest/search-equal-costs-sorted` | pass | 5/5 | flirt on a small random pair whose search costs tie (shrunk from the catch-up trial's finding 20261103-00035): the sear… |

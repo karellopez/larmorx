@@ -745,3 +745,83 @@ with standard output and error merged through `sh`, to place a warning between v
   in a registration is warned about twice (`An input intended to be a single 3D volume has multiple
   timepoints ...`), the second time after the sform warning (FSL reads both images twice), the
   reference included (`verbose/2-basescale-tr`).
+
+## The clean-room catch-up: numerics, `-debug` and NaN centres (relay 4, 2026-11-05)
+
+Items 9 to 13 of `docs/next-steps.md`'s list for the original (`specs/flirt.md` §14's answers of
+2026-11-03), and what black-box runs of FSL 6.0.7.23 showed on the way. Every FSL run went through
+the oracle-output cache (`use`); the probes are the catch-up's (`catchup_finding.py`,
+`catchup_probe.py`, `catchup_replay.py`) and `catchup_schedule.py` (FLIRT on a finding's inputs
+with a schedule of the probe's own, its lines written from FSL's `-v` echo, `print` lines added to
+see a list), all in `validation/investigations/cleanroom-flirt/`.
+
+- **`leastsq`** (§6.2, item 12): three levels of single-precision sums (row, slice, total) of
+  `δ·δ` and the count without smoothing or weights, of `(w·δ)·δ` and `w` otherwise; the quotient
+  single when the weight (count) is above 1, else `(max − min)²`. `real/cost-leastsq` passes (it
+  failed at 82 mm with double sums).
+- **applyxfm4D's spline** (§15.7, item 11) is FLIRT's own (§9.3) instead of mcflirt's: a float
+  image's passes stored in single precision, a double image's values read and filtered in double
+  (each value still rounded to single). The five trial findings the spec writer modelled (#368,
+  #4718, #3494, #6140 float, #6013 double) differed in 47, 4,430, 177, 342 and 181 voxels, 5,177
+  in all: 0 now (permanent cases `applyxfm4d-spline-float`, `-double`).
+- **`-debug`'s volumes** (§9.4, item 9): each level's header from the reference by the
+  resampling's steps, `level/d` per axis in single precision (`d` the voxel sizes as FLIRT holds
+  them, scaled by the base scale), composing only a set form, every form of a neurological
+  reference (an unset one too) swapped back with the level's grid, the elements in single
+  precision and the quaternion computed from them, as `-applyisoxfm`'s header (one function now
+  serves both); `global_refweight1` without weights has `pixdim[0]` (qfac) and `pixdim[4..7]` 1.
+  Observed beyond the spec: with `-noresample` the levels are the reference itself (its forms as
+  read, the held voxel sizes as `pixdim`) and, without weights, no `global_refweight1` is written;
+  `testvol`'s `pixdim` are the input's held voxel sizes (scaled by the base scale; trial #175).
+  With the boundary-based cost and no boundary point, `-debug`'s five lines surround the set-up
+  and its error (`Result (post) of is_bbr_set is 0`), the boundary counts as not set, so the
+  set-up, its lines and its error come again before every evaluation (then the NaN warning); the
+  final call writes `debug` (zeros), and FSL goes on to `-omat` (the `-init` matrix) and `-out`.
+  One evaluation's lines are pushed together (the grids' evaluations run in parallel). The first
+  pair's set-up comes after `-verbose 3`'s centres (their COG warnings first; trial #1308).
+  The 161 `-debug` findings of the 2026-11-02 trial: 52 agreed before, 123 now.
+- **A perturbation is composed with all twelve parameters** (observed, `schedule/perturb-scaled`):
+  `measurecost 6` of a scaled and skewed row keeps its scales and skew, `measurecost 7` with a
+  scale perturbation changes only the first scale (`1.2 → 1.3`, the others kept): the row is
+  decomposed, perturbed and composed again whatever the command's dof (the original composed the
+  command's dof, at least 6, before: a row's non-rigid parameters were lost). An optimisation's
+  `Starting with :` matrix is its start's first `dof` parameters composed (a scaled start at 6
+  dof shows the rigid matrix, at 7 its first scale), its `Starting with` line the start's twelve.
+- **The search's `P`** keeps each start as composed once (§8.1 step 9: "the starting matrix kept
+  in `P` is the composed start itself"), its cost that matrix's; the free optimisation starts from
+  its decomposition. Under gimbal lock the two differ (FSL's 84.266223 against the original's
+  84.266231 before, on `real/weights-normcorr`, whose `-verbose 7` trace now follows FSL's to line
+  7,556 instead of 7,467).
+- **NaN centres** (FSL-14 reproduced: NaN or infinite input voxels), item 13: FSL prints an
+  optimisation's NaN starting parameters, then evaluates from the identity's (rotations,
+  translations and skews 0, scales 1: `1 : -nan :: 0.000000 ...`), so a 6-dof optimisation
+  composes the identity exactly and a 12-dof one (its skew and scale about the NaN centre) all
+  NaN; the original now does the same. The coarse and threshold grids' `Starting with :` shows the
+  identity's parameters composed about the centre (the identity, all NaN about a NaN centre); a NaN
+  fine-grid scale is not outside `[0.5, 2]`, so it is kept; a NaN pre-image (a NaN matrix) is
+  outside the input: the output voxel is the background value (FSL's whole image one value,
+  the original's NaN before). Of the 57 findings of the two 2026-11-02 trials that stopped at
+  `inv(): matrix is singular` (37 agreed after relay 3), 52 agree now; left: #1760 (an
+  ill-posed path: FSL's own variability 22 mm), #3788 (a registration 211 mm away, not studied),
+  #7221 (the
+  `normmi` cost of a translation whose overlap reaches the NaN voxels, `-1.305830` against FSL's
+  `-1.000000` at evaluation 119,956 of 120,000, every earlier line FSL's), #4404 (its image's
+  correlation, not studied) and pairreg's #2381 (FSL's heap corruption, FSL-75). Finding #2424 (BBR, no
+  boundary, infinite voxels, `-debug`) is FSL's in every file and line but the cost object's
+  address (permanent case `debug-bbr-no-boundary`).
+- **The C library's functions in `reproduce`** (item 10): wired since the glibc maths part
+  (`sinf`, `cosf`, `atan2f`, `exp`, `cos`, `logf`); the spline's horizon now uses the correctly
+  rounded logarithm (`larmorx_core::math::log`; the platform's `ln` before; the same 15 terms).
+- **Still open** (for a spec writer; the record's failures): FSL-91's and FSL-92's `reproduce`
+  traces (`real/weights-empty-refweight`, `-inweight`, `edge/one-voxel-input`, every cost equal)
+  are FSL's through line 66,124 of 140,494 and part at a free optimisation's final line, the sign
+  of a zero third skew under gimbal lock (`r_y = −π/2`: FSL `-0.000000`, the original `0.000000`),
+  after which the next start's angle differs in its 6th digit (`-0.327782` against `-0.327783`);
+  the compositions and decompositions of 50 gimbal-lock angle triples through `setrowparams`
+  and `measurecost` print FSL's rows exactly (probes `gimbal.sch`, `gimbal2.sch`), so the sign
+  comes from a step the spec does not state. FSL's first evaluated vector also differs from its
+  printed start in a zero's sign (`Starting with 0 -0 -0 ...`, first evaluation `0 0 -0`; probe
+  `shown.sch`). `real/weights-normcorr` (0.5083 mm, FSL's own 0.1879) and `real/weights-woods`
+  (Woods' warning one line more) part at the 4 mm stage: evaluation 47 (`0.050021` against
+  `0.050056`, the costs equal to their 6 printed digits) and 356 (`0.948010` against `0.947916` at
+  the same printed parameters), the weighted costs' last bits.

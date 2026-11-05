@@ -282,6 +282,23 @@ where `-verbose 3` measures them, the levels' fourth size (the image's TR as rea
 images without one), the sampling and initial matrices in scaled millimetres with a base scale
 ([findings](../findings/fsl-flirt-original.md), "The clean-room catch-up").
 
+**The clean-room catch-up, numerics and `-debug` (2026-11-05).** Items 9 to 13 of the list:
+`leastsq` sums in three single-precision levels (`real/cost-leastsq` passes); applyxfm4D's spline
+is FLIRT's own (§9.3: a double image filtered in double; the 5,177 voxels of five trial findings
+that differed are FSL's); `-debug`'s levels take their headers from the resampling's steps (only
+set forms composed, a neurological reference's forms swapped back with each level's grid,
+`-noresample`'s levels the reference's own forms), `global_refweight1`'s qfac and `pixdim[4..7]`
+are 1, and with the boundary-based cost and no boundary point the set-up's lines and error come at
+every evaluation and FLIRT goes on to write `debug`, `-omat` and `-out` (123 of the trial's 161
+`-debug` findings agree, 52 before); a perturbed row is composed with all twelve parameters (its
+scales and skews kept whatever the command's dof); the search's `P` keeps each start composed
+once; with `reproduce` and NaN centres (FSL-14) an optimisation starts from the identity's
+parameters where its own are NaN, and a NaN pre-image is outside (the background value): 52 of
+the 57 trial findings with non-finite voxels agree (37 before). Open: FSL-91's and FSL-92's
+`reproduce` traces part at the sign of a zero skew under gimbal lock, and the weighted `normcorr`
+and `woods` registrations at their costs' last bits
+([findings](../findings/fsl-flirt-original.md), "numerics, `-debug` and NaN centres").
+
 ## Upstream defects (D13)
 
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
@@ -369,7 +386,7 @@ stage-4 cost's sinc table is the same with either `cos` (all 201 entries), so it
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported). Known difference (part 3's random testing): with NaN or
-infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
-(`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
-the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.
+ported). Known differences: with NaN or infinite input voxels in `reproduce` mode (FSL-14), the sign of
+NaN results can differ from FSL's (`nan` against `-nan`; the values are NaN in both); FSL-91's and
+FSL-92's `reproduce` runs (every cost equal) and the weighted `normcorr` and `woods`
+registrations of the record part from FSL's paths (the catch-up's findings, above).

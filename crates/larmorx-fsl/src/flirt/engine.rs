@@ -595,9 +595,7 @@ fn resampled_header(
         h.qoffset_z = nq[2][3];
         quaternion_final = true;
     }
-    for j in 0..3 {
-        h.pixdim[1 + j] = d1[j];
-    }
+    h.pixdim[1..4].copy_from_slice(&d1);
     (out, quaternion_final)
 }
 
@@ -618,9 +616,7 @@ fn level_header(
     let d1 = level.voxel_size.map(f64::from);
     if !resampled {
         let mut out = reference.clone();
-        for j in 0..3 {
-            out.header.pixdim[1 + j] = d1[j];
-        }
+        out.header.pixdim[1..4].copy_from_slice(&d1);
         out.vol.shape = level.shape;
         return (out, false);
     }

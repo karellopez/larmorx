@@ -26,3 +26,27 @@ def test_images_of_other_grids_still_differ() -> None:
     got = suite._field_measures("jac_01", np.ones(2), np.ones(2), mask)
     assert [m.name for m in got] == ["jac_01: the same grid"]
     assert suite._field_measures("f", np.ones((2, 2)), np.ones((2, 2)), None)[0].value == np.inf
+
+
+def test_a_nifti2_quaternion_a_float_rounding_above_one_is_read(tmp_path) -> None:
+    # FSL writes the float quaternion's doubles: b, c, d whose squares sum to a little more than
+    # 1 (topup-trial-04796); nibabel's NIfTI-2 (double) tolerance refuses them, its float one not
+    import nibabel as nib
+
+    hdr = nib.Nifti2Header()
+    hdr.set_data_shape((2, 2, 2))
+    hdr.set_data_dtype(np.float32)
+    hdr["qform_code"], hdr["sform_code"] = 1, 0
+    s = float(np.nextafter(np.float32(np.sqrt(0.5)), np.float32(1)))
+    hdr["quatern_b"], hdr["quatern_c"], hdr["quatern_d"] = 0.0, s, s
+    assert s * s * 2 > 1
+    path = tmp_path / "q.nii"
+    path.write_bytes(hdr.binaryblock + b"\0" * 4 + np.zeros(8, np.float32).tobytes())
+    try:
+        nib.load(str(path)).get_qform()
+        refused = False
+    except ValueError:
+        refused = True
+    assert refused, "nibabel's double tolerance no longer refuses it"
+    img = suite._load(path)
+    assert img.get_qform().shape == (4, 4)

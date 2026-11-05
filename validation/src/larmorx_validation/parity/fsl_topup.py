@@ -379,9 +379,26 @@ def _stem(name: str) -> str:
 
 
 def _load(p: Path):
+    """The image at ``p``. A NIfTI-2 quaternion whose double components exceed 1 by float rounding
+    (FSL and the original write the float quaternion's doubles: ``w2`` a few 1e-9 below 0) is
+    read with nibabel's float tolerance, as NIfTI-1's (random testing's topup-trial-04796: an
+    exception in the comparison, as FAST's and fslmaths' suites met before)."""
     import nibabel as nib
 
-    return nib.load(str(p))
+    try:
+        img = nib.load(str(p))
+    except ValueError as e:
+        if "w2 should be positive" not in str(e):
+            raise
+        old = nib.Nifti2Header.quaternion_threshold
+        nib.Nifti2Header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+        try:
+            img = nib.load(str(p))
+        finally:
+            nib.Nifti2Header.quaternion_threshold = old
+    if isinstance(img.header, nib.Nifti2Header):
+        img.header.quaternion_threshold = nib.Nifti1Header.quaternion_threshold
+    return img
 
 
 def _data(img) -> np.ndarray:

@@ -4711,7 +4711,17 @@ def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl standard_space_roi`` (``specs/standard_space_roi.md`` §2): one image
     registered to the other as its reference (``-ssref``, FLIRT's ``-dof 6``), the field of
     view's mask and cut with ``-d``'s files; ``-b`` refused when FSL's standard images are found
-    nowhere (``LARMORX_FSL_DATA`` an empty directory, the only place searched); the usage."""
+    nowhere (``LARMORX_FSL_DATA`` an empty directory, the only place searched); the usage (which
+    names ``$FSLDIR``'s standard image: ``FSLDIR`` and ``LARMORX_NC_BIN`` are unset for the case, as
+    in CI)."""
+    hidden = {k: os.environ.pop(k) for k in ("FSLDIR", "LARMORX_NC_BIN") if k in os.environ}
+    try:
+        return _standard_space_roi_case(ctx)
+    finally:
+        os.environ.update(hidden)
+
+
+def _standard_space_roi_case(ctx: Context) -> dict[str, Any]:
     a, a2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
     out = ctx.out("roi")
     _fsl(ctx, "standard_space_roi", a2, out, "-ssref", a, "-d", "-dof", "6")

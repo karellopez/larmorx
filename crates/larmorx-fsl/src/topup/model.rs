@@ -1185,12 +1185,12 @@ impl Level {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::images::{level_images, prepare};
     use super::*;
 
     /// Two smooth volumes (plain arithmetic) encoded along y and x, and a small random field.
-    fn level(fsl146: bool) -> (Level, Vec<f64>) {
+    pub(in super::super) fn level(fsl146: bool) -> (Level, Vec<f64>) {
         let dims = [12, 10, 4];
         let voxel = [2.0, 2.0, 3.0];
         let vol = |sx: f64, sy: f64| -> Vec<f32> {

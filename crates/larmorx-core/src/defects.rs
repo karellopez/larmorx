@@ -648,6 +648,8 @@ defects! {
         "fslroi and fslmerge (and bet -F and -Z, which run them) write an int8 image as uint8 with the same bytes: every negative value becomes another (128 to 255), and bet2 then runs on those values";
     FSL_241 = "FSL-241", "midtrans", true,
         "transforms whose values reach beyond double precision in its averages (a scale of 1e200, a translation of 1e300) make midtrans write rows of NaN, or report its failed singular value decomposition as a matrix-size error, and exit 0, instead of saying that the transforms cannot be averaged";
+    FSL_242 = "FSL-242", "topup", true,
+        "with --minmet=1 (scaled conjugate gradients), a level whose last iteration's step is rejected (its cost above the current point's) ends at that rejected point, not at the lowest cost the level found: the next level, or the outputs, start from a worse field (and movements) than the level had";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

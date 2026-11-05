@@ -555,6 +555,20 @@ fn run(
             Ok(est) => {
                 // GLIBC-07 is not named: an iterative fit cannot tell whether the smoothing's
                 // last bits moved its results (the user's decision of 2026-11-04)
+                if est.fsl242_met {
+                    ns.push(Notice::new(
+                        &defects::FSL_242,
+                        mode,
+                        match mode {
+                            UpstreamDefects::Fix => {
+                                "a level of scaled conjugate gradients whose last iteration was rejected ends at the lowest cost it found (FSL ends at the rejected step's worse point)"
+                            }
+                            UpstreamDefects::Reproduce => {
+                                "a level of scaled conjugate gradients whose last iteration was rejected ends at that rejected step's point, as FSL's"
+                            }
+                        },
+                    ));
+                }
                 write_outputs(given, settings, mode, &s, &est, &mut ns, &mut ebuf)
             }
             Err(topup::LevelError::Subsampling(l)) => {
@@ -898,6 +912,7 @@ fn settle(
         fsl145: mode == UpstreamDefects::Reproduce,
         fsl146: mode == UpstreamDefects::Reproduce,
         fsl201: mode == UpstreamDefects::Reproduce,
+        fsl242: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
         glibc: mode == UpstreamDefects::Reproduce,

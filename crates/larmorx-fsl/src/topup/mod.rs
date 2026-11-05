@@ -78,6 +78,9 @@ pub struct Params {
     /// FSL-201 reproduced: the movements through FSL's matrices, their derivatives FSL's forward
     /// differences.
     pub fsl201: bool,
+    /// FSL-242 reproduced: a level of scaled conjugate gradients whose last iteration is rejected
+    /// ends at that iteration's point (else at the current point).
+    pub fsl242: bool,
     /// Trilinear interpolation of the images (`--interp=linear`).
     pub linear: bool,
     /// The field's B-spline order (`--splineorder`: 3 or 2).
@@ -240,6 +243,9 @@ pub struct Estimate {
     pub glibc: bool,
     /// FSL-201 reproduced: the outputs' predictions moved through FSL's matrices.
     pub fsl201: bool,
+    /// Some level of scaled conjugate gradients ended on a rejected iteration (FSL-242: the two
+    /// modes' results differ).
+    pub fsl242_met: bool,
 }
 
 /// Runs the estimation (§4) on `volumes` (each `dims`, x fastest, radiological frame) with voxel
@@ -263,6 +269,7 @@ pub fn estimate(
     let mut field: Option<Field> = None;
     let mut prev: Option<LevelSpec> = None;
     let mut cached: Option<(usize, f64, LevelImages)> = None;
+    let mut fsl242_met = false;
     let mut mov = vec![[0.0; 6]; scans.len()];
     for (l, spec) in params.levels.iter().enumerate() {
         let s = spec.subsamp.max(1);
@@ -346,7 +353,15 @@ pub fn estimate(
                 minimise::levenberg_marquardt(&level, theta, spec.miter, &mut rep)
             }
             Minimiser::ScaledConjugateGradients => {
-                minimise::scaled_conjugate_gradients(&level, theta, spec.miter, &mut rep)
+                let end = minimise::scaled_conjugate_gradients(
+                    &level,
+                    theta,
+                    spec.miter,
+                    params.fsl242,
+                    &mut rep,
+                );
+                fsl242_met |= end.last_rejected;
+                end.x
             }
         };
         mov = level.movements(&theta);
@@ -376,6 +391,7 @@ pub fn estimate(
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
         glibc: params.glibc,
         fsl201: params.fsl201,
+        fsl242_met,
     })
 }
 

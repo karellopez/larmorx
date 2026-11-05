@@ -1,0 +1,224 @@
+{
+ "defect": null,
+ "description": "applyxfm4D of an int32 image of 2147483647: its padding (the background value) written exactly in the type, its interpolated voxels through single precision (FSL-09)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz bit-identical (nearestneighbour): 35214 of 37500 values differ (max 4.295e+09)",
+  "n": 3732,
+  "seed": "20261103",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz bit-identical (nearestneighbour)"
+  ]
+ },
+ "id": "applyxfm4d-int32-padding",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "applyxfm4D"
+  },
+  "features": {
+   "-3D": false,
+   "-interp": true,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.15,
+   "axis1": 1.05,
+   "axis2": 0.9,
+   "bias0": -0.0075,
+   "bias1": 0.005,
+   "bias2": 0.005,
+   "bias3": 0.01,
+   "centre0": 1.0,
+   "centre1": 0.0,
+   "centre2": 6.0,
+   "content": "noise",
+   "dtype": "int16",
+   "extreme": false,
+   "interp": "nearestneighbour",
+   "kind": "applyxfm4D",
+   "noise": 1.0,
+   "orientation": "axes+oblique",
+   "origin0": 39.75,
+   "origin1": -4.5,
+   "origin2": -20.5,
+   "q0": 22,
+   "q1": 2,
+   "q2": -2,
+   "q3": 1,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "scale0": "1.05",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "25x25x20",
+   "shift0": "-2",
+   "shift1": "3.25",
+   "shift2": "3.25",
+   "size": 18.0,
+   "spacing0": 2.0,
+   "spacing1": 0.5,
+   "spacing2": 1.5,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "tr": 3.0,
+   "tunits": "sec",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:in}",
+     "{in:ref}",
+     "out",
+     "{in:m}",
+     "-singlematrix"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-interp",
+     "nearestneighbour"
+    ],
+    "name": "-interp",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.15,
+      1.05,
+      0.9
+     ],
+     "bias": [
+      -0.0075,
+      0.005,
+      0.005,
+      0.01
+     ],
+     "centre": [
+      1.0,
+      0.0,
+      6.0
+     ],
+     "noise": 1.0,
+     "seed": 1125314619,
+     "size": 18.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      3.0,
+      -0.75,
+      26.0
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      -2,
+      21,
+      2,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     22,
+     8,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 3.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1e+30
+    }
+   },
+   "m": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "1.028701826 -0.1054766734 -0.1703853955 -2\n0.07667342799 0.9797160243 -0.1866125761 3.25\n0.1959432049 0.1703853955 0.9675456389 3.25\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 17701384,
+     "type": "noise"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      39.75,
+      -4.5,
+      -20.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      -2,
+      17,
+      -2,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      0.5,
+      1.5
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     25,
+     20
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 3732,
+  "options": [
+   "-interp nearestneighbour",
+   "4D",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "applyxfm4D"
+  ],
+  "seed": "20261103",
+  "tool": "fsl-flirt-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt",
+ "tier": "standard",
+ "tool": "fsl-flirt-original"
+}

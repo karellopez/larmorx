@@ -158,3 +158,10 @@ original named by `LARMORX_TOPUP_BIN`; every run inside `scripts/orchestration/b
 | `trial_f6_probe.py` | finding topup-trial-00006's shrunk case (1 x 1 x 3 voxels, 3 volumes) on FSL and the original with `--iout` and `--featout`: the default, `--fwhm=0`, `--estmov=0`, both (`trial_f6_probe.py <dir with pair.nii.gz and acq.txt> <out>`) |
 | `trial_f6_probe2.py` | the same pair tiled (x and y to 4 voxels, z to 24): which short axis makes the smoothed magnitude differ (confounded: FSL then estimates a field) |
 | `trial_spread.py` | FSL's own spread beside the original's distance on trial findings: FSL (cache, `use`) with the read-out times changed by `k` last bits and the original's `reproduce` run, each against FSL's unperturbed run, the finding's failed metrics over their thresholds (`LARMORX_TOPUP_BIN=<larmorx> trial_spread.py <out> 16,256 <finding .json> ...`) |
+| `trial_modes.py` | a finding's drawn case run by the original in both modes with extra words (`-v`), the `.par` lines printed, the streams kept (`trial_modes.py <finding .json> <out> -v`) |
+| `trial_fsl_verbose.py` | the same case run by FSL through the oracle cache with extra words (`-v`): the cost lines per level beside the original's (what showed `--miter`'s count of rejected iterations and FSL-242) |
+| `trial_recheck.py` | the trial's findings with a scaled-conjugate-gradient level (and every 25th other) re-checked with the current build (`recheck.replay`, drawn recipes); counts by minimiser and movements |
+| `trial_categories.py` | every finding of the trial in one category (its recipe and how far its failed metrics lie from FSL's own one-bit band); counts, a reproducer per category, `--json` (`trial_categories.py <trial> <this folder> --json out.json`) |
+| `trial_band_ratios.py` | per group, the failed metrics over FSL's one-bit band: median, 90th percentile, the findings whose band is 0 |
+| `trial_quadratic.py` | the trial's `--splineorder=2` cases without movements, agreeing and differing, by whether an axis is shorter than two knot spacings at some level (FSL-145's layout) |
+

@@ -398,7 +398,11 @@ pub fn search(
             }
         }
     }
-    if minima.is_empty() {
+    // no local minimum (a grid of one point per axis, or every point beside a smaller one):
+    // the overall minimum, which FSL lists only on its `Cost minima` line (observed: `-nosearch
+    // -verbose 7`, random testing's 20261103-07259)
+    let fallback = minima.is_empty();
+    if fallback {
         let mut best = 0usize;
         for c in 0..fz {
             for b in 0..fy {
@@ -413,6 +417,9 @@ pub fn search(
     }
     if let Some(tr) = at(3) {
         for word in ["COST", "Cost"] {
+            if fallback && word == "COST" {
+                continue;
+            }
             for &i in &minima {
                 let (a, b, c) = at_index(i);
                 tr.line(&format!("{word} minima at : {a},{b},{c}"));

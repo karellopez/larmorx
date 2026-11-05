@@ -2700,8 +2700,17 @@ pub(crate) fn write_values(
     };
     let v = match larmorx_mri::hmc::image::integer_range(t) {
         Some((lo, hi)) => {
-            let (data, conv) =
+            let (mut data, conv) =
                 larmorx_mri::hmc::image::convert_values(&values, mode, lo, hi, |i| i as f64, |f| f);
+            // values held exactly (applyxfm4D's int32 padding): those single precision rounds
+            // written as they are, in the type's range
+            if let Some(d) = &doubles {
+                for ((x, &e), &v) in data.iter_mut().zip(d).zip(&values) {
+                    if e.to_bits() != f64::from(v).to_bits() && (lo..=hi).contains(&e) {
+                        *x = e;
+                    }
+                }
+            }
             if conv.rounded + conv.out_of_range > 0 {
                 defects::push_once(
                     notices,
@@ -2825,19 +2834,23 @@ fn write_registered(
     // -out of a registration, -applyxfm, -applyisoxfm, every interpolation)
     like.header.cal_min = 0.0;
     like.header.cal_max = 0.0;
-    write_image_as(
-        ctx,
-        stem,
-        &like,
-        refv.shape,
-        1,
-        None,
-        values,
-        t,
+    // a sform completed from the reference's qform keeps the negative zeros of its products
+    // (qfac -1 times a zero entry) unless the reference is stored neurologically (its swap's
+    // products make them positive); a stored sform's are written as zeros (observed, random
+    // testing's 20261103-11635 and -01058 of 2026-11-05: a qform-only reference with qfac -1)
+    let h = &reference.input.header;
+    let completed_from_qform = h.sform_code == 0 && h.qform_code > 0;
+    let look = Look {
+        reference: &like,
+        shape: refv.shape,
+        volumes: 1,
+        tr: None,
+        cal: None,
+        descrip: "larmorx fsl flirt",
+        positive_zeros: !completed_from_qform || reference.input.flipped,
         quaternion_final,
-        err,
-        notices,
-    )
+    };
+    write_values(ctx, stem, &look, values, None, t, err, notices)
 }
 
 /// One volume resampled as §9.2 says; `pad` the padding value when given (else the blurred

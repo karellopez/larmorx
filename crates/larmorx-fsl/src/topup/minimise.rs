@@ -9,7 +9,11 @@
 //! gradients per accepted iteration, and their cost sequence is reproduced to 5 digits by the
 //! textbook algorithm (Møller 1993, in Bishop's formulation) with `σ = 0.01` and `λ₁ = 0.1`;
 //! the gradient at `x + σd` takes the regulariser's weight of the current point (FSL evaluates
-//! no cost there).
+//! no cost there). `--miter` counts every iteration of the scaled conjugate gradients, the
+//! rejected ones too, and a level whose last iteration is rejected ends at that iteration's
+//! point in FSL (FSL-242; observed with `-v`, random testing's topup-trial-06854 and -11566 of
+//! 2026-11-05: one SCG iteration whose step raises the cost evaluates once, and the next level
+//! starts from the worse point).
 
 use super::model::{Eval, Level, dot};
 use super::stencil::{Hessian, pcg_damped};
@@ -94,13 +98,26 @@ pub fn levenberg_marquardt(
     c
 }
 
-/// Scaled conjugate gradients from `c`, at most `miter` accepted steps.
+/// What a level of scaled conjugate gradients ended with.
+#[derive(Debug)]
+pub struct ScgEnd {
+    /// The parameters it ends at.
+    pub x: Vec<f64>,
+    /// Its last iteration's step was rejected (its cost not below the current point's): FSL
+    /// ends at that rejected point (FSL-242), the default at the current one; the two differ.
+    pub last_rejected: bool,
+}
+
+/// Scaled conjugate gradients from `c`, `miter` iterations (each counted, accepted or not:
+/// observed). When the last one is rejected, `fsl242` (`reproduce`) ends at its point, as FSL;
+/// else at the current point (the lowest cost found).
 pub fn scaled_conjugate_gradients(
     level: &Level,
     mut x: Vec<f64>,
     miter: usize,
+    fsl242: bool,
     report: &mut dyn Report,
-) -> Vec<f64> {
+) -> ScgEnd {
     const SIGMA0: f64 = 0.01;
     const BETA_MIN: f64 = 1e-15;
     const BETA_MAX: f64 = 1e100;
@@ -108,7 +125,10 @@ pub fn scaled_conjugate_gradients(
     let ev = level.eval(&x);
     report.evaluated(level, &ev, 0, 1);
     if miter == 0 {
-        return x;
+        return ScgEnd {
+            x,
+            last_rejected: false,
+        };
     }
     // FSL's numbering: a counter of the gradients; an evaluation takes the counter's value
     let mut counter = 1;
@@ -126,9 +146,11 @@ pub fn scaled_conjugate_gradients(
     let mut success = true;
     let mut nsuccess = 0usize;
     let mut beta = 0.1;
-    let mut accepted = 0;
+    let mut iterations = 0;
+    let mut last_rejected = false;
     let (mut mu, mut kappa, mut gamma) = (0.0, 0.0, 0.0);
-    while accepted < miter {
+    while iterations < miter {
+        iterations += 1;
         if success {
             mu = dot(&d, &gnew);
             if mu >= 0.0 {
@@ -177,8 +199,8 @@ pub fn scaled_conjugate_gradients(
         let ratio = 2.0 * (fnew - fold) / (alpha * mu);
         if ratio >= 0.0 && fnew.is_finite() {
             success = true;
+            last_rejected = false;
             nsuccess += 1;
-            accepted += 1;
             std::mem::swap(&mut x, &mut xnew);
             fold = fnew;
             cur_ssd = en.ssd;
@@ -214,6 +236,7 @@ pub fn scaled_conjugate_gradients(
             level.pool().give(gold);
         } else {
             success = false;
+            last_rejected = true;
             level.recycle(en);
         }
         if ratio < 0.25 {
@@ -223,5 +246,58 @@ pub fn scaled_conjugate_gradients(
             beta = (0.5 * beta).max(BETA_MIN);
         }
     }
-    x
+    // the loop ends after `miter` iterations (or at the gradient test, after an accepted step)
+    if last_rejected && fsl242 {
+        std::mem::swap(&mut x, &mut xnew);
+    }
+    ScgEnd { x, last_rejected }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The costs a minimiser evaluates.
+    #[derive(Default)]
+    struct Costs(Vec<f64>);
+
+    impl Report for Costs {
+        fn evaluated(&mut self, _level: &Level, e: &Eval, _iter: usize, _attempt: usize) {
+            self.0.push(e.cost);
+        }
+    }
+
+    #[test]
+    fn every_scg_iteration_counts_and_a_rejected_last_one_is_fsl242() {
+        // observed (FSL with -v): `--miter=k` evaluates the level's start and k steps, rejected
+        // ones included; FSL ends a level whose last step is rejected at that step's point
+        let (level, start) = super::super::model::tests::level(false);
+        let mut rejected = 0;
+        // rough starts (the helper's field scaled), where the quadratic model can fail
+        for (scale, miter) in [1.0, 300.0, 3000.0, 30000.0]
+            .into_iter()
+            .flat_map(|s| (0..12).map(move |m| (s, m)))
+        {
+            let start: Vec<f64> = start.iter().map(|c| scale * c).collect();
+            let mut fix = Costs::default();
+            let a = scaled_conjugate_gradients(&level, start.clone(), miter, false, &mut fix);
+            let mut rep = Costs::default();
+            let b = scaled_conjugate_gradients(&level, start.clone(), miter, true, &mut rep);
+            assert_eq!(fix.0.len(), 1 + miter, "miter {miter}");
+            assert_eq!(fix.0, rep.0, "the same path in both modes");
+            assert_eq!(a.last_rejected, b.last_rejected);
+            let cost = |x: &[f64]| level.eval(x).cost;
+            if a.last_rejected {
+                rejected += 1;
+                // the default keeps the lowest cost, FSL's the rejected step's (higher)
+                assert!(cost(&b.x) > cost(&a.x), "miter {miter}");
+                assert_eq!(cost(&b.x).to_bits(), fix.0[miter].to_bits());
+            } else {
+                assert_eq!(a.x, b.x, "miter {miter}");
+            }
+            let lowest = fix.0.iter().copied().fold(f64::INFINITY, f64::min);
+            assert_eq!(cost(&a.x).to_bits(), lowest.to_bits(), "miter {miter}");
+        }
+        assert!(rejected > 0, "no rejected last step: the test sees nothing");
+    }
 }

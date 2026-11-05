@@ -149,3 +149,11 @@ original named by `LARMORX_TOPUP_BIN`; every run inside `scripts/orchestration/b
 | `lsr_speed.py` | applytopup `lsr` on ds005040's pair with FSL's topup result: the original's wall time at the given thread counts and its output against FSL's (0.13 s on one thread, 0.03 s on 14; FSL 0.42 s, `docs/benchmarks/fsl-topup.md`) |
 
 `mine.py` takes the original's binary from `LARMORX_BIN` (default `target/release/larmorx`).
+
+### The catch-up's random-testing trial (2026-11-05)
+
+| Script | What it does |
+|---|---|
+| `trial_replay_vs_direct.py` | a finding of `fsl-topup-original` run as `difftest --replay` does (`judge_once`) and directly through the suite (`run_case`), on its drawn and its shrunk recipe: the replay runs the shrunk one (`trial_replay_vs_direct.py <finding .json>`, `LXT` the threads) |
+| `trial_f6_probe.py` | finding topup-trial-00006's shrunk case (1 x 1 x 3 voxels, 3 volumes) on FSL and the original with `--iout` and `--featout`: the default, `--fwhm=0`, `--estmov=0`, both (`trial_f6_probe.py <dir with pair.nii.gz and acq.txt> <out>`) |
+| `trial_f6_probe2.py` | the same pair tiled (x and y to 4 voxels, z to 24): which short axis makes the smoothed magnitude differ (confounded: FSL then estimates a field) |

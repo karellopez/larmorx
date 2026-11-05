@@ -308,11 +308,14 @@ pub fn oblique_angle(m: &M34) -> Option<f32> {
     if plumb {
         return None;
     }
-    // libm's acos (pure Rust): larmorx_core::math has no acos yet (rule 5). The result is
-    // rounded to float32 and printed with 6 decimals. AFNI's π has 10 digits.
+    // The correctly rounded acos (rule 5). The result is rounded to float32 and printed with 6
+    // decimals; AFNI's π has 10 digits. AFNI's acos is the C library's: on every float32 cosine
+    // in [0, 1] (1,065,353,217 values) this angle is glibc 2.35's bit for bit, as the `libm`
+    // crate's was (the clean-room catch-up, 2026-11-05: the doubles of acos itself differ from
+    // glibc's on 25,402 of them, none visible after the rounding to float32).
     #[allow(clippy::approx_constant)]
     const AFNI_PI: f64 = 3.141_592_653;
-    let angle = (libm::acos(f64::from(smallest)) * 180.0 / AFNI_PI) as f32;
+    let angle = (larmorx_core::math::acos(f64::from(smallest)) * 180.0 / AFNI_PI) as f32;
     (angle > 0.01).then_some(angle)
 }
 

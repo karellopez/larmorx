@@ -210,7 +210,6 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
- "libm",
  "rayon",
  "tempfile",
  "thiserror",
@@ -263,7 +262,6 @@ name = "larmorx-core"
 version = "0.0.1"
 dependencies = [
  "bytemuck",
- "libm",
  "ndarray",
  "num-complex",
  "rayon",
@@ -342,7 +340,6 @@ dependencies = [
  "flate2",
  "larmorx-core",
  "larmorx-io",
- "libm",
  "rayon",
  "ruzstd",
  "tempfile",

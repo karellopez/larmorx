@@ -62,20 +62,32 @@ impl Volume {
     }
 
     /// The intensity-weighted centre in FSL-mm (§6.1): `d ⊙ Σ (v − v_min)·idx / Σ (v − v_min)`,
-    /// with `v − v_min` in float32 and the sums in double. A denominator below 1e−5 is
-    /// replaced by 1. One NaN voxel makes the centre NaN, as in mcflirt (FSL-14).
+    /// as every centre of mass of FLIRT (`specs/flirt.md` §8.1 step 3; `specs/mcflirt.md` §6.1,
+    /// spec writer 2026-11-03): `v − v_min` in float32, converted to double; double running sums
+    /// over the voxels in z, y, x order, flushed into the totals after every
+    /// `max(1000, trunc(√N)) + 1` voxels (each block's sums restart at 0 and are added to the
+    /// totals, the last block's at the end); each coordinate its total over the total, times
+    /// the voxel size. A total below 1e−5 in magnitude counts as 1. One NaN voxel makes the
+    /// centre NaN, as in mcflirt (FSL-14).
     pub fn centre_of_mass(&self) -> [f64; 3] {
-        self.centre(false)
+        self.centre(false).0
     }
 
     /// [`Volume::centre_of_mass`] with NaN and infinite voxels left out (of the minimum and of
-    /// the sums): larmorx's correction of FSL-14. For a volume without such voxels it is the
-    /// same computation, so the same bits.
+    /// the sums; they still count in the blocks' lengths): larmorx's correction of FSL-14. For
+    /// a volume without such voxels it is the same computation, so the same bits.
     pub fn centre_of_mass_finite(&self) -> [f64; 3] {
-        self.centre(true)
+        self.centre(true).0
     }
 
-    fn centre(&self, finite_only: bool) -> [f64; 3] {
+    /// The centre ([`Volume::centre_of_mass`], or with `finite_only` the finite one) and
+    /// whether its total was below 1e−5 in magnitude (counted as 1; mcflirt prints
+    /// `WARNING::in calculating COG, total = 0.0` there, §6.1; a NaN total is not below).
+    pub fn centre_counted(&self, finite_only: bool) -> ([f64; 3], bool) {
+        self.centre(finite_only)
+    }
+
+    fn centre(&self, finite_only: bool) -> ([f64; 3], bool) {
         let [nx, ny, nz] = self.shape;
         let vmin = if finite_only {
             let mut it = self.data.iter().copied().filter(|v| v.is_finite());
@@ -85,31 +97,50 @@ impl Volume {
         } else {
             self.min()
         };
-        let (mut total, mut sx, mut sy, mut sz) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        let block = ((self.data.len() as f64).sqrt() as usize).max(1000) + 1;
+        // [Σ w·x, Σ w·y, Σ w·z, Σ w]: the totals and the current block's sums
+        let mut tot = [0.0f64; 4];
+        let mut part = [0.0f64; 4];
+        let mut count = 0usize;
         for z in 0..nz {
             for y in 0..ny {
                 let row = &self.data[nx * (y + ny * z)..nx * (y + ny * z + 1)];
                 for (x, &v) in row.iter().enumerate() {
-                    if finite_only && !v.is_finite() {
-                        continue;
+                    if !(finite_only && !v.is_finite()) {
+                        let w = f64::from(v - vmin);
+                        part[0] += w * x as f64;
+                        part[1] += w * y as f64;
+                        part[2] += w * z as f64;
+                        part[3] += w;
                     }
-                    let w = f64::from(v - vmin);
-                    total += w;
-                    sx += w * x as f64;
-                    sy += w * y as f64;
-                    sz += w * z as f64;
+                    count += 1;
+                    if count == block {
+                        for k in 0..4 {
+                            tot[k] += part[k];
+                            part[k] = 0.0;
+                        }
+                        count = 0;
+                    }
                 }
             }
         }
-        if total < 1e-5 {
+        for k in 0..4 {
+            tot[k] += part[k];
+        }
+        let mut total = tot[3];
+        let zero = total.abs() < 1e-5;
+        if zero {
             total = 1.0;
         }
         let d = self.voxel_size.map(f64::from);
-        [
-            d[0] * (sx / total),
-            d[1] * (sy / total),
-            d[2] * (sz / total),
-        ]
+        (
+            [
+                d[0] * (tot[0] / total),
+                d[1] * (tot[1] / total),
+                d[2] * (tot[2] / total),
+            ],
+            zero,
+        )
     }
 
     /// The background value (§9.2): the value at index `⌊count / 10⌋` of the sorted voxels of
@@ -168,6 +199,62 @@ mod tests {
         // A constant volume: the denominator is 0, replaced by 1, so the centre is 0.
         let c = Volume::new([2, 2, 2], [1.0; 3], vec![5.0; 8]).centre_of_mass();
         assert_eq!(c, [0.0; 3]);
+    }
+
+    /// The sums run in blocks of max(1000, trunc(√N)) + 1 voxels (§6.1): on a volume of more
+    /// than one block the centre is the blocked sums' bits, which a single running sum misses.
+    #[test]
+    fn the_centre_sums_in_blocks() {
+        let shape = [37usize, 29, 23];
+        let n: usize = shape.iter().product();
+        let mut s: u64 = 99;
+        let data: Vec<f32> = (0..n)
+            .map(|_| {
+                s = s
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                // a wide range of magnitudes, so that the double sums round
+                ((s >> 40) % 4096) as f32
+                    * 0.37
+                    * [1e-3f32, 1.0, 1e3, 1e5][((s >> 20) % 4) as usize]
+                    + 11.0
+            })
+            .collect();
+        let v = Volume::new(shape, [1.1, 0.9, 2.3], data.clone());
+        let vmin = v.min();
+        let block = ((n as f64).sqrt() as usize).max(1000) + 1;
+        let (mut tot, mut part, mut count) = ([0.0f64; 4], [0.0f64; 4], 0usize);
+        let (mut single, mut single_w) = ([0.0f64; 3], 0.0f64);
+        for (i, &x) in data.iter().enumerate() {
+            let w = f64::from(x - vmin);
+            let idx = [i % 37, (i / 37) % 29, i / (37 * 29)].map(|c| c as f64);
+            for a in 0..3 {
+                part[a] += w * idx[a];
+                single[a] += w * idx[a];
+            }
+            part[3] += w;
+            single_w += w;
+            count += 1;
+            if count == block {
+                for k in 0..4 {
+                    tot[k] += part[k];
+                    part[k] = 0.0;
+                }
+                count = 0;
+            }
+        }
+        for k in 0..4 {
+            tot[k] += part[k];
+        }
+        let d = [1.1f32, 0.9, 2.3].map(f64::from);
+        let want = [0, 1, 2].map(|a| d[a] * (tot[a] / tot[3]));
+        assert_eq!(v.centre_of_mass(), want);
+        let one_sum = [0, 1, 2].map(|a| d[a] * (single[a] / single_w));
+        assert_ne!(want, one_sum, "the blocks must matter on this volume");
+        assert_eq!(v.centre_counted(false), (want, false));
+        // a constant volume: total 0, counted as 1 and reported
+        let c = Volume::new([2, 2, 2], [1.0; 3], vec![5.0; 8]);
+        assert_eq!(c.centre_counted(false), ([0.0; 3], true));
     }
 
     #[test]

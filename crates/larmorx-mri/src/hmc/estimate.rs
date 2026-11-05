@@ -336,7 +336,15 @@ pub struct Estimate {
     pub in_plane: bool,
     /// The upstream defects that changed the matrices (or, reproduced, would have).
     pub notices: Vec<Notice>,
+    /// How many times a registration measured a test volume's centre of mass whose total was
+    /// below 1e-5 (a constant volume, §6.1): mcflirt prints `WARNING::in calculating COG, total
+    /// = 0.0` on standard error each time (observed: three times for a constant volume with
+    /// the default three stages).
+    pub cog_warnings: usize,
 }
+
+/// mcflirt's line for a centre of mass whose total is below 1e-5 (§6.1).
+pub const COG_WARNING: &str = "WARNING::in calculating COG, total = 0.0";
 
 /// The base tolerances (§5.2): rotations 0.005 rad / `rotation`, translations 0.2 mm, scales
 /// 0.002, skews 0.001, times the stage factor (float32).
@@ -417,12 +425,17 @@ fn evaluate(stage: &Stage<'_>, tv: &TestVolume<'_>, m: &Mat4) -> f32 {
 /// clean-room implementer, 2026-10-29: with the unpadded volume's centre the evaluated matrices
 /// of mcflirt 6.0.7.23's `-verbose 20` trace differ from the first rotation step on;
 /// `validation/investigations/cleanroom-align/mi_trace.py`).
-fn register(test: &Volume, centre: [f64; 3], start: &Mat4, stage: &Stage<'_>) -> Mat4 {
+/// Also returns whether the centre's total was below 1e-5 (mcflirt's COG warning, §6.1).
+fn register(
+    test: &Volume,
+    centre: ([f64; 3], bool),
+    start: &Mat4,
+    stage: &Stage<'_>,
+) -> (Mat4, bool) {
     let padded = stage.in_plane.then(|| pad_z(test, 1));
     let vol = padded.as_ref().unwrap_or(test);
-    let centre = match &padded {
-        Some(v) if stage.skip_non_finite => v.centre_of_mass_finite(),
-        Some(v) => v.centre_of_mass(),
+    let (centre, zero) = match &padded {
+        Some(v) => v.centre_counted(stage.skip_non_finite),
         None => centre,
     };
     let mut p: Params = rigid::decompose(start, centre);
@@ -450,7 +463,7 @@ fn register(test: &Volume, centre: [f64; 3], start: &Mat4, stage: &Stage<'_>) ->
     }
     let mut cost = |q: &Params| evaluate(stage, &tv, &rigid::compose(q, stage.ncompose, centre));
     let (p, _) = sweep(&mut cost, &p, &stage.order, &stage.tolerances);
-    rigid::compose(&p, stage.ncompose, centre)
+    (rigid::compose(&p, stage.ncompose, centre), zero)
 }
 
 /// The visiting order and stage-1 chains (§5.1, §5.4): each chain is a list of volumes whose
@@ -511,7 +524,7 @@ pub fn estimate(
     }
     match reference {
         Reference::Volume(r) => {
-            let (matrices, in_plane, notices) = run_stages(series, r, None, params)?;
+            let (matrices, in_plane, notices, cog_warnings) = run_stages(series, r, None, params)?;
             Ok(Estimate {
                 matrices,
                 reference: r.clone(),
@@ -519,13 +532,14 @@ pub fn estimate(
                 mean: None,
                 in_plane,
                 notices,
+                cog_warnings,
             })
         }
         &Reference::Index(index) => {
             if index >= n {
                 return Err(EstimateError::BadIndex { index, n });
             }
-            let (matrices, in_plane, notices) =
+            let (matrices, in_plane, notices, cog_warnings) =
                 run_stages(series, &series[index], Some(index), params)?;
             Ok(Estimate {
                 matrices,
@@ -534,6 +548,7 @@ pub fn estimate(
                 mean: None,
                 in_plane,
                 notices,
+                cog_warnings,
             })
         }
         Reference::Mean(first_ref) => {
@@ -551,10 +566,11 @@ pub fn estimate(
                 stages: params.stages.min(3),
                 ..params.clone()
             };
-            let (matrices, _, mut notices) = run_stages(series, first_volume, first_index, &first)?;
+            let (matrices, _, mut notices, cog_first) =
+                run_stages(series, first_volume, first_index, &first)?;
             let mean =
                 super::resample::mean_volume(series, &matrices, first_volume, params.n_threads)?;
-            let (matrices, in_plane, second) = run_stages(series, &mean, None, params)?;
+            let (matrices, in_plane, second, cog_second) = run_stages(series, &mean, None, params)?;
             for n in second {
                 defects::push_once(&mut notices, n);
             }
@@ -565,19 +581,23 @@ pub fn estimate(
                 mean: Some(mean),
                 in_plane,
                 notices,
+                cog_warnings: cog_first + cog_second,
             })
         }
     }
 }
 
 /// The stages of §5.2 for one reference. Returns the matrices, whether the in-plane mode was
-/// used, and the upstream defects that changed the matrices (or would have).
+/// used, the upstream defects that changed the matrices (or would have), and how many test
+/// volume centres had a total below 1e-5 (mcflirt's COG warnings, one per registration).
+type Stages = (Vec<Mat4>, bool, Vec<Notice>, usize);
+
 fn run_stages(
     series: &[Volume],
     reference: &Volume,
     ref_index: Option<usize>,
     params: &EstimateParams,
-) -> Result<(Vec<Mat4>, bool, Vec<Notice>), EstimateError> {
+) -> Result<Stages, EstimateError> {
     let n = series.len();
     let dof = params.dof.clamp(6, 12);
     let mode = params.upstream_defects;
@@ -590,7 +610,7 @@ fn run_stages(
     let mut notices = Vec::new();
     let registered: Vec<usize> = (0..n).filter(|&v| Some(v) != ref_index).collect();
     if params.stages == 0 || registered.is_empty() {
-        return Ok((matrices, false, notices));
+        return Ok((matrices, false, notices, 0));
     }
     // FSL-21 and FSL-66 reproduced: mcflirt crashes when a stage starts on bins it cannot use;
     // a histogram cost with no bins runs as mcflirt's does.
@@ -628,16 +648,10 @@ fn run_stages(
     }
     let skip_non_finite = fix && (!non_finite.is_empty() || reference_non_finite);
     let out = parallel::with_threads(params.n_threads, || {
-        let centres: Vec<[f64; 3]> = series
-            .par_iter()
-            .map(|v| {
-                if fix {
-                    v.centre_of_mass_finite()
-                } else {
-                    v.centre_of_mass()
-                }
-            })
-            .collect();
+        // each volume's centre (its blocked sums, §6.1), and whether its total was below 1e-5
+        let centres: Vec<([f64; 3], bool)> =
+            series.par_iter().map(|v| v.centre_counted(fix)).collect();
+        let mut cog = 0usize;
         let grid8 = subsample(reference, 8.0);
         let grid4 = subsample(reference, 4.0);
         let check = |v: &Volume| match params.in_plane {
@@ -706,21 +720,23 @@ fn run_stages(
             };
             stage_notices.push(Notice::new(&defects::FSL_03, mode, detail));
         }
-        let results: Vec<Vec<(usize, Mat4)>> = chains(n, ref_index, params.fudge, !fix)
+        let results: Vec<Vec<(usize, Mat4, bool)>> = chains(n, ref_index, params.fudge, !fix)
             .par_iter()
             .map(|chain| {
                 let mut prev = IDENTITY;
                 chain
                     .iter()
                     .map(|&v| {
-                        prev = register(&series[v], centres[v], &prev, &stage1);
-                        (v, prev)
+                        let (m, zero) = register(&series[v], centres[v], &prev, &stage1);
+                        prev = m;
+                        (v, prev, zero)
                     })
                     .collect()
             })
             .collect();
-        for (v, m) in results.into_iter().flatten() {
+        for (v, m, zero) in results.into_iter().flatten() {
             matrices[v] = m;
+            cog += usize::from(zero);
         }
         // FSL-01: the last volume's start, when its predecessor's result is not the identity.
         if !params.fudge
@@ -772,19 +788,20 @@ fn run_stages(
                 count: params.normcorr_count,
                 libm: &libm,
             };
-            let out: Vec<Mat4> = registered
+            let out: Vec<(Mat4, bool)> = registered
                 .par_iter()
                 .map(|&v| register(&series[v], centres[v], &matrices[v], &s))
                 .collect();
-            for (&v, m) in registered.iter().zip(out) {
+            for (&v, (m, zero)) in registered.iter().zip(out) {
                 matrices[v] = m;
+                cog += usize::from(zero);
             }
         }
-        (matrices, in_plane, stage_notices)
+        (matrices, in_plane, stage_notices, cog)
     })?;
-    let (matrices, in_plane, stage_notices) = out;
+    let (matrices, in_plane, stage_notices, cog) = out;
     notices.extend(stage_notices);
-    Ok((matrices, in_plane, notices))
+    Ok((matrices, in_plane, notices, cog))
 }
 
 /// "volumes 3, 7 and the reference have", for the FSL-14 notice (at most 10 indices listed).
@@ -1149,6 +1166,30 @@ mod tests {
         let b = estimate(&s, &r, &with_mode(UpstreamDefects::Reproduce)).unwrap();
         assert_eq!(a.matrices, b.matrices);
         assert!(a.notices.is_empty() && b.notices.is_empty());
+    }
+
+    /// mcflirt's COG warning (§6.1): one per registration of a test volume whose centre's total
+    /// is below 1e-5 (observed, `validation/investigations/cleanroom-align/cog_warning_probe.py`:
+    /// three for a constant volume with the default three stages, four with `-stages 4`).
+    #[test]
+    fn cog_warnings_per_registration() {
+        let mut s = series();
+        let shape = s[3].shape;
+        s[3] = Volume::new(shape, s[3].voxel_size, vec![100.0; s[3].len()]);
+        let r = Reference::Index(2);
+        for stages in [3, 4] {
+            let params = EstimateParams {
+                stages,
+                ..with_mode(UpstreamDefects::Fix)
+            };
+            assert_eq!(estimate(&s, &r, &params).unwrap().cog_warnings, stages);
+        }
+        assert_eq!(
+            estimate(&series(), &r, &with_mode(UpstreamDefects::Fix))
+                .unwrap()
+                .cog_warnings,
+            0
+        );
     }
 
     /// FSL-03: the in-plane mode pads the first stage's grid once when corrected.

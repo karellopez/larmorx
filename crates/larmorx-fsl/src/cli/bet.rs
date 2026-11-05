@@ -891,24 +891,42 @@ fn small_fov(
     let npad = npad as usize;
     let slice = nx * ny;
     let tmp = format!("{output}_tmp");
-    // fslroi's slices and fslmerge's image in the input's type (FSL-217 for int8)
-    fsl217(run.mode, &inp.header, &v.data, debug, notices);
-    let typed = |data: Vec<f32>| roi_values(run.mode, &inp.header, data);
+    // fslroi's slices and fslmerge's image in the input's type (FSL-217 for int8); a double
+    // image's keep its double values (observed, random testing 2026-11-04 case 330, with -d: as
+    // -F's first volume)
+    let doubles: Option<Vec<f64>> = if inp.header.datatype == 64 {
+        image::resolve_input(&run.settings.name(input))
+            .ok()
+            .and_then(|r| ImageFiles::of(&r))
+            .and_then(|f| image::read_f64_series(&f, run.settings.threads()))
+            .filter(|d| d.len() >= v.data.len())
+            .map(|mut d| {
+                d.truncate(v.data.len());
+                d
+            })
+    } else {
+        None
+    };
+    if doubles.is_none() {
+        fsl217(run.mode, &inp.header, &v.data, debug, notices);
+    }
+    // the values of the voxels `[from, to)` of the volume, in the type fslroi writes
+    let typed = |data: Vec<f32>, from: usize, to: usize| match &doubles {
+        Some(d) => Values::F64(d[from..to].to_vec()),
+        None => roi_values(run.mode, &inp.header, data),
+    };
     let bottom = v.data[..slice].to_vec();
     let top = v.data[(nz - 1) * slice..].to_vec();
     let one = Vol::new([nx, ny, 1], v.voxel, bottom.clone());
-    let w = |stem: &str, vol: &Vol, out: &mut dyn Write, err: &mut dyn Write| {
-        write_like(
-            run,
-            stem,
-            &inp,
-            std::slice::from_ref(vol),
-            typed(vol.data.clone()),
-            None,
-        )
-        .map_err(|e| fail(e, out, err))
-    };
-    w(&format!("{tmp}_bottom"), &one, out, err)?;
+    write_like(
+        run,
+        &format!("{tmp}_bottom"),
+        &inp,
+        std::slice::from_ref(&one),
+        typed(one.data.clone(), 0, slice),
+        None,
+    )
+    .map_err(|e| fail(e, out, err))?;
     // the top slice as fslroi cuts it: its origin moved to that slice
     let mut top_inp = inp.clone();
     {
@@ -936,7 +954,7 @@ fn small_fov(
         &format!("{tmp}_top"),
         &top_inp,
         std::slice::from_ref(&top_vol),
-        typed(top_vol.data.clone()),
+        typed(top_vol.data.clone(), (nz - 1) * slice, nz * slice),
         None,
     )
     .map_err(|e| fail(e, out, err))?;
@@ -961,12 +979,26 @@ fn small_fov(
         header: with_quaternion(&inp.header, &bottom_header),
         ..inp.clone()
     };
+    let merged_values = match &doubles {
+        Some(d) => {
+            let mut all = Vec::with_capacity(slice * pz);
+            for _ in 0..npad {
+                all.extend_from_slice(&d[..slice]);
+            }
+            all.extend_from_slice(d);
+            for _ in 0..npad {
+                all.extend_from_slice(&d[(nz - 1) * slice..]);
+            }
+            Values::F64(all)
+        }
+        None => roi_values(run.mode, &inp.header, pvol.data.clone()),
+    };
     write_like(
         run,
         &tmp,
         &merged,
         std::slice::from_ref(&pvol),
-        typed(pvol.data.clone()),
+        merged_values,
         None,
     )
     .map_err(|e| fail(e, out, err))?;

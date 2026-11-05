@@ -9,7 +9,6 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-io.workspace = true
-libm.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 

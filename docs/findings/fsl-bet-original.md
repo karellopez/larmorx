@@ -466,3 +466,92 @@ other, as the script runs them: two at once (§10 allows `-S`'s raw bet2 beside 
 peak memory is held to FSL's, whose peak is its largest program's (CLAUDE.md). Memory
 (`tests/parity/test_memory_peak.py`, the suite's head with FSL's standard images): `-S -m` 62 MiB
 against FSL's 67, `-B` 61 against 115, `-A2` 58 against 72.
+
+## The BET part's random-testing differences and ds002603's scalp (the clean-room catch-up, relay 7, 2026-11-05)
+
+The BET options part's trial on the original (`oracles/difftest/2026-11-04-bet-options-6b`, seed
+`bet-options-6`, 2,699 cases) kept 176 differing cases of the original: 164 betsurf, 11 `bet`, 1
+`bet2`. Judged again as black-box cases with relay 6's build (`replay_trial.py`: each finding's
+recipe and its shrunk reproducer, FSL from the oracle cache, each case in its own 3 GiB leaf of
+the memory box), 172 still differed. `betsurf_shares.py` ran every betsurf finding again with
+`-v`: the share of profiles set aside (`removed profiles`) was FSL's on only 74 of the 164 images,
+and 82 of the 90 others were `--t1only`. So most differences began at the profiles' decisions.
+`profile_oracle_cached.py` (`betsurf_profile_oracle.py`'s single profiles, FSL through the cache;
+the profiles' voxels, normals and samples from a temporary probe build of the original, never
+kept) then gave FSL's decision on every profile of eight T1-only and three T1-and-T2 images
+(5,290 single profiles), and `t1model.py`-style readings of the rules were tried against them.
+Four readings of `specs/bet.md` §6.4 were the original's own mistakes (rule A: the original now
+follows FSL; none is a defect of FSL):
+
+- **A profile's first sample is never read backwards** (T1 only): the backward searches (the
+  scalp, `S'`, the outer skull's two searches) stop before the profile's first sample, and the
+  T1-only scan for `b` starts at the second sample when `a` is the first (`b` itself starts at
+  `a`). A profile whose inner and outer skull both fell on its first sample (−3 mm) is set aside
+  by FSL (case 1156: FSL sets aside 63 of 64 profiles, the original kept 7 more; case 678's
+  profile 120: the scan from the first sample stopped at 3.5 mm, from the second it finds the
+  outer skull at 6.0 mm as FSL). The forward searches do read the first sample (11 mismatches of
+  604 profiles otherwise). 3,284 of 3,288 T1-only profiles now decided as FSL decides them.
+- **Step 5's "within 10 mm" is strict**: a first bright T2 sample exactly 10 mm past the inner skull
+  does not count (case 2530: three such profiles; case 1746: three).
+- **Step 5's alternation**: each search starts after the sample the previous one found (case
+  617's profile 74: a flat region, 159 on T1 and T2 alike, whose one sample is bright and dark at
+  once; FSL sets it aside).
+- **An empty outer-skull search range** (step 7: `a` finds nothing) **counts the scalp only, and
+  FSL runs on.** The spec's FSL-50 (FSL ends with status 255 there) was never seen: on the 43
+  images of the two trials where such a profile occurs (41 of this trial's with these rules, 278,
+  913, 1746, 1924 and 2557 among them, and cases 216 and 635 of 2026-10-31) FSL runs to the end
+  (status 0; case 364 fails later at its output type, as the original does). Counting only the scalp is what FSL does: on case 617 (719
+  such profiles, a ramp whose inner skull lies at its scalp) the scalp mesh is 0.41 mm from FSL's
+  (95th percentile) when they count the scalp and 5.76 mm when they are dropped, the shares equal
+  either way. The original therefore no longer stops in `reproduce` (`larmorx_fsl::cli::betsurf`:
+  the `fsl50` switch of `betsurf::votes` is off); when FSL ends (FSL-50) is a question for the spec
+  writer.
+
+With these, **162 of the 164 images' shares are FSL's** (74 before); the two left: case 192 (four
+profiles of a constant int16 image, every value 32767, whose two outer searches find nothing in
+a two-sample region at the profile's end: FSL keeps them, the rule `OS2 ≥ IS` sets them aside)
+and case 1389 (two profiles more set aside in the whole run, though each of its 319 profiles alone
+is decided as FSL decides it). And **`bet -Z -d` on a float64 image** (case 330) now keeps the
+input's double values in `<out>_tmp`, `<out>_tmp_bottom` and `<out>_tmp_top` (FSL's are float64;
+the original wrote float32), as `-F`'s first volume does. Permanent cases (`validation/difftest/
+cases/fsl-bet/`): `original-betsurf-t1only-first-sample` (1156),
+`original-betsurf-gap-strictly-within-10mm` (2530), `original-betsurf-flat-region-gaps` (617),
+`original-betsurf-empty-range-scalp-only` (1746), `original-bet-Z-d-float64-tmp` (330); their
+shrunk reproducers agree.
+
+**What still differs** (all 176 judged again with the final build: 25 agree, 151 differ):
+
+- `bet` (6) and `bet2` (1): every one a neurologically stored image (a qform or sform of positive
+  determinant) with `-R` or `-c` (the skull image in 5, the self-intersection total in 2: 6.54282e+06
+  against 6.3927e+06, 20.1978 against 20.1488): the class of cases 622 and 677, the conversion of a
+  centre in voxels into FSL's radiological frame (open with the spec writer).
+- betsurf (144): the decisions are FSL's, the surfaces are not exactly. Per image, the 95th
+  percentile of the vertex distance to FSL's mesh: the inner skull exactly FSL's on 6 images and
+  within 0.1 mm on 122 of 156 (median 0.047 mm), the outer skull median 0.82 mm, the scalp median
+  3.6 mm (13 of 163 within 0.1 mm). The failing checks: the scalp's mask or outline alone in 88
+  cases, the skull mask alone in 19 and with the scalp in 15, the inner skull in 8, the outer
+  skull with the scalp in 7. On these images of 10 to 32 voxels per side the masks are a few
+  hundred voxels (the skull masks of case 47: 2 and 8 voxels; Dice 0.4 for 6 voxels), so
+  betsurf's thresholds (Dice ≥ 0.99, boundary p95 ≤ 1 voxel) fail on a voxel or two.
+  - **The scalp's deformation**: on the four images where every profile is the scalp's only and the
+    inner and outer skull are FSL's exactly (cases 1504, 651, 180, 2101: the skulls shrink to 1 to
+    2 mm, the scalp's sphere grows from there to 50 to 70 mm, far outside the working grid), the
+    scalp is 0.24, 1.58, 1.95 and 3.43 mm from FSL's (95th percentile). Reading the counting image
+    outside the grid as its nearest edge value instead of 0, or as 0 beyond `[0, n − 1]`, makes it
+    worse on all four (6.2 to 49.6 mm and 1.2 to 7.9 mm). These four are the cleanest inputs for
+    the spec writer's question about the scalp phase (§6.5).
+  - **`-p` with every profile set aside** (8 cases): the inner skull shrinks to one point (every
+    vertex `(20.25, 23.25, 7.5)` on case 1974), and FSL's retessellation of that collapsed mesh
+    writes 782 points where the original's (each edge's midpoint once) writes 1,026, with the same
+    first faces: how FSL shares midpoints between edges of coincident points is open (the
+    coordinates are the same point either way).
+- **ds002603 with its T2** (`real/philips-surf-t2`, the record's failure): with the corrected
+  profile rules its inner skull is FSL's to 0.026 mm (95th percentile; maximum 1.22 mm) where it
+  was 0.95 mm (maximum 11.0 mm: the "few profiles vote" region of part 2b, now explained by step
+  5's rules), its outer skull 0.20 mm (0.56); the scalp stays 2.86 mm (3.18; maximum 16.9 mm), its
+  mask's Dice 0.9935 and boundary p95 2.0 voxels (the threshold 1): the scalp's deformation above.
+  The record's other surface cases keep their status (the 82-year-old's scalp 0.55 → 0.30 mm, the
+  adult's 0.66 → 1.36 mm: the scalp phase is sensitive to the vote image's last details).
+
+The probes: `replay_trial.py`, `finding_dirs.py`, `betsurf_shares.py`, `profile_oracle_cached.py`
+([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)).

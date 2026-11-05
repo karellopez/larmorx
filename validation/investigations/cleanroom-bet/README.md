@@ -86,3 +86,16 @@ T1-only triangles alike.
 | `ssroi_fsl_runs.py <out> '<case regex>' [--args=<words>]` | (relay 5's, used again) FSL's runs of the BET suite's option cases (`bet/eyes*`, `bet/bias*`, `bet/surfaces*`, `defects/eyes-*`, `real/*-S`, ...), with `-d` or `-v` added: the files a failed run leaves (`bet/eyes-no-brain`: 12), bash's reports of an abort and their commands' texts, a negative mean's `dc: stack empty` (`defects/eyes-negative-mean`) |
 | `fsl_program.py <dir> <program> <args...>` | one FSL program through the cache: `fslstats <prebrain> -M` and `-S` on FSL's own `-S -d` files print six decimals (`1951833.117037`: never an exponent); bet2 with `-c` on `-B`'s unbiased image of the 3.5-year-old (the robust run's second pass: FSL's self-intersection total 123.412, the original's 124.668) |
 | `dc_probe.py` | GNU dc 1.4.1 (this machine's) on `10 k <mean> 3.5 <sd> * + p`, both streams apart: the unit tests' expected texts of the eye threshold (FSL-216) |
+
+## The clean-room catch-up, relay 7 (2026-11-05): the BET part's random-testing differences
+
+| Script | What it shows |
+|---|---|
+| `replay_trial.py <trial> <out.jsonl> [--jobs 16] [--only n,...] [--which recipe,shrunk]` | every finding of the original judged again with the current build, as black-box cases (FSL from the oracle cache), each worker in its own leaf of the memory box with the trial's case limit; every check written (run inside `scripts/orchestration/boxed.sh`) |
+| `finding_dirs.py <finding.json> <dir> [recipe\|shrunk] [--mode fix\|reproduce] [--extra='-v']` | one finding's call run by FSL (cache) in `<dir>/fsl` and the original in `<dir>/lx`, both kept |
+| `betsurf_shares.py <trial> <out.jsonl> [--mode reproduce\|fix] [--only ...]` | every betsurf finding with `-v` added: FSL's and the original's share of profiles set aside, each mesh's vertex distance and each mask's differing voxels, so that a difference is placed at the profiles or after them (2026-11-04-bet-options-6b: 74 of 164 shares FSL's before the corrections, 162 after) |
+| `profile_oracle_cached.py <t1> <t2\|-> <matrix> <dir> <dump> [--jobs 16] [i ...]` | `betsurf_profile_oracle.py`'s single profiles with FSL through the cache, in parallel, and the original on the same files: FSL's decision on each profile of a whole image (5,290 profiles of 11 images: the four readings of §6.4 in the findings) |
+
+The profiles' voxels, normals and samples (`<dump>`) came from a temporary build of the original
+that wrote one `DUMP {...}` line per profile into the file `LX_BETSURF_DUMP` names (a patch of
+`betsurf::votes` applied to a scratch build and reverted; the product has no such switch).

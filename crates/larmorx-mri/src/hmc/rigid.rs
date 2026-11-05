@@ -154,9 +154,14 @@ pub fn compose(p: &Params, n: usize, centre: [f64; 3]) -> Mat4 {
     m
 }
 
-/// `atan2` (the `libm` crate's: `larmorx_core::math` has no correctly rounded port of it yet).
+/// `atan2`, correctly rounded in double (`larmorx_core::math`, rule 5; until 2026-11-05 the
+/// `libm` crate's, which differs from it in the last bit of 25 % of near-identity rotations
+/// and of 18 % of random ones, none of 2·10⁷ random ones once rounded to float). mcflirt's decomposition takes glibc's single-precision `atan2f`
+/// of these float quotients (`specs/flirt.md` §3, the decomposition `specs/mcflirt.md` §4.4
+/// shares): its bits are a `reproduce` matter for a later part (the original has no glibc
+/// trigonometry yet), and in the `.par` file's 6 significant digits the two agree.
 fn atan2(y: f64, x: f64) -> f64 {
-    libm::atan2(y, x)
+    larmorx_core::math::atan2(y, x)
 }
 
 /// The Euler angles of a rotation matrix (§4.4), from float32 intermediates.

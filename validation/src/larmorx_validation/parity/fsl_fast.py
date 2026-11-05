@@ -22,7 +22,16 @@ What is compared (``specs/fast.md`` §11), each output against FSL's inside FSL'
   never set, FSL-96: not compared);
 - ``_bias``, ``_restore``: the relative difference at most 1e-4 at the 99.9th percentile,
   identical outside the mask;
-- the D13 fix pass: a defect named exactly when the default's outputs differ from ``reproduce``.
+- the D13 fix pass: a defect named exactly when the default's outputs differ from ``reproduce``;
+- the default against the replica's default (``larmorx-nc``, ``LARMORX_NC_BIN``, run as a
+  separate program; skipped when it is not built), with the same thresholds: both correct the
+  same defects (FSL-202's variance among them), so there the band of a last-bit change is the
+  narrow one of the corrected arithmetic (``specs/fast.md`` §11), not FSL's.
+
+Besides the replica suite's cases, the original's own (``original/``, the clean-room catch-up,
+2026-11-05): the lines of standard output at FAST's aborts and before the images are read
+(§7), the loops without a class (``-n 0``), NaN voxels in ``_restore`` (§4.1.1); their derived
+inputs in ``<workspace>/oracles/inputs/fsl-fast/``.
 """
 
 from __future__ import annotations
@@ -385,6 +394,50 @@ def compare(
         checks.add(c)
 
 
+def against_replica_default(
+    checks: CheckList,
+    prepare,
+    args: list[str],
+    settings,
+    ours_dir: Path,
+    ours: Completed,
+    before: set[str],
+) -> None:
+    """§11: the original's default run (in ``ours_dir``) against the replica's default (the same
+    corrections), with the thresholds of FSL's comparison and no band; each check's name says
+    what it compares. Nothing when the replica's program is not built."""
+    from larmorx_validation.parity.fsl_mcflirt_replica import replica_binary
+
+    if replica_binary() is None:
+        return
+    with tempfile.TemporaryDirectory(prefix="lx-fast-rd_") as name:
+        tmp = Path(name)
+        prepare(tmp)
+        r = rep.run_replica("fast", args, cwd=tmp, settings=settings, mode=defects.FIX)
+        label = "Default against the replica's default"
+        checks(
+            f"{label}: exit status",
+            r.code == ours.code,
+            detail=f"replica {r.code}, the original {ours.code}",
+        )
+        fa = {k for k in _files(tmp, set()) if k not in before}
+        fb = {k for k in _files(ours_dir, set()) if k not in before}
+        checks(
+            f"{label}: files written",
+            fa == fb,
+            detail=f"replica only {sorted(fa - fb)[:4]}, original only {sorted(fb - fa)[:4]}",
+        )
+        if r.code == 0 and ours.code == 0:
+            so, why = _numbers_close(
+                r.stdout.replace(str(tmp), "{cwd}"), ours.stdout.replace(str(ours_dir), "{cwd}")
+            )
+            checks(f"{label}: standard output (numbers to 4 significant digits)", so, detail=why)
+            images = CheckList()
+            compare_images(images, tmp, ours_dir)
+            for c in images.checks:
+                checks.add(dataclasses.replace(c, name=f"{label}: {c.name}"))
+
+
 def fix_pass(
     checks: CheckList,
     prepare,
@@ -393,7 +446,8 @@ def fix_pass(
     reproduced_dir: Path,
     reproduced: Completed,
 ) -> None:
-    """D13: the original's default run against its ``reproduce`` run."""
+    """D13: the original's default run against its ``reproduce`` run, and against the replica's
+    default (:func:`against_replica_default`)."""
     from larmorx_validation.parity.fsl_mcflirt_replica import _change
 
     with tempfile.TemporaryDirectory(prefix="lx-fast-fix_") as name:
@@ -423,6 +477,7 @@ def fix_pass(
             # FAST names no GLIBC-07 (an iterative fit; defects.UNNAMED_GLIBC)
             unnamed_ok=defects.UNNAMED_GLIBC,
         )
+        against_replica_default(checks, prepare, args, settings, tmp, r, before)
 
 
 def _band_of(stack: contextlib.ExitStack, prepare, args, settings, never: str, unwritten=()):
@@ -443,6 +498,138 @@ def _band_of(stack: contextlib.ExitStack, prepare, args, settings, never: str, u
     return band
 
 
+#: The original's own derived inputs (``<workspace>/oracles/inputs/fsl-fast/``, from the replica
+#: suite's), named ``%<name>`` in a case's arguments; the marker of their version.
+OWN_INPUTS = "fsl-fast"
+OWN_VERSION = "DONE-v2"
+
+
+def own_inputs() -> Path:
+    """The original's own inputs, made once (deterministic, from the replica suite's inputs):
+    ``t1_nan_noneg`` (``t1_nan``'s five NaN voxels and no negative value: §4.1's rule skipped,
+    so the NaN voxels stay NaN), ``t1_nan_offset`` (``t1_half`` whose background is -40, so its
+    2nd percentile is negative and subtracting the minimum puts the background back at 0 (the
+    suite's ``t1_offset`` shifts every voxel, so its background lands above 0 and FAST stops),
+    with the same NaN voxels: the rule's first branch, NaN minus the minimum)."""
+    import nibabel as nib
+
+    from larmorx_validation.parity.fsl_mcflirt_replica import workspace
+
+    src = rep.inputs()
+    ws = workspace()
+    d = (ws / "oracles" / "inputs" / OWN_INPUTS) if ws is not None else src.parent / OWN_INPUTS
+    if (d / OWN_VERSION).is_file():
+        return d
+    d.mkdir(parents=True, exist_ok=True)
+    nan = nib.load(src / "t1_nan.nii.gz")
+    x = np.asarray(nan.dataobj, dtype=np.float32)
+    holes = np.isnan(x)
+    noneg = np.where(x < 0, np.float32(0), x).astype(np.float32)
+    nib.save(nib.Nifti1Image(noneg, nan.affine, nan.header), d / "t1_nan_noneg.nii.gz")
+    half = nib.load(src / "t1_half.nii.gz")
+    z = np.asarray(half.dataobj, dtype=np.float32).copy()
+    z[z <= 0] = np.float32(-40.0)
+    z[holes] = np.float32(np.nan)
+    nib.save(nib.Nifti1Image(z, half.affine, half.header), d / "t1_nan_offset.nii.gz")
+    (d / OWN_VERSION).write_text("t1_nan_noneg, t1_nan_offset\n", encoding="utf-8")
+    return d
+
+
+def _prepare(run: rep.Run, tmp: Path) -> list[str]:
+    """The replica suite's preparation (``@name`` its derived inputs), with the original's own
+    inputs (``%name``, :func:`own_inputs`) copied first."""
+    if not any(a.startswith("%") for a in run.args):
+        return rep._prepare(run, tmp)
+    own = own_inputs()
+    args = []
+    for a in run.args:
+        if a.startswith("%"):
+            shutil.copy(own / a[1:], tmp / a[1:])
+            a = a[1:]
+        args.append(a)
+    return rep._prepare(dataclasses.replace(run, args=tuple(args)), tmp)
+
+
+def _original_cases() -> list[tuple[str, str, rep.Run]]:
+    """The original's own cases (the clean-room catch-up, 2026-11-05): the paths its answers
+    changed that the replica suite's cases leave out (each once; FSL's runs cached under their
+    own keys)."""
+    r = rep.Run
+    T, T2 = "@mni4_t1.nii.gz", "@mni4_t2.nii.gz"
+    unset = (("FSLDIR", None),)
+    return [
+        (
+            "original/v-n0",
+            "-v -n 0: the loops without a class, then the abort in the partial volumes; standard "
+            "output ends at the last flushed line (` BETA 0.1`, the unflushed heading lost: §7)",
+            r(("-v", "-n", "0", "-o", "seg", T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/v-n0-nopve",
+            "-v -n 0 --nopve: the loops' lines without a class and `total tissue 0`, exit 0",
+            r(("-v", "-n", "0", "--nopve", "-o", "seg", T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/v-n0-H-nan",
+            "-v -n 0 -H nan: FSL-99's TOTAL lines and pairs without a class, then the abort",
+            r(("-v", "-n", "0", "-H", "nan", "-o", "seg", T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/multi-v-n0",
+            "-S 2 -v -n 0: several channels' loops without a class (empty CHANNEL lines), the "
+            "partial-volume heading and `total tissue 0`, exit 0",
+            r(("-S", "2", "-v", "-n", "0", "-o", "seg", T2, T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/v-n-negative",
+            "-v -n -1: FAST prints the image lines, then aborts",
+            r(("-v", "-n", "-1", "-o", "seg", T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/multi-v-n-negative",
+            "-S 2 -v -n -2: the heading, then the abort",
+            r(("-S", "2", "-v", "-n", "-2", "-o", "seg", T2, T), fix_refuses="FSL-99"),
+        ),
+        (
+            "original/v-S0",
+            "-S 0 -v: the multi-channel heading before the channels' error",
+            r(("-S", "0", "-v", T)),
+        ),
+        (
+            "original/v-missing-input",
+            "-v with an image that cannot be read: the heading is printed before it is read",
+            r(("-v", "-o", "seg", "nothere.nii.gz")),
+        ),
+        (
+            "original/v-fsldir-unset",
+            "-v with FSLDIR unset: the image lines, then FSL-100's abort",
+            r(("-v", "-o", "seg", T), unset, fix_finishes="FSL-100"),
+        ),
+        (
+            "original/multi-v-fsldir-unset",
+            "-S 2 -v with FSLDIR unset: the heading, then FSL-100's abort",
+            r(("-S", "2", "-v", "-o", "seg", T2, T), unset, fix_finishes="FSL-100"),
+        ),
+        (
+            "original/v-fsldir-unset-n-negative",
+            "-v -n -1 with FSLDIR unset: FSL-100's abort comes first",
+            r(("-v", "-n", "-1", "-o", "seg", T), unset, fix_refuses="FSL-99"),
+        ),
+        (
+            "original/nan-no-negative",
+            "NaN voxels in an image without a negative value: §4.1's rule skipped, `_restore` NaN "
+            "there (§4.1.1)",
+            r(("-B", "-b", "-o", "seg", "%t1_nan_noneg.nii.gz")),
+        ),
+        (
+            "original/nan-offset",
+            "NaN voxels in an image whose 2nd percentile is negative: the minimum subtracted, "
+            "`_restore` NaN there (§4.1.1)",
+            r(("-B", "-o", "seg", "%t1_nan_offset.nii.gz")),
+        ),
+    ]
+
+
 def _refusal(stderr: str) -> str:
     return next((ln for ln in stderr.splitlines() if ln.startswith("larmorx: error:")), "")
 
@@ -454,7 +641,7 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         for mode in (defects.REPRODUCE, defects.FIX):
             with tempfile.TemporaryDirectory(prefix="lx-fast_") as b_:
                 b = Path(b_)
-                r = run_original(rep._prepare(run, b), cwd=b, settings=settings, mode=mode)
+                r = run_original(_prepare(run, b), cwd=b, settings=settings, mode=mode)
                 checks(
                     f"the original refuses ({mode})",
                     r.code == 1 and run.refused in _refusal(r.stderr),
@@ -469,8 +656,8 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         contextlib.ExitStack() as stack,
     ):
         a, b = Path(a_), Path(b_)
-        args = rep._prepare(run, a)
-        rep._prepare(run, b)
+        args = _prepare(run, a)
+        _prepare(run, b)
         before = set(_files(a, set()))
         oracle = rep.run_oracle(args, cwd=a, settings=settings, never=run.never)
         ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
@@ -479,16 +666,14 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         if run.no_bias_field:
             # FSL-97: FSL's files hold memory it never wrote; the defined result instead
             rep._undefined_bias_field(checks, a, args)
-        band = _band_of(
-            stack, lambda t: rep._prepare(run, t), args, settings, run.never, run.unwritten
-        )
+        band = _band_of(stack, lambda t: _prepare(run, t), args, settings, run.never, run.unwritten)
         compare(checks, oracle, ours, a, b, before, band)
         if run.fix and ours.code == 0:
-            fix_pass(checks, lambda t: rep._prepare(run, t), args, settings, b, ours)
+            fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours)
     if run.fix_finishes:
         with tempfile.TemporaryDirectory(prefix="lx-fast-fix_") as b_:
             b = Path(b_)
-            r = run_original(rep._prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
+            r = run_original(_prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
             named = defects.notices_in(r.stderr)
             checks(
                 f"the default run finishes and names {run.fix_finishes}",
@@ -498,7 +683,7 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
     if run.fix_refuses:
         with tempfile.TemporaryDirectory(prefix="lx-fast-fix_") as b_:
             b = Path(b_)
-            r = run_original(rep._prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
+            r = run_original(_prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
             checks(
                 f"the default run refuses, naming {run.fix_refuses}",
                 r.code == 1 and run.fix_refuses in _refusal(r.stderr),
@@ -536,7 +721,13 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
 
 
 def cases(tier: str) -> list[Case]:
-    return list(rep.cases(tier))
+    from larmorx_validation.parity.harness import in_tier
+
+    out = list(rep.cases(tier))
+    if in_tier("standard", tier):
+        for name, desc, run in _original_cases():
+            out.append(Case(name, name.split("/")[0], desc, ("direct", run)))
+    return out
 
 
 def run_case(case: Case, checks: CheckList) -> None:

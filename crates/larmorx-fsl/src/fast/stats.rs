@@ -172,10 +172,35 @@ impl Gauss {
     }
 }
 
+/// `a / b` with x86-64's NaN on every platform: a NaN made from numbers (`0 / 0`) is SSE's
+/// default NaN, with the sign bit set, as FAST's (`-nan` in its messages); a NaN operand is
+/// passed on.
+#[inline]
+pub fn div_sse(a: f64, b: f64) -> f64 {
+    let r = a / b;
+    if r.is_nan() && !a.is_nan() && !b.is_nan() {
+        f64::from_bits(0xfff8_0000_0000_0000)
+    } else {
+        r
+    }
+}
+
 /// Each class's mean and variance from the posteriors `post` (`n` per voxel) and the values
-/// `y` over the mask (§4.4): `μ = Σ p y / Σ p` rounded to single, `σ² = Σ p y y / Σ p - μ²`
-/// with the quotient in double and `μ²` in single, rounded to single.
-pub fn class_stats(post: &[f32], y: &[f32], n: usize, len: usize) -> Vec<(f32, f32)> {
+/// `y` over the mask (§4.4): `μ = Σ p y / Σ p` rounded to single; the variance `Σ p y y / Σ p -
+/// μ²` with the second moment's quotient in double and
+/// - by default (FSL-202 corrected) `μ²` the square of the **double-precision** mean, in double;
+/// - with `fsl_variance` (FSL-202 reproduced) FAST's `μ²`, the single-precision square of the
+///   single-precision mean, which cancels most digits in the log domain;
+///
+/// the difference rounded to single. Also returns whether a class's variance differs between
+/// the two (the default names FSL-202 then).
+pub fn class_stats(
+    post: &[f32],
+    y: &[f32],
+    n: usize,
+    len: usize,
+    fsl_variance: bool,
+) -> (Vec<(f32, f32)>, bool) {
     // Σ p, Σ p y, Σ p y y of each class, FSL's blocked sums (in parallel, [`blocked_sums`])
     let sums = blocked_sums(y.len(), len, 3 * n, |i, part| {
         let yi = y[i];
@@ -187,18 +212,27 @@ pub fn class_stats(post: &[f32], y: &[f32], n: usize, len: usize) -> Vec<(f32, f
             part[3 * c + 2] += f64::from(pyy);
         }
     });
-    sums.as_chunks::<3>()
+    let mut differs = false;
+    let out = sums
+        .as_chunks::<3>()
         .0
         .iter()
         .map(|s| {
             let w = s[0];
-            let mean = (s[1] / w) as f32;
+            let exact_mean = div_sse(s[1], w);
+            let mean = exact_mean as f32;
             // the second moment stays in double (observed against FSL with correctly rounded
-            // maths, 2026-11-03: the spec's single-precision quotient gives other variances)
-            let var = (s[2] / w - f64::from(mean * mean)) as f32;
-            (mean, var)
+            // maths, 2026-11-03; spec §4.4)
+            let second = div_sse(s[2], w);
+            let fsl = (second - f64::from(mean * mean)) as f32;
+            let exact = (second - exact_mean * exact_mean) as f32;
+            if fsl.to_bits() != exact.to_bits() && !(fsl.is_nan() && exact.is_nan()) {
+                differs = true;
+            }
+            (mean, if fsl_variance { fsl } else { exact })
         })
-        .collect()
+        .collect();
+    (out, differs)
 }
 
 #[cfg(test)]
@@ -230,5 +264,41 @@ mod tests {
         assert_eq!(percentile(&v, 0.5), 3.0);
         assert!(percentile(&v, 2.0).is_nan());
         assert_eq!(percentile(&[], 0.5), 0.0);
+    }
+
+    #[test]
+    fn variances_fsl202() {
+        // log intensities of a white-matter-like class: μ about 6.5, σ² about 4e-3
+        let y: Vec<f32> = (0..2000)
+            .map(|i| 6.5 + ((i * 37 % 101) as f32 - 50.0) * 0.002)
+            .collect();
+        let post: Vec<f32> = (0..2000).map(|i| 0.25 + (i % 7) as f32 * 0.1).collect();
+        let (fsl, d1) = class_stats(&post, &y, 1, 10_001, true);
+        let (fix, d2) = class_stats(&post, &y, 1, 10_001, false);
+        assert_eq!(d1, d2);
+        assert_eq!(
+            fsl[0].0, fix[0].0,
+            "the mean is the same single-precision quotient"
+        );
+        // the exact weighted variance, in double, against both
+        let (mut sw, mut s1) = (0f64, 0f64);
+        for (p, v) in post.iter().zip(&y) {
+            sw += f64::from(*p);
+            s1 += f64::from(*p) * f64::from(*v);
+        }
+        let m = s1 / sw;
+        let mut s2 = 0f64;
+        for (p, v) in post.iter().zip(&y) {
+            s2 += f64::from(*p) * (f64::from(*v) - m) * (f64::from(*v) - m);
+        }
+        let exact = s2 / sw;
+        let e_fix = ((f64::from(fix[0].1) - exact) / exact).abs();
+        let e_fsl = ((f64::from(fsl[0].1) - exact) / exact).abs();
+        assert!(e_fix < 1e-4, "{e_fix}");
+        assert!(d1 && e_fsl > e_fix, "{e_fsl} {e_fix}");
+        // a class without weight: SSE's default NaN (-nan) in both, nothing differs
+        let (z, d) = class_stats(&[0.0; 4], &[1.0; 4], 1, 10_001, false);
+        assert_eq!(z[0].0.to_bits(), 0xffc0_0000);
+        assert!(z[0].1.is_nan() && !d);
     }
 }

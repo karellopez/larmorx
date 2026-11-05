@@ -1,0 +1,11 @@
+--- a/crates/larmorx-fsl/src/cli/fast.rs
++++ b/crates/larmorx-fsl/src/cli/fast.rs
+@@ -877,7 +877,7 @@
+         fsl_variance: !fix,
+         // quiet: FAST names no GLIBC-07 (its iterations cannot tell whether a last bit of its
+         // functions moved the segmentation; the user's decision of 2026-11-04)
+-        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
++        libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(if std::env::var_os("LXM_GLIBC").is_some() { UpstreamDefects::Reproduce } else { mode })),
+     };
+     let result = larmorx_core::parallel::with_threads(n_threads, || {
+         // standard output as FAST buffers it (§7: an abort loses the lines not yet flushed)

@@ -486,6 +486,18 @@ pub fn run(
         );
         return 1;
     }
+    let multi = o.channels != 1;
+    if o.verbose {
+        // printed before the images are read (observed: with an image that cannot be read, or
+        // -S 0); this line and the image lines below flush standard output (§7)
+        let heading = if multi {
+            "Starting Multi Image Segmentation"
+        } else {
+            "Starting Single Image Segmentation"
+        };
+        let _ = writeln!(out, "{heading}");
+        let _ = out.flush();
+    }
     if o.channels < 1 {
         let _ = write!(
             err,
@@ -493,7 +505,6 @@ pub fn run(
         );
         return 1;
     }
-    let multi = o.channels > 1;
     if o.images.len() < o.channels as usize {
         return refuse(
             err,
@@ -524,50 +535,6 @@ pub fn run(
             );
         }
         notices.push(n);
-        if o.n_classes < 0 {
-            print_notices(err, &notices);
-            if multi {
-                return abort(
-                    err,
-                    "fast",
-                    "std::logic_error",
-                    "Mat::init(): requested size is too large",
-                );
-            }
-            let what = if o.n_classes == -1 {
-                "vector::_M_fill_insert"
-            } else {
-                "vector::_M_default_append"
-            };
-            return abort(err, "fast", "std::length_error", what);
-        }
-    }
-    // FSL-100: FAST reads FSLDIR (for its standard priors) whether or not -a is given, unless
-    // -A names the priors (observed: `-A a b c` without FSLDIR segments)
-    if settings.get("FSLDIR").is_none() && o.priors.is_none() {
-        match mode {
-            UpstreamDefects::Reproduce => {
-                print_notices(
-                    err,
-                    &[Notice::new(
-                        &defects::FSL_100,
-                        mode,
-                        "FSLDIR is unset: FAST aborts before it segments",
-                    )],
-                );
-                return abort(
-                    err,
-                    "fast",
-                    "std::logic_error",
-                    "basic_string: construction from null is not valid",
-                );
-            }
-            UpstreamDefects::Fix => notices.push(Notice::new(
-                &defects::FSL_100,
-                mode,
-                "FSLDIR is unset: segmented without it (no standard priors used); FAST aborts there",
-            )),
-        }
     }
     let n_threads = settings.threads();
     // the channels, channel 1 first (the last word)
@@ -631,56 +598,133 @@ pub fn run(
         }
         sizes_differ = true;
     }
-    if o.verbose {
-        if multi {
-            let _ = writeln!(out, "Starting Multi Image Segmentation");
-        } else {
-            let _ = writeln!(out, "Starting Single Image Segmentation");
-            let _ = writeln!(
-                out,
-                "{}",
-                match o.image_type {
-                    2 => "T2-weighted image",
-                    3 => "PD-weighted image",
-                    _ => "T1-weighted image",
-                }
-            );
-            let _ = writeln!(
-                out,
-                "Imagesize : {} x {} x {}",
-                shape[0], shape[1], shape[2]
-            );
-            let _ = writeln!(
-                out,
-                "Pixelsize : {} x {} x {}",
-                g(f64::from(voxel[0])),
-                g(f64::from(voxel[1])),
-                g(f64::from(voxel[2]))
-            );
-            let _ = writeln!(out);
+    if o.verbose && !multi {
+        let _ = writeln!(
+            out,
+            "{}",
+            match o.image_type {
+                2 => "T2-weighted image",
+                3 => "PD-weighted image",
+                _ => "T1-weighted image",
+            }
+        );
+        let _ = writeln!(
+            out,
+            "Imagesize : {} x {} x {}",
+            shape[0], shape[1], shape[2]
+        );
+        let _ = writeln!(
+            out,
+            "Pixelsize : {} x {} x {}",
+            g(f64::from(voxel[0])),
+            g(f64::from(voxel[1])),
+            g(f64::from(voxel[2]))
+        );
+        let _ = writeln!(out);
+        let _ = out.flush();
+    }
+    // FSL-100: FAST reads FSLDIR (for its standard priors) whether or not -a is given, unless
+    // -A names the priors (observed: `-A a b c` without FSLDIR segments); after the image lines
+    // (observed: FAST prints them, then aborts)
+    if settings.get("FSLDIR").is_none() && o.priors.is_none() {
+        match mode {
+            UpstreamDefects::Reproduce => {
+                print_notices(
+                    err,
+                    &[Notice::new(
+                        &defects::FSL_100,
+                        mode,
+                        "FSLDIR is unset: FAST aborts before it segments",
+                    )],
+                );
+                return abort(
+                    err,
+                    "fast",
+                    "std::logic_error",
+                    "basic_string: construction from null is not valid",
+                );
+            }
+            UpstreamDefects::Fix => notices.push(Notice::new(
+                &defects::FSL_100,
+                mode,
+                "FSLDIR is unset: segmented without it (no standard priors used); FAST aborts there",
+            )),
         }
+    }
+    // FSL-99 reproduced with fewer than 0 classes: FAST aborts once the images are read and the
+    // image lines printed (observed), after FSL-100's abort
+    if o.n_classes < 0 {
+        print_notices(err, &notices);
+        if multi {
+            return abort(
+                err,
+                "fast",
+                "std::logic_error",
+                "Mat::init(): requested size is too large",
+            );
+        }
+        let what = if o.n_classes == -1 {
+            "vector::_M_fill_insert"
+        } else {
+            "vector::_M_default_append"
+        };
+        return abort(err, "fast", "std::length_error", what);
     }
     let manual = o
         .manual
         .as_ref()
         .and_then(|f| std::fs::read_to_string(settings.path(f)).ok())
         .map(|t| stream_floats(&t));
-    // §4.1: the negative values, the mask
+    // §4.1: the negative values, the mask. FSL-203: an input whose first voxel is NaN (any
+    // channel) has FAST's extrema NaN
+    let fix = mode.fix();
+    let nan_first: Vec<&str> = channels
+        .iter()
+        .filter(|c| c.input.vol.data.first().is_some_and(|v| v.is_nan()))
+        .map(|c| c.name.as_str())
+        .collect();
+    if !nan_first.is_empty() {
+        let names = nan_first.join(", ");
+        let empty = if multi {
+            ""
+        } else {
+            " and, with one channel, its mask (between 0 and the maximum + 1) is empty"
+        };
+        notices.push(Notice::new(
+            &defects::FSL_203,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => format!(
+                    "the first voxel of {names} is NaN: the image's minimum and maximum taken over the voxels that are not NaN; FAST's are NaN (they start from the first voxel), so it skips the rule for negative values{empty}"
+                ),
+                UpstreamDefects::Reproduce => format!(
+                    "the first voxel of {names} is NaN: the image's minimum and maximum are NaN, as FAST's (they start from the first voxel): the rule for negative values skipped{empty}"
+                ),
+            },
+        ));
+    }
     for c in channels.iter_mut() {
         // on the call's pool (its parallel parts would otherwise use rayon's global pool)
         let data = &mut c.input.vol.data;
-        if let Err(e) =
-            larmorx_core::parallel::with_threads(n_threads, || fast::single::negative_rule(data))
-        {
+        if let Err(e) = larmorx_core::parallel::with_threads(n_threads, || {
+            fast::single::negative_rule(data, !fix)
+        }) {
             return refuse(err, &notices, &e.to_string());
         }
     }
-    let bound = fast::single::maximum(&channels[0].input.vol.data) + 1.0;
+    // FAST's bound (NaN for a NaN first voxel, FSL-203), and the one of the corrected extrema,
+    // against which FSL-103's change is counted in both modes
+    let data0 = &channels[0].input.vol.data;
+    let bound_fixed = fast::single::maximum(data0, false) + 1.0;
+    let bound = if fix {
+        bound_fixed
+    } else {
+        fast::single::maximum(data0, true) + 1.0
+    };
     if !multi {
-        let data = &channels[0].input.vol.data;
-        let differ = data
+        let differ = data0
             .iter()
-            .filter(|&&v| fast::single::in_mask(v) != fast::single::in_fsl_mask(v, bound))
+            .filter(|&&v| fast::single::in_mask(v) != fast::single::in_fsl_mask(v, bound_fixed))
             .count();
         if differ > 0 {
             notices.push(Notice::new(
@@ -689,19 +733,36 @@ pub fn run(
                 match mode {
                     UpstreamDefects::Fix => format!(
                         "the mask keeps the {differ} voxels equal to the image's maximum ({}); FAST's leaves them out (its bound, the maximum + 1, rounds to the maximum in single precision)",
-                        g(f64::from(bound))
+                        g(f64::from(bound_fixed))
                     ),
                     UpstreamDefects::Reproduce => format!(
                         "the mask leaves out the {differ} voxels equal to the image's maximum ({}), as FAST's does",
-                        g(f64::from(bound))
+                        g(f64::from(bound_fixed))
                     ),
                 },
             ));
         }
     }
     if o.n_classes == 0 {
-        // FSL-99 with reproduce: no classes
+        // FSL-99 with reproduce: FAST runs its loops without a class (-v prints their lines),
+        // then with one channel and partial volumes aborts
+        let zp = Params {
+            n_classes: 0,
+            bias_iterations: o.bias_iterations,
+            f_hard: o.f_hard,
+            init_iterations: o.init_iterations,
+            fixed_iterations: o.fixed_iterations,
+            hyper: o.hyper,
+            pve: o.pve,
+            verbose: o.verbose,
+            ..Params::default()
+        };
+        let mut text = fast::Buffered::default();
+        let mut etext: Vec<u8> = Vec::new();
+        fast::zero_classes(&zp, channels.len(), &mut text, &mut etext);
+        let _ = err.write_all(&etext);
         if o.pve && !multi {
+            let _ = out.write_all(text.flushed());
             print_notices(err, &notices);
             return abort(
                 err,
@@ -710,6 +771,7 @@ pub fn run(
                 "Mixeltype exceeds allowed types",
             );
         }
+        let _ = out.write_all(text.all());
         let zeros = vec![0i32; shape.iter().product()];
         return write_outputs(
             o,
@@ -722,7 +784,6 @@ pub fn run(
             err,
         );
     }
-    let fix = mode.fix();
     let in_mask = |i: usize| -> bool {
         if multi {
             channels.iter().all(|c| c.input.vol.data[i] > 0.0)
@@ -813,12 +874,14 @@ pub fn run(
         priors: priors.take(),
         priors_throughout: o.priors_throughout,
         fsl98_pairing: !fix,
+        fsl_variance: !fix,
         // quiet: FAST names no GLIBC-07 (its iterations cannot tell whether a last bit of its
         // functions moved the segmentation; the user's decision of 2026-11-04)
         libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),
     };
     let result = larmorx_core::parallel::with_threads(n_threads, || {
-        let mut text: Vec<u8> = Vec::new();
+        // standard output as FAST buffers it (§7: an abort loses the lines not yet flushed)
+        let mut text = fast::Buffered::default();
         let mut etext: Vec<u8> = Vec::new();
         let r = if multi {
             let data: Vec<&[f32]> = channels.iter().map(|c| &c.input.vol.data[..]).collect();
@@ -850,12 +913,17 @@ pub fn run(
         Ok(x) => x,
         Err(e) => return refuse(err, &notices, &e.to_string()),
     };
-    let _ = out.write_all(&text);
     let _ = err.write_all(&etext);
+    // FAST's aborts write what was flushed; its other exits everything
+    let _ = out.write_all(match r {
+        Err(Stop::Singular | Stop::Sizes) => text.flushed(),
+        _ => text.all(),
+    });
     let what = match r {
         Ok(w) => w,
         Err(Stop::KMeans) => {
             let _ = writeln!(out, "Exception: Not enough classes detected to init KMeans");
+            let _ = out.flush();
             print_notices(err, &notices);
             return 255;
         }
@@ -885,6 +953,16 @@ pub fn run(
     if let Outputs::Single(s) = &what {
         for _ in 0..s.empty_sums {
             let _ = writeln!(err, "ERROR:: Empty mask image");
+        }
+        if s.variance_differs {
+            notices.push(Notice::new(
+                &defects::FSL_202,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => "the classes' variances subtract the square of the double-precision mean; FAST squares the single-precision mean in single precision, which cancels most digits in the log domain (the variances of small-spread classes a few tenths of a percent off)",
+                    UpstreamDefects::Reproduce => "the classes' variances subtract the single-precision square of the single-precision mean, as FAST's (most digits cancel in the log domain)",
+                },
+            ));
         }
     }
     if let Outputs::Multi(m) = &what {
@@ -1175,18 +1253,13 @@ fn write_outputs(
     };
     if o.restore {
         for (c, ch) in channels.iter().enumerate() {
-            // NaN voxels are written as 0, the others outside the mask as they are (observed: a
-            // voxel equal to a maximum of 2^25, outside FSL-103's mask, keeps its value)
-            let mut v: Vec<f32> = ch
-                .input
-                .vol
-                .data
-                .iter()
-                .map(|&x| if x.is_nan() { 0.0 } else { x * outside })
-                .collect();
+            // the image after §4.1's rule for negative values times the correction: outside the
+            // mask a voxel keeps its value (observed: a voxel equal to a maximum of 2^25, outside
+            // FSL-103's mask, keeps its value), a NaN voxel stays NaN unless the rule's second
+            // branch set it to 0 (§4.1.1, observed)
+            let mut v: Vec<f32> = ch.input.vol.data.iter().map(|&x| x * outside).collect();
             for (i, &idx) in grid.index.iter().enumerate() {
-                let x = ch.input.vol.data[idx as usize];
-                v[idx as usize] = if x.is_nan() { 0.0 } else { x } * correction(c, i);
+                v[idx as usize] = ch.input.vol.data[idx as usize] * correction(c, i);
             }
             let own = output_of(ch, input.vol.shape, ext, mode, n_threads);
             if !write(suffix("_restore", c), Values::F32(v), &mut notices, &own) {

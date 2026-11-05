@@ -213,6 +213,42 @@ def test_channels_options_and_priors(scripts, tmp_path):
     assert r.bias_fields is not None and len(r.bias_fields) == 2
 
 
+def test_the_originals_variance_nan_voxels_and_first_voxel(scripts, tmp_path):
+    """The clean-room original (the catch-up of 2026-11-05): FSL-202's variance corrected and
+    named by default; a NaN voxel of an image without a negative value stays NaN in
+    ``_restore`` (``specs/fast.md`` §4.1.1); a NaN first voxel (FSL-203) is corrected and named,
+    and with ``reproduce`` FAST's empty mask stops the run as FAST does (exit 255)."""
+    rng = np.random.default_rng(3)
+    data = np.zeros((10, 10, 6), np.float32)
+    data[2:8, 2:8, 1:5] = rng.choice([100.0, 200.0, 300.0], size=(6, 6, 4)) + rng.normal(
+        0, 4, (6, 6, 4)
+    ).astype(np.float32)
+    data[5, 5, 2] = np.nan
+    # a radiological grid (x reversed): the first voxel FAST reads is data[0, 0, 0]
+    grid = np.diag([-2.0, 2.0, 2.0, 1.0])
+    path = tmp_path / "nan.nii"
+    lx.save((data, grid), path)
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-202"):
+        r = lx.fsl.fast(path, implementation="original", restored=True, bias_iterations=1)
+    assert r.restored is not None
+    restored = np.asarray(r.restored[0].data)
+    assert np.isnan(restored[5, 5, 2]) and np.isfinite(restored[2, 2, 1])
+    data[0, 0, 0] = np.nan
+    first = tmp_path / "first.nii"
+    lx.save((data, grid), first)
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-203"):
+        f = lx.fsl.fast(first, implementation="original", bias_iterations=1, pve=False)
+    seg = np.asarray(f.segmentation.data)
+    # every brain voxel segmented but the NaN one (outside the mask); FAST's mask is empty
+    inside = seg[2:8, 2:8, 1:5]
+    assert int((inside == 0).sum()) == 1 and set(np.unique(inside)) == {0, 1, 2, 3}
+    with (
+        pytest.warns(lx.UpstreamDefectWarning, match="FSL-203"),
+        pytest.raises(RuntimeError, match="Not enough classes"),
+    ):
+        lx.fsl.fast(first, implementation="original", upstream_defects="reproduce")
+
+
 def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
     program = stub(scripts)
     path = volume(tmp_path)

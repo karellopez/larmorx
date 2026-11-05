@@ -19,6 +19,9 @@ environment (FSL never on the `PATH`), and larmorx's clean-room original (`LARMO
 | `quatern_probe.py <dir> <inputs...>` | FSL's rewritten quaternion against the standard's conversions in several precisions |
 | `bench.py --larmorx <bin> [--replica <bin>] --threads 1,16 [--tool betsurf --args "..."] [--json <report>] <name>=<file>[,<file>...]...` | the benchmark of [docs/benchmarks/fsl-bet.md](../../../docs/benchmarks/fsl-bet.md): FSL 6.0.7.23, the replica and the original on the same calls, the median of `--repeat` runs, a JSON report in the form of `docs/benchmarks/*.json` |
 | `site_inventory.py count <site> fsl-bet`, `compare <before> <after>` | the site page's evidence counted (examples, panels, comparisons, arrays, blobs and their bytes, cases per implementation, speed rows), and the proof that an export lost nothing (after >= before) |
+| `ssroi_fsl_runs.py <dir> <case regex> [--args "..."] [--env NAME=VALUE]` | FSL 6.0.7.23's runs of the BET suite's `ssroi/`, `fslroi/` and `defects/` cases through the oracle cache: exit status, both streams, the files written (the clean-room catch-up, relay 5, 2026-11-05) |
+| `ssroi_stage_probe.py <dir> <case id>` | a standard_space_roi case run stage by stage: FSL's `-d` matrix given to FSL and to the original (`-d -applyxfm -init`), every image's differing header fields and values |
+| `fit_translate.py <root>` | which arithmetic gives FSL's fslroi translations on two neurologically stored real images (the frame, each product's precision, the terms' order): the model of `larmorx_fsl::cli::fslroi::translate` (`docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi") |
 
 The reruns' probes (`variants.py`, `variants2.py` in the part's notes) needed a temporary build
 with each candidate rule; their results are listed in the findings ("Reruns").

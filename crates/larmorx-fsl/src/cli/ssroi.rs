@@ -928,7 +928,7 @@ fn reference_dims(settings: &Settings, name: &str, mode: UpstreamDefects) -> [i6
     let files = crate::cli::bet2::resolve_image(settings, name, mode, &mut Vec::new()).ok();
     files
         .and_then(|f| larmorx_io::nifti::read_header(&f.header).ok())
-        .map_or([0, 0, 0], |h| [1, 2, 3].map(|k| i64::from(h.dim[k])))
+        .map_or([0, 0, 0], |h| [1, 2, 3].map(|k| h.dim[k]))
 }
 
 /// fslpy's `imcp <src> <dest>` (§2.5): the source's files copied when they are in

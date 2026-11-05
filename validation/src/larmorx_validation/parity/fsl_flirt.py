@@ -1468,6 +1468,26 @@ def _original_cases() -> list[tuple[str, str, rep.Run]]:
             ),
         ),
         (
+            "out/display-range",
+            "-applyxfm onto FSL's MNI152_T1_2mm (display range 3000 to 8000): -out's range 0 and 0, "
+            "as FSL writes it whatever the reference's (catch-up relay 5)",
+            r(
+                "flirt",
+                (
+                    "-in",
+                    T,
+                    "-ref",
+                    str(rep.fsldir() / "data/standard/MNI152_T1_2mm"),
+                    "-applyxfm",
+                    "-init",
+                    "eye.mat",
+                    "-out",
+                    "out",
+                ),
+                files=(("eye.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),),
+            ),
+        ),
+        (
             "debug/bbr-setoption",
             "-debug -wmseg: the boundary-based cost set up by setoption and by a new pair",
             r(

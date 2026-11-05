@@ -282,3 +282,83 @@ The probes: `night_case.py`, `compare.py` and `retrial.py`
 ([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)), and for the
 reading beyond the image a temporary build (not kept: three variants of the sample at a point
 outside the image, chosen by an environment variable).
+
+## standard_space_roi and fslroi (the clean-room catch-up, relay 5, 2026-11-05)
+
+The clean-room originals of FLIRT's `standard_space_roi` script and of `fslroi`
+(`larmorx_fsl::cli::ssroi`, `::fslroi`), written from
+[`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) and `specs/bet.md` §5.4 (FSL's
+standard images, `larmorx_fsl::data`), and these black-box runs of FSL 6.0.7.23 through the
+oracle-output cache (`ssroi_fsl_runs.py`, `ssroi_stage_probe.py`, `fit_translate.py` in
+[`validation/investigations/cleanroom-bet/`](../../validation/investigations/cleanroom-bet/README.md)).
+The BET suite's 57 cases of the two programs (`ssroi/`, `fslroi/` and the six `defects/` cases of
+FSL-211 to FSL-214) all pass or are refused by both: every `standard_space_roi` case is FSL's
+**bit for bit**, the six real images included (an adult, a 3.5-year-old with `-b -d`, an
+82-year-old with `-maskFOV -roiNONE -d`, a tumour with `-roiMASK`, a Philips T1w with `-b
+-maskMASK`, a T2w): the original's FLIRT gives FSL's matrices on every one, and every later file
+follows.
+
+- **fslroi's matrices** (§3.2; `fit_translate.py`): FSL computes the box's new sform and qform in
+  the frame it holds the image in. For an image held mirrored (stored neurologically) the matrix
+  of that frame, `M·F(nx)`, has its translation `M₀·(nx − 1) + M₃` in single precision (the
+  product and the sum each rounded); the output's translation is that matrix applied, in double,
+  to the held voxel of the box's first file voxel, `(nx − 1 − x₀, y₀, z₀)`, then stored in
+  single precision. The direct `t + M·corner` in double is one unit in the last place away on
+  ds005003's T1w (x: −70.20059204 against −70.20058441); a single-precision chain through the
+  three products is one unit away on ds000256's oblique T2w (y). The model fits all twelve rows
+  (both matrices of both images) and every phantom of the suite. A matrix whose code is 0 is kept
+  (`fslroi/type-head-noxform`).
+- **fslroi's messages**: an exception is two lines on standard error, `Image Exception : #<n> ::
+  <what>` then `<what>` (#21 `Invalid ROI dimensions`, #5 `Out of Bounds (time index)`, #63 `No
+  image files match: <name without extension>`).
+- **FLIRT's `-out`** (found here, corrected in the FLIRT original; the case
+  `out/display-range` of FLIRT's suite): FSL writes the display range `cal_min = cal_max = 0`
+  whatever the reference's (MNI152_T1_2mm has 3000 and 8000): in a registration's `-out`,
+  `-applyxfm`, `-applyisoxfm`, every interpolation, `-datatype float` or not. The original kept the
+  reference's; `standard_space_roi -d`'s `<out>_tmp_to_std` showed it.
+- **The script's tests** (FSL-211, `reproduce`): an output name with blanks makes the script's
+  test of its second argument print `standard_space_roi: line 112: [: too many arguments`, as
+  `[ X$2 = X ]` does; an option with blanks ends the options with `line 133: [: syntax error:
+  `-maskNONE' unexpected`, as `[ _$1 != _ ]` does (the options' loop). These forms are inferred from
+  the messages (the script was not read); the original evaluates them with GNU bash 5.2's `test`
+  rules (its argument-count cases, `-a`, `-o`, `!`, parentheses, the unary and binary operators;
+  a leftover argument gives `syntax error: `<it>' unexpected` when it starts with `-`, else `too
+  many arguments`). An input, reference or mask name with blanks is "not valid" (FSL's `imtest`
+  of several words). For a spec writer: whether the script tests other names unquoted (the
+  replica's `[` messages for other options with blanks were not observed).
+- **The cascade** (FSL-214, `reproduce`): after FLIRT refuses an option, FSL's script goes on and
+  every later program prints its own failure: FLIRT's `Could not open matrix file
+  <out>_tmp_to_std.mat` and `Cannot read input-matrix`, `convert_xfm`'s `matrix multiplication:
+  incompatible matrix dimensions: 4x4 and 0x0`, fslmaths' abort with bash's report (`<script>:
+  line 229: <pid> Aborted` and the command as the script writes it), `fslstats -w` silent on
+  standard output so that `fslroi` prints its usage, then the cleanup. The original's programs
+  print FSL's text in each of these places: the cases `defects/flirt-refuses`,
+  `defects/option-blank` and `defects/output-blank` are FSL's byte for byte.
+- **FSL given its own matrix** (the suite's stage check): `standard_space_roi ... -applyxfm -init
+  <its own -d matrix>` gives FSL's `-d` files exactly on a phantom, but not in general: on the
+  3.5-year-old's T1w the input resampled on MNI152's grid (`<out>_tmp_to_std`) differs in 4,122
+  of 902,629 voxels near the field of view's edges (the matrix's text against FLIRT's own
+  double-precision matrix). The stage check therefore compares the original with FSL's own run
+  from the same matrix's text.
+- **imcp's conversion** (§2.5): FSL's (fslpy's, through nibabel) `.nii` copy of a `.nii.gz`
+  input is the input's decompressed bytes (`ssroi/phantom-none-convert`); the original converts
+  by the files' layout (the same header and data; a pair's magic and offset where the layout
+  changes) and passes. The replica refuses that case (pending).
+- **FSL's standard images** (§5.4): the original's download of FSL's `fsl-data_standard`
+  2208.0-0 (196,312,969 bytes from FSL's site, once, with `curl`) took 17 s on the main machine,
+  13.6 MB of memory (the package checked by its size and SHA-256, its bzip2 tar read only until
+  the three images, each checked): the three files are FSL 6.0.7.23's byte for byte. CI never
+  downloads: the unit tests serve a package of their own as a local file
+  (`LARMORX_FSL_DATA_PACKAGE`), with a changed byte, another size and another member refused.
+- **Speed** (§7; the adult's T1w of ds000005 to MNI152 2 mm with the defaults, the main
+  machine): FSL 21.3 s (one thread, the oracle cache's run), the replica 15.5 s at 1 thread and
+  14.6 s at 16, the original 11.5 s at 1 thread and 2.6 s at 16 (its FLIRT's threads), the same
+  output. The registration is almost all of it; the original also writes its temporary images
+  uncompressed without `-d` and resamples the field of view once when it is both the mask and
+  the region. Memory (`tests/parity/test_memory_peak.py`, the suite's 96 × 112 × 84 head with
+  `-b`): the original 58 MiB, FSL 67 MiB (its largest program); `fslroi` of the 30-volume int16
+  series 69 MiB against FSL's 61 (the input and the box; the allowance 81).
+
+Left for relay 6 (BET's options): `bet -F` and `-Z` of an int8 image (FSL-217 inside bet: the
+suite's `bet/fmri-int8`, `bet/small-fov-int8`, `bet/small-fov-int8-debug`, still in
+`ORIGINAL_PENDING_CASES`), and `bet -S`, `-B`, `-A`, `-A2`, which run these programs.

@@ -377,3 +377,26 @@ and of the `larmorx-nc` replica's program, and the defect register's FSL-187 row
 | Module | What changed | From |
 |---|---|---|
 | `maths::filters` (`direct_volume`, `convolve_in_place`) | where FSL convolves by its FFT (§10.2's criterion), the direct sum's products in double precision added to a double-precision sum, rounded once to single precision (FSL's direct path keeps §10.2's single-precision sum); the same order of taps, NaN rules and bits at any thread count | findings 31 (the page's `-kernel sphere 21 -fmean` against its exact result; `fft_cases_reference.py` on the record's FFT cases) |
+
+## standard_space_roi and fslroi (the clean-room catch-up, relay 5, 2026-11-05)
+
+Written by a clean-room implementer under the same rules (FSL's source, the scripts' text in
+`~/fsl-6.0.7.23/bin`, the replica crates (`crates-nc/` with its `wheel-data/` and manifest
+scripts), the source-derived findings, the register's restricted sections, `docs/parts/` and
+`validation/probes/` not opened; FSL's standard images read only as data files, by path). Its
+only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) (FSL 6.0.7.23's `standard_space_roi`, fsl-flirt 2111.4, and `fslroi`, fsl-avwutils 2209.6) | the command lines, the usages, the work's steps and their files, the messages and statuses, bash's report of an abort (its lines and commands), fslpy's `imcp`, the types and the region, FSL-211 to FSL-215 and FSL-217 |
+| [`specs/bet.md`](../../specs/bet.md) §5.4 | FSL's standard images: their sizes and SHA-256, FSL's package (its address, size and SHA-256, its members), the order of the search, the refusal |
+| Black-box runs of FSL 6.0.7.23's `standard_space_roi`, `fslroi` and `flirt` through the oracle cache (`validation/investigations/cleanroom-bet/ssroi_fsl_runs.py`, `ssroi_stage_probe.py`, `fit_translate.py`; the BET suite's cases) | the observations of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "standard_space_roi and fslroi": fslroi's matrices through the held frame, the script's two tests' forms, FLIRT's `-out` display range |
+| GNU bash 5.2's `test` builtin run on this machine (its messages for argument lists with extra words) | `[`'s evaluation and messages for names split at blanks (FSL-211, `reproduce`) |
+| One download of FSL's `fsl-data_standard-2208.0-0.tar.bz2` from FSL's site (2026-11-05) | the package's tar layout (its members `data/standard/<image>.nii.gz`) and the three images' bytes, checked against the spec's checksums; not kept in the repository |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::fslroi` | `fslroi`'s three forms, `atoi`'s numbers, the region (sizes of −1, a box outside the image, the time range), the output type (`-odt input`'s rule), the matrices moved to the box's corner (FSL's held-frame arithmetic), the messages, FSL-215, FSL-217 | spec §3, black-box (`fit_translate.py`) |
+| `cli::ssroi` | the script's options, usage and checks, the five steps run in this process with the original's programs (their messages, bash's `Aborted` report), the field of view resampled once where it is both the mask and the region, the temporary images uncompressed without `-d`, fslpy's `imcp` (a copy, or the layout converted), the cleanup; FSL-211 (bash's splitting and `[`'s messages), FSL-212, FSL-213, FSL-214 | spec §2, §6, §7, black-box |
+| `data` | FSL's standard images found as §5.4 says: the named directory, larmorx-nc's copy read as data (checked), `$FSLDIR`, larmorx's data cache filled once by a checksum-verified download (`curl`, else `wget`) of FSL's package, only its three images kept with a manifest; the refusal naming every place looked | `specs/bet.md` §5.4; the decision log, 2026-11-04 |
+| `flirt::engine` (the `-out` writers) | `-out`'s display range 0 and 0 | black-box (findings) |

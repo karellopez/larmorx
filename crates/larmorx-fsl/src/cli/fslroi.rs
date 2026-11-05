@@ -225,7 +225,7 @@ fn run(
         v => v,
     };
     let mut header = header;
-    let flip = flipped.then_some((dims[0], bounds[0].1, shape[0]));
+    let flip = flipped.then_some(dims[0]);
     translate(&mut header, [bounds[0].0, bounds[1].0, bounds[2].0], flip);
     let img: Img<u8> = Img {
         dims: shape,
@@ -331,49 +331,40 @@ fn cut<T: Num>(data: &[T], (dims, flipped, bounds, shape): Geometry) -> Vec<T> {
 }
 
 /// The sform and qform (each with its code set) translated so that the file's voxel `corner`
-/// becomes voxel `(0, 0, 0)` with the same world position (§3.2). FSL computes the new matrix in
-/// the frame it holds the image in, with single-precision products and sums (observed,
-/// 2026-11-05: a neurologically stored T1w's x translation one unit in the last place from the
-/// direct `t + M·corner`): for an image held mirrored (`flipped`, `nx` voxels along x, the box's
-/// last x `last_x` and `nx_out` voxels wide), `M·F(nx)·T(c)·F(nx_out)` with `c` the box's corner
-/// in the mirrored frame (`F(n)`: x to `n − 1 − x`); else `M·T(corner)`; each element
-/// `((a₀b₀ + a₁b₁) + a₂b₂) + a₃b₃`. NIfTI-2's double matrices: the same in double. A matrix
-/// whose code is 0 is kept.
-pub fn translate(h: &mut NiftiHeader, corner: [i64; 3], flip: Option<(usize, i64, usize)>) {
+/// becomes voxel `(0, 0, 0)` with the same world position (§3.2), as FSL computes it (observed,
+/// 2026-11-05: fitted on every row of both matrices of two neurologically stored real images,
+/// ds005003's T1w and ds000256's oblique T2w, where other orders are a unit in the last place
+/// away; `validation/investigations/cleanroom-bet/fit_translate.py`): the matrix of the frame
+/// FSL holds the image in, `A = M·F(nx)` for an image held mirrored (`flip`: `nx` voxels along
+/// x; `F(n)` takes x to `n − 1 − x`), its elements in single precision (`M₀·(nx − 1) + M₃`, the
+/// product and the sum each rounded), and `A = M` otherwise; then the output's translation is
+/// `A` applied in double to the held voxel of the box's first file voxel (`(nx − 1 − x₀, y₀, z₀)`
+/// mirrored, `corner` otherwise), stored in the header's precision. A matrix whose code is 0 is
+/// kept.
+pub fn translate(h: &mut NiftiHeader, corner: [i64; 3], flip: Option<usize>) {
     let single = h.version == NiftiVersion::V1;
     let r = |x: f64| if single { f64::from(x as f32) } else { x };
-    // one row's translation: a 4x4 product's last column, its terms in order, each rounded
-    let column = |m: [f64; 4], b: [f64; 4]| -> f64 {
-        let mut acc = r(m[0] * b[0]);
+    // one element of a product of a row and a column, its terms in order: each product and sum
+    // rounded by `round`
+    let dot = |m: [f64; 4], b: [f64; 4], round: &dyn Fn(f64) -> f64| -> f64 {
+        let mut acc = round(m[0] * b[0]);
         for k in 1..4 {
-            acc = r(acc + r(m[k] * b[k]));
+            acc = round(acc + round(m[k] * b[k]));
         }
         acc
     };
+    let exact = |x: f64| x;
+    let [x0, y0, z0] = corner.map(|v| v as f64);
     let moved = |rows: [[f64; 4]; 3]| -> [f64; 3] {
         rows.map(|row| {
             let m = row.map(r);
             match flip {
-                None => column(
-                    m,
-                    [corner[0] as f64, corner[1] as f64, corner[2] as f64, 1.0],
-                ),
-                Some((nx, last_x, nx_out)) => {
-                    // A = M·F(nx): column 0 negated, column 3 M0·(nx − 1) + M3
-                    let a = [
-                        -m[0],
-                        m[1],
-                        m[2],
-                        column(m, [(nx as f64) - 1.0, 0.0, 0.0, 1.0]),
-                    ];
-                    // B = A·T(c), c the corner in the mirrored frame
-                    let c0 = nx as i64 - 1 - last_x;
-                    let b3 = column(a, [c0 as f64, corner[1] as f64, corner[2] as f64, 1.0]);
-                    // C = B·F(nx_out)
-                    column(
-                        [a[0], a[1], a[2], b3],
-                        [(nx_out as f64) - 1.0, 0.0, 0.0, 1.0],
-                    )
+                None => dot(m, [x0, y0, z0, 1.0], &exact),
+                Some(nx) => {
+                    // the held frame's matrix M·F(nx): column 0 negated, column 3 M0·(nx − 1) + M3
+                    let n1 = nx as f64 - 1.0;
+                    let a = [-m[0], m[1], m[2], dot(m, [n1, 0.0, 0.0, 1.0], &r)];
+                    dot(a, [n1 - x0, y0, z0, 1.0], &exact)
                 }
             }
         })
@@ -487,7 +478,16 @@ mod tests {
         ];
         h.srow_y = [0.0, 1.0, 0.0, 0.0];
         h.srow_z = [0.0, 0.0, 1.0, 0.0];
-        translate(&mut h, [13, 30, 58], Some((144, 135, 123)));
-        assert_eq!(h.srow_x[3] as f32, -70.200_592_f32);
+        translate(&mut h, [13, 30, 58], Some(144));
+        assert_eq!(h.srow_x[3] as f32, -70.200_59_f32);
+        // and an oblique one (ds000256's T2w, 224 voxels along x, the box from z 12): FSL's
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[224, 4, 4], DataType::F32).unwrap();
+        h.sform_code = 1;
+        h.srow_x = [1.0, 0.0, 0.0, 0.0];
+        h.srow_y = [-5.912_370_6e-2, 7.232_544e-1, 3.386_019_5e-1, -1.191_069e2]
+            .map(|v: f32| f64::from(v));
+        h.srow_z = [0.0, 0.0, 1.0, 0.0];
+        translate(&mut h, [0, 0, 12], Some(224));
+        assert_eq!(h.srow_y[3] as f32, -115.043_68_f32);
     }
 }

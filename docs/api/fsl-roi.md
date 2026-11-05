@@ -14,30 +14,72 @@ masks the input with it and/or cuts the input down to its bounding box. `bet -S`
 run it (`-b -d`, `-maskFOV -roiNONE -d`).
 
 **Implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
-larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)). Both programs
-have their bit-exact **replica** (2026-11-04), `larmorx-nc fsl fslroi` and `larmorx-nc fsl
-standard_space_roi` (package `larmorx-nc`; `crates-nc/larmorx-nc-avwutils` and
-`crates-nc/larmorx-nc-flirt`, the region itself and fslpy's `imcp` in `larmorx-nc-core`, under the
-FSL Licence's terms: [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)). Their
-clean-room originals are to be written from their specs (the clean-room catch-up); until then
-`implementation="auto"` and `"replica"` need `larmorx-nc` (otherwise `ReplicaNotFoundError`) and
-`"original"` raises `NotImplementedError`. The script runs every program in the replica's own
-process (FLIRT, `convert_xfm`, `fslval`, `fslmaths`, `fslstats -w`, `fslroi`, fslpy's `imcp`, GNU
-`dc` and `rm`): no FSL installation is needed.
+larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)):
+- the **clean-room original** (since 2026-11-05; `crates/larmorx-fsl`, `larmorx_fsl::cli::fslroi`
+  and `::ssroi`, Apache-2.0, written from
+  [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md), FSL's documentation and
+  black-box runs of FSL 6.0.7.23: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in this
+  process; `standard_space_roi` runs the original's own FLIRT, `convert_xfm`, `fslmaths`,
+  `fslstats` and `fslroi`, and fslpy's `imcp`, in the same process: no FSL installation is
+  needed;
+- the bit-exact **replica** (2026-11-04), `larmorx-nc fsl fslroi` and `larmorx-nc fsl
+  standard_space_roi` (package `larmorx-nc`, under the FSL Licence's terms:
+  [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), which runs every program in the
+  replica's own process.
+
+`implementation="auto"` runs the replica when its program is found, else the original;
+`"original"` and `"replica"` choose. The command line follows `LARMORX_IMPLEMENTATION` the same
+way.
+
+**Built for speed** (the original): the registration to the reference is almost all of
+`standard_space_roi`'s time; besides it, without `-d` the temporary images are written
+uncompressed (they are removed at the end), and when the field of view is both the mask and the
+region it is resampled into the input's space once. `fslroi` converts the stored values once (or
+moves them, where the type is kept) and copies the box row by row in parallel.
 
 **Status: `experimental`** (the records come with BET's options, in the same part).
 
 ## FSL's standard images
 
 `standard_space_roi` reads `MNI152_T1_2mm` (the default reference) and, for `-b`,
-`MNI152_T1_2mm_brain_mask_dil`, from FSL's `data/standard`. The replica looks for each, in this
-order: `LARMORX_FSL_DATA` (a directory laid out as `$FSLDIR/data`; when it is set nothing else is
-searched), `$FSLDIR/data`, and the copy larmorx-nc carries (`<prefix>/share/larmorx-nc/fsl-data`
-beside its program, which the wheel installs: FSL 6.0.7.23's files byte for byte, with FSL's
-Licence, MNI's notice and their manifest; `crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`). When none has the image it refuses before running anything, naming the
-image and every place looked (`larmorx-nc: error: standard_space_roi: FSL's data image
-standard/MNI152_T1_2mm was not found: ...`, exit 1). `-ssref` (and masks given with `-maskMASK`,
-`-roiMASK`) need none of them. The Python wrapper takes `fsl_data=`.
+`MNI152_T1_2mm_brain_mask_dil`, from FSL's `data/standard` (FSL 6.0.7.23's `fsl-data_standard`
+2208.0; their checksums in [`specs/bet.md`](../../specs/bet.md) §5.4). They are FSL's data
+(the FSL Licence: non-commercial use; the MNI152 template also under its MNI notice): the
+`larmorx` package (Apache-2.0) never ships them. `-ssref` (and masks given with `-maskMASK`,
+`-roiMASK`) need none of them.
+
+**The original** looks for each, in this order (`specs/bet.md` §5.4):
+1. the directory the call names: `fsl_data=` in Python, `LARMORX_FSL_DATA` otherwise (laid out
+   as `$FSLDIR/data`: `<dir>/standard/MNI152_T1_2mm.nii.gz`, any of FSL's image extensions); when
+   it is given, nothing else is searched;
+2. larmorx-nc's copy, when its program is found (`LARMORX_NC_BIN`, the Python environment's
+   scripts directory, `PATH`): `<prefix>/share/larmorx-nc/fsl-data/standard/`, read as data only
+   (nothing of larmorx-nc is run), each file checked against FSL's SHA-256;
+3. `$FSLDIR/data/standard/`;
+4. larmorx's data cache: `LARMORX_DATA_DIR`, else the user cache directory (`$XDG_CACHE_HOME` or
+   `~/.cache` on Linux, `~/Library/Caches` on macOS, `%LOCALAPPDATA%\larmorx\cache` on Windows,
+   `larmorx` in it), under `fsl/fsl-data_standard-2208.0-0/standard/`. When the image is not
+   there, FSL's package is downloaded once from FSL's site
+   (`https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/public/noarch/fsl-data_standard-2208.0-0.tar.bz2`,
+   196 MB, with the platform's `curl`, else `wget`), checked against its size and SHA-256, and
+   only its three standard images kept (each checked against its SHA-256, with a
+   `MANIFEST.tsv`); a message names FSL's Licence when it downloads. `larmorx fetch
+   fsl-standard [<package>]` fills the cache ahead and prints its directory. For a machine
+   without the network, copy the package file there and name it (`larmorx fetch fsl-standard
+   <file>`, or `LARMORX_FSL_DATA_PACKAGE=<file>`, read instead of the download), or copy a filled
+   cache directory.
+
+Files from larmorx-nc's copy and from the cache must match FSL's checksums (a damaged file is
+refused, naming it); files from the named directory or `$FSLDIR` are used as they are (another
+FSL release's images give that release's results, as in FSL). When none has the image, the
+original refuses before running anything (exit 1), naming the image and every place looked
+(`larmorx fsl standard_space_roi: FSL's standard image MNI152_T1_2mm was not found (looked in:
+...)`).
+
+**The replica** looks in `LARMORX_FSL_DATA` (alone when set), then `$FSLDIR/data`, then its
+own copy (`crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`, installed by its wheel); it
+refuses likewise (`larmorx-nc: error: standard_space_roi: FSL's data image
+standard/MNI152_T1_2mm was not found: ...`, exit 1).
 
 ## Options
 
@@ -78,6 +120,15 @@ the rest).
   bytes as uint8, so a negative value becomes 128 to 255); named whenever the input is int8, with
   the number of negative values; `reproduce` writes FSL's uint8 (named where a value is negative).
 
-**Not replicated yet:** fslpy's `imcp` converts an input of another file type than
-`FSLOUTPUTTYPE` with nibabel (`standard_space_roi -maskNONE -roiNONE` on such an input); the
-replica refuses that case clearly (exit 1) in both modes.
+**imcp's conversion.** `standard_space_roi -maskNONE -roiNONE` copies its input with fslpy's
+`imcp`, which converts an input of another file type than `FSLOUTPUTTYPE` with nibabel. The
+original converts it (the same header and data in the output's file layout and compression: a
+`.nii.gz` input becomes FSL's `.nii` byte for byte, the record's `ssroi/phantom-none-convert`);
+the replica refuses that case clearly (exit 1) in both modes.
+
+The validation: the BET records (`docs/validation/fsl-bet.md` for the original,
+`fsl-bet-replica.md` for the replica), categories `ssroi/` and `fslroi/` and the `defects/`
+cases of FSL-211 to FSL-215. The original's `standard_space_roi` is FSL's bit for bit where its
+FLIRT gives FSL's matrix (an adult's T1w, a Philips T1w and a T2w with the defaults); elsewhere
+its matrices are within FLIRT's 12-dof threshold and, given FSL's matrix, every file is FSL's
+(`docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi").

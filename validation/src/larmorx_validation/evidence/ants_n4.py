@@ -966,7 +966,7 @@ def _command(c) -> str:
         a = re.sub(r"\{gen:([^}]+)\}", lambda m: f"<generated: {m.group(1)}>", a)
         a = re.sub(r"\{missing:([^}]+)\}", lambda m: m.group(1), a)
         a = a.replace("{out}", "out.nii.gz").replace("{out2}", "bias.nii.gz").replace("{tmp}/", "")
-        return a
+        return core.short_path(a)
 
     return " ".join(
         [c.program, *(shlex.quote(arg(a)) if " " in arg(a) else arg(a) for a in c.args)]

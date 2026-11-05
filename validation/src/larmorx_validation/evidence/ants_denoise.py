@@ -639,7 +639,7 @@ def _command(c) -> str:
         a = re.sub(r"\{in:([^}]+)\}", lambda m: m.group(1), a)
         a = re.sub(r"\{gen:([^}]+)\}", lambda m: f"<generated: {m.group(1)}>", a)
         a = re.sub(r"\{missing:([^}]+)\}", lambda m: m.group(1), a)
-        return (
+        return core.short_path(
             a.replace("{out}", "out.nii.gz").replace("{out2}", "noise.nii.gz").replace("{tmp}/", "")
         )
 

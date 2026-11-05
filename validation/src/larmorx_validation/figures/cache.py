@@ -317,12 +317,21 @@ def checkout_paths(text: str) -> str:
     return _CHECKOUT.sub("<larmorx>", text)
 
 
+#: An agent's scratch directory (Claude Code's per-session ``scratchpad``, whose name carries the
+#: account's home directory): written ``<scratch>``.
+_SCRATCH = re.compile(r"/tmp/claude-\d+/[^/\s\"']+/[0-9a-f-]{36}/scratchpad")
+
+
 def _short(arg: str) -> str:
-    """A path with the machine-specific part replaced (provenance is published)."""
+    """A path with the machine-specific part replaced (provenance is published).
+
+    >>> _short("/tmp/claude-1000/-home-u-w/0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b/scratchpad/p/x.nii")
+    '<scratch>/p/x.nii'
+    """
     from larmorx_validation.report import redact
 
     home = str(Path.home())
-    out = checkout_paths(arg)
+    out = _SCRATCH.sub("<scratch>", checkout_paths(arg))
     # the workspace before the home directory (``redact`` replaces that by ``~``)
     for parent in Path(__file__).resolve().parents:
         if (parent / "oracles").is_dir():

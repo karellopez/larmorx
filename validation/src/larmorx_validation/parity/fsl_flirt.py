@@ -1084,6 +1084,68 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
 
 _ROW = "setrow UQ 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
 _COST = "measurecost 6 UQ 0 0 0 0 0 0 rel"
+#: pointflirt's points (the replica suite's eight points, written out here).
+_PF_IN = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n"
+_PF_REF = (
+    "13.31 18.62 35.25\n-9.33 7.41 44.05\n38.47 -8.32 13.9\n2.5 -1 1.5\n29.29 23.95 -9.68\n"
+    "-5.24 -31.87 26.59\n17.35 7.55 -1.71\n-17.75 18.24 7.86\n"
+)
+_MT_A = "1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n"
+
+
+def _refusal_cases() -> list[tuple[str, str, rep.Run, str, str]]:
+    """Cases where FSL finishes with an arbitrary result the original refuses in both modes
+    (rule B, no ``reproduce`` of it yet): name, description, the run, the register entry and what
+    FSL does (the clean-room catch-up, 2026-11-05)."""
+    r = rep.Run
+    big = "1e200 0 0 0\n0 1e200 0 0\n0 0 1e200 0\n0 0 0 1\n"
+    shift = "1 0 0 1e300\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
+    return [
+        (
+            "programs/midtrans-overflow",
+            "midtrans of a transform of 1e200 scales (its determinant overflows: used, §15.5): "
+            "FSL writes rows of NaN; refused (FSL-241)",
+            r("midtrans", ("a.mat", "big.mat"), files=(("a.mat", _MT_A), ("big.mat", big))),
+            "FSL-241",
+            "writes rows of NaN with exit status 0",
+        ),
+        (
+            "programs/midtrans-overflow-svd",
+            "midtrans of a translation of 1e300: FSL's decomposition fails and it reports a "
+            "matrix-size error, exit 0; refused (FSL-241)",
+            r("midtrans", ("a.mat", "big.mat"), files=(("a.mat", _MT_A), ("big.mat", shift))),
+            "FSL-241",
+            "reports its failed decomposition as a matrix-size error with exit status 0",
+        ),
+    ]
+
+
+def _refusal_case(payload: tuple[rep.Run, str, str], checks: CheckList) -> None:
+    """FSL's run (cached) finishes with status 0; the original refuses in both modes with a
+    message naming the entry: an expected divergence."""
+    run, entry, does = payload
+    with tempfile.TemporaryDirectory(prefix="lx-flirt-") as a_:
+        a = Path(a_)
+        args = rep._prepare(run, a)
+        oracle = rep.run_oracle(run.program, args, cwd=a, settings=dict(run.settings))
+        checks(f"{run.program} finishes (exit 0)", oracle.code == 0, detail=f"exit {oracle.code}")
+        for mode in (defects.REPRODUCE, defects.FIX):
+            with tempfile.TemporaryDirectory(prefix="lx-flirt-") as b_:
+                b = Path(b_)
+                rep._prepare(run, b)
+                ours = run_original(
+                    run.program, args, cwd=b, settings=dict(run.settings), mode=mode
+                )
+                checks(
+                    f"the original refuses naming {entry} ({mode})",
+                    ours.code == 1 and entry in ours.stderr,
+                    detail=f"exit {ours.code}: {' '.join(ours.stderr.split())[-160:]}",
+                )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"{run.program} {does} ({entry}, rule B); the original refuses in both modes",
+        )
 
 
 def _sched(*lines: str) -> tuple[tuple[str, str], ...]:
@@ -1257,6 +1319,87 @@ def _original_cases() -> list[tuple[str, str, rep.Run]]:
                 ),
             ),
         ),
+        # the clean-room catch-up (2026-11-05, specs/flirt.md §14's questions of 2026-11-03)
+        (
+            "verbose/2-basescale-tr",
+            "-verbose 2 with a base scale (0.6 mm voxels) and a 4D input of TR 2: the sampling "
+            "and initial matrices in scaled mm, the levels' TR",
+            r(
+                "flirt",
+                (
+                    *("-in", "@bold4.nii", "-ref", "@t1_small.nii", "-init", "@init.mat"),
+                    *("-verbose", "2", *sch),
+                ),
+                files=_sched("setscale 4", _ROW, _COST),
+            ),
+        ),
+        (
+            "verbose/3-empty-reference",
+            "-verbose 3 with an all-zero reference: the centre's COG warning where its line prints",
+            r(
+                "flirt",
+                ("-in", E, "-ref", "@zero:t1.nii:zeroweight.nii", "-verbose", "3", *sch),
+                files=_sched("setscale 8", _ROW, _COST),
+            ),
+        ),
+        (
+            "real/anglerep-quaternion-dof3",
+            "-anglerep quaternion at 3 dof: FSL-90's starts and the dof message start by start, "
+            "the invalid starts the identity (§8.1 step 9)",
+            r("flirt", ("-in", *base, "-anglerep", "quaternion", "-dof", "3", "-omat", "out.mat")),
+        ),
+        (
+            "programs/pointflirt-no-points-verbose",
+            "pointflirt -v without points: FSL's lines and headings, then its crash (FSL-204; "
+            "refused in both modes)",
+            r("pointflirt", ("-v", "-i", "none1.txt", "-r", "none2.txt"), crash="FSL-204"),
+        ),
+        (
+            "programs/pointflirt-nan-word",
+            "a nan word in a coordinate file reads 0 (§2.2): the fit of the points as read",
+            r(
+                "pointflirt",
+                ("-i", "in.txt", "-r", "ref.txt"),
+                files=(("in.txt", _PF_IN.replace("5 40", "5 nan")), ("ref.txt", _PF_REF)),
+            ),
+        ),
+        (
+            "programs/pointflirt-overflow",
+            "a coordinate whose square overflows: FSL's SVD fails (signal 6; the original exits 1)",
+            r(
+                "pointflirt",
+                ("-i", "in.txt", "-r", "ref.txt"),
+                files=(("in.txt", _PF_IN.replace("5 40", "5 1e200")), ("ref.txt", _PF_REF)),
+            ),
+        ),
+        (
+            "programs/img2imgcoord-warp-3d",
+            "img2imgcoord -warp of a 3D image, verbose: the lines so far, FSL's read error, "
+            "exit 1 (§15.2: exactly three volumes)",
+            r(
+                "img2imgcoord",
+                ("-src", E, "-dest", T, "-warp", "@epi.nii", "-v", "c.txt"),
+                files=(("c.txt", "1 2 3\n"),),
+            ),
+        ),
+        (
+            "programs/std2imgcoord-warp-4d",
+            "std2imgcoord -warp of a 4-volume series: FSL's read error, exit 1",
+            r(
+                "std2imgcoord",
+                ("-img", E, "-std", T, "-warp", "@bold4.nii", "c.txt"),
+                files=(("c.txt", "1 2 3\n"),),
+            ),
+        ),
+        (
+            "programs/pairreg-verbose",
+            "pairreg -v at 12 dof: every line of the three schedules the original carries "
+            "(§15.8), echoed as FSL's",
+            r(
+                "pairreg",
+                ("@t1.nii", "@t1_moved.nii", "@t1.nii", "@t1_moved.nii", "pair.mat", "-v"),
+            ),
+        ),
         (
             "debug/bbr-setoption",
             "-debug -wmseg: the boundary-based cost set up by setoption and by a new pair",
@@ -1289,6 +1432,8 @@ def cases(tier: str) -> list[Case]:
     if in_tier("standard", tier):
         for name, desc, run in _original_cases():
             out.append(Case(name, name.split("/")[0], desc, ("direct", run)))
+        for name, desc, run, entry, does in _refusal_cases():
+            out.append(Case(name, name.split("/")[0], desc, ("refusal", (run, entry, does))))
     return out
 
 
@@ -1296,6 +1441,8 @@ def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
+    elif kind == "refusal":
+        _refusal_case(payload, checks)
     elif kind == "direct":
         _run_case(payload, checks)
     else:

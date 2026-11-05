@@ -207,7 +207,11 @@ fn lu_left_looking(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
             for k in 0..j {
                 t += m[r][k] * m[k][j];
             }
-            m[r][j] = minus_one() * t + m[r][j];
+            // `(−1)·t + y` in this order (§12): the product the first operand
+            #[allow(clippy::assign_op_pattern)]
+            {
+                m[r][j] = minus_one() * t + m[r][j];
+            }
         }
         let mut p = j;
         let mut best = m[j][j].abs();

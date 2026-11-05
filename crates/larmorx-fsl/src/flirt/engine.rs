@@ -725,14 +725,22 @@ fn run_inner(
     let in_name = o.input.clone().unwrap_or_default();
     let ref_name = o.reference.clone().unwrap_or_default();
     let applying = o.apply_xfm || o.apply_iso.is_some();
+    // FSL's warning for a 4D image read as a 3D volume (§3): a registration reads both images
+    // twice, the second time after the sform lines (observed, 2026-11-05: two warnings for each
+    // 4D image, the sform warning between them); -applyxfm reads the reference once
+    const MULTIPLE_TIMEPOINTS: &str = "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release.";
     let mut reference = read(ctx, &ref_name, false, notices)?;
-    if reference.input.volumes > 1 && applying {
-        let _ = writeln!(
-            err,
-            "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release."
-        );
+    if reference.input.volumes > 1 {
+        let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
     }
     let mut input = read(ctx, &in_name, applying, notices)?;
+    let four_d = [
+        reference.input.volumes > 1,
+        input.input.volumes > 1 && !applying,
+    ];
+    if four_d[1] {
+        let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
+    }
     // FSL-92: an image of one voxel cannot measure an alignment (§4.1): refused by default
     if !applying {
         let one = |im: &Image| im.vols[0].shape == [1, 1, 1];
@@ -825,6 +833,11 @@ fn run_inner(
             err,
             "WARNING: Both reference and input images have an sform matrix set"
         );
+    }
+    if !applying {
+        for _ in four_d.iter().filter(|&&d| d) {
+            let _ = writeln!(err, "{MULTIPLE_TIMEPOINTS}");
+        }
     }
     // the initial matrix
     let q_unscaled = qsform(&reference.input, &input.input);
@@ -1196,6 +1209,7 @@ fn register(
     st.opt.level = o.verbose;
     // the schedule
     let text = match &o.schedule {
+        _ if o.schedule_text.is_some() => o.schedule_text.unwrap_or_default().to_owned(),
         Some(name) => match std::fs::read_to_string(ctx.settings.path(name)) {
             Ok(t) => t,
             Err(_) => {
@@ -1206,7 +1220,7 @@ fn register(
         None if o.two_d => schedule::DEFAULT_2D.to_owned(),
         None => schedule::DEFAULT_3D.to_owned(),
     };
-    let lines: Vec<&str> = if o.schedule.is_some() {
+    let lines: Vec<&str> = if o.schedule.is_some() || o.schedule_text.is_some() {
         text.split('\n').collect()
     } else {
         text.lines().collect()
@@ -2136,10 +2150,10 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
 fn run_search(st: &mut State<'_>, dof: usize, err: &mut dyn Write) -> Result<(), End> {
     check_bbr_step(st, st.search_cost)?;
     let pair = st.pair()?.clone();
-    let log = st.log.clone();
     let cost = st.search_cost;
     let tr = st.trace.clone();
-    let eval = |t: &Mat4| evaluate(&pair, t, cost, &log, &tr);
+    // the log each evaluation writes to: the run's for the grids, a free optimisation's own
+    let eval = |t: &Mat4, lg: &super::cost::Log| evaluate(&pair, t, cost, lg, &tr);
     let mut opt = st.opt.clone();
     opt.level = st.o.verbose - 2;
     // the search measures both centres again (observed: one more warning for an empty

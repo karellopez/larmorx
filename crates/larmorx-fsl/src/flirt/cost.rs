@@ -58,7 +58,8 @@ impl Cost {
 }
 
 /// Messages a cost prints on standard error as it evaluates (identical lines, so their order
-/// across parallel evaluations does not matter).
+/// across parallel evaluations does not matter; the search's free optimisations, whose lines
+/// differ, each write a [`Log::child`] passed on in their order).
 #[derive(Debug, Default)]
 pub struct Log {
     lines: Mutex<Vec<String>>,
@@ -104,6 +105,21 @@ impl Log {
             .lock()
             .map(|mut l| std::mem::take(&mut *l))
             .unwrap_or_default()
+    }
+    /// A new log with this log's functions, for one part of a run whose lines must keep their
+    /// order (a free optimisation of the search, which may run beside others): its lines are
+    /// passed on with [`Log::absorb`].
+    pub fn child(&self) -> Log {
+        self.quiet()
+    }
+    /// `other`'s lines appended in their order, and its fatal error kept if this log has none.
+    pub fn absorb(&self, other: &Log) {
+        for line in other.take() {
+            self.push(line);
+        }
+        if let Some(f) = other.fatal_error() {
+            self.fatal(f);
+        }
     }
     /// An error that ends the run (FSL's exception, e.g. a singular matrix): the first is kept.
     pub fn fatal(&self, message: impl Into<String>) {

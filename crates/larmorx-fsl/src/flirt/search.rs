@@ -93,7 +93,7 @@ pub fn samplings_text(t: &Trace, r: &Ranges) -> String {
 /// interleave with the optimisations' lines (a level of 4 or more) the grids run in order.
 #[allow(clippy::too_many_arguments)]
 pub fn search(
-    eval: &(dyn Fn(&Mat4) -> f32 + Sync),
+    eval_logged: &(dyn Fn(&Mat4, &super::cost::Log) -> f32 + Sync),
     centre: [f64; 3],
     ref_params: Params,
     dof: usize,
@@ -131,9 +131,12 @@ pub fn search(
     };
     let settings = &euler;
     let at = |l: i32| settings.at(l);
-    // the run's C library functions (GLIBC-07), through its log
+    // the run's C library functions (GLIBC-07), through its log; the grids' evaluations write
+    // to the run's log (their lines alike), the free optimisations each to their own (below)
     let quiet_grid = super::cost::Log::default();
-    let libm = settings.log.as_deref().unwrap_or(&quiet_grid).libm();
+    let run_log = settings.log.as_deref().unwrap_or(&quiet_grid);
+    let libm = run_log.libm();
+    let eval = &|m: &Mat4| eval_logged(m, run_log);
     // the lines of each grid point interleave with the evaluations': one point after the other
     let n_threads_parallel = n_threads_parallel && at(4).is_none();
     if let Some(t) = at(4) {
@@ -424,34 +427,15 @@ pub fn search(
         && minima
             .iter()
             .any(|&i| fine_params[i][..3].iter().any(|&a| a != 0.0));
-    let quiet = super::cost::Log::default();
-    let log = user.log.as_deref().unwrap_or(&quiet);
-    // the matrix the optimisation starts from: the start's decomposition composed again
-    // (observed: FLIRT's `Starting with` and `P` show it, under gimbal lock other angles);
-    // a `-dof` below 6 prints FLIRT's dof message once for each start, after the start's own
-    // messages (observed, 2026-11-02)
+    let log = run_log;
+    // each start in turn, as FLIRT runs them (observed, 2026-11-05: with -dof 3 and -anglerep
+    // quaternion the messages of a start's composition, its dof message and its optimisation's
+    // evaluations follow one another start by start): the start composed (FSL-90's message for
+    // a vector part outside the unit ball), its decomposition composed again (FLIRT's `Starting
+    // with` and `P` show it, under gimbal lock other angles), a `-dof` below 6's message after
+    // the start's own messages (2026-11-02), then its optimisation; each start's lines go to its
+    // own log, passed on in the starts' order whatever runs in parallel
     let dof_message = super::optimise::clamp_dof(free_dof as i64).1;
-    let starts: Vec<Mat4> = minima
-        .iter()
-        .map(|&i| {
-            let m = if fsl90 && quaternion {
-                // at 6 parameters the 7 are composed first, then the scale dropped (observed:
-                // FLIRT's message twice for each such start with -dof 6, once below 6)
-                if free == 6 {
-                    let _ = super::param::compose(rep, &fine_params[i], 7, centre, log);
-                }
-                super::param::compose(rep, &fine_params[i], free, centre, log)
-            } else {
-                super::param::euler_compose(&fine_params[i], free, centre, log.libm())
-            };
-            let x = super::param::decompose(rep, &m, centre, log.libm());
-            let m = super::param::compose(rep, &x, free, centre, log);
-            if let Some(msg) = &dof_message {
-                log.push(msg.as_str());
-            }
-            m
-        })
-        .collect();
     let free_settings = Settings {
         tol_x0: None,
         ..user.clone()
@@ -467,44 +451,73 @@ pub fn search(
             tr.nums(super::param::decompose(rep, m, centre, log.libm()))
         ));
     };
-    let run_free = |k: usize| -> Result<(Mat4, f32, f32), String> {
+    type Freed = (Mat4, Mat4, f32, f32, std::sync::Arc<super::cost::Log>);
+    let run_free = |k: usize| -> Result<Freed, String> {
+        let own = std::sync::Arc::new(log.child());
+        let i = minima[k];
+        let m = if fsl90 && quaternion {
+            // composed once (§8.1 step 9; spec writer, 2026-11-03: FLIRT's further messages
+            // with -dof 6 are its evaluations' compositions outside the unit ball)
+            super::param::compose(rep, &fine_params[i], free, centre, &own)
+        } else {
+            super::param::euler_compose(&fine_params[i], free, centre, own.libm())
+        };
+        let x = super::param::decompose(rep, &m, centre, own.libm());
+        let start = super::param::compose(rep, &x, free, centre, &own);
+        if let Some(msg) = &dof_message {
+            own.push(msg.as_str());
+        }
+        let s_k = Settings {
+            log: Some(std::sync::Arc::clone(&own)),
+            ..free_settings.clone()
+        };
+        let eval_k = |m: &Mat4| eval_logged(m, &own);
         let (x, c) = optimise::optimise_params(
-            eval,
-            super::param::decompose(rep, &starts[k], centre, log.libm()),
+            &eval_k,
+            super::param::decompose(rep, &start, centre, own.libm()),
             centre,
             free,
             4,
-            &free_settings,
+            &s_k,
             None,
             Kind::Free,
-            &starts[k],
+            &start,
         )?;
-        let m = super::param::compose(rep, &x, free, centre, log);
+        let m = super::param::compose(rep, &x, free, centre, &own);
         // the start's own cost goes with it into `P`: evaluated after the optimisation
         // (counted, not printed)
-        let c0 = eval(&starts[k]);
+        let c0 = eval_k(&start);
         if !n_threads_parallel && let Some(tr) = at(1) {
             freed_line(tr, c, &m);
         }
-        Ok((m, c, c0))
+        Ok((m, start, c, c0, own))
     };
     if let Some(tr) = at(1) {
         tr.line("After free optimisation, parameters are:");
     }
-    let freed: Vec<(Mat4, f32, f32)> = if n_threads_parallel {
-        let f: Vec<(Mat4, f32, f32)> = (0..starts.len())
+    let freed: Vec<Freed> = if n_threads_parallel {
+        let f: Vec<Freed> = (0..minima.len())
             .into_par_iter()
             .map(run_free)
             .collect::<Result<_, _>>()?;
         if let Some(tr) = at(1) {
-            for (m, c, _) in &f {
+            for (m, _, c, _, _) in &f {
                 freed_line(tr, *c, m);
             }
         }
         f
     } else {
-        (0..starts.len()).map(run_free).collect::<Result<_, _>>()?
+        (0..minima.len()).map(run_free).collect::<Result<_, _>>()?
     };
+    let mut starts = Vec::with_capacity(freed.len());
+    let freed: Vec<(Mat4, f32, f32)> = freed
+        .into_iter()
+        .map(|(m, start, c, c0, own)| {
+            log.absorb(&own);
+            starts.push(start);
+            (m, c, c0)
+        })
+        .collect();
     // the list, sorted by the optimised cost: a new entry is compared with the entries in their
     // order and the first within the distance decides (a strictly better new entry replaces it,
     // otherwise the new one is dropped); a new entry is inserted after every entry of lower or

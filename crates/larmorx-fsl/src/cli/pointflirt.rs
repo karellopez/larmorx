@@ -4,7 +4,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::defects::UpstreamDefects;
 
 use super::Settings;
 use super::common::{self, abort, print_notices};
@@ -180,17 +180,12 @@ fn run(
     }
     if x.is_empty() && y.is_empty() {
         // FSL-204 (§15.6): no points at all; FSL crashes here (a segmentation fault, after the
-        // lines above), refused in both modes (rule B)
-        let detail = "both coordinate files are empty or missing (no points): FSL crashes (a segmentation fault); refused";
-        defects::push_once(
-            &mut notices,
-            Notice::new(&defects::FSL_204, mode, detail.to_owned()),
-        );
+        // lines above), refused in both modes (rule B; a crash is never reproduced)
         print_notices(err, &notices);
         return common::refuse(
             err,
             "pointflirt",
-            "no points in the coordinate files (FSL-204)",
+            "no points in the coordinate files (FSL-204: both are empty or missing; FSL crashes here); refused",
         );
     }
     for pts in [&x, &y] {
@@ -329,11 +324,10 @@ mod tests {
             out,
             "Input volume coordinates are (in mm)\n\nReference volume coordinates are (in mm)\n\n"
         );
-        assert!(
-            err.starts_with("Could not open matrix file none1.txt\nCould not open matrix file none2.txt\nlarmorx: upstream defect FSL-204"),
-            "{err}"
+        assert_eq!(
+            err,
+            "Could not open matrix file none1.txt\nCould not open matrix file none2.txt\nlarmorx fsl pointflirt: no points in the coordinate files (FSL-204: both are empty or missing; FSL crashes here); refused (larmorx)\n"
         );
-        assert!(err.ends_with("no points in the coordinate files (FSL-204) (larmorx)\n"));
         // files of words only read no points either; --vox's own error comes first
         let files = [("w.txt", "abc def\n"), ("e.txt", "")];
         let (c, _, err) = run(&["-i", "w.txt", "-r", "e.txt"], &files);

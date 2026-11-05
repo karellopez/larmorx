@@ -214,17 +214,12 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         Err(MidError::Singular) => return exception(err, mat::SINGULAR, mode, &mut notices),
         Err(MidError::NotFinite) => {
             // FSL-241 (rule B; §15.5): FSL writes rows of NaN, or reports its failed SVD as a
-            // size error, and exits 0; refused in both modes (its values not specified)
-            let detail = "the transforms' averages reach beyond double precision: FSL writes rows of NaN or reports its failed singular value decomposition, exit status 0; refused";
-            defects::push_once(
-                &mut notices,
-                Notice::new(&defects::FSL_241, mode, detail.to_owned()),
-            );
+            // size error, and exits 0; refused in both modes (FSL's values not specified)
             print_notices(err, &notices);
             return common::refuse(
                 err,
                 "midtrans",
-                "the averages hold values that are not finite (a transform too large for double precision): they cannot be averaged (FSL-241); refused",
+                "the averages hold values that are not finite (a transform too large for double precision): they cannot be averaged (FSL-241: FSL writes rows of NaN or reports its failed decomposition, exit status 0); refused",
             );
         }
     };

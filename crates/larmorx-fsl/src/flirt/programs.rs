@@ -87,16 +87,24 @@ pub struct Avscale {
     pub determinant: f64,
 }
 
+/// Whether FSL's decomposition of `m` about `centre` (§3) solves: no scale 0 and every entry of
+/// the top three rows finite (otherwise [`INVERSE_PROBLEM`]: avscale, §15.1, and `convert_xfm
+/// -fixscaleskew`'s two decompositions, §10; observed 2026-11-05: a matrix file of `-nan` words,
+/// read as zeros, aborts both).
+pub fn decomposable(m: &Mat4, centre: [f64; 3]) -> bool {
+    if m.iter().take(3).flatten().any(|v| !v.is_finite()) {
+        return false;
+    }
+    let (_, s, _, _) = rigid::decompose_parts(m, centre);
+    !s.contains(&0.0)
+}
+
 /// The decomposition of `m` about `centre` (§15.1): `Err` with FSL's message when a scale is 0
 /// or an entry of the top three rows is not finite.
 /// The angles and the rotation are `libm`'s (glibc's `atan2f`, `sinf`, `cosf` with
 /// `reproduce`, GLIBC-07).
 pub fn avscale(m: &Mat4, centre: [f64; 3], libm: &Libm) -> Result<Avscale, &'static str> {
-    if m.iter().take(3).flatten().any(|v| !v.is_finite()) {
-        return Err(INVERSE_PROBLEM);
-    }
-    let (_, s, _, _) = rigid::decompose_parts(m, centre);
-    if s.contains(&0.0) {
+    if !decomposable(m, centre) {
         return Err(INVERSE_PROBLEM);
     }
     let params = single_scales(param::euler_decompose(m, centre, libm));

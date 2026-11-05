@@ -56,10 +56,14 @@ pub fn abort(err: &mut dyn Write, program: &str, kind: &str, what: &str) -> u8 {
     );
     let _ = writeln!(
         err,
-        "larmorx fsl {program}: FSL aborts here (signal 6); exit status 1 (larmorx)"
+        "larmorx fsl {program}: {ABORTED}; exit status 1 (larmorx)"
     );
     1
 }
+
+/// The words of [`abort`]'s own line: where FSL's program is killed by signal 6 (a script's
+/// shell then prints `Aborted`).
+pub const ABORTED: &str = "FSL aborts here (signal 6)";
 
 /// A refusal of the original (a case whose FSL result is undefined or a size FSL cannot compute
 /// with): larmorx's message, exit status 1.

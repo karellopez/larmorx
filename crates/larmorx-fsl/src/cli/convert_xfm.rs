@@ -125,6 +125,17 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
                 return 2;
             }
         };
+        // both decompositions solve (§3, §15.1): a zero scale or a non-finite entry (a file of
+        // `nan` words reads as zeros, §2.2) makes FSL's abort (observed, 2026-11-05)
+        let fails = |a: &Mat4| !crate::flirt::programs::decomposable(a, [0.0; 3]);
+        if fails(&m) || fails(&s) {
+            return super::common::abort(
+                err,
+                "convert_xfm",
+                "std::runtime_error",
+                crate::flirt::programs::INVERSE_PROBLEM,
+            );
+        }
         let fixed = xfm::fix_scale_skew(&m, &s, &Libm::new(mode));
         // GLIBC-07 (§10, §3): named where the other choice of arctangent, sine and cosine
         // writes another matrix
@@ -184,4 +195,40 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         let _ = writeln!(out, "{}", stream.matrix(&m));
     }
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `-fixscaleskew` of a matrix whose decomposition has a zero scale (a file of `-nan` words,
+    /// read as zeros, §2.2): FSL aborts with its linear-algebra library's message (observed,
+    /// 2026-11-05: FLIRT's NaN matrices in `pairreg`'s third step).
+    #[test]
+    fn fixscaleskew_of_a_zero_scale_aborts() {
+        let dir = tempfile::tempdir().unwrap();
+        let nan = "-nan  -nan  -nan  -nan  \n".repeat(4);
+        let a = "1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n";
+        std::fs::write(dir.path().join("n.mat"), nan).unwrap();
+        std::fs::write(dir.path().join("a.mat"), a).unwrap();
+        let settings = Settings {
+            dir: Some(dir.path().to_path_buf()),
+            ..Settings::default()
+        };
+        for words in [
+            ["-fixscaleskew", "n.mat", "a.mat", "-omat", "o.mat"],
+            ["-fixscaleskew", "a.mat", "n.mat", "-omat", "o.mat"],
+        ] {
+            let args: Vec<String> = words.iter().map(|s| (*s).to_owned()).collect();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let c = main(&args, &settings, &mut out, &mut err);
+            let err = String::from_utf8(err).unwrap();
+            assert_eq!(c, 1);
+            assert!(
+                err.starts_with("terminate called after throwing an instance of 'std::runtime_error'\n  what():  matrix multiplication: problem with matrix inverse"),
+                "{err}"
+            );
+            assert!(!dir.path().join("o.mat").exists());
+        }
+    }
 }

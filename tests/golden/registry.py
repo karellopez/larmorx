@@ -4462,12 +4462,21 @@ def _(ctx: Context) -> dict[str, Any]:
 
 
 _POINTS = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n"
-#: A schedule of FLIRT's language for pairreg's three runs (the golden case's own: FSL's
-#: pairreg1.sch to pairreg3.sch are FSL's files, not on the CI's machines).
+#: A schedule of FLIRT's language in the stand-in ``$FSLDIR`` (FAST's case needs the variable set;
+#: pairreg no longer reads it: the original carries FSL's three schedules).
 _PAIRREG_SCHEDULE = (
     "setscale 2 force\nsetrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
     "optimise 6 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 rel 2\nsort U\n"
 )
+
+
+def _fsldir(ctx: Context) -> str:
+    """A directory standing for ``$FSLDIR`` (with three schedule files, as before)."""
+    d = ctx.dir / "fsl" / "etc" / "flirtsch"
+    d.mkdir(parents=True, exist_ok=True)
+    for k in (1, 2, 3):
+        (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
+    return os.fspath(ctx.dir / "fsl")
 
 
 def _points(ctx: Context) -> tuple[str, str]:
@@ -4482,15 +4491,6 @@ def _points(ctx: Context) -> tuple[str, str]:
     a.write_text(_POINTS)
     b.write_text("".join(" ".join(repr(float(v)) for v in r) + "\n" for r in mapped))
     return str(a), str(b)
-
-
-def _fsldir(ctx: Context) -> str:
-    """A directory standing for ``$FSLDIR`` with pairreg's three schedules."""
-    d = ctx.dir / "fsl" / "etc" / "flirtsch"
-    d.mkdir(parents=True, exist_ok=True)
-    for k in (1, 2, 3):
-        (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
-    return os.fspath(ctx.dir / "fsl")
 
 
 #: An affine matrix whose avscale report glibc's ``atan2f``, ``sinf`` and ``cosf`` change in a
@@ -4578,18 +4578,10 @@ def _(ctx: Context) -> dict[str, Any]:
 @case("cli.fsl.pairreg", covers=("cli:fsl pairreg",))
 def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl pairreg`` (§15.8): three FLIRT runs and one ``convert_xfm -fixscaleskew``
-    with the case's own schedules standing for FSL's; its usage."""
-    saved = os.environ.get("FSLDIR")
-    os.environ["FSLDIR"] = _fsldir(ctx)
-    try:
-        o = ctx.out("pair.mat")
-        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
-        _fsl(ctx, "pairreg", b1, b2, b1, b2, o, "-dof 6")
-    finally:
-        if saved is None:
-            os.environ.pop("FSLDIR", None)
-        else:
-            os.environ["FSLDIR"] = saved
+    with FSL's three schedules, which the original carries (no ``$FSLDIR``); its usage."""
+    o = ctx.out("pair.mat")
+    b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    _fsl(ctx, "pairreg", b1, b2, b1, b2, o, "-dof 6")
     return {"matrix": File(o), **_status_outputs("usage", _fsl_status(ctx, "pairreg", "a"))}
 
 
@@ -4711,17 +4703,9 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.fsl.pairreg", covers=("lx.fsl.pairreg",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``lx.fsl.pairreg`` with the clean-room original and the case's own schedules."""
-    saved = os.environ.get("FSLDIR")
-    os.environ["FSLDIR"] = _fsldir(ctx)
-    try:
-        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
-        m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
-    finally:
-        if saved is None:
-            os.environ.pop("FSLDIR", None)
-        else:
-            os.environ["FSLDIR"] = saved
+    """``lx.fsl.pairreg`` with the clean-room original and FSL's schedules it carries."""
+    b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
     return {"matrix": m}
 
 

@@ -782,8 +782,19 @@ def _kind(name: str) -> str:
     return "brain"
 
 
-def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> None:
-    """One file FSL wrote against the clean-room original's, by specs/bet.md §11's metrics."""
+#: ``(Dice, boundary distance p95, max)`` of the masks and brains: bet2's (``specs/bet.md`` §11)
+#: and, for ``bet -S``, ``-B``, ``-A``, ``-A2`` where FLIRT's matrices or FAST's bias field are not
+#: FSL's bits, §11.1's (Dice >= 0.99, p95 <= 1 voxel, max <= 3 voxels).
+MASK_LIMITS = (MASK_DICE, BOUNDARY_P95, BOUNDARY_MAX)
+OPTION_LIMITS = (0.99, 1.0, 3.0)
+
+
+def compare_original_file(
+    checks: CheckList, label: str, pa: Path, pb: Path, limits: tuple = MASK_LIMITS
+) -> None:
+    """One file FSL wrote against the clean-room original's, by specs/bet.md §11's metrics
+    (``limits``: the masks' and brains' thresholds)."""
+    mask_dice, boundary_p95, boundary_max = limits
     name = pa.name
     if name.endswith(".vtk"):
         try:
@@ -924,10 +935,10 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
     inside = int(np.count_nonzero((fa != fb) & both))
     checks(
         f"{label}{name}",
-        d >= MASK_DICE and p95 <= BOUNDARY_P95 and mx <= BOUNDARY_MAX and inside == 0,
+        d >= mask_dice and p95 <= boundary_p95 and mx <= boundary_max and inside == 0,
         metric="Dice; boundary distance p95 / max (voxels)",
         value=f"{d:.6f}; {p95:.2f} / {mx:.2f}",
-        threshold=f">= {MASK_DICE}; <= {BOUNDARY_P95} / {BOUNDARY_MAX}"
+        threshold=f">= {mask_dice}; <= {boundary_p95} / {boundary_max}"
         + ("" if kind == "mask" else "; values identical inside both"),
         detail=f"{differing} of {da.size} values differ"
         + ("" if kind == "mask" else f", {inside} inside both"),
@@ -935,7 +946,12 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
 
 
 def compare_dirs_original(
-    checks: CheckList, a: Path, b: Path, inputs: tuple[str, ...] = (), label: str = ""
+    checks: CheckList,
+    a: Path,
+    b: Path,
+    inputs: tuple[str, ...] = (),
+    label: str = "",
+    limits: tuple = MASK_LIMITS,
 ) -> None:
     """Every file FSL wrote in ``a`` against the clean-room original's in ``b``."""
     fa, fb = written(a, inputs), written(b, inputs)
@@ -944,7 +960,7 @@ def compare_dirs_original(
     )
     for name in fa:
         if name in fb:
-            compare_original_file(checks, label, a / name, b / name)
+            compare_original_file(checks, label, a / name, b / name, limits)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1171,6 +1187,8 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("last-variation", "bet", "-B -R -S -A: the last variation given (-A)", S("bet", ("{0}", "out", "-B", "-R", "-S", "-A"), (h,), tier="standard"))
     add("eyes-threshold-exponent", "defects", "-S on intensities above 1e6: fslstats prints 2.1e+06 and dc reads the exponent as commands (FSL-216)",
         S("bet", ("{0}", "out", "-S", "-m"), ("head-large",), tier="standard", silent_ok=s_ok))
+    add("eyes-negative-mean", "defects", "-S on a head whose brain has a negative mean: dc reads fslstats' minus sign as its subtraction, with too few numbers on its stack (FSL-216)",
+        S("bet", ("{0}", "out", "-S", "-m"), ("head-negative",), tier="standard", silent_ok=s_ok))
     add("eyes-nan", "defects", "-S with NaN voxels in the brain: FLIRT inside standard_space_roi fails (FSL-14; convert_xfm aborts, the script goes on), bet2 then aborts (FSL-216's threshold is not reached)",
         S("bet", ("{0}", "out", "-S"), ("head-nan",), fix_refuses="FSL-14", tier="standard"))
     add("bias-skull-echo", "defects", "-B -e -s: the skull's sed passes bet2's options through echo, which takes -e (FSL-63)",
@@ -1458,6 +1476,9 @@ def _phantoms() -> dict[str, Path]:
     # bet -S's threshold (FSL-216): intensities whose brain mean fslstats prints with an
     # exponent, and NaN voxels inside the brain (its mean printed nan)
     p["head-large"] = _save((t1 * 3000).astype(np.float32), d / "head-large.nii.gz")
+    # (2026-11-05) a head whose brain has a negative mean: dc reads the printed minus sign as
+    # its subtraction (FSL-216)
+    p["head-negative"] = _save((t1 - 1000).astype(np.float32), d / "head-negative.nii.gz")
     nan = t1.copy()
     c = tuple(n // 2 for n in HEAD_SHAPE)
     nan[c[0] - 2 : c[0] + 2, c[1] - 2 : c[1] + 2, c[2] - 2 : c[2] + 2] = np.nan
@@ -1714,16 +1735,22 @@ def named_entry(run: Run) -> str | None:
     return next((d for d in FILL_DEFECTS if f"upstream defect {d} (" in run.err), None)
 
 
-#: bet's variations with a replica only (2026-11-04): the clean-room original refuses them.
-REPLICA_ONLY_VARIATIONS = ("-S", "-B", "-A", "-A2")
+#: bet's variations with a replica only: none since 2026-11-05 (``-S``, ``-B``, ``-A``, ``-A2``
+#: have their clean-room original, the clean-room catch-up); a variation listed here would be
+#: refused by the original as pending.
+REPLICA_ONLY_VARIATIONS: tuple[str, ...] = ()
 #: The programs of this suite with no clean-room original yet: left out of the original's
 #: suite; a random case the original's descriptor draws for them expects larmorx's refusal.
 #: None since 2026-11-05 (fslroi and standard_space_roi, the clean-room catch-up).
 REPLICA_ONLY_TOOLS: tuple[str, ...] = ()
-#: Cases of FSL-217 (bet -F and -Z of an int8 image with negative values), which the clean-room
-#: original does not reproduce yet (the register's gap "original": the clean-room catch-up part's):
-#: left out of the original's suite until then.
-ORIGINAL_PENDING_CASES = ("bet/fmri-int8", "bet/small-fov-int8", "bet/small-fov-int8-debug")
+#: Where the clean-room original's default refuses naming another defect than the replica's:
+#: ``bet -S`` of a head with NaN voxels: the original's FLIRT leaves the NaN voxels out of its
+#: costs by default (``specs/flirt.md``'s FSL-14), the script goes on, and the brain's mean is
+#: printed ``nan``, refused by FSL-216's rule B (the replica's FLIRT refuses the NaN input).
+ORIGINAL_FIX_REFUSES = {"defects/eyes-nan": "FSL-216"}
+#: Cases the clean-room original's suite leaves out until the original has their behaviour: none
+#: since 2026-11-05 (FSL-217 inside bet -F and -Z, the clean-room catch-up).
+ORIGINAL_PENDING_CASES: tuple[str, ...] = ()
 
 
 def replica_only_variation(s: Scenario) -> bool:
@@ -1755,9 +1782,11 @@ def _run_case(case: Case, checks: CheckList) -> None:
         raise Outcome("skipped", f"input not available: {e}") from e
     args = _arguments(s, paths)
     if original() and s.expect != "error" and replica_only_variation(s):
-        # bet -S, -B, -A, -A2: the clean-room original refuses them as pending (their original
-        # is to be written from specs/bet.md)
+        # a variation with no clean-room original: the original refuses it as pending (none
+        # since 2026-11-05)
         s = replace(s, expect="pending")
+    if original() and case.id in ORIGINAL_FIX_REFUSES:
+        s = replace(s, fix_refuses=ORIGINAL_FIX_REFUSES[case.id])
     env = environment(s.output_type, s.env)
     if original() and s.tool == "standard_space_roi" and s.expect == "pending":
         # imcp's conversion with nibabel (-maskNONE -roiNONE of an input in another format):
@@ -1920,8 +1949,103 @@ def _compare_original(
     ``specs/bet.md`` §11 (:func:`compare_dirs_original`)."""
     if s.tool == "standard_space_roi":
         _compare_ssroi(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
+    elif s.tool == "bet" and _variation(s.args) in OPTION_VARIATIONS:
+        _compare_options(checks, s, args, env, fsl, f_dir, r_dir, root, inputs)
     else:
         compare_dirs_original(checks, f_dir, r_dir, inputs)
+
+
+#: bet's variations that run FSL's other programs (``specs/bet.md`` §5.3, §11.1).
+OPTION_VARIATIONS = ("-S", "-B", "-A", "-A2")
+#: The files of their -d runs made by a program whose output may differ from FSL's bits within
+#: its own thresholds (FLIRT's matrices, FAST's bias field and what FLIRT resamples): the stage
+#: where §11.1's thresholds take over.
+OPTION_SOURCES = (
+    "_tmp_to_std.mat",
+    "_tmp_to_std_inv.mat",
+    "_tmp_T1_to_std.mat",
+    "_tmp_T2_to_T1.mat",
+    "_tmp_T2_to_T1",
+    "_tmp_to_std",
+    "_tmp_premask_bias",
+)
+#: The name of §11.1's stage-by-stage check.
+OPTION_STAGE = "stage by stage (-d): the first file that differs"
+
+
+def _variation(args: tuple[str, ...]) -> str | None:
+    """The variation bet runs: the last of its variation options."""
+    last = None
+    for a in args[2:]:
+        if a in ("-R", "-S", "-Z", "-F", "-A", "-A2", "-B"):
+            last = a
+    return last
+
+
+def _compare_options(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    r_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """bet -S, -B, -A, -A2 (``specs/bet.md`` §11.1): every output bit for bit (bet2's thresholds)
+    where the original's programs give FSL's files; else stage by stage, from both programs'
+    -d runs (FSL's from its own run when the case has -d), the first file in the script's order
+    that is not FSL's: when it is a FLIRT matrix, FAST's bias field or an image FLIRT resampled,
+    the outputs are held to §11.1's thresholds (masks Dice >= 0.99, boundary distance p95 <= 1,
+    max <= 3 voxels, the brain FSL's values inside both); otherwise the program that made it is
+    the difference (a failure)."""
+    sub = CheckList()
+    compare_dirs_original(sub, f_dir, r_dir, inputs)
+    if all(c.passed for c in sub.checks) or fsl.code != 0:
+        for c in sub.checks:
+            checks.add(c)
+        return
+    if "-d" in args[2:]:
+        fd, rd = f_dir, r_dir
+    else:
+        fd, rd = root / "fsl-d", root / "larmorx-d"
+        for d in (fd, rd):
+            _prepare(d, s)
+        with_d = [*args, "-d"]
+        oracle_run(s.tool, with_d, env, fd, never=case_never(s))
+        run_larmorx(s.tool, with_d, "reproduce", env, rd)
+    names = sorted(
+        (p for p in rd.iterdir() if p.name in written(rd, inputs) and "_tmp" in p.name),
+        key=lambda p: (p.stat().st_mtime_ns, p.name),
+    )
+    first = None
+    for p in names:
+        q = fd / p.name
+        if not q.is_file():
+            first = (p.name, "FSL has no such file")
+            break
+        one = CheckList()
+        compare_original_file(one, "", q, p)
+        if not all(c.passed for c in one.checks):
+            first = (p.name, "; ".join(f"{c.name}: {c.detail}" for c in one.checks if not c.passed))
+            break
+    stem = first[0].split(".nii")[0].split(".hdr")[0] if first else ""
+    upstream = first is not None and stem.endswith(OPTION_SOURCES)
+    checks(
+        OPTION_STAGE,
+        upstream,
+        metric="file",
+        value=first[0] if first else "none",
+        threshold="FLIRT's matrices, FAST's bias field or FLIRT's resampled images "
+        "(their programs' own thresholds); else the step that made it",
+        detail=(first[1][:400] if first else "every temporary file FSL's"),
+    )
+    if upstream:
+        compare_dirs_original(checks, f_dir, r_dir, inputs, limits=OPTION_LIMITS)
+    else:
+        for c in sub.checks:
+            checks.add(c)
 
 
 def _mat(path: Path) -> np.ndarray | None:

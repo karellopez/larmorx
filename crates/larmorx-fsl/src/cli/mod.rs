@@ -13,6 +13,7 @@ pub mod applyxfm4d;
 pub mod avscale;
 pub mod bet;
 pub mod bet2;
+pub mod bet_script;
 pub mod betsurf;
 pub mod bre;
 pub mod common;

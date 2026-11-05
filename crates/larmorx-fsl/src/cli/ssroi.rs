@@ -549,7 +549,7 @@ pub fn parse(
 
 /// `FSLOUTPUTTYPE`'s uncompressed form (`NIFTI_GZ` → `NIFTI`, `NIFTI2_PAIR_ZST` →
 /// `NIFTI2_PAIR`): `None` when it is unset or unknown (the programs print FSL's messages).
-fn uncompressed(t: Option<&str>) -> Option<String> {
+pub(super) fn uncompressed(t: Option<&str>) -> Option<String> {
     let t = t?;
     if !crate::bet::image::OUTPUT_TYPES.contains(&t) {
         return None;
@@ -683,7 +683,9 @@ fn run(
         Err(c) => c,
     };
     if call.debug {
-        return code;
+        // FSL's script ends with its cleanup's test, whose status is 0 with -d: it checks no
+        // step (§2.3; the default stops at a failure with status 1, FSL-214)
+        return if mode.reproduce() { 0 } else { code };
     }
     let rm = cleanup(settings, &call.output, &before, mode, notices, err);
     if mode.reproduce() { rm } else { code }
@@ -943,7 +945,14 @@ fn imcp(
     _err: &mut dyn Write,
 ) -> Result<(), u8> {
     let settings = s.settings;
-    let r = copy_image(settings, src, dest);
+    // a source that is no image: fslpy's message (observed, 2026-11-05: bet -S of an image with
+    // NaN voxels, whose masking step FSL's script went past)
+    let r = match source_files(settings, src) {
+        Err(_) => Err(format!(
+            "Could not find a supported file with prefix \"{src}\""
+        )),
+        Ok(_) => copy_image(settings, src, dest),
+    };
     match r {
         Ok(()) => Ok(()),
         Err(m) => {

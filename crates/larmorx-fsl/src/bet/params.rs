@@ -112,6 +112,11 @@ fn robust_pass(v: &Vol, last_bin: bool) -> (f64, f64, bool) {
     (f64::from(t2), f64::from(t98), far)
 }
 
+/// The minimum and maximum as a scan from the first voxel finds them (a strictly smaller or
+/// larger value replaces the one held): of equal values the first is kept, so a zero's sign is
+/// the first zero's (observed, 2026-11-05: `bet -S -v`'s premasked image, whose first voxel is
+/// +0 and later ones -0, prints `min 0` in FSL). The chunks are combined in order, so the result
+/// does not depend on the thread count.
 fn min_max(d: &[f32]) -> (f32, f32) {
     d.par_iter()
         .with_min_len(1 << 16)
@@ -121,7 +126,12 @@ fn min_max(d: &[f32]) -> (f32, f32) {
         )
         .reduce(
             || (f32::INFINITY, f32::NEG_INFINITY),
-            |a, b| (a.0.min(b.0), a.1.max(b.1)),
+            |a, b| {
+                (
+                    if b.0 < a.0 { b.0 } else { a.0 },
+                    if b.1 > a.1 { b.1 } else { a.1 },
+                )
+            },
         )
 }
 

@@ -844,13 +844,24 @@ def suite() -> Suite:
             ("Probabilities", f"mean |d| <= {PROB_MEAN}"),
             ("Bias field, restored image", f"relative difference <= {BIAS_REL} at p99.9"),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
+            (
+                "Default against the replica's default",
+                "the thresholds above (one channel: no band; several channels that correct "
+                "nothing compared: FSL's own band, FSL with correctly rounded maths)",
+            ),
         ],
         cases=cases,
         run_case=run_case,
         packages=("nibabel",),
         notes=(
-            "The cases are the replica suite's (`fsl-fast-replica`); FSL's runs are served from "
-            "the oracle cache under that suite's keys. The original is compared in `reproduce` "
-            "mode (D13) and its default `fix` pass against the reproduced run."
+            "The cases are the replica suite's (`fsl-fast-replica`) and the original's own "
+            "(`original/`: standard output at FAST's aborts and before the images are read, the "
+            "loops without a class, NaN voxels in `_restore`); FSL's runs are served from the "
+            "oracle cache under that suite's keys. The original is compared in `reproduce` mode "
+            "(D13) with FSL, and its default `fix` run with its reproduced run (the fix pass) and "
+            "with the replica's default (`larmorx-nc`, the same corrections: `specs/fast.md` "
+            "§11), which differ by the original's correctly rounded functions only (with glibc's, "
+            "the original's default is the replica's bit for bit on every single-channel case: "
+            "`validation/investigations/cleanroom-fast/glibc_default.py`)."
         ),
     )

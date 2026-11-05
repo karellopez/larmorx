@@ -162,6 +162,7 @@ original named by `LARMORX_TOPUP_BIN`; every run inside `scripts/orchestration/b
 | `trial_fsl_verbose.py` | the same case run by FSL through the oracle cache with extra words (`-v`): the cost lines per level beside the original's (what showed `--miter`'s count of rejected iterations and FSL-242) |
 | `trial_recheck.py` | the trial's findings with a scaled-conjugate-gradient level (and every 25th other) re-checked with the current build (`recheck.replay`, drawn recipes); counts by minimiser and movements |
 | `trial_categories.py` | every finding of the trial in one category (its recipe and how far its failed metrics lie from FSL's own one-bit band); counts, a reproducer per category, `--json` (`trial_categories.py <trial> <this folder> --json out.json`) |
+| `trial_catchup_triage.json` | `trial_categories.py`'s output on the catch-up trial (`trial_categories.py <workspace>/oracles/difftest/2026-11-05-catchup-topup . --json trial_catchup_triage.json`): the 4,223 differing cases' counts per category, the lowest finding of each and every category's findings; topup's page reads it for the catch-up trial's triage table (`evidence/fsl_topup.py`, `trial_catchup`; relay 9) |
 | `trial_band_ratios.py` | per group, the failed metrics over FSL's one-bit band: median, 90th percentile, the findings whose band is 0 |
 | `trial_quadratic.py` | the trial's `--splineorder=2` cases without movements, agreeing and differing, by whether an axis is shorter than two knot spacings at some level (FSL-145's layout) |
 

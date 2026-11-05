@@ -1,0 +1,82 @@
+{
+ "counts": {
+  "default-replica: glibc's functions give the replica's bits": 39,
+  "default-replica: not measured with glibc's functions": 1,
+  "several channels: noise-free channels": 2,
+  "singular covariance: the original aborts": 2,
+  "singular covariance: FSL aborts": 2,
+  "several channels: the reproduce run parts": 4
+ },
+ "reproducers": {
+  "default-replica: glibc's functions give the replica's bits": "cleanroom-fast-01459-original",
+  "default-replica: not measured with glibc's functions": "cleanroom-fast-02117-original",
+  "several channels: noise-free channels": "cleanroom-fast-02215-original",
+  "singular covariance: the original aborts": "cleanroom-fast-05605-original",
+  "singular covariance: FSL aborts": "cleanroom-fast-12578-original",
+  "several channels: the reproduce run parts": "cleanroom-fast-15057-original"
+ },
+ "members": {
+  "default-replica: glibc's functions give the replica's bits": [
+   1459,
+   1516,
+   1945,
+   2616,
+   3102,
+   3544,
+   3889,
+   4228,
+   4920,
+   5308,
+   7100,
+   7151,
+   7214,
+   7518,
+   8333,
+   8645,
+   8776,
+   8844,
+   8945,
+   10011,
+   10449,
+   10913,
+   10944,
+   11730,
+   12199,
+   12435,
+   13489,
+   14362,
+   14373,
+   14440,
+   14753,
+   14859,
+   14873,
+   15322,
+   15433,
+   17571,
+   17826,
+   18670,
+   18724
+  ],
+  "default-replica: not measured with glibc's functions": [
+   2117
+  ],
+  "several channels: noise-free channels": [
+   2215,
+   2311
+  ],
+  "singular covariance: the original aborts": [
+   5605,
+   13533
+  ],
+  "singular covariance: FSL aborts": [
+   12578,
+   14174
+  ],
+  "several channels: the reproduce run parts": [
+   15057,
+   16101,
+   18394,
+   19057
+  ]
+ }
+}

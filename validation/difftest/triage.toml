@@ -3088,16 +3088,6 @@ link = "validation/difftest/cases/fsl-bet/bet-small-fov-n-nothing-cropped.json"
 [[difference]]
 tool = "fsl-bet"
 implementation = "original"
-signature = ["out_outskin_mask.nii.gz"]
-status = "open"
-explanation = "Trial 2026-11-04-bet-options-6b (the clean-room original, not this part's code): betsurf on small random heads, 190 cases over some 50 signatures of its masks, meshes and messages (outskin and skull masks most: 42 + 22 + 15 cases; 5 exit status 255 where FSL finishes; 5 undefined FSL-51), bet's skull (-s, 6) and -Z's temporary files of int8 slabs (330, 2254: FSL-217, the original's gap), bet -Z -n's FSL-45 notice without a change (1983); the same kinds as the open betsurf entries above (the profiles' search and the mask's fill on tiny heads). For the clean-room catch-up part. Reproducers: fsl-bet:bet-options-6:<n> (results.jsonl of the trial)."
-link = "docs/findings/fsl-bet-original.md"
-
-# The clean-room catch-up, relay 7 (2026-11-05): the original's differences of the BET options part's trial, by signature
-
-[[difference]]
-tool = "fsl-bet"
-implementation = "original"
 signature = ["exit status", "files written"]
 status = "open"
 explanation = "Trial 2026-11-04-bet-options-6b (the original, betsurf, 5 case(s), reproducer 278), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): betsurf: 3 of 5 agree now (the profile rules of §6.4 corrected: shares of profiles set aside FSL's on 162 of the trial's 164 betsurf images); 2 still differ in the surfaces after the profiles: the scalp phase's deformation (§6.5; on images where the skulls are FSL's exactly the scalp is 0.24 to 3.4 mm away), with the few-voxel masks of these 10- to 32-voxel heads failing Dice >= 0.99 by a voxel or two (spec writer)"

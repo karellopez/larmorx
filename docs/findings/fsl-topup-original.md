@@ -575,8 +575,11 @@ The original brought up to `specs/topup.md`'s answers (§13's table, lines marke
     runs with 16 and 256 last bits changed spread as far on sampled findings (`trial_spread.py`);
     608 with the movements beyond 10 times the band, of which 179 run away (translations tens of mm
     from FSL's; 159 with an SCG level, which FSL warns against; in both modes; 98 already in the
-    2026-11-03 trial: from the same first cost FSL's first SCG step and the original's differ,
-    `topup-trial-04946`, open); 236 FSL-143 (applytopup vb3D, vb4D); 88 without movements within 10
+    2026-11-03 trial; on `topup-trial-04946`, with `--debug`, the first gradients agree to 1e-7 and
+    the field part of the second, at `x + σd`, to 9e-5, but its rotation entries part by 1.5 %:
+    FSL-201's forward differences jump by about 2 % when an angle's single-precision rounding flips,
+    which the scaled conjugate gradients divide by their small `σ`, so their curvature and step
+    differ from the first iteration: FSL-201 with SCG, FSL's own end a rotation of 0.69 rad); 236 FSL-143 (applytopup vb3D, vb4D); 88 without movements within 10
     times the band; 24 cubic cases without movements beyond it (2 were finding 46's, 6 of 10
     sampled within FSL's wider spread, 07557 and 10619 open); 28 quadratic cases without movements,
     deterministic (FSL's band 1e-7 to 1e-5), 22 of them among the 109 cases with an axis shorter

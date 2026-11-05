@@ -394,6 +394,29 @@ def compare(
         checks.add(c)
 
 
+#: The checks of :func:`against_replica_default` start with this.
+REPLICA_DEFAULT = "Default against the replica's default"
+
+#: Cases whose default lies beyond the thresholds from the replica's default, with the measured
+#: reason; their other checks must pass (the case is then an expected divergence).
+EXPECTED_DEFAULT: dict[str, str] = {
+    "multi/s2-manualseg-cycle": (
+        "Both defaults correct FSL-98's class order (a cycle here), so FSL's own band (FSL with "
+        "correctly rounded maths) is not this path's; several channels have no FSL-202 "
+        "(one channel's), so their band is FSL's own size, not the narrow one of the corrected "
+        "variance. The difference is the correctly rounded functions only: with glibc's "
+        "functions the original's default gives the replica's default's labels exactly "
+        "(validation/investigations/cleanroom-fast/glibc_default.py); FSL against FSL with "
+        "correctly rounded maths on the same case, on FAST's uncorrected order: _mixeltype Dice "
+        "0.99941. In reproduce FSL's labels exactly."
+    ),
+}
+
+#: Corrections whose notice changes no compared value (FSL-96: values FSL never writes, outside
+#: the mask): a default that names only these computes FSL's arithmetic, with its own functions.
+_NOTHING_COMPARED = frozenset({"FSL-96"})
+
+
 def against_replica_default(
     checks: CheckList,
     prepare,
@@ -402,10 +425,21 @@ def against_replica_default(
     ours_dir: Path,
     ours: Completed,
     before: set[str],
+    band=None,
 ) -> None:
     """§11: the original's default run (in ``ours_dir``) against the replica's default (the same
-    corrections), with the thresholds of FSL's comparison and no band; each check's name says
-    what it compares. Nothing when the replica's program is not built."""
+    corrections), with the thresholds of FSL's comparison; each check's name says what it
+    compares. Nothing when the replica's program is not built.
+
+    The two defaults differ by the original's correctly rounded functions against the replica's
+    glibc ones (with glibc's, the original's default is the replica's on every single-channel case
+    of the suite: ``validation/investigations/cleanroom-fast/glibc_default.py``). With one channel
+    FSL-202's variance makes that band narrow (``specs/fast.md`` §4.4), and no band is allowed.
+    Several channels have no FSL-202: their band is FSL's own. So ``band`` (FSL with correctly
+    rounded maths, :func:`_band_of`) is given only when the default corrects nothing compared
+    (several channels, only :data:`_NOTHING_COMPARED` named): that run is then the default's
+    arithmetic with the default's functions, and a check that fails against the replica's default
+    passes when the original's default agrees with it within the same thresholds, saying so."""
     from larmorx_validation.parity.fsl_mcflirt_replica import replica_binary
 
     if replica_binary() is None:
@@ -414,7 +448,7 @@ def against_replica_default(
         tmp = Path(name)
         prepare(tmp)
         r = rep.run_replica("fast", args, cwd=tmp, settings=settings, mode=defects.FIX)
-        label = "Default against the replica's default"
+        label = REPLICA_DEFAULT
         checks(
             f"{label}: exit status",
             r.code == ours.code,
@@ -428,13 +462,32 @@ def against_replica_default(
             detail=f"replica only {sorted(fa - fb)[:4]}, original only {sorted(fb - fa)[:4]}",
         )
         if r.code == 0 and ours.code == 0:
-            so, why = _numbers_close(
-                r.stdout.replace(str(tmp), "{cwd}"), ours.stdout.replace(str(ours_dir), "{cwd}")
-            )
-            checks(f"{label}: standard output (numbers to 4 significant digits)", so, detail=why)
+            own_out = ours.stdout.replace(str(ours_dir), "{cwd}")
+            so, why = _numbers_close(r.stdout.replace(str(tmp), "{cwd}"), own_out)
             images = CheckList()
             compare_images(images, tmp, ours_dir)
+            banded = None
+            if band is not None and (not so or not all(c.passed for c in images.checks)):
+                banded = band()
+            within = "within the correctly rounded functions' band (several channels, nothing corrected: FSL with correctly rounded maths is the default's arithmetic with its functions)"
+            if not so and banded is not None:
+                ok, _ = _numbers_close(banded[0].stdout.replace(str(banded[1]), "{cwd}"), own_out)
+                if ok:
+                    so, why = True, f"{within}; against the replica's default: {why}"
+            checks(f"{label}: standard output (numbers to 4 significant digits)", so, detail=why)
+            alt: dict[str, Check] = {}
+            if banded is not None:
+                other = CheckList()
+                compare_images(other, banded[1], ours_dir)
+                alt = {c.name: c for c in other.checks}
             for c in images.checks:
+                k = alt.get(c.name)
+                if not c.passed and k is not None and k.passed:
+                    c = dataclasses.replace(
+                        c,
+                        passed=True,
+                        detail=f"{within}: against FSL with correctly rounded maths {k.detail}; against the replica's default {c.detail}",
+                    )
                 checks.add(dataclasses.replace(c, name=f"{label}: {c.name}"))
 
 
@@ -445,6 +498,7 @@ def fix_pass(
     settings,
     reproduced_dir: Path,
     reproduced: Completed,
+    band=None,
 ) -> None:
     """D13: the original's default run against its ``reproduce`` run, and against the replica's
     default (:func:`against_replica_default`)."""
@@ -477,22 +531,47 @@ def fix_pass(
             # FAST names no GLIBC-07 (an iterative fit; defects.UNNAMED_GLIBC)
             unnamed_ok=defects.UNNAMED_GLIBC,
         )
-        against_replica_default(checks, prepare, args, settings, tmp, r, before)
+        allowed = _channels(args) > 1 and set(entries) <= _NOTHING_COMPARED
+        against_replica_default(
+            checks, prepare, args, settings, tmp, r, before, band if allowed else None
+        )
+
+
+def _channels(args: list[str]) -> int:
+    """``-S``'s value on a command line (1 when not given)."""
+    for k, a in enumerate(args):
+        if a in ("-S", "--channels") and k + 1 < len(args):
+            try:
+                return int(args[k + 1], 0)
+            except ValueError:
+                return 1
+        if a.startswith("--channels="):
+            try:
+                return int(a.split("=", 1)[1], 0)
+            except ValueError:
+                return 1
+    return 1
 
 
 def _band_of(stack: contextlib.ExitStack, prepare, args, settings, never: str, unwritten=()):
-    """The band's run (:func:`compare`), made only when a check needs it: FSL with the CORE-MATH
-    preload through the oracle cache (the preload's content is part of the key)."""
+    """The band's run (:func:`compare`, :func:`against_replica_default`), made only when a check
+    needs it, once: FSL with the CORE-MATH preload through the oracle cache (the preload's
+    content is part of the key)."""
+    made: list[tuple[Completed, Path] | None] = []
 
     def band() -> tuple[Completed, Path] | None:
+        if made:
+            return made[0]
         lib = crmath_preload()
         if lib is None:
+            made.append(None)
             return None
         c = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="lx-fast-cr_")))
         prepare(c)
         p = rep.run_oracle(args, cwd=c, settings={**settings, "LD_PRELOAD": str(lib)}, never=never)
         if unwritten:
             rep._clear_unwritten(CheckList(), c, unwritten)
+        made.append((p, c))
         return p, c
 
     return band
@@ -669,7 +748,7 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         band = _band_of(stack, lambda t: _prepare(run, t), args, settings, run.never, run.unwritten)
         compare(checks, oracle, ours, a, b, before, band)
         if run.fix and ours.code == 0:
-            fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours)
+            fix_pass(checks, lambda t: _prepare(run, t), args, settings, b, ours, band)
     if run.fix_finishes:
         with tempfile.TemporaryDirectory(prefix="lx-fast-fix_") as b_:
             b = Path(b_)
@@ -689,6 +768,10 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
                 r.code == 1 and run.fix_refuses in _refusal(r.stderr),
                 detail=f"exit {r.code}: {_refusal(r.stderr)[:160]}",
             )
+    why = EXPECTED_DEFAULT.get(name)
+    bad = [c for c in checks.checks if not c.passed]
+    if why is not None and bad and all(c.name.startswith(REPLICA_DEFAULT) for c in bad):
+        raise Outcome(EXPECTED, f"{why} Measured: " + "; ".join(c.detail[:240] for c in bad))
     if oracle.code != 0 and all(c.passed for c in checks.checks):
         tail = " ".join(oracle.stderr.split())[:200]
         raise Outcome(BOTH_ERROR, f"fast exits {oracle.code}; the same from the original. {tail}")

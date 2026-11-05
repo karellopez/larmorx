@@ -78,3 +78,11 @@ build of commit `f1f9a35` (`crates/larmorx-fsl/src/betsurf/`, environment knobs 
 in `095818a`); the decision rules found with them are in the findings ("betsurf (§6), part 2b"):
 330 of 330 single profiles decided as FSL decides, 127 of 128 T1-and-T2 triangles and 64 of 64
 T1-only triangles alike.
+
+## The clean-room catch-up, relay 6 (2026-11-05): `bet -S`, `-B`, `-A`, `-A2`
+
+| Script | What it shows |
+|---|---|
+| `ssroi_fsl_runs.py <out> '<case regex>' [--args=<words>]` | (relay 5's, used again) FSL's runs of the BET suite's option cases (`bet/eyes*`, `bet/bias*`, `bet/surfaces*`, `defects/eyes-*`, `real/*-S`, ...), with `-d` or `-v` added: the files a failed run leaves (`bet/eyes-no-brain`: 12), bash's reports of an abort and their commands' texts, a negative mean's `dc: stack empty` (`defects/eyes-negative-mean`) |
+| `fsl_program.py <dir> <program> <args...>` | one FSL program through the cache: `fslstats <prebrain> -M` and `-S` on FSL's own `-S -d` files print six decimals (`1951833.117037`: never an exponent); bet2 with `-c` on `-B`'s unbiased image of the 3.5-year-old (the robust run's second pass: FSL's self-intersection total 123.412, the original's 124.668) |
+| `dc_probe.py` | GNU dc 1.4.1 (this machine's) on `10 k <mean> 3.5 <sd> * + p`, both streams apart: the unit tests' expected texts of the eye threshold (FSL-216) |

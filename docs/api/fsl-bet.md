@@ -64,12 +64,18 @@ Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmr
 ANALYZE) or an in-memory image. Without `variation` it runs `bet2`; with `"robust"` (`-R`),
 `"small_fov"` (`-Z`) or `"fmri"` (`-F`) the `bet` script; `"eyes"` (`-S`), `"bias"` (`-B`),
 `"surfaces"` (`-A`) and `"surfaces_t2"` (`-A2`, with `t2`) run the script with FLIRT,
-standard_space_roi, FAST, fslmaths, fslstats and betsurf, and have only their replica yet
-(since 2026-11-04; `implementation="original"`, or `"auto"` without `larmorx-nc`:
-`NotImplementedError`); `"surfaces"` and `"surfaces_t2"` also return betsurf's surfaces
+standard_space_roi, FAST, fslmaths, fslstats and betsurf (the replica since 2026-11-04, the
+clean-room original since 2026-11-05: each implementation runs its own programs, in its
+process); `"surfaces"` and `"surfaces_t2"` also return betsurf's surfaces
 (`BetResult.surfaces`, a `BetsurfResult` with the masks, the skull's mask and the outlines). They
-read FSL's standard images from `fsl_data` (a directory laid out as `$FSLDIR/data`; the variable
-`LARMORX_FSL_DATA` otherwise), else `$FSLDIR/data`, else the copy `larmorx-nc` carries. The
+read FSL's standard images (FSL's data under the FSL Licence, which this package never ships)
+from `fsl_data` (a directory laid out as `$FSLDIR/data`; the variable `LARMORX_FSL_DATA`
+otherwise; when given, the only place looked). Otherwise the original reads them from the copy
+`larmorx-nc` installs (as data), else `$FSLDIR/data`, else larmorx's data cache, filled once by
+a checksum-verified download of FSL's `fsl-data_standard` package (`larmorx fetch fsl-standard`
+fetches it ahead; [fsl-roi.md](fsl-roi.md), "FSL's standard images"); the replica reads
+`$FSLDIR/data`, else its own copy. An image found nowhere is refused before anything runs
+(`RuntimeError` from the original, naming the image and every place looked). The
 arguments are checked first (`ValueError`); FSL's
 settings are the call's: the outputs are written as NIfTI-1 and read back, `FSLOUTPUTTYPE`,
 `FSL_LOAD_NIFTI_EXTENSIONS` and every other `FSL*` variable of the process are never passed, and no
@@ -164,7 +170,10 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-45** (A): `bet -Z` crops its outputs with `imglob` called without `${FSLDIR}/bin`: with
   FSL off the `PATH` (always so in Python) FSL leaves them padded; the default crops exactly its
   outputs.
-- **FSL-46** (A): `bet`'s cleanup removes every `<output>_tmp*` file; the default only its own.
+- **FSL-46** (A): `bet`'s cleanup removes every `<output>_tmp*` file; the default only its own
+  (every `<output>_tmp...` file the run's programs created or changed, `standard_space_roi`'s and
+  FAST's in `-S` and `-B` included). A step that fails ends the script before its cleanup, in
+  both modes (FSL's `ERR` trap: its temporary files are left, observed).
 - **FSL-47** (A): `betsurf --t1only` fills the scalp mask from the outer skull surface's centre in
   its padded grid; the default from the scalp's (named only when the mask changes).
 - **FSL-48** (B): a T2 on another grid than the T1 is sampled at the T1's voxel coordinates; the
@@ -183,7 +192,13 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-216** (A; B for a number that is not one): `bet -S` computes its eye threshold with GNU
   `dc` from what `fslstats` prints, which `dc` misreads for a number with an exponent, a minus
   sign, `nan` or `inf`; the default reads the numbers as numbers and refuses a mean or deviation
-  that is not a number; `reproduce` gives what `dc` prints, its messages too.
+  that is not a number; `reproduce` gives what `dc` prints, its messages too. (The clean-room
+  original, observed on FSL 6.0.7.23: `fslstats -M` and `-S` print six decimals, never an
+  exponent; a brain with a negative mean gives FSL's threshold `|mean| + 3.5 × SD` and one
+  `dc: stack empty` on standard error, which `reproduce` gives (case
+  `defects/eyes-negative-mean`); `nan` and `inf`, which only NaN or infinite voxels make and
+  which FSL's script never reaches with them, are refused in both modes, `reproduce` saying that
+  dc's commands are not reproduced.)
 - **FSL-217** (A): `bet -F` and `-Z` cut the input with fslroi (and `-Z` joins the slices with
   fslmerge), which write an int8 image as uint8 with the same bytes: bet2 then runs on negative
   values turned into 128 to 255. The default keeps int8 and its values, named where the result

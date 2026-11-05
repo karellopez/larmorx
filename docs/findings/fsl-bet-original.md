@@ -361,4 +361,103 @@ follows.
 
 Left for relay 6 (BET's options): `bet -F` and `-Z` of an int8 image (FSL-217 inside bet: the
 suite's `bet/fmri-int8`, `bet/small-fov-int8`, `bet/small-fov-int8-debug`, still in
-`ORIGINAL_PENDING_CASES`), and `bet -S`, `-B`, `-A`, `-A2`, which run these programs.
+`ORIGINAL_PENDING_CASES`), and `bet -S`, `-B`, `-A`, `-A2`, which run these programs: done, below.
+
+## bet -S, -B, -A, -A2 (the clean-room catch-up, relay 6, 2026-11-05)
+
+`larmorx_fsl::cli::bet_script`, written from `specs/bet.md` §5.3, §5.4, §7, §9 to §11.1, runs each
+variation as the script's sequence of the original's own programs, in this process (bet2,
+`standard_space_roi`, FLIRT, `fslmaths`, `fslstats`, FAST, betsurf, and the bet script itself for
+`-B`'s robust run), with the arguments the spec names; FSL's standard images are found before
+anything runs (`larmorx_fsl::data`, relay 5). These black-box runs of FSL 6.0.7.23 (through the
+oracle cache: `ssroi_fsl_runs.py` with `-d` and `-v` added, `fsl_program.py`) and of GNU dc
+1.4.1 (`dc_probe.py`) showed what the spec leaves open:
+
+- **dc's threshold** (§5.3 step 9, FSL-216): FSL 6.0.7.23's `fslstats -M` and `-S` print six
+  decimals (`1951833.117037 ` for `defects/eyes-threshold-exponent`'s brain, whose mean is about
+  2 × 10⁶): **no exponent ever reaches dc**, so the spec's first kind of misreading (`2.1e+06`) does
+  not occur with this release (that case passes without any dc message). A brain with a negative
+  mean (the new case `defects/eyes-negative-mean`, the phantom less 1000: mean `-349.436360`, SD
+  `158.050544`) makes FSL print exactly one `dc: stack empty` on standard error and use the
+  magnitude, `349.436360 + 3.5 × 158.050544`: the minus sign is dc's subtraction with too few
+  numbers on its stack, whatever the order of the expression's words. `reproduce` gives that
+  (the case FSL's bit for bit, its message included); the default uses the number, `-349.436360 +
+  553.1769040 = 203.740544`, and names FSL-216. dc prints its messages in two pieces, `dc: ` on
+  standard error and the rest on standard output (`'e' (0145) unimplemented`), so in FSL's script
+  an unimplemented command's text would land in the threshold. `nan` and `inf` (NaN or infinite
+  voxels in the brain) are refused in both modes: FSL's script never reaches the threshold with
+  them (its FLIRT's NaN matrix ends `standard_space_roi`'s steps; `defects/eyes-nan`), and dc's
+  reading of the words `nan` and `inf` as commands (`n`, `a`, `i`, `f`) depends on the script's
+  exact expression, which the spec does not give (a question for the spec writer).
+- **The threshold's arithmetic**: dc's product `3.5 × SD` at scale 10 keeps `min(1 + s,
+  max(10, s))` decimals of an SD with `s` decimals, truncated; the sum is exact; the text has no
+  leading zero (`.5`), keeps its scale's zeros (`100.0`), and zero is `0` (`dc_probe.py`, the unit
+  tests of `bet_script`).
+- **A failed run leaves its temporary files** (`bet/eyes-no-brain`: FSL's 12 `out_tmp_*` files;
+  `defects/eyes-nan`: 5): bash's `ERR` trap exits before the script's cleanup. The original does
+  the same in both modes (rule C: the files show what failed); a run whose temporary images were
+  written uncompressed (no `-d`) rewrites them in `FSLOUTPUTTYPE`'s format before it ends, so
+  that the files left are FSL's.
+- **bash's reports** of an abort inside `bet` all name line 399 (fslmaths in `-S`'s step 7, bet2
+  in its step 3, betsurf in `-A2`), each with the command as the script writes it: `${FSLDIR}/bin/
+  bet2 ${OUT}_tmp_premask ${OUT}_tmp_premask_bet -n -m -f 0.4 $bet2opts`, `${FSLDIR}/bin/betsurf
+  -o -m -s $IN ${OUT}_tmp_T2_to_T1 ${OUT}_mesh.vtk ${OUT}_tmp_T1_to_std.mat $OUT` (observed); the
+  other commands' texts follow the same form (not observed: they do not abort on the suite's
+  inputs).
+- **`-A2` with a T2 that does not exist** (`bet/surfaces-t2-missing`): FSL's FLIRT prints its
+  image errors and exits 0 (FLIRT's FSL-68), the script goes on (the registration to MNI152, bet2
+  `-e`), and betsurf aborts on the missing `<out>_tmp_T2_to_T1`: its messages, bash's report and the
+  failure line. `reproduce` gives exactly that (refused by both alike); the default's FLIRT exits 1
+  there, so the script fails at once.
+- **`bet -S` with NaN voxels** (`defects/eyes-nan`, `reproduce`): FSL's FLIRT writes a NaN matrix,
+  `convert_xfm -inverse` aborts (`inv(): matrix is singular`), the later steps fail on missing
+  files, fslpy's `imcp` prints `Could not find a supported file with prefix
+  "out_tmp_premask_tmp_masked"` (standard output) and `standard_space_roi -d` ends with status 0;
+  bet2 then aborts on the missing premask. Found here and corrected in the original's
+  `standard_space_roi`: fslpy's message for a missing source (it printed the image layer's) and
+  the status 0 with `-d` in `reproduce` (it returned imcp's 1). In the default the original's FLIRT
+  leaves the NaN voxels out of its costs (`specs/flirt.md`'s FSL-14), the script goes on, the brain's
+  mean is printed `nan` and the threshold refuses it (FSL-216's rule B): the default refuses, as the
+  replica's (whose FLIRT refuses the input). The spec's §5.3 says "FSL-14 of FLIRT: the default
+  refuses there", which `specs/flirt.md` does not say (a question for the spec writer); and the
+  original's FLIRT does not name FSL-14 when it leaves NaN voxels out of a registration's costs (it
+  names it for the centres of gravity only): a gap of FLIRT's notices, for its next part.
+- **The sign of bet2's zero minimum** (`bet/eyes-verbose`, `bet/bias-skull`, `-v`): `standard_space_roi
+  -b`'s premasked image holds +0 and −0 (fslmaths' `-mas` makes a negative value outside the mask
+  −0, `specs/fslmaths.md` §6.3); its first voxel is +0 and FSL's bet2 prints `min 0`. The original
+  combined its parallel chunks' minima with `f32::min`, which can return either zero, and printed
+  `min -0`; its extremes now keep the first of equal values in every chunk and between chunks (a
+  scan from the first voxel), at any thread count.
+- **`-R`'s centre** is now `fslstats <brain> -l 0.001 -C` run in this process (`specs/fslstats.md`
+  §5.7: FSL's block sums, every value less the minimum; the script's own call, `specs/fslstats.md`
+  §1), its six decimals passed on as text; the earlier sum of its own gave the same text on every
+  record case. fslstats' centre now computes each weight as it sums it (no copy of the volume in
+  double precision: `bet -R`'s memory call, 130 MiB against an allowance of 127, came back under
+  it).
+- **The 3.5-year-old with `-B`** (`real/child-3y-B`, the record's failure): every temporary file of
+  the `-d` runs is FSL's bit for bit (both `standard_space_roi` runs, FAST's bias field and its six
+  other files, the unbiased images); the difference is the robust run's second bet2 pass, `bet2
+  <unbiased premask> -c 85.061718 75.366898 129.742609` (the first pass and its centre FSL's
+  exactly): FSL's self-intersection total 123.412, the original's 124.668, the mask's Dice 0.9983,
+  the boundary distance's 95th percentile 1.0 and its maximum 2.24 voxels (bet2's threshold 2; the
+  brain's values FSL's inside both). The image is stored neurologically (its qform a rotation of
+  positive determinant): `-c` on such an image is the open question of random testing's cases 622
+  and 677 (the conversion of a centre given in voxels between the storage and FSL's radiological
+  frame, through FSL's 4 × 4 inverse), for the spec writer.
+
+**What agrees.** The suite's 31 new cases of relay 6 (the record of 2026-11-05): `-S` and `-B` FSL's
+**bit for bit** in every case but the 3.5-year-old (every output and every `-d` file, the real
+adult, tumour and 82-year-old included; `-S` with `-n`, a NaN head, an int16 pair output), `-A` and
+`-A2` with bet2's brain and mesh and FLIRT's matrices FSL's and betsurf's masks within betsurf's
+thresholds (the 75-year-old's and the 7.5-year-old's Dice 0.993 to 0.9995, as betsurf's own record);
+`-F` and `-Z` of int8 heads (FSL-217) FSL's in `reproduce`. Messages and statuses FSL's byte for
+byte in every case (bash's process IDs masked).
+
+**Built for speed.** The programs are the original's (FLIRT about twice FSL's speed on one thread
+and parallel inside, bet2 and betsurf likewise); the temporary images are written uncompressed
+when they are not kept; the eye threshold in exact decimal arithmetic. The steps run one after the
+other, as the script runs them: two at once (§10 allows `-S`'s raw bet2 beside its
+`standard_space_roi`, `-A`'s FLIRT beside bet2) would hold both programs' images, and larmorx's
+peak memory is held to FSL's, whose peak is its largest program's (CLAUDE.md). Memory
+(`tests/parity/test_memory_peak.py`, the suite's head with FSL's standard images): `-S -m` 62 MiB
+against FSL's 67, `-B` 61 against 115, `-A2` 58 against 72.

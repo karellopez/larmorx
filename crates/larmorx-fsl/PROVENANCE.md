@@ -400,3 +400,24 @@ only inputs were:
 | `cli::ssroi` | the script's options, usage and checks, the five steps run in this process with the original's programs (their messages, bash's `Aborted` report), the field of view resampled once where it is both the mask and the region, the temporary images uncompressed without `-d`, fslpy's `imcp` (a copy, or the layout converted), the cleanup; FSL-211 (bash's splitting and `[`'s messages), FSL-212, FSL-213, FSL-214 | spec §2, §6, §7, black-box |
 | `data` | FSL's standard images found as §5.4 says: the named directory, larmorx-nc's copy read as data (checked), `$FSLDIR`, larmorx's data cache filled once by a checksum-verified download (`curl`, else `wget`) of FSL's package, only its three images kept with a manifest; the refusal naming every place looked | `specs/bet.md` §5.4; the decision log, 2026-11-04 |
 | `flirt::engine` (the `-out` writers) | `-out`'s display range 0 and 0 | black-box (findings) |
+
+## bet -S, -B, -A, -A2 (the clean-room catch-up, relay 6, 2026-11-05)
+
+Written by a clean-room implementer under the same rules (FSL's source, FSL's `bet` and
+`standard_space_roi` scripts' text, the replica crates, the source-derived findings, the
+register's restricted sections, `docs/parts/` and `validation/probes/` not opened). Its only
+inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/bet.md`](../../specs/bet.md) §5.3, §5.4, §7, §9 to §11.1 | each variation's programs, their arguments, files and types, the eye threshold in dc's decimal arithmetic, the standard images, the messages and statuses, FSL-44, FSL-46, FSL-63, FSL-216, FSL-217 |
+| [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md) §2.4, §3.2; [`specs/fslstats.md`](../../specs/fslstats.md) §4, §5.7 | standard_space_roi's status 0 with `-d`; fslroi's types (FSL-217); `fslstats -l -C` (the robust run's centre) |
+| Black-box runs of FSL 6.0.7.23's `bet` (the suite's option cases, with `-d` and `-v` added), `bet2`, `fslstats` through the oracle cache (`validation/investigations/cleanroom-bet/ssroi_fsl_runs.py`) | the observations of [`docs/findings/fsl-bet-original.md`](../../docs/findings/fsl-bet-original.md), "bet -S, -B, -A, -A2": fslstats' six decimals, a negative mean's `dc: stack empty`, the files a failed run leaves, the commands' texts in bash's reports, fslpy's message for a missing image, the sign of bet2's zero minimum |
+| GNU dc 1.4.1 run on this machine (`10 k <mean> 3.5 <sd> * + p`, its two streams) | the threshold's text (scales, truncation, `.5`, `0`, `-`), dc's messages split between standard error (`dc: `) and standard output |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `cli::bet_script` | `-S`, `-B`, `-A`, `-A2` as the script's sequences of the original's programs in this process (bet2, standard_space_roi, FLIRT, fslmaths, fslstats, FAST with its streams discarded, betsurf, the script itself), bash's `Aborted` report and the `ERR` trap's line, fslpy's `immv`, the eye threshold (`Decimal`: dc's `*` and `+` at scale 10, its text), FSL-63's removal of `-s`, FSL-216 | spec §5.3, §9; black-box (findings) |
+| `cli::bet` | the standard images found before anything runs, the temporary images uncompressed when not kept, a failed run's temporary files left (rewritten in the run's format), FSL-46's cleanup by the files created or changed, `-R`'s centre by `fslstats -l 0.001 -C`, `-F`'s and `-Z`'s temporary images in fslroi's types (FSL-217) | spec §5.1 to §5.4, §9; `specs/standard_space_roi.md` §3.2; `specs/fslstats.md` §5.7 |
+| `bet::params` (`min_max`) | of equal extremes the first kept (a zero's sign) | black-box (findings) |
+| `cli::ssroi` | fslpy's `Could not find a supported file with prefix "<name>"`; the status 0 with `-d` in `reproduce` | `specs/standard_space_roi.md` §2.4; black-box |

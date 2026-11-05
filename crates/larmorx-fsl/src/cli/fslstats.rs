@@ -1336,13 +1336,15 @@ fn centre(input: &Image, pass: &Pass, mm: bool, err: &mut dyn Write) -> [f64; 3]
     let [nx, ny, nz, _] = pass.dims;
     let n3 = nx * ny * nz;
     let min = ops::extremes(&pass.img, false).map_or(0.0, |e| e.0);
-    let w: Vec<f64> = pass.img[..n3]
-        .par_iter()
-        .map(|&v| f64::from(num::nan32(v, min, v - min)))
-        .collect();
+    // each weight computed as it is summed: no copy of the volume in double (memory as FSL's)
+    let w = || {
+        pass.img[..n3]
+            .iter()
+            .map(move |&v| f64::from(num::nan32(v, min, v - min)))
+    };
     let at = |axis: usize| {
         blocks(
-            w.iter().enumerate().map(|(i, &x)| {
+            w().enumerate().map(|(i, x)| {
                 let c = match axis {
                     0 => i % nx,
                     1 => (i / nx) % ny,
@@ -1354,7 +1356,7 @@ fn centre(input: &Image, pass: &Pass, mm: bool, err: &mut dyn Write) -> [f64; 3]
             1000,
         )
     };
-    let mut total = blocks(w.iter().copied(), n3, 1000);
+    let mut total = blocks(w(), n3, 1000);
     if total.abs() < 1e-5 {
         let _ = writeln!(err, "{COG_ZERO}");
         total = 1.0;

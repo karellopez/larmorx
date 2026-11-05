@@ -11,6 +11,7 @@ use std::sync::Arc;
 use super::cost::Log;
 use super::mat::{IDENTITY, Mat4};
 use super::param::{self, AngleRep};
+use super::programs::sse::sub;
 use super::trace::Trace;
 
 /// FLIRT's default tolerances (§8.2): rotations (rad), translations (mm), scales, skews.
@@ -499,13 +500,13 @@ pub fn optimise_params(
             for i in 0..12 {
                 tplus[i] = (f64::from(tol[i]) + tx0[i]) - tx0[i];
                 // x0 - x0 as the spec writes it: 0, or NaN for a parameter that is not finite
-                zero[i] = if tx0[i].is_finite() { 0.0 } else { f64::NAN };
+                // (the parameter's own NaN, x86-64's default NaN for an infinite one)
+                zero[i] = sub(tx0[i], tx0[i]);
             }
             let a = p.reduce(&tplus);
             let b = p.reduce(&zero);
             // the start y = pinv(P)·(x_start − x₀) = 0 (x_start = x₀)
-            let zero: [f64; 12] =
-                std::array::from_fn(|i| if x0d[i].is_finite() { 0.0 } else { f64::NAN });
+            let zero: [f64; 12] = std::array::from_fn(|i| sub(x0d[i], x0d[i]));
             let ty: Vec<f32> = a.iter().zip(&b).map(|(x, y)| (x - y) as f32).collect();
             let y0 = p.reduce(&zero);
             let tys = |t: &Trace| t.nums(ty.iter().map(|&v| f64::from(v)));

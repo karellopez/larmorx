@@ -93,7 +93,8 @@ pub enum Step<'a> {
 /// How `midtrans`'s computation stops (§15.5).
 #[derive(Debug, PartialEq)]
 pub enum MidError {
-    /// A decomposition of a matrix that is not finite (FSL's fails; refused, rule B).
+    /// Averages or a decomposition of values that are not finite (FSL-241: FSL's fails or
+    /// writes NaN rows; refused, rule B).
     NotFinite,
     /// `AAᵀ` is singular (`inv(): matrix is singular`, FSL-78).
     Singular,
@@ -196,6 +197,12 @@ pub fn midtrans(ts: &[Mat4], xs: &[V3], step: &mut dyn FnMut(Step<'_>)) -> Resul
     bat = sub(&bat, &ut_av);
     bat = add(&bat, &outer(&u_av, &tp_av));
     let bat = scale(&bat, -1.0);
+    // averages beyond double precision (FSL-241): FSL writes NaN rows or reports its failed
+    // decomposition; refused here, before the inverse would call them singular
+    let finite3 = |m: &M3| m.iter().flatten().all(|v| v.is_finite());
+    if !finite3(&aat) || !finite3(&bat) {
+        return Err(MidError::NotFinite);
+    }
     let inv = inverse3(&aat).ok_or(MidError::Singular)?;
     let m = scale(&mul3(&bat, &inv), -1.0);
     let mut w = mv(&m, &ppx_av).map(|v| -v);
@@ -210,6 +217,9 @@ pub fn midtrans(ts: &[Mat4], xs: &[V3], step: &mut dyn FnMut(Step<'_>)) -> Resul
     for i in 0..3 {
         out[i][..3].copy_from_slice(&ma[i]);
         out[i][3] = w[i] + ms[i];
+    }
+    if out.iter().flatten().any(|v| !v.is_finite()) {
+        return Err(MidError::NotFinite);
     }
     Ok(out)
 }
@@ -300,8 +310,9 @@ pub struct PointFit {
 
 /// `pointflirt`'s affine matrix mapping the points `x` onto `y` (3 × n each, points as
 /// columns) in the least-squares sense (§15.6): the 12 × 12 normal equations solved by their
-/// SVD, singular values up to 1e-8 dropped. `None` when a coordinate is not finite (refused,
-/// rule B: FSL's decomposition returns garbage or fails).
+/// SVD, singular values up to 1e-8 dropped. `None` when a coordinate, or an entry of the
+/// system (products of `X·Xᵀ` that overflow), is not finite: FSL's SVD fails there (§15.6:
+/// `Mat::operator(): index out of bounds`).
 pub fn pointflirt(x: &[Vec<f64>; 3], y: &[Vec<f64>; 3]) -> Option<PointFit> {
     let n = x[0].len();
     if x.iter().chain(y.iter()).flatten().any(|v| !v.is_finite()) {
@@ -337,6 +348,9 @@ pub fn pointflirt(x: &[Vec<f64>; 3], y: &[Vec<f64>; 3]) -> Option<PointFit> {
             rhs[3 * c + i] = q[i][c];
         }
         rhs[9 + c] = yb[c];
+    }
+    if b.iter().chain(&rhs).any(|v| !v.is_finite()) {
+        return None;
     }
     let (u, d, v) = vnl_svd(&b, 12, 12)?;
     let mut nullspace = 0;

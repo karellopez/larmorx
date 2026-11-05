@@ -231,6 +231,19 @@ fn world(input: &Input) -> Option<Mat4> {
     Some(mat::mul(&mat::mul(&mat::mul(&a, &di), &f), &dm))
 }
 
+/// The input's sampling matrix, which a level of 2 prints (§2.3): its voxel sizes as prepared
+/// (a single slice's 8 mm, then divided by the base scale `b`; observed: 0.5 mm voxels print 1).
+fn sampling_matrix(v: &Volume, b: f32) -> Mat4 {
+    let mut vs = v.voxel_size;
+    if v.shape[2] == 1 {
+        vs[2] = 8.0;
+    }
+    if (b - 1.0).abs() > 1e-5 {
+        vs = vs.map(|d| d / b);
+    }
+    mat::diagonal(vs.map(f64::from))
+}
+
 /// The scaled-mm conversion of a matrix (§3): `S M S⁻¹`, `S = diag(1/b)`.
 fn scale_in(m: &Mat4, b: f32) -> Mat4 {
     if (b - 1.0).abs() <= 1e-5 {
@@ -318,6 +331,10 @@ struct State<'a> {
     /// The input's sampling matrix and raw range, which a level of 2 prints at each `setscale`.
     sampling: Mat4,
     raw_input: (f32, f32),
+    /// The reference's and the input's `pixdim[4]` as read, which a level's description (a
+    /// level of 2, `-debug`) prints as its fourth size (observed: FSL prints 0 for images whose
+    /// TR is 0).
+    tr: [f64; 2],
     /// `-debug`: the current pair's boundary-based cost set up (its lines printed, §9.4); the
     /// final debug call's evaluation, which saves BBR's volume `debug`.
     bbr_set: bool,
@@ -784,13 +801,10 @@ fn run_inner(
             ),
         };
         trace.line(&between("Refvol", 0));
-        let vs = input.vols[0].voxel_size;
-        let z = if input.vols[0].shape[2] == 1 {
-            8.0
-        } else {
-            vs[2]
-        };
-        let sampling = mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)]);
+        let sampling = sampling_matrix(
+            &input.vols[0],
+            base_scale(o, &reference.vols[0], &input.vols[0]),
+        );
         trace.write(&format!(
             "Testvol sampling matrix =\n{}\n",
             trace.matrix(&sampling)
@@ -822,11 +836,14 @@ fn run_inner(
     } else {
         IDENTITY
     };
+    // the initial matrix printed in scaled mm (observed: 0.5 mm voxels, a base scale of 0.5,
+    // print an -init translation of 1.5 as 3)
+    let init_shown = scale_in(
+        &init_unscaled,
+        base_scale(o, &reference.vols[0], &input.vols[0]),
+    );
     if trace.at(2) {
-        trace.write(&format!(
-            "Init Matrix = \n{}\n",
-            trace.matrix(&init_unscaled)
-        ));
+        trace.write(&format!("Init Matrix = \n{}\n", trace.matrix(&init_shown)));
     }
     if trace.at(1) {
         if ref_sform {
@@ -837,10 +854,7 @@ fn run_inner(
         }
     }
     if trace.at(1) || o.print_init {
-        trace.write(&format!(
-            "Init Matrix = \n{}\n",
-            trace.matrix(&init_unscaled)
-        ));
+        trace.write(&format!("Init Matrix = \n{}\n", trace.matrix(&init_shown)));
     }
     if applying {
         return apply(
@@ -1136,16 +1150,12 @@ fn register(
         ctx,
         log: Arc::new(Log::sharing(Arc::clone(&ctx.libm))),
         trace: trace.clone(),
-        sampling: {
-            let vs = input.vols[0].voxel_size;
-            let z = if input.vols[0].shape[2] == 1 {
-                8.0
-            } else {
-                vs[2]
-            };
-            mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)])
-        },
+        sampling: sampling_matrix(&input.vols[0], b),
         raw_input: prepared.raw.map_or((0.0, 0.0), |r| r[1].range),
+        tr: [
+            reference.input.header.pixdim[4],
+            input.input.header.pixdim[4],
+        ],
         bbr_set: false,
         debug_bbr: false,
         debug_volume: None,
@@ -1205,9 +1215,15 @@ fn register(
     set_scale(&mut st, 8.0, true, false, err)?;
     st.flush(err);
     if trace.at(3) {
-        let c = |v: &Volume| trace.nums(cost::centre_of_mass(v, false));
-        trace.line(&format!("CoG for refvol is:  {}", c(&st.reference)));
-        trace.line(&format!("CoG for testvol is:  {}", c(&st.input0)));
+        // each centre measured for its line, its total's warning on standard error (observed:
+        // an empty reference prints it between `CoG for refvol is:` and its numbers)
+        for (name, v) in [("refvol", &st.reference), ("testvol", &st.input0)] {
+            let (c, zero) = cost::centre_of_mass_counted(v, false);
+            if zero {
+                let _ = writeln!(err, "WARNING::in calculating COG, total = 0.0");
+            }
+            trace.line(&format!("CoG for {name} is:  {}", trace.nums(c)));
+        }
     }
     let testvol = if o.no_resample {
         st.input0.clone()
@@ -1221,9 +1237,9 @@ fn register(
                 "Resampling refvol isotropically: {}",
                 trace.num(f64::from(st.min_sampling))
             ));
-            trace.volume_info("Refvol", &st.levels[0]);
+            trace.volume_info("Refvol", &st.levels[0], st.tr[0]);
         }
-        trace.volume_info("TESTVOL", &testvol);
+        trace.volume_info("TESTVOL", &testvol, st.tr[1]);
     }
     if o.debug {
         debug_files(&st, &reference.input, &input.input, &testvol, err, notices)?;
@@ -1932,7 +1948,7 @@ fn set_scale(
                 mat::g(f64::from(st.min_sampling), 6)
             );
             if let Some(p) = &st.pair {
-                trace.volume_info("testvol DEBUG", &p.input);
+                trace.volume_info("testvol DEBUG", &p.input, st.tr[1]);
             }
         }
         if trace.at(2) {

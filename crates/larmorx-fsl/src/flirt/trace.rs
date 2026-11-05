@@ -151,10 +151,11 @@ impl Trace {
         ));
     }
 
-    /// [`Trace::info`] of a volume of the run (`dim4` 1, one volume).
-    pub fn volume_info(&self, name: &str, v: &Volume) {
+    /// [`Trace::info`] of a volume of the run (one volume): a level's or a prepared image's four
+    /// lines, `tr` its image's `pixdim[4]` as read.
+    pub fn volume_info(&self, name: &str, v: &Volume, tr: f64) {
         let d = v.voxel_size.map(f64::from);
-        self.info(name, v.shape, [d[0], d[1], d[2], 1.0], 1, &v.data);
+        self.info(name, v.shape, [d[0], d[1], d[2], tr], 1, &v.data);
     }
 }
 

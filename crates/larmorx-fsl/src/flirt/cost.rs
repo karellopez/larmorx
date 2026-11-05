@@ -429,6 +429,13 @@ fn mismatch(v: &Volume, p: [f32; 3], x: f32) -> f32 {
 /// With `finite_only` (FSL-14 corrected) NaN and infinite voxels are left out of the minimum and
 /// the sums (they still count in the blocks' lengths).
 pub fn centre_of_mass(v: &Volume, finite_only: bool) -> [f64; 3] {
+    centre_of_mass_counted(v, finite_only).0
+}
+
+/// [`centre_of_mass`], and whether its total was below 1e-5 in magnitude (counted as 1: FSL
+/// prints `WARNING::in calculating COG, total = 0.0` each time it measures such a centre; a NaN
+/// total is not below).
+pub fn centre_of_mass_counted(v: &Volume, finite_only: bool) -> ([f64; 3], bool) {
     let [nx, ny, nz] = v.shape;
     let vmin = if finite_only {
         let mut it = v.data.iter().copied().filter(|x| x.is_finite());
@@ -469,13 +476,17 @@ pub fn centre_of_mass(v: &Volume, finite_only: bool) -> [f64; 3] {
         tot[k] += part[k];
     }
     let mut total = tot[3];
-    if total.abs() < 1e-5 {
+    let zero = total.abs() < 1e-5;
+    if zero {
         total = 1.0;
     }
     let d = v.voxel_size.map(f64::from);
-    [
-        d[0] * (tot[0] / total),
-        d[1] * (tot[1] / total),
-        d[2] * (tot[2] / total),
-    ]
+    (
+        [
+            d[0] * (tot[0] / total),
+            d[1] * (tot[1] / total),
+            d[2] * (tot[2] / total),
+        ],
+        zero,
+    )
 }

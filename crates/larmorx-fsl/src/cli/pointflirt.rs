@@ -4,7 +4,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 
 use super::Settings;
 use super::common::{self, abort, print_notices};
@@ -178,6 +178,21 @@ fn run(
             rows_text(&y)
         );
     }
+    if x.is_empty() && y.is_empty() {
+        // FSL-204 (§15.6): no points at all; FSL crashes here (a segmentation fault, after the
+        // lines above), refused in both modes (rule B)
+        let detail = "both coordinate files are empty or missing (no points): FSL crashes (a segmentation fault); refused";
+        defects::push_once(
+            &mut notices,
+            Notice::new(&defects::FSL_204, mode, detail.to_owned()),
+        );
+        print_notices(err, &notices);
+        return common::refuse(
+            err,
+            "pointflirt",
+            "no points in the coordinate files (FSL-204)",
+        );
+    }
     for pts in [&x, &y] {
         if pts.len() != 3 {
             print_notices(err, &notices);
@@ -194,11 +209,14 @@ fn run(
     }
     let as3 = |p: &[Vec<f64>]| [p[0].clone(), p[1].clone(), p[2].clone()];
     let Some(fit) = fits::pointflirt(&as3(&x), &as3(&y)) else {
+        // a coordinate that is not finite (an overflow: a value read as the largest double
+        // times a voxel size above 1, or products that overflow): FSL's SVD fails (§15.6)
         print_notices(err, &notices);
-        return common::refuse(
+        return abort(
             err,
             "pointflirt",
-            "a coordinate is not finite: the least-squares solve is undefined (FSL's decomposition fails or returns arbitrary values); refused",
+            "std::out_of_range",
+            "Mat::operator(): index out of bounds",
         );
     };
     if fit.nullspace > 0 {
@@ -299,5 +317,63 @@ mod tests {
             out.starts_with("Input volume coordinates are (in mm)\n1.000000 2.000000 3.000000 \n")
         );
         assert!(err.contains("3x1 and 2x1"), "{err}");
+    }
+
+    #[test]
+    fn no_points_fsl_204() {
+        // FSL 6.0.7.23 (observed): its lines, the verbose headings, then a segmentation fault;
+        // refused in both modes (the test runs the default)
+        let (c, out, err) = run(&["-v", "-i", "none1.txt", "-r", "none2.txt"], &[]);
+        assert_eq!(c, 1);
+        assert_eq!(
+            out,
+            "Input volume coordinates are (in mm)\n\nReference volume coordinates are (in mm)\n\n"
+        );
+        assert!(
+            err.starts_with("Could not open matrix file none1.txt\nCould not open matrix file none2.txt\nlarmorx: upstream defect FSL-204"),
+            "{err}"
+        );
+        assert!(err.ends_with("no points in the coordinate files (FSL-204) (larmorx)\n"));
+        // files of words only read no points either; --vox's own error comes first
+        let files = [("w.txt", "abc def\n"), ("e.txt", "")];
+        let (c, _, err) = run(&["-i", "w.txt", "-r", "e.txt"], &files);
+        assert!(c == 1 && err.contains("FSL-204"), "{err}");
+        let (c, _, err) = run(&["-i", "w.txt", "-r", "e.txt", "--vox"], &files);
+        assert_eq!(
+            (c, err.as_str()),
+            (
+                2,
+                "ERROR: need to specify --invol and --refvol to use --vox\n"
+            )
+        );
+    }
+
+    #[test]
+    fn words_and_overflows() {
+        // a `nan` word reads 0 (§2.2), so the fit of the points as read (observed: the same
+        // bytes as with 0)
+        let with = |w: &str| IN.replacen("40\n", &format!("{w}\n"), 1);
+        let (zero, nan) = (with("0"), with("nan"));
+        let (c0, out0, _) = run(
+            &["-i", "a.txt", "-r", "r.txt"],
+            &[("a.txt", &zero), ("r.txt", REF)],
+        );
+        let (c1, out1, _) = run(
+            &["-i", "a.txt", "-r", "r.txt"],
+            &[("a.txt", &nan), ("r.txt", REF)],
+        );
+        assert_eq!((c0, c1), (0, 0));
+        assert_eq!(out0, out1);
+        // an overflow (the largest double squared): FSL's SVD fails (observed with --vox)
+        let big = with("1e200");
+        let (c, _, err) = run(
+            &["-i", "a.txt", "-r", "r.txt"],
+            &[("a.txt", &big), ("r.txt", REF)],
+        );
+        assert_eq!(c, 1);
+        assert!(
+            err.starts_with("terminate called after throwing an instance of 'std::out_of_range'\n  what():  Mat::operator(): index out of bounds\n"),
+            "{err}"
+        );
     }
 }

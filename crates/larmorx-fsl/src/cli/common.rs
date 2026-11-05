@@ -111,6 +111,32 @@ pub fn read_header(
     mode: UpstreamDefects,
     notices: &mut Vec<Notice>,
 ) -> Result<HeaderImage, ImageError> {
+    read_nifti_header(settings, name, mode, notices).map(|h| header_image(&h))
+}
+
+/// The number of volumes of the image `name`, from its header (`dim[4]` when `dim[0]` is 4 or
+/// more, at least 1; else 1): the coordinate programs' `-warp` (`specs/flirt.md` §15.2).
+pub fn read_header_volumes(
+    settings: &Settings,
+    name: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<usize, ImageError> {
+    let h = read_nifti_header(settings, name, mode, notices)?;
+    Ok(if h.dim[0] >= 4 {
+        usize::try_from(h.dim[4]).unwrap_or(0).max(1)
+    } else {
+        1
+    })
+}
+
+/// The parsed header of the image `name` (an ANALYZE header without its transforms).
+fn read_nifti_header(
+    settings: &Settings,
+    name: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<NiftiHeader, ImageError> {
     let f = super::bet2::resolve_image(settings, name, mode, notices)?;
     let path = f.header.as_path();
     let invalid = |m: String| ImageError::Invalid(format!("{}: {m}", path.display()));
@@ -133,8 +159,7 @@ pub fn read_header(
             *b = 0;
         }
     }
-    let h = NiftiHeader::parse(&block).map_err(|e| invalid(e.to_string()))?;
-    Ok(header_image(&h))
+    NiftiHeader::parse(&block).map_err(|e| invalid(e.to_string()))
 }
 
 /// The first 540 bytes of an image file, decompressed (at most a NIfTI-2 header): only the

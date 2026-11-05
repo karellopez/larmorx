@@ -128,8 +128,10 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
                 &mut notices,
             );
         }
+        // |det| < 1e-6 is FSL's test: a determinant that is not finite (an overflow) is not
+        // below it, and the transform is used (§15.5)
         let det = fits::determinant(&rows);
-        if !(det.abs() >= 1e-6) || det.is_infinite() {
+        if det.abs() < 1e-6 {
             let _ = writeln!(err, "Could not read matrix {name}");
             print_notices(err, &notices);
             return 1;
@@ -211,11 +213,18 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         Ok(m) => m,
         Err(MidError::Singular) => return exception(err, mat::SINGULAR, mode, &mut notices),
         Err(MidError::NotFinite) => {
+            // FSL-241 (rule B; §15.5): FSL writes rows of NaN, or reports its failed SVD as a
+            // size error, and exits 0; refused in both modes (its values not specified)
+            let detail = "the transforms' averages reach beyond double precision: FSL writes rows of NaN or reports its failed singular value decomposition, exit status 0; refused";
+            defects::push_once(
+                &mut notices,
+                Notice::new(&defects::FSL_241, mode, detail.to_owned()),
+            );
             print_notices(err, &notices);
             return common::refuse(
                 err,
                 "midtrans",
-                "the averages hold values that are not finite (a transform too large for double precision): their singular value decomposition is undefined (FSL's fails and it goes on with empty matrices); refused",
+                "the averages hold values that are not finite (a transform too large for double precision): they cannot be averaged (FSL-241); refused",
             );
         }
     };
@@ -319,5 +328,23 @@ mod tests {
         ];
         let (c, _, err) = run(&["a.mat", "s.mat"], &sing, "fix");
         assert_eq!((c, err.as_str()), (1, "Could not read matrix s.mat\n"));
+    }
+
+    #[test]
+    fn transforms_beyond_double_precision_fsl_241() {
+        // a determinant that overflows is not below 1e-6: the transform is used (§15.5), and
+        // its averages are refused in both modes (FSL writes NaN rows, exit 0; observed)
+        let big = "1e200 0 0 0\n0 1e200 0 0\n0 0 1e200 0\n0 0 0 1\n";
+        let shift = "1 0 0 1e300\n0 1 0 0\n0 0 1 0\n0 0 0 1\n";
+        for other in [big, shift] {
+            let files = [("a.mat", A), ("b.mat", other)];
+            for mode in ["fix", "reproduce"] {
+                let (c, out, err) = run(&["a.mat", "b.mat"], &files, mode);
+                assert_eq!(c, 1, "{mode}: {err}");
+                assert_eq!(out, "Assuming MNI origin as no template image specified\n");
+                assert!(!err.contains("Could not read matrix"), "{err}");
+                assert!(err.contains("FSL-241"), "{err}");
+            }
+        }
     }
 }

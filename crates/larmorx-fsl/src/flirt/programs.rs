@@ -358,8 +358,9 @@ pub fn img2std(c: [f64; 3], m: &Mat4, img: &Space, std: &Space, mm: bool) -> Opt
 
 /// x86-64's rules for NaN operands, written out so that every platform gives the same NaN signs
 /// (`makerot`, §15.4): an operation with one NaN operand returns it, with two the first one's;
-/// an invalid operation on numbers gives the default NaN, whose sign bit is set.
-mod sse {
+/// an invalid operation on numbers gives the default NaN, whose sign bit is set. (Also the
+/// registrations' subsets, `optimise`.)
+pub(crate) mod sse {
     pub const DEFAULT_NAN: f64 = f64::from_bits(0xfff8_0000_0000_0000);
 
     #[inline]

@@ -563,6 +563,13 @@ pub fn search(
         }
         tr.line("");
     }
+    // then the list is sorted by the optimised cost with `sort`'s order (§7.1: libstdc++'s
+    // `std::sort`, not stable) before it is appended to S and P: entries of equal cost take the
+    // order its introsort gives them, the rows already in S and P stay first (observed, the
+    // clean-room catch-up's relay 10: a pair whose every cost is 1, 829 starting points of the
+    // same cost, FSL's S and P exactly this permutation of the list as printed; with 20 rows in S
+    // before the search, those 20 first and the search's rows permuted after them)
+    super::schedule::std_sort(&mut list, &|a: &(f32, Mat4, Mat4, f32), b| a.0 < b.0);
     Ok(Found {
         results: list.iter().map(|(c, m, _, _)| (*c, *m)).collect(),
         starts: list.iter().map(|(_, _, s, c0)| (*c0, *s)).collect(),

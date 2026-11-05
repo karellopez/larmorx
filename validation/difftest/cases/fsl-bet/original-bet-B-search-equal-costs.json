@@ -1,0 +1,193 @@
+{
+ "defect": null,
+ "description": "bet -B -f 0.7 -o -n on a small head: the inner standard_space_roi's FLIRT search, whose starting points share a cost, sorted as FSL sorts them (std::sort); both programs then fail midway alike",
+ "expect": "pass",
+ "found": {
+  "detail": "out_tmp_premask_tmp_to_std.mat: differs; out_tmp_premask_tmp_to_std_inv.mat: differs",
+  "n": 218,
+  "seed": "bet-options-6",
+  "shrink_moves": [],
+  "signature": [
+   "out_tmp_premask_tmp_to_std.mat",
+   "out_tmp_premask_tmp_to_std_inv.mat"
+  ]
+ },
+ "id": "original-bet-B-search-equal-costs",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": true,
+   "-g": false,
+   "-m": false,
+   "-n": true,
+   "-o": true,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.95,
+   "axis1": 1.1,
+   "axis2": 0.9,
+   "bias0": 0.0025,
+   "bias1": 0.0025,
+   "bias2": 0.0075,
+   "bias3": -0.0075,
+   "centre0": 6.0,
+   "centre1": 0.5,
+   "centre2": -4.5,
+   "content": "head",
+   "dtype": "int32",
+   "extreme": false,
+   "f": "0.7",
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": 23.75,
+   "origin1": 47.25,
+   "origin2": -55.75,
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "26x7x15",
+   "size": 11.5,
+   "spacing0": 1.0,
+   "spacing1": 1.5,
+   "spacing2": 1.5,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "-B"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-B"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-f",
+     "0.7"
+    ],
+    "name": "-f",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o"
+    ],
+    "name": "-o",
+    "optional": true
+   },
+   {
+    "args": [
+     "-n"
+    ],
+    "name": "-n",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.95,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0025,
+      0.0025,
+      0.0075,
+      -0.0075
+     ],
+     "centre": [
+      6.0,
+      0.5,
+      -4.5
+     ],
+     "noise": 0.0,
+     "seed": 1886395825,
+     "size": 11.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      23.75,
+      47.25,
+      -55.75
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      -1,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     26,
+     7,
+     15
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 218,
+  "options": [
+   "-B",
+   "-f",
+   "-n",
+   "-o",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "bet-options-6",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

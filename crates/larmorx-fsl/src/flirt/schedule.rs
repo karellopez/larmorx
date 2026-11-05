@@ -652,6 +652,24 @@ mod tests {
     }
 
     #[test]
+    fn std_sort_orders_equal_costs_as_fsl_orders_its_search() {
+        // FSL's S after a search whose 829 starting points all cost 1 (observed, the clean-room
+        // catch-up's relay 10: a trial finding of standard_space_roi): the list as it was found,
+        // permuted so; its first 16 and last 20 rows, by their place in that list
+        let mut v: Vec<(f32, usize)> = (0..829).map(|i| (1.0, i)).collect();
+        std_sort(&mut v, &|a, b| a.0 < b.0);
+        let ids: Vec<usize> = v.iter().map(|x| x.1).collect();
+        let mut head = vec![557];
+        head.extend(545..557);
+        head.extend([544, 558, 559]);
+        assert_eq!(ids[..16], head[..]);
+        let mut tail: Vec<usize> = (264..272).collect();
+        tail.push(0);
+        tail.extend(273..284);
+        assert_eq!(ids[809..], tail[..]);
+    }
+
+    #[test]
     fn splitting() {
         assert_eq!(words("clear U"), ["clear", "U"]);
         assert_eq!(words("  setrow UQ  1 0"), ["setrow", "UQ", "1", "0"]);

@@ -99,3 +99,9 @@ T1-only triangles alike.
 The profiles' voxels, normals and samples (`<dump>`) came from a temporary build of the original
 that wrote one `DUMP {...}` line per profile into the file `LX_BETSURF_DUMP` names (a patch of
 `betsurf::votes` applied to a scratch build and reverted; the product has no such switch).
+
+## The clean-room catch-up, relay 10 (2026-11-05): the trial's last BET differences
+
+| Script | What it shows |
+|---|---|
+| `trial_ssroi_matrices.py <trial> <work> <n,...> [--jobs 8]` | the random-testing findings of standard_space_roi and of `bet -B`'s inner standard_space_roi whose FLIRT matrix parts from FSL's: each drawn call run with `-d` by FSL (cache) and the original (`reproduce`); FSL's own `flirt` measures both final matrices' costs at 8, 4, 2 and 1 mm (`-init` the matrix, a `measurecost 12` schedule of the script's own) and the identity's; the input's size, the matrices' RMS deviation, the outputs' values and, given FSL's matrix, the output header fields that still differ. On the trial's 15 such findings (2026-11-05-catchup-bet) before the fix: both matrices cost 1 at every scale on most pairs, the search's starting points tied; after FLIRT's search sorts them as FSL does (libstdc++'s `std::sort`, `flirt/search.rs`), 13 matrices are FSL's (RMS 0), 88 ends at a lower cost than FSL's by FSL's measure (0.964919 against 0.967734 at 1 mm) and 114 at a higher one (0.989526 against 0.985458) |

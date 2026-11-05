@@ -2416,7 +2416,13 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
     trows = []
     for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
         text, verdict = CATCHUP_TEXT[cat]
-        row = {"head": text, "cells": [common.cell(int(n), "count"),
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
+        vcell = (
+            {"verdict": verdict}
+            if verdict
+            else {"text": "fixed: agrees on replay with the final build"}
+        )
+        row = {"head": text, "cells": [common.cell(int(n), "count"), vcell,
                                        common.cell(tri["reproducers"][cat])]}  # fmt: skip
         if verdict:
             row["verdict"] = verdict
@@ -2424,7 +2430,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
     triage = common.table(
         "trial-catchup-triage",
         "The catch-up trial's differing cases, each in one category",
-        ["Category", {"label": "Cases", "num": True}, "Reproducer"],
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
         trows,
         note="Every differing case of the trial in one category by its recipe and how far its "
         "failed metrics lie from FSL's own one-bit band "

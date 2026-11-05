@@ -2162,13 +2162,14 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
     trows = []
     for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
         text, verdict = CATCHUP_TEXT[cat]
+        # the verdict as a cell of its own (the site draws a cell's verdict, not a row's)
         trows.append({"head": text, "verdict": verdict,
-                      "cells": [common.cell(int(n), "count"),
+                      "cells": [common.cell(int(n), "count"), {"verdict": verdict},
                                 common.cell(tri["reproducers"][cat])]})  # fmt: skip
     triage = common.table(
         "trial-catchup-triage",
         "The trial's differing cases, each in one category",
-        ["Category", {"label": "Cases", "num": True}, "Reproducer"],
+        ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
         trows,
         note="Every differing case of the trial in one category by its failed checks "
         "(`validation/investigations/cleanroom-fast/trial_catchup_categories.py`, its output "

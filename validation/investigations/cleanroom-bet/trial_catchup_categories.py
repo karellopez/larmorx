@@ -20,7 +20,9 @@ import collections, json, re, sys
 from pathlib import Path
 
 CRASH = re.compile(r"Segmentation fault|free\(\)|munmap_chunk|double free|corrupted|Usage: fslroi")
-SURF = re.compile(r"_(inskull|outskull|outskin|skull)_(mask|mesh)|\.vtk|_skull\.|_outskin|_outskull|_inskull")
+SURF = re.compile(
+    r"_(inskull|outskull|outskin|skull)_(mask|mesh)|\.vtk|_skull\.|_outskin|_outskull|_inskull"
+)
 MATS = ("_tmp_to_std.mat", "_tmp_to_std_inv.mat")
 
 
@@ -31,7 +33,9 @@ def category(doc, replay):
     det = str(doc["detail"])
     opts = set(r.get("options") or [])
     agree = replay.get(doc["n"]) == "agree"
-    if prog in ("betsurf",) or (prog == "bet" and ("-A" in opts or "-A2" in opts) and any(SURF.search(s) for s in sig)):
+    if prog in ("betsurf",) or (
+        prog == "bet" and ("-A" in opts or "-A2" in opts) and any(SURF.search(s) for s in sig)
+    ):
         if agree:
             return "betsurf: agrees with the final build"
         return "betsurf's surfaces on small heads: the scalp's deformation"
@@ -68,8 +72,12 @@ NUM = re.compile(r"[-+]?\d+\.?\d*(?:e[-+]?\d+)?")
 def header_kind(doc, probe):
     """The output header's difference, FSL's matrix given, by the fields that differ
     (``trial_ssroi_matrices.py``'s stage run)."""
-    fields = [f for v in ((probe or {}).get("stage_headers") or {}).values() for f in v
-              if not f.startswith("shape")]
+    fields = [
+        f
+        for v in ((probe or {}).get("stage_headers") or {}).values()
+        for f in v
+        if not f.startswith("shape")
+    ]
     opts = set(doc["recipe"].get("options") or [])
     copied = "-maskNONE" in opts and ("-roiNONE" in opts or "-b" in opts)
     if any(f.startswith(("scl_slope", "pixdim", "sizeof_hdr", "magic")) for f in fields) or (

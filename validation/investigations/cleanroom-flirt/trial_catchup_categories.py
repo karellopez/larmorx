@@ -62,8 +62,11 @@ def category(doc):
 
 
 SORTED = "fixed: the search's starting points of equal cost (std::sort)"
-PATHS = ("a registration ends elsewhere", "messages whose number follows the path",
-         "pairreg: its registrations' paths")
+PATHS = (
+    "a registration ends elsewhere",
+    "messages whose number follows the path",
+    "pairreg: its registrations' paths",
+)
 
 
 def replays(path):

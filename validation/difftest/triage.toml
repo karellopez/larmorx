@@ -3709,3 +3709,19 @@ signature = ["messages before FSL's crash"]
 status = "open"
 explanation = "Trial 2026-11-05-catchup-bet: 5 bet -B and -A2 runs where FSL's script fails or crashes midway (Error: input image out_tmp_unbiased_premask... not found; a crash after bet failed during command) and the original's messages or status differ (reproducers bet-options-6-00225, 00409): not yet looked at"
 link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "out_mcf.nii.gz_rel.rms: values", "out_mcf.nii.gz_abs.rms: values", "out_mcf.nii.gz: voxel values"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-hmc (seed 20261030, the 2026-10-30 trial's drawn again and further; 30 minutes, 12 jobs at one thread, 3 GiB a case, the oracle cache in use mode; run again after a first run overlapped two rebuilds of the extension): 83,244 cases, 31,552 agree, 51,681 differ, 11 notices, as the earlier trials' share (37 % agreeing on 2026-10-30). The registrations on small phantoms with large motions end elsewhere than mcflirt's, as well aligned: 400 sampled findings measured with hmc_alignment.py (the corrected series' temporal standard deviation in the phantom, larmorx over mcflirt, in reproduce mode as the trial compares): median 1.000 (5 and 95 % quantiles 0.933 and 1.041), 279 within 1 %, 67 lower, 54 higher (mcflirt's own residual against the input's: median 1.41). The default mode's ratio (FSL-01, -03 and the other corrections on) has a longer tail: median 1.002, above 1.05 in 102 of the 400, for the head-motion correction's next part"
+link = "validation/investigations/cleanroom-fixes/hmc_alignment.py"
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["files written"]
+status = "harness"
+explanation = "Trial 2026-11-05-catchup-hmc: 6,363 findings where mcflirt wrote no .mat directory and the original (FSL-13 reproduced) did: each a run with -rmsrel or -rmsabs without -mats served from the oracle cache, which keeps a run's files and not its empty directories (the first run of the same cases, mcflirt live, had none of them). Fixed in the descriptor: such mcflirt runs go live, the cache off (difftest/tools/mri_hmc.py, validation/tests/test_mri_hmc_descriptor.py); the cache itself keeping empty directories is for the orchestrator"
+link = "validation/tests/test_mri_hmc_descriptor.py"

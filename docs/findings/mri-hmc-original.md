@@ -225,3 +225,25 @@ running sums over the voxels in z, y, x order flushed into the totals every `max
   of each registration carry it. mcflirt's own is glibc's single-precision `atan2f` (`specs/flirt.md`
   §3's decomposition, which §4.4 shares), for a later part's `reproduce`.
 - **The record** (`mri-hmc`, standard tier, `--jobs 1`, from 0842fbd): 169 cases, 145 pass, 20 rejected by both, 3 expected divergences, 1 failure (`real/ds003345/default`, as main's); against main's record (`compare_records.py`) no status and no detail differs. Below the record's printed precision, `centre_moves.py` ran fMRIPrep's call on four real runs (ds000005, ds000117, ds005040, ds006010) and `-cost normmi`, `-meanvol` and `-dof 12` on ds000005 with main's build, the blocks alone and the final build (`reproduce`, the `.par` file added): the 1,344 matrices and `.par` lines are the same text in all three.
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-hmc` (seed `20261030`, the 2026-10-30 trial's drawn again and
+further; 30 minutes, 12 jobs at one thread, 3 GiB a case, the oracle cache in `use` mode): 83,244
+cases, 31,552 agree, 51,681 differ, 11 notices (FSL-01, -09, -59). A first run of the same trial
+overlapped two rebuilds of the extension (its numbers, kept in `...-overlapped-rebuild`, are not
+used). The registrations of small phantoms with large motions end elsewhere than mcflirt's, as in
+the earlier trials (37 % agreeing on 2026-10-30, 38 % now), and are as well aligned:
+`validation/investigations/cleanroom-fixes/hmc_alignment.py` on 400 findings (the corrected series'
+temporal standard deviation in the phantom, larmorx over mcflirt) gives in `reproduce` mode, as the
+trial compares, a median of 1.000 (5 and 95 % quantiles 0.933 and 1.041; 279 within 1 %, 67 lower,
+54 higher; mcflirt's own residual against the input's 1.41). The default (FSL-01, -03 and the other
+corrections on) has a longer tail: median 1.002, above 1.05 in 102 of the 400 (`reproduce`: 18), a
+question for the head-motion correction's next part.
+
+6,363 findings were the harness's: a run with `-rmsrel` or `-rmsabs` without `-mats` makes
+mcflirt create an empty `.mat` directory (FSL-13, which `reproduce` follows), and the oracle-output
+cache keeps a run's files, not its empty directories, so the trial's replays from the cache lacked
+it (the first run, mcflirt live, had no such difference). The descriptor runs those mcflirt calls
+live now (`difftest/tools/mri_hmc.py`'s `makes_empty_directory`;
+`validation/tests/test_mri_hmc_descriptor.py`).

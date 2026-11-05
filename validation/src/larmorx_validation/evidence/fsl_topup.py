@@ -2306,7 +2306,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     "open: movements, beyond 10 times FSL's own band": (
         "The movements estimated, beyond 10 times FSL's own band: of 14 sampled, 6 within FSL's "
         "spread at 16 and 256 last bits; 179 run away (159 with a scaled-conjugate-gradient "
-        "level, which FSL warns against): measured with --debug, FSL-201's forward differences "
+        "level, which FSL warns against): measured with `--debug`, FSL-201's forward differences "
         "part by 1.5 % at the second gradient, which the scaled conjugate gradients divide by "
         "their small step sigma",
         "open",
@@ -2323,7 +2323,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
         "open",
     ),
     "explained: --debug's attempt files (the minimisation's path)": (
-        "--debug's attempt files: how many Levenberg-Marquardt attempts a level makes follows "
+        "`--debug`'s attempt files: how many Levenberg-Marquardt attempts a level makes follows "
         "the minimisation's path, so the files written differ",
         "open",
     ),

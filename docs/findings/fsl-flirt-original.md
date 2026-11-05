@@ -839,3 +839,37 @@ both). The five failures are the "Still open" list above. Memory: the changed pa
 `cli.fsl.flirt`, `.costs`, `.reproduce`, `.schedule` and `cli.fsl.applyxfm4D` move (the
 perturbations' twelve parameters, `leastsq`'s sums, the spline), to be re-recorded once with the
 part's other moves.
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-flirt` (seed `20261103`, the 2026-11-02 trial's, so its first
+4,240 cases are that trial's drawn again; 30 minutes, 14 jobs at one thread, 3 GiB a case, the
+oracle cache in `use` mode): 13,907 cases, 12,334 agree, 1,560 differ, 13 notices (FSL-09, -79,
+-80, -111, -187). Of the 1,140 differences of the cases drawn again, 696 agree now; 46 cases that
+agreed then differ now (36 registrations' paths, 7 the headers below, 2 `labeldiff`, 1 pairreg).
+Fixed (each with a permanent case, `validation/difftest/cases/fsl-flirt-original/`):
+
+- **The search's minima on a one-point grid** (17 cases, `search-cost-minima-fallback`): with no
+  local minimum (`-nosearch`: the grid's only point is the last index on every axis) the overall
+  minimum is listed only on FSL's `Cost minima at` line, without a `COST minima at` line
+  (observed, `-verbose 7`); the original listed both.
+- **A sform completed from a qform-only reference keeps its negative zeros** (25 cases,
+  `out-completed-sform-negative-zero`): with `qfac` −1 the qform's zero entries times −1 are
+  negative zeros, which FSL's `-out` writes; a stored sform's negative zeros are still written as
+  zeros (relay 3's observation), and a neurologically stored reference's are positive (its swap's
+  products).
+- **applyxfm4D's padding of an int32 image** (1 case, `applyxfm4d-int32-padding`): FSL writes the
+  background value exactly in the type (2147483647) and the interpolated voxels through single
+  precision (2³¹, wrapped to −2147483648: FSL-09), observed with `catchup8_int_nn.py` (FLIRT's
+  `-applyxfm` pads through single precision: unchanged); the original keeps an int32 image's
+  values when some lie beyond 2²⁴ (`bet::image::read_i32_series`) and writes the padding from them.
+
+Open (in `validation/difftest/triage.toml`): 941 registrations ending elsewhere on the trial's
+random, often ill-posed pairs and 51 with `labeldiff`; messages whose count follows the path (166
+COG warnings, 172 FSL-90 quaternion messages); 110 pairreg paths and 12 runs where FSL crashes
+(FSL-75); and, for the spec writer, 9 searches whose test volume has no intensity range at a scale
+(`Testvol intensity clamped between 0 and 0`): FSL prints `WARNING: Found 0 or less
+sub-threshold costs`, its fine grid's costs and parameters print as 0 and every point becomes a
+minimum, where §8.1 steps 6 and 7 give the cost of no variance (1) and an optimisation of every
+point (`20261103-08267`, `03733`).
+

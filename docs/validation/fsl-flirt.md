@@ -1,12 +1,12 @@
 # Parity: FLIRT (clean-room original)
 
-**5 case(s) fail.** 333 cases on the `standard` tier: 229 pass, 89 rejected by both, 10 expected divergences, 5 failures.
+**5 case(s) fail.** 337 cases on the `standard` tier: 233 pass, 89 rejected by both, 10 expected divergences, 5 failures.
 
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
-- **Original programs:** 332 runs: 317 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 336 runs: 321 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -26,9 +26,10 @@
 | bbr | 11 | 11 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
 | debug | 4 | 4 | 0 | 0 | 0 |
-| difftest | 11 | 10 | 1 | 0 | 0 |
+| difftest | 14 | 13 | 1 | 0 | 0 |
 | edge | 35 | 9 | 19 | 6 | 1 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
+| out | 1 | 1 | 0 | 0 | 0 |
 | programs | 140 | 83 | 53 | 4 | 0 |
 | real | 62 | 58 | 0 | 0 | 4 |
 | schedule | 30 | 23 | 7 | 0 | 0 |
@@ -179,7 +180,7 @@ a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact o
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (23710fea9904) |
+| larmorx | 0.0.1 (5a44c8f498f9) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -515,9 +516,11 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `debug/bbr-no-boundary` | pass | 13/13 | -debug -cost bbr with an all-zero white-matter segmentation (the clean-room catch-up, relay 4): the set-up's lines and … |
 | `debug/noresample` | pass | 10/10 | -debug -noresample (the clean-room catch-up, relay 4): the levels are the reference itself, its forms as read; no globa… |
 | `schedule/perturb-scaled` | pass | 5/5 | measurecost and gridmeasurecost of a scaled and skewed row at 6, 7 and 12 dof (the clean-room catch-up, relay 4): a per… |
+| `out/display-range` | pass | 6/6 | -applyxfm onto FSL's MNI152_T1_2mm (display range 3000 to 8000): -out's range 0 and 0, as FSL writes it whatever the re… |
 | `debug/bbr-setoption` | pass | 11/11 | -debug -wmseg: the boundary-based cost set up by setoption and by a new pair |
 | `programs/midtrans-overflow` | expected-divergence | 3/3 | midtrans of a transform of 1e200 scales (its determinant overflows: used, §15.5): FSL writes rows of NaN; refused (FSL-… |
 | `programs/midtrans-overflow-svd` | expected-divergence | 3/3 | midtrans of a translation of 1e300: FSL's decomposition fails and it reports a matrix-size error, exit 0; refused (FSL-… |
+| `difftest/applyxfm4d-int32-padding` | pass | 6/6 | applyxfm4D of an int32 image of 2147483647: its padding (the background value) written exactly in the type, its interpo… |
 | `difftest/applyxfm4d-spline-double` | pass | 6/6 | applyxfm4D's spline of a double image (read and filtered in double, each value rounded to single, specs/flirt.md §15.7)… |
 | `difftest/applyxfm4d-spline-float` | pass | 6/6 | applyxfm4D's spline of a float image as specs/flirt.md §9.3 and §15.7 state it (each pass stored in single precision): … |
 | `difftest/debug-bbr-first-pair` | pass | 13/13 | -debug -cost bbr at -verbose 3: the first pair's set-up lines after the verbose centres' COG warning (observed; trial 2… |
@@ -529,3 +532,5 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `difftest/nan-matrices-forcescaling` | both-error | 4/4 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
 | `difftest/nan-matrices-subset` | pass | 6/6 | with reproduce, an input with infinite voxels (FSL-14 lets them in): NaN centres and matrices, inverted as FSL inverts … |
 | `difftest/nan-matrix-padded` | pass | 6/6 | reproduce with NaN input voxels: a NaN matrix's every pre-image is outside, so the -out image is the background value e… |
+| `difftest/out-completed-sform-negative-zero` | pass | 6/6 | -out with a qform-only reference of qfac -1: the sform completed from the qform keeps its negative zeros, as FSL writes… |
+| `difftest/search-cost-minima-fallback` | pass | 6/6 | -verbose 7 with a one-point search grid: no local minimum, the overall minimum listed only on FSL's Cost minima line (n… |

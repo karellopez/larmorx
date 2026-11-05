@@ -535,6 +535,56 @@ The original brought up to `specs/topup.md`'s answers (§13's table, lines marke
     `feat_fieldmap_mag`'s p99; 27: `jac_N: the same grid`): a difference of the replay's
     environment, to understand before the next trial (sub-task 6).
 
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+45. **The replay question of finding 44, answered.** `difftest --replay` runs a finding's
+    *shrunk* recipe (`doc["shrunk"]`); the direct runs of finding 44 took its *drawn* one. On the
+    same recipe the replay (`runner.judge_once`) and the suite (`run_case`) agree
+    (`trial_replay_vs_direct.py`): both drawn cases agree, both shrunk ones differed. The shrunk
+    case of 27 (1 x 1 x 1 voxel, `--jacout`) was the suite's mistake: nibabel reads the
+    one-voxel Jacobian as shape `(1,)` (NIfTI's `dim[0]` drops trailing axes of one voxel) and the
+    suite compared it with the mask's `(1, 1, 1)`, "another grid" on identical files; the suite
+    measures such images on the mask's grid now (`validation/tests/test_fsl_topup_measures.py`).
+    The shrunk case of 6 (1 x 1 x 3 voxels of 1 mm, three volumes, the default FWHM of 8 mm: a
+    19-tap kernel on a 3-voxel axis) is the original's: `--featout`'s magnitude (here `--iout`'s
+    mean of the first volume's smoothed prediction: every voxel lies outside the common mask)
+    3.0 to 3.1 % above FSL's, identical to 1 ulp with `--fwhm=0` (`trial_f6_probe.py`): the
+    smoothing of §4.4 on an axis shorter than its kernel, a question for the spec writer.
+
+46. **`--miter` counts every iteration of the scaled conjugate gradients, and FSL-242** (observed
+    with `-v`, `trial_fsl_verbose.py`). A level of SCG evaluates its start and exactly `--miter`
+    steps, the rejected ones too: `topup-trial-11566`'s second level (three iterations) evaluates
+    four costs in FSL, the first step rejected (311236 above 284996), where the original counted
+    accepted steps and evaluated five. And a level whose last iteration is rejected ends at that
+    rejected, worse point: `topup-trial-06854`'s second level (one iteration) rejects its only step
+    (4120.88 above 1193.2) and FSL's third level starts from it (4164.96), not from 1193.2.
+    The original counts every iteration in both modes (FSL's design, rule C); ending at a rejected
+    point is FSL-242 (rule A, new): `reproduce` ends there, the default at the lowest cost the level
+    found, the notice named on every run where that happens (`topup::minimise`'s unit test
+    `every_scg_iteration_counts_and_a_rejected_last_one_is_fsl242`; permanent cases
+    `scg-every-iteration-counts` and `scg-rejected-last-step`). With it both findings agree; of
+    1,351 trial findings with an SCG level or an FSL configuration, 61 now agree
+    (`trial_recheck.py`); the record keeps every status and detail.
+
+47. **The trial** (`oracles/difftest/2026-11-05-catchup-topup`, seed `topup-trial`, 30 minutes,
+    14 jobs at one thread, 1.5 GiB a case, the oracle cache in `use` mode: 17,535 cases, 13,300
+    agree, 4,223 differ, 12 notices; of the 2026-11-03 trial's 6,999 differences drawn again,
+    3,695 agree now). By category (`trial_categories.py`, the failed metrics against FSL's own band:
+    its run with the read-out times changed in their last float bit): 3,213 estimate the
+    movements and lie within 10 times that band (median 2.2): FSL-201's path, which FSL's own
+    runs with 16 and 256 last bits changed spread as far on sampled findings (`trial_spread.py`);
+    608 with the movements beyond 10 times the band, of which 179 run away (translations tens of mm
+    from FSL's; 159 with an SCG level, which FSL warns against; in both modes; 98 already in the
+    2026-11-03 trial: from the same first cost FSL's first SCG step and the original's differ,
+    `topup-trial-04946`, open); 236 FSL-143 (applytopup vb3D, vb4D); 88 without movements within 10
+    times the band; 24 cubic cases without movements beyond it (2 were finding 46's, 6 of 10
+    sampled within FSL's wider spread, 07557 and 10619 open); 28 quadratic cases without movements,
+    deterministic (FSL's band 1e-7 to 1e-5), 22 of them among the 109 cases with an axis shorter
+    than two knot spacings (5 of the 145 others; `trial_quadratic.py`): §4.6's bending energy on
+    FSL-145's layout, a question for the spec writer; 25 `--debug` attempt files (the path); 1 the
+    suite's (a NIfTI-2 quaternion a float rounding above 1, read with nibabel's float tolerance
+    now). The triage: `validation/difftest/triage.toml`.
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

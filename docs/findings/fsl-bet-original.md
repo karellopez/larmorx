@@ -568,3 +568,21 @@ cases agree again).
 
 The probes: `replay_trial.py`, `finding_dirs.py`, `betsurf_shares.py`, `profile_oracle_cached.py`
 ([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)).
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-bet` (seed `bet-options-6`, the BET part's trial drawn again;
+30 minutes, 14 jobs at one thread, 3 GiB a case, both implementations, the oracle cache in `use`
+mode): 909 cases; the original 792 agree, 114 differ, 2 notices (FSL-51), 1 undefined; the replica
+896 agree, 13 differ, every one where FSL's FLIRT crashes inside standard_space_roi (FSL-75). The
+original's: 53 betsurf surfaces (`-A`, `-A2`, betsurf: the scalp's deformation on small heads,
+relay 7's open class); about 27 standard_space_roi runs whose FLIRT crashes in FSL
+(`Segmentation fault`, `free(): invalid pointer`: FSL-75, never reproduced; FSL-214: the script
+goes on) where the original registers; 19 standard_space_roi headers that differ from FSL's even
+given FSL's matrix and 14 FLIRT matrices that part (`bet-options-6-00151`, `00009`: open); 6
+fslroi boxes of a neurologically stored oblique image reaching its last x voxel, whose corner
+translation is one float unit in the last place from FSL's (`00796`: FSL's equals the double
+product `M·(20, 4, 4)` rounded once, where §3.2's held frame rounds its translation first: a
+question for the spec writer); 5 `-B` and `-A2` runs where FSL fails midway and the messages part
+(`00225`, `00409`: open).
+

@@ -3500,3 +3500,212 @@ signature = ["out_tmp.nii.gz", "out_tmp_bottom.nii.gz", "out_tmp_top.nii.gz"]
 status = "fixed"
 explanation = "Trial 2026-11-04-bet-options-6b (the original, bet, 1 case(s), reproducer 330), judged again by relay 7 of the clean-room catch-up (2026-11-05, replay_trial.py with the final build): bet -Z -d keeps a float64 input's doubles in its temporary images, and relay 6's fslroi types for the others"
 link = "validation/difftest/cases/fsl-bet/original-bet-Z-d-float64-tmp.json"
+
+# --- The clean-room catch-up's random-testing trials (relay 8, 2026-11-05): the clean-room originals
+# of topup, FAST, FLIRT, BET and the head-motion correction, each boxed, 30 minutes, the oracle cache
+# in use mode (oracles/difftest/2026-11-05-catchup-<tool>/); every difference judged by the user's
+# rule; probes in validation/investigations/cleanroom-topup/trial_*.py, cleanroom-flirt/catchup8_int_nn.py
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["corrected: relative difference inside the brain, Nth percentile", "corrected_mean: relative difference inside the brain, Nth percentile"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-topup (seed topup-trial, 17,535 cases: 13,300 agree, 4,223 differ, 12 notices; of the 6,999 differences of the 2026-11-03 trial's cases drawn again 3,695 now agree). 3,213 differences estimate the movements and lie within 10 times FSL's own band (its run with the read-out times changed in their last float bit; the failed metric's median 2.2 times that band): FSL-201's forward differences make FSL's path depend on its inputs' last bits, which the original's reproduce mode follows to its first gradients but not along a chaotic path (FSL's runs with 16 and 256 last bits changed lie as far as the original on 2 of 5 sampled findings, within 1.3 to 5 times on the other 3; trial_spread.py, trial_categories.py)"
+link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-201"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["o_movpar.txt: rotations"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-topup: 608 differences with the movements estimated lie beyond 10 times FSL's one-bit band. Of 14 sampled, 6 lie within FSL's own spread at 16 and 256 last bits (trial_spread.py). 179 findings run away: the original's movements end tens of mm and rad from FSL's (159 with a scaled-conjugate-gradient level, which FSL warns against; 98 already in the 2026-11-03 trial), in both modes, and the next level's masked voxel count falls to 0 (reproducer topup-trial-04946: from the same first cost 5504.72 FSL's first SCG step gives 4286.28 with 580 voxels, the original's 4319.86 with 582; at level 2 FSL stops at n = 425, the original at n = 0). For topup's next clean-room relay, with --debug's gradients"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["_fieldcoef (its field, Hz): correlation inside the brain", "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile", "_fieldcoef (its field, Hz): |d| inside the brain, mean"]
+status = "register"
+explanation = "FSL-242 (rule A, new): topup's scaled conjugate gradients count every iteration toward --miter, the rejected ones too (observed with -v: a level of one iteration whose step raises the cost evaluates two costs; reproducer topup-trial-11566, now permanent case scg-every-iteration-counts), and a level whose last iteration is rejected ends at that rejected, worse point (topup-trial-06854: FSL's next level starts at SSD 4164.96 after the rejected 4120.88, not from 1193.2). The original now counts every iteration in both modes; reproduce ends at the rejected point, the default at the lowest cost, named where it happens. Re-checked with the fix: 61 of 1,351 findings with an SCG level or an FSL configuration now agree (trial_recheck.py); the record fsl-topup keeps every status and detail"
+link = "validation/difftest/cases/fsl-topup-original/scg-rejected-last-step.json"
+defect = "FSL-242"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["vb: the printed phi, lambda and their ratio"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-topup: 236 applytopup --method=vb3D and vb4D cases: FSL-143 reproduced, its indefinite prior makes the iterations diverge and amplifies the moved images' last bits (as the 2026-11-03 trial's 51; reproducer topup-trial-00039)"
+link = "docs/findings/fsl-topup-original.md"
+defect = "FSL-143"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["corrected: relative difference inside the brain, Nth percentile"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-topup: 88 cases without movements lie within 10 times FSL's own one-bit band (most just past a threshold, e.g. 0.00102 for 0.001): fits the data hardly determine, whose path FSL's own last bits move as far (reproducer topup-trial-00063)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile", "_fieldcoef (its field, Hz): |d| inside the brain, mean"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-topup: 24 cubic-spline cases without movements beyond 10 times FSL's one-bit band. 2 were FSL-242's and the iteration count (06854, 11566: fixed); of 10 sampled, 6 lie within FSL's own spread at 16 and 256 last bits (trial_spread.py); open: topup-trial-07557 (one Levenberg-Marquardt iteration, SSD 1522.84 against 1521.91) and 10619 (subsampling 4, 12 voxels in the mask). For topup's next clean-room relay"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["--fout (Hz): correlation inside the brain", "--fout (Hz): |d| inside the brain, Nth percentile", "--fout (Hz): |d| inside the brain, mean", "_fieldcoef (its field, Hz): correlation inside the brain", "_fieldcoef (its field, Hz): |d| inside the brain, Nth percentile", "_fieldcoef (its field, Hz): |d| inside the brain, mean"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-topup: 28 --splineorder=2 cases without movements differ deterministically (FSL's one-bit band 1e-7 to 1e-5, the corrected images 0.2 to 0.7 % apart, reproducer topup-trial-01082); 22 of the 109 such cases with an axis shorter than two knot spacings at some level (FSL-145's layout) differ, 5 of the 145 others (trial_quadratic.py): a question for the spec writer (specs/topup.md §4.6's bending energy on an axis of FSL-145's two coefficients)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["Files written"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-topup: 25 --debug runs: how many Levenberg-Marquardt attempts a level makes follows the minimisation's path, so its attempt files differ (as the 2026-11-03 trial's 17; reproducer topup-trial-02087)"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["exception", "jac_N: the same grid"]
+status = "harness"
+explanation = "The suite's own mistakes, fixed with tests (validation/tests/test_fsl_topup_measures.py): a 1 x 1 x 1 image's Jacobian (nibabel's shape (1,): NIfTI drops trailing axes of one voxel) compared with the mask's 3D grid, reported as another grid on identical files (topup-trial-00027 of 2026-11-03, shrunk; relay 1's replay question: difftest --replay runs a finding's shrunk recipe, the direct runs had taken its drawn one); a NIfTI-2 quaternion a float rounding above 1 refused by nibabel's double tolerance, an exception (topup-trial-04796)"
+link = "validation/tests/test_fsl_topup_measures.py"
+
+[[difference]]
+tool = "fsl-topup-original"
+implementation = "original"
+signature = ["feat_fieldmap_mag: mean |d| / mean intensity inside the brain", "feat_fieldmap_mag: relative difference inside the brain, Nth percentile"]
+status = "open"
+explanation = "topup-trial-00006 of 2026-11-03, shrunk to 1 x 1 x 3 voxels of 1 mm (3 volumes, the default FWHM of 8 mm: a 19-tap kernel on a 3-voxel axis): --featout's magnitude (here --iout's mean of the first volume's smoothed prediction, every voxel outside the common mask) 3.0 to 3.1 % above FSL's, identical to 1 ulp with --fwhm=0 (trial_f6_probe.py): the smoothing on an axis shorter than its kernel, a question for the spec writer (specs/topup.md §4.4); the drawn case agrees"
+link = "docs/findings/fsl-topup-original.md"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Default against the replica's default: Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-fast (seed cleanroom-fast, 19,695 cases: 19,645 agree, 50 differ; 178 of the 2026-11-03 trial's 182 differences agreed on replay before it). 40 differ only where the record holds the default to the replica's default (Dice 0.988 to 0.999, a -v line in its 4th digit): with glibc's functions in the default (glibc_default.patch, LXM_GLIBC=1) 39 of the 40 are the replica's bit for bit, so the two defaults differ by the correctly rounded functions' last bits only; the 40th (cleanroom-fast-02117, two channels with -a priors) was not measured (the patched build predates FLIRT's changes)"
+link = "validation/investigations/cleanroom-fast/glibc_default.py"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Exit status", "Files written", "Standard error (the original's own lines left out)"]
+status = "explained"
+explanation = "Trial 2026-11-05-catchup-fast: 4 cases of several channels whose class covariance is singular in exact arithmetic: which program aborts (inv(): matrix is singular) is decided by the matrix arithmetic's last bits, FSL in cleanroom-fast-12578 (-6, the original finishes), the original in 13533 and 05605 (FSL finishes), as the 2026-11-03 trial's case"
+link = "docs/findings/fsl-fast-original.md"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Segmentations (_seg, _seg_n, _pveseg, _mixeltype): Dice and identical voxels", "Partial volumes (_pve_n): mean and pN.N differences, totals"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-fast: 6 cases of two to four channels where the original's reproduce run itself parts from FSL's (Dice 0.88 to 0.999): 02215 and 02311 explained before (noise-free channels); open: cleanroom-fast-15057 (--nopve -B), 16101 (-g -B -p), 18394 (-a, -B -N -O -R), 19057 (-f 0.1 -p, four channels). For FAST's next clean-room relay"
+link = "docs/findings/fsl-fast-original.md"
+
+[[difference]]
+tool = "fsl-fast-original"
+implementation = "original"
+signature = ["Standard error (the original's own lines left out)"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-fast: two channels with FSLOUTPUTTYPE=ANALYZE (cleanroom-fast-14174, -t 2 -I 2 -o t1_brain -S 2): FSL's standard error starts with terminate called after throwing an instance of 'std::runtime_error' where the original prints the image layer's ERROR:: Unrecognised value (ANALYZE) line: the multi-channel path's failure, not yet looked at"
+link = "docs/findings/fsl-fast-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["stdout: the same lines (numbers aside)"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-flirt (seed 20261103, 13,907 cases: 12,334 agree, 1,560 differ, 13 notices; of the 1,140 differences of the 2026-11-02 trial's cases drawn again 696 now agree). 17 verbose searches on a one-point grid (-nosearch): no local minimum, so the overall minimum is listed only on FSL's Cost minima line, without a COST line (reproducer 20261103-07259): fixed (flirt/search.rs)"
+link = "validation/difftest/cases/fsl-flirt-original/search-cost-minima-fallback.json"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz bit-identical"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-flirt: 25 -out headers: a reference with a qform only and qfac -1 has its sform completed from the qform, whose zero entries times -1 are negative zeros, which FSL writes; the original wrote zeros (reproducers 20261103-11635, 01058, 05402): fixed, a stored sform's negative zeros still written as zeros (flirt/engine.rs)"
+link = "validation/difftest/cases/fsl-flirt-original/out-completed-sform-negative-zero.json"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz bit-identical (nearestneighbour)"]
+status = "fixed"
+explanation = "Trial 2026-11-05-catchup-flirt: applyxfm4D of an int32 image of 2147483647 (20261103-03732): FSL writes its padding (the background value) exactly in the type, 2147483647, and its interpolated voxels through single precision (2^31, wrapped to -2147483648: FSL-09); the original wrote both through single precision. Fixed: an int32 image with values beyond 2^24 keeps them for the padding (catchup8_int_nn.py: flirt -applyxfm pads through single precision, as before)"
+link = "validation/difftest/cases/fsl-flirt-original/applyxfm4d-int32-padding.json"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat: Nth-percentile displacement over the reference's brain", "stdout: the same lines (numbers aside)"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-flirt: 9 searches whose test volume has no intensity range at a scale (Testvol intensity clamped between 0 and 0): FSL prints WARNING: Found 0 or less sub-threshold costs, its fine grid's costs and parameters print as 0 and every grid point becomes a minimum, while the original evaluates the fine grid's costs (1, corratio's cost of no variance, specs/flirt.md §6.2) and optimises them (reproducers 20261103-08267, 03733): a question for the spec writer (§8.1 steps 6 and 7)"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat: Nth-percentile displacement over the reference's brain"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-flirt: 941 registrations (607 by the matrix alone) end elsewhere than FSL's on the trial's random, often ill-posed pairs, as the 2026-11-02 trials' (the entries above); 36 of them agreed in the 2026-11-02 trial and differ now; 51 more with -cost labeldiff. Left for FLIRT's next clean-room relay and the final validation phase (reproducers 20261103-00035, 00076)"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["stderr: the same lines (numbers aside)"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-flirt: messages whose number follows the optimiser's path: 166 cases of mcflirt-style COG warnings (WARNING::in calculating COG, total = 0.0) printed a different number of times (20261103-00045), 172 of -anglerep quaternion's Parameters do not form a valid axis - greater than unity (FSL-90's message, 20261103-00262), as relay 4's -debug findings' rest; 110 pairreg registrations' paths (pair.mat) and 12 runs where FSL itself crashes (Segmentation fault, free(): invalid size: FSL-75, registered)"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out_outskin_mask.nii.gz"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet (seed bet-options-6, 909 cases; the original 792 agree, 114 differ, 2 notices, 1 undefined; the replica 896 agree, 13 differ, all where FSL's FLIRT crashes inside standard_space_roi: FSL-75, for the orchestrator). 53 betsurf surfaces (bet -A, -A2 and betsurf): the scalp's deformation on small heads, relay 7's open class (reproducer bet-options-6-00078: 54 of 1,320 voxels of the scalp mask)"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["files written", "messages: FSL's, byte for byte"]
+status = "register"
+explanation = "Trial 2026-11-05-catchup-bet: standard_space_roi runs whose FLIRT crashes in FSL (Segmentation fault, free(): invalid pointer or invalid size; FSL-75's corrupted heap, undefined behaviour never reproduced) where the original registers and goes on (FSL-214: FSL's script goes on too), so the messages, files and later images differ (about 27 cases, reproducer bet-options-6-00060)"
+link = "docs/findings/fsl-bet-original.md"
+defect = "FSL-75"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["given FSL's matrix (-applyxfm -init): out.nii.gz: header"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet: 19 standard_space_roi -ssref cases whose output header differs from FSL's even when the original is given FSL's matrix (reproducers bet-options-6-00151, 00657; FLIRT's -out zeros of relay 8 do not change them), and 14 whose FLIRT matrix parts (out_tmp_to_std.mat, 00009): not yet looked at"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["out.nii.gz: header"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet: 6 fslroi boxes of a neurologically stored oblique image reaching its last x voxel: the corner's translation one float unit in the last place from FSL's (bet-options-6-00796: -28.71428871 for -28.71428680; FSL's equals the double product M·(20, 4, 4) rounded once, the original rounds the held frame's translation first, specs/standard_space_roi.md §3.2): a question for the spec writer"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages before FSL's crash"]
+status = "open"
+explanation = "Trial 2026-11-05-catchup-bet: 5 bet -B and -A2 runs where FSL's script fails or crashes midway (Error: input image out_tmp_unbiased_premask... not found; a crash after bet failed during command) and the original's messages or status differ (reproducers bet-options-6-00225, 00409): not yet looked at"
+link = "docs/findings/fsl-bet-original.md"

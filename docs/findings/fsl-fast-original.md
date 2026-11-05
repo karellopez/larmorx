@@ -341,3 +341,20 @@ four classes (`-t 2 -H 0 -N --nopve -v`): a `-v` standard deviation 1.72904 agai
 (6e-4 relative); with glibc's functions the original's default is the replica's default bit for
 bit there too: the correctly rounded functions' last bits, amplified by four classes on 256
 brain voxels.
+
+## The catch-up's random-testing trial (relay 8, 2026-11-05)
+
+`oracles/difftest/2026-11-05-catchup-fast` (seed `cleanroom-fast`, the 2026-11-03 trial's, drawn
+again and further; 30 minutes, 14 jobs at one thread, 3 GiB a case, the oracle cache in `use`
+mode): 19,695 cases, 19,645 agree, 50 differ. 40 differ only where the record holds the default to
+the replica's default (Dice 0.988 to 0.999 of a label image, or a `-v` line in its 4th digit):
+with glibc's functions in the default (`glibc_default.patch`, `LXM_GLIBC=1`, replayed with
+`replay_findings.py`) 39 of them are the replica's bit for bit, so the two defaults differ only by
+the correctly rounded functions' last bits; the 40th (`cleanroom-fast-02117`, two channels with
+`-a` priors) was not measured (the patched build predates FLIRT's changes). 4 are a covariance
+singular in exact arithmetic, where the matrix arithmetic's last bits decide which program aborts
+(`12578`: FSL; `13533`, `05605`: the original). 6 of several channels part from FSL in
+`reproduce` (`02215` and `02311` explained before; open: `15057`, `16101`, `18394`, `19057`), and one
+two-channel run with `FSLOUTPUTTYPE=ANALYZE` prints the image layer's message where FSL's
+uncaught `std::runtime_error` prints `terminate called after throwing ...` (`14174`, open).
+

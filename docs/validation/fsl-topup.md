@@ -1,12 +1,12 @@
 # Parity: topup (clean-room original)
 
-**All cases agree.** 183 cases on the `standard` tier: 102 pass, 67 rejected by both, 14 expected divergences, 0 failures.
+**All cases agree.** 185 cases on the `standard` tier: 104 pass, 67 rejected by both, 14 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl topup` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/topup.md, Apache-2.0)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5), the conda build at `~/fsl-6.0.7.23`, one thread
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
-- **Original programs:** 194 runs: 173 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 196 runs: 175 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -30,7 +30,7 @@
 | at | 74 | 43 | 25 | 6 | 0 |
 | cfg | 16 | 10 | 4 | 2 | 0 |
 | debug | 5 | 5 | 0 | 0 | 0 |
-| difftest | 7 | 7 | 0 | 0 | 0 |
+| difftest | 9 | 9 | 0 | 0 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
 | fmriprep | 2 | 2 | 0 | 0 | 0 |
 | opt | 37 | 29 | 2 | 6 | 0 |
@@ -131,7 +131,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6bb746fc6a7e) |
+| larmorx | 0.0.1 (5a44c8f498f9) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -328,5 +328,7 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `difftest/fsl145-short-axis` | pass | 16/16 | FSL-145: --splineorder=2 on an axis shorter than two knot spacings (two coefficients; reproduce FSL's, the default the … |
 | `difftest/fsl146-mixed-axes` | pass | 24/24 | FSL-146: volumes encoded along y and x (FSL's gradient leaves the volumes not encoded along an axis out of its Jacobian… |
 | `difftest/quadratic-count` | pass | 21/21 | topup --splineorder=2: FSL's quadratic B-spline count ceil((2n + k - 4) / (2k)) + 2 (the original had taken the cubic's… |
+| `difftest/scg-every-iteration-counts` | pass | 12/12 | --miter counts every iteration of the scaled conjugate gradients, the rejected ones too (a level of 3 iterations whose … |
 | `difftest/scg-regulariser-weight` | pass | 28/28 | scaled conjugate gradients at a level whose start has Reg > 0: the gradient at x + sigma d takes the current point's re… |
+| `difftest/scg-rejected-last-step` | pass | 13/13 | a level of scaled conjugate gradients (--miter=1) whose one step is rejected: FSL counts it and ends the level at the r… |
 | `difftest/trace-verbose` | pass | 22/22 | --trace with -v: FSL prints a stage's Entering line inside a cost line; the suite takes the stages out |

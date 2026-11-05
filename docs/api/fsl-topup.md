@@ -33,9 +33,9 @@ oblique phase encodings, four volumes, a zero read-out time, `--debug`, `--trace
 each compared file by file with FSL's.
 
 The original against FSL 6.0.7.23 (the parity suite `fsl-topup`, record
-[fsl-topup](../validation/fsl-topup.md), 2026-11-04, §12's thresholds, compared in `reproduce`
-mode): 183 cases of the standard tier (the replica suite's cases, fMRIPrep's two calls and 7
-permanent cases of random testing), 102 within the thresholds, 67 rejected by both alike, 14
+[fsl-topup](../validation/fsl-topup.md), 2026-11-05, §12's thresholds, compared in `reproduce`
+mode): 185 cases of the standard tier (the replica suite's cases, fMRIPrep's two calls and 9
+permanent cases of random testing), 104 within the thresholds, 67 rejected by both alike, 14
 expected divergences (each with its reason in the record: 6 cases whose movements are estimated
 and not converged, where FSL's own path is not determined beyond its inputs' last bits (FSL-201's
 forward differences: FSL's runs with the read-out times changed in their last bits spread as far,
@@ -45,7 +45,8 @@ fMRIPrep's calls: ds001600 within the thresholds, ds005040 within FSL's own band
 change (the field's p99 0.61 Hz against FSL at `--nthr=4`'s 0.64). Random testing's trial (14,400
 cases, the replica trial's draws) is triaged case by case in
 [the findings](../findings/fsl-topup-original.md) (finding 36; its open items closed by the
-catch-up of 2026-11-04, findings 37 to 44).
+catch-up of 2026-11-04, findings 37 to 44); the catch-up's trial of 2026-11-05 (17,535 cases,
+13,300 agree) and FSL-242 in findings 45 to 47.
 
 ## Quick start
 
@@ -219,6 +220,12 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   exact derivatives by default (both implementations; `reproduce` FSL's matrices and forward
   differences, in the original since 2026-11-04; fMRIPrep's calls, which estimate no movements,
   unchanged).
+- **FSL-242**: with `--minmet=1` (scaled conjugate gradients), a level whose last iteration's
+  step is rejected (its cost above the current point's) ends at that rejected, worse point, from
+  which the next level or the outputs start: the lowest cost the level found by default
+  (the clean-room original since 2026-11-05; `reproduce` FSL's; named on every run where it
+  happens). `--miter` counts every iteration, the rejected ones too, in both modes (FSL's, observed
+  with `-v`).
 
 ### glibc's maths functions (GLIBC-07)
 

@@ -577,7 +577,17 @@ def brain_mask(
     return img > BRAIN * np.percentile(img, 99)
 
 
+def _spatial(x: np.ndarray) -> np.ndarray:
+    """An image with at least its three spatial axes: NIfTI's ``dim[0]`` drops trailing axes of
+    one voxel (FSL and the original write a 1 x 1 x 1 image's Jacobian with ``dim[0] = 1``, which
+    nibabel reads as shape ``(1,)``), where the brain mask keeps all three (the random-testing
+    trial's finding topup-trial-00027, shrunk to one voxel: the same files reported as another
+    grid)."""
+    return x.reshape(x.shape + (1,) * (3 - x.ndim)) if x.ndim < 3 else x
+
+
 def _field_measures(tag: str, fa: np.ndarray, fb: np.ndarray, mask, scale: float = 1.0):
+    fa, fb = _spatial(fa), _spatial(fb)
     if mask is None or fa.shape[:3] != mask.shape or fa.shape != fb.shape:
         return [Measure(f"{tag}: the same grid", float("inf"), 0.0, "shape")]
     x, y = fa[mask], fb[mask]
@@ -613,6 +623,7 @@ def _field_measures(tag: str, fa: np.ndarray, fb: np.ndarray, mask, scale: float
 
 
 def _intensity_measures(tag: str, ia: np.ndarray, ib: np.ndarray, mask):
+    ia, ib = _spatial(ia), _spatial(ib)
     if mask is None or ia.shape[:3] != mask.shape or ia.shape != ib.shape:
         return [Measure(f"{tag}: the same grid", float("inf"), 0.0, "shape")]
     vols = [(ia, ib)] if ia.ndim == 3 else [(ia[..., i], ib[..., i]) for i in range(ia.shape[3])]

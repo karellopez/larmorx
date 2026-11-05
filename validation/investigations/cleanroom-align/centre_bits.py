@@ -35,11 +35,15 @@ def sums(w: np.ndarray, idx: np.ndarray, block: int | None) -> float:
 
 
 def centre(v: np.ndarray, d: np.ndarray, block: int | None) -> np.ndarray:
-    nx, ny, nz = v.shape
+    nx, ny, _nz = v.shape
     flat = np.asarray(v, np.float32).reshape(-1, order="F")
     w = (flat - flat.min()).astype(np.float64)
     i = np.arange(flat.size)
-    x, y, z = (i % nx).astype(np.float64), ((i // nx) % ny).astype(np.float64), (i // (nx * ny)).astype(np.float64)
+    x, y, z = (
+        (i % nx).astype(np.float64),
+        ((i // nx) % ny).astype(np.float64),
+        (i // (nx * ny)).astype(np.float64),
+    )
     tw = sums(w, np.ones_like(w), block)
     if abs(tw) < 1e-5:
         tw = 1.0

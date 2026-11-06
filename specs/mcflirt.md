@@ -406,7 +406,12 @@ grid, every row of every slice, including rows with no contributing point), and
     A_r = C_1 + … + C_r            (running total of C)
     N   = Σ over slices z of A_{last row of slice z}
 
-all as float32 running sums in visiting order. `N` is many orders of magnitude larger than
+all as float32 running sums in visiting order. (spec writer, 2026-11-06) Precisely: `C` is **one float32 running
+total to which each contributing point's weight is added as the point is visited**, never
+restarted, so `C_r` is its value at the end of row `r` (each point added one by one, not the
+row's total `w_r` added at once: with fractional weights the two round differently, and `N`'s
+last bits move the correlation's, `specs/flirt.md` §6.4's observation); at the end of every row
+`C` is added to `A`, at the end of every slice `A` to `N`; neither `A` nor `N` restarts. `N` is many orders of magnitude larger than
 the number of contributing points (about `10^4` times larger on a 4 mm grid of a typical
 BOLD volume).
 

@@ -556,9 +556,35 @@ each factor present only when the sample lies within the smoothing distance of t
 edge (`f = o/s`) or else of its high edge (`f = (b − o)/s`), the quotient formed first; a
 negative result is set to 0.
 The sums are those of the smoothed forms. Differences from §6.2:
-- `normcorr`: the cost is `1 − r`, **not** `1 − |r|` (an anticorrelation is not rewarded);
+- `normcorr`: the cost is `1 − r`, **not** `1 − |r|` (an anticorrelation is not rewarded). Its count
+  `N` is `specs/mcflirt.md` §6.4's exactly, and the order of its first running total decides the
+  last bits (spec writer, 2026-11-06; the record's `real/weights-normcorr`): `C` is one
+  single-precision running total to which **each contributing point's weight is added as the point
+  is visited**, over the whole grid, never restarted (not each row's total added at the row's
+  end); at the end of every row (a row without a contributing point included) `C` is added to the
+  running total `A`, and at the end of every slice `A` to `N` (neither restarted). With fractional
+  weights (a reference weight filtered from a mask, the edge factors) a row's total added at once
+  rounds differently, `N`'s last bits move and, through the single-precision `cov`, `varx` and
+  `vary`, so do `r`'s: one or two units in the last place of a cost near 0.05, enough to move a
+  parabolic step in its 5th significant digit **(observed**: FSL's `-verbose 7` trace of
+  `real/weights-normcorr` and the original's agree through the 4 mm stage's 46th evaluation and
+  part at the 47th, `0.050021` against `0.050056`; FSL's arithmetic with only this change, each
+  row's total added at once, gives the original's evaluations, its 9,001 evaluations against
+  FSL's 8,980 and its final matrix to every printed digit, 0.5083 mm from FSL's at the 95th
+  percentile; every other weighted cost, the weighted `corratio` of the search included, and the
+  pyramid's weights and images, `-debug`'s files, are FSL's bit for bit);
 - `woods`: prints `WARNING: Woods is not implemented with cost function weighting` on standard
-  error at every evaluation and uses the unweighted `woods`;
+  error at every evaluation and uses the unweighted `woods` (§6.2: unsmoothed, no weight, no edge
+  factor, on the pair's input blurred with the weights, §5). (spec writer, 2026-11-06; the
+  record's `real/weights-woods`, not closed by this text) **(Observed**: on 40 matrices around the
+  parting point of the record's trace, measured on the 4 mm pair by a schedule (`setscale 4`,
+  `measurecost 6`), FSL's and the original's `woods` agree to every printed digit, `0.948010` at
+  the parting point's printed parameters included; the trace parts at the 4 mm stage's 356th
+  evaluation, a step of 0.8 mm in `t_x`, where `woods` jumps by 1e-4 (a sample crossing the
+  input's bounds test, §6.1: `woods` counts every sample with weight 1) at parameters that agree
+  to their printed digits. So the pair and `woods` are as specified; the matrices along the path
+  differ in their last bits before the jump: a question of §8.2's composition and line search,
+  open);
 - the mutual-information costs always take the weighted fuzzy form.
 The weight volumes follow the pyramid (§5): the reference weight's level matches the reference
 level; the input weight is blurred with the input (§7.2).

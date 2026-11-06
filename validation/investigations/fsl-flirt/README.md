@@ -52,3 +52,9 @@ Run them with `PYTHONPATH=<checkout>/python:<checkout>/validation/src` and `FSLD
 FSL 6.0.7.23's. The record itself is made with `python -m larmorx_validation parity
 fsl-flirt-replica`; the probes beside it are in `validation/probes/fsl-flirt-costs` and
 `validation/probes/fsl-flirt-pinv`.
+- `normcorr_row_totals.py` (PRELUDE part's spec writer, 2026-11-06): builds a probe of the
+  replica whose normalised correlation adds each row's total weight to the count's running total
+  at the row's end (FSL adds every point's weight as it is visited): on `real/weights-normcorr`
+  the probe gives the clean-room original's `-verbose 7` evaluations and final matrix, so that
+  order is the cause of the original's record failure (`specs/flirt.md` §6.4, `specs/mcflirt.md`
+  §6.4). The source is restored after the build.

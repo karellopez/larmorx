@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lx.fsl.prelude``: FSL's PRELUDE, a tool with only its replica (``larmorx-nc``) so far.
-Without the replica's program, ``auto`` and ``replica`` raise
-:class:`larmorx._replica.ReplicaNotFoundError` and ``original`` ``NotImplementedError``; the
-arguments are checked first. With a stand-in program written by the test (a small Python script
-that records its arguments and writes prelude's output files), the wrapper's command line, its
-settings and the outputs it reads back. The outputs themselves are checked against FSL by the
-replica's parity suite (``fsl-prelude-replica``) and on every platform by larmorx-nc's golden
-cases."""
+"""``lx.fsl.prelude``: FSL's PRELUDE, with its replica (``larmorx-nc``) and its clean-room
+original (this package, since 2026-11-06). Without the replica's program, ``auto`` and
+``original`` run the original in the process and ``replica`` raises
+:class:`larmorx._replica.ReplicaNotFoundError`; the arguments are checked first. With a stand-in
+program written by the test (a small Python script that records its arguments and writes
+prelude's output files), the wrapper's command line, its settings and the outputs it reads back.
+The outputs themselves are checked against FSL by the parity suites (``fsl-prelude-replica``,
+``fsl-prelude``) and on every platform by the golden cases."""
 
 from __future__ import annotations
 
@@ -122,18 +122,50 @@ def test_the_arguments_are_checked_first(kwargs, message):
 
 
 @pytest.mark.usefixtures("no_replica")
-def test_replica_only():
+def test_the_original_runs_without_the_replica():
     phase, magnitude = _inputs()
-    with pytest.raises(NotImplementedError, match="no clean-room original of fsl prelude"):
-        lx.fsl.prelude(phase, magnitude, implementation="original")
-    for implementation in ("auto", "replica"):
-        with pytest.raises(_replica.ReplicaNotFoundError, match="larmorx-nc"):
-            lx.fsl.prelude(phase, magnitude, implementation=implementation)
+    for implementation in ("auto", "original"):
+        r = lx.fsl.prelude(
+            phase,
+            magnitude,
+            implementation=implementation,
+            save_mask=True,
+            save_labels=True,
+            save_raw_phase=True,
+            verbose=True,
+        )
+        assert r.unwrapped.implementation == _replica.ORIGINAL
+        assert r.mask is not None and r.labels is not None and r.raw_phase is not None
+        # a constant magnitude: every voxel in the mask, each unwrapped by whole turns
+        assert np.all(np.asarray(r.mask.data) == 1)
+        turns = (np.asarray(r.unwrapped.data, np.float64) - _phase()) / (2 * np.pi)
+        assert np.allclose(turns, np.round(turns), atol=1e-5)
+        assert np.asarray(r.labels.data).min() >= 1
+        assert r.stdout.startswith("Loading volumes\nPhase loaded\nMagnitude loaded\n")
+        assert "Did while loop" in r.stdout
+    with pytest.raises(_replica.ReplicaNotFoundError, match="larmorx-nc"):
+        lx.fsl.prelude(phase, magnitude, implementation="replica")
 
 
-def test_the_registry_lists_it_without_an_original():
+@pytest.mark.usefixtures("no_replica")
+def test_the_originals_failure_raises_with_preludes_message():
+    phase, magnitude = _inputs()
+    wide = lx.Image(_phase() * 2.5, AFFINE)
+    with pytest.raises(RuntimeError, match="exceeds allowable phase range"):
+        lx.fsl.prelude(wide, magnitude, implementation="original")
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-262"):
+        series = lx.Image(np.stack([_phase()] * 2, -1), AFFINE)
+        lx.fsl.prelude(
+            series,
+            lx.Image(np.stack([_magnitude()] * 2, -1), AFFINE),
+            save_mask=True,
+            implementation="original",
+        )
+
+
+def test_the_registry_lists_it_with_its_original():
     r = _replica.registry()[("fsl", "prelude")]
-    assert not r.original
+    assert r.original
     assert (r.package, r.program, r.env) == ("larmorx-nc", "larmorx-nc", "LARMORX_NC_BIN")
 
 

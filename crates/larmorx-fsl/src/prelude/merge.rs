@@ -223,7 +223,7 @@ pub fn merge(n_regions: u32, sums: PairMap<Sum>, verbose: bool, lines: &mut Vec<
                 },
             }
         };
-        if verbose && choices % 1000 == 0 {
+        if verbose && choices.is_multiple_of(1000) {
             lines.push(format!("{} constraints left", cons.len()));
         }
         choices += 1;
@@ -330,7 +330,7 @@ mod tests {
         // region 2 lies one turn above region 1 along 10 voxel pairs
         let mut sums = PairMap::default();
         for _ in 0..10 {
-            contribute(&mut sums, 2, 0.1 + 6.283_185, 1, 0.1);
+            contribute(&mut sums, 2, 0.1 + std::f32::consts::TAU, 1, 0.1);
         }
         let mut lines = Vec::new();
         let m = merge(2, sums, true, &mut lines);

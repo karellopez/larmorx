@@ -435,3 +435,33 @@ inputs were:
 | `cli::betsurf` | FSL-50's stop not reproduced (FSL observed to run on) | black-box (findings) |
 | `cli::bet` (`-Z`) | a float64 input's slices and padded image kept double | black-box (findings) |
 | `cli::bet2` (`centre_mm`) | `-c` of three zeros after the conversion into the radiological frame is the centre of gravity | spec §3.2; black-box (findings) |
+
+## PRELUDE (`prelude`, `cli::prelude`; relay 1 of PRELUDE's clean-room part, 2026-11-06)
+
+`prelude` (FSL's phase unwrapping: the mask, the linear ramps, the phase intervals and regions,
+the constraints between regions and their merging, the slices' joining, the command line, its
+messages, failures and defects) was written by a clean-room implementer who never opened FSL's
+source code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy), the replica crates
+(`crates-nc/`, its `larmorx-nc-fugue` above all, `crates/larmorx-afni-replica`, `crates-gpl/`), the
+restricted findings (`docs/findings/fsl-prelude.md` and the others of CLAUDE.md rule 1, the
+register's sections marked restricted), `docs/parts/`, the replica author's probes
+(`validation/investigations/fsl-prelude/`), the replica's suite and evidence modules, its
+permanent random-testing cases, `validation/probes/`, or the spec writer's probe and model as text
+(`validation/investigations/prelude-spec/blackbox.py`, `model.py`: run as black boxes only). Its
+only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/prelude.md`](../../specs/prelude.md) (FSL 6.0.7.23, fsl-fugue 2603.0) | the behaviour: the command line, the images, the extrema and the rewrap, the modes, the mask, the ramps, the intervals and regions, the constraints, the choice rule and the folds, the reference region, the slices' join, the messages, the numeric conventions, the defects FSL-261 to FSL-272 |
+| M. Jenkinson, "Fast, automated, N-dimensional phase-unwrapping algorithm", Magnetic Resonance in Medicine 49:193-197, 2003; FSL's FUGUE user guide (PRELUDE) | the method |
+| Black-box runs of the spec writer's probe (`blackbox.py`) and of the replica's program (`larmorx-nc fsl prelude`, as a program, both D13 modes) on the probe's and larmorx's own generated inputs ([`validation/investigations/fsl-prelude-original/`](../../validation/investigations/fsl-prelude-original/README.md)); fMRIPrep 25.2.6's seven prelude outputs | no `Loading volumes` before a complex image (§4.11's list read with §3.1); relay 1's comparisons |
+| The defect register's summary rows of FSL-261 to FSL-272 and GLIBC-07 (`larmorx_core::defects`) | the defects' names in the notices |
+| larmorx's own Apache-2.0 code: `bet::image` and `cli::{bet2, common, options, fmt}` (FSL's image names, reading and writing, the parser, `%g`, `%f`), `maths::num` (x86-64's NaN rules), `flirt::schedule::std_sort_checked` (libstdc++'s sort from its documentation), `larmorx_core` (thread pools, D13, `math::Libm`'s `atan2f`) | images, options, numbers, threads |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `prelude::num` | `rnd`, `wrap`, the intervals, FSL's extrema and the default's (FSL-272) | §4.2, §4.6, §6 |
+| `prelude::components` | the components (6-connected, or 4-connected in a slice) with roots at their first voxel: the numbering by first voxel and the largest component's tie; larmorx's own design (in-plane unions in parallel over the slices) | §4.4, §4.6, §10 |
+| `prelude::merge` | the constraints' sums in the visiting order, `K` and `C`, the choice sequence (largest `C`, smallest pair; NaN by step 1's rule), the folds, the offsets, the reference region; larmorx's own structures (a heap with lazy deletion, neighbour lists, a weighted union-find) | §4.7, §4.8, §10 |
+| `prelude::volume` | the default threshold, the candidate set and the largest component (per slice in the slices mode), FSL-271's reading of another grid, FSL-269's removal of NaN phases, the ramps' estimate, removal and restoration (FSL-261's domain), the regions in the three modes, the slices' join, the unwrapped values | §4.4 to §4.10, §9 |
+| `cli::prelude` | the parser and the checks in FSL's order, the usage, the images (the complex input's readers, FSL-263 to FSL-265, `atan2f` with GLIBC-07's witness), the volumes processed and their aborts, the range check and the rewrap, the modes, the writes in FSL's order (FSL-262, FSL-266), FSL-270, FSL-271, the notices | §2, §3, §4.1 to §4.3, §4.11, §5, §9 |

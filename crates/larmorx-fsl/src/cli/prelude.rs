@@ -126,10 +126,10 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
     let mut given: Vec<Option<Given>> = vec![None; SPECS.len()];
     let mut out: Option<String> = None;
     for (k, g) in all {
-        if k == OUT || k == UNWRAP {
-            if let Given::Text(t) = &g {
-                out = Some(t.clone());
-            }
+        if (k == OUT || k == UNWRAP)
+            && let Given::Text(t) = &g
+        {
+            out = Some(t.clone());
         }
         given[k] = Some(g);
     }
@@ -227,6 +227,9 @@ impl Series {
         &self.data[v * n..(v + 1) * n]
     }
 }
+
+/// A reading of the images, run in the call's thread pool.
+type Reading<'a> = Box<dyn FnOnce() -> Result<(Series, Option<Series>), ReadFail> + Send + 'a>;
 
 /// Why an image could not be read.
 enum ReadFail {
@@ -431,7 +434,7 @@ fn read_complex(
                 }
                 f32::from_ne_bytes(b)
             };
-            for (i, c) in bytes.chunks_exact(8).take(n).enumerate() {
+            for (i, c) in bytes.as_chunks::<8>().0.iter().take(n).enumerate() {
                 re[i] = word(&c[..4]);
                 im[i] = word(&c[4..]);
             }
@@ -459,7 +462,7 @@ fn read_complex(
                     }
                     crate::maths::num::to_f32(f64::from_ne_bytes(b))
                 };
-                for (i, c) in bytes.chunks_exact(16).take(n).enumerate() {
+                for (i, c) in bytes.as_chunks::<16>().0.iter().take(n).enumerate() {
                     re[i] = word(&c[..8]);
                     im[i] = word(&c[8..]);
                 }
@@ -742,7 +745,7 @@ fn run(
     };
     // §3.1, §3.2: the images (`Loading volumes` before the phase; nothing before a complex
     // image, observed)
-    let pool = |f: Box<dyn FnOnce() -> Result<(Series, Option<Series>), ReadFail> + Send + '_>| {
+    let pool = |f: Reading<'_>| {
         larmorx_core::parallel::with_threads(n_threads, f)
             .unwrap_or_else(|e| Err(ReadFail::Refused(format!("no thread pool: {e}"))))
     };

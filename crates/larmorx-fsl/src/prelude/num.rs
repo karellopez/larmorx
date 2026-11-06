@@ -169,7 +169,7 @@ mod tests {
         let w = wrap(4.0);
         assert!((f64::from(w) - (4.0 - TWO_PI)).abs() < 1e-6);
         let width = interval_width(8);
-        assert_eq!(interval(-3.14159, width, 8), 1);
+        assert_eq!(interval(-3.1, width, 8), 1);
         assert_eq!(interval(3.2, width, 8), 8);
         assert_eq!(interval(f32::NAN, width, 8), 1);
         assert!(wrap(f32::NAN).is_nan());

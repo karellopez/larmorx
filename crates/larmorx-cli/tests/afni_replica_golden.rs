@@ -1138,11 +1138,18 @@ fn output_files(dir: &Path, id: &str, option: &str, name: &str) -> Vec<(String, 
     out
 }
 
-/// A text output's fingerprint: the SHA-256 of its bytes.
+/// A text output's fingerprint: the SHA-256 of its bytes, its comment lines (`#`) left out:
+/// `-maxdisp1D`'s files name the command line, whose input path is the test's temporary one.
 fn text_fingerprint(path: &Path) -> Fingerprint {
     let raw = std::fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let kept: Vec<u8> = raw
+        .split_inclusive(|&b| b == b'\n')
+        .filter(|line| !line.starts_with(b"#"))
+        .flatten()
+        .copied()
+        .collect();
     Fingerprint {
-        sha256: sha256(&raw),
+        sha256: sha256(&kept),
         dtype: "text".into(),
         sample: "-".into(),
     }

@@ -23,10 +23,18 @@ Translated works
 
 FSL 6.0.7.23 (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
   Translated: the mcflirt program (fsl-mcflirt 2111.0); bet, bet2 and betsurf (fsl-bet2
-  2111.9); and the parts of fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0,
-  fsl-znzlib 2511.3, fsl-meshclass 2111.0, fsl-utils 2412.6 and fsl-avwutils 2209.6 they use
-  (first translated from FSL 6.0.7.17's packages)
-  (crates larmorx-nc-mcflirt, larmorx-nc-bet and larmorx-nc-core).
+  2111.9); flirt, convert_xfm and FLIRT's other programs and scripts (fsl-flirt 2111.4); fast
+  (fsl-fast4 2111.3); topup and applytopup (fsl-topup 2203.5); fslmaths, fslstats and fslroi
+  (fsl-avwutils 2209.6); prelude (fsl-fugue 2603.0); and the parts of fsl-newimage 2601.0,
+  fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-znzlib 2511.3, fsl-meshclass 2111.0, fsl-utils
+  2412.6, fsl-basisfield 2203.4, fsl-warpfns 2501.0 and fsl-cprob 2111.0 they use (mcflirt's
+  and BET's first translated from FSL 6.0.7.17's packages)
+  (crates larmorx-nc-mcflirt, larmorx-nc-bet, larmorx-nc-flirt, larmorx-nc-fast,
+  larmorx-nc-topup, larmorx-nc-avwutils, larmorx-nc-fugue and larmorx-nc-core).
+  PRELUDE: "Mark Jenkinson, FMRIB Image Analysis Group; Copyright (C) 2000/2001 University of
+  Oxford". fsl-cprob is FSL's C++ wrapper of Stephen L. Moshier's Cephes Math Library
+  ("Copyright 1984, 1987, 1989, 2000 by Stephen L. Moshier"), distributed by FSL with its
+  packages under the FSL Licence.
   BET: "BETv1 Steve Smith; BETv2 Mickael Pechaud, Mark Jenkinson, Steve Smith; FMRIB Image
   Analysis Group; Copyright (C) 1999-2003 University of Oxford". bet2's head-CT conversion is,
   as FSL's code says, "adapted from: https://github.com/neurolabusc/Clinical/blob/master/

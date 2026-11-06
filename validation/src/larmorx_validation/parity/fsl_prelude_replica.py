@@ -10,7 +10,8 @@ cases:
   ``fmap_preproc_wf/<estimator>/phdiff_wf/prelude``: ``prelude --abs=<magnitude> --mask=<mask>
   --phase=<phase difference in rad, 0 to 2pi> --unwrap=<out>``) of the oracle runs: the inputs
   from the runs' working directories, copied into the run directory under their names;
-  fMRIPrep's own outputs (its container's FSL) compared too, as a report;
+  fMRIPrep's own outputs (its container's FSL) compared too, as a report, and the Python API
+  (``lx.fsl.prelude``) on the same inputs, whose unwrapped phase must be FSL's;
 - **opt**, **out**, **err**: every option of prelude (complex or phase and magnitude input, the
   mask and its threshold, 3D and 2D labels and unwrapping, the volume range, the saved mask,
   labels and raw phase, the phase ramps, the messages), the output types, the messages and
@@ -27,6 +28,7 @@ draws no random numbers.
 from __future__ import annotations
 
 import dataclasses
+import os
 import shlex
 import shutil
 import tempfile
@@ -177,7 +179,49 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             )
         if oracle.code == 0 and replica.code == 0:
             fix_pass(checks, PROGRAM, prepare, args, {}, b, replica)
+            _python_check(checks, args, files, a)
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
+
+
+#: The options of fMRIPrep's call that ``lx.fsl.prelude`` takes (:func:`_python_check`).
+_PYTHON_OPTIONS = {"--abs", "--mask", "--phase", "--unwrap"}
+
+
+def _python_check(checks: CheckList, args: list[str], files: dict[str, Path], fsl: Path) -> None:
+    """``lx.fsl.prelude`` (the Python API, ``implementation="replica"``, ``reproduce``) on the
+    call's inputs: its unwrapped phase must be FSL's, bit for bit."""
+    import warnings
+
+    import nibabel as nib
+
+    import larmorx as lx
+    from larmorx_validation.parity.fsl_bet import process_environment
+
+    opts = dict(a.partition("=")[::2] for a in args)
+    if not set(opts) <= _PYTHON_OPTIONS or not {"--abs", "--phase", "--unwrap"} <= set(opts):
+        return
+    env = dict(os.environ, LARMORX_NC_BIN=str(replica_binary()))
+    with process_environment(env), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = lx.fsl.prelude(
+            str(files[opts["--phase"]]),
+            str(files[opts["--abs"]]),
+            mask=str(files[opts["--mask"]]) if "--mask" in opts else None,
+            upstream_defects="reproduce",
+            implementation="replica",
+        )
+    ours = np.asarray(res.unwrapped.data)
+    theirs = np.asarray(nib.load(fsl / opts["--unwrap"]).dataobj)
+    same = (
+        ours.dtype == theirs.dtype == np.float32
+        and ours.shape == theirs.shape
+        and np.array_equal(ours.view(np.uint32), theirs.view(np.uint32))
+    )
+    checks(
+        "Python API (lx.fsl.prelude): the unwrapped phase",
+        same,
+        detail="FSL's, bit for bit" if same else "differs from FSL's",
+    )
 
 
 # ------------------------------------------------------------------------------------------------

@@ -17,7 +17,8 @@ two implementations (CLAUDE.md rule 1, `docs/licensing.md`):
 restricted), the replica author's probes (`validation/investigations/fsl-prelude/`), the
 replica's permanent random-testing cases (`validation/difftest/cases/fsl-prelude/`) or
 `docs/parts/` (porting guide §1). It may read and run `validation/investigations/prelude-spec/`
-(this spec's black-box probe, written from runs of FSL's program).
+(this spec's black-box probe and its model of §4, written from runs of FSL's program and from
+this text: §12).
 
 This spec describes behaviour: what goes in, what comes out, the maths and the conventions that
 decide the results. It holds no code. Statements marked **(observed)** were confirmed by running
@@ -48,8 +49,9 @@ The masked phase is cut into regions of similar wrapped phase (each voxel's phas
 of `n` equal intervals of `[-π, π]`; the connected parts of equal interval are the regions);
 neighbouring regions are then merged, the best-agreeing pair first, each time moving the merged
 region by the whole number of turns (2π) that best joins it to its partner; the result is the
-phase plus 2π times each region's number of turns, 0 outside the mask. Images whose phase varies
-much along a few slices may be labelled and unwrapped slice by slice instead (§4.3, §4.9). The
+phase plus 2π times each region's number of turns, 0 outside the mask. Large images are labelled
+slice by slice (and unwrapped in 3D); with `-s` everything is done slice by slice and the slices
+are joined (§4.3, §4.9). The
 input is either a wrapped phase and a magnitude image (the mask is made from the magnitude), or a
 complex image (its phase and magnitude); a mask image can replace the magnitude's mask.
 
@@ -696,3 +698,21 @@ the standard tier) is the model; the original's suite runs the same cases with
   against the original gives two reports to compare line for line (messages, statuses, files,
   headers); the parts where larmorx differs by design are the aborts (exit 1 and larmorx's line)
   and the defaults of §9.
+
+## 12. How this text was checked (spec writer, 2026-11-06)
+
+`validation/investigations/prelude-spec/model.py` models §4 and §6 as written here (numpy and
+scipy; no FSL code; the merging a plain heap keyed by `(−C, a, b)`), and compares its files and
+`-v` lines with FSL's, bit for bit:
+- the 22 cases of `blackbox.py` that write an unwrapped phase from real-valued inputs (3D, the
+  automatic and the asked-for 2D labels, `-s`, the ramps, series with `--start`, a mask series, a
+  one-voxel and an empty mask, `-n 0x3`, a NaN first phase voxel with a 0-to-2π phase and with a
+  12.6 rad range, a 70-voxel-wide image with and without `-f`): **22 of 22** identical in every
+  file (`-o`, `--savemask`, `-l`, `-r`) and every `-v` line; with `--fix` against the replica's
+  default (FSL-261's full domain, FSL-262's series): 22 of 22;
+- fMRIPrep 25.2.6's seven calls (§11): **7 of 7** bit-identical to fMRIPrep's own unwrapped phase
+  (ds005454: 14,678 regions).
+
+Not checked by the model (the replica's suite checks them against FSL): complex input (§3.2,
+§6.4), NaN values inside the mask (FSL-268, FSL-269), the readers of FSL-263 to FSL-265,
+FSL-271's reading.

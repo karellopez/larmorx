@@ -724,7 +724,7 @@ pub fn brikname(path: &str, settings: &Settings) -> String {
         .get("AFNI_NIFTI_PRIORITY")
         .and_then(|v| v.bytes().next())
     {
-        Some(c) if c.to_ascii_uppercase() == b'Q' => b'Q',
+        Some(c) if c.eq_ignore_ascii_case(&b'Q') => b'Q',
         _ => b'S',
     };
     let (q, s) = (h.qform_code, h.sform_code);

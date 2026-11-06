@@ -184,6 +184,35 @@ from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
 | `environ` | `src/afni_environ.c`, `src/Aomp.h` | the variables of 3dAutomask and 3dUnifize (`environ::AUTOMASK`, `UNIFIZE`; `AFNI_SETUP_OMP`'s `OMP_NUM_THREADS`) | MCW 1994-2000 |
 | `dataset` | `src/thd_niftiread.c` | `THD_load_nifti`'s brick factor of a loaded dataset (`read_loaded`) | NIH, public domain |
 
+### 3dvolreg (2026-11-06, AFNI 26.3.05; the same text in 25.2.09)
+
+| Rust module | AFNI file | Functions, macros | Copyright |
+|---|---|---|---|
+| `vecmat` | `src/vecmat.h` | `LOAD_ROT_DMAT` (`LOAD_ROTGEN_DMAT`), `DMAT_MUL`, `DMATVEC`, `DMATVEC_ADD`, `TRANSPOSE_DMAT`, `DMAT_INV`, `DMAT_DET`, `DMAT_TRACE`, `MUL_DVECMAT`, `SIZE_DFVEC3`, `SUB_DFVEC3`, `ADD_DFVEC3`, `MATVEC` (a double matrix on a float vector), `LOAD_DIAG_DMAT` | MCW 1994-2000 |
+| `vecmat` | `src/thd_shear3d.c` | `rot_to_matrix` (`sincos` for axis 2, `sin` and `cos` for axes 0 and 1, as AFNI's build calls them) | MCW 1994-2000 |
+| `vecmat` | `src/thd_read_vecmat.c` | `invert_dvecmat` | NIH, public domain |
+| `shear` | `src/thd_shear3d.c`, `src/thd_shear3d.h` | `MCW_3shear`, `norm_3shear`, `permute_3shear`, `permute_dmat33`, `permute_dfvec3`, `shear_xzyx` (Maple's closed form), `shear_arb`, `shear_best`, `rot_to_shear`, `rot_to_shear_matvec`, `DMAT_svd`, `DMAT_svdrot_newer` | MCW 1994-2000 |
+| `eispack` | `src/eispack/eis_svd.c`, `eis_pythag.c`, `src/f2c/d_sign.c` | EISPACK's `svd` (Garbow, Argonne, August 1983), `pythag`, f2c's `d_sign` and `abs`, `max`, `min` | EISPACK and f2c: "Free" (AFNI's `LICENSE.txt`, netlib) |
+| `eispack` | `src/cs_symeig.c` | `svd_double` for 3 × 3 (with `CHECK_SVD`'s test; the perturbed retry not ported) | MCW 1994-2000 |
+| `rot3d` | `src/thd_rot3d.c` | `THD_rota_method`, `flip_xy`, `flip_yz`, `flip_xz`, `apply_xshear`, `apply_yshear`, `apply_zshear`, `apply_3shear`, `THD_rota_setpad`, `THD_rota_vol`, `THD_rota3D`, `THD_rota_vol_matvec`, `THD_rota3D_matvec` | MCW 1994-2000 |
+| `rot3d` | `src/edt_volpad.c` | `EDIT_volpad` (`EDIT_volpad_even`, both signs) | NIH, public domain |
+| `blur` | `src/edt_blur.c` | `EDIT_blur_volume_3d` (float: FIR, FFT, clipping, the once-per-run message), `fir_blurx`, `fir_blury` (both paths), `fir_blurz`, `BMIRROR`, `RMIRROR`, `FIR_blur_volume`, `FIR_blur_volume_3d`, `fir_gaussian_load` | MCW 1994-2000 |
+| `lsqfit` | `src/mri_lsqfit.c` | `check_ref_vectors`, `startup_lsqfit`, `delayed_lsqfit`, `mri_startup_lsqfit`, `mri_delayed_lsqfit` | MCW 1994-2000 |
+| `align3d` | `src/mri_3dalign.c` | `mri_3dalign_params`, `_method`, `_initvals`, `_final_regmode`, `_edging`, `_force_edging`, `_wproccing`, `_wtrimming`, `_scaleinit`, `mri_3dalign_setup`, `mri_3dalign_one` | MCW 1994-2000 |
+| `align3d` | `src/thd_automask.c`, `src/mri_cut.c`, `src/mri_max.c` | `MRI_autobbox`; `mri_cut_3D`; `mri_max`, `mri_min` (float) | NIH (thd_automask.c), MCW (the others) |
+| `volreg` | `src/3dvolreg.c` | the work of `main` after the option scan, `voldif`, `get_best_shift`, `new_voldif`, `new_get_best_shift`, `new_get_best_shiftrot` | MCW 1994-2000 |
+| `volreg` | `src/thd_rotangles.c` | `THD_rotcom_to_matvec` (the `-rotate` part), `THD_rotangle_user_to_dset`, `mangle_angle`, `THD_axcode`, `THD_handedness`, `DBLE_mat_to_dicomm` | MCW 1994-2000 |
+| `volreg` | `src/thd_center.c`, `src/thd_coords.c`, `src/mri_allzero.c` | `THD_dataset_center`; `THD_3dind_to_3dmm_no_wod`, `THD_3dmm_to_dicomm`; `mri_nonzero_count` | NIH (thd_center.c, mri_allzero.c), MCW (thd_coords.c) |
+| `volreg` | `src/mri_to_short.c`, `src/mri_to_byte.c` | `mri_to_short` with scale 1 (`SHORTIZE`), `mri_to_byte` (AFNI-87) | MCW 1994-2000 |
+| `cli::volreg` | `src/3dvolreg.c` | `main`, `VL_command_line` (option scan, checks, messages, the parameter and matrix files, `-rotcom`) | MCW 1994-2000 |
+| `cli::volreg` | `src/thd_notes.c`, `src/thd_opendset.c`, `src/thd_mismatch.c` | `tross_commandline`; `modify_afni_prefix` (a suffix); `THD_dataset_mismatch` (dimensions, spacing, orientation) | MCW (thd_notes.c, thd_opendset.c), NIH (thd_mismatch.c) |
+| `environ` | `src/edt_blur.c`, `src/mri_3dalign.c`, `src/3dvolreg.c`, `src/thd_rot3d.c` | 3dvolreg's variables (`environ::VOLREG`) | MCW 1994-2000 |
+
+Not yet translated (relay 1, 2026-11-06): `thd_tshift.c` (`-tshift`), `VL_get_displacments`,
+`VL_normalize_timeseries`, `VL_create_disprod` (`-savedisp`, `-SAVEDISP`), the `-rotparent` and
+`-gridparent` paths (`THD_zeropad`, the VOLREG attributes of an AFNI extension), `-twodup` with an
+external base, sub-brick selectors, `addto_args` (`-@`), `svd_double`'s perturbed retry.
+
 Not translations (written for larmorx-gpl, relicensed to Apache-2.0 on 2026-10-29): `x87` (the
 arithmetic of x86-64's `long double`, for the formulas of `nifti2_io.c` that use it) and
 `cli::output` (writing the output through a temporary file and a rename; `cannot_open`,

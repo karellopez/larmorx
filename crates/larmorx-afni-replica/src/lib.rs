@@ -31,6 +31,11 @@
 //! - `3dUnifize` (white-matter uniformization): the local percentile mean, the scalings and the
 //!   T2 inversion ([`unifize`]), with fdlibm's `tanhf` as glibc runs it ([`fdlibm`]); the
 //!   command line is [`cli::unifize`].
+//! - `3dvolreg` (rigid-body registration of every sub-brick to a base): the program's work
+//!   ([`volreg`]) on AFNI's registration ([`align3d`]: iterated linearised weighted least
+//!   squares, [`lsqfit`]), its volume rotation by four shears ([`rot3d`], [`shear`],
+//!   [`vecmat`], with EISPACK's SVD, [`eispack`]) and its Gaussian blur ([`blur`]); the command
+//!   line is [`cli::volreg`].
 //! - AFNI's environment variables and global options (`-Dname=value`, `-overwrite`), as a
 //!   settings table that never changes the process environment ([`environ`]), and AFNI's
 //!   messages ([`message`]).

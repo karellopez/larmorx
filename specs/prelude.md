@@ -664,7 +664,7 @@ What must stay the same, and what is free:
 ## 11. Validation plan
 
 Against FSL 6.0.7.23 (`~/fsl-6.0.7.23/bin/prelude`), through `python -m larmorx_validation parity`:
-the replica's suite `fsl-prelude-replica` (`docs/validation/fsl-prelude-replica.md`, 86 cases on
+the replica's suite `fsl-prelude-replica` (`docs/validation/fsl-prelude-replica.md`, 88 cases on
 the standard tier) is the model; the original's suite runs the same cases with
 `implementation="original"` and the oracle cache's stored FSL runs (`use` mode).
 - **Cases** (the record's categories): fMRIPrep 25.2.6's seven calls (sdcflows' phase-difference

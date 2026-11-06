@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "1770116246bd",
+  "larmorx_commit": "f4882fef66d7",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -22,8 +22,8 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 6,
-  "saved_seconds": 42.7,
-  "served": 80
+  "saved_seconds": 42.8,
+  "served": 82
  },
  "reference": "prelude from FSL 6.0.7.23 (fsl-fugue 2603.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-utils 2412.6; the conda build at `~/fsl-6.0.7.23`, as built)",
  "results": [
@@ -41,7 +41,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.181,
+   "seconds": 0.254,
    "status": "pass"
   },
   {
@@ -58,7 +58,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.202,
+   "seconds": 0.289,
    "status": "pass"
   },
   {
@@ -75,7 +75,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.209,
+   "seconds": 0.231,
    "status": "pass"
   },
   {
@@ -92,7 +92,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.155,
+   "seconds": 0.237,
    "status": "pass"
   },
   {
@@ -109,7 +109,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.167,
+   "seconds": 0.228,
    "status": "pass"
   },
   {
@@ -126,7 +126,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 1.643,
+   "seconds": 1.604,
    "status": "pass"
   },
   {
@@ -143,7 +143,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the replica's (reported)": "yes"
    },
-   "seconds": 0.864,
+   "seconds": 0.824,
    "status": "pass"
   },
   {
@@ -159,7 +159,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.076,
+   "seconds": 0.125,
    "status": "pass"
   },
   {
@@ -175,7 +175,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -191,7 +191,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -207,7 +207,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.118,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -223,7 +223,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.074,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -239,7 +239,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.037,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -255,7 +255,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.03,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -271,7 +271,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -287,7 +287,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -303,7 +303,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.018,
    "status": "pass"
   },
   {
@@ -319,7 +319,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.07,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -335,7 +335,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -351,7 +351,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -367,7 +367,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -383,7 +383,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.017,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -415,7 +415,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.037,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -431,7 +431,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -447,7 +447,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.04,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -463,7 +463,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -479,7 +479,7 @@
    "reported": {
     "D13 fix pass": 103680
    },
-   "seconds": 0.1,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -495,7 +495,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.036,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -527,7 +527,7 @@
    "reported": {
     "D13 fix pass": 15750
    },
-   "seconds": 0.031,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -543,7 +543,7 @@
    "reported": {
     "D13 fix pass": 11860
    },
-   "seconds": 0.029,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -575,7 +575,7 @@
    "reported": {
     "D13 fix pass": 1125
    },
-   "seconds": 0.013,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -591,7 +591,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.012,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -607,7 +607,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -623,7 +623,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -639,7 +639,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -655,7 +655,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -685,7 +685,7 @@
     "D13 fix pass": 11860,
     "every file bit-identical": "1/2"
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -727,7 +727,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.023,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -760,6 +760,38 @@
     "D13 fix pass": 0
    },
    "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-first-twopi",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4170
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-first-range",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -807,7 +839,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -855,7 +887,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -887,7 +919,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -932,7 +964,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -948,7 +980,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -964,7 +996,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.12,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -980,7 +1012,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.229,
+   "seconds": 0.219,
    "status": "pass"
   },
   {
@@ -996,7 +1028,7 @@
    "reported": {
     "D13 fix pass": 8568
    },
-   "seconds": 0.393,
+   "seconds": 0.36,
    "status": "pass"
   },
   {
@@ -1035,7 +1067,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "prelude exits 1; the same from the replica. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
-   "seconds": 0.003,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -1048,7 +1080,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the replica. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1061,7 +1093,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "prelude exits 1; the same from the replica.  the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Cannot specify both --complex AND --phase or --abs.",
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1113,7 +1145,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the replica. s filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --bogus: Option doesn't exist!",
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1139,7 +1171,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the replica. filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message extra: is an unrecognised token!",
-   "seconds": 0.007,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1152,7 +1184,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "prelude exits -6; the same from the replica. ead volume nothere Error : No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume nothere Error : No image files match: nothere",
-   "seconds": 0.023,
+   "seconds": 0.026,
    "status": "both-error"
   },
   {
@@ -1165,7 +1197,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "prelude exits -6; the same from the replica. e Exception : #22 :: Failed to read volume Error : No image files match: terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume Error : No image files match:",
-   "seconds": 0.022,
+   "seconds": 0.019,
    "status": "both-error"
   },
   {
@@ -1217,7 +1249,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the replica. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.05,
+   "seconds": 0.046,
    "status": "both-error"
   },
   {
@@ -1230,7 +1262,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the replica. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.049,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1243,7 +1275,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the replica. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.043,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -1256,7 +1288,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "",
-   "seconds": 0.021,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1282,7 +1314,7 @@
     "every file bit-identical": "4/4"
    },
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -1295,7 +1327,7 @@
     "every file bit-identical": "5/5"
    },
    "reason": "",
-   "seconds": 0.037,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -1311,7 +1343,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -1327,7 +1359,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.047,
+   "seconds": 0.039,
    "status": "pass"
   }
  ],
@@ -1336,7 +1368,7 @@
   "both-error": 20,
   "expected-divergence": 0,
   "fail": 0,
-  "pass": 66,
+  "pass": 68,
   "skipped": 0
  },
  "tier": "standard"

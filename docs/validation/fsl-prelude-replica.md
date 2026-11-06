@@ -1,12 +1,12 @@
 # Parity: PRELUDE replica (bit-exact, FSL Licence)
 
-**All cases agree.** 86 cases on the `standard` tier: 66 pass, 20 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 88 cases on the `standard` tier: 68 pass, 20 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl prelude` (crate larmorx-nc-fugue, translated from FSL 6.0.7.23's source)
 - **Reference:** prelude from FSL 6.0.7.23 (fsl-fugue 2603.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-utils 2412.6; the conda build at `~/fsl-6.0.7.23`, as built)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-06 on Linux x86_64, with `python -m larmorx_validation parity fsl-prelude-replica --tier standard`
-- **Original programs:** 86 runs: 80 from the oracle cache, 6 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 88 runs: 82 from the oracle cache, 6 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -25,7 +25,7 @@
 | difftest | 2 | 2 | 0 | 0 | 0 |
 | err | 22 | 4 | 18 | 0 | 0 |
 | fmriprep | 7 | 7 | 0 | 0 | 0 |
-| opt | 44 | 44 | 0 | 0 | 0 |
+| opt | 46 | 46 | 0 | 0 | 0 |
 | out | 6 | 5 | 1 | 0 | 0 |
 | panel | 5 | 4 | 1 | 0 | 0 |
 
@@ -58,7 +58,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1770116246bd) |
+| larmorx | 0.0.1 (f4882fef66d7) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -120,6 +120,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `opt/nan-magnitude` | pass | 6/6 | NaN magnitudes (FSL-268) |
 | `opt/nan-first-magnitude` | pass | 6/6 | a NaN first magnitude voxel (FSL-268) |
 | `opt/nan-phase` | pass | 6/6 | NaN phases inside the mask (FSL-269) |
+| `opt/nan-first-twopi` | pass | 6/6 | a phase from 0 to 2pi whose first value is NaN: FSL does not rewrap it (FSL-272; the default rewraps it as without the … |
+| `opt/nan-first-range` | pass | 6/6 | a phase of range 4pi whose first value is NaN: FSL does not refuse it (FSL-272; the default stops with FSL's range erro… |
 | `opt/nan-phase-first` | pass | 6/6 | NaN phases at the mask's first voxels (FSL-269) |
 | `opt/nan-phase-region` | pass | 6/6 | a NaN phase inside a region of the first phase bin (FSL-269) |
 | `opt/nan-phase-slices` | pass | 6/6 | NaN phases with -s (FSL-269) |

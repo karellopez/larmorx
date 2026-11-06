@@ -148,8 +148,9 @@ nothing.
   estimators) and ds001600-sub-1 (three)) are bit-identical to FSL 6.0.7.23 and to fMRIPrep's own
   outputs (its container's FSL). The D13 pass: each defect named exactly where the default's
   outputs differ. **The record** `fsl-prelude-replica` (docs/validation/fsl-prelude-replica.md,
-  from the clean commit 1770116, 2026-11-06): 86 cases, 66 bit-identical, 20 rejected by both
-  alike, 0 expected divergences, 0 failures; besides relay 1's cases, the data panel's two
+  re-made from the clean commit f4882fe, 2026-11-06, after FSL-272): 88 cases, 68 bit-identical,
+  20 rejected by both alike, 0 expected divergences, 0 failures (from 1770116: 86, 66, 20; the two
+  new cases FSL-272's); besides relay 1's cases, the data panel's two
   phase-difference maps no fMRIPrep run unwrapped (ds000256's child, ds004958's GRE map; sdcflows'
   `au2rads` input, prelude's own mask, `-s` and the ramps with every output; the scanner's raw
   units: FSL's range error) and the two permanent cases of random testing.

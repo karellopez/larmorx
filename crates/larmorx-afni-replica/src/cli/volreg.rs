@@ -912,7 +912,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     }
     let cmdline = commandline(&pre.args, settings);
     if o.verbose > 0 {
-        io.raw(format!("++ Reading input dataset {}\n", afni_output_name(&o.dataset)));
+        io.raw(format!("++ Reading input dataset {}\n", o.dataset));
     }
 
     if let Some(b) = &bset {

@@ -10,8 +10,16 @@ programs, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) and
 | File | What it shows | How to run |
 |---|---|---|
 | `probe.py` | for fslmaths, fslroi, bet2, fast, flirt, mcflirt, prelude, topup and applytopup, each of the eight pair types of `FSLOUTPUTTYPE` (`NIFTI_PAIR`, `NIFTI2_PAIR`, each also `_GZ`, `_ZST`, `_BZ2`), optionally two single-file types, and with `FSL_LOAD_NIFTI_EXTENSIONS=1` inputs carrying one extension (fslmaths, bet2, fast, prelude) or two of different sizes (fslmaths): the length of every header file FSL writes (decompressed), the four bytes after its header block, and every file the original writes compared with FSL's, decompressed, byte for byte (`descrip` apart, which the suites compare separately; data files and other files reported too) | `boxed.sh 8 python -P probe.py <work dir> --larmorx <larmorx program> [--only fslmaths,prelude] [--singles] [--mode fix\|reproduce] [--json out.json]` (the workspace's `.venv`, `PYTHONPATH=<checkout>/validation/src`) |
+| `time_step.py` | the time step (`pixdim[4]`) FSL writes for inputs whose time step is 0 or negative, against the originals: fslmaths (`-mul`, `-Tmean`), fslroi (a series, one volume) and prelude (a series, one volume, a 3D phase) | `boxed.sh 4 python -P time_step.py <work dir> <larmorx program>` |
 
-What it showed (2026-11-06, 106 runs; inputs generated in `<workspace>/oracles/inputs/fsl-pair-header/`):
+What `time_step.py` showed (2026-11-06, 14 runs): FSL reads a time step as its magnitude, and as
+1 for an image with a time axis (`dim[0]` 4 or more) whose time step is 0; its outputs keep that
+(`specs/flirt.md` §4.1 states the same reading). prelude's original follows it since this relay
+(found by its random-testing trial); **fslmaths' and fslroi's originals keep the stored value**
+(8 of the 14 runs differ: a series of 0 written 0 where FSL writes 1, of -2 written -2 where FSL
+writes 2): open, for a shared fix in the FSL readers.
+
+What `probe.py` showed (2026-11-06, 106 runs; inputs generated in `<workspace>/oracles/inputs/fsl-pair-header/`):
 
 - **FSL writes a pair's header file as the header block followed by NIfTI's four extension
   bytes, for every pair type and every program probed**: 352 bytes for NIfTI-1, 544 for NIfTI-2,

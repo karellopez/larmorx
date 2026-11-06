@@ -1,0 +1,292 @@
+{
+ "defect": null,
+ "description": "random testing: every file bit-identical",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.nii.gz: header differs",
+  "n": 0,
+  "seed": "prelude-trial",
+  "shrink_moves": [
+   "dropped labels (-l labels)",
+   "dropped -v (-v)",
+   "dropped -n (-n 2)",
+   "dropped -t (--thresh=600)",
+   "phase: axis 0 32 -> 16 voxels",
+   "phase: axis 1 32 -> 16 voxels",
+   "phase: axis 2 32 -> 16 voxels",
+   "phase: axis 0 16 -> 8 voxels",
+   "phase: axis 1 16 -> 8 voxels",
+   "phase: axis 2 16 -> 8 voxels",
+   "phase: axis 0 8 -> 4 voxels",
+   "phase: axis 1 8 -> 4 voxels",
+   "phase: axis 2 8 -> 4 voxels",
+   "phase: axis 0 4 -> 2 voxels",
+   "phase: axis 1 4 -> 2 voxels",
+   "phase: axis 2 4 -> 2 voxels",
+   "phase: axis 0 2 -> 1 voxels",
+   "phase: axis 1 2 -> 1 voxels",
+   "phase: axis 2 2 -> 1 voxels",
+   "phase (and its grid): plumb orientation",
+   "phase (and its grid): unit spacing",
+   "phase (and its grid): origin at 0",
+   "phase (and its grid): qform and sform codes 1",
+   "magnitude: plain value range",
+   "magnitude: content head -> constant"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "time-step-zero-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "nan": false,
+   "output_type": "NIFTI_GZ",
+   "tool": "prelude",
+   "volumes": 2
+  },
+  "features": {
+   "--end": false,
+   "--labelslices": false,
+   "--removeramps": false,
+   "--start": false,
+   "-a long": true,
+   "-f": false,
+   "-l long": false,
+   "-m": false,
+   "-n": true,
+   "-n long": false,
+   "-p long": false,
+   "-s": false,
+   "-t": true,
+   "-t long": true,
+   "-v": true,
+   "-v long": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "NaN magnitudes": false,
+   "NaN phases": false,
+   "background": "smooth",
+   "bias0": 0.005,
+   "bias1": -0.005,
+   "bias2": -0.01,
+   "bias3": 0.01,
+   "bump": false,
+   "drift": 0.0,
+   "extension": ".nii.gz",
+   "extreme": false,
+   "field of view": 64.0,
+   "head axis0": 0.85,
+   "head axis1": 0.95,
+   "head axis2": 0.95,
+   "head centre0": -0.08,
+   "head centre1": 0.08,
+   "head fraction": 0.36,
+   "isotropic": true,
+   "kind": "phase and magnitude",
+   "labels": true,
+   "linear0": 4.0,
+   "linear1": 0.0,
+   "linear2": 0.0,
+   "magnitude big-endian": false,
+   "magnitude dtype": "float32",
+   "magnitude noise": 6.0,
+   "magnitude scale": 10.0,
+   "magnitude suffix": ".nii",
+   "n": "2",
+   "orientation": "axes",
+   "origin0": 51.25,
+   "origin1": 33.5,
+   "origin2": 13.0,
+   "other size": false,
+   "output extension": true,
+   "output name": "out",
+   "output option": "--unwrap",
+   "phase big-endian": true,
+   "phase field": "cycles",
+   "phase noise": 0.0,
+   "phase offset": 1.25,
+   "phase storage": "float32",
+   "phase suffix": ".nii.gz",
+   "qfac": 1,
+   "qform_code": 3,
+   "quadratic0": -1.5,
+   "quadratic1": 2.625,
+   "quadratic2": -0.75,
+   "quadratic3": 3.0,
+   "quadratic4": 1.125,
+   "quadratic5": -0.375,
+   "rawphase": false,
+   "savemask": false,
+   "series": true,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "32x32x32",
+   "slices": "all",
+   "spacing0": 1.5,
+   "spacing1": 3.0,
+   "spacing2": 3.0,
+   "threshold fraction": 0.6,
+   "tissues": "t2",
+   "units": "mm",
+   "volumes": 2,
+   "wrap": "pi"
+  },
+  "groups": [
+   {
+    "args": [
+     "-p",
+     "{in:phase}",
+     "--abs={in:magnitude}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "--unwrap=out.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "magnitude": {
+    "content": {
+     "seed": 569635391,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "phase": {
+    "content": {
+     "axes": [
+      0.85,
+      0.95,
+      0.95
+     ],
+     "centre": [
+      -4.0,
+      4.0,
+      0.0
+     ],
+     "drift": 0.0,
+     "noise": 0.0,
+     "outside": "smooth",
+     "poly": [
+      1.25,
+      4.0,
+      0.0,
+      0.0,
+      -1.5,
+      2.625,
+      -0.75,
+      3.0,
+      1.125,
+      -0.375
+     ],
+     "seed": 1910683674,
+     "size": 17.5,
+     "type": "phase",
+     "wrap": "pi"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "header": {
+     "big_endian": true
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 0,
+  "options": [
+   "-n",
+   "-t",
+   "-v",
+   "2 volumes",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "labels",
+   "phase and magnitude",
+   "phase pi float32"
+  ],
+  "seed": "prelude-trial",
+  "tool": "fsl-prelude-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-prelude",
+ "tier": "smoke",
+ "tool": "fsl-prelude-original"
+}

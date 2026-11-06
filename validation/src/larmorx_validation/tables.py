@@ -228,6 +228,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "fsl-stats": _maths_original,
     # PRELUDE's replica (2026-11-06): fMRIPrep's calls counted as BET's
     "fsl-prelude-replica": _bet,
+    # PRELUDE's clean-room original (2026-11-06): fMRIPrep's calls counted as BET's
+    "fsl-prelude": _bet,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
     # standard records.
     "ants-apply-transforms-panel": _bit_identical(),

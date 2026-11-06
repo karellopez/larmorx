@@ -1092,9 +1092,9 @@ def image_math_operations() -> list[str]:
 #: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
 #: functions below). ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` had only their
 #: replicas from 2026-11-04 to 2026-11-05, when their clean-room originals came (their cases
-#: below). Since 2026-11-06 ``lx.fsl.prelude`` runs a tool with only its replica (FSL's
-#: prelude).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.fsl.prelude": "fsl prelude"}
+#: below). ``lx.fsl.prelude`` ran a tool with only its replica (FSL's prelude) from 2026-11-06
+#: until its clean-room original came the same day (its cases below).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -5592,4 +5592,110 @@ def _(ctx: Context) -> dict[str, Any]:
         "max_at": _orig(f.extremum_position, anat()),
         "bounding": _orig(f.bounding_roi, mask()),
         "histogram": _orig(f.image_histogram, anat(), 10, limits=(0, 500)),
+    }
+
+
+# --- PRELUDE (FSL's phase unwrapping, the clean-room original) -------------------------------
+
+
+def _prelude_phase(shape: tuple[int, ...], seed: int, scale: float = 1.0) -> np.ndarray:
+    """A wrapped phase (radians, float32): a quadratic with a ramp and seeded noise, wrapped by
+    numpy's remainder (plain arithmetic)."""
+    i, j, k = np.meshgrid(*(np.arange(n, dtype=np.float64) for n in shape[:3]), indexing="ij")
+    c = [(n - 1) / 2 for n in shape[:3]]
+    q = scale * (0.06 * (i - c[0]) ** 2 + 0.04 * (j - c[1]) ** 2 + 0.5 * i - 0.3 * k)
+    q = q + (ints(seed, shape[:3], 0, 41) - 20) / 200.0
+    return np.asfortranarray(np.remainder(q + np.pi, 2 * np.pi) - np.pi).astype(np.float32)
+
+
+def _prelude_inputs(ctx: Context) -> dict[str, str]:
+    """PRELUDE's golden inputs in the case's directory: a phase and magnitude on SHAPE3, a
+    two-volume series with a mask series, a wide image (automatic 2D labels), a phase whose
+    range is above 3 pi."""
+    aff = affine(SHAPE3, (2.0, 2.0, 2.5), (0.5, -1.0, 0.25))
+    mag = (phantom(SHAPE3, 21) * 10 + 5).astype(np.float32)
+    head = ellipsoid(SHAPE3, 9, 10) > 0
+    files = {
+        "ph": _prelude_phase(SHAPE3, 22),
+        "mag": mag,
+        "ph2": np.stack([_prelude_phase(SHAPE3, 23), _prelude_phase(SHAPE3, 24, 1.3)], -1),
+        "mag2": np.stack([mag, mag], -1),
+        "mask2": np.stack([head, head & (np.arange(SHAPE3[2]) < 10)], -1).astype(np.float32),
+        "big": _prelude_phase(SHAPE3, 26) * np.float32(2),
+    }
+    wide = (66, 4, 2)
+    files["phwide"] = _prelude_phase(wide, 25)
+    files["magwide"] = np.full(wide, 100, np.float32)
+    out = {}
+    for name, data in files.items():
+        a = affine(data.shape[:3], (2.0, 2.0, 2.5)) if name.endswith("wide") else aff
+        path = os.path.join(ctx.dir, f"{name}.nii")
+        lx.save((np.asfortranarray(data), a), path)
+        out[name] = path
+    return out
+
+
+@case("cli.fsl.prelude", covers=("cli:fsl prelude",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl prelude`` (the clean-room original, ``specs/prelude.md``): 3D with every
+    output and ``-v``; the slices mode with the ramps; the 2D labels asked for with three
+    intervals and a threshold; an image wider than 64 voxels (automatic 2D labels); a series
+    with a mask series from the second volume; the range error (exit 255) and the usage."""
+    f = _prelude_inputs(ctx)
+    d = ctx.out
+    v1 = _fsl(ctx, "prelude", "-p", f["ph"], "-a", f["mag"], "-o", d("o"), "-v",
+              f"--savemask={d('m')}", "-l", d("l"), "-r", d("r"))  # fmt: skip
+    v2 = _fsl(ctx, "prelude", "-p", f["ph"], "-a", f["mag"], "-o", d("s"), "-s", "--removeramps",
+              "-v", "-l", d("sl"), "-r", d("sr"))  # fmt: skip
+    _fsl(ctx, "prelude", "-p", f["ph"], "-a", f["mag"], "-o", d("ls"), "--labelslices", "-n", "3",
+         "-t", "200")  # fmt: skip
+    _fsl(ctx, "prelude", "-p", f["phwide"], "-a", f["magwide"], "-o", d("w"), "-l", d("wl"))
+    _fsl(ctx, "prelude", "-p", f["ph2"], "-a", f["mag2"], "-m", f["mask2"], "-o", d("ser"),
+         "--start=1", f"--savemask={d('serm')}")  # fmt: skip
+    names = ("o", "m", "l", "r", "s", "sl", "sr", "ls", "w", "wl", "ser", "serm")
+    return {
+        **{k: Nifti(f"{d(k)}.nii.gz") for k in names},
+        "verbose": v1.replace(os.fspath(ctx.dir), "<dir>"),
+        "verbose_slices": v2.replace(os.fspath(ctx.dir), "<dir>"),
+        **_status_outputs(
+            "range", _fsl_status(ctx, "prelude", "-p", f["big"], "-a", f["mag"], "-o", d("x"))
+        ),
+        **_status_outputs("usage", _fsl_status(ctx, "prelude", "-p", f["ph"])),
+    }
+
+
+@case("cli.fsl.prelude.reproduce", covers=())
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl prelude`` with ``reproduce`` (D13): FSL-261's ramp domain in the slices
+    mode, FSL-262's last-volume mask and labels of a two-volume series."""
+    f = _prelude_inputs(ctx)
+    d = ctx.out
+    _fsl(ctx, "prelude", "-p", f["ph"], "-a", f["mag"], "-o", d("s"), "-s", "--removeramps",
+         "-r", d("sr"), upstream_defects="reproduce")  # fmt: skip
+    _fsl(ctx, "prelude", "-p", f["ph2"], "-a", f["mag2"], "-o", d("ser"), f"--savemask={d('m')}",
+         "-l", d("l"), upstream_defects="reproduce")  # fmt: skip
+    return {k: Nifti(f"{d(k)}.nii.gz") for k in ("s", "sr", "ser", "m", "l")}
+
+
+@case("py.fsl.prelude", covers=("lx.fsl.prelude",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.prelude`` with the clean-room original: a phase and magnitude with every output,
+    and an in-memory complex image (complex64: the phase by the correctly rounded arctangent,
+    the same on every platform)."""
+    f = _prelude_inputs(ctx)
+    r = lx.fsl.prelude(f["ph"], f["mag"], save_mask=True, save_labels=True, save_raw_phase=True,
+                       verbose=True, implementation="original")  # fmt: skip
+    i, j, k = np.meshgrid(*(np.arange(n, dtype=np.float32) for n in SHAPE3), indexing="ij")
+    head = (ellipsoid(SHAPE3, 9, 10) > 0).astype(np.float32)
+    z = ((i - 11.5) * head + 0.25 + 1j * ((j - 9.5) * head - 0.5 * k)).astype(np.complex64)
+    c = lx.fsl.prelude(complex_image=(np.asfortranarray(z), np.eye(4)), save_labels=True,
+                       implementation="original")  # fmt: skip
+    return {
+        "unwrapped": r.unwrapped.data,
+        "mask": r.mask.data,
+        "labels": r.labels.data,
+        "raw_phase": r.raw_phase.data,
+        "stdout": r.stdout,
+        "complex_unwrapped": c.unwrapped.data,
+        "complex_labels": c.labels.data,
     }

@@ -840,7 +840,18 @@ def _example_fsl272(ctx: core.Context) -> dict:
     }  # fmt: skip
 
 
-def _example_ramps(ctx: core.Context) -> dict:
+def _fix_counts(rec, prefix: str) -> list[tuple[str, int]]:
+    """The record's cases whose id starts with ``prefix``: (case, values its default mode
+    changes, the record's D13 fix pass)."""
+    out = []
+    for r in rec.results:
+        if r["case"].startswith(prefix):
+            n = r.get("reported", {}).get("D13 fix pass")
+            out.append((r["case"], int(n) if isinstance(n, int) else 0))
+    return out
+
+
+def _example_ramps(ctx: core.Context, rec) -> dict:
     import nibabel as nib
 
     from larmorx_validation.evidence import example as exm
@@ -886,10 +897,17 @@ def _example_ramps(ctx: core.Context) -> dict:
     other = int(np.count_nonzero(dv[:, :, : nz - 1][m[:, :, : nz - 1]]))
     for x in diffs:
         if x["id"] == "fix-replica" and x.get("verdict") == "d13":
+            mt = x["metrics"]["unwrapped"]
+            synth = ", ".join(f"`{c}` {n:,}" for c, n in _fix_counts(rec, "opt/removeramps") if n)
             x["reason"] += (
                 f" Here the brain mask holds {int(m[:, :, nz - 1].sum()):,} voxels of the last "
                 f"slice: {last:,} of them change, and {other:,} voxels of the other slices (the "
-                "ramps estimated over every slice)."
+                f"ramps estimated over every slice), by at most {mt['max_abs']:.2g} rad (RMS "
+                f"{mt['rms']:.2g}): the same whole cycles everywhere, only the last bits of the "
+                "ramps' removal and restoration move. Not important on this map; the correction "
+                "matters where the last column, row or slice holds more of the image, or where "
+                "the image has one slice (FSL then removes no ramp at all): the values the "
+                f"record's synthetic cases change, {synth}."
             )
     at, _k = common.largest_in_slice(ex, "replica-fix", "replica", "unwrapped", "coronal")
     default = {
@@ -952,18 +970,21 @@ def _example_truth(ctx: core.Context) -> dict:
     mag_name = args[args.index("-a") + 1]
     pimg = nib.load(str(base / ph_name))
     shape = tuple(pimg.shape[:3])
-    truth = P._true_phase(shape, 1).astype(np.float32)
     name = _out_name(args, e.dir / "fsl")
     arrays = {lab: {"unwrapped": _unwrapped(e.dir / lab, name)}
               for lab in ("fsl", "replica", "replica-fix")}  # fmt: skip
+    # prelude writes 0 outside its mask: the truth is shown and compared inside it
+    inside = arrays["fsl"]["unwrapped"] != 0
+    truth = np.where(inside, P._true_phase(shape, 1), 0.0).astype(np.float32)
     wrapped = common.load(str(base / ph_name))
     mag = common.load(str(base / mag_name))
     show = common.unmasked(wrapped, mag, truth, *(a["unwrapped"] for a in arrays.values()))
     grid = core.Grid.around(pimg, show)
     ex = exm.Example(ctx, grid, show)
-    ex.add(exm.Panel("truth", "input", "the true phase (rad)",
+    ex.add(exm.Panel("truth", "input", "the true phase (rad), inside prelude's mask",
                      "the suite's smooth phase: a ramp and a bowl spanning several cycles, with "
-                     "noise (float64, shown in float32)", {"all": truth}))  # fmt: skip
+                     "noise (float64, shown in float32); 0 outside the mask, as prelude writes",
+                     {"all": truth}))  # fmt: skip
     ex.add(exm.Panel("phase", "input", "the wrapped phase (rad)",
                      "the true phase wrapped into [−π, π) (float32): prelude's -p",
                      {"all": wrapped}))  # fmt: skip
@@ -998,16 +1019,18 @@ def _example_truth(ctx: core.Context) -> dict:
     for x in diffs:
         if x["id"] == "fsl-truth":
             x["verdict"] = None
+            plus = (
+                f"plus {int(vals[0])} × 2π in every one of them" if len(vals) == 1
+                else "plus " + ", ".join(f"{int(a):+d} × 2π in {int(b):,} voxels"
+                                         for a, b in zip(vals, counts, strict=True))
+            )  # fmt: skip
             x["reason"] = (
                 "What unwrapping recovers (no verdict: the truth is not a program's output): "
                 f"inside prelude's mask ({int(m.sum()):,} voxels) FSL's unwrapped phase is the "
-                "true phase plus "
-                + ", ".join(f"{int(a):+d} × 2π in {int(b):,} voxels" for a, b in zip(vals, counts,
-                                                                                    strict=True))
-                + f", to {float(resid.max()):.2g} rad (the wrapped phase's float32 rounding): one "
-                "constant whole number of cycles, which no unwrapping can know; outside the mask "
-                "prelude writes 0."
-            )  # fmt: skip
+                f"true phase {plus}, to {float(resid.max()):.2g} rad (the wrapped phase's float32 "
+                "rounding): every wrap undone. The one constant whole number of cycles that no "
+                "unwrapping can know is set by the reference region prelude starts from."
+            )
     at, _k = common.largest_in_slice(ex, "fsl", "phase", "unwrapped", "axial")
     default = {
         "output": "unwrapped",
@@ -1321,7 +1344,7 @@ def export(ctx: core.Context) -> dict:
     calls = _calls_table(exs)
     for ex in exs:
         ex.pop("cycles", None)
-    exs += [_example_fsl272(ctx), _example_ramps(ctx), _example_truth(ctx)]
+    exs += [_example_fsl272(ctx), _example_ramps(ctx, rec), _example_truth(ctx)]
     entries = [fmriprep_entry(ctx, run, est) for _i, run, est, _w in FMRIPREP]
     entries += [fsl272_entry(ctx), ramps_entry(ctx), truth_entry(ctx), ne]
     tt, tprov = trial(ctx)

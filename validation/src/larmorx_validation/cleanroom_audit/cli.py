@@ -78,6 +78,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     from larmorx_validation.cleanroom_audit import verdicts
 
     verdicts.add_arguments(sub)
+    from larmorx_validation.cleanroom_audit import similarity
+
+    similarity.add_arguments(sub)
 
 
 def main(args: argparse.Namespace) -> int:
@@ -87,6 +90,10 @@ def main(args: argparse.Namespace) -> int:
         from larmorx_validation.cleanroom_audit import verdicts
 
         return verdicts.main(args)
+    if args.audit_command == "similarity":
+        from larmorx_validation.cleanroom_audit import similarity
+
+        return similarity.main(args)
     return 2
 
 

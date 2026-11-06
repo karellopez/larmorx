@@ -10,7 +10,10 @@ source code"; code similarity is extra evidence only).
   ``cd``, loops, command substitutions);
 - :mod:`.accesses`: what one tool call read, listed, searched, ran, wrote or committed;
 - :mod:`.transcripts`: the transcripts found and read as a stream, every call with its result;
-- :mod:`.cli`: ``python -m larmorx_validation cleanroom-audit scan --out <private dir>``.
+- :mod:`.verdicts`: who touched each clean-room original, in which role, after seeing what;
+- :mod:`.similarity`: code similarity against the upstream source and the replicas, with its
+  calibration (figures only, no threshold);
+- :mod:`.cli`: ``python -m larmorx_validation cleanroom-audit scan|verdicts|similarity``.
 
 The outputs hold absolute paths and the account name: they stay in ``<workspace>/archive/`` (or a
 scratch directory), never in the repository.

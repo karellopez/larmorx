@@ -328,29 +328,40 @@ fn find(adj: &mut [Vec<u32>], slots: &[Slot], r: u32, t: u32) -> Option<u32> {
 /// the `<count> constraints left` lines and `Did while loop` (with `verbose`).
 pub fn merge(n_regions: u32, sums: PairMap<Sum>, verbose: bool, lines: &mut Vec<String>) -> Merged {
     let l = n_regions as usize;
-    let mut adj: Vec<Vec<u32>> = vec![Vec::new(); l + 1];
-    // the totals of §4.8 (exact integers)
+    // the totals of §4.8 (exact integers) and each region's number of constraints
     let mut total: Vec<u64> = vec![0; l + 1];
+    let mut degree: Vec<u32> = vec![0; l + 1];
+    // the slots first and the sums' map freed before the heap and the lists are built, the
+    // lists at their exact sizes (the memory of FSL's call, §10)
     let mut slots: Vec<Slot> = Vec::with_capacity(sums.len());
-    let mut elems: Vec<Elem> = Vec::with_capacity(sums.len());
-    let mut nan_seen = false;
     for (&k, s) in &sums {
         let (a, b) = pair(k);
         let n = count_f32(s.count);
         total[a as usize] += n as u64;
         total[b as usize] += n as u64;
-        let id = slots.len() as u32;
+        degree[a as usize] += 1;
+        degree[b as usize] += 1;
         slots.push(Slot { a, b, p: s.p, n });
-        let (_, c) = merit(s.p, n);
+    }
+    drop(sums);
+    let mut adj: Vec<Vec<u32>> = degree
+        .iter()
+        .map(|&d| Vec::with_capacity(d as usize))
+        .collect();
+    drop(degree);
+    let mut elems: Vec<Elem> = Vec::with_capacity(slots.len());
+    let mut nan_seen = false;
+    for (id, s) in slots.iter().enumerate() {
+        let id = id as u32;
+        let (_, c) = merit(s.p, s.n);
         if c.is_nan() {
             nan_seen = true;
         } else {
-            elems.push(Elem::of(c, a, b, id));
+            elems.push(Elem::of(c, s.a, s.b, id));
         }
-        adj[a as usize].push(id);
-        adj[b as usize].push(id);
+        adj[s.a as usize].push(id);
+        adj[s.b as usize].push(id);
     }
-    drop(sums);
     let mut heap = Heap::new(elems, slots.len());
     let mut rule: Option<NanRule> = None;
     let start_rule = |slots: &[Slot]| {

@@ -519,7 +519,14 @@ pub fn process(
         p.mode == Mode::Slices,
         p.rules.nan_source,
     )?;
-    let mut mask = mask_on_grid(&src_mask, src_shape, shape);
+    // on the phase's own grid the source's mask is used as it is (no copy, §10); on another
+    // grid (FSL-271 with `reproduce`) it is read at the phase's voxels and kept for `--savemask`
+    let same_grid = src_shape == shape;
+    let (mut mask, src_mask) = if same_grid {
+        (src_mask, None)
+    } else {
+        (mask_on_grid(&src_mask, src_shape, shape), Some(src_mask))
+    };
     let nan_in_mask = mask
         .par_iter()
         .zip(phase.par_iter())
@@ -533,11 +540,6 @@ pub fn process(
             }
         }
     }
-    let saved_mask = if src_shape == shape {
-        mask.clone()
-    } else {
-        src_mask
-    };
     let mask_on_edge = (0..nvox).into_par_iter().any(|i| {
         mask[i] != 0 && {
             let (x, y, z) = (i % nx, (i / nx) % ny, i / plane);
@@ -582,13 +584,16 @@ pub fn process(
     let mut parent = vec![NONE; nvox];
     let maxima = number_regions(&mut labels, shape, p.mode, &mut parent);
     drop(parent);
-    // §4.7 to §4.9
-    let mut unwrapped = vec![0f32; nvox];
+    // §4.7 to §4.9 (the unwrapped phase allocated once the constraints are merged, each slice's
+    // written in place: the memory of FSL's call, §10)
+    let mut unwrapped;
     let mut merge_lines = Vec::new();
     if p.mode == Mode::Slices {
-        let per: Vec<(Vec<String>, Vec<f32>)> = (0..nz)
-            .into_par_iter()
-            .map(|z| {
+        unwrapped = vec![0f32; nvox];
+        let per: Vec<Vec<String>> = unwrapped
+            .par_chunks_mut(plane.max(1))
+            .enumerate()
+            .map(|(z, u)| {
                 let mut lines = Vec::new();
                 let l = maxima[z];
                 if p.verbose {
@@ -600,15 +605,13 @@ pub fn process(
                     lines.push("Finished connection_matrices".to_owned());
                 }
                 let m = merge::merge(l as u32, sums, p.verbose, &mut lines);
-                let mut u = vec![0f32; plane];
                 let r = z * plane..(z + 1) * plane;
-                unwrap_values(&mut u, &labels[r.clone()], &phase[r], &m.offsets);
-                (lines, u)
+                unwrap_values(u, &labels[r.clone()], &phase[r], &m.offsets);
+                lines
             })
             .collect();
-        for (z, (lines, u)) in per.into_iter().enumerate() {
+        for lines in per {
             merge_lines.extend(lines);
-            unwrapped[z * plane..(z + 1) * plane].copy_from_slice(&u);
         }
         join_slices(&mut unwrapped, &labels, shape)?;
     } else {
@@ -621,6 +624,7 @@ pub fn process(
             merge_lines.push("Finished connection_matrices".to_owned());
         }
         let m = merge::merge(l as u32, sums, p.verbose, &mut merge_lines);
+        unwrapped = vec![0f32; nvox];
         unwrap_values(&mut unwrapped, &labels, &phase, &m.offsets);
     }
     // FSL-269's correction: the unwrapped phase NaN where the phase is
@@ -634,7 +638,9 @@ pub fn process(
         over_domain(&mut phase, &mask, shape, &r, add);
     }
     Ok(VolumeResult {
-        mask: saved_mask,
+        // `--savemask`'s mask: the phase's own once its NaN phases are out (FSL-269), or the
+        // source's on its grid
+        mask: src_mask.unwrap_or(mask),
         mask_shape: src_shape,
         ramp_lines,
         ramp_free,

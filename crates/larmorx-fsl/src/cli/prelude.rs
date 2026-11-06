@@ -1194,12 +1194,23 @@ fn compute(
     v: usize,
 ) -> Result<(VolumeResult, Vec<Notice>), Undefined> {
     let mut notices = Vec::new();
+    // the phase is kept for the other rule's result only where one can be needed (a NaN phase,
+    // FSL-269; the ramps, FSL-261), else moved into the computation (no copy: §10)
+    let may_differ = p.ramps || phase.par_iter().any(|x| x.is_nan());
+    let (input, kept) = if may_differ {
+        (phase.clone(), Some(phase))
+    } else {
+        (phase, None)
+    };
     let alternative = |rules: Rules| {
         let q = Params {
             rules,
             keep_ramp_free: false,
             ..*p
         };
+        let phase = kept
+            .as_ref()
+            .expect("the phase is kept where another rule's result is computed");
         volume::process(phase.clone(), shape, src, src_shape, &q)
     };
     // FSL-268: NaN values in the mask's source
@@ -1224,7 +1235,7 @@ fn compute(
             notices.push(Notice::new(&defects::FSL_268, mode, detail));
         }
     }
-    let result = volume::process(phase.clone(), shape, src, src_shape, p)?;
+    let result = volume::process(input, shape, src, src_shape, p)?;
     // FSL-269: NaN phases inside the mask
     if result.nan_in_mask {
         let other = alternative(Rules {

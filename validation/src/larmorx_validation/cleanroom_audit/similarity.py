@@ -1445,9 +1445,46 @@ EXPLAINED = (
         " translates AFNI's copy of the same function",
     ),
     (
+        "crates/larmorx-afni/src/automask/program.rs",
+        "the NIfTI reference library's closest-orientation method (public domain,"
+        " `nifti_mat44_to_orientation`), which `specs/3dAutomask.md` states step by step (unit"
+        " columns, the cross product); the replica translates AFNI's copy of it",
+    ),
+    (
+        "crates/larmorx-afni/src/cli/tshift.rs",
+        "the option matching `specs/3dTshift.md`'s option table states (both spellings, the first"
+        " 4 or 7 characters); the clean-room code is the older (2026-10-09), the replica"
+        " (2026-10-10) has its form",
+    ),
+    (
+        "crates/larmorx-afni/src/unifize/duplo.rs",
+        "the 7-value sorting network `specs/3dUnifize.md` gives, its 14 pairs in order",
+    ),
+    (
         "crates/larmorx-fsl/src/bet/quatern.rs",
         "NIfTI-1's matrix-to-quaternion method, public domain, as above; FSL's NewNifti and the"
         " replica carry the same function",
+    ),
+    (
+        "crates/larmorx-fsl/src/flirt/schedule.rs",
+        "the heap step of the introsort libstdc++'s `std::sort` documents (the SGI STL"
+        " algorithm), which `specs/flirt.md` requires for the order of equal costs; written after"
+        " the replica's translation, with no access to it recorded (the verdicts): one published"
+        " algorithm in the same terms",
+    ),
+    (
+        "crates/larmorx-fsl/src/cli/options.rs",
+        "C's `strtod` grammar for `inf` and `nan(n-char-sequence)` (the C standard); written after"
+        " the replica's, with no access to it recorded (the verdicts)",
+    ),
+    (
+        "crates/larmorx-mri/src/cli/hmc.rs",
+        "larmorx's own defect notices and option matching; the clean-room code is the older"
+        " (2026-10-10), the replica (2026-10-24) has its form",
+    ),
+    (
+        "crates/larmorx-fsl/src/cli/ssroi.rs",
+        "bash's word splitting, in Rust's usual four lines",
     ),
     (
         "crates/larmorx-core/src/math/tanh_glibc.rs",
@@ -1456,8 +1493,8 @@ EXPLAINED = (
     ),
     (
         "crates/larmorx-core/src/math/sincos_glibc.rs",
-        "it and the spec writer's model both carry out `specs/glibc-dbl.md`'s operations step by"
-        " step",
+        "`specs/glibc-dbl.md`'s operations in the spec's order (the reduction of §8 as a sum of"
+        " its six parts); the spec writer's model carries out the same text",
     ),
 )
 #: Runs at least this long (names stream, in tokens) are listed in the public section.

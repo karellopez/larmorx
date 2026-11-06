@@ -73,13 +73,7 @@ impl Blur {
 
     /// `EDIT_blur_volume_3d(nx,ny,nz, dx,dy,dz, MRI_float, f, sx,sy,sz)`.
     #[allow(clippy::too_many_arguments)]
-    pub fn blur_volume_3d(
-        &mut self,
-        n: [usize; 3],
-        mut d: [f32; 3],
-        f: &mut [f32],
-        s: [f32; 3],
-    ) {
+    pub fn blur_volume_3d(&mut self, n: [usize; 3], mut d: [f32; 3], f: &mut [f32], s: [f32; 3]) {
         let mut sfac = self.firfac;
         if sfac <= 0.0 {
             sfac = 2.5;
@@ -190,6 +184,7 @@ impl Blur {
     }
 
     /// `fir_gaussian_load(m, dx, ff)`: the `m + 1` weights.
+    #[allow(clippy::needless_range_loop)] // AFNI's index loops, as written
     fn gaussian_load(&self, m: i32, dx: f32) -> Vec<f32> {
         let m = m as usize;
         let mut ff = vec![0.0f32; m + 1];
@@ -249,9 +244,24 @@ impl Blur {
         let one_point = axis == 1 && nx >= 512;
         // (stride, starts of the rows)
         let (stride, starts): (usize, Vec<usize>) = match axis {
-            0 => (1, (0..nz).flat_map(|k| (0..ny).map(move |j| j * nx + k * nxy)).collect()),
-            1 => (nx, (0..nz).flat_map(|k| (0..nx).map(move |i| i + k * nxy)).collect()),
-            _ => (nxy, (0..ny).flat_map(|j| (0..nx).map(move |i| i + j * nx)).collect()),
+            0 => (
+                1,
+                (0..nz)
+                    .flat_map(|k| (0..ny).map(move |j| j * nx + k * nxy))
+                    .collect(),
+            ),
+            1 => (
+                nx,
+                (0..nz)
+                    .flat_map(|k| (0..nx).map(move |i| i + k * nxy))
+                    .collect(),
+            ),
+            _ => (
+                nxy,
+                (0..ny)
+                    .flat_map(|j| (0..nx).map(move |i| i + j * nx))
+                    .collect(),
+            ),
         };
         for start in starts {
             for q in 0..len {
@@ -306,15 +316,40 @@ impl Blur {
         let mut cx = vec![Complex32::default(); nup];
         // (stride, row starts, the other row's offset)
         let (stride, pairs, next, count) = match axis {
-            0 => (1, (0..nz).flat_map(|k| (0..ny).step_by(2).map(move |j| (j, j * nx + k * nxy))).collect::<Vec<_>>(), nx, ny),
-            1 => (nx, (0..nz).flat_map(|k| (0..nx).step_by(2).map(move |i| (i, i + k * nxy))).collect(), 1, nx),
-            _ => (nxy, (0..ny).flat_map(|j| (0..nx).step_by(2).map(move |i| (i, i + j * nx))).collect(), 1, nx),
+            0 => (
+                1,
+                (0..nz)
+                    .flat_map(|k| (0..ny).step_by(2).map(move |j| (j, j * nx + k * nxy)))
+                    .collect::<Vec<_>>(),
+                nx,
+                ny,
+            ),
+            1 => (
+                nx,
+                (0..nz)
+                    .flat_map(|k| (0..nx).step_by(2).map(move |i| (i, i + k * nxy)))
+                    .collect(),
+                1,
+                nx,
+            ),
+            _ => (
+                nxy,
+                (0..ny)
+                    .flat_map(|j| (0..nx).step_by(2).map(move |i| (i, i + j * nx)))
+                    .collect(),
+                1,
+                nx,
+            ),
         };
         for (idx, base) in pairs {
             let single = idx == count - 1;
             for q in 0..len {
                 let re = f[base + q * stride];
-                let im = if single { 0.0 } else { f[base + next + q * stride] };
+                let im = if single {
+                    0.0
+                } else {
+                    f[base + next + q * stride]
+                };
                 cx[q] = Complex32::new(re, im);
             }
             for c in &mut cx[len..] {
@@ -376,7 +411,11 @@ mod tests {
         let mut f = vec![3.0f32; 12 * 10 * 9];
         b.blur_volume_3d(n, [1.0; 3], &mut f, [2.0; 3]);
         assert!(f.iter().all(|&x| (x - 3.0).abs() < 1e-5));
-        assert!(b.take_note().unwrap().starts_with("edt_blur: sigx 2, dx 1, fwhm 4.70964"));
+        assert!(
+            b.take_note()
+                .unwrap()
+                .starts_with("edt_blur: sigx 2, dx 1, fwhm 4.70964")
+        );
         assert!(b.take_note().is_none());
         // The FFT path (m > 35).
         let mut f = vec![3.0f32; 12 * 10 * 9];

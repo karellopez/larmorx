@@ -234,17 +234,17 @@ pub fn shear_xzyx(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
     let t102 = t51 * q31;
     let t107 = t11 * t36;
     let t109 = t38 * t22;
-    let t113 = t86 * t87 - t57 * t90 + 2.0 * t50 * t92 + 2.0 * t37 * t94 + t96 * t22 * t3
-        + t96 * q31 * t8
-        - 3.0 * t24
-        - t96 * q22 * t102
-        + 3.0 * t30
-        + t27
-        - 2.0 * t36 * t26 * t3
-        - t19
-        - t62 * q32 * t107
-        - 2.0 * t37 * t109
-        - t26 * q21 * t64;
+    let t113 =
+        t86 * t87 - t57 * t90 + 2.0 * t50 * t92 + 2.0 * t37 * t94 + t96 * t22 * t3 + t96 * q31 * t8
+            - 3.0 * t24
+            - t96 * q22 * t102
+            + 3.0 * t30
+            + t27
+            - 2.0 * t36 * t26 * t3
+            - t19
+            - t62 * q32 * t107
+            - 2.0 * t37 * t109
+            - t26 * q21 * t64;
     let t118 = q32 * q22;
     let t119 = t118 * q11;
     let t121 = q11 * t36;
@@ -289,19 +289,18 @@ pub fn shear_xzyx(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
     let t167 = ydel * t26;
     let t185 = xdel * q21;
     let t190 = ydel * q11;
-    let t193 = -ydel * q22 * t51 * t26 - t157 * q23 * t134 - t160 * t129 * q33
-        + t164 * t119
-        + t163 * t54
-        - t167 * q21 * q22 * q12
-        + ydel * t134 * t3
-        + t157 * q21 * q33 * t26
-        - t167 * t6
-        - 3.0 * ydel * q21 * t75 * q32
-        + t167 * t8
-        + 3.0 * ydel * t15 * t17 * q22 * q31
-        + t185 * t20 * t26
-        - ydel * t16 * t18
-        - t190 * t28 * q31;
+    let t193 =
+        -ydel * q22 * t51 * t26 - t157 * q23 * t134 - t160 * t129 * q33 + t164 * t119 + t163 * t54
+            - t167 * q21 * q22 * q12
+            + ydel * t134 * t3
+            + t157 * q21 * q33 * t26
+            - t167 * t6
+            - 3.0 * ydel * q21 * t75 * q32
+            + t167 * t8
+            + 3.0 * ydel * t15 * t17 * q22 * q31
+            + t185 * t20 * t26
+            - ydel * t16 * t18
+            - t190 * t28 * q31;
     let t194 = zdel * q21;
     let t195 = t125 * q12;
     let t203 = xdel * t18;
@@ -329,8 +328,7 @@ pub fn shear_xzyx(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
     let t240 = ydel * t96;
     let t241 = t240 * q21;
     let t252 = ydel * t36;
-    let t264 = -t203 * t36 * t15 + t230 * t12 + 2.0 * t238 * t61 - t241 * t141
-        - t240 * q22 * t102
+    let t264 = -t203 * t36 * t15 + t230 * t12 + 2.0 * t238 * t61 - t241 * t141 - t240 * q22 * t102
         + t220 * t221 * t36
         - t160 * q31 * t87
         + 2.0 * t206 * t36 * t29 * q32
@@ -344,7 +342,8 @@ pub fn shear_xzyx(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
     let t267 = t160 * t36;
     let t269 = ydel * q31;
     let t275 = t252 * q21;
-    let t292 = -2.0 * t238 * t67 + t240 * t69 + 2.0 * t267 * t132 - t269 * q32 * t90
+    let t292 = -2.0 * t238 * t67 + t240 * t69 + 2.0 * t267 * t132
+        - t269 * q32 * t90
         - t185 * t36 * t20 * t22
         + 2.0 * t275 * t94
         + t230 * t10
@@ -395,7 +394,11 @@ fn shear_arb(q: &DMat33, xyzdel: &DVec3, ox: [usize; 3], libc: Libc) -> Shear {
 /// smallest-norm decomposition of the six axis orders (the first of equal norms).
 pub fn shear_best(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
     let dsum = vecmat::trace(q);
-    let esum = q[0][1].abs() + q[0][2].abs() + q[1][0].abs() + q[1][2].abs() + q[2][0].abs()
+    let esum = q[0][1].abs()
+        + q[0][2].abs()
+        + q[1][0].abs()
+        + q[1][2].abs()
+        + q[2][0].abs()
         + q[2][1].abs();
     if dsum >= 2.99999 && esum / dsum < 1.0e-6 {
         let (dx, dy, dz) = (xyzdel[0], xyzdel[1], xyzdel[2]);
@@ -412,7 +415,14 @@ pub fn shear_best(q: &DMat33, xyzdel: &DVec3, libc: Libc) -> Shear {
             sft: [0.0, dy, dz, dx],
         };
     }
-    let orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    let orders = [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
     let sh: Vec<Shear> = orders
         .iter()
         .map(|&o| shear_arb(q, xyzdel, o, libc))
@@ -460,7 +470,14 @@ fn flips(q: DMat33) -> (DMat33, i32, i32) {
 
 /// `rot_to_shear`'s and `rot_to_shear_matvec`'s common end: the scaling to voxel units, the best
 /// decomposition, and once more with a perturbed matrix if none was valid; then the flips.
-fn shear_scaled(mut q: DMat33, mut d: DVec3, del: [f64; 3], libc: Libc, flip0: i32, flip1: i32) -> Shear {
+fn shear_scaled(
+    mut q: DMat33,
+    mut d: DVec3,
+    del: [f64; 3],
+    libc: Libc,
+    flip0: i32,
+    flip1: i32,
+) -> Shear {
     let [xdel, ydel, zdel] = del;
     d[0] /= xdel;
     d[1] /= ydel;
@@ -542,7 +559,12 @@ pub fn svdrot_newer(m: &DMat33) -> Result<DMat33, SvdError> {
 /// `rot_to_shear_matvec(rmat, tvec, xdel,ydel,zdel)`: the shears of `x -> rmat·x + tvec`,
 /// with `rmat` first made orthogonal (`q = (V·Uᵀ)ᵀ`, `DMAT_svdrot_newer`); the shift always
 /// after the rotation.
-pub fn rot_to_shear_matvec(rmat: &DMat33, tvec: &DVec3, del: [f64; 3], libc: Libc) -> Result<Shear, SvdError> {
+pub fn rot_to_shear_matvec(
+    rmat: &DMat33,
+    tvec: &DVec3,
+    del: [f64; 3],
+    libc: Libc,
+) -> Result<Shear, SvdError> {
     let p = svdrot_newer(rmat)?;
     let q = vecmat::transpose(&p);
     let (q, flip0, flip1) = flips(q);
@@ -572,15 +594,28 @@ mod tests {
     #[test]
     fn decomposition_reproduces_the_map() {
         let libc = Libc::default();
-        for th in [[0.05, -0.02, 0.03], [0.3, 0.2, -0.4], [2.5, 0.1, 0.2], [1e-6, 1.1e-6, 0.9e-6]] {
+        for th in [
+            [0.05, -0.02, 0.03],
+            [0.3, 0.2, -0.4],
+            [2.5, 0.1, 0.2],
+            [1e-6, 1.1e-6, 0.9e-6],
+        ] {
             let sh = rot_to_shear([2, 0, 1], th, -1, [1.0, -2.0, 0.5], [1.0, 1.0, 1.0], libc);
             assert!(sh.is_valid(), "{th:?}");
             let q = vecmat::rot_to_matrix(2, th[0], 0, th[1], 1, th[2], libc);
-            for p in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [3.0, -2.0, 5.0]] {
+            for p in [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [3.0, -2.0, 5.0],
+            ] {
                 let want = vecmat::add(&vecmat::matvec(&q, &p), &[1.0, -2.0, 0.5]);
                 let got = apply(&sh, p);
                 for k in 0..3 {
-                    assert!((got[k] - want[k]).abs() < 1e-6, "{th:?} {p:?}: {got:?} {want:?}");
+                    assert!(
+                        (got[k] - want[k]).abs() < 1e-6,
+                        "{th:?} {p:?}: {got:?} {want:?}"
+                    );
                 }
             }
         }

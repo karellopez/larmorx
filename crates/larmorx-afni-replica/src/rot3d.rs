@@ -189,15 +189,27 @@ impl Rotator {
         for qq in 0..4 {
             match shr.ax[qq] {
                 0 => {
-                    let (a, b, s) = (shr.scl[qq][1] as f32, shr.scl[qq][2] as f32, shr.sft[qq] as f32);
+                    let (a, b, s) = (
+                        shr.scl[qq][1] as f32,
+                        shr.scl[qq][2] as f32,
+                        shr.sft[qq] as f32,
+                    );
                     self.xshear(a, b, s, n, vol);
                 }
                 1 => {
-                    let (a, b, s) = (shr.scl[qq][0] as f32, shr.scl[qq][2] as f32, shr.sft[qq] as f32);
+                    let (a, b, s) = (
+                        shr.scl[qq][0] as f32,
+                        shr.scl[qq][2] as f32,
+                        shr.sft[qq] as f32,
+                    );
                     self.yshear(a, b, s, n, vol);
                 }
                 2 => {
-                    let (a, b, s) = (shr.scl[qq][0] as f32, shr.scl[qq][1] as f32, shr.sft[qq] as f32);
+                    let (a, b, s) = (
+                        shr.scl[qq][0] as f32,
+                        shr.scl[qq][1] as f32,
+                        shr.sft[qq] as f32,
+                    );
                     self.zshear(a, b, s, n, vol);
                 }
                 _ => {}
@@ -275,7 +287,15 @@ impl Rotator {
                 }
                 let a0 = a * (ii as f32 - nx2) + b * (kk as f32 - nz2) + s;
                 a1 = a0 + a;
-                shift_two_rows(self.method, nup, a0, &mut fj0, a1, Some(&mut fj1), &mut self.work);
+                shift_two_rows(
+                    self.method,
+                    nup,
+                    a0,
+                    &mut fj0,
+                    a1,
+                    Some(&mut fj1),
+                    &mut self.work,
+                );
                 for jj in 0..ny {
                     v[at(ii, jj, kk)] = fj0[jj];
                     v[at(ii + 1, jj, kk)] = fj1[jj];
@@ -321,7 +341,15 @@ impl Rotator {
                 }
                 let a0 = a * (ii as f32 - nx2) + b * (jj as f32 - ny2) + s;
                 a1 = a0 + a;
-                shift_two_rows(self.method, nup, a0, &mut fj0, a1, Some(&mut fj1), &mut self.work);
+                shift_two_rows(
+                    self.method,
+                    nup,
+                    a0,
+                    &mut fj0,
+                    a1,
+                    Some(&mut fj1),
+                    &mut self.work,
+                );
                 for kk in 0..nz {
                     v[at(ii, jj, kk)] = fj0[kk];
                     v[at(ii + 1, jj, kk)] = fj1[kk];
@@ -391,7 +419,11 @@ fn flip_xz(n: [usize; 3], v: &mut [f32]) {
 /// in the middle of a larger one of zeros.
 pub fn volpad(v: &[f32], n: [usize; 3], bot: [usize; 3], top: [usize; 3]) -> Vec<f32> {
     let [nx, ny, nz] = n;
-    let nn = [nx + bot[0] + top[0], ny + bot[1] + top[1], nz + bot[2] + top[2]];
+    let nn = [
+        nx + bot[0] + top[0],
+        ny + bot[1] + top[1],
+        nz + bot[2] + top[2],
+    ];
     let mut out = vec![0.0f32; nn[0] * nn[1] * nn[2]];
     for kk in 0..nz {
         for jj in 0..ny {
@@ -457,6 +489,11 @@ mod tests {
         let out = r.rota3d(&v, n, [1.0; 3], [2, 0, 1], [0.0; 3], -1, [1.0, 0.0, 0.0]);
         // Interior voxels away from the edges: the value of the voxel one step back.
         let at = |i: usize, j: usize, k: usize| i + j * 8 + k * 48;
-        assert!((out[at(4, 3, 2)] - v[at(3, 3, 2)]).abs() < 1e-3, "{} {}", out[at(4, 3, 2)], v[at(3, 3, 2)]);
+        assert!(
+            (out[at(4, 3, 2)] - v[at(3, 3, 2)]).abs() < 1e-3,
+            "{} {}",
+            out[at(4, 3, 2)],
+            v[at(3, 3, 2)]
+        );
     }
 }

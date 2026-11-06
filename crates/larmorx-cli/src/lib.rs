@@ -478,7 +478,10 @@ mod tests {
             .collect();
         assert_eq!(listed, AFNI_TOOLS);
         // Every AFNI tool has its built-in replica; 3dvolreg has no clean-room original yet.
-        assert_eq!(replica::replica_only("afni").collect::<Vec<_>>(), ["3dvolreg"]);
+        assert_eq!(
+            replica::replica_only("afni").collect::<Vec<_>>(),
+            ["3dvolreg"]
+        );
         assert_eq!(larmorx_afni_replica::cli::TOOLS, AFNI_TOOLS);
         let replica = Options {
             implementation: Some(Implementation::Replica),

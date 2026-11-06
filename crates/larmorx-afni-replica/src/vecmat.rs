@@ -251,7 +251,15 @@ pub fn rot_matrix(th: f64, axis: i32, libc: Libc) -> DMat33 {
 
 /// `rot_to_matrix(ax1,th1, ax2,th2, ax3,th3)` (`thd_shear3d.c`): `R3·R2·R1`, `Ri` the rotation
 /// by `thi` about axis `axi`.
-pub fn rot_to_matrix(ax1: i32, th1: f64, ax2: i32, th2: f64, ax3: i32, th3: f64, libc: Libc) -> DMat33 {
+pub fn rot_to_matrix(
+    ax1: i32,
+    th1: f64,
+    ax2: i32,
+    th2: f64,
+    ax3: i32,
+    th3: f64,
+    libc: Libc,
+) -> DMat33 {
     let mut q = rot_matrix(th1, ax1, libc);
     let p = rot_matrix(th2, ax2, libc);
     q = mul(&p, &q);

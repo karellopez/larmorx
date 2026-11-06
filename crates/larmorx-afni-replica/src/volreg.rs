@@ -202,10 +202,11 @@ pub fn handedness(o: [u8; 3]) -> i32 {
             _ => q[2][col] = -1.0,
         }
     }
-    let val = q[0][0] * q[1][1] * q[2][2] - q[0][0] * q[1][2] * q[2][1] - q[1][0] * q[0][1] * q[2][2]
-        + q[1][0] * q[0][2] * q[2][1]
-        + q[2][0] * q[0][1] * q[1][2]
-        - q[2][0] * q[0][2] * q[1][1];
+    let val =
+        q[0][0] * q[1][1] * q[2][2] - q[0][0] * q[1][2] * q[2][1] - q[1][0] * q[0][1] * q[2][2]
+            + q[1][0] * q[0][2] * q[2][1]
+            + q[2][0] * q[0][1] * q[1][2]
+            - q[2][0] * q[0][2] * q[1][1];
     if val > 0.0 { 1 } else { -1 }
 }
 
@@ -442,7 +443,8 @@ fn best_shiftrot(
             for kk in 0..h[2] {
                 for jj in 0..h[1] {
                     for ii in 0..h[0] {
-                        out[ii + jj * h[0] + kk * h[0] * h[1]] = t[2 * (ii + jj * nx + kk * nx * ny)];
+                        out[ii + jj * h[0] + kk * h[0] * h[1]] =
+                            t[2 * (ii + jj * nx + kk * nx * ny)];
                     }
                 }
             }
@@ -527,8 +529,7 @@ fn best_shiftrot(
                     Some(t)
                 };
                 let tar = tim.as_deref().unwrap_or(&vim);
-                let (sum, sh) =
-                    best_shift(n, &bim, tar, Some(&www), coarse, fix, &mut met_empty);
+                let (sum, sh) = best_shift(n, &bim, tar, Some(&www), coarse, fix, &mut met_empty);
                 if verbose {
                     log.push(Message::Raw(if sum < bsum { "*" } else { "." }.to_owned()));
                 }
@@ -565,12 +566,7 @@ fn note_empty(ctx: &mut Ctx<'_>, met: bool) {
 }
 
 /// The registered brick in the output's storage type, from the float volume (`tim`).
-fn store(
-    tim: &[f32],
-    kind: Kind,
-    mode: UpstreamDefects,
-    notices: &mut Notices,
-) -> BrickData {
+fn store(tim: &[f32], kind: Kind, mode: UpstreamDefects, notices: &mut Notices) -> BrickData {
     match kind {
         Kind::Float => BrickData::Float(tim.to_vec()),
         Kind::Short => BrickData::Short(tim.iter().map(|&x| crate::tshift::shortize(x)).collect()),
@@ -621,7 +617,7 @@ fn brick(ds: &Dataset, iv: usize) -> Vec<f32> {
 
 /// Runs 3dvolreg's registration on `ds` (loaded). `null_output`: `-prefix NULL`. Messages go to
 /// `log` in AFNI's order; the upstream defects met to `notices`.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::needless_range_loop)] // AFNI's index loops, as written
 pub fn volreg(
     ds: &Dataset,
     p: &VolregParams,
@@ -712,7 +708,8 @@ pub fn volreg(
                         continue;
                     }
                     let (ii, kk, jj) = (mm % nx, mm / nxy, (mm % nxy) / nx);
-                    if ii + 1 >= nx || ii == 0 || jj + 1 >= ny || jj == 0 || kk + 1 >= nz || kk == 0 {
+                    if ii + 1 >= nx || ii == 0 || jj + 1 >= ny || jj == 0 || kk + 1 >= nz || kk == 0
+                    {
                         msk[mm] = 1;
                         nmsk += 1;
                         continue;
@@ -755,7 +752,11 @@ pub fn volreg(
         }
     }
     // AFNI-92: the clip fraction THD_automask keeps for the coarse rotation search's mask.
-    let clfrac = if p.maxdisp || mode.fix() { 0.333f32 } else { 0.5 };
+    let clfrac = if p.maxdisp || mode.fix() {
+        0.333f32
+    } else {
+        0.5
+    };
     if mode.reproduce() && !p.maxdisp && p.twopass && p.coarse_rot {
         notices.add(
             &defects::AFNI_92,
@@ -785,7 +786,10 @@ pub fn volreg(
     let mut first: Vec<[f32; 6]> = vec![[0.0; 6]; imcount];
     if p.twopass {
         if verbose {
-            raw("++ Start of first pass alignment on all sub-bricks\n".to_owned(), log);
+            raw(
+                "++ Start of first pass alignment on all sub-bricks\n".to_owned(),
+                log,
+            );
         }
         let mut tp_base = imbase.clone();
         crate::dataset::floatscan(&mut tp_base);
@@ -822,7 +826,10 @@ pub fn volreg(
             al.setup(&tp_vol, w.as_ref(), &mut rot, &mut blur, log)
         } else {
             if verbose {
-                raw("++ Computing first pass weight as sum of base and brick\n".to_owned(), log);
+                raw(
+                    "++ Computing first pass weight as sum of base and brick\n".to_owned(),
+                    log,
+                );
             }
             let mut far = brick(ds, 0);
             blur.blur_volume_3d(n, [1.0; 3], &mut far, [p.twoblur; 3]);
@@ -835,8 +842,7 @@ pub fn volreg(
                         raw("++ Getting best coarse shift [0]:".to_owned(), log);
                     }
                     let mut met = false;
-                    let (_, s) =
-                        best_shift(n, &tp_base, &far, None, &coarse, mode.fix(), &mut met);
+                    let (_, s) = best_shift(n, &tp_base, &far, None, &coarse, mode.fix(), &mut met);
                     note_empty(&mut ctx, met);
                     sx = s;
                     if verbose {
@@ -847,7 +853,14 @@ pub fn volreg(
                         raw("++ Getting best coarse rot+shift [0]:".to_owned(), log);
                     }
                     let (a, s) = best_shiftrot(
-                        &mut ctx, &tp_base, &far, &mut coarse, &mut rot, &blur, clfrac, log,
+                        &mut ctx,
+                        &tp_base,
+                        &far,
+                        &mut coarse,
+                        &mut rot,
+                        &blur,
+                        clfrac,
+                        log,
                     )?;
                     ang = a;
                     sx = s;
@@ -880,7 +893,7 @@ pub fn volreg(
                 ang = [0.0; 3];
             }
             let mut qar = tp_base.clone();
-            let lo = sx.map(|e| e.abs() as usize);
+            let lo = sx.map(|e| e.unsigned_abs() as usize);
             let at = |i: usize, j: usize, k: usize| i + j * nx + k * nx * ny;
             let shifted = |i: usize, j: usize, k: usize| {
                 at(
@@ -909,7 +922,10 @@ pub fn volreg(
                             }
                         } else {
                             raw(
-                                format!("++ Warning: Scale init = {} is large. Check output.\n", g(sf)),
+                                format!(
+                                    "++ Warning: Scale init = {} is large. Check output.\n",
+                                    g(sf)
+                                ),
                                 log,
                             );
                         }
@@ -971,7 +987,13 @@ pub fn volreg(
                                 raw(format!("++ Getting best coarse rot+shift [{kim}]:"), log);
                             }
                             let (a, s) = best_shiftrot(
-                                &mut ctx, &tp_base, &fim, &mut coarse, &mut rot, &blur, clfrac,
+                                &mut ctx,
+                                &tp_base,
+                                &fim,
+                                &mut coarse,
+                                &mut rot,
+                                &blur,
+                                clfrac,
                                 log,
                             )?;
                             ang = a;
@@ -1048,7 +1070,10 @@ pub fn volreg(
     let wvol = weight.map(|w| Vol { n, d, data: w });
     let basis: Basis = al.setup(&base_vol, wvol.as_ref(), &mut rot, &mut blur, log);
     if verbose {
-        raw(format!("++ Starting final pass on {imcount} sub-bricks: "), log);
+        raw(
+            format!("++ Starting final pass on {imcount} sub-bricks: "),
+            log,
+        );
     }
 
     let kind = if p.floatize {
@@ -1072,7 +1097,11 @@ pub fn volreg(
             if p.twopass {
                 al.init = first[kim];
             }
-            let im = Vol { n, d, data: fim.clone() };
+            let im = Vol {
+                n,
+                d,
+                data: fim.clone(),
+            };
             let (t, s, out) = al
                 .one(&basis, &im, &mut rot, log)
                 .map_err(|_| crash_after_lsqfit(ctx.notices))?;
@@ -1207,7 +1236,11 @@ pub fn volreg(
             res.matrix_save.push(row);
         }
         if maxdisp {
-            let tvec0: DVec3 = [f64::from(matar[3]), f64::from(matar[7]), f64::from(matar[11])];
+            let tvec0: DVec3 = [
+                f64::from(matar[3]),
+                f64::from(matar[7]),
+                f64::from(matar[11]),
+            ];
             let pp = mat_to_dicomm(o);
             let ppt = vecmat::transpose(&pp);
             let r = vecmat::mul(&ppt, &rmat);

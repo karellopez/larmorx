@@ -243,10 +243,36 @@ fn delt_name(name: &str) -> Option<String> {
         return None;
     }
     const EXT: &[&str] = &[
-        ".HEAD", ".BRIK", ".BRIK.gz", ".mnc", ".mri", ".svl", ".1D", ".1D.dset", ".1D.do", ".txt",
-        ".3D", ".nii", ".nii.gz", ".nia", ".hdr", ".img", ".mpg", ".mpeg", ".MPG", ".MPEG",
-        ".niml", ".niml.dset", ".niml.do", ".gii", ".gii.dset", ".niml.tract", ".jpg", ".jpeg",
-        ".png", ".heic",
+        ".HEAD",
+        ".BRIK",
+        ".BRIK.gz",
+        ".mnc",
+        ".mri",
+        ".svl",
+        ".1D",
+        ".1D.dset",
+        ".1D.do",
+        ".txt",
+        ".3D",
+        ".nii",
+        ".nii.gz",
+        ".nia",
+        ".hdr",
+        ".img",
+        ".mpg",
+        ".mpeg",
+        ".MPG",
+        ".MPEG",
+        ".niml",
+        ".niml.dset",
+        ".niml.do",
+        ".gii",
+        ".gii.dset",
+        ".niml.tract",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".heic",
     ];
     for e in EXT {
         if let Some(stem) = name.strip_suffix(e) {
@@ -323,7 +349,9 @@ fn parse(
     while i < args.len() && args[i].starts_with('-') {
         let arg = args[i].as_str();
         let unsupported = |what: &str| -> Result<Options, Stop> {
-            Err(Stop::Fatal(format!("{what} is not supported by larmorx yet")))
+            Err(Stop::Fatal(format!(
+                "{what} is not supported by larmorx yet"
+            )))
         };
         if arg == "-input" || arg == "-source" {
             if o.input.is_some() {
@@ -458,7 +486,9 @@ fn parse(
         if arg == "-twoblur" {
             o.twoblur = strtod(&value(args, &mut i, arg, notices)?).0 as f32;
             if o.twoblur < 2.0 {
-                return Err(Stop::Raw("** ERROR: value after -twoblur is < 2.0\n".to_owned()));
+                return Err(Stop::Raw(
+                    "** ERROR: value after -twoblur is < 2.0\n".to_owned(),
+                ));
             }
             i += 1;
             continue;
@@ -614,7 +644,9 @@ fn parse(
             }
             if v.as_bytes().get(used) == Some(&b'%') {
                 if ee > 25.0 {
-                    return Err(Stop::Raw("** Illegal percentage after -edging\n".to_owned()));
+                    return Err(Stop::Raw(
+                        "** Illegal percentage after -edging\n".to_owned(),
+                    ));
                 }
                 o.edging = Some(Edging::Percent(ee));
             } else {
@@ -629,7 +661,9 @@ fn parse(
             }
             let v = value(args, &mut i, arg, notices)?;
             let Some(pos) = v.find('[').filter(|&p| p > 0) else {
-                return Err(Stop::Raw("** Illegal weight dataset after -weight\n".to_owned()));
+                return Err(Stop::Raw(
+                    "** Illegal weight dataset after -weight\n".to_owned(),
+                ));
             };
             let name = v[..pos].to_owned();
             // sscanf(cpt+1, "%d", &bb) with bb = -1 first.
@@ -672,7 +706,10 @@ fn parse(
         o.dataset = args[i].clone();
     } else {
         if i < args.len() {
-            io.warn(format!("Skipping argument(s) after last option? '{}'", args[i]));
+            io.warn(format!(
+                "Skipping argument(s) after last option? '{}'",
+                args[i]
+            ));
         }
         o.dataset = o.input.clone().unwrap_or_default();
     }
@@ -756,7 +793,10 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
                 })
             })?;
             if o.verbose > 0 {
-                io.raw(format!("++ Reading in base dataset {}\n", afni_output_name(name)));
+                io.raw(format!(
+                    "++ Reading in base dataset {}\n",
+                    afni_output_name(name)
+                ));
             }
             if ds.nvals > 1 {
                 io.warn(format!("-base dataset {name} has more than 1 sub-brick"));
@@ -784,10 +824,18 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             )));
         }
         if o.verbose > 0 {
-            io.raw(format!("++ Reading in weight dataset {}\n", afni_output_name(name)));
+            io.raw(format!(
+                "++ Reading in weight dataset {}\n",
+                afni_output_name(name)
+            ));
         }
         let nvox = ds.nxyz.iter().product();
-        weight = Some(crate::automask::scale_to_float(&ds.data, nvox, *bb, ds.factors[*bb]));
+        weight = Some(crate::automask::scale_to_float(
+            &ds.data,
+            nvox,
+            *bb,
+            ds.factors[*bb],
+        ));
         weight_dims = Some(ds.nxyz);
     }
 
@@ -806,7 +854,9 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
                 let (ee, used) = strtod(ef);
                 let ee = ee as f32;
                 if ee < 0.0 {
-                    return Err(Stop::Raw("** Illegal value in AFNI_VOLREG_EDGING\n".to_owned()));
+                    return Err(Stop::Raw(
+                        "** Illegal value in AFNI_VOLREG_EDGING\n".to_owned(),
+                    ));
                 }
                 if ef.as_bytes().get(used) == Some(&b'%') {
                     if ee > 25.0 {
@@ -849,10 +899,16 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     let cen_inp = volreg::dataset_center(&ds).map_err(stop)?;
     if let Some(b) = &bset {
         let cen_bas = volreg::dataset_center(b).map_err(stop)?;
-        let dv = [cen_bas[0] - cen_inp[0], cen_bas[1] - cen_inp[1], cen_bas[2] - cen_inp[2]];
+        let dv = [
+            cen_bas[0] - cen_inp[0],
+            cen_bas[1] - cen_inp[1],
+            cen_bas[2] - cen_inp[2],
+        ];
         let dist = (f64::from(dv[0] * dv[0] + dv[1] * dv[1] + dv[2] * dv[2])).sqrt() as f32;
         if dist > 0.01 && o.verbose > 0 {
-            io.info(format!("centers of base and input datasets are {dist:.2} mm apart"));
+            io.info(format!(
+                "centers of base and input datasets are {dist:.2} mm apart"
+            ));
         }
     }
     if intern && nbase_given >= ds.nvals {
@@ -873,7 +929,9 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         )));
     }
     if intern && ds.nvals == 1 {
-        return Err("You can't register a 1 brick dataset to itself!".to_owned().into());
+        return Err("You can't register a 1 brick dataset to itself!"
+            .to_owned()
+            .into());
     }
     let mut coarse_del = o.coarse_del;
     if o.twopass && o.coarse_del > 0 && o.coarse_num > 0 {
@@ -883,7 +941,9 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             mm = 1;
         }
         if coarse_del > mm {
-            io.raw(format!("++ Coarse del was {coarse_del}, replaced with {mm}\n"));
+            io.raw(format!(
+                "++ Coarse del was {coarse_del}, replaced with {mm}\n"
+            ));
             coarse_del = mm;
         }
     }
@@ -1063,7 +1123,13 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
 }
 
 /// `-dfile` and `-1Dfile`.
-fn write_params(o: &Options, res: &VolregResult, imcount: usize, settings: &Settings, io: &mut Io<'_>) {
+fn write_params(
+    o: &Options,
+    res: &VolregResult,
+    imcount: usize,
+    settings: &Settings,
+    io: &mut Io<'_>,
+) {
     let f8 = |x: f32| format!("{x:8.4}");
     let g11 = |x: f32| format!("{:>11}", gp(f64::from(x), 4));
     if let Some(name) = &o.dfile {

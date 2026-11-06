@@ -18,8 +18,10 @@ use larmorx_core::defects::UpstreamDefects;
 fn read(name: &str, n: usize) -> Vec<f32> {
     let b = std::fs::read(name).expect("input");
     assert_eq!(b.len(), 4 * n, "size of {name}");
-    b.chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+    b.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| f32::from_le_bytes(*c))
         .collect()
 }
 
@@ -63,8 +65,20 @@ fn main() {
             let n = [u(2), u(3), u(4)];
             let v = read(&a[1], n[0] * n[1] * n[2]);
             let mut r = Rotator::new(method(a[8].parse().expect("a method")), u(9), mode);
-            let ax = [a[10].parse().expect("an axis"), a[12].parse().expect("an axis"), a[14].parse().expect("an axis")];
-            let out = r.rota3d(&v, n, [f(5), f(6), f(7)], ax, [f(11), f(13), f(15)], -1, [f(16), f(17), f(18)]);
+            let ax = [
+                a[10].parse().expect("an axis"),
+                a[12].parse().expect("an axis"),
+                a[14].parse().expect("an axis"),
+            ];
+            let out = r.rota3d(
+                &v,
+                n,
+                [f(5), f(6), f(7)],
+                ax,
+                [f(11), f(13), f(15)],
+                -1,
+                [f(16), f(17), f(18)],
+            );
             write(&a[19], &out);
         }
         _ => {

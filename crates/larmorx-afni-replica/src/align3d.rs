@@ -79,6 +79,9 @@ pub fn mri_min(v: &[f32]) -> f64 {
     f64::from(m)
 }
 
+/// What [`Align3d::one`] gives: the angles (radians), the shifts (mm) and the registered volume.
+pub type OneFit = ([f32; 3], [f32; 3], Option<Vec<f32>>);
+
 /// A crop box (`xa..xb`, inclusive).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Box3 {
@@ -88,7 +91,11 @@ pub struct Box3 {
 
 impl Box3 {
     fn dims(&self) -> [usize; 3] {
-        [self.b[0] - self.a[0] + 1, self.b[1] - self.a[1] + 1, self.b[2] - self.a[2] + 1]
+        [
+            self.b[0] - self.a[0] + 1,
+            self.b[1] - self.a[1] + 1,
+            self.b[2] - self.a[2] + 1,
+        ]
     }
 }
 
@@ -134,8 +141,13 @@ pub fn autobbox(v: &[f32], n: [usize; 3]) -> [i64; 6] {
     let mut out = [0i64; 6];
     for axis in 0..3 {
         let len = n[axis];
-        out[2 * axis] = (0..len).find(|&i| plane(axis, i)).map_or(len as i64, |i| i as i64);
-        out[2 * axis + 1] = (0..len).rev().find(|&i| plane(axis, i)).map_or(-1, |i| i as i64);
+        out[2 * axis] = (0..len)
+            .find(|&i| plane(axis, i))
+            .map_or(len as i64, |i| i as i64);
+        out[2 * axis + 1] = (0..len)
+            .rev()
+            .find(|&i| plane(axis, i))
+            .map_or(-1, |i| i as i64);
     }
     out
 }
@@ -144,7 +156,10 @@ pub fn autobbox(v: &[f32], n: [usize; 3]) -> [i64; 6] {
 /// `MRI_LINEAR`, `MRI_CUBIC`, `MRI_FOURIER`, `MRI_QUINTIC`, `MRI_HEPTIC`: 0 to 5, the order of
 /// its `modes[]` names).
 pub fn clips(m: Method) -> bool {
-    matches!(m, Method::Quintic | Method::Cubic | Method::Heptic | Method::Fourier)
+    matches!(
+        m,
+        Method::Quintic | Method::Cubic | Method::Heptic | Method::Fourier
+    )
 }
 
 /// The registration's parameters and state (the static variables of `mri_3dalign.c`).
@@ -224,9 +239,9 @@ impl Align3d {
         if dfac > 0.0 {
             self.delfac = dfac;
         }
-        for i in 0..3 {
-            if (0..=2).contains(&bx[i]) {
-                self.ax[i] = bx[i];
+        for (ax, &b) in self.ax.iter_mut().zip(&bx) {
+            if (0..=2).contains(&b) {
+                *ax = b;
             }
         }
         self.dcode = dc;
@@ -284,7 +299,7 @@ impl Align3d {
             for x in f.iter_mut() {
                 *x = x.abs();
             }
-            blur.blur_volume_3d(n, d, f, [3.0 * d[0], 3.0 * d[1], 3.0 * d[2]].map(|v| v as f32));
+            blur.blur_volume_3d(n, d, f, [3.0 * d[0], 3.0 * d[1], 3.0 * d[2]]);
             if let Some(m) = blur.take_note() {
                 log.push(Message::Info(m));
             }
@@ -375,7 +390,10 @@ impl Align3d {
                     imww = cut(&imww, n, &bx);
                     trim = Some(bx);
                 } else {
-                    raw(" + skipping use of trim - too little savings\n".to_owned(), log);
+                    raw(
+                        " + skipping use of trim - too little savings\n".to_owned(),
+                        log,
+                    );
                 }
             } else {
                 raw(
@@ -388,7 +406,11 @@ impl Align3d {
         }
         if self.verbose {
             raw(
-                format!("  weight range: min={}  max={}\n", g(mri_min(&imww)), g(mri_max(&imww))),
+                format!(
+                    "  weight range: min={}  max={}\n",
+                    g(mri_min(&imww)),
+                    g(mri_max(&imww))
+                ),
                 log,
             );
         }
@@ -400,7 +422,10 @@ impl Align3d {
             if self.verbose {
                 let perc = (100.0 * nzer as f64 / imww.len() as f64) as f32;
                 raw(
-                    format!(" # zero weights={nzer} out of {} ({perc:.1}%)\n", imww.len()),
+                    format!(
+                        " # zero weights={nzer} out of {} ({perc:.1}%)\n",
+                        imww.len()
+                    ),
                     log,
                 );
             }
@@ -430,10 +455,16 @@ impl Align3d {
             }
             let (delta, scale) = if q < 3 {
                 let delta = (2.0 * f64::from(self.delfac) / (nx + ny + nz) as f64) as f32;
-                (delta, (f64::from(self.sinit) * 0.5 * DFAC / f64::from(delta)) as f32)
+                (
+                    delta,
+                    (f64::from(self.sinit) * 0.5 * DFAC / f64::from(delta)) as f32,
+                )
             } else {
                 let delta = self.delfac * d[q - 3];
-                (delta, (f64::from(self.sinit) * 0.5 / f64::from(delta)) as f32)
+                (
+                    delta,
+                    (f64::from(self.sinit) * 0.5 / f64::from(delta)) as f32,
+                )
             };
             if self.verbose {
                 raw(format!("[delta={}]", g(f64::from(delta))), log);
@@ -458,11 +489,19 @@ impl Align3d {
             for m in rot.messages.drain(..) {
                 log.push(Message::Raw(m));
             }
-            let dim: Vec<f32> = mim.iter().zip(&pim).map(|(&m, &p)| scale * (m - p)).collect();
+            let dim: Vec<f32> = mim
+                .iter()
+                .zip(&pim)
+                .map(|(&m, &p)| scale * (m - p))
+                .collect();
             let dim = tr(dim);
             if self.verbose {
                 raw(
-                    format!("  {name} range: min={}  max={}\n", g(mri_min(&dim)), g(mri_max(&dim))),
+                    format!(
+                        "  {name} range: min={}  max={}\n",
+                        g(mri_min(&dim)),
+                        g(mri_max(&dim))
+                    ),
                     log,
                 );
             }
@@ -475,11 +514,7 @@ impl Align3d {
         let fit = lsqfit::startup(fitim, Some(&imww));
         if let Err(e) = &fit {
             for m in &e.messages {
-                log.push(if m.starts_with("mri_startup_lsqfit:") {
-                    Message::Error(m.clone())
-                } else {
-                    Message::Error(m.clone())
-                });
+                log.push(Message::Error(m.clone()));
             }
         }
         Basis { fit, trim, n }
@@ -494,7 +529,7 @@ impl Align3d {
         im: &Vol,
         rot: &mut Rotator,
         log: &mut Vec<Message>,
-    ) -> Result<([f32; 3], [f32; 3], Option<Vec<f32>>), LsqError> {
+    ) -> Result<OneFit, LsqError> {
         let fitter = match &basis.fit {
             Ok(s) => s,
             Err(e) => return Err(e.clone()),
@@ -552,7 +587,15 @@ impl Align3d {
         };
         let mut iter = 0;
         while good {
-            let tim = rot.rota3d(fim, n, im.d, self.ax, angles(&fit), self.dcode, [fit[4], fit[5], fit[6]]);
+            let tim = rot.rota3d(
+                fim,
+                n,
+                im.d,
+                self.ax,
+                angles(&fit),
+                self.dcode,
+                [fit[4], fit[5], fit[6]],
+            );
             for m in rot.messages.drain(..) {
                 log.push(Message::Raw(m));
             }
@@ -587,7 +630,9 @@ impl Align3d {
                     || a(3) > phi);
         }
         if self.verbose {
-            log.push(Message::Raw(format!("Iteration complete at {iter} steps\n")));
+            log.push(Message::Raw(format!(
+                "Iteration complete at {iter} steps\n"
+            )));
         }
         let th = angles(&fit);
         let sh = [fit[4], fit[5], fit[6]];

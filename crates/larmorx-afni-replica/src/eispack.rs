@@ -57,7 +57,7 @@ pub fn pythag(a: f64, b: f64) -> f64 {
         let u = s * 2.0 + 1.0;
         p *= u;
         let d1 = s / u;
-        r = d1 * d1 * r;
+        r *= d1 * d1;
     }
 }
 
@@ -272,7 +272,7 @@ fn svd(m: usize, n: usize, a_in: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>, usize
                 s = 1.0;
                 for i in l..=k {
                     f = s * rv1[i];
-                    rv1[i] = c * rv1[i];
+                    rv1[i] *= c;
                     let tst2 = tst1 + fabs(f);
                     if tst2 == tst1 {
                         break;
@@ -388,9 +388,12 @@ pub struct SvdError {
     pub err: f64,
 }
 
+/// The singular values and the `u` and `v` matrices (column-major) of [`svd_double3`].
+pub type Svd3 = ([f64; 3], [f64; 9], [f64; 9]);
+
 /// `svd_double(3, 3, a, s, u, v)` without sorting (`svd_sort` is 0): `a`, `u` and `v`
 /// column-major (`a[i + 3j]` is row `i`, column `j`). Returns `(s, u, v)`.
-pub fn svd_double3(a: &[f64; 9]) -> Result<([f64; 3], [f64; 9], [f64; 9]), SvdError> {
+pub fn svd_double3(a: &[f64; 9]) -> Result<Svd3, SvdError> {
     let (w, u, v, _ierr) = svd(3, 3, a);
     // CHECK_SVD: the average absolute error against the average absolute entry.
     let (m, n) = (3usize, 3usize);
@@ -426,7 +429,13 @@ mod tests {
 
     #[test]
     fn pythag_matches_hypot() {
-        for (a, b) in [(3.0, 4.0), (1e-300, 1e-300), (0.0, 0.0), (-5.0, 12.0), (1e300, 1e300)] {
+        for (a, b) in [
+            (3.0, 4.0),
+            (1e-300, 1e-300),
+            (0.0, 0.0),
+            (-5.0, 12.0),
+            (1e300, 1e300),
+        ] {
             let p = pythag(a, b);
             let h = f64::hypot(a, b);
             assert!((p - h).abs() <= 4.0 * f64::EPSILON * h, "{a} {b}: {p} {h}");

@@ -73,6 +73,9 @@ enum Input {
     Head4dCbrtf,
     /// One axial slice of the head, 24 × 24 × 1, float32 (the 2D automask).
     Slice,
+    /// 4 volumes of the T2-like head, float32, 4 mm voxels, volume `t` moved by `t` voxels
+    /// along x and `t / 2` along y (3dvolreg).
+    Head4dMoving,
 }
 
 struct Case {
@@ -95,6 +98,42 @@ struct Case {
 }
 
 const CASES: &[Case] = &[
+    // 3dvolreg: the default (heptic, -maxdisp), and fMRIPrep's call (-Fourier -twopass -zpad 4:
+    // the blurred first pass, the coarse search over rotations and shifts, the SVD of the
+    // rotation matrices) by default and with glibc's maths (`reproduce`, GLIBC-07).
+    Case {
+        id: "3dvolreg.heptic",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &[],
+    },
+    Case {
+        id: "3dvolreg.fourier.twopass",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &["-Fourier", "-twopass", "-zpad", "4"],
+    },
+    Case {
+        id: "3dvolreg.fourier.twopass.reproduce",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &[],
+        mode: "reproduce",
+        input: Input::Head4dMoving,
+        args: &["-Fourier", "-twopass", "-zpad", "4"],
+    },
     Case {
         id: "3dTshift.fourier.int16",
         tool: "afni 3dTshift",
@@ -763,8 +802,8 @@ fn write_shaped<T: Element>(path: &Path, h: &NiftiHeader, shape: &[usize], data:
     nifti::write(path, h, view, &WriteOptions::default()).unwrap();
 }
 
-/// The head inputs: `head`, `head-t2`, `head-4d`, `head-4d-negative`, `head-4d-cbrtf` and
-/// `slice`.
+/// The head inputs: `head`, `head-t2`, `head-4d`, `head-4d-negative`, `head-4d-cbrtf`,
+/// `head-4d-moving` and `slice`.
 fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
     let [nx, ny, nz] = HEAD;
     let t1 = head_values(T1_LEVELS, 21);
@@ -816,6 +855,26 @@ fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
         &head_header(&shape4, DataType::I16, 4.0, -1.0),
         &shape4,
         &negated,
+    );
+    // 3dvolreg's moving series: volume t shifted by t voxels along x and t / 2 along y (the
+    // background level beyond the edge), with the 4D series' noise.
+    let moving: Vec<f32> = (0..nx * ny * nz * 4)
+        .map(|f| {
+            let (v, t) = (f % (nx * ny * nz), f / (nx * ny * nz));
+            let (i, j, k) = (v % nx, (v / nx) % ny, v / (nx * ny));
+            let (si, sj) = (i.checked_sub(t), j.checked_sub(t / 2));
+            let base = match (si, sj) {
+                (Some(si), Some(sj)) => t2[si + sj * nx + k * nx * ny],
+                _ => T2_LEVELS[4],
+            };
+            (base + (noise[f] % 21) as i64 - 10) as f32 / 2.0
+        })
+        .collect();
+    write_shaped(
+        &p("head-4d-moving", paths),
+        &head_header(&shape4, DataType::F32, 4.0, 0.0),
+        &shape4,
+        &moving,
     );
     let plane = nx * ny * 8;
     let slice: Vec<f32> = t1[plane..plane + nx * ny]
@@ -1138,6 +1197,7 @@ fn golden() {
             Input::Head4dNegative => &inputs["head-4d-negative"],
             Input::Head4dCbrtf => &inputs["head-4d-cbrtf"],
             Input::Slice => &inputs["slice"],
+            Input::Head4dMoving => &inputs["head-4d-moving"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];

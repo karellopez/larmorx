@@ -53,6 +53,7 @@ pub struct Startup {
 }
 
 /// `mri_startup_lsqfit(refim, wtim)`: consumes the references, which come back weighted.
+#[allow(clippy::needless_range_loop)] // AFNI's index loops, as written
 pub fn startup(mut refs: Vec<Vec<f32>>, wt: Option<&[f32]>) -> Result<Startup, LsqError> {
     let nref = refs.len();
     let veclen = refs.first().map_or(0, Vec::len);
@@ -174,10 +175,19 @@ mod tests {
         let data: Vec<f32> = (0..n).map(|i| 2.0 * r0[i] - 0.5 * r1[i]).collect();
         let s = startup(vec![r0, r1], None).unwrap();
         let fit = s.solve(&data).unwrap();
-        assert!((fit[0] - 2.0).abs() < 1e-5 && (fit[1] + 0.5).abs() < 1e-5, "{fit:?}");
+        assert!(
+            (fit[0] - 2.0).abs() < 1e-5 && (fit[1] + 0.5).abs() < 1e-5,
+            "{fit:?}"
+        );
         let e = startup(vec![vec![1.0; 4], vec![0.0; 4]], None).unwrap_err();
-        assert_eq!(e.messages[0], "lsqfit :: 1 vector are all 0 for data fitting");
+        assert_eq!(
+            e.messages[0],
+            "lsqfit :: 1 vector are all 0 for data fitting"
+        );
         let e = startup(vec![vec![1.0; 4], vec![2.0; 4]], None).unwrap_err();
-        assert!(e.messages[0].starts_with("Choleski factorization failure"), "{e:?}");
+        assert!(
+            e.messages[0].starts_with("Choleski factorization failure"),
+            "{e:?}"
+        );
     }
 }

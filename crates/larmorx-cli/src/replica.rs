@@ -693,7 +693,7 @@ mod tests {
     use super::*;
 
     const TSHIFT: &Replica = &REPLICAS[0];
-    const MCFLIRT: &Replica = &REPLICAS[3];
+    const MCFLIRT: &Replica = &REPLICAS[4];
 
     #[test]
     fn tools_without_an_original() {
@@ -739,15 +739,22 @@ mod tests {
         );
         let e = choose_with(Implementation::Original, &BUILTIN_ONLY, never).unwrap_err();
         assert!(e.to_string().contains("built in"), "{e}");
-        // The AFNI tools have their originals and their replicas built in. FSL's bet, bet2 and
-        // betsurf have their clean-room originals (since 2026-10-31 betsurf's too).
+        // The AFNI tools have their replicas built in, and their originals but 3dvolreg's
+        // (its clean-room original is to be written from specs/3dvolreg.md). FSL's bet, bet2
+        // and betsurf have their clean-room originals (since 2026-10-31 betsurf's too).
         assert!(
             REPLICAS
                 .iter()
                 .filter(|r| r.family == "afni")
-                .all(|r| r.original && r.package().is_none())
+                .all(|r| (r.original || r.tool == "3dvolreg") && r.package().is_none())
         );
-        assert_eq!(replica_only("afni").count(), 0);
+        assert_eq!(replica_only("afni").collect::<Vec<_>>(), ["3dvolreg"]);
+        let volreg = lookup("afni", "3dvolreg").unwrap();
+        assert_eq!(
+            choose_with(Implementation::Auto, volreg, never),
+            Ok(Choice::Builtin)
+        );
+        assert!(choose_with(Implementation::Original, volreg, never).is_err());
         assert_eq!(replica_only("ants").count(), 0);
         // every FSL tool has its clean-room original (fslroi and standard_space_roi since
         // 2026-11-05)
@@ -779,7 +786,7 @@ mod tests {
             lookup("fsl", "mcflirt").unwrap().package().unwrap().program,
             "larmorx-nc"
         );
-        assert!(lookup("afni", "3dvolreg").is_none());
+        assert!(lookup("afni", "3dAllineate").is_none());
         assert!(lookup("ants", "3dTshift").is_none());
         for (i, a) in REPLICAS.iter().enumerate() {
             assert!(

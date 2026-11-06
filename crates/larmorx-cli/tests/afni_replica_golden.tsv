@@ -2,7 +2,7 @@
 # Golden checksums of the AFNI replicas (tests/afni_replica_golden.rs): SHA-256 of the
 # NIfTI header and data they write on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 9a6a77a08d243c406137d110e93baec1a546b33a on 2026-11-04 (Linux x86_64)
+# Recorded from 5e161fa1f901d9535287952ecc4aee98775f950a+dirty on 2026-11-06 (Linux x86_64)
 # case	output	sha256	type	sample
 3dAutomask.2d	data	8aff51b83ef2becbb88f5b2dc0a61250c4b0b649768abc311cdf1dcbea15cb82	uint8	0000000101000100
 3dAutomask.2d	header	79a6a2db8b5d92f6d6b91bc913305ef315702829030f0e96df491429d9aa63f7	-	-
@@ -100,3 +100,9 @@
 3dUnifize.default.int16	scale.header	9ecc6656a6d8416b3ce94ad54344666ba3ee48232bd060909610511655a0a9ba	-	-
 3dUnifize.fmriprep.T2	data	f029b5d71262257818a6e233600aae0131d8bb2b755539cf41f73bed615b4dc6	float32	0000000000000000498b134464cf934481658b44c89106440000000000000000
 3dUnifize.fmriprep.T2	header	9ecc6656a6d8416b3ce94ad54344666ba3ee48232bd060909610511655a0a9ba	-	-
+3dvolreg.fourier.twopass	data	272da86a8377264d5a4d3da61223b7eb81e187292f0f871bcf936234b80aa02f	float32	0000284100e03d44f3d077414a699b433a5ec343f2eea741d8f44444009a50b8
+3dvolreg.fourier.twopass	header	cb9078edf5129d8530b7999f52020880f1613772a6db2067d962551c9b083823	-	-
+3dvolreg.fourier.twopass.reproduce	data	272da86a8377264d5a4d3da61223b7eb81e187292f0f871bcf936234b80aa02f	float32	0000284100e03d44f3d077414a699b433a5ec343f2eea741d8f44444009a50b8
+3dvolreg.fourier.twopass.reproduce	header	cb9078edf5129d8530b7999f52020880f1613772a6db2067d962551c9b083823	-	-
+3dvolreg.heptic	data	c9bb09557e9de9183a9f9bd65cf78d38d650fd5cb92a0200b9a1bf1294ac7bac	float32	0000284100e03d449007784125469b43c744c3431016a841a33b45449e191335
+3dvolreg.heptic	header	cb9078edf5129d8530b7999f52020880f1613772a6db2067d962551c9b083823	-	-

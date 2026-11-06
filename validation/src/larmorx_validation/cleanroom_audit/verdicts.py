@@ -114,18 +114,30 @@ def tool_of(rel: str) -> tuple[str, str] | None:
 
 # --- roles -------------------------------------------------------------------------------------
 
-ROLE_RULES = (
-    # (role, pattern on the brief, pattern on the description); the first match wins.
-    ("orchestrator", None, r"^ORCHESTRATOR$"),
-    ("audit", r"clean-room audit part", r"[Cc]lean-room audit"),
+#: The role a launch description names (the first match wins).
+ROLE_BY_WORDS = (
+    ("orchestrator", r"^ORCHESTRATOR$"),
+    ("audit", r"[Cc]lean-room audit"),
+    ("spec writer", r"\(spec\)|spec answers|behaviour spec|[Ss]pec writer"),
+    ("replica author", r"[Rr]eplica|^Port (AFNI|FSL)"),
+    ("clean-room implementer", r"[Cc]lean-room|[Cc]lean room"),
+)
+#: The role a brief states about its reader (in its "You are ..." and "Your role ..." sentences
+#: first, then anywhere), when the description names none; the first match wins.
+ROLE_IN_BRIEF = (
+    (
+        "replica author",
+        r"replica author|replica-author|relay agent of the \*\*\S+ replica|\*\*replica author",
+    ),
+    ("spec writer", r"\bthe spec writer\b|\*\*spec writer"),
     (
         "clean-room implementer",
-        r"(CLEAN-ROOM implementer|clean-room implementer|CLEAN-ROOM implementation|strict "
-        r"clean-room original|Clean-room role|You are completing larmorx's \*\*clean-room)",
-        None,
+        r"CLEAN-ROOM implementer|clean-room implementer|CLEAN-ROOM implementation|strict "
+        r"clean-room original|## Clean-room role|You are completing larmorx's \*\*clean-room",
     ),
-    ("spec writer", r"\bspec writer\b|\bSPEC WRITER\b", r"\bspec\b"),
-    ("replica author", r"\breplica author\b|bit-exact|Port AFNI", r"replica|Port AFNI|Port FSL"),
+)
+SELF = re.compile(
+    r"((?:You are|Your role is|\*{0,2}Your role:|## Your role)[^\n]{0,400}?)(?=\.\s|\n|$)"
 )
 
 
@@ -134,6 +146,11 @@ ROLE_BY_DESCRIPTION = {
     # Wired the replica program into the command line and the Python package: read the GPL
     # replica's command line to do so; not a clean-room implementer, not a replica author.
     'implementation="auto": run the GPL replica': "integration",
+    # "You are porting AFNI programs": the replicas of 3dAutomask and 3dUnifize and their specs.
+    "AFNI 3dAutomask and 3dUnifize": "replica author",
+    # Wrote the porting guide and the defect register from the findings (source-derived ones
+    # included); its brief describes the clean-room implementer's rules, it is not one.
+    "Porting guide + upstream defect register": "documentation",
 }
 
 
@@ -141,11 +158,13 @@ def role_of(description: str, brief: str) -> tuple[str, str]:
     """An agent's role from its launch description and brief: (role, the words that decided)."""
     if description in ROLE_BY_DESCRIPTION:
         return ROLE_BY_DESCRIPTION[description], "read from the brief (ROLE_BY_DESCRIPTION)"
-    for role, rx_brief, rx_desc in ROLE_RULES:
-        if rx_desc and re.search(rx_desc, description):
+    for role, rx in ROLE_BY_WORDS:
+        if re.search(rx, description):
             return role, f"description: {description}"
-        if rx_brief:
-            m = re.search(rx_brief, brief)
+    own = "\n".join(m[1] for m in SELF.finditer(brief))
+    for text in (own, brief):
+        for role, rx in ROLE_IN_BRIEF:
+            m = re.search(rx, text)
             if m:
                 return role, f"brief: {m[0]}"
     return "other", f"description: {description}"
@@ -230,16 +249,21 @@ GIT_MAKE = re.compile(r"\bgit\b[^|;&\n]*\b(commit|merge|cherry-pick|am|rebase)\b
 
 def git_commands(manifest: list[dict]) -> list[dict]:
     """Every Bash call that commits, merges, cherry-picks or rebases (largest copy of each
-    transcript): key, line, time and command."""
+    transcript): key, line, time, command and the head of its output."""
     best: dict[str, dict] = {}
     for m in manifest:
         if m["key"] not in best or m["bytes"] > best[m["key"]]["bytes"]:
             best[m["key"]] = m
     out = []
     for key, m in sorted(best.items()):
+        pending: dict[str, dict] = {}
         with open(m["path"], encoding="utf-8", errors="replace") as fh:
             for n, raw in enumerate(fh, 1):
-                if '"tool_use"' not in raw or "git" not in raw:
+                if '"tool_use"' in raw and "git" in raw:
+                    kind = "use"
+                elif pending and '"tool_result"' in raw:
+                    kind = "result"
+                else:
                     continue
                 try:
                     r = json.loads(raw)
@@ -249,15 +273,22 @@ def git_commands(manifest: list[dict]) -> list[dict]:
                 if not isinstance(content, list):
                     continue
                 for b in content:
-                    if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                    if not isinstance(b, dict):
                         continue
-                    if b.get("name") != "Bash":
+                    if kind == "result" and b.get("tool_use_id") in pending:
+                        t = b.get("content")
+                        if isinstance(t, list):
+                            t = "\n".join(x.get("text", "") for x in t if isinstance(x, dict))
+                        pending.pop(b["tool_use_id"])["result"] = (t or "")[:4000]
+                        continue
+                    if b.get("type") != "tool_use" or b.get("name") != "Bash":
                         continue
                     cmd = str((b.get("input") or {}).get("command", ""))
                     if GIT_MAKE.search(cmd) and r.get("timestamp"):
-                        out.append(
-                            {"key": key, "line": n, "ts": r["timestamp"], "command": cmd[:4000]}
-                        )
+                        rec = {"key": key, "line": n, "ts": r["timestamp"], "command": cmd[:4000]}
+                        rec["result"] = ""
+                        out.append(rec)
+                        pending[b.get("id", "")] = rec
     return out
 
 
@@ -285,7 +316,7 @@ def attribute(
     for c in commands:
         cmds[c["key"]].append((epoch(c["ts"]), c))
 
-    def near(key: str, when: float, lo: float = -15, hi: float = 600):
+    def near(key: str, when: float, lo: float = -1800, hi: float = 600):
         best = None
         for t, c in cmds.get(key, []):
             d = t - when
@@ -305,6 +336,17 @@ def attribute(
                 cands.append((0 if v else 1, abs(epoch(r["ts"]) - cd), r["key"], v))
         cands.sort(key=lambda x: (x[0], x[1]))
         res["printed_by"] = sorted({x[2] for x in cands})
+        if not cands:
+            # A hash printed in a commit command's own output that the scan's reader did not take
+            # for a commit (another line before it).
+            for key, lst in cmds.items():
+                for t, k in lst:
+                    # a command can run long before its commit (a build first): its output's
+                    # hash is the check
+                    if -1800 <= t - cd <= 600 and re.search(rf"\b{h[:7]}\b", k.get("result", "")):
+                        v = (t - cd, k)
+                        cands.append((0, abs(t - cd), key, v))
+            cands.sort(key=lambda x: (x[0], x[1]))
         if cands and cands[0][0] == 0:
             d, cmd = cands[0][3]
             res.update(maker=cands[0][2], how="printed", delta_s=round(d), line=cmd["line"])
@@ -568,10 +610,22 @@ def run(scan: Path, repo: Path) -> dict:
     edits: dict[str, list[dict]] = collections.defaultdict(list)
     restricted: dict[str, list[dict]] = collections.defaultdict(list)
     register: dict[str, list[dict]] = collections.defaultdict(list)
+    brief_reads: dict[str, dict] = {}
+    brief_dep: dict[str, list[dict]] = collections.defaultdict(list)
+    case_first_writer: dict[str, str] = {}
     for key, info in agents.items():
         for r in access_log(scan, info):
             if r.get("refused"):
                 continue
+            path = str(r.get("path", ""))
+            if (
+                key not in brief_reads
+                and r["op"] == "read"
+                and re.search(r"/[^/]*brief[^/]*\.md$", path, re.I)
+                and path in (info.get("brief") or "")
+                and r.get("call")
+            ):
+                brief_reads[key] = r
             rel = r.get("rel") or ""
             if r.get("area") == "larmorx" and r["op"] in TOUCH_OPS and tool_of(rel):
                 edits[key].append({k: r.get(k) for k in KEEP})
@@ -580,7 +634,27 @@ def run(scan: Path, repo: Path) -> dict:
                 keep = {k: r.get(k) for k in KEEP}
                 keep["command"] = (r.get("command") or "")[:2000]
                 restricted[key].append(keep)
-            elif cat == "register" and r["op"] in (
+            if (
+                r.get("area") == "larmorx"
+                and r["op"] in ("write", "edit")
+                and rel.startswith("validation/difftest/cases/")
+                and rel not in case_first_writer
+            ):
+                case_first_writer[rel] = key
+            if (
+                r.get("area") == "larmorx"
+                and r["op"] in CONTENT_OPS
+                and (
+                    BRIEF_RESTRICTED.search(rel)
+                    or BRIEF_FILES.search(rel)
+                    or rel.startswith("validation/difftest/cases/")
+                )
+            ):
+                keep = {k: r.get(k) for k in KEEP}
+                keep["command"] = (r.get("command") or "")[:2000]
+                brief_dep[key].append(keep)
+            if cat == "register" and r["op"] in (
+                "search",
                 "read",
                 "search-hit",
                 "copy",
@@ -588,6 +662,23 @@ def run(scan: Path, repo: Path) -> dict:
                 "script-path",
             ):
                 register[key].append({k: r.get(k) for k in KEEP})
+    # A prompt that names its brief's file: the role is read from that file, as the agent read
+    # it (its own words about itself in the prompt first), unless the description settles it.
+    want: dict[str, set[str]] = collections.defaultdict(set)
+    for r in brief_reads.values():
+        want[r["file"]].add(r["call"])
+    brief_texts = fetch_results(want)
+    for key, r in brief_reads.items():
+        desc = description(agents[key])
+        if desc in ROLE_BY_DESCRIPTION or any(re.search(rx, desc) for _, rx in ROLE_BY_WORDS):
+            continue
+        text = brief_texts.get(r["call"])
+        if text:
+            prompt = agents[key].get("brief") or ""
+            own = "\n".join(m[1] for m in SELF.finditer(prompt))
+            role, basis = role_of(desc, own + "\n" + text)
+            if role != "other":
+                roles[key] = (role, f"its brief file: {basis}")
     commits = git_commits(repo)
     commands = git_commands(manifest)
     edit_times = {k: [(epoch(e["ts"]), e["rel"]) for e in v] for k, v in edits.items()}
@@ -623,8 +714,9 @@ def run(scan: Path, repo: Path) -> dict:
     # The register's restricted-only lines, and what each clean-room toucher's outputs showed.
     reg = register_lines(register_versions(repo))
     touchers = {k for k, _ in touches}
+    implementers = {k for k, v in roles.items() if v[0] == "clean-room implementer"}
     wanted: dict[str, set[str]] = collections.defaultdict(set)
-    for k in touchers:
+    for k in touchers | implementers:
         for r in register[k]:
             if r.get("call") and r.get("file"):
                 wanted[r["file"]].add(r["call"])
@@ -696,13 +788,61 @@ def run(scan: Path, repo: Path) -> dict:
         )
     for entry in tools_out.values():
         entry["verdict"] = verdict(entry)
+        for a in entry["agents"]:
+            if a["role"] != "clean-room implementer":
+                a["diffs"] = {h: diff_nature(repo, h) for h in a["commits"]}
     orch = {k: [e for e in v] for k, v in edits.items() if roles[k][0] == "orchestrator"}
     orch_commits = [
         {"hash": h, **{x: commits[h][x] for x in ("commit_date", "subject", "files")}, **makers[h]}
         for h in commits
         if makers[h]["maker"] and roles.get(makers[h]["maker"], ("",))[0] == "orchestrator"
     ]
+    slips = implementer_slips(
+        agents, roles, restricted, register, texts, reg, writer_roles, touches
+    )
+    cases = case_writers(repo, printed, commands, {r["rel"] for v in brief_dep.values() for r in v})
+    brief_dependent = []
+    for key in sorted(k for k, v in roles.items() if v[0] == "clean-room implementer"):
+        for r in brief_dep.get(key, []):
+            rel = r["rel"]
+            if rel.startswith("validation/difftest/cases/"):
+                w = cases.get(rel) or case_first_writer.get(rel)
+                wrole = roles[w][0] if w in roles else "unknown"
+                if w == key or wrole == "clean-room implementer":
+                    continue  # a clean-room part's own case
+                if w is None and rel.rsplit("/", 1)[-1].startswith("original-"):
+                    continue  # named for the clean-room original that differed: its own case
+                kind = f"R15: a permanent case added by a {wrole}"
+            elif BRIEF_FILES.search(rel):
+                if epoch(r["ts"]) < epoch(BRIEF_FILES_SINCE):
+                    continue
+                desc = description(agents[key])
+                if any(desc.startswith(d) and rel == p for d, p in BRIEF_ALLOWED):
+                    continue
+                kind = (
+                    "R15: the random-testing triage's entries (its brief: do not read them)"
+                    if rel.endswith("triage.toml")
+                    else "R16: a replica part's or spec writer's investigation (its brief: never open)"
+                )
+            else:
+                desc = description(agents[key])
+                if not any(desc.startswith(p) for p in R16_FORBIDDEN_BY):
+                    continue  # its brief named the replica's suite for its cases and mechanics
+                kind = "R16: a replica's suite or evidence module (its brief: never read)"
+            brief_dependent.append(
+                {
+                    "agent": key,
+                    "description": description(agents[key]),
+                    "kind": kind,
+                    **{
+                        k: r.get(k)
+                        for k in ("ts", "op", "via", "rel", "file", "line", "call", "command")
+                    },
+                }
+            )
     return {
+        "slips": slips,
+        "brief_dependent": brief_dependent,
         "tools": tools_out,
         "commits": {h: {**commits[h], **makers[h]} for h in commits},
         "merge_edits": merges,
@@ -721,34 +861,49 @@ SEVERE = ("content", "possible")
 
 
 def verdict(entry: dict) -> dict:
-    """A tool's verdict from its touchers' judged accesses (the dossier's words)."""
-    notes = collections.Counter()
+    """A tool's verdict: the clean-room implementers' judged accesses (the key question: did any
+    of them see restricted material of this family before or while writing it?), and apart, the
+    agents of other roles (the orchestrator, integration, a replica author) that touched it."""
+    notes: collections.Counter = collections.Counter()
     findings = []
-    non_clean = []
+    other = []
     for a in entry["agents"]:
-        if a["role"] not in ("clean-room implementer",):
-            non_clean.append(
-                {"description": a["description"], "role": a["role"], "touches": a["touches"]}
+        seen = [
+            r
+            for r in a["restricted"]
+            if r["when"] == "before or during" and r["relevant"] and r["level"] in SEVERE
+        ]
+        seen_reg = [
+            g
+            for g in a["register"]
+            if g["when"] == "before or during" and g["relevant"] and g["body_lines"]
+        ]
+        if a["role"] != "clean-room implementer":
+            other.append(
+                {
+                    "description": a["description"],
+                    "role": a["role"],
+                    "touches": a["touches"],
+                    "commits": a["commits"],
+                    "relevant_content_before": len(seen) + len(seen_reg),
+                }
             )
+            continue
+        for r in seen:
+            findings.append((a["description"], r["rule"], r["level"], r["show"], r["ts"]))
+        for g in seen_reg:
+            findings.append((a["description"], "R12", "body lines", REGISTER, g["ts"]))
         for r in a["restricted"]:
-            if r["when"] != "before or during":
-                continue
-            if r["relevant"] and r["level"] in SEVERE:
-                findings.append((a["description"], r["rule"], r["level"], r["show"], r["ts"]))
-            else:
+            if r["when"] == "before or during" and r not in seen:
                 notes[(r["rule"], r["level"], "relevant" if r["relevant"] else "other")] += 1
         for g in a["register"]:
-            if g["when"] != "before or during":
-                continue
-            if g["relevant"] and g["body_lines"]:
-                findings.append((a["description"], "R12", "content", REGISTER, g["ts"]))
-            else:
+            if g["when"] == "before or during" and g not in seen_reg:
                 kind = "body" if g["body_lines"] else "headings"
                 notes[("R12", kind, "relevant" if g["relevant"] else "other")] += 1
     if findings:
         status = "review"
-    elif non_clean:
-        status = "clean code, edits by other roles listed"
+    elif other:
+        status = "clean (implementers); edits by other roles listed"
     elif notes:
         status = "clean, with notes"
     else:
@@ -757,8 +912,157 @@ def verdict(entry: dict) -> dict:
         "status": status,
         "findings": findings,
         "notes": {"/".join(k): n for k, n in sorted(notes.items())},
-        "other_roles": non_clean,
+        "other_roles": other,
     }
+
+
+#: Files a clean-room brief may forbid (R16): the replicas' parity suites and evidence modules.
+BRIEF_RESTRICTED = re.compile(
+    r"^validation/src/larmorx_validation/(?:parity|evidence|difftest/tools)/"
+    r"(?:\w*replica\w*|fsl_mcflirt\w*)\.py$"
+)
+CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-path"})
+#: Files the clean-room briefs forbid from the clean-room fixes part on (2026-10-29): the
+#: random-testing triage (replica authors' entries; appending one's own is allowed) and the
+#: investigations of replica parts and spec writers.
+BRIEF_FILES = re.compile(
+    r"^validation/difftest/triage\.toml$|^validation/investigations/(?:fsl-bet|fsl-fast|fsl-flirt|"
+    r"fsl-maths|fsl-mcflirt-replica|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
+    r"version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site)/|"
+    r"^validation/investigations/glibc-dbl/tables\.py$"
+)
+BRIEF_FILES_SINCE = "2026-10-29T01:20:00+01:00"
+#: Files of those folders a brief named for its reader (launch description prefix, path).
+BRIEF_ALLOWED = (
+    # "the block hashes of glibc's results, ...-blocks.json (that one file only: black-box output)"
+    (
+        "Clean-room cbrtf for reproduce",
+        "validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json",
+    ),
+    # "the spec writer's README validation/investigations/bet-spec-answers/README.md"
+    ("BET clean-room part 2a", "validation/investigations/bet-spec-answers/README.md"),
+)
+#: The parts whose briefs forbade the replicas' suites (the clean-room catch-up, 2026-11-04: "The
+#: replicas' suites run the replica as a black box; read only your originals' suites and code").
+#: FLIRT's, FAST's, topup's and fslmaths' clean-room briefs named the replica's suite "for its
+#: cases and mechanics"; the earlier briefs say nothing of it (no rule restricted it).
+R16_FORBIDDEN_BY = ("Clean-room catch-up",)
+
+
+def case_writers(repo: Path, printed, commands, paths: set[str]) -> dict[str, str | None]:
+    """Who added each permanent random-testing case (the maker of the commit that added it)."""
+    out: dict[str, str | None] = {}
+    if not paths:
+        return out
+    txt = _git(
+        repo,
+        "log",
+        "--all",
+        "--diff-filter=A",
+        "--format=" + SEP + "%H%x1f%cI%x1f%s",
+        "--name-only",
+        "--",
+        "validation/difftest/cases",
+    )
+    added: dict[str, dict] = {}
+    for chunk in txt.split(SEP)[1:]:
+        head, _, body = chunk.partition("\n")
+        h, cd, subject = head.split("\x1f")
+        for f in body.splitlines():
+            if f.strip() and f.strip() not in added:
+                added[f.strip()] = {"hash": h, "commit_date": cd, "subject": subject, "files": []}
+    wanted = {p: added[p] for p in paths if p in added}
+    makers = attribute({c["hash"]: c for c in wanted.values()}, printed, commands, {})
+    for p, c in wanted.items():
+        out[p] = makers[c["hash"]]["maker"]
+    return out
+
+
+def implementer_slips(agents, roles, restricted, register, texts, reg, writer_roles, touches):
+    """Every clean-room implementer's accesses that showed restricted material (any family, any
+    time; material only clean-room implementers wrote excepted), one entry per call: the list
+    the declared slips are compared with."""
+    touched: dict[str, set[str]] = collections.defaultdict(set)
+    for (k, tool), _ in touches.items():
+        touched[k].add("/".join(tool))
+    out = []
+    for key in sorted(k for k, v in roles.items() if v[0] == "clean-room implementer"):
+        calls: dict[str, dict] = {}
+        for r in restricted[key]:
+            j = judge(r, "", writer_roles, part_kind)
+            if j.level not in SEVERE or not r.get("in_force"):
+                continue
+            c = calls.setdefault(
+                r.get("call") or f"line-{r['line']}",
+                {
+                    "ts": r["ts"],
+                    "file": r["file"],
+                    "line": r["line"],
+                    "command": r.get("command") or r.get("detail") or "",
+                    "rules": collections.Counter(),
+                    "paths": set(),
+                },
+            )
+            c["rules"][f"{r['rule']}:{r.get('family')}:{j.level}"] += 1
+            c["paths"].add(r["show"])
+        for g in register[key]:
+            txt = texts.get(g.get("call") or "", "")
+            hits = printed_register_lines(txt, reg) if txt else []
+            if not hits:
+                continue
+            c = calls.setdefault(
+                g.get("call") or f"line-{g['line']}",
+                {
+                    "ts": g["ts"],
+                    "file": g["file"],
+                    "line": g["line"],
+                    "command": g.get("command") or "",
+                    "rules": collections.Counter(),
+                    "paths": set(),
+                },
+            )
+            body = sum(1 for _, x in hits if not is_heading(x))
+            c["rules"][
+                f"R12:{'+'.join(sorted({s.split(':')[1].split('(')[0].strip() for s, _ in hits}))}:"
+                f"{'body' if body else 'headings'}"
+            ] += len(hits)
+            c["paths"].add(REGISTER)
+            c.setdefault("register_sample", [x[:160] for _, x in hits if not is_heading(x)][:3])
+        for cid, c in sorted(calls.items(), key=lambda kv: kv[1]["ts"]):
+            out.append(
+                {
+                    "agent": key,
+                    "description": description(agents[key]),
+                    "tools_touched": sorted(touched.get(key, ())),
+                    "call": cid,
+                    **{k: v for k, v in c.items() if k not in ("rules", "paths")},
+                    "rules": dict(c["rules"]),
+                    "paths": sorted(c["paths"]),
+                }
+            )
+    return out
+
+
+def diff_nature(repo: Path, h: str, paths=CLEANROOM_PATHS) -> dict:
+    """What a commit changed in the clean-room code: lines added and removed, and how many of
+    them are comments, blank or package metadata (a merge: its own resolution, ``--cc``)."""
+    txt = _git(repo, "show", "--cc", "--format=", h, "--", *paths)
+    added = removed = trivial = 0
+    for line in txt.splitlines():
+        if line.startswith(("+++", "---", "diff ", "index ", "@@")):
+            continue
+        m = re.match(r"^([ +-]{1,2})(.*)$", line)
+        if not m or ("+" not in m[1] and "-" not in m[1]) or m[1].strip() == "":
+            continue
+        body = m[2].strip()
+        if "+" in m[1]:
+            added += 1
+        else:
+            removed += 1
+        if not body or body.startswith(("//", "#", "/*", "*")):
+            trivial += 1
+    files = re.findall(r"^diff --(?:git a/\S+ b/|cc )(\S+)$", txt, re.M)
+    return {"files": files, "added": added, "removed": removed, "comments_or_blank": trivial}
 
 
 def add_arguments(sub) -> None:

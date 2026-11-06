@@ -100,6 +100,7 @@ correction changed the result, and reproduced with `upstream_defects="reproduce"
 | FSL-269 | NaN phases inside the mask enter the regions: a region joined to a NaN moves by about 2^31 turns | NaN voxels left out of the mask, NaN in the output |
 | FSL-270 | `--end` before `--start` writes no output and exits 0 | refused (exit 1) |
 | FSL-271 | a magnitude or mask of another size is read by the phase's voxel indices | refused (exit 1) |
+| FSL-272 | a NaN first phase value skips the phase range check and the rewrap to [-pi, pi] (FSL's extrema are both NaN) | the extrema of the other values: rewrapped, or FSL's range error (exit 255), as without the NaN |
 
 FSL-267 (the range message says 6.283 radians where the check is 3 pi) is a message only: kept
 as FSL prints it.

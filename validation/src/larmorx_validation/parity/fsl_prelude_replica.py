@@ -239,7 +239,7 @@ def _python_check(checks: CheckList, args: list[str], files: dict[str, Path], fs
 # Derived inputs
 
 #: The derived inputs' recipe version: a change makes them again (a new directory).
-INPUTS_VERSION = "3"
+INPUTS_VERSION = "4"
 
 
 def _atomic_dir(target: Path, make: Any) -> Path:
@@ -336,6 +336,14 @@ def _make_inputs(d: Path) -> None:
             far = _wrapped(true)
             far[20, 18, 6] = 3.5 * np.pi
             _save(d / "s_range.nii.gz", far)
+            # FSL-272: a NaN first value (FSL's first in memory: the image is radiological) of a
+            # phase from 0 to 2pi (not rewrapped by FSL) and of one of range 4pi (not refused)
+            twopi_nan = _wrapped(true) + np.float32(np.pi)
+            twopi_nan[0, 0, 0] = np.nan
+            _save(d / "s_ph2pi_nanfirst.nii.gz", twopi_nan)
+            range_nan = (_wrapped(true) + np.float32(np.pi)) * np.float32(2.0)
+            range_nan[0, 0, 0] = np.nan
+            _save(d / "s_range4pi_nanfirst.nii.gz", range_nan)
             _save(d / "s_mag_other.nii.gz", mag[:, :, :10])
             _save(
                 d / "s_mag_larger.nii.gz",
@@ -766,6 +774,18 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
             "standard",
             "NaN phases inside the mask (FSL-269)",
             Run(("-p", "@s_nanph.nii.gz", "-a", "@s_mag.nii.gz", *o)),
+        ),
+        "opt/nan-first-twopi": (
+            "standard",
+            "a phase from 0 to 2pi whose first value is NaN: FSL does not rewrap it (FSL-272; the "
+            "default rewraps it as without the NaN)",
+            Run(("-p", "@s_ph2pi_nanfirst.nii.gz", "-a", "@s_mag.nii.gz", *o)),
+        ),
+        "opt/nan-first-range": (
+            "standard",
+            "a phase of range 4pi whose first value is NaN: FSL does not refuse it (FSL-272; the "
+            "default stops with FSL's range error, status 255)",
+            Run(("-p", "@s_range4pi_nanfirst.nii.gz", "-a", "@s_mag.nii.gz", *o)),
         ),
         "opt/nan-phase-first": (
             "standard",

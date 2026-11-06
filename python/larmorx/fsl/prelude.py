@@ -13,7 +13,7 @@ PRELUDE has only its bit-exact replica yet (``larmorx-nc``, FSL Licence, run as 
 program); its clean-room original is to be written from ``specs/prelude.md``.
 ``implementation`` is ``"auto"`` or ``"replica"`` (``"original"`` raises
 ``NotImplementedError``). FSL's deterministic defects are corrected by default (D13,
-``docs/api/upstream-defects.md``: FSL-261 to FSL-271); ``upstream_defects="reproduce"`` gives
+``docs/api/upstream-defects.md``: FSL-261 to FSL-272); ``upstream_defects="reproduce"`` gives
 FSL's results bit for bit. FSL's environment variables are never read from the process
 environment (CLAUDE.md rule 6). A run that fails raises :class:`larmorx._replica.ReplicaError`
 (a :class:`RuntimeError`) with FSL's messages."""

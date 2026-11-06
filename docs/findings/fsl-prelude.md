@@ -102,7 +102,7 @@ bit), *probed* (`validation/investigations/fsl-prelude/`).
   result computes both (FSL-268, FSL-269); `-v`'s messages keep FSL's order. The thresholds'
   two percentiles sort the values once (FSL sorts the same values twice: the same order).
 
-## Defects (D13; the register's FSL-261 to FSL-271)
+## Defects (D13; the register's FSL-261 to FSL-272)
 
 `LARMORX_UPSTREAM_DEFECTS=reproduce` gives FSL's result bit for bit (the suite runs the replica so
 and compares every file); the default `fix` corrects each, with a notice where the correction
@@ -121,6 +121,7 @@ changed the result. Decided by the rules A-D (CLAUDE.md, D13).
 | FSL-269 | NaN phases inside the mask are labelled (their bin is 1: `(int)NaN` is INT_MIN, clamped); their constraints are NaN and merged last with `round(NaN)` = INT_MIN as the offset, so a region labelled together with a NaN voxel, or merged into one through a NaN constraint, moves by about 2^31 cycles (about 1.35e10 written in 2,608 voxels: `nan_phase_region.py`); with `-s` NaN differences between slices enter the median's sort (undefined order) (`opt/nan-phase*`) | A | NaN voxels left out of the mask; NaN put back in the unwrapped phase | the outputs or `-v`'s lines differ (both computed; random testing, 2026-11-06: a NaN phase in a one-voxel mask changes only the size `-v` prints); reproduce: a sort outside the values (`-s`) is refused |
 | FSL-270 | `--end` before `--start` processes no volume and writes no unwrapped output, yet exits 0 (the raw phase, if asked for, is written) (`opt/series-start-end`) | B | refused: "no volume to process: --end (<e>) is before --start (<s>)" (exit 1), after FSL's own exception for a `--start` outside the series | reproduce: no volume processed, no output (named) |
 | FSL-271 | a magnitude (or mask) image of another size than the phase is not refused: it is read by the phase's voxel indices, outside its own extent by its extrapolation, so the mask does not correspond to the phase (reproduced bit for bit, three suite cases) | B | refused: "the magnitude (mask) image has another size than the phase image" (exit 1) | reproduce: read by the phase's indices (named) |
+| FSL-272 | `main`'s sanity check takes `phasemaps[n].max()` and `.min()` (newimage's `calc_minmax`, started at the first value: a NaN first value makes both NaN); `range > 3*M_PI` and the rewrap's test (`max > 1.001*M_PI` or `min < -1.001*M_PI`) are then false: no range error, no rewrap. Measured (spec writer 2026-11-06, `validation/investigations/prelude-spec/fsl272_measure.py`, FSL's runs): 7 of 8 maps (fMRIPrep's 7 calls moved to [0, 2π), a synthetic one) come out whole cycles wrong in some regions (0.1 to 100 % of the mask, up to 18.8 rad); the rewrapped map gives FSL's own result without the NaN; a 4π range is processed (exit 0) | D, then A | the extrema of the values that are not NaN (`extrema_without_nan`): the rewrap, or FSL's range error with status 255, as without the NaN (the replica's default gives FSL's result without the NaN bit for bit on ds005454's call) | when the two extrema decide differently (range error, rewrap or neither), both modes |
 
 Refusals print `larmorx-nc: error: prelude: <what> (FSL-<n>)` on standard error and write
 nothing.

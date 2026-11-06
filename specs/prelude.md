@@ -292,7 +292,10 @@ Before any mask, for each volume `v = s, ..., e` in turn (before the next volume
   then for each later value, if it is greater than the maximum it becomes the maximum, otherwise
   if it is less than the minimum it becomes the minimum (IEEE comparisons: a NaN never replaces
   nor is replaced, so a NaN first value makes both extrema NaN; NaN values elsewhere are passed
-  over) **(observed:** a NaN first voxel skips both rules below; §9.2**)**;
+  over) **(observed:** a NaN first voxel skips both rules below**)**. That is FSL's (`reproduce`);
+  the **default** starts both at the first value that is **not NaN** and applies the same rule to
+  the values after it (every value NaN: both NaN, neither rule below applies), so a NaN first
+  value no longer skips the range check or the rewrap (FSL-272, §9.1; spec writer, 2026-11-06);
 - the **range** `R = max − min` (single precision); if `R > 3π` (the comparison in double, `3π`
   the double `3 × π`): `ERROR: input phase image exceeds allowable phase range.`, `Allowable range
   is 6.283 radians.  Image range is: <R> radians.` (two blanks after the first full stop; `R` as a
@@ -589,6 +592,7 @@ family's error type with the same messages).
 | FSL-269 | NaN phases inside the mask are labelled (interval 1), their constraints get NaN `P`, `K` and `C`, are chosen by §4.8's rule, and their `rnd(NaN) = −2³¹` turns move a region labelled with a NaN voxel, or merged through a NaN constraint, by about `2³¹` turns (about `1.35 × 10¹⁰` rad); in the slices mode NaN differences enter §4.9's sort | the NaN voxels left out of the mask (before the ramps; the saved mask without them, not reduced to a component again), the unwrapped phase NaN there (the raw phase keeps them) (rule A) | FSL's (§4.6, §4.8 with NaN arithmetic); a §4.9 sort with NaN values refused where it would read outside them | where the correction changes anything the run writes or prints (both computed; a NaN in a one-voxel mask changes only `-v`'s `(1 by 1)`) |
 | FSL-270 | `--end` before `--start` processes no volume and writes no unwrapped phase, yet exits 0 (`-r` written) | refused: `no volume to process: --end (<e>) is before --start (<s>)`, after the loading lines and FSL's own exception for a `--start` outside the series, before §4.2, nothing written (rule B) | FSL's | reproduce: no volume processed, no output written |
 | FSL-271 | a magnitude (or, with `-m`, a mask image) of another spatial size than the phase is not refused: the mask, made on the source's own grid, is read at the phase's voxel indices: a coordinate one voxel beyond the source's grid is moved onto its edge, and a point then inside reads that voxel, any other point outside reads 0 | refused: `the magnitude image has another size than the phase image` (with `-m`: `the mask image has ...`), after §4.2 and §4.3, before any volume (only when a volume is processed; with `-m` the magnitude's size is not compared; the number of volumes is not compared: §4.4) (rule B) | FSL's reading | reproduce: named |
+| FSL-272 | §4.2's extrema start at the first value, so a NaN first phase value makes both NaN: the `3π` range check and the `1.001 π` rewrap are both skipped (a phase from 0 to 2π is unwrapped without the rewrap, and some regions come out whole cycles from where they come without the NaN; a phase of any range is processed) | the extrema of the values that are not NaN (§4.2): the range error and its status 255 and the rewrap as without the NaN (rule D measured, then A) | FSL's | when the two extrema decide differently (the range error, the rewrap or neither), both modes: `volume <n>: its first phase value is NaN: the rewrap to [-pi,pi] taken over its other values (prelude skips it)` (`the range check ...`; with `reproduce` `... skipped, as in prelude`) |
 
 Refusals print `larmorx: error: prelude: <what> (FSL-<n>)` on standard error (the replica:
 `larmorx-nc: error: prelude: ...`) and exit 1; notices print `larmorx: upstream defect FSL-<n>
@@ -600,11 +604,16 @@ refusals of a sort that would read outside its values (FSL-268, FSL-269 with `re
 ### 9.2 Kept as FSL's (rule C, not registered)
 
 - The automatic 2D labels for images larger than 64 voxels along x or y (Jenkinson 2003's design).
-- The `3π` range check and the rewrap beyond `1.001 π`; the extrema rule of §4.2, so a NaN first
-  phase value skips both (the range check and the rewrap) in both modes **(observed:** a 0-to-2π
-  phase with a NaN first voxel is labelled as it is, 7 regions instead of 58, and a phase of range
-  12.6 rad is not refused**)**. Whether correcting it helps (rule D) is to be measured; it would be
-  a new entry, then also in this spec.
+- The `3π` range check and the rewrap beyond `1.001 π` themselves (FSL's design). Their extrema's
+  NaN rule is FSL-272 (§9.1), decided by rule D (spec writer, 2026-11-06) **(observed** with FSL's
+  runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls
+  and a synthetic map, each phase moved to [0, 2π) with its first value NaN: FSL's unwrapped
+  phase differs from its own result for the same map without the NaN in 7 of the 8, by whole
+  cycles, in 0.1 % to 100 % of the mask's voxels, with up to five distinct offsets in one map
+  (regions unwrapped against each other wrongly, up to 18.8 rad); the map rewrapped beforehand,
+  which is what the default does, gives FSL's result without the NaN to 9.5e-7 rad (the rewrap's
+  own rounding); a phase of range 4π with a NaN first value is processed, exit 0, where without the
+  NaN FSL stops with its range error, 255**)**.
 - A given `-m` mask cut down to its largest component; `-t` applied to it; its last volume reused.
 - `-r`'s raw phase with the ramps removed and restored (§4.5).
 - The complex input unscaled (§3.2); a magnitude series shorter than the phase's aborting (§4.4).
@@ -671,7 +680,7 @@ the standard tier) is the model; the original's suite runs the same cases with
   with a gap, complex64 in both byte orders, complex128, float32 and int16 given to `-c`, NaN
   magnitudes and phases (first voxels, inside a region, `-s`), long names, `-u` and grouped
   flags); every output type; every message and failure of §2.4, §3, §4.1, §4.2 (the errors'
-  category); FSL-261 to FSL-271 in both modes.
+  category); FSL-261 to FSL-272 in both modes.
 - **Random testing**: the descriptor `fsl-prelude` (`validation/src/larmorx_validation/difftest/
   tools/fsl_prelude.py`: wrapped smooth phases over a head phantom with a random background, complex
   images, every option, series, the defects' inputs) with the original as the implementation under

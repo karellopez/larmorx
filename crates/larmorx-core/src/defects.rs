@@ -670,6 +670,8 @@ defects! {
         "--end before --start processes no volume and writes no unwrapped output, yet exits 0 (the raw phase output, if asked for, is written)";
     FSL_271 = "FSL-271", "prelude", true,
         "a magnitude or mask image of another size than the phase image is not refused: it is read by the phase image's voxel indices, outside its own extent by its extrapolation, so the mask does not correspond to the phase";
+    FSL_272 = "FSL-272", "prelude", true,
+        "the phase range check (more than 3 pi refused) and the rewrap to [-pi, pi] (beyond 1.001 pi) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2 pi is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused";
     FSL_273 = "FSL-273", "applytopup", true,
         "--method=jac divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each phase-encoded axis by the ratio of the voxel sizes, not the Jacobian of the displacement applied, so the intensities are modulated wrongly";
     ITK_50 = "ITK-50", "ITK", true,

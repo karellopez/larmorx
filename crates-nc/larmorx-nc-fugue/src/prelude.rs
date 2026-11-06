@@ -212,6 +212,24 @@ fn args_of(parser: &OptionParser, p: &Parsed) -> Args {
     }
 }
 
+/// The extrema of `data` by FSL's rule (each later value that is greater becomes the maximum,
+/// otherwise each that is less the minimum) started at the first value that is not NaN: FSL-272's
+/// default. All NaN: both NaN.
+fn extrema_without_nan(data: &[f32]) -> (f32, f32) {
+    let Some(i) = data.iter().position(|v| !v.is_nan()) else {
+        return (f32::NAN, f32::NAN);
+    };
+    let (mut mx, mut mn) = (data[i], data[i]);
+    for &v in &data[i + 1..] {
+        if v > mx {
+            mx = v;
+        } else if v < mn {
+            mn = v;
+        }
+    }
+    (mx, mn)
+}
+
 /// The streams and the notices of one run.
 struct Io<'a> {
     out: &'a mut dyn Write,
@@ -416,7 +434,40 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
     // sanity check on phase values
     for n in imgstart..=imgend {
         let ph = phasemaps.sub_volume(n)?;
-        let (mx, mn) = ph.extrema();
+        // FSL-272 (rule D -> A): FSL's extrema start at the first value, so a NaN first value
+        // makes both NaN and skips the range check and the rewrap; the default takes them over
+        // the values that are not NaN
+        let (fmx, fmn) = ph.extrema();
+        let (nmx, nmn) = extrema_without_nan(&ph.data);
+        let (mx, mn) = if fsl { (fmx, fmn) } else { (nmx, nmn) };
+        // what the extrema decide: 2 the range error, 1 the rewrap, 0 neither
+        let outcome = |mx: f32, mn: f32| {
+            let range = (larmorx_nc_core::sse::S32(mx) - mn).0;
+            if f64::from(range) > 3.0 * PI {
+                2
+            } else if f64::from(mx) > 1.001 * PI || f64::from(mn) < -1.001 * PI {
+                1
+            } else {
+                0
+            }
+        };
+        let (cf, cx) = (outcome(fmx, fmn), outcome(nmx, nmn));
+        if cf != cx {
+            let what = ["neither", "the rewrap to [-pi,pi]", "the range check"][cf.max(cx)];
+            io.notice(
+                &defects::FSL_272,
+                if fsl {
+                    format!(
+                        "volume {n}: its first phase value is NaN: {what} skipped, as in prelude"
+                    )
+                } else {
+                    format!(
+                        "volume {n}: its first phase value is NaN: {what} taken over its other \
+                         values (prelude skips it)"
+                    )
+                },
+            );
+        }
         let range = (larmorx_nc_core::sse::S32(mx) - mn).0;
         if f64::from(range) > 3.0 * PI {
             let _ = writeln!(
@@ -1005,6 +1056,30 @@ mod tests {
     /// writes or prints: `-v`'s lines (random testing, prelude-check 2928: a NaN phase left out
     /// of a one-voxel mask changes only "Calculating starting matrices (1 by 1)"), grot only
     /// where it is written (reproduce), the saved mask only where the mask changes (FSL-269).
+    #[test]
+    fn fsl272_extrema_pass_over_nan() {
+        let nan = f32::NAN;
+        // FSL's rule: a NaN first value makes both extrema NaN; the default starts at the first
+        // value that is not NaN, by the same rule
+        let v = [nan, 0.5, 6.0, -0.25, nan, 3.0];
+        let (fmx, fmn) = {
+            let (mut mx, mut mn) = (v[0], v[0]);
+            for &x in &v[1..] {
+                if x > mx {
+                    mx = x;
+                } else if x < mn {
+                    mn = x;
+                }
+            }
+            (mx, mn)
+        };
+        assert!(fmx.is_nan() && fmn.is_nan());
+        assert_eq!(extrema_without_nan(&v), (6.0, -0.25));
+        assert_eq!(extrema_without_nan(&[1.0, nan, 2.0]), (2.0, 1.0));
+        let (a, b) = extrema_without_nan(&[nan, nan]);
+        assert!(a.is_nan() && b.is_nan());
+    }
+
     #[test]
     fn notices_compare_what_the_run_writes_and_prints() {
         let base = ["-p", "ph", "-a", "mag", "-o", "out"];

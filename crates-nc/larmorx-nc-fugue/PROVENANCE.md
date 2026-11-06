@@ -56,5 +56,6 @@ what it translates.
 ## Upstream defects (D13)
 
 `LARMORX_UPSTREAM_DEFECTS=reproduce` gives FSL's result bit for bit; the default `fix` corrects
-FSL-261 to FSL-266 and FSL-268 to FSL-271 (FSL-267, the range message, is kept as FSL prints it):
+FSL-261 to FSL-266 and FSL-268 to FSL-272 (FSL-267, the range message, is kept as FSL prints it;
+FSL-272, the extrema of the values that are not NaN: `prelude::extrema_without_nan`, 2026-11-06):
 `docs/findings/fsl-prelude.md` and the register.

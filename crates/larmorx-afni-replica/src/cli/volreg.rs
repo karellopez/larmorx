@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0 AND CC-BY-4.0
 // Translated to Rust from AFNI 26.3.05 src/3dvolreg.c (main and VL_command_line: the option scan,
 // the checks, the messages, the parameter files and the -rotcom fragments), src/thd_notes.c
-// (tross_commandline), src/thd_opendset.c (modify_afni_prefix with a suffix) and
-// src/thd_mismatch.c (THD_dataset_mismatch's dimension, spacing and orientation tests). Major
-// portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
-// released by AFNI 26.3.05 under the Creative Commons Attribution 4.0 International licence (CC BY
-// 4.0). thd_mismatch.c carries no such notice: it was written at the NIH and is in the public
-// domain.
+// (tross_commandline), src/thd_opendset.c (modify_afni_prefix with a suffix),
+// src/thd_mismatch.c (THD_dataset_mismatch's dimension, spacing and orientation tests),
+// src/thd_tshift.c (THD_dataset_tshift), 3dvolreg.c's VL_normalize_timeseries and
+// VL_create_disprod, src/thd_detrend.c (THD_normmax), src/thd_zeropad.c (THD_zeropad with
+// ZPAD_EMPTY), src/cs_addto_args.c (addto_args) and src/thd_coords.c (THD_report_obliquity's
+// first_oblique). Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI,
+// Robert W. Cox et al.), released by AFNI 26.3.05 under the Creative Commons Attribution 4.0
+// International licence (CC BY 4.0). thd_mismatch.c and thd_zeropad.c carry no such notice:
+// they were written at the NIH and are in the public domain.
 // CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ (the material is provided as is, without
 // warranties of any kind); source: https://github.com/afni/afni, tag AFNI_26.3.05.
 // AFNI asks that work based on it cite its authors (LICENSE.txt).
@@ -1469,6 +1472,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         firfac: settings.num("AFNI_BLUR_FIRFAC"),
         firold: settings.yes("AFNI_BLUR_FIROLD"),
         matvec,
+        whole_point_mirrors: false,
         mode,
     };
     drop(o.weight.take());

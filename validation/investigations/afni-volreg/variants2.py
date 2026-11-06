@@ -43,8 +43,9 @@ def save(arr, affine, name, tr=None, slice_code=0, slope=None):
 # Slice timing: sequential ascending, TR 2 s, 24 slices (float32).
 save(data, aff, "s6_st.nii.gz", tr=2.0, slice_code=1)
 # int16 with a negative slope and alternating slices (AFNI-01 on -tshift's path).
-save(np.round(-data * 4).astype(np.int16), aff, "s6_stneg.nii.gz", tr=2.0, slice_code=3,
-     slope=-0.25)
+save(
+    np.round(-data * 4).astype(np.int16), aff, "s6_stneg.nii.gz", tr=2.0, slice_code=3, slope=-0.25
+)
 # Slice timing on a 4-volume series (-tshift's "ignore is too large").
 save(data[..., :4], aff, "s6_st4.nii.gz", tr=2.0, slice_code=1)
 
@@ -74,12 +75,15 @@ save(np.ascontiguousarray(data[:, :, 12:13, :4]), aff, "s7_nz1.nii.gz")
 save(np.ascontiguousarray(data[:, :, 10:14, :4]), aff, "s7_nz4.nii.gz")
 
 # -rotparent: AFNI's own 3dvolreg outputs (registered to sub-brick 3, so sub-brick 0 moved).
-env = {"PATH": "/usr/bin:/bin", "HOME": str(d), "OMP_NUM_THREADS": "1",
-       "AFNI_QUIET_STARTUP": "YES"}
-for src, out in (("s1.nii.gz", "rp.nii.gz"), ("s6_st.nii.gz", "rp_st.nii.gz"),
-                 ("s3_oblique.nii.gz", "rp_obl.nii.gz")):
+env = {"PATH": "/usr/bin:/bin", "HOME": str(d), "OMP_NUM_THREADS": "1", "AFNI_QUIET_STARTUP": "YES"}
+for src, out in (
+    ("s1.nii.gz", "rp.nii.gz"),
+    ("s6_st.nii.gz", "rp_st.nii.gz"),
+    ("s3_oblique.nii.gz", "rp_obl.nii.gz"),
+):
     if (d / out).exists():
         os.remove(d / out)
-    subprocess.run([afni, "-base", "3", "-prefix", out, src], cwd=d, env=env, check=True,
-                   capture_output=True)
+    subprocess.run(
+        [afni, "-base", "3", "-prefix", out, src], cwd=d, env=env, check=True, capture_output=True
+    )
 print("ok")

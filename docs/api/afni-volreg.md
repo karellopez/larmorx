@@ -1,0 +1,111 @@
+# 3dvolreg
+
+`lx.afni.volreg` (command line `larmorx afni 3dvolreg`): rigid-body (6-parameter) registration
+of every volume of a series to a base volume, as AFNI's `3dvolreg` computes it (AFNI 26.3.05).
+fMRIPrep runs it for its BOLD reference (niworkflows' `RobustAverage`: up to 20 volumes aligned
+before their median, `-Fourier -twopass -zpad 4`, once per run and per 4D sbref) and sdcflows'
+PEPOLAR estimator for its reference averages.
+
+**One implementation so far, in `pip install larmorx`.** The bit-exact **replica**, translated
+from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for
+the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0
+([NOTICE](../../NOTICE), [licensing](../licensing.md)), and the NIH's public-domain files,
+[PROVENANCE](../../crates/larmorx-afni-replica/PROVENANCE.md)). Its clean-room original, built
+for speed, is to be written from [`specs/3dvolreg.md`](../../specs/3dvolreg.md) by another agent
+(the user, 2026-11-06). `implementation="auto"` (the default, and `larmorx afni 3dvolreg`) and
+`"replica"` run the replica, in the same process; `"original"` raises `NotImplementedError`.
+
+**Status: `experimental`** (2026-11-06): the replica is bit-identical with AFNI 26.3.05 on every
+case compared so far (`validation/investigations/afni-volreg/`: over 110 cases, every option, data
+type, orientation and message, fMRIPrep's call on inputs re-made from three oracle runs); the
+validation record `afni-volreg-replica` (the oracle cache, the standard tier) comes with the
+parity suite.
+
+## Quick start
+
+```python
+import larmorx as lx
+
+# As fMRIPrep's RobustAverage calls 3dvolreg (-Fourier -twopass -zpad 4).
+r = lx.afni.volreg("bold_sliced.nii.gz", **lx.afni.fmriprep_volreg_options())
+r.registered          # the registered series (an lx.Image)
+r.parameters          # (n, 6): roll, pitch, yaw (deg), dS, dL, dP (mm), as -1Dfile
+r.matrices            # (n, 12): -1Dmatrix_save's rows (base to input, DICOM)
+r.max_displacement    # (n,): -maxdisp1D
+
+# The default heptic registration to volume 3, with the displacement datasets.
+r = lx.afni.volreg(series, base=3, save_displacements=True, n_threads=6)
+```
+
+```bash
+larmorx afni 3dvolreg -Fourier -twopass -zpad 4 -1Dfile mc.1D -1Dmatrix_save mc.aff12.1D \
+    -maxdisp1D md.1D -prefix reg.nii.gz bold.nii.gz
+```
+
+## `lx.afni.volreg(image, *, base=0, interpolation="heptic", final=None, clip=True, zpad=4, twopass=False, twoblur=2.0, coarse=(10, 2), coarse_rotation=True, sinit=True, weight=None, weight_index=0, weight_input=False, edging=None, max_iterations=23, x_threshold=0.01, rot_threshold=0.02, delta=0.70, tshift=None, float_output=False, maxdisp=True, save_displacements=False, rotparent=None, gridparent=None, twodup=False, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
+
+Returns a `VolregResult`: `registered`, `parameters`, `matrices`, `rms` (`-dfile`'s rmsold and
+rmsnew), `max_displacement` and `max_delta_displacement` (with `maxdisp=True`), `displacements`
+(with `save_displacements=True`: the x, y and z displacement series). `lx.afni.fmriprep_volreg_options()`
+gives fMRIPrep's arguments. The arguments are checked before anything runs (`ValueError`);
+AFNI's fatal errors (a base with fewer than 100 non-zero voxels, mismatched grids, ...) are
+`larmorx.ReplicaError`s with AFNI's message.
+
+### Option mapping
+
+| 3dvolreg | `lx.afni.volreg` | Notes |
+|---|---|---|
+| `dataset`, `-input`, `-source` | `image` | NIfTI-1/2 (`.nii`, `.nii.gz`) or an in-memory image; sub-brick selectors (`dset[...]`) are refused, as by every larmorx AFNI tool |
+| `-base n`, `-base dset` | `base` (int, path or image) | an external base's first volume (AFNI warns when it has more) |
+| `-Fourier`, `-heptic` (default), `-quintic`, `-cubic`, `-linear` | `interpolation` | also `-fourier`, `-Heptic`, ... (4 letters) |
+| `-final mode` | `final` | `NN`, `linear`, `cubic`, `quintic`, `heptic`, `Fourier` |
+| `-clipit` (default), `-noclip` | `clip` | `-clipit` prints AFNI's notice |
+| `-zpad n` | `zpad` | default 4; `AFNI_ROTA_ZPAD` is never read (AFNI's help says otherwise: kept, rule C) |
+| `-prefix p` | (temporary file) | `.nii`/`.nii.gz` only; `NULL` writes nothing |
+| `-float` | `float_output` | a scaled input is always written as float, as in AFNI |
+| `-1Dfile`, `-dfile`, `-1Dmatrix_save` | `parameters`, `rms`, `matrices` | `-1Dmatrix_save ff` writes `ff.aff12.1D` unless `ff` ends in `.1D` |
+| `-maxdisp` (default), `-nomaxdisp`, `-maxdisp1D mm` | `maxdisp`, `max_displacement`, `max_delta_displacement` | the delta goes to `mm_delt` (with `-maxdisp1D -`: the file `-_delt`, as AFNI's help says: kept, rule C) |
+| `-savedisp sss`, `-SAVEDISP sss` | `save_displacements` | `-SAVEDISP` (command line only): 19 normalised datasets; names must end in `.nii`/`.nii.gz` |
+| `-rotcom` | (command line only) | the `3drotate` fragments on standard output |
+| `-twopass`, `-twoblur bb`, `-twodup`, `-sinit`, `-coarse del num` | `twopass`, `twoblur`, `twodup`, `sinit=False`, `coarse` | `-twopass` raises a `-maxite` below 10 to 66 |
+| `-coarserot` (default), `-nocoarserot` | `coarse_rotation` | AFNI-86: AFNI reads `-nocoarserot` as `-noclip` (`reproduce`) |
+| `-weight 'wset[n]'`, `-wtinp`, `-wtrim` | `weight`, `weight_index`, `weight_input` | `-wtrim` is always on (AFNI's notice) |
+| `-edging ee`, `-edging ee%` | `edging` | default 5%, or `AFNI_VOLREG_EDGING` |
+| `-maxite`, `-x_thresh`, `-rot_thresh`, `-delta`, `-params m x r d` | `max_iterations`, `x_threshold`, `rot_threshold`, `delta` | non-positive values are ignored by `-maxite` etc. (the wrapper refuses them) |
+| `-tshift ii` | `tshift` | 3dTshift's default (Fourier, the trend restored) before registering |
+| `-rotparent rset`, `-gridparent gset` | `rotparent`, `gridparent` (paths) | the rotparent must be an output of AFNI's own 3dvolreg (larmorx writes no `VOLREG_*` attributes) |
+| `-verbose` (twice: more) | (command line only) | the CPU times are printed as 0 |
+| `-@` | (command line only) | the arguments from standard input |
+| `-overwrite`, `-Dname=value`, `-skip_afnirc` | `afni_settings` | AFNI's global options |
+
+## Upstream defects
+
+Corrected by default, reproduced with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS`);
+each is named by an `UpstreamDefectWarning` (`*+ WARNING: upstream defect ...` on the command
+line) where it changed the result ([register](upstream-defects.md)):
+
+| ID | Rule | What AFNI does | larmorx by default |
+|---|---|---|---|
+| AFNI-86 | A | `-nocoarserot` matches `-noclip` first: the clipping goes off, the coarse rotation search stays on | as the help says |
+| AFNI-87 | A | a byte dataset's registered volumes are stretched to 0..255.9 each | rounded and clamped bytes |
+| AFNI-88 | B | an option that needs a value, given last, reads past the arguments (a crash) | an error (both modes); AFNI's own message where it gives one (`-input`, `-rotparent`, `-gridparent`, `-1Dmatrix_save`) |
+| AFNI-89 | B | a base whose least squares cannot be set up (a constant volume) crashes at the first volume | an error after AFNI's messages (both modes) |
+| AFNI-90 | A | `-prefix`, `-dfile`, `-1Dfile` and `-weight`'s name of 256 bytes or more abort (buffer overflow); `-maxdisp1D` names are cut at 997 | kept whole (`reproduce`: refused, cut) |
+| AFNI-92 | A | `-nomaxdisp` changes `-twopass`'s coarse rotation search (the automask's clip fraction) | the same search with and without |
+| AFNI-93 | A | a coarse-search region with no voxel (a volume too thin) scores 0 and keeps the first candidate | such candidates are not taken |
+| AFNI-94 | B | `-coarse 1` on a volume of 120³ or more never ends | an error (both modes) |
+| AFNI-95 | B | `-base 0 -base 3` is accepted (the last wins) | an error |
+| AFNI-96 | B | a `-rotparent` without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE` is read through a NULL pointer | an error (both modes) |
+
+Kept in both modes and documented (rule C): the blur's row-end mirrors (measured: switching to
+whole-point mirrors moves the parameters by at most 1.5e-5 degrees and 1.1e-5 mm, the registered
+volumes by 1.4e-6 of their largest value), `-twopass`'s first-pass weight built from the base
+and the first volume even when the base is that volume, the help's `-maxite 66` and
+`AFNI_ROTA_ZPAD`.
+
+## Differences from AFNI shared with every larmorx AFNI tool
+
+NIfTI only (AFNI's `.HEAD/.BRIK` is refused, and so is a `-prefix` or `-savedisp` without
+`.nii`/`.nii.gz`); no AFNI extension is written (no history or `VOLREG_*` attributes); no
+version banner; results do not depend on the number of threads (AFNI's 3dvolreg is single
+threaded on this path).

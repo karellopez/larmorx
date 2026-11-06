@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 AND CC-BY-4.0
 // Translated to Rust from AFNI 26.3.05: src/3dvolreg.c (the work of main after the option scan:
 // the -maxdisp mask, the -twopass first pass with voldif, get_best_shift, new_voldif,
-// new_get_best_shift and new_get_best_shiftrot, the final pass, the parameters, the
-// statistics, the matrices and the displacements), src/thd_rotangles.c (THD_rotcom_to_matvec,
+// new_get_best_shift and new_get_best_shiftrot, the final pass, -rotparent's final
+// transformation, the parameters, the statistics, the matrices, the displacements and
+// VL_get_displacments), src/thd_rotangles.c (THD_rotcom_to_matvec,
 // THD_rotangle_user_to_dset, mangle_angle, THD_axcode, THD_handedness, DBLE_mat_to_dicomm),
 // src/thd_center.c (THD_dataset_center), src/thd_coords.c (THD_3dind_to_3dmm_no_wod,
 // THD_3dmm_to_dicomm), src/mri_to_short.c (mri_to_short with scale 1), src/mri_to_byte.c
@@ -120,6 +121,9 @@ pub struct VolregParams {
     /// `-rotparent`: the final transformation applied on top of each sub-brick's own, instead
     /// of the registration's own resampling.
     pub matvec: Option<Matvec>,
+    /// For measurement only: the blur's rows mirrored about their end points on every axis
+    /// ([`Blur::whole_point_mirrors`]); `false` (AFNI's mirrors) in both D13 modes.
+    pub whole_point_mirrors: bool,
     pub mode: UpstreamDefects,
 }
 
@@ -870,6 +874,7 @@ pub fn volreg(
 
     let mut rot = Rotator::new(p.resam, p.zpad, mode);
     let mut blur = Blur::new(p.firfac, p.firold, mode);
+    blur.whole_point_mirrors = p.whole_point_mirrors;
     let mut ctx = Ctx {
         p,
         o,

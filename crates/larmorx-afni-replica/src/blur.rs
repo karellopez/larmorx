@@ -52,6 +52,10 @@ pub struct Blur {
     /// The message `EDIT_blur_volume_3d` prints once, when it is first called.
     pub note: Option<String>,
     noted: bool,
+    /// For measurement only (the rule-D measurement of `docs/findings/afni-volreg.md`): mirror
+    /// every row about its first and last point (`RMIRROR`'s form) on every axis and every
+    /// size, instead of AFNI's mirrors. `false` (AFNI's) in both D13 modes.
+    pub whole_point_mirrors: bool,
 }
 
 impl Blur {
@@ -63,6 +67,7 @@ impl Blur {
             mode,
             note: None,
             noted: false,
+            whole_point_mirrors: false,
         }
     }
 
@@ -241,7 +246,7 @@ impl Blur {
         let len = n[axis];
         let mut r = vec![0.0f32; len + 2 * m];
         // fir_blury's large-volume path (nx >= 512) mirrors one point at each end.
-        let one_point = axis == 1 && nx >= 512;
+        let one_point = axis == 1 && nx >= 512 && !self.whole_point_mirrors;
         // (stride, starts of the rows)
         let (stride, starts): (usize, Vec<usize>) = match axis {
             0 => (
@@ -272,7 +277,7 @@ impl Blur {
                 r[len + m..].fill(0.0);
                 r[m - 1] = r[m + 1];
                 r[len + m] = r[len + m - 2];
-            } else if axis == 2 {
+            } else if axis == 2 || self.whole_point_mirrors {
                 // RMIRROR: mirrored about the first and the last point.
                 for mm in 1..=m {
                     r[m - mm] = r[m + mm];

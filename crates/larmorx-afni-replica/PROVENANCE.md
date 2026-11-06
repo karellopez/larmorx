@@ -208,10 +208,26 @@ from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
 | `cli::volreg` | `src/thd_notes.c`, `src/thd_opendset.c`, `src/thd_mismatch.c` | `tross_commandline`; `modify_afni_prefix` (a suffix); `THD_dataset_mismatch` (dimensions, spacing, orientation) | MCW (thd_notes.c, thd_opendset.c), NIH (thd_mismatch.c) |
 | `environ` | `src/edt_blur.c`, `src/mri_3dalign.c`, `src/3dvolreg.c`, `src/thd_rot3d.c` | 3dvolreg's variables (`environ::VOLREG`) | MCW 1994-2000 |
 
-Not yet translated (relay 1, 2026-11-06): `thd_tshift.c` (`-tshift`), `VL_get_displacments`,
-`VL_normalize_timeseries`, `VL_create_disprod` (`-savedisp`, `-SAVEDISP`), the `-rotparent` and
-`-gridparent` paths (`THD_zeropad`, the VOLREG attributes of an AFNI extension), `-twodup` with an
-external base, sub-brick selectors, `addto_args` (`-@`), `svd_double`'s perturbed retry.
+Added by relay 2 (2026-11-06):
+
+| Rust module | AFNI file | Functions, macros | Copyright |
+|---|---|---|---|
+| `cli::volreg` | `src/thd_tshift.c` | `THD_dataset_tshift` (its checks and set-up; the shifting loop is `tshift::tshift`, 3dTshift's) | MCW 1994-2000 |
+| `cli::volreg` | `src/3dvolreg.c` | `VL_normalize_timeseries`, `VL_create_disprod` (`Pleg`), the `-rotparent`/`-gridparent` set-up of `main`, `-twodup`, `-savedisp`'s names (`SDAPP`) | MCW 1994-2000 |
+| `cli::volreg` | `src/thd_detrend.c` | `THD_normmax` (`THD_linear_detrend` is `detrend`'s) | MCW 1994-2000 |
+| `cli::volreg` | `src/thd_zeropad.c` | `THD_zeropad` with `ZPAD_EMPTY` (the grid, its cardinal matrix, the slice times padded) | NIH, public domain |
+| `cli::volreg` | `src/cs_addto_args.c` | `addto_args`, `append_string_to_args`, `tokenize_string` (`-@`) | MCW 1994-2000 |
+| `cli::volreg` | `src/thd_coords.c` | `THD_report_obliquity`'s `first_oblique` (the long warning once per run) | MCW 1994-2000 |
+| `volreg` | `src/3dvolreg.c` | `VL_get_displacments`, the final transformation of `-rotparent` in the registration loop | MCW 1994-2000 |
+| `volreg` | `src/thd_rotangles.c` | `THD_rotcom_to_matvec` (the `-ashift` part) | MCW 1994-2000 |
+| `volreg` | `src/mri_3dalign.c` | `mri_3dalign_setup`'s `MRI_IS_3D` test | MCW 1994-2000 |
+| `rot3d` | `src/thd_rot3d.c` | `THD_rota3D_matvec`'s `MRI_IS_3D` test | MCW 1994-2000 |
+| `dataset` | `src/thd_niftiread.c` | `THD_nifti_process_afni_ext` for `-rotparent`'s attributes (`afni_attributes`, on `afni_ext::parse`) | NIH, public domain |
+
+Not translated: sub-brick selectors (refused, as by every larmorx AFNI tool), `svd_double`'s
+perturbed retry (unreachable for a rotation). Not a translation: `blur`'s
+`whole_point_mirrors` and `examples/volreg_mirrors.rs` (larmorx's, for the rule-D measurement
+of `docs/findings/afni-volreg.md`).
 
 Not translations (written for larmorx-gpl, relicensed to Apache-2.0 on 2026-10-29): `x87` (the
 arithmetic of x86-64's `long double`, for the formulas of `nifti2_io.c` that use it) and

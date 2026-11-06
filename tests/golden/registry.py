@@ -1092,8 +1092,9 @@ def image_math_operations() -> list[str]:
 #: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
 #: functions below). ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` had only their
 #: replicas from 2026-11-04 to 2026-11-05, when their clean-room originals came (their cases
-#: below).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: below). Since 2026-11-06 ``lx.fsl.prelude`` runs a tool with only its replica (FSL's
+#: prelude).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.fsl.prelude": "fsl prelude"}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and

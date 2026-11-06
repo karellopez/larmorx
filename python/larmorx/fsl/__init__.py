@@ -23,10 +23,12 @@ original (since 2026-11-03, written from ``specs/fast.md``). ``topup`` and
 ``fslmaths`` (the image calculator: the generic :func:`fslmaths` and typed wrappers of its
 operations, :func:`arithmetic`, :func:`threshold`, :func:`collapse`, ...) and ``fslstats`` (image
 statistics: the generic :func:`fslstats` and typed wrappers, :func:`image_mean`,
-:func:`centre_of_gravity`, ...) have their replicas only, since 2026-11-03.
-``fslroi`` (a region or range of volumes) and FLIRT's ``standard_space_roi`` script (an image
-masked and cut down to a standard space's field of view or mask) have their replicas only,
-since 2026-11-04 (their clean-room originals are to come).
+:func:`centre_of_gravity`, ...) have their replicas and, since 2026-11-03, their clean-room
+originals. ``fslroi`` (a region or range of volumes) and FLIRT's ``standard_space_roi`` script
+(an image masked and cut down to a standard space's field of view or mask) have their replicas
+(since 2026-11-04) and their clean-room originals (since 2026-11-05).
+``prelude`` (phase unwrapping, since 2026-11-06) has its replica only (its clean-room original
+is to be written from ``specs/prelude.md``).
 """
 
 from larmorx.fsl.bet import (
@@ -88,6 +90,7 @@ from larmorx.fsl.maths import (
     threshold,
     unary,
 )
+from larmorx.fsl.prelude import PreludeResult, prelude
 from larmorx.fsl.regions import StandardSpaceRoiResult, fslroi, standard_space_roi
 from larmorx.fsl.stats import (
     bounding_roi,
@@ -119,6 +122,7 @@ __all__ = [
     "BetsurfResult",
     "FastResult",
     "FlirtResult",
+    "PreludeResult",
     "RocResult",
     "StandardSpaceRoiResult",
     "Surface",
@@ -162,6 +166,7 @@ __all__ = [
     "normalise_intensity",
     "pairreg",
     "pointflirt",
+    "prelude",
     "read_vtk",
     "rmsdiff",
     "roc",

@@ -439,6 +439,7 @@ const PRINTING: &[&str] = &[
     "fsl applytopup",
     "fsl fslmaths",
     "fsl fslstats",
+    "fsl prelude",
 ];
 
 /// FAST's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
@@ -1775,6 +1776,251 @@ const BET_CASES: &[BetCase] = &[
         named: &[],
         output_type: "NIFTI",
     },
+    // prelude (2026-11-06), on the wrapped quadratic phase and the ellipsoid magnitude of
+    // [`write_prelude_inputs`]: fMRIPrep's call (sdcflows: the long options, a mask); a given
+    // threshold with every output saved; 2D unwrapping (-s, the slices joined by their median
+    // offsets); 2D labels with another phase split; the ramps removed and restored with -v
+    // (FSL-261: a mask reaching the last column, row and slice; FSL-266: grot); the complex
+    // input (complex64, gzip-compressed output; complex128, FSL-265; big-endian, FSL-264);
+    // a range of volumes of a series with its masks and labels saved (FSL-262); NaN phases
+    // inside the mask (FSL-269) and NaN magnitudes (FSL-268)
+    BetCase {
+        id: "prelude.fmriprep",
+        tool: "fsl prelude",
+        args: &[
+            "--abs={pmag}",
+            "--mask={pmask}",
+            "--phase={pph}",
+            "--unwrap=out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.threshold-outputs",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pph}",
+            "-a",
+            "{pmag}",
+            "-o",
+            "out",
+            "-t",
+            "300",
+            "--savemask=mask",
+            "-l",
+            "labels",
+            "-r",
+            "raw",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.slices",
+        tool: "fsl prelude",
+        args: &[
+            "-p", "{pph}", "-a", "{pmag}", "-o", "out", "-s", "-l", "labels",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.labelslices",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pph}",
+            "-a",
+            "{pmag}",
+            "-o",
+            "out",
+            "--labelslices",
+            "-n",
+            "6",
+            "-l",
+            "labels",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.ramps",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pramp}",
+            "-a",
+            "{pmag}",
+            "-m",
+            "{pfull}",
+            "-o",
+            "out",
+            "--removeramps",
+            "-v",
+        ],
+        mode: "fix",
+        named: &["FSL-261", "FSL-266"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.ramps.reproduce",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pramp}",
+            "-a",
+            "{pmag}",
+            "-m",
+            "{pfull}",
+            "-o",
+            "out",
+            "--removeramps",
+            "-v",
+        ],
+        mode: "reproduce",
+        named: &["FSL-261", "FSL-266"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.complex",
+        tool: "fsl prelude",
+        args: &["-c", "{pc64}", "-o", "out"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_GZ",
+    },
+    BetCase {
+        id: "prelude.complex128",
+        tool: "fsl prelude",
+        args: &["-c", "{pc128}", "-o", "out"],
+        mode: "fix",
+        named: &["FSL-265"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.complex-big-endian",
+        tool: "fsl prelude",
+        args: &["-c", "{pc64be}", "-o", "out"],
+        mode: "fix",
+        named: &["FSL-264"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.complex-big-endian.reproduce",
+        tool: "fsl prelude",
+        args: &["-c", "{pc64be}", "-o", "out"],
+        mode: "reproduce",
+        named: &["FSL-264"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.series",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pph4}",
+            "-a",
+            "{pmag4}",
+            "-o",
+            "out",
+            "--start=1",
+            "--savemask=mask",
+            "-l",
+            "labels",
+        ],
+        mode: "fix",
+        named: &["FSL-262"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.series.reproduce",
+        tool: "fsl prelude",
+        args: &[
+            "-p",
+            "{pph4}",
+            "-a",
+            "{pmag4}",
+            "-o",
+            "out",
+            "--start=1",
+            "--savemask=mask",
+            "-l",
+            "labels",
+        ],
+        mode: "reproduce",
+        named: &["FSL-262"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.nan-phase",
+        tool: "fsl prelude",
+        args: &["-p", "{pphnan}", "-a", "{pmag}", "-o", "out"],
+        mode: "fix",
+        named: &["FSL-269"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.nan-phase.reproduce",
+        tool: "fsl prelude",
+        args: &["-p", "{pphnan}", "-a", "{pmag}", "-o", "out"],
+        mode: "reproduce",
+        named: &["FSL-269"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "prelude.nan-magnitude",
+        tool: "fsl prelude",
+        args: &["-p", "{pph}", "-a", "{pmagnan}", "-o", "out"],
+        mode: "fix",
+        named: &["FSL-268"],
+        output_type: "NIFTI",
+    },
+];
+
+/// prelude's failures (2026-11-06): `(id, arguments, exit status, the defects named)`, nothing
+/// written (recorded by their status): a phase range above 3 pi (FSL's own error, 255), and the
+/// inputs the default refuses (rule B, status 1): a complex input that is not complex
+/// (FSL-263), `--end` before `--start` (FSL-270), a magnitude of another size (FSL-271).
+const PRELUDE_FAILURES: &[(&str, &[&str], i32, &[&str])] = &[
+    (
+        "prelude.range",
+        &["-p", "{pphwide}", "-a", "{pmag}", "-o", "out"],
+        255,
+        &[],
+    ),
+    (
+        "prelude.fsl263.not-complex",
+        &["-c", "{pmag}", "-o", "out"],
+        1,
+        &["FSL-263"],
+    ),
+    (
+        "prelude.fsl270.end-before-start",
+        &[
+            "-p",
+            "{pph4}",
+            "-a",
+            "{pmag4}",
+            "-o",
+            "out",
+            "--start=2",
+            "--end=1",
+        ],
+        1,
+        &["FSL-270"],
+    ),
+    (
+        "prelude.fsl271.sizes",
+        &["-p", "{pph}", "-a", "{pmagsmall}", "-o", "out"],
+        1,
+        &["FSL-271"],
+    ),
 ];
 
 // ------------------------------------------------------------------------------------------------
@@ -2504,7 +2750,170 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     }
     standard("MNI152_T1_2mm_brain_mask_dil", 2, 8, u8_bytes(&dil));
     standard("MNI152_T1_2mm_eye_mask", 2, 8, u8_bytes(&eye));
+    write_prelude_inputs(dir, &mut paths);
     paths
+}
+
+/// prelude's grid (2026-11-06): 24 x 20 x 12 voxels.
+const PRELUDE_GRID: [i64; 3] = [24, 20, 12];
+
+/// prelude's inputs (2026-11-06), from integers and plain arithmetic only: a quadratic phase in
+/// steps of pi / 64 with noise, wrapped to [-pi, pi) (`pph`; `pramp` with a linear ramp added
+/// before wrapping; three volumes shifted by 8 steps each, `pph4`; NaN at some voxels inside
+/// the head, `pphnan`; one value of 10, a range above 3 pi, `pphwide`); the magnitude, an
+/// ellipsoid with the head's x gradient and noise over a low background (int16 `pmag`, three
+/// volumes `pmag4`, float32 with NaN at some voxels, the first among them, `pmagnan`, a grid
+/// two slices shorter `pmagsmall`); a mask a little inside the ellipsoid (`pmask`, uint8) and
+/// one of every voxel (`pfull`); the complex image of a smoother phase, the magnitude times the
+/// powers of the rotation (12 + 5i) / 13 computed by repeated multiplication (`pc64` complex64,
+/// `pc128` complex128, `pc64be` complex64 stored big-endian).
+fn write_prelude_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
+    let [nx, ny, nz] = PRELUDE_GRID;
+    let nv = (nx * ny * nz) as usize;
+    let step = std::f32::consts::PI / 64.0;
+    // x86-64's default NaN, as FSL's computations make it
+    let nan = f32::from_bits(0xffc0_0000);
+    let noise = splitmix64(61, 4 * nv);
+    let mut put = |name: &'static str, bytes: Vec<u8>| {
+        let p = dir.join(format!("{name}.nii"));
+        std::fs::write(&p, bytes).unwrap();
+        paths.insert(name, p);
+    };
+    let f32s = |v: &[f32]| -> Vec<u8> { v.iter().flat_map(|x| x.to_le_bytes()).collect() };
+    let i16s =
+        |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as i16).to_le_bytes()).collect() };
+    let voxels =
+        || (0..nz).flat_map(move |k| (0..ny).flat_map(move |j| (0..nx).map(move |i| (i, j, k))));
+    // the head's squared radius (in half voxels) and the phase's quadratic, in steps
+    let radius = |i: i64, j: i64, k: i64| {
+        let (x, y, z) = (2 * i - 23, 2 * j - 19, 2 * k - 11);
+        x * x + y * y + 2 * z * z
+    };
+    let steps = |i: i64, j: i64, k: i64| (i - 12).pow(2) + (j - 10).pow(2) + 2 * (k - 6).pow(2);
+    let wrap = |s: i64| ((s + 64).rem_euclid(128) - 64) as f32 * step;
+    let phase = |shift: i64, ramp: bool| -> Vec<f32> {
+        voxels()
+            .enumerate()
+            .map(|(n, (i, j, k))| {
+                let r = if ramp { 5 * i - 3 * j + 4 * k } else { 0 };
+                wrap(steps(i, j, k) + shift + r + (noise[n] % 5) as i64 - 2)
+            })
+            .collect()
+    };
+    let magnitude = |t: usize| -> Vec<i64> {
+        voxels()
+            .enumerate()
+            .map(|(n, (i, j, k))| {
+                let e = (noise[nv * (1 + t % 3) + n] % 21) as i64 - 10;
+                if radius(i, j, k) < 520 {
+                    800 * (90 + i) / 100 + e
+                } else {
+                    20 + e
+                }
+            })
+            .collect()
+    };
+    let dims3 = [nx, ny, nz];
+    let ph = phase(0, false);
+    put("pph", bet_nifti(&dims3, 16, 32, &f32s(&ph)));
+    put("pramp", bet_nifti(&dims3, 16, 32, &f32s(&phase(0, true))));
+    let mut ph4 = Vec::with_capacity(3 * nv);
+    for t in 0..3 {
+        ph4.extend(phase(8 * t, false));
+    }
+    put("pph4", bet_nifti(&[nx, ny, nz, 3], 16, 32, &f32s(&ph4)));
+    let inside: Vec<bool> = voxels().map(|(i, j, k)| radius(i, j, k) < 520).collect();
+    let phnan: Vec<f32> = ph
+        .iter()
+        .enumerate()
+        .map(|(n, &v)| if inside[n] && n % 97 == 13 { nan } else { v })
+        .collect();
+    put("pphnan", bet_nifti(&dims3, 16, 32, &f32s(&phnan)));
+    let mut wide = ph.clone();
+    wide[nv / 2] = 10.0;
+    put("pphwide", bet_nifti(&dims3, 16, 32, &f32s(&wide)));
+    let mag = magnitude(0);
+    put("pmag", bet_nifti(&dims3, 4, 16, &i16s(&mag)));
+    let mut mag4 = Vec::with_capacity(3 * nv);
+    for t in 0..3 {
+        mag4.extend(magnitude(t));
+    }
+    put("pmag4", bet_nifti(&[nx, ny, nz, 3], 4, 16, &i16s(&mag4)));
+    let magnan: Vec<f32> = mag
+        .iter()
+        .enumerate()
+        .map(|(n, &v)| if n % 89 == 0 { nan } else { v as f32 })
+        .collect();
+    put("pmagnan", bet_nifti(&dims3, 16, 32, &f32s(&magnan)));
+    put(
+        "pmagsmall",
+        bet_nifti(
+            &[nx, ny, nz - 2],
+            4,
+            16,
+            &i16s(&mag[..(nx * ny * (nz - 2)) as usize]),
+        ),
+    );
+    let mask: Vec<u8> = voxels()
+        .map(|(i, j, k)| u8::from(radius(i, j, k) < 440))
+        .collect();
+    put("pmask", bet_nifti(&dims3, 2, 8, &mask));
+    put("pfull", bet_nifti(&dims3, 2, 8, &vec![1u8; nv]));
+    // the complex image: the magnitude times (12 + 5i)^m / 13^m, m the quadratic in 8 steps
+    let (c, s) = (12.0f64 / 13.0, 5.0f64 / 13.0);
+    let mut powers = vec![(1.0f64, 0.0f64)];
+    for _ in 0..64 {
+        let (a, b) = *powers.last().unwrap();
+        powers.push((a * c - b * s, a * s + b * c));
+    }
+    let values: Vec<(f64, f64)> = voxels()
+        .enumerate()
+        .map(|(n, (i, j, k))| {
+            let (a, b) = powers[(steps(i, j, k) / 8) as usize];
+            let m = mag[n] as f64;
+            (m * a, m * b)
+        })
+        .collect();
+    let c64: Vec<u8> = values
+        .iter()
+        .flat_map(|&(a, b)| [(a as f32).to_le_bytes(), (b as f32).to_le_bytes()])
+        .flatten()
+        .collect();
+    put("pc64", bet_nifti(&dims3, 32, 64, &c64));
+    let c128: Vec<u8> = values
+        .iter()
+        .flat_map(|&(a, b)| [a.to_le_bytes(), b.to_le_bytes()])
+        .flatten()
+        .collect();
+    put("pc128", bet_nifti(&dims3, 1792, 128, &c128));
+    put("pc64be", big_endian(&bet_nifti(&dims3, 32, 64, &c64), 4));
+}
+
+/// A little-endian NIfTI-1 file of [`bet_nifti`] stored big-endian: every numeric header field
+/// and every data value of `width` bytes (a complex64's two floats: 4) reversed.
+fn big_endian(le: &[u8], width: usize) -> Vec<u8> {
+    let mut be = le.to_vec();
+    let mut swap = |at: usize, n: usize, count: usize| {
+        for f in 0..count {
+            be[at + f * n..at + (f + 1) * n].reverse();
+        }
+    };
+    swap(0, 4, 1); // sizeof_hdr
+    swap(32, 4, 1); // extents
+    swap(36, 2, 1); // session_error
+    swap(40, 2, 8); // dim
+    swap(56, 4, 3); // intent_p1..3
+    swap(68, 2, 4); // intent_code, datatype, bitpix, slice_start
+    swap(76, 4, 11); // pixdim, vox_offset, scl_slope, scl_inter
+    swap(120, 2, 1); // slice_end
+    swap(124, 4, 4); // cal_max, cal_min, slice_duration, toffset
+    swap(140, 4, 2); // glmax, glmin
+    swap(252, 2, 2); // qform_code, sform_code
+    swap(256, 4, 18); // quatern_b..qoffset_z, srow_x..srow_z
+    for chunk in be[352..].chunks_mut(width) {
+        chunk.reverse();
+    }
+    be
 }
 
 /// The generated FSL data directory's name in the BET inputs' directory (`LARMORX_FSL_DATA` of
@@ -3092,6 +3501,29 @@ fn golden() {
                 sha256: sha256(b"1\n"),
                 dtype: "-".into(),
                 sample: "1".into(),
+            },
+        );
+        runs.insert(id, run);
+    }
+    for &(id, case_args, status, named) in PRELUDE_FAILURES {
+        let run = dir.path().join(id);
+        std::fs::create_dir(&run).unwrap();
+        let args: Vec<String> = case_args.iter().map(|a| fill(a, &bet_inputs)).collect();
+        let out = run_bet(&run, "fsl prelude", &args, "fix", "NIFTI");
+        assert_eq!(out.status.code(), Some(status), "{id}: {out:?}");
+        if let Some(problem) = named_problem(&out.stderr, id, "fix", named) {
+            notices.push(problem);
+        }
+        let fps = case_fingerprints(&run);
+        let names: Vec<&String> = fps.iter().map(|(n, _)| n).collect();
+        assert!(fps.is_empty(), "{id}: an error, yet it wrote {names:?}");
+        let text = format!("{status}\n");
+        actual.insert(
+            (id.to_owned(), "status".to_owned()),
+            Fingerprint {
+                sha256: sha256(text.as_bytes()),
+                dtype: "-".into(),
+                sample: status.to_string(),
             },
         );
         runs.insert(id, run);

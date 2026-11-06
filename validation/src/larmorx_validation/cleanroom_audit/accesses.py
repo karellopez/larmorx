@@ -692,6 +692,17 @@ def _tar(args: list[str], add) -> None:
         add("write", archive, "tar c")
 
 
+def _pathspecs(specs: list[str]) -> list[str]:
+    """Git pathspecs as paths: exclusions (``:!p``, ``:^p``, ``:(exclude)p``) name what the
+    command leaves out, so they are dropped; other magic (``:(top)p``, ``:/p``) is removed."""
+    out = []
+    for p in specs:
+        if re.match(r"^:(!|\^|\([^)]*\bexclude\b[^)]*\))", p):
+            continue
+        out.append(re.sub(r"^:(\([^)]*\)|/)", "", p) or ".")
+    return out
+
+
 def _git(args, cwd, st, ctx, res, seen, unresolved) -> None:
     i = 0
     gcwd = cwd
@@ -714,7 +725,7 @@ def _git(args, cwd, st, ctx, res, seen, unresolved) -> None:
             Access(op, _abs(path, base, ctx), "git " + sub, detail, unresolved=unresolved)
         )
 
-    after = rest[rest.index("--") + 1 :] if "--" in rest else []
+    after = _pathspecs(rest[rest.index("--") + 1 :]) if "--" in rest else []
     before = rest[: rest.index("--")] if "--" in rest else rest
     if sub in ("show", "cat-file"):
         for a in before:

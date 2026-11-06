@@ -75,11 +75,18 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--workspace", help="the workspace (default: this checkout's)")
     s.add_argument("--home", help="the home directory (default: the user's)")
     s.add_argument("--jobs", type=int, default=12, help="parallel readers (spawned processes)")
+    from larmorx_validation.cleanroom_audit import verdicts
+
+    verdicts.add_arguments(sub)
 
 
 def main(args: argparse.Namespace) -> int:
     if args.audit_command == "scan":
         return scan(args)
+    if args.audit_command == "verdicts":
+        from larmorx_validation.cleanroom_audit import verdicts
+
+        return verdicts.main(args)
     return 2
 
 

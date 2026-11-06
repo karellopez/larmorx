@@ -1,0 +1,25 @@
+# 3dvolreg cases for batch.py: <input> <mode> <options...> (inputs from make_series.py and variants.py)
+probe/s1.nii.gz fix -Fourier -twopass -1Dfile o.1D -1Dmatrix_save o.aff12.1D -prefix o.nii.gz -zpad 4 -maxdisp1D o_md.1D
+probe/s1.nii.gz fix -prefix o.nii.gz -dfile d.txt
+probe/s5_byte.nii.gz fix -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz fix -nocoarserot -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -weight weight.nii.gz[1] -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -base base3d.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D -dfile d.txt
+probe/s1.nii.gz reproduce -twopass -base base3d.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D
+probe/s1.nii.gz reproduce -twopass -weight weight.nii.gz[0] -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -wtinp -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -maxdisp1D - -prefix o.nii.gz
+probe/s1.nii.gz reproduce -params 3 0.05 0.05 0.5 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -clipit -wtrim -coarserot -prefix o.nii.gz
+probe/s1.nii.gz reproduce -input s1.nii.gz -prefix o.nii.gz extra
+probe/s1.nii.gz reproduce -bogus
+probe/s1.nii.gz reproduce -final bogus
+probe/s1.nii.gz reproduce -twoblur 1
+probe/s1.nii.gz reproduce -zpad -2
+probe/s1.nii.gz reproduce -base 99
+probe/s1.nii.gz reproduce -base -1
+probe/s1.nii.gz reproduce -edging -1
+probe/s1.nii.gz reproduce -edging 30%
+probe/s1.nii.gz reproduce -weight noselector.nii.gz
+probe/s1.nii.gz reproduce -1Dmatrix_save m -prefix o.nii.gz
+probe/s1.nii.gz reproduce -zpad 3 -zpad 2 -prefix o.nii.gz

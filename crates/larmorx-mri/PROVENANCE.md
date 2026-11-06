@@ -129,3 +129,10 @@ mcflirt's `WARNING::in calculating COG, total = 0.0` as often as mcflirt 6.0.7.2
 with `validation/investigations/cleanroom-align/cog_warning_probe.py`, through the oracle cache:
 once per registration of a constant test volume, once per `.par` line of a constant reference).
 `hmc::rigid`'s `atan2` is `larmorx_core::math::atan2` (rule 5; the `libm` crate's before).
+
+The pair header and ANALYZE's fields (PRELUDE's clean-room part, relay 2, 2026-11-06; black-box
+runs of FSL 6.0.7.23's mcflirt through the oracle cache,
+`validation/investigations/fsl-pair-header/probe.py`): `hmc::image::write_like_files` writes a
+pair's header file with NIfTI's four extension bytes (352 bytes, NIfTI-2 544) for every pair type,
+and `extents` 16384 and `regular` `r` into every NIfTI-1 header, as mcflirt writes them whatever
+the input holds.

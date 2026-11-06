@@ -465,3 +465,15 @@ only inputs were:
 | `prelude::merge` | the constraints' sums in the visiting order, `K` and `C`, the choice sequence (largest `C`, smallest pair; NaN by step 1's rule), the folds, the offsets, the reference region; larmorx's own structures (a heap with lazy deletion, neighbour lists, a weighted union-find) | §4.7, §4.8, §10 |
 | `prelude::volume` | the default threshold, the candidate set and the largest component (per slice in the slices mode), FSL-271's reading of another grid, FSL-269's removal of NaN phases, the ramps' estimate, removal and restoration (FSL-261's domain), the regions in the three modes, the slices' join, the unwrapped values | §4.4 to §4.10, §9 |
 | `cli::prelude` | the parser and the checks in FSL's order, the usage, the images (the complex input's readers, FSL-263 to FSL-265, `atan2f` with GLIBC-07's witness), the volumes processed and their aborts, the range check and the rewrap, the modes, the writes in FSL's order (FSL-262, FSL-266), FSL-270, FSL-271, the notices | §2, §3, §4.1 to §4.3, §4.11, §5, §9 |
+
+### Relay 2 of PRELUDE's clean-room part (2026-11-06): the pair header and the time step
+
+Black-box runs of FSL 6.0.7.23 through the oracle cache (no source read):
+[`validation/investigations/fsl-pair-header/`](../../validation/investigations/fsl-pair-header/README.md)
+(`probe.py`: every pair `FSLOUTPUTTYPE` with fslmaths, fslroi, bet2, fast, flirt, mcflirt,
+prelude, topup, applytopup; `time_step.py`) and the random-testing trial of the original.
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `bet::image::write` (shared by BET, betsurf, FAST, FLIRT and its programs, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) | a pair's header file holds the header block, NIfTI's four extension bytes and the kept extensions (352 bytes without extensions, NIfTI-2 544), every pair type, in its own compression; a zstd or bzip2 pair keeps its extensions | `probe.py`: FSL's header files |
+| `cli::prelude` | the time step of `-p`, `-a` and `-m` as FSL's image layer reads it (its magnitude; 1 for an image with a time axis and a time step of 0), and of `-c` (its magnitude, a 0 kept), which every output keeps from its source | `time_step.py`, the trial's findings; `specs/flirt.md` §4.1 states the same reading |

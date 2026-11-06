@@ -15,19 +15,32 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 - the bit-exact **replica** (2026-11-06), `larmorx-nc fsl prelude` (package `larmorx-nc`, under
   the FSL Licence's terms: [PROVENANCE](../../crates-nc/larmorx-nc-fugue/PROVENANCE.md)), run as
   a separate program;
-- the **clean-room original** is to be written from `specs/prelude.md` (the next part).
+- the **clean-room original** (2026-11-06), `larmorx fsl prelude` in the main package (crate
+  `larmorx-fsl`, Apache-2.0, written from `specs/prelude.md` without FSL's source:
+  [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), run in-process; built for speed (below).
 
-Until the original exists, `implementation="auto"` and `"replica"` run the replica and need
-`larmorx-nc` installed (`pip install larmorx-nc`); without it they raise
-`ReplicaNotFoundError`, and `"original"` raises `NotImplementedError`. The command line follows
-`LARMORX_IMPLEMENTATION` the same way (exit 127 when the replica's program is not found).
+`implementation="auto"` runs the replica when `larmorx-nc` is installed (`pip install
+larmorx-nc`), else the original; `"replica"` needs `larmorx-nc` (`ReplicaNotFoundError` without
+it); `"original"` runs the original. The command line follows `LARMORX_IMPLEMENTATION` the same
+way (exit 127 when the replica's program is asked for and not found). With `reproduce` both give
+FSL's result bit for bit; by default they agree bit for bit too, except the phase of a complex
+image (`-c`): the original's arctangent is correctly rounded, glibc's `atan2f` (FSL's, and the
+replica's) is not, so a few phases differ in their last bit (GLIBC-07, named), and the unwrapped
+phase keeps FSL's whole turns.
 
 **Speed.** The replica merges the regions with FSL's arithmetic in FSL's order, but keeps each
 region's neighbours and the candidate merges ordered, instead of scanning every region for every
 merge: fMRIPrep's call on ds005454-sub-16 (14,678 regions) takes 0.15 s against FSL's 6.5 s,
-with the same bits.
+with the same bits. The original makes the same choices in the same order through an indexed
+heap of the candidate merges and a weighted union-find of the regions' turns (each merge costs a
+logarithm of the candidates and the neighbours of the region that joins), and runs the linear
+parts (the mask, the regions, the ramps, reading and writing) on its threads: the same call
+takes 0.07 s on one thread, 0.06 s on 14; a 256 x 256 x 160 map of 153,000 regions 2.5 s
+(the replica 9.5 s), with the same bits at every thread count
+([benchmarks](../benchmarks/fsl-prelude.md)).
 
-**Status: `experimental`** (the record `fsl-prelude-replica` comes with this part's tests).
+**Status: `experimental`** (the records `fsl-prelude-replica` and `fsl-prelude`, the
+original's, come with these parts' tests).
 
 ## Usage
 
@@ -75,8 +88,8 @@ prelude's messages.
 | `-h,--help` | - | the usage (exit 1) |
 | `FSLOUTPUTTYPE` | - (NIfTI, read back) | the output files' type; the wrapper sets it and never reads the caller's FSL variables |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives FSL's result bit for bit |
-| - | `implementation="auto"` | `"auto"` or `"replica"` (no original yet) |
-| - | `n_threads=1` | threads for writing and reading the images (prelude itself runs on one thread, as FSL's) |
+| - | `implementation="auto"` | `"auto"`, `"replica"` or `"original"` |
+| - | `n_threads=1` | threads: the replica's for reading and writing the images; the original's also for the mask, the regions, the ramps and the slices of `-s` (the merging itself is sequential: its order is the result); the same bits at any count (`OMP_NUM_THREADS` on the command line) |
 
 A long option takes its value after `=` (`--start=1`), as in FSL. The Python wrapper checks its
 arguments before running anything (`ValueError`): `complex_image` or `phase` and `magnitude`
@@ -103,7 +116,9 @@ correction changed the result, and reproduced with `upstream_defects="reproduce"
 | FSL-272 | a NaN first phase value skips the phase range check and the rewrap to [-pi, pi] (FSL's extrema are both NaN) | the extrema of the other values: rewrapped, or FSL's range error (exit 255), as without the NaN |
 
 FSL-267 (the range message says 6.283 radians where the check is 3 pi) is a message only: kept
-as FSL prints it.
+as FSL prints it. The original also names GLIBC-07 (both modes) where its correctly rounded
+arctangent and glibc's `atan2f` differ on a voxel of a complex image; `reproduce` uses glibc's
+bits.
 
 ## Validation
 
@@ -113,3 +128,12 @@ as FSL prints it.
   to FSL and to fMRIPrep's own outputs.
 - **Golden**: larmorx-nc's 15 cases and 4 failures (`crates-nc/larmorx-nc-cli/tests/golden.rs`)
   on every platform.
+- **Original against FSL 6.0.7.23** (the parity suite `fsl-prelude`,
+  [record](../validation/fsl-prelude.md)): the replica suite's cases, the original standing in
+  for the replica's program; its own cases (every option, image type, NaN input, failure and
+  output type) with `reproduce` bit-identical to FSL (headers whole, the pair's extension bytes
+  included) and by default bit-identical to the replica's default (GLIBC-07's phases by their
+  whole turns); fMRIPrep's seven calls bit-identical to fMRIPrep's own outputs in both modes.
+  Findings: [fsl-prelude-original](../findings/fsl-prelude-original.md).
+- **Golden** (the original): `cli.fsl.prelude`, `cli.fsl.prelude.reproduce`, `py.fsl.prelude`
+  (`tests/golden/registry.py`) on every platform.

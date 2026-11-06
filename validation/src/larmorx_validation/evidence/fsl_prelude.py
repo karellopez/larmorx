@@ -758,17 +758,19 @@ def _example_fsl272(ctx: core.Context) -> dict:
     u, c = np.unique(k.astype(int), return_counts=True)
     common_k = int(u[int(np.argmax(c))])
     wrong = int(np.count_nonzero(k != common_k))
-    cycles = ", ".join(f"{int(a):+d} cycles in {int(b):,}" for a, b in zip(u, c, strict=True))
+    parts = [f"{int(a):+d} in {int(b):,}" for a, b in zip(u, c, strict=True)]
+    cycles = ", ".join(parts[:-1]) + f" and {parts[-1]}" if len(parts) > 1 else parts[0]
     for x in diffs:
         if x["id"] == "nan-nonan":
             x["verdict"] = None
             x["reason"] = (
                 "The defect's effect, FSL against itself (no verdict): with the NaN first value "
                 "FSL keeps the phase in 0 to 2π and unwraps it in other intervals than the "
-                f"rewrapped phase, so of the {int(m.sum()):,} mask voxels {cycles} voxels "
-                f"differ from its own result without the NaN: {wrong:,} voxels "
-                f"({100 * wrong / max(1, int(m.sum())):.1f} %) by another number of cycles than "
-                "the rest, regions unwrapped whole cycles wrong relative to their neighbours."
+                f"rewrapped phase. Of the {int(m.sum()):,} mask voxels, its result differs from "
+                f"its own result without the NaN by whole cycles of 2π: {cycles}. Most move by "
+                f"{common_k:+d} cycle(s), one constant offset of the map; {wrong:,} voxels "
+                f"({100 * wrong / max(1, int(m.sum())):.1f} %) by another number, regions "
+                "unwrapped whole cycles wrong relative to their neighbours."
             )
             x["links"] = [{"label": "FSL-272", "href": "docs/findings/upstream-defects.md"}]
         elif x["id"] == "fix-nonan":

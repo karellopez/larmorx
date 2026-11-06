@@ -188,6 +188,21 @@ and FSL-141 to FSL-143 with their measurements; the behaviour and what larmorx d
   int and is right.
 - **FSL-134** (A + B): `jac_resample`'s field-image branch scales `ycomp` by `ovol.xdim()`; neither
   path compares the field's grid with the images'.
+- **FSL-273** (A; found 2026-11-06 by the PRELUDE part's spec writer from the clean-room
+  catch-up's question): `jac_resample` lays the field into `df` by `ShadowVolume::equals`, which
+  copies the data only, so the displacement keeps the images' header (`d = h t p · (dx, dy)` mm,
+  `h t p` image voxels) whatever the field's voxel sizes; the Jacobian divides by the field's own:
+  the coefficient branch `deffield2jacobian` by the splinefield's `Vxs_x/y` (the intent
+  parameters) after `ScaleField(p t dx)`, the field-image branch `volume_deffield_2_jacobian` by
+  `pxd.xdim()` and `pyd.ydim()` (the field image's header). A field of the images' shape whose
+  voxel sizes differ gets `dx / fx`, `dy / fy` (a field image `dx / fx`, `dx / fy` with FSL-134)
+  where the mapping applied has 1. The default scales the coefficient field's components by its
+  own voxel sizes (`ScaleField(p t fx)`) and divides a field image's by the images' voxel sizes:
+  identical bits wherever the voxel sizes agree (every case before; golden unchanged).
+  Black-box proof: `validation/investigations/spec-answers-4/jac_scales.py` (FSL's outputs are
+  `S (1 + c g)` with `c = dy / fy`, `dx / fy`; the default gives FSL's own output on the data
+  with matching voxel sizes); suite cases `at/jac-coef-aniso` (new) and `at/jac-field-aniso` (both
+  names FSL-273 in the default).
 - **FSL-135** (B): `applytopup()`'s `else {}` for an unknown method; `MoveMatrix` throws for an
   index without movements.
 - **FSL-141** (a): `n*N/2`, `m*N/2` in `int`.

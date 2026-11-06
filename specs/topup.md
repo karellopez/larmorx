@@ -718,7 +718,19 @@ over the inputs (volume by volume) **(observed)**. Precisely (spec writer, 2026-
   z leaves the image uncorrected (FSL-144);
 - the Jacobian of a **coefficient field**: `1 + t (px ∂h/∂x · dx / fx + py ∂h/∂y · dy / fy)`
   per voxel, the derivatives per voxel of the field's grid from the spline, `dx`, `dy` the
-  image's voxel sizes and `fx`, `fy` the field's (its intent parameters);
+  image's voxel sizes and `fx`, `fy` the field's (its intent parameters). That is FSL's
+  (`reproduce`). The displacement is laid at the images' voxel indices and moves `h t` voxels
+  whatever the voxel sizes, so where the field's voxel sizes differ from the images' (a field
+  of the images' shape) FSL's scales `dx / fx` and `dy / fy` are not those of the mapping
+  applied (FSL-273): the **default** is `1 + t (px ∂h/∂x + py ∂h/∂y)`, the Jacobian of the
+  mapping applied, computed as FSL's with each component scaled by the field's own voxel size
+  instead of the image's (the same numbers wherever `fx = dx` and `fy = dy`); FSL-273 is named
+  when, along an encoded axis (`px ≠ 0` for x, `py ≠ 0` for y), the field's voxel size differs
+  from the images' **(observed**: FSL's outputs on one image's data stored with 6, 4 and 3 mm
+  voxels along y under coefficients made on 6 mm voxels are `S (1 + c g)` with `c = dy / fy`, the
+  `g` solved from the two ratios to the 6 mm run agreeing to 5e-6 at the median; the default on
+  the 4 and 3 mm images gives FSL's 6 mm output to 1.5e-5 relative, bit for bit on the 3 mm one:
+  `validation/investigations/spec-answers-4/jac_scales.py`) (spec writer, 2026-11-06);
 - the Jacobian of a **field image** (no coefficients): the image `h` scaled to displacements
   (`px t dx · h` and `py t dx · h` mm: the y one with the **x** voxel size, FSL-134; the default
   uses `dy`) and divided by the field image's own voxel sizes along x and y, then the cubic-spline
@@ -727,7 +739,15 @@ over the inputs (volume by volume) **(observed)**. Precisely (spec writer, 2026-
   z²) (2 c⁺[N − 1] − f[N − 1])`) and the coefficients beyond the image taken as 0; `J` is the
   determinant of `I` plus these derivatives. So the y term is `py t (dx / fy) ∂h/∂y` (the
   clean-room implementer's finding 18 right: `vx / vy` with `vx` the image's and `vy` the field
-  image's);
+  image's), FSL's (`reproduce`). The **default** divides by the **images'** voxel sizes instead
+  (FSL-273, as for a coefficient field) and scales the y displacement by `dy` (FSL-134): its
+  terms are `px t ∂h/∂x` and `py t ∂h/∂y`, the Jacobian of the mapping applied, whatever voxel
+  sizes the field image's header gives (a field image on the images' grid gets the numbers it
+  got before: `dx / dx`, `dy / dy`); FSL-273 is named when, along an encoded axis, the field
+  image's voxel size differs from the images' (FSL-134 when `dx ≠ dy` and `py ≠ 0`) **(observed**:
+  FSL's outputs with the field image's header saying 6, 4 and 3 mm along y on a 6 mm image are
+  `S (1 + c g)` with `c = dx / fy`, the solved `g` agreeing to 2.4e-6 at the median; the default
+  gives FSL's 6 mm output bit for bit on all three: `jac_scales.py`) (spec writer, 2026-11-06);
 - **a field of the images' voxel count in another shape** (FSL-134; `reproduce`): the field
   evaluated on its own grid (a coefficient field: the grid its header gives) is laid onto the
   image's grid **in storage order** (x fastest: the image voxel of linear index `L` takes the
@@ -901,6 +921,7 @@ is banded, e.g. a zero field). The vb methods' traces and solves follow Armadill
 | FSL-132 | applytopup: the first volume of the first image is resampled trilinearly whatever `--interp` says (the default spline) | every volume with the method asked for; named | that volume trilinear |
 | FSL-133 | applytopup `lsr`/`vb`: a line's wrap-around reads the wrong voxel for line lengths that do not divide 2³² (30, 96, 100, ...): the mapping at an index `k < 0` takes the field of voxel `(k + 2³²) mod n` instead of `n + k` (§7.4; spec writer, 2026-11-03) | the circular wrap; named when a read differs | FSL's |
 | FSL-134 | applytopup with a field image: `jac`'s Jacobian takes the y displacement in units of the x voxel size (the displacement itself uses the y voxel size); a field on another grid than the images is not refused (of the same voxel count: laid as stored for the displacement, its Jacobian at the same indices, §7.3; read past its lines with `lsr`) (spec writer, 2026-11-03) | the y voxel size; other grids refused | FSL's (`lsr` with another grid refused in both modes) |
+| FSL-273 | applytopup `jac`: the Jacobian's derivatives divided by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian scaled along each encoded axis by their ratio (`dx / fx`, `dy / fy`; a field image `dx / fx`, `dx / fy` with FSL-134), not the Jacobian of the mapping applied (§7.3; rule A; spec writer, 2026-11-06) | the Jacobian of the mapping applied (scale 1); named when along an encoded axis the field's voxel size differs from the images' | FSL's scales |
 | FSL-135 | applytopup: an unknown `--method` writes nothing and exits 0; `lsr`/`vb` without movements abort (`TopupFileReader::MoveMatrix: Index i out of bound`) | clear refusals | FSL's |
 | FSL-141 | `vb*`: the Gamma shapes' counts in 32-bit integers wrap beyond 2³¹ values | 64-bit counts | the wrapped values |
 | FSL-142 | `vb3D`/`vb4D` count `2 m` data points per line whatever the collection holds (`vb2D` counts every image) | the collection's count; named | FSL's |

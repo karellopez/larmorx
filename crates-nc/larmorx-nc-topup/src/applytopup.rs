@@ -583,11 +583,35 @@ fn jac_resample(
         jac.data.fill(0.0);
         match topupfile.field() {
             Ok(f) => {
+                // FSL-273 (rule A): the derivatives are divided by the field's own voxel sizes
+                // (its intent parameters) while the displacement is laid at the images' indices
+                // in the images' voxel sizes; the default scales each component by the field's
+                // voxel size instead, which gives the Jacobian of the mapping applied (the same
+                // bits wherever the two voxel sizes are equal)
+                let [fx, fy, _] = f.voxel_size();
+                let differs = (pe[0] != 0.0 && fx != xdim) || (pe[1] != 0.0 && fy != ydim);
+                let (sx, sy) = if ctx.con.reproduce() {
+                    (xdim, ydim)
+                } else {
+                    (fx, fy)
+                };
+                if differs {
+                    ctx.con.notice(
+                        &defects::FSL_273,
+                        if ctx.con.reproduce() {
+                            "the coefficient field's Jacobian scaled by the images' voxel sizes \
+                             over the field's, as in applytopup"
+                        } else {
+                            "the coefficient field's Jacobian taken at the images' voxel indices \
+                             (its voxel sizes differ from the images')"
+                        },
+                    );
+                }
                 let mut xc = f.clone();
                 let mut yc = f.clone();
                 let mut zc = f;
-                xc.scale_field(pe[0] * rt * xdim);
-                yc.scale_field(pe[1] * rt * ydim);
+                xc.scale_field(pe[0] * rt * sx);
+                yc.scale_field(pe[1] * rt * sy);
                 zc.scale_field(0.0);
                 warpfns::deffield2jacobian(&mut xc, &mut yc, &mut zc, &mut jac)?;
             }
@@ -613,6 +637,27 @@ fn jac_resample(
                     );
                 }
                 let ky = if ctx.con.reproduce() { ky_fsl } else { ky_fix };
+                // FSL-273 (rule A): FSL divides the displacements by the field image's own voxel
+                // sizes; the default by the images' (the field is laid at the images' indices)
+                let (fx, fy) = (xc.xdim(), yc.ydim());
+                let (ix, iy) = (ovol.xdim(), ovol.ydim());
+                if (pe[0] != 0.0 && fx != ix) || (pe[1] != 0.0 && fy != iy) {
+                    ctx.con.notice(
+                        &defects::FSL_273,
+                        if ctx.con.reproduce() {
+                            "the field image's displacements divided by its own voxel sizes, as \
+                             in applytopup"
+                        } else {
+                            "the field image's displacements divided by the images' voxel sizes \
+                             (the field image's differ)"
+                        },
+                    );
+                }
+                let div = if ctx.con.reproduce() {
+                    [fx, fy]
+                } else {
+                    [ix, iy]
+                };
                 for v in xc.data.iter_mut() {
                     *v *= kx;
                 }
@@ -620,7 +665,7 @@ fn jac_resample(
                     *v *= ky;
                 }
                 zc.data.fill(0.0);
-                volume_deffield_2_jacobian(&xc, &yc, &zc, &mut jac)?;
+                volume_deffield_2_jacobian(&xc, &yc, &zc, div, &mut jac)?;
             }
         }
         let m = if topupfile.move_par_valid() {
@@ -653,11 +698,14 @@ fn jac_resample(
 
 /// `volume_deffield_2_jacobian(pxd, pyd, pzd, jac)`: the Jacobian determinant of the
 /// displacements (mm) from the spline interpolation's derivatives of each, at every voxel of
-/// `jac` (FSL builds its size check's exception but never throws it).
+/// `jac` (FSL builds its size check's exception but never throws it). `div` holds the x and y
+/// voxel sizes the x and y displacements are divided by: FSL's are `pxd`'s and `pyd`'s own
+/// (FSL-273); the z displacement is divided by `pzd`'s.
 fn volume_deffield_2_jacobian(
     pxd: &Volume,
     pyd: &Volume,
     pzd: &Volume,
+    div: [f32; 2],
     jac: &mut Volume,
 ) -> Result<(), FslError> {
     let per = |p: &Volume, d: f32| {
@@ -668,8 +716,8 @@ fn volume_deffield_2_jacobian(
         v.interp = Interpolation::Spline;
         v
     };
-    let xd = per(pxd, pxd.xdim());
-    let yd = per(pyd, pyd.ydim());
+    let xd = per(pxd, div[0]);
+    let yd = per(pyd, div[1]);
     let zd = per(pzd, pzd.zdim());
     let (ix, iy, iz) = (
         Interpolator::new(&xd)?,

@@ -643,7 +643,7 @@ def run(scan: Path, repo: Path) -> dict:
                 case_first_writer[rel] = key
             if (
                 r.get("area") == "larmorx"
-                and r["op"] in CONTENT_OPS
+                and (r["op"] in CONTENT_OPS or r["op"] == "search")
                 and (
                     BRIEF_RESTRICTED.search(rel)
                     or BRIEF_FILES.search(rel)
@@ -810,7 +810,10 @@ def run(scan: Path, repo: Path) -> dict:
                 wrole = roles[w][0] if w in roles else "unknown"
                 if w == key or wrole == "clean-room implementer":
                     continue  # a clean-room part's own case
-                if w is None and rel.rsplit("/", 1)[-1].startswith("original-"):
+                if w is None and (
+                    rel.rsplit("/", 1)[-1].startswith("original-")
+                    or re.match(r"^validation/difftest/cases/[^/]+-original(/|$)", rel)
+                ):
                     continue  # named for the clean-room original that differed: its own case
                 kind = f"R15: a permanent case added by a {wrole}"
             elif BRIEF_FILES.search(rel):
@@ -819,6 +822,8 @@ def run(scan: Path, repo: Path) -> dict:
                 desc = description(agents[key])
                 if any(desc.startswith(d) and rel == p for d, p in BRIEF_ALLOWED):
                     continue
+                if rel.endswith("triage.toml") and r["op"] in ("script-path", "copy"):
+                    continue  # the syntax check with tomllib the briefs ask for, or a backup
                 kind = (
                     "R15: the random-testing triage's entries (its brief: do not read them)"
                     if rel.endswith("triage.toml")
@@ -840,6 +845,35 @@ def run(scan: Path, repo: Path) -> dict:
                     },
                 }
             )
+    # The lines each read printed: a search of one file names none (its output is the check); the
+    # triage's: a replica author's entry, or only clean-room ones?
+    want = collections.defaultdict(set)
+    for x in brief_dependent:
+        if x.get("call") and (x["rel"].endswith("triage.toml") or x["op"] == "search"):
+            want[x["file"]].add(x["call"])
+    shown = fetch_results(want)
+    kept = []
+    seen_search: set[tuple[str, str]] = set()
+    for x in brief_dependent:
+        if x["op"] == "search":
+            if any(ch in x["rel"] for ch in "*?[") or not re.search(r"\.\w+$", x["rel"]):
+                continue  # a folder or a glob: the names its lines carry are the hits
+            t = shown.get(x.get("call") or "", "")
+            hit = any(c["call"] == x["call"] and c["op"] != "search" for c in brief_dependent)
+            if hit or not t.strip() or (x["agent"], x["call"]) in seen_search:
+                continue  # its lines are counted as hits, or nothing was printed
+            n = lines_of_file_shown(repo, x["rel"], t)
+            if not n:
+                continue  # the call printed nothing of that file
+            seen_search.add((x["agent"], x["call"]))
+            x["kind"] += f"; a search printed {n} of its lines"
+        if x["rel"].endswith("triage.toml"):
+            t = shown.get(x.get("call") or "", "")
+            if not REPLICA_ENTRY.search(t):
+                continue  # only clean-room entries (the part's own) were printed
+            x["kind"] += "; a replica author's entry printed"
+        kept.append(x)
+    brief_dependent = kept
     return {
         "slips": slips,
         "brief_dependent": brief_dependent,
@@ -932,6 +966,8 @@ BRIEF_FILES = re.compile(
     r"^validation/investigations/glibc-dbl/tables\.py$"
 )
 BRIEF_FILES_SINCE = "2026-10-29T01:20:00+01:00"
+#: A replica author's triage entry in an output (TOML or a printed dict).
+REPLICA_ENTRY = re.compile(r"implementation\s*=\s*\"replica\"|'implementation': 'replica'")
 #: Files of those folders a brief named for its reader (launch description prefix, path).
 BRIEF_ALLOWED = (
     # "the block hashes of glibc's results, ...-blocks.json (that one file only: black-box output)"
@@ -947,6 +983,22 @@ BRIEF_ALLOWED = (
 #: FLIRT's, FAST's, topup's and fslmaths' clean-room briefs named the replica's suite "for its
 #: cases and mechanics"; the earlier briefs say nothing of it (no rule restricted it).
 R16_FORBIDDEN_BY = ("Clean-room catch-up",)
+
+
+_FILE_LINES: dict[str, set[str]] = {}
+
+
+def lines_of_file_shown(repo: Path, rel: str, text: str) -> int:
+    """How many lines of an output are lines of a repository file (its version on main; grep's
+    ``N:`` prefixes removed; lines shorter than 8 characters ignored)."""
+    if rel not in _FILE_LINES:
+        try:
+            body = _git(repo, "show", f"main:{rel}")
+        except subprocess.CalledProcessError:
+            body = ""
+        _FILE_LINES[rel] = {norm_line(x) for x in body.splitlines() if len(norm_line(x)) >= 8}
+    have = _FILE_LINES[rel]
+    return sum(1 for raw in text.splitlines() if norm_line(PREFIX.sub("", raw, count=1)) in have)
 
 
 def case_writers(repo: Path, printed, commands, paths: set[str]) -> dict[str, str | None]:
@@ -1065,6 +1117,122 @@ def diff_nature(repo: Path, h: str, paths=CLEANROOM_PATHS) -> dict:
     return {"files": files, "added": added, "removed": removed, "comments_or_blank": trivial}
 
 
+def _cmd(x: dict, n: int = 240) -> str:
+    c = (x.get("command") or x.get("detail") or "").replace("\n", " | ").replace("`", "'")
+    return c[:n] + ("..." if len(c) > n else "")
+
+
+def _ev(x: dict, key: str | None = None) -> str:
+    """Evidence: session/agent, the transcript file's line, the time."""
+    k = key or x.get("agent") or ""
+    return f"`{k}` line {x.get('line')} ({x.get('ts', '')[:19]}Z), `{x.get('file', '')}`"
+
+
+def write_markdown(res: dict, path: Path, scan: str, repo_head: str) -> None:
+    """The private dossier: every verdict with its evidence (session, record line, time)."""
+    L: list[str] = []
+    w = L.append
+    w("# The clean-room audit: verdicts (private: paths, sessions, command lines)\n")
+    w(f"Scan: `{scan}`; repository at `{repo_head}`. Generated by `cleanroom-audit verdicts`.\n")
+    w("## Per clean-room original\n")
+    w("| tool | family | agents (implementers / other roles) | status | findings |")
+    w("|---|---|---|---|---|")
+    for _name, e in sorted(res["tools"].items()):
+        n_impl = sum(1 for a in e["agents"] if a["role"] == "clean-room implementer")
+        n_other = len(e["agents"]) - n_impl
+        v = e["verdict"]
+        w(
+            f"| {e['name']} | {e['family']} | {n_impl} / {n_other} | {v['status']} | {len(v['findings'])} |"
+        )
+    for name, e in sorted(res["tools"].items()):
+        v = e["verdict"]
+        w(f"\n### {e['name']} (`{name}`): {v['status']}\n")
+        w("| agent | role | first touch | last touch | touches | commits |")
+        w("|---|---|---|---|---|---|")
+        for a in sorted(e["agents"], key=lambda a: a["first_touch"]):
+            w(
+                f"| {a['description']} (`{a['key']}`) | {a['role']} | {a['first_touch'][:16]} | "
+                f"{a['last_touch'][:16]} | {a['touches']} | {' '.join(a['commits'][:6])}"
+                f"{' ...' if len(a['commits']) > 6 else ''} |"
+            )
+        if v["findings"]:
+            w(
+                "\nFindings (an implementer saw restricted material of this family before or while writing it):\n"
+            )
+            for a in e["agents"]:
+                for r in a["restricted"]:
+                    if r["when"] == "before or during" and r["relevant"] and r["level"] in SEVERE:
+                        w(
+                            f"- {a['description']}: {r['rule']} {r['level']} `{r['show']}`; {_ev(r, a['key'])}; `{_cmd(r)}`"
+                        )
+                for g in a["register"]:
+                    if g["when"] == "before or during" and g["relevant"] and g["body_lines"]:
+                        w(
+                            f"- {a['description']}: R12 {g['body_lines']} body lines, {g['headings']} "
+                            f"headings of {', '.join(g['sections'])}; {_ev(g, a['key'])}; e.g. "
+                            f"{'; '.join(g['sample'][:2])}"
+                        )
+        if v["other_roles"]:
+            w("\nEdits by agents of other roles:\n")
+            for o in v["other_roles"]:
+                a = next(x for x in e["agents"] if x["description"] == o["description"])
+                diffs = "; ".join(
+                    f"{h}: +{d['added']}/-{d['removed']} ({d['comments_or_blank']} comments or blank)"
+                    for h, d in a.get("diffs", {}).items()
+                )
+                ex = "; ".join(
+                    f"{t['how']} {t['rel']} {t['ts'][:16]}" for t in a["touch_examples"][:3]
+                )
+                w(
+                    f"- {o['description']} ({o['role']}): {o['touches']} touches; restricted content of "
+                    f"this family seen before: {o['relevant_content_before']}; {diffs or 'no commit'}; {ex}"
+                )
+        if v["notes"]:
+            w(
+                "\nOther accesses of the implementers before or during the work (rule/level/family): "
+                + ", ".join(f"{k} {n}" for k, n in v["notes"].items())
+            )
+    w("\n## Every clean-room implementer's accesses that showed restricted material (any family)\n")
+    for x in res["slips"]:
+        sample = f"; e.g. {'; '.join(x['register_sample'][:2])}" if x.get("register_sample") else ""
+        w(
+            f"- {x['description']} (touched: {', '.join(x['tools_touched']) or 'no clean-room code'}): "
+            f"{x['rules']} {', '.join(x['paths'][:4])}; {_ev(x)}; `{_cmd(x)}`{sample}"
+        )
+    w("\n## Files the implementers' briefs forbade (R15, R16)\n")
+    for x in res["brief_dependent"]:
+        w(f"- {x['description']}: {x['kind']}; `{x['rel']}` ({x['op']}, {x['via']}); {_ev(x)}")
+    w("\n## The orchestrator's own edits of clean-room code\n")
+    for k, lst in res["orchestrator_edits"].items():
+        for e in lst:
+            w(f"- `{k}`: {e['op']} ({e['via']}) `{e['rel']}`; {_ev(e, k)}")
+    for c in res["orchestrator_commits"]:
+        files = ", ".join(f["path"] for f in c["files"][:6])
+        w(
+            f"- commit `{c['hash'][:9]}` {c['commit_date'][:16]} ({c['how']}, line {c['line']}): {c['subject'][:160]}; {files}"
+        )
+    for m in res["merge_edits"]:
+        w(
+            f"- merge `{m['hash'][:9]}` {m['commit_date'][:16]}: its own resolution in {', '.join(m['files'])} "
+            f"(+{m['lines_added']}/-{m['lines_removed']}): {m['subject'][:120]}"
+        )
+        w("\n```diff\n" + m["diff"][:3000] + "\n```")
+    w("\n## Commits of clean-room code and their makers\n")
+    how = collections.Counter(c["how"] for c in res["commits"].values())
+    w(
+        f"{len(res['commits'])} commits; attributed by: {dict(how)}; unattributed: {len(res['unattributed'])}.\n"
+    )
+    w("| commit | date | maker | how | subject |")
+    w("|---|---|---|---|---|")
+    for h, c in sorted(res["commits"].items(), key=lambda kv: kv[1]["commit_date"]):
+        role = res["roles"].get(c["maker"] or "", {})
+        w(
+            f"| `{h[:9]}` | {c['commit_date'][:16]} | {role.get('description', '?')} ({role.get('role', '?')}) "
+            f"`{c['maker']}` | {c['how']} (line {c['line']}) | {c['subject'][:90]} |"
+        )
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+
+
 def add_arguments(sub) -> None:
     v = sub.add_parser("verdicts", help="the verdicts per clean-room original, from a scan")
     v.add_argument("--scan", required=True, help="a scan's output directory")
@@ -1077,6 +1245,8 @@ def main(args: argparse.Namespace) -> int:
     res = run(Path(args.scan), repo)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    head = _git(repo, "rev-parse", "--short", "HEAD").strip()
+    write_markdown(res, out / "verdicts.md", str(args.scan), head)
     (out / "verdicts.json").write_text(
         json.dumps(res, indent=1, sort_keys=True, default=list) + "\n"
     )

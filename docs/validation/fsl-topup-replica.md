@@ -1,12 +1,12 @@
 # Parity: topup and applytopup replicas (bit-exact, FSL Licence)
 
-**All cases agree.** 176 cases on the `standard` tier: 106 pass, 67 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 177 cases on the `standard` tier: 107 pass, 67 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl topup` and `fsl applytopup` (crate larmorx-nc-topup, translated from FSL 6.0.7.23's source)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5, fsl-basisfield 2203.4, fsl-warpfns 2501.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, OpenBLAS 0.3.33 on one thread; the conda build at `~/fsl-6.0.7.23`, as built)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup-replica --tier standard`
-- **Original programs:** 176 runs: 155 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-06 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup-replica --tier standard`
+- **Original programs:** 177 runs: 156 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -22,7 +22,7 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| at | 74 | 47 | 25 | 2 | 0 |
+| at | 75 | 48 | 25 | 2 | 0 |
 | cfg | 16 | 12 | 4 | 0 | 0 |
 | debug | 5 | 5 | 0 | 0 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
@@ -114,7 +114,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (53796ce0a606) |
+| larmorx | 0.0.1 (868c1fce14ec) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -266,7 +266,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `at/jac-x` | pass | 6/6 | Jacobian modulation along x |
 | `at/jac-quadratic` | pass | 6/6 | a field of quadratic splines |
 | `at/jac-field` | pass | 6/6 | --topup naming a field image (topup's --fout): no movements |
-| `at/jac-field-aniso` | pass | 6/6 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
+| `at/jac-field-aniso` | pass | 7/7 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
+| `at/jac-coef-aniso` | pass | 7/7 | topup's coefficients (a field of 6 x 6 mm voxels in plane) on images of 6 x 4 mm voxels of the same shape: FSL scales t… |
 | `at/jac-no-movpar` | pass | 6/6 | coefficients without their _movpar.txt (no movements) |
 | `at/jac-oblique` | pass | 6/6 | a phase-encoding vector along x and y |
 | `at/jac-z` | pass | 6/6 | phase encoding along z (FSL-144: FSL leaves the z component out silently; the default refuses) |

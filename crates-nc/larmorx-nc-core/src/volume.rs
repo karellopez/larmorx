@@ -1269,7 +1269,7 @@ pub fn find_pathname(filename: &str) -> String {
 // Reading
 
 /// `NiftiGetLeftRightOrder(header)`: from the float determinants of the header's 3x3 matrices.
-fn header_left_right_order(h: &NiftiHeader) -> i32 {
+pub(crate) fn header_left_right_order(h: &NiftiHeader) -> i32 {
     let mut order;
     let mut dets: f32 = -1.0;
     let mut detq: f32 = -1.0;
@@ -1301,7 +1301,7 @@ fn header_left_right_order(h: &NiftiHeader) -> i32 {
     order
 }
 
-fn mat44_to_mat(m: &nifti::Mat44) -> Mat {
+pub(crate) fn mat44_to_mat(m: &nifti::Mat44) -> Mat {
     let mut out = Mat::zeros(4, 4);
     for (i, row) in m.iter().enumerate() {
         for (j, v) in row.iter().enumerate() {

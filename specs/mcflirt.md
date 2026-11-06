@@ -406,7 +406,12 @@ grid, every row of every slice, including rows with no contributing point), and
     A_r = C_1 + … + C_r            (running total of C)
     N   = Σ over slices z of A_{last row of slice z}
 
-all as float32 running sums in visiting order. `N` is many orders of magnitude larger than
+all as float32 running sums in visiting order. (spec writer, 2026-11-06) Precisely: `C` is **one float32 running
+total to which each contributing point's weight is added as the point is visited**, never
+restarted, so `C_r` is its value at the end of row `r` (each point added one by one, not the
+row's total `w_r` added at once: with fractional weights the two round differently, and `N`'s
+last bits move the correlation's, `specs/flirt.md` §6.4's observation); at the end of every row
+`C` is added to `A`, at the end of every slice `A` to `N`; neither `A` nor `N` restarts. `N` is many orders of magnitude larger than
 the number of contributing points (about `10^4` times larger on a 4 mm grid of a typical
 BOLD volume).
 
@@ -1123,7 +1128,19 @@ All use the sampling, interpolation and edge weights of §6.1–6.3. Reference g
 binned once per stage: `bin = ⌊(g − g_min)·B/(g_max − g_min)⌋`, clamped to `0 … B−1`
 (`B` = bins, §5.2; `g_max − g_min = 0` is replaced by 1).
 - `leastsquares`: weighted mean of `(x − y)²` with the true weight sum (no `N` quirk);
-  empty overlap gives `(max − min)²` over both images.
+  empty overlap gives `(max − min)²` over both images. (spec writer, 2026-11-06; the clean-room
+  catch-up's question: does it sum in three levels as FLIRT's?) **Yes: mcflirt's `leastsquares`
+  is FLIRT's `leastsq` unchanged** (`specs/flirt.md` §6.2, "`leastsq` exactly"): with `δ = x −
+  y` in single precision, each contributing point (§6.1) adds `(w·δ)·δ` (each product rounded to
+  single precision; `w` the edge weight of §6.3, a negative weight set to 0) and `w` to two
+  single-precision running sums that have **three levels**, as §6.4's: each row (along x) has its
+  own sums started at 0, added at the row's end to the slice's sums, which are added at the
+  slice's end to the totals; with `-smooth 0` each point adds `δ·δ` and the count is the integer
+  number of points. The cost is the total of the squares over the total weight (over the count
+  with `-smooth 0`), a single-precision quotient, when that weight (count) is above 1; otherwise
+  `(max − min)²`, `max` the larger of the two volumes' maxima and `min` the smaller of their
+  minima (single precision); it is returned as it is (no further rounding). mcflirt passes no
+  weight images, so FLIRT's weighted form does not arise.
 - `corratio`: `Σ_b n_b·var_b / (n·var)` over bins with `n_b > 2` (weighted counts, variances
   with `n_b − 1`), i.e. 1 − the correlation ratio of the test values given the reference bin;
   (spec writer, 2026-11-02) **`n` and the total variance `var` over those bins only**: the points

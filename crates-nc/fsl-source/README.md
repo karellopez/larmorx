@@ -34,6 +34,7 @@ them again.
 | fsl-topup | 2203.5 | https://git.fmrib.ox.ac.uk/fsl/topup | `topup.cpp`, `topupfns.{h,cpp}`, `topup_costfunctions.{h,cpp}`, `topup_file_io.{h,cpp}`, `topup_matrices.{h,cpp}`, `applytopup.{h,cpp}`, `displacement_vector.{h,cpp}` |
 | fsl-avwutils | 2209.6 | https://git.fmrib.ox.ac.uk/fsl/avwutils | `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` (fslmaths, fslstats and fslroi in full; what the scripts run of the others) |
 | fsl-cprob | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/cprob | `drand.cc`, `ndtri.cc`, `polevl.cc`, `mtherr.cc`, `const.cc`, `mconf.h`, `cprob.h` (FSL's C++ wrapper of Stephen L. Moshier's Cephes library; fslmaths' random numbers and normal quantiles) |
+| fsl-fugue | 2603.0 | https://git.fmrib.ox.ac.uk/fsl/fugue | `prelude.cc`, `unwarpfns.{h,cc}`, `Makefile` (`prelude` links `prelude.o` and `unwarpfns.o`; `fugue`, `sigloss` and the other programs are not translated) |
 
 FSL is Copyright (C) 1999-2023 University of Oxford; the files carry their own notices
 (`nifti1.h`, `znzlib.{h,c}` and the code `legacyFunctions.cc` takes from `nifti1_io.c` were

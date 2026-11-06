@@ -185,7 +185,7 @@ title = "topup and applytopup (the susceptibility field from reversed phase enco
 eco = "fsl"
 page = "/tools/fsl-topup/"
 use = ["larmorx fsl topup", "larmorx fsl applytopup", "lx.fsl.topup", "lx.fsl.applytopup"]
-how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; 2026-11-04: the spec answers of 2026-11-03, FSL-133, FSL-134, FSL-145 and FSL-201 reproduced with `reproduce`; 2026-11-05: the scaled conjugate gradients' `--miter` count, FSL-242 corrected by default; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods)"
+how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; 2026-11-04: the spec answers of 2026-11-03, FSL-133, FSL-134, FSL-145 and FSL-201 reproduced with `reproduce`; 2026-11-05: the scaled conjugate gradients' `--miter` count, FSL-242 corrected by default; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods; 2026-11-06: FSL-273, applytopup's Jacobian with a field of other voxel sizes, corrected by default)"
 validation = "original: [{fsl-topup.pass} of {fsl-topup.compared}](record:fsl-topup) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-topup.fmriprep} oracle runs: ds001600 within FSL's own thread band in every metric, ds005040 in every one but the field's correlation, 0.999958 against FSL's own 0.999966), {fsl-topup.both} more rejected by both alike, {fsl-topup.expected} expected divergences, each with its reason (estimated movements that do not converge, where FSL-201's forward differences make FSL's own path depend on its inputs' last bits, FSL's measured spread beside the original's; FSL-143's diverging iterations, reproduced; vb2D's transients; FSL-126; inputs refused for FSL-124 and FSL-134); replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"
 [[tool]]
 id = "fsl-maths"
@@ -204,6 +204,14 @@ page = "/tools/fsl-stats/"
 use = ["larmorx fsl fslstats", "lx.fsl.fslstats", "lx.fsl.image_mean", "lx.fsl.image_std"]
 how = "clean-room original, `experimental` (2026-11-04: every option, `-t`, `-K` and `-json`, every message and failure case); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, `-t`, `-K` and `-json`, every message and failure case; BET's replica runs it)"
 validation = "original: [{fsl-stats.pass} of {fsl-stats.compared}](record:fsl-stats) compared cases within thresholds against FSL 6.0.7.23, {fsl-stats.identical} of them FSL's numbers (fMRIPrep's {fsl-stats.fmriprep} goodvoxels calls included; BET's call within 6e-8 relative), {fsl-stats.both} more rejected by both alike; replica: [{fsl-stats-replica.pass} of {fsl-stats-replica.compared}](record:fsl-stats-replica) compared cases printing FSL 6.0.7.23's text byte for byte (with its messages and exit status): fMRIPrep's {fsl-stats-replica.fmriprep} goodvoxels calls, BET's call, FSL's own tests, every option; {fsl-stats-replica.both} more rejected by both alike"
+[[tool]]
+id = "fsl-prelude"
+title = "prelude (phase unwrapping of field maps' phase differences and complex images)"
+eco = "fsl"
+page = "/tools/fsl-prelude/"
+use = ["larmorx fsl prelude", "larmorx-nc fsl prelude", "lx.fsl.prelude"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-06: every option, message and failure case, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`); clean-room original: the next part, from `specs/prelude.md`"
+validation = "replica: [{fsl-prelude-replica.pass} of {fsl-prelude-replica.compared}](record:fsl-prelude-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-prelude-replica.fmriprep} calls on four oracle runs, the data panel's two other phase-difference maps, every option, complex and phase-and-magnitude inputs, series, NaN values (in a complex128 image's case, FSL-265, the values FSL takes from memory it never wrote are reported, not compared); {fsl-prelude-replica.both} more rejected by both alike"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -480,3 +488,8 @@ id = "fsl-stats-replica"
 larmorx = "`larmorx-nc fsl fslstats`; `lx.fsl.fslstats` and its typed wrappers, `larmorx fsl fslstats` (the replica, FSL Licence)"
 reference = "fslstats (FSL 6.0.7.23, fsl-avwutils 2209.6); FSL's own tests' expected outputs"
 status = "`experimental` ({fsl-stats-replica.pass} of {fsl-stats-replica.compared} compared cases identical, fMRIPrep's {fsl-stats-replica.fmriprep} calls included; {fsl-stats-replica.both} rejected by both, with the same messages and status)"
+[[record]]
+id = "fsl-prelude-replica"
+larmorx = "`larmorx-nc fsl prelude`; `lx.fsl.prelude` and `larmorx fsl prelude` (the replica, FSL Licence)"
+reference = "prelude (FSL 6.0.7.23, fsl-fugue 2603.0); fMRIPrep's calls also against fMRIPrep's own outputs"
+status = "`experimental` ({fsl-prelude-replica.pass} of {fsl-prelude-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-prelude-replica.fmriprep} calls included (in a complex128 image's case the values FSL takes from memory it never wrote, FSL-265, are reported, not compared); {fsl-prelude-replica.both} rejected by both, with the same messages and status)"

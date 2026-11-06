@@ -69,6 +69,7 @@ FSL_TOOLS = (
     (r"(^|/)(maths/|fslmaths|fslstats)", "fslmaths"),
     (r"(^|/)ssroi\.rs$", "standard_space_roi"),
     (r"(^|/)fslroi\.rs$", "fslroi"),
+    (r"(^|/)prelude(/|\.rs$)", "prelude"),
 )
 #: What each tool is the clean-room original of (the public summary's names).
 TOOL_NAMES = {
@@ -84,6 +85,7 @@ TOOL_NAMES = {
     ("FSL", "fslmaths"): "fslmaths and fslstats",
     ("FSL", "standard_space_roi"): "standard_space_roi",
     ("FSL", "fslroi"): "fslroi",
+    ("FSL", "prelude"): "prelude (phase unwrapping)",
     ("FSL", "fsl-shared"): "larmorx-fsl's shared code (images, options, messages, data)",
     ("GNU", "cbrtf_glibc"): "cbrtf with glibc 2.35's bits (larmorx-core)",
     ("GNU", "sincos_glibc"): "sin, cos, sincos with glibc 2.35's bits (larmorx-core)",
@@ -985,7 +987,7 @@ CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-pat
 #: investigations of replica parts and spec writers.
 BRIEF_FILES = re.compile(
     r"^validation/difftest/triage\.toml$|^validation/investigations/(?:fsl-bet|fsl-fast|fsl-flirt|"
-    r"fsl-maths|fsl-mcflirt-replica|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
+    r"fsl-maths|fsl-mcflirt-replica|fsl-prelude|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
     r"version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site)/|"
     r"^validation/investigations/glibc-dbl/tables\.py$"
 )

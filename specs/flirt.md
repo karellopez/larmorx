@@ -283,8 +283,9 @@ by the scale, both about the centre: `(M·K)·S` with `K = [1 k₁ k₂; 0 1 k�
 s_y, s_z)` and their translations `c − K·c`, `c − S·c` (the products first).
 
 **The decomposition exactly** (spec writer, 2026-11-02). Of a matrix `M` about `c`, with `x`, `y`,
-`z` its first three columns and every dot product summed as §12's (two interleaved accumulators:
-`(p₁ + p₃) + p₂` for three terms): `s_x = √(x·x)` in double, rounded to single; then in single
+`z` its first three columns and every dot product summed as §12's (two interleaved accumulators,
+each started at `+0`: `((+0 + p₁) + p₃) + (+0 + p₂)` for three terms, which matters only for the
+sign of a zero result: never `−0`, §3's signs below): `s_x = √(x·x)` in double, rounded to single; then in single
 precision, each dot product rounded to single first: `d = x·y`, `s_y = √(y·y − d²/s_x²)`, `k₁ =
 d/(s_x·s_y)`; in double `x₀ = x/s_x` and `y₀ = y/s_y − k₁·x₀`; in single `s_z = √((z·z − (x₀·z)²) −
 (y₀·z)²)`, `k₂ = (x₀·z)/s_z`, `k₃ = (y₀·z)/s_z`. The rotation is `R = A·(S⁻¹·K⁻¹)` with `A` the 3 × 3
@@ -294,6 +295,19 @@ reciprocal rounded first); the angles from `R` as `specs/mcflirt.md` §4.4 (`cy`
 root of `R₁₁² + R₁₂²` rounded to single; `R₁₁/cy` and the other quotients double quotients rounded
 to single; glibc's `atan2f`), and the translations `A·c + m − c` (double, the product first, `m`
 the fourth column).
+
+**The signs of zero parameters** (spec writer, 2026-11-06; the clean-room catch-up's question on a
+zero third skew under gimbal lock). Every dot product of the decomposition is a sum started at
+`+0` (two accumulators, each from `+0`), and `s_z` (like `s_x`, `s_y`) is positive for an
+invertible matrix, so a skew is **never an exact `−0`**: a skew printed `-0.000000` is a negative
+value of magnitude below 5e-7, the rounding residue of `x₀·z` or `y₀·z` for a 3 × 3 part that is
+orthonormal only to single precision (the rotations' single-precision cosines and sines: `cos(−π/2)`
+is `−4.37e-8` in single precision, so under gimbal lock, `|r_y| = π/2`, the composed columns are
+not exactly orthogonal). Its sign follows from the matrix's last bits through the arithmetic
+above, nothing else; a sign that differs from FSL's means the matrix decomposed differs from
+FSL's in its last bits (an earlier step), not a rule about zeros. Rotation parameters can be an
+exact `−0` (glibc's `atan2f` of a `−0` entry), translations only as the differences above give
+them.
 
 **Quaternion parameters** (`-anglerep quaternion`; observed, the replica identical to FSL on the
 record's cases). The three rotation parameters are the vector part `(x, y, z)` of a unit
@@ -556,9 +570,35 @@ each factor present only when the sample lies within the smoothing distance of t
 edge (`f = o/s`) or else of its high edge (`f = (b − o)/s`), the quotient formed first; a
 negative result is set to 0.
 The sums are those of the smoothed forms. Differences from §6.2:
-- `normcorr`: the cost is `1 − r`, **not** `1 − |r|` (an anticorrelation is not rewarded);
+- `normcorr`: the cost is `1 − r`, **not** `1 − |r|` (an anticorrelation is not rewarded). Its count
+  `N` is `specs/mcflirt.md` §6.4's exactly, and the order of its first running total decides the
+  last bits (spec writer, 2026-11-06; the record's `real/weights-normcorr`): `C` is one
+  single-precision running total to which **each contributing point's weight is added as the point
+  is visited**, over the whole grid, never restarted (not each row's total added at the row's
+  end); at the end of every row (a row without a contributing point included) `C` is added to the
+  running total `A`, and at the end of every slice `A` to `N` (neither restarted). With fractional
+  weights (a reference weight filtered from a mask, the edge factors) a row's total added at once
+  rounds differently, `N`'s last bits move and, through the single-precision `cov`, `varx` and
+  `vary`, so do `r`'s: one or two units in the last place of a cost near 0.05, enough to move a
+  parabolic step in its 5th significant digit **(observed**: FSL's `-verbose 7` trace of
+  `real/weights-normcorr` and the original's agree through the 4 mm stage's 46th evaluation and
+  part at the 47th, `0.050021` against `0.050056`; FSL's arithmetic with only this change, each
+  row's total added at once, gives the original's evaluations, its 9,001 evaluations against
+  FSL's 8,980 and its final matrix to every printed digit, 0.5083 mm from FSL's at the 95th
+  percentile; every other weighted cost, the weighted `corratio` of the search included, and the
+  pyramid's weights and images, `-debug`'s files, are FSL's bit for bit);
 - `woods`: prints `WARNING: Woods is not implemented with cost function weighting` on standard
-  error at every evaluation and uses the unweighted `woods`;
+  error at every evaluation and uses the unweighted `woods` (§6.2: unsmoothed, no weight, no edge
+  factor, on the pair's input blurred with the weights, §5). (spec writer, 2026-11-06; the
+  record's `real/weights-woods`, not closed by this text) **(Observed**: on 40 matrices around the
+  parting point of the record's trace, measured on the 4 mm pair by a schedule (`setscale 4`,
+  `measurecost 6`), FSL's and the original's `woods` agree to every printed digit, `0.948010` at
+  the parting point's printed parameters included; the trace parts at the 4 mm stage's 356th
+  evaluation, a step of 0.8 mm in `t_x`, where `woods` jumps by 1e-4 (a sample crossing the
+  input's bounds test, §6.1: `woods` counts every sample with weight 1) at parameters that agree
+  to their printed digits. So the pair and `woods` are as specified; the matrices along the path
+  differ in their last bits before the jump: a question of §8.2's composition and line search,
+  open);
 - the mutual-information costs always take the weighted fuzzy form.
 The weight volumes follow the pyramid (§5): the reference weight's level matches the reference
 level; the input weight is blurred with the input (§7.2).
@@ -958,7 +998,15 @@ differences:
   fl(1/fl(1/t_k))`, which differs from `fl(t_k)` for some tolerances (for 29 % of random ones;
   never for the defaults at the scales 8, 4, 2 and 1); along Powell's direction it is one tolerance
   unit in this L1 sense (question 19: the implementer's `1/‖d ⊘ t‖` holds with the L1 norm of the
-  unit direction).
+  unit direction). **The first evaluation of a line search is a trial point too** (spec writer, 2026-11-06; the
+  clean-room catch-up's question on FSL's first evaluated vector): when the line search's starting
+  cost is not known (0), it is measured at `p + 0·û` (`a = 0`), not at `p` itself, so the zeros of
+  the evaluated vector take IEEE's signs: `0·û_i` is `−0` where `û_i` is negative (or `−0`), `+0`
+  otherwise, and `(+0) + (−0)` is `+0`: an exact `−0` in `p` is evaluated (and printed) as `0`
+  except along a negative component of `û`, while a negative value too small for six decimals
+  keeps its sign (FSL's `Starting with 0.000000 -0.000000 -0.000000 ...` followed by a first
+  evaluation `0.000000 0.000000 -0.000000`: the second parameter an exact `−0`, the third a
+  negative residue, below).
 - **Powell** (`optimisationtype powell`): after a sweep that did not converge, let `Δ_m` be each
   line search's cost change (new minus start, single), `m*` the most negative, `f0` the sweep's
   first starting cost, `f1` its final cost, `fe` the cost at `x_start + 2(x_end − x_start)`; if

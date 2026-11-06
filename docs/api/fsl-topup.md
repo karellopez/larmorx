@@ -199,6 +199,12 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   takes fields on other grids: corrected, refused (`reproduce`: FSL's scales, and a field of as
   many voxels as the images in another shape laid as stored, its Jacobian at the same indices;
   in the original since 2026-11-04).
+- **FSL-273**: applytopup `--method=jac` divides the field's derivatives by the field's own voxel
+  sizes while it applies the displacement at the images' voxel indices, so a field (coefficients
+  or a field image) of the images' shape whose voxel sizes differ from the images' gets a
+  Jacobian scaled by their ratio: corrected (the Jacobian of the displacement applied; the same
+  result wherever the voxel sizes agree), named when the voxel sizes differ along an encoded
+  axis (`reproduce`: FSL's scales; the replica since 2026-11-06).
 - **FSL-135**: an unknown `--method` writes nothing and exits 0; a restoration without movements
   aborts: refused clearly.
 - **FSL-141** to **FSL-143**: the vb methods' counts in 32-bit integers, `vb3D`/`vb4D`'s count of

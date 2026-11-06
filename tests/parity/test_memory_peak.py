@@ -9,7 +9,7 @@ with; ``validation/investigations/difftest/memory_pair.py`` measures any call by
 BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's, FAST's,
 topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES``,
 ``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``:
-fslmaths' and fslstats' since 2026-11-03).
+fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -625,6 +625,62 @@ def test_avwutils_replica_needs_no_more_memory_than_fsl(tmp_path, name, program,
         if mode == "reproduce":
             assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
             assert out == fsl_out, f"{program} {name}"
+
+
+#: FSL's prelude (FSL 6.0.7.23) against ``python -m larmorx fsl prelude`` (the ``larmorx-nc``
+#: replica, 2026-11-06): fMRIPrep's call on ds005454-sub-16 (sdcflows' phase-difference workflow:
+#: 14,678 regions, the largest of the oracle runs), as it ran and with the slice-by-slice
+#: unwrapping, the ramps and every output added. The outputs bit-identical in ``reproduce``.
+PRELUDE_CASES = [
+    ("fmriprep", ""),
+    ("slices-ramps-outputs", "-s --removeramps --savemask=mask -l labels -r raw"),
+]
+
+
+@pytest.mark.parametrize(("name", "extra"), PRELUDE_CASES)
+def test_prelude_replica_needs_no_more_memory_than_fsl(tmp_path, name, extra):
+    fp = pytest.importorskip("larmorx_validation.parity.fsl_prelude_replica")
+    if fp.replica_binary() is None:
+        pytest.skip("the larmorx-nc program is not built (crates-nc)")
+    if not (fp.fsldir() / "bin" / "prelude").is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    calls = [node for run, node in fp.fmriprep_calls() if run == "ds005454-sub-16-noreconall"]
+    if not calls:
+        pytest.skip("the ds005454 fMRIPrep oracle run was not found")
+    args, files = fp.fmriprep_args("ds005454-sub-16-noreconall", calls[0])
+    words = []
+    for a in args:
+        key, sep, value = a.partition("=")
+        words.append(f"{key}={files[value]}" if sep and value in files else a)
+    words += extra.split()
+    env = {**fp._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak(
+        [str(fp.fsldir() / "bin" / "prelude"), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(fp.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"prelude {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"prelude {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"prelude {name}"
 
 
 #: FAST's clean-room original (``crates/larmorx-fsl``, 2026-11-03) on the same calls, at one

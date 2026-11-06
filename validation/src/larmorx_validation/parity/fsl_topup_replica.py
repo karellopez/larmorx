@@ -1775,6 +1775,19 @@ def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
         "--topup=tu_field",
         out,
         jac,
+        fix_finishes="FSL-273",
+    )
+    add(
+        "jac-coef-aniso",
+        "topup's coefficients (a field of 6 x 6 mm voxels in plane) on images of 6 x 4 mm voxels "
+        "of the same shape: FSL scales the Jacobian's y term by 4/6 (FSL-273)",
+        "--imain=@half_up_aniso.nii.gz",
+        "--inindex=1",
+        acq,
+        tu,
+        out,
+        jac,
+        fix_finishes="FSL-273",
     )
     add(
         "jac-no-movpar",

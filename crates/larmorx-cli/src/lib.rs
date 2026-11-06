@@ -39,7 +39,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
 /// FLIRT's, FAST's, topup's, applytopup's, fslmaths', fslstats', fslroi's and
-/// standard_space_roi's programs are `larmorx_fsl::cli`; a test checks the list).
+/// standard_space_roi's programs are `larmorx_fsl::cli`; a test checks the list); `prelude` has
+/// only its replica yet (2026-11-06).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -66,6 +67,7 @@ const FSL_TOOLS: &[&str] = &[
     "fslstats",
     "fslroi",
     "standard_space_roi",
+    "prelude",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -498,7 +500,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats, fslroi, standard_space_roi"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats, fslroi, standard_space_roi, prelude"),
             "{out}"
         );
         assert!(
@@ -506,14 +508,29 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        // every FSL tool has its clean-room original (fslroi and standard_space_roi since
-        // 2026-11-05); every one but mcflirt (`mri hmc`) is larmorx_fsl's
-        assert_eq!(replica::replica_only("fsl").count(), 0);
-        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
+        // every FSL tool but prelude has its clean-room original (fslroi and
+        // standard_space_roi since 2026-11-05); prelude has only its replica (2026-11-06)
+        assert_eq!(
+            replica::replica_only("fsl").collect::<Vec<_>>(),
+            ["prelude"]
+        );
+        // every FSL tool but mcflirt (`mri hmc`) and the replica without an original is
+        // larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 1], larmorx_fsl::cli::TOOLS);
+        assert_eq!(FSL_TOOLS[FSL_TOOLS.len() - 1], "prelude");
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
         };
+        // prelude has no clean-room original yet (2026-11-06): `original` is an error that names
+        // the replica's package (exit 127)
+        let (code, _, err) = run_options(&["lx", "fsl", "prelude"], &original);
+        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert!(
+            err.contains("no clean-room original of fsl prelude yet")
+                && err.contains("larmorx-nc package"),
+            "{err}"
+        );
         // fast runs its clean-room original (2026-11-03): no arguments, the usage (exit 1)
         let (code, _, err) = run_options(&["lx", "fsl", "fast"], &original);
         assert_eq!(code, 1);

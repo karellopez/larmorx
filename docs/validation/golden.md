@@ -246,6 +246,21 @@ What the coverage test enumerates:
   the cases add about 1 to 2 s to the debug golden run. The main package's checksums were
   re-recorded from f56c282 with the parity smoke tier's marker (2,731 passed): only the header
   changed.
+- **prelude, the replica** (2026-11-06, 15 cases in `crates-nc/larmorx-nc-cli/tests/golden.rs` on
+  `write_prelude_inputs`, 24 × 20 × 12 voxels: a wrapped phase and the same with a ramp, a series,
+  NaN phases and magnitudes, a phase of too wide a range, the magnitude and its mask, a complex
+  image as complex64, complex128 and big-endian complex64, made from powers of (12 + 5i)/13: plain
+  arithmetic): `prelude.fmriprep` (fMRIPrep's call), `.threshold-outputs`, `.slices`,
+  `.labelslices`, `.ramps` and its `.reproduce` (FSL-261), `.complex`, `.complex128` (FSL-265),
+  `.complex-big-endian` and its `.reproduce` (FSL-264), `.series` and its `.reproduce` (FSL-262),
+  `.nan-phase` and its `.reproduce` (FSL-269), `.nan-magnitude` (FSL-268); the failures
+  `prelude.range` (exit status 255), `.fsl263.not-complex`, `.fsl270.end-before-start` and
+  `.fsl271.sizes` by their status and the entries they name. prelude's printed messages are a
+  golden file too (`PRINTING`). `lx.fsl.prelude` is a replica-only function
+  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until PRELUDE's clean-room original.
+  `larmorx-nc`'s checksums recorded on 2026-11-06 from fb86dc8 (committed as 8fc37df): 15 cases and
+  69 checksum rows added, every other checksum unchanged; the unwrapped phases checked against the
+  inputs' truth (the true phase minus 2π).
 - **topup and applytopup, the clean-room original** (2026-11-03, six cases in
   `tests/golden/registry.py`, on `blip_pair`, a generated head of 16 × 16 × 8 voxels of 3 mm moved
   one voxel either way along y (seeded integers, no transcendental functions), its volumes `blip_up`

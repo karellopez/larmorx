@@ -123,7 +123,9 @@ at a time:
    2026-11-06: [docs/validation/clean-room-audit.md](validation/clean-room-audit.md), every clean-room original
    clean, 21 slips of implementers listed with their nature, 5 of them undeclared; `docs/parts/2026-11-06-clean-room-audit/`;
    the merge step: [docs/orchestration.md](orchestration.md), step 5a); (2) PRELUDE's
-   replica, its spec writer also answering the waiting spec questions (below, "The questions for a spec writer,
+   replica, its spec writer also answering the waiting spec questions (**done** 2026-11-06: the replica FSL
+   6.0.7.23's bytes in every compared case of its record, fMRIPrep's seven calls included; `specs/prelude.md`;
+   FSL-261 to FSL-273; the questions answered and those still open below, "The questions for a spec writer,
    gathered"); (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05) and (5) its clean-room
    original; (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
    then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);
@@ -722,6 +724,27 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From PRELUDE's replica part (2026-11-06).**
+  - *For PRELUDE's clean-room original (the next part):* from `specs/prelude.md` (§9: FSL-261 to
+    FSL-272's defaults, FSL-272 included; §10: what may be built for speed; §11: the validation
+    plan, every file bit-identical, `-c` within GLIBC-07). The spec writer's black-box probe and
+    model, `validation/investigations/prelude-spec/`, are open to the implementer (the replica
+    author's probes, `validation/investigations/fsl-prelude/`, are not). The site page's examples
+    wait for the original's panels (`larmorx_validation.evidence.fsl_prelude`).
+  - *For the clean-room originals, from the spec writer's answers:* FLIRT's `normcorr` count per
+    point (`specs/flirt.md` §6.4: each point's weight added as it is visited; the original adds
+    row totals, the cause of `real/weights-normcorr`; the same engine in `lx.mri.hmc`); topup's
+    coefficient-field Jacobian (`specs/topup.md` §7.3, FSL-273: scale 1 by default, FSL's
+    `dx / fx` in `reproduce`, named where an encoded axis' voxel sizes differ); fslmaths' FFT
+    twiddles with glibc's `sincos` in `reproduce` (`specs/fslmaths.md` §19); `lx.mri.hmc`'s
+    `leastsquares` as FLIRT's (`specs/mcflirt.md` appendix A).
+  - *Harness:* `tests/python/test_mri_replica.py::test_the_replica_itself` reads
+    `LARMORX_NC_BIN` after its `no_replica` fixture cleared it, so it fails in a checkout without
+    `crates-nc/target/release` when the variable is set (a module-level `_built_replica()` would
+    fix it); random testing's logs carry nibabel's "sizeof_hdr should be 348" warnings from the
+    comparators' difference details on pair and ANALYZE files (cosmetic).
+  - *The site:* `site.yml`'s fslmaths and fslstats entries still say "the clean-room original
+    planned" (both exist since 2026-11-04).
 - **From the clean-room audit (2026-11-06, `docs/validation/clean-room-audit.md`).** (a) The porting
   guide to name the replica program as an allowed black box (every FSL clean-room part ran it: a
   compiled program with the upstream's behaviour, no source shown) and to say which replica suite
@@ -786,18 +809,23 @@ The items below keep their history.
     crashes inside standard_space_roi (FSL-75); FSL-242 in the topup replica's default.
   - *The questions for a spec writer, gathered (the whole catch-up, relays 1 to 10; each with its
     black-box observation in the tool's `docs/findings/<tool>-original.md`):*
-    - `specs/topup.md`: §7.3's default Jacobian scales of a field image whose header voxel sizes
-      differ from the image's (`at/jac-field-aniso`: the spec's `dy / fy` gives 4/6, FSL and the
-      field indexed as the image give 1); a coefficient field's scale `dx / fx` when its intent
-      voxel sizes differ (FSL's behaviour or a defect?); §4.6's bending energy with
+    - `specs/topup.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06): §7.3's Jacobian scales of a
+      field image and of a coefficient field whose voxel sizes differ from the images' (FSL-273,
+      rule A: the Jacobian of the mapping applied, in the replica; the clean-room original's
+      coefficient-field default to follow, below). Still open: §4.6's bending energy with
       `--splineorder=2` on an axis shorter than two knot spacings (`topup-trial-01082`); §4.4's
       smoothing on an axis shorter than its kernel (`--featout` 3 % from FSL's); to state: `--miter`
       counts every iteration of the scaled conjugate gradients, and FSL-242 (§4.7).
     - `specs/fast.md`: §11's band of the default against the replica's default holds for one
       channel only; §7 and §4.1.4 to state the order of the messages black-box runs showed.
-    - `specs/flirt.md`: §3/§8.1 step 9's sign of a zero third skew under gimbal lock and FSL's first
-      evaluated vector's zero (no record case depends on it since relay 10); §6.4's weighted
-      `normcorr` and `woods` costs' last bits (the record's two failures); §8.2/§8.3 to state:
+    - `specs/flirt.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06): §6.4's weighted `normcorr`
+      (the count's running total adds each point's weight as it is visited, not each row's total:
+      the cause of `real/weights-normcorr`; also `specs/mcflirt.md` §6.4, `lx.mri.hmc`'s shared
+      engine) and §3/§8.2's zero signs (a skew is never an exact −0: FSL's −0.000000 is a residue
+      of the matrix's last bits; a line search's first evaluation is p + 0·û). Still open: the
+      third skew's parting under gimbal lock (the decomposed matrix's last bits, an earlier step);
+      `real/weights-woods` (the 4 mm pair and woods are FSL's at 40 matrices; the path's last bits);
+      §8.2/§8.3 to state:
       perturbations composed with all twelve parameters, a start composed at its dof, a NaN start
       parameter replaced by the identity's, the grids' starting matrix; §9.2's NaN pre-image (the
       background value) and §9.4's `-noresample` levels; §6.3/§6.2 `normmi` once the overlap reaches
@@ -808,7 +836,7 @@ The items below keep their history.
       to state (relay 10): §7.1/§8.1 step 9, the search's list sorted with `std::sort` before it
       enters `S` and `P`; §2.3's 4D warning, the levels' TR and the scaled sampling and initial
       matrices; §15.8's schedules' exact lines; §9.2's `-out` display range 0 and 0.
-    - `specs/mcflirt.md`: whether mcflirt's `leastsquares` sums in three levels as FLIRT's (§6.2).
+    - `specs/mcflirt.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06, appendix A): mcflirt's `leastsquares` is FLIRT's `leastsq` unchanged (three-level single-precision sums); `lx.mri.hmc`'s may use FLIRT's implementation.
     - `specs/standard_space_roi.md`: §3.2's fslroi matrices' arithmetic (the held frame, fitted;
       a box at the last x voxel of a neurologically stored oblique image: FSL's translation the
       double product rounded once, `bet-options-6-00796`), which form fslroi moves by which corner
@@ -822,8 +850,20 @@ The items below keep their history.
       frame; `-c` or `bet -R` on a neurologically stored image (cases 622, 677, `real/child-3y-B`);
       §6.4's four readings, case 192, step 3's "within 10 mm", FSL-50 (when FSL stops), §6.5's
       scalp phase, `-p` on a collapsed mesh.
-    - Carried from the brief (not this part's): `specs/fslmaths.md` §10.4, §19, §7; FLIRT §3 and
-      §8.1 step 9's skews; BET's open questions in `docs/findings/fsl-bet-original.md`.
+    - Carried from the brief: `specs/fslmaths.md` §10.4, §19 and §7 ANSWERED (PRELUDE's spec
+      writer, 2026-11-06: `-edge` exactly; `reproduce`'s glibc functions exp, log, pow, sin and cos,
+      and the replica's FFT twiddles with glibc's `sincos`); FLIRT §3 and §8.1 step 9's skews
+      answered as above (the third skew's parting still open); BET's open questions in
+      `docs/findings/fsl-bet-original.md` still open.
+    - Still open after PRELUDE's replica part (2026-11-06), four groups for a later spec writer:
+      BET's (§6.5's scalp phase, `-p` on a collapsed mesh, `-R` and `-c` on neurologically stored
+      images; the replica author's starting point in the part's notes, `docs/parts/`); FAST's
+      (§11's band with several channels, §7 and §4.1.4's message order); topup's (`--splineorder=2`
+      bending on axes shorter than two knot spacings; the 1 × 1 × 3 smoothing's 3 % from
+      `--featout`: narrowed, FSL's smoothing wraps periodically as the original's does, so the
+      difference lies elsewhere); `standard_space_roi`'s output headers (17 cases; the replica
+      author's analysis in the part's notes, a black-box model needed before it goes into the
+      spec). FLIRT's other gathered items, and `standard_space_roi` §2.5 and §2.1, not looked at.
 - **From BET's `-S`/`-B`/`-A`/`-A2` replica part (2026-11-04).**
   - *For the clean-room catch-up:* the original of `bet -S`, `-B`, `-A`, `-A2` from `specs/bet.md`
     §5.3 and §5.4, with the data search (`fsl_data=` or `LARMORX_FSL_DATA`, larmorx-nc's copy

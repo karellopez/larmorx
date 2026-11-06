@@ -848,6 +848,7 @@ FSL_UPSTREAM_TOOLS = (
     (r"^fsl-(topup|basisfield|warpfns)/", "topup"),
     (r"^fsl-avwutils/fslroi\.cc$", "fslroi"),
     (r"^fsl-avwutils/(fslmaths|fslstats)\.cc$|^fsl-cprob/", "fslmaths"),
+    (r"^fsl-fugue/", "prelude"),
 )
 #: The FSL replicas' files (``crates-nc/``) by tool, likewise.
 FSL_REPLICA_TOOLS = (
@@ -863,6 +864,7 @@ FSL_REPLICA_TOOLS = (
     ),
     (r"^larmorx-nc-avwutils/src/fslroi\.rs$|^larmorx-nc-core/src/avwutils\.rs$", "fslroi"),
     (r"^larmorx-nc-avwutils/|^larmorx-nc-core/src/(fslstats|cprob)\.rs$", "fslmaths"),
+    (r"^larmorx-nc-fugue/", "prelude"),
 )
 #: The AFNI replica's modules (``crates/larmorx-afni-replica/src``) by tool; the rest is shared.
 AFNI_MODULE_TOOLS = {

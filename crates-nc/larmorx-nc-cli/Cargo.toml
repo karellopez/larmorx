@@ -20,6 +20,7 @@ larmorx-nc-flirt.workspace = true
 larmorx-nc-fast.workspace = true
 larmorx-nc-topup.workspace = true
 larmorx-nc-avwutils.workspace = true
+larmorx-nc-fugue.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true

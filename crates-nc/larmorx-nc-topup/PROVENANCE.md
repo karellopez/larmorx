@@ -72,7 +72,9 @@ what it translates.
   resampled with the interpolation asked for: `applytopup::Ctx::first_volume`; reproduced, with
   the interpolation it was read with, as newimage's cache of a series' volumes gives FSL),
   FSL-133 (displacement lines wrapped circularly: `dispvec::CircularArray`), FSL-134 (a field
-  image's Jacobian in the y voxel size; a field on another grid refused: `applytopup`), FSL-135
+  image's Jacobian in the y voxel size; a field on another grid refused: `applytopup`), FSL-273
+  (the Jacobian of the mapping applied when the field's voxel sizes differ from the images':
+  `jac_resample`, 2026-11-06), FSL-135
   (an unknown `--method` and `--method=lsr` or a `vb` method without movements refused), FSL-141
   (the vb methods' counts of data points in 64 bits), FSL-142 (`vb3D` and `vb4D` count every
   image of a collection), FSL-143 (`vb3D` and `vb4D`'s prior with `AᵀA`'s coupling between

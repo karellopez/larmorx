@@ -650,6 +650,30 @@ defects! {
         "transforms whose values reach beyond double precision in its averages (a scale of 1e200, a translation of 1e300) make midtrans write rows of NaN, or report its failed singular value decomposition as a matrix-size error, and exit 0, instead of saying that the transforms cannot be averaged";
     FSL_242 = "FSL-242", "topup", true,
         "with --minmet=1 (scaled conjugate gradients), a level whose last iteration's step is rejected (its cost above the current point's) ends at that rejected point, not at the lowest cost the level found: the next level, or the outputs, start from a worse field (and movements) than the level had";
+    FSL_261 = "FSL-261", "prelude", true,
+        "--removeramps estimates, removes and restores the linear phase ramps without the voxels of the image's last column, row and slice: their differences do not count in the ramps and their phase keeps the ramp while the rest loses it; an image of one slice gets no ramp removed at all";
+    FSL_262 = "FSL-262", "prelude", true,
+        "with several volumes, --savemask and --labels write each volume's mask and labels to the same file in turn: only the last volume's are kept";
+    FSL_263 = "FSL-263", "prelude", true,
+        "-c with an image that is not complex takes the file's bytes as single-precision floats (right only for float32 data, without its scaling; other types give other values or are read past their end) and takes every imaginary value from memory that was never written";
+    FSL_264 = "FSL-264", "prelude", true,
+        "-c with a complex image stored in the other byte order (big-endian) exchanges its real and imaginary parts (each value's 8 bytes are swapped as one), so the phase is wrong";
+    FSL_265 = "FSL-265", "prelude", true,
+        "-c with a complex128 (double-precision) image reads none of its values: every value comes from memory past the empty data buffer";
+    FSL_266 = "FSL-266", "prelude", true,
+        "-v with --removeramps writes the ramp-free phase to an image named grot in the working directory, replacing any file of that name";
+    FSL_268 = "FSL-268", "prelude", true,
+        "NaN values in the magnitude (or mask) image enter the sort of the percentiles that set the default mask threshold (their place undefined), and a NaN first voxel makes the image's maximum NaN, so the mask is empty and the unwrapped phase all zeros";
+    FSL_269 = "FSL-269", "prelude", true,
+        "NaN phase values inside the mask enter the labels: their constraints are NaN, merged last from the most negative integer as their offset, so a region labelled together with a NaN voxel, or merged into one through a NaN constraint, is moved by about 2^31 cycles (the phase written is of the order of 1e10), and with -s NaN differences between slices are sorted in an undefined order";
+    FSL_270 = "FSL-270", "prelude", true,
+        "--end before --start processes no volume and writes no unwrapped output, yet exits 0 (the raw phase output, if asked for, is written)";
+    FSL_271 = "FSL-271", "prelude", true,
+        "a magnitude or mask image of another size than the phase image is not refused: it is read by the phase image's voxel indices, outside its own extent by its extrapolation, so the mask does not correspond to the phase";
+    FSL_272 = "FSL-272", "prelude", true,
+        "the phase range check (more than 3 pi refused) and the rewrap to [-pi, pi] (beyond 1.001 pi) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2 pi is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused";
+    FSL_273 = "FSL-273", "applytopup", true,
+        "--method=jac divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each phase-encoded axis by the ratio of the voxel sizes, not the Jacobian of the displacement applied, so the intensities are modulated wrongly";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

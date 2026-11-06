@@ -1,0 +1,313 @@
+# PRELUDE's replica part (2026-11-06; relays 1 to 6): the shared documents' changes.
+# Checked with: python -P scripts/orchestration/apply_handoff.py <scratch>/HANDOFF.toml --site <scratch>/site --check
+# (from main's checkout and from the part's worktree). The reasons: HANDOFF.md beside this file.
+
+# ------------------------------------------------------------------ the register (summary table)
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-242 | topup |"
+text = '''| FSL-261 † | prelude (`--removeramps`) | the ramps' loops stop one short (`x < maxx`, `y < maxy`, `z < maxz`) in the estimate, the removal and the restoration: the last column, row and slice never count in the ramps and are unwrapped with their ramp while the rest is unwrapped without it (restored after); an image of one slice gets no ramp removed at all | c | none (fMRIPrep does not ask for the ramps) | rule A: every column, row and slice by default, named where the outputs or `-v`'s lines change; `reproduce` FSL's loops; the replica 2026-11-06 (`opt/removeramps*`; fMRIPrep's ds002422 run-02 call with `--removeramps`: 885 values by at most 4.8e-7 rad, the site's example) | original |
+| FSL-262 † | prelude (`--savemask`, `-l`) | with several volumes each volume's mask and labels are written to the same file in turn: only the last volume's are kept | c | none (one volume, no saved mask) | rule A: one series of every processed volume's by default, named; `reproduce` FSL's; the replica 2026-11-06 (`opt/series-saved`) | original |
+| FSL-263 † | prelude (`-c`) | an image that is not complex is read as complex: its bytes as floats (right only for float32 data, without its scaling; a 16-bit image read past its end) and every imaginary value from memory never written (zeros in practice) | a | none (no `-c`) | rule B: refused by default ("the complex input <name> is a <type> image, not a complex one", exit 1); `reproduce` FSL's reading, the values beyond the buffer and the imaginary parts named and filled with zeros; the replica 2026-11-06 (`opt/complex-real`, `opt/complex-int16`) | original |
+| FSL-264 † | prelude (`-c`) | a big-endian complex64 image has each value's 8 bytes swapped as one, so its real and imaginary parts change places and the phase is wrong | c | none | rule A: each float swapped on its own by default, named; `reproduce` FSL's; the replica 2026-11-06 (`opt/complex-big-endian`) | original |
+| FSL-265 † | prelude (`-c`) | a complex128 image is read with no width: its buffer is empty and every value comes from memory past it (zeros in practice) | a | none | rule A: read as complex128 and converted by default, named; `reproduce` zeros, the undefined values named; the replica 2026-11-06 (`opt/complex128`, an expected divergence on the site) | original |
+| FSL-266 † | prelude (`-v --removeramps`) | the ramp-free phase is saved as `grot` in the working directory, replacing any file of that name | c | none | rule A: not written by default, named; `reproduce` writes it; the replica 2026-11-06 (`opt/removeramps-verbose`) | original |
+| FSL-267 † | prelude (messages) | the range error says "Allowable range is 6.283 radians" while the check is 3π; "Removed linear ramps" is printed again after the ramps are restored | f | none | kept as FSL prints them (no switch) | – |
+| FSL-268 † | prelude (NaN in the magnitude or mask) | NaN values enter the sort of the percentiles that set the default threshold (their place undefined: the sort may read outside the values), and a NaN first voxel makes the maximum NaN, so the mask is empty and the unwrapped phase all zeros | c, a | none (sdcflows' clipped magnitude and mask hold no NaN) | rule A: NaN left out of the threshold and the maximum by default, named where the mask changes; `reproduce` FSL's, a sort that would read outside the values refused (memory FSL does not own); the replica 2026-11-06 (`opt/nan-magnitude`, `opt/nan-first-magnitude`) | original |
+| FSL-269 † | prelude (NaN phases in the mask) | NaN phases inside the mask are labelled (their bin 1) and their constraints, NaN, are merged last with an offset of about 2^31 cycles, so a region labelled with a NaN voxel, or merged into one through a NaN constraint, moves by about 2^31 cycles (1.35e10 rad written in 2,608 voxels); with `-s`, NaN differences between slices enter the median's sort (undefined order) | c, a | none (sdcflows' `au2rads`: a NaN anywhere would make every value NaN) | rule A: NaN voxels left out of the mask by default and put back as NaN in the output, named where the outputs or `-v`'s lines change; `reproduce` FSL's, the `-s` sort outside the values refused; the replica 2026-11-06 (`opt/nan-phase*`) | original |
+| FSL-270 † | prelude (`--start`, `--end`) | `--end` before `--start` processes no volume and writes no unwrapped output, yet exits 0 | e | none | rule B: refused by default ("no volume to process: --end (<e>) is before --start (<s>)", exit 1); `reproduce` FSL's, named; the replica 2026-11-06 (`err/empty-range`) | original |
+| FSL-271 † | prelude (`-a`, `-m`) | a magnitude or mask image of another size than the phase is read by the phase's voxel indices (outside its own extent by its extrapolation), so the mask does not correspond to the phase | c | none (sdcflows' images share the phase's grid) | rule B: refused by default ("the magnitude (mask) image has another size than the phase image", exit 1); `reproduce` FSL's reading, named; the replica 2026-11-06 (`err/size-mismatch*`) | original |
+| FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | original |
+| FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so (its coefficient-field default to follow, `specs/topup.md` §7.3) | original (coefficient fields) |'''
+
+# ------------------------------------------------------------------ the register (the replicas' paragraph)
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''for these options, `standard_space_roi` and `fslroi` (the clean-room catch-up, from
+`specs/bet.md` §5.3 and §5.4 and `specs/standard_space_roi.md`).
+'''
+new = '''for these options, `standard_space_roi` and `fslroi` (the clean-room catch-up, from
+`specs/bet.md` §5.3 and §5.4 and `specs/standard_space_roi.md`).
+
+**The PRELUDE replica** (`larmorx-nc`, 2026-11-06; FSL 6.0.7.23's `prelude`, fsl-fugue 2603.0,
+[fsl-prelude.md](fsl-prelude.md)): FSL-261 to FSL-272, each with `reproduce`: corrected by default
+FSL-261, -262, -264, -265, -266, -268, -269 and -272 (rule D measured, then A); refused by default
+(rule B) FSL-263, -270 and -271; FSL-267 (messages) kept. Where FSL's result depends on memory it
+does not own (FSL-268's and FSL-269's sorts reaching outside the values) `reproduce` refuses, and
+FSL-263's and FSL-265's undefined values are filled with zeros and named. The spec writer of the
+same part found FSL-273 in applytopup (`--method=jac` with a field of other voxel sizes): the topup
+replica corrects it by default. PRELUDE's clean-room original is the next part (`specs/prelude.md`).
+'''
+
+# ------------------------------------------------------------------ the register (restricted section)
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "## Restricted: FSL BET, FLIRT, FAST, topup, fslmaths and fslstats (source-derived)"
+new = "## Restricted: FSL BET, FLIRT, FAST, topup, fslmaths, fslstats and prelude (source-derived)"
+
+[[op]]
+do = "append"
+file = "docs/findings/upstream-defects.md"
+text = '''### FSL-261 to FSL-273: prelude (fsl-fugue 2603.0) and applytopup's Jacobian (FSL 6.0.7.23) †
+
+Found while translating FSL 6.0.7.23's `prelude` (fsl-fugue 2603.0: `prelude.cc`,
+`unwarpfns.{h,cc}`, with newimage's complex reader and NewNifti) for the replica (2026-11-06; the
+restricted findings [fsl-prelude.md](fsl-prelude.md) have the lines, FSL's runs and the replica
+author's probes, `validation/investigations/fsl-prelude/`), and by the same part's spec writer
+(FSL-272, FSL-273). FSL-261: `remove_ramps`, `find_ramps` and their restoration loop `x < maxx`,
+`y < maxy`, `z < maxz` (newimage's maxima are the last indices). FSL-262: `main` saves `--savemask`
+and `-l` inside the volume loop under the same name. FSL-263: `read_complexvolume` takes the
+file's raw buffer as complex floats whatever its datatype. FSL-264: NewNifti swaps a complex64
+value's eight bytes as one. FSL-265: NewNifti gives `DT_COMPLEX128` no width. FSL-266: `-v` with
+ramps calls `save_volume(..., "grot")`. FSL-267: the range message's text and the second "Removed
+linear ramps". FSL-268: newimage's `percentile` sorts every value with `std::sort` (a NaN breaks
+its strict weak order) and `max()` starts at the first value. FSL-269: the phase's bin
+`(int)((phase + pi) / binsize) + 1` is INT_MIN for NaN, clamped to 1; the NaN constraints' `K` and
+`C` are NaN and the merge's `round` gives INT_MIN; `-s`'s slice joining sorts the differences.
+FSL-270: the volume loop runs from `--start` to `--end` and nothing checks their order. FSL-271:
+the magnitude and mask are read by the phase's indices through newimage's extrapolation.
+FSL-272: `main`'s check takes `phasemaps[n].max()` and `.min()` (`calc_minmax` from the first
+value). FSL-273: applytopup's `jac` divides the field's derivatives by the field's own voxel sizes
+(a coefficient field's intent parameters, a field image's header) while `ShadowVolume::equals`
+copies the data only, so the displacement is laid at the images' indices. Cases: the replica's
+record `fsl-prelude-replica` (its `opt/`, `err/` and `panel/` categories), the topup replica's
+`at/jac-coef-aniso` and `at/jac-field-aniso`; the unit tests of `larmorx-nc-fugue`
+(`unwrap_matches_fsl_loops`, `notices_compare_what_the_run_writes_and_prints`,
+`fsl272_extrema_pass_over_nan`); the probes `validation/investigations/fsl-prelude/`
+(`nan_phase_region.py`, `nan_phase_effect.py`) and the measurements
+`validation/investigations/prelude-spec/fsl272_measure.py` and
+`validation/investigations/spec-answers-4/jac_scales.py`.'''
+
+# ------------------------------------------------------------------ the user-facing table
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-242 | topup |"
+text = '''| FSL-261 | prelude `--removeramps` | the replica `larmorx-nc fsl prelude` (`larmorx fsl prelude`, `lx.fsl.prelude`); the clean-room original: the next part | the ramps are estimated, removed and restored over every column, row and slice but the last; an image of one slice keeps its ramp | every column, row and slice; `reproduce` FSL's |
+| FSL-262 | prelude `--savemask`, `-l` | the replica `larmorx-nc fsl prelude` | with several volumes only the last volume's mask and labels are kept | one series of every volume's; `reproduce` FSL's |
+| FSL-263 | prelude `-c` | the replica `larmorx-nc fsl prelude` | an image that is not complex is read as complex (its bytes as floats, the imaginary parts from memory never written) | refused (exit status 1); `reproduce` FSL's reading, the undefined values filled with zeros |
+| FSL-264 | prelude `-c` | the replica `larmorx-nc fsl prelude` | a big-endian complex64 image has its real and imaginary parts swapped | each part read in its own byte order; `reproduce` FSL's |
+| FSL-265 | prelude `-c` | the replica `larmorx-nc fsl prelude` | a complex128 image is read from memory past an empty buffer | read as complex128; `reproduce` zeros, named |
+| FSL-266 | prelude `-v --removeramps` | the replica `larmorx-nc fsl prelude` | writes `grot` into the working directory | not written; `reproduce` writes it |
+| FSL-268 | prelude | the replica `larmorx-nc fsl prelude` | NaN magnitudes enter the threshold's sort; a NaN first voxel empties the mask | NaN left out of the threshold and the maximum; `reproduce` FSL's (a sort outside the values refused) |
+| FSL-269 | prelude | the replica `larmorx-nc fsl prelude` | NaN phases inside the mask move a region by about 2^31 cycles | NaN voxels left out of the mask, NaN in the output; `reproduce` FSL's (`-s`'s sort outside the values refused) |
+| FSL-270 | prelude `--start`, `--end` | the replica `larmorx-nc fsl prelude` | `--end` before `--start`: nothing written, exit status 0 | refused (exit status 1); `reproduce` FSL's |
+| FSL-271 | prelude `-a`, `-m` | the replica `larmorx-nc fsl prelude` | a magnitude or mask of another size is read by the phase's indices | refused (exit status 1); `reproduce` FSL's |
+| FSL-272 | prelude | the replica `larmorx-nc fsl prelude` (the clean-room original: the next part) | a NaN first phase value skips the phase range check and the rewrap to [−π, π] | the extrema of the other values: rewrapped, or FSL's range error (exit 255), as without the NaN; `reproduce` FSL's |
+| FSL-273 | applytopup | the replica `larmorx-nc fsl applytopup`; the clean-room original for field images | `--method=jac`'s Jacobian scaled by the field's own voxel sizes when they differ from the images' | the Jacobian of the displacement applied; `reproduce` FSL's |'''
+
+# ------------------------------------------------------------------ CLAUDE.md and the porting guide
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = "`fsl-topup.md`, `fsl-maths.md`, the sections of `upstream-defects.md` marked restricted)"
+new = "`fsl-topup.md`, `fsl-maths.md`, `fsl-prelude.md`, the sections of `upstream-defects.md` marked restricted)"
+
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = "[findings/fsl-maths.md](findings/fsl-maths.md), [parts/](parts/)"
+new = "[findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [parts/](parts/)"
+
+# ------------------------------------------------------------------ validation/tools.toml
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = 'validation = "original: [{fsl-stats.pass} of {fsl-stats.compared}](record:fsl-stats)'
+text = '''[[tool]]
+id = "fsl-prelude"
+title = "prelude (phase unwrapping of field maps' phase differences and complex images)"
+eco = "fsl"
+page = "/tools/fsl-prelude/"
+use = ["larmorx fsl prelude", "larmorx-nc fsl prelude", "lx.fsl.prelude"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-06: every option, message and failure case, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`); clean-room original: the next part, from `specs/prelude.md`"
+validation = "replica: [{fsl-prelude-replica.pass} of {fsl-prelude-replica.compared}](record:fsl-prelude-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-prelude-replica.fmriprep} calls on four oracle runs, the data panel's two other phase-difference maps, every option, complex and phase-and-magnitude inputs, series, NaN values (in a complex128 image's case, FSL-265, the values FSL takes from memory it never wrote are reported, not compared); {fsl-prelude-replica.both} more rejected by both alike"'''
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = 'status = "`experimental` ({fsl-stats-replica.pass} of {fsl-stats-replica.compared}'
+text = '''
+[[record]]
+id = "fsl-prelude-replica"
+larmorx = "`larmorx-nc fsl prelude`; `lx.fsl.prelude` and `larmorx fsl prelude` (the replica, FSL Licence)"
+reference = "prelude (FSL 6.0.7.23, fsl-fugue 2603.0); fMRIPrep's calls also against fMRIPrep's own outputs"
+status = "`experimental` ({fsl-prelude-replica.pass} of {fsl-prelude-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-prelude-replica.fmriprep} calls included (in a complex128 image's case the values FSL takes from memory it never wrote, FSL-265, are reported, not compared); {fsl-prelude-replica.both} rejected by both, with the same messages and status)"'''
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods)"
+new = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods; 2026-11-06: FSL-273, applytopup's Jacobian with a field of other voxel sizes, corrected by default)"
+
+# ------------------------------------------------------------------ docs/validation/golden.md
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''  changed.
+- **topup and applytopup, the clean-room original** (2026-11-03, six cases in'''
+new = '''  changed.
+- **prelude, the replica** (2026-11-06, 15 cases in `crates-nc/larmorx-nc-cli/tests/golden.rs` on
+  `write_prelude_inputs`, 24 × 20 × 12 voxels: a wrapped phase and the same with a ramp, a series,
+  NaN phases and magnitudes, a phase of too wide a range, the magnitude and its mask, a complex
+  image as complex64, complex128 and big-endian complex64, made from powers of (12 + 5i)/13: plain
+  arithmetic): `prelude.fmriprep` (fMRIPrep's call), `.threshold-outputs`, `.slices`,
+  `.labelslices`, `.ramps` and its `.reproduce` (FSL-261), `.complex`, `.complex128` (FSL-265),
+  `.complex-big-endian` and its `.reproduce` (FSL-264), `.series` and its `.reproduce` (FSL-262),
+  `.nan-phase` and its `.reproduce` (FSL-269), `.nan-magnitude` (FSL-268); the failures
+  `prelude.range` (exit status 255), `.fsl263.not-complex`, `.fsl270.end-before-start` and
+  `.fsl271.sizes` by their status and the entries they name. prelude's printed messages are a
+  golden file too (`PRINTING`). `lx.fsl.prelude` is a replica-only function
+  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until PRELUDE's clean-room original.
+  `larmorx-nc`'s checksums recorded on 2026-11-06 from fb86dc8 (committed as 8fc37df): 15 cases and
+  69 checksum rows added, every other checksum unchanged; the unwrapped phases checked against the
+  inputs' truth (the true phase minus 2π).
+- **topup and applytopup, the clean-room original** (2026-11-03, six cases in'''
+
+# ------------------------------------------------------------------ docs/status.md
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "FLIRT, FAST, topup and applytopup, fslmaths and fslstats replicas;"
+new = "FLIRT, FAST, topup and applytopup, fslmaths, fslstats and prelude replicas;"
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "Next: the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`), PRELUDE (a replica, then a clean-room original),"
+new = "The clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; 2026-11-05). PRELUDE's replica (2026-11-06: FSL 6.0.7.23's `prelude` complete, every compared case of its record bit-identical, fMRIPrep's seven calls on four oracle runs included; FSL-261 to FSL-272, and FSL-273 in applytopup; `specs/prelude.md`, the waiting spec questions answered but four groups). Next: PRELUDE's clean-room original, 3dvolreg (a replica, then a clean-room original),"
+
+# ------------------------------------------------------------------ docs/next-steps.md
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''replica, its spec writer also answering the waiting spec questions (below, "The questions for a spec writer,
+   gathered"); (3) PRELUDE's clean-room original;'''
+new = '''replica, its spec writer also answering the waiting spec questions (**done** 2026-11-06: the replica FSL
+   6.0.7.23's bytes in every compared case of its record, fMRIPrep's seven calls included; `specs/prelude.md`;
+   FSL-261 to FSL-273; the questions answered and those still open below, "The questions for a spec writer,
+   gathered"); (3) PRELUDE's clean-room original;'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''    - `specs/topup.md`: §7.3's default Jacobian scales of a field image whose header voxel sizes
+      differ from the image's (`at/jac-field-aniso`: the spec's `dy / fy` gives 4/6, FSL and the
+      field indexed as the image give 1); a coefficient field's scale `dx / fx` when its intent
+      voxel sizes differ (FSL's behaviour or a defect?); §4.6's'''
+new = '''    - `specs/topup.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06): §7.3's Jacobian scales of a
+      field image and of a coefficient field whose voxel sizes differ from the images' (FSL-273,
+      rule A: the Jacobian of the mapping applied, in the replica; the clean-room original's
+      coefficient-field default to follow, below). Still open: §4.6's'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''    - `specs/flirt.md`: §3/§8.1 step 9's sign of a zero third skew under gimbal lock and FSL's first
+      evaluated vector's zero (no record case depends on it since relay 10); §6.4's weighted
+      `normcorr` and `woods` costs' last bits (the record's two failures); §8.2/§8.3'''
+new = '''    - `specs/flirt.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06): §6.4's weighted `normcorr`
+      (the count's running total adds each point's weight as it is visited, not each row's total:
+      the cause of `real/weights-normcorr`; also `specs/mcflirt.md` §6.4, `lx.mri.hmc`'s shared
+      engine) and §3/§8.2's zero signs (a skew is never an exact −0: FSL's −0.000000 is a residue
+      of the matrix's last bits; a line search's first evaluation is p + 0·û). Still open: the
+      third skew's parting under gimbal lock (the decomposed matrix's last bits, an earlier step);
+      `real/weights-woods` (the 4 mm pair and woods are FSL's at 40 matrices; the path's last bits);
+      §8.2/§8.3'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    - `specs/mcflirt.md`: whether mcflirt's `leastsquares` sums in three levels as FLIRT's (§6.2)."
+new = "    - `specs/mcflirt.md`: ANSWERED (PRELUDE's spec writer, 2026-11-06, appendix A): mcflirt's `leastsquares` is FLIRT's `leastsq` unchanged (three-level single-precision sums); `lx.mri.hmc`'s may use FLIRT's implementation."
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''    - Carried from the brief (not this part's): `specs/fslmaths.md` §10.4, §19, §7; FLIRT §3 and
+      §8.1 step 9's skews; BET's open questions in `docs/findings/fsl-bet-original.md`.'''
+new = '''    - Carried from the brief: `specs/fslmaths.md` §10.4, §19 and §7 ANSWERED (PRELUDE's spec
+      writer, 2026-11-06: `-edge` exactly; `reproduce`'s glibc functions exp, log, pow, sin and cos,
+      and the replica's FFT twiddles with glibc's `sincos`); FLIRT §3 and §8.1 step 9's skews
+      answered as above (the third skew's parting still open); BET's open questions in
+      `docs/findings/fsl-bet-original.md` still open.
+    - Still open after PRELUDE's replica part (2026-11-06), four groups for a later spec writer:
+      BET's (§6.5's scalp phase, `-p` on a collapsed mesh, `-R` and `-c` on neurologically stored
+      images; the replica author's starting point in the part's notes, `docs/parts/`); FAST's
+      (§11's band with several channels, §7 and §4.1.4's message order); topup's (`--splineorder=2`
+      bending on axes shorter than two knot spacings; the 1 × 1 × 3 smoothing's 3 % from
+      `--featout`: narrowed, FSL's smoothing wraps periodically as the original's does, so the
+      difference lies elsewhere); `standard_space_roi`'s output headers (17 cases; the replica
+      author's analysis in the part's notes, a black-box model needed before it goes into the
+      spec). FLIRT's other gathered items, and `standard_space_roi` §2.5 and §2.1, not looked at.'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''- **From PRELUDE's replica part (2026-11-06).**
+  - *For PRELUDE's clean-room original (the next part):* from `specs/prelude.md` (§9: FSL-261 to
+    FSL-272's defaults, FSL-272 included; §10: what may be built for speed; §11: the validation
+    plan, every file bit-identical, `-c` within GLIBC-07). The spec writer's black-box probe and
+    model, `validation/investigations/prelude-spec/`, are open to the implementer (the replica
+    author's probes, `validation/investigations/fsl-prelude/`, are not). The site page's examples
+    wait for the original's panels (`larmorx_validation.evidence.fsl_prelude`).
+  - *For the clean-room originals, from the spec writer's answers:* FLIRT's `normcorr` count per
+    point (`specs/flirt.md` §6.4: each point's weight added as it is visited; the original adds
+    row totals, the cause of `real/weights-normcorr`; the same engine in `lx.mri.hmc`); topup's
+    coefficient-field Jacobian (`specs/topup.md` §7.3, FSL-273: scale 1 by default, FSL's
+    `dx / fx` in `reproduce`, named where an encoded axis' voxel sizes differ); fslmaths' FFT
+    twiddles with glibc's `sincos` in `reproduce` (`specs/fslmaths.md` §19); `lx.mri.hmc`'s
+    `leastsquares` as FLIRT's (`specs/mcflirt.md` appendix A).
+  - *Harness:* `tests/python/test_mri_replica.py::test_the_replica_itself` reads
+    `LARMORX_NC_BIN` after its `no_replica` fixture cleared it, so it fails in a checkout without
+    `crates-nc/target/release` when the variable is set (a module-level `_built_replica()` would
+    fix it); random testing's logs carry nibabel's "sizeof_hdr should be 348" warnings from the
+    comparators' difference details on pair and ANALYZE files (cosmetic).
+  - *The site:* `site.yml`'s fslmaths and fslstats entries still say "the clean-room original
+    planned" (both exist since 2026-11-04).'''
+
+# ------------------------------------------------------------------ the site's shared files
+
+[[op]]
+do = "insert"
+file = "site:site.yml"
+after = '      summary: "Image statistics, per volume, per label and as JSON'
+text = '''  - { title: prelude, url: "/tools/fsl-prelude/", eco: fsl,
+      summary: "Phase unwrapping (prelude) of field maps' phase differences and complex images: an exact replica in larmorx-nc, fMRIPrep's seven calls bit for bit; the clean-room original next." }'''
+
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = "    text: The clean-room originals' catch-up with their specifications' answers (topup, FAST, FLIRT, BET, the head-motion correction), with the clean-room originals of BET's `-S`, `-B`, `-A`, `-A2`, `standard_space_roi` and `fslroi`; then PRELUDE (FSL's phase unwrapping), a replica and a clean-room original (the mcflirt, BET with every option, FLIRT, FAST, topup, `fslmaths`, `fslstats`, `standard_space_roi` and `fslroi` replicas and the clean-room originals of BET, FLIRT, FAST, topup, `fslmaths` and `fslstats` are done)."
+new = "    text: PRELUDE's clean-room original (FSL's phase unwrapping) (the mcflirt, BET with every option, FLIRT, FAST, topup, `fslmaths`, `fslstats`, `standard_space_roi`, `fslroi` and prelude replicas and the clean-room originals of BET with every option, FLIRT, FAST, topup, `fslmaths`, `fslstats`, `standard_space_roi` and `fslroi` are done)."
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "**Last updated: 2026-11-05.**"
+new = "**Last updated: 2026-11-06.**"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| BET's options in the replica (2026-11-04) and the clean-room catch-up (2026-11-05) complete, below; next PRELUDE |"
+new = "| BET's options in the replica (2026-11-04), the clean-room catch-up (2026-11-05) and PRELUDE's replica (2026-11-06) complete, below; next PRELUDE's clean-room original |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 2026-11-05 | **The clean-room catch-up: topup, FAST, FLIRT, BET and the head-motion correction.**"
+new = "| 2026-11-06 | **PRELUDE's replica.** FSL 6.0.7.23's phase unwrapping, which sdcflows runs for every phase-difference field map, translated from FSL's source with every option (phase and magnitude or a complex image, the mask and its threshold, 3D and slice-by-slice unwrapping, series, the ramps, the saved mask, labels and raw phase), message and failure case: every file bit for bit FSL's in every compared case of its record, fMRIPrep's seven calls on four oracle runs included (fMRIPrep's own outputs the same), with a faster bookkeeping of the regions; twelve defects of FSL found (FSL-261 to FSL-272), eleven of them corrected by default or refused, FSL's behaviour on request ( a NaN first phase value that skips the rewrap, the ramps' last slice, NaN phases that move a region by about 2^31 cycles, among them); the behavioural specification its clean-room original will be written from, and the answers to the waiting questions of the other specifications (FSL-273 found in applytopup). [The page](/tools/fsl-prelude/) |\n| 2026-11-05 | **The clean-room catch-up: topup, FAST, FLIRT, BET and the head-motion correction.**"

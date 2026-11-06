@@ -3797,3 +3797,27 @@ signature = ["given FSL's matrix (-applyxfm -init): out.nii.gz: header"]
 status = "open"
 explanation = "Trial 2026-11-05-catchup-bet, relay 10's refinement of relay 8's entry for these findings (replayed with the final build, the stage runs' header fields read by trial_ssroi_matrices.py): of the 16 standard_space_roi header findings left, 9 are the cut's translation one float unit from FSL's (128, 151, 165, 395, 619, 870, 407, 545, 744), 4 a form's translation whole voxels from FSL's where the input's qform and sform differ (189: qoffset_x -14.25 against -38.25; 313, 315, 456), 2 NIfTI-2 outputs whose matrices FSL holds in single precision and whose sform of code 0 it moves too (543: -44.40308380 against -44.40308296; 567: srow_x's translation -1.2412 against the input's 51.25), and 222 fslpy's conversion (scl_slope 1 against 0). Questions for the spec writer (specs/standard_space_roi.md §3.2, §2.5); open"
 link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-prelude"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "Check run 2026-11-06-prelude-check (seed prelude-check, 2 minutes, 12 jobs at one thread, FSL 6.0.7.23 through the oracle cache: 3,201 cases, 3,196 agree): 2 cases (736, 2928) whose fix pass found the default's standard output changed with no defect named: a NaN phase inside the mask with -v, where FSL-269's correction (the NaN voxel left out of the mask) changes only -v's lines (shrunk to one voxel: 'Calculating starting matrices (1 by 1)' against '(0 by 0)'). The replica's notice compared the files only; it now compares -v's lines too (and grot where it is written), unit test notices_compare_what_the_run_writes_and_prints. Both cases agree; permanent case nan-phase-verbose-notice"
+link = "validation/difftest/cases/fsl-prelude/nan-phase-verbose-notice.json"
+
+[[difference]]
+tool = "fsl-prelude"
+implementation = "replica"
+signature = ["notice: FSL-261"]
+status = "fixed"
+explanation = "Check run 2026-11-06-prelude-check: 3 cases (189, 972, 1969) named FSL-261 (--removeramps' loops leave the last column, row and slice out) where the correction changed nothing visible: the notice fired for any mask voxel in the last planes. It now fires where FSL's loops and the corrected ones give different files or -v lines (both computed, only where such a voxel lies). The three agree; permanent case ramps-notice-unchanged (case 189's recipe, made a finding by validation/investigations/difftest/notice_case.py)"
+link = "validation/difftest/cases/fsl-prelude/ramps-notice-unchanged.json"
+
+[[difference]]
+tool = "fsl-prelude"
+implementation = "replica"
+signature = ["the default refuses (FSL-N)"]
+status = "harness"
+explanation = "Trial 2026-11-06-prelude-replica (seed prelude-trial, 30 minutes, 12 jobs at one thread, 1.5 GiB a case, larmorx 2f464a9, FSL 6.0.7.23 through the oracle cache: 50,711 cases, 50,702 bit-identical to FSL in every file, both streams and the exit status, with their D13 fix pass; no notice without a change, no undefined case): 9 cases (1855, 10951, 12987, 16930, 21443, 25582, 25781, 29795, 31177) the descriptor's own mistake: it drew a magnitude or mask of another size (FSL-271) on a one-slice image by shortening its one-voxel axis, which stayed one voxel, so the sizes were equal and the replica's default rightly did not refuse (its reproduce runs bit-identical to FSL's). The draw now lengthens such an axis; the nine drawn again agree (the default refuses with FSL-271, reproduce bit-identical to FSL's reading by the phase's indices)"
+link = "validation/src/larmorx_validation/difftest/tools/fsl_prelude.py"

@@ -67,6 +67,8 @@ def main() -> int:
                 "OMP_NUM_THREADS": str(a.threads),
                 "LARMORX_UPSTREAM_DEFECTS": a.mode,
                 "HOME": os.environ.get("HOME", "/tmp"),
+                # larmorx's own program runs its original, never a replica it finds
+                "LARMORX_IMPLEMENTATION": "original",
             }
             best = float("inf")
             for _ in range(a.repeat):
@@ -85,7 +87,7 @@ def main() -> int:
             same = a_data.dtype == b_data.dtype and a_data.tobytes() == b_data.tobytes()
             header_diff = [
                 key
-                for key in ref.header.keys()
+                for key in ref.header
                 if key != "descrip"
                 and np.asarray(ref.header[key]).tobytes() != np.asarray(got.header[key]).tobytes()
             ]

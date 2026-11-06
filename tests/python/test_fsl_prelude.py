@@ -149,7 +149,7 @@ def test_the_original_runs_without_the_replica():
 
 @pytest.mark.usefixtures("no_replica")
 def test_the_originals_failure_raises_with_preludes_message():
-    phase, magnitude = _inputs()
+    _, magnitude = _inputs()
     wide = lx.Image(_phase() * 2.5, AFFINE)
     with pytest.raises(RuntimeError, match="exceeds allowable phase range"):
         lx.fsl.prelude(wide, magnitude, implementation="original")

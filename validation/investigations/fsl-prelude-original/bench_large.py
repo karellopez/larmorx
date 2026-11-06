@@ -59,15 +59,33 @@ def main() -> int:
         for label, words in programs:
             for t in threads if label.startswith("original") else threads[:1]:
                 out = d / f"out-{label}-{t}.nii.gz"
-                env = {"PATH": "/usr/bin:/bin", "FSLOUTPUTTYPE": "NIFTI_GZ"}
+                env = {
+                    "PATH": "/usr/bin:/bin",
+                    "FSLOUTPUTTYPE": "NIFTI_GZ",
+                    "LARMORX_IMPLEMENTATION": "original",
+                }
                 env["OMP_NUM_THREADS"] = str(t)
                 best, peak = float("inf"), 0
                 for _ in range(a.repeat):
                     t0 = time.perf_counter()
                     r = subprocess.run(
-                        ["/usr/bin/time", "-v", *shlex.split(words), "-p", "ph", "-a", "mag",
-                         "-o", out.name, "-v", *shlex.split(a.extra)],
-                        cwd=d, env=env, capture_output=True, text=True,
+                        [
+                            "/usr/bin/time",
+                            "-v",
+                            *shlex.split(words),
+                            "-p",
+                            "ph",
+                            "-a",
+                            "mag",
+                            "-o",
+                            out.name,
+                            "-v",
+                            *shlex.split(a.extra),
+                        ],
+                        cwd=d,
+                        env=env,
+                        capture_output=True,
+                        text=True,
                     )
                     best = min(best, time.perf_counter() - t0)
                     m = re.search(r"Maximum resident set size \(kbytes\): (\d+)", r.stderr)

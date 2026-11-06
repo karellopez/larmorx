@@ -2,7 +2,7 @@
 """PRELUDE's validation plan's cases (`specs/prelude.md` §11) on generated inputs, run with two
 programs in both D13 modes and compared: exit status, standard output, standard error without
 larmorx's own lines (those starting with ``larmorx``), and every file written (every header field
-but ``descrip``, the data bit for bit).
+but ``descrip``, a pair's header file's length, the data bit for bit).
 
 Written for the clean-room original against the replica (the replica's record: bit-identical to
 FSL 6.0.7.23 on its cases); no FSL program runs here. Usage::
@@ -56,7 +56,6 @@ def save(path: Path, data: np.ndarray, aff=None, dtype=None, slope=None, endian=
 
 def make_inputs(d: Path) -> None:
     rng = np.random.default_rng(20261106)
-    nx, ny, nz = SHAPE
     x, y, z = np.meshgrid(*(np.arange(n, dtype=np.float64) for n in SHAPE), indexing="ij")
     c = [(n - 1) / 2 for n in SHAPE]
     r = ((x - c[0]) / 10.5) ** 2 + ((y - c[1]) / 8.5) ** 2 + ((z - c[2]) / 4.6) ** 2
@@ -174,9 +173,15 @@ CASES: list[tuple[str, str]] = [
     ("size-mask", "-p ph -a mag -m magsmall -o o --savemask=m"),
     ("range", "-p phrange -a mag -o o -v"),
     ("grot", "-p ph -a mag -o o -v --removeramps"),
-    ("long-names", "--phase=ph --abs=mag --unwrap=o --numphasesplit=5 --thresh=100 --rawphase=raw --labels=lab --verbose"),
+    (
+        "long-names",
+        "--phase=ph --abs=mag --unwrap=o --numphasesplit=5 --thresh=100 --rawphase=raw --labels=lab --verbose",
+    ),
     ("u-grouped", "-p ph -a mag -u o -fvn 4"),
-    ("type-pair", "-p ph -a mag -o o -l lab", ),
+    (
+        "type-pair",
+        "-p ph -a mag -o o -l lab",
+    ),
     ("type-nifti2", "-p ph -a mag -o o --savemask=m"),
     ("type-unset", "-p ph -a mag -o o -v --savemask=m"),
     ("type-bogus", "-p ph -a mag -o o -v --savemask=m"),
@@ -200,6 +205,8 @@ def run(program: str, case: str, args: str, inputs: Path, d: Path, mode: str):
         "FSLOUTPUTTYPE": "NIFTI_GZ",
         "LARMORX_UPSTREAM_DEFECTS": mode,
         "OMP_NUM_THREADS": "4",
+        # larmorx's own program runs its original, never a replica it finds
+        "LARMORX_IMPLEMENTATION": "original",
     }
     for k, v in ENV.get(case, {}).items():
         if v is None:
@@ -214,6 +221,14 @@ def run(program: str, case: str, args: str, inputs: Path, d: Path, mode: str):
     return r.returncode, r.stdout, err, files, r.stderr
 
 
+def _plain(p: Path) -> bytes:
+    """A file's bytes, decompressed when gzip-compressed."""
+    import gzip
+
+    raw = p.read_bytes()
+    return gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+
+
 def compare_files(fa: dict, fb: dict) -> list[str]:
     out = []
     if set(fa) != set(fb):
@@ -223,8 +238,11 @@ def compare_files(fa: dict, fb: dict) -> list[str]:
             if fa[name].read_bytes() != fb[name].read_bytes():
                 out.append(f"{name} bytes")
             continue
+        ra_bytes, rb_bytes = _plain(fa[name]), _plain(fb[name])
+        if name.endswith((".hdr", ".hdr.gz")) and len(ra_bytes) != len(rb_bytes):
+            out.append(f"{name} header file {len(ra_bytes)} vs {len(rb_bytes)} bytes")
         ia, ib = nib.load(fa[name]), nib.load(fb[name])
-        for k in ia.header.keys():
+        for k in ia.header:
             if k == "descrip":
                 continue
             if np.asarray(ia.header[k]).tobytes() != np.asarray(ib.header[k]).tobytes():

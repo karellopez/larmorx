@@ -732,3 +732,27 @@ def test_a_run_stopped_for_time_leaves_no_process_behind(tmp_path):
     finally:
         if orphan.poll() is None:
             orphan.kill()
+
+
+def test_a_replica_programs_refusal_of_memory_it_does_not_own_is_named():
+    """A replica that runs as a program of its own (``larmorx-nc``) refuses in ``reproduce``
+    where FSL would read memory it does not own (prelude's NaN sorts, FSL-268 and FSL-269): the
+    suite names the defect to the runner, as larmorx's in-process notices are, so a random case's
+    difference is judged *undefined* (fsl-prelude, 2026-11-06)."""
+    from larmorx_validation.difftest import runner
+    from larmorx_validation.parity import fsl_prelude_replica as fp
+    from larmorx_validation.parity.fsl_mcflirt_replica import Completed
+
+    assert {"FSL-268", "FSL-269"} <= set(runner.UNDEFINED_DEFECTS)
+    runner._NOTICES.clear()
+    err = (
+        "larmorx-nc: error: prelude: NaN differences between slices in the sort of their median "
+        "(FSL-269: FSL reads memory it does not own here)\n"
+    )
+    fp._note_memory_refusal(Completed(0, "", err))
+    assert runner._NOTICES == []
+    fp._note_memory_refusal(Completed(1, "", "larmorx-nc: error: prelude: other (FSL-271)\n"))
+    assert runner._NOTICES == []
+    fp._note_memory_refusal(Completed(1, "", err))
+    assert runner._NOTICES == ["FSL-269"]
+    runner._NOTICES.clear()

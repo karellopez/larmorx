@@ -46,8 +46,8 @@ what it translates.
   visited, their arithmetic and its order are FSL's; the test `unwrap_matches_fsl_loops` compares
   the result with `unwrap_reference`, a statement-by-statement translation.
 - One volume's work after its mask (`per_volume`) is a function, so that a correction whose
-  notice needs FSL's result computes both (FSL-268, FSL-269); the messages of `-v` keep FSL's
-  order.
+  notice needs FSL's result computes both (FSL-261, FSL-268, FSL-269: the files, `-v`'s lines
+  and, in `reproduce`, grot compared); the messages of `-v` keep FSL's order.
 - The thresholds' two percentiles sort the values once (FSL sorts the same values twice: the
   same order).
 - Slices (`ROI`, `copyROI`) are copied plainly; a slice beyond a smaller mask holds the mask's

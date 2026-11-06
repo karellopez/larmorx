@@ -261,7 +261,9 @@ def _other_size(d: gen.Draw, spec: dict) -> dict:
     longer."""
     shape = list(spec["shape"])
     k = d.integer("other size axis", 0, 2)
-    shape[k] = max(1, shape[k] + d.choice("other size by", (-3, -1, 1, 2)))
+    by = d.choice("other size by", (-3, -1, 1, 2))
+    # longer instead where a shorter axis would vanish (a one-slice image: trial 2026-11-06)
+    shape[k] = shape[k] + by if shape[k] + by >= 1 else shape[k] - by
     return {**spec, "shape": shape}
 
 

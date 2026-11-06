@@ -9,6 +9,9 @@
 # touched. On 2026-10-25 one random N4BiasFieldCorrection case grew to 28 GB; the machine swapped
 # until VS Code's terminal host stopped answering and the editor, with every agent running in
 # it, went down. The command's exit status is returned; 137 means the box killed it.
+# The box also caps its tasks (processes and threads; BOXED_TASKS_MAX, 16384 by default): on
+# 2026-11-06 a stand-in script that found itself again through LARMORX_NC_BIN spawned about 100,000
+# processes in its box before it was killed by hand.
 #
 # Example: scripts/orchestration/boxed.sh 10 python -m larmorx_validation difftest --budget 6h
 set -u
@@ -16,4 +19,4 @@ set -u
 GIB=$1; shift
 case $GIB in ''|*[!0-9]*) echo "boxed.sh: <GiB> must be a whole number, got '$GIB'" >&2; exit 2;; esac
 exec systemd-run --user --scope --quiet --collect \
-  -p MemoryMax="${GIB}G" -p MemorySwapMax=0 -- "$@"
+  -p MemoryMax="${GIB}G" -p MemorySwapMax=0 -p TasksMax="${BOXED_TASKS_MAX:-16384}" -- "$@"

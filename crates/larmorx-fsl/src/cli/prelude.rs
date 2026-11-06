@@ -740,8 +740,8 @@ fn run(
             let _ = writeln!(out, "{line}");
         }
     };
-    say(out, "Loading volumes");
-    // §3.1, §3.2: the images
+    // §3.1, §3.2: the images (`Loading volumes` before the phase; nothing before a complex
+    // image, observed)
     let pool = |f: Box<dyn FnOnce() -> Result<(Series, Option<Series>), ReadFail> + Send + '_>| {
         larmorx_core::parallel::with_threads(n_threads, f)
             .unwrap_or_else(|e| Err(ReadFail::Refused(format!("no thread pool: {e}"))))
@@ -757,6 +757,7 @@ fn run(
             Err(f) => return read_failed(err, f),
         }
     } else {
+        say(out, "Loading volumes");
         let mut ns = Vec::new();
         let name = o.phase.clone().unwrap_or_default();
         let r = pool(Box::new(|| {

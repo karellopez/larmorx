@@ -31,6 +31,7 @@ pub mod midtrans;
 pub mod options;
 pub mod pairreg;
 pub mod pointflirt;
+pub mod prelude;
 pub mod rmsdiff;
 pub mod ssroi;
 pub mod topup;
@@ -68,6 +69,7 @@ pub const TOOLS: &[&str] = &[
     "fslstats",
     "fslroi",
     "standard_space_roi",
+    "prelude",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -196,6 +198,7 @@ pub fn run_with(
         "fslstats" => Some(fslstats::main(args, settings, out, err)),
         "fslroi" => Some(fslroi::main(args, settings, out, err)),
         "standard_space_roi" => Some(ssroi::main(args, settings, out, err)),
+        "prelude" => Some(prelude::main(args, settings, out, err)),
         _ => None,
     }
 }

@@ -424,6 +424,10 @@ def extract(scan: Path, verdicts_dir: Path, similarity_dir: Path, judgements: Ju
                 "files": sum(1 for x in data.splitlines() if x.strip()),
             }
     archived = sum(1 for m in manifest if m.get("archive_sha256"))
+    archived_hashes = {m["sha256"] for m in manifest if m.get("archive_sha256")}
+    live_kept = sum(
+        1 for m in manifest if not m.get("archive_sha256") and m["sha256"] in archived_hashes
+    )
     ranges = [r for r in summary["session_ranges"].values() if r[0]]
     gaps = summary["gaps"]
     evidence = {
@@ -432,6 +436,7 @@ def extract(scan: Path, verdicts_dir: Path, similarity_dir: Path, judgements: Ju
         "transcript_bytes": summary["transcript_bytes"],
         "archived_files": archived,
         "live_files": summary["transcript_files"] - archived,
+        "live_files_also_archived": live_kept,
         "archive_checksums_matched": summary["archive_checksums_matched"],
         "archive_checksums_differ": summary["archive_checksums_differ"],
         "archives": archives,
@@ -1162,15 +1167,17 @@ def render(facts: dict) -> str:
     )
     for name, a in sorted(ev["archives"].items()):
         w(
-            f"- **The archive** `{name}`: {_n(a['files'])} transcripts copied before Claude Code's"
-            f" 30-day clean-up, with their checksum list; the list's SHA-256 is `{a['sha256']}`."
+            f"- **The archive** `{name}` (copies made before Claude Code's 30-day clean-up): its"
+            f" checksum list names {_n(a['files'])} files; the list's SHA-256 is `{a['sha256']}`."
         )
+    also = ev.get("live_files_also_archived", 0)
     w(
-        f"  Of the files read, {_n(ev['archived_files'])} are archived copies (each matches its"
-        f" checksum: {_n(ev['archive_checksums_matched'])} match, {ev['archive_checksums_differ']}"
-        f" differ) and {_n(ev['live_files'])} were read where Claude Code keeps them (newer"
-        " sessions; the merge step archives them from now on). The private dossier lists the"
-        " SHA-256 of every file read."
+        f"- **Integrity:** of the transcript files read, {_n(ev['archived_files'])} are archived"
+        f" copies, each checked against its list ({_n(ev['archive_checksums_matched'])} match,"
+        f" {ev['archive_checksums_differ']} differ), and {_n(ev['live_files'])} were read where"
+        f" Claude Code keeps them ({_n(also)} of them with the same content as an archived copy);"
+        " the merge step archives the rest. The private dossier lists the SHA-256 of every file"
+        " read."
     )
     g = ev["gaps"]
     w(

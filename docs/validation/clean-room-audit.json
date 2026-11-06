@@ -134,6 +134,7 @@
   },
   "last_record": "2026-11-06 16:08 UTC",
   "live_files": 185,
+  "live_files_also_archived": 179,
   "sessions": 4,
   "tool_calls": 68457,
   "tool_calls_by_tool": [

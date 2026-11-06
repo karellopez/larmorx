@@ -1587,6 +1587,11 @@ pub struct ImageData {
     offset: usize,
     len: usize,
     width: usize,
+    /// The number of values (the product of `dim[1..=7]`).
+    count: usize,
+    /// The bytes swapped as one in a file of the other byte order: `width` (NewNifti swaps each
+    /// value whole, a complex64 value's 8 bytes too), or a part of it ([`ImageData::reading_values`]).
+    swap_unit: usize,
     /// The most bytes the data file can deliver (its size, or a bound of its decompressed size).
     bound: usize,
 }
@@ -1648,6 +1653,8 @@ pub fn open_image(path: &Path, open: &OpenOptions) -> Result<ImageData, NiftiErr
         offset,
         len: n.saturating_mul(width),
         width,
+        count: n,
+        swap_unit: width,
         bound,
     })
 }
@@ -1658,6 +1665,17 @@ impl ImageData {
     pub fn capacity_hint(&self) -> usize {
         let bytes = self.len.min(self.bound.saturating_sub(self.offset));
         bytes / self.width.max(1)
+    }
+
+    /// The data read as values of `width` bytes whose `unit`-byte parts are each swapped in a
+    /// file of the other byte order (not NewNifti's reading: a complex64 value's two floats, or a
+    /// complex128 value's two doubles, to which NewNifti gives no width, read as the file means
+    /// them; larmorx's correction of prelude's complex input, FSL-265 and FSL-266).
+    pub fn reading_values(mut self, width: usize, unit: usize) -> ImageData {
+        self.width = width;
+        self.len = self.count.saturating_mul(width);
+        self.swap_unit = unit.max(1);
+        self
     }
 
     /// The data, given to `sink` in pieces of whole values in native byte order, in order; the
@@ -1684,8 +1702,9 @@ impl ImageData {
             if from_pre < k {
                 self.source.read_exact(&mut buf[from_pre..k])?;
             }
-            if self.header.was_wrong_endian && w > 1 {
-                for value in buf[..k].chunks_mut(w) {
+            let u = self.swap_unit.min(w);
+            if self.header.was_wrong_endian && u > 1 {
+                for value in buf[..k].chunks_mut(u) {
                     value.reverse();
                 }
             }

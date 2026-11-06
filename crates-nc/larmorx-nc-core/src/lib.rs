@@ -57,6 +57,7 @@ pub mod basisfield;
 pub mod bbr;
 pub mod bfmatrix;
 pub mod cnum;
+pub mod complex;
 pub mod costfns;
 pub mod cprob;
 pub mod crand;

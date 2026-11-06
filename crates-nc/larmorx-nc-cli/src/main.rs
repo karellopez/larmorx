@@ -59,6 +59,7 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("fslstats", larmorx_nc_avwutils::fslstats),
     ("fslroi", larmorx_nc_avwutils::fslroi),
     ("standard_space_roi", larmorx_nc_flirt::standard_space_roi),
+    ("prelude", larmorx_nc_fugue::prelude),
 ];
 
 fn tool_names() -> String {

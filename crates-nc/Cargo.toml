@@ -20,6 +20,7 @@ members = [
     "larmorx-nc-fast",
     "larmorx-nc-topup",
     "larmorx-nc-avwutils",
+    "larmorx-nc-fugue",
     "larmorx-nc-core/tools/libm-verify",
     "larmorx-nc-cli",
 ]
@@ -40,6 +41,7 @@ larmorx-nc-flirt = { path = "larmorx-nc-flirt", version = "0.0.1" }
 larmorx-nc-fast = { path = "larmorx-nc-fast", version = "0.0.1" }
 larmorx-nc-topup = { path = "larmorx-nc-topup", version = "0.0.1" }
 larmorx-nc-avwutils = { path = "larmorx-nc-avwutils", version = "0.0.1" }
+larmorx-nc-fugue = { path = "larmorx-nc-fugue", version = "0.0.1" }
 # zlib-rs: the pure-Rust zlib implementation (no C zlib), as the root workspace.
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 # znzlib 2511.3 (FSL 6.0.7.23) also reads and writes zstd and bzip2: ruzstd (pure-Rust zstd) and
@@ -75,4 +77,7 @@ opt-level = 1
 opt-level = 1
 
 [profile.dev.package.larmorx-nc-avwutils]
+opt-level = 1
+
+[profile.dev.package.larmorx-nc-fugue]
 opt-level = 1

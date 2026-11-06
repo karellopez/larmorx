@@ -225,6 +225,7 @@ dependencies = [
  "larmorx-nc-core",
  "larmorx-nc-fast",
  "larmorx-nc-flirt",
+ "larmorx-nc-fugue",
  "larmorx-nc-mcflirt",
  "larmorx-nc-topup",
  "ruzstd",
@@ -259,6 +260,15 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-avwutils",
+ "larmorx-nc-core",
+ "tempfile",
+]
+
+[[package]]
+name = "larmorx-nc-fugue"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
  "larmorx-nc-core",
  "tempfile",
 ]

@@ -116,8 +116,22 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves and the replicas' step (b) done 2026-11-04; item 7), BET's `-S`, `-B`, `-A`, `-A2` (the replica done 2026-11-04, with `standard_space_roi` and `fslroi`; item 7), then the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`) and PRELUDE (a replica, then a clean-room original; the user, 2026-11-04); field maps,
-   FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves and the replicas' step (b) done 2026-11-04; item 7), BET's `-S`, `-B`, `-A`, `-A2` (the replica done 2026-11-04, with `standard_space_roi` and `fslroi`; item 7), the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; done 2026-11-05,
+   `docs/parts/2026-11-05-cleanroom-catchup/`). **Then, before FreeSurfer** (the user, 2026-11-06; decision log; two
+   agents at once by role, relay agents): (1) the clean-room audit tool (from the session transcripts: no implementer
+   opened restricted material; code similarity only as extra evidence; run at every merge afterwards); (2) PRELUDE's
+   replica, its spec writer also answering the waiting spec questions (below, "The questions for a spec writer,
+   gathered"); (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05) and (5) its clean-room
+   original; (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
+   then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);
+   (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);
+   (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
+   confound steps: nothing from FreeSurfer); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
+   then `mri_coreg`, `lta_convert`, `mri_robust_template`, which fMRIPrep runs without `recon-all`), surfaces
+   (item 8); larmorprepx (item 9). **Later** (the user, 2026-11-06): a clean-room original of every program, the
+   permissive ports included, as the next-generation implementation; the completeness parts (proposed, after
+   FreeSurfer: ANTs' missing operations and image kinds, the clean-room `-gdt`, 3dTshift's `-voxshift` and AFNI's own
+   format, the replicas' refused paths, FSL's scripts). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
    (part b: AFNI, FSL and I/O; the new tools), full tiers, heavy and nightly random testing

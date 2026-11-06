@@ -41,8 +41,8 @@ testing in one final validation phase (user, 2026-10-28). FLIRT's clean-room ori
 replica (2026-11-02), FAST's clean-room original and topup's replica, topup's clean-room original,
 `fslmaths` and `fslstats`'s replica and the spec answers for topup, FAST and FLIRT (2026-11-03), `fslmaths`' and
 `fslstats`' clean-room originals, glibc's exact maths for `reproduce` (both halves) and BET's `-S`/`-B`/`-A`/`-A2` replica with `standard_space_roi` and `fslroi`
-(2026-11-04) complete; next the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`),
-then PRELUDE's replica and its clean-room original (the user, 2026-11-04); then field maps, templates, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+(2026-11-04) and the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; 2026-11-05)
+complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the clean-room audit tool, PRELUDE's replica and clean-room original, 3dvolreg's replica and clean-room original, the field maps (two parts), multi-echo `t2smap` (replica and clean-room), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.
@@ -64,13 +64,14 @@ with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait fo
   - **FreeSurfer: both as well** (user, 2026-10-26): a replica of every program in `larmorx-freesurfer` and a clean-room original of every program in the main package, built for speed (FreeSurfer is the slowest stage), every program complete; version 8.2.0 (decision log 2026-10-26).
   - MSM: a clean-room original only, in the surfaces track, after a patent check.
 - **Each tool gets its own Python wrapper**, so other developers can build on the library.
+- **A clean-room original of every program, later** (user, 2026-11-06; decision log): not only where the licence restricts it: the permissive ports (ANTs/ITK, sdcflows, nitransforms, the confounds, fMRIPrep's Python steps) get one too, by the same rules, as the next-generation implementation (efficient algorithms, memory, deterministic threads, SIMD) within the original's own variability. Its place in the order is to be decided. Every clean-room original's cleanliness is proven by the **clean-room audit** (session transcripts: no implementer opened restricted material; code similarity only as extra evidence).
 - **Clean-room originals are built for speed** (user, 2026-10-19): the original's behaviour within the validated thresholds, but designed to be much faster than a replica, with the best methods (efficient algorithms, cache-friendly memory, deterministic multithreading, SIMD with runtime dispatch), benchmarked against the original and the replica (`docs/porting-guide.md`, "Clean-room originals: the same behaviour, built for speed"). Replicas stay bit-exact first.
 - **Full completeness for every tool** (user, 2026-10-12, asked whether to scope new tools to fMRIPrep's code paths first): every option, message and failure case, with D13 switches, as for 3dTshift. One agent at a time; A4 after the stage comparisons (decision log 2026-10-12).
 
 - **Newest upstream versions, updated in steps** (user, 2026-10-27): each tool is ported from the newest release; a newer release is brought in by a planned part (source changes ported, records re-made), the old oracle kept. fMRIPrep's own versions are only a reference for the final comparisons (the user: "I would not like larmorx to be limited by fmriprep. The idea was that it reproduces fmriprep, but also to bring a solution in which user can simple use whatever they want to make software"). AFNI (25.2.09, newest 26.3.x) and FSL (6.0.7.17, newest 6.0.7.23) are updated after the move (decision log 2026-10-27).
 - **Port every tool first, compare with fMRIPrep at the end** (user, 2026-10-16). Each port is validated against its own original program; stage-by-stage and end-to-end comparisons with fMRIPrep wait until all tools are ported.
 - **Agents: in bounded parts with a stop after each; two at once at most, by role, with relay
-  agents** (the user, 2026-11-02: "can we try this new method after this flirt clean room? The idea
+  agents** (confirmed for the parts before FreeSurfer, user 2026-11-06) (the user, 2026-11-02: "can we try this new method after this flirt clean room? The idea
   is to go faster, spending less tokens and also maintaining quality"; before: one at a time, the
   user's decisions of 2026-10-10, 10-17, 10-22, 10-24 and 10-26 in the decision log): the user
   watches the weekly usage limit (only they can see it, with `/usage`) and starts each next part;

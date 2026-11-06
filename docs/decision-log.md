@@ -1981,3 +1981,39 @@ together at the end.
 - **FSL's design, not a defect:** FLIRT sorts its search's starting points with libstdc++'s unstable `std::sort`
   before they enter S and P (observed on 829 tied points); the clean-room original follows it.
 - **Measured, not reproduced:** FSL-50's stop in betsurf was seen on none of 43 images, so neither mode stops there.
+
+## 2026-11-06: The plan before FreeSurfer, a clean-room original of every program, the clean-room audit, two agents (the user)
+- **Asked** (2026-11-05/06): what else must be ported before FreeSurfer; whether the ported programs are complete;
+  how to prove the clean-room originals are clean.
+- **The plan before FreeSurfer** (the user: "I like the plan"; "We will have to port 3dvolreg as well then before
+  freesurfer"): (1) the clean-room audit tool; (2) PRELUDE's replica, its spec writer also answering the waiting
+  spec questions; (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05: fMRIPrep's BOLD
+  reference and sdcflows' PEPOLAR reference run it); (5) its clean-room original; (6, 7) the field maps (sdcflows,
+  in two parts); (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a
+  clean-room original); (9) the confounds (they need nothing from FreeSurfer: fMRIPrep's CompCor masks come from
+  FAST's tissue maps); (10) the templates. Then FreeSurfer, its oracle runs first, then the three programs fMRIPrep
+  runs without `recon-all` (`mri_coreg`, `lta_convert`, `mri_robust_template`). After FreeSurfer, before the final
+  validation phase (proposed, not yet decided): the completeness parts (ANTs' missing operations and image kinds,
+  mcflirt's `-gdt` in the clean-room original, 3dTshift's `-voxshift` and AFNI's own format, the replicas' refused
+  paths, FSL's scripts); FNIRT, `applywarp`, `fugue` and `convertwarp` (needed only by FLIRT's `-warp`, `epi_reg`,
+  `flirt_average`) out of scope for now, revisited before the first release (the orchestrator's recommendation; the
+  user has not answered).
+- **A clean-room original of every program, later** (the user: "remember that later we want a clean room
+  implementation for every programs, and not only for the ones with restrictive licenses. Remember also that the
+  idea of the clean room, is not [only] to take the legal licence problems out, but also a nice opportunity to
+  reproduce the programs with a better efficiency, speed, optimization, etc. Performance wise, they seek to be the
+  nextgen algorithms."): the permissive ports (ANTs and ITK, sdcflows, nitransforms and fMRIPrep's resampler, the
+  confounds, fMRIPrep's Python steps) also get clean-room originals, written by the same rules (the implementer
+  never reads the source), built as next-generation implementations (efficient algorithms, cache-friendly memory,
+  deterministic multithreading, SIMD), validated within the original's own variability (D11). When: later, its
+  place in the order to be decided.
+- **The clean-room audit** (the user: "the audit tool is good, but code similarity shouldn't be strict, the only
+  thing most important to prove is that the agents did not look directly the source code. We can keep code
+  similarity as something extra"): a tool reads every session transcript (all of them archived in
+  `<workspace>/archive/2026-11-05-session-transcripts/` with their SHA-256; Claude Code's `cleanupPeriodDays` set to
+  36500 on both machines so none is deleted) and writes, per clean-room original, which agents wrote it, what they
+  read, any access to restricted material and the slips; code similarity only as additional, non-strict evidence;
+  run at every merge from then on.
+- **Two agents at once by role, from now until FreeSurfer** (the user: "you can use 2 agents at the same times as
+  before, now with the relays we save usage, so we can for now go ahed with 2 before starting with freesurfer"):
+  the arrangement of 2026-11-02 (CLAUDE.md, "Agents at once"), with relay agents.

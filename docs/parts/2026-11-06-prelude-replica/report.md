@@ -52,3 +52,10 @@ before, screenshots at 1440 and 390 in both themes. `evidence-blobs` 067d4e5 (1,
 - The clean-room audit's tables extended for PRELUDE (the relay's text): `fsl-prelude.md` among the source-derived
   findings, prelude among the FSL tools and their names, the replica's investigations among the brief-restricted
   files, `fsl-fugue` and `larmorx-nc-fugue` in the similarity mappings.
+- Verified (`verify-merge.sh` on 1eb168f, 21:10-21:43, 8 threads beside two agents): the three Rust workspaces'
+  gates, the GPL and nc builds, the smoke tier (2,796 passed, the memory tests with prelude's two calls among them) and
+  golden (every checksum unchanged, only the header); re-runs against the committed records: `fsl-prelude-replica`
+  88/88 and `fsl-topup-replica` 177/177, no status or detail differs; the two pages re-exported unchanged. The Python
+  gates found one failure of the merge itself: the clean-room audit's classification test used `fsl-prelude.md` as its
+  unlisted findings example, restricted since the merge; the example renamed (`fsl-newtool.md`), the prelude row
+  added as R11; `validation/tests` 379 passed.

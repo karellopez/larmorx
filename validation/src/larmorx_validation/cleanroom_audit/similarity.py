@@ -1266,12 +1266,19 @@ def run(repo: Path, workspace: Path, fsl_src: Path | None, wide: bool, jobs: int
         res["calibration"].append(r)
     for fam, lst in plan.wide.items():
         big = reader.code(f"{fam}/wide", lst)
-        res["wide"][fam] = {"files": len(big.files), "tokens": big.tokens, "tools": {}}
+        w = {"files": len(big.files), "tokens": big.tokens, "tools": {}, "floor": {}}
+        w["replicas"] = {}
         for key, entry in res["tools"].items():
+            cr = codes[(entry["family"], entry["tool"], "cleanroom")]
             if entry["family"] == fam:
-                cr = codes[(fam, entry["tool"], "cleanroom")]
-                res["wide"][fam]["tools"][key] = compare(cr, big, full=False)
-                print(f"  wide {key}: {time.time() - t0:.0f} s", flush=True)
+                w["tools"][key] = compare(cr, big, full=False)
+                rep = codes[(fam, entry["tool"], "replica")]
+                if rep.tokens:  # the high end: the tool's translation of this tree's code
+                    w["replicas"][key] = compare(rep, big, full=False)
+            else:  # the floor: clean-room code of another family against this tree
+                w["floor"][key] = compare(cr, big, full=False)
+            print(f"  wide {fam} {key}: {time.time() - t0:.0f} s", flush=True)
+        res["wide"][fam] = w
     res["seconds"] = round(time.time() - t0, 1)
     return res
 
@@ -1523,16 +1530,27 @@ def public_markdown(res: dict) -> str:
             f" {nm['longest_run']['tokens']} |"
         )
     if res.get("wide"):
-        L += ["", "**Against the whole upstream source trees:**", ""]
-        L += ["| clean-room original | tree | shared names | in runs of 8+ | longest run |"]
-        L += ["|---|---|---|---|---|"]
+        L += [
+            "",
+            "**Against the whole upstream source trees** (every C and C++ file; the floor: the"
+            " other families' clean-room code against the same tree, median and maximum; the"
+            " high end: the tool's replica against it):",
+            "",
+            "| clean-room original | tree | shared names | in runs of 8+ | longest run | floor:"
+            " in runs of 8+ (median; max) | the replica: in runs of 8+ |",
+            "|---|---|---|---|---|---|---|",
+        ]
         for fam, w in res["wide"].items():
             tree = f"{fam} ({w['files']:,} files, {w['tokens']:,} tokens)"
+            fl = [c["names"][f"coverage_{n0}"] for c in w.get("floor", {}).values()]
+            floor = f"{_pct(float(np.median(fl)))}; {_pct(max(fl))}" if fl else "-"
             for k, c in w["tools"].items():
                 nm = c["names"]
+                rep = w.get("replicas", {}).get(k)
                 L.append(
                     f"| {res['tools'][k]['name']} | {tree} | {_pct(c['identifiers_shared'])} |"
-                    f" {_pct(nm[f'coverage_{n0}'])} | {nm['longest_run']['tokens']} |"
+                    f" {_pct(nm[f'coverage_{n0}'])} | {nm['longest_run']['tokens']} | {floor} |"
+                    f" {_pct(rep['names'][f'coverage_{n0}']) if rep else '-'} |"
                 )
     runs = []
     for e in res["tools"].values():
@@ -1603,9 +1621,10 @@ def main(args: argparse.Namespace) -> int:
     repo = Path(args.repo) if args.repo else REPO
     workspace = Path(args.workspace) if args.workspace else default_workspace()
     fsl_src = Path(args.fsl_src) if args.fsl_src else default_fsl_src()
+    head = vd._git(repo, "rev-parse", "--short", "HEAD").strip()  # before: the code that runs
+    dirty = vd._git(repo, "status", "--porcelain", "--", "validation/src").strip()
     res = run(repo, workspace, fsl_src, args.wide, args.jobs)
-    head = vd._git(repo, "rev-parse", "--short", "HEAD").strip()
-    res["commit"] = head
+    res["commit"] = head + ("-dirty" if dirty else "")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "similarity.json").write_text(json.dumps(res, indent=1, sort_keys=True) + "\n")

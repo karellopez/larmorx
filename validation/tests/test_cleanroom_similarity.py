@@ -302,6 +302,7 @@ def test_run_on_a_synthetic_plan(tmp_path, monkeypatch):
             [plan.tools["FSL"]["total"]["upstream"][0]],
         )
     )
+    plan.wide["FSL"] = [t["upstream"][0] for t in plan.tools["FSL"].values()]
     monkeypatch.setattr(sm, "make_plan", lambda *a: plan)
     res = sm.run(tmp_path, tmp_path, None, False, 1)
     total = res["tools"]["FSL/total"]
@@ -321,6 +322,10 @@ def test_run_on_a_synthetic_plan(tmp_path, monkeypatch):
     public = sm.public_markdown(res)
     assert public.startswith("### Code similarity") and str(tmp_path) not in public
     assert "| total |" in public and "**Calibration pairs**" in public
+    wide = res["wide"]["FSL"]
+    assert set(wide["tools"]) == {"FSL/total", "FSL/other"} and wide["floor"] == {}
+    assert wide["replicas"]["FSL/total"]["names"][f"coverage_{n}"] == rep_cov
+    assert "Against the whole upstream source trees" in public
 
 
 def test_public_names():

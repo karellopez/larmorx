@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The constraints between touching regions and their merging (`specs/prelude.md` §4.7, §4.8),
 //! built for speed (§10): FSL scans every constraint for each choice (`O(L²)` per volume); here
-//! a binary heap keyed by the merit `C` (largest first, then the smallest pair) with lazy
-//! deletion gives the same choice sequence in `O(log E)`, each group keeps a list of its
-//! neighbours (dead entries skipped), and a weighted union-find holds the integer offsets.
-//! Every value is computed in the order and precision the spec fixes; only the structures that
-//! find the next choice are larmorx's.
+//! the constraints live in slots (a slot reused when a fold moves its constraint from `s` to
+//! `r`), an indexed 4-ary heap keyed by the merit `C` (largest first, then the smallest pair)
+//! gives the same choice sequence in `O(log E)` with each fold's update in place, each group
+//! keeps a list of its slots (the constraint between two groups found by scanning the shorter
+//! list, no hashing), and a weighted union-find holds the integer offsets. Every value is
+//! computed in the order and precision the spec fixes; only the structures that find the next
+//! choice are larmorx's (a test checks them against §4.8 written out as the spec states it).
 
-use std::collections::{BTreeSet, BinaryHeap, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasherDefault, Hasher};
 
 use super::num::{TWO_PI, add32, div64, mul64, narrow, rnd, sub32, sub64, wide};
@@ -93,13 +95,19 @@ pub fn merit(p: f32, n: f32) -> (f32, f32) {
     (k, c)
 }
 
-/// One constraint.
+/// A removed slot's pair.
+const DEAD: u32 = u32::MAX;
+/// A slot outside the heap (its merit NaN, or removed).
+const OUT: u32 = u32::MAX;
+
+/// One constraint: its pair (`a < b`, group names; `a == DEAD` once removed), `P` (as seen
+/// from `a`) and `N`. A slot is reused when a fold moves its constraint from `s` to `r`.
 #[derive(Clone, Copy, Debug)]
-struct Cons {
+struct Slot {
+    a: u32,
+    b: u32,
     p: f32,
     n: f32,
-    k: f32,
-    stamp: u32,
 }
 
 /// A merit as an ordered integer (`-0` and `+0` equal); NaN is kept apart by the caller.
@@ -113,33 +121,174 @@ fn ordered(c: f32) -> u32 {
     }
 }
 
-/// A heap entry: the largest merit first, then the smallest pair.
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct Entry {
-    c: u32,
-    a: u32,
-    b: u32,
-    stamp: u32,
+/// A heap element: the largest merit first, then the smallest pair (`key` holds the merit and
+/// the complement of `a`, `tie` the complement of `b`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Elem {
+    key: u64,
+    tie: u32,
+    id: u32,
 }
 
-impl Ord for Entry {
-    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
-        self.c
-            .cmp(&o.c)
-            .then_with(|| o.a.cmp(&self.a))
-            .then_with(|| o.b.cmp(&self.b))
-            .then_with(|| self.stamp.cmp(&o.stamp))
+impl Elem {
+    fn of(c: f32, a: u32, b: u32, id: u32) -> Elem {
+        Elem {
+            key: (u64::from(ordered(c)) << 32) | u64::from(!a),
+            tie: !b,
+            id,
+        }
     }
 }
 
-impl PartialOrd for Entry {
-    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(o))
+/// An indexed 4-ary max-heap of slots: each slot's position is known, so a fold updates its
+/// constraint in place (no stale entries).
+struct Heap {
+    h: Vec<Elem>,
+    pos: Vec<u32>,
+}
+
+impl Heap {
+    const D: usize = 4;
+
+    fn new(mut h: Vec<Elem>, slots: usize) -> Heap {
+        let mut pos = vec![OUT; slots];
+        // Floyd's construction
+        let n = h.len();
+        if n > 1 {
+            for i in (0..=(n - 2) / Self::D).rev() {
+                Self::down(&mut h, i);
+            }
+        }
+        for (i, e) in h.iter().enumerate() {
+            pos[e.id as usize] = i as u32;
+        }
+        Heap { h, pos }
     }
+
+    /// Sifts `h[i]` down (positions not tracked: the construction only).
+    fn down(h: &mut [Elem], mut i: usize) {
+        let n = h.len();
+        loop {
+            let first = Self::D * i + 1;
+            if first >= n {
+                return;
+            }
+            let mut best = first;
+            for c in first + 1..(first + Self::D).min(n) {
+                if h[c] > h[best] {
+                    best = c;
+                }
+            }
+            if h[best] <= h[i] {
+                return;
+            }
+            h.swap(i, best);
+            i = best;
+        }
+    }
+
+    #[inline]
+    fn place(&mut self, i: usize, e: Elem) {
+        self.h[i] = e;
+        self.pos[e.id as usize] = i as u32;
+    }
+
+    fn sift_up(&mut self, mut i: usize) {
+        let e = self.h[i];
+        while i > 0 {
+            let p = (i - 1) / Self::D;
+            if self.h[p] >= e {
+                break;
+            }
+            let pe = self.h[p];
+            self.place(i, pe);
+            i = p;
+        }
+        self.place(i, e);
+    }
+
+    fn sift_down(&mut self, mut i: usize) {
+        let n = self.h.len();
+        let e = self.h[i];
+        loop {
+            let first = Self::D * i + 1;
+            if first >= n {
+                break;
+            }
+            let mut best = first;
+            for c in first + 1..(first + Self::D).min(n) {
+                if self.h[c] > self.h[best] {
+                    best = c;
+                }
+            }
+            if self.h[best] <= e {
+                break;
+            }
+            let be = self.h[best];
+            self.place(i, be);
+            i = best;
+        }
+        self.place(i, e);
+    }
+
+    fn pop(&mut self) -> Option<u32> {
+        let top = *self.h.first()?;
+        self.pos[top.id as usize] = OUT;
+        let last = self.h.pop().expect("not empty");
+        if !self.h.is_empty() {
+            self.place(0, last);
+            self.sift_down(0);
+        }
+        Some(top.id)
+    }
+
+    fn remove(&mut self, id: u32) {
+        let i = self.pos[id as usize];
+        if i == OUT {
+            return;
+        }
+        self.pos[id as usize] = OUT;
+        let i = i as usize;
+        let last = self.h.pop().expect("not empty");
+        if i < self.h.len() {
+            self.place(i, last);
+            self.sift_up(i);
+            let j = self.pos[last.id as usize] as usize;
+            self.sift_down(j);
+        }
+    }
+
+    /// Puts slot `e.id` in the heap with its new key (in place when it is there).
+    fn set(&mut self, e: Elem) {
+        let i = self.pos[e.id as usize];
+        if i == OUT {
+            self.h.push(e);
+            let n = self.h.len() - 1;
+            self.place(n, e);
+            self.sift_up(n);
+        } else {
+            let i = i as usize;
+            let old = self.h[i];
+            self.place(i, e);
+            if e > old {
+                self.sift_up(i);
+            } else {
+                self.sift_down(i);
+            }
+        }
+    }
+}
+
+/// The live pairs once a NaN merit exists (§4.8 step 1's rule): every pair, and the NaN ones,
+/// each with its slot.
+#[derive(Default)]
+struct NanRule {
+    all: BTreeMap<(u32, u32), u32>,
+    nan: BTreeMap<(u32, u32), u32>,
 }
 
 /// What the merging gives for one set of regions.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Merged {
     /// The offset of each region in turns, `o_l` (index 0 unused).
     pub offsets: Vec<f32>,
@@ -147,151 +296,180 @@ pub struct Merged {
     pub choices: usize,
 }
 
+/// The slot of the live constraint between groups `r` and `t`, by a scan of the shorter of their
+/// lists (removed and moved slots dropped from it on the way).
+fn find(adj: &mut [Vec<u32>], slots: &[Slot], r: u32, t: u32) -> Option<u32> {
+    let (g, other) = if adj[r as usize].len() <= adj[t as usize].len() {
+        (r, t)
+    } else {
+        (t, r)
+    };
+    let (a, b) = (g.min(other), g.max(other));
+    let list = &mut adj[g as usize];
+    let mut found = None;
+    let mut w = 0;
+    for i in 0..list.len() {
+        let id = list[i];
+        let s = slots[id as usize];
+        if s.a == DEAD || (s.a != g && s.b != g) {
+            continue;
+        }
+        if s.a == a && s.b == b {
+            found = Some(id);
+        }
+        list[w] = id;
+        w += 1;
+    }
+    list.truncate(w);
+    found
+}
+
 /// The constraints of regions `1..=n_regions` from their sums, merged (§4.8). `lines` receives
-/// the `<count> constraints left` lines (with `verbose`).
+/// the `<count> constraints left` lines and `Did while loop` (with `verbose`).
 pub fn merge(n_regions: u32, sums: PairMap<Sum>, verbose: bool, lines: &mut Vec<String>) -> Merged {
     let l = n_regions as usize;
-    let mut cons: PairMap<Cons> = PairMap::default();
-    cons.reserve(sums.len());
     let mut adj: Vec<Vec<u32>> = vec![Vec::new(); l + 1];
     // the totals of §4.8 (exact integers)
     let mut total: Vec<u64> = vec![0; l + 1];
-    let mut heap: BinaryHeap<Entry> = BinaryHeap::with_capacity(sums.len());
-    let mut nan_pairs: BTreeSet<(u32, u32)> = BTreeSet::new();
-    let mut stamp: u32 = 0;
+    let mut slots: Vec<Slot> = Vec::with_capacity(sums.len());
+    let mut elems: Vec<Elem> = Vec::with_capacity(sums.len());
+    let mut nan_seen = false;
     for (&k, s) in &sums {
         let (a, b) = pair(k);
         let n = count_f32(s.count);
         total[a as usize] += n as u64;
         total[b as usize] += n as u64;
-        let (kk, c) = merit(s.p, n);
-        stamp += 1;
-        cons.insert(
-            k,
-            Cons {
-                p: s.p,
-                n,
-                k: kk,
-                stamp,
-            },
-        );
+        let id = slots.len() as u32;
+        slots.push(Slot { a, b, p: s.p, n });
+        let (_, c) = merit(s.p, n);
         if c.is_nan() {
-            nan_pairs.insert((a, b));
+            nan_seen = true;
         } else {
-            heap.push(Entry {
-                c: ordered(c),
-                a,
-                b,
-                stamp,
-            });
+            elems.push(Elem::of(c, a, b, id));
         }
-        adj[a as usize].push(b);
-        adj[b as usize].push(a);
+        adj[a as usize].push(id);
+        adj[b as usize].push(id);
     }
     drop(sums);
-    // every live pair, ordered, once a NaN merit exists (§4.8 step 1's rule)
-    let mut all_pairs: Option<BTreeSet<(u32, u32)>> =
-        (!nan_pairs.is_empty()).then(|| cons.keys().map(|&k| pair(k)).collect());
+    let mut heap = Heap::new(elems, slots.len());
+    let mut rule: Option<NanRule> = None;
+    let start_rule = |slots: &[Slot]| {
+        let mut r = NanRule::default();
+        for (id, s) in slots.iter().enumerate() {
+            if s.a != DEAD {
+                r.all.insert((s.a, s.b), id as u32);
+                if merit(s.p, s.n).1.is_nan() {
+                    r.nan.insert((s.a, s.b), id as u32);
+                }
+            }
+        }
+        r
+    };
+    if nan_seen {
+        rule = Some(start_rule(&slots));
+    }
+    let mut live = slots.len();
     let mut alive = vec![true; l + 1];
     // the weighted union-find: each merged group's name points to the group it joined, with
     // the turns it moved by (relative)
     let mut parent: Vec<u32> = (0..=n_regions).collect();
     let mut moved: Vec<i32> = vec![0; l + 1];
     let mut choices = 0usize;
-    loop {
-        if cons.is_empty() {
-            break;
-        }
-        // the choice (§4.8 step 1)
-        let chosen = {
-            let first_nan = match (&all_pairs, nan_pairs.is_empty()) {
-                (Some(all), false) => all.first().copied().filter(|p| nan_pairs.contains(p)),
-                _ => None,
-            };
-            match first_nan {
-                Some(p) => p,
-                None => loop {
-                    let Some(top) = heap.pop() else {
-                        unreachable!("a live constraint has a merit in the heap or the NaN set")
-                    };
-                    if cons
-                        .get(&key(top.a, top.b))
-                        .is_some_and(|c| c.stamp == top.stamp)
-                    {
-                        break (top.a, top.b);
-                    }
-                },
-            }
+    while live > 0 {
+        // the choice (§4.8 step 1): the smallest pair when its merit is NaN, else the largest
+        // merit (the smallest pair among equal)
+        let first_nan = rule.as_ref().and_then(|ru| {
+            let (p, id) = ru.all.first_key_value()?;
+            ru.nan.contains_key(p).then_some(*id)
+        });
+        let id = match first_nan {
+            Some(id) => id,
+            None => heap
+                .pop()
+                .expect("a live constraint is in the heap or has a NaN merit"),
         };
         if verbose && choices.is_multiple_of(1000) {
-            lines.push(format!("{} constraints left", cons.len()));
+            lines.push(format!("{live} constraints left"));
         }
         choices += 1;
-        let (r, s) = chosen;
-        let c = cons
-            .remove(&key(r, s))
-            .expect("the chosen constraint is live");
-        if let Some(all) = &mut all_pairs {
-            all.remove(&(r, s));
+        let chosen = slots[id as usize];
+        let (r, s) = (chosen.a, chosen.b);
+        slots[id as usize].a = DEAD;
+        live -= 1;
+        heap.remove(id);
+        if let Some(ru) = &mut rule {
+            ru.all.remove(&(r, s));
+            ru.nan.remove(&(r, s));
         }
-        nan_pairs.remove(&(r, s));
-        let k = rnd(wide(c.k));
+        let k = rnd(wide(merit(chosen.p, chosen.n).0));
         // group s moves by -k turns and joins r (§4.8 step 2)
         parent[s as usize] = r;
         moved[s as usize] = k.wrapping_neg();
         alive[s as usize] = false;
         // fold s's other constraints into r's (step 3)
-        let neighbours = std::mem::take(&mut adj[s as usize]);
-        for t in neighbours {
-            if t == r || !alive[t as usize] {
+        let ids = std::mem::take(&mut adj[s as usize]);
+        for sid in ids {
+            let st = slots[sid as usize];
+            if st.a == DEAD {
                 continue;
             }
-            let kst = key(s.min(t), s.max(t));
-            let Some(st) = cons.remove(&kst) else {
+            let t = if st.a == s {
+                st.b
+            } else if st.b == s {
+                st.a
+            } else {
                 continue;
             };
-            if let Some(all) = &mut all_pairs {
-                all.remove(&(s.min(t), s.max(t)));
-            }
-            nan_pairs.remove(&(s.min(t), s.max(t)));
+            debug_assert!(t != r && alive[t as usize]);
             let p_st = if s < t { st.p } else { -st.p };
             let n_st = st.n;
-            let krt = key(r.min(t), r.max(t));
-            let (p_rt, n_rt, existed) = match cons.remove(&krt) {
-                Some(rt) => (if r < t { rt.p } else { -rt.p }, rt.n, true),
-                None => (0.0, 0.0, false),
+            let rt = find(&mut adj, &slots, r, t);
+            let (p_rt, n_rt) = match rt {
+                Some(i) => {
+                    let x = slots[i as usize];
+                    (if r < t { x.p } else { -x.p }, x.n)
+                }
+                None => (0.0, 0.0),
             };
             let n = n_rt + n_st;
             let sum = wide(add32(p_rt, p_st));
             let shift = mul64(TWO_PI * f64::from(n_st), f64::from(k));
             let q = narrow(sub64(sum, shift));
             let p = if r < t { q } else { -q };
-            let (kk, cc) = merit(p, n);
-            stamp = stamp.wrapping_add(1);
-            cons.insert(krt, Cons { p, n, k: kk, stamp });
-            let pr = (r.min(t), r.max(t));
-            if cc.is_nan() {
-                if all_pairs.is_none() {
-                    all_pairs = Some(cons.keys().map(|&k| pair(k)).collect());
-                } else if let Some(all) = &mut all_pairs {
-                    all.insert(pr);
-                }
-                nan_pairs.insert(pr);
-            } else {
-                nan_pairs.remove(&pr);
-                if let Some(all) = &mut all_pairs {
-                    all.insert(pr);
-                }
-                heap.push(Entry {
-                    c: ordered(cc),
-                    a: pr.0,
-                    b: pr.1,
-                    stamp,
-                });
+            let (a2, b2) = (r.min(t), r.max(t));
+            let (_, c) = merit(p, n);
+            if let Some(ru) = &mut rule {
+                ru.all.remove(&(st.a, st.b));
+                ru.nan.remove(&(st.a, st.b));
             }
-            if !existed {
-                adj[r as usize].push(t);
-                adj[t as usize].push(r);
+            let target = match rt {
+                Some(i) => {
+                    slots[sid as usize].a = DEAD;
+                    heap.remove(sid);
+                    live -= 1;
+                    i
+                }
+                None => {
+                    adj[r as usize].push(sid);
+                    sid
+                }
+            };
+            slots[target as usize] = Slot { a: a2, b: b2, p, n };
+            if c.is_nan() {
+                heap.remove(target);
+                if rule.is_none() {
+                    rule = Some(start_rule(&slots));
+                }
+                if let Some(ru) = &mut rule {
+                    ru.all.insert((a2, b2), target);
+                    ru.nan.insert((a2, b2), target);
+                }
+            } else {
+                heap.set(Elem::of(c, a2, b2, target));
+                if let Some(ru) = &mut rule {
+                    ru.all.insert((a2, b2), target);
+                    ru.nan.remove(&(a2, b2));
+                }
             }
         }
     }
@@ -325,6 +503,82 @@ pub fn merge(n_regions: u32, sums: PairMap<Sum>, verbose: bool, lines: &mut Vec<
 mod tests {
     use super::*;
 
+    /// §4.8 written out as the spec states it (a scan of every constraint in pair order for each
+    /// choice, every region of group s moved): the reference for [`merge`].
+    fn by_the_spec(l: u32, sums: &PairMap<Sum>) -> (Merged, Vec<String>) {
+        let mut cons: BTreeMap<(u32, u32), (f32, f32)> = BTreeMap::new();
+        let mut total = vec![0u64; l as usize + 1];
+        for (&k, s) in sums {
+            let (a, b) = pair(k);
+            let n = count_f32(s.count);
+            total[a as usize] += n as u64;
+            total[b as usize] += n as u64;
+            cons.insert((a, b), (s.p, n));
+        }
+        let mut group: Vec<u32> = (0..=l).collect();
+        let mut d = vec![0i32; l as usize + 1];
+        let mut lines = Vec::new();
+        let mut choices = 0;
+        while !cons.is_empty() {
+            let mut best: Option<((u32, u32), f32)> = None;
+            for (&pr, &(p, n)) in &cons {
+                let c = merit(p, n).1;
+                match best {
+                    None => best = Some((pr, c)),
+                    Some((_, bc)) if c > bc => best = Some((pr, c)),
+                    _ => {}
+                }
+            }
+            let ((r, s), _) = best.expect("a constraint");
+            if choices % 1000 == 0 {
+                lines.push(format!("{} constraints left", cons.len()));
+            }
+            choices += 1;
+            let (p, n) = cons.remove(&(r, s)).expect("live");
+            let k = rnd(wide(merit(p, n).0));
+            for i in 1..=l as usize {
+                if group[i] == s {
+                    d[i] = d[i].wrapping_sub(k);
+                    group[i] = r;
+                }
+            }
+            let others: Vec<(u32, u32)> = cons
+                .keys()
+                .copied()
+                .filter(|&(a, b)| (a == s || b == s) && a != r && b != r)
+                .collect();
+            for (a, b) in others {
+                let t = if a == s { b } else { a };
+                let (pst, nst) = cons.remove(&(a, b)).expect("live");
+                let p_st = if s < t { pst } else { -pst };
+                let (p_rt, n_rt) = match cons.remove(&(r.min(t), r.max(t))) {
+                    Some((x, y)) => (if r < t { x } else { -x }, y),
+                    None => (0.0, 0.0),
+                };
+                let q = narrow(sub64(
+                    wide(add32(p_rt, p_st)),
+                    mul64(TWO_PI * f64::from(nst), f64::from(k)),
+                ));
+                cons.insert(
+                    (r.min(t), r.max(t)),
+                    (if r < t { q } else { -q }, n_rt + nst),
+                );
+            }
+        }
+        lines.push(format!("Did while loop {choices} times"));
+        let mut reference = 1usize.min(l as usize);
+        for i in 1..=l as usize {
+            if total[i] > total[reference] {
+                reference = i;
+            }
+        }
+        let dref = if l == 0 { 0.0 } else { d[reference] as f32 };
+        let offsets = (0..=l as usize)
+            .map(|i| if i == 0 { 0.0 } else { d[i] as f32 - dref })
+            .collect();
+        (Merged { offsets, choices }, lines)
+    }
+
     #[test]
     fn two_regions_one_turn_apart() {
         // region 2 lies one turn above region 1 along 10 voxel pairs
@@ -348,5 +602,45 @@ mod tests {
         assert!(ordered(1.0) > ordered(0.5));
         assert_eq!(ordered(-0.0), ordered(0.0));
         assert!(ordered(-1.0) < ordered(0.0));
+    }
+
+    #[test]
+    fn the_heap_and_lists_give_the_specs_sequence() {
+        // random region graphs (a grid's neighbours and random long links), random sums,
+        // some merits tied, some NaN
+        let mut seed = 12345u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for case in 0..60 {
+            let l = 2 + (next() % 60) as u32;
+            let mut sums = PairMap::default();
+            for _ in 0..(l * 3) {
+                let a = 1 + (next() % u64::from(l)) as u32;
+                let b = 1 + (next() % u64::from(l)) as u32;
+                if a == b {
+                    continue;
+                }
+                let turns = (next() % 7) as f32 - 3.0;
+                let noise = ((next() % 1000) as f32 - 500.0) / 400.0;
+                let count = 1 + next() % 5;
+                for _ in 0..count {
+                    let p2 = if case % 7 == 3 && next() % 50 == 0 {
+                        f32::NAN
+                    } else {
+                        0.2 + turns * std::f32::consts::TAU + noise
+                    };
+                    contribute(&mut sums, a, 0.2, b, p2);
+                }
+            }
+            let mut lines = Vec::new();
+            let fast = merge(l, sums.clone(), true, &mut lines);
+            let (want, want_lines) = by_the_spec(l, &sums);
+            assert_eq!(fast, want, "case {case}");
+            assert_eq!(lines, want_lines, "case {case}");
+        }
     }
 }

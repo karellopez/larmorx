@@ -874,7 +874,31 @@ def run(scan: Path, repo: Path) -> dict:
             x["kind"] += "; a replica author's entry printed"
         kept.append(x)
     brief_dependent = kept
+    # A grep of one restricted file prints no name: its output is compared with the file's lines.
+    want = collections.defaultdict(set)
+    single = []
+    for key in implementers:
+        for r in restricted[key]:
+            rel = r.get("rel") or ""
+            if (
+                r["op"] != "search"
+                or any(ch in rel for ch in "*?[")
+                or not re.search(r"\.\w+$", rel)
+            ):
+                continue
+            want[r["file"]].add(r["call"])
+            single.append((key, r))
+    shown = fetch_results(want)
+    single_file_scopes = {"checked": len(single), "shown": []}
+    for key, r in single:
+        t = shown.get(r.get("call") or "", "")
+        n = lines_of_file_shown(repo, r["rel"], t) if t.strip() else 0
+        if n:
+            single_file_scopes["shown"].append(
+                {"agent": key, "description": description(agents[key]), "lines": n, **r}
+            )
     return {
+        "single_file_scopes": single_file_scopes,
         "slips": slips,
         "brief_dependent": brief_dependent,
         "tools": tools_out,
@@ -1074,10 +1098,11 @@ def implementer_slips(agents, roles, restricted, register, texts, reg, writer_ro
                 },
             )
             body = sum(1 for _, x in hits if not is_heading(x))
-            c["rules"][
-                f"R12:{'+'.join(sorted({s.split(':')[1].split('(')[0].strip() for s, _ in hits}))}:"
-                f"{'body' if body else 'headings'}"
-            ] += len(hits)
+            sections = "+".join(sorted({s.split(":")[1].split("(")[0].strip() for s, _ in hits}))
+            k = f"R12:{sections}:{'body' if body else 'headings'}"
+            # one call's output, counted once whatever the number of its access records
+            c["rules"][k] = max(c["rules"][k], len(hits))
+            c["register_lines"] = {"body": body, "headings": len(hits) - body}
             c["paths"].add(REGISTER)
             c.setdefault("register_sample", [x[:160] for _, x in hits if not is_heading(x)][:3])
         for cid, c in sorted(calls.items(), key=lambda kv: kv[1]["ts"]):
@@ -1202,6 +1227,15 @@ def write_markdown(res: dict, path: Path, scan: str, repo_head: str) -> None:
     w("\n## Files the implementers' briefs forbade (R15, R16)\n")
     for x in res["brief_dependent"]:
         w(f"- {x['description']}: {x['kind']}; `{x['rel']}` ({x['op']}, {x['via']}); {_ev(x)}")
+    sf = res.get("single_file_scopes", {"checked": 0, "shown": []})
+    w(
+        f"\nGreps of one restricted file by implementers (no file name printed): {sf['checked']}; "
+        f"with lines of that file (on main) in their output: {len(sf['shown'])}."
+    )
+    for x in sf["shown"]:
+        w(
+            f"- {x['description']}: {x['rule']} `{x['rel']}`, {x['lines']} lines; {_ev(x, x['agent'])}"
+        )
     w("\n## The orchestrator's own edits of clean-room code\n")
     for k, lst in res["orchestrator_edits"].items():
         for e in lst:

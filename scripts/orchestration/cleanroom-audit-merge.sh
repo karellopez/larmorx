@@ -22,8 +22,8 @@
 # part-<part>.json) and <workspace>/archive/clean-room-audit/<date>-<part>/ (scan/, verdicts/,
 # gate.txt, main.log: one line per step, ALLDONE at the end). Private: never publish either.
 # Exit status: 0 the gate passed; 1 the gate stopped the merge (its STOP lines: read each call in
-# the dossier's verdicts.md, then judge it in judgements.toml or undo the edit; re-run); 2 a step
-# failed (an agent of the part without a transcript included).
+# the dossier's verbatim.md and verdicts.md, then judge it in judgements.toml or undo the edit;
+# re-run); 2 a step failed (an agent of the part without a transcript included).
 set -u
 [ $# -ge 2 ] || { sed -n '3,24p' "$0"; exit 2; }
 R=$(cd "$1" && pwd); PART=$2; shift 2
@@ -74,7 +74,12 @@ grep -E '^(STOP|JUDGE) ' "$OUT/gate.txt" | tee -a "$L"
 tail -n 1 "$OUT/gate.txt" | tee -a "$L"
 [ "$GATE" -le 1 ] || fail gate "$GATE"
 
-if [ "$SUMMARY" = 1 ] && [ "$GATE" = 0 ]; then
+if [ "$GATE" != 0 ]; then
+  # What the page would say and every item's call verbatim, kept private in the dossier.
+  step "DOSSIER every item's call verbatim ($OUT/verbatim.md; the page as it would be: $OUT/page.md)"
+  "${LXV[@]}" cleanroom-audit summary --dossier "$OUT" --json "$OUT/facts.json" --out "$OUT/page.md" \
+    --verbatim "$OUT/verbatim.md" > "$OUT/summary.log" 2>&1 || fail summary $?
+elif [ "$SUMMARY" = 1 ]; then
   step "SUMMARY docs/validation/clean-room-audit.{json,md} in $R"
   "${LXV[@]}" cleanroom-audit summary --dossier "$OUT" --verbatim "$OUT/verbatim.md" \
     > "$OUT/summary.log" 2>&1 || fail summary $?

@@ -1642,6 +1642,11 @@ def add_arguments(sub) -> None:
     s.add_argument("--fsl-src", help="FSL's whole source tree, for --wide ($FSLDIR/src)")
     s.add_argument("--wide", action="store_true", help="also against the whole upstream trees")
     s.add_argument("--jobs", type=int, default=8, help="parallel readers (spawned processes)")
+    s.add_argument(
+        "--report-only",
+        action="store_true",
+        help="only rewrite the reports from --out's similarity.json (no measuring)",
+    )
 
 
 def default_fsl_src() -> Path | None:
@@ -1658,14 +1663,19 @@ def main(args: argparse.Namespace) -> int:
     repo = Path(args.repo) if args.repo else REPO
     workspace = Path(args.workspace) if args.workspace else default_workspace()
     fsl_src = Path(args.fsl_src) if args.fsl_src else default_fsl_src()
+    out = Path(args.out)
+    if args.report_only:
+        res = json.loads((out / "similarity.json").read_text(encoding="utf-8"))
+        write_markdown(res, out / "similarity.md", res["commit"])
+        (out / "similarity-public.md").write_text(public_markdown(res), encoding="utf-8")
+        return 0
     head = vd._git(repo, "rev-parse", "--short", "HEAD").strip()  # before: the code that runs
     dirty = vd._git(repo, "status", "--porcelain", "--", "validation/src").strip()
     res = run(repo, workspace, fsl_src, args.wide, args.jobs)
     res["commit"] = head + ("-dirty" if dirty else "")
-    out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "similarity.json").write_text(json.dumps(res, indent=1, sort_keys=True) + "\n")
-    write_markdown(res, out / "similarity.md", head)
+    write_markdown(res, out / "similarity.md", res["commit"])
     (out / "similarity-public.md").write_text(public_markdown(res), encoding="utf-8")
     for k, e in res["tools"].items():
         print(

@@ -146,7 +146,21 @@ nothing.
   phase-difference workflow on ds005454-sub-16, ds002603-sub-01, ds002422-sub-02 (two
   estimators) and ds001600-sub-1 (three)) are bit-identical to FSL 6.0.7.23 and to fMRIPrep's own
   outputs (its container's FSL). The D13 pass: each defect named exactly where the default's
-  outputs differ. The record `fsl-prelude-replica` is made from a clean commit in sub-task 2.
+  outputs differ. **The record** `fsl-prelude-replica` (docs/validation/fsl-prelude-replica.md,
+  from the clean commit 1770116, 2026-11-06): 86 cases, 66 bit-identical, 20 rejected by both
+  alike, 0 expected divergences, 0 failures; besides relay 1's cases, the data panel's two
+  phase-difference maps no fMRIPrep run unwrapped (ds000256's child, ds004958's GRE map; sdcflows'
+  `au2rads` input, prelude's own mask, `-s` and the ramps with every output; the scanner's raw
+  units: FSL's range error) and the two permanent cases of random testing.
+- **Random testing** (`difftest --tools fsl-prelude`, descriptor
+  `validation/src/larmorx_validation/difftest/tools/fsl_prelude.py`): the trial
+  `oracles/difftest/2026-11-06-prelude-replica` (30 minutes, 12 jobs, FSL through the oracle
+  cache): 50,711 cases, 50,702 bit-identical with their D13 fix pass; the 9 others the
+  descriptor's own size draw on one-slice images (fixed: bit-identical drawn again). A two-minute
+  check run before it found two imprecise notices of the replica (FSL-261 named where its
+  correction changed nothing; FSL-269's change of `-v`'s lines unnamed): both notices now compare
+  everything the run writes and prints, both computed (permanent cases `ramps-notice-unchanged`,
+  `nan-phase-verbose-notice`; `validation/difftest/triage.toml`).
 - **Golden** (`crates-nc/larmorx-nc-cli/tests/golden.rs`, recorded from fb86dc8): 15 cases and 4
   failures on a 24 x 20 x 12 grid of a wrapped quadratic phase (plain arithmetic): fMRIPrep's
   form, a threshold with every output, `-s`, `--labelslices -n 6`, the ramps with `-v` (FSL-261,

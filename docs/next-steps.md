@@ -131,7 +131,9 @@ at a time:
    (item 8); larmorprepx (item 9). **Later** (the user, 2026-11-06): a clean-room original of every program, the
    permissive ports included, as the next-generation implementation; the completeness parts (proposed, after
    FreeSurfer: ANTs' missing operations and image kinds, the clean-room `-gdt`, 3dTshift's `-voxshift` and AFNI's own
-   format, the replicas' refused paths, FSL's scripts). Each with its site page from
+   format, the replicas' refused paths, FSL's scripts); **after FreeSurfer** (the user, 2026-11-06): FSL's FNIRT,
+   `applywarp`, `convertwarp` and `fugue`, each a replica and a clean-room original, then the FLIRT pieces that wait
+   for them (the coordinate programs' `-warp`, `epi_reg`, `flirt_average`). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
    (part b: AFNI, FSL and I/O; the new tools), full tiers, heavy and nightly random testing

@@ -1995,9 +1995,10 @@ together at the end.
   runs without `recon-all` (`mri_coreg`, `lta_convert`, `mri_robust_template`). After FreeSurfer, before the final
   validation phase (proposed, not yet decided): the completeness parts (ANTs' missing operations and image kinds,
   mcflirt's `-gdt` in the clean-room original, 3dTshift's `-voxshift` and AFNI's own format, the replicas' refused
-  paths, FSL's scripts); FNIRT, `applywarp`, `fugue` and `convertwarp` (needed only by FLIRT's `-warp`, `epi_reg`,
-  `flirt_average`) out of scope for now, revisited before the first release (the orchestrator's recommendation; the
-  user has not answered).
+  paths, FSL's scripts). **FNIRT, `applywarp`, `convertwarp` and `fugue`** (needed by FLIRT's coordinate programs'
+  `-warp`, `epi_reg` and `flirt_average`; fMRIPrep runs none of them): **after FreeSurfer**, each a replica and a
+  clean-room original, with the three FLIRT pieces that wait for them (the user, 2026-11-06: "put them in the todos
+  list, after freesurfer, we will port all these programs").
 - **A clean-room original of every program, later** (the user: "remember that later we want a clean room
   implementation for every programs, and not only for the ones with restrictive licenses. Remember also that the
   idea of the clean room, is not [only] to take the legal licence problems out, but also a nice opportunity to

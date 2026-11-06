@@ -532,12 +532,12 @@ def _note(n: int, extra: str = "") -> str:
     )
 
 
-def _programs(info: dict) -> str:
+def _programs(info: dict, ran_by: str = "the record") -> str:
     vers = info.get("versions", {})
     served = info.get("oracle_cache", {})
     how = (
-        "its run served from the oracle cache, as the record ran it"
-        if served.get("fsl") == "served"
+        f"its runs served from the oracle cache, as {ran_by} ran them"
+        if served and all(v == "served" for v in served.values())
         else "run for this page through the oracle cache"
     )
     return (
@@ -848,7 +848,7 @@ def _example_fsl272(ctx: core.Context) -> dict:
                 "sdcflows' brain mask, dilated by 2 voxels, so no face shows",
             },
             {"label": "Command", "text": "`" + command_fmriprep(call) + "`"},
-            {"label": "Programs", "text": _programs(info)},
+            {"label": "Programs", "text": _programs(info, "FSL-272's measurement")},
             {"label": "Grid", "text": common.describe_grid(pimg, grid.shape)},
         ],
         **out,

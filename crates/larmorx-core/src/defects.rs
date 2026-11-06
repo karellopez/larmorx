@@ -378,6 +378,24 @@ defects! {
         "-T2 given three or more times (the help documents once and twice) leaves the output inverted: neither inverted back nor edge-clipped";
     AFNI_75 = "AFNI-75", "3dUnifize", true,
         "-EPI sets the neighbourhood's radius to 18.3 mm over the voxels' geometric mean size, in voxels, with no upper bound: on micrometre (or otherwise tiny) voxels the ball of neighbours has trillions of points, built before any is used, which fills the machine until the process is stopped";
+    AFNI_86 = "AFNI-86", "3dvolreg", true,
+        "-nocoarserot matches -noclip's first four letters, which the option scan tests first: it turns the clipping of the registered bricks off and leaves the coarse rotation search on";
+    AFNI_87 = "AFNI-87", "3dvolreg", true,
+        "a byte dataset's registered sub-bricks are written through mri_to_byte, which stretches each to 0..255.9 from its own minimum and maximum";
+    AFNI_88 = "AFNI-88", "3dvolreg", true,
+        "an option that needs a value, given last on the command line, reads past the arguments (a crash; -savedisp's check is off by one)";
+    AFNI_89 = "AFNI-89", "3dvolreg", true,
+        "a base whose least squares cannot be set up (all-zero weights, or a rotated or shifted copy that equals the base under the weight: a constant volume, a dimension below 2) prints lsqfit's errors and crashes at the first registered sub-brick";
+    AFNI_90 = "AFNI-90", "3dvolreg", true,
+        "-prefix, -dfile and -1Dfile longer than 255 bytes, and a -weight dataset name longer than 255, overflow fixed buffers; -maxdisp1D names are cut at 998 bytes";
+    AFNI_92 = "AFNI-92", "3dvolreg", true,
+        "-maxdisp (the default) sets the automask's clip fraction to 0.333 for the rest of the run, so -nomaxdisp changes -twopass's coarse rotation search (its mask with 0.5): an output-only option changes the registration";
+    AFNI_93 = "AFNI-93", "3dvolreg", true,
+        "the coarse search of -twopass on a volume too thin for its edge (n - edge <= edge on an axis) sums over no voxel, so every shift scores 0 and the first candidate wins: a start shifted by -2 steps along z and rotated by -9, -18, -9 degrees";
+    AFNI_94 = "AFNI-94", "3dvolreg", true,
+        "-twopass with -coarse 1 on a volume of 120^3 voxels or more halves the coarse step to 0 for the subsampled search, which never ends";
+    AFNI_95 = "AFNI-95", "3dvolreg", true,
+        "a second -base is refused only when the first was a dataset or an index above 0: -base 0 -base 3 registers to brick 3";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

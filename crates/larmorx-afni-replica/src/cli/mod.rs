@@ -10,6 +10,7 @@ mod common;
 mod output;
 pub mod tshift;
 pub mod unifize;
+pub mod volreg;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -20,7 +21,7 @@ use larmorx_core::defects::{EXIT_BAD_MODE, UpstreamDefects};
 use crate::environ::Settings;
 
 /// The AFNI programs on the command line.
-pub const TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize"];
+pub const TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize", "3dvolreg"];
 
 /// Runs AFNI program `tool` with `args` (the arguments after the program name), with the
 /// process's environment and working directory: D13's mode from `LARMORX_UPSTREAM_DEFECTS`,
@@ -31,6 +32,7 @@ pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write
         "3dTshift" => Some(tshift::main(args, out, err)),
         "3dAutomask" => Some(automask::main(args, out, err)),
         "3dUnifize" => Some(unifize::main(args, out, err)),
+        "3dvolreg" => Some(volreg::main(args, out, err)),
         _ => None,
     }
 }
@@ -73,6 +75,7 @@ pub fn run_in(
         "3dTshift" => Some(tshift::main_with(args, mode, settings, out, err)),
         "3dAutomask" => Some(automask::main_with(args, mode, settings, out, err)),
         "3dUnifize" => Some(unifize::main_with(args, mode, settings, out, err)),
+        "3dvolreg" => Some(volreg::main_with(args, mode, settings, out, err)),
         _ => None,
     }
 }

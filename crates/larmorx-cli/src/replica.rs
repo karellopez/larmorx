@@ -126,6 +126,15 @@ pub const REPLICAS: &[Replica] = &[
         },
         original: true,
     },
+    // The clean-room original is to be written from specs/3dvolreg.md.
+    Replica {
+        family: "afni",
+        tool: "3dvolreg",
+        location: Location::Builtin {
+            licence: AFNI_REPLICA_LICENCE,
+        },
+        original: false,
+    },
     // The clean-room original is `larmorx mri hmc` (`lx.mri.hmc`), which takes mcflirt's
     // arguments.
     Replica {

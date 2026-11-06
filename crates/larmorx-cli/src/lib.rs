@@ -69,8 +69,9 @@ const FSL_TOOLS: &[&str] = &[
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
-/// built-in replica (`larmorx_afni_replica::cli::TOOLS`; a test checks the lists).
-const AFNI_TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize"];
+/// built-in replica (`larmorx_afni_replica::cli::TOOLS`; a test checks the lists), then those
+/// with a replica only (`3dvolreg`, whose clean-room original is still to be written).
+const AFNI_TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize", "3dvolreg"];
 
 /// How a command line runs, besides its arguments.
 pub struct Options<'a> {
@@ -476,8 +477,8 @@ mod tests {
             .chain(replica::replica_only("afni"))
             .collect();
         assert_eq!(listed, AFNI_TOOLS);
-        // Every AFNI tool has its clean-room original and its built-in replica.
-        assert_eq!(replica::replica_only("afni").count(), 0);
+        // Every AFNI tool has its built-in replica; 3dvolreg has no clean-room original yet.
+        assert_eq!(replica::replica_only("afni").collect::<Vec<_>>(), ["3dvolreg"]);
         assert_eq!(larmorx_afni_replica::cli::TOOLS, AFNI_TOOLS);
         let replica = Options {
             implementation: Some(Implementation::Replica),
@@ -731,10 +732,10 @@ mod tests {
             "{err}"
         );
 
-        let (code, _, err) = run_capture(&["lx", "afni", "3dvolreg"]);
+        let (code, _, err) = run_capture(&["lx", "afni", "3dAllineate"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(
-            err.starts_with("error: unknown afni tool '3dvolreg'"),
+            err.starts_with("error: unknown afni tool '3dAllineate'"),
             "{err}"
         );
 

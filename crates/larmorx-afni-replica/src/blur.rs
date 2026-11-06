@@ -16,9 +16,12 @@
 //!
 //! The FIR weights (`fir_gaussian_load`) average the Gaussian over 23 points of each cell
 //! (trapezoid, ends weighted 1/2), normalised to sum 1; with `AFNI_BLUR_FIROLD=YES` its value
-//! at each cell's centre. The ends of each row are mirrored (`BMIRROR`: `r[-q] = r[q]`,
-//! `r[n-1+q] = r[n-1-q]`), except along y for volumes 512 or more voxels wide, which mirror one
-//! point and leave the rest of the border zero (AFNI-91 reproduced; by default all mirrored).
+//! at each cell's centre. The ends of each row are mirrored: along x and y (`BMIRROR`) about
+//! the first point but about the half-point after the last (`r[-q] = r[q]`, `r[n-1+q] =
+//! r[n-q]`), along z (`RMIRROR`) about the first and the last point (`r[n-1+q] = r[n-1-q]`);
+//! along y in volumes 512 or more voxels wide one point at each end only (`r[-1] = r[1]`,
+//! `r[n] = r[n-2]`), the rest of the border zero. Both inconsistencies are AFNI's, kept in
+//! both modes until measured (`docs/findings/afni-volreg.md`).
 //! An axis shorter than `m + 1` is not blurred. The sums keep AFNI's order: for `m` up to 7 the
 //! unrolled `w_m·(r[-m]+r[m]) + ... + w_1·(r[-1]+r[1]) + w_0·r[0]`, beyond it
 //! `w_0·r[0] + w_1·(r[-1]+r[1]) + ...`.
@@ -45,8 +48,6 @@ pub struct Blur {
     /// `AFNI_yesenv("AFNI_BLUR_FIROLD")`.
     pub firold: bool,
     pub libc: Libc,
-    /// AFNI-91 reproduced: the y blur of volumes 512 or more voxels wide mirrors one point.
-    pub reproduce_y_mirror: bool,
     mode: UpstreamDefects,
     /// The message `EDIT_blur_volume_3d` prints once, when it is first called.
     pub note: Option<String>,
@@ -59,7 +60,6 @@ impl Blur {
             firfac,
             firold,
             libc: Libc::new(mode),
-            reproduce_y_mirror: mode.reproduce(),
             mode,
             note: None,
             noted: false,
@@ -201,7 +201,7 @@ impl Blur {
             fac = 1.0;
             ff[0] = 1.0;
             for ii in 1..=m {
-                let xx = ii as f64 * f64::from(dx);
+                let xx = f64::from(ii as f32 * dx);
                 ff[ii] = self.libc.exp(-0.5 * xx * xx) as f32;
                 fac += 2.0f32 * ff[ii];
             }
@@ -212,7 +212,8 @@ impl Blur {
             for ii in 0..=m {
                 let mut sum = 0.0f64;
                 for jj in -NG..=NG {
-                    let xx = ii as f64 * f64::from(dx) + f64::from(jj) * dxj;
+                    // ii*dx is a float product.
+                    let xx = f64::from(ii as f32 * dx) + f64::from(jj) * dxj;
                     let ee = self.libc.exp(-0.5 * xx * xx);
                     if jj == -NG || jj == NG {
                         sum += 0.5 * ee;
@@ -244,7 +245,8 @@ impl Blur {
         let nxy = nx * ny;
         let len = n[axis];
         let mut r = vec![0.0f32; len + 2 * m];
-        let one_point = axis == 1 && nx >= 512 && self.reproduce_y_mirror;
+        // fir_blury's large-volume path (nx >= 512) mirrors one point at each end.
+        let one_point = axis == 1 && nx >= 512;
         // (stride, starts of the rows)
         let (stride, starts): (usize, Vec<usize>) = match axis {
             0 => (1, (0..nz).flat_map(|k| (0..ny).map(move |j| j * nx + k * nxy)).collect()),
@@ -260,8 +262,15 @@ impl Blur {
                 r[len + m..].fill(0.0);
                 r[m - 1] = r[m + 1];
                 r[len + m] = r[len + m - 2];
+            } else if axis == 2 {
+                // RMIRROR: mirrored about the first and the last point.
+                for mm in 1..=m {
+                    r[m - mm] = r[m + mm];
+                    r[m + len - 1 + mm] = r[m + len - 1 - mm];
+                }
             } else {
-                // BMIRROR / RMIRROR: mirrored at the ends, all the way.
+                // BMIRROR: mirrored about the first point, but about the half-point after the
+                // last one (the last value repeated).
                 for mm in 1..=m {
                     r[m - mm] = r[m + mm];
                     r[m + len - 1 + mm] = r[m + len - mm];

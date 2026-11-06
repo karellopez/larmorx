@@ -64,4 +64,5 @@ pub mod tpattern;
 pub mod tshift;
 pub mod unifize;
 pub mod vecmat;
+pub mod volreg;
 pub mod x87;

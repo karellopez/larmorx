@@ -307,6 +307,32 @@ pub const UNIFIZE: Program = Program {
     without: &["AFNI_1D_ZERO_TEXT"],
 };
 
+/// 3dvolreg: 3dAutomask's variables (the `-maxdisp` mask is THD_automask's), and those of its
+/// registration: `AFNI_VOLREG_EDGING` (the weight's edges), `AFNI_BLUR_FIRFAC` and
+/// `AFNI_BLUR_FIROLD` (the Gaussian blurs); `AFNI_ROTA_ZPAD` is never read, as 3dvolreg sets
+/// the padding itself (`-zpad`, default 4).
+pub const VOLREG: Program = Program {
+    name: "3dvolreg",
+    extra: &[
+        ("AFNI_QUIET_STARTUP", QUIET),
+        ("AFNI_USE_FGETS", Use::NoEffect(NO_TEXT_FILES)),
+        ("AFNI_VOLREG_EDGING", Use::Applied),
+        ("AFNI_BLUR_FIRFAC", Use::Applied),
+        ("AFNI_BLUR_FIROLD", Use::Applied),
+        (
+            "AFNI_BLUR_INTS_AS_OLD",
+            Use::NoEffect("it applies to blurring integer volumes; 3dvolreg blurs floats only"),
+        ),
+        (
+            "AFNI_ROTA_ZPAD",
+            Use::NoEffect(
+                "3dvolreg sets the rotation's zero padding itself (-zpad), so AFNI never reads it",
+            ),
+        ),
+    ],
+    without: &["AFNI_1D_ZERO_TEXT"],
+};
+
 /// `YESSISH(s)`: the value starts with `Y` or `y`.
 pub fn yessish(value: Option<&str>) -> bool {
     value.is_some_and(|v| matches!(v.as_bytes().first(), Some(b'Y' | b'y')))

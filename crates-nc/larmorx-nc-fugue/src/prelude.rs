@@ -560,7 +560,7 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
             let differs = per_volume(&ph, &m2, &modes, true)
                 .map(|mut f| {
                     f.uph = with_nan_phases(f.uph, &ph, &nan_inside);
-                    outputs_differ(&f, &r, a)
+                    outputs_differ(&f, &r, a, true, true)
                 })
                 .unwrap_or(true);
             if differs {
@@ -576,7 +576,7 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
                 .expect("no NaN phase is labelled: the sorts hold no NaN");
             r.uph = with_nan_phases(r.uph, &ph, &nan_inside);
             let differs = per_volume(&ph, &mask, &modes, false)
-                .map(|f| outputs_differ(&f, &r, a))
+                .map(|f| outputs_differ(&f, &r, a, true, false))
                 .unwrap_or(true);
             if differs {
                 io.notice(
@@ -597,7 +597,20 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
                 saved_masks.volumes.push(mask.clone());
             }
         }
-        if a.removeramps && uw::ramps_skip_voxels(&ph, &mask) {
+        // FSL-261: the notice where the other loops change what this volume writes or prints
+        // (both computed; an image with no mask voxel in its last planes cannot differ)
+        if a.removeramps
+            && uw::ramps_skip_voxels(&ph, &mask)
+            && per_volume(&ph, &mask, &modes, !fsl)
+                .map(|mut other| {
+                    if !fsl {
+                        // FSL-269's correction puts the NaN phases back, as in `done`
+                        other.uph = with_nan_phases(other.uph, &ph, &nan_inside);
+                    }
+                    outputs_differ(&done, &other, a, false, fsl)
+                })
+                .unwrap_or(true)
+        {
             io.notice(
                 &defects::FSL_261,
                 if fsl {
@@ -840,15 +853,24 @@ fn per_volume(
 }
 
 /// Whether two runs of one volume give different outputs (bit for bit): the unwrapped phase,
-/// the raw phase, the labels, and the mask (FSL-269's correction leaves NaN phases out of it).
-fn outputs_differ(x: &Done, y: &Done, a: &Args) -> bool {
+/// the raw phase, the labels, `-v`'s lines, with `grot` the ramp-free phase (FSL-266's grot,
+/// written in `reproduce`), and with `mask_changed` the saved mask (FSL-269's correction leaves
+/// NaN phases out of it).
+fn outputs_differ(x: &Done, y: &Done, a: &Args, mask_changed: bool, grot: bool) -> bool {
     let bits = |p: &[f32], q: &[f32]| {
         p.len() != q.len() || p.iter().zip(q).any(|(u, v)| u.to_bits() != v.to_bits())
     };
     bits(&x.uph.data, &y.uph.data)
         || (a.rawphasevol.is_some() && bits(&x.ph.data, &y.ph.data))
         || (a.labelvol.is_some() && x.label.data != y.label.data)
-        || a.maskvol.is_some()
+        || (a.verbose
+            && (x.before != y.before || x.after != y.after || x.unwrap_log != y.unwrap_log))
+        || (grot
+            && match (&x.ramp_free, &y.ramp_free) {
+                (Some(p), Some(q)) => bits(&p.data, &q.data),
+                _ => false,
+            })
+        || (mask_changed && a.maskvol.is_some())
 }
 
 /// The mask without the voxels `nan` (NaN phases inside it), FSL-269's correction.
@@ -945,4 +967,58 @@ fn save_series<T: Elem>(
         s.data[t * n..(t + 1) * n].copy_from_slice(&v.data);
     }
     save(&s, name, run, io)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(words: &[&str]) -> Args {
+        let p = parser();
+        let argv: Vec<String> = std::iter::once("prelude")
+            .chain(words.iter().copied())
+            .map(str::to_owned)
+            .collect();
+        let Ok(parsed) = p.parse_command_line(&argv, 0, false) else {
+            panic!("invalid options {words:?}")
+        };
+        args_of(&p, &parsed)
+    }
+
+    fn done(log: &str, grot: f32) -> Done {
+        let mut v = Volume::new(2, 2, 1, 1);
+        v.data.fill(0.5);
+        let mut free = v.clone();
+        free.data[0] = grot;
+        Done {
+            ph: v.clone(),
+            uph: v,
+            label: Volume::new(2, 2, 1, 1),
+            ramp_free: Some(free),
+            before: Vec::new(),
+            after: Vec::new(),
+            unwrap_log: vec![log.to_owned()],
+        }
+    }
+
+    /// The D13 notices of FSL-261 and FSL-269 fire where a correction changes anything the run
+    /// writes or prints: `-v`'s lines (random testing, prelude-check 2928: a NaN phase left out
+    /// of a one-voxel mask changes only "Calculating starting matrices (1 by 1)"), grot only
+    /// where it is written (reproduce), the saved mask only where the mask changes (FSL-269).
+    #[test]
+    fn notices_compare_what_the_run_writes_and_prints() {
+        let base = ["-p", "ph", "-a", "mag", "-o", "out"];
+        let quiet = args(&base);
+        let verbose = args(&[&base[..], &["-v"]].concat());
+        let saved = args(&[&base[..], &["--savemask=m"]].concat());
+        let (x, y) = (done("(1 by 1)", 0.5), done("(0 by 0)", 0.5));
+        assert!(!outputs_differ(&x, &y, &quiet, false, true));
+        assert!(outputs_differ(&x, &y, &verbose, false, true));
+        let (x, y) = (done("same", 0.5), done("same", 0.25));
+        assert!(outputs_differ(&x, &y, &quiet, false, true));
+        assert!(!outputs_differ(&x, &y, &quiet, false, false));
+        let (x, y) = (done("same", 0.5), done("same", 0.5));
+        assert!(!outputs_differ(&x, &y, &saved, false, true));
+        assert!(outputs_differ(&x, &y, &saved, true, true));
+    }
 }

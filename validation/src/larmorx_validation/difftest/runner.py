@@ -122,6 +122,8 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "FSL-51": "betsurf's profile searches read past their samples (memory)",
     "FSL-53": "betsurf uses the matrix entries it could not read (memory)",
     "FSL-55": "the 98th percentile's selection over NaNs runs outside its vector (memory)",
+    "FSL-268": "prelude's percentile sort over NaN magnitudes runs outside its values (memory)",
+    "FSL-269": "prelude's sort of slice differences over NaN phases runs outside them (memory)",
 }
 
 #: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)
@@ -130,6 +132,13 @@ _REFUSAL = re.compile(r"\(([A-Z]+-\d+)\)")
 
 #: The D13 notices larmorx's in-process runs printed in ``reproduce`` mode during a case.
 _NOTICES: list[str] = []
+
+
+def note_defects(*ids: str) -> None:
+    """Defects a suite saw larmorx name while reproducing the original in a program of its own
+    (a replica's refusal of a class (a) case, ``larmorx-nc``): judged as the notices of
+    larmorx's in-process runs are (:func:`_watch_notices`)."""
+    _NOTICES.extend(ids)
 
 
 def _watch_notices() -> None:

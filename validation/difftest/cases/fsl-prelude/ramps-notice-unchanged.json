@@ -1,0 +1,273 @@
+{
+ "defect": null,
+ "description": "--removeramps with mask voxels in the last planes where FSL's loops give the same result: FSL-261's notice now fires only where the other loops change what the run writes or prints (both computed; found by the trial check prelude-check 189, 972, 1969)",
+ "expect": "pass",
+ "found": {
+  "detail": "FSL-261: no values changed",
+  "n": 189,
+  "seed": "prelude-check",
+  "shrink_moves": [],
+  "signature": [
+   "notice: FSL-261"
+  ]
+ },
+ "id": "ramps-notice-unchanged",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "nan": false,
+   "output_type": "NIFTI2_GZ",
+   "tool": "prelude",
+   "volumes": 1
+  },
+  "features": {
+   "--labelslices": false,
+   "--removeramps": true,
+   "-a long": false,
+   "-f": false,
+   "-m": false,
+   "-n": false,
+   "-p long": false,
+   "-r long": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "NaN phases": false,
+   "background": "random",
+   "bias0": 0.0025,
+   "bias1": 0.01,
+   "bias2": -0.0025,
+   "bias3": 0.0025,
+   "extreme": false,
+   "field of view": 128.0,
+   "head axis0": 0.85,
+   "head axis1": 0.9,
+   "head axis2": 1.15,
+   "head centre0": -0.04,
+   "head centre1": 0.08,
+   "head fraction": 0.3,
+   "isotropic": false,
+   "kind": "phase and magnitude",
+   "labels": false,
+   "magnitude big-endian": false,
+   "magnitude dtype": "uint8",
+   "magnitude noise": 0.0,
+   "magnitude scale": 10.0,
+   "magnitude suffix": ".nii.gz",
+   "orientation": "axes",
+   "origin0": -55.0,
+   "origin1": 52.5,
+   "origin2": -12.5,
+   "other size": false,
+   "output extension": false,
+   "output name": "uph",
+   "output option": "-u",
+   "phase big-endian": false,
+   "phase field": "flat",
+   "phase noise": 0.0,
+   "phase offset": -1.25,
+   "phase storage": "float32",
+   "phase suffix": ".nii.gz",
+   "qfac": 1,
+   "qform_code": 1,
+   "rawphase": true,
+   "savemask": false,
+   "series": false,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "32x32x32",
+   "slices": "all",
+   "spacing0": 4.0,
+   "spacing1": 3.0,
+   "spacing2": 1.5,
+   "tissues": "epi",
+   "units": "mm",
+   "wrap": "pi"
+  },
+  "groups": [
+   {
+    "args": [
+     "-p",
+     "{in:phase}",
+     "-a",
+     "{in:magnitude}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-u",
+     "uph"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "--removeramps"
+    ],
+    "name": "--removeramps",
+    "optional": true
+   },
+   {
+    "args": [
+     "-r",
+     "raw"
+    ],
+    "name": "rawphase",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "magnitude": {
+    "content": {
+     "axes": [
+      0.85,
+      0.9,
+      1.15
+     ],
+     "bias": [
+      0.00125,
+      0.005,
+      -0.00125,
+      8.333333333333333e-05
+     ],
+     "brain": false,
+     "centre": [
+      -4.0,
+      7.5,
+      0.0
+     ],
+     "noise": 0.0,
+     "seed": 1218067061,
+     "size": 29.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      46.5,
+      -23.25,
+      62.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      3.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     32,
+     32,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 10.0
+    }
+   },
+   "phase": {
+    "content": {
+     "axes": [
+      0.85,
+      0.9,
+      1.15
+     ],
+     "centre": [
+      -4.0,
+      7.5,
+      0.0
+     ],
+     "noise": 0.0,
+     "outside": "random",
+     "poly": [
+      -1.25,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 1769936817,
+     "size": 29.0,
+     "type": "phase",
+     "wrap": "pi"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      46.5,
+      -23.25,
+      62.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      3.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     32,
+     32,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 189,
+  "options": [
+   "--removeramps",
+   "FSLOUTPUTTYPE=NIFTI2_GZ",
+   "phase and magnitude",
+   "phase pi float32",
+   "rawphase"
+  ],
+  "seed": "prelude-check",
+  "tool": "fsl-prelude"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-prelude-replica",
+ "tier": "standard",
+ "tool": "fsl-prelude"
+}

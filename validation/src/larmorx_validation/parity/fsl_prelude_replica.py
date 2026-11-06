@@ -15,7 +15,11 @@ cases:
 - **opt**, **out**, **err**: every option of prelude (complex or phase and magnitude input, the
   mask and its threshold, 3D and 2D labels and unwrapping, the volume range, the saved mask,
   labels and raw phase, the phase ramps, the messages), the output types, the messages and
-  failures, on synthetic phase images with known wraps (``oracles/inputs/fsl-prelude-replica``).
+  failures, on synthetic phase images with known wraps (``oracles/inputs/fsl-prelude-replica``);
+- **difftest**: random cases (``larmorx_validation.difftest.tools.fsl_prelude``), a :class:`Run`
+  of their own (``direct``), inputs named ``@dt:<key>``; where the replica refuses in
+  ``reproduce`` because FSL's sort would read memory it does not own (FSL-268, FSL-269), the
+  defect is named to the random-testing runner (the verdict ``undefined``).
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status, standard
 output and error (the run directory and FSL's program path replaced, the replica's
@@ -29,6 +33,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
 import shlex
 import shutil
 import tempfile
@@ -388,6 +393,25 @@ class Run:
     fix_refuses: str = ""
     #: The replica refuses in both modes, naming this entry (FSL reads memory it does not own).
     refused: str = ""
+    #: A random case (differential random testing): a class (a) refusal of the replica's
+    #: ``reproduce`` run is named to the random-testing runner (:func:`_note_memory_refusal`).
+    random: bool = False
+
+
+#: The replica's refusal where FSL would read memory it does not own (``reproduce`` included).
+_MEMORY_REFUSAL = re.compile(r"\((FSL-\d+): FSL reads memory it does not own here\)")
+
+
+def _note_memory_refusal(replica: Completed) -> None:
+    """A random case the replica refused in ``reproduce`` because FSL's result there depends on
+    memory it does not own (a NaN sort, FSL-268 and FSL-269): the defect is named to the
+    random-testing runner, whose verdict is then ``undefined`` (not comparable), as for the
+    defects larmorx names while reproducing in-process."""
+    ids = _MEMORY_REFUSAL.findall(replica.stderr) if replica.code == 1 else []
+    if ids:
+        from larmorx_validation.difftest import runner
+
+        runner.note_defects(*ids)
 
 
 def _resolve(word: str, d: Path) -> str:
@@ -396,6 +420,16 @@ def _resolve(word: str, d: Path) -> str:
         key, value = "", word
     if not value.startswith("@"):
         return word
+    if value.startswith("@dt:"):
+        # a random case's input (differential random testing), built from its recipe; a
+        # pair's .img beside its .hdr
+        from larmorx_validation.difftest import inputs as dt_inputs
+
+        src = dt_inputs.path(value[1:])
+        for p in (src, src.with_suffix(".img") if src.suffix == ".hdr" else None):
+            if p is not None and p.is_file() and not (d / p.name).exists():
+                shutil.copy(p, d / p.name)
+        return f"{key}{sep}{src.name}" if sep else src.name
     src = inputs() / value[1:]
     for p in src.parent.glob(src.name.split(".")[0] + ".*"):
         if not (d / p.name).exists():
@@ -465,6 +499,8 @@ def _run_case(run: Run, checks: CheckList) -> None:
         _prepare(run, b)
         oracle = _oracle(args, a, settings, run.never)
         replica = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
+        if run.random:
+            _note_memory_refusal(replica)
         compare(checks, PROGRAM, oracle, replica, a, b)
         if run.undefined:
             for i, c in enumerate(checks.checks):
@@ -842,6 +878,8 @@ def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
+    elif kind == "direct":
+        _run_case(payload, checks)
     else:
         _run_case(_all_cases()[payload][2], checks)
 

@@ -19,7 +19,9 @@ An **image spec** (a JSON object) names everything a NIfTI file holds:
 - ``content``: what the values look like (a head-like phantom of nested ellipsoids with a
   polynomial bias field, brain-extracted on request (``"brain"``: zero outside the brain, as
   after BET), polynomial blobs, labels, a ramp, a checkerboard, noise, a constant,
-  zeros, sparse points, a crop of a real image from ``larmorx-testdata``), evaluated in world
+  zeros, sparse points, a crop of a real image from ``larmorx-testdata``; a field map's wrapped
+  phase over a head with a random background, a complex image: the head's magnitude times a
+  unit complex number of a smooth phase), evaluated in world
   coordinates, so a moved copy of the same phantom is a registration problem with a known
   answer;
 - ``values``: the range (scale and offset: tiny, huge, negative), integer steps, special
@@ -61,6 +63,8 @@ DTYPES = {
     "uint32": 768,
     "int64": 1024,
     "uint64": 1280,
+    "complex64": 32,
+    "complex128": 1792,
 }
 _UNITS = {"unknown": 0, "m": 1, "mm": 2, "um": 3}
 _TUNITS = {"unknown": 0, "sec": 8, "msec": 16, "usec": 24}
@@ -403,6 +407,10 @@ def render(content: dict, points: np.ndarray, *, volume: int = 0) -> np.ndarray:
     r2 = (u * u).sum(axis=0)
     if kind == "head":
         return _head(content, u, r2, rng, shape)
+    if kind == "phase":
+        return _phase(content, u, r2, rng, shape, volume)
+    if kind == "complex":
+        return _complex(content, u, r2, rng, shape, volume)
     if kind == "blobs":
         out = np.zeros(shape)
         brng = np.random.default_rng(content["seed"])
@@ -455,6 +463,81 @@ def _head(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape) -> np.ndarra
     if content.get("brain"):
         # brain-extracted (as after BET): zero outside the brain (the CSF's ellipsoid)
         out = np.where(r2 < 1.0, out, 0.0)
+    return out
+
+
+#: pi and 2 pi as float64 constants (no transcendental function is evaluated).
+_PI = np.pi
+_TWO_PI = 2.0 * np.pi
+
+
+def _phase_poly(content: dict, u: np.ndarray, volume: int) -> np.ndarray:
+    """A smooth field of the head's normalised coordinates ``u``: ``content["poly"]``'s ten
+    coefficients (a constant, the linear, square and cross terms) and a ``bump`` (a sinus-like
+    off-resonance: ``amplitude * b**2``, ``b = max(0, 1 - |u - centre|**2 / width**2)``), times
+    ``1 + drift * volume`` in a series."""
+    p = content["poly"]
+    f = (
+        p[0]
+        + p[1] * u[0]
+        + p[2] * u[1]
+        + p[3] * u[2]
+        + p[4] * u[0] * u[0]
+        + p[5] * u[1] * u[1]
+        + p[6] * u[2] * u[2]
+        + p[7] * u[0] * u[1]
+        + p[8] * u[1] * u[2]
+        + p[9] * u[0] * u[2]
+    )
+    if bump := content.get("bump"):
+        bc = bump["centre"]
+        w2 = float(bump["width"]) * float(bump["width"])
+        q = sum((u[k] - bc[k]) * (u[k] - bc[k]) for k in range(3)) / w2
+        b = np.maximum(0.0, 1.0 - q)
+        f = f + float(bump["amplitude"]) * b * b
+    return f * (1.0 + float(content.get("drift", 0.0)) * volume)
+
+
+def _phase(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape, volume: int) -> np.ndarray:
+    """A phase map in radians (a field map's phase or phase difference): :func:`_phase_poly`
+    with Irwin-Hall noise of ``noise`` radians; beyond the head's skull ellipsoid a uniformly
+    random phase (``outside: "random"``, a scanner's background) or the same field; wrapped
+    into [-pi, pi) (``wrap: "pi"``), [0, 2 pi) (``"twopi"``) or not at all (``"none"``)."""
+    f = _phase_poly(content, u, volume)
+    if content.get("noise"):
+        f = f + float(content["noise"]) * 2.0 * _irwin_hall(rng, shape)
+    if content.get("outside", "random") == "random":
+        f = np.where(r2 < 1.12**2, f, rng.random(shape) * _TWO_PI - _PI)
+    wrap = content.get("wrap", "pi")
+    if wrap == "pi":
+        return np.mod(f + _PI, _TWO_PI) - _PI
+    if wrap == "twopi":
+        return np.mod(f, _TWO_PI)
+    return f
+
+
+def _complex(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape, volume: int) -> np.ndarray:
+    """A complex image (a scanner's complex data): the head's magnitude (:func:`_head`, from the
+    content's tissue keys) times ``w**power``, ``w = ((1 - t**2) + 2 i t) / (1 + t**2)`` (a unit
+    complex number of phase ``2 atan(t)``, in plain arithmetic), ``t`` :func:`_phase_poly` with
+    Irwin-Hall noise of ``phase_noise``; beyond the skull a random ``t`` in [-4, 4). The complex
+    products are written on the real and imaginary parts (no fused operation)."""
+    mag = _head(content, u, r2, rng, shape)
+    t = _phase_poly(content, u, volume)
+    if content.get("phase_noise"):
+        t = t + float(content["phase_noise"]) * 2.0 * _irwin_hall(rng, shape)
+    if content.get("outside", "random") == "random":
+        t = np.where(r2 < 1.12**2, t, rng.random(shape) * 8.0 - 4.0)
+    tt = t * t
+    den = 1.0 + tt
+    wr = (1.0 - tt) / den
+    wi = (2.0 * t) / den
+    zr, zi = wr, wi
+    for _ in range(int(content.get("power", 1)) - 1):
+        zr, zi = zr * wr - zi * wi, zr * wi + zi * wr
+    out = np.empty(np.shape(mag), dtype=np.complex128)
+    out.real = mag * zr
+    out.imag = mag * zi
     return out
 
 
@@ -550,7 +633,7 @@ def to_dtype(x: np.ndarray, dtype: str, scaling: dict | None) -> np.ndarray:
     if scaling:
         x = (x - scaling.get("inter", 0.0)) / scaling["slope"]
     dt = np.dtype(dtype)
-    if dt.kind == "f":
+    if dt.kind in "fc":
         with np.errstate(over="ignore", invalid="ignore"):
             return x.astype(dt)
     info = np.iinfo(dt)

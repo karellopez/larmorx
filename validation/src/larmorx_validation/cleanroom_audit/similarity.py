@@ -1417,6 +1417,168 @@ def write_markdown(res: dict, path: Path, head: str) -> None:
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
+# --- the public section ---------------------------------------------------------------------------
+
+#: Public names for the reference files outside the repository (no workspace or home paths).
+PUBLIC_PREFIXES = (
+    (f"{AFNI_TAG}/", "AFNI 26.3.05 "),
+    (f"{GLIBC_TAG}/", "glibc 2.35 "),
+    (f"{CORE_MATH_TAG}/", "CORE-MATH "),
+    ("$FSLDIR/src/", "FSL 6.0.7.23 "),
+)
+
+#: The nature of the largest overlaps, found by reading both sides (the audit's relay 3,
+#: 2026-11-06): (the clean-room file, what the overlap is). A run of a clean-room file listed
+#: here is explained in the public section; any other long run is listed as unexplained.
+EXPLAINED = (
+    (
+        "crates/larmorx-afni/src/geometry.rs",
+        "NIfTI-1's matrix-to-quaternion method, public domain (`specs/3dTshift.md` names ITK's"
+        " copy of `nifti_mat44_to_quatern`), in the standard's R11 to R33 names; the replica"
+        " translates AFNI's copy of the same function",
+    ),
+    (
+        "crates/larmorx-fsl/src/bet/quatern.rs",
+        "NIfTI-1's matrix-to-quaternion method, public domain, as above; FSL's NewNifti and the"
+        " replica carry the same function",
+    ),
+    (
+        "crates/larmorx-core/src/math/tanh_glibc.rs",
+        "a declared port of fdlibm's netlib files (Sun's permissive notice), which glibc 2.35"
+        " ships with small changes; the FSL replica translates glibc's copy",
+    ),
+    (
+        "crates/larmorx-core/src/math/sincos_glibc.rs",
+        "it and the spec writer's model both carry out `specs/glibc-dbl.md`'s operations step by"
+        " step",
+    ),
+)
+#: Runs at least this long (names stream, in tokens) are listed in the public section.
+LONG_RUN = 40
+
+
+def public_name(name: str) -> str:
+    for prefix, label in PUBLIC_PREFIXES:
+        if name.startswith(prefix):
+            return label + name[len(prefix) :]
+    return name
+
+
+def _explained(file: str) -> str | None:
+    return next((why for f, why in EXPLAINED if file == f), None)
+
+
+def public_markdown(res: dict) -> str:
+    """The similarity section of ``docs/validation/clean-room-audit.md``: figures, public file
+    names and the nature of the long runs; no workspace, home or scratch path."""
+    n0, n1 = NS["names"]
+    L = [
+        "### Code similarity (extra evidence, no threshold)",
+        "",
+        "How much of each clean-room original's code also occurs, as a run of tokens, in its"
+        " upstream's source and in its replicas, against how much unrelated code and known"
+        " translations share (`cleanroom-audit similarity`; the method in its module's"
+        " documentation). Rust, C, C++ and the scripts are read into one token stream:"
+        " comments, types, braces and what one language writes and the other does not left out;"
+        " every identifier kept by its name (case and underscores ignored), numbers and strings"
+        f" as one symbol each. Figures: the share of the code's names ({LONG_NAME} characters"
+        f" or more) also in the reference; the share of its tokens in a run of at least {n0}"
+        f" tokens also in the reference; the longest common run, in tokens. Within a family the"
+        " tools' own code is compared with every other tool's: the other tools give the floor"
+        " (code that is not a translation of each other), the replica (a translation of the"
+        " same source) the high end.",
+        "",
+        "| clean-room original | tokens | against its upstream | the other tools' upstream"
+        " (median; max) | its replica against the same upstream | against its replica | the"
+        " other tools' replicas (median; max) |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for fam, m in res["matrices"].items():
+        cu = dict(zip(m["tools"], m["cleanroom_vs_upstream_floors"], strict=True))
+        ru = dict(zip(m["tools"], m["replica_vs_upstream_floors"], strict=True))
+        cr = dict(zip(m["tools"], m["cleanroom_vs_replica_floors"], strict=True))
+        for tool in m["tools"]:
+            e = res["tools"][f"{fam}/{tool}"]
+            L.append(
+                f"| {e['name']} | {e['cleanroom']['tokens']:,} | {_cell_text(cu[tool]['diagonal'])}"
+                f" | {_floor_text(cu[tool])} | {_cell_text(ru[tool]['diagonal'])} |"
+                f" {_cell_text(cr[tool]['diagonal'])} | {_floor_text(cr[tool])} |"
+            )
+    L += [
+        "",
+        f"Each cell: shared names; tokens in a run of {n0} or more; the longest run. A dash: no"
+        " replica of that part (larmorx's own shared code, or a function with no translated"
+        " counterpart).",
+        "",
+        "**Calibration pairs** (the same measure on code of known origin):",
+        "",
+        "| pair | kind | tokens | shared names | in runs of 8+ | in runs of 16+ | longest run |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for c in res["calibration"]:
+        nm = c["names"]
+        L.append(
+            f"| {c['name']} | {c['kind']} | {c['tokens']:,} | {_pct(c['identifiers_shared'])} |"
+            f" {_pct(nm[f'coverage_{n0}'])} | {_pct(nm[f'coverage_{n1}'])} |"
+            f" {nm['longest_run']['tokens']} |"
+        )
+    if res.get("wide"):
+        L += ["", "**Against the whole upstream source trees:**", ""]
+        L += ["| clean-room original | tree | shared names | in runs of 8+ | longest run |"]
+        L += ["|---|---|---|---|---|"]
+        for fam, w in res["wide"].items():
+            tree = f"{fam} ({w['files']:,} files, {w['tokens']:,} tokens)"
+            for k, c in w["tools"].items():
+                nm = c["names"]
+                L.append(
+                    f"| {res['tools'][k]['name']} | {tree} | {_pct(c['identifiers_shared'])} |"
+                    f" {_pct(nm[f'coverage_{n0}'])} | {nm['longest_run']['tokens']} |"
+                )
+    runs = []
+    for e in res["tools"].values():
+        comps = [("upstream", e["cleanroom_vs_upstream"]), ("replicas", e["cleanroom_vs_replica"])]
+        comps += [
+            (f"whole {f} tree", w["tools"].get(f"{e['family']}/{e['tool']}"))
+            for f, w in res.get("wide", {}).items()
+        ]
+        for label, c in comps:
+            lr = c["names"]["longest_run"] if c else {}
+            if lr.get("tokens", 0) >= LONG_RUN and "ours" in lr:
+                runs.append((e["name"], label, lr))
+    L += [
+        "",
+        f"**The runs of {LONG_RUN} tokens or more** (clean-room code against the upstream, the"
+        " replicas and the whole trees) and their nature:",
+        "",
+    ]
+    for name, label, lr in runs:
+        o, t = lr["ours"], lr["theirs"]
+        why = _explained(o["file"]) or "not yet explained (to read)"
+        L.append(
+            f"- {name}, against the {label}: {lr['tokens']} tokens, `{o['file']}` lines"
+            f" {o['lines'][0]}-{o['lines'][1]} and `{public_name(t['file'])}` lines"
+            f" {t['lines'][0]}-{t['lines'][1]}: {why}."
+        )
+    if not runs:
+        L.append("- none")
+    return "\n".join(L) + "\n"
+
+
+def _cell_text(c: dict | None) -> str:
+    if not c:
+        return "-"
+    n0 = NS["names"][0]
+    return f"{_pct(c['identifiers_shared'])}; {_pct(c[f'coverage_{n0}'])}; {c['longest_run']}"
+
+
+def _floor_text(f: dict) -> str:
+    n0 = NS["names"][0]
+    med, top = f.get(f"median_coverage_{n0}"), f.get(f"max_coverage_{n0}")
+    if med is None:
+        return "-"
+    return f"{_pct(med)}; {_pct(top)} (runs up to {f.get('max_longest_run')})"
+
+
 def add_arguments(sub) -> None:
     s = sub.add_parser("similarity", help="code similarity figures (extra evidence, no threshold)")
     s.add_argument("--out", required=True, help="a private directory (never committed)")
@@ -1448,6 +1610,7 @@ def main(args: argparse.Namespace) -> int:
     out.mkdir(parents=True, exist_ok=True)
     (out / "similarity.json").write_text(json.dumps(res, indent=1, sort_keys=True) + "\n")
     write_markdown(res, out / "similarity.md", head)
+    (out / "similarity-public.md").write_text(public_markdown(res), encoding="utf-8")
     for k, e in res["tools"].items():
         print(
             f"{k:24s} upstream {figures(e['cleanroom_vs_upstream'])} | replica"

@@ -318,3 +318,14 @@ def test_run_on_a_synthetic_plan(tmp_path, monkeypatch):
     sm.write_markdown(res, out, "abc1234")
     text = out.read_text(encoding="utf-8")
     assert "## Calibration pairs" in text and str(tmp_path) not in text
+    public = sm.public_markdown(res)
+    assert public.startswith("### Code similarity") and str(tmp_path) not in public
+    assert "| total |" in public and "**Calibration pairs**" in public
+
+
+def test_public_names():
+    assert sm.public_name("tags/AFNI-26.3.05/src/3dTshift.c") == "AFNI 26.3.05 src/3dTshift.c"
+    assert sm.public_name("$FSLDIR/src/fsl-bet2/bet2.cpp") == "FSL 6.0.7.23 fsl-bet2/bet2.cpp"
+    assert sm.public_name("crates-nc/fsl-source/fsl-bet2/bet2.cpp").startswith("crates-nc/")
+    assert sm._explained("crates/larmorx-afni/src/geometry.rs").startswith("NIfTI-1")
+    assert sm._explained("crates/larmorx-afni/src/tshift/mod.rs") is None

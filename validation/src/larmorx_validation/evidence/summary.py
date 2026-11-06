@@ -208,6 +208,12 @@ PAGES = [
         ],
     ),
     (
+        "/tools/fsl-prelude/",
+        "prelude",
+        "fsl",
+        [("larmorx-nc replica", "fsl-prelude-replica", "experimental", None, None)],
+    ),
+    (
         "/tools/resample-series/",
         "One-shot BOLD resampler",
         "larmorx",

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """``python -m larmorx_validation cleanroom-audit scan``: every transcript read, every agent's and
 the orchestrator's access log written (private: it holds absolute paths and the account name).
+The other commands: ``verdicts``, ``similarity``, ``summary`` and ``gate`` (their modules).
 
     cleanroom-audit scan --out <private dir> [--root DIR ...] [--jobs 12]
 
@@ -81,6 +82,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     from larmorx_validation.cleanroom_audit import similarity
 
     similarity.add_arguments(sub)
+    from larmorx_validation.cleanroom_audit import summary
+
+    summary.add_arguments(sub)
 
 
 def main(args: argparse.Namespace) -> int:
@@ -94,6 +98,14 @@ def main(args: argparse.Namespace) -> int:
         from larmorx_validation.cleanroom_audit import similarity
 
         return similarity.main(args)
+    if args.audit_command in ("summary", "gate"):
+        from larmorx_validation.cleanroom_audit import summary
+
+        return (
+            summary.main_summary(args)
+            if args.audit_command == "summary"
+            else summary.main_gate(args)
+        )
     return 2
 
 

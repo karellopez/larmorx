@@ -13,7 +13,9 @@ source code"; code similarity is extra evidence only).
 - :mod:`.verdicts`: who touched each clean-room original, in which role, after seeing what;
 - :mod:`.similarity`: code similarity against the upstream source and the replicas, with its
   calibration (figures only, no threshold);
-- :mod:`.cli`: ``python -m larmorx_validation cleanroom-audit scan|verdicts|similarity``.
+- :mod:`.summary`: the public summary (``docs/validation/clean-room-audit.md``, generated from its
+  public facts, ``docs/validation/clean-room-audit.json``) and the merge step's gate;
+- :mod:`.cli`: ``python -m larmorx_validation cleanroom-audit scan|verdicts|similarity|summary|gate``.
 
 The outputs hold absolute paths and the account name: they stay in ``<workspace>/archive/`` (or a
 scratch directory), never in the repository.

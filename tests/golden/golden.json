@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "b52e43eaa02cc9a8548be07889402285072980d4", "date": "2026-11-05", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "cfbb40c95951016f3422a83b97bda63744ddcdac", "date": "2026-11-06", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -1498,6 +1498,10 @@
   },
   "py.afni.fmriprep_unifize_options": {
    "options": {"dtype": "<f8", "sample": "9a9999999999c93fcdcccccccc4c324000000000004050400000000000805640000000000000f03f", "sha256": "d4e931789fd4bec001388a399c4b1e03c19ae83421166cae07901312170b26fa", "shape": [5], "sum": "174.5"}
+  },
+  "py.afni.fmriprep_volreg_options": {
+   "method": {"bytes": 7, "sha256": "6e50be7fee60b3fbdc6c5f01ff27495244336cef4057e15e53ad0c23941f7ebb"},
+   "options": {"dtype": "<f8", "sample": "000000000000f03f0000000000001040", "sha256": "61333f2fb3305d797c8979e7930a25f4d5c37377bcf5ef016254e3472fbc4b6c", "shape": [2], "sum": "5.0"}
   },
   "py.afni.tshift": {
    "cubic": {"dtype": "<f4", "sample": "4a954b43e54d8d430000b34356107f43a0c4aa438e6f684385439b430080c643", "sha256": "5213b982e6ffe36d25c17abb570130b8a536b7b92e1b4c34a3636df7cbcda6e1", "shape": [8, 6, 5, 10], "sum": "717345.8805084229"},

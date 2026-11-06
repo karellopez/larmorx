@@ -5,8 +5,8 @@
 - **Validated:** `larmorx fsl prelude` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/prelude.md, Apache-2.0), as a program (`python -m larmorx`, or `LARMORX_PRELUDE_BIN`)
 - **Reference:** prelude from FSL 6.0.7.23 (fsl-fugue 2603.0, fsl-newimage 2601.0), the conda installation in `~/fsl-6.0.7.23`; the replica (`larmorx-nc fsl prelude`) by default as a black box
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-06 on Linux x86_64, with `python -m larmorx_validation parity fsl-prelude --tier standard`
-- **Original programs:** 166 runs: 151 from the oracle cache, 15 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity fsl-prelude --tier standard`
+- **Original programs:** 166 runs: 152 from the oracle cache, 14 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 - **The replica suite's cases and random testing's permanent cases (89), the original standing in for the replica's program:** 69 pass, 20 where both refuse, 0 expected, 0 failures (FSL's runs from the oracle cache under that suite's keys).
 - **The original's own 77 cases:** 69 pass, 8 where both refuse, 0 expected, 0 failures, 0 skipped.
@@ -79,7 +79,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (378a1b8e225d) |
+| larmorx | 0.0.1 (6321137536c7) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

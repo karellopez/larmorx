@@ -2,7 +2,7 @@
 # Golden checksums of the AFNI replicas (tests/afni_replica_golden.rs): SHA-256 of the
 # NIfTI header and data they write on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 354bb4c8ea3ac1a9e85e41c96f60c27da73cdf27 on 2026-11-06 (Linux x86_64)
+# Recorded from 5aa8fafc155ad9e9a3805f948ed470142ab01bbe on 2026-11-06 (Linux x86_64)
 # case	output	sha256	type	sample
 3dAutomask.2d	data	8aff51b83ef2becbb88f5b2dc0a61250c4b0b649768abc311cdf1dcbea15cb82	uint8	0000000101000100
 3dAutomask.2d	header	79a6a2db8b5d92f6d6b91bc913305ef315702829030f0e96df491429d9aa63f7	-	-

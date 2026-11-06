@@ -117,7 +117,20 @@ pub struct VolregParams {
     pub floatize: bool,
     pub firfac: f64,
     pub firold: bool,
+    /// `-rotparent`: the final transformation applied on top of each sub-brick's own, instead
+    /// of the registration's own resampling.
+    pub matvec: Option<Matvec>,
     pub mode: UpstreamDefects,
+}
+
+/// `-rotparent`'s transformation (`rmat`, `tvec` of 3dvolreg's main, in the dataset's axis
+/// order) and `-gridparent`'s zero padding along the third axis (`npad_neg` slices before the
+/// first, `npad_pos` after the last).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Matvec {
+    pub rmat: DMat33,
+    pub tvec: DVec3,
+    pub npad: [usize; 2],
 }
 
 /// The results, per sub-brick and overall.
@@ -139,6 +152,8 @@ pub struct VolregResult {
     /// The `VOLREG_MATVEC_*` matrices (`a11 a12 a13 v1 ... v3`, base to input in DICOM order
     /// inverted: input to base) of each sub-brick, as floats.
     pub matvec: Vec<[f32; 12]>,
+    /// The rotation of each `VOLREG_MATVEC` in double (DICOM order), as `-savedisp` uses it.
+    pub rmat: Vec<DMat33>,
     /// The `-1Dmatrix_save` rows: the inverse of each `VOLREG_MATVEC`, about the centres.
     pub matrix_save: Vec<[f64; 12]>,
 }
@@ -287,6 +302,86 @@ pub fn rotcom_rotation(o: [u8; 3], r: f32, p: f32, y: f32, libc: vecmat::Libc) -
         -(PI / 180.0) * f64::from(d3),
         libc,
     )
+}
+
+/// `THD_rotcom_to_matvec(dset, "-rotate <r>I <p>R <y>A -ashift <s>S <l>L <q>P")`: the rotation
+/// of [`rotcom_rotation`] and the shift, each value printed with `%.4f` and read back; a shift
+/// along an axis's positive direction is negated (`THD_axcode`).
+pub fn rotcom_matvec(
+    o: [u8; 3],
+    angles: [f32; 3],
+    shifts: [f32; 3],
+    libc: vecmat::Libc,
+) -> DVecMat {
+    let mm = rotcom_rotation(o, angles[0], angles[1], angles[2], libc);
+    let mut q = [0.0f32; 3];
+    for (k, (&v, ch)) in shifts.iter().zip(['S', 'L', 'P']).enumerate() {
+        let v = rotcom_value(v);
+        let code = axcode(o, ch);
+        // The `default:` of each switch: the axis in the shift's own position, negative.
+        let code = if (1..=3).contains(&code.abs()) {
+            code
+        } else {
+            -(k as i32 + 1)
+        };
+        let axis = code.unsigned_abs() as usize - 1;
+        q[axis] = if code > 0 { -v } else { v };
+    }
+    DVecMat {
+        mm,
+        vv: q.map(f64::from),
+    }
+}
+
+/// `VL_get_displacments(dset, rmat, tvec)`: each voxel's displacement (mm, the dataset's axis
+/// order) by the transformation `rmat`, `tvec` (DICOM order) about the centre of `out` (the
+/// output's grid, `DSET_XCEN`), at the coordinates of the input's grid (`input`, whose axes
+/// give each voxel's position).
+#[allow(clippy::needless_range_loop)] // AFNI's voxel loop, as written
+pub fn displacements(
+    input: &crate::axes::Axes,
+    out: &crate::axes::Axes,
+    out_n: [usize; 3],
+    rmat: &DMat33,
+    tvec: &DVec3,
+) -> Result<[Vec<f32>; 3], VolregError> {
+    let o = out.orient.ok_or_else(|| {
+        VolregError::Fatal("the dataset's voxel-to-world matrix has no orientation".to_owned())
+    })?;
+    let [nx, ny, nz] = out_n;
+    let nxy = nx * ny;
+    let nxyz = nxy * nz;
+    let centre = |a: usize| {
+        (f64::from(out.org[a]) + 0.5 * (out_n[a] as f64 - 1.0) * f64::from(out.del[a])) as f32
+    };
+    let vorg: DVec3 = [
+        f64::from(centre(0)),
+        f64::from(centre(1)),
+        f64::from(centre(2)),
+    ];
+    let pp = mat_to_dicomm(o);
+    let ppt = vecmat::transpose(&pp);
+    let r = vecmat::mul(&ppt, rmat);
+    let r = vecmat::mul(&r, &pp);
+    let t = vecmat::matvec(&ppt, tvec);
+    let mut disp = [vec![0.0f32; nxyz], vec![0.0f32; nxyz], vec![0.0f32; nxyz]];
+    for mm in 0..nxyz {
+        let (ii, kk, jj) = (mm % nx, mm / nxy, (mm % nxy) / nx);
+        let fv = [
+            input.org[0] + ii as f32 * input.del[0],
+            input.org[1] + jj as f32 * input.del[1],
+            input.org[2] + kk as f32 * input.del[2],
+        ];
+        let dv: DVec3 = fv.map(f64::from);
+        let mut qv = vecmat::sub(&dv, &vorg);
+        qv = vecmat::matvec_add(&r, &qv, &t);
+        qv = vecmat::add(&qv, &vorg);
+        qv = vecmat::sub(&dv, &qv);
+        for a in 0..3 {
+            disp[a][mm] = qv[a] as f32;
+        }
+    }
+    Ok(disp)
 }
 
 /// `mri_nonzero_count`.
@@ -823,6 +918,9 @@ pub fn volreg(
                 d,
                 data: w.clone(),
             });
+            if nz < 2 {
+                return Err(not_3d(log, "first pass alignment algorithm"));
+            }
             al.setup(&tp_vol, w.as_ref(), &mut rot, &mut blur, log)
         } else {
             if verbose {
@@ -960,6 +1058,9 @@ pub fn volreg(
             }
             al.force_edging = true;
             let w = Vol { n, d, data: qar };
+            if nz < 2 {
+                return Err(not_3d(log, "first pass alignment algorithm"));
+            }
             let b = al.setup(&tp_vol, Some(&w), &mut rot, &mut blur, log);
             al.force_edging = false;
             b
@@ -1059,7 +1160,8 @@ pub fn volreg(
         raw("++ Initializing alignment base\n".to_owned(), log);
     }
     al.params(p.maxite, p.dxy, p.dph, p.del, axes, -1);
-    al.method(p.resam, p.verbose > 1, false, p.clipit);
+    // 14 Feb 2001: with a final transformation (-rotparent) the registration makes no output.
+    al.method(p.resam, p.verbose > 1, p.matvec.is_some(), p.clipit);
     let final_mode = p.final_mode.unwrap_or(p.resam);
     al.final_regmode = Some(final_mode);
     let mut weight = p.weight.clone();
@@ -1068,6 +1170,9 @@ pub fn volreg(
         al.wproc = true;
     }
     let wvol = weight.map(|w| Vol { n, d, data: w });
+    if nz < 2 {
+        return Err(not_3d(log, "base image for alignment"));
+    }
     let basis: Basis = al.setup(&base_vol, wvol.as_ref(), &mut rot, &mut blur, log);
     if verbose {
         raw(
@@ -1159,7 +1264,46 @@ pub fn volreg(
         res.dx.push(ddx);
         res.dy.push(ddy);
         res.dz.push(ddz);
-        // rmsnew, rmsold: float sums.
+        // -rotparent: the final transformation on top of this one, on the (zero-padded) input.
+        let tim = match &p.matvec {
+            None => tim,
+            Some(mv) => {
+                let vm1 = rotcom_matvec(o, [roll, pitch, yaw], [ddx, ddy, ddz], rot.libc);
+                let vm2 = DVecMat {
+                    mm: mv.rmat,
+                    vv: mv.tvec,
+                };
+                let vmtot = vecmat::mul_vecmat(&vm2, &vm1);
+                let (fimp, np) = if mv.npad != [0, 0] {
+                    (
+                        crate::rot3d::volpad(&fim, n, [0, 0, mv.npad[0]], [0, 0, mv.npad[1]]),
+                        [nx, ny, nz + mv.npad[0] + mv.npad[1]],
+                    )
+                } else {
+                    (fim.clone(), n)
+                };
+                rot.method = final_mode;
+                let mut t = rot
+                    .rota3d_matvec(&fimp, np, d, &vmtot.mm, &vmtot.vv)
+                    .map_err(|e| VolregError::Fatal(e.to_string()))?;
+                for m in rot.messages.drain(..) {
+                    log.push(Message::Raw(m));
+                }
+                if p.clipit && align3d::clips(final_mode) {
+                    let ftop = mri_max(&fimp) as f32;
+                    let fbot = align3d::mri_min(&fimp) as f32;
+                    for x in &mut t {
+                        if *x < fbot {
+                            *x = fbot;
+                        } else if *x > ftop {
+                            *x = ftop;
+                        }
+                    }
+                }
+                t
+            }
+        };
+        // rmsnew, rmsold: float sums (0 with a final transformation: AFNI cannot compute them).
         let rms = |a: &[f32]| {
             let mut sum = 0.0f32;
             for (&b, &t) in imbase.iter().zip(a) {
@@ -1168,8 +1312,13 @@ pub fn volreg(
             }
             (sum / a.len() as f32).sqrt()
         };
-        res.rmsnew.push(rms(&tim));
-        res.rmsold.push(rms(&fim));
+        if p.matvec.is_some() {
+            res.rmsnew.push(0.0);
+            res.rmsold.push(0.0);
+        } else {
+            res.rmsnew.push(rms(&tim));
+            res.rmsold.push(rms(&fim));
+        }
         if !null_output {
             bricks.push(store(&tim, kind, mode, ctx.notices));
         }
@@ -1216,6 +1365,7 @@ pub fn volreg(
         matar[7] = res.dz[kim];
         matar[11] = res.dx[kim];
         res.matvec.push(matar);
+        res.rmat.push(rmat);
         {
             let dv = vecmat::matvec_f(&rmat, &cen_inp);
             let xd = matar[3] + (cen_bas[0] - dv[0]);
@@ -1290,7 +1440,12 @@ pub fn volreg(
 
     if !null_output {
         let mut out = ds.clone();
-        out.data = concat(bricks, nxyz);
+        // -gridparent's zero padding: the output has the padded number of slices.
+        if let Some(mv) = &p.matvec {
+            out.nxyz[2] = nz + mv.npad[0] + mv.npad[1];
+        }
+        let out_nxyz = out.nxyz.iter().product();
+        out.data = concat(bricks, out_nxyz);
         out.factors = vec![0.0; imcount];
         res.output = Some(out);
     }
@@ -1332,6 +1487,15 @@ fn concat(bricks: Vec<BrickData>, nxyz: usize) -> BrickData {
 
 /// AFNI-89: the least squares could not be set up (AFNI printed why) and AFNI dereferences its
 /// result for the first brick it registers.
+/// `mri_3dalign_setup` on a volume of one slice (not `MRI_IS_3D`): its message, then
+/// 3dvolreg's "Can't initialize ..." and exit status 1.
+fn not_3d(log: &mut Vec<Message>, what: &str) -> VolregError {
+    log.push(Message::Raw(
+        "\n*** mri_3dalign_setup: cannot use nD images!\x07\n".to_owned(),
+    ));
+    VolregError::Plain(format!("** Can't initialize {what}\n"))
+}
+
 fn crash_after_lsqfit(notices: &mut Notices) -> VolregError {
     notices.add(
         &defects::AFNI_89,

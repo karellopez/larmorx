@@ -708,6 +708,26 @@ fn realpath(path: &Path) -> std::io::Result<String> {
 /// then its real path ([`realpath`]) unless `AFNI_NOREALPATH` is YES or the file is a symbolic
 /// link. "reading X instead of non-existing Y" is printed only when the name is not replaced
 /// by its real path.
+/// The attributes of a NIfTI file's AFNI extension (`THD_find_*_atr` on a dataset AFNI
+/// opened), or `None` when it has none or cannot be read. 3dvolreg's `-rotparent` reads its
+/// `VOLREG_*` attributes.
+pub fn afni_attributes(path: &str) -> Option<afni_ext::AfniAttributes> {
+    let mut file = PathBuf::from(path);
+    if !file.is_file() && !path.contains(".gz") {
+        let candidate = PathBuf::from(format!("{path}.gz"));
+        if candidate.is_file() {
+            file = candidate;
+        }
+    }
+    let header = nifti::read_header(&file).ok()?;
+    let extensions: Vec<(i32, &[u8])> = header
+        .extensions
+        .iter()
+        .map(|e| (e.code, e.content.as_slice()))
+        .collect();
+    afni_ext::parse(&extensions)
+}
+
 fn nifti_file(
     path: &str,
     settings: &Settings,

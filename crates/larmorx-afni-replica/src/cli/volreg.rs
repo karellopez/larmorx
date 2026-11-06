@@ -25,20 +25,28 @@
 //! Differences from AFNI, shared with every larmorx AFNI tool: input and output are NIfTI
 //! only, and `-prefix` must end in `.nii` or `.nii.gz` (AFNI's default prefix `volreg` writes
 //! its own format); no AFNI header extension is written (so no `VOLREG_*` attributes or
-//! history); no version banner; the CPU times of `-verbose` are not measured (printed as 0).
-//! Not yet supported (relay 1): `-tshift`, `-savedisp`/`-SAVEDISP`, `-rotparent`,
-//! `-gridparent`, `-twodup` with an external base, sub-brick selectors, `-@`.
+//! history), so a `-rotparent` dataset must come from AFNI's own 3dvolreg; no version banner;
+//! the CPU times of `-verbose` are not measured (printed as 0); `-savedisp`'s names must end
+//! in `.nii` or `.nii.gz` too; sub-brick selectors (`dset[...]`) are refused, as by every
+//! larmorx AFNI tool (`-weight`'s own `wset[n]` is 3dvolreg's, not a selector, and works).
+//! `-@` (the arguments from standard input) works as AFNI's.
+//!
+//! The datasets of `-input`, `-base`, `-weight`, `-rotparent` and `-gridparent` are opened
+//! during the option scan, as AFNI opens them, so their messages come where AFNI prints them.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
+use crate::axes::Axes;
 use crate::cnum::{fmt_g, strtod};
-use crate::dataset::{Dataset, ReadError};
+use crate::dataset::{BrickData, Dataset, ReadError};
 use crate::environ::{self, Prefiltered, Settings, VOLREG};
 use crate::message::Message;
 use crate::shift::Method;
+use crate::tshift::{Rlt, TshiftParams};
+use crate::vecmat::{self, DVec3, FVec3};
 use crate::volreg::{self, Base, Edging, VolregError, VolregParams, VolregResult, mode_name};
 
 use super::common::{
@@ -137,7 +145,7 @@ pub fn main_with(
         let _ = out.write_all(USAGE.as_bytes());
         return 0;
     }
-    let pre = environ::prefilter_for(&VOLREG, args, env, mode);
+    let mut pre = environ::prefilter_for(&VOLREG, args, env, mode);
     let mut io = Io::new(out, err, &pre.settings, mode);
     echo_command_line("3dvolreg", &pre, &mut io);
     for w in &pre.warnings {
@@ -145,6 +153,12 @@ pub fn main_with(
     }
     if !pre.settings.yes("AFNI_QUIET_STARTUP") {
         io.info("Authored by: RW Cox");
+    }
+    // addto_args: a last argument `-@` is replaced by the words of the standard input.
+    if pre.args.last().map(String::as_str) == Some("-@") {
+        let mut text = Vec::new();
+        let _ = std::io::stdin().lock().read_to_end(&mut text);
+        addto_args(&mut pre.args, &text);
     }
     match run(&pre, mode, &mut io) {
         Ok(()) => 0,
@@ -157,6 +171,22 @@ pub fn main_with(
             1
         }
     }
+}
+
+/// `addto_args`: `-@`, the last argument, replaced by the words of `text` (split at blanks,
+/// tabs, newlines, carriage returns, form feeds and vertical tabs). Nothing read: the `-@`
+/// stays, and the option scan reports it.
+fn addto_args(args: &mut Vec<String>, text: &[u8]) {
+    let words: Vec<String> = text
+        .split(|&c| matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0c | 0x0b))
+        .filter(|w| !w.is_empty())
+        .map(|w| String::from_utf8_lossy(w).into_owned())
+        .collect();
+    if text.is_empty() || words.is_empty() {
+        return;
+    }
+    args.pop();
+    args.extend(words);
 }
 
 /// The command line after the option scan (3dvolreg's `VL_*` globals).
@@ -188,17 +218,54 @@ struct Options {
     coarse_rot: bool,
     wtinp: bool,
     edging: Option<Edging>,
-    weight: Option<(String, usize)>,
+    /// `-weight`: the dataset's name, and its sub-brick as floats with the grid's size.
+    weight: Option<(String, Vec<f32>, [usize; 3])>,
     twodup: bool,
     floatize: bool,
     dataset: String,
+    /// `-input`'s dataset, opened during the scan as AFNI opens it.
+    input_ds: Option<Dataset>,
+    /// `-base dset`: what 3dvolreg keeps of it after the scan.
+    bset: Option<BaseSet>,
+    /// `-tshift ii`: the number of points to ignore.
+    tshift: Option<i32>,
+    /// `-savedisp` / `-SAVEDISP`: the names' first and last parts, and whether the 19
+    /// normalised datasets are wanted.
+    savedisp: Option<(String, String, bool)>,
+    rotpar: Option<RotPar>,
+    gridpar: Option<GridPar>,
+}
+
+/// A `-base` dataset as 3dvolreg keeps it after the scan (AFNI unloads the dataset): its
+/// sub-brick 0 as floats, its grid and its centre.
+struct BaseSet {
+    name: String,
+    vol: Vec<f32>,
+    nxyz: [usize; 3],
+    axes: Axes,
+    center: FVec3,
+}
+
+/// A `-rotparent` dataset's `VOLREG_*` attributes.
+struct RotPar {
+    name: String,
+    matvec: Vec<f32>,
+    center_old: Option<Vec<f32>>,
+    center_base: Option<Vec<f32>>,
+}
+
+/// A `-gridparent` dataset's grid.
+struct GridPar {
+    nxyz: [usize; 3],
+    axes: Axes,
+    center: FVec3,
 }
 
 /// `-base`'s value as given: none, an index, or a dataset.
 enum BaseArg {
     None,
     Index(usize),
-    Dataset(String),
+    Dataset,
 }
 
 /// `strtol(s, &end, 10)` stored in an `int`: leading blanks, a sign and digits; returns the
@@ -309,6 +376,7 @@ fn parse(
     args: &[String],
     mode: UpstreamDefects,
     settings: &Settings,
+    n_threads: usize,
     notices: &mut Notices,
     io: &mut Io<'_>,
 ) -> Result<Options, Stop> {
@@ -344,20 +412,29 @@ fn parse(
         twodup: false,
         floatize: false,
         dataset: String::new(),
+        input_ds: None,
+        bset: None,
+        tshift: None,
+        savedisp: None,
+        rotpar: None,
+        gridpar: None,
     };
     let mut i = 0;
     while i < args.len() && args[i].starts_with('-') {
         let arg = args[i].as_str();
-        let unsupported = |what: &str| -> Result<Options, Stop> {
-            Err(Stop::Fatal(format!(
-                "{what} is not supported by larmorx yet"
-            )))
-        };
         if arg == "-input" || arg == "-source" {
             if o.input.is_some() {
                 return Err(format!("Can't have 2 '{arg}' options!").into());
             }
-            o.input = Some(value(args, &mut i, arg, notices)?);
+            i += 1;
+            // THD_open_dataset(NULL) fails: AFNI names the dataset "(null)".
+            let Some(name) = args.get(i).cloned() else {
+                return Err(Stop::Fatal("Can't open input dataset '(null)'".to_owned()));
+            };
+            let ds = open(&name, n_threads, settings, notices, io)
+                .map_err(|e| input_error(&name, &e, mode, true))?;
+            o.input = Some(name);
+            o.input_ds = Some(ds);
             i += 1;
             continue;
         }
@@ -386,7 +463,28 @@ fn parse(
             continue;
         }
         if arg == "-savedisp" || arg == "-SAVEDISP" {
-            return unsupported(arg);
+            // AFNI checks `++Iarg > Argc` (off by one) and then copies a NULL: AFNI-88.
+            let v = value(args, &mut i, arg, notices)?;
+            let bad = || -> Stop { format!("{arg} '{v}' is invalid output dataset name").into() };
+            if !filename_ok(&v, settings) {
+                return Err(bad());
+            }
+            let (pra, prb) = if let Some(stem) = v.strip_suffix(".nii") {
+                if v.len() < 5 {
+                    return Err(bad());
+                }
+                (stem.to_owned(), ".nii")
+            } else if let Some(stem) = v.strip_suffix(".nii.gz") {
+                if v.len() < 8 {
+                    return Err(bad());
+                }
+                (stem.to_owned(), ".nii.gz")
+            } else {
+                (v.clone(), "")
+            };
+            o.savedisp = Some((pra, prb.to_owned(), arg == "-SAVEDISP"));
+            i += 1;
+            continue;
         }
         if arg == "-1Dmatrix_save" {
             if o.matrix_save.is_some() {
@@ -554,23 +652,33 @@ fn parse(
             continue;
         }
         if starts(arg, "-prefix", 4) {
-            o.prefix = value(args, &mut i, arg, notices)?;
+            o.prefix = long_name(value(args, &mut i, arg, notices)?, arg, mode, notices)?;
             i += 1;
             continue;
         }
         if starts(arg, "-dfile", 4) {
-            o.dfile = Some(value(args, &mut i, arg, notices)?);
+            o.dfile = Some(long_name(
+                value(args, &mut i, arg, notices)?,
+                arg,
+                mode,
+                notices,
+            )?);
             i += 1;
             continue;
         }
         if starts(arg, "-1Dfile", 4) {
-            o.oned_file = Some(value(args, &mut i, arg, notices)?);
+            o.oned_file = Some(long_name(
+                value(args, &mut i, arg, notices)?,
+                arg,
+                mode,
+                notices,
+            )?);
             i += 1;
             continue;
         }
         if starts(arg, "-base", 4) {
             let twice = match o.base {
-                BaseArg::Dataset(_) => true,
+                BaseArg::Dataset => true,
                 BaseArg::Index(k) => k > 0 || mode.fix(),
                 BaseArg::None => false,
             };
@@ -595,11 +703,35 @@ fn parse(
             if bb < 0 {
                 return Err("Illegal negative number after -base".to_owned().into());
             }
-            o.base = if used == v.len() {
-                BaseArg::Index(bb as usize)
+            if used == v.len() {
+                o.base = BaseArg::Index(bb as usize);
+                o.bset = None;
             } else {
-                BaseArg::Dataset(v)
-            };
+                // The base dataset is opened, read and unloaded during the scan.
+                let ds = open(&v, n_threads, settings, notices, io).map_err(|e| {
+                    Stop::Fatal(match (mode.fix(), &e) {
+                        (false, ReadError::Nifti(_) | ReadError::Afni(_)) => {
+                            format!("Couldn't open -base dataset {v}")
+                        }
+                        _ => format!("Couldn't open -base dataset {v}: {e}"),
+                    })
+                })?;
+                if o.verbose > 0 {
+                    io.raw(format!("++ Reading in base dataset {v}\n"));
+                }
+                if ds.nvals > 1 {
+                    io.warn(format!("-base dataset {v} has more than 1 sub-brick"));
+                }
+                let nvox = ds.nxyz.iter().product();
+                o.bset = Some(BaseSet {
+                    name: v.clone(),
+                    vol: crate::automask::scale_to_float(&ds.data, nvox, 0, ds.factors[0]),
+                    nxyz: ds.nxyz,
+                    center: volreg::dataset_center(&ds).map_err(stop)?,
+                    axes: ds.geometry.axes.clone(),
+                });
+                o.base = BaseArg::Dataset;
+            }
             i += 1;
             continue;
         }
@@ -666,6 +798,13 @@ fn parse(
                 ));
             };
             let name = v[..pos].to_owned();
+            // `char dname[256]`: a longer name overflows it (AFNI-90).
+            if pos > 255 {
+                long_name_notice(&name, "-weight dataset", mode, notices);
+                if mode.reproduce() {
+                    return Err(long_name_stop("-weight dataset", pos));
+                }
+            }
             // sscanf(cpt+1, "%d", &bb) with bb = -1 first.
             let bb = crate::cnum::scan_int(&v[pos + 1..]).map_or(-1, |(b, _)| b);
             if bb < 0 {
@@ -673,7 +812,26 @@ fn parse(
                     "** Illegal sub-brick selector after -weight\n".to_owned(),
                 ));
             }
-            o.weight = Some((name, bb as usize));
+            let bb = bb as usize;
+            let ds = open(&name, n_threads, settings, notices, io).map_err(|e| {
+                Stop::Raw(match (mode.fix(), &e) {
+                    (false, ReadError::Nifti(_) | ReadError::Afni(_)) => {
+                        format!("** Can't open weight dataset {name}\n")
+                    }
+                    _ => format!("** Can't open weight dataset {name}: {e}\n"),
+                })
+            })?;
+            if bb >= ds.nvals {
+                return Err(Stop::Raw(format!(
+                    "** Illegal sub-brick selector for dataset {name}\n"
+                )));
+            }
+            if o.verbose > 0 {
+                io.raw(format!("++ Reading in weight dataset {name}\n"));
+            }
+            let nvox = ds.nxyz.iter().product();
+            let w = crate::automask::scale_to_float(&ds.data, nvox, bb, ds.factors[bb]);
+            o.weight = Some((name, w, ds.nxyz));
             i += 1;
             continue;
         }
@@ -683,10 +841,80 @@ fn parse(
             continue;
         }
         if arg == "-tshift" {
-            return unsupported(arg);
+            // (int)strtod(...): out-of-range values clamp (C leaves them undefined).
+            let ig = strtod(&value(args, &mut i, arg, notices)?).0 as i32;
+            if ig < 0 {
+                return Err(Stop::Raw("** -tshift parameter is negative!\n".to_owned()));
+            }
+            o.tshift = Some(ig);
+            i += 1;
+            continue;
         }
-        if starts(arg, "-rotpar", 7) || starts(arg, "-gridpar", 8) {
-            return unsupported(arg);
+        if starts(arg, "-rotpar", 7) {
+            if o.rotpar.is_some() {
+                return Err(Stop::Raw(
+                    "** Can't use -2 -rotparent options!\n".to_owned(),
+                ));
+            }
+            i += 1;
+            // THD_open_one_dataset(NULL) fails, as a dataset that cannot be opened.
+            let cant = "** Can't open -rotparent dataset!\n\n";
+            let Some(name) = args.get(i).cloned() else {
+                return Err(Stop::Raw(cant.to_owned()));
+            };
+            let _ds = open(&name, n_threads, settings, notices, io).map_err(|e| {
+                Stop::Raw(if mode.fix() {
+                    format!("** Can't open -rotparent dataset {name}: {e}\n")
+                } else {
+                    cant.to_owned()
+                })
+            })?;
+            let attrs = crate::dataset::afni_attributes(&settings.path(&name).to_string_lossy());
+            let floats = |n: &str| {
+                attrs
+                    .as_ref()
+                    .and_then(|a| a.floats(n))
+                    .map(<[f32]>::to_vec)
+            };
+            let Some(matvec) = floats("VOLREG_MATVEC_000000").filter(|m| m.len() >= 12) else {
+                return Err(Stop::Raw(
+                    "** -rotparent dataset doesn't have VOLREG attributes!?\n".to_owned(),
+                ));
+            };
+            o.rotpar = Some(RotPar {
+                name,
+                matvec,
+                center_old: floats("VOLREG_CENTER_OLD"),
+                center_base: floats("VOLREG_CENTER_BASE"),
+            });
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-gridpar", 7) {
+            if o.gridpar.is_some() {
+                return Err(Stop::Raw(
+                    "** Can't use -2 -gridparent options!\n".to_owned(),
+                ));
+            }
+            i += 1;
+            let cant = "** Can't open -gridparent dataset!\n\n";
+            let Some(name) = args.get(i).cloned() else {
+                return Err(Stop::Raw(cant.to_owned()));
+            };
+            let ds = open(&name, n_threads, settings, notices, io).map_err(|e| {
+                Stop::Raw(if mode.fix() {
+                    format!("** Can't open -gridparent dataset {name}: {e}\n")
+                } else {
+                    cant.to_owned()
+                })
+            })?;
+            o.gridpar = Some(GridPar {
+                nxyz: ds.nxyz,
+                center: volreg::dataset_center(&ds).map_err(stop)?,
+                axes: ds.geometry.axes.clone(),
+            });
+            i += 1;
+            continue;
         }
         if starts(arg, "-float", 6) {
             o.floatize = true;
@@ -714,6 +942,63 @@ fn parse(
         o.dataset = o.input.clone().unwrap_or_default();
     }
     Ok(o)
+}
+
+/// The message when the dataset to register cannot be opened: AFNI's, and by default the
+/// reason too where AFNI gives none.
+fn input_error(arg: &str, e: &ReadError, mode: UpstreamDefects, option: bool) -> Stop {
+    match (mode.fix(), e, option) {
+        (false, ReadError::Nifti(_) | ReadError::Afni(_), true) => {
+            Stop::Fatal(format!("Can't open input dataset '{arg}'"))
+        }
+        (false, ReadError::Nifti(_) | ReadError::Afni(_), false) => {
+            Stop::Raw(format!("** Can't open dataset {arg}\n"))
+        }
+        _ => Stop::Fatal(format!("Can't open input dataset '{arg}': {e}")),
+    }
+}
+
+/// AFNI-90: `strcpy` into a 256-byte buffer (`-prefix`, `-dfile`, `-1Dfile`). A name of 256
+/// bytes or more makes AFNI abort (`*** buffer overflow detected ***`); by default it is kept
+/// whole, with the notice; `reproduce` refuses it.
+fn long_name(
+    v: String,
+    arg: &str,
+    mode: UpstreamDefects,
+    notices: &mut Notices,
+) -> Result<String, Stop> {
+    if v.len() > 255 {
+        long_name_notice(&v, arg, mode, notices);
+        if mode.reproduce() {
+            return Err(long_name_stop(arg, v.len()));
+        }
+    }
+    Ok(v)
+}
+
+fn long_name_notice(v: &str, what: &str, mode: UpstreamDefects, notices: &mut Notices) {
+    let n = v.len();
+    notices.add(
+        &defects::AFNI_90,
+        if mode.fix() {
+            format!(
+                "the {what} name has {n} bytes: kept whole; AFNI copies it into a 256-byte \
+                 buffer and aborts (buffer overflow detected)"
+            )
+        } else {
+            format!(
+                "the {what} name has {n} bytes, more than AFNI's 256-byte buffer holds: AFNI \
+                 aborts (buffer overflow detected)"
+            )
+        },
+    );
+}
+
+fn long_name_stop(what: &str, n: usize) -> Stop {
+    Stop::Fatal(format!(
+        "the {what} name has {n} bytes; AFNI's buffer holds 255 and AFNI aborts here \
+         (*** buffer overflow detected ***, AFNI-90)"
+    ))
 }
 
 /// `tross_commandline("3dvolreg", argc, argv)`: the program and its arguments (after the
@@ -759,10 +1044,22 @@ fn open(
     let mut messages = Vec::new();
     let read = open_dataset(name, n_threads, settings, &mut messages, notices, true);
     for m in messages {
+        // THD_report_obliquity: its long warning only for the run's first oblique dataset.
+        if let Message::Warning(text) = &m
+            && text.starts_with(OBLIQUE_WARNING)
+        {
+            if io.oblique_warned {
+                continue;
+            }
+            io.oblique_warned = true;
+        }
         io.message(m);
     }
     read
 }
+
+/// The start of `THD_report_obliquity`'s warning, which AFNI prints once per run.
+const OBLIQUE_WARNING: &str = "  If you are performing spatial transformations on an oblique dset";
 
 /// `"%.4f"` of a float, as C prints it.
 fn f4(x: f32) -> String {
@@ -775,76 +1072,26 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     let n_threads = threads(settings);
     let mut notices = Notices::new(mode);
     notices.extend(pre.notices.iter().cloned());
-    let o = parse(&pre.args, mode, settings, &mut notices, io)?;
+    let mut o = parse(&pre.args, mode, settings, n_threads, &mut notices, io)?;
+    let intern = !matches!(o.base, BaseArg::Dataset);
+    let nbase_given = match o.base {
+        BaseArg::Index(k) => k,
+        _ => 0,
+    };
 
-    // The base dataset, opened during the option scan in AFNI (its messages come there).
-    let mut base = Base::Index(0);
-    let mut nbase_given = 0usize;
-    let mut bset: Option<Dataset> = None;
-    match &o.base {
-        BaseArg::Index(k) => nbase_given = *k,
-        BaseArg::Dataset(name) => {
-            let ds = open(name, n_threads, settings, &mut notices, io).map_err(|e| {
-                Stop::Fatal(match (mode.fix(), &e) {
-                    (false, ReadError::Nifti(_) | ReadError::Afni(_)) => {
-                        format!("Couldn't open -base dataset {name}")
-                    }
-                    _ => format!("Couldn't open -base dataset {name}: {e}"),
-                })
-            })?;
-            if o.verbose > 0 {
-                io.raw(format!(
-                    "++ Reading in base dataset {}\n",
-                    afni_output_name(name)
-                ));
-            }
-            if ds.nvals > 1 {
-                io.warn(format!("-base dataset {name} has more than 1 sub-brick"));
-            }
-            bset = Some(ds);
-        }
-        BaseArg::None => {}
+    // After the scan: -twodup needs -twopass and an external base; -gridparent needs
+    // -rotparent.
+    let mut twodup = o.twodup && o.twopass && !intern;
+    if o.gridpar.is_some() && o.rotpar.is_none() {
+        io.raw("++ WARNING: -gridparent means nothing without -rotparent!\n");
+        o.gridpar = None;
     }
-    let intern = !matches!(o.base, BaseArg::Dataset(_));
-    // The weight dataset, also opened during the scan.
-    let mut weight: Option<Vec<f32>> = None;
-    let mut weight_dims = None;
-    if let Some((name, bb)) = &o.weight {
-        let ds = open(name, n_threads, settings, &mut notices, io).map_err(|e| {
-            Stop::Raw(match (mode.fix(), &e) {
-                (false, ReadError::Nifti(_) | ReadError::Afni(_)) => {
-                    format!("** Can't open weight dataset {name}\n")
-                }
-                _ => format!("** Can't open weight dataset {name}: {e}\n"),
-            })
-        })?;
-        if *bb >= ds.nvals {
-            return Err(Stop::Raw(format!(
-                "** Illegal sub-brick selector for dataset {name}\n"
-            )));
-        }
-        if o.verbose > 0 {
-            io.raw(format!(
-                "++ Reading in weight dataset {}\n",
-                afni_output_name(name)
-            ));
-        }
-        let nvox = ds.nxyz.iter().product();
-        weight = Some(crate::automask::scale_to_float(
-            &ds.data,
-            nvox,
-            *bb,
-            ds.factors[*bb],
-        ));
-        weight_dims = Some(ds.nxyz);
+    if o.rotpar.is_some() && o.twopass {
+        io.raw("++ WARNING: Combining -rotparent and -twopass isn't recommended!\n");
     }
-
-    // After the scan.
-    let twodup = o.twodup && o.twopass && !intern;
-    if twodup {
-        return Err(Stop::Fatal(
-            "-twodup with an external base is not supported by larmorx yet".to_owned(),
-        ));
+    if o.gridpar.is_some() && twodup {
+        io.raw("++ WARNING: -gridparent overrides -twodup!\n");
+        twodup = false;
     }
     let edging = match o.edging {
         Some(e) => e,
@@ -877,18 +1124,11 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         io.info(IMPLEMENTATION);
         io.info(format!("upstream defects: {mode} ({})", defects::ENV));
     }
-    let ds = open(&o.dataset, n_threads, settings, &mut notices, io).map_err(|e| {
-        let arg = o.dataset.as_str();
-        match (mode.fix(), &e, o.input.is_some()) {
-            (false, ReadError::Nifti(_) | ReadError::Afni(_), true) => {
-                Stop::Fatal(format!("Can't open input dataset '{arg}'"))
-            }
-            (false, ReadError::Nifti(_) | ReadError::Afni(_), false) => {
-                Stop::Raw(format!("** Can't open dataset {arg}\n"))
-            }
-            _ => Stop::Fatal(format!("Can't open input dataset '{arg}': {e}")),
-        }
-    })?;
+    let mut ds = match o.input_ds.take() {
+        Some(ds) => ds,
+        None => open(&o.dataset, n_threads, settings, &mut notices, io)
+            .map_err(|e| input_error(&o.dataset, &e, mode, false))?,
+    };
     let mut floatize = o.floatize;
     let mut floatize_forced = false;
     if !floatize && ds.need_brick_factor() {
@@ -897,8 +1137,8 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         io.warn("Input dataset has scale factors ==> output will be stored as floats!");
     }
     let cen_inp = volreg::dataset_center(&ds).map_err(stop)?;
-    if let Some(b) = &bset {
-        let cen_bas = volreg::dataset_center(b).map_err(stop)?;
+    if let Some(b) = &o.bset {
+        let cen_bas = b.center;
         let dv = [
             cen_bas[0] - cen_inp[0],
             cen_bas[1] - cen_inp[1],
@@ -911,21 +1151,43 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             ));
         }
     }
+    let [nx, ny, nz] = ds.nxyz;
+    let mut tshift = o.tshift;
+    if let Some(ig) = tshift {
+        let nvals = ds.nvals as i64;
+        let nsl = ds
+            .taxis
+            .as_ref()
+            .and_then(|t| t.toff_sl.as_ref())
+            .map_or(0, Vec::len);
+        if ds.nvals < 2 {
+            io.raw("++ WARNING: -tshift used on a 1 brick dataset!\n");
+            tshift = None;
+        } else if ds.taxis.is_none() || nsl < nz {
+            io.raw("++ WARNING: -tshift used on a dataset with no time-offsets!\n");
+            tshift = None;
+        } else if i64::from(ig) > nvals - 5 {
+            io.raw("++ WARNING: -tshift ignore is too large for this dataset!\n");
+            tshift = None;
+        } else if intern && (nbase_given as i64) < i64::from(ig) {
+            io.raw("++ WARNING: base brick is prior to -tshift ignore point.\n");
+        }
+    }
     if intern && nbase_given >= ds.nvals {
         return Err(Stop::Raw(format!(
             "** Dataset {} doesn't have base brick index = {nbase_given}\n",
             o.dataset
         )));
     }
-    if let Some(b) = &bset {
-        mismatch(&ds, b, &o.dataset)?;
+    if let Some(b) = &o.bset {
+        mismatch(&ds, b.nxyz, &b.axes, &o.dataset, &b.name)?;
     }
-    if let Some(wd) = weight_dims
-        && wd != ds.nxyz
+    if let Some((_, _, wd)) = &o.weight
+        && *wd != ds.nxyz
     {
         return Err(Stop::Raw(format!(
             "** Dataset {} doesn't conform to dimensions of weight brick\n    Weight  has nx = {}  ny = {}  nz = {}\n    Dataset has nx = {}  ny = {}  nz = {}\n",
-            o.dataset, wd[0], wd[1], wd[2], ds.nxyz[0], ds.nxyz[1], ds.nxyz[2]
+            o.dataset, wd[0], wd[1], wd[2], nx, ny, nz
         )));
     }
     if intern && ds.nvals == 1 {
@@ -935,7 +1197,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     }
     let mut coarse_del = o.coarse_del;
     if o.twopass && o.coarse_del > 0 && o.coarse_num > 0 {
-        let mm = ds.nxyz[0].min(ds.nxyz[1]).min(ds.nxyz[2]);
+        let mm = nx.min(ny).min(nz);
         let mut mm = (0.1 * mm as f64 + 0.499) as i32;
         if mm < 1 {
             mm = 1;
@@ -948,12 +1210,81 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         }
     }
     let mut wtinp = o.wtinp;
-    if weight.is_some() && wtinp {
+    if o.weight.is_some() && wtinp {
         io.raw("++ Input weight file overrides -wtinp option!\n");
         wtinp = false;
     }
 
-    // main(): the output.
+    // main(): the output dataset's grid (new_dset), zero-padded to match -gridparent.
+    let mut out_axes = ds.geometry.axes.clone();
+    let mut out_taxis = ds.taxis.clone();
+    let mut out_nz = nz;
+    let mut npad = [0usize; 2];
+    let orient = ds.geometry.axes.orient.ok_or_else(|| {
+        Stop::Fatal(
+            "the dataset's voxel-to-world matrix has no orientation (a zero or repeated \
+             column): not supported by larmorx"
+                .to_owned(),
+        )
+    })?;
+    if let Some(gp) = &o.gridpar {
+        let (a, g) = (&ds.geometry.axes, &gp.axes);
+        let far = |x: f32, y: f32| f64::from(x - y).abs() > 0.01 * f64::from(x).abs();
+        let delta = (0..3).any(|k| far(g.del[k], a.del[k]));
+        if delta || g.orient != a.orient {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent dataset and input dataset don't\n** match in grid spacing and/or orientation!\n".to_owned(),
+            ));
+        }
+        if gp.nxyz[0] != nx || gp.nxyz[1] != ny {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent and input datasets\n** don't match in x,y dimensions!\n".to_owned(),
+            ));
+        }
+        let nz_gp = gp.nxyz[2];
+        if nz_gp < nz {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent has fewer slices than input dataset!\n".to_owned(),
+            ));
+        }
+        if nz_gp > nz {
+            let npad1 = (nz_gp - nz) / 2;
+            let npad2 = (nz_gp - nz) - npad1;
+            let zo = orient[2];
+            let (sp1, sp2) = match crate::axes::coordinate(zo) {
+                0 => ("R", "L"),
+                1 => ("A", "P"),
+                _ => ("I", "S"),
+            };
+            // npad_neg slices before the first (index 0), npad_pos after the last.
+            npad = if crate::axes::positive(zo) {
+                [npad1, npad2]
+            } else {
+                [npad2, npad1]
+            };
+            if o.verbose > 0 {
+                io.raw(format!(
+                    "++ Zero padding to match -gridparent: -{sp1} {npad1}  -{sp2} {npad2}\n"
+                ));
+            }
+            // THD_zeropad(..., ZPAD_EMPTY): the new grid, its matrix the cardinal one, the
+            // slice times padded with zeros.
+            out_nz = nz + npad1 + npad2;
+            out_axes.org[2] -= npad[0] as f32 * out_axes.del[2];
+            if let Some(m) = crate::axes::cardinal(&out_axes) {
+                out_axes.real = m;
+            }
+            if let Some(t) = out_taxis.as_mut()
+                && let Some(old) = t.toff_sl.take()
+            {
+                let mut new = vec![0.0f32; out_nz];
+                new[npad[0]..npad[0] + old.len()].copy_from_slice(&old);
+                t.toff_sl = Some(new);
+            }
+        }
+    }
+
+    // The output's name.
     let null_output = o.prefix == "NULL";
     let mut out = None;
     if null_output {
@@ -970,28 +1301,152 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         output.check(false, &notices, io)?;
         out = Some(output);
     }
+    // -savedisp's datasets (written with larmorx's NIfTI writer only).
+    let disp_names: Vec<(&str, String)> = match &o.savedisp {
+        None => Vec::new(),
+        Some((pra, prb, s19)) => {
+            let labels: &[&str] = if *s19 {
+                &DISP_LABELS
+            } else {
+                &DISP_LABELS[..3]
+            };
+            labels
+                .iter()
+                .map(|l| (*l, format!("{pra}{l}{prb}")))
+                .collect()
+        }
+    };
+    let mut disp_out = Vec::new();
+    for (_, name) in &disp_names {
+        output_path(name)?;
+        let output = Output::new(name, settings, pre.quiet_overwrite);
+        output.check(false, &notices, io)?;
+        disp_out.push(output);
+    }
     let cmdline = commandline(&pre.args, settings);
-    if o.verbose > 0 {
-        io.raw(format!("++ Reading input dataset {}\n", o.dataset));
+
+    // -rotparent: its transformation, moved for the centres of the datasets and converted to
+    // the dataset's axis order.
+    let mut matvec = None;
+    if let Some(rp) = &o.rotpar {
+        let m: Vec<f64> = rp.matvec.iter().map(|&x| f64::from(x)).collect();
+        let mut rmat = [[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]];
+        let mut tvec = [m[3], m[7], m[11]];
+        let pp = vecmat::mul(&vecmat::transpose(&rmat), &rmat);
+        let sum = ((pp[0][0] - 1.0).abs()
+            + pp[1][0].abs()
+            + pp[2][0].abs()
+            + pp[0][1].abs()
+            + (pp[1][1] - 1.0).abs()
+            + pp[2][1].abs()
+            + pp[0][2].abs()
+            + pp[1][2].abs()
+            + (pp[2][2] - 1.0).abs()) as f32;
+        if f64::from(sum) > 0.01 {
+            return Err(Stop::Raw(
+                "** -rotparent matrix not orthogonal!\n".to_owned(),
+            ));
+        }
+        let out_grid = grid_center(&out_axes, [nx, ny, out_nz]);
+        let cv_e2 = out_grid.map(f64::from);
+        let cv_e1 = o
+            .gridpar
+            .as_ref()
+            .map_or(cv_e2, |g| g.center.map(f64::from));
+        let mut three = |v: &Option<Vec<f32>>, what: &str| -> Result<DVec3, Stop> {
+            match v.as_deref() {
+                Some(&[a, b, c, ..]) => Ok([f64::from(a), f64::from(b), f64::from(c)]),
+                _ => {
+                    notices.add(
+                        &defects::AFNI_96,
+                        format!(
+                            "the -rotparent dataset {} has VOLREG_MATVEC_000000 but no {what} \
+                             attribute of 3 numbers: refused; AFNI reads through a NULL pointer \
+                             (a crash) or past the attribute",
+                            rp.name
+                        ),
+                    );
+                    Err(Stop::Fatal(format!(
+                        "-rotparent dataset {} has no {what} attribute (AFNI-96: AFNI crashes)",
+                        rp.name
+                    )))
+                }
+            }
+        };
+        let cv_s2 = three(&rp.center_old, "VOLREG_CENTER_OLD")?;
+        let cv_s1 = three(&rp.center_base, "VOLREG_CENTER_BASE")?;
+        let dv = vecmat::matvec(&rmat, &vecmat::sub(&cv_e2, &cv_s2));
+        let ev = vecmat::sub(&cv_e1, &cv_s1);
+        let qv = vecmat::sub(&dv, &ev);
+        tvec = vecmat::add(&tvec, &qv);
+        let pp = volreg::mat_to_dicomm(orient);
+        let ppt = vecmat::transpose(&pp);
+        rmat = vecmat::mul(&vecmat::mul(&ppt, &rmat), &pp);
+        tvec = vecmat::matvec(&ppt, &tvec);
+        if let Some(gp) = &o.gridpar {
+            out_axes.org = gp.axes.org;
+        }
+        // The time offsets, moved by the shift along the slices.
+        if let Some(t) = out_taxis.as_mut()
+            && let Some(old) = t.toff_sl.as_mut()
+        {
+            let ndz = (tvec[2] / f64::from(out_axes.del[2]).abs()).round_ties_even() as i64;
+            if ndz != 0 {
+                let nsl = old.len() as i64;
+                let shifted: Vec<f32> = (0..nsl)
+                    .map(|kk| {
+                        let jj = kk - ndz;
+                        if jj < 0 || jj >= nsl {
+                            0.0
+                        } else {
+                            old[jj as usize]
+                        }
+                    })
+                    .collect();
+                *old = shifted;
+                if o.verbose > 0 {
+                    io.raw(format!("++ adjusting time-offsets by {ndz} slices\n"));
+                }
+            }
+        }
+        matvec = Some(volreg::Matvec { rmat, tvec, npad });
     }
 
-    if let Some(b) = &bset {
-        let nvox = b.nxyz.iter().product();
-        let vol = crate::automask::scale_to_float(&b.data, nvox, 0, b.factors[0]);
-        base = Base::External {
-            vol,
-            center: volreg::dataset_center(b).map_err(stop)?,
-            origin: b.geometry.axes.org,
-        };
-    } else {
-        base = match base {
-            Base::Index(_) => Base::Index(nbase_given),
-            other => other,
-        };
+    // Reading (and time-shifting) the input.
+    if o.verbose > 0 {
+        if tshift.is_some() {
+            io.raw(format!("++ Time shifting input dataset {}\n", o.dataset));
+        } else {
+            io.raw(format!("++ Reading input dataset {}\n", o.dataset));
+        }
     }
+    if let Some(ig) = tshift {
+        match tshift_dataset(&mut ds, ig as usize, n_threads, mode) {
+            Ok(found) => {
+                notices.extend(found);
+                if let Some(t) = out_taxis.as_mut() {
+                    t.toff_sl = None;
+                    t.ttorg = 0.0;
+                }
+            }
+            Err(TshiftFail::Afni) => {
+                io.raw("++ WARNING: some error during -tshift operation!\n");
+            }
+            Err(TshiftFail::Larmorx(m)) => return Err(Stop::Fatal(m)),
+        }
+    }
+
+    let base = match &o.bset {
+        Some(b) => Base::External {
+            vol: b.vol.clone(),
+            center: b.center,
+            origin: b.axes.org,
+        },
+        None => Base::Index(nbase_given),
+    };
     let p = VolregParams {
         base,
-        weight,
+        weight: o.weight.as_ref().map(|(_, w, _)| w.clone()),
         wtinp,
         resam: o.resam,
         final_mode: o.final_mode,
@@ -1013,18 +1468,22 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         floatize,
         firfac: settings.num("AFNI_BLUR_FIRFAC"),
         firold: settings.yes("AFNI_BLUR_FIROLD"),
+        matvec,
         mode,
     };
+    drop(o.weight.take());
     let mut log = Vec::new();
     let result = volreg::volreg(&ds, &p, null_output, &mut log, &mut notices);
     for m in log {
         io.message(m);
     }
-    let res = result.map_err(stop)?;
+    let mut res = result.map_err(stop)?;
+    drop(p);
     let final_mode = o.final_mode.unwrap_or(o.resam);
     let imcount = ds.nvals;
+    let out_n = [nx, ny, out_nz];
 
-    // The matrices and the maximum displacements.
+    // The matrices, the displacements and the maximum displacements.
     if res.maxdisp.is_some() && o.verbose > 0 {
         io.info("Max displacements (mm) for each sub-brick:");
     }
@@ -1037,6 +1496,24 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         }
         if std::fs::write(settings.path(name), text).is_err() {
             io.error(format!("Cannot open '{name}' for output :("));
+        }
+    }
+    // -savedisp: each voxel's displacement along x, y and z, sub-brick by sub-brick.
+    let mut disp: Vec<Dataset> = Vec::new();
+    if !disp_names.is_empty() {
+        let mut parts = [Vec::new(), Vec::new(), Vec::new()];
+        for kim in 0..imcount {
+            let m = &res.matvec[kim];
+            let tvec = [f64::from(m[3]), f64::from(m[7]), f64::from(m[11])];
+            let d =
+                volreg::displacements(&ds.geometry.axes, &out_axes, out_n, &res.rmat[kim], &tvec)
+                    .map_err(stop)?;
+            for (part, v) in parts.iter_mut().zip(d) {
+                part.extend_from_slice(&v);
+            }
+        }
+        for part in parts {
+            disp.push(float_dataset(&ds, out_n, &out_axes, &out_taxis, part));
         }
     }
     if let Some(md) = &res.maxdisp {
@@ -1078,7 +1555,17 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         }
     }
 
-    // The dataset.
+    // The registered dataset: the output grid, -twodup's origin (the base's).
+    if let Some(ds_out) = res.output.as_mut() {
+        ds_out.geometry.axes = out_axes.clone();
+        ds_out.taxis = out_taxis.clone();
+        if twodup
+            && o.rotpar.is_none()
+            && let Some(b) = &o.bset
+        {
+            ds_out.geometry.axes.org = b.axes.org;
+        }
+    }
     if let (Some(output), Some(ds_out)) = (&out, &res.output) {
         let written = write_dataset(output, ds_out, n_threads, settings, &mut notices, io)
             .map_err(Stop::from)?;
@@ -1086,6 +1573,32 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             io.info(format!("Wrote dataset to disk in {}", written.shown));
         }
     }
+    res.output = None;
+    if let Some((_, _, s19)) = &o.savedisp {
+        for (k, d) in disp.iter_mut().enumerate() {
+            if *s19 {
+                normalize_timeseries(d);
+            }
+            let written = write_dataset(&disp_out[k], d, n_threads, settings, &mut notices, io)
+                .map_err(Stop::from)?;
+            if o.verbose > 0 {
+                io.info(format!("Wrote dataset to disk in {}", written.shown));
+            }
+        }
+        if *s19 {
+            for (k, powers) in DISP_PRODUCTS.iter().enumerate() {
+                let mut d = disprod(&disp, *powers);
+                normalize_timeseries(&mut d);
+                let written =
+                    write_dataset(&disp_out[3 + k], &d, n_threads, settings, &mut notices, io)
+                        .map_err(Stop::from)?;
+                if o.verbose > 0 {
+                    io.info(format!("Wrote dataset to disk in {}", written.shown));
+                }
+            }
+        }
+    }
+    drop(disp);
 
     // The parameter files.
     write_params(&o, &res, imcount, settings, io);
@@ -1120,6 +1633,206 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         io.notice(n);
     }
     Ok(())
+}
+
+/// The suffixes of `-savedisp`'s 3 and `-SAVEDISP`'s 19 datasets, in the order AFNI writes
+/// them.
+const DISP_LABELS: [&str; 19] = [
+    "_DX", "_DY", "_DZ", "_DXX", "_DYY", "_DZZ", "_DXY", "_DXZ", "_DYZ", "_DXXX", "_DYYY", "_DZZZ",
+    "_DXXY", "_DXXZ", "_DXYY", "_DXZZ", "_DYYZ", "_DYZZ", "_DXYZ",
+];
+
+/// The Legendre degrees of x, y and z of `-SAVEDISP`'s 16 products (`VL_create_disprod`).
+const DISP_PRODUCTS: [[u8; 3]; 16] = [
+    [2, 0, 0],
+    [0, 2, 0],
+    [0, 0, 2],
+    [1, 1, 0],
+    [1, 0, 1],
+    [0, 1, 1],
+    [3, 0, 0],
+    [0, 3, 0],
+    [0, 0, 3],
+    [2, 1, 0],
+    [2, 0, 1],
+    [1, 2, 0],
+    [1, 0, 2],
+    [0, 2, 1],
+    [0, 1, 2],
+    [1, 1, 1],
+];
+
+/// `THD_dataset_center` of a grid given by its axes and size.
+fn grid_center(axes: &Axes, n: [usize; 3]) -> FVec3 {
+    let Some(o) = axes.orient else {
+        return [0.0; 3];
+    };
+    let dicom = |v: [f32; 3]| {
+        let mut d = [0.0f32; 3];
+        for (axis, &code) in o.iter().enumerate() {
+            d[crate::axes::coordinate(code)] = v[axis];
+        }
+        d
+    };
+    let fv1 = dicom(axes.org);
+    let fv2 = dicom([
+        axes.org[0] + (n[0] as f32 - 1.0) * axes.del[0],
+        axes.org[1] + (n[1] as f32 - 1.0) * axes.del[1],
+        axes.org[2] + (n[2] as f32 - 1.0) * axes.del[2],
+    ]);
+    [
+        0.5f32 * (fv1[0] + fv2[0]),
+        0.5f32 * (fv1[1] + fv2[1]),
+        0.5f32 * (fv1[2] + fv2[2]),
+    ]
+}
+
+/// A float dataset on the output's grid (`EDIT_empty_copy(new_dset)` with float sub-bricks).
+fn float_dataset(
+    like: &Dataset,
+    n: [usize; 3],
+    axes: &Axes,
+    taxis: &Option<crate::dataset::TimeAxis>,
+    data: Vec<f32>,
+) -> Dataset {
+    let mut d = header_of(like);
+    d.nxyz = n;
+    d.geometry.axes = axes.clone();
+    d.taxis = taxis.clone();
+    d.factors = vec![0.0; like.nvals];
+    d.data = BrickData::Float(data);
+    d.dropped_inter = None;
+    d
+}
+
+/// A dataset's header without its data.
+fn header_of(ds: &Dataset) -> Dataset {
+    Dataset {
+        nxyz: ds.nxyz,
+        nvals: ds.nvals,
+        data: BrickData::Float(Vec::new()),
+        factors: ds.factors.clone(),
+        taxis: ds.taxis.clone(),
+        geometry: ds.geometry.clone(),
+        dropped_inter: None,
+    }
+}
+
+/// `VL_normalize_timeseries`: each voxel's series detrended (`THD_linear_detrend`) and scaled
+/// to a largest magnitude of 1 (`THD_normmax`).
+fn normalize_timeseries(d: &mut Dataset) {
+    let nvox: usize = d.nxyz.iter().product();
+    let nvals = d.nvals;
+    let BrickData::Float(v) = &mut d.data else {
+        return;
+    };
+    let mut tar = vec![0.0f32; nvals];
+    for ii in 0..nvox {
+        for (t, x) in tar.iter_mut().enumerate() {
+            *x = v[ii + t * nvox];
+        }
+        crate::detrend::linear_detrend(&mut tar);
+        let mut fac = 0.0f32;
+        for &x in &tar {
+            let val = x.abs();
+            fac = if fac > val { fac } else { val };
+        }
+        if fac != 0.0 {
+            let fac = 1.0f32 / fac;
+            for x in &mut tar {
+                *x *= fac;
+            }
+        }
+        for (t, &x) in tar.iter().enumerate() {
+            v[ii + t * nvox] = x;
+        }
+    }
+}
+
+/// `VL_create_disprod`: the product of Legendre polynomials of the normalised x, y and z
+/// displacements (`P0 = 1`, `P1 = x`, `P2 = 1.5x² - 0.5`, `P3 = (2.5x² - 1.5)x`, in float).
+fn disprod(disp: &[Dataset], powers: [u8; 3]) -> Dataset {
+    let leg = |n: u8, x: f32| -> f32 {
+        match n {
+            0 => 1.0,
+            1 => x,
+            2 => 1.5f32 * x * x - 0.5f32,
+            _ => (2.5f32 * x * x - 1.5f32) * x,
+        }
+    };
+    let get = |k: usize| match &disp[k].data {
+        BrickData::Float(v) => v.as_slice(),
+        _ => &[],
+    };
+    let (xd, yd, zd) = (get(0), get(1), get(2));
+    let data: Vec<f32> = (0..xd.len())
+        .map(|i| leg(powers[0], xd[i]) * leg(powers[1], yd[i]) * leg(powers[2], zd[i]))
+        .collect();
+    let mut d = header_of(&disp[0]);
+    d.data = BrickData::Float(data);
+    d
+}
+
+/// Why `-tshift` did not shift: one of `THD_dataset_tshift`'s own failures (AFNI then warns
+/// and goes on), or one of larmorx's limits.
+enum TshiftFail {
+    Afni,
+    Larmorx(String),
+}
+
+/// `THD_dataset_tshift(dset, ignore)`: 3dTshift's default (Fourier interpolation, the linear
+/// trend removed and restored, the slices aligned to their mean time offset) on the dataset in
+/// place. Returns the upstream defects met (AFNI-01).
+fn tshift_dataset(
+    ds: &mut Dataset,
+    ignore: usize,
+    n_threads: usize,
+    mode: UpstreamDefects,
+) -> Result<Vec<defects::Notice>, TshiftFail> {
+    let nzz = ds.nxyz[2];
+    let ntt = ds.nvals;
+    if ignore + 4 > ntt || ntt < 2 {
+        return Err(TshiftFail::Afni);
+    }
+    let Some(t) = ds.taxis.as_ref() else {
+        return Err(TshiftFail::Afni);
+    };
+    let Some(tpat) = t.toff_sl.as_ref().filter(|v| v.len() >= nzz) else {
+        return Err(TshiftFail::Afni);
+    };
+    let tpat: Vec<f32> = tpat[..nzz].to_vec();
+    let tr = t.ttdel;
+    // WAY_BIG = 1e10, as float.
+    let (mut tomin, mut tomax) = (1.0e10f32, -1.0e10f32);
+    for &x in &tpat {
+        if x > tomax {
+            tomax = x;
+        }
+        if x < tomin {
+            tomin = x;
+        }
+    }
+    if tomin < 0.0 || tomax > tr || tomin >= tomax {
+        return Err(TshiftFail::Afni);
+    }
+    let mut tzero = 0.0f32;
+    for &x in &tpat {
+        tzero += x;
+    }
+    tzero /= nzz as f32;
+    let params = TshiftParams {
+        tr,
+        tpat,
+        tzero,
+        ignore,
+        method: Method::Fourier,
+        rlt: Rlt::Trend,
+        detrend: true,
+        bad: false,
+        n_threads,
+        upstream_defects: mode,
+    };
+    crate::tshift::tshift(ds, &params).map_err(|e| TshiftFail::Larmorx(e.to_string()))
 }
 
 /// `-dfile` and `-1Dfile`.
@@ -1211,15 +1924,21 @@ fn gp(x: f64, prec: usize) -> String {
 
 /// `THD_dataset_mismatch`'s dimension, spacing and orientation tests between the input and the
 /// base, with 3dvolreg's messages.
-fn mismatch(ds: &Dataset, b: &Dataset, name: &str) -> Result<(), Stop> {
+fn mismatch(
+    ds: &Dataset,
+    b_nxyz: [usize; 3],
+    c: &Axes,
+    name: &str,
+    base_name: &str,
+) -> Result<(), Stop> {
     let mut text = String::new();
-    let (a, c) = (&ds.geometry.axes, &b.geometry.axes);
+    let a = &ds.geometry.axes;
     let shown_in = afni_output_name(name);
-    let shown_b = "(base)";
-    if ds.nxyz != b.nxyz {
+    let shown_b = afni_output_name(base_name);
+    if ds.nxyz != b_nxyz {
         text.push_str(&format!(
             "** Input {shown_in} and base {shown_b} don't have same dimensions!\n   Input: nx={}  ny={}  nz={}\n   Base:  nx={}  ny={}  nz={}\n",
-            ds.nxyz[0], ds.nxyz[1], ds.nxyz[2], b.nxyz[0], b.nxyz[1], b.nxyz[2]
+            ds.nxyz[0], ds.nxyz[1], ds.nxyz[2], b_nxyz[0], b_nxyz[1], b_nxyz[2]
         ));
     }
     let far = |x: f32, y: f32| f64::from(x - y).abs() > 0.01 * f64::from(x).abs();
@@ -1232,7 +1951,7 @@ fn mismatch(ds: &Dataset, b: &Dataset, name: &str) -> Result<(), Stop> {
     if a.orient != c.orient {
         let s = |o: Option<[u8; 3]>, k: usize| {
             let t = crate::automask::tinystr(o.map(|v| v[k]));
-            format!("{}2{}", t[0], t[1])
+            format!("{}-{}", t[0], t[1])
         };
         text.push_str(&format!(
             "** Input {shown_in} and base {shown_b} don't have same orientation!\n   Input: {} {} {}\n   Base:  {} {} {} \n",

@@ -126,6 +126,13 @@ impl Rotator {
         tvec: &DVec3,
     ) -> Result<Vec<f32>, SvdError> {
         let mut out = vol.to_vec();
+        if n[2] < 2 {
+            // `!MRI_IS_3D(im)`: AFNI returns no image; its callers here only read a volume of
+            // one slice where nothing is summed, so the copy stands for it.
+            self.messages
+                .push("\n*** THD_rota3D_matvec: non-3D image input!\n".to_owned());
+            return Ok(out);
+        }
         self.rota_vol_matvec(&mut out, n, del.map(f32::abs), rmat, tvec)?;
         Ok(out)
     }

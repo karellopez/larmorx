@@ -57,6 +57,8 @@ pub(crate) struct Io<'a> {
     pub(crate) out: &'a mut dyn Write,
     pub(crate) err: &'a mut dyn Write,
     pub(crate) style: Style,
+    /// `THD_report_obliquity`'s long warning was printed (once per run, `first_oblique`).
+    pub(crate) oblique_warned: bool,
 }
 
 impl<'a> Io<'a> {
@@ -75,6 +77,7 @@ impl<'a> Io<'a> {
                 prefix: settings.get("AFNI_MESSAGE_PREFIX").map(str::to_owned),
                 colorize: mode.reproduce() && !settings.no("AFNI_MESSAGE_COLORIZE"),
             },
+            oblique_warned: false,
         }
     }
 

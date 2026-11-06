@@ -396,6 +396,8 @@ defects! {
         "-twopass with -coarse 1 on a volume of 120^3 voxels or more halves the coarse step to 0 for the subsampled search, which never ends";
     AFNI_95 = "AFNI-95", "3dvolreg", true,
         "a second -base is refused only when the first was a dataset or an index above 0: -base 0 -base 3 registers to brick 3";
+    AFNI_96 = "AFNI-96", "3dvolreg", true,
+        "a -rotparent dataset with VOLREG_MATVEC_000000 but without VOLREG_CENTER_OLD or VOLREG_CENTER_BASE (or with fewer than 3 numbers in one) is read through a NULL pointer or past the attribute (a crash or garbage)";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

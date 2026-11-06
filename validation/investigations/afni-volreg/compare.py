@@ -93,6 +93,18 @@ for f in sorted(da.iterdir()):
             print(f"{f.name}: {nd} of {x.size} voxels differ, max |d| {dd.max():.3g}")
         if not np.allclose(a.affine, b.affine, atol=0, rtol=0):
             print(f"{f.name}: affine differs\n{a.affine}\n{b.affine}")
+        ha, hb = a.header, b.header
+        fields = [
+            "dim", "pixdim", "xyzt_units", "datatype", "slice_code", "slice_start",
+            "slice_end", "slice_duration", "toffset", "qform_code", "sform_code",
+            "quatern_b", "quatern_c", "quatern_d", "qoffset_x", "qoffset_y", "qoffset_z",
+            "srow_x", "srow_y", "srow_z", "scl_slope", "scl_inter", "dim_info",
+        ]
+        hd = [k for k in fields if np.asarray(ha[k]).tobytes() != np.asarray(hb[k]).tobytes()
+              and not (np.all(np.isnan(ha[k])) and np.all(np.isnan(hb[k])))]
+        if hd:
+            print(f"{f.name}: header differs in " + ", ".join(
+                f"{k} ({ha[k]} vs {hb[k]})" for k in hd))
     else:
         if f.read_bytes() != g.read_bytes():
             print(f"{f.name} differs:\n--- afni\n{f.read_text()}--- larmorx\n{g.read_text()}")

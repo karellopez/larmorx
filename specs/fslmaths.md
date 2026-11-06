@@ -470,8 +470,11 @@ computing type (§4):
   (`log`) and 0.083 % (`pow`) of random image intensities, by one unit in the last place, and
   **on none in 6.7 × 10⁷ arguments once rounded to float**: under the default `float` computing
   type a correctly rounded function gives FSL's bits. larmorx computes correctly rounded values by
-  default (`larmorx_core::math`); its replica gives glibc's bits for `exp`, `log` and `pow` with
-  `reproduce`.
+  default (`larmorx_core::math`); with `reproduce`, glibc 2.35's bits for `exp`, `log`, `pow`,
+  `sin` and `cos` (`sin` and `cos` from `specs/glibc-dbl.md`, both implementations since the
+  glibc maths part of 2026-11-04), named where they change a voxel; `tan`, `asin`, `acos` and
+  `atan` stay correctly rounded in both modes (the user's decision of 2026-11-04: an expected
+  divergence of a last place in a double image) (spec writer, 2026-11-06).
 - `-sqr`: `v × v` in the computing type. `-sqrt`: for `v > 0` the square root (single precision
   for `float`; the double root converted for the others), else 0 (NaN and negative voxels
   become 0). `-recip`: `1 / v` in the computing type for `v ≠ 0` (an integer division for the
@@ -631,6 +634,17 @@ Each volume: inside a one-voxel border (in-plane only, all slices, when the imag
 slices), the value becomes `√(Σ_axes ((v₊ − v₋)² / d²)) / (2 √(Σ_axes 1/d²))` (central
 differences in the computing type, the rest in double; the denominator rounded to single
 precision; the squares and `1/d²` by `pow(x, 2)`); the border keeps its values [edge/...].
+(spec writer, 2026-11-06; relay 2b's black-box observation right, stated exactly) Every square is
+the product `x·x` in double (FSL's `pow(x, 2)` is compiled to it: no glibc call, so `-edge` has no
+GLIBC-07 bits). The denominator is computed once per image from **all three** voxel sizes, in the
+images of at most 2 slices too: `2·√((1/(d_x·d_x) + 1/(d_y·d_y)) + 1/(d_z·d_z))` (each `d`
+converted to double and squared, each quotient `1/…` in double, added from x to z, the double
+square root times 2, rounded to single precision). Each interior value: the central difference
+`v₊ − v₋` along each axis **in the computing type**, converted to double, squared and divided by
+that axis' squared voxel size (double), the terms added **from the last axis to the first**:
+`(t_z + t_y) + t_x` (`t_y + t_x` with at most 2 slices, where every slice is computed and only x
+and y have a border); the double square root divided by the single-precision denominator
+(converted to double), stored in the computing type.
 
 ### 10.5 `-dog_edge σ₁ σ₂`
 
@@ -897,7 +911,7 @@ changes the result.
 | FSL-179 | `-roc` with a noise image of another size: misplaced, repeated or outside values | rule B: an error | FSL's result inside the noise image's memory; refused beyond |
 | FSL-180 | `-roc` without true voxels (or without zero voxels and no noise image): NaN rates, then `sort(): detected NaN` | rule B: an error before the curve | FSL's curve and abort |
 | FSL-187 | the robust range's histogram (the thresholds' `p` forms) counts a value more than about 2³¹ bins above a pass's range in the first bin | the last bin; named where the limits change | FSL's |
-| GLIBC-07 | glibc 2.35's double functions are not correctly rounded (§7), nor its `sincos` in the FFT convolution's twiddle factors (§10) | correctly rounded | glibc's bits for `exp`, `log`, `pow`; `sin`, `cos`, `tan`, `asin`, `acos`, `atan` and the twiddle factors correctly rounded in both modes (an expected divergence of the last place in a double image, or in a few voxels of an FFT convolution) |
+| GLIBC-07 | glibc 2.35's double functions are not correctly rounded (§7), nor its `sincos` in the FFT convolution's twiddle factors (§10) | correctly rounded | glibc's bits for `exp`, `log`, `pow`, `sin`, `cos` (§7) and the FFT convolution's twiddle factors (glibc's `sincos`, `specs/glibc-dbl.md` §7: the replica since 2026-11-04; the original's twiddles are still correctly rounded in both modes, its follow-up); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (an expected divergence of the last place in a double image) (spec writer, 2026-11-06) |
 
 Measured for FSL-187 (rule D, before deciding): none of fMRIPrep's inputs reaches it; the
 smallest trigger is 99 values on [0, 1) and one at 1e12.

@@ -50,6 +50,7 @@ VERSIONS = {
     "fsl-basisfield": "2203.4",
     "fsl-topup": "2203.5",
     "fsl-cprob": "2111.0",
+    "fsl-fugue": "2603.0",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -216,6 +217,11 @@ FILES = [
     # fslmaths (2026-11-03, sub-task 3): the normal distribution function (-ztop)
     ("fsl-cprob", "ndtr.cc"),
     ("fsl-cprob", "expx2.cc"),
+    # prelude (2026-11-06): PRELUDE and the unwrapping routines it calls
+    ("fsl-fugue", "prelude.cc"),
+    ("fsl-fugue", "unwarpfns.h"),
+    ("fsl-fugue", "unwarpfns.cc"),
+    ("fsl-fugue", "Makefile"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

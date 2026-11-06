@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23: fsl-fugue 2201.5 (unwarpfns.{h,cc}: maximum_position,
+// Translated to Rust from FSL 6.0.7.23: fsl-fugue 2603.0 (unwarpfns.{h,cc}: maximum_position,
 // basic_mask_threshold, make_basic_head_mask, largest_connected_component, make_head_mask,
 // make_head_mask2D, wrap, estimate_linear_ramps, remove_linear_ramps, restore_linear_ramps,
 // the constraint map (getP, find_maxC, calc_constraint, make_constraints), apply_unwrapping,
@@ -144,11 +144,7 @@ pub fn largest_connected_component(mask: &Volume) -> Volume {
     hist[0] = 0.0;
     let brainidx = (maximum_position(&hist) - 1) as i32;
     for (v, &l) in work.data.iter_mut().zip(&labels) {
-        *v = if l >= brainidx && l <= brainidx {
-            1.0
-        } else {
-            0.0
-        };
+        *v = if l == brainidx { 1.0 } else { 0.0 };
     }
     work
 }
@@ -159,15 +155,31 @@ pub fn make_head_mask(absmap: &Volume, thresh: f32, without_nan: bool) -> Volume
 }
 
 /// Slice `z` of a 3D volume as a volume of one slice (`ROI(minx, miny, z, 0, maxx, maxy, z, 0)`:
-/// the values; the properties do not reach a result).
+/// the volume's own extent in x and y, its values read by its `const` access, so a slice beyond
+/// it holds its extrapolation (a mask smaller than the phase: FSL-271); the properties copied).
 pub fn slice_of<T: larmorx_nc_core::volume::Elem>(v: &Volume<T>, z: i64) -> Volume<T> {
     let (nx, ny) = (v.dims[0], v.dims[1]);
     let n = (nx * ny) as usize;
     let mut s = Volume::<T>::new(nx, ny, 1, 1);
     s.copy_properties(v);
-    let at = z as usize * n;
-    s.data.copy_from_slice(&v.data[at..at + n]);
+    if (0..v.dims[2]).contains(&z) {
+        let at = z as usize * n;
+        s.data.copy_from_slice(&v.data[at..at + n]);
+    } else {
+        for y in 0..ny {
+            for x in 0..nx {
+                s.data[(y * nx + x) as usize] = v.get(x, y, z);
+            }
+        }
+    }
     s
+}
+
+/// Whether voxel `i` of `ph`'s grid is inside `mask` (read by `ph`'s indices).
+pub fn inside_at(mask: &Volume, ph: &Volume, i: usize) -> bool {
+    let (nx, ny) = (ph.dims[0] as usize, ph.dims[1] as usize);
+    let (x, y, z) = (i % nx, (i / nx) % ny, i / (nx * ny));
+    inside(mask, x as i64, y as i64, z as i64)
 }
 
 /// `copyROI(slice, ..., z, ...)`: the slice's values into slice `z`.
@@ -181,9 +193,7 @@ pub fn set_slice<T: larmorx_nc_core::volume::Elem>(v: &mut Volume<T>, z: i64, s:
 /// 4-connected component), with `absmap`'s properties.
 pub fn make_head_mask2d(absmap: &Volume, thresh: f32, without_nan: bool) -> Volume {
     let mut mask = absmap.clone();
-    for v in &mut mask.data {
-        *v = 0.0;
-    }
+    mask.data.fill(0.0);
     for z in 0..absmap.dims[2] {
         let aslice = slice_of(absmap, z);
         let mslice = make_head_mask(&aslice, thresh, without_nan);
@@ -351,32 +361,21 @@ pub fn find_phase_labels(phasemap: &Volume, mask: &Volume, n: i32) -> Volume<i32
     out
 }
 
-/// What [`find_phase_labels2d`] met: whether a slice without labels came after labelled ones
-/// and before others (FSL-262: FSL then numbers the later slices' labels from 1 again).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Labels2d {
-    pub reused: bool,
-}
-
 /// `find_phase_labels2D(phasemap, mask, n, unique3Dlabels)`: each slice's labels (4-connected
 /// in its plane); with `unique3Dlabels` each slice's numbered on from the previous slice's
 /// largest label. FSL takes that largest label from the slice itself, 0 for a slice without
-/// labels, so the slices after it reuse earlier numbers (`fsl`, FSL-262); the correction keeps
-/// the largest label so far.
+/// labels, so the slices after an empty one would reuse earlier numbers; prelude's masks are one
+/// 3D-connected component, so no empty slice lies between labelled ones and this never happens
+/// (`docs/findings/fsl-prelude.md`).
 pub fn find_phase_labels2d(
     phasemap: &Volume,
     mask: &Volume,
     n: i32,
     unique3dlabels: bool,
-    fsl: bool,
-) -> (Volume<i32>, Labels2d) {
+) -> Volume<i32> {
     let mut label = Volume::<i32>::copyconvert(phasemap);
-    for v in &mut label.data {
-        *v = 0;
-    }
+    label.data.fill(0);
     let mut max_label = 0i32;
-    let mut met = Labels2d::default();
-    let mut seen_empty_after_labels = false;
     for z in 0..phasemap.dims[2] {
         let pslice = slice_of(phasemap, z);
         let mslice = slice_of(mask, z);
@@ -384,25 +383,15 @@ pub fn find_phase_labels2d(
         if unique3dlabels {
             // lsmask = binarise(lslice, 1): [1, lslice.max()]
             let lmax = lslice.extrema().0;
-            let any = lslice.data.iter().any(|&l| l >= 1 && l <= lmax);
-            if any && seen_empty_after_labels {
-                met.reused = true;
-            }
-            if !any && max_label > 0 {
-                seen_empty_after_labels = true;
-            }
             for l in &mut lslice.data {
                 let m = i32::from(*l >= 1 && *l <= lmax);
                 *l = l.wrapping_add(max_label).wrapping_mul(m);
             }
-            let smax = lslice.extrema().0;
-            if fsl || any {
-                max_label = smax;
-            }
+            max_label = lslice.extrema().0;
         }
         set_slice(&mut label, z, &lslice);
     }
-    (label, met)
+    label
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -699,9 +688,7 @@ pub fn unwrap2d(
 ) -> Result<(Volume, UnwrapLog), Outside> {
     let mut log = UnwrapLog::default();
     let mut uphase = phasemap.clone();
-    for v in &mut uphase.data {
-        *v = 0.0;
-    }
+    uphase.data.fill(0.0);
     let nz = phasemap.dims[2];
     for z in 0..nz {
         if verbose {
@@ -872,9 +859,7 @@ mod tests {
         ] {
             let ph = phase_volume(dims.0, dims.1, dims.2, seed, slope);
             let mut mask = ph.clone();
-            for v in &mut mask.data {
-                *v = 1.0;
-            }
+            mask.data.fill(1.0);
             for n in [2, 3, 8] {
                 let label = find_phase_labels(&ph, &mask, n);
                 let fast = unwrap(&ph, &label, false).0;
@@ -885,7 +870,7 @@ mod tests {
                     .zip(&slow.data)
                     .all(|(a, b)| a.to_bits() == b.to_bits());
                 assert!(same, "seed {seed} n {n}");
-                let (l2, _) = find_phase_labels2d(&ph, &mask, n, true, true);
+                let l2 = find_phase_labels2d(&ph, &mask, n, true);
                 let fast = unwrap(&ph, &l2, false).0;
                 let slow = unwrap_reference(&ph, &l2);
                 assert!(
@@ -898,8 +883,10 @@ mod tests {
         }
     }
 
+    /// FSL's numbering after a slice without labels starts again from 1 (unreachable through
+    /// prelude, whose masks are 3D-connected: kept as FSL computes it).
     #[test]
-    fn empty_slices_reuse_labels_in_fsl() {
+    fn an_empty_slice_restarts_the_numbering() {
         let ph = phase_volume(6, 6, 3, 9, 1.1);
         let mut mask = ph.clone();
         for z in 0..3 {
@@ -909,11 +896,7 @@ mod tests {
                 }
             }
         }
-        let (fsl, met) = find_phase_labels2d(&ph, &mask, 8, true, true);
-        let (fixed, _) = find_phase_labels2d(&ph, &mask, 8, true, false);
-        assert!(met.reused);
-        assert_eq!(fsl.value(0, 0, 2), fsl.value(0, 0, 0));
-        assert!(fixed.value(0, 0, 2) > fixed.extrema().0 - 100);
-        assert_ne!(fixed.value(0, 0, 2), fixed.value(0, 0, 0));
+        let l = find_phase_labels2d(&ph, &mask, 8, true);
+        assert_eq!(l.value(0, 0, 2), l.value(0, 0, 0));
     }
 }

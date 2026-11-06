@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.23: fsl-fugue 2201.5 (prelude.cc: the options, `wrap` of a
+// Translated to Rust from FSL 6.0.7.23: fsl-fugue 2603.0 (prelude.cc: the options, `wrap` of a
 // volume, `do_unwrapping`, `main`). PRELUDE (Phase Region Expanding Labeller for Unwrapping
 // Discrete Estimates): Mark Jenkinson, FMRIB Image Analysis Group; Copyright (C) 2000-2001
 // University of Oxford. Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the
@@ -10,13 +10,12 @@
 //! it writes.
 //!
 //! D13 (`LARMORX_UPSTREAM_DEFECTS`): `reproduce` gives FSL's result bit for bit; `fix` (the
-//! default) corrects FSL-261 to FSL-272 (`docs/findings/fsl-prelude.md`), with a notice where a
+//! default) corrects FSL-261 to FSL-271 (`docs/findings/fsl-prelude.md`), with a notice where a
 //! correction changed the result.
 
 use std::io::Write;
 
 use larmorx_core::defects::{self, Defect, Notices, UpstreamDefects};
-use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::complex;
 use larmorx_nc_core::exception;
@@ -339,7 +338,7 @@ fn series_like(like: &Volume, n: i64) -> Volume {
     v
 }
 
-/// The outputs that FSL writes once per volume (FSL-263): FSL's file is the last volume's; the
+/// The outputs that FSL writes once per volume (FSL-262): FSL's file is the last volume's; the
 /// correction collects every volume's into one series.
 struct PerVolume<T: Elem> {
     name: Option<String>,
@@ -404,12 +403,12 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
         }
     }
 
-    // FSL-271: no volume to process (FSL writes no output and exits 0)
+    // FSL-270: no volume to process (FSL writes no output and exits 0)
     if imgend < imgstart && !fsl {
         // FSL's own exception for a first volume outside the series comes first
         phasemaps.sub_volume(imgstart)?;
         return Err(io.reject(
-            &defects::FSL_271,
+            &defects::FSL_270,
             &format!("no volume to process: --end ({imgend}) is before --start ({imgstart})"),
         ));
     }
@@ -452,7 +451,7 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
         unwrap_2d = false;
     }
 
-    // FSL-272: a magnitude (or, with -m, a mask) of another size than the phase: FSL reads it by
+    // FSL-271: a magnitude (or, with -m, a mask) of another size than the phase: FSL reads it by
     // the phase's indices, with its extrapolation outside it
     let size3 = |v: &Volume| [v.dims[0], v.dims[1], v.dims[2]];
     let source_size = masks.as_ref().map_or_else(|| size3(&absmaps), size3);
@@ -463,11 +462,21 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
             "the magnitude image has another size than the phase image"
         };
         if !fsl {
-            return Err(io.reject(&defects::FSL_272, what));
+            return Err(io.reject(&defects::FSL_271, what));
         }
-        return Err(io.refuse(&defects::FSL_272, what));
+        io.notice(
+            &defects::FSL_271,
+            format!("{what}: read by the phase's indices"),
+        );
     }
 
+    let modes = Modes {
+        removeramps: a.removeramps,
+        verbose: a.verbose,
+        unwrap_2d,
+        label_2d,
+        num_phase_split: a.num_phase_split,
+    };
     let mut uphase: Option<Volume> = None;
     let mut count = 0i64;
     let mut saved_masks = PerVolume::<f32>::new(&a.maskvol);
@@ -478,35 +487,107 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
             Some(m) => m.sub_volume(n.min(maskend))?,
             None => absmaps.sub_volume(n)?,
         };
-        // FSL-269: NaN values change the threshold (from percentiles), and a NaN first value
-        // makes the maximum NaN (an empty mask)
-        let nan_first = source.data.first().is_some_and(|v| v.is_nan());
-        if uw::has_nan(&source) && (!threshset || nan_first) {
-            io.notice(
-                &defects::FSL_269,
-                if fsl {
-                    "NaN values of the magnitude (or mask) image entered its threshold or maximum"
-                } else {
-                    "NaN values of the magnitude (or mask) image left out of its threshold and maximum"
-                },
-            );
-        }
-        if !threshset {
-            threshval = match uw::basic_mask_threshold(&source, !fsl) {
-                Ok(t) => t,
-                Err(_) => {
-                    return Err(io.refuse(
-                        &defects::FSL_269,
-                        "NaN values of the magnitude image in the sort of its percentiles",
-                    ));
-                }
-            };
-        }
-        let mask = if unwrap_2d {
-            uw::make_head_mask2d(&source, threshval, !fsl)
-        } else {
-            uw::make_head_mask(&source, threshval, !fsl)
+        let make = |thresh: f32, without_nan: bool| {
+            if unwrap_2d {
+                uw::make_head_mask2d(&source, thresh, without_nan)
+            } else {
+                uw::make_head_mask(&source, thresh, without_nan)
+            }
         };
+        // FSL-268: NaN values in the sort of the threshold's percentiles, a NaN first value as
+        // the maximum (an empty mask); the notice where FSL's mask and the corrected one differ
+        let nan = uw::has_nan(&source);
+        let fsl_thresh = if threshset {
+            Ok(threshval)
+        } else {
+            uw::basic_mask_threshold(&source, false)
+        };
+        let fixed = if threshset {
+            threshval
+        } else {
+            uw::basic_mask_threshold(&source, true).unwrap_or(0.0)
+        };
+        let mut mask = match (fsl, fsl_thresh) {
+            (true, Err(_)) => {
+                return Err(io.refuse(
+                    &defects::FSL_268,
+                    "NaN values of the magnitude image in the sort of its percentiles",
+                ));
+            }
+            (true, Ok(t)) => {
+                let m = make(t, false);
+                if nan && m.data != make(fixed, true).data {
+                    io.notice(
+                        &defects::FSL_268,
+                        "NaN values of the magnitude (or mask) image entered its threshold or maximum",
+                    );
+                }
+                m
+            }
+            (false, ft) => {
+                let m = make(fixed, true);
+                let differs = match ft {
+                    Ok(t) => make(t, false).data != m.data,
+                    Err(_) => true,
+                };
+                if nan && differs {
+                    io.notice(
+                        &defects::FSL_268,
+                        "NaN values of the magnitude (or mask) image left out of its threshold and maximum",
+                    );
+                }
+                m
+            }
+        };
+
+        let ph = phasemaps.sub_volume(n)?;
+        // FSL-269: NaN phases inside the mask enter the labels and constraints; the correction
+        // leaves them out (NaN in the unwrapped phase, as their phase)
+        let nan_inside: Vec<usize> = (0..ph.data.len())
+            .filter(|&i| ph.data[i].is_nan() && uw::inside_at(&mask, &ph, i))
+            .collect();
+        let done = if nan_inside.is_empty() {
+            match per_volume(&ph, &mask, &modes, fsl) {
+                Ok(r) => r,
+                Err(_) => return Err(io.refuse(&defects::FSL_269, NAN_SORT)),
+            }
+        } else if fsl {
+            let r = match per_volume(&ph, &mask, &modes, true) {
+                Ok(r) => r,
+                Err(_) => return Err(io.refuse(&defects::FSL_269, NAN_SORT)),
+            };
+            let (m2, _) = without_nan_phases(&mask, &ph, &nan_inside);
+            let differs = per_volume(&ph, &m2, &modes, true)
+                .map(|mut f| {
+                    f.uph = with_nan_phases(f.uph, &ph, &nan_inside);
+                    outputs_differ(&f, &r, a)
+                })
+                .unwrap_or(true);
+            if differs {
+                io.notice(
+                    &defects::FSL_269,
+                    "NaN phases inside the mask entered the labels and their constraints",
+                );
+            }
+            r
+        } else {
+            let (m2, _) = without_nan_phases(&mask, &ph, &nan_inside);
+            let mut r = per_volume(&ph, &m2, &modes, false)
+                .expect("no NaN phase is labelled: the sorts hold no NaN");
+            r.uph = with_nan_phases(r.uph, &ph, &nan_inside);
+            let differs = per_volume(&ph, &mask, &modes, false)
+                .map(|f| outputs_differ(&f, &r, a))
+                .unwrap_or(true);
+            if differs {
+                io.notice(
+                    &defects::FSL_269,
+                    "NaN phases inside the mask left out of the labels (NaN in the output)",
+                );
+            }
+            mask = m2;
+            r
+        };
+
         if let Some(name) = &saved_masks.name {
             if fsl {
                 if let Some(code) = save(&mask, name, run, io)? {
@@ -516,115 +597,59 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
                 saved_masks.volumes.push(mask.clone());
             }
         }
-
-        let mut ph = phasemaps.sub_volume(n)?;
-        // Remove phase ramps
-        let mut ramps = [0.0f64; 3];
-        if a.removeramps {
-            if uw::ramps_skip_voxels(&ph, &mask) {
-                io.notice(
-                    &defects::FSL_261,
-                    if fsl {
-                        "the phase ramps left the last column, row and slice out"
-                    } else {
-                        "the phase ramps estimated, removed and restored on every column, row and slice"
-                    },
-                );
-            }
-            if a.verbose {
-                io.cout("Removing linear ramps");
-            }
-            ramps = uw::estimate_linear_ramps(&ph, &mask, fsl);
-            if a.verbose {
-                io.cout("Estimated linear ramps");
-            }
-            uw::remove_linear_ramps(&ramps, &mut ph, &mask, fsl);
-            phasemaps.set_sub_volume(n, &ph)?;
-            if a.verbose {
-                io.cout("Removed linear ramps");
-                let m = Mat::col(&ramps);
-                let _ = writeln!(io.out, "Ramp values: {}", arma::print_expr(&m));
+        if a.removeramps && uw::ramps_skip_voxels(&ph, &mask) {
+            io.notice(
+                &defects::FSL_261,
                 if fsl {
-                    io.notice(
-                        &defects::FSL_267,
-                        "the ramp-free phase written to grot in the working directory",
-                    );
-                    if let Some(code) = save(&ph, "grot", run, io)? {
-                        return Ok(code);
-                    }
+                    "the phase ramps left the last column, row and slice out"
                 } else {
-                    io.notice(
-                        &defects::FSL_267,
-                        "no file grot written in the working directory",
-                    );
-                }
-            }
+                    "the phase ramps estimated, removed and restored on every column, row and slice"
+                },
+            );
         }
-
-        // Make labels
-        if a.verbose {
-            io.cout(&format!("Number of phase splits = {}", a.num_phase_split));
+        for l in &done.before {
+            io.cout(l);
         }
-        let label = if unwrap_2d {
-            uw::find_phase_labels2d(&ph, &mask, a.num_phase_split, false, fsl).0
-        } else if label_2d {
-            let (l, met) = uw::find_phase_labels2d(&ph, &mask, a.num_phase_split, true, fsl);
-            if met.reused {
-                io.notice(
-                    &defects::FSL_262,
-                    if fsl {
-                        "label numbers reused after a slice without labels"
-                    } else {
-                        "label numbers kept unique across a slice without labels"
-                    },
-                );
-            }
-            l
-        } else {
-            uw::find_phase_labels(&ph, &mask, a.num_phase_split)
-        };
-        if let Some(name) = &saved_labels.name {
+        if let Some(ramp_free) = &done.ramp_free {
             if fsl {
-                if let Some(code) = save(&label, name, run, io)? {
+                io.notice(
+                    &defects::FSL_266,
+                    "the ramp-free phase written to grot in the working directory",
+                );
+                if let Some(code) = save(ramp_free, "grot", run, io)? {
                     return Ok(code);
                 }
             } else {
-                saved_labels.volumes.push(label.clone());
+                io.notice(
+                    &defects::FSL_266,
+                    "no file grot written in the working directory",
+                );
             }
         }
-
-        // Unwrap phase
-        let (mut uph, log): (Volume, UnwrapLog) = if unwrap_2d {
-            match uw::unwrap2d(&ph, &label, a.verbose) {
-                Ok(r) => r,
-                Err(_) => {
-                    return Err(io.refuse(
-                        &defects::FSL_270,
-                        "NaN differences between slices in the sort of their median",
-                    ));
-                }
-            }
-        } else {
-            uw::unwrap(&ph, &label, a.verbose)
-        };
-        for l in &log.lines {
+        for l in &done.after {
             io.cout(l);
         }
-
-        // Restore phase ramps
-        if a.removeramps {
-            uw::restore_linear_ramps(&ramps, &mut uph, &mask, fsl);
-            uw::restore_linear_ramps(&ramps, &mut ph, &mask, fsl);
-            phasemaps.set_sub_volume(n, &ph)?;
-            if a.verbose {
-                io.cout("Removed linear ramps");
+        if let Some(name) = &saved_labels.name {
+            if fsl {
+                if let Some(code) = save(&done.label, name, run, io)? {
+                    return Ok(code);
+                }
+            } else {
+                saved_labels.volumes.push(done.label.clone());
             }
         }
+        for l in &done.unwrap_log {
+            io.cout(l);
+        }
+        if a.removeramps && a.verbose {
+            io.cout("Removed linear ramps");
+        }
+        phasemaps.set_sub_volume(n, &done.ph)?;
 
         // uphase.addvolume(uph)
         let total = imgend - imgstart + 1;
-        let u = uphase.get_or_insert_with(|| series_like(&uph, total));
-        u.set_sub_volume(count, &uph)?;
+        let u = uphase.get_or_insert_with(|| series_like(&done.uph, total));
+        u.set_sub_volume(count, &done.uph)?;
         count += 1;
     }
 
@@ -635,7 +660,7 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
     if !fsl {
         if saved_masks.volumes.len() > 1 || saved_labels.volumes.len() > 1 {
             io.notice(
-                &defects::FSL_263,
+                &defects::FSL_262,
                 "every volume's mask or labels saved, not only the last",
             );
         }
@@ -651,14 +676,14 @@ fn do_unwrapping(a: &Args, run: &Run, io: &mut Io) -> Result<u8, End> {
         }
     } else if count > 1 && (saved_masks.name.is_some() || saved_labels.name.is_some()) {
         io.notice(
-            &defects::FSL_263,
+            &defects::FSL_262,
             "only the last volume's mask or labels saved",
         );
     }
     if fsl_saves_nothing {
         // newimage writes nothing for an image without volumes (save_volume4D's -1, ignored)
         io.notice(
-            &defects::FSL_271,
+            &defects::FSL_270,
             "no volume processed and no output written",
         );
     } else if let Some(code) = save(&uphase, &a.uphasevol, run, io)? {
@@ -696,22 +721,22 @@ fn read_complex(name: &str, settings: &Settings, io: &mut Io) -> Result<(Volume,
                 )
             };
             let d = if c.datatype == dt::COMPLEX128 {
-                &defects::FSL_266
+                &defects::FSL_265
             } else {
-                &defects::FSL_264
+                &defects::FSL_263
             };
             io.notice(d, detail);
         }
         if c.swapped && c.datatype == dt::COMPLEX {
             io.notice(
-                &defects::FSL_265,
+                &defects::FSL_264,
                 "a complex image of the other byte order read with its real and imaginary parts exchanged",
             );
         }
     } else {
         if c.not_complex {
             return Err(io.reject(
-                &defects::FSL_264,
+                &defects::FSL_263,
                 &format!(
                     "the complex input {name} is a {} image, not a complex one",
                     datatype_name(c.datatype)
@@ -720,15 +745,141 @@ fn read_complex(name: &str, settings: &Settings, io: &mut Io) -> Result<(Volume,
         }
         if c.swapped && c.datatype == dt::COMPLEX {
             io.notice(
-                &defects::FSL_265,
+                &defects::FSL_264,
                 "a complex image of the other byte order read with its real and imaginary parts in place",
             );
         }
         if c.datatype == dt::COMPLEX128 {
-            io.notice(&defects::FSL_266, "a complex128 image read (as float)");
+            io.notice(&defects::FSL_265, "a complex128 image read (as float)");
         }
     }
     Ok((complex::phase(&c.re, &c.im), complex::abs(&c.re, &c.im)))
+}
+
+/// The options that decide one volume's work.
+struct Modes {
+    removeramps: bool,
+    verbose: bool,
+    unwrap_2d: bool,
+    label_2d: bool,
+    num_phase_split: i32,
+}
+
+/// One volume's work after its mask: the ramps, labels, unwrapping and the ramps restored.
+struct Done {
+    /// The phase as FSL leaves it in the series (the ramps removed and restored).
+    ph: Volume,
+    uph: Volume,
+    label: Volume<i32>,
+    /// With `-v` and `--removeramps`: the ramp-free phase FSL saves as grot.
+    ramp_free: Option<Volume>,
+    /// `-v`'s lines before grot is saved, after it (before the labels are saved), and those
+    /// of the unwrapping.
+    before: Vec<String>,
+    after: Vec<String>,
+    unwrap_log: Vec<String>,
+}
+
+const NAN_SORT: &str = "NaN differences between slices in the sort of their median";
+
+/// `do_unwrapping`'s loop body from the ramps on, for one volume `ph` and its mask (`fsl`:
+/// FSL's loops for FSL-261). `Err(Outside)`: NaN values in the sort of `unwrap2D`'s medians.
+fn per_volume(
+    ph: &Volume,
+    mask: &Volume,
+    m: &Modes,
+    fsl: bool,
+) -> Result<Done, larmorx_nc_core::stdsort::Outside> {
+    let mut ph = ph.clone();
+    let (mut before, mut after) = (Vec::new(), Vec::new());
+    let mut ramps = [0.0f64; 3];
+    let mut ramp_free = None;
+    if m.removeramps {
+        if m.verbose {
+            before.push("Removing linear ramps".to_owned());
+        }
+        ramps = uw::estimate_linear_ramps(&ph, mask, fsl);
+        if m.verbose {
+            before.push("Estimated linear ramps".to_owned());
+        }
+        uw::remove_linear_ramps(&ramps, &mut ph, mask, fsl);
+        if m.verbose {
+            before.push("Removed linear ramps".to_owned());
+            before.push(format!("Ramp values: {}", column_text(&ramps)));
+            ramp_free = Some(ph.clone());
+        }
+    }
+    if m.verbose {
+        after.push(format!("Number of phase splits = {}", m.num_phase_split));
+    }
+    let label = if m.unwrap_2d {
+        uw::find_phase_labels2d(&ph, mask, m.num_phase_split, false)
+    } else if m.label_2d {
+        uw::find_phase_labels2d(&ph, mask, m.num_phase_split, true)
+    } else {
+        uw::find_phase_labels(&ph, mask, m.num_phase_split)
+    };
+    let (mut uph, log): (Volume, UnwrapLog) = if m.unwrap_2d {
+        uw::unwrap2d(&ph, &label, m.verbose)?
+    } else {
+        uw::unwrap(&ph, &label, m.verbose)
+    };
+    if m.removeramps {
+        uw::restore_linear_ramps(&ramps, &mut uph, mask, fsl);
+        uw::restore_linear_ramps(&ramps, &mut ph, mask, fsl);
+    }
+    Ok(Done {
+        ph,
+        uph,
+        label,
+        ramp_free,
+        before,
+        after,
+        unwrap_log: log.lines,
+    })
+}
+
+/// Whether two runs of one volume give different outputs (bit for bit): the unwrapped phase,
+/// the raw phase, the labels, and the mask (FSL-269's correction leaves NaN phases out of it).
+fn outputs_differ(x: &Done, y: &Done, a: &Args) -> bool {
+    let bits = |p: &[f32], q: &[f32]| {
+        p.len() != q.len() || p.iter().zip(q).any(|(u, v)| u.to_bits() != v.to_bits())
+    };
+    bits(&x.uph.data, &y.uph.data)
+        || (a.rawphasevol.is_some() && bits(&x.ph.data, &y.ph.data))
+        || (a.labelvol.is_some() && x.label.data != y.label.data)
+        || a.maskvol.is_some()
+}
+
+/// The mask without the voxels `nan` (NaN phases inside it), FSL-269's correction.
+fn without_nan_phases(mask: &Volume, ph: &Volume, nan: &[usize]) -> (Volume, usize) {
+    let mut m = mask.clone();
+    if m.dims[..3] == ph.dims[..3] {
+        for &i in nan {
+            m.data[i] = 0.0;
+        }
+    }
+    (m, nan.len())
+}
+
+/// The unwrapped phase with the NaN phases `nan` put back (FSL-269's correction).
+fn with_nan_phases(mut uph: Volume, ph: &Volume, nan: &[usize]) -> Volume {
+    for &i in nan {
+        uph.data[i] = ph.data[i];
+    }
+    uph
+}
+
+/// `cout << ColumnVector` (armawrap's `doPrint`, NEWMAT's form): each value in fixed notation
+/// with the stream's precision (6) and a blank, a newline after each row. (It leaves `cout` in
+/// fixed notation; prelude prints no floating value on it afterwards.)
+fn column_text(v: &[f64]) -> String {
+    let mut s = String::new();
+    for &x in v {
+        s.push_str(&cnum::fmt_f(x, 6));
+        s.push_str(" \n");
+    }
+    s
 }
 
 /// A NIfTI datatype's name, as the messages give it.
@@ -769,7 +920,7 @@ fn save<T: Elem>(v: &Volume<T>, name: &str, run: &Run, io: &mut Io) -> Result<Op
     }
 }
 
-/// FSL-263's correction: every processed volume's mask (or labels) as one series.
+/// FSL-262's correction: every processed volume's mask (or labels) as one series.
 fn save_series<T: Elem>(
     vols: &[Volume<T>],
     name: &str,

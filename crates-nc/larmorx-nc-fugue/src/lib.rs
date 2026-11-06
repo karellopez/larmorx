@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Copyright 2026 Karel Lopez Vilaret.
-//! A bit-exact replica of FSL's PRELUDE (FSL 6.0.7.23: fsl-fugue 2201.5), Phase Region
+//! A bit-exact replica of FSL's PRELUDE (FSL 6.0.7.23: fsl-fugue 2603.0), Phase Region
 //! Expanding Labeller for Unwrapping Discrete Estimates (Jenkinson 2003, "Fast, automated,
 //! N-dimensional phase-unwrapping algorithm", MRM 49:193-197), translated from FSL's source
 //! under the FSL Licence's terms (non-commercial; the licence and FSL's original source travel

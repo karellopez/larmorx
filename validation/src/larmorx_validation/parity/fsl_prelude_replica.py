@@ -16,6 +16,12 @@ cases:
   mask and its threshold, 3D and 2D labels and unwrapping, the volume range, the saved mask,
   labels and raw phase, the phase ramps, the messages), the output types, the messages and
   failures, on synthetic phase images with known wraps (``oracles/inputs/fsl-prelude-replica``);
+- **panel**: the data panel's phase-difference field maps that no fMRIPrep run unwrapped (no
+  BOLD names them: ds000256's child, ds004958's GRE map, from ``larmorx-testdata``), made into
+  prelude's input as sdcflows makes it (``au2rads``: the phase difference rescaled from its
+  minimum and maximum to 0 to 2 pi, float32), with the first magnitude: prelude's own mask, and
+  ``-s`` or ``--removeramps`` with the saved outputs; the raw scanner values given as they are
+  (FSL's range error);
 - **difftest**: random cases (``larmorx_validation.difftest.tools.fsl_prelude``), a :class:`Run`
   of their own (``direct``), inputs named ``@dt:<key>``; where the replica refuses in
   ``reproduce`` because FSL's sort would read memory it does not own (FSL-268, FSL-269), the
@@ -371,6 +377,62 @@ def inputs() -> Path:
     return _atomic_dir(base / SUITE / f"v{INPUTS_VERSION}", _make_inputs)
 
 
+#: The data panel's phase-difference field maps that no fMRIPrep oracle run unwrapped (no BOLD
+#: names them): name -> (phase difference, first magnitude) in ``larmorx-testdata``.
+PANEL_MAPS = {
+    "ds000256": (
+        "openneuro/ds000256/sub-CTS203/fmap/sub-CTS203_phasediff.nii.gz",
+        "openneuro/ds000256/sub-CTS203/fmap/sub-CTS203_magnitude1.nii.gz",
+    ),
+    "ds004958": (
+        "openneuro/ds004958/sub-fsm64ps/fmap/sub-fsm64ps_acq-gre_phasediff.nii.gz",
+        "openneuro/ds004958/sub-fsm64ps/fmap/sub-fsm64ps_acq-gre_magnitude1.nii.gz",
+    ),
+}
+#: The panel inputs' recipe version.
+PANEL_VERSION = "1"
+
+
+def au2rads(src: Path, dst: Path) -> None:
+    """A phase map in arbitrary units as sdcflows makes prelude's input of it (``au2rads``):
+    rescaled from its minimum and maximum to [0, 2 pi] in double precision, rounded to float32
+    and clipped; the header kept (float32, millimetres)."""
+    import nibabel as nib
+
+    im = nib.load(src)
+    data = np.asarray(im.dataobj, dtype=np.float64)
+    data = (data - data.min()) * (2 * np.pi / (data.max() - data.min()))
+    data = np.clip(np.float32(data), 0.0, 2 * np.pi)
+    hdr = im.header.copy()
+    hdr.set_data_dtype(np.float32)
+    hdr.set_xyzt_units("mm")
+    nib.Nifti1Image(data, None, hdr).to_filename(dst)
+
+
+def _make_panel_inputs(d: Path) -> None:
+    import larmorx_testdata as td
+
+    for name, (phase, magnitude) in PANEL_MAPS.items():
+        shutil.copy(td.get(phase), d / f"{name}_phasediff.nii.gz")
+        shutil.copy(td.get(magnitude), d / f"{name}_magnitude1.nii.gz")
+        au2rads(d / f"{name}_phasediff.nii.gz", d / f"{name}_phasediff_rads.nii.gz")
+
+
+def panel_inputs() -> Path | None:
+    """The panel's derived inputs (``oracles/inputs/fsl-prelude-replica/panel-v1``), or ``None``
+    without ``larmorx-testdata`` or its files."""
+    try:
+        import larmorx_testdata  # noqa: F401
+    except ImportError:
+        return None
+    ws = workspace()
+    base = (ws / "oracles" / "inputs") if ws else Path(tempfile.gettempdir())
+    try:
+        return _atomic_dir(base / SUITE / f"panel-v{PANEL_VERSION}", _make_panel_inputs)
+    except Exception:  # a file the catalog cannot fetch here
+        return None
+
+
 # ------------------------------------------------------------------------------------------------
 # Cases
 
@@ -420,6 +482,13 @@ def _resolve(word: str, d: Path) -> str:
         key, value = "", word
     if not value.startswith("@"):
         return word
+    if value.startswith("@panel/"):
+        base = panel_inputs()
+        if base is None:
+            raise Outcome("skipped", "the data panel's field maps (larmorx-testdata) are missing")
+        src = base / value.removeprefix("@panel/")
+        shutil.copy(src, d / src.name)
+        return f"{key}{sep}{src.name}" if sep else src.name
     if value.startswith("@dt:"):
         # a random case's input (differential random testing), built from its recipe; a
         # pair's .img beside its .hdr
@@ -759,6 +828,40 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         "standard",
         "-u (the output's other name) and grouped flags -fv",
         Run((*pa, "-u", "out", "-fv")),
+    )
+    c.update(_panel_cases())
+    return c
+
+
+def _panel_cases() -> dict[str, tuple[str, str, Run]]:
+    """The data panel's two phase-difference maps no fMRIPrep run unwrapped (module doc)."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    for name, extra, what in (
+        ("ds000256", ("-s", "-v", "--savemask=m", "-l", "l"), "-s -v with the mask and labels"),
+        ("ds004958", ("--removeramps", "-r", "r", "-v"), "--removeramps -v with the raw phase"),
+    ):
+        mag, rads = f"@panel/{name}_magnitude1.nii.gz", f"@panel/{name}_phasediff_rads.nii.gz"
+        c[f"panel/{name}/rads"] = (
+            "standard",
+            f"the data panel's {name} phase difference in radians (sdcflows' au2rads) and its "
+            "first magnitude: prelude's own mask",
+            Run((f"--abs={mag}", f"--phase={rads}", "--unwrap=out")),
+        )
+        c[f"panel/{name}/options"] = (
+            "standard",
+            f"the data panel's {name} phase difference in radians: {what}",
+            Run(("-a", mag, "-p", rads, "-o", "out", *extra)),
+        )
+    c["panel/ds000256/raw"] = (
+        "standard",
+        "the data panel's ds000256 phase difference in the scanner's units (FSL's range error)",
+        Run(
+            (
+                "--abs=@panel/ds000256_magnitude1.nii.gz",
+                "--phase=@panel/ds000256_phasediff.nii.gz",
+                "--unwrap=out",
+            )
+        ),
     )
     return c
 

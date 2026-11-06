@@ -22,6 +22,7 @@ opened), ``mention`` (a path among a command's arguments whose effect the audit 
 
 from __future__ import annotations
 
+import fnmatch
 import posixpath
 import re
 from dataclasses import dataclass, field
@@ -233,10 +234,12 @@ def _grep_tool(inp: dict, result: str, cwd: str, ctx: Context, res: Result) -> N
 @dataclass
 class _Seen:
     search_cwds: list[tuple[str, bool]] = field(default_factory=list)
+    search_scopes: list[tuple[str, str]] = field(default_factory=list)  # (cwd, path searched)
     git_diff_roots: list[str] = field(default_factory=list)
     compile_roots: list[str] = field(default_factory=list)
     commit_repos: list[str] = field(default_factory=list)
     log_after_commit: bool = False
+    search_names: bool = False  # ``grep -l``/``-L``/``-c``: the output names files, no lines
 
 
 def _bash(cmd: str, result: str, cwd: str, ctx: Context, scripts: dict, res: Result) -> None:
@@ -292,7 +295,7 @@ def _simple(
     def add(op: str, path: str, detail: str = "", **kw) -> None:
         if path:
             res.accesses.append(
-                Access(op, _abs(path, cwd, ctx), name, detail, unresolved=un or "$" in path, **kw)
+                Access(op, _abs(path, cwd, ctx), name, detail, unresolved="$" in path, **kw)
             )
 
     if name in IGNORE:
@@ -572,10 +575,18 @@ def _search(name: str, args: list[str], add, cwd: str, seen: _Seen) -> None:
         pos = ["."]
     if not pos:  # a search of its input (a pipe): the files are the earlier command's
         return
-    single = pos[0] if len(pos) == 1 and _looks_like_file(pos[0]) else ""
+    single = pos[0] if len(pos) == 1 and _looks_like_file(pos[0]) and not _glob(pos[0]) else ""
+    if any(
+        a in ("--files-with-matches", "--files-without-match", "--count")
+        or re.fullmatch(r"-[A-Za-z]*[lLc][A-Za-z]*", a)
+        for a in args
+    ):
+        seen.search_names = True
+        single = ""
     seen.search_cwds.append((cwd, single))
     for a in pos:
         add("search", a, f"{name} {pattern!r}"[:160])
+        seen.search_scopes.append((cwd, a))
 
 
 def _find(args, add, cwd, st, ctx, scripts, res, seen, depth) -> None:
@@ -600,6 +611,7 @@ def _find(args, add, cwd, st, ctx, scripts, res, seen, depth) -> None:
             if inner_name in SEARCH:
                 op = "search"
                 seen.search_cwds.append((cwd, ""))
+                seen.search_scopes.extend((cwd, p) for p in paths)
             if op:
                 for p in paths:
                     add(op, p, "find -exec " + " ".join(inner)[:120])
@@ -715,8 +727,13 @@ def _git(args, cwd, st, ctx, res, seen, unresolved) -> None:
             add("diff-shown", p, f"git {sub}", gcwd)
         seen.git_diff_roots.append(root)
     elif sub in ("diff", "log", "whatchanged", "format-patch", "range-diff", "stash"):
-        patch = sub == "diff" or any(
-            a in ("-p", "--patch", "-u") or a.startswith("-L") for a in rest
+        names_only = any(
+            a in ("--stat", "--name-only", "--name-status", "--shortstat", "--numstat")
+            or a.startswith("--stat=")
+            for a in rest
+        )
+        patch = not names_only and (
+            sub == "diff" or any(a in ("-p", "--patch", "-u") or a.startswith("-L") for a in rest)
         )
         for p in after:
             add("diff-shown" if patch else "stat", p, f"git {sub}", gcwd)
@@ -729,6 +746,7 @@ def _git(args, cwd, st, ctx, res, seen, unresolved) -> None:
         scope = after or [p for p in pos if not re.match(r"^[0-9a-f]{7,40}$|^HEAD|^main$", p)]
         for p in scope or ["."]:
             add("search", p, "git grep", gcwd)
+            seen.search_scopes.append((gcwd, p))
         seen.search_cwds.append((gcwd, ""))
     elif sub in ("ls-files", "ls-tree"):
         pos = _positional(before, set("x"))
@@ -853,7 +871,7 @@ def _literals(code: str, add, via: str) -> None:
 
 
 def _mention(a: str, add, detail: str = "") -> None:
-    if "=" in a and a.startswith("-"):
+    if "=" in a and (a.startswith("-") or re.match(r"^[A-Za-z_]\w*=", a)):
         a = a.split("=", 1)[1]
     if not a or a.startswith("-") or re.match(r"^[a-z]+://", a) or " " in a or "\n" in a:
         return
@@ -872,9 +890,26 @@ def _outputs(result: str, ctx: Context, res: Result, seen: _Seen) -> None:
     if not result:
         return
     text = result[:8_000_000]
+    scopes = [shell.resolve(p, c, ctx.home).rstrip("/") for c, p in seen.search_scopes]
+
+    def in_scope(p: str) -> bool:
+        # A hit is a file the search looked at: a ``path:line:`` text in a searched file's own
+        # lines (a program's message in a log) is not one.
+        return not scopes or any(
+            p == s or p.startswith(s + "/") or (_glob(s) and fnmatch.fnmatchcase(p, s))
+            for s in scopes
+        )
+
     for cwd, single in seen.search_cwds:
+        if seen.search_names:
+            for line in text.splitlines():
+                name = line.split(":", 1)[0].strip()
+                if name and _pathlike(name) and in_scope(_abs(name, cwd, ctx)):
+                    res.accesses.append(Access("search-match", _abs(name, cwd, ctx), "output"))
+            break
         for p, lines in _hits(text, cwd, ctx, single=single or None).items():
-            res.accesses.append(Access("search-hit", p, "output", "", hits=tuple(lines)))
+            if in_scope(p):
+                res.accesses.append(Access("search-hit", p, "output", "", hits=tuple(lines)))
         break
     for root in seen.git_diff_roots[:1]:
         for _a, b in DIFF_HEADER.findall(text):
@@ -926,6 +961,10 @@ def _hits(text: str, base: str, ctx: Context, single: str | bool | None) -> dict
         nums = [int(n) for n in re.findall(r"^(\d+)[:-]", text, re.M)]
         out[_abs(single, base, ctx)] = nums
     return out
+
+
+def _glob(p: str) -> bool:
+    return any(ch in p for ch in "*?[")
 
 
 def _pathlike(p: str) -> bool:

@@ -21,6 +21,7 @@ import gzip
 import json
 import multiprocessing
 import os
+import posixpath
 import re
 import sys
 import time
@@ -32,9 +33,8 @@ from larmorx_validation.cleanroom_audit import transcripts as tr
 
 HERE = Path(__file__).resolve()
 REPO = HERE.parents[4]
-SCRATCH_TASK = re.compile(
-    r"/tmp/claude-\d+/[^/]+/[^/]+/scratchpad/([^/\s'\"]+)/(?:BRIEF|NOTES)\.md"
-)
+#: A scratch folder a brief names (the agent's own: its brief, notes and handoff live there).
+SCRATCH_TASK = re.compile(r"/tmp/claude-\d+/[^/\s]+/[^/\s]+/scratchpad/([^/\s'\"`)<>]+)")
 
 
 def default_workspace() -> Path:
@@ -169,6 +169,7 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
     launched_by: dict[str, str] = {}
     n_access = 0
     n_calls = 0
+    merged: dict[str, dict[str, tr.Call]] = {}
     for key, copies in sorted(by_key.items()):
         copies.sort(key=lambda f: (-len(f.calls), f.file.path))
         calls: dict[str, tr.Call] = {}
@@ -177,19 +178,31 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
                 prev = calls.get(c.id)
                 if prev is None or (not prev.has_result and c.has_result):
                     calls[c.id] = c
+        merged[key] = calls
+    # Who wrote into each scratch folder, and when (the orchestrator's briefs excepted): a folder
+    # another agent wrote into before is that agent's, unless the reader's brief names it.
+    task_writes: dict[str, list[tuple[str, str]]] = collections.defaultdict(list)
+    for key, calls in merged.items():
+        if key.endswith("/main"):
+            continue
+        for c in calls.values():
+            for a in c.accesses:
+                m = rs.SCRATCH.match(a["path"]) if a["op"] in rs.WRITE_OPS else None
+                if m and m["task"]:
+                    task_writes[m["task"]].append((c.ts, key))
+    first_write = {
+        t: sorted({k: ts for ts, k in sorted(v, reverse=True)}.items(), key=lambda x: x[1])
+        for t, v in task_writes.items()
+    }
+    for key, copies in sorted(by_key.items()):
+        calls = merged[key]
         best = copies[0]
         meta = next((f.meta for f in copies if f.meta), {})
         brief = next((f.brief for f in copies if f.brief), "")
         session, agent = key.split("/", 1)
         is_main = agent == "main"
-        written_tasks = set()
-        for c in calls.values():
-            for a in c.accesses:
-                if a["op"] in rs.WRITE_OPS:
-                    m = rs.SCRATCH.match(a["path"])
-                    if m and m["task"]:
-                        written_tasks.add(m["task"])
-        own_tasks = written_tasks | set(SCRATCH_TASK.findall(brief))
+        own_tasks = {t for t, ws in first_write.items() if any(k == key for k, _ in ws)}
+        own_tasks |= set(SCRATCH_TASK.findall(brief))
         lines_out = []
         commits = []
         for c in sorted(calls.values(), key=lambda c: (c.ts, c.line)):
@@ -205,6 +218,9 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
                     )
             if c.persisted == "missing":
                 gaps["persisted_output_missing"] += 1
+                gap_examples["persisted_output_missing"].append(f"{key} line {c.line}")
+            if not c.has_result:
+                gap_examples["calls_without_result"].append(f"{key} line {c.line} {c.tool}")
             if c.spawn:
                 aid = c.spawn.get("agent")
                 if aid:
@@ -213,7 +229,7 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
             for k in c.commits:
                 commits.append({**k, "key": key, "ts": c.ts, "line": c.line, "call": c.id})
             for a in c.accesses:
-                rec = classify_access(a, ctx, c.ts, own_tasks, is_main)
+                rec = classify_access(a, ctx, c.ts, own_tasks, is_main, first_write, key)
                 rec["refused"] = c.refused
                 n_access += 1
                 ops[a["op"]] += 1
@@ -274,6 +290,8 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
             gaps["request_only_calls"] += f.request_only_calls
             gaps["bad_lines"] += f.bad_lines
             gaps["compaction_parent_missing"] += f.compaction_parent_missing
+            if f.compaction_parent_missing:
+                gap_examples["compaction_parent_missing"].append(f.file.path)
             for t, k in f.unknown_tools.items():
                 gaps[f"unknown_tool:{t}"] += k
         gaps["compactions"] += agents[key]["compactions"]
@@ -300,6 +318,9 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
             gaps["launches_whose_transcript_is_missing"] += 1
             gap_examples["launches_whose_transcript_is_missing"].append(k)
     (out / "agents.json").write_text(json.dumps(agents, indent=1, sort_keys=True) + "\n")
+    (out / "scratch_tasks.json").write_text(
+        json.dumps(first_write, indent=1, sort_keys=True) + "\n"
+    )
     with (out / "commits.jsonl").open("w", encoding="utf-8") as fh:
         for k in all_commits:
             fh.write(json.dumps(k, sort_keys=True) + "\n")
@@ -332,16 +353,32 @@ def write_outputs(results: list[tr.FileResult], roots, ctx: rs.Context, out: Pat
     }
 
 
-def classify_access(a: dict, ctx: rs.Context, ts: str, own_tasks: set[str], is_main: bool) -> dict:
+def classify_access(
+    a: dict,
+    ctx: rs.Context,
+    ts: str,
+    own_tasks: set[str],
+    is_main: bool,
+    first_write: dict[str, list[tuple[str, str]]] | None = None,
+    key: str = "",
+) -> dict:
     """An access with its location, category, rule, family and whether the rule was in force."""
     loc = rs.locate(a["path"], ctx, unresolved=a.get("unresolved", False))
     if a["op"] == "exec" and a.get("hint"):
         cls = rs.Class("run", None, a["hint"])
     else:
         cls = rs.classify(loc, a["op"])
-    other = loc.checkout and loc.checkout not in own_tasks
-    if loc.area == "scratch" and cls.category == "scratch" and not is_main and other:
-        cls = rs.restricted("R18", "all", a["op"], loc.rel)
+    if cls.rule == "R17" and a["path"].endswith(".jsonl") and key:
+        stem = posixpath.basename(a["path"])[: -len(".jsonl")]
+        session, agent = key.split("/", 1)
+        if stem == agent or (agent == "main" and stem == session):
+            cls = rs.Class("own-transcript")  # an agent reading its own record: nothing new
+    writers: list[str] = []
+    scratch = loc.area == "scratch" and cls.category == "scratch" and not is_main
+    if scratch and loc.checkout and loc.checkout not in own_tasks:
+        writers = [k for k, t in (first_write or {}).get(loc.checkout, []) if k != key and t <= ts]
+        if writers:
+            cls = rs.restricted("R18", "all", a["op"], loc.rel)
     content, named = rs.in_force(cls, loc.rel, ts) if ts else (False, False)
     rec = {
         "op": a["op"],
@@ -363,6 +400,8 @@ def classify_access(a: dict, ctx: rs.Context, ts: str, own_tasks: set[str], is_m
         rec["lines"] = a["lines"]
     if a.get("hits"):
         rec["hits"] = a["hits"][:500]
+    if writers:
+        rec["writers"] = writers
     if cls.rule == "R13":
         m = re.search(r"docs/parts/([^/]+)", a["path"])
         rec["part"] = m[1] if m else ""

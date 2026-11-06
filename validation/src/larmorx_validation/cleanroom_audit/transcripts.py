@@ -122,7 +122,7 @@ NEUTRAL_TOOLS = _words(
     "ToolSearch TaskStop TaskOutput SendMessage AskUserQuestion SubagentHandback Skill "
     "ReadNotifications Artifact ArtifactComments ArtifactData WebSearch TodoWrite ExitPlanMode "
     "EnterPlanMode BashOutput KillShell KillBash EnterWorktree ExitWorktree "
-    "ListMcpResourcesTool ReadMcpResourceTool"
+    "ListMcpResourcesTool ReadMcpResourceTool CronCreate CronDelete CronList"
 )
 MODELLED_TOOLS = _words(
     "Read Write Edit MultiEdit NotebookEdit Grep Glob LS WebFetch Bash Monitor Agent Task"
@@ -265,7 +265,7 @@ def _result(b: dict, r: dict, pending: dict, fr: FileResult, file, roots, ctx, s
         fr.results_without_call += 1
         return
     text = _text(b.get("content"))
-    if "<persisted-output>" in text[:200]:
+    if text.lstrip().startswith("<persisted-output>"):
         path = _persisted_path(text, file, roots)
         if path is None:
             c.persisted = "missing"

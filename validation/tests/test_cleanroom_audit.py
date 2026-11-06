@@ -143,7 +143,7 @@ def bash(command: str, output: str = "", cwd: str = WT) -> list[tuple[str, str, 
             [
                 ("build", "crates-nc/Cargo.toml", "restricted-build", "R10"),
                 ("build", ".", "repo", None),
-                ("mention", "crates-nc/Cargo.toml", "restricted-mention", "R10"),
+                ("mention", "crates-nc/Cargo.toml", "replica-metadata", "R10"),
                 ("diagnostic", "crates-nc/larmorx-nc-bet/src/x.rs", "restricted", "R10"),
             ],
         ),
@@ -202,6 +202,38 @@ def test_grep_of_one_file_attributes_its_hits():
     )
     hits = [a for a in res.accesses if a.op == "search-hit"]
     assert len(hits) == 1 and hits[0].hits == (12, 3789)
+
+
+def test_hits_outside_the_searched_files_are_not_reads():
+    # A program's message quoting a script's path and line, found in a log by a search.
+    out = "/home/u/fsl/bin/standard_space_roi: 12: bad option"
+    assert bash("grep -n 'bad option' /tmp/run/stdout", out) == [
+        ("search", "/tmp/run/stdout", "system", None)
+    ]
+
+
+def test_git_diff_stat_shows_names_only():
+    assert bash("git diff --stat main -- crates-nc") == [
+        ("stat", "crates-nc", "restricted-names", "R10")
+    ]
+
+
+def test_replica_metadata_and_build_outputs():
+    got = bash(
+        "grep -n larmorx crates-gpl/Cargo.lock; cp NOTICE crates-gpl/LICENSES/NOTICE-larmorx.txt"
+    )
+    assert [g[2] for g in got] == ["replica-metadata", "repo", "replica-metadata"]
+    got = bash("LARMORX_NC_BIN=/tmp/x/target-nc/release/larmorx-nc python3 run.py")
+    assert ("exec", "run.py", "repo", None) in got
+
+
+def test_a_names_only_search_names_files():
+    out = "docs/findings/fsl-bet.md\ndocs/findings/mri-hmc-original.md\n"
+    assert bash("grep -rln mri-hmc docs/findings/*.md", out) == [
+        ("search", "docs/findings/*.md", "restricted", "R11"),
+        ("search-match", "docs/findings/fsl-bet.md", "restricted-names", "R11"),
+        ("search-match", "docs/findings/mri-hmc-original.md", "repo", None),
+    ]
 
 
 def test_a_search_of_a_pipe_opens_nothing():
@@ -435,6 +467,17 @@ def test_compaction_keeps_both_halves(tmp_path, monkeypatch):
     assert agents["s1/main"]["role_hint"] == "orchestrator"
 
 
+def test_an_agent_reading_its_own_transcript(tmp_path, monkeypatch):
+    own = f"{HOME}/.claude/projects/-home-u-ws/s1/subagents/agent-a10.jsonl"
+    other = f"{HOME}/.claude/projects/-home-u-ws/s1/subagents/agent-a11.jsonl"
+    s = Session(agent="a10").prompt("x")
+    s.call("Bash", {"command": f"grep -c bench {own}; grep -c bench {other}"}, "3")
+    s.write(tmp_path / "root", meta={"toolUseId": "t10"})
+    _, _, logs = scan(tmp_path, [tmp_path / "root"], monkeypatch)
+    cats = [r["category"] for r in logs["s1/agent-a10"]]
+    assert cats == ["own-transcript", "restricted"]  # -c prints counts: no lines, no hit
+
+
 def test_the_orchestrator_cwd_comes_from_each_record(tmp_path, monkeypatch):
     s = Session().prompt("orchestrate")
     s.call("Bash", {"command": "cat a.md"}, cwd=f"{WS}/larmorx")
@@ -509,19 +552,30 @@ def test_commits_printed_and_quiet_commits(tmp_path, monkeypatch):
 
 
 def test_other_agents_scratch_is_restricted(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    rep = Session(agent="r1").prompt("FAST replica")
+    rep.call(
+        "Write",
+        {"file_path": f"{SCRATCH}/fast-replica/NOTES.md", "content": "x"},
+        ts="2026-11-02T09:00:00Z",
+    )
+    rep.write(root, meta={"toolUseId": "t8"})
     s = Session(agent="a7").prompt(f"Read your brief: {SCRATCH}/fast-cr/BRIEF.md")
     s.call("Read", {"file_path": f"{SCRATCH}/fast-cr/BRIEF.md"}, "1\tbrief")
     s.call("Read", {"file_path": f"{SCRATCH}/fast-replica/NOTES.md"}, "1\tnotes")
     s.call("Write", {"file_path": f"{SCRATCH}/fast-cr2/NOTES.md", "content": "x"})
     s.call("Read", {"file_path": f"{SCRATCH}/fast-cr2/NOTES.md"}, "1\tx")
-    s.write(tmp_path / "root", meta={"toolUseId": "t7"})
-    _, agents, logs = scan(tmp_path, [tmp_path / "root"], monkeypatch)
-    cats = [(r["rel"], r["category"], r["rule"]) for r in logs["s1/agent-a7"] if r["op"] == "read"]
-    assert cats == [
+    s.call("Read", {"file_path": f"{SCRATCH}/unclaimed/out.txt"}, "1\tx")
+    s.write(root, meta={"toolUseId": "t7"})
+    _, agents, logs = scan(tmp_path, [root], monkeypatch)
+    reads = [r for r in logs["s1/agent-a7"] if r["op"] == "read"]
+    assert [(r["rel"], r["category"], r["rule"]) for r in reads] == [
         ("fast-cr/BRIEF.md", "scratch", None),
         ("fast-replica/NOTES.md", "restricted", "R18"),
         ("fast-cr2/NOTES.md", "scratch", None),
+        ("unclaimed/out.txt", "scratch", None),
     ]
+    assert reads[1]["writers"] == ["s1/agent-r1"]
     assert agents["s1/agent-a7"]["own_scratch"] == ["fast-cr", "fast-cr2"]
 
 
@@ -610,6 +664,14 @@ def test_glibc_source_dates_and_the_rules_table():
         (f"{WT}/docs/findings/fsl-bet-original.md", "read", "repo", None),
         (f"{SCRATCH}/x/larmorx_documentation/content/a.md", "read", "repo-site", None),
         (f"{SCRATCH}/x/clone/crates-nc/fsl-source/a.cc", "read", "restricted", "R01"),
+        (f"{HOME}/.claude/projects/-home-u-ws/s1/tool-results/b1.txt", "read", "tool-output", None),
+        (f"{HOME}/.claude/projects/-home-u-ws/memory/MEMORY.md", "read", "memory", None),
+        ("/tmp/claude-1000/-home-u-ws/s1/tasks/b2.output", "read", "task-output", None),
+        (f"{WS}/oracles/afni-25.2.09/bin/3dTshift", "script-path", "run", None),
+        (f"{HOME}/fsl/bin/mcflirt", "script-path", "run", None),
+        (f"{WS}/oracles/ants-2.6.5-src/Examples/a.cxx", "mention", "permissive-source", None),
+        (f"{WT}/crates-nc/target/release/larmorx-nc", "copy", "replica-build-output", "R10"),
+        (f"{SCRATCH}/t/nc-target/release/larmorx-nc", "exec", "replica-build-output", "R10"),
     ],
 )
 def test_classification(path, op, category, rule):

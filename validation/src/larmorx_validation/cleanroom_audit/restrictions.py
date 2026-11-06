@@ -261,6 +261,21 @@ WRITE_OPS = frozenset({"write", "edit", "delete", "move"})
 
 #: Anchors that mark restricted material wherever a copy lives (a scratch clone, an archive, a
 #: wheel): pattern on "/" + path, rule, family.
+#: Operations that name a program a script or a command runs (a path in a ``bin`` folder named by a
+#: script is the program it runs: a black-box run, not a read).
+RUN_OPS = frozenset({"exec", "script-path", "mention"})
+#: Build outputs of the replica workspaces (compiled code, not source).
+BUILD_OUTPUT = re.compile(
+    r"/crates-(nc|gpl)/target(/|$)|/(nc|gpl)-target(/|$)|/target-(nc|gpl)(/|$)"
+)
+#: Licence, notice and package metadata of a replica crate (not its code).
+REPLICA_METADATA = re.compile(
+    r"/crates-(?:nc|gpl)(?:/[^/]+)?/(?:LICENSE[^/]*|LICENSES/.*|NOTICE[^/]*|Cargo\.(?:toml|lock)|"
+    r"pyproject\.toml|README\.md|\.gitignore)$|/crates/larmorx-afni-replica/(?:LICENSE[^/]*|"
+    r"NOTICE[^/]*|Cargo\.toml)$"
+)
+TASK_OUTPUT = re.compile(r"^/tmp/claude-\d+/[^/]+/[^/]+/tasks/")
+
 ANCHORS = (
     (re.compile(r"/crates-nc/fsl-source(/|$)"), "R01", "FSL"),
     (re.compile(r"/fsl-source(-[0-9.]+)?(/|$)"), "R01", "FSL"),
@@ -415,9 +430,16 @@ def classify(loc: Location, op: str) -> Class:
     if loc.area == "url":
         return _classify_url(loc.rel)
     rel = loc.rel
+    if loc.area == "system" and TASK_OUTPUT.match(rel):
+        return Class("task-output")
     # Restricted material wherever a copy lives.
     if loc.area in ("larmorx", "site", "testdata", "scratch", "workspace", "home", "system"):
-        hit = _anchor(("/" + rel) if loc.area != "system" else rel)
+        s = ("/" + rel) if loc.area != "system" else rel
+        if BUILD_OUTPUT.search(s):
+            return Class("replica-build-output", "R10", "FSL" if "nc" in s else "AFNI")
+        if REPLICA_METADATA.search(s) and op not in ("build", "exec"):
+            return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI")
+        hit = _anchor(s)
         if hit and not (loc.area == "workspace" and rel.startswith("archive/")):
             rule, family = hit
             if rule == "R14" and family is None:
@@ -432,6 +454,10 @@ def classify(loc: Location, op: str) -> Class:
     if loc.area == "workspace":
         return _classify_workspace(rel, op)
     if loc.area == "transcripts":
+        if re.match(r"^\.claude/projects/[^/]+/[^/]+/tool-results/", rel):
+            return Class("tool-output")
+        if re.match(r"^\.claude/projects/[^/]+/memory/", rel):
+            return Class("memory")
         return restricted("R17", "all", op, rel)
     if loc.area == "scratch":
         return Class("scratch", note=loc.checkout)
@@ -439,7 +465,7 @@ def classify(loc: Location, op: str) -> Class:
         if rel.startswith("/usr/include/c++/"):
             return restricted("R06", "GNU", op, rel)
         if rel.startswith("/usr/local/freesurfer/"):
-            if op == "exec":
+            if op in RUN_OPS and "/bin/" in rel:
                 return Class("run", None, "FreeSurfer")
             if op in CONTENT_OPS and re.search(r"/(bin|python|lib)/", rel):
                 return restricted("R03", "FreeSurfer", op, rel)
@@ -484,7 +510,7 @@ def _classify_repo(rel: str, op: str) -> Class:
 
 def _classify_fsl(rel: str, op: str) -> Class:
     top = rel.split("/", 1)[0]
-    if op == "exec" and top in ("bin", "share", "libexec"):
+    if op in RUN_OPS and top in ("bin", "share", "libexec"):
         return Class("run", None, "FSL")
     if top in ("src", "include", "pkgs"):
         return restricted("R01", "FSL", op, rel)
@@ -511,11 +537,11 @@ def _classify_workspace(rel: str, op: str) -> Class:
         or re.match(r"^oracles/afni-[^/]+/build", rel)
     ):
         return restricted("R02", "AFNI", op, rel)
-    if re.match(r"^oracles/(afni|ants)-[^/]+/bin/", rel) or rel.startswith("oracles/ants-"):
-        if op == "exec":
-            return Class("run", None, "AFNI" if "afni" in rel.split("/")[1] else "ANTs")
-        if rel.startswith("oracles/afni-") and op in CONTENT_OPS:
-            return restricted("R02", "AFNI", op, rel)
+    m = re.match(r"^oracles/(afni|ants)-[^/]+/(?:[^/]+/)?bin/", rel)
+    if m and op in RUN_OPS:
+        return Class("run", None, "AFNI" if m[1] == "afni" else "ANTs")
+    if m and m[1] == "afni" and op in CONTENT_OPS:
+        return restricted("R02", "AFNI", op, rel)
     if top == "freesurfer" or rel.startswith("tags/freesurfer"):
         return restricted("R03", "FreeSurfer", op, rel)
     if rel.startswith("reference_src/workbench"):

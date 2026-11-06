@@ -789,7 +789,25 @@ def _example_fsl272(ctx: core.Context) -> dict:
                     "(no whole cycle)."
                 )
             x["links"] = [{"label": "FSL-272", "href": "docs/findings/upstream-defects.md"}]
-    at, _k = common.largest_in_slice(ex, "fsl", "fsl-nonan", "unwrapped", "axial")
+    # the view: the axial slice holding most of the voxels unwrapped by another number of
+    # cycles than the rest, the crosshair on the one nearest their centre there
+    va = ex.values(ex.key("fsl", "unwrapped"))
+    vb = ex.values(ex.key("fsl-nonan", "unwrapped"))
+    odd = ex.m & (va != 0) & (vb != 0) & (np.rint((va - vb) / TWO_PI) != common_k)
+    if odd.any():
+        z = int(np.argmax(odd.sum(axis=(0, 1))))
+        idx = np.argwhere(odd[:, :, z])
+        near = idx[int(np.argmin(((idx - idx.mean(0)) ** 2).sum(axis=1)))]
+        at = [int(near[0]), int(near[1]), z]
+        where = (
+            "the slice holding most of the voxels FSL unwraps by another number of cycles than "
+            "the rest (with the NaN), the crosshair on one of them"
+        )
+    else:
+        at, _k = common.largest_in_slice(ex, "fsl", "fsl-nonan", "unwrapped", "axial")
+        where = (
+            "the crosshair where FSL's output with the NaN departs most from its output without it"
+        )
     default = {
         "output": "unwrapped",
         "plane": "axial",
@@ -800,9 +818,12 @@ def _example_fsl272(ctx: core.Context) -> dict:
     }
     out = common.finish(
         ctx, ex, diffs, copy.deepcopy(outputs), default=default, window_panel="fsl-nonan",
-        caption="the crosshair where FSL's output with the NaN departs most from its output "
-        "without it in this slice.",
+        caption=f"{where}.",
     )  # fmt: skip
+    # each image's own window first: FSL's output with the NaN lies about 2π above the others
+    for o in out["outputs"]:
+        own = [w for w in o["windows"] if w["id"] == "own"]
+        o["windows"] = own + [w for w in o["windows"] if w["id"] != "own"]
     data = _data(run)
     return {
         "id": "fsl272",
@@ -815,8 +836,10 @@ def _example_fsl272(ctx: core.Context) -> dict:
         "mode gives FSL's bytes; its default takes the extrema over the values that are numbers "
         "and gives what FSL gives for the same map without the NaN. The difference *FSL with the "
         "NaN − FSL without it* shows the defect: whole cycles, and other numbers of them in some "
-        "regions. fMRIPrep's own calls are not affected: sdcflows rescales the phase from its "
-        "minimum and maximum, so a NaN anywhere would make every value NaN.",
+        "regions. The panels open in each image's own window (FSL's output with the NaN lies "
+        "about 2π above the others); choose the brain window to see them on one scale. "
+        "fMRIPrep's own calls are not affected: sdcflows rescales the phase from its minimum "
+        "and maximum, so a NaN anywhere would make every value NaN.",
         "facts": [
             {
                 "label": "Data",

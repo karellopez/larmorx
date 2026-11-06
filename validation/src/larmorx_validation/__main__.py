@@ -341,6 +341,12 @@ def cmd_tables(args: argparse.Namespace) -> int:
     return tables.main(args)
 
 
+def cmd_cleanroom_audit(args: argparse.Namespace) -> int:
+    from larmorx_validation.cleanroom_audit import cli
+
+    return cli.main(args)
+
+
 def cmd_pipeline_stages(args: argparse.Namespace) -> int:
     from larmorx_validation import stages
 
@@ -451,6 +457,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     tables_arguments(tb)
     tb.set_defaults(func=cmd_tables)
+    ca = sub.add_parser(
+        "cleanroom-audit",
+        help="the clean-room audit: every agent's access log from the session transcripts "
+        "(private outputs; docs/validation/clean-room-audit.md)",
+    )
+    from larmorx_validation.cleanroom_audit.cli import add_arguments as audit_arguments
+
+    audit_arguments(ca)
+    ca.set_defaults(func=cmd_cleanroom_audit)
     b = sub.add_parser("bench", help="benchmark larmorx against reference implementations")
     b.add_argument("suite", choices=BENCH_SUITES)
     b.add_argument("--tier", default="full", choices=("smoke", "standard", "full"))

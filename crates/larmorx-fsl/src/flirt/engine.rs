@@ -2736,16 +2736,10 @@ pub(crate) fn write_values(
     };
     match image::write(&name, version, &o, v) {
         Ok(n) => {
+            // a pair's header file holds NIfTI's four extension bytes (352 bytes), which the
+            // shared writer writes for every pair type
             for x in n {
                 defects::push_once(notices, x);
-            }
-            // FLIRT's pair headers carry NIfTI's four extension bytes (observed: 352 bytes)
-            if name.ends_with(".hdr")
-                && let Ok(mut bytes) = std::fs::read(&name)
-                && bytes.len() == 348
-            {
-                bytes.extend_from_slice(&[0, 0, 0, 0]);
-                let _ = std::fs::write(&name, bytes);
             }
             Ok(())
         }

@@ -680,8 +680,12 @@ pub fn write_like(
 }
 
 /// The header block of a file written as `files` (what larmorx's NIfTI writer sets: the data
-/// type, the shape, the magic string, NIfTI-2's line-ending check, `vox_offset`; the extender
-/// of a single file), for [`write_like_files`]' own writer.
+/// type, the shape, the magic string, NIfTI-2's line-ending check, `vox_offset`), followed by
+/// NIfTI's four extension bytes (0: the output keeps no extensions), for [`write_like_files`]'
+/// own writer: in a single file before the data, and in a pair's header file too (352 bytes,
+/// NIfTI-2: 544), as FSL 6.0.7.23's mcflirt writes every pair type (observed:
+/// `validation/investigations/fsl-pair-header`; larmorx's NIfTI writer, nibabel's convention,
+/// leaves them out of a pair).
 fn header_block(
     h: &NiftiHeader,
     data_type: DataType,
@@ -704,9 +708,7 @@ fn header_block(
         0.0
     };
     let mut out = h.to_bytes();
-    if single {
-        out.extend_from_slice(&[0; 4]);
-    }
+    out.extend_from_slice(&[0; 4]);
     Ok(out)
 }
 
@@ -770,6 +772,13 @@ pub fn write_like_files(
     let d = descrip.as_bytes();
     h.descrip[..d.len().min(79)].copy_from_slice(&d[..d.len().min(79)]);
     h.extensions.clear();
+    if version == NiftiVersion::V1 {
+        // ANALYZE's `extents` and `regular`, which FSL 6.0.7.23 writes into every NIfTI-1
+        // output whatever the input holds (observed: mcflirt on an input with 0 in both;
+        // `validation/investigations/fsl-pair-header`)
+        h.analyze.extents = 16384;
+        h.analyze.regular = b'r';
+    }
     // A qform quaternion whose (b, c, d) is not shorter than 1 is normalised, as the NIfTI
     // standard reads it and as mcflirt writes it back (observed on ds000122).
     let q2 = h.quatern_b * h.quatern_b + h.quatern_c * h.quatern_c + h.quatern_d * h.quatern_d;
@@ -862,13 +871,16 @@ pub fn write_like_files(
         );
     }
     let compression = Compression::of_name(&path.to_string_lossy());
-    if files.standard_names() && matches!(compression, Compression::None | Compression::Gzip) {
+    if files.data.is_none()
+        && files.standard_names()
+        && matches!(compression, Compression::None | Compression::Gzip)
+    {
         // Not inside the pool above: the writer runs its own parallel compression.
         nifti::write_dyn(path, &h, &array, &options)?;
         return Ok(notices);
     }
-    // FSL 6.0.7.23's other names: the header block and the data, each file compressed as its
-    // name says (little-endian data, as `h` says on every supported platform).
+    // Pairs and FSL 6.0.7.23's other names: the header block and the data, each file
+    // compressed as its name says (little-endian data, as `h` says on every supported platform).
     let head = header_block(&h, data_type, &shape, files.data.is_none())?;
     let swap = !h.byte_order.is_native();
     let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
@@ -908,6 +920,93 @@ mod tests {
 
     const FIX: UpstreamDefects = UpstreamDefects::Fix;
     const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
+    /// FSL 6.0.7.23's mcflirt writes a pair's header file as the header block and NIfTI's four
+    /// extension bytes (352 bytes; NIfTI-2: 544) for every pair type, and `extents` 16384 and
+    /// `regular` `r` into every NIfTI-1 header whatever the input holds (observed:
+    /// `validation/investigations/fsl-pair-header`).
+    #[test]
+    fn pair_headers_hold_the_extension_bytes_for_every_type() {
+        let dir = tempfile::tempdir().unwrap();
+        let template = NiftiHeader::new(NiftiVersion::V1, &[3, 2, 2], DataType::F32).unwrap();
+        assert_eq!(template.analyze.extents, 0);
+        let vols = [
+            Volume::new([3, 2, 2], [1.0; 3], (0..12).map(|v| v as f32).collect()),
+            Volume::new(
+                [3, 2, 2],
+                [1.0; 3],
+                (0..12).map(|v| 2.0 * v as f32).collect(),
+            ),
+        ];
+        let types = [
+            "NIFTI_PAIR",
+            "NIFTI_PAIR_GZ",
+            "NIFTI_PAIR_ZST",
+            "NIFTI_PAIR_BZ2",
+        ];
+        for t in types
+            .iter()
+            .flat_map(|t| [t.to_string(), t.replace("NIFTI", "NIFTI2")])
+        {
+            let stem = dir.path().join(&t);
+            let (name, version) = output_name(&stem.to_string_lossy(), &t).unwrap();
+            write_like(
+                Path::new(&name),
+                &template,
+                version,
+                false,
+                &vols,
+                DataType::F32,
+                "test",
+                true,
+                2,
+                FIX,
+            )
+            .unwrap();
+            let files = ImageFiles::of(&name).unwrap();
+            let read = |p: &Path| {
+                let raw = std::fs::read(p).unwrap();
+                Compression::of_file(p).unwrap().decompress(raw).unwrap()
+            };
+            let h = read(&files.header);
+            let block = if version == NiftiVersion::V1 {
+                348
+            } else {
+                540
+            };
+            assert_eq!(h.len(), block + 4, "{t}");
+            assert_eq!(h[block..], [0, 0, 0, 0], "{t}");
+            if version == NiftiVersion::V1 {
+                assert_eq!(
+                    i32::from_le_bytes(h[32..36].try_into().unwrap()),
+                    16384,
+                    "{t}"
+                );
+                assert_eq!(h[38], b'r', "{t}");
+            }
+            assert_eq!(read(files.data.as_deref().unwrap()).len(), 96, "{t}");
+        }
+        // a single NIfTI-1 file: extents and regular too, the data at 352
+        let (name, version) =
+            output_name(&dir.path().join("one").to_string_lossy(), "NIFTI").unwrap();
+        write_like(
+            Path::new(&name),
+            &template,
+            version,
+            false,
+            &vols,
+            DataType::F32,
+            "test",
+            true,
+            2,
+            FIX,
+        )
+        .unwrap();
+        let h = std::fs::read(&name).unwrap();
+        assert_eq!(h.len(), 352 + 96);
+        assert_eq!(i32::from_le_bytes(h[32..36].try_into().unwrap()), 16384);
+        assert_eq!(h[38], b'r');
+    }
 
     /// FSL-09: integer outputs truncated and wrapped (mcflirt on x86-64), or rounded and
     /// clamped (corrected).

@@ -688,32 +688,11 @@ impl Writer<'_> {
                 for x in ns {
                     defects::push_once(notices, x);
                 }
-                pair_extender(&name).map_err(|_| WriteFail::Open(shown))
+                Ok(())
             }
             Err(_) => Err(WriteFail::Open(shown)),
         }
     }
-}
-
-/// A pair's header file as FSL writes it: the header block followed by NIfTI's four extension
-/// bytes (0: no extension), 352 bytes (NIfTI-2: 544), in the file's own compression (observed
-/// with the replica's program, a black box: FLIRT's pairs likewise).
-fn pair_extender(name: &str) -> std::io::Result<()> {
-    let Some(f) = ImageFiles::of(name) else {
-        return Ok(());
-    };
-    if f.data.is_none() {
-        return Ok(());
-    }
-    let path = f.header.as_path();
-    let c = Compression::of_file(path)?;
-    let mut bytes = c.decompress(std::fs::read(path)?)?;
-    if bytes.len() != 348 && bytes.len() != 540 {
-        return Ok(());
-    }
-    bytes.extend_from_slice(&[0, 0, 0, 0]);
-    let w = std::io::BufWriter::new(std::fs::File::create(path)?);
-    Compression::of_name(&path.to_string_lossy()).compress(&bytes, w)
 }
 
 /// The exit status of a failed write.

@@ -871,7 +871,7 @@ def _highlights(results) -> list[str]:
         c for r in own for c in r.checks if "GLIBC-07" in c.name and c.threshold == GLIBC07_SHARE
     ]
     out = [
-        f"- **The replica suite's {len(rep)} cases, the original standing in for the replica's program:** "
+        f"- **The replica suite's cases and random testing's permanent cases ({len(rep)}), the original standing in for the replica's program:** "
         f"{count(rep, 'pass')} pass, {count(rep, BOTH_ERROR)} where both refuse, {count(rep, EXPECTED)} expected, "
         f"{count(rep, FAIL)} failures (FSL's runs from the oracle cache under that suite's keys).",
         f"- **The original's own {len(own)} cases:** {count(own, 'pass')} pass, {count(own, BOTH_ERROR)} where both refuse, "

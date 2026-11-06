@@ -727,7 +727,8 @@ over the inputs (volume by volume) **(observed)**. Precisely (spec writer, 2026-
   instead of the image's (the same numbers wherever `fx = dx` and `fy = dy`); FSL-273 is named
   when, along an encoded axis (`px ≠ 0` for x, `py ≠ 0` for y), the field's voxel size differs
   from the images' **(observed**: FSL's outputs on one image's data stored with 6, 4 and 3 mm
-  voxels along y under coefficients made on 6 mm voxels are `S (1 + c g)` with `c = dy / fy`, the
+  voxels along y under coefficients made on 6 mm voxels (`--interp=trilinear`, so that FSL-132 plays no
+  part) are `S (1 + c g)` with `c = dy / fy`, the
   `g` solved from the two ratios to the 6 mm run agreeing to 5e-6 at the median; the default on
   the 4 and 3 mm images gives FSL's 6 mm output to 1.5e-5 relative, bit for bit on the 3 mm one:
   `validation/investigations/spec-answers-4/jac_scales.py`) (spec writer, 2026-11-06);

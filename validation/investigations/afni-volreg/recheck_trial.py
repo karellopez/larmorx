@@ -61,9 +61,7 @@ def main(argv: list[str]) -> int:
             fh.write(json.dumps(row) + "\n")
     by_verdict = collections.Counter(r["verdict"] for r in rows)
     print(f"{len(rows)} findings replayed: {dict(by_verdict)}")
-    by_sig = collections.Counter(
-        (tuple(r["trial_signature"] or ()), r["verdict"]) for r in rows
-    )
+    by_sig = collections.Counter((tuple(r["trial_signature"] or ()), r["verdict"]) for r in rows)
     for (sig, verdict), n in by_sig.most_common():
         print(f"  {n:5d}  {verdict:9s}  trial: {', '.join(sig)}")
     return 0

@@ -38,11 +38,12 @@ with padding and flips).
 
 ## Relay 2 (2026-11-06)
 
-`cases3.txt` (49 cases): 45 bit-identical with AFNI 26.3.05 (files, NIfTI headers, messages,
-exit statuses); the other 4 by design: the replica's error where AFNI crashes on a constant
-base (AFNI-89, both modes), AFNI-93's empty coarse region corrected by default, and two that
-were fixed and then identical (the obliquity warning once per run, the base's name in the
-mismatch messages). The cases `compare.py` cannot express (standard input for `-@`, an option
+`cases3.txt` (55 cases): all bit-identical with AFNI 26.3.05 (files, NIfTI headers, messages,
+exit statuses) but for two by design: AFNI-93's empty coarse region, corrected by default
+(`fix`), and a constant base with `-twopass` (AFNI-89: AFNI crashes, the replica stops with an
+error after AFNI's messages). Fixed on the way: the obliquity warning once per run, the base's
+name and `R-L` in the mismatch messages, a one-slice volume's messages, and `DSET_BRIKNAME` in
+the `-verbose` messages (a qform or sform of code 2 adds the directory). The cases `compare.py` cannot express (standard input for `-@`, an option
 given last, a 300-byte `-weight` name) were run side by side by hand: identical, but for the
 long name, where AFNI aborts (buffer overflow) and the replica's `reproduce` refuses it with an
 explanation (AFNI-90). Four cases (fMRIPrep's call, `-tshift` with `-savedisp`, `-rotparent`

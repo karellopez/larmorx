@@ -720,7 +720,10 @@ fn parse(
                     })
                 })?;
                 if o.verbose > 0 {
-                    io.raw(format!("++ Reading in base dataset {v}\n"));
+                    io.raw(format!(
+                        "++ Reading in base dataset {}\n",
+                        crate::dataset::brikname(&settings.path(&v).to_string_lossy(), settings)
+                    ));
                 }
                 if ds.nvals > 1 {
                     io.warn(format!("-base dataset {v} has more than 1 sub-brick"));
@@ -830,7 +833,10 @@ fn parse(
                 )));
             }
             if o.verbose > 0 {
-                io.raw(format!("++ Reading in weight dataset {name}\n"));
+                io.raw(format!(
+                    "++ Reading in weight dataset {}\n",
+                    crate::dataset::brikname(&settings.path(&name).to_string_lossy(), settings)
+                ));
             }
             let nvox = ds.nxyz.iter().product();
             let w = crate::automask::scale_to_float(&ds.data, nvox, bb, ds.factors[bb]);
@@ -1417,10 +1423,12 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
 
     // Reading (and time-shifting) the input.
     if o.verbose > 0 {
+        let shown =
+            crate::dataset::brikname(&settings.path(&o.dataset).to_string_lossy(), settings);
         if tshift.is_some() {
-            io.raw(format!("++ Time shifting input dataset {}\n", o.dataset));
+            io.raw(format!("++ Time shifting input dataset {shown}\n"));
         } else {
-            io.raw(format!("++ Reading input dataset {}\n", o.dataset));
+            io.raw(format!("++ Reading input dataset {shown}\n"));
         }
     }
     if let Some(ig) = tshift {

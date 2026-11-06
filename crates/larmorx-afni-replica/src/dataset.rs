@@ -708,6 +708,43 @@ fn realpath(path: &Path) -> std::io::Result<String> {
 /// then its real path ([`realpath`]) unless `AFNI_NOREALPATH` is YES or the file is a symbolic
 /// link. "reading X instead of non-existing Y" is printed only when the name is not replaced
 /// by its real path.
+/// `DSET_BRIKNAME` of a NIfTI file AFNI opened as `path`: the path it read (the real path of a
+/// file that is not a symbolic link, unless `AFNI_NOREALPATH` is YES; `.gz` added when only
+/// that exists), except that a dataset whose coordinates come from a qform or sform of code 2
+/// (aligned) gets its directory written out (`./` when there is none): `THD_open_nifti`
+/// renames it after choosing its view. `path` itself if the file cannot be read.
+pub fn brikname(path: &str, settings: &Settings) -> String {
+    let Ok((file, shown)) = nifti_file(path, settings, &mut Vec::new()) else {
+        return path.to_owned();
+    };
+    let Ok(h) = nifti::read_header(&file) else {
+        return shown;
+    };
+    let priority = match settings
+        .get("AFNI_NIFTI_PRIORITY")
+        .and_then(|v| v.bytes().next())
+    {
+        Some(c) if c.to_ascii_uppercase() == b'Q' => b'Q',
+        _ => b'S',
+    };
+    let (q, s) = (h.qform_code, h.sform_code);
+    let form_code = match (q > 0, s > 0) {
+        (true, true) if priority == b'Q' => q,
+        (true, true) => s,
+        (true, false) => q,
+        (false, true) => s,
+        (false, false) => 0,
+    };
+    if form_code != 2 {
+        return shown;
+    }
+    // THD_filepath + THD_trailname: the directory up to the last '/', or "./".
+    match shown.rfind('/') {
+        Some(_) => shown,
+        None => format!("./{shown}"),
+    }
+}
+
 /// The attributes of a NIfTI file's AFNI extension (`THD_find_*_atr` on a dataset AFNI
 /// opened), or `None` when it has none or cannot be read. 3dvolreg's `-rotparent` reads its
 /// `VOLREG_*` attributes.

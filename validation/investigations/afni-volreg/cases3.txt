@@ -54,3 +54,10 @@ probe/s7_nz1.nii.gz reproduce -prefix o.nii.gz
 probe/s7_nz4.nii.gz reproduce -twopass -prefix o.nii.gz -1Dfile p.1D
 probe/s7_nz4.nii.gz fix -twopass -prefix o.nii.gz -1Dfile p.1D
 probe/s7_nz4.nii.gz reproduce -twopass -nocoarserot -prefix o.nii.gz -1Dfile p.1D
+# DSET_BRIKNAME in the -verbose messages (a qform or sform of code 2 adds the directory)
+probe/s1.nii.gz reproduce -verbose -base base3d.nii.gz -weight weight.nii.gz[0] -prefix o.nii.gz
+probe/s5_byte.nii.gz reproduce -verbose -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz reproduce -verbose -tshift 0 -base weight.nii.gz -prefix o.nii.gz
+probe/base3d.nii.gz reproduce -verbose -base s1.nii.gz -prefix o.nii.gz
+probe/s7_const.nii.gz reproduce -twopass -prefix o.nii.gz
+probe/s7_nz1.nii.gz reproduce -twopass -prefix o.nii.gz

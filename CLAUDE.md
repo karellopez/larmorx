@@ -42,7 +42,7 @@ replica (2026-11-02), FAST's clean-room original and topup's replica, topup's cl
 `fslmaths` and `fslstats`'s replica and the spec answers for topup, FAST and FLIRT (2026-11-03), `fslmaths`' and
 `fslstats`' clean-room originals, glibc's exact maths for `reproduce` (both halves) and BET's `-S`/`-B`/`-A`/`-A2` replica with `standard_space_roi` and `fslroi`
 (2026-11-04) and the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; 2026-11-05)
-complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the clean-room audit tool, PRELUDE's replica and clean-room original, 3dvolreg's replica and clean-room original, the field maps (two parts), multi-echo `t2smap` (replica and clean-room), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+complete, and the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge); next, before FreeSurfer (the user, 2026-11-06; decision log): PRELUDE's replica and clean-room original, 3dvolreg's replica and clean-room original, the field maps (two parts), multi-echo `t2smap` (replica and clean-room), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.
@@ -231,6 +231,15 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 - **The orchestrator's procedures** (merging an agent's work, the checklist the user asked for:
   "Make sure everything works before merging"; reading CI without a login; launching worktree
   agents): [docs/orchestration.md](docs/orchestration.md). Agents do not merge, push or launch.
+- **The clean-room audit at every merge** (the user, 2026-11-06; docs/orchestration.md step 5a):
+  `scripts/orchestration/cleanroom-audit-merge.sh <checkout> <part> --scratch <folder> --summary`
+  before the push archives the part's transcripts with their SHA-256 (Claude Code's own copies
+  are not a record: `cleanupPeriodDays` is 36500 on both machines since 2026-11-06, but they live
+  in one place) and stops the merge (exit 1) when a clean-room original was edited by an agent
+  that had seen restricted material of that tool's family, the orchestrator included, unless
+  `validation/cleanroom-audit/judgements.toml` judges the call; the public page
+  `docs/validation/clean-room-audit.md` is generated from it (never edited by hand). The
+  transcripts and the dossiers stay private in `<workspace>/archive/`.
 - **Detached jobs (`nohup ... &`) send no notice when they end.** Watch their log for a final line in a tracked background command.
 - **Oracle builds:** `scripts/build_ants_oracle.sh` (GCC 14.3; `oracles/ants-2.6.5`, with `antsAI`, `antsAffineInitializer`, `Atropos`, ...), `scripts/build_afni_oracle.sh` (`oracles/afni-25.2.09`, `oracles/afni-26.3.05`), `scripts/build_crmath_preload.sh` (`oracles/core-math-preload`, correctly rounded `exp`, `log`, `sin`, `cos`, `pow`, `asin`, `acos`, `atan2`, `cbrt` and their float versions; older preloads archived).
 
@@ -261,6 +270,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 | `validation/` | parity suites and benchmarks (dev-only package `larmorx-validation`) |
 | `validation/src/larmorx_validation/oracle_cache/`, `validation/tests/` | the oracle-output cache (key, store, policy, replays, `verify`) and the validation package's own tests ([docs/validation/oracle-cache.md](docs/validation/oracle-cache.md)) |
 | `validation/src/larmorx_validation/difftest/`, `validation/difftest/` | differential random testing: the harness and one descriptor per tool; the permanent cases and `triage.toml` ([docs/validation/difftest.md](docs/validation/difftest.md)) |
+| `validation/src/larmorx_validation/cleanroom_audit/`, `validation/cleanroom-audit/judgements.toml` | the clean-room audit: the transcripts read into every agent's access log, the restriction table, the verdicts per clean-room original, code similarity, the public summary and the merge step's gate; the human judgement of every item it raised ([docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md)) |
 | `validation/tools.toml`, `validation/src/larmorx_validation/tables.py` | one description per tool, from which the README's tool table, the validation index and the site's status table are generated (`python -m larmorx_validation tables`) |
 | `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/`, `docs/findings/` | conventions, user docs per tool, validation records, benchmark reports, findings about the upstream tools |
 | `docs/findings/upstream-defects.md` | the register of every defect found in the originals (class, evidence, fMRIPrep impact, what larmorx does, D13 gap), with the list of defects larmorx still reproduces by default |

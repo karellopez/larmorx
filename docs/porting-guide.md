@@ -73,7 +73,21 @@ record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../cr
 restricted sections as a whole (`grep` over `docs/findings/upstream-defects.md` prints lines of the
 sections marked †): read the register's summary table by its line range only, and search only the
 files this section allows. The replica authors' permanent cases are not read either (a clean-room
-part's own cases are named in its brief).
+part's own cases are named in its brief). A search over `crates/` prints the AFNI replicas' lines
+since they moved there (2026-10-29): add `--exclude-dir=larmorx-afni-replica`, and exclude folders
+with `--exclude-dir`, never by filtering grep's output (a filter on `^./` fails when grep prints
+names without `./`: the clean-room audit found four slips of these two kinds).
+
+**The clean-room audit** (2026-11-06, [validation/clean-room-audit.md](validation/clean-room-audit.md))
+proves these rules from the session transcripts: for every agent, what it read, searched, listed,
+ran and wrote, classified by the restriction table of `validation/src/larmorx_validation/
+cleanroom_audit/restrictions.py` (this section, with the date each item began to apply); for
+every clean-room original, who made each commit, in which role, after seeing what. It runs at
+every merge (docs/orchestration.md, step 5a) and stops a merge that lets an agent edit a
+clean-room original after seeing restricted material of its family. A slip (restricted lines a
+search printed) is no failure by itself: declare it in the part's report, with what it showed;
+the audit compares the declarations with what it finds. Code similarity is reported beside it,
+as extra evidence only.
 
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
 (3dTshift: 279 of 279 compared cases); the original keeps the main package Apache-2.0 at the

@@ -327,6 +327,12 @@ Each tool's validation record reports both.
 
   They work from `specs/<tool>.md`, documentation, papers and black-box runs of the
   upstream binary.
+- **The proof:** the clean-room audit ([validation/clean-room-audit.md](validation/clean-room-audit.md),
+  since 2026-11-06) reads every session transcript, made at the time, and shows per clean-room
+  original which agents wrote it, in which role, what each had seen before and while it wrote,
+  and every slip with its nature; it runs at every merge and stops one that would let an agent
+  edit a clean-room original after seeing restricted material of that tool's family. The
+  transcripts themselves stay private, archived with their SHA-256.
 - **Never** move replica code into the main package, even renamed.
 
 ## Options considered

@@ -119,7 +119,10 @@ at a time:
    and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica and the clean-room original done 2026-11-03; item 7), fslmaths and fslstats (the replicas done 2026-11-03; item 7), glibc's exact maths for `reproduce` (both halves and the replicas' step (b) done 2026-11-04; item 7), BET's `-S`, `-B`, `-A`, `-A2` (the replica done 2026-11-04, with `standard_space_roi` and `fslroi`; item 7), the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; done 2026-11-05,
    `docs/parts/2026-11-05-cleanroom-catchup/`). **Then, before FreeSurfer** (the user, 2026-11-06; decision log; two
    agents at once by role, relay agents): (1) the clean-room audit tool (from the session transcripts: no implementer
-   opened restricted material; code similarity only as extra evidence; run at every merge afterwards); (2) PRELUDE's
+   opened restricted material; code similarity only as extra evidence; run at every merge afterwards; **done**
+   2026-11-06: [docs/validation/clean-room-audit.md](validation/clean-room-audit.md), every clean-room original
+   clean, 21 slips of implementers listed with their nature, 5 of them undeclared; `docs/parts/2026-11-06-clean-room-audit/`;
+   the merge step: [docs/orchestration.md](orchestration.md), step 5a); (2) PRELUDE's
    replica, its spec writer also answering the waiting spec questions (below, "The questions for a spec writer,
    gathered"); (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05) and (5) its clean-room
    original; (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
@@ -719,6 +722,20 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From the clean-room audit (2026-11-06, `docs/validation/clean-room-audit.md`).** (a) The porting
+  guide to name the replica program as an allowed black box (every FSL clean-room part ran it: a
+  compiled program with the upstream's behaviour, no source shown) and to say which replica suite
+  modules a clean-room brief may name (the FLIRT, FAST, topup and fslmaths briefs named the replica's
+  suite "for its cases and mechanics"; the catch-up's forbade them); proposed text in the part's
+  handoff. (b) Briefs: `grep ... crates/ --exclude-dir=larmorx-afni-replica` (the porting guide's §1
+  now says so). (c) The similarity re-measured (`cleanroom-audit-merge.sh --similarity`) at the
+  merges that change clean-room code, and with every new family's upstream (PRELUDE: FSL; 3dvolreg:
+  AFNI; t2smap: tedana's source, a new `similarity` family). (d) The old laptop's transcripts after
+  2026-11-01 (none expected: no development there) and any Windows-laptop sessions: archive them
+  with `archive_transcripts.py --live <their folder> --machine <name>` if they exist. (e) The
+  restriction table gains tedana's (R07, in place) and FreeSurfer's (R03, in place) families'
+  clean-room parts when they start; the audit's `verdicts.tool_of` learns each new clean-room
+  crate or module (a new tool's code is otherwise counted as its crate's shared code).
 - **From the clean-room catch-up's random-testing trials (2026-11-05, relay 8; the findings'
   sections "The catch-up's random-testing trial" in `docs/findings/fsl-topup-original.md`
   (findings 45 to 47), `fsl-flirt-original.md`, `fsl-fast-original.md`, `fsl-bet-original.md`; every

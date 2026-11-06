@@ -1,0 +1,166 @@
+# The clean-room audit part (2026-11-06): the exact changes to the shared documents, in order.
+# Reasons and the proposals not included here: HANDOFF.md beside this file.
+# Check: python -P scripts/orchestration/apply_handoff.py <scratch>/HANDOFF.toml --check
+# Afterwards: python -m larmorx_validation tables (the validation index gets the audit's row).
+
+# ---------------------------------------------------------------- docs/orchestration.md
+
+[[op]]
+do = "edit"
+file = "docs/orchestration.md"
+old = '''Nothing reaches `main` or GitHub before steps 1-5 pass on the merged tree in the main checkout:'''
+new = '''Nothing reaches `main` or GitHub before steps 1-5 and 5a pass on the merged tree in the main checkout:'''
+
+[[op]]
+do = "insert"
+file = "docs/orchestration.md"
+after = "  5. Re-run the new or changed tool's standard-tier parity yourself"
+text = '''  5a. **The clean-room audit** (the user, 2026-11-06: "the only thing most important to prove is that the agents did not look directly the source code"; [validation/clean-room-audit.md](validation/clean-room-audit.md)), on the committed merge, before the push: `scripts/orchestration/cleanroom-audit-merge.sh <checkout> <part> --scratch <the part's scratch folder> [--worktree <its worktree>] [--notes <its NOTES.md>] --summary` (about half a minute). It copies every transcript Claude Code holds that the archive lacks (the part's agents and the orchestrator's session; Claude Code deletes them after 30 days) into `<workspace>/archive/<date>-session-transcripts-<part>/` with their SHA-256 (an agent of the part without a transcript: exit 2), scans every transcript, makes the verdicts from the merged history and runs the gate. **Exit 1 stops the merge**: each `STOP` line is an edit of clean-room code by an agent after it had seen restricted material of that tool's family (an implementer's finding, or another role's edit: the orchestrator's own included), or a commit of clean-room code nobody's record made. Read the call in the dossier (`<workspace>/archive/clean-room-audit/<date>-<part>/verdicts/verdicts.md`, the call verbatim in `verbatim.md`); then either revert the edit (a fresh clean-room agent redoes it) or, when it carries nothing of the upstream (a title, behaviour the spec states, another family's lines, larmorx's own code), judge it in `validation/cleanroom-audit/judgements.toml` and re-run. `JUDGE` lines (slips of other families, headings, files a brief forbade) do not stop the merge: judge them the same way before the next one. With `--summary` the step regenerates `docs/validation/clean-room-audit.json` and `.md` (commit them with the merge; `lxv.sh . cleanroom-audit summary --check` verifies the page); add `--similarity` (about 15 minutes, boxed) when the part changed clean-room code, so the page's similarity figures cover it.'''
+
+# ---------------------------------------------------------------- scripts/orchestration/README.md
+
+[[op]]
+do = "edit"
+file = "scripts/orchestration/README.md"
+old = '''5. **Publish:** check for AI attribution, push both, `watch_ci.py <sha>`, `watch_pages.py <sha>`;
+   when green, delete merged worktrees' build caches except the newest.'''
+new = '''5. **The clean-room audit:** `cleanroom-audit-merge.sh <checkout> <part> --scratch <folder>
+   --summary` on the committed merge ([docs/orchestration.md](../../docs/orchestration.md), step
+   5a): exit 1 stops the merge until each `STOP` line is reverted or judged in
+   `validation/cleanroom-audit/judgements.toml`.
+6. **Publish:** check for AI attribution, push both, `watch_ci.py <sha>`, `watch_pages.py <sha>`;
+   when green, delete merged worktrees' build caches except the newest.'''
+
+# ---------------------------------------------------------------- docs/licensing.md
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''  They work from `specs/<tool>.md`, documentation, papers and black-box runs of the
+  upstream binary.
+- **Never** move replica code into the main package, even renamed.'''
+new = '''  They work from `specs/<tool>.md`, documentation, papers and black-box runs of the
+  upstream binary.
+- **The proof:** the clean-room audit ([validation/clean-room-audit.md](validation/clean-room-audit.md),
+  since 2026-11-06) reads every session transcript, made at the time, and shows per clean-room
+  original which agents wrote it, in which role, what each had seen before and while it wrote,
+  and every slip with its nature; it runs at every merge and stops one that would let an agent
+  edit a clean-room original after seeing restricted material of that tool's family. The
+  transcripts themselves stay private, archived with their SHA-256.
+- **Never** move replica code into the main package, even renamed.'''
+
+# ---------------------------------------------------------------- docs/porting-guide.md §1
+
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''files this section allows. The replica authors' permanent cases are not read either (a clean-room
+part's own cases are named in its brief).'''
+new = '''files this section allows. The replica authors' permanent cases are not read either (a clean-room
+part's own cases are named in its brief). A search over `crates/` prints the AFNI replicas' lines
+since they moved there (2026-10-29): add `--exclude-dir=larmorx-afni-replica`, and exclude folders
+with `--exclude-dir`, never by filtering grep's output (a filter on `^./` fails when grep prints
+names without `./`: the clean-room audit found four slips of these two kinds).
+
+**The clean-room audit** (2026-11-06, [validation/clean-room-audit.md](validation/clean-room-audit.md))
+proves these rules from the session transcripts: for every agent, what it read, searched, listed,
+ran and wrote, classified by the restriction table of `validation/src/larmorx_validation/
+cleanroom_audit/restrictions.py` (this section, with the date each item began to apply); for
+every clean-room original, who made each commit, in which role, after seeing what. It runs at
+every merge (docs/orchestration.md, step 5a) and stops a merge that lets an agent edit a
+clean-room original after seeing restricted material of its family. A slip (restricted lines a
+search printed) is no failure by itself: declare it in the part's report, with what it showed;
+the audit compares the declarations with what it finds. Code similarity is reported beside it,
+as extra evidence only.'''
+
+# ---------------------------------------------------------------- docs/next-steps.md
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''(1) the clean-room audit tool (from the session transcripts: no implementer
+   opened restricted material; code similarity only as extra evidence; run at every merge afterwards);'''
+new = '''(1) the clean-room audit tool (from the session transcripts: no implementer
+   opened restricted material; code similarity only as extra evidence; run at every merge afterwards; **done**
+   2026-11-06: [docs/validation/clean-room-audit.md](validation/clean-room-audit.md), every clean-room original
+   clean, 21 slips of implementers listed with their nature, 5 of them undeclared; `docs/parts/2026-11-06-clean-room-audit/`;
+   the merge step: [docs/orchestration.md](orchestration.md), step 5a);'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''- **From the clean-room audit (2026-11-06, `docs/validation/clean-room-audit.md`).** (a) The porting
+  guide to name the replica program as an allowed black box (every FSL clean-room part ran it: a
+  compiled program with the upstream's behaviour, no source shown) and to say which replica suite
+  modules a clean-room brief may name (the FLIRT, FAST, topup and fslmaths briefs named the replica's
+  suite "for its cases and mechanics"; the catch-up's forbade them); proposed text in the part's
+  handoff. (b) Briefs: `grep ... crates/ --exclude-dir=larmorx-afni-replica` (the porting guide's §1
+  now says so). (c) The similarity re-measured (`cleanroom-audit-merge.sh --similarity`) at the
+  merges that change clean-room code, and with every new family's upstream (PRELUDE: FSL; 3dvolreg:
+  AFNI; t2smap: tedana's source, a new `similarity` family). (d) The old laptop's transcripts after
+  2026-11-01 (none expected: no development there) and any Windows-laptop sessions: archive them
+  with `archive_transcripts.py --live <their folder> --machine <name>` if they exist. (e) The
+  restriction table gains tedana's (R07, in place) and FreeSurfer's (R03, in place) families'
+  clean-room parts when they start; the audit's `verdicts.tool_of` learns each new clean-room
+  crate or module (a new tool's code is otherwise counted as its crate's shared code).'''
+
+# ---------------------------------------------------------------- CLAUDE.md
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the clean-room audit tool, PRELUDE's replica'''
+new = '''complete, and the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge); next, before FreeSurfer (the user, 2026-11-06; decision log): PRELUDE's replica'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''  agents): [docs/orchestration.md](docs/orchestration.md). Agents do not merge, push or launch.'''
+new = '''  agents): [docs/orchestration.md](docs/orchestration.md). Agents do not merge, push or launch.
+- **The clean-room audit at every merge** (the user, 2026-11-06; docs/orchestration.md step 5a):
+  `scripts/orchestration/cleanroom-audit-merge.sh <checkout> <part> --scratch <folder> --summary`
+  before the push archives the part's transcripts with their SHA-256 (Claude Code deletes them
+  after 30 days) and stops the merge (exit 1) when a clean-room original was edited by an agent
+  that had seen restricted material of that tool's family, the orchestrator included, unless
+  `validation/cleanroom-audit/judgements.toml` judges the call; the public page
+  `docs/validation/clean-room-audit.md` is generated from it (never edited by hand). The
+  transcripts and the dossiers stay private in `<workspace>/archive/`.'''
+
+[[op]]
+do = "insert"
+file = "CLAUDE.md"
+after = "| `validation/src/larmorx_validation/difftest/`, `validation/difftest/` |"
+text = '''| `validation/src/larmorx_validation/cleanroom_audit/`, `validation/cleanroom-audit/judgements.toml` | the clean-room audit: the transcripts read into every agent's access log, the restriction table, the verdicts per clean-room original, code similarity, the public summary and the merge step's gate; the human judgement of every item it raised ([docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md)) |'''
+
+# ---------------------------------------------------------------- docs/status.md
+
+[[op]]
+do = "insert"
+file = "docs/status.md"
+after = "- **Generated tables:** `python -m larmorx_validation tables [--check]`"
+text = '''- **The clean-room audit** ([docs/validation/clean-room-audit.md](validation/clean-room-audit.md), 2026-11-06): from the session transcripts (archived with their SHA-256), every agent's accesses and every commit of clean-room code with its maker; every clean-room original clean, its slips listed with their nature; at every merge `scripts/orchestration/cleanroom-audit-merge.sh` (docs/orchestration.md, step 5a).'''
+
+# ---------------------------------------------------------------- the validation index (validation/tools.toml)
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = '''[[record]]
+id = "difftest"
+larmorx = "differential random testing: random valid inputs and options through every original program and larmorx each night, differences shrunk into permanent cases (`python -m larmorx_validation difftest`)"
+reference = "—"
+status = "reference"
+'''
+new = '''[[record]]
+id = "difftest"
+larmorx = "differential random testing: random valid inputs and options through every original program and larmorx each night, differences shrunk into permanent cases (`python -m larmorx_validation difftest`)"
+reference = "—"
+status = "reference"
+
+[[record]]
+id = "clean-room-audit"
+larmorx = "the clean-room audit: from the session transcripts made at the time, per clean-room original who wrote it, in which role, after seeing what; every slip with its nature; code similarity as extra evidence (`python -m larmorx_validation cleanroom-audit`; generated, run at every merge)"
+reference = "—"
+status = "reference"
+'''

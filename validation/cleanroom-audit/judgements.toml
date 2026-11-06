@@ -1,0 +1,319 @@
+# SPDX-License-Identifier: Apache-2.0
+# The human judgement of every item the clean-room audit raised (python -m larmorx_validation
+# cleanroom-audit verdicts; docs/validation/clean-room-audit.md). Written by the audit's relay 2
+# (2026-11-06) after reading each call and its output in the transcripts; extended at each merge
+# by the orchestrator when `cleanroom-audit gate` lists a new item (scripts/orchestration/
+# cleanroom-audit-merge.sh). The public summary takes its words from here; the gate stops a merge
+# on any blocking item that has no entry here.
+#
+# [[access]]: one tool call of a clean-room implementer that showed restricted material (a slip):
+#   agent (the harness's agent id), line (the call's record line in that agent's transcript),
+#   time (UTC), declared ("yes": in the part's report or notes; "partly": declared, under-counted;
+#   "covered": the same exposure as a declared call; "no"), shown (what the output showed, in
+#   words), nature (what that material is), judgement.
+# [[edit]]: an edit of clean-room code by an agent of another role (the orchestrator, an
+#   integration agent, a replica author): agent ("orchestrator" for the orchestrator), commit (the
+#   short hash; "" for an edit never committed), what, judgement.
+# [verdict]: each clean-room original's verdict in words (tool id: family/tool).
+# [[limit]]: what the evidence cannot see. [[recommendation]]: what the audit recommends.
+
+# ------------------------------------------------- implementers: content of the tool's own family
+
+[[access]]
+agent = "a0313b1bd242cb7eb"
+line = 42
+time = "2026-10-12T12:40:54Z"
+declared = "partly"
+shown = "9 lines of the GPL replica of 3dTshift (two PROVENANCE rows, three test assertions, three lines of its command line, one of its output code) and 2 lines of the register's restricted 3dTshift section (AFNI-26's heading, 'both implementations exit 1 by default'), printed by a search whose filter meant to leave the replica out did not match"
+nature = "behaviour the spec already gave (a failed write exits 0; the message's origin in NIfTI's public-domain writer); no routine"
+judgement = "no contamination of substance; a slip, declared in the part's report ('Accidental exposures'), which omits two lines naming the defect's identifier and the second PROVENANCE row"
+
+[[access]]
+agent = "a0313b1bd242cb7eb"
+line = 47
+time = "2026-10-12T12:41:01Z"
+declared = "covered"
+shown = "3 headings of the register's restricted sections (titles only)"
+nature = "titles of defect entries, which the register's open summary table also describes"
+judgement = "covered by the same agent's declaration"
+
+[[access]]
+agent = "a91cbd5bb2b9e5d0e"
+line = 104
+time = "2026-10-30T03:46:11Z"
+declared = "yes"
+shown = "6 body lines and 5 headings of the register's restricted sections (AFNI 3dAutomask and 3dUnifize, FSL mcflirt: AFNI-75, FSL-20, FSL-21, FSL-65, FSL-66), printed by a search of the whole register for those identifiers, before the agent implemented them"
+nature = "behaviour lines that the specs state (the defects' effects and larmorx's answers); no routine"
+judgement = "no contamination of substance; declared (exposure 1) and assessed at the merge of 2026-10-30, where the porting guide's 'Searching is opening' rule was added"
+
+[[access]]
+agent = "a91cbd5bb2b9e5d0e"
+line = 249
+time = "2026-10-30T03:52:10Z"
+declared = "no"
+shown = "1 line of the AFNI replica's 3dUnifize command line (`if let Err(limit) = larmorx_core::alloc::check_plan(needed) {`), printed by a search of every crate for larmorx's memory check"
+nature = "a call of larmorx's own memory check; nothing of AFNI"
+judgement = "no contamination of substance; an undeclared slip of the same kind as FLIRT part 1's"
+
+# ------------------------------------------------- implementers: other families, headings, black boxes
+
+[[access]]
+agent = "a083655161a925b75"
+line = 3617
+time = "2026-11-02T10:29:55Z"
+declared = "yes"
+shown = "lines of the AFNI replica's PROVENANCE and environment module (AFNI environment-variable names), printed by a search of every crate"
+nature = "another family's names (the agent wrote FSL code only)"
+judgement = "no effect on FSL code; declared ('three lines ... unrelated to FLIRT')"
+
+[[access]]
+agent = "abec7fbbff23f3191"
+line = 529
+time = "2026-11-04T22:55:07Z"
+declared = "no"
+shown = "3 lines of the AFNI replica (`let params = TshiftParams {` and a test helper's signature), printed by a search of every crate whose filter left out only the FSL replicas"
+nature = "another family's code structure (the agent wrote FSL code only)"
+judgement = "no effect on FSL code; undeclared (its statement: 'no slip')"
+
+[[access]]
+agent = "ac15f1af9c8d17145"
+line = 40
+time = "2026-10-11T15:10:34Z"
+declared = "no"
+shown = "35 headings of the register's restricted sections, by a listing of every heading, ten minutes after the sections were first committed and named"
+nature = "titles of defect entries, which the register's open summary table also describes"
+judgement = "titles only; undeclared"
+
+[[access]]
+agent = "ac15f1af9c8d17145"
+line = 2221
+time = "2026-10-11T17:19:32Z"
+declared = "no"
+shown = "1 heading of the register's restricted mcflirt section (FSL-02), after the agent's work on it"
+nature = "the title of a defect entry"
+judgement = "a title only, after the work; undeclared"
+
+[[access]]
+agent = "ad98aa6636037d334"
+line = 157
+time = "2026-10-12T09:53:10Z"
+declared = "yes"
+shown = "44 headings of the register's restricted sections (titles only)"
+nature = "titles of defect entries, which the register's open summary table also describes"
+judgement = "titles only; declared"
+
+[[access]]
+agent = "ad98aa6636037d334"
+line = 1032
+time = "2026-10-12T10:49:45Z"
+declared = "yes"
+shown = "1 heading of the register's restricted 3dTshift section"
+nature = "the title of a defect entry"
+judgement = "a title only; declared"
+
+[[access]]
+agent = "a9232cf1150982f92"
+line = 380
+time = "2026-11-02T14:01:59Z"
+declared = "yes"
+shown = "2 headings of the register's restricted FSL sections"
+nature = "titles of defect entries"
+judgement = "titles only; declared"
+
+[[access]]
+agent = "a888f8be0d1f2c1af"
+line = 4464
+time = "2026-10-31T23:36:25Z"
+declared = "yes"
+shown = "1 heading of the register's restricted FSL section (FSL-50), after the agent's work"
+nature = "the title of a defect entry"
+judgement = "a title only, after the work; declared"
+
+# ------------------------------------------------- implementers: files their briefs forbade
+
+[[access]]
+agent = "a8b1ff8bf024e7a25"
+line = 369
+time = "2026-11-05T00:41:38Z"
+declared = "yes"
+shown = "lines of the FLIRT replica's parity suite (its oracle and replica runners and its `Run` record), which the brief forbade"
+nature = "test-harness code written by a replica author (how the programs are run), no FSL routine"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "a8b1ff8bf024e7a25"
+line = 384
+time = "2026-11-05T00:43:24Z"
+declared = "yes"
+shown = "more lines of the FLIRT replica's parity suite (40 in all with the call above)"
+nature = "test-harness code written by a replica author, no FSL routine"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "a8b1ff8bf024e7a25"
+line = 525
+time = "2026-11-05T00:51:11Z"
+declared = "no"
+shown = "1 docstring line of the topup replica's parity suite, printed by a search over every suite"
+nature = "test-harness text"
+judgement = "no contamination of substance; undeclared"
+
+[[access]]
+agent = "a956a24f69845bd6a"
+line = 757
+time = "2026-11-05T04:54:58Z"
+declared = "yes"
+shown = "5 option-list lines of the fslstats replica's parity suite"
+nature = "the program's options as the harness passes them (black-box knowledge)"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "a8316af2ce10a23c2"
+line = 1135
+time = "2026-11-05T06:47:58Z"
+declared = "yes"
+shown = "the random-testing triage's last lines, with two lines of a replica author's entry"
+nature = "a description of a difference found by random testing"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "a1aa3f3b179ec16db"
+line = 920
+time = "2026-11-05T09:00:48Z"
+declared = "yes"
+shown = "3 option-string lines of the topup replica's parity suite"
+nature = "the program's options as the harness passes them (black-box knowledge)"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "abec7fbbff23f3191"
+line = 153
+time = "2026-11-04T22:33:55Z"
+declared = "yes"
+shown = "the README of a spec writer's investigation (spec-answers-3), which the brief forbade"
+nature = "a spec writer's description of its measurements (the spec's answers came from it)"
+judgement = "no contamination of substance; declared"
+
+[[access]]
+agent = "a91cbd5bb2b9e5d0e"
+line = 277
+time = "2026-10-30T03:53:01Z"
+declared = "yes"
+shown = "a permanent random-testing case of 3dUnifize added by another agent (an input recipe and the guard's verdict)"
+nature = "black-box data: how to make an input and what the original did with it"
+judgement = "no contamination of substance; declared (exposure 2)"
+
+[[access]]
+agent = "a91cbd5bb2b9e5d0e"
+line = 842
+time = "2026-10-30T04:21:35Z"
+declared = "covered"
+shown = "the same permanent case, read again by a script and its last lines printed"
+nature = "black-box data"
+judgement = "covered by the same agent's declaration (exposure 2)"
+
+# ------------------------------------------------- edits of clean-room code by other roles
+
+[[edit]]
+agent = "orchestrator"
+commit = "0feafe98f"
+what = "an SPDX licence header line added to 9 files of the clean-room 3dTshift crate"
+judgement = "no algorithmic content; nothing AFNI-derived"
+
+[[edit]]
+agent = "orchestrator"
+commit = "5fd27ff9f"
+what = "a unit test's temporary directory read through its real path, for GitHub's Windows runners"
+judgement = "no algorithmic content; nothing AFNI-derived"
+
+[[edit]]
+agent = "orchestrator"
+commit = "ac354d2b4"
+what = "a merge's own resolution in larmorx-fsl's package manifest: the unused `libm` dependency removed, as the implementer's handoff asked"
+judgement = "package metadata only; nothing FSL-derived"
+
+[[edit]]
+agent = "orchestrator"
+commit = ""
+what = "the replica author's uncommitted csfft port moved out of the not-yet-created crate folder into a quarantine, 59 seconds after it was copied there (2026-10-09)"
+judgement = "a removal; the port never entered a clean-room commit"
+
+[[edit]]
+agent = "afd9ce2a8a5d9f694"
+commit = ""
+what = "its bit-exact port of AFNI's csfft.c copied into the main checkout's crates/larmorx-afni/src/csfft.rs before the crate existed (the strict clean-room rule was decided that day); quarantined by the orchestrator 59 seconds later; it went into the GPL replica (2026-10-10), never into a clean-room commit; the clean-room 3dTshift implementer started two hours later"
+judgement = "no effect on the clean-room code"
+
+[[edit]]
+agent = "a72e1622ee1fcbc61"
+commit = "d1a8ecb55"
+what = "9 lines in the clean-room 3dTshift command line, after reading the GPL replica's command line: a constant naming the implementation ('implementation: original (larmorx X, Apache-2.0), clean-room 3dTshift') and one log call"
+judgement = "plumbing in larmorx's own words, nothing AFNI-derived; the only edit of clean-room code by an agent that had read a replica; the rule that such an agent never edits a clean-room crate was written later (2026-10-20)"
+
+# ------------------------------------------------- the verdicts, per clean-room original
+
+[verdict]
+"AFNI/tshift" = "clean: no agent with access to AFNI's source or the replica's code wrote its algorithms; one declared exposure (AFNI-26: 9 lines of the GPL replica and 2 of the register, all restating behaviour the spec gave) and the integration agent's 9 lines of plumbing"
+"AFNI/automask" = "clean (names of restricted files, build caches and black-box runs only)"
+"AFNI/unifize" = "clean: the declared exposure of AFNI-75's register lines (behaviour the spec states) and one undeclared replica line that calls larmorx's own memory check"
+"AFNI/afni-shared" = "clean: the replica author's port sat in the crate's folder for 59 seconds before any clean-room work and was quarantined, never committed there; the orchestrator's licence headers and a test path"
+"FSL/hmc" = "clean: the declared AFNI-75 exposure's FSL-20, FSL-21, FSL-65 and FSL-66 lines were seen before those were implemented: behaviour lines the spec states, declared and assessed at the merge of 2026-10-30"
+"FSL/bet" = "clean (one register heading seen after the work, declared)"
+"FSL/flirt" = "clean (register headings and another family's replica lines, declared)"
+"FSL/fast" = "clean"
+"FSL/topup" = "clean"
+"FSL/fslmaths" = "clean"
+"FSL/standard_space_roi" = "clean (a listing that printed FSL source file names, declared)"
+"FSL/fslroi" = "clean"
+"FSL/fsl-shared" = "clean (the orchestrator's merge resolution in its package manifest)"
+"GNU/cbrtf_glibc" = "clean"
+"GNU/sincos_glibc" = "clean"
+"GNU/tanh_glibc" = "clean (a declared port of fdlibm's permissive code; glibc's source never opened)"
+
+# ------------------------------------------------- what the evidence cannot see
+
+[[limit]]
+title = "Programs' own reads"
+text = "A command's reads are seen through the paths it names and the output it printed: cargo, pytest and scripts read files the transcript does not list. A compile error in a replica crate or a failing replica test would print source lines: none was found in the implementers' outputs (the compiler's diagnostics are parsed), but outputs written to log files and never shown are not in the transcripts (some relays ran their gates that way)."
+
+[[limit]]
+title = "Listings"
+text = "The names printed by `find` and `ls` are not parsed (the search tools' are): names-level slips of that kind are seen only through the command's arguments, and they are names only, by definition."
+
+[[limit]]
+title = "Replica suites the briefs allowed"
+text = "The FLIRT, FAST, topup and fslmaths clean-room briefs named the replica's parity suite for its cases and mechanics. Their implementers' reads of it are allowed by their briefs; the suites were written by replica authors and are not judged line by line."
+
+[[limit]]
+title = "Roles"
+text = "Roles are read from the launch descriptions and the briefs; four were settled by hand. Every agent that touched clean-room code was checked by reading its brief's role sentence."
+
+[[limit]]
+title = "Searches of one file"
+text = "A search of a single file prints no file name: the register's are checked by content against every version of its restricted lines, every other restricted file's against that file's lines today (a line that changed since would not be recognised)."
+
+[[limit]]
+title = "Before the first record"
+text = "The repository's first 15 minutes (its root commit, 2026-10-09) precede the first transcript record; no clean-room code existed then. Agents without a harness worktree in their metadata (early agents and relays) are attributed by the commit hashes they printed or by their commit commands."
+
+[[limit]]
+title = "The briefs"
+text = "The briefs were written by the orchestrator, who reads source to merge: the clean-room parts' briefs hold no line of a restricted register section and no line of a source-derived finding (checked against every version), and name upstream source files only in their forbidden lists."
+
+[[limit]]
+title = "Live transcripts"
+text = "Transcripts newer than the archive of 2026-11-05 were read where Claude Code keeps them; they still grow and are deleted after 30 days. From this audit on, every merge copies its part's transcripts into the archive with their SHA-256 before it runs the audit."
+
+# ------------------------------------------------- recommendations
+
+[[recommendation]]
+text = "Name the replica program as an allowed black box in the porting guide (every FSL clean-room part runs it), and say which replica suite modules a clean-room brief may name."
+
+[[recommendation]]
+text = "Since the AFNI replicas moved into crates/ (2026-10-29), a search over crates/ prints their lines: briefs should ask for `grep ... crates/ --exclude-dir=larmorx-afni-replica` (two undeclared slips of this kind)."
+
+[[recommendation]]
+text = "Exclude folders with `--exclude-dir` rather than by filtering a search's output: a filter on `^./` fails when grep prints names without `./` (the AFNI-26 slip)."
+
+[[recommendation]]
+text = "Run the audit at every merge (scripts/orchestration/cleanroom-audit-merge.sh): it archives the part's transcripts and stops the merge on any unjudged edit of clean-room code after restricted material of the tool's family."

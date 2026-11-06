@@ -257,6 +257,12 @@ reference = "—"
 status = "reference"
 
 [[record]]
+id = "clean-room-audit"
+larmorx = "the clean-room audit: from the session transcripts made at the time, per clean-room original who wrote it, in which role, after seeing what; every slip with its nature; code similarity as extra evidence (`python -m larmorx_validation cleanroom-audit`; generated, run at every merge)"
+reference = "—"
+status = "reference"
+
+[[record]]
 id = "afni-tshift-replica"
 larmorx = "`larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` (the replica, `crates/larmorx-afni-replica`, in-process)"
 reference = "3dTshift (AFNI 26.3.05 binary; AFNI 25.2.09 beside it, the version step)"

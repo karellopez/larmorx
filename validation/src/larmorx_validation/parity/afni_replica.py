@@ -360,10 +360,30 @@ def last_error(text: str) -> str:
 # Outputs
 
 
+def is_nifti(path: Path) -> bool:
+    """Whether an output is a NIfTI file (by its name); any other output is text (3dvolreg's
+    ``-1Dfile``, ``-dfile``, ``-1Dmatrix_save``, ``-maxdisp1D``), compared byte for byte."""
+    return path.name.endswith((".nii", ".nii.gz"))
+
+
+def text_values(raw: bytes) -> np.ndarray:
+    """The numbers of a text output, in order (float64; ``#`` comments and words left out)."""
+    out = []
+    for line in raw.decode("utf-8", "replace").splitlines():
+        for word in line.split("#", 1)[0].split():
+            try:
+                out.append(float(word))
+            except ValueError:
+                continue
+    return np.asarray(out, dtype=np.float64)
+
+
 def nifti_parts(path: Path) -> tuple[bytes, bytes]:
     """A NIfTI file's header (the bytes before the data, extensions included) and data bytes,
-    decompressed."""
+    decompressed; a text output (:func:`is_nifti`) has no header and its bytes as data."""
     raw = path.read_bytes()
+    if not is_nifti(path):
+        return b"", raw
     if raw[:2] == b"\x1f\x8b":
         raw = gzip.decompress(raw)
     if raw[:4] == b"\x5c\x01\x00\x00":
@@ -376,8 +396,12 @@ def nifti_parts(path: Path) -> tuple[bytes, bytes]:
 
 
 def stored(path: Path) -> np.ndarray:
-    """The values as stored (before scaling), read with nibabel."""
+    """The values as stored (before scaling), read with nibabel; a text output's numbers
+    (:func:`text_values`)."""
     import nibabel as nib
+
+    if not is_nifti(path):
+        return text_values(path.read_bytes())
 
     return np.asanyarray(nib.load(path).dataobj.get_unscaled())
 
@@ -748,6 +772,8 @@ class Scenario:
     python_outputs: dict[str, str] = field(default_factory=dict)
     #: AFNI's own variability: also run AFNI at these thread counts, and fMRIPrep's AFNI.
     band: tuple[int, ...] = ()
+    #: fMRIPrep's AFNI (in its image) without a thread band (a program without OpenMP).
+    fmriprep_build: bool = False
     #: fMRIPrep's own output of this call (its oracle run), compared with each output named.
     fmriprep: tuple[tuple[str, str], ...] = ()
     #: Defects whose notice may be named without a visible change.
@@ -785,6 +811,15 @@ class ToolSpec:
     #: For float32 outputs that need not be bit-identical: the largest |diff| allowed, as a
     #: fraction of the largest |AFNI output| (``None``: bit-identity required).
     tolerance: float | None = None
+    #: Files a case derives from a run's outputs, written in the run's directory before they
+    #: are compared (3dvolreg: the median of the registered volumes, fMRIPrep's BOLD
+    #: reference, compared with fMRIPrep's own): ``derive(scenario, directory)``.
+    derive: Callable[[Scenario, Path], None] | None = None
+    #: Every file a run writes must be one of the case's outputs (nothing written unlisted).
+    every_file: bool = False
+    #: Defects the fix pass may meet without naming them (``defects.UNNAMED_GLIBC``: an
+    #: iterative fit on glibc's maths with ``reproduce``, correctly rounded by default).
+    unnamed_ok: tuple[str, ...] = ()
 
 
 def cases_of(spec: ToolSpec, tier: str) -> list[Case]:
@@ -871,8 +906,14 @@ def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             return
         afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
+        if spec.every_file:
+            _every_file(checks, s, a_dir, l_dir)
+        if spec.derive is not None:
+            for run, d in ((afni, a_dir), (ours, l_dir)):
+                if run.code == 0:
+                    spec.derive(s, d)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
-        _step(checks, program, s, args, env, tmp, afni, a_dir, a_out, paths)
+        _step(checks, program, s, args, env, tmp, afni, a_dir, a_out, paths, spec.derive)
 
         if s.undefined is not None:
             _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir, impl)
@@ -881,6 +922,8 @@ def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             check_crash(checks, afni, ours)
             if s.expect != "crash":
                 checks("AFNI does not crash", False, detail=last_error(afni.err))
+            if s.fix_writes is not None:
+                _fix_writes(checks, program, s, args, env, tmp, impl)
             if all(c.passed for c in checks.checks):
                 raise Outcome(
                     BOTH_ERROR,
@@ -972,11 +1015,11 @@ def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
                         detail=c.detail,
                     )
                 )
-        if s.band:
+        if s.band or s.fmriprep_build:
             _band(checks, spec, s, args, env, tmp, a_dir, paths)
         if s.python is not None:
             _python(checks, spec, s, paths[0], l_dir)
-        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
+        _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl, spec)
 
 
 def _step(
@@ -990,6 +1033,7 @@ def _step(
     a_dir: Path,
     a_out: list[str],
     paths: list[Path],
+    derive: Callable[[Scenario, Path], None] | None = None,
 ) -> None:
     """AFNI's own step from the previous version to the one compared (:mod:`afni_versions`):
     the previous build on the same arguments, in a directory set up alike (served from the
@@ -1002,6 +1046,8 @@ def _step(
     o_dir = tmp / "afni-step"
     _setup(o_dir, s)
     prev = run_afni(program, args, env, o_dir, never=case_never(s), version=old)
+    if derive is not None and prev.code == 0:
+        derive(s, o_dir)
     o_out = _produced(o_dir, s)
     msgs = tuple(
         (r.out + afni_text(r.err)).replace(str(d), "<dir>")
@@ -1031,6 +1077,27 @@ def _step(
             threshold="reported",
             detail=detail,
         )
+    )
+
+
+def _every_file(checks: CheckList, s: Scenario, a_dir: Path, l_dir: Path) -> None:
+    """Every file AFNI and larmorx wrote (the case's own files aside) is one of the case's
+    outputs, and both wrote the same files: nothing written goes uncompared."""
+    before = {name for name, _ in s.files}
+
+    def written(d: Path) -> list[str]:
+        return sorted(
+            str(f.relative_to(d))
+            for f in d.rglob("*")
+            if f.is_file() and str(f.relative_to(d)) not in before
+        )
+
+    a, b = written(a_dir), written(l_dir)
+    unlisted = sorted(set(a) - set(s.outputs))
+    checks(
+        "every file written is compared",
+        a == b and not unlisted,
+        detail=f"AFNI {a}, larmorx {b}" + (f"; not listed: {unlisted}" if unlisted else ""),
     )
 
 
@@ -1111,7 +1178,14 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
     import larmorx as lx
 
     fn = getattr(lx.afni, spec.function)
-    kwargs = dict(s.python or {})
+    # A dataset argument written "{n}" is the case's input n (3dvolreg's base, weight,
+    # rotparent).
+    kwargs = {
+        k: spec.inputs(s.inputs[int(v[1:-1])])
+        if isinstance(v, str) and re.fullmatch(r"\{\d+\}", v)
+        else v
+        for k, v in (s.python or {}).items()
+    }
     env = dict(os.environ)
     with process_environment(env), warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -1121,6 +1195,14 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
     bad = []
     for attr, name in s.python_outputs.items():
         img = getattr(result, attr)
+        if isinstance(img, np.ndarray):
+            # A table (3dvolreg's parameters, matrices, displacements): the text output's
+            # first columns, as numbers.
+            table = np.loadtxt(l_dir / name, comments="#", ndmin=2)
+            want_t = table[:, : img.shape[1]] if img.ndim == 2 else table[:, 0]
+            if img.shape != want_t.shape or not np.array_equal(img, want_t):
+                bad.append(attr)
+            continue
         want = lx.load(l_dir / name)
         a, b = np.asarray(img.data), np.asarray(want.data)
         same = (
@@ -1263,10 +1345,13 @@ def _fix_pass(
     reproduced_dir: Path,
     reproduced: Run,
     impl: str = "replica",
+    spec: ToolSpec | None = None,
 ) -> None:
     d = tmp / "fix"
     _setup(d, s)
     r = run_larmorx(program, args, defects.FIX, env, d, impl)
+    if spec is not None and spec.derive is not None and r.code == 0:
+        spec.derive(s, d)
     # A refusal happens where the program would use the option; an input it gives up on
     # earlier (a constant image, found by random testing) never gets there: then the default
     # runs, and the ordinary fix pass below checks it.
@@ -1312,7 +1397,12 @@ def _fix_pass(
         other.append("messages")
     entries = defects.notices_in(r.err)
     defects.add_fix_check(
-        checks, entries, change, other_changes=", ".join(other), silent_ok=s.silent_ok
+        checks,
+        entries,
+        change,
+        other_changes=", ".join(other),
+        silent_ok=s.silent_ok,
+        unnamed_ok=spec.unnamed_ok if spec is not None else (),
     )
     reproduced_entries = defects.notices_in(reproduced.err)
     one_mode_only = (set(entries) ^ set(reproduced_entries)) <= set(s.one_mode)

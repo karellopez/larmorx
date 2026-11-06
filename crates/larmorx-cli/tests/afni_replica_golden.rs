@@ -76,6 +76,9 @@ enum Input {
     /// 4 volumes of the T2-like head, float32, 4 mm voxels, volume `t` moved by `t` voxels
     /// along x and `t / 2` along y (3dvolreg).
     Head4dMoving,
+    /// The same moving series with slice times: sequential ascending, TR 2 s (3dvolreg's
+    /// `-tshift`).
+    Head4dMovingTimed,
 }
 
 struct Case {
@@ -93,7 +96,10 @@ struct Case {
     /// Whether a file of the output's name exists before the run.
     existing: bool,
     /// More outputs: `(option, name)`; the option is given `<id>.<name>.nii`, and the file's
-    /// fingerprints are recorded as `<name>.header` and `<name>.data`.
+    /// fingerprints are recorded as `<name>.header` and `<name>.data`. A name with its own
+    /// extension (`par.1D`, `rms.txt`) is a text output, given `<id>.<name>` and recorded as
+    /// `<name>` (its bytes); `-maxdisp1D`'s second file (`<stem>_delt.1D`) is recorded too, and
+    /// `-savedisp`'s three datasets (`<name>_DX.nii`, `_DY`, `_DZ`) in place of `<name>`.
     outputs: &'static [(&'static str, &'static str)],
 }
 
@@ -117,7 +123,12 @@ const CASES: &[Case] = &[
         tool: "afni 3dvolreg",
         env: &[],
         existing: false,
-        outputs: &[],
+        // fMRIPrep's text outputs: the parameters, the matrices, the maximum displacements.
+        outputs: &[
+            ("-1Dfile", "par.1D"),
+            ("-1Dmatrix_save", "mat.aff12.1D"),
+            ("-maxdisp1D", "md.1D"),
+        ],
         named: &[],
         mode: "fix",
         input: Input::Head4dMoving,
@@ -133,6 +144,76 @@ const CASES: &[Case] = &[
         mode: "reproduce",
         input: Input::Head4dMoving,
         args: &["-Fourier", "-twopass", "-zpad", "4"],
+    },
+    // 3dvolreg's other paths: each registration method with another final one and the
+    // clipping off (the RMS file); the weight from the input with edging and another base; the
+    // int16 output; -twopass's blur, coarse grid and no scale initialisation; -tshift with the
+    // displacement datasets.
+    Case {
+        id: "3dvolreg.cubic.final-linear.noclip",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-dfile", "rms.txt")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &["-cubic", "-final", "linear", "-noclip"],
+    },
+    Case {
+        id: "3dvolreg.quintic.final-nn.zpad0",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-1Dfile", "par.1D")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &["-quintic", "-final", "NN", "-zpad", "0"],
+    },
+    Case {
+        id: "3dvolreg.linear.wtinp.edging",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-1Dfile", "par.1D")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &["-linear", "-wtinp", "-edging", "2", "-base", "2"],
+    },
+    Case {
+        id: "3dvolreg.heptic.int16",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-1Dfile", "par.1D")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4d,
+        args: &[],
+    },
+    Case {
+        id: "3dvolreg.twopass.coarse.sinit",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-1Dmatrix_save", "mat.aff12.1D")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMoving,
+        args: &["-twopass", "-twoblur", "3", "-coarse", "2", "1", "-sinit"],
+    },
+    Case {
+        id: "3dvolreg.tshift.savedisp",
+        tool: "afni 3dvolreg",
+        env: &[],
+        existing: false,
+        outputs: &[("-savedisp", "sd")],
+        named: &[],
+        mode: "fix",
+        input: Input::Head4dMovingTimed,
+        args: &["-tshift", "0"],
     },
     Case {
         id: "3dTshift.fourier.int16",
@@ -876,6 +957,14 @@ fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
         &shape4,
         &moving,
     );
+    // The same series with slice times: sequential ascending along k, TR 2 s.
+    let mut timed = head_header(&shape4, DataType::F32, 4.0, 0.0);
+    timed.dim_info = 3 << 4;
+    timed.slice_code = 1;
+    timed.slice_start = 0;
+    timed.slice_end = (nz - 1) as i64;
+    timed.slice_duration = 2.0 / nz as f64;
+    write_shaped(&p("head-4d-moving-timed", paths), &timed, &shape4, &moving);
     let plane = nx * ny * 8;
     let slice: Vec<f32> = t1[plane..plane + nx * ny]
         .iter()
@@ -1007,6 +1096,56 @@ fn nifti_fingerprints(path: &Path) -> BTreeMap<&'static str, Fingerprint> {
             },
         ),
     ])
+}
+
+/// Whether an output's name is a text file's (its own extension, not `.nii`).
+fn is_text(name: &str) -> bool {
+    name.contains('.') && !name.ends_with(".nii")
+}
+
+/// The name an output option is given: `<id>.<name>` for a text output, `<id>.<name>.nii`
+/// otherwise.
+fn output_name(id: &str, name: &str) -> String {
+    if is_text(name) {
+        format!("{id}.{name}")
+    } else {
+        format!("{id}.{name}.nii")
+    }
+}
+
+/// The files an output option writes, with their labels in `golden.tsv`: the one named, and
+/// `-maxdisp1D`'s delta file beside it; `-savedisp`'s three datasets in its place.
+fn output_files(dir: &Path, id: &str, option: &str, name: &str) -> Vec<(String, PathBuf)> {
+    if option == "-savedisp" {
+        return ["_DX", "_DY", "_DZ"]
+            .iter()
+            .map(|s| {
+                (
+                    format!("{name}{s}"),
+                    dir.join(format!("{id}.{name}{s}.nii")),
+                )
+            })
+            .collect();
+    }
+    let mut out = vec![(name.to_owned(), dir.join(output_name(id, name)))];
+    if option == "-maxdisp1D" {
+        let delta = match name.strip_suffix(".1D") {
+            Some(stem) => format!("{stem}_delt.1D"),
+            None => format!("{name}_delt"),
+        };
+        out.push((delta.clone(), dir.join(format!("{id}.{delta}"))));
+    }
+    out
+}
+
+/// A text output's fingerprint: the SHA-256 of its bytes.
+fn text_fingerprint(path: &Path) -> Fingerprint {
+    let raw = std::fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    Fingerprint {
+        sha256: sha256(&raw),
+        dtype: "text".into(),
+        sample: "-".into(),
+    }
 }
 
 fn unhex(s: &str) -> Vec<u8> {
@@ -1198,6 +1337,7 @@ fn golden() {
             Input::Head4dCbrtf => &inputs["head-4d-cbrtf"],
             Input::Slice => &inputs["slice"],
             Input::Head4dMoving => &inputs["head-4d-moving"],
+            Input::Head4dMovingTimed => &inputs["head-4d-moving-timed"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];
@@ -1206,7 +1346,7 @@ fn golden() {
         // cannot make the -prefix one AFNI refuses (AFNI-12).
         args.extend(["-prefix".into(), format!("{}.nii", case.id)]);
         for (option, name) in case.outputs {
-            args.extend([(*option).to_owned(), format!("{}.{name}.nii", case.id)]);
+            args.extend([(*option).to_owned(), output_name(case.id, name)]);
         }
         args.push(input.display().to_string());
         if case.existing {
@@ -1245,10 +1385,15 @@ fn golden() {
         for (name, fp) in nifti_fingerprints(&output) {
             actual.insert((case.id.to_owned(), name.to_owned()), fp);
         }
-        for (_, extra) in case.outputs {
-            let path = dir.path().join(format!("{}.{extra}.nii", case.id));
-            for (name, fp) in nifti_fingerprints(&path) {
-                actual.insert((case.id.to_owned(), format!("{extra}.{name}")), fp);
+        for (option, extra) in case.outputs {
+            for (label, path) in output_files(dir.path(), case.id, option, extra) {
+                if is_text(&label) {
+                    actual.insert((case.id.to_owned(), label), text_fingerprint(&path));
+                    continue;
+                }
+                for (name, fp) in nifti_fingerprints(&path) {
+                    actual.insert((case.id.to_owned(), format!("{label}.{name}")), fp);
+                }
             }
         }
         files.insert(case.id, output);

@@ -32,6 +32,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "afni-tshift": ("afni_tshift", "TOOL"),
     "afni-automask": ("afni_masks", "AUTOMASK"),
     "afni-unifize": ("afni_masks", "UNIFIZE"),
+    "afni-volreg": ("afni_volreg", "TOOL"),
     "mri-hmc": ("mri_hmc", "ORIGINAL"),
     "fsl-mcflirt": ("mri_hmc", "REPLICA"),
     "fsl-bet": ("fsl_bet", "TOOL"),

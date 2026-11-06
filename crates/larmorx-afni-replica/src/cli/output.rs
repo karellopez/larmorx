@@ -22,9 +22,15 @@ use std::time::{Duration, Instant};
 /// How long a rename is retried while another program holds the target (Windows).
 const RETRY_FOR: Duration = Duration::from_secs(2);
 
+/// The longest file name the systems allow (bytes on Linux and macOS, UTF-16 units on Windows).
+const NAME_MAX: usize = 255;
+
 /// The temporary name for `target` in its own directory: hidden (a leading `.`), unique to this
 /// process and call, and ending with `target`'s compression suffix (`.nii` or `.nii.gz`), which
-/// tells the NIfTI writer whether to compress.
+/// tells the NIfTI writer whether to compress. The stem is cut (at a character) so that the name
+/// stays within [`NAME_MAX`]: an output named with up to 255 bytes, which AFNI writes, can be
+/// written (random testing's case of 2026-11-06: a 255-byte `-prefix` failed with "File name
+/// too long").
 fn temporary_name(target: &Path) -> PathBuf {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let name = target
@@ -40,8 +46,13 @@ fn temporary_name(target: &Path) -> PathBuf {
     };
     let (stem, suffix) = name.split_at(name.len() - suffix_len);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp = format!(".{stem}.larmorx-{}-{n}.tmp{suffix}", std::process::id());
-    target.with_file_name(tmp)
+    let tail = format!(".larmorx-{}-{n}.tmp{suffix}", std::process::id());
+    let room = NAME_MAX.saturating_sub(1 + tail.len());
+    let mut cut = stem.len().min(room);
+    while !stem.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    target.with_file_name(format!(".{}{tail}", &stem[..cut]))
 }
 
 /// Whether a failed rename may succeed if tried again: on Windows, the target is held by
@@ -194,6 +205,24 @@ mod tests {
             temporary_name(Path::new("a.nii")),
             temporary_name(Path::new("a.nii"))
         );
+        // A name of 255 bytes: its temporary name within the limit, the suffix kept.
+        let long = format!("{}é.nii.gz", "L".repeat(246));
+        assert_eq!(long.len(), 255);
+        let v = temporary_name(Path::new(&long));
+        let name = v.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            name.len() <= NAME_MAX && name.ends_with(".tmp.nii.gz"),
+            "{name}"
+        );
+        assert!(name.starts_with(".LLL"), "{name}");
+    }
+
+    #[test]
+    fn a_name_of_255_bytes_is_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join(format!("{}.nii", "N".repeat(251)));
+        replace_atomically(&target, |p| std::fs::write(p, "data")).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"data");
     }
 
     #[test]

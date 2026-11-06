@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The replica of 3dvolreg (built into larmorx) against AFNI itself, through the AFNI 26.3.05
+binary (see validation/)."""
+
+import os
+
+import pytest
+
+pytest.importorskip("larmorx_testdata")
+parity = pytest.importorskip("larmorx_validation.parity")
+from larmorx_validation.parity import afni_replica as ar  # noqa: E402
+from larmorx_validation.parity import afni_volreg  # noqa: E402
+
+if ar.afni_binary("3dvolreg") is None:
+    pytest.skip("the AFNI 3dvolreg oracle is not available", allow_module_level=True)
+
+TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
+SUITE = afni_volreg.suite("replica")
+CASES = SUITE.cases(TIER)
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c.id for c in CASES])
+def test_afni_volreg_replica_parity(case):
+    result = parity.run_one(SUITE, case)
+    problems = [f"{c.name}: {c.detail}" for c in result.failed_checks]
+    assert result.status in parity.OK_STATUSES, "\n".join([result.reason, *problems])

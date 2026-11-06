@@ -54,3 +54,21 @@ The blur's mirrors (rule D): `cargo run --release -p larmorx-afni-replica --exam
 volreg_mirrors -- <series.nii.gz> [heptic]` registers a series with AFNI's mirrors and with
 whole-point mirrors on every axis and prints the largest differences
 (`docs/findings/afni-volreg.md` has the numbers).
+
+## Relay 3 (2026-11-06): the parity suite, and the speed
+
+The cases above became the parity suite `afni-volreg-replica`
+(`validation/src/larmorx_validation/parity/afni_volreg.py`; `python -m larmorx_validation parity
+afni-volreg --implementation replica --tier standard`, `tests/parity/test_afni_volreg_replica.py`),
+whose derived inputs are made once in `<workspace>/oracles/inputs/afni-volreg/` by the same code
+(the synthetic series and their variants bit-identical with the files these scripts make; the
+`-rotparent` datasets by AFNI through the oracle cache). fMRIPrep's calls run on RobustAverage's
+`_sliced` input re-made by fMRIPrep's own Python in its image: `sliced.py` here, run with the
+shared environment's numpy 2.3.5, makes another input than the image's numpy 2.2.6 (the drift's
+float32 mean over the volumes sums in another order: 2,002 of 2,785,280 stored values one unit
+apart on ds000005's run 1), and niworkflows' own `RobustAverage`, run in the image on the BIDS
+file, gives the oracle run's `_average` file byte for byte.
+
+| Script | What it does |
+|---|---|
+| `speed.py [--repeats 3] [--labels ...] [--json out.json]` | AFNI 26.3.05's 3dvolreg against the replica (the standalone `larmorx` binary and `python -m larmorx`) on fMRIPrep's call, one thread, the median of the repeats, the outputs compared byte for byte |

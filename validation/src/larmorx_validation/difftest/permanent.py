@@ -112,6 +112,7 @@ SUITES: dict[str, tuple[str, str]] = {
     "afni-automask-replica": ("afni-automask", "replica"),
     "afni-unifize": ("afni-unifize", "original"),
     "afni-unifize-replica": ("afni-unifize", "replica"),
+    "afni-volreg-replica": ("afni-volreg", "replica"),
     "mri-hmc": ("mri-hmc", "original"),
     "fsl-mcflirt-replica": ("fsl-mcflirt", "replica"),
     "fsl-bet-replica": ("fsl-bet", "replica"),

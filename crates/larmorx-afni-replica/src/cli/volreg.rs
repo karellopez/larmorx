@@ -53,8 +53,8 @@ use crate::vecmat::{self, DVec3, FVec3};
 use crate::volreg::{self, Base, Edging, VolregError, VolregParams, VolregResult, mode_name};
 
 use super::common::{
-    Io, Output, afni_output_name, echo_command_line, filename_ok, open_dataset, output_path,
-    write_dataset,
+    Io, Output, afni_output_name, echo_command_line, filename_ok, open_dataset, output_name_ok,
+    output_path, write_dataset,
 };
 use super::threads;
 
@@ -1077,11 +1077,28 @@ fn f4(x: f32) -> String {
 
 #[allow(clippy::too_many_lines)]
 fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), Stop> {
-    let settings = &pre.settings;
-    let n_threads = threads(settings);
     let mut notices = Notices::new(mode);
     notices.extend(pre.notices.iter().cloned());
-    let mut o = parse(&pre.args, mode, settings, n_threads, &mut notices, io)?;
+    let r = run_with(pre, mode, io, &mut notices);
+    if r.is_err() {
+        // A run that stops names the defects met so far: the default's refusals (AFNI-94,
+        // AFNI-95, ...) with their reason. A run that ends prints them itself, last.
+        for n in notices.as_slice() {
+            io.notice(n);
+        }
+    }
+    r
+}
+
+fn run_with(
+    pre: &Prefiltered,
+    mode: UpstreamDefects,
+    io: &mut Io<'_>,
+    notices: &mut Notices,
+) -> Result<(), Stop> {
+    let settings = &pre.settings;
+    let n_threads = threads(settings);
+    let mut o = parse(&pre.args, mode, settings, n_threads, notices, io)?;
     let intern = !matches!(o.base, BaseArg::Dataset);
     let nbase_given = match o.base {
         BaseArg::Index(k) => k,
@@ -1135,7 +1152,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     }
     let mut ds = match o.input_ds.take() {
         Some(ds) => ds,
-        None => open(&o.dataset, n_threads, settings, &mut notices, io)
+        None => open(&o.dataset, n_threads, settings, notices, io)
             .map_err(|e| input_error(&o.dataset, &e, mode, false))?,
     };
     let mut floatize = o.floatize;
@@ -1307,7 +1324,8 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
                 afni_output_name(&o.prefix)
             )));
         }
-        output.check(false, &notices, io)?;
+        output.check(false, notices, io)?;
+        name_notice(&o.prefix, mode, settings, notices);
         out = Some(output);
     }
     // -savedisp's datasets (written with larmorx's NIfTI writer only).
@@ -1329,7 +1347,8 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     for (_, name) in &disp_names {
         output_path(name)?;
         let output = Output::new(name, settings, pre.quiet_overwrite);
-        output.check(false, &notices, io)?;
+        output.check(false, notices, io)?;
+        name_notice(name, mode, settings, notices);
         disp_out.push(output);
     }
     let cmdline = commandline(&pre.args, settings);
@@ -1485,7 +1504,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
     };
     drop(o.weight.take());
     let mut log = Vec::new();
-    let result = volreg::volreg(&ds, &p, null_output, &mut log, &mut notices);
+    let result = volreg::volreg(&ds, &p, null_output, &mut log, notices);
     for m in log {
         io.message(m);
     }
@@ -1579,8 +1598,8 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         }
     }
     if let (Some(output), Some(ds_out)) = (&out, &res.output) {
-        let written = write_dataset(output, ds_out, n_threads, settings, &mut notices, io)
-            .map_err(Stop::from)?;
+        let written =
+            write_dataset(output, ds_out, n_threads, settings, notices, io).map_err(Stop::from)?;
         if o.verbose > 0 {
             io.info(format!("Wrote dataset to disk in {}", written.shown));
         }
@@ -1591,7 +1610,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             if *s19 {
                 normalize_timeseries(d);
             }
-            let written = write_dataset(&disp_out[k], d, n_threads, settings, &mut notices, io)
+            let written = write_dataset(&disp_out[k], d, n_threads, settings, notices, io)
                 .map_err(Stop::from)?;
             if o.verbose > 0 {
                 io.info(format!("Wrote dataset to disk in {}", written.shown));
@@ -1601,9 +1620,8 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             for (k, powers) in DISP_PRODUCTS.iter().enumerate() {
                 let mut d = disprod(&disp, *powers);
                 normalize_timeseries(&mut d);
-                let written =
-                    write_dataset(&disp_out[3 + k], &d, n_threads, settings, &mut notices, io)
-                        .map_err(Stop::from)?;
+                let written = write_dataset(&disp_out[3 + k], &d, n_threads, settings, notices, io)
+                    .map_err(Stop::from)?;
                 if o.verbose > 0 {
                     io.info(format!("Wrote dataset to disk in {}", written.shown));
                 }
@@ -1645,6 +1663,22 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
         io.notice(n);
     }
     Ok(())
+}
+
+/// AFNI-12 by default: an output name `THD_filename_ok` rejects (blanks, shell metacharacters,
+/// non-ASCII characters, a leading `-`) is written; AFNI's 3dvolreg writes nothing then, with
+/// exit status 0 (`reproduce`: the writer says so and writes nothing).
+fn name_notice(prefix: &str, mode: UpstreamDefects, settings: &Settings, notices: &mut Notices) {
+    if mode.fix() && !output_name_ok(prefix, settings) {
+        notices.add(
+            &defects::AFNI_12,
+            format!(
+                "the output name '{}' has blanks, shell metacharacters or non-ASCII characters, \
+                 or starts with '-': written; AFNI writes nothing (exit status 0)",
+                afni_output_name(prefix)
+            ),
+        );
+    }
 }
 
 /// The suffixes of `-savedisp`'s 3 and `-SAVEDISP`'s 19 datasets, in the order AFNI writes

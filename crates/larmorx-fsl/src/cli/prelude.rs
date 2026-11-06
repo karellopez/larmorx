@@ -999,11 +999,17 @@ fn run(
                 mag.volume(v)
             }
         };
-        let vol = phase.volume(v).to_vec();
+        // a single volume is moved out of the series and its result moved back (no copy: the
+        // memory of FSL's call, §10)
+        let vol = if phase.volumes == 1 {
+            std::mem::take(&mut phase.data)
+        } else {
+            phase.volume(v).to_vec()
+        };
         let computed = larmorx_core::parallel::with_threads(n_threads, || {
             compute(vol, phase.shape, src, source.shape, &params, o, mode, v)
         });
-        let (result, extra) = match computed {
+        let (mut result, extra) = match computed {
             Ok(Ok(r)) => r,
             Ok(Err(u)) => {
                 return refuse(
@@ -1037,14 +1043,14 @@ fn run(
             return write_failed(err, f);
         }
         say_lines(out, &result.ramp_lines);
-        if let Some(free) = &result.ramp_free
+        if let Some(free) = result.ramp_free.take()
             && let Err(f) = writer.put(
                 "grot",
                 &phase.header,
                 phase.flipped,
                 phase.shape,
                 1,
-                Values::F32(free.clone()),
+                Values::F32(free),
                 notices,
                 err,
             )
@@ -1060,7 +1066,7 @@ fn run(
                 phase.flipped,
                 phase.shape,
                 1,
-                Values::I32(result.labels.clone()),
+                Values::I32(std::mem::take(&mut result.labels)),
                 notices,
                 err,
             )
@@ -1071,14 +1077,18 @@ fn run(
         if o.ramps {
             say(out, "Removed linear ramps");
         }
-        unwrapped.extend_from_slice(&result.unwrapped);
-        phase.data[v * per..(v + 1) * per].copy_from_slice(&result.phase);
+        append(&mut unwrapped, std::mem::take(&mut result.unwrapped));
+        if phase.volumes == 1 {
+            phase.data = std::mem::take(&mut result.phase);
+        } else {
+            phase.data[v * per..(v + 1) * per].copy_from_slice(&result.phase);
+        }
         if mode.fix() {
             if o.savemask.is_some() {
-                masks.extend_from_slice(&result.mask);
+                append(&mut masks, std::mem::take(&mut result.mask));
             }
             if o.labels.is_some() {
-                labels.extend_from_slice(&result.labels);
+                append(&mut labels, std::mem::take(&mut result.labels));
             }
         }
     }
@@ -1153,6 +1163,15 @@ fn run(
         }
     }
     0
+}
+
+/// `v` after `acc`'s values: moved when `acc` is empty (one volume: no copy), else copied.
+fn append<T: Copy>(acc: &mut Vec<T>, v: Vec<T>) {
+    if acc.is_empty() {
+        *acc = v;
+    } else {
+        acc.extend_from_slice(&v);
+    }
 }
 
 /// `nx x ny x nz`.

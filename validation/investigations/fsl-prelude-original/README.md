@@ -2,8 +2,8 @@
 
 The clean-room implementer's tools for `larmorx fsl prelude` (`crates/larmorx-fsl/src/prelude/`,
 `cli/prelude.rs`, written from `specs/prelude.md`). They run larmorx's original and another program
-(the replica, `larmorx-nc fsl prelude`, as a black box) and compare their outputs; no FSL program
-runs here (FSL's runs go through the oracle cache in the parity suite `fsl-prelude`). Run them
+(the replica, `larmorx-nc fsl prelude`, as a black box) and compare their outputs; FSL's runs go
+through the oracle cache (the parity suite `fsl-prelude`, `bench_calls.py`, `recheck.py`). Run them
 with the workspace's `.venv` inside `scripts/orchestration/boxed.sh` (8 GiB).
 
 | File | What it shows | How to run |
@@ -11,6 +11,8 @@ with the workspace's `.venv` inside `scripts/orchestration/boxed.sh` (8 GiB).
 | `fmriprep_calls.py` | fMRIPrep 25.2.6's seven prelude calls (ds001600 three, ds002422 two, ds002603, ds005454) run with each program given, each output compared bit for bit with fMRIPrep's own unwrapped phase (data and header but `descrip`), with the wall time | `python -P fmriprep_calls.py <workspace>/oracles/fmriprep-25.2.6 <scratch> --program "<larmorx> fsl prelude" --program "<larmorx-nc> fsl prelude" [--threads N] [--mode reproduce] [--repeat 3]` |
 | `edge_cases.py` | the validation plan's cases (§11) on generated inputs (59 cases: every option and mode, the ramps in every mode and on one slice, a neurological image, an int16 phase with a slope, series with `--start`/`--end` and a shorter mask series, complex64 in both byte orders, complex128, float32 and int16 given to `-c`, NaN magnitudes and phases, magnitudes of another size, the range error, `grot`, long names, output types), both D13 modes, two programs compared: exit status, standard output, standard error without larmorx's own lines, every file bit for bit | `python -P edge_cases.py <work dir> --a "<larmorx> fsl prelude" --b "<larmorx-nc> fsl prelude" [--only <prefix>] [--mode fix\|reproduce\|both]` |
 | `bench_large.py` | speed and peak memory (`/usr/bin/time -v`) of each program on large generated maps (a wrapped smooth phase with noise over an ellipsoid; the noise sets how many regions there are), the original at several thread counts, its output compared bit for bit with the first program's | `python -P bench_large.py <work dir> --program "original=<larmorx> fsl prelude" --program "replica=<larmorx-nc> fsl prelude" --threads 1 --threads 14 [--noise 0.15] [--sizes 128x128x128,256x256x160]` |
+| `bench_calls.py` | wall time of fMRIPrep's seven calls: FSL (through `oracle_cache.run` with a reason never to store it), the replica and the original at the thread counts given, each output bit for bit against FSL's (relay 2) | `boxed.sh 8 python -P bench_calls.py <scratch> --larmorx <larmorx> --replica <larmorx-nc> --threads 1 --threads 14 [--repeat 3] [--json out.json]` |
+| `recheck.py` | every finding of a random-testing trial of `fsl-prelude-original` replayed with the current build (`difftest --replay`), the verdicts by the trial's signature (relay 2) | `boxed.sh 24 python -P recheck.py <trial dir> --jobs 6 --out <dir>` |
 
 What they gave (relay 1, 2026-11-06; the original built from this branch, the replica from main
 1eb168f):

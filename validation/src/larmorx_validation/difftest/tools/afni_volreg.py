@@ -194,12 +194,28 @@ def _case(
     ):
         if name in present:
             outs += files
+    # Notices that name a condition whose effect the outputs need not show (as the suite's):
+    # AFNI-86 (-nocoarserot read as -noclip: the clipping and the coarse rotation search,
+    # which may change nothing), AFNI-93 (another start for -twopass's search), AFNI-92 (the
+    # coarse rotation search's automask from another clip fraction; with -nocoarserot the
+    # default has no coarse rotation search, so only `reproduce` names it).
+    silent, one_mode = [], []
+    if "nocoarserot" in present:
+        silent.append("AFNI-86")
+    if "twopass" in present:
+        silent.append("AFNI-93")
     if {"nomaxdisp", "twopass"} <= present:
-        # AFNI-92's notice names a condition (the coarse rotation search's automask from
-        # another clip fraction) whose effect the outputs may not show; with -nocoarserot the
-        # default has no coarse rotation search (AFNI-86), so only `reproduce` names it.
-        kw.setdefault("silent_ok", ("AFNI-92",))
-        kw.setdefault("one_mode", ("AFNI-92",))
+        silent.append("AFNI-92")
+        one_mode.append("AFNI-92")
+    if recipe["inputs"]["input"].get("dtype") == "uint8":
+        # AFNI-87 is named where a brick's stretched bytes differ from its rounded ones: another
+        # correction (AFNI-86, -92, -93: another start) or the default's correctly rounded maths
+        # moves the registered values, so one mode may meet it alone (the trial's case 31851).
+        one_mode.append("AFNI-87")
+    if silent:
+        kw.setdefault("silent_ok", tuple(silent))
+    if one_mode:
+        kw.setdefault("one_mode", tuple(one_mode))
     s = ar.Scenario(
         tuple(words),
         tuple("dt:" + inputs.key(prefix, n) for n in names),
@@ -257,4 +273,8 @@ TOOL = Tool(
     weight=1.0,
     unavailable=_unavailable,
     family="afni",
+    # Where AFNI crashes (AFNI-89's least squares, AFNI-97's NULL row, an option given last):
+    # larmorx prints AFNI's messages up to the crash, then refuses with exit status 1.
+    crash_kw={"expect": "crash"},
+    payload_fields=("tier", "expect", "reason", "silent_ok", "fix_writes"),
 )

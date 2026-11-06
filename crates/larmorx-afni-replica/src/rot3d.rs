@@ -57,6 +57,14 @@ impl Rotator {
         }
     }
 
+    /// Whether a Fourier shear since the last call shifted a lone row (an odd count of rows)
+    /// with both its shift and the previous pair's beyond the row length: AFNI clears the
+    /// missing second row through a NULL pointer there and crashes (AFNI-97); the replica
+    /// cleared the row that exists, and its caller decides.
+    pub fn take_null_row(&mut self) -> bool {
+        self.work.take_null_row()
+    }
+
     /// `THD_rota3D(im, ax1,th1, ax2,th2, ax3,th3, dcode, dx,dy,dz)` on a float volume: the
     /// rotated copy (`th` in radians, `d` in mm, `del` the voxel sizes).
     #[allow(clippy::too_many_arguments)]

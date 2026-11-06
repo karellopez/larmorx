@@ -15,11 +15,15 @@ for speed, is to be written from [`specs/3dvolreg.md`](../../specs/3dvolreg.md) 
 (the user, 2026-11-06). `implementation="auto"` (the default, and `larmorx afni 3dvolreg`) and
 `"replica"` run the replica, in the same process; `"original"` raises `NotImplementedError`.
 
-**Status: `experimental`** (2026-11-06): the replica is bit-identical with AFNI 26.3.05 on every
-case compared so far (`validation/investigations/afni-volreg/`: over 110 cases, every option, data
-type, orientation and message, fMRIPrep's call on inputs re-made from three oracle runs); the
-validation record `afni-volreg-replica` (the oracle cache, the standard tier) comes with the
-parity suite.
+**Status: `validated`** (2026-11-06): the replica is bit-identical with AFNI 26.3.05 in every
+compared case of its record ([afni-volreg-replica](../validation/afni-volreg-replica.md), the
+standard tier through the oracle-output cache: every option, data type, orientation, message and
+failure case; fMRIPrep's RobustAverage call on the BOLD references of 6 oracle runs (single-band,
+two volumes, multiband with 160 × 160 × 96 voxels, multi-echo, multiband 8 stored as uint16,
+Philips float32; 7 more in the full tier) and on sdcflows' PEPOLAR reference averages of 2,
+whose medians are fMRIPrep's own `gen_avg` and `ref_average` outputs byte for byte; AFNI
+25.2.09 identical on every case), and in a random-testing trial
+(`validation/difftest/triage.toml`).
 
 ## Quick start
 
@@ -93,9 +97,10 @@ line) where it changed the result ([register](upstream-defects.md)):
 | AFNI-90 | A | `-prefix`, `-dfile`, `-1Dfile` and `-weight`'s name of 256 bytes or more abort (buffer overflow); `-maxdisp1D` names are cut at 997 | kept whole (`reproduce`: refused, cut) |
 | AFNI-92 | A | `-nomaxdisp` changes `-twopass`'s coarse rotation search (the automask's clip fraction) | the same search with and without |
 | AFNI-93 | A | a coarse-search region with no voxel (a volume too thin) scores 0 and keeps the first candidate | such candidates are not taken |
-| AFNI-94 | B | `-coarse 1` on a volume of 120³ or more never ends | an error (both modes) |
+| AFNI-94 | B | `-coarse 1` on a volume of 120 voxels or more along every axis never ends | an error (both modes) |
 | AFNI-95 | B | `-base 0 -base 3` is accepted (the last wins) | an error |
 | AFNI-96 | B | a `-rotparent` without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE` is read through a NULL pointer | an error (both modes) |
+| AFNI-97 | A | a Fourier rotation shifting the last of an odd count of rows (and the previous pair's second row) beyond the row length writes through a NULL pointer (a crash; rotations far beyond a head's motion) | the row cleared alone, as AFNI clears a pair |
 
 Kept in both modes and documented (rule C): the blur's row-end mirrors (measured: switching to
 whole-point mirrors moves the parameters by at most 1.5e-5 degrees and 1.1e-5 mm, the registered

@@ -1062,10 +1062,24 @@ fn open(
             }
             io.oblique_warned = true;
         }
+        // THD_open_nifti's conversion to float: announced for the run's first such dataset
+        // only, unless AFNI_NIFTI_TYPE_WARN is YES (its static n_xform_warn).
+        if let Message::Raw(text) = &m
+            && text.starts_with(TYPE_WARNING)
+        {
+            let first = !io.type_warned;
+            io.type_warned = true;
+            if !first && !settings.yes("AFNI_NIFTI_TYPE_WARN") {
+                continue;
+            }
+        }
         io.message(m);
     }
     read
 }
+
+/// The start of `THD_open_nifti`'s announcement of a conversion to float.
+const TYPE_WARNING: &str = "** AFNI converts NIFTI_datatype=";
 
 /// The start of `THD_report_obliquity`'s warning, which AFNI prints once per run.
 const OBLIQUE_WARNING: &str = "  If you are performing spatial transformations on an oblique dset";
@@ -1505,8 +1519,15 @@ fn run_with(
     drop(o.weight.take());
     let mut log = Vec::new();
     let result = volreg::volreg(&ds, &p, null_output, &mut log, notices);
+    // Where AFNI crashes, its banner starts a new line: a progress line left open ("0..1")
+    // ends before larmorx's error.
+    let open_line = matches!(log.last(), Some(Message::Raw(t)) if !t.ends_with('\n'));
+    let crashed = matches!(result, Err(VolregError::Crash(_)));
     for m in log {
         io.message(m);
+    }
+    if crashed && open_line {
+        io.raw("\n");
     }
     let mut res = result.map_err(stop)?;
     drop(p);
@@ -2014,7 +2035,7 @@ fn mismatch(
 /// A registration error, as AFNI prints it.
 fn stop(e: VolregError) -> Stop {
     match e {
-        VolregError::Fatal(m) => Stop::Fatal(m),
+        VolregError::Fatal(m) | VolregError::Crash(m) => Stop::Fatal(m),
         VolregError::Plain(m) => Stop::Raw(m),
     }
 }

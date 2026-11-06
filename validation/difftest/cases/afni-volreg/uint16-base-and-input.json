@@ -1,0 +1,335 @@
+{
+ "defect": null,
+ "description": "a uint16 base and input: AFNI announces the conversion to float once per run (THD_open_nifti's n_xform_warn); the replica announced it for each dataset",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: AFNI's, byte for byte: stderr line 5: AFNI '\\x1b[7m** FATAL ERROR:\\x1b[0m 3dvolreg fails: base image has 64 nonzero voxels (< 100)', larmorx '** AFNI converts NIFTI_datatype=512 (UINT16) in file /tmp/lx-difftest-inputs_7jp43ht7/run/d03ff3f6b2591858/input.nii.gz to FLOAT32'",
+  "n": 9,
+  "seed": "volreg-trial",
+  "shrink_moves": [
+   "dropped maxdisp1D (-maxdisp1D md.1D)",
+   "dropped dfile (-dfile d.txt)",
+   "dropped delta (-delta 0.2)",
+   "dropped rot_thresh (-rot_thresh 0.1)",
+   "dropped x_thresh (-x_thresh 0.3)",
+   "dropped maxite (-maxite 40)",
+   "dropped final (-final heptic)",
+   "input: axis 0 30 -> 15 voxels",
+   "input: axis 1 17 -> 8 voxels",
+   "input: axis 0 15 -> 7 voxels",
+   "input: axis 1 8 -> 4 voxels",
+   "input: axis 0 7 -> 4 voxels",
+   "input: axis 2 5 -> 4 voxels",
+   "base: axis 0 30 -> 15 voxels",
+   "base: axis 1 17 -> 8 voxels",
+   "base: axis 0 15 -> 7 voxels",
+   "base: axis 1 8 -> 4 voxels",
+   "base: axis 0 7 -> 4 voxels",
+   "base: axis 2 5 -> 4 voxels",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "base (and its grid): unit spacing",
+   "base (and its grid): origin at 0"
+  ],
+  "signature": [
+   "messages: AFNI's, byte for byte"
+  ]
+ },
+ "id": "uint16-base-and-input",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "d.txt",
+    "md.1D",
+    "md_delt.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": false,
+   "1Dmatrix_save": false,
+   "content": "head",
+   "controls": true,
+   "delta value": "0.2",
+   "dfile": true,
+   "dtype": "uint16",
+   "edging": false,
+   "external base": true,
+   "extreme": false,
+   "final": true,
+   "final value": "heptic",
+   "first at rest": false,
+   "float": false,
+   "maxdisp1D": true,
+   "maxite value": "40",
+   "method": false,
+   "noclip": false,
+   "noise": 3.0,
+   "nomaxdisp": false,
+   "nx": 30,
+   "ny": 17,
+   "nz": 5,
+   "oblique": false,
+   "rot b": 2,
+   "rot c": 0,
+   "rot d": 1,
+   "rot scale": 4,
+   "rot_thresh value": "0.1",
+   "savedisp": false,
+   "shift0": -0.25,
+   "shift1": 1.25,
+   "shift2": 0.0,
+   "slice spacing": 3.5,
+   "spacing": 3.5,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tshift": false,
+   "twopass": false,
+   "verbose": false,
+   "volumes": 2,
+   "weight": false,
+   "wtinp": false,
+   "x_thresh value": "0.3",
+   "zpad": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-base",
+     "{in:base}"
+    ],
+    "name": "base",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "base": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 1308658736,
+     "size": 24.99,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 1308658736,
+     "size": 24.99,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       30,
+       -1,
+       0,
+       2
+      ],
+      "translation": [
+       3.5,
+       0.5,
+       -1.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       36,
+       2,
+       0,
+       1
+      ],
+      "translation": [
+       -0.25,
+       1.25,
+       0.0
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 9,
+  "options": [
+   "-base",
+   "-delta",
+   "-dfile",
+   "-final",
+   "-maxdisp1D",
+   "-maxite",
+   "-rot_thresh",
+   "-x_thresh",
+   "2 volumes",
+   "5 slices",
+   "uint16 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-volreg",
+ "tier": "smoke",
+ "tool": "afni-volreg"
+}

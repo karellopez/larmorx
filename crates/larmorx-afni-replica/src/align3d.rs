@@ -82,6 +82,33 @@ pub fn mri_min(v: &[f32]) -> f64 {
 /// What [`Align3d::one`] gives: the angles (radians), the shifts (mm) and the registered volume.
 pub type OneFit = ([f32; 3], [f32; 3], Option<Vec<f32>>);
 
+/// Why [`Align3d::one`] stopped where AFNI crashes: the least squares it could not set up
+/// (AFNI-89), or, with `reproduce`, a Fourier rotation that met AFNI-97 (AFNI clears a row that
+/// does not exist).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OneError {
+    Lsq(LsqError),
+    NullRow,
+}
+
+impl From<LsqError> for OneError {
+    fn from(e: LsqError) -> OneError {
+        OneError::Lsq(e)
+    }
+}
+
+/// After a rotation: AFNI-97's condition met (the rotator's flag, kept in `met` for the
+/// default's notice); with `reproduce` the fit stops there, as AFNI crashes.
+fn null_row(rot: &mut Rotator, met: &mut bool, reproduce: bool) -> Result<(), OneError> {
+    if rot.take_null_row() {
+        *met = true;
+        if reproduce {
+            return Err(OneError::NullRow);
+        }
+    }
+    Ok(())
+}
+
 /// A crop box (`xa..xb`, inclusive).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Box3 {
@@ -523,17 +550,22 @@ impl Align3d {
     /// `mri_3dalign_one(basis, im, ...)`: the parameters `[th1, th2, th3]` (radians) and
     /// `[dx, dy, dz]` (mm), and the registered volume (`None` with `noreg`). An error where AFNI
     /// dereferences the failed least squares (AFNI-89).
+    /// `null_rows` is set when a Fourier rotation met AFNI-97's condition; with `reproduce`
+    /// (the rotator's mode) the fit stops there with [`OneError::NullRow`].
     pub fn one(
         &self,
         basis: &Basis,
         im: &Vol,
         rot: &mut Rotator,
         log: &mut Vec<Message>,
-    ) -> Result<OneFit, LsqError> {
+        null_rows: &mut bool,
+    ) -> Result<OneFit, OneError> {
         let fitter = match &basis.fit {
             Ok(s) => s,
-            Err(e) => return Err(e.clone()),
+            Err(e) => return Err(OneError::Lsq(e.clone())),
         };
+        // The rotator's mode: glibc's functions exactly with `reproduce`.
+        let reproduce = rot.libc.is_glibc();
         let fim = &im.data;
         let n = im.n;
         let trim = |v: &[f32]| match &basis.trim {
@@ -599,6 +631,7 @@ impl Align3d {
             for m in rot.messages.drain(..) {
                 log.push(Message::Raw(m));
             }
+            null_row(rot, null_rows, reproduce)?;
             let dfit = fitter.solve(&trim(&tim))?;
             for i in 1..7 {
                 fit[i] += dfit[i];
@@ -644,6 +677,7 @@ impl Align3d {
             for m in rot.messages.drain(..) {
                 log.push(Message::Raw(m));
             }
+            null_row(rot, null_rows, reproduce)?;
             if self.clipit && clips(final_mode) {
                 let ftop = mri_max(fim) as f32;
                 let fbot = mri_min(fim) as f32;

@@ -1,0 +1,279 @@
+{
+ "defect": "AFNI-89",
+ "description": "-twopass on a constant 4 x 34 x 4 series: the least squares cannot be set up and AFNI crashes at the first volume (AFNI-89); larmorx refuses after AFNI's messages",
+ "expect": "crash",
+ "found": {
+  "detail": "AFNI does not crash: Fatal Signal 11 (SIGSEGV) received",
+  "n": 108,
+  "seed": "volreg-trial",
+  "shrink_moves": [
+   "dropped 1Dfile (-1Dfile p.1D)",
+   "dropped base (-base 1)",
+   "dropped zpad (-zpad 8)",
+   "dropped method (-cubic)",
+   "input: axis 0 15 -> 7 voxels",
+   "input: axis 2 12 -> 6 voxels",
+   "input: axis 0 7 -> 4 voxels",
+   "input: axis 2 6 -> 4 voxels",
+   "input: 5 -> 2 volumes",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0"
+  ],
+  "signature": [
+   "AFNI does not crash"
+  ]
+ },
+ "id": "constant-twopass-lsqfit",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "p.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": true,
+   "1Dmatrix_save": false,
+   "base index": true,
+   "base value": 1,
+   "coarse": false,
+   "content": "constant",
+   "controls": false,
+   "dfile": false,
+   "dtype": "float32",
+   "edging": false,
+   "external base": false,
+   "extreme": false,
+   "final": false,
+   "first at rest": true,
+   "float": false,
+   "maxdisp1D": false,
+   "method": true,
+   "method value": "cubic",
+   "noclip": false,
+   "nocoarserot": false,
+   "nomaxdisp": false,
+   "nx": 15,
+   "ny": 34,
+   "nz": 12,
+   "oblique": true,
+   "qa": 12,
+   "qb": -2,
+   "qd": 1,
+   "rot b": 2,
+   "rot c": -1,
+   "rot d": 0,
+   "rot scale": 5,
+   "savedisp": false,
+   "shift0": 0.25,
+   "shift1": -0.25,
+   "shift2": 0.0,
+   "shift3": 4.0,
+   "shift4": 0.5,
+   "sinit": false,
+   "slice spacing": 4.0,
+   "spacing": 4.0,
+   "suffix": ".nii.gz",
+   "tshift": false,
+   "twoblur": false,
+   "twodup": false,
+   "twopass": true,
+   "verbose": false,
+   "volumes": 5,
+   "weight": false,
+   "wtinp": false,
+   "zpad": true,
+   "zpad value": "8"
+  },
+  "groups": [
+   {
+    "args": [
+     "-twopass"
+    ],
+    "name": "twopass",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 906697297,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       37,
+       -2,
+       0,
+       2
+      ],
+      "translation": [
+       0.5,
+       0.25,
+       0.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       21,
+       1,
+       2,
+       1
+      ],
+      "translation": [
+       2.0,
+       0.5,
+       4.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       38,
+       -1,
+       -2,
+       -2
+      ],
+      "translation": [
+       2.25,
+       -2.75,
+       -2.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       52,
+       2,
+       -1,
+       0
+      ],
+      "translation": [
+       0.25,
+       -0.25,
+       0.0
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     4,
+     34,
+     4,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 108,
+  "options": [
+   "-1Dfile",
+   "-base",
+   "-cubic",
+   "-twopass",
+   "-zpad",
+   "12 slices",
+   "5 volumes",
+   "float32 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": "B",
+ "status": "register",
+ "suite": "afni-volreg",
+ "tier": "standard",
+ "tool": "afni-volreg"
+}

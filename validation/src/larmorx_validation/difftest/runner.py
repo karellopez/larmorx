@@ -322,8 +322,11 @@ def judge_once(
     return j
 
 
+#: The original crashed: ANTs' exit statuses and signals, AFNI's crash banner ("Fatal Signal
+#: 11 (SIGSEGV) received": 3dvolreg's AFNI-89 and AFNI-97, since 2026-11-06).
 _CRASHED = re.compile(
     r"ANTs (?:exit )?-\d+\b|ANTs killed by signal|ANTs \(?signal|by signal \d+|ANTs crash"
+    r"|Fatal Signal \d+"
 )
 
 

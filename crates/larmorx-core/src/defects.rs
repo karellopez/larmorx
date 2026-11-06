@@ -393,11 +393,13 @@ defects! {
     AFNI_93 = "AFNI-93", "3dvolreg", true,
         "the coarse search of -twopass on a volume too thin for its edge (n - edge <= edge on an axis) sums over no voxel, so every shift scores 0 and the first candidate wins: a start shifted by -2 steps along z and rotated by -9, -18, -9 degrees";
     AFNI_94 = "AFNI-94", "3dvolreg", true,
-        "-twopass with -coarse 1 on a volume of 120^3 voxels or more halves the coarse step to 0 for the subsampled search, which never ends";
+        "-twopass with -coarse 1 on a volume of 120 or more voxels along every axis halves the coarse step to 0 for the subsampled search, which never ends";
     AFNI_95 = "AFNI-95", "3dvolreg", true,
         "a second -base is refused only when the first was a dataset or an index above 0: -base 0 -base 3 registers to brick 3";
     AFNI_96 = "AFNI-96", "3dvolreg", true,
         "a -rotparent dataset with VOLREG_MATVEC_000000 but without VOLREG_CENTER_OLD or VOLREG_CENTER_BASE (or with fewer than 3 numbers in one) is read through a NULL pointer or past the attribute (a crash or garbage)";
+    AFNI_97 = "AFNI-97", "3dvolreg", true,
+        "a Fourier rotation whose shear shifts the last of an odd count of rows, and the previous pair's second row, beyond the row length clears the missing second row through a NULL pointer (fft_shift2): a crash";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

@@ -76,6 +76,10 @@ pub struct ShiftWork {
     cf: Vec<Complex32>,
     cg: Vec<Complex32>,
     lcbuf: Vec<f32>,
+    /// AFNI-97: a Fourier shift of a lone row (no second row) found both shifts beyond the row
+    /// length, where AFNI clears the second row through its NULL pointer and crashes; here only
+    /// the row that exists is cleared. Cleared by [`ShiftWork::take_null_row`].
+    null_row: bool,
 }
 
 impl std::fmt::Debug for ShiftWork {
@@ -92,6 +96,11 @@ impl ShiftWork {
             mode,
             ..ShiftWork::default()
         }
+    }
+
+    /// Whether a lone row met AFNI-97's condition since the last call (see the field).
+    pub fn take_null_row(&mut self) -> bool {
+        std::mem::take(&mut self.null_row)
     }
 
     fn plan(&mut self, nup: usize) -> &CsfftPlan {
@@ -195,8 +204,10 @@ fn fft_shift2(
     let nf = n as f32;
     if (af < -nf || af > nf) && (ag < -nf || ag > nf) {
         f.fill(0.0);
-        if let Some(g) = g.as_deref_mut() {
-            g.fill(0.0);
+        match g.as_deref_mut() {
+            Some(g) => g.fill(0.0),
+            // AFNI-97: AFNI's `g[ii] = 0.0` through the NULL pointer (the caller decides).
+            None => work.null_row = true,
         }
         return;
     }

@@ -47,6 +47,8 @@ def _kw(tool_name: str, p: dict) -> dict:
         kw["reason"] = p["reason"]
     if "silent_ok" in fields and p.get("silent_ok"):
         kw["silent_ok"] = tuple(p["silent_ok"])
+    if "fix_writes" in fields and p.get("fix_writes"):
+        kw["fix_writes"] = p["fix_writes"]
     if "step" in fields and p.get("step"):
         kw["step"] = tuple(p["step"])
     return kw

@@ -131,3 +131,45 @@ release (`tags/AFNI-26.3.05/src`; the same text in 25.2.09 for every routine bel
   neither is a candidate: no shift and no rotation.
 - **A constant base** (AFNI-89): `lsqfit`'s "vectors are all 0" errors, then the crash at the
   first registered volume, in both passes.
+
+## The parity suite and random testing (relay 3)
+
+- **The subsampled coarse search needs 120 voxels along every axis** (`new_get_best_shiftrot`:
+  `nx >= 120 && ny >= 120 && nz >= 120`), not 120³ voxels in all: none of the oracle runs'
+  series takes it (ds005454 is 160 × 160 × 96). The suite's `e_big120` series (120³, 3 volumes)
+  does, and AFNI-94's case (`-coarse 1`, the subsampled step 0) is checked on it.
+- **AFNI-97** (random testing's trial of 2026-11-06, rule A): `fft_shift2` (`thd_shift2.c`)
+  returns zeros when both rows' shifts are beyond the row length, `for(ii...) f[ii] = g[ii] =
+  0.0`, without the `g != NULL` test every other `*_shift2` has. The shears (`apply_xshear`,
+  `apply_yshear`, `apply_zshear`, `thd_rot3d.c`) shift the last row of an odd count alone
+  (`g = NULL`), passing the previous pair's `a1` as the second shift; when that row's shift and
+  the stale `a1` are both beyond the row length (a rotation far beyond a head's motion: the
+  trial's runaway fits, `-twopass` first passes ending at 160 degrees), AFNI writes through
+  the NULL pointer (`memset`, SIGSEGV in `fft_shift2` under `apply_3shear`). Only the Fourier
+  method (`-Fourier`, `-final Fourier`) and an odd row count along the sheared axis. The
+  replica clears the existing row alone by default (as AFNI clears a pair) and names AFNI-97;
+  with `reproduce` it stops where AFNI crashes, after AFNI's messages (the fit's rotations and
+  the `-rotparent` final rotation).
+- **`THD_open_nifti`'s float-conversion notice is printed once per run** (its static
+  `n_xform_warn`, unless `AFNI_NIFTI_TYPE_WARN` is YES): 3dvolreg opens several datasets (a
+  uint16 base and input: the trial's 348 message differences); the replica mutes the later ones
+  as it mutes `THD_report_obliquity`'s long warning.
+- **AFNI-12 with 3dvolreg**: 3dvolreg's `-prefix` is not checked during the option scan; the
+  writer refuses a name `THD_filename_ok` rejects ("Illegal filename for NIfTI output", nothing
+  written, exit status 0). By default the replica writes it and names AFNI-12 (it named
+  nothing before); `-savedisp`'s names alike.
+- **The replica's temporary output name** (`cli/output.rs`, `.<name>.larmorx-<pid>-<n>.tmp`)
+  exceeded 255 bytes for an output name of 228 bytes or more, which AFNI writes: the stem is now
+  cut so that the temporary name stays within 255 bytes. The clean-room AFNI crate names its
+  temporary files the same way (a follow-up for its agent, `docs/next-steps.md`).
+- **A run that stops names its defects**: the default's refusals (AFNI-94, AFNI-95) printed no
+  notice, because the notices were printed only at the end of a run that ends; now a run that
+  stops prints the notices met first.
+- **fMRIPrep's input to 3dvolreg depends on numpy's version**: RobustAverage divides the sliced
+  volumes by their drift, `np.mean(data, axis=(0, 1, 2))` of float32 data, which numpy 2.3
+  sums in another order than fMRIPrep 25.2.6's numpy 2.2.6 (2,002 of 2,785,280 stored values
+  one unit apart on ds000005's run 1); the suite re-makes the input with fMRIPrep's own Python
+  in its image, and the median of the replica's registered volumes is then fMRIPrep's
+  `gen_avg` output byte for byte on every call compared.
+- **A constant series** registers without `-twopass` (every parameter 0, AFNI's exit status
+  0); with `-twopass` it is AFNI-89 (the crash).

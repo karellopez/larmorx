@@ -3797,3 +3797,59 @@ signature = ["given FSL's matrix (-applyxfm -init): out.nii.gz: header"]
 status = "open"
 explanation = "Trial 2026-11-05-catchup-bet, relay 10's refinement of relay 8's entry for these findings (replayed with the final build, the stage runs' header fields read by trial_ssroi_matrices.py): of the 16 standard_space_roi header findings left, 9 are the cut's translation one float unit from FSL's (128, 151, 165, 395, 619, 870, 407, 545, 744), 4 a form's translation whole voxels from FSL's where the input's qform and sform differ (189: qoffset_x -14.25 against -38.25; 313, 315, 456), 2 NIfTI-2 outputs whose matrices FSL holds in single precision and whose sform of code 0 it moves too (543: -44.40308380 against -44.40308296; 567: srow_x's translation -1.2412 against the input's 51.25), and 222 fslpy's conversion (scl_slope 1 against 0). Questions for the spec writer (specs/standard_space_roi.md §3.2, §2.5); open"
 link = "docs/findings/fsl-bet-original.md"
+
+# ---------------------------------------------------------------- 3dvolreg's replica trial (2026-11-06)
+# oracles/difftest/2026-11-06-volreg-replica, seed volreg-trial, 30 minutes, 12 jobs at one thread,
+# 1.5 GiB per case, AFNI through the oracle cache (use): 39,751 cases, 37,925 agree, 112 notices,
+# 1,714 differences; every finding replayed with the final build agrees
+# (validation/investigations/afni-volreg/recheck_trial.py).
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["messages: AFNI's, byte for byte"]
+status = "fixed"
+explanation = "Trial 2026-11-06-volreg-replica, 993 findings (uint16 datasets; with 17 crashes and 5 AFNI-86 notices besides): THD_open_nifti announces a dataset's conversion to float once per run (its static n_xform_warn, unless AFNI_NIFTI_TYPE_WARN is YES); 3dvolreg opens a base, a weight or a rotparent besides its input, and the replica announced each. Muted after the first as AFNI does (cli/volreg.rs's open, Io.type_warned)"
+link = "validation/difftest/cases/afni-volreg/uint16-base-and-input.json"
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["AFNI does not crash"]
+status = "harness"
+explanation = "Trial 2026-11-06-volreg-replica, 452 findings (constant, noise, small or degenerate series with -twopass): AFNI-89, AFNI's crash at the first registered volume when the least squares cannot be set up; the replica printed AFNI's messages up to the crash and refused with exit status 1, as the suite expects, but the descriptor had no crash expectation and random testing did not recognise AFNI's crash banner ('Fatal Signal 11'). The descriptor now compares such runs the suite's way (crash_kw), and the runner recognises AFNI's banner"
+link = "validation/difftest/cases/afni-volreg/constant-twopass-lsqfit.json"
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["AFNI does not crash", "every file written is compared", "exit status", "messages before AFNI's crash"]
+status = "register"
+defect = "AFNI-97"
+rule = "A"
+explanation = "Trial 2026-11-06-volreg-replica, 264 findings (-Fourier or -final Fourier; fits that run to rotations far beyond a head's motion, mostly from AFNI-93's start on thin volumes): fft_shift2 zero-fills both rows when both shifts are beyond the row length without testing that the second row exists; the shears pass none for the last of an odd count of rows (with the previous pair's stale shift), and AFNI writes through the NULL pointer (gdb: memset in fft_shift2 under apply_3shear). New defect AFNI-97 (rule A): by default the row is cleared alone and AFNI-97 named; with reproduce the replica, which had gone on, now stops where AFNI crashes, after AFNI's messages"
+link = "validation/difftest/cases/afni-volreg/fourier-lone-row-default.json"
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["AFNI does not crash", "messages before AFNI's crash"]
+status = "fixed"
+explanation = "Trial 2026-11-06-volreg-replica: AFNI-97's and AFNI-89's crashes after an open progress line (-verbose's 'Starting final pass on 5 sub-bricks: 0..1'), where AFNI's crash banner starts a new line: the replica's notice and error followed on the open line. Its error now starts a line (VolregError::Crash); 17 more of this signature were the uint16 notice above"
+link = "validation/difftest/cases/afni-volreg/crash-after-progress-line.json"
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["D13 fix pass", "messages: AFNI's, byte for byte"]
+status = "harness"
+explanation = "Trial 2026-11-06-volreg-replica, 5 findings and 112 notices (cases with -nocoarserot, -twopass on thin volumes, bytes): AFNI-86 (-nocoarserot read as -noclip: the clipping and the coarse rotation search, which may change no value), AFNI-93 (another start for -twopass's search, which may end at the same fit) and AFNI-87 (a byte brick's stretched and rounded values, compared in each mode on that mode's registration) name a condition whose effect the outputs need not show, or that one mode alone meets; the descriptor allows them as the suite allows AFNI-92 (silent_ok, one_mode). Their messages: the uint16 notice above"
+link = "validation/src/larmorx_validation/difftest/tools/afni_volreg.py"
+
+[[difference]]
+tool = "afni-volreg"
+implementation = "replica"
+signature = ["messages: AFNI's, byte for byte"]
+status = "harness"
+explanation = "Trial 2026-11-06-volreg-replica, 2 findings: AFNI's '3dvolreg might not converge.' (a large scale difference with -twopass) leaves its line open, and larmorx's upstream-defect notices followed on it; the comparison dropped the whole line as larmorx's. It now keeps AFNI's text before a notice (afni_replica.larmorx_text)"
+link = "validation/difftest/cases/afni-volreg/notice-after-open-line.json"

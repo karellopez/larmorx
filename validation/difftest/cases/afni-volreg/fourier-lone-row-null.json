@@ -1,0 +1,253 @@
+{
+ "defect": "AFNI-97",
+ "description": "-Fourier -twopass on 37 x 4 x 16 voxels: AFNI's coarse search, on a volume too thin for its region, starts the fit from its first candidate (AFNI-93), the final pass's rotation runs far beyond a head's motion and shifts the lone last row (odd x) and the previous pair's second row beyond the row length: AFNI clears the missing row through a NULL pointer and crashes (AFNI-97); the default, AFNI-93 corrected, does not run away and writes the output",
+ "expect": "crash",
+ "fix_writes": "AFNI-93",
+ "found": {
+  "detail": "every file written is compared: AFNI [], larmorx ['o.nii']; exit status: ; messages before AFNI's crash: line 4: AFNI '', larmorx '++ Max displacement in automask = 30.81 (mm) at sub-brick 1'; AFNI does not crash: Fatal Signal 11 (SIGSEGV) received",
+  "n": 426,
+  "seed": "volreg-trial",
+  "shrink_moves": [
+   "dropped 1Dmatrix_save (-1Dmatrix_save m.aff12.1D)",
+   "dropped 1Dfile (-1Dfile p.1D)",
+   "dropped nomaxdisp (-nomaxdisp)",
+   "dropped coarse (-coarse 2 2)",
+   "input: axis 1 40 -> 20 voxels",
+   "input (and its grid): origin at 0",
+   "input: axis 1 20 -> 10 voxels",
+   "input: axis 1 10 -> 5 voxels",
+   "input: axis 1 5 -> 4 voxels",
+   "input (and its grid): unit spacing",
+   "input: float32 storage"
+  ],
+  "signature": [
+   "AFNI does not crash",
+   "every file written is compared",
+   "exit status",
+   "messages before AFNI's crash"
+  ]
+ },
+ "id": "fourier-lone-row-null",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "p.1D",
+    "m.aff12.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": true,
+   "1Dmatrix_save": true,
+   "base index": false,
+   "coarse": true,
+   "coarse del": "2",
+   "coarse num": "2",
+   "content": "head",
+   "controls": false,
+   "dfile": false,
+   "dtype": "uint16",
+   "edging": false,
+   "external base": false,
+   "extreme": false,
+   "final": false,
+   "first at rest": true,
+   "float": false,
+   "maxdisp1D": false,
+   "method": true,
+   "method value": "Fourier",
+   "noclip": false,
+   "nocoarserot": false,
+   "noise": 1.0,
+   "nomaxdisp": true,
+   "nx": 37,
+   "ny": 40,
+   "nz": 16,
+   "oblique": false,
+   "rot b": 1,
+   "rot c": 1,
+   "rot d": 1,
+   "rot scale": 5,
+   "savedisp": false,
+   "shift0": 1.25,
+   "shift1": -4.0,
+   "shift2": -1.75,
+   "sinit": false,
+   "slice spacing": 4.0,
+   "spacing": 3.5,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tshift": false,
+   "twoblur": false,
+   "twodup": false,
+   "twopass": true,
+   "verbose": false,
+   "volumes": 2,
+   "weight": false,
+   "wtinp": false,
+   "zpad": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-Fourier"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twopass"
+    ],
+    "name": "twopass",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 708219803,
+     "size": 54.39,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       32,
+       1,
+       1,
+       1
+      ],
+      "translation": [
+       1.25,
+       -4.0,
+       -1.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     37,
+     4,
+     16,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 426,
+  "options": [
+   "-1Dfile",
+   "-1Dmatrix_save",
+   "-Fourier",
+   "-coarse",
+   "-nomaxdisp",
+   "-twopass",
+   "16 slices",
+   "2 volumes",
+   "uint16 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "afni-volreg",
+ "tier": "smoke",
+ "tool": "afni-volreg"
+}

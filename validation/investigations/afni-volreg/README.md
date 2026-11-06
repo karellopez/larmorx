@@ -72,3 +72,4 @@ file, gives the oracle run's `_average` file byte for byte.
 | Script | What it does |
 |---|---|
 | `speed.py [--repeats 3] [--labels ...] [--json out.json]` | AFNI 26.3.05's 3dvolreg against the replica (the standalone `larmorx` binary and `python -m larmorx`) on fMRIPrep's call, one thread, the median of the repeats, the outputs compared byte for byte |
+| `recheck_trial.py <night> <out.jsonl> [--jobs 8]` | every finding of a random-testing trial replayed with the current build (`difftest --replay`, AFNI from the oracle cache): the counts by verdict and by the trial's signatures (the trial of 2026-11-06: all 1,714 findings agree with the final build; `validation/difftest/triage.toml`) |

@@ -59,6 +59,9 @@ pub(crate) struct Io<'a> {
     pub(crate) style: Style,
     /// `THD_report_obliquity`'s long warning was printed (once per run, `first_oblique`).
     pub(crate) oblique_warned: bool,
+    /// `THD_open_nifti` announced a conversion to float (`n_xform_warn`: once per run unless
+    /// `AFNI_NIFTI_TYPE_WARN` is YES; 3dvolreg opens several datasets).
+    pub(crate) type_warned: bool,
 }
 
 impl<'a> Io<'a> {
@@ -78,6 +81,7 @@ impl<'a> Io<'a> {
                 colorize: mode.reproduce() && !settings.no("AFNI_MESSAGE_COLORIZE"),
             },
             oblique_warned: false,
+            type_warned: false,
         }
     }
 

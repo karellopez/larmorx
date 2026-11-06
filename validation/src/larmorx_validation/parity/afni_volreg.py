@@ -13,7 +13,7 @@ rotated and shifted per volume, with noise: :func:`_make_series`) and their vari
 scaled, bytes, oblique with odd sizes, sagittal, slice timing, grids for ``-gridparent``, a
 shifted base, one, two and four slices, a constant series, one volume, no motion, large
 rotations, NaN), ``-rotparent`` datasets made by AFNI's own 3dvolreg (its ``VOLREG_*``
-attributes); the errors and crashes; the defects (D13: AFNI-86 to AFNI-96); AFNI's global
+attributes); the errors and crashes; the defects (D13: AFNI-86 to AFNI-97); AFNI's global
 options and the variables 3dvolreg reads; and real data: fMRIPrep's own call (niworkflows'
 ``RobustAverage``: ``3dvolreg -Fourier -twopass -1Dfile -1Dmatrix_save -prefix -zpad 4
 -maxdisp1D``) on the volumes its BOLD reference averaged, re-made from the oracle runs'
@@ -935,8 +935,8 @@ def suite(implementation: str = "replica") -> Suite:
             PROGRAM,
             "volreg",
             "an option given last without its value, AFNI-88; a base whose least squares "
-            "cannot be set up, AFNI-89; a name of 256 bytes or more, AFNI-90; a rotparent "
-            "without its centres, AFNI-96",
+            "cannot be set up, AFNI-89; a name of 256 bytes or more, AFNI-90; a Fourier "
+            "rotation that clears a row through a NULL pointer, AFNI-97",
             "replica",
         ),
         notes=(

@@ -34,11 +34,16 @@
 //!   of the run, so `-nomaxdisp` changes `-coarserot`'s mask (0.5); by default 0.333 always;
 //! - AFNI-93: a coarse search whose overlap region is empty scores every candidate 0 and keeps
 //!   the first; by default such candidates are not taken;
-//! - AFNI-94: a coarse step of 1 voxel on a volume of 120³ or more halves to 0 for the
-//!   subsampled search, an endless loop in AFNI: an error in both modes;
+//! - AFNI-94: a coarse step of 1 voxel on a volume of 120 or more voxels along every axis
+//!   halves to 0 for the subsampled search, an endless loop in AFNI: an error in both modes;
 //! - AFNI-89: a least squares AFNI cannot set up (all-zero weights, an all-zero weighted
 //!   derivative) crashes AFNI at the first registered brick: an error in both modes, after
 //!   AFNI's messages.
+//! - AFNI-97: a Fourier rotation whose shear shifts the last of an odd count of rows and the
+//!   previous pair's second row beyond the row length (rotations far beyond a head's motion,
+//!   random testing's trial of 2026-11-06): `fft_shift2` clears the missing second row through
+//!   its NULL pointer and AFNI crashes; by default the row that exists is cleared alone (as
+//!   AFNI clears a pair), with `reproduce` an error where AFNI crashes, after its messages.
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
 
@@ -178,6 +183,9 @@ pub enum VolregError {
     Fatal(String),
     /// A `fprintf(stderr, "** ...")` and `exit(1)`: the text as AFNI prints it.
     Plain(String),
+    /// Where AFNI crashes (AFNI-89, AFNI-97): larmorx's error, on a line of its own (AFNI's
+    /// crash banner starts a new line after a progress line such as "0..1").
+    Crash(String),
 }
 
 /// The dataset's orientation codes, or an error for a degenerate matrix (AFNI indexes its
@@ -510,8 +518,8 @@ struct Ctx<'a> {
 /// `new_get_best_shiftrot(dset, base, vol, ...)`: the best of 3 × 5 × 3 rotations (roll, pitch,
 /// yaw in steps of 9°) of `vol`, each nearest-neighbour rotated and searched for its best
 /// shift against `base` with a weight (the blurred, normalised and automasked |base|).
-/// Volumes of 120³ or more are first blurred and subsampled by 2. Returns `(roll, pitch, yaw)`
-/// and the shift in voxels.
+/// Volumes of 120 or more voxels along every axis are first blurred and subsampled by 2.
+/// Returns `(roll, pitch, yaw)` and the shift in voxels.
 #[allow(clippy::too_many_arguments)]
 fn best_shiftrot(
     ctx: &mut Ctx<'_>,
@@ -559,12 +567,13 @@ fn best_shiftrot(
             // AFNI-94: AFNI loops forever with a step of 0.
             ctx.notices.add(
                 &defects::AFNI_94,
-                "-twopass's coarse search with a step of 1 voxel on a volume of 120^3 voxels or \
-                 more: the subsampled search's step is 0, which AFNI repeats forever",
+                "-twopass's coarse search with a step of 1 voxel on a volume of 120 or more \
+                 voxels along every axis: the subsampled search's step is 0, which AFNI \
+                 repeats forever",
             );
             return Err(VolregError::Fatal(
-                "-coarse with a step of 1 voxel on a volume of 120^3 voxels or more: the \
-                 subsampled coarse search would have a step of 0 (AFNI loops forever; \
+                "-coarse with a step of 1 voxel on a volume of 120 or more voxels along every \
+                 axis: the subsampled coarse search would have a step of 0 (AFNI loops forever; \
                  AFNI-94); use -coarse 2 or more"
                     .to_owned(),
             ));
@@ -878,6 +887,8 @@ pub fn volreg(
     }
 
     let mut rot = Rotator::new(p.resam, p.zpad, mode);
+    // AFNI-97 met by a Fourier rotation (the default's notice; `reproduce` stops there).
+    let mut null_rows = false;
     let mut blur = Blur::new(p.firfac, p.firold, mode);
     blur.whole_point_mirrors = p.whole_point_mirrors;
     let mut ctx = Ctx {
@@ -1148,8 +1159,8 @@ pub fn volreg(
                 ];
                 let im = Vol { n, d, data: fim };
                 let (th, sh, _) = al
-                    .one(&basis, &im, &mut rot, log)
-                    .map_err(|_| crash_after_lsqfit(ctx.notices))?;
+                    .one(&basis, &im, &mut rot, log, &mut null_rows)
+                    .map_err(|e| one_failed(e, ctx.notices))?;
                 first[kim] = [
                     (f64::from(th[0]) * (180.0 / PI)) as f32,
                     (f64::from(th[1]) * (180.0 / PI)) as f32,
@@ -1218,8 +1229,8 @@ pub fn volreg(
                 data: fim.clone(),
             };
             let (t, s, out) = al
-                .one(&basis, &im, &mut rot, log)
-                .map_err(|_| crash_after_lsqfit(ctx.notices))?;
+                .one(&basis, &im, &mut rot, log, &mut null_rows)
+                .map_err(|e| one_failed(e, ctx.notices))?;
             th = t;
             sh = s;
             tim = out.unwrap_or_default();
@@ -1299,6 +1310,12 @@ pub fn volreg(
                 for m in rot.messages.drain(..) {
                     log.push(Message::Raw(m));
                 }
+                if rot.take_null_row() {
+                    null_rows = true;
+                    if mode.reproduce() {
+                        return Err(one_failed(align3d::OneError::NullRow, ctx.notices));
+                    }
+                }
                 if p.clipit && align3d::clips(final_mode) {
                     let ftop = mri_max(&fimp) as f32;
                     let fbot = align3d::mri_min(&fimp) as f32;
@@ -1344,6 +1361,15 @@ pub fn volreg(
         }
         raw("\n".to_owned(), log);
         summary(&res, imcount, log);
+    }
+
+    if null_rows {
+        ctx.notices.add(
+            &defects::AFNI_97,
+            "a Fourier rotation shifted the last of an odd count of rows, with the previous \
+             pair's second shift, beyond the row length: that row is cleared alone; AFNI clears \
+             the missing second row through a NULL pointer and crashes",
+        );
     }
 
     // The matrices and displacements.
@@ -1506,13 +1532,35 @@ fn not_3d(log: &mut Vec<Message>, what: &str) -> VolregError {
     VolregError::Plain(format!("** Can't initialize {what}\n"))
 }
 
+/// Where AFNI crashes in `mri_3dalign_one`: AFNI-89's failed least squares, or AFNI-97's
+/// Fourier shift of a missing row (`reproduce`; by default the rotation goes on).
+fn one_failed(e: align3d::OneError, notices: &mut Notices) -> VolregError {
+    match e {
+        align3d::OneError::Lsq(_) => crash_after_lsqfit(notices),
+        align3d::OneError::NullRow => {
+            notices.add(
+                &defects::AFNI_97,
+                "a Fourier rotation shifted the last of an odd count of rows, with the previous \
+                 pair's second shift, beyond the row length: AFNI clears the missing second row \
+                 through a NULL pointer and crashes (segmentation fault) here",
+            );
+            VolregError::Crash(
+                "a Fourier rotation shifted the last of an odd count of rows beyond the row \
+                 length together with the previous pair's second shift (a rotation far beyond a \
+                 head's motion); AFNI crashes here (AFNI-97; the default goes on)"
+                    .to_owned(),
+            )
+        }
+    }
+}
+
 fn crash_after_lsqfit(notices: &mut Notices) -> VolregError {
     notices.add(
         &defects::AFNI_89,
         "the registration's least squares could not be set up (see the messages above): AFNI \
          crashes (segmentation fault) at the first sub-brick it registers",
     );
-    VolregError::Fatal(
+    VolregError::Crash(
         "the base's least squares could not be set up (the messages above say why: all-zero \
          weights, or a base whose rotated and shifted copies do not change under the weight); \
          AFNI crashes here (AFNI-89)"

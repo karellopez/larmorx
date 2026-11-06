@@ -290,9 +290,23 @@ def afni_text(text: str) -> str:
     return _ELAPSED.sub("Elapsed = N sec", _AFNI_BUILD_LINES.sub("", text))
 
 
+#: Where larmorx's upstream-defect notice starts on a line that AFNI's own message left open
+#: (3dvolreg's "3dvolreg might not converge." has no newline): what precedes it is AFNI's.
+_NOTICE_START = re.compile(r"(?:\x1b\[7m)?\*\+ WARNING:(?:\x1b\[0m)? upstream defect ")
+
+
 def larmorx_text(text: str) -> str:
-    kept = "".join(line for line in text.splitlines(keepends=True) if not larmorx_own(line))
-    return _ELAPSED.sub("Elapsed = N sec", kept)
+    kept = []
+    for line in text.splitlines(keepends=True):
+        if not larmorx_own(line):
+            kept.append(line)
+            continue
+        m = _NOTICE_START.search(line)
+        before = _ANSI.sub("", line[: m.start()]) if m is not None else ""
+        # (AFNI_MESSAGE_PREFIX's "<prefix>::" before the notice is the notice's own.)
+        if before.strip() and not before.endswith("::"):
+            kept.append(line[: m.start()])
+    return _ELAPSED.sub("Elapsed = N sec", "".join(kept))
 
 
 def first_difference(a: str, b: str) -> str:
@@ -330,14 +344,21 @@ def check_messages(
     checks(MESSAGES, same, detail=detail)
 
 
+#: glibc's report of a run it aborts (``__fortify_fail``: a buffer overflow, a stack smash).
+_GLIBC_ABORT = re.compile(r"^\*\*\* [^\n]* \*\*\*: terminated\n", re.M)
+
+
 def crashed(run: Run) -> bool:
     return "Fatal Signal" in run.err
 
 
 def check_crash(checks: CheckList, afni: Run, ours: Run) -> None:
     """AFNI crashed (a signal, its crash banner, exit 1); larmorx must print what AFNI printed
-    before the signal, then one line of its own, and exit with 1."""
+    before the signal, then one line of its own, and exit with 1. glibc's own report of an
+    abort (``*** buffer overflow detected ***: terminated``, 3dvolreg's AFNI-90) belongs to the
+    crash, as the banner does."""
     before = afni_text(afni.err.split("\nFatal Signal", 1)[0] + "\n")
+    before = _GLIBC_ABORT.sub("", before)
     lines = larmorx_text(ours.err).splitlines(keepends=True)
     ours_before = "".join(lines[:-1]) if lines else ""
     checks(EXIT, afni.code == ours.code == 1, metric="exit status", value=ours.code, threshold=1)

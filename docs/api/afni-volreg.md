@@ -114,3 +114,22 @@ NIfTI only (AFNI's `.HEAD/.BRIK` is refused, and so is a `-prefix` or `-savedisp
 `.nii`/`.nii.gz`); no AFNI extension is written (no history or `VOLREG_*` attributes); no
 version banner; results do not depend on the number of threads (AFNI's 3dvolreg is single
 threaded on this path).
+
+## Speed
+
+The replica against AFNI 26.3.05's 3dvolreg on fMRIPrep's call (RobustAverage: `-Fourier
+-twopass -zpad 4 -1Dfile -1Dmatrix_save -maxdisp1D`) on the parity suite's inputs, one thread
+each (3dvolreg has no OpenMP loop), the median of three runs, every output byte for byte AFNI's
+(`validation/investigations/afni-volreg/speed.py`, 2026-11-06, the main machine shared with
+another agent's work: informal timings):
+
+| Input | Voxels × volumes | AFNI | `larmorx afni 3dvolreg` | `python -m larmorx` |
+|---|---|---|---|---|
+| ds000005 run 1 (single-band) | 64 × 64 × 34 × 20 | 8.95 s | 2.88 s (3.1×) | 2.66 s |
+| ds003592 echo 1 (multi-echo) | 64 × 64 × 43 × 20 | 9.79 s | 3.21 s (3.1×) | 3.18 s |
+| ds005454 (multiband) | 160 × 160 × 96 × 20 | 93.2 s | 40.8 s (2.3×) | 41.0 s |
+| ds004958 (multiband 8, uint16) | 104 × 104 × 72 × 3 | 4.62 s | 2.05 s (2.2×) | 1.99 s |
+| ds005040 PEPOLAR average | 64 × 64 × 40 × 2 | 0.83 s | 0.34 s (2.4×) | 0.35 s |
+
+The replica follows AFNI's arithmetic step by step (single-threaded on this path); the
+clean-room original, to come, is to be built for speed.

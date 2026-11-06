@@ -173,3 +173,11 @@ release (`tags/AFNI-26.3.05/src`; the same text in 25.2.09 for every routine bel
   `gen_avg` output byte for byte on every call compared.
 - **A constant series** registers without `-twopass` (every parameter 0, AFNI's exit status
   0); with `-twopass` it is AFNI-89 (the crash).
+- **Memory, as AFNI holds it**: AFNI unloads each input sub-brick once registered
+  (`DSET_unload_one`), so its peak is about one copy of the data and the registration's work
+  space (27 MiB for fMRIPrep's call on 64 × 64 × 40 × 20 float32 voxels). The replica held the
+  input, the registered sub-bricks, a clone of the input dataset and their concatenation (62 MiB
+  there; 71 MiB through `python -m larmorx`, the memory test's failure); it now writes each
+  registered sub-brick over its input one when both are stored alike, and otherwise holds the
+  input sub-brick by sub-brick, each freed once registered (29 MiB; scaled int16 written as float
+  32 MiB against AFNI's 26).

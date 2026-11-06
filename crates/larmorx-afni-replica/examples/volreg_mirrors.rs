@@ -62,7 +62,7 @@ fn main() {
         };
         let mut log = Vec::new();
         let mut nt = Notices::new(mode);
-        volreg::volreg(&ds, &p, false, &mut log, &mut nt).expect("a registration")
+        volreg::volreg(&mut ds.clone(), &p, false, &mut log, &mut nt).expect("a registration")
     };
     let afni = run(false);
     let whole = run(true);

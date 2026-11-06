@@ -730,9 +730,14 @@ fn brick(ds: &Dataset, iv: usize) -> Vec<f32> {
 
 /// Runs 3dvolreg's registration on `ds` (loaded). `null_output`: `-prefix NULL`. Messages go to
 /// `log` in AFNI's order; the upstream defects met to `notices`.
+///
+/// Memory, as AFNI holds it (`DSET_unload_one` after each registered sub-brick): with an output,
+/// `ds`'s data become the output's ([`VolregResult::output`]) and `ds` is left without data. Each
+/// registered sub-brick is written over its input sub-brick when both are stored alike, else the
+/// input is held sub-brick by sub-brick and each freed once registered.
 #[allow(clippy::too_many_lines, clippy::needless_range_loop)] // AFNI's index loops, as written
 pub fn volreg(
-    ds: &Dataset,
+    ds: &mut Dataset,
     p: &VolregParams,
     null_output: bool,
     log: &mut Vec<Message>,
@@ -1212,12 +1217,18 @@ pub fn volreg(
         }
     };
     let mut res = VolregResult::default();
-    let mut bricks: Vec<BrickData> = Vec::with_capacity(imcount);
+    // -gridparent's zero padding: the output has the padded number of slices.
+    let out_nz = match &p.matvec {
+        Some(mv) => nz + mv.npad[0] + mv.npad[1],
+        None => nz,
+    };
+    let out_nxyz = nx * ny * out_nz;
+    let mut out_data = OutputData::new(ds, kind, out_nxyz, null_output);
     for kim in 0..imcount {
         if verbose {
             raw(format!("{kim}"), log);
         }
-        let fim = brick(ds, kim);
+        let fim = out_data.input_brick(ds, kim);
         let (th, sh, tim): ([f32; 3], [f32; 3], Vec<f32>);
         if Some(kim) != nbase && nonzero_count(&fim) >= 66 {
             if p.twopass {
@@ -1347,7 +1358,7 @@ pub fn volreg(
             res.rmsold.push(rms(&fim));
         }
         if !null_output {
-            bricks.push(store(&tim, kind, mode, ctx.notices));
+            out_data.put(ds, kim, store(&tim, kind, mode, ctx.notices));
         }
         if verbose {
             raw(".".to_owned(), log);
@@ -1475,49 +1486,126 @@ pub fn volreg(
     }
 
     if !null_output {
-        let mut out = ds.clone();
-        // -gridparent's zero padding: the output has the padded number of slices.
-        if let Some(mv) = &p.matvec {
-            out.nxyz[2] = nz + mv.npad[0] + mv.npad[1];
-        }
-        let out_nxyz = out.nxyz.iter().product();
-        out.data = concat(bricks, out_nxyz);
+        let mut out = header_of(ds);
+        out.nxyz[2] = out_nz;
+        out.data = out_data.finish(ds);
         out.factors = vec![0.0; imcount];
         res.output = Some(out);
     }
     Ok(res)
 }
 
-/// The sub-bricks joined into one array of the output's type.
-fn concat(bricks: Vec<BrickData>, nxyz: usize) -> BrickData {
-    match bricks.first() {
-        Some(BrickData::Byte(_)) => BrickData::Byte(
-            bricks
-                .into_iter()
-                .flat_map(|b| match b {
-                    BrickData::Byte(v) => v,
-                    _ => vec![0; nxyz],
-                })
+/// A dataset's header without its data.
+fn header_of(ds: &Dataset) -> Dataset {
+    Dataset {
+        nxyz: ds.nxyz,
+        nvals: ds.nvals,
+        data: BrickData::Float(Vec::new()),
+        factors: ds.factors.clone(),
+        taxis: ds.taxis.clone(),
+        geometry: ds.geometry.clone(),
+        dropped_inter: ds.dropped_inter,
+    }
+}
+
+/// Where the final pass reads its input sub-bricks and writes the registered ones (see
+/// [`volreg`]'s memory note).
+enum OutputData {
+    /// `-prefix NULL`: the input stays, nothing is written.
+    None,
+    /// Each registered sub-brick over its input one (the same storage type and grid).
+    InPlace,
+    /// The input sub-brick by sub-brick (each freed once read: `DSET_unload_one`), the output
+    /// in its own array of the output's type.
+    Split {
+        input: Vec<Option<BrickData>>,
+        output: BrickData,
+    },
+}
+
+impl OutputData {
+    fn new(ds: &mut Dataset, kind: Kind, out_nxyz: usize, null_output: bool) -> OutputData {
+        if null_output {
+            return OutputData::None;
+        }
+        let nxyz: usize = ds.nxyz.iter().product();
+        let same = matches!(
+            (&ds.data, kind),
+            (BrickData::Byte(_), Kind::Byte)
+                | (BrickData::Short(_), Kind::Short)
+                | (BrickData::Float(_), Kind::Float)
+        );
+        if same && out_nxyz == nxyz {
+            return OutputData::InPlace;
+        }
+        let total = out_nxyz * ds.nvals;
+        let output = match kind {
+            Kind::Byte => BrickData::Byte(Vec::with_capacity(total)),
+            Kind::Short => BrickData::Short(Vec::with_capacity(total)),
+            Kind::Float => BrickData::Float(Vec::with_capacity(total)),
+        };
+        // The input's sub-bricks apart, so that each is freed once registered (the copy is
+        // made before the output holds anything).
+        let input = match std::mem::replace(&mut ds.data, BrickData::Float(Vec::new())) {
+            BrickData::Byte(v) => v
+                .chunks(nxyz)
+                .map(|c| Some(BrickData::Byte(c.to_vec())))
                 .collect(),
-        ),
-        Some(BrickData::Short(_)) => BrickData::Short(
-            bricks
-                .into_iter()
-                .flat_map(|b| match b {
-                    BrickData::Short(v) => v,
-                    _ => vec![0; nxyz],
-                })
+            BrickData::Short(v) => v
+                .chunks(nxyz)
+                .map(|c| Some(BrickData::Short(c.to_vec())))
                 .collect(),
-        ),
-        _ => BrickData::Float(
-            bricks
-                .into_iter()
-                .flat_map(|b| match b {
-                    BrickData::Float(v) => v,
-                    _ => vec![0.0; nxyz],
-                })
+            BrickData::Float(v) => v
+                .chunks(nxyz)
+                .map(|c| Some(BrickData::Float(c.to_vec())))
                 .collect(),
-        ),
+        };
+        OutputData::Split { input, output }
+    }
+
+    /// Sub-brick `kim` of the input as floats (`mri_scale_to_float`); in a split input it is
+    /// freed here (`DSET_unload_one`).
+    fn input_brick(&mut self, ds: &Dataset, kim: usize) -> Vec<f32> {
+        match self {
+            OutputData::Split { input, .. } => {
+                let b = input[kim].take().expect("each sub-brick is read once");
+                let nvox = b.len();
+                automask::scale_to_float(&b, nvox, 0, ds.factors[kim])
+            }
+            _ => brick(ds, kim),
+        }
+    }
+
+    /// Stores registered sub-brick `kim` (`b`, of the output's type).
+    fn put(&mut self, ds: &mut Dataset, kim: usize, b: BrickData) {
+        match self {
+            OutputData::None => {}
+            OutputData::InPlace => {
+                let n = b.len();
+                let range = kim * n..(kim + 1) * n;
+                match (&mut ds.data, b) {
+                    (BrickData::Byte(v), BrickData::Byte(x)) => v[range].copy_from_slice(&x),
+                    (BrickData::Short(v), BrickData::Short(x)) => v[range].copy_from_slice(&x),
+                    (BrickData::Float(v), BrickData::Float(x)) => v[range].copy_from_slice(&x),
+                    _ => unreachable!("an in-place output has the input's storage type"),
+                }
+            }
+            OutputData::Split { output, .. } => match (output, b) {
+                (BrickData::Byte(v), BrickData::Byte(x)) => v.extend_from_slice(&x),
+                (BrickData::Short(v), BrickData::Short(x)) => v.extend_from_slice(&x),
+                (BrickData::Float(v), BrickData::Float(x)) => v.extend_from_slice(&x),
+                _ => unreachable!("the output array has the output's storage type"),
+            },
+        }
+    }
+
+    /// The output's data; `ds` is left without data (an in-place output is its data).
+    fn finish(self, ds: &mut Dataset) -> BrickData {
+        match self {
+            OutputData::None => BrickData::Float(Vec::new()),
+            OutputData::InPlace => std::mem::replace(&mut ds.data, BrickData::Float(Vec::new())),
+            OutputData::Split { output, .. } => output,
+        }
     }
 }
 

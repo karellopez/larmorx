@@ -1518,7 +1518,7 @@ fn run_with(
     };
     drop(o.weight.take());
     let mut log = Vec::new();
-    let result = volreg::volreg(&ds, &p, null_output, &mut log, notices);
+    let result = volreg::volreg(&mut ds, &p, null_output, &mut log, notices);
     // Where AFNI crashes, its banner starts a new line: a progress line left open ("0..1")
     // ends before larmorx's error.
     let open_line = matches!(log.last(), Some(Message::Raw(t)) if !t.ends_with('\n'));

@@ -628,11 +628,16 @@ fn best_shiftrot(
                     Some(t)
                 };
                 let tar = tim.as_deref().unwrap_or(&vim);
-                let (sum, sh) = best_shift(n, &bim, tar, Some(&www), coarse, fix, &mut met_empty);
+                let mut empty = false;
+                let (sum, sh) = best_shift(n, &bim, tar, Some(&www), coarse, fix, &mut empty);
+                met_empty |= empty;
+                // AFNI-93 corrected: a rotation whose shift search summed over no voxel (the
+                // region is the same for every shift) is not a candidate either.
+                let take = sum < bsum && !(fix && empty);
                 if verbose {
-                    log.push(Message::Raw(if sum < bsum { "*" } else { "." }.to_owned()));
+                    log.push(Message::Raw(if take { "*" } else { "." }.to_owned()));
                 }
-                if sum < bsum {
+                if take {
                     best = ([r, p, y], sh);
                     bsum = sum;
                 }

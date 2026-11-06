@@ -124,5 +124,10 @@ release (`tags/AFNI-26.3.05/src`; the same text in 25.2.09 for every routine bel
   pass alignment algorithm"); `-twopass`'s coarse rotation search first prints
   `THD_rota3D_matvec`'s "non-3D image input!" for each of its 44 rotations (its sums over the
   empty region read no voxel).
+- **AFNI-93's region**: `voldif`'s region (the voxels at least `(num+1)·del` from every
+  face) is the same for every shift, so on a volume too thin for it every shift of a rotation
+  scores 0 (and every rotation of the coarse rotation search scores the full `Σ b²`): AFNI keeps
+  the first shift (-2 steps along z) and the first rotation (-9, -18, -9 degrees). Corrected,
+  neither is a candidate: no shift and no rotation.
 - **A constant base** (AFNI-89): `lsqfit`'s "vectors are all 0" errors, then the crash at the
   first registered volume, in both passes.

@@ -182,7 +182,10 @@ def estimate_ramps(phi, inside, dom) -> list[float]:
 
 def ramp_terms(shape, r):
     x, y, z = np.meshgrid(*[np.arange(n) for n in shape], indexing="ij")
-    d = [(c.astype(F) - F((n - 1) / 2.0)).astype(np.float64) for c, n in zip((x, y, z), shape)]
+    d = [
+        (c.astype(F) - F((n - 1) / 2.0)).astype(np.float64)
+        for c, n in zip((x, y, z), shape, strict=True)
+    ]
     return [r[0] * d[0], r[1] * d[1], r[2] * d[2]]
 
 
@@ -300,7 +303,7 @@ def constraints(phi, lab):
     np.add.at(p, inv, vals)  # in order, in single precision
     n = np.bincount(inv, minlength=len(uniq)).astype(F)
     out = {}
-    for (a, b), pp, nn in zip(uniq.tolist(), p, n):
+    for (a, b), pp, nn in zip(uniq.tolist(), p, n, strict=True):
         out[(a, b)] = calc(F(nn), F(pp))
     return out
 
@@ -413,15 +416,41 @@ def unwrap_slices(phi, lab, verbose, log):
 
 
 def parse(args: list[str]) -> dict:
-    takes = {"-c": "complex", "-a": "abs", "-p": "phase", "-o": "out", "-u": "out", "-n": "n",
-             "-t": "thresh", "-m": "mask", "-r": "raw", "-l": "labels"}
+    takes = {
+        "-c": "complex",
+        "-a": "abs",
+        "-p": "phase",
+        "-o": "out",
+        "-u": "out",
+        "-n": "n",
+        "-t": "thresh",
+        "-m": "mask",
+        "-r": "raw",
+        "-l": "labels",
+    }
     flags = {"-s": "slices", "-f": "force3d", "-v": "verbose", "-h": "help"}
-    long_take = {"--complex": "complex", "--abs": "abs", "--phase": "phase", "--out": "out",
-                 "--unwrap": "out", "--numphasesplit": "n", "--thresh": "thresh",
-                 "--mask": "mask", "--start": "start", "--end": "end", "--savemask": "savemask",
-                 "--rawphase": "raw", "--labels": "labels"}
-    long_flags = {"--labelslices": "labelslices", "--slices": "slices", "--force3D": "force3d",
-                  "--removeramps": "removeramps", "--verbose": "verbose"}
+    long_take = {
+        "--complex": "complex",
+        "--abs": "abs",
+        "--phase": "phase",
+        "--out": "out",
+        "--unwrap": "out",
+        "--numphasesplit": "n",
+        "--thresh": "thresh",
+        "--mask": "mask",
+        "--start": "start",
+        "--end": "end",
+        "--savemask": "savemask",
+        "--rawphase": "raw",
+        "--labels": "labels",
+    }
+    long_flags = {
+        "--labelslices": "labelslices",
+        "--slices": "slices",
+        "--force3D": "force3d",
+        "--removeramps": "removeramps",
+        "--verbose": "verbose",
+    }
     o: dict = {}
     i = 0
     while i < len(args):
@@ -465,7 +494,9 @@ def run(args: list[str], cwd: Path, fix: bool = False) -> dict:
     t = ph.shape[3]
     s = int(o["start"], 0) if "start" in o else 0
     e = int(o["end"], 0) if "end" in o else t - 1
-    theta_given = F(float(o["thresh"])) if "thresh" in o else (F(0.5) if masks is not None else None)
+    theta_given = (
+        F(float(o["thresh"])) if "thresh" in o else (F(0.5) if masks is not None else None)
+    )
     for v in range(s, e + 1):
         mx, mn = extrema(ph[..., v])
         rng = F(F(mx) - F(mn))
@@ -585,10 +616,15 @@ def blackbox(work: Path, fix: bool, report: Path | None) -> int:
             continue  # an error case of the command line
         if env or "-c" in o or "complex" in o or "out" not in o or "phase" not in o:
             continue
-        outs = {k: d / f"{stem(v)}.nii.gz" for k, v in (("o", o["out"]),
-                                                  ("m", o.get("savemask", "")),
-                                                  ("lab", o.get("labels", "")),
-                                                  ("raw", o.get("raw", "")))}
+        outs = {
+            k: d / f"{stem(v)}.nii.gz"
+            for k, v in (
+                ("o", o["out"]),
+                ("m", o.get("savemask", "")),
+                ("lab", o.get("labels", "")),
+                ("raw", o.get("raw", "")),
+            )
+        }
         if not outs["o"].is_file():
             continue
         try:
@@ -623,8 +659,10 @@ def fmriprep(root: Path) -> int:
         res = run([a for a in args if not a.startswith("--unwrap=")] + ["--unwrap=x"], node)
         eq, nd = same(res["o"], load_out(out))
         ok += eq
-        print(f"{'ok  ' if eq else 'FAIL'} {run_dir.name}/{node.parts[-3]}: unwrapped "
-              f"{'bit-identical' if eq else f'{nd} voxels differ'} ({out.name})")
+        print(
+            f"{'ok  ' if eq else 'FAIL'} {run_dir.name}/{node.parts[-3]}: unwrapped "
+            f"{'bit-identical' if eq else f'{nd} voxels differ'} ({out.name})"
+        )
     print(f"fmriprep: {ok} of {len(nodes)} calls bit-identical")
     return 0 if ok == len(nodes) else 1
 

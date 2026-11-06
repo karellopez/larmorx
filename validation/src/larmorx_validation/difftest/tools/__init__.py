@@ -48,6 +48,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "fsl-maths-original": ("fsl_avwutils_original", "MATHS"),
     "fsl-stats-original": ("fsl_avwutils_original", "STATS_TOOL"),
     "fsl-prelude": ("fsl_prelude", "TOOL"),
+    "fsl-prelude-original": ("fsl_prelude_original", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
 }
 

@@ -35,8 +35,9 @@ with the same bits. The original makes the same choices in the same order throug
 heap of the candidate merges and a weighted union-find of the regions' turns (each merge costs a
 logarithm of the candidates and the neighbours of the region that joins), and runs the linear
 parts (the mask, the regions, the ramps, reading and writing) on its threads: the same call
-takes 0.07 s on one thread, 0.06 s on 14; a 256 x 256 x 160 map of 153,000 regions 2.5 s
-(the replica 9.5 s), with the same bits at every thread count
+takes 0.069 s on one thread (97 times FSL's speed, 2.5 times the replica's), 0.053 s on 12;
+ds002603's 0.135 s against FSL's 28.4 s; a 256 x 256 x 160 map of 153,000 regions 2.0 s (the
+replica 9.4 s), with the same bits at every thread count
 ([benchmarks](../benchmarks/fsl-prelude.md)).
 
 **Status: `experimental`** (the records `fsl-prelude-replica` and `fsl-prelude`, the

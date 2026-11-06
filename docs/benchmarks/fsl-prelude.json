@@ -1,0 +1,88 @@
+{
+ "machine": "x86_64",
+ "python": "3.12.16",
+ "repeat": 5,
+ "threads": [
+  1,
+  12
+ ],
+ "rows": [
+  {
+   "call": "ds001600-sub-1-noreconall/wf_auto_00000",
+   "fsl_s": 0.0818,
+   "fsl_exit": 0,
+   "replica_s": 0.0162,
+   "replica_same": true,
+   "original-1_s": 0.0153,
+   "original-1_same": true,
+   "original-12_s": 0.0146,
+   "original-12_same": true
+  },
+  {
+   "call": "ds001600-sub-1-noreconall/wf_auto_00001",
+   "fsl_s": 0.0904,
+   "fsl_exit": 0,
+   "replica_s": 0.0181,
+   "replica_same": true,
+   "original-1_s": 0.016,
+   "original-1_same": true,
+   "original-12_s": 0.0143,
+   "original-12_same": true
+  },
+  {
+   "call": "ds001600-sub-1-noreconall/wf_auto_00002",
+   "fsl_s": 0.0811,
+   "fsl_exit": 0,
+   "replica_s": 0.0166,
+   "replica_same": true,
+   "original-1_s": 0.0141,
+   "original-1_same": true,
+   "original-12_s": 0.0133,
+   "original-12_same": true
+  },
+  {
+   "call": "ds002422-sub-02-noreconall/wf_auto_00000",
+   "fsl_s": 0.0684,
+   "fsl_exit": 0,
+   "replica_s": 0.0095,
+   "replica_same": true,
+   "original-1_s": 0.0103,
+   "original-1_same": true,
+   "original-12_s": 0.0105,
+   "original-12_same": true
+  },
+  {
+   "call": "ds002422-sub-02-noreconall/wf_auto_00001",
+   "fsl_s": 0.0605,
+   "fsl_exit": 0,
+   "replica_s": 0.0142,
+   "replica_same": true,
+   "original-1_s": 0.0123,
+   "original-1_same": true,
+   "original-12_s": 0.0114,
+   "original-12_same": true
+  },
+  {
+   "call": "ds002603-sub-01-noreconall/wf_auto_00000",
+   "fsl_s": 28.4435,
+   "fsl_exit": 0,
+   "replica_s": 0.3737,
+   "replica_same": true,
+   "original-1_s": 0.1346,
+   "original-1_same": true,
+   "original-12_s": 0.1029,
+   "original-12_same": true
+  },
+  {
+   "call": "ds005454-sub-16-noreconall/wf_gre16",
+   "fsl_s": 6.6799,
+   "fsl_exit": 0,
+   "replica_s": 0.1735,
+   "replica_same": true,
+   "original-1_s": 0.0688,
+   "original-1_same": true,
+   "original-12_s": 0.0528,
+   "original-12_same": true
+  }
+ ]
+}

@@ -40,21 +40,28 @@
 #![forbid(unsafe_code)]
 
 pub mod afni_ext;
+pub mod align3d;
 pub mod automask;
 pub mod axes;
+pub mod blur;
 pub mod cli;
 pub mod cnum;
 pub mod csfft;
 pub mod dataset;
 pub mod detrend;
+pub mod eispack;
 pub mod environ;
 pub mod fdlibm;
+pub mod lsqfit;
 pub mod mask;
 pub mod message;
 pub mod oned;
+pub mod rot3d;
+pub mod shear;
 pub mod shift;
 pub mod sincosf;
 pub mod tpattern;
 pub mod tshift;
 pub mod unifize;
+pub mod vecmat;
 pub mod x87;

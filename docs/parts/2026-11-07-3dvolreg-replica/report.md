@@ -71,3 +71,12 @@ cards still say the AFNI replicas are in `larmorx-gpl` (the user's design text).
   `afni-volreg.md` among the source-derived findings, volreg among the AFNI tools and their names, the replica's
   investigations and modules among the brief-restricted files, the replica's modules and four upstream files in the
   similarity mappings).
+- The clean-room audit's merge step stopped once: PRELUDE's clean-room implementer (relay 2, in its own part, then in
+  progress) had printed its own stand-in script, named `larmorx-nc` after the replica's program, which the replica rule
+  (R10) matched by name; read by the orchestrator (a shell script calling `larmorx fsl prelude` with the original
+  forced, no replica code), judged in `validation/cleanroom-audit/judgements.toml` (not declared: no slip), with a
+  provisional verdict for PRELUDE's clean-room original until its own merge; the step then passed (17 originals, 216
+  commits, 0 blocking).
+- Verified (`verify-merge.sh` on d25c34f, 03:52-04:23, 8 threads): the three Rust workspaces' gates, the GPL and nc
+  builds, the Python gates, the smoke tier and golden (every checksum unchanged, only the header); the re-run against the
+  committed record `afni-volreg-replica` 190/190, no status or detail differs; the page re-exported unchanged.

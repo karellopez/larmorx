@@ -262,9 +262,9 @@ conversion and file layout, re-expressed in crates/larmorx-hdf5) - HDF5 licence 
   The lookup3 hash (H5checksum.c) is Bob Jenkins' public-domain code.
 
 AFNI 26.3.05 (tag AFNI_26.3.05; first translated from AFNI 25.2.09, tag AFNI_25.2.09) - the
-3dTshift, 3dAutomask and 3dUnifize programs and the routines they use, translated into Rust in
-crates/larmorx-afni-replica (the bit-exact replicas; crates/larmorx-afni, the clean-room
-originals, contain no AFNI code)
+3dTshift, 3dAutomask, 3dUnifize and (since 2026-11-06, from 26.3.05) 3dvolreg programs and the
+routines they use, translated into Rust in crates/larmorx-afni-replica (the bit-exact replicas;
+crates/larmorx-afni, the clean-room originals, contain no AFNI code)
   Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et
   al.). AFNI 26.3.05 releases them under the Creative Commons Attribution 4.0 International
   licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/; its legal code is in
@@ -282,6 +282,27 @@ originals, contain no AFNI code)
   domain (AFNI's LICENSE.txt), which asks to "provide appropriate attribution and cite the authors
   in any work or product based on this material"; the NIfTI library states "This code is released
   to the public domain."
+
+EISPACK's svd and pythag (Burton S. Garbow, Argonne National Laboratory, August 1983; a
+translation of Golub and Reinsch's Algol procedure), as AFNI 26.3.05 carries them translated by
+f2c (src/eispack/eis_svd.c, eis_pythag.c), and f2c's libf2c routine d_sign (src/f2c/d_sign.c) -
+3dvolreg's 3 x 3 singular value decomposition
+  EISPACK is freely available from netlib (AFNI's LICENSE.txt: "License: Free
+  [https://www.netlib.org/misc/faq.html]").
+  libf2c: Copyright 1990 - 1995 by AT&T Bell Laboratories and Bellcore.
+  Permission to use, copy, modify, and distribute this software and its documentation for any
+  purpose and without fee is hereby granted, provided that the above copyright notice appear in
+  all copies and that both that the copyright notice and this permission notice and warranty
+  disclaimer appear in supporting documentation, and that the names of AT&T Bell Laboratories or
+  Bellcore or any of their entities not be used in advertising or publicity pertaining to
+  distribution of the software without specific, written prior permission.
+  AT&T and Bellcore disclaim all warranties with regard to this software, including all implied
+  warranties of merchantability and fitness.  In no event shall AT&T or Bellcore be liable for
+  any special, indirect or consequential damages or any damages whatsoever resulting from loss of
+  use, data or profits, whether in an action of contract, negligence or other tortious action,
+  arising out of or in connection with the use or performance of this software.
+  Translated into Rust in crates/larmorx-afni-replica/src/eispack.rs, modified from the
+  originals (the operations kept in the Fortran's order, f2c's 1-based indices).
 
 Arm Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c, cosf.c, sincosf_data.c,
 logf.c, logf_data.c, expf.c, exp2f_data.c, powf.c, powf_log2_data.c, exp.c, exp_data.c, log.c,

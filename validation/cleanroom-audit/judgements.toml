@@ -223,6 +223,24 @@ shown = "the implementer's own stand-in script, written by the implementer in it
 nature = "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard"
 judgement = "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)"
 
+[[access]]
+agent = "a8e31783627a47230"
+line = 534
+time = "2026-11-07T03:09:33Z"
+declared = "yes"
+shown = "the first 150 characters of the first message of each of its own part's five agents (the role line, e.g. 'You are relay 2 of PRELUDE's clean-room original part ...'), printed from the session's transcripts to find the part's agent ids for the audit's archive"
+nature = "role lines of the agents' briefs; no source, no replica code, no source-derived finding"
+judgement = "no contamination of substance; declared in the part's clean-room statements (relay 5)"
+
+[[access]]
+agent = "a8e31783627a47230"
+line = 538
+time = "2026-11-07T03:09:43Z"
+declared = "yes"
+shown = "the first 90 characters of the first message of nine agents of the session (the role lines of PRELUDE's replica and clean-room parts and 3dvolreg's replica part) and a yes/no match per transcript, printed from the session's transcripts to find the part's agent ids for the audit's archive"
+nature = "role lines of the agents' briefs; no source, no replica code, no source-derived finding"
+judgement = "no contamination of substance; declared in the part's clean-room statements (relay 5)"
+
 [[edit]]
 agent = "orchestrator"
 commit = "0feafe98f"

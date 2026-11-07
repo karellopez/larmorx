@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-07-3dvolreg-replica",
+ "dossier": "2026-11-07-prelude-original",
  "edits": [
   {
    "added": null,
@@ -106,11 +106,11 @@
   }
  ],
  "evidence": {
-  "accesses": 245116,
+  "accesses": 245558,
   "agents": 198,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 275,
-  "archived_files": 275,
+  "archive_checksums_matched": 277,
+  "archived_files": 277,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -131,28 +131,32 @@
    "2026-11-07-session-transcripts-3dvolreg-replica": {
     "files": 30,
     "sha256": "9c2bf802d659d95d1aba2ea0de7b44e89b0c19bb2ca6f4edaf3bfadebd7906a0"
+   },
+   "2026-11-07-session-transcripts-prelude-original": {
+    "files": 3,
+    "sha256": "c0f92faf091795fc423ef765a6e823201dd19ad70013882910668dd32a4c974f"
    }
   },
-  "commits_printed": 2390,
+  "commits_printed": 2395,
   "distinct_transcripts": 202,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
    "agents_without_worktree": 113,
    "bad_lines": 0,
-   "calls_without_result": 15,
+   "calls_without_result": 16,
    "compaction_parent_missing": 2,
    "compactions": 64,
    "refused_calls": 1418,
    "refused_calls_restricted_accesses": 656,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 6105
+   "unresolved_paths": 6120
   },
-  "last_record": "2026-11-07 02:50 UTC",
+  "last_record": "2026-11-07 03:27 UTC",
   "live_files": 202,
-  "live_files_also_archived": 201,
+  "live_files_also_archived": 202,
   "sessions": 4,
-  "tool_calls": 72322,
+  "tool_calls": 72430,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -168,7 +172,7 @@
    ],
    [
     "Bash",
-    60314
+    60418
    ],
    [
     "CronCreate",
@@ -204,7 +208,7 @@
    ],
    [
     "SubagentHandback",
-    210
+    211
    ],
    [
     "TaskOutput",
@@ -228,12 +232,12 @@
    ],
    [
     "Write",
-    5218
+    5221
    ]
   ],
-  "transcript_bytes": 5895613360,
-  "transcript_files": 477,
-  "unique_paths": 52179
+  "transcript_bytes": 6000911500,
+  "transcript_files": 479,
+  "unique_paths": 52262
  },
  "levels": [
   [
@@ -314,7 +318,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "95ea64a8",
-  "verdicts_repository": "dfbf46c5"
+  "verdicts_repository": "d0a238c5"
  },
  "overview": {
   "agents_by_role": [
@@ -3735,6 +3739,50 @@
    ],
    "shown": "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)",
    "time": "2026-11-06 21:55 UTC"
+  },
+  {
+   "agent": "a8e31783627a47230",
+   "declared": "yes",
+   "description": "PRELUDE clean-room, relay 5 (handoff)",
+   "files": [
+    "<transcripts>/..."
+   ],
+   "judged": true,
+   "judgement": "no contamination of substance; declared in the part's clean-room statements (relay 5)",
+   "kind": "restricted material",
+   "line": 534,
+   "nature": "role lines of the agents' briefs; no source, no replica code, no source-derived finding",
+   "register": null,
+   "rules": [
+    [
+     "R17 content (all)",
+     3
+    ]
+   ],
+   "shown": "the first 150 characters of the first message of each of its own part's five agents (the role line, e.g. 'You are relay 2 of PRELUDE's clean-room original part ...'), printed from the session's transcripts to find the part's agent ids for the audit's archive",
+   "time": "2026-11-07 03:09 UTC"
+  },
+  {
+   "agent": "a8e31783627a47230",
+   "declared": "yes",
+   "description": "PRELUDE clean-room, relay 5 (handoff)",
+   "files": [
+    "<transcripts>/..."
+   ],
+   "judged": true,
+   "judgement": "no contamination of substance; declared in the part's clean-room statements (relay 5)",
+   "kind": "restricted material",
+   "line": 538,
+   "nature": "role lines of the agents' briefs; no source, no replica code, no source-derived finding",
+   "register": null,
+   "rules": [
+    [
+     "R17 content (all)",
+     1
+    ]
+   ],
+   "shown": "the first 90 characters of the first message of nine agents of the session (the role lines of PRELUDE's replica and clean-room parts and 3dvolreg's replica part) and a yes/no match per transcript, printed from the session's transcripts to find the part's agent ids for the audit's archive",
+   "time": "2026-11-07 03:09 UTC"
   }
  ],
  "tools": [
@@ -8816,7 +8864,7 @@
    ],
    "verdict": {
     "status": "reviewed (every finding judged)",
-    "words": "clean so far (its part in progress at 3dvolreg's replica merge, to be judged again at its own merge): the implementer's stand-in script, named after the replica's program, was a false match of the replica rule on its name"
+    "words": "clean (names of restricted files, harness lines and a traceback's call lines of the replica suite, declared; the implementer's stand-in script named after the replica's program, a false match of the replica rule on its name)"
    }
   }
  ]

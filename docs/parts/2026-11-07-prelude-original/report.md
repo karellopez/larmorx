@@ -65,3 +65,11 @@ about 100,000 processes on 2026-11-06 (cleared; the boxes now cap their tasks).
   in the workspace archive; 8 added).
 - HANDOFF.toml's 63 operations applied (9 files); `register_counts.py` 421 entries; `tables --site`, `tables --check`,
   the summary re-exported; the site build 0 problems.
+- The clean-room audit's merge step: 5 agents archived, 0 blocking; two declared reads of the agents' role lines (relay
+  5, to find the part's agent ids) judged; PRELUDE's verdict final ("clean").
+- Verified (`verify-merge.sh` on 181755b, 04:29-05:12, 24 threads): the three Rust workspaces' gates, the GPL and nc
+  builds, the Python gates, the smoke tier and golden (every checksum unchanged, only the header); re-runs against the
+  committed records, no status or detail differs: `fsl-prelude` 166/166, `fsl-flirt` 339/339, `mri-hmc` 170/170,
+  `fsl-topup` 187/187, `fsl-maths` 454/454, `fsl-bet` 252/252, `fsl-fast` 102/102. The five pages re-exported equal as
+  data; PRELUDE's page's provenance named the first `fsl-prelude` record (6321137), now the final one (1ca117e), and the
+  re-exports were taken into the site (e4b3757).

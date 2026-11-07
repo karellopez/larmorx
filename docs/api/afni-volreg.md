@@ -22,8 +22,10 @@ failure case; fMRIPrep's RobustAverage call on the BOLD references of 6 oracle r
 two volumes, multiband with 160 × 160 × 96 voxels, multi-echo, multiband 8 stored as uint16,
 Philips float32; 7 more in the full tier) and on sdcflows' PEPOLAR reference averages of 2,
 whose medians are fMRIPrep's own `gen_avg` and `ref_average` outputs byte for byte; AFNI
-25.2.09 identical on every case), and in a random-testing trial
-(`validation/difftest/triage.toml`).
+25.2.09 identical on every case), and in a random-testing trial and two checks of the final build
+(`validation/difftest/triage.toml`: the trial's 39,751 random cases agree once its findings were
+fixed; the final build's checks ran 22,539 cases without a difference, whose notices without a
+visible change made AFNI-99's notice exact, then 20,824, every one agreeing).
 
 ## Quick start
 
@@ -102,7 +104,7 @@ line) where it changed the result ([register](upstream-defects.md)):
 | AFNI-96 | B | a `-rotparent` without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE` is read through a NULL pointer | an error (both modes) |
 | AFNI-97 | A | a Fourier rotation shifting the last of an odd count of rows (and the previous pair's second row) beyond the row length writes through a NULL pointer (a crash; rotations far beyond a head's motion) | the row cleared alone, as AFNI clears a pair |
 | AFNI-98 | A | with `-input`, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: `(null)` when there is none | the dataset's name |
-| AFNI-99 | A | `-maxdisp` and `-savedisp` compute the displacements of the position mirrored along every axis stored L2R, P2A or S2I (the same data stored RAS and LPS: 1.718 against 1.672 mm) | the displacements of the voxels themselves |
+| AFNI-99 | A | `-maxdisp` and `-savedisp` compute the displacements of the position mirrored along every axis stored L2R, P2A or S2I (the same data stored RAS and LPS: 1.718 against 1.672 mm) | the displacements of the voxels themselves (named where a value the run prints or writes changes: the messages' two decimals, `-maxdisp1D`'s three, `-savedisp`'s values) |
 
 Kept in both modes and documented (rule C): the blur's row-end mirrors (measured: switching to
 whole-point mirrors moves the parameters by at most 1.5e-5 degrees and 1.1e-5 mm, the registered

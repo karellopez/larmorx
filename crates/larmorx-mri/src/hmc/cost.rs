@@ -534,11 +534,11 @@ impl Accumulator for CorrSlice {
 /// as the point is visited, over the whole grid; at each row's end `C` added to `A`): runs of
 /// unit weights kept as their lengths, the other weights as they are. The slices are sampled
 /// in parallel and their sequences replayed in slice order ([`CorrTotal::add`]).
-#[derive(Default)]
 struct WeightSeq {
     /// The unit weights not yet written into `tokens`.
     ones: u32,
-    /// `RUN | k << 2` (k unit weights), `VALUE` (the next of `values`), `ROW` (a row's end).
+    /// `RUN | k << 2` (k unit weights), `VALUE` (the next of `values`), `ROW` (a row's end),
+    /// `RUN_ROW | k << 2` (k unit weights, then the row's end: a row's usual token).
     tokens: Vec<u32>,
     values: Vec<f32>,
 }
@@ -546,16 +546,28 @@ struct WeightSeq {
 const RUN: u32 = 0;
 const VALUE: u32 = 1;
 const ROW: u32 = 2;
-const MAX_RUN: u32 = u32::MAX >> 2;
+const RUN_ROW: u32 = 3;
+
+impl Default for WeightSeq {
+    fn default() -> WeightSeq {
+        // one allocation for a slice's usual rows (a token per row)
+        WeightSeq {
+            ones: 0,
+            tokens: Vec::with_capacity(64),
+            values: Vec::new(),
+        }
+    }
+}
+/// The longest run a token holds (rows are far shorter), below `2^24` so its length is exact
+/// in single precision.
+const MAX_RUN: u32 = 1 << 24;
 
 impl WeightSeq {
     #[inline(always)]
     fn point(&mut self, w: f32) {
         if w.to_bits() == 1.0f32.to_bits() {
+            // a row holds far fewer than MAX_RUN points (flushed at its end)
             self.ones += 1;
-            if self.ones == MAX_RUN {
-                self.flush();
-            }
         } else {
             self.flush();
             self.tokens.push(VALUE);
@@ -572,8 +584,12 @@ impl WeightSeq {
     }
 
     fn end_row(&mut self) {
-        self.flush();
-        self.tokens.push(ROW);
+        if self.ones > 0 {
+            self.tokens.push(RUN_ROW | (self.ones << 2));
+            self.ones = 0;
+        } else {
+            self.tokens.push(ROW);
+        }
     }
 }
 
@@ -589,6 +605,10 @@ pub fn add_ones(mut c: f32, mut k: u32) -> f32 {
             let next = f32::from_bits((c.to_bits() & 0x7f80_0000) + 0x0080_0000);
             // next - c is exact (Sterbenz: next / 2 <= c < next)
             let room = next - c;
+            if k < MAX_RUN && (k as f32) < room {
+                // the common case: the whole run within the binade, one exact addition
+                return c + k as f32;
+            }
             let below = (room.ceil() as u32).saturating_sub(1).min(k);
             if below > 0 {
                 c += below as f32;
@@ -637,7 +657,11 @@ impl CorrTotal {
             match t & 3 {
                 RUN => self.c = add_ones(self.c, t >> 2),
                 VALUE => self.c += *values.next().expect("a value per token"),
-                _ => self.a += self.c,
+                ROW => self.a += self.c,
+                _ => {
+                    self.c = add_ones(self.c, t >> 2);
+                    self.a += self.c;
+                }
             }
         }
         self.n += self.a;

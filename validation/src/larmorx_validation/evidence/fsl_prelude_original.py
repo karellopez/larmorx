@@ -541,6 +541,15 @@ def _case_verdict(r: dict) -> tuple[str, str]:
             "exit status, messages and file names, each FSL's; the default mode is checked "
             "against the replica's default"
         )
+    partly = reported.get("every file bit-identical")
+    if partly is not None:  # the suite reports the files instead of checking them
+        which = ("FSL-265: a complex128 image read with no width" if "complex128" in r["case"]
+                 else "an input whose values FSL takes from outside what it read")  # fmt: skip
+        return "divergence", (
+            f"FSL's values come from memory it never wrote ({which}): {partly} files "
+            "bit-identical, the others' values reported, not compared; the exit status, the "
+            "messages and the file names are FSL's"
+        )
     files = measured.get("every file bit-identical")
     why = (f"every file FSL writes ({files}) byte for byte" if files else
            "every file FSL writes byte for byte") + ", with FSL's exit status and messages"  # fmt: skip
@@ -550,11 +559,13 @@ def _case_verdict(r: dict) -> tuple[str, str]:
     if glibc:
         parts = []
         for k, v in sorted(glibc.items()):
-            what = k.split(": ", 1)[1].split(";", 1)[0]
+            what = k.split(": ", 1)[1].replace("; GLIBC-07)", ")")
             if "integer offsets" in k:
-                parts.append(f"{what}: on {float(v) * 100:.4g} % of the mask's voxels")
+                parts.append(f"{what} on {float(v) * 100:.4g} % of the mask's voxels")
+            elif int(v) == 0:
+                parts.append(f"{what} the same")
             else:
-                parts.append(f"{what}: {int(v)} values in their last bits")
+                parts.append(f"{what}: {int(v)} values differ in their last bits")
         why += ("; by default GLIBC-07 (the correctly rounded arctangent of a complex value "
                 "against glibc's atan2f), against the replica's default: " + "; ".join(parts))  # fmt: skip
     return "bit-identical", why

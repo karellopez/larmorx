@@ -310,7 +310,8 @@ bits, which mcflirt shares at the same size. The suite counts the two as expecte
 with these numbers in their reasons (`parity/mri_hmc.py`'s `PATH_DIVERGENCES`: only when every
 failed check is one of the estimates' metrics and the run lies within mcflirt's measured spread;
 every check still runs and is reported), as it counts `difftest/phantom-several-minima`. The
-record (`docs/validation/mri-hmc.md`, made from `1df84f3`: 145 pass, 20 rejected by both, 5
-expected divergences, 0 failures) keeps these statuses; its two reasons are the earlier words,
-without the spread, until the record is next re-made.
+record (`docs/validation/mri-hmc.md`) re-made from `a3f1d34` (`--jobs 1`): 145 pass, 20 rejected
+by both, 5 expected divergences, 0 failures, every status and measured value as in its making
+from `1df84f3`; only the two reasons changed, to these numbers (the site's case explorer shows
+them).
 `real/ds000005/opt-cost-leastsquares` passes (p95 0.0227 mm, 0.0220 before).

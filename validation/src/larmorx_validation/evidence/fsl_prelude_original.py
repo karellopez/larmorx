@@ -664,8 +664,8 @@ def _bench(ctx: core.Context) -> tuple[dict, list[dict], str]:
             mm = re.fullmatch(r"([\d.]+) s, (\d+) MiB", c)
             runs.append((float(mm.group(1)), int(mm.group(2))) if mm else None)
         large.append({"map": cells[0], "runs": runs})
-    m = re.search(r"main machine: ([^)]*\))", md)
-    return calls, large, m.group(1) if m else "?"
+    m = re.search(r"main machine: ([^)]*)\)", md)
+    return calls, large, " ".join(m.group(1).split()) if m else "?"
 
 
 SPEED_SERIES = [

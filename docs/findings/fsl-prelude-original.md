@@ -52,12 +52,16 @@ of -2 gives 2, a complex series of 0 and -2 gives 0 and 2). `specs/flirt.md` §4
 same reading for FLIRT. The original kept the stored value; corrected in `cli::prelude` (the
 images' reading). For a spec writer: §3.1 and §3.2 of `specs/prelude.md` could state it.
 
-**The same in other clean-room originals (open, for the orchestrator).** `time_step.py` finds
-fslmaths' and fslroi's clean-room originals writing the stored time step where FSL writes its
-magnitude, or 1 (a 4D input of time step 0: FSL 1, the original 0; of -2: FSL 2, the original
--2; whole series, `-Tmean` and one volume alike). The rule belongs to FSL's image layer, so a
-shared fix in the readers of `bet::image` and `hmc::image` (every FSL original but FLIRT, which
-reads it itself) would settle it; their suites' records are to be re-checked with it.
+**The same in the other clean-room originals (settled in relay 3, 2026-11-07).** The rule
+belongs to FSL's image layer: `time_step.py`, extended to every FSL program with a clean-room
+original that writes images (66 runs), found every original but FLIRT's (which reads it itself)
+writing the stored time step (47 runs differed: fslmaths, fslroi, bet2, bet `-F`, fast,
+applyxfm4D, mcflirt, topup's `--iout` and `--fout`). The shared readers apply it now
+(`larmorx_mri::hmc::image::time_step_as_read` in `read_series_files` and `read_stored_files`,
+and `bet::image`'s ANALYZE and lean readers), prelude's own reading removed: 63 of the 66 runs
+identical to FSL's, the other 3 FSL-262's corrected default (identical with `reproduce`).
+`pixdim[5..7]` are kept as stored, as FSL keeps them. The records re-made with it: see their
+findings files.
 
 ## 4. Messages and notices
 
@@ -89,3 +93,23 @@ constraint between two groups) and a weighted union-find of the turns, so a choi
 operation and a merge the neighbours of the group that joins; the merge order and each merge's
 arithmetic are FSL's (§4.8, §10). The linear parts run on the call's threads, with the same bits at
 any thread count. The numbers: [benchmarks](../benchmarks/fsl-prelude.md).
+
+## 7. Memory on large maps (relay 3, 2026-11-07)
+
+On the benchmark's 128³ map (66,020 regions, 295,535 constraints) the original's peak was 78.2 MiB
+at one thread against FSL's 64 MiB, above the memory rule's 78.4 for the standalone program with
+little margin. Where it went: two full copies of the phase (one kept for the other rule's result,
+FSL-261 and FSL-269's notices), three masks (the source's, the phase grid's copy, `--savemask`'s
+copy), the unwrapped phase allocated before the merging, and the constraints' map alive while the
+merge built its slots, heap and lists. Now (`a85f764`): the phase is copied only where the other
+rule's result can be needed (a NaN phase, `--removeramps`), the source's mask is used as it is on
+the phase's grid and returned for `--savemask`, the unwrapped phase is allocated after the merging
+(the slices mode writes each slice's into it in place), and the merge makes its slots, frees the
+map, then builds its lists at their exact sizes. The same bits everywhere (the large maps' outputs
+and fMRIPrep's calls compared). Peaks, standalone program, one thread: 128³ **59.1 MiB** (was
+78.2), with `-s` 43.0 (61.8), with `--removeramps` 67.1 (77.7; the phase kept for FSL-261's
+notice), with `-s --removeramps` and every output 50.9 (62.7); 256 × 256 × 160 210 MiB (272);
+at 12 threads 75 MiB on 128³ (the threads' own buffers). The memory test gained the 128³ map's two
+calls (`test_prelude_original_large_map_needs_no_more_memory_than_fsl`, through Python, against
+FSL's peaks in the oracle cache): 69.8 and 54.4 MiB against FSL's 67.3 and 56.8 (allowances 88.0
+and 76.5).

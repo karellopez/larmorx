@@ -624,3 +624,14 @@ both final matrices' costs at 8, 4, 2 and 1 mm, and the output header given FSL'
   standard_space_roi runs whose FLIRT crashes in FSL (FSL-75), 6 fslroi corners one float unit
   apart (relay 8's question), 5 `-B`/`-A2` runs where FSL fails midway (not yet looked at), 2
   `-R`/`-c` centres on neurologically stored images (the question of cases 622 and 677).
+
+## The time step as FSL's image layer reads it (PRELUDE's clean-room part, relay 3, 2026-11-07)
+
+`validation/investigations/fsl-pair-header/time_step.py` (FSL 6.0.7.23 through the oracle cache):
+bet2 (a 3D image and a series, `-m`), bet `-F` (its 4D brain and 3D mask) and fslroi (a series,
+one volume, a 3D region) wrote the stored time step where FSL writes its magnitude, and 1 for an
+image with a time axis whose time step is 0 (FSL's image layer; a 3D image's 0 kept). Corrected
+in the shared readers (`larmorx_mri::hmc::image::time_step_as_read`, `bet::image`'s ANALYZE and
+lean readers); standard_space_roi's `-maskNONE -roiNONE` copy (fslpy's `imcp`) keeps the stored
+value, as FSL's does. The records `fsl-bet` and `fsl-fast` re-run from `f005a08`: unchanged
+(their inputs' time steps are positive, or 0 in 3D images).

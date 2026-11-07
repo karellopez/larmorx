@@ -477,3 +477,16 @@ prelude, topup, applytopup; `time_step.py`) and the random-testing trial of the 
 |---|---|---|
 | `bet::image::write` (shared by BET, betsurf, FAST, FLIRT and its programs, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) | a pair's header file holds the header block, NIfTI's four extension bytes and the kept extensions (352 bytes without extensions, NIfTI-2 544), every pair type, in its own compression; a zstd or bzip2 pair keeps its extensions | `probe.py`: FSL's header files |
 | `cli::prelude` | the time step of `-p`, `-a` and `-m` as FSL's image layer reads it (its magnitude; 1 for an image with a time axis and a time step of 0), and of `-c` (its magnitude, a 0 kept), which every output keeps from its source | `time_step.py`, the trial's findings; `specs/flirt.md` §4.1 states the same reading |
+
+### Relay 3 of PRELUDE's clean-room part (2026-11-07): memory, the time step, the spec answers' follow-ups
+
+Black-box runs of FSL 6.0.7.23 through the oracle cache (no source read):
+`validation/investigations/fsl-pair-header/time_step.py` (every FSL original that writes images),
+`time_step_cases.py` (the permanent cases), `validation/investigations/cleanroom-topup/jac_fsl273.py`.
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `bet::image` (`read_analyze`, `read_series_lean`; `read`, `read_first` through `larmorx_mri::hmc::image`) | the time step as FSL's image layer reads it (its magnitude; 1 for an image with a time axis whose time step is 0), every output keeping it; `cli::prelude`'s own reading removed | `time_step.py`; `specs/flirt.md` §4.1 |
+| `flirt::cost` (`normcorr`) | the count's running total `C` takes each point's weight as it is visited (`larmorx_mri::hmc::cost::sample_fold`) | `specs/flirt.md` §6.4 (spec writer, 2026-11-06) |
+| `cli::applytopup` (`jac_scales`) | `--method=jac`'s Jacobian scales: 1 by default (the Jacobian of the displacement applied), FSL's `dx / fx`, `dy / fy` (a field image's `dx / fx`, `dx / fy`) with `reproduce`; FSL-273 and FSL-134 named where they change it | `specs/topup.md` §7.3 (spec writer, 2026-11-06); `jac_fsl273.py` |
+| `prelude::merge`, `prelude::volume`, `cli::prelude` (`compute`) | the same results with less memory: the slots before the sums' map is freed, the lists at their exact sizes, no copy of the source's mask, the unwrapped phase allocated after the merging, the phase copied only where the other rule's result can be needed | `specs/prelude.md` §10 |

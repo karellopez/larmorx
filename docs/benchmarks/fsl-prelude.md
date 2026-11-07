@@ -39,15 +39,20 @@ two large ones the original is 2.5 to 2.8 times the replica's speed on one threa
 
 | Map (regions) | FSL | replica (1) | original (1) | original (12) |
 |---|---|---|---|---|
-| 128 × 128 × 128 (66,020) | 183.7 s, 64 MiB | 1.36 s, 117 MiB | 0.30 s, 78 MiB | 0.24 s, 79 MiB |
-| 256 × 256 × 160 (152,738) | not run | 9.41 s, 469 MiB | 1.97 s, 272 MiB | 2.56 s, 273 MiB |
+| 128 × 128 × 128 (66,020) | 183.7 s, 64 MiB | 1.36 s, 117 MiB | 0.30 s, 59 MiB | 0.24 s, 75 MiB |
+| 256 × 256 × 160 (152,738) | not run | 9.41 s, 469 MiB | 1.97 s, 210 MiB | 2.56 s, 211 MiB |
 
 (Peak resident memory by `/usr/bin/time -v`.) FSL's merging scans every constraint for each
 choice (`O(L²)` per volume, `specs/prelude.md` §10): 66,020 regions take it three minutes, where
-the original takes 0.3 s (610×). On the 128³ map the original's peak is 79 MiB against FSL's
-64 MiB, slightly above the memory rule's allowance (1.1 × 64 + 8 = 78.4 MiB) on this synthetic map
-of very many regions (the constraint slots and the heap): reported here, to be measured further
-(fMRIPrep's calls are within the rule: `tests/parity/test_memory_peak.py`). On the 256 × 256 ×
+the original takes 0.3 s (610×). The original's peaks were re-measured after its memory
+change of relay 3 (`a85f764`: no copy of the phase or the masks where none is needed, the
+unwrapped phase allocated after the merging, the constraints' map freed before the merge's lists
+are built; the same bits, the times unchanged in substance and not re-measured on the loaded
+machine): on the 128³ map 59 MiB at one thread (78 before) against FSL's 64 MiB, within the memory
+rule (1.1 × 64 + 8 = 78.4 MiB); at 12 threads 75 MiB (the threads' own buffers); on the 256 × 256
+× 160 map 210 MiB (272 before). `tests/parity/test_memory_peak.py` measures fMRIPrep's call and
+the 128³ map (as it is and with `-s`) through Python against FSL's peaks
+([findings](../findings/fsl-prelude-original.md), section 7). On the 256 × 256 ×
 160 map the 12-thread run was slower than the 1-thread run while the machine was loaded.
 
 ## Where the time goes, and why it is faster

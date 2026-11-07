@@ -129,7 +129,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 | `-stats` | (CLI only) | ✓ (`_meanvol`, `_variance`, `_sigma`; every slice, named after `-out` without its extension; mcflirt's end slices at 0 and names with `reproduce`, FSL-08) | ✓ (the same corrections) |
 | `-sinc_final`, `-spline_final`, `-nn_final` | `final="sinc"`, `"spline"`, `"nearest"` | ✓ | ✓ |
 | `-dof n` | `dof` | ✓ (6–12; CLI clamps with mcflirt's message) | ✓ |
-| `-cost c` | `cost` | ✓ `normcorr`, `mutualinfo`, `normmi` (exactly as the spec's appendix B: mcflirt's evaluated matrices, evaluation by evaluation); ~ `leastsquares`, `corratio`, `woods` (described in the spec only in outline; not validated) | ✓ every cost, bit-identical |
+| `-cost c` | `cost` | ✓ `normcorr` (its count's running total takes each point's weight as the point is visited, since 2026-11-07), `mutualinfo`, `normmi` (exactly as the spec's appendix B: mcflirt's evaluated matrices, evaluation by evaluation); `corratio`, `woods` (FLIRT's, since 2026-11-02), `leastsquares` (FLIRT's `leastsq`: three single-precision levels, since 2026-11-07) | ✓ every cost, bit-identical |
 | `-bins n` | `bins` | ✓ | ✓ (below 8 with a histogram cost: refused by default, FSL-21) |
 | `-smooth x` | `smooth` | ✓ (0: unweighted, Pearson's correlation) | ✓ |
 | `-rotation x` | `rotation` | ✓ | ✓ |
@@ -353,6 +353,13 @@ aligned worse until the exact histogram costs (median ratio 1.051 against mcflir
 1 %). With `-fudge -stages 1`, mcflirt's evaluated matrices are larmorx's, evaluation by
 evaluation, on 22 of 30 phantoms; the others part after 19 to 224 evaluations in the last
 decimals, as with `normcorr`.
+
+**The count per point and `leastsquares`** (2026-11-07; `specs/mcflirt.md` §6.4 and appendix A,
+the spec writer's answers of 2026-11-06): the weighted correlation's count takes each point's
+weight into its first running total as the point is visited (each row's total before), which
+follows mcflirt's evaluated matrices longer on every recorded run traced
+([findings](../findings/mri-hmc-original.md)); `cost="leastsquares"` is FLIRT's `leastsq` (three
+single-precision levels; double sums before).
 
 **Centres of mass** (the clean-room catch-up, 2026-11-05; `specs/mcflirt.md` §6.1): both of
 mcflirt's centres, each test volume's (the rotations' centre) and the reference's (the `.par`

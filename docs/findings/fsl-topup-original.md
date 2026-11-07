@@ -613,3 +613,30 @@ four). Each of its metrics lies inside FSL's own band. ds001600 meets §12's thr
 (The final costs of the runs without `-v` are recomputed from `--iout`, `final_ssd.py`: the
 last level has no smoothing and no subsampling, so its predictions are `--iout` times `100 /
 g`.)
+
+## FSL-273: applytopup `--method=jac`'s Jacobian scales (PRELUDE's clean-room part, relay 3, 2026-11-07)
+
+The spec answer of 2026-11-06 (`specs/topup.md` §7.3, FSL-273): FSL divides the field's
+derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field
+image's header) while it lays the displacement at the images' voxel indices in the images' voxel
+sizes, so a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian
+scaled along each encoded axis by `dx / fx`, `dy / fy` (a field image: `dx / fx`, `dx / fy` with
+FSL-134). The original used FSL's scales for a coefficient field in both modes. Now
+(`cli::applytopup::jac_scales`): **by default the scale is 1** along both axes, the Jacobian of
+the displacement applied (the same numbers wherever the voxel sizes agree); `reproduce` keeps
+FSL's; FSL-273 is named when, along an encoded axis, the field's voxel size differs from the
+images' (coefficients and field images alike), FSL-134 when a field image's y term takes the x
+voxel size (the images' x and y voxel sizes differ, y encoded), each only with `--method=jac`.
+Observed (`validation/investigations/cleanroom-topup/jac_fsl273.py`: FSL's coefficients of a pair
+with 6 mm voxels along y, applied by FSL and the original to the same data whose header says 6, 4
+and 3 mm along y, `--interp=trilinear`): FSL's outputs on 4 and 3 mm differ from its 6 mm one by
+up to 32 and 48 % of the largest value (the Jacobian's y term scaled by 4/6 and 3/6); the
+original's default on 6, 4 and 3 mm gives the same output each time, its own 6 mm output (each
+within 1.07e-6 of the largest value from FSL's 6 mm output, 3,580 of 9,216 voxels identical: the
+usual applytopup arithmetic), its `reproduce` FSL's outputs within 1.1e-6 on all three, FSL-273
+named on the 4 and 3 mm runs only. Unit test `cli::applytopup::tests::jacobian_scales_both_modes`.
+The record `fsl-topup` re-made from `fa35411`: 187 cases, 106 pass, 67 rejected by both, 14
+expected divergences, 0 failures; the replica suite's new `at/jac-coef-aniso` (a coefficient field
+of other voxel sizes) passes, `at/jac-field-aniso`'s fix pass names FSL-273 now, and the time
+step's permanent case (`time-step-zero-series`, fMRIPrep's call on a series of time step 0, its
+`--iout` compared) passes; nothing else moved.

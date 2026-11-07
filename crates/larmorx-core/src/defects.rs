@@ -400,6 +400,10 @@ defects! {
         "a -rotparent dataset with VOLREG_MATVEC_000000 but without VOLREG_CENTER_OLD or VOLREG_CENTER_BASE (or with fewer than 3 numbers in one) is read through a NULL pointer or past the attribute (a crash or garbage)";
     AFNI_97 = "AFNI-97", "3dvolreg", true,
         "a Fourier rotation whose shear shifts the last of an odd count of rows, and the previous pair's second row, beyond the row length clears the missing second row through a NULL pointer (fft_shift2): a crash";
+    AFNI_98 = "AFNI-98", "3dvolreg", true,
+        "with -input, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: (null) when there is none";
+    AFNI_99 = "AFNI-99", "3dvolreg", true,
+        "-maxdisp and -savedisp convert the matrix to the dataset's axes with their signs but leave the voxel positions unsigned: for an axis stored L2R, P2A or S2I the displacements are those of the mirrored position";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

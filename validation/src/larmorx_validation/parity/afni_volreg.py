@@ -757,6 +757,9 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
         ("gridparent-last", ("-gridparent",), "error"),
         ("matrix-save-last", ("-1Dmatrix_save",), "error"),
         ("one-volume-no-base", ("-base", "1", *p, "{3}"), "error"),
+        # AFNI-98: with -input, AFNI's message names "(null)" or the stray argument
+        ("base-beyond-input", ("-base", "99", *p, "-input", "{0}"), "error"),
+        ("base-beyond-input-stray", ("-base", "99", *p, "-input", "{0}", "stray"), "error"),
     ):
         kw: dict = {}
         if cid == "base-twice":

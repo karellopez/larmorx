@@ -181,3 +181,44 @@ release (`tags/AFNI-26.3.05/src`; the same text in 25.2.09 for every routine bel
   registered sub-brick over its input one when both are stored alike, and otherwise holds the
   input sub-brick by sub-brick, each freed once registered (29 MiB; scaled int16 written as float
   32 MiB against AFNI's 26).
+
+## The spec and its model (relay 4, 2026-11-07)
+
+- **AFNI-99** (rule A): `-maxdisp` and `-savedisp` convert `VOLREG_MATVEC`'s rotation and shift
+  to the dataset's axes with `DBLE_mat_to_dicomm` (signed: −1 for L2R, P2A, S2I) but take the
+  voxel positions from `THD_3dind_to_3dmm_no_wod`, which are DICOM-valued along each axis (a
+  permutation of DICOM, no signs). For an axis stored with a negative sign the displacement is
+  that of the position mirrored about the axis centre. The same 40 × 44 × 24 array stored LPS and
+  RAS (the motion turned 180° about z, which moves no point farther) gives maximum displacements
+  1.672, 3.343, 5.014, 6.693, 8.363 mm against 1.718, 3.436, 5.150, 6.874, 8.589 mm; with the
+  permutation (`|P|`) 1.672, 3.344, 5.014, 6.693, 8.363 for both, and the corrected `-savedisp`
+  fields agree within 8e-4 mm (with the components' expected signs) where AFNI's differ by up to
+  9.2 mm, more than the field's own range. The default uses `|P|` (`volreg::disp_conversion`),
+  `reproduce` AFNI's `P`, both computed to name AFNI-99 where a value differs. fMRIPrep writes
+  `-maxdisp1D` but uses only the registered volumes.
+- **AFNI-98** (rule A, messages only): "Dataset %s doesn't have base brick index" and "doesn't
+  conform to dimensions of weight brick" print `Argv[Iarg]`, which after `-input` is the first
+  stray argument or `Argv[Argc]` = NULL (`(null)` from glibc's printf). The default names the
+  dataset; `reproduce` prints AFNI's text (`Options.rest`).
+- **`apply_xshear`/`apply_yshear`/`apply_zshear` shift the second row of each pair by `a1 = a0 +
+  a`** (float), not by its own `a*(jj+1-ny2) + ...`: the two differ in the last bit, which decides
+  the result for every method (the spec's §5.5; the model missed it at first and differed in 1 %
+  of the voxels by one ulp).
+- **`roll[kim] *= (180.0/PI)`** (and the first pass's `roll_1[kim] *= ...`) is a double product of
+  the float radians, rounded to float (spec §8.5, §8.7).
+- **The shear decomposition in its retry is numerically fragile.** A rotation about one axis
+  (every rotation derivative image of `mri_3dalign_setup`) fails `shear_xzyx` in all six orders
+  (exact zeros), so `rot_to_shear` conjugates it by the `PER0..PER2` rotation; the result is
+  nearly singular: four orders tie in `norm_3shear` to the last double bits and the tiny
+  coefficients (`cx1` 1.37e-6 against 1e-8 from the stable formulas, nearly cancelled by `cx2`)
+  come from the Maple form's cancellations (its `t34` through `pow(·, 0.333333333333333)` makes
+  `f` 0.9999999999999809). Both reconstruct `Q` to about 1e-8, but for `−ε` about z AFNI picks
+  order (1,0,2) where the stable formulas pick (0,2,1), and the roll derivative image's extremes
+  move by 0.4 % (−24.80 against −24.69 on the spec's synthetic series), the parameters by up to
+  0.001° (0.0098° with `-linear`). The spec gives the stable formulas and these numbers; with
+  `shear_xzyx`'s own evaluation plugged into the spec's model (a scratch check, not committed,
+  as it is AFNI's generated code) the model is bit-identical to AFNI on 12 cases.
+- **`nn_shift` takes the floor of the position** (`ia = (int)af; if(af<0) ia--` with `af = -af`),
+  not the nearest sample, and an exact negative integer one lower (a shift of exactly +1 takes
+  `f[i-2]`): rule C (AFNI's NN is "experimental"; exact integer shifts only), kept and documented
+  in the spec.

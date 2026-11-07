@@ -101,6 +101,8 @@ line) where it changed the result ([register](upstream-defects.md)):
 | AFNI-95 | B | `-base 0 -base 3` is accepted (the last wins) | an error |
 | AFNI-96 | B | a `-rotparent` without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE` is read through a NULL pointer | an error (both modes) |
 | AFNI-97 | A | a Fourier rotation shifting the last of an odd count of rows (and the previous pair's second row) beyond the row length writes through a NULL pointer (a crash; rotations far beyond a head's motion) | the row cleared alone, as AFNI clears a pair |
+| AFNI-98 | A | with `-input`, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: `(null)` when there is none | the dataset's name |
+| AFNI-99 | A | `-maxdisp` and `-savedisp` compute the displacements of the position mirrored along every axis stored L2R, P2A or S2I (the same data stored RAS and LPS: 1.718 against 1.672 mm) | the displacements of the voxels themselves |
 
 Kept in both modes and documented (rule C): the blur's row-end mirrors (measured: switching to
 whole-point mirrors moves the parameters by at most 1.5e-5 degrees and 1.1e-5 mm, the registered

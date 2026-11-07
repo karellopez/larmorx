@@ -228,6 +228,8 @@ struct Options {
     dataset: String,
     /// `-input`'s dataset, opened during the scan as AFNI opens it.
     input_ds: Option<Dataset>,
+    /// With `-input`: the first argument after the options, if any (AFNI-98).
+    rest: Option<String>,
     /// `-base dset`: what 3dvolreg keeps of it after the scan.
     bset: Option<BaseSet>,
     /// `-tshift ii`: the number of points to ignore.
@@ -416,6 +418,7 @@ fn parse(
         floatize: false,
         dataset: String::new(),
         input_ds: None,
+        rest: None,
         bset: None,
         tshift: None,
         savedisp: None,
@@ -948,6 +951,7 @@ fn parse(
                 args[i]
             ));
         }
+        o.rest = args.get(i).cloned();
         o.dataset = o.input.clone().unwrap_or_default();
     }
     Ok(o)
@@ -1213,10 +1217,35 @@ fn run_with(
             io.raw("++ WARNING: base brick is prior to -tshift ignore point.\n");
         }
     }
+    // AFNI-98: these two messages print the argument after the options; with -input that is
+    // a stray argument or none ("(null)").
+    let shown = match (&o.input, mode.reproduce()) {
+        (Some(_), true) => o.rest.clone().unwrap_or_else(|| "(null)".to_owned()),
+        _ => o.dataset.clone(),
+    };
+    let note98 = |notices: &mut Notices| {
+        let afni = o.rest.clone().unwrap_or_else(|| "(null)".to_owned());
+        if o.input.is_some() && afni != o.dataset {
+            notices.add(
+                &defects::AFNI_98,
+                if mode.fix() {
+                    format!(
+                        "the message names the dataset given by -input; AFNI prints '{afni}' (the \
+                         argument after the options) instead"
+                    )
+                } else {
+                    format!(
+                        "the message names '{afni}', the argument after the options, as AFNI does, \
+                         not the dataset given by -input"
+                    )
+                },
+            );
+        }
+    };
     if intern && nbase_given >= ds.nvals {
+        note98(notices);
         return Err(Stop::Raw(format!(
-            "** Dataset {} doesn't have base brick index = {nbase_given}\n",
-            o.dataset
+            "** Dataset {shown} doesn't have base brick index = {nbase_given}\n"
         )));
     }
     if let Some(b) = &o.bset {
@@ -1225,9 +1254,10 @@ fn run_with(
     if let Some((_, _, wd)) = &o.weight
         && *wd != ds.nxyz
     {
+        note98(notices);
         return Err(Stop::Raw(format!(
             "** Dataset {} doesn't conform to dimensions of weight brick\n    Weight  has nx = {}  ny = {}  nz = {}\n    Dataset has nx = {}  ny = {}  nz = {}\n",
-            o.dataset, wd[0], wd[1], wd[2], nx, ny, nz
+            shown, wd[0], wd[1], wd[2], nx, ny, nz
         )));
     }
     if intern && ds.nvals == 1 {
@@ -1554,15 +1584,40 @@ fn run_with(
     let mut disp: Vec<Dataset> = Vec::new();
     if !disp_names.is_empty() {
         let mut parts = [Vec::new(), Vec::new(), Vec::new()];
+        // AFNI-99: the other mode's displacements too, to name it where a value changes.
+        let other_mode = if mode.reproduce() {
+            UpstreamDefects::Fix
+        } else {
+            UpstreamDefects::Reproduce
+        };
+        let check = out_axes.orient.is_some_and(volreg::has_negative_axis);
+        let mut differs = false;
         for kim in 0..imcount {
             let m = &res.matvec[kim];
             let tvec = [f64::from(m[3]), f64::from(m[7]), f64::from(m[11])];
-            let d =
-                volreg::displacements(&ds.geometry.axes, &out_axes, out_n, &res.rmat[kim], &tvec)
+            let (a, r) = (&ds.geometry.axes, &res.rmat[kim]);
+            let d = volreg::displacements(a, &out_axes, out_n, r, &tvec, mode).map_err(stop)?;
+            if check && !differs {
+                let e = volreg::displacements(a, &out_axes, out_n, r, &tvec, other_mode)
                     .map_err(stop)?;
+                differs = d != e;
+            }
             for (part, v) in parts.iter_mut().zip(d) {
                 part.extend_from_slice(&v);
             }
+        }
+        if differs {
+            notices.add(
+                &defects::AFNI_99,
+                if mode.fix() {
+                    "-savedisp's displacements are those of the voxels themselves; AFNI converts \
+                     the matrix with the signs of the axes stored L2R, P2A or S2I but not the \
+                     voxel positions, and so writes the displacements of the mirrored positions"
+                } else {
+                    "-savedisp's displacements are those of the positions mirrored along the axes \
+                     stored L2R, P2A or S2I, as AFNI computes them"
+                },
+            );
         }
         for part in parts {
             disp.push(float_dataset(&ds, out_n, &out_axes, &out_taxis, part));

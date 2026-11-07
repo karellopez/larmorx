@@ -253,6 +253,28 @@ pub fn mat_to_dicomm(o: [u8; 3]) -> DMat33 {
     t
 }
 
+/// [`mat_to_dicomm`] without its signs: the permutation of the axes. AFNI-99 corrected: the
+/// voxel positions of `-maxdisp` and `-savedisp` are AFNI's dataset coordinates, DICOM values
+/// along each axis, which this permutation (not the signed matrix) converts.
+pub fn mat_to_dicomm_unsigned(o: [u8; 3]) -> DMat33 {
+    mat_to_dicomm(o).map(|row| row.map(f64::abs))
+}
+
+/// The conversion matrix of `-maxdisp` and `-savedisp`: AFNI's signed one with `reproduce`
+/// (AFNI-99), the permutation by default.
+pub fn disp_conversion(o: [u8; 3], mode: UpstreamDefects) -> DMat33 {
+    if mode.reproduce() {
+        mat_to_dicomm(o)
+    } else {
+        mat_to_dicomm_unsigned(o)
+    }
+}
+
+/// Whether AFNI-99 can change anything: an axis stored L2R, P2A or S2I.
+pub fn has_negative_axis(o: [u8; 3]) -> bool {
+    mat_to_dicomm(o).iter().flatten().any(|&v| v < 0.0)
+}
+
 /// `THD_3dmm_to_dicomm`: dataset-order coordinates to DICOM order.
 fn mm_to_dicomm(o: [u8; 3], v: FVec3) -> FVec3 {
     let mut d = [0.0f32; 3];
@@ -356,6 +378,7 @@ pub fn displacements(
     out_n: [usize; 3],
     rmat: &DMat33,
     tvec: &DVec3,
+    mode: UpstreamDefects,
 ) -> Result<[Vec<f32>; 3], VolregError> {
     let o = out.orient.ok_or_else(|| {
         VolregError::Fatal("the dataset's voxel-to-world matrix has no orientation".to_owned())
@@ -371,7 +394,7 @@ pub fn displacements(
         f64::from(centre(1)),
         f64::from(centre(2)),
     ];
-    let pp = mat_to_dicomm(o);
+    let pp = disp_conversion(o, mode);
     let ppt = vecmat::transpose(&pp);
     let r = vecmat::mul(&ppt, rmat);
     let r = vecmat::mul(&r, &pp);
@@ -1392,6 +1415,7 @@ pub fn volreg(
     let libc = vecmat::Libc::new(mode);
     let mut md = MaxDisp::default();
     let mut emaxvec: Vec<DVec3> = vec![[0.0; 3]; dispvec.len()];
+    let mut emaxvec2: Vec<DVec3> = vec![[0.0; 3]; dispvec.len()];
     for kim in 0..imcount {
         let rmat = vecmat::rot_to_matrix(
             2,
@@ -1438,11 +1462,24 @@ pub fn volreg(
                 f64::from(matar[7]),
                 f64::from(matar[11]),
             ];
-            let pp = mat_to_dicomm(o);
-            let ppt = vecmat::transpose(&pp);
-            let r = vecmat::mul(&ppt, &rmat);
-            let r = vecmat::mul(&r, &pp);
-            let tvec = vecmat::matvec(&ppt, &tvec0);
+            // AFNI-99: AFNI's signed conversion with `reproduce`, the permutation by default;
+            // the other one is computed too, to name the defect where it changes a value.
+            let convert = |pp: DMat33| {
+                let ppt = vecmat::transpose(&pp);
+                let r = vecmat::mul(&vecmat::mul(&ppt, &rmat), &pp);
+                (r, vecmat::matvec(&ppt, &tvec0))
+            };
+            let (r, tvec) = convert(disp_conversion(o, mode));
+            let other = has_negative_axis(o).then(|| {
+                convert(disp_conversion(
+                    o,
+                    if mode.reproduce() {
+                        UpstreamDefects::Fix
+                    } else {
+                        UpstreamDefects::Reproduce
+                    },
+                ))
+            });
             let ax = &ds.geometry.axes;
             let centre = |a: usize| {
                 (f64::from(ax.org[a]) + 0.5 * (n[a] as f64 - 1.0) * f64::from(ax.del[a])) as f32
@@ -1453,12 +1490,16 @@ pub fn volreg(
                 f64::from(centre(2)),
             ];
             let (mut dmax, mut emax) = (0.0f32, 0.0f32);
+            let (mut dmax2, mut emax2) = (0.0f32, 0.0f32);
+            let disp = |r: &DMat33, t: &DVec3, dv: &DVec3| {
+                let mut qv = vecmat::sub(dv, &vorg);
+                qv = vecmat::matvec_add(r, &qv, t);
+                qv = vecmat::add(&qv, &vorg);
+                vecmat::sub(dv, &qv)
+            };
             for (qq, dvf) in dispvec.iter().enumerate() {
                 let dv: DVec3 = dvf.map(f64::from);
-                let mut qv = vecmat::sub(&dv, &vorg);
-                qv = vecmat::matvec_add(&r, &qv, &tvec);
-                qv = vecmat::add(&qv, &vorg);
-                qv = vecmat::sub(&dv, &qv);
+                let qv = disp(&r, &tvec, &dv);
                 let ddd = vecmat::size(&qv) as f32;
                 if ddd > dmax {
                     dmax = ddd;
@@ -1470,6 +1511,33 @@ pub fn volreg(
                 if eee > emax {
                     emax = eee;
                 }
+                if let Some((r2, t2)) = &other {
+                    let qv2 = disp(r2, t2, &dv);
+                    let d2 = vecmat::size(&qv2) as f32;
+                    if d2 > dmax2 {
+                        dmax2 = d2;
+                    }
+                    let ev2 = if kim > 0 { emaxvec2[qq] } else { qv2 };
+                    emaxvec2[qq] = qv2;
+                    let e2 = vecmat::size(&vecmat::sub(&ev2, &qv2)) as f32;
+                    if e2 > emax2 {
+                        emax2 = e2;
+                    }
+                }
+            }
+            if other.is_some() && (dmax != dmax2 || emax != emax2) {
+                notices.add(
+                    &defects::AFNI_99,
+                    if mode.fix() {
+                        "the maximum displacements are those of the voxels themselves; AFNI \
+                         converts the matrix with the signs of the axes stored L2R, P2A or S2I \
+                         but not the voxel positions, and so reports the displacements of the \
+                         mirrored positions"
+                    } else {
+                        "the maximum displacements are those of the positions mirrored along the \
+                         axes stored L2R, P2A or S2I, as AFNI computes them"
+                    },
+                );
             }
             if md.top.0 < dmax {
                 md.top = (dmax, kim);

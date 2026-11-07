@@ -1,20 +1,20 @@
 # Parity: 3dvolreg (replica)
 
-**All cases agree.** 189 cases on the `standard` tier: 157 pass, 30 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 190 cases on the `standard` tier: 158 pass, 30 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution), in-process: `larmorx afni 3dvolreg` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.volreg(..., implementation="replica")`
 - **Reference:** 3dvolreg from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0; no OpenMP loop), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity afni-volreg --tier standard --implementation replica`
-- **Original programs:** 384 runs: 384 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 386 runs: 386 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical to AFNI: 136 of 136 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 21 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 179 of 179 identical, in every case that ran both programs.
+**Bit-identical to AFNI: 137 of 137 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 21 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 180 of 180 identical, in every case that ran both programs.
 - 7 case(s) where AFNI crashes (an option given last without its value, AFNI-88; a base whose least squares cannot be set up, AFNI-89; a name of 256 bytes or more, AFNI-90; a Fourier rotation that clears a row through a NULL pointer, AFNI-97): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
 - **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 8 of 8 bit-identical to the replica's.
 - AFNI's own variability, fMRIPrep 25.2.6's AFNI: 8 of 8 runs give the oracle's output bit for bit.
 - Python API (`lx.afni.volreg(..., implementation="replica")`): 21 of 21 cases give the command line's outputs bit for bit.
-- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 188 of 188 cases identical (exit status, messages, every output).
+- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 189 of 189 cases identical (exit status, messages, every output).
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 1 with changed values (largest difference 7.15e+03): `tshift/tshift-negative-slope`
   - AFNI-11: 1 case(s) named it, 0 with changed values (largest difference 0): `global/exists`
@@ -46,7 +46,7 @@
 | base | 7 | 7 | 0 | 0 | 0 |
 | datatypes | 10 | 10 | 0 | 0 | 0 |
 | defects | 3 | 2 | 1 | 0 | 0 |
-| difftest | 6 | 2 | 4 | 0 | 0 |
+| difftest | 7 | 3 | 4 | 0 | 0 |
 | divergences | 2 | 0 | 0 | 2 | 0 |
 | edge cases | 23 | 22 | 1 | 0 | 0 |
 | environment | 6 | 6 | 0 | 0 | 0 |
@@ -108,7 +108,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (b302c95de55c) |
+| larmorx | 0.0.1 (1a9e7f20a8af) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -308,6 +308,7 @@ Both programs run in directories of their own on the same input files (made once
 | `fmriprep/pepolar-ds005040` | pass | 20/20 | fMRIPrep's RobustAverage call (sdcflows' PEPOLAR reference average: 2 topup-corrected volumes, float32) |
 | `fmriprep/pepolar-ds001600` | pass | 20/20 | fMRIPrep's RobustAverage call (sdcflows' PEPOLAR reference average: 2 volumes, 80 x 80 x 60) |
 | `defects/coarse-1-large` | pass | 4/4 | -twopass -coarse 1 1 on 120 x 120 x 120 voxels: AFNI never ends (AFNI-94); larmorx refuses in both modes (AFNI is not r… |
+| `difftest/afni99-notice-unchanged` | pass | 12/12 | AFNI-99 named only where a maximum displacement the run prints or writes changes: -cubic -final Fourier -zpad 0 on an i… |
 | `difftest/constant-twopass-lsqfit` | both-error | 4/4 | -twopass on a constant 4 x 34 x 4 series: the least squares cannot be set up and AFNI crashes at the first volume (AFNI… |
 | `difftest/crash-after-progress-line` | both-error | 4/4 | -heptic -final Fourier -twopass -verbose: AFNI crashes (AFNI-97) after its open progress line 'Starting final pass ... … |
 | `difftest/fourier-lone-row-default` | both-error | 5/5 | -Fourier -final NN -twopass -twoblur 4.5 -wtinp on a uint16 series 21 degrees oblique: the fit runs to rotations of 160… |

@@ -1,6 +1,6 @@
 # Parity: Head-motion correction (mcflirt-compatible)
 
-**2 case(s) fail.** 170 cases on the `standard` tier: 145 pass, 20 rejected by both, 3 expected divergences, 2 failures.
+**All cases agree.** 170 cases on the `standard` tier: 145 pass, 20 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`
@@ -53,7 +53,7 @@
   - FSL-59: 3 case(s) named it, 3 with changed values (largest difference 391), 3 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-nn_final`, `syn/motion/small/nn_final`, `syn/motion/small/sinc_final`
   - FSL-65: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/fsl20-plots-only`, `failures/par-dir-plots-mats`, `failures/par-dir-plots`, `failures/par-dir-plots-mats-ref0`, `failures/rms-dir`
   - FSL-66: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/binsm1-normcorr`, `failures/binsm4-normcorr-s2`, `failures/binsm8-normcorr`, `failures/binsm16-normcorr`, `failures/binsm16-mutualinfo`
-  - Matrices (RMS deviation, radius 80 mm): the corrections change 109 run(s); on the 52 real runs a run's largest change is 0.0204 mm (median) and at most 15.9 mm; the largest is 106 mm, in `syn/content/background/default`; non-finite matrices on one side in `syn/content/nan/default`, `syn/content/nan/reffile`.
+  - Matrices (RMS deviation, radius 80 mm): the corrections change 107 run(s); on the 52 real runs a run's largest change is 0.0204 mm (median) and at most 15.9 mm; the largest is 106 mm, in `syn/content/background/default`; non-finite matrices on one side in `syn/content/nan/default`, `syn/content/nan/reffile`.
 
 ## mcflirt's own variability band
 
@@ -213,31 +213,19 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 | options (ds000005) | 25 | 24 | 1 | 0 | 0 |
 | real | 30 | 29 | 1 | 0 | 0 |
 | synthetic/cli | 11 | 6 | 5 | 0 | 0 |
-| synthetic/content | 6 | 5 | 0 | 0 | 1 |
+| synthetic/content | 6 | 5 | 0 | 1 | 0 |
 | synthetic/dtypes | 10 | 10 | 0 | 0 | 0 |
 | synthetic/geometry | 10 | 10 | 0 | 0 | 0 |
 | synthetic/motion | 36 | 31 | 4 | 1 | 0 |
-| synthetic/orientation | 6 | 5 | 0 | 0 | 1 |
-
-## Failures
-
-### `syn/content/ramp/reffile`
-
-ramp moved along x: the default cost finds the shifts
-
-- **the identifiable translation** (max |diff| (mm) = 0.3419, threshold ≤ 0.3): the other parameters are not constrained by the data (reported only): max |Δ| 15.22°, 2.14 mm
-
-### `syn/orientation/ras-unflipped/reffile`
-
--reffile phantom/ref
-
-- **out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile** (mm = 0.1102, threshold ≤ 0.1 (spec)): median 0.0295, max 0.1133 mm over 12 volumes
+| synthetic/orientation | 6 | 5 | 0 | 1 | 0 |
 
 ## Expected divergences
 
 | Case | Reason |
 |---|---|
+| `syn/content/ramp/reffile` | A ramp along x, which only the x translation can align (the other parameters are not constrained by the data): larmorx's and mcflirt's paths part at the second evaluation with either count (48 matrices identical to mcflirt's with the per-point count of specs/mcflirt.md §6.4, 3 before; count_trace.p… |
 | `syn/motion/small/no-fsloutputtype` | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default). |
+| `syn/orientation/ras-unflipped/reffile` | Since the weighted correlation's count takes each point's weight as the point is visited (specs/mcflirt.md §6.4, 2026-11-07), larmorx's evaluated matrices are mcflirt's for the first 41 evaluations (9 before; count_trace.py, mcflirt's -verbose 20), then part in the line search's last digits (open) … |
 | `difftest/normmi-aligns-worse` | -cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thr… |
 | `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing… |
 
@@ -270,7 +258,7 @@ ramp moved along x: the default cost finds the shifts
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (f005a08f6328) |
+| larmorx | 0.0.1 (1df84f3d4054) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -356,7 +344,7 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 | `syn/content/background/reffile` | pass | 17/17 | -reffile phantom/ref |
 | `syn/content/nan/default` | pass | 16/16 | defaults |
 | `syn/content/nan/reffile` | pass | 16/16 | -reffile phantom/ref |
-| `syn/content/ramp/reffile` | fail | 4/5 | ramp moved along x: the default cost finds the shifts |
+| `syn/content/ramp/reffile` | expected-divergence | 4/5 | ramp moved along x: the default cost finds the shifts |
 | `syn/content/ramp/reffile-smooth0` | pass | 5/5 | ramp with -smooth 0 (the unweighted cost) |
 | `syn/dtypes/float32/default` | pass | 16/16 | defaults |
 | `syn/dtypes/float32/reffile` | pass | 16/16 | -reffile phantom/ref |
@@ -417,7 +405,7 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 | `syn/orientation/oblique/default` | pass | 16/16 | defaults |
 | `syn/orientation/oblique/reffile` | pass | 16/16 | -reffile phantom/ref |
 | `syn/orientation/ras-unflipped/default` | pass | 16/16 | defaults |
-| `syn/orientation/ras-unflipped/reffile` | fail | 15/16 | -reffile phantom/ref |
+| `syn/orientation/ras-unflipped/reffile` | expected-divergence | 15/16 | -reffile phantom/ref |
 | `syn/orientation/ras/default` | pass | 16/16 | defaults |
 | `syn/orientation/ras/reffile` | pass | 17/17 | -reffile phantom/ref |
 | `failures/fsl20-mats` | pass | 8/8 | -mats in a directory that does not exist (FSL-20) |

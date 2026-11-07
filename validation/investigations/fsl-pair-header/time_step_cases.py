@@ -19,9 +19,17 @@ from larmorx_validation.difftest import core, inputs, tools
 
 #: (tool, case id, time step, what the case is, the draw's number or None for the first series;
 #: mri-hmc's case 10 of the seed: ``-plots -rmsrel``, the default cost, so that the case tests the
-#: header and not a registration's random divergence)
+#: header and not a registration's random divergence; fsl-topup-original's case 2: fMRIPrep's
+#: call, whose ``--iout`` series the suite compares with its time step, where a field's 3D header
+#: has none)
 CASES = (
-    ("fsl-maths-original", "time-step-zero-series", 0.0, "fslmaths on a series of time step 0", None),
+    (
+        "fsl-maths-original",
+        "time-step-zero-series",
+        0.0,
+        "fslmaths on a series of time step 0",
+        None,
+    ),
     (
         "fsl-maths-original",
         "time-step-negative-series",
@@ -29,8 +37,20 @@ CASES = (
         "fslmaths on a series of time step -2",
         None,
     ),
-    ("mri-hmc", "time-step-negative-series", -2.0, "mcflirt's engine on a series of time step -2", 10),
-    ("fsl-topup-original", "time-step-zero-series", 0.0, "topup on a series of time step 0", None),
+    (
+        "mri-hmc",
+        "time-step-negative-series",
+        -2.0,
+        "mcflirt's engine on a series of time step -2",
+        10,
+    ),
+    (
+        "fsl-topup-original",
+        "time-step-zero-series",
+        0.0,
+        "topup on a series of time step 0 (fMRIPrep's call: its --iout series compared whole)",
+        2,
+    ),
 )
 
 

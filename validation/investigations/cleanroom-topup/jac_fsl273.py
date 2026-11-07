@@ -27,7 +27,7 @@ import probe
 
 def _save(path: Path, data: np.ndarray, vox: tuple[float, float, float]) -> Path:
     a = np.diag([*vox, 1.0])
-    a[:3, 3] = [-(n - 1) * v / 2 for n, v in zip(data.shape[:3], vox)]
+    a[:3, 3] = [-(n - 1) * v / 2 for n, v in zip(data.shape[:3], vox, strict=True)]
     img = nib.Nifti1Image(data.astype(np.float32), a)
     img.header.set_qform(a, 1)
     img.header.set_sform(a, 1)
@@ -126,6 +126,9 @@ def main() -> int:
             f"    default against FSL's 6 mm run: {rel(outs[('fix', dy)], outs[('fsl', 6.0)])};"
             f" FSL-273 named: default {named[('fix', dy)]}, reproduce {named[('reproduce', dy)]}"
         )
+        same = np.array_equal(outs[("fix", dy)], outs[("fix", 6.0)])
+        print(f"    default identical to the default's 6 mm output: {same}")
+        bad += not same
         bad += named[("fix", dy)] != (dy != 6.0)
     print(f"{bad} naming mismatches")
     return 1 if bad else 0

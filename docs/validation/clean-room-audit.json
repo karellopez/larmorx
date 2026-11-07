@@ -3716,7 +3716,7 @@
   },
   {
    "agent": "ab67a91e24eb199bf",
-   "declared": "not needed",
+   "declared": "no",
    "description": "PRELUDE clean-room, relay 2",
    "files": [
     "<scratch>/prelude-cr-1/standin/larmorx-nc"
@@ -5178,7 +5178,7 @@
     },
     {
      "agent": "ab67a91e24eb199bf",
-     "declared": "not needed",
+     "declared": "no",
      "description": "PRELUDE clean-room, relay 2",
      "files": [
       "<scratch>/prelude-cr-1/standin/larmorx-nc"
@@ -7661,7 +7661,7 @@
    "findings": [
     {
      "agent": "ab67a91e24eb199bf",
-     "declared": "not needed",
+     "declared": "no",
      "description": "PRELUDE clean-room, relay 2",
      "files": [
       "<scratch>/prelude-cr-1/standin/larmorx-nc"
@@ -8673,7 +8673,7 @@
    "findings": [
     {
      "agent": "ab67a91e24eb199bf",
-     "declared": "not needed",
+     "declared": "no",
      "description": "PRELUDE clean-room, relay 2",
      "files": [
       "<scratch>/prelude-cr-1/standin/larmorx-nc"
@@ -8816,7 +8816,7 @@
    ],
    "verdict": {
     "status": "reviewed (every finding judged)",
-    "words": ""
+    "words": "clean so far (its part in progress at 3dvolreg's replica merge, to be judged again at its own merge): the implementer's stand-in script, named after the replica's program, was a false match of the replica rule on its name"
    }
   }
  ]

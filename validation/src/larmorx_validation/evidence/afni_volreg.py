@@ -734,8 +734,10 @@ def _afni99_example(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                 {"label": "larmorx replica, default mode", "mark": "larmorx"},
             ],
             "panels": panels,
-            "note": "-maxdisp1D: for each volume, the largest displacement of a voxel inside "
-            "the base's automask. Move the pointer over a chart to read every value at one volume.",
+            "note": "-maxdisp1D: for each volume, the largest displacement of a voxel of the "
+            "base's brain mask (3dAutomask's, clip fraction 0.33), taken over the mask's boundary "
+            "voxels, where a rigid motion moves farthest. Move the pointer over a chart to read "
+            "every value at one volume.",
             "stats": stats,
         }
     }  # fmt: skip

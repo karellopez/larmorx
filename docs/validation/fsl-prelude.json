@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "6321137536c7",
+  "larmorx_commit": "1ca117ed64eb",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -43,7 +43,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.277,
+   "seconds": 0.289,
    "status": "pass"
   },
   {
@@ -60,7 +60,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.316,
+   "seconds": 0.295,
    "status": "pass"
   },
   {
@@ -77,7 +77,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.266,
+   "seconds": 0.298,
    "status": "pass"
   },
   {
@@ -94,7 +94,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.18,
+   "seconds": 0.273,
    "status": "pass"
   },
   {
@@ -111,7 +111,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.193,
+   "seconds": 0.275,
    "status": "pass"
   },
   {
@@ -128,7 +128,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.804,
+   "seconds": 0.88,
    "status": "pass"
   },
   {
@@ -145,7 +145,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
    },
-   "seconds": 0.485,
+   "seconds": 0.565,
    "status": "pass"
   },
   {
@@ -161,7 +161,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.093,
+   "seconds": 0.152,
    "status": "pass"
   },
   {
@@ -177,7 +177,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -193,7 +193,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -209,7 +209,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.119,
+   "seconds": 0.123,
    "status": "pass"
   },
   {
@@ -225,7 +225,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.101,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -241,7 +241,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -257,7 +257,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -273,7 +273,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -289,7 +289,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -305,7 +305,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.09,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -321,7 +321,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.095,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -337,7 +337,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -353,7 +353,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -369,7 +369,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -385,7 +385,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -401,7 +401,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.103,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -417,7 +417,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -433,7 +433,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.099,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -449,7 +449,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.094,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -465,7 +465,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -481,7 +481,7 @@
    "reported": {
     "D13 fix pass": 103680
    },
-   "seconds": 0.148,
+   "seconds": 0.159,
    "status": "pass"
   },
   {
@@ -497,7 +497,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.103,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -513,7 +513,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.101,
+   "seconds": 0.107,
    "status": "pass"
   },
   {
@@ -529,7 +529,7 @@
    "reported": {
     "D13 fix pass": 15750
    },
-   "seconds": 0.093,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -545,7 +545,7 @@
    "reported": {
     "D13 fix pass": 11860
    },
-   "seconds": 0.089,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -561,7 +561,7 @@
    "reported": {
     "D13 fix pass": 4348
    },
-   "seconds": 0.089,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -577,7 +577,7 @@
    "reported": {
     "D13 fix pass": 1125
    },
-   "seconds": 0.079,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -593,7 +593,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.08,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -609,7 +609,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.101,
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -625,7 +625,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.084,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -641,7 +641,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.104,
    "status": "pass"
   },
   {
@@ -657,7 +657,7 @@
    "reported": {
     "D13 fix pass": 3996
    },
-   "seconds": 0.086,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -673,7 +673,7 @@
    "reported": {
     "D13 fix pass": 29140
    },
-   "seconds": 0.09,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -687,7 +687,7 @@
     "D13 fix pass": 11860,
     "every file bit-identical": "1/2"
    },
-   "seconds": 0.085,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -700,7 +700,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -713,7 +713,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -729,7 +729,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.089,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -745,7 +745,7 @@
    "reported": {
     "D13 fix pass": 11859
    },
-   "seconds": 0.085,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -761,7 +761,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -777,7 +777,7 @@
    "reported": {
     "D13 fix pass": 4170
    },
-   "seconds": 0.085,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -793,7 +793,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.081,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -809,7 +809,7 @@
    "reported": {
     "D13 fix pass": 3
    },
-   "seconds": 0.087,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -825,7 +825,7 @@
    "reported": {
     "D13 fix pass": 2608
    },
-   "seconds": 0.086,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -841,7 +841,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -857,7 +857,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -873,7 +873,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.084,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -889,7 +889,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -905,7 +905,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.094,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -921,7 +921,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -934,7 +934,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. FTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2",
-   "seconds": 0.044,
+   "seconds": 0.047,
    "status": "both-error"
   },
   {
@@ -950,7 +950,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.1,
    "status": "pass"
   },
   {
@@ -966,7 +966,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -982,7 +982,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.122,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -998,7 +998,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.141,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -1014,7 +1014,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.179,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -1030,7 +1030,7 @@
    "reported": {
     "D13 fix pass": 8568
    },
-   "seconds": 0.255,
+   "seconds": 0.292,
    "status": "pass"
   },
   {
@@ -1043,7 +1043,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 255; the same from the original. ERROR: input phase image exceeds allowable phase range. Allowable range is 6.283 radians. Image range is: 8188 radians. Aborting.",
-   "seconds": 0.05,
+   "seconds": 0.056,
    "status": "both-error"
   },
   {
@@ -1069,7 +1069,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "prelude exits 1; the same from the original. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
-   "seconds": 0.034,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1082,7 +1082,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
-   "seconds": 0.038,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -1095,7 +1095,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "prelude exits 1; the same from the original.  the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Cannot specify both --complex AND --phase or --abs.",
-   "seconds": 0.042,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -1108,7 +1108,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "prelude exits 1; the same from the original. saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Both --phase AND --abs must be used together.",
-   "seconds": 0.036,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1121,7 +1121,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "prelude exits 1; the same from the original. saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Both --phase AND --abs must be used together.",
-   "seconds": 0.036,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -1134,7 +1134,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. ing the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Always set --numphasesplit greater than 1. NOT 1",
-   "seconds": 0.038,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -1147,7 +1147,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. s filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --bogus: Option doesn't exist!",
-   "seconds": 0.038,
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
@@ -1160,7 +1160,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. ame for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message -n: Couldn't set_value! valstr=\"abc\"!",
-   "seconds": 0.039,
+   "seconds": 0.043,
    "status": "both-error"
   },
   {
@@ -1173,7 +1173,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message extra: is an unrecognised token!",
-   "seconds": 0.045,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -1186,7 +1186,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "prelude exits -6; the same from the original. ead volume nothere Error : No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume nothere Error : No image files match: nothere",
-   "seconds": 0.063,
+   "seconds": 0.071,
    "status": "both-error"
   },
   {
@@ -1199,7 +1199,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "prelude exits -6; the same from the original. e Exception : #22 :: Failed to read volume Error : No image files match: terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume Error : No image files match:",
-   "seconds": 0.057,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1212,7 +1212,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "prelude exits 1; the same from the original. for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --complex: Missing non-optional argument!",
-   "seconds": 0.034,
+   "seconds": 0.045,
    "status": "both-error"
   },
   {
@@ -1225,7 +1225,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 255; the same from the original. ERROR: input phase image exceeds allowable phase range. Allowable range is 6.283 radians. Image range is: 14.1372 radians. Aborting.",
-   "seconds": 0.044,
+   "seconds": 0.062,
    "status": "both-error"
   },
   {
@@ -1238,7 +1238,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits 1; the same from the original. e for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --start: Missing non-optional argument!",
-   "seconds": 0.043,
+   "seconds": 0.053,
    "status": "both-error"
   },
   {
@@ -1251,7 +1251,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.072,
+   "seconds": 0.077,
    "status": "both-error"
   },
   {
@@ -1264,7 +1264,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.069,
+   "seconds": 0.094,
    "status": "both-error"
   },
   {
@@ -1277,7 +1277,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
-   "seconds": 0.069,
+   "seconds": 0.089,
    "status": "both-error"
   },
   {
@@ -1290,7 +1290,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "",
-   "seconds": 0.091,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -1303,7 +1303,7 @@
     "every file bit-identical": "4/4"
    },
    "reason": "",
-   "seconds": 0.085,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -1316,7 +1316,7 @@
     "every file bit-identical": "4/4"
    },
    "reason": "",
-   "seconds": 0.085,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -1329,7 +1329,7 @@
     "every file bit-identical": "5/5"
    },
    "reason": "",
-   "seconds": 0.092,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -1345,7 +1345,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.094,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -1361,7 +1361,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.108,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -1371,7 +1371,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -1381,7 +1381,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1391,7 +1391,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1401,7 +1401,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1411,7 +1411,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1421,7 +1421,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1431,7 +1431,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1441,7 +1441,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -1451,7 +1451,7 @@
    "checks_total": 21,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1461,7 +1461,7 @@
    "checks_total": 25,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1471,7 +1471,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1481,7 +1481,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -1491,7 +1491,7 @@
    "checks_total": 28,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -1501,7 +1501,7 @@
    "checks_total": 28,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1511,7 +1511,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1521,7 +1521,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.077,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1531,7 +1531,7 @@
    "checks_total": 16,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1541,7 +1541,7 @@
    "checks_total": 21,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1551,7 +1551,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.075,
    "status": "pass"
   },
   {
@@ -1561,7 +1561,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.071,
    "status": "pass"
   },
   {
@@ -1571,7 +1571,7 @@
    "checks_total": 20,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1581,7 +1581,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -1591,7 +1591,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.082,
    "status": "pass"
   },
   {
@@ -1601,7 +1601,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1611,7 +1611,7 @@
    "checks_total": 25,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -1621,7 +1621,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1631,7 +1631,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -1641,7 +1641,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.073,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -1651,7 +1651,7 @@
    "checks_total": 26,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.089,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1661,7 +1661,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -1671,7 +1671,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.083,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -1681,7 +1681,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.089,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -1700,7 +1700,7 @@
     }
    ],
    "reason": "both stop (exit -6):   what():  Invalid t index in [] operator",
-   "seconds": 0.099,
+   "seconds": 0.108,
    "status": "both-error"
   },
   {
@@ -1717,7 +1717,7 @@
     "default against the replica's: lab.nii.gz (labels; GLIBC-07)": 0,
     "default against the replica's: raw.nii.gz (raw phase; GLIBC-07)": 282
    },
-   "seconds": 0.086,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -1730,7 +1730,7 @@
     "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
    },
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -1746,7 +1746,7 @@
    "reported": {
     "reproduce: values not compared": null
    },
-   "seconds": 0.092,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -1759,7 +1759,7 @@
    "reported": {
     "reproduce: values not compared": null
    },
-   "seconds": 0.086,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1772,7 +1772,7 @@
    "reported": {
     "reproduce: values not compared": null
    },
-   "seconds": 0.081,
+   "seconds": 0.091,
    "status": "pass"
   },
   {
@@ -1782,7 +1782,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1792,7 +1792,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1802,7 +1802,7 @@
    "checks_total": 14,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1812,7 +1812,7 @@
    "checks_total": 26,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.085,
+   "seconds": 0.092,
    "status": "pass"
   },
   {
@@ -1822,7 +1822,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.086,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1832,7 +1832,7 @@
    "checks_total": 21,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.079,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -1842,7 +1842,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -1852,7 +1852,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1868,7 +1868,7 @@
    "reported": {
     "default against the replica's: raw.nii.gz (raw phase; GLIBC-07)": 564
    },
-   "seconds": 0.075,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1881,7 +1881,7 @@
     "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
    },
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1891,7 +1891,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -1901,7 +1901,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -1911,7 +1911,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.078,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -1921,7 +1921,7 @@
    "checks_total": 13,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.071,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -1931,7 +1931,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.074,
+   "seconds": 0.085,
    "status": "pass"
   },
   {
@@ -1941,7 +1941,7 @@
    "checks_total": 26,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.08,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -1951,7 +1951,7 @@
    "checks_total": 18,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.072,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -1961,7 +1961,7 @@
    "checks_total": 20,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1971,7 +1971,7 @@
    "checks_total": 12,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.076,
+   "seconds": 0.093,
    "status": "pass"
   },
   {
@@ -1990,7 +1990,7 @@
     }
    ],
    "reason": "both stop (exit -6):   what():  Invalid t index in [] operator",
-   "seconds": 0.087,
+   "seconds": 0.098,
    "status": "both-error"
   },
   {
@@ -2009,7 +2009,7 @@
     }
    ],
    "reason": "both stop (exit -6):   what():  Fslread: DT 32 not supported",
-   "seconds": 0.088,
+   "seconds": 0.093,
    "status": "both-error"
   },
   {
@@ -2028,7 +2028,7 @@
     }
    ],
    "reason": "both stop (exit -6):   what():  Fslread: DT 32 not supported",
-   "seconds": 0.077,
+   "seconds": 0.091,
    "status": "both-error"
   },
   {
@@ -2038,7 +2038,7 @@
    "checks_total": 9,
    "failed_checks": [],
    "reason": "both stop (exit 255): Aborting.",
-   "seconds": 0.066,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -2057,7 +2057,7 @@
     }
    ],
    "reason": "both stop (exit -6):   what():  Error: cant open file nodir/o.nii.gz",
-   "seconds": 0.081,
+   "seconds": 0.093,
    "status": "both-error"
   },
   {
@@ -2067,7 +2067,7 @@
    "checks_total": 25,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.075,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -2077,7 +2077,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -2087,7 +2087,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.096,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -2097,7 +2097,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.088,
+   "seconds": 0.102,
    "status": "pass"
   },
   {
@@ -2107,7 +2107,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.07,
+   "seconds": 0.084,
    "status": "pass"
   },
   {
@@ -2117,7 +2117,7 @@
    "checks_total": 17,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.083,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -2136,7 +2136,7 @@
     }
    ],
    "reason": "both stop (exit 1): e.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"",
-   "seconds": 0.07,
+   "seconds": 0.079,
    "status": "both-error"
   },
   {
@@ -2155,7 +2155,7 @@
     }
    ],
    "reason": "both stop (exit 1): Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_",
-   "seconds": 0.071,
+   "seconds": 0.077,
    "status": "both-error"
   },
   {
@@ -2165,7 +2165,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.38,
+   "seconds": 0.394,
    "status": "pass"
   },
   {
@@ -2175,7 +2175,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.379,
+   "seconds": 0.396,
    "status": "pass"
   },
   {
@@ -2185,7 +2185,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.369,
+   "seconds": 0.376,
    "status": "pass"
   },
   {
@@ -2195,7 +2195,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.349,
+   "seconds": 0.352,
    "status": "pass"
   },
   {
@@ -2205,7 +2205,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.363,
+   "seconds": 0.371,
    "status": "pass"
   },
   {
@@ -2215,7 +2215,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 1.286,
+   "seconds": 1.241,
    "status": "pass"
   },
   {
@@ -2225,7 +2225,7 @@
    "checks_total": 15,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.815,
+   "seconds": 0.786,
    "status": "pass"
   },
   {
@@ -2241,7 +2241,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.081,
    "status": "pass"
   }
  ],

@@ -46,19 +46,34 @@ def phantom(shape=(40, 44, 24), seed=7) -> np.ndarray:
     for _ in range(14):
         px, py, pz = rng.uniform(0.3, 0.7, 3) * (nx, ny, nz)
         s = rng.uniform(1.5, 3.5)
-        v += rng.uniform(-200, 400) * np.exp(-((x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2) / (2 * s * s)) * (r < 1)
+        v += (
+            rng.uniform(-200, 400)
+            * np.exp(-((x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2) / (2 * s * s))
+            * (r < 1)
+        )
     return ndimage.gaussian_filter(v, 0.8)
 
 
-def moving_series(path: Path, *, n=5, deg=0.6, shift=(0.3, -0.2, 0.15), affine=None, dtype=np.float32,
-                  shape=(40, 44, 24), voxel=(3.0, 3.0, 3.5)) -> None:
+def moving_series(
+    path: Path,
+    *,
+    n=5,
+    deg=0.6,
+    shift=(0.3, -0.2, 0.15),
+    affine=None,
+    dtype=np.float32,
+    shape=(40, 44, 24),
+    voxel=(3.0, 3.0, 3.5),
+) -> None:
     base = phantom(shape)
     vols = []
     c = (np.array(shape) - 1) / 2
     for k in range(n):
         a = np.deg2rad(deg * k)
         R = np.array([[np.cos(a), -np.sin(a), 0], [np.sin(a), np.cos(a), 0], [0, 0, 1.0]])
-        R = R @ np.array([[1, 0, 0], [0, np.cos(a / 3), -np.sin(a / 3)], [0, np.sin(a / 3), np.cos(a / 3)]])
+        R = R @ np.array(
+            [[1, 0, 0], [0, np.cos(a / 3), -np.sin(a / 3)], [0, np.sin(a / 3), np.cos(a / 3)]]
+        )
         off = c - R @ c - np.array(shift) * k
         vols.append(ndimage.affine_transform(base, R, offset=off, order=3))
     data = np.stack(vols, axis=3)
@@ -93,11 +108,21 @@ CASES = {
     "ras-int16": ("syn-ras-int16", (), {}),
     "ras-int16-fmriprep": ("syn-ras-int16", FMRIPREP, {"method": "fourier", "twopass": True}),
     # AFNI reads -nocoarserot as -noclip (AFNI-86): the clipping off, the rotation search on
-    "nocoarserot-cubic": ("syn", ("-cubic", "-twopass", "-nocoarserot", "-nomaxdisp"),
-                          {"method": "cubic", "twopass": True, "clip": False, "maxdisp": False}),
-    "shift-only-cubic": ("syn", ("-cubic", "-twopass", "-coarse", "2", "1", "-nomaxdisp"),
-                         {"method": "cubic", "twopass": True, "coarse_del": 2, "coarse_num": 1, "maxdisp": False}),
-    "ds000005-fmriprep": ("ds000005-run-01_sliced.nii.gz", FMRIPREP, {"method": "fourier", "twopass": True}),
+    "nocoarserot-cubic": (
+        "syn",
+        ("-cubic", "-twopass", "-nocoarserot", "-nomaxdisp"),
+        {"method": "cubic", "twopass": True, "clip": False, "maxdisp": False},
+    ),
+    "shift-only-cubic": (
+        "syn",
+        ("-cubic", "-twopass", "-coarse", "2", "1", "-nomaxdisp"),
+        {"method": "cubic", "twopass": True, "coarse_del": 2, "coarse_num": 1, "maxdisp": False},
+    ),
+    "ds000005-fmriprep": (
+        "ds000005-run-01_sliced.nii.gz",
+        FMRIPREP,
+        {"method": "fourier", "twopass": True},
+    ),
     "ds000005-heptic": ("ds000005-run-01_sliced.nii.gz", (), {}),
 }
 
@@ -119,12 +144,34 @@ def make_input(kind: str, d: Path) -> Path:
 
 
 def run_afni(inp: Path, opts, d: Path) -> float:
-    env = {"HOME": str(d), "PATH": "/usr/bin:/bin", "AFNI_DONT_LOGFILE": "YES", "AFNI_NIFTI_TYPE_WARN": "NO"}
+    env = {
+        "HOME": str(d),
+        "PATH": "/usr/bin:/bin",
+        "AFNI_DONT_LOGFILE": "YES",
+        "AFNI_NIFTI_TYPE_WARN": "NO",
+    }
     for f in ("a.nii", "a.1D", "a.aff12.1D", "a_md.1D", "a_md_delt.1D"):
         (d / f).unlink(missing_ok=True)
     t = time.time()
-    p = subprocess.run([str(AFNI), *opts, "-prefix", "a.nii", "-1Dfile", "a.1D", "-1Dmatrix_save", "a",
-                        "-maxdisp1D", "a_md.1D", str(inp)], cwd=d, env=env, capture_output=True, text=True)
+    p = subprocess.run(
+        [
+            str(AFNI),
+            *opts,
+            "-prefix",
+            "a.nii",
+            "-1Dfile",
+            "a.1D",
+            "-1Dmatrix_save",
+            "a",
+            "-maxdisp1D",
+            "a_md.1D",
+            str(inp),
+        ],
+        cwd=d,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
     if p.returncode != 0:
         raise RuntimeError(p.stderr[-500:])
     return time.time() - t
@@ -148,18 +195,18 @@ def check(name: str, work: Path) -> str:
     M.write_1d(res, d / "m.1D")
     M.write_matrices(res, d / "m.aff12.1D")
     a1, m1 = lines(d / "a.1D"), lines(d / "m.1D")
-    same1 = sum(x == y for x, y in zip(a1, m1))
+    same1 = sum(x == y for x, y in zip(a1, m1, strict=False))
     pa = np.array([[float(v) for v in x.split()] for x in a1])
     pm = np.array([[float(v) for v in x.split()] for x in m1])
     dpar = float(np.max(np.abs(pa - pm)))
     am, mm = lines(d / "a.aff12.1D"), lines(d / "m.aff12.1D")
-    samem = sum(x == y for x, y in zip(am, mm))
+    samem = sum(x == y for x, y in zip(am, mm, strict=False))
     md = ""
     if (d / "a_md.1D").exists() and res.maxdisp:
         amd = [float(x) for x in lines(d / "a_md.1D")]
-        same_md = sum(abs(x - y) < 5e-4 for x, y in zip(amd, res.maxdisp))
+        same_md = sum(abs(x - y) < 5e-4 for x, y in zip(amd, res.maxdisp, strict=False))
         ade = [float(x) for x in lines(d / "a_md_delt.1D")]
-        same_de = sum(abs(x - y) < 5e-4 for x, y in zip(ade, res.maxdelta))
+        same_de = sum(abs(x - y) < 5e-4 for x, y in zip(ade, res.maxdelta, strict=False))
         md = f" maxdisp {same_md}/{len(amd)} delta {same_de}/{len(ade)}"
     ad = np.asarray(nib.load(d / "a.nii").dataobj).astype(np.float64)
     mdat = np.stack([v.transpose(2, 1, 0) for v in res.registered], axis=3).astype(np.float64)
@@ -167,8 +214,10 @@ def check(name: str, work: Path) -> str:
         ad = ad[..., None]
     rel = float(np.max(np.abs(ad - mdat)) / max(np.max(np.abs(ad)), 1e-30))
     bits = int(np.sum(ad == mdat))
-    return (f"{name}: 1Dfile {same1}/{len(a1)} identical (max |diff| {dpar:.4g}); matrices {samem}/{len(am)};"
-            f"{md}; volumes max rel diff {rel:.3g}, {bits}/{ad.size} voxels identical; AFNI {ta:.1f} s, model {tm:.1f} s")
+    return (
+        f"{name}: 1Dfile {same1}/{len(a1)} identical (max |diff| {dpar:.4g}); matrices {samem}/{len(am)};"
+        f"{md}; volumes max rel diff {rel:.3g}, {bits}/{ad.size} voxels identical; AFNI {ta:.1f} s, model {tm:.1f} s"
+    )
 
 
 def main() -> int:
@@ -177,7 +226,7 @@ def main() -> int:
     for n in names:
         try:
             print(check(n, work), flush=True)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"{n}: ERROR {type(e).__name__}: {e}", flush=True)
     return 0
 

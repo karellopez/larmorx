@@ -31,7 +31,14 @@ PI = math.pi
 # §4.1 AFNI's grid
 
 #: Orientation names; the DICOM coordinate each runs along and its sign.
-ORIENT = {"R2L": (0, +1), "L2R": (0, -1), "P2A": (1, -1), "A2P": (1, +1), "I2S": (2, +1), "S2I": (2, -1)}
+ORIENT = {
+    "R2L": (0, +1),
+    "L2R": (0, -1),
+    "P2A": (1, -1),
+    "A2P": (1, +1),
+    "I2S": (2, +1),
+    "S2I": (2, -1),
+}
 FROM = {"R2L": "R", "L2R": "L", "P2A": "P", "A2P": "A", "I2S": "I", "S2I": "S"}
 TO = {"R2L": "L", "L2R": "R", "P2A": "A", "A2P": "P", "I2S": "S", "S2I": "I"}
 
@@ -74,20 +81,23 @@ class Grid:
     def to_dicom(self, u):
         out = [F32(0)] * 3
         for n, o in enumerate(self.orient):
-            c, s = ORIENT[o]
-            out[c] = F32(u[n]) if s > 0 else F32(u[n])  # coordinates are already DICOM-signed
+            c, _ = ORIENT[o]
+            out[c] = F32(u[n])  # a permutation: the coordinates are already DICOM-valued
         return np.array(out, F32)
 
     def centre(self) -> np.ndarray:
         """THE centre of §4.1: 0.5f*(first + last), DICOM order, float32."""
         a = self.org.astype(F32)
-        b = np.array([F32(self.org[n] + F32(F32(self.n[n] - 1) * self.step[n])) for n in range(3)], F32)
+        b = np.array(
+            [F32(self.org[n] + F32(F32(self.n[n] - 1) * self.step[n])) for n in range(3)], F32
+        )
         a, b = self.to_dicom(a), self.to_dicom(b)
         return (F32(0.5) * (a + b)).astype(F32)
 
     def axis_centre(self) -> np.ndarray:
         return np.array(
-            [F32(F64(self.org[n]) + 0.5 * (self.n[n] - 1) * F64(self.step[n])) for n in range(3)], F32
+            [F32(F64(self.org[n]) + 0.5 * (self.n[n] - 1) * F64(self.step[n])) for n in range(3)],
+            F32,
         )
 
 
@@ -116,7 +126,9 @@ def read_grid(img) -> Grid:
         c, s = ORIENT[o]
         step.append(F32(size[n] if s > 0 else -size[n]))
         org.append(F32(m[2, 3] if c == 2 else -m[c, 3]))
-    return Grid(tuple(int(x) for x in img.shape[:3]), tuple(names), np.array(step, F32), np.array(org, F32))
+    return Grid(
+        tuple(int(x) for x in img.shape[:3]), tuple(names), np.array(step, F32), np.array(org, F32)
+    )
 
 
 def read_volumes(img) -> tuple[list[np.ndarray], str]:
@@ -131,7 +143,9 @@ def read_volumes(img) -> tuple[list[np.ndarray], str]:
         raw = raw[..., None]
     dt = raw.dtype
     factor = None
-    if dt in (np.dtype("uint8"), np.dtype("int16"), np.dtype("float32")) and not (slope != 0 and inter != 0):
+    if dt in (np.dtype("uint8"), np.dtype("int16"), np.dtype("float32")) and not (
+        slope != 0 and inter != 0
+    ):
         kind = {np.dtype("uint8"): "byte", np.dtype("int16"): "short"}.get(dt, "float")
         if slope not in (0.0, 1.0):
             factor = F32(slope)
@@ -241,7 +255,12 @@ def shear_best(Q, d):
     tr = Q[0, 0] + Q[1, 1] + Q[2, 2]
     es = abs(Q[0, 1]) + abs(Q[0, 2]) + abs(Q[1, 0]) + abs(Q[1, 2]) + abs(Q[2, 0]) + abs(Q[2, 1])
     if tr >= 2.99999 and es / tr < 1e-6:
-        return [Shear(0, (0, 0, 0), 0.0), Shear(1, (0, 0, 0), d[1]), Shear(2, (0, 0, 0), d[2]), Shear(0, (0, 0, 0), d[0])]
+        return [
+            Shear(0, (0, 0, 0), 0.0),
+            Shear(1, (0, 0, 0), d[1]),
+            Shear(2, (0, 0, 0), d[2]),
+            Shear(0, (0, 0, 0), d[0]),
+        ]
     best, bestn = None, 1e38
     for o in ORDERS:
         q = np.array([[Q[o[m], o[n]] for n in range(3)] for m in range(3)])
@@ -304,38 +323,50 @@ def _weights(method, x):
     if method == "linear":
         return [(1.0 - X).astype(F32), x.astype(F32)], [0, 1]
     if method == "cubic":
-        w = [X * (1.0 - X) * (X - 2.0) * 0.1666667, (X + 1.0) * (X - 1.0) * (X - 2.0) * 0.5,
-             X * (X + 1.0) * (2.0 - X) * 0.5, X * (X + 1.0) * (X - 1.0) * 0.1666667]
+        w = [
+            X * (1.0 - X) * (X - 2.0) * 0.1666667,
+            (X + 1.0) * (X - 1.0) * (X - 2.0) * 0.5,
+            X * (X + 1.0) * (2.0 - X) * 0.5,
+            X * (X + 1.0) * (X - 1.0) * 0.1666667,
+        ]
         return [v.astype(F32) for v in w], [-1, 0, 1, 2]
     if method == "quintic":
-        w = [X * (XX - 1.0) * (2.0 - X) * (X - 3.0) * 0.008333333,
-             X * (XX - 4.0) * (X - 1.0) * (X - 3.0) * 0.041666667,
-             (XX - 4.0) * (XX - 1.0) * (3.0 - X) * 0.083333333,
-             X * (XX - 4.0) * (X + 1.0) * (X - 3.0) * 0.083333333,
-             X * (XX - 1.0) * (X + 2.0) * (3.0 - X) * 0.041666667,
-             X * (XX - 1.0) * (XX - 4.0) * 0.008333333]
+        w = [
+            X * (XX - 1.0) * (2.0 - X) * (X - 3.0) * 0.008333333,
+            X * (XX - 4.0) * (X - 1.0) * (X - 3.0) * 0.041666667,
+            (XX - 4.0) * (XX - 1.0) * (3.0 - X) * 0.083333333,
+            X * (XX - 4.0) * (X + 1.0) * (X - 3.0) * 0.083333333,
+            X * (XX - 1.0) * (X + 2.0) * (3.0 - X) * 0.041666667,
+            X * (XX - 1.0) * (XX - 4.0) * 0.008333333,
+        ]
         return [v.astype(F32) for v in w], [-2, -1, 0, 1, 2, 3]
     if method == "heptic":
-        w = [X * (XX - 1.0) * (XX - 4.0) * (X - 3.0) * (4.0 - X) * 0.0001984126984,
-             X * (XX - 1.0) * (X - 2.0) * (XX - 9.0) * (X - 4.0) * 0.001388888889,
-             X * (X - 1.0) * (XX - 4.0) * (XX - 9.0) * (4.0 - X) * 0.004166666667,
-             (XX - 1.0) * (XX - 4.0) * (XX - 9.0) * (X - 4.0) * 0.006944444444,
-             X * (X + 1.0) * (XX - 4.0) * (XX - 9.0) * (4.0 - X) * 0.006944444444,
-             X * (XX - 1.0) * (X + 2.0) * (XX - 9.0) * (X - 4.0) * 0.004166666667,
-             X * (XX - 1.0) * (XX - 4.0) * (X + 3.0) * (4.0 - X) * 0.001388888889,
-             X * (XX - 1.0) * (XX - 4.0) * (XX - 9.0) * 0.0001984126984]
+        w = [
+            X * (XX - 1.0) * (XX - 4.0) * (X - 3.0) * (4.0 - X) * 0.0001984126984,
+            X * (XX - 1.0) * (X - 2.0) * (XX - 9.0) * (X - 4.0) * 0.001388888889,
+            X * (X - 1.0) * (XX - 4.0) * (XX - 9.0) * (4.0 - X) * 0.004166666667,
+            (XX - 1.0) * (XX - 4.0) * (XX - 9.0) * (X - 4.0) * 0.006944444444,
+            X * (X + 1.0) * (XX - 4.0) * (XX - 9.0) * (4.0 - X) * 0.006944444444,
+            X * (XX - 1.0) * (X + 2.0) * (XX - 9.0) * (X - 4.0) * 0.004166666667,
+            X * (XX - 1.0) * (XX - 4.0) * (X + 3.0) * (4.0 - X) * 0.001388888889,
+            X * (XX - 1.0) * (XX - 4.0) * (XX - 9.0) * 0.0001984126984,
+        ]
         return [v.astype(F32) for v in w], [-3, -2, -1, 0, 1, 2, 3, 4]
     raise ValueError(method)
 
 
 #: The order of the terms in the sums (§5.6).
-SUM_ORDER = {"linear": [0, 1], "cubic": [-1, 0, 1, 2], "quintic": [-2, -1, 0, 1, 2, 3],
-             "heptic": [-2, -1, 0, 1, 2, 3, -3, 4]}
+SUM_ORDER = {
+    "linear": [0, 1],
+    "cubic": [-1, 0, 1, 2],
+    "quintic": [-2, -1, 0, 1, 2, 3],
+    "heptic": [-2, -1, 0, 1, 2, 3, -3, 4],
+}
 
 
 def shift_rows_poly(rows: np.ndarray, alpha: np.ndarray, method: str) -> np.ndarray:
     """§5.6 for NN and the polynomial methods; rows (m, n) float32, alpha (m,) float32."""
-    m, n = rows.shape
+    n = rows.shape[1]
     beta = (-alpha).astype(F32)
     ia = _floor_ia(beta.astype(F64))
     x = (beta - ia.astype(F32)).astype(F32)
@@ -350,7 +381,7 @@ def shift_rows_poly(rows: np.ndarray, alpha: np.ndarray, method: str) -> np.ndar
         out = np.where(valid & ok[:, None], g, F32(0)).astype(F32)
         return out
     w, ks = _weights(method, x)
-    wk = dict(zip(ks, w))
+    wk = dict(zip(ks, w, strict=True))
     kmin, kmax = min(ks), max(ks)
     interior = (base + kmin >= 0) & (base + kmax <= n - 1)
     samp = {}
@@ -478,7 +509,7 @@ def apply_shear(v: np.ndarray, sh: Shear, method: str) -> np.ndarray:
             if ax == 0:
                 ag1 = (af1 + a).astype(F32)
             else:
-                ag1 = (a0[:, j - 1] if j >= 2 else np.zeros(n1, F32))
+                ag1 = a0[:, j - 1] if j >= 2 else np.zeros(n1, F32)
             of, _ = fourier_pairs(f1, np.zeros_like(f1), af1, ag1, L, True)
             out[:, j, :] = of
     inv = np.argsort(perm)
@@ -547,7 +578,7 @@ def fir_blur_axis(v: np.ndarray, a: int, w: np.ndarray, wide512: bool = False) -
     if n < m + 1:
         return v
     x = np.moveaxis(v, ax, -1)
-    ext = np.zeros(x.shape[:-1] + (n + 2 * m,), F32)
+    ext = np.zeros((*x.shape[:-1], n + 2 * m), F32)
     ext[..., m : m + n] = x
     if a == 1 and wide512:
         ext[..., m - 1] = x[..., 1]
@@ -563,13 +594,17 @@ def fir_blur_axis(v: np.ndarray, a: int, w: np.ndarray, wide512: bool = False) -
     if m <= 7:
         acc = None
         for q in range(m, 0, -1):
-            t = (w[q] * (ext[..., m - q : m - q + n] + ext[..., m + q : m + q + n]).astype(F32)).astype(F32)
+            t = (
+                w[q] * (ext[..., m - q : m - q + n] + ext[..., m + q : m + q + n]).astype(F32)
+            ).astype(F32)
             acc = t if acc is None else (acc + t).astype(F32)
         acc = (acc + (w[0] * c).astype(F32)).astype(F32)
     else:
         acc = (w[0] * c).astype(F32)
         for q in range(1, m + 1):
-            t = (w[q] * (ext[..., m - q : m - q + n] + ext[..., m + q : m + q + n]).astype(F32)).astype(F32)
+            t = (
+                w[q] * (ext[..., m - q : m - q + n] + ext[..., m + q : m + q + n]).astype(F32)
+            ).astype(F32)
             acc = (acc + t).astype(F32)
     return np.ascontiguousarray(np.moveaxis(acc, -1, ax)).astype(F32)
 
@@ -690,7 +725,7 @@ class Settings:
 
 @dataclass
 class State:
-    sinit: F32 = F32(1)
+    sinit: F32 = field(default_factory=lambda: F32(1))
     clfrac: float = 0.333
     log: list = field(default_factory=list)
 
@@ -786,8 +821,9 @@ class Basis:
             good = True
         else:
             fit = self.lsq(y)
-            good = (any(10.0 * abs(F64(fit[1 + p])) > phi_t for p in range(3))
-                    or any(10.0 * abs(F64(fit[4 + n])) > dt[n] for n in range(3)))
+            good = any(10.0 * abs(F64(fit[1 + p])) > phi_t for p in range(3)) or any(
+                10.0 * abs(F64(fit[4 + n])) > dt[n] for n in range(3)
+            )
         it = 0
         while good:
             th = [F32(F64(fit[1 + p]) * (PI / 180.0)) for p in range(3)]
@@ -795,8 +831,10 @@ class Basis:
             df = self.lsq(t)
             fit[1:] = (fit[1:] + df[1:]).astype(F32)
             it += 1
-            good = it < maxite and (any(abs(F64(df[1 + p])) > phi_t for p in range(3))
-                                    or any(abs(F64(df[4 + n])) > dt[n] for n in range(3)))
+            good = it < maxite and (
+                any(abs(F64(df[1 + p])) > phi_t for p in range(3))
+                or any(abs(F64(df[4 + n])) > dt[n] for n in range(3))
+            )
         th = [F32(F64(fit[1 + p]) * (PI / 180.0)) for p in range(3)]
         out = None
         if final is not None:
@@ -859,9 +897,11 @@ def shiftrot_search(grid: Grid, B, V, dl, num, delta, zpad, st: State):
     sub = nx >= 120 and ny >= 120 and nz >= 120
     one = (F32(1), F32(1), F32(1))
     if sub:
+
         def half(x):
             t = blur(x, one, one, coarse=True)
             return np.ascontiguousarray(t[::2, ::2, ::2])
+
         B, V = half(B), half(V)
         dl = dl // 2
         delta = [F32(2 * d) for d in delta]
@@ -883,8 +923,14 @@ def shiftrot_search(grid: Grid, B, V, dl, num, delta, zpad, st: State):
                 if r == 0 and p == 0 and y == 0:
                     T = V
                 else:
-                    M = R3(axes[0], -(PI / 180.0) * (sig[0] * r), axes[1], -(PI / 180.0) * (sig[1] * p),
-                           axes[2], -(PI / 180.0) * (sig[2] * y))
+                    M = R3(
+                        axes[0],
+                        -(PI / 180.0) * (sig[0] * r),
+                        axes[1],
+                        -(PI / 180.0) * (sig[1] * p),
+                        axes[2],
+                        -(PI / 180.0) * (sig[2] * y),
+                    )
                     T = rotate_matrix(V, delta, M, [0.0, 0.0, 0.0], "nn", zpad)
                 s, sh = shift_search(B, T, W, dl, num)
                 if s < bsum:
@@ -963,8 +1009,10 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
         W1[boxs] = (W1[boxs] + shifted[boxs]).astype(F32)
         W1 = blur(W1, tb, one)
         clip = F32(0.025 * F64(W1.max()))
-        W1 = np.where(W1 < clip, F32(0), W1).astype(F32)
-        bas1 = Basis(B1, delta, axes, W1, edges, False, "linear", F32(s.twoblur * F32(s.dfac)), s.zpad, st)
+        W1 = np.where(clip > W1, F32(0), W1).astype(F32)
+        bas1 = Basis(
+            B1, delta, axes, W1, edges, False, "linear", F32(s.twoblur * F32(s.dfac)), s.zpad, st
+        )
         for k, v in enumerate(vols):
             if k == s.base_index or np.count_nonzero(v) < 66:
                 init[k] = [0.0] * 6
@@ -980,8 +1028,12 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
                     rot = (0.0, 0.0, 0.0)
             else:
                 rot, sh = (0.0, 0.0, 0.0), (0, 0, 0)
-            iv = [F32(rot[p] * sig[p]) for p in range(3)] + [F32(sh[n] * delta[n]) for n in range(3)]
-            th, dd, _, _ = bas1.register(Vk, iv, F32(s.twoblur * F32(s.x_t)), F32(s.twoblur * F32(s.phi_t)), maxite)
+            iv = [F32(rot[p] * sig[p]) for p in range(3)] + [
+                F32(sh[n] * delta[n]) for n in range(3)
+            ]
+            th, dd, _, _ = bas1.register(
+                Vk, iv, F32(s.twoblur * F32(s.x_t)), F32(s.twoblur * F32(s.phi_t)), maxite
+            )
             init[k] = [F32(F64(t) * (180.0 / PI)) for t in th] + dd
     bas = Basis(base, delta, axes, None, edges, False, s.method, F32(s.dfac), s.zpad, st)
     res = Result([], [], kind, [], [], [], [])
@@ -994,8 +1046,9 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
         elif np.count_nonzero(v) < 66:
             th, dd, out = [F32(0)] * 3, [F32(0)] * 3, v.copy()
         else:
-            th, dd, out, _ = bas.register(v, init[k] if s.twopass else None, F32(s.x_t), F32(s.phi_t),
-                                          maxite, final, s.clip)
+            th, dd, out, _ = bas.register(
+                v, init[k] if s.twopass else None, F32(s.x_t), F32(s.phi_t), maxite, final, s.clip
+            )
         ang = [F32(F64(t) * (180.0 / PI)) for t in th]
         rep_ang = [F32(ang[p]) if sig[p] > 0 else F32(-ang[p]) for p in range(3)]
         dS = dL = dP = F32(0)
@@ -1022,25 +1075,65 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
         ro = F32(math.sqrt(F64(F32(seqsum32(((base - v) ** 2).astype(F32)) / F32(n)))))
         res.rms.append((ro, rn))
         # §4.5 the matrices
-        Rm = R3(2, -(PI / 180.0) * F64(roll), 0, -(PI / 180.0) * F64(pitch), 1, -(PI / 180.0) * F64(yaw))
+        Rm = R3(
+            2, -(PI / 180.0) * F64(roll), 0, -(PI / 180.0) * F64(pitch), 1, -(PI / 180.0) * F64(yaw)
+        )
         t = np.array([dL, dP, dS], F32)
-        w = np.array([F32(Rm[i, 0] * F64(ci[0]) + Rm[i, 1] * F64(ci[1]) + Rm[i, 2] * F64(ci[2])) for i in range(3)], F32)
+        w = np.array(
+            [
+                F32(Rm[i, 0] * F64(ci[0]) + Rm[i, 1] * F64(ci[1]) + Rm[i, 2] * F64(ci[2]))
+                for i in range(3)
+            ],
+            F32,
+        )
         vv = np.array([F32(t[i] + F32(cb[i] - w[i])) for i in range(3)], F64)
         A = Rm
-        det = (A[0, 0] * A[1, 1] * A[2, 2] - A[0, 0] * A[1, 2] * A[2, 1] - A[1, 0] * A[0, 1] * A[2, 2]
-               + A[1, 0] * A[0, 2] * A[2, 1] + A[2, 0] * A[0, 1] * A[1, 2] - A[2, 0] * A[0, 2] * A[1, 1])
+        det = (
+            A[0, 0] * A[1, 1] * A[2, 2]
+            - A[0, 0] * A[1, 2] * A[2, 1]
+            - A[1, 0] * A[0, 1] * A[2, 2]
+            + A[1, 0] * A[0, 2] * A[2, 1]
+            + A[2, 0] * A[0, 1] * A[1, 2]
+            - A[2, 0] * A[0, 2] * A[1, 1]
+        )
         r = 1.0 / det
-        inv = np.array([
-            [(A[1, 1] * A[2, 2] - A[1, 2] * A[2, 1]) * r, (-A[0, 1] * A[2, 2] + A[0, 2] * A[2, 1]) * r,
-             (A[0, 1] * A[1, 2] - A[0, 2] * A[1, 1]) * r],
-            [(-A[1, 0] * A[2, 2] + A[1, 2] * A[2, 0]) * r, (A[0, 0] * A[2, 2] - A[0, 2] * A[2, 0]) * r,
-             (-A[0, 0] * A[1, 2] + A[0, 2] * A[1, 0]) * r],
-            [(A[1, 0] * A[2, 1] - A[1, 1] * A[2, 0]) * r, (-A[0, 0] * A[2, 1] + A[0, 1] * A[2, 0]) * r,
-             (A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]) * r]])
+        inv = np.array(
+            [
+                [
+                    (A[1, 1] * A[2, 2] - A[1, 2] * A[2, 1]) * r,
+                    (-A[0, 1] * A[2, 2] + A[0, 2] * A[2, 1]) * r,
+                    (A[0, 1] * A[1, 2] - A[0, 2] * A[1, 1]) * r,
+                ],
+                [
+                    (-A[1, 0] * A[2, 2] + A[1, 2] * A[2, 0]) * r,
+                    (A[0, 0] * A[2, 2] - A[0, 2] * A[2, 0]) * r,
+                    (-A[0, 0] * A[1, 2] + A[0, 2] * A[1, 0]) * r,
+                ],
+                [
+                    (A[1, 0] * A[2, 1] - A[1, 1] * A[2, 0]) * r,
+                    (-A[0, 0] * A[2, 1] + A[0, 1] * A[2, 0]) * r,
+                    (A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]) * r,
+                ],
+            ]
+        )
         u = matvec(inv, vv)
         u = -u
-        res.matrices.append([inv[0, 0], inv[0, 1], inv[0, 2], u[0], inv[1, 0], inv[1, 1], inv[1, 2], u[1],
-                             inv[2, 0], inv[2, 1], inv[2, 2], u[2]])
+        res.matrices.append(
+            [
+                inv[0, 0],
+                inv[0, 1],
+                inv[0, 2],
+                u[0],
+                inv[1, 0],
+                inv[1, 1],
+                inv[1, 2],
+                u[1],
+                inv[2, 0],
+                inv[2, 1],
+                inv[2, 2],
+                u[2],
+            ]
+        )
     # §8.4 / §8.8 maximum displacements
     if s.maxdisp:
         import larmorx as lx
@@ -1049,20 +1142,44 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
         m = np.asarray(r.mask.data if hasattr(r.mask, "data") else r.mask)
         m = np.ascontiguousarray(m.transpose(2, 1, 0)) != 0
         pad = np.pad(m, 1, constant_values=False)
-        inner = (pad[2:, 1:-1, 1:-1] & pad[:-2, 1:-1, 1:-1] & pad[1:-1, 2:, 1:-1] & pad[1:-1, :-2, 1:-1]
-                 & pad[1:-1, 1:-1, 2:] & pad[1:-1, 1:-1, :-2])
+        inner = (
+            pad[2:, 1:-1, 1:-1]
+            & pad[:-2, 1:-1, 1:-1]
+            & pad[1:-1, 2:, 1:-1]
+            & pad[1:-1, :-2, 1:-1]
+            & pad[1:-1, 1:-1, 2:]
+            & pad[1:-1, 1:-1, :-2]
+        )
         face = np.zeros_like(m)
-        face[0], face[-1], face[:, 0], face[:, -1], face[:, :, 0], face[:, :, -1] = True, True, True, True, True, True
+        face[0], face[-1], face[:, 0], face[:, -1], face[:, :, 0], face[:, :, -1] = (
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+        )
         edge = m & (~inner | face)
         ks, js, is_ = np.nonzero(edge)
-        X = np.stack([
-            (grid.org[0] + (is_.astype(F32) * grid.step[0]).astype(F32)).astype(F32),
-            (grid.org[1] + (js.astype(F32) * grid.step[1]).astype(F32)).astype(F32),
-            (grid.org[2] + (ks.astype(F32) * grid.step[2]).astype(F32)).astype(F32)], axis=1).astype(F64)
+        X = np.stack(
+            [
+                (grid.org[0] + (is_.astype(F32) * grid.step[0]).astype(F32)).astype(F32),
+                (grid.org[1] + (js.astype(F32) * grid.step[1]).astype(F32)).astype(F32),
+                (grid.org[2] + (ks.astype(F32) * grid.step[2]).astype(F32)).astype(F32),
+            ],
+            axis=1,
+        ).astype(F64)
         c = grid.axis_centre().astype(F64)
         prev = None
-        for k, (roll, pitch, yaw, dS, dL, dP) in enumerate(res.params):
-            Rm = R3(2, -(PI / 180.0) * F64(roll), 0, -(PI / 180.0) * F64(pitch), 1, -(PI / 180.0) * F64(yaw))
+        for roll, pitch, yaw, dS, dL, dP in res.params:
+            Rm = R3(
+                2,
+                -(PI / 180.0) * F64(roll),
+                0,
+                -(PI / 180.0) * F64(pitch),
+                1,
+                -(PI / 180.0) * F64(yaw),
+            )
             Rm32 = Rm  # double
             t = np.array([dL, dP, dS], F32).astype(F64)
             Rd = P.T @ Rm32 @ P
@@ -1084,11 +1201,11 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
 def write_1d(res: Result, path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for p in res.params:
-            f.write("%8.4f %8.4f %8.4f %8.4f %8.4f %8.4f\n" % tuple(float(x) for x in p))
+            f.write("%8.4f %8.4f %8.4f %8.4f %8.4f %8.4f\n" % tuple(float(x) for x in p))  # noqa: UP031 (C's printf)
 
 
 def write_matrices(res: Result, path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         f.write("# 3dvolreg matrices (DICOM-to-DICOM, row-by-row):\n")
         for m in res.matrices:
-            f.write(" ".join("%13.6g" % x for x in m) + "\n")
+            f.write(" ".join("%13.6g" % x for x in m) + "\n")  # noqa: UP031 (C's printf)

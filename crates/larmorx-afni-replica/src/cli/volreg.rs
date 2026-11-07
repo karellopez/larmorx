@@ -314,12 +314,14 @@ fn starts(arg: &str, name: &str, len: usize) -> bool {
 /// (two decimals and the sub-brick), `-verbose`'s list (two decimals) and the lines of the
 /// `-maxdisp1D` files (three). AFNI-99's notice compares the two modes' forms, so it is given
 /// exactly where the correction changes what the run shows.
-fn printed_maxdisp(md: &volreg::MaxDisp, o: &Options) -> Vec<String> {
+/// `shown`: whether `-verbose` is given, and the `-maxdisp1D` file and its `_delt` file are written.
+fn printed_maxdisp(md: &volreg::MaxDisp, shown: (bool, bool, bool)) -> Vec<String> {
+    let (verbose, dfile, efile) = shown;
     let mut shown = vec![
         format!("{:.2} {}", md.top.0, md.top.1),
         format!("{:.2} {}", md.top_delta.0, md.top_delta.1),
     ];
-    if o.verbose > 0 {
+    if verbose {
         shown.extend(
             md.dmax
                 .iter()
@@ -327,10 +329,10 @@ fn printed_maxdisp(md: &volreg::MaxDisp, o: &Options) -> Vec<String> {
                 .map(|(d, e)| format!("{d:.2}({e:.2})")),
         );
     }
-    if o.dmaxfile.is_some() {
+    if dfile {
         shown.extend(md.dmax.iter().map(|d| format!("{d:.3}")));
     }
-    if o.emaxfile.is_some() {
+    if efile {
         shown.extend(md.emax.iter().map(|e| format!("{e:.3}")));
     }
     shown
@@ -1594,10 +1596,10 @@ fn run_with(
     // AFNI-99: named where a maximum displacement the run prints or writes differs between the
     // two modes (the other mode's values come from the registration).
     if let Some(md) = &res.maxdisp
-        && md
-            .other
-            .as_deref()
-            .is_some_and(|m2| printed_maxdisp(md, &o) != printed_maxdisp(m2, &o))
+        && md.other.as_deref().is_some_and(|m2| {
+            let shown = (o.verbose > 0, o.dmaxfile.is_some(), o.emaxfile.is_some());
+            printed_maxdisp(md, shown) != printed_maxdisp(m2, shown)
+        })
     {
         notices.add(
             &defects::AFNI_99,
@@ -2161,5 +2163,42 @@ mod tests {
         assert_eq!(gp(123456.0, 4), "1.235e+05");
         assert_eq!(gp(12.0, 4), "12");
         assert_eq!(gp(0.00001234, 4), "1.234e-05");
+    }
+
+    /// AFNI-99's notice compares what the run shows: the messages' two decimals, `-verbose`'s
+    /// list, the `-maxdisp1D` files' three (the final check of 2026-11-07: float32 values that
+    /// differ below them named nothing visible).
+    #[test]
+    fn afni_99_compares_the_printed_values() {
+        let md = |d: [f32; 2], e: [f32; 2]| volreg::MaxDisp {
+            dmax: d.to_vec(),
+            emax: e.to_vec(),
+            top: (d[1], 1),
+            top_delta: (e[1], 1),
+            other: None,
+        };
+        let a = md([0.5, 1.2341], [0.0, 0.7341]);
+        let b = md([0.5, 1.2342], [0.0, 0.7342]);
+        let c = md([0.5, 1.2346], [0.0, 0.7341]);
+        for shown in [(false, false, false), (true, true, true)] {
+            assert_eq!(printed_maxdisp(&a, shown), printed_maxdisp(&b, shown));
+        }
+        assert_eq!(
+            printed_maxdisp(&a, (true, false, false)),
+            printed_maxdisp(&c, (true, false, false))
+        );
+        assert_ne!(
+            printed_maxdisp(&a, (false, true, false)),
+            printed_maxdisp(&c, (false, true, false))
+        );
+        assert_eq!(
+            printed_maxdisp(&a, (false, false, true)),
+            printed_maxdisp(&c, (false, false, true))
+        );
+        let d = md([0.5, 1.26], [0.0, 0.7341]);
+        assert_ne!(
+            printed_maxdisp(&a, (false, false, false)),
+            printed_maxdisp(&d, (false, false, false))
+        );
     }
 }

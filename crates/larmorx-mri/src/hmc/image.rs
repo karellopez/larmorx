@@ -284,6 +284,16 @@ fn read_decompressed(
     Ok((header, data))
 }
 
+/// The time step (`pixdim[4]`) as FSL 6.0.7.23's image layer reads it: its magnitude, and 1 for
+/// an image with a time axis (`dim[0]` 4 or more, one volume or several) whose time step is 0
+/// (`specs/flirt.md` §4.1; observed for every FSL program with a clean-room original, whose
+/// outputs keep the time step as read: `validation/investigations/fsl-pair-header/time_step.py`).
+/// A 3D image's 0 stays 0; `pixdim[5..7]` are kept as stored. Both readers below apply it.
+pub fn time_step_as_read(h: &mut NiftiHeader) {
+    let t = h.pixdim[4].abs();
+    h.pixdim[4] = if t == 0.0 && h.dim[0] >= 4 { 1.0 } else { t };
+}
+
 /// The header and the stored values (unscaled, in the file's order) of the image `files`,
 /// each file read by its content: what [`read_series_files`] converts, for a caller that
 /// computes in the stored type (the clean-room fslmaths, `specs/fslmaths.md` §3.1).
@@ -311,10 +321,15 @@ pub fn read_stored_files(
                 n_threads,
             },
         )?;
-        Ok((img.header, img.data))
+        let mut header = img.header;
+        time_step_as_read(&mut header);
+        Ok((header, img.data))
     } else {
-        parallel::with_threads(n_threads, || read_decompressed(files, compression))
-            .map_err(|e| ImageError::Invalid(e.to_string()))?
+        let (mut header, data) =
+            parallel::with_threads(n_threads, || read_decompressed(files, compression))
+                .map_err(|e| ImageError::Invalid(e.to_string()))??;
+        time_step_as_read(&mut header);
+        Ok((header, data))
     }
 }
 
@@ -333,7 +348,7 @@ pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series,
     let standard = files.standard_names()
         && plain_or_gzip(compression.0)
         && compression.1.is_none_or(plain_or_gzip);
-    let (header, data) = if standard {
+    let (mut header, data) = if standard {
         let img = nifti::read(
             path,
             &ReadOptions {
@@ -346,6 +361,7 @@ pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series,
         parallel::with_threads(n_threads, || read_decompressed(files, compression))
             .map_err(|e| ImageError::Invalid(e.to_string()))??
     };
+    time_step_as_read(&mut header);
     let shape = data.shape().to_vec();
     if shape.is_empty() || shape.iter().product::<usize>() == 0 {
         return Err(ImageError::Invalid(format!(
@@ -1081,6 +1097,71 @@ mod tests {
 
     /// Every output type written and read back by content, a pair whose header FSL-60 renamed
     /// included: the same header fields and values as the `.nii.gz` file.
+    /// The time step as FSL's image layer reads it, through both readers and every output type
+    /// (plain, gzip, zstd, bzip2; single files and pairs): its magnitude, 1 for a series of time
+    /// step 0, a 3D image's 0 kept (observed: `validation/investigations/fsl-pair-header/
+    /// time_step.py`, 66 runs of FSL 6.0.7.23's programs).
+    #[test]
+    fn the_time_step_as_fsl_reads_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let cases: [(&[usize], f64, f64); 6] = [
+            (&[3, 2, 2, 2], 0.0, 1.0),
+            (&[3, 2, 2, 2], -2.0, 2.0),
+            (&[3, 2, 2, 1], 0.0, 1.0),
+            (&[3, 2, 2], 0.0, 0.0),
+            (&[3, 2, 2], -2.0, 2.0),
+            (&[3, 2, 2, 2], 2.5, 2.5),
+        ];
+        for (k, (shape, stored, read)) in cases.into_iter().enumerate() {
+            let mut h = NiftiHeader::new(NiftiVersion::V1, shape, DataType::F32).unwrap();
+            h.pixdim[4] = stored;
+            h.pixdim[5] = -3.0;
+            let mut t = h.clone();
+            time_step_as_read(&mut t);
+            assert_eq!(t.pixdim[4], read, "case {k}");
+            assert_eq!(t.pixdim[5], -3.0);
+            if shape.len() == 4 && shape[3] == 1 {
+                // mcflirt's writer writes one volume 3D (§10.1): the rule alone
+                continue;
+            }
+            let n = shape.iter().product::<usize>();
+            let nv = n / 12;
+            let vols: Vec<Volume> = (0..nv)
+                .map(|v| {
+                    Volume::new(
+                        [3, 2, 2],
+                        [1.0; 3],
+                        (0..12).map(|i| (i + v) as f32).collect(),
+                    )
+                })
+                .collect();
+            for ty in OUTPUT_TYPES {
+                let at = dir.path().join(format!("c{k}"));
+                let (name, version) = output_name(&at.to_string_lossy(), ty).unwrap();
+                let files = ImageFiles::of(&name).unwrap();
+                // the stored header written as it is (the writer keeps the template's pixdim)
+                write_like_files(
+                    &files,
+                    &h,
+                    version,
+                    false,
+                    &vols,
+                    DataType::F32,
+                    "t",
+                    true,
+                    1,
+                    FIX,
+                )
+                .unwrap();
+                let s = read_series_files(&files, 1).unwrap();
+                assert_eq!(s.header.pixdim[4], read, "case {k} {ty}");
+                assert_eq!(s.header.pixdim[5], -3.0, "case {k} {ty}");
+                let (hs, _) = read_stored_files(&files, 1).unwrap();
+                assert_eq!(hs.pixdim[4], read, "case {k} {ty}");
+            }
+        }
+    }
+
     #[test]
     fn compressed_types_round_trip() {
         let dir = tempfile::tempdir().unwrap();

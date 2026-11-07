@@ -249,17 +249,6 @@ fn datatype_code(settings: &Settings, name: &str, mode: UpstreamDefects) -> Opti
         .map(|h| h.datatype)
 }
 
-/// The time step (`pixdim[4]`) of an image read through FSL's image layer (§3.1), which every
-/// output taking that image's header keeps: its magnitude, and 1 for an image with a time axis
-/// (`dim[0]` 4 or more, one volume or several) whose time step is 0 (observed: FSL 6.0.7.23's
-/// prelude writes 1, 2 and 2 for a 4D phase of time step 0, 2 and -2, 2 for a 3D phase of -2, 0 for
-/// one of 0, and the magnitude's for the mask; `specs/flirt.md` §4.1 reads a time step alike). The
-/// complex image of `-c` keeps its own (§3.2).
-fn time_step_as_read(h: &mut NiftiHeader) {
-    let t = h.pixdim[4].abs();
-    h.pixdim[4] = if t == 0.0 && h.dim[0] >= 4 { 1.0 } else { t };
-}
-
 /// Reads the image `name` whole (every volume), scaled to single precision (§3.1).
 fn read_real(
     settings: &Settings,
@@ -286,8 +275,9 @@ fn read_real(
         let shape = input.vol.shape;
         let volumes = vols.len();
         let data: Vec<f32> = vols.into_iter().flat_map(|v| v.data).collect();
-        let mut header = input.header;
-        time_step_as_read(&mut header);
+        // the time step as FSL's image layer reads it (its magnitude; 1 for a series of time step
+        // 0), applied by the shared readers; the complex image of `-c` keeps its own (§3.2)
+        let header = input.header;
         return Ok(Series {
             header,
             flipped: input.flipped,
@@ -296,8 +286,7 @@ fn read_real(
             data,
         });
     }
-    let (mut header, array) = read_stored_files(&files, n_threads).map_err(exception)?;
-    time_step_as_read(&mut header);
+    let (header, array) = read_stored_files(&files, n_threads).map_err(exception)?;
     let dims = array.shape().to_vec();
     let shape = [0, 1, 2].map(|k| dims.get(k).copied().unwrap_or(1));
     let per = shape.iter().product::<usize>();

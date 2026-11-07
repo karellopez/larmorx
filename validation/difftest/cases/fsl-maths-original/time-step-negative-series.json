@@ -1,0 +1,154 @@
+{
+ "defect": null,
+ "description": "fslmaths on a series of time step -2: FSL writes the time step as its image layer reads it (its magnitude, 1 for a series of 0); the clean-room originals wrote the stored value",
+ "expect": "pass",
+ "found": {
+  "detail": "validation/investigations/fsl-pair-header/time_step.py: 47 of 66 runs of the FSL originals differed in pixdim[4] before the shared readers' fix",
+  "n": 4,
+  "seed": "time-step",
+  "shrink_moves": [],
+  "signature": [
+   "time step as read"
+  ]
+ },
+ "id": "time-step-negative-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-odt": false,
+   "4D": true,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "chain": 1,
+   "content": "ramp",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "unary",
+   "kind": "general",
+   "one slice": false,
+   "orientation": "axes+oblique",
+   "origin0": 19.0,
+   "origin1": 11.25,
+   "origin2": 34.25,
+   "output": "out",
+   "qfac": -1,
+   "qform_code": 1,
+   "ramp0": -2,
+   "ramp1": 2,
+   "ramp2": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "24x28x11x5",
+   "size0": 24,
+   "size1": 28,
+   "size2": 11,
+   "spacing0": 0.5,
+   "spacing1": 2.5,
+   "spacing2": 1.2,
+   "specials": false,
+   "suffix": ".nii.gz",
+   "tr": 1.0,
+   "tunits": "msec",
+   "unary": "-bin",
+   "units": "mm",
+   "volumes": 5
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-bin"
+    ],
+    "name": "-bin",
+    "optional": true
+   },
+   {
+    "args": [
+     "out"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "direction": [
+      -2,
+      2,
+      0
+     ],
+     "seed": 1029071454,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      19.0,
+      11.25,
+      34.25
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      16,
+      -20,
+      1,
+      5
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     24,
+     28,
+     11,
+     5
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": -2.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 4,
+  "options": [
+   "-bin",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "kind general"
+  ],
+  "seed": "time-step",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "smoke",
+ "tool": "fsl-maths-original"
+}

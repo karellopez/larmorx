@@ -1,0 +1,304 @@
+{
+ "defect": null,
+ "description": "topup on a series of time step 0: FSL writes the time step as its image layer reads it (its magnitude, 1 for a series of 0); the clean-room originals wrote the stored value",
+ "expect": "pass",
+ "found": {
+  "detail": "validation/investigations/fsl-pair-header/time_step.py: 47 of 66 runs of the FSL originals differed in pixdim[4] before the shared readers' fix",
+  "n": 0,
+  "seed": "time-step",
+  "shrink_moves": [],
+  "signature": [
+   "time step as read"
+  ]
+ },
+ "id": "time-step-zero-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 2
+  },
+  "features": {
+   "--acqp": true,
+   "--debug": false,
+   "--dfout": false,
+   "--estmov given": false,
+   "--featout": false,
+   "--fout": true,
+   "--fwhm given": true,
+   "--interp": false,
+   "--iout": false,
+   "--jacout": false,
+   "--lambda given": true,
+   "--logout": false,
+   "--minmet given": true,
+   "--nthr": false,
+   "--numprec": false,
+   "--out": true,
+   "--rbmout": false,
+   "--regmod": false,
+   "--regrid": false,
+   "--scale": true,
+   "--scale value": "0",
+   "--splineorder": false,
+   "--ssqlambda": false,
+   "--subsamp given": false,
+   "--trace": false,
+   "-v": false,
+   "FSL's configuration": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": false,
+   "basename": "my_topup",
+   "bias0": -0.002,
+   "bias1": 0.004,
+   "bias2": -0.002,
+   "config file": false,
+   "dtype": "uint16",
+   "estmov0": true,
+   "extreme": false,
+   "field Hz": 50.0,
+   "field centre0": 0.0,
+   "field centre1": -0.3,
+   "field centre2": -0.2,
+   "field gradient0": 2.0,
+   "field gradient1": 4.0,
+   "field gradient2": 4.0,
+   "field width": 0.45,
+   "fwhm0": 1,
+   "head axis0": 1.15,
+   "head axis1": 0.85,
+   "head axis2": 1.15,
+   "head centre0": 0.02,
+   "head centre1": 0.04,
+   "head centre2": -0.02,
+   "head fraction": 0.36,
+   "in-plane gradient only": true,
+   "in-plane voxel": 2.0,
+   "kind": "topup",
+   "lambda0": "5e-05",
+   "largest subsampling": 2,
+   "levels": 1,
+   "miter0": 1,
+   "movements": false,
+   "noise": 1.0,
+   "nx": 24,
+   "ny": 16,
+   "nz": 16,
+   "orientation": "oblique",
+   "origin0": 10.75,
+   "origin1": -35.25,
+   "origin2": 7.0,
+   "phase encodings": "y pair",
+   "qfac": 1,
+   "qform_code": 2,
+   "read-out time": 0.015,
+   "read-out times differ": false,
+   "reversed first": false,
+   "scaled": false,
+   "scg throughout": false,
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "24x16x16",
+   "slice thickness": 2.5,
+   "spacing0": 2.5,
+   "spacing1": 0.8,
+   "spacing2": 4.0,
+   "subsamp drops0": false,
+   "suffix": ".nii.gz",
+   "units": "mm",
+   "warpres pool": 5
+  },
+  "groups": [
+   {
+    "args": [
+     "--imain={in:pair}"
+    ],
+    "name": "imain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--acqp={in:acq}"
+    ],
+    "name": "datain",
+    "optional": false
+   },
+   {
+    "args": [
+     "--out=my_topup"
+    ],
+    "name": "out",
+    "optional": false
+   },
+   {
+    "args": [
+     "--warpres=20"
+    ],
+    "name": "--warpres",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fwhm=1"
+    ],
+    "name": "--fwhm",
+    "optional": true
+   },
+   {
+    "args": [
+     "--miter=1"
+    ],
+    "name": "--miter",
+    "optional": true
+   },
+   {
+    "args": [
+     "--lambda=5e-05"
+    ],
+    "name": "--lambda",
+    "optional": true
+   },
+   {
+    "args": [
+     "--minmet=0"
+    ],
+    "name": "--minmet",
+    "optional": true
+   },
+   {
+    "args": [
+     "--scale=0"
+    ],
+    "name": "--scale",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fout=field"
+    ],
+    "name": "--fout",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 1 0 0.01500000\n0 -1 0 0.01500000\n"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      1.15,
+      0.85,
+      1.15
+     ],
+     "bias": [
+      -0.002,
+      0.004,
+      -0.002,
+      0.0
+     ],
+     "centre": [
+      0.5,
+      1.5,
+      -0.5
+     ],
+     "noise": 1.0,
+     "seed": 2019603549,
+     "size": 11.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      0.0,
+      -0.3,
+      -0.2
+     ],
+     "gradient": [
+      2.0,
+      4.0,
+      0.0
+     ],
+     "hz": 50.0,
+     "volumes": [
+      [
+       1,
+       0.015
+      ],
+      [
+       1,
+       -0.015
+      ]
+     ],
+     "width": 0.45
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -25.5,
+      -10.0,
+      -18.75
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      25,
+      2,
+      1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      2.0,
+      2.0,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     24,
+     16,
+     16,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": 0.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 0,
+  "options": [
+   "--acqp",
+   "--fout",
+   "--fwhm",
+   "--lambda",
+   "--minmet",
+   "--miter",
+   "--scale",
+   "--warpres",
+   "1 levels",
+   "FSLOUTPUTTYPE=NIFTI_GZ"
+  ],
+  "seed": "time-step",
+  "tool": "fsl-topup-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

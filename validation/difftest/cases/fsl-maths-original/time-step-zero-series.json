@@ -1,0 +1,285 @@
+{
+ "defect": null,
+ "description": "fslmaths on a series of time step 0: FSL writes the time step as its image layer reads it (its magnitude, 1 for a series of 0); the clean-room originals wrote the stored value",
+ "expect": "pass",
+ "found": {
+  "detail": "validation/investigations/fsl-pair-header/time_step.py: 47 of 66 runs of the FSL originals differed in pixdim[4] before the shared readers' fix",
+  "n": 3,
+  "seed": "time-step",
+  "shrink_moves": [],
+  "signature": [
+   "time step as read"
+  ]
+ },
+ "id": "time-step-zero-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR",
+   "program": "fslmaths"
+  },
+  "features": {
+   "-dt": false,
+   "-odt": false,
+   "-s sigma": 2.5,
+   "-thr value": 50,
+   "4D operand": true,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "axis0": 1.0,
+   "axis1": 0.9,
+   "axis2": 0.8,
+   "bias0": -0.0075,
+   "bias1": -0.0075,
+   "bias2": -0.0025,
+   "bias3": 0.0,
+   "centre0": -0.5,
+   "centre1": -6.0,
+   "centre2": 3.5,
+   "chain": 3,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "family": "smooth",
+   "image op": "-sub",
+   "kind": "series",
+   "noise": 1.0,
+   "offset": 160.0,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": -22.25,
+   "origin1": -46.75,
+   "origin2": -13.25,
+   "other orientation": true,
+   "output": "out.nii",
+   "period": 3,
+   "qfac": -1,
+   "qform_code": 3,
+   "range": "negative",
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "14x23x21x8",
+   "shear0": 0.1,
+   "shear1": -0.05,
+   "shear2": 0.025,
+   "signal": 0.05,
+   "size": 18.5,
+   "size0": 14,
+   "size1": 23,
+   "size2": 21,
+   "slice_code": 1,
+   "spacing0": 2.0,
+   "spacing1": 1.0,
+   "spacing2": 3.0,
+   "suffix": ".nii.gz",
+   "threshold": "-thr",
+   "tissues": "t2",
+   "tr": 2.5,
+   "tunits": "sec",
+   "units": "mm",
+   "volumes": 8
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:img}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-thr",
+     "50"
+    ],
+    "name": "-thr",
+    "optional": true
+   },
+   {
+    "args": [
+     "-sub",
+     "{in:i1}"
+    ],
+    "name": "-sub",
+    "optional": true
+   },
+   {
+    "args": [
+     "-s",
+     "2.5"
+    ],
+    "name": "-s",
+    "optional": true
+   },
+   {
+    "args": [
+     "out.nii"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "i1": {
+    "content": {
+     "axes": [
+      1.0,
+      0.9,
+      0.8
+     ],
+     "bias": [
+      -0.0075,
+      -0.0075,
+      -0.0025,
+      0.0
+     ],
+     "centre": [
+      -0.5,
+      -6.0,
+      3.5
+     ],
+     "noise": 1.0,
+     "seed": 706466667,
+     "size": 18.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -22.25,
+      -46.75,
+      -13.25
+     ],
+     "qfac": -1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      1,
+      -1,
+      1
+     ],
+     "sform": "other",
+     "sform_code": 1,
+     "shear": [
+      0.1,
+      -0.05,
+      0.025
+     ],
+     "spacing": [
+      2.0,
+      1.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     23,
+     21,
+     8
+    ],
+    "signal": {
+     "amplitude": 0.05,
+     "period": 3
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": 0.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": -160.0,
+     "scale": 1.0
+    }
+   },
+   "img": {
+    "content": {
+     "axes": [
+      0.8,
+      1.05,
+      1.2
+     ],
+     "bias": [
+      -0.0025,
+      0.0025,
+      -0.01,
+      0.0075
+     ],
+     "centre": [
+      3.0,
+      4.5,
+      -2.0
+     ],
+     "noise": 0.0,
+     "seed": 668840197,
+     "size": 8.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "int32",
+    "geometry": {
+     "origin": [
+      -15.25,
+      30.75,
+      10.0
+     ],
+     "qfac": -1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      1.0,
+      3.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     23,
+     21,
+     8
+    ],
+    "signal": {
+     "amplitude": 0.02,
+     "period": 3
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": 0.0,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 3,
+  "options": [
+   "-s",
+   "-sub",
+   "-thr",
+   "FSLOUTPUTTYPE=NIFTI_PAIR",
+   "kind series"
+  ],
+  "seed": "time-step",
+  "tool": "fsl-maths-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-maths",
+ "tier": "smoke",
+ "tool": "fsl-maths-original"
+}

@@ -10,14 +10,27 @@ programs, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) and
 | File | What it shows | How to run |
 |---|---|---|
 | `probe.py` | for fslmaths, fslroi, bet2, fast, flirt, mcflirt, prelude, topup and applytopup, each of the eight pair types of `FSLOUTPUTTYPE` (`NIFTI_PAIR`, `NIFTI2_PAIR`, each also `_GZ`, `_ZST`, `_BZ2`), optionally two single-file types, and with `FSL_LOAD_NIFTI_EXTENSIONS=1` inputs carrying one extension (fslmaths, bet2, fast, prelude) or two of different sizes (fslmaths): the length of every header file FSL writes (decompressed), the four bytes after its header block, and every file the original writes compared with FSL's, decompressed, byte for byte (`descrip` apart, which the suites compare separately; data files and other files reported too) | `boxed.sh 8 python -P probe.py <work dir> --larmorx <larmorx program> [--only fslmaths,prelude] [--singles] [--mode fix\|reproduce] [--json out.json]` (the workspace's `.venv`, `PYTHONPATH=<checkout>/validation/src`) |
-| `time_step.py` | the time step (`pixdim[4]`) FSL writes for inputs whose time step is 0 or negative, against the originals: fslmaths (`-mul`, `-Tmean`), fslroi (a series, one volume) and prelude (a series, one volume, a 3D phase) | `boxed.sh 4 python -P time_step.py <work dir> <larmorx program>` |
+| `time_step.py` | the time step (`pixdim[4]`) and `pixdim[5..7]` FSL writes for inputs whose time step is 0 or negative, against the originals: every FSL program with a clean-room original that writes images (fslmaths, fslroi, bet2, bet `-F`, fast, flirt, applyxfm4D, mcflirt, prelude, topup, applytopup, standard_space_roi) on series (several volumes, one volume with `dim[0]` 4) and 3D images of time step 0 and -2, and a series whose `pixdim[5..7]` are -3, 0, 4 (66 runs) | `boxed.sh 8 python -P time_step.py <work dir> <larmorx program> [--only fslmaths,mcflirt] [--mode fix\|reproduce]` |
+| `time_step_cases.py` | writes the permanent cases of that rule for the originals whose random testing never draws such a series (`validation/difftest/cases/{fsl-maths-original,mri-hmc,fsl-topup-original}/time-step-*.json`) | `python -P time_step_cases.py` |
 
-What `time_step.py` showed (2026-11-06, 14 runs): FSL reads a time step as its magnitude, and as
-1 for an image with a time axis (`dim[0]` 4 or more) whose time step is 0; its outputs keep that
-(`specs/flirt.md` §4.1 states the same reading). prelude's original follows it since this relay
-(found by its random-testing trial); **fslmaths' and fslroi's originals keep the stored value**
-(8 of the 14 runs differ: a series of 0 written 0 where FSL writes 1, of -2 written -2 where FSL
-writes 2): open, for a shared fix in the FSL readers.
+What `time_step.py` showed (2026-11-06, 14 runs; 2026-11-07, 66 runs): FSL reads a time step as
+its magnitude, and as 1 for an image with a time axis (`dim[0]` 4 or more, one volume or several)
+whose time step is 0; a 3D image's 0 stays 0; every output keeps the time step as read, a 3D
+output of a series included (fslmaths `-Tmean`, fslroi of one volume, bet2 and mcflirt of a
+one-volume series), and `pixdim[5..7]` as stored (applyxfm4D writes the reference's)
+(`specs/flirt.md` §4.1 states the same reading). Before relay 3's fix, **47 of the 66 runs
+differed**: every original but FLIRT's (which reads it itself) and prelude's (fixed by relay 2)
+wrote the stored value (fslmaths, fslroi, bet2, bet `-F`, fast, applyxfm4D, mcflirt, topup's
+`--iout` and `--fout`; applytopup's call then failed in the probe itself). **The fix**: the
+shared readers apply the rule (`larmorx_mri::hmc::image::time_step_as_read`, in
+`read_series_files` and `read_stored_files`, and `larmorx_fsl::bet::image`'s ANALYZE and lean
+readers), so every FSL original and `lx.mri.hmc` get it; after it, 63 of 66 runs are identical,
+the other 3 prelude's `--savemask` of a two-volume series, a 4D mask by default where FSL keeps
+the last volume's (FSL-262 corrected, D13), identical with `--mode reproduce`. standard_space_roi's
+`-maskNONE -roiNONE` copy (fslpy's `imcp`) keeps the stored value in both. The unit test
+`hmc::image::tests::the_time_step_as_fsl_reads_it` (`crates/larmorx-mri`) keeps the rule for
+both readers and every output type; the permanent cases run in the fsl-maths, mri-hmc and
+fsl-topup suites.
 
 What `probe.py` showed (2026-11-06, 106 runs; inputs generated in `<workspace>/oracles/inputs/fsl-pair-header/`):
 

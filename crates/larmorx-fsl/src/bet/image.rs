@@ -556,6 +556,8 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
     h.scl_slope = 1.0;
     h.scl_inter = 0.0;
     h.intent_code = 0;
+    // the time step as FSL's image layer reads it (its magnitude; 1 for a time axis of 0)
+    larmorx_mri::hmc::image::time_step_as_read(&mut h);
     let volumes = vols.len();
     let first = vols
         .first()
@@ -690,7 +692,8 @@ pub fn read_series_lean(
             n_threads,
         },
     )?;
-    let header = img.header;
+    let mut header = img.header;
+    larmorx_mri::hmc::image::time_step_as_read(&mut header);
     let shape = img.data.shape().to_vec();
     let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
     let per: usize = dims.iter().product();

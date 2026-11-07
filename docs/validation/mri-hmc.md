@@ -223,9 +223,9 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 
 | Case | Reason |
 |---|---|
-| `syn/content/ramp/reffile` | A ramp along x, which only the x translation can align (the other parameters are not constrained by the data): larmorx's and mcflirt's paths part at the second evaluation with either count (48 matrices identical to mcflirt's with the per-point count of specs/mcflirt.md §6.4, 3 before; count_trace.p… |
+| `syn/content/ramp/reffile` | A ramp along x, which only the x translation can align (the other parameters are not constrained by the data: mcflirt's own matrices move 11 to 17 mm at the 95th percentile when its inputs move in their last bits): the x translation ends 0.342 mm from mcflirt's (threshold 0.3), within mcflirt's own… |
 | `syn/motion/small/no-fsloutputtype` | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default). |
-| `syn/orientation/ras-unflipped/reffile` | Since the weighted correlation's count takes each point's weight as the point is visited (specs/mcflirt.md §6.4, 2026-11-07), larmorx's evaluated matrices are mcflirt's for the first 41 evaluations (9 before; count_trace.py, mcflirt's -verbose 20), then part in the line search's last digits (open) … |
+| `syn/orientation/ras-unflipped/reffile` | larmorx's evaluated matrices are mcflirt's for the first 41 evaluations (count_trace.py, mcflirt's -verbose 20), then part in a translation's 6th decimal and end 0.110 mm from mcflirt's at the 95th percentile, beyond the 0.1 mm made for real BOLD runs but within mcflirt's own spread on this run (hm… |
 | `difftest/normmi-aligns-worse` | -cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thr… |
 | `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing… |
 
@@ -258,7 +258,7 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1df84f3d4054) |
+| larmorx | 0.0.1 (a3f1d343b8ec) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

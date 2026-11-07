@@ -207,6 +207,16 @@ def _case(
     if {"nomaxdisp", "twopass"} <= present:
         silent.append("AFNI-92")
         one_mode.append("AFNI-92")
+    # AFNI-99 is named where a maximum displacement the run prints or writes differs between
+    # the voxels' own and AFNI's mirrored positions; each mode compares them on its own
+    # registration, and the two registrations differ in their last bits (GLIBC-07: correctly
+    # rounded sines and cosines by default, glibc's with `reproduce`; or another start, AFNI-86,
+    # -92, -93), so a value on a rounding boundary may show in one mode alone (the final check
+    # of 2026-11-07, cases 169, 3935, 8279). AFNI-97 likewise, where another start takes one
+    # mode to a rotation far beyond a head's motion (cases 1062, 4016, 11015).
+    one_mode.append("AFNI-99")
+    if {"twopass", "nocoarserot"} & present:
+        one_mode.append("AFNI-97")
     if recipe["inputs"]["input"].get("dtype") == "uint8":
         # AFNI-87 is named where a brick's stretched bytes differ from its rounded ones: another
         # correction (AFNI-86, -92, -93: another start) or the default's correctly rounded maths

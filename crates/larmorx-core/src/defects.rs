@@ -387,7 +387,7 @@ defects! {
     AFNI_89 = "AFNI-89", "3dvolreg", true,
         "a base whose least squares cannot be set up (all-zero weights, or a rotated or shifted copy that equals the base under the weight: a constant volume, a dimension below 2) prints lsqfit's errors and crashes at the first registered sub-brick";
     AFNI_90 = "AFNI-90", "3dvolreg", true,
-        "-prefix, -dfile and -1Dfile longer than 255 bytes, and a -weight dataset name longer than 255, overflow fixed buffers; -maxdisp1D names are cut at 998 bytes";
+        "-prefix, -dfile and -1Dfile longer than 255 bytes, and a -weight dataset name longer than 255, overflow fixed buffers; -maxdisp1D names are cut to their first 997 bytes";
     AFNI_92 = "AFNI-92", "3dvolreg", true,
         "-maxdisp (the default) sets the automask's clip fraction to 0.333 for the rest of the run, so -nomaxdisp changes -twopass's coarse rotation search (its mask with 0.5): an output-only option changes the registration";
     AFNI_93 = "AFNI-93", "3dvolreg", true,

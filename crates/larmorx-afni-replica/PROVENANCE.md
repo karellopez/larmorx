@@ -192,7 +192,7 @@ from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
 | `vecmat` | `src/thd_shear3d.c` | `rot_to_matrix` (`sincos` for axis 2, `sin` and `cos` for axes 0 and 1, as AFNI's build calls them) | MCW 1994-2000 |
 | `vecmat` | `src/thd_read_vecmat.c` | `invert_dvecmat` | NIH, public domain |
 | `shear` | `src/thd_shear3d.c`, `src/thd_shear3d.h` | `MCW_3shear`, `norm_3shear`, `permute_3shear`, `permute_dmat33`, `permute_dfvec3`, `shear_xzyx` (Maple's closed form), `shear_arb`, `shear_best`, `rot_to_shear`, `rot_to_shear_matvec`, `DMAT_svd`, `DMAT_svdrot_newer` | MCW 1994-2000 |
-| `eispack` | `src/eispack/eis_svd.c`, `eis_pythag.c`, `src/f2c/d_sign.c` | EISPACK's `svd` (Garbow, Argonne, August 1983), `pythag`, f2c's `d_sign` and `abs`, `max`, `min` | EISPACK and f2c: "Free" (AFNI's `LICENSE.txt`, netlib) |
+| `eispack` | `src/eispack/eis_svd.c`, `eis_pythag.c`, `src/f2c/d_sign.c` | EISPACK's `svd` (Garbow, Argonne, August 1983), `pythag`, f2c's `d_sign` and `abs`, `max`, `min` | EISPACK and f2c: "Free" (AFNI's `LICENSE.txt`, netlib); libf2c's `d_sign` under AT&T Bell Laboratories and Bellcore's permission notice (`src/f2c/Notice`, reproduced in `NOTICE`) |
 | `eispack` | `src/cs_symeig.c` | `svd_double` for 3 × 3 (with `CHECK_SVD`'s test; the perturbed retry not ported) | MCW 1994-2000 |
 | `rot3d` | `src/thd_rot3d.c` | `THD_rota_method`, `flip_xy`, `flip_yz`, `flip_xz`, `apply_xshear`, `apply_yshear`, `apply_zshear`, `apply_3shear`, `THD_rota_setpad`, `THD_rota_vol`, `THD_rota3D`, `THD_rota_vol_matvec`, `THD_rota3D_matvec` | MCW 1994-2000 |
 | `rot3d` | `src/edt_volpad.c` | `EDIT_volpad` (`EDIT_volpad_even`, both signs) | NIH, public domain |

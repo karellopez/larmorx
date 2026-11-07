@@ -174,6 +174,10 @@ pub struct MaxDisp {
     pub emax: Vec<f32>,
     pub top: (f32, usize),
     pub top_delta: (f32, usize),
+    /// AFNI-99: the same values in the other mode (AFNI's mirrored positions with the default,
+    /// the voxels' own with `reproduce`), computed when an axis is stored L2R, P2A or S2I, so
+    /// that the command line names the defect exactly where a printed value differs.
+    pub other: Option<Box<MaxDisp>>,
 }
 
 /// Why the registration stopped.
@@ -1525,19 +1529,19 @@ pub fn volreg(
                     }
                 }
             }
-            if other.is_some() && (dmax != dmax2 || emax != emax2) {
-                notices.add(
-                    &defects::AFNI_99,
-                    if mode.fix() {
-                        "the maximum displacements are those of the voxels themselves; AFNI \
-                         converts the matrix with the signs of the axes stored L2R, P2A or S2I \
-                         but not the voxel positions, and so reports the displacements of the \
-                         mirrored positions"
-                    } else {
-                        "the maximum displacements are those of the positions mirrored along the \
-                         axes stored L2R, P2A or S2I, as AFNI computes them"
-                    },
-                );
+            if other.is_some() {
+                // AFNI-99 is named by the command line where a printed value differs
+                // (`notice_afni_99` in `cli::volreg`): the messages' two decimals and
+                // -maxdisp1D's three hide most last-bit differences.
+                let m2 = md.other.get_or_insert_with(Box::default);
+                if m2.top.0 < dmax2 {
+                    m2.top = (dmax2, kim);
+                }
+                if m2.top_delta.0 < emax2 {
+                    m2.top_delta = (emax2, kim);
+                }
+                m2.dmax.push(dmax2);
+                m2.emax.push(emax2);
             }
             if md.top.0 < dmax {
                 md.top = (dmax, kim);

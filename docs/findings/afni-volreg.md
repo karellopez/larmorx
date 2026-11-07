@@ -222,3 +222,25 @@ release (`tags/AFNI-26.3.05/src`; the same text in 25.2.09 for every routine bel
   not the nearest sample, and an exact negative integer one lower (a shift of exactly +1 takes
   `f[i-2]`): rule C (AFNI's NN is "experimental"; exact integer shifts only), kept and documented
   in the spec.
+
+## The final check (relay 6, 2026-11-07)
+
+- **AFNI-99's notice is given where a printed or written value changes.** The final build's check
+  on the trial's own seed (`oracles/difftest/2026-11-07-volreg-final-check`: 22,539 cases, AFNI's
+  runs from the oracle cache) found no difference, but 669 cases where AFNI-99 was named and
+  nothing the run shows had changed: the replica compared the two modes' float32 maximum
+  displacements, while the messages print them with two decimals and `-maxdisp1D` with three.
+  The registration now returns the other mode's values (`volreg::MaxDisp::other`) and the command
+  line names AFNI-99 where the two modes' printed forms differ (`cli::volreg::printed_maxdisp`:
+  the two messages, `-verbose`'s list, the `-maxdisp1D` files); `-savedisp`'s check already
+  compared the stored values. No output changed (every golden checksum the same); five golden
+  cases no longer name AFNI-99 (`3dvolreg.heptic`, `.heptic.int16`, `.cubic.final-linear.noclip`,
+  `.linear.wtinp.edging`, `.fourier.twopass.reproduce`). Each mode compares the displacements on
+  its own registration, and the two registrations differ in their last bits (GLIBC-07, or another
+  start: AFNI-86, -92, -93), so AFNI-99, and AFNI-97 after another start, may be named in one mode
+  alone (the random-testing descriptor's `one_mode`).
+- **libf2c's notice.** `d_sign` comes from AFNI's copy of f2c's libf2c (`src/f2c/`), whose
+  permission notice (AT&T Bell Laboratories and Bellcore, `src/f2c/Notice`) asks for the notice in
+  the supporting documentation: it is in `NOTICE`, beside EISPACK's (freely available, netlib).
+- **The core registry's AFNI-90 text** said the `-maxdisp1D` names are "cut at 998 bytes"
+  (`MCW_strncpy`'s size): the first 997 bytes are kept, as the replica does; the text says so now.

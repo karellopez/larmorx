@@ -3,7 +3,9 @@
 // Burton S. Garbow, Argonne National Laboratory, a translation of Golub and Reinsch's Algol
 // procedure; as f2c translated it), src/eispack/eis_pythag.c (pythag), src/f2c/d_sign.c, and
 // the 3 x 3 path of svd_double in src/cs_symeig.c with its CHECK_SVD test. EISPACK and f2c are
-// freely available (AFNI's LICENSE.txt: "License: Free [https://www.netlib.org/misc/faq.html]").
+// freely available (AFNI's LICENSE.txt: "License: Free [https://www.netlib.org/misc/faq.html]");
+// libf2c (d_sign): Copyright 1990 - 1995 by AT&T Bell Laboratories and Bellcore, under its
+// permission notice (src/f2c/Notice; reproduced in NOTICE).
 // cs_symeig.c: Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert
 // W. Cox et al.), released by AFNI 26.3.05 under the Creative Commons Attribution 4.0
 // International licence (CC BY 4.0).

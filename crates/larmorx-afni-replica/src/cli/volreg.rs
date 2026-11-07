@@ -310,6 +310,32 @@ fn starts(arg: &str, name: &str, len: usize) -> bool {
 
 /// `modify_afni_prefix(name, NULL, "_delt")`: the suffix inserted before a known extension, or
 /// appended.
+/// What a run prints and writes of `-maxdisp`'s values, as it prints them: the two messages
+/// (two decimals and the sub-brick), `-verbose`'s list (two decimals) and the lines of the
+/// `-maxdisp1D` files (three). AFNI-99's notice compares the two modes' forms, so it is given
+/// exactly where the correction changes what the run shows.
+fn printed_maxdisp(md: &volreg::MaxDisp, o: &Options) -> Vec<String> {
+    let mut shown = vec![
+        format!("{:.2} {}", md.top.0, md.top.1),
+        format!("{:.2} {}", md.top_delta.0, md.top_delta.1),
+    ];
+    if o.verbose > 0 {
+        shown.extend(
+            md.dmax
+                .iter()
+                .zip(&md.emax)
+                .map(|(d, e)| format!("{d:.2}({e:.2})")),
+        );
+    }
+    if o.dmaxfile.is_some() {
+        shown.extend(md.dmax.iter().map(|d| format!("{d:.3}")));
+    }
+    if o.emaxfile.is_some() {
+        shown.extend(md.emax.iter().map(|e| format!("{e:.3}")));
+    }
+    shown
+}
+
 fn delt_name(name: &str) -> Option<String> {
     if name.is_empty() {
         return None;
@@ -1564,6 +1590,27 @@ fn run_with(
     let final_mode = o.final_mode.unwrap_or(o.resam);
     let imcount = ds.nvals;
     let out_n = [nx, ny, out_nz];
+
+    // AFNI-99: named where a maximum displacement the run prints or writes differs between the
+    // two modes (the other mode's values come from the registration).
+    if let Some(md) = &res.maxdisp
+        && md
+            .other
+            .as_deref()
+            .is_some_and(|m2| printed_maxdisp(md, &o) != printed_maxdisp(m2, &o))
+    {
+        notices.add(
+            &defects::AFNI_99,
+            if mode.fix() {
+                "the maximum displacements are those of the voxels themselves; AFNI converts the \
+                 matrix with the signs of the axes stored L2R, P2A or S2I but not the voxel \
+                 positions, and so reports the displacements of the mirrored positions"
+            } else {
+                "the maximum displacements are those of the positions mirrored along the axes \
+                 stored L2R, P2A or S2I, as AFNI computes them"
+            },
+        );
+    }
 
     // The matrices, the displacements and the maximum displacements.
     if res.maxdisp.is_some() && o.verbose > 0 {

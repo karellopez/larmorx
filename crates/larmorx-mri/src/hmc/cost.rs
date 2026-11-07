@@ -365,6 +365,58 @@ pub fn sample_weighted<A: Accumulator>(
     }
 }
 
+/// [`sample_weighted`], each slice's accumulator folded into `state` with `fold` in slice order
+/// as soon as its group of slices is sampled (with `parallel`, groups of four slices per thread
+/// sampled in parallel), so at most a group's accumulators exist at once: the same result as
+/// folding [`sample_weighted`]'s, at any thread count.
+#[allow(clippy::too_many_arguments)]
+pub fn sample_fold<A: Accumulator, S>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+    make: impl Fn() -> A + Sync,
+    mut state: S,
+    mut fold: impl FnMut(&mut S, A),
+) -> S {
+    let nz = grid.shape[2];
+    let one = |z: usize| -> A {
+        match weight {
+            None => {
+                let mut acc = make();
+                sample_into(grid, test, b, z, &mut acc);
+                acc
+            }
+            Some(weight) => {
+                let mut w = Weighted {
+                    inner: make(),
+                    weight,
+                };
+                sample_into(grid, test, b, z, &mut w);
+                w.inner
+            }
+        }
+    };
+    if !parallel {
+        for z in 0..nz {
+            fold(&mut state, one(z));
+        }
+        return state;
+    }
+    let group = (4 * rayon::current_num_threads()).max(1);
+    let mut z0 = 0;
+    while z0 < nz {
+        let z1 = (z0 + group).min(nz);
+        let accs: Vec<A> = (z0..z1).into_par_iter().map(one).collect();
+        for a in accs {
+            fold(&mut state, a);
+        }
+        z0 = z1;
+    }
+    state
+}
+
 /// Every slice of the grid into the one accumulator `acc`, in slice order (one running sum over
 /// the whole grid), each point weighted by `weight` when one is given.
 pub fn sample_all_weighted<A: Accumulator>(
@@ -446,13 +498,13 @@ impl Sums {
 }
 
 /// The correlation sums of one slice (§6.4): float32 running sums over each row, the row
-/// totals summed over the slice; the total weight of every row; the number of points.
+/// totals summed over the slice; the points' weights in visiting order ([`WeightSeq`]); the
+/// number of points.
 #[derive(Default)]
 pub struct CorrSlice {
     slice: Sums,
     row: Sums,
-    row_weight: f32,
-    row_weights: Vec<f32>,
+    weights: WeightSeq,
     points: u32,
 }
 
@@ -466,51 +518,200 @@ impl Accumulator for CorrSlice {
         self.row.sxx += wg * g;
         self.row.syy += wv * v;
         self.row.sxy += wg * v;
-        self.row_weight += w;
+        self.weights.point(w);
         self.points += 1;
     }
 
     fn end_row(&mut self) {
         let row = std::mem::take(&mut self.row);
         self.slice.add(&row);
-        self.row_weights.push(std::mem::take(&mut self.row_weight));
+        self.weights.end_row();
+    }
+}
+
+/// The weights of one slice's points in visiting order, with the ends of its rows, for the
+/// count's single running total (§6.4, `specs/flirt.md` §6.4: each point's weight added to `C`
+/// as the point is visited, over the whole grid; at each row's end `C` added to `A`): runs of
+/// unit weights kept as their lengths, the other weights as they are. The slices are sampled
+/// in parallel and their sequences replayed in slice order ([`CorrTotal::add`]).
+struct WeightSeq {
+    /// The unit weights not yet written into `tokens`.
+    ones: u32,
+    /// `RUN | k << 2` (k unit weights), `VALUE` (the next of `values`), `ROW` (a row's end),
+    /// `RUN_ROW | k << 2` (k unit weights, then the row's end: a row's usual token).
+    tokens: Vec<u32>,
+    values: Vec<f32>,
+}
+
+const RUN: u32 = 0;
+const VALUE: u32 = 1;
+const ROW: u32 = 2;
+const RUN_ROW: u32 = 3;
+
+impl Default for WeightSeq {
+    fn default() -> WeightSeq {
+        // one allocation for a slice's usual rows (a token per row)
+        WeightSeq {
+            ones: 0,
+            tokens: Vec::with_capacity(64),
+            values: Vec::new(),
+        }
+    }
+}
+/// The longest run a token holds (rows are far shorter), below `2^24` so its length is exact
+/// in single precision.
+const MAX_RUN: u32 = 1 << 24;
+
+impl WeightSeq {
+    #[inline(always)]
+    fn point(&mut self, w: f32) {
+        if w.to_bits() == 1.0f32.to_bits() {
+            // a row holds far fewer than MAX_RUN points (flushed at its end)
+            self.ones += 1;
+        } else {
+            self.flush();
+            self.tokens.push(VALUE);
+            self.values.push(w);
+        }
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) {
+        if self.ones > 0 {
+            self.tokens.push(RUN | (self.ones << 2));
+            self.ones = 0;
+        }
+    }
+
+    fn end_row(&mut self) {
+        if self.ones > 0 {
+            self.tokens.push(RUN_ROW | (self.ones << 2));
+            self.ones = 0;
+        } else {
+            self.tokens.push(ROW);
+        }
+    }
+}
+
+/// `c` after `k` float32 additions of 1, one after the other, exactly as they round: within a
+/// binade whose spacing divides 1 (`1 <= c < 2^24`) the additions are exact up to the next
+/// power of two and are made at once; across it, and below 1, at and above `2^24`, for negative
+/// or non-finite `c`, one at a time (above `2^24` adding 1 changes `c` at most once).
+pub fn add_ones(mut c: f32, mut k: u32) -> f32 {
+    const TOP: f32 = 16_777_216.0;
+    while k > 0 {
+        if (1.0..TOP).contains(&c) {
+            // c in [2^e, 2^(e+1)), its spacing at most 1: c + j exact while below 2^(e+1)
+            let next = f32::from_bits((c.to_bits() & 0x7f80_0000) + 0x0080_0000);
+            // next - c is exact (Sterbenz: next / 2 <= c < next)
+            let room = next - c;
+            if k < MAX_RUN && (k as f32) < room {
+                // the common case: the whole run within the binade, one exact addition
+                return c + k as f32;
+            }
+            let below = (room.ceil() as u32).saturating_sub(1).min(k);
+            if below > 0 {
+                c += below as f32;
+                k -= below;
+            }
+            if k > 0 {
+                c += 1.0;
+                k -= 1;
+            }
+        } else if c >= TOP && c.is_finite() {
+            let n = c + 1.0;
+            k -= 1;
+            if n == c {
+                return c;
+            }
+            c = n;
+        } else if c.is_nan() || c.is_infinite() {
+            return c + 1.0;
+        } else {
+            c += 1.0;
+            k -= 1;
+        }
+    }
+    c
+}
+
+/// The correlation's totals over the slices, in slice order (§6.4): the five sums, the count's
+/// running totals `C` (the points' weights), `A` (`C` at every row's end) and `N` (`A` at every
+/// slice's end), and the number of points.
+#[derive(Default)]
+pub struct CorrTotal {
+    total: Sums,
+    c: f32,
+    a: f32,
+    n: f32,
+    points: u32,
+}
+
+impl CorrTotal {
+    /// One more slice, after the slices before it.
+    pub fn add(&mut self, s: CorrSlice) {
+        let mut seq = s.weights;
+        seq.flush();
+        let mut values = seq.values.iter();
+        for &t in &seq.tokens {
+            match t & 3 {
+                RUN => self.c = add_ones(self.c, t >> 2),
+                VALUE => self.c += *values.next().expect("a value per token"),
+                ROW => self.a += self.c,
+                _ => {
+                    self.c = add_ones(self.c, t >> 2);
+                    self.a += self.c;
+                }
+            }
+        }
+        self.n += self.a;
+        self.total.add(&s.slice);
+        self.points += s.points;
+    }
+
+    /// The correlation `r` (§6.4): with `weighted` (`smooth > 0`) mcflirt's count `N` or the sum
+    /// of the weights (`count`), else the number of contributing points.
+    pub fn correlation(&self, weighted: bool, count: NormCorrCount) -> f32 {
+        if weighted {
+            match count {
+                NormCorrCount::Mcflirt => correlation_weighted(&self.total, self.n),
+                // `C` is the float32 running total of every point's weight: Σ w.
+                NormCorrCount::Weights => correlation_weighted(&self.total, self.c),
+            }
+        } else {
+            correlation_counted(&self.total, self.points as f32)
+        }
     }
 }
 
 /// The normalised-correlation cost `1 − |r|` (§6.4). With weighting (`smooth > 0`), the
-/// correlation uses mcflirt's count `N` (a float32 running sum of running sums of the row
+/// correlation uses mcflirt's count `N` (a float32 running sum of running sums of the points'
 /// weights), or with [`NormCorrCount::Weights`] the sum of the weights (FSL-02 corrected);
 /// without weighting, the number of contributing points (Pearson's correlation).
 pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], parallel: bool) -> f32 {
-    let slices = sample(grid, test, b, parallel, CorrSlice::default);
-    1.0 - correlation(&slices, test.weighted(), test.count).abs()
+    let total = sample_fold(
+        grid,
+        test,
+        b,
+        parallel,
+        None,
+        CorrSlice::default,
+        CorrTotal::default(),
+        |t, s| t.add(s),
+    );
+    1.0 - total.correlation(test.weighted(), test.count).abs()
 }
 
-/// The correlation `r` of the slices' sums (§6.4): with `weighted` (`smooth > 0`) mcflirt's
-/// count `N` or the sum of the weights (`count`), else the number of contributing points. Shared
-/// by mcflirt's `normcorr` and FLIRT's (`specs/flirt.md` §6.2, §6.4).
-pub fn correlation(slices: &[CorrSlice], weighted: bool, count: NormCorrCount) -> f32 {
-    let mut total = Sums::default();
-    let (mut c, mut a, mut n) = (0.0f32, 0.0f32, 0.0f32);
-    let mut points = 0u32;
+/// The correlation `r` of the slices' sums (§6.4), the slices in order ([`CorrTotal`]): with
+/// `weighted` (`smooth > 0`) mcflirt's count `N` or the sum of the weights (`count`), else the
+/// number of contributing points. Shared by mcflirt's `normcorr` and FLIRT's (`specs/flirt.md`
+/// §6.2, §6.4).
+pub fn correlation(slices: Vec<CorrSlice>, weighted: bool, count: NormCorrCount) -> f32 {
+    let mut total = CorrTotal::default();
     for s in slices {
-        for &w in &s.row_weights {
-            c += w;
-            a += c;
-        }
-        n += a;
-        total.add(&s.slice);
-        points += s.points;
+        total.add(s);
     }
-    if weighted {
-        match count {
-            NormCorrCount::Mcflirt => correlation_weighted(&total, n),
-            // `c` is the float32 running total of every row's weight: Σ w.
-            NormCorrCount::Weights => correlation_weighted(&total, c),
-        }
-    } else {
-        correlation_counted(&total, points as f32)
-    }
+    total.correlation(weighted, count)
 }
 
 /// The correlation with mcflirt's count `N`: the divisions by `N − 1` in double, the
@@ -549,24 +750,42 @@ fn correlation_counted(s: &Sums, n: f32) -> f32 {
     }
 }
 
-/// Least squares (appendix A): the weighted mean of `(g − v)²`.
+/// The sums of one slice of the least-squares cost (appendix A: FLIRT's `leastsq` unchanged,
+/// `specs/flirt.md` §6.2): with `δ = g − v` in single precision, `Σ (w·δ)·δ` and `Σ w` (without
+/// weighting `Σ δ·δ` and the count) per row, each row's added to the slice's at its end, in
+/// single precision.
 #[derive(Default)]
 struct SquaresSlice {
-    sum: f64,
-    weight: f64,
+    weighted: bool,
+    row: (f32, f32),
+    slice: (f32, f32),
+    points: u64,
 }
 
 impl Accumulator for SquaresSlice {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
-        let d = f64::from(g) - f64::from(v);
-        self.sum += f64::from(w) * d * d;
-        self.weight += f64::from(w);
+        let d = g - v;
+        if self.weighted {
+            self.row.0 += (w * d) * d;
+            self.row.1 += w;
+        } else {
+            self.row.0 += d * d;
+        }
+        self.points += 1;
     }
-    fn end_row(&mut self) {}
+
+    fn end_row(&mut self) {
+        self.slice.0 += self.row.0;
+        self.slice.1 += self.row.1;
+        self.row = (0.0, 0.0);
+    }
 }
 
-/// The least-squares cost; an empty overlap gives `(max − min)²` over both images.
+/// The least-squares cost (appendix A, as FLIRT's `leastsq`): the total of the squares over the
+/// total weight (over the count without weighting), a single-precision quotient, the slices'
+/// sums added in slice order, when that weight (count) is above 1; otherwise `(max − min)²`,
+/// the larger of the two volumes' maxima and the smaller of their minima (their finite values).
 pub fn least_squares(
     grid: &Volume,
     test: &TestVolume<'_>,
@@ -584,20 +803,38 @@ pub fn least_squares_weighted(
     parallel: bool,
     weight: Option<PointWeight<'_>>,
 ) -> f32 {
-    let slices = sample_weighted(grid, test, b, parallel, weight, SquaresSlice::default);
-    let (sum, weight) = slices
-        .iter()
-        .fold((0.0, 0.0), |(s, w), x| (s + x.sum, w + x.weight));
-    if weight > 0.0 {
-        (sum / weight) as f32
-    } else {
+    let weighted = test.weighted() || weight.is_some();
+    let slices = sample_weighted(grid, test, b, parallel, weight, || SquaresSlice {
+        weighted,
+        ..SquaresSlice::default()
+    });
+    let (mut num, mut den) = (0.0f32, 0.0f32);
+    let mut points = 0u64;
+    for s in &slices {
+        num += s.slice.0;
+        den += s.slice.1;
+        points += s.points;
+    }
+    let empty = || {
         let (lo, hi) = [grid, test.vol]
             .iter()
             .flat_map(|v| v.data.iter())
+            .filter(|v| v.is_finite())
             .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &x| {
                 (l.min(x), h.max(x))
             });
         (hi - lo) * (hi - lo)
+    };
+    if weighted {
+        if den <= 1.0 {
+            return empty();
+        }
+        num / den
+    } else {
+        if points <= 1 {
+            return empty();
+        }
+        num / points as f32
     }
 }
 
@@ -1202,6 +1439,147 @@ mod tests {
             }
         }
         Volume::new(shape, voxel, data)
+    }
+
+    /// `add_ones` is `k` additions of 1 one after the other, bit for bit: below 1, inside
+    /// binades, across powers of two with fractional parts, at and above 2^24, negative and
+    /// non-finite starts.
+    #[test]
+    fn unit_runs_add_as_one_by_one() {
+        let naive = |mut c: f32, k: u32| {
+            for _ in 0..k {
+                c += 1.0;
+            }
+            c
+        };
+        let mut seed = 0x2026_1107u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let mut starts: Vec<f32> = vec![
+            0.0,
+            -0.0,
+            0.3,
+            1.0,
+            1.5,
+            7.75,
+            1023.9,
+            8_388_607.5,
+            8_388_600.25,
+            16_777_215.0,
+            16_777_216.0,
+            16_777_217.0 * 1.0,
+            33_554_436.0,
+            -5.5,
+            -1.0e-3,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ];
+        for _ in 0..400 {
+            // fractional values near powers of two
+            let e = (next() % 25) as i32;
+            let frac = (next() % 1000) as f32 / 997.0;
+            starts.push(2f32.powi(e) - frac * 3.0);
+            starts.push(f32::from_bits(next() as u32 & 0x4bff_ffff));
+        }
+        for &c in &starts {
+            for k in [0u32, 1, 2, 3, 17, 255, 1000, 70_000] {
+                let (a, b) = (add_ones(c, k), naive(c, k));
+                assert!(a.to_bits() == b.to_bits(), "{c} + {k} ones: {a} vs {b}");
+            }
+        }
+        assert!(add_ones(f32::NAN, 3).is_nan());
+    }
+
+    /// The count `N` takes each point's weight as it is visited (§6.4, spec writer 2026-11-06):
+    /// one running total `C` over the whole grid, `A` at every row's end, `N` at every slice's
+    /// end, whatever the slices' grouping and thread count.
+    #[test]
+    fn the_count_adds_each_points_weight() {
+        let mut seed = 0x5eed_0001u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        // slices of rows of weights: mostly 1, some fractional, some empty rows
+        let grid: Vec<Vec<Vec<f32>>> = (0..9)
+            .map(|_| {
+                (0..7)
+                    .map(|_| {
+                        let n = (next() % 40) as usize;
+                        (0..n)
+                            .map(|_| {
+                                if next() % 5 == 0 {
+                                    (next() % 1000) as f32 / 1000.0
+                                } else {
+                                    1.0
+                                }
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        let (mut c, mut a, mut n) = (0f32, 0f32, 0f32);
+        let mut total = CorrTotal::default();
+        for slice in &grid {
+            let mut acc = CorrSlice::default();
+            for row in slice {
+                for &w in row {
+                    c += w;
+                    acc.point(1.0, 2.0, w);
+                }
+                a += c;
+                acc.end_row();
+            }
+            n += a;
+            total.add(acc);
+        }
+        assert_eq!(total.c.to_bits(), c.to_bits());
+        assert_eq!(total.a.to_bits(), a.to_bits());
+        assert_eq!(total.n.to_bits(), n.to_bits());
+    }
+
+    /// `leastsquares` as FLIRT's `leastsq` (appendix A): three single-precision levels of
+    /// `(w·δ)·δ` and `w` (the count without weighting), the quotient in single precision.
+    #[test]
+    fn least_squares_sums_three_levels() {
+        let rows: [&[(f32, f32, f32)]; 3] = [
+            &[(3.0, 1.0, 0.5), (2.0, 2.5, 1.0)],
+            &[],
+            &[(1.0, 0.25, 0.75), (4.0, 1.0, 1.0), (0.1, 0.3, 0.2)],
+        ];
+        for weighted in [true, false] {
+            let mut acc = SquaresSlice {
+                weighted,
+                ..SquaresSlice::default()
+            };
+            let (mut sn, mut sw) = (0f32, 0f32);
+            for row in rows {
+                let (mut rn, mut rw) = (0f32, 0f32);
+                for &(g, v, w) in row {
+                    let d = g - v;
+                    if weighted {
+                        rn += (w * d) * d;
+                        rw += w;
+                    } else {
+                        rn += d * d;
+                    }
+                    acc.point(g, v, w);
+                }
+                sn += rn;
+                sw += rw;
+                acc.end_row();
+            }
+            assert_eq!(acc.slice.0.to_bits(), sn.to_bits());
+            assert_eq!(acc.slice.1.to_bits(), sw.to_bits());
+            assert_eq!(acc.points, 5);
+        }
     }
 
     #[test]

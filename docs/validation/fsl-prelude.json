@@ -1,0 +1,2257 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "1ca117ed64eb",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "ended by a signal, SIGABRT (never stored)": 10,
+   "never cached: FSL-263: the imaginary parts (and a narrower type's values past its data) from memory FSL never wrote": 2,
+   "never cached: FSL-265: every value from memory past an empty buffer": 1,
+   "never cached: NaN values: FSL's sorts may read memory it does not own (FSL-268, FSL-269)": 1
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 14,
+  "saved_seconds": 75.5,
+  "served": 152
+ },
+ "reference": "prelude from FSL 6.0.7.23 (fsl-fugue 2603.0, fsl-newimage 2601.0), the conda installation in `~/fsl-6.0.7.23`; the replica (`larmorx-nc fsl prelude`) by default as a black box",
+ "results": [
+  {
+   "case": "fmriprep/ds001600-sub-1-noreconall/wf_auto_00000",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.289,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds001600-sub-1-noreconall/wf_auto_00001",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.295,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds001600-sub-1-noreconall/wf_auto_00002",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.298,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-sub-02-noreconall/wf_auto_00000",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.273,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-sub-02-noreconall/wf_auto_00001",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-sub-01-noreconall/wf_auto_00000",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.88,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005454-sub-16-noreconall/wf_gre16",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's own output (its container's FSL) against the original's (reported)": "yes"
+   },
+   "seconds": 0.565,
+   "status": "pass"
+  },
+  {
+   "case": "opt/default",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.152,
+   "status": "pass"
+  },
+  {
+   "case": "opt/twopi-mask",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "opt/verbose",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "opt/big-auto-2d-labels",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.123,
+   "status": "pass"
+  },
+  {
+   "case": "opt/big-force3d",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "opt/labelslices",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "opt/slices",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.1,
+   "status": "pass"
+  },
+  {
+   "case": "opt/slices-force3d",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "opt/n2",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.095,
+   "status": "pass"
+  },
+  {
+   "case": "opt/n3",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "opt/n24",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "opt/thresh",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "opt/thresh-zero",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "opt/mask",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "opt/mask-thresh",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.113,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series-mask2",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.108,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series-start-end",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series-start",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series-end",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.103,
+   "status": "pass"
+  },
+  {
+   "case": "opt/series-saved",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 103680
+   },
+   "seconds": 0.159,
+   "status": "pass"
+  },
+  {
+   "case": "opt/saved",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "opt/saved-slices",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.107,
+   "status": "pass"
+  },
+  {
+   "case": "opt/removeramps",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 15750
+   },
+   "seconds": 0.103,
+   "status": "pass"
+  },
+  {
+   "case": "opt/removeramps-verbose",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11860
+   },
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "opt/removeramps-slices",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4348
+   },
+   "seconds": 0.095,
+   "status": "pass"
+  },
+  {
+   "case": "opt/removeramps-one-slice",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1125
+   },
+   "seconds": 0.087,
+   "status": "pass"
+  },
+  {
+   "case": "opt/one-slice",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "opt/neurological",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.106,
+   "status": "pass"
+  },
+  {
+   "case": "opt/int16-phase",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "opt/gap-slice",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.104,
+   "status": "pass"
+  },
+  {
+   "case": "opt/complex",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3996
+   },
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "opt/complex-big-endian",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 29140
+   },
+   "seconds": 0.087,
+   "status": "pass"
+  },
+  {
+   "case": "opt/complex128",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11860,
+    "every file bit-identical": "1/2"
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "opt/complex-real",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "opt/complex-int16",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-magnitude",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-first-magnitude",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11859
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-phase",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-first-twopi",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4170
+   },
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-first-range",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-phase-first",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3
+   },
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-phase-region",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2608
+   },
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nan-phase-slices",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "out/nifti",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "out/nifti_pair",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "out/nifti2_gz",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "out/nifti_pair_gz",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "out/nifti2",
+   "category": "out",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "out/invalid",
+   "category": "out",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. FTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2",
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "opt/long-names",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.1,
+   "status": "pass"
+  },
+  {
+   "case": "opt/u-alias",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "panel/ds000256/rads",
+   "category": "panel",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.13,
+   "status": "pass"
+  },
+  {
+   "case": "panel/ds000256/options",
+   "category": "panel",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.15,
+   "status": "pass"
+  },
+  {
+   "case": "panel/ds004958/rads",
+   "category": "panel",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.187,
+   "status": "pass"
+  },
+  {
+   "case": "panel/ds004958/options",
+   "category": "panel",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 8568
+   },
+   "seconds": 0.292,
+   "status": "pass"
+  },
+  {
+   "case": "panel/ds000256/raw",
+   "category": "panel",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 255; the same from the original. ERROR: input phase image exceeds allowable phase range. Allowable range is 6.283 radians. Image range is: 8188 radians. Aborting.",
+   "seconds": 0.056,
+   "status": "both-error"
+  },
+  {
+   "case": "err/help",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "prelude exits 1; the same from the original. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "err/no-arguments",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "prelude exits 1; the same from the original. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "err/no-output",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. the raw phase output -l,--labels filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message",
+   "seconds": 0.044,
+   "status": "both-error"
+  },
+  {
+   "case": "err/complex-and-phase",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "prelude exits 1; the same from the original.  the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Cannot specify both --complex AND --phase or --abs.",
+   "seconds": 0.044,
+   "status": "both-error"
+  },
+  {
+   "case": "err/phase-without-abs",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "prelude exits 1; the same from the original. saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Both --phase AND --abs must be used together.",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "err/abs-without-phase",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "prelude exits 1; the same from the original. saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Both --phase AND --abs must be used together.",
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "err/n1",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. ing the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message Always set --numphasesplit greater than 1. NOT 1",
+   "seconds": 0.04,
+   "status": "both-error"
+  },
+  {
+   "case": "err/unknown-option",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. s filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --bogus: Option doesn't exist!",
+   "seconds": 0.048,
+   "status": "both-error"
+  },
+  {
+   "case": "err/bad-number",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. ame for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message -n: Couldn't set_value! valstr=\"abc\"!",
+   "seconds": 0.043,
+   "status": "both-error"
+  },
+  {
+   "case": "err/stray-word",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. filename for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message extra: is an unrecognised token!",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "err/missing-file",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "prelude exits -6; the same from the original. ead volume nothere Error : No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume nothere Error : No image files match: nothere",
+   "seconds": 0.071,
+   "status": "both-error"
+  },
+  {
+   "case": "err/no-input",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "prelude exits -6; the same from the original. e Exception : #22 :: Failed to read volume Error : No image files match: terminate called after throwing an instance of 'std::runtime_error' what(): Failed to read volume Error : No image files match:",
+   "seconds": 0.062,
+   "status": "both-error"
+  },
+  {
+   "case": "err/complex-empty-name",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "prelude exits 1; the same from the original. for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --complex: Missing non-optional argument!",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "err/range",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 255; the same from the original. ERROR: input phase image exceeds allowable phase range. Allowable range is 6.283 radians. Image range is: 14.1372 radians. Aborting.",
+   "seconds": 0.062,
+   "status": "both-error"
+  },
+  {
+   "case": "err/long-option-space",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits 1; the same from the original. e for saving the area labels output --removeramps remove phase ramps during unwrapping -v,--verbose switch on diagnostic messages -h,--help display this message --start: Missing non-optional argument!",
+   "seconds": 0.053,
+   "status": "both-error"
+  },
+  {
+   "case": "err/start-outside",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
+   "seconds": 0.077,
+   "status": "both-error"
+  },
+  {
+   "case": "err/start-negative",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
+   "seconds": 0.094,
+   "status": "both-error"
+  },
+  {
+   "case": "err/end-outside",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "prelude exits -6; the same from the original. Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operator",
+   "seconds": 0.089,
+   "status": "both-error"
+  },
+  {
+   "case": "err/empty-range",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "seconds": 0.101,
+   "status": "pass"
+  },
+  {
+   "case": "err/size-mismatch",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "err/size-mismatch-larger",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "err/size-mismatch-slices",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "seconds": 0.098,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/nan-phase-verbose-notice",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.099,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/ramps-notice-unchanged",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/basic",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/n2",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/n3",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.076,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/n24",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/t0",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/t300",
+   "category": "orig-options",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/mask",
+   "category": "orig-options",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/mask-t",
+   "category": "orig-options",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/maskgap",
+   "category": "orig-options",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/slices",
+   "category": "orig-options",
+   "checks_passed": 25,
+   "checks_total": 25,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/labelslices",
+   "category": "orig-options",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/force3d-slices",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/ramps",
+   "category": "orig-options",
+   "checks_passed": 28,
+   "checks_total": 28,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/ramps-slices",
+   "category": "orig-options",
+   "checks_passed": 28,
+   "checks_total": 28,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/ramps-labelslices",
+   "category": "orig-options",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/ramps-noverbose",
+   "category": "orig-options",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/grot",
+   "category": "orig-options",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.076,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/long-names",
+   "category": "orig-options",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "orig-options/u-grouped",
+   "category": "orig-options",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/one-slice",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/one-slice-ramps",
+   "category": "orig-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.082,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/one-slice-s",
+   "category": "orig-images",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/wide",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.082,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/wide-f",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.077,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/neuro",
+   "category": "orig-images",
+   "checks_passed": 25,
+   "checks_total": 25,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.095,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/neuro-ramps",
+   "category": "orig-images",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/int16-slope",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.089,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/rewrap",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/series",
+   "category": "orig-images",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.109,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/series-start",
+   "category": "orig-images",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/series-start-end",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.087,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/series-mask2",
+   "category": "orig-images",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.103,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/series-short-mag",
+   "category": "orig-images",
+   "checks_passed": 15,
+   "checks_total": 16,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit -6):   what():  Invalid t index in [] operator",
+   "seconds": 0.108,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-images/complex",
+   "category": "orig-images",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "measured": {
+    "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "default against the replica's: lab.nii.gz (labels; GLIBC-07)": 0,
+    "default against the replica's: raw.nii.gz (raw phase; GLIBC-07)": 282
+   },
+   "seconds": 0.105,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/complex-be",
+   "category": "orig-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
+   },
+   "reason": "",
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/complex128",
+   "category": "orig-images",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "reproduce: values not compared": null
+   },
+   "seconds": 0.101,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/complex-float32",
+   "category": "orig-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "reproduce: values not compared": null
+   },
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/complex-int16",
+   "category": "orig-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "reproduce: values not compared": null
+   },
+   "seconds": 0.091,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/size-big",
+   "category": "orig-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/size-small",
+   "category": "orig-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/size-mask",
+   "category": "orig-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-zero",
+   "category": "orig-images",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.092,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-negative",
+   "category": "orig-images",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-one-volume",
+   "category": "orig-images",
+   "checks_passed": 21,
+   "checks_total": 21,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-3d",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-4d-one",
+   "category": "orig-images",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.077,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-complex",
+   "category": "orig-images",
+   "checks_passed": 22,
+   "checks_total": 22,
+   "failed_checks": [],
+   "measured": {
+    "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "default against the replica's: raw.nii.gz (raw phase; GLIBC-07)": 564
+   },
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-images/time-step-complex-zero",
+   "category": "orig-images",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "measured": {
+    "default against the replica's: o.nii.gz (the replica's integer offsets; GLIBC-07)": 1.0
+   },
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/mag-first",
+   "category": "orig-nan",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/mag-inside",
+   "category": "orig-nan",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/mag-first-s",
+   "category": "orig-nan",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/phase-first",
+   "category": "orig-nan",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.076,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/phase-first-2pi",
+   "category": "orig-nan",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.085,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/phase-inside",
+   "category": "orig-nan",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/phase-inside-s",
+   "category": "orig-nan",
+   "checks_passed": 18,
+   "checks_total": 18,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "orig-nan/phase-inside-ramps",
+   "category": "orig-nan",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-errors/end-before-start",
+   "category": "orig-errors",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.093,
+   "status": "pass"
+  },
+  {
+   "case": "orig-errors/end-before-start-outside",
+   "category": "orig-errors",
+   "checks_passed": 11,
+   "checks_total": 12,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit -6):   what():  Invalid t index in [] operator",
+   "seconds": 0.098,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-errors/complex-as-phase",
+   "category": "orig-errors",
+   "checks_passed": 11,
+   "checks_total": 12,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit -6):   what():  Fslread: DT 32 not supported",
+   "seconds": 0.093,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-errors/complex-as-mask",
+   "category": "orig-errors",
+   "checks_passed": 11,
+   "checks_total": 12,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit -6):   what():  Fslread: DT 32 not supported",
+   "seconds": 0.091,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-errors/range",
+   "category": "orig-errors",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "both stop (exit 255): Aborting.",
+   "seconds": 0.084,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-errors/no-dir",
+   "category": "orig-errors",
+   "checks_passed": 11,
+   "checks_total": 12,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit -6):   what():  Error: cant open file nodir/o.nii.gz",
+   "seconds": 0.093,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-types/pair",
+   "category": "orig-types",
+   "checks_passed": 25,
+   "checks_total": 25,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.101,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/pair-gz",
+   "category": "orig-types",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.097,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/pair-zst",
+   "category": "orig-types",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.109,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/nifti2-pair-bz2",
+   "category": "orig-types",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.102,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/nifti2-gz",
+   "category": "orig-types",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/nifti-zst",
+   "category": "orig-types",
+   "checks_passed": 17,
+   "checks_total": 17,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.094,
+   "status": "pass"
+  },
+  {
+   "case": "orig-types/unset",
+   "category": "orig-types",
+   "checks_passed": 9,
+   "checks_total": 10,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit 1): e.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"",
+   "seconds": 0.079,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-types/bogus",
+   "category": "orig-types",
+   "checks_passed": 9,
+   "checks_total": 10,
+   "failed_checks": [
+    {
+     "detail": "named []",
+     "metric": "exact",
+     "name": "D13: the default's difference from reproduce is named",
+     "passed": false,
+     "threshold": null,
+     "value": null
+    }
+   ],
+   "reason": "both stop (exit 1): Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_",
+   "seconds": 0.077,
+   "status": "both-error"
+  },
+  {
+   "case": "orig-fmriprep/ds001600-sub-1-noreconall/wf_auto_00000",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.394,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds001600-sub-1-noreconall/wf_auto_00001",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.396,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds001600-sub-1-noreconall/wf_auto_00002",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.376,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds002422-sub-02-noreconall/wf_auto_00000",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.352,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds002422-sub-02-noreconall/wf_auto_00001",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.371,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds002603-sub-01-noreconall/wf_auto_00000",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 1.241,
+   "status": "pass"
+  },
+  {
+   "case": "orig-fmriprep/ds005454-sub-16-noreconall/wf_gre16",
+   "category": "orig-fmriprep",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.786,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/time-step-zero-series",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.081,
+   "status": "pass"
+  }
+ ],
+ "suite": "fsl-prelude",
+ "summary": {
+  "both-error": 28,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 138,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

@@ -9,7 +9,8 @@ with; ``validation/investigations/difftest/memory_pair.py`` measures any call by
 BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's, FAST's,
 topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES``,
 ``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``:
-fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06).
+fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06) and clean-room original
+(``ORIGINAL_PRELUDE_CASES``, 2026-11-06).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -681,6 +682,129 @@ def test_prelude_replica_needs_no_more_memory_than_fsl(tmp_path, name, extra):
         )
         if mode == "reproduce":
             assert _blanked(f_dir) == _blanked(r_dir), f"prelude {name}"
+
+
+#: PRELUDE's clean-room original (``crates/larmorx-fsl``, 2026-11-06) on the same calls, at one
+#: thread: fMRIPrep's call on ds005454-sub-16 as it ran, and with the slice-by-slice unwrapping,
+#: the ramps and every output added; the outputs bit-identical to FSL's in ``reproduce``
+#: (``docs/validation/fsl-prelude.md``), its memory similar to FSL's (``specs/prelude.md`` §10).
+ORIGINAL_PRELUDE_CASES = list(PRELUDE_CASES)
+
+
+@pytest.mark.parametrize(("name", "extra"), ORIGINAL_PRELUDE_CASES)
+def test_prelude_original_needs_no_more_memory_than_fsl(tmp_path, name, extra):
+    fo = pytest.importorskip("larmorx_validation.parity.fsl_prelude")
+    fv = pytest.importorskip("larmorx_validation.parity.fsl_versions")
+    prelude = fv.program("prelude")
+    if not prelude.is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    calls = [
+        w for run, _node, w in fo.fmriprep_calls() if run.startswith("ds005454-sub-16-noreconall/")
+    ]
+    if not calls:
+        pytest.skip("the ds005454 fMRIPrep oracle run was not found")
+    words = [*calls[0], *extra.split()]
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {**fo._base_env(home, {}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak([str(prelude), *words], env, "fsl", _emptier(f_dir), f_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_IMPLEMENTATION": "original",
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"prelude original {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"prelude original {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"prelude original {name}"
+
+
+def _large_phase_map(d: Path, shape: tuple[int, int, int] = (128, 128, 128), noise: float = 0.15):
+    """The benchmark's large map (``validation/investigations/fsl-prelude-original/bench_large.py``,
+    ``make``): a wrapped smooth phase with noise over an ellipsoid and its magnitude, seed 7; at
+    128³ and noise 0.15 its mask holds 66,020 regions and 295,535 constraints."""
+    rng = np.random.default_rng(7)
+    x, y, z = np.meshgrid(*(np.linspace(-1, 1, n, dtype=np.float32) for n in shape), indexing="ij")
+    inside = x**2 + y**2 + z**2 < 0.9
+    truth = 30 * x**2 + 20 * y**2 + 12 * x * z + 8 * z
+    phase = np.mod(truth + rng.normal(0, noise, shape) + np.pi, 2 * np.pi) - np.pi
+    mag = np.where(inside, 1000.0, 20.0) + rng.normal(0, 10, shape)
+    aff = np.diag([-2.0, 2.0, 2.0, 1.0])
+    nib.save(nib.Nifti1Image(phase.astype(np.float32), aff), str(d / "ph.nii.gz"))
+    nib.save(nib.Nifti1Image(mag.astype(np.float32), aff), str(d / "mag.nii.gz"))
+
+
+#: PRELUDE's clean-room original on a large map (``_large_phase_map``: 128³, 66,020 regions, the
+#: benchmark's, ``docs/benchmarks/fsl-prelude.md``), at one thread, as it is and with the
+#: slice-by-slice unwrapping: the merging's structures at their largest (FSL needs about 3 minutes
+#: for its first call, the oracle cache serves it afterwards).
+ORIGINAL_PRELUDE_LARGE_CASES = [("large-128", ""), ("large-128-slices", "-s")]
+
+
+@pytest.mark.parametrize(("name", "extra"), ORIGINAL_PRELUDE_LARGE_CASES)
+def test_prelude_original_large_map_needs_no_more_memory_than_fsl(tmp_path, name, extra):
+    fo = pytest.importorskip("larmorx_validation.parity.fsl_prelude")
+    fv = pytest.importorskip("larmorx_validation.parity.fsl_versions")
+    prelude = fv.program("prelude")
+    if not prelude.is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {**fo._base_env(home, {}), "OMP_NUM_THREADS": "1"}
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    _large_phase_map(inputs)
+    # the inputs named whole (the oracle cache keys them by their content), the outputs in each
+    # run's own folder
+    words = [
+        "-p",
+        str(inputs / "ph.nii.gz"),
+        "-a",
+        str(inputs / "mag.nii.gz"),
+        "-o",
+        "out",
+        *extra.split(),
+    ]
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak([str(prelude), *words], env, "fsl", _emptier(f_dir), f_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_IMPLEMENTATION": "original",
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"prelude original {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"prelude original {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"prelude original {name}"
 
 
 #: FAST's clean-room original (``crates/larmorx-fsl``, 2026-11-03) on the same calls, at one

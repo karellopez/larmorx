@@ -135,7 +135,7 @@ pub fn read_header_volumes(
 }
 
 /// The parsed header of the image `name` (an ANALYZE header without its transforms).
-fn read_nifti_header(
+pub(crate) fn read_nifti_header(
     settings: &Settings,
     name: &str,
     mode: UpstreamDefects,

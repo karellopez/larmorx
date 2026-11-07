@@ -9,14 +9,17 @@ neighbours: the result is the unwrapped phase in radians (the regions' offsets d
 multiples of 2 pi; outside the mask the phase is 0). sdcflows (fMRIPrep) runs it on the phase
 difference of a phase-difference field map: ``prelude(phase, magnitude, mask=mask)``.
 
-PRELUDE has only its bit-exact replica yet (``larmorx-nc``, FSL Licence, run as a separate
-program); its clean-room original is to be written from ``specs/prelude.md``.
-``implementation`` is ``"auto"`` or ``"replica"`` (``"original"`` raises
-``NotImplementedError``). FSL's deterministic defects are corrected by default (D13,
+PRELUDE has two implementations: its bit-exact replica (``larmorx-nc``, FSL Licence, run as a
+separate program) and the clean-room original of this package (``larmorx_fsl::prelude``,
+written from ``specs/prelude.md``, run in this process: the same files bit for bit, its
+default's ``-c`` phases from the correctly rounded arctangent). ``implementation="auto"`` runs
+the replica when ``larmorx-nc`` is installed, else the original; ``"replica"`` or
+``"original"`` choose. FSL's deterministic defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``: FSL-261 to FSL-272); ``upstream_defects="reproduce"`` gives
 FSL's results bit for bit. FSL's environment variables are never read from the process
 environment (CLAUDE.md rule 6). A run that fails raises :class:`larmorx._replica.ReplicaError`
-(a :class:`RuntimeError`) with FSL's messages."""
+(a :class:`RuntimeError`) with FSL's messages, or, for the original, a :class:`RuntimeError`
+with the same messages."""
 
 from __future__ import annotations
 
@@ -27,7 +30,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.fsl.bet import _read_image, _threads, _write_image
@@ -64,6 +67,15 @@ class PreludeResult:
     labels: Image | None
     raw_phase: Image | None
     stdout: str
+
+
+@dataclass(frozen=True)
+class _Run:
+    """The original's run: its exit status and output streams."""
+
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 def _write_complex(image: Any, tmp: str, n_threads: int) -> str:
@@ -142,7 +154,6 @@ def prelude(
             raise ValueError(f"{name} must be a volume index (0 or more), not {value}")
     n = _threads(n_threads)
     selected = _replica.select("fsl", "prelude", implementation)
-    assert selected is not None  # prelude has no clean-room original yet
     with tempfile.TemporaryDirectory(prefix="larmorx-prelude-") as tmp:
         if complex_image is not None:
             args = ["-c", _write_complex(complex_image, tmp, n)]
@@ -177,17 +188,33 @@ def prelude(
             args += ["-r", "rawphase"]
         if verbose:
             args.append("-v")
-        process = _replica.run(
-            selected,
-            args,
-            cwd=tmp,
-            n_threads=1,
-            upstream_defects=upstream_defects,
-            env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp},
-            exclude=lambda name: name.upper().startswith("FSL"),
-        )
-        _warn(process.stderr)
-        impl = selected.implementation()
+        if selected is None:
+            # the clean-room original, in this process, with FSL's settings of this call
+            env = [("FSLOUTPUTTYPE", "NIFTI"), ("PATH", tmp), (_defects.ENV, upstream_defects)]
+            if n > 0:
+                env.append(("OMP_NUM_THREADS", str(n)))
+            code, out, err = _core.fsl_run_original("prelude", args, env, tmp)
+            _warn(err)
+            if code != 0:
+                tail = "\n".join((out + err).strip().splitlines()[-20:])
+                raise RuntimeError(
+                    f"larmorx fsl prelude (the clean-room original) failed with exit code "
+                    f"{code}:\n{tail}"
+                )
+            process = _Run(code, out, err)
+            impl = _replica.ORIGINAL
+        else:
+            process = _replica.run(
+                selected,
+                args,
+                cwd=tmp,
+                n_threads=1,
+                upstream_defects=upstream_defects,
+                env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp},
+                exclude=lambda name: name.upper().startswith("FSL"),
+            )
+            _warn(process.stderr)
+            impl = selected.implementation()
 
         def read(name: str, wanted: bool) -> Image | None:
             path = os.path.join(tmp, f"{name}.nii")

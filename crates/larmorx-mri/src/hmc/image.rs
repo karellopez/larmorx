@@ -284,6 +284,16 @@ fn read_decompressed(
     Ok((header, data))
 }
 
+/// The time step (`pixdim[4]`) as FSL 6.0.7.23's image layer reads it: its magnitude, and 1 for
+/// an image with a time axis (`dim[0]` 4 or more, one volume or several) whose time step is 0
+/// (`specs/flirt.md` §4.1; observed for every FSL program with a clean-room original, whose
+/// outputs keep the time step as read: `validation/investigations/fsl-pair-header/time_step.py`).
+/// A 3D image's 0 stays 0; `pixdim[5..7]` are kept as stored. Both readers below apply it.
+pub fn time_step_as_read(h: &mut NiftiHeader) {
+    let t = h.pixdim[4].abs();
+    h.pixdim[4] = if t == 0.0 && h.dim[0] >= 4 { 1.0 } else { t };
+}
+
 /// The header and the stored values (unscaled, in the file's order) of the image `files`,
 /// each file read by its content: what [`read_series_files`] converts, for a caller that
 /// computes in the stored type (the clean-room fslmaths, `specs/fslmaths.md` §3.1).
@@ -311,10 +321,15 @@ pub fn read_stored_files(
                 n_threads,
             },
         )?;
-        Ok((img.header, img.data))
+        let mut header = img.header;
+        time_step_as_read(&mut header);
+        Ok((header, img.data))
     } else {
-        parallel::with_threads(n_threads, || read_decompressed(files, compression))
-            .map_err(|e| ImageError::Invalid(e.to_string()))?
+        let (mut header, data) =
+            parallel::with_threads(n_threads, || read_decompressed(files, compression))
+                .map_err(|e| ImageError::Invalid(e.to_string()))??;
+        time_step_as_read(&mut header);
+        Ok((header, data))
     }
 }
 
@@ -333,7 +348,7 @@ pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series,
     let standard = files.standard_names()
         && plain_or_gzip(compression.0)
         && compression.1.is_none_or(plain_or_gzip);
-    let (header, data) = if standard {
+    let (mut header, data) = if standard {
         let img = nifti::read(
             path,
             &ReadOptions {
@@ -346,6 +361,7 @@ pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series,
         parallel::with_threads(n_threads, || read_decompressed(files, compression))
             .map_err(|e| ImageError::Invalid(e.to_string()))??
     };
+    time_step_as_read(&mut header);
     let shape = data.shape().to_vec();
     if shape.is_empty() || shape.iter().product::<usize>() == 0 {
         return Err(ImageError::Invalid(format!(
@@ -680,8 +696,12 @@ pub fn write_like(
 }
 
 /// The header block of a file written as `files` (what larmorx's NIfTI writer sets: the data
-/// type, the shape, the magic string, NIfTI-2's line-ending check, `vox_offset`; the extender
-/// of a single file), for [`write_like_files`]' own writer.
+/// type, the shape, the magic string, NIfTI-2's line-ending check, `vox_offset`), followed by
+/// NIfTI's four extension bytes (0: the output keeps no extensions), for [`write_like_files`]'
+/// own writer: in a single file before the data, and in a pair's header file too (352 bytes,
+/// NIfTI-2: 544), as FSL 6.0.7.23's mcflirt writes every pair type (observed:
+/// `validation/investigations/fsl-pair-header`; larmorx's NIfTI writer, nibabel's convention,
+/// leaves them out of a pair).
 fn header_block(
     h: &NiftiHeader,
     data_type: DataType,
@@ -704,9 +724,7 @@ fn header_block(
         0.0
     };
     let mut out = h.to_bytes();
-    if single {
-        out.extend_from_slice(&[0; 4]);
-    }
+    out.extend_from_slice(&[0; 4]);
     Ok(out)
 }
 
@@ -770,6 +788,13 @@ pub fn write_like_files(
     let d = descrip.as_bytes();
     h.descrip[..d.len().min(79)].copy_from_slice(&d[..d.len().min(79)]);
     h.extensions.clear();
+    if version == NiftiVersion::V1 {
+        // ANALYZE's `extents` and `regular`, which FSL 6.0.7.23 writes into every NIfTI-1
+        // output whatever the input holds (observed: mcflirt on an input with 0 in both;
+        // `validation/investigations/fsl-pair-header`)
+        h.analyze.extents = 16384;
+        h.analyze.regular = b'r';
+    }
     // A qform quaternion whose (b, c, d) is not shorter than 1 is normalised, as the NIfTI
     // standard reads it and as mcflirt writes it back (observed on ds000122).
     let q2 = h.quatern_b * h.quatern_b + h.quatern_c * h.quatern_c + h.quatern_d * h.quatern_d;
@@ -862,13 +887,16 @@ pub fn write_like_files(
         );
     }
     let compression = Compression::of_name(&path.to_string_lossy());
-    if files.standard_names() && matches!(compression, Compression::None | Compression::Gzip) {
+    if files.data.is_none()
+        && files.standard_names()
+        && matches!(compression, Compression::None | Compression::Gzip)
+    {
         // Not inside the pool above: the writer runs its own parallel compression.
         nifti::write_dyn(path, &h, &array, &options)?;
         return Ok(notices);
     }
-    // FSL 6.0.7.23's other names: the header block and the data, each file compressed as its
-    // name says (little-endian data, as `h` says on every supported platform).
+    // Pairs and FSL 6.0.7.23's other names: the header block and the data, each file
+    // compressed as its name says (little-endian data, as `h` says on every supported platform).
     let head = header_block(&h, data_type, &shape, files.data.is_none())?;
     let swap = !h.byte_order.is_native();
     let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
@@ -908,6 +936,93 @@ mod tests {
 
     const FIX: UpstreamDefects = UpstreamDefects::Fix;
     const REPRODUCE: UpstreamDefects = UpstreamDefects::Reproduce;
+
+    /// FSL 6.0.7.23's mcflirt writes a pair's header file as the header block and NIfTI's four
+    /// extension bytes (352 bytes; NIfTI-2: 544) for every pair type, and `extents` 16384 and
+    /// `regular` `r` into every NIfTI-1 header whatever the input holds (observed:
+    /// `validation/investigations/fsl-pair-header`).
+    #[test]
+    fn pair_headers_hold_the_extension_bytes_for_every_type() {
+        let dir = tempfile::tempdir().unwrap();
+        let template = NiftiHeader::new(NiftiVersion::V1, &[3, 2, 2], DataType::F32).unwrap();
+        assert_eq!(template.analyze.extents, 0);
+        let vols = [
+            Volume::new([3, 2, 2], [1.0; 3], (0..12).map(|v| v as f32).collect()),
+            Volume::new(
+                [3, 2, 2],
+                [1.0; 3],
+                (0..12).map(|v| 2.0 * v as f32).collect(),
+            ),
+        ];
+        let types = [
+            "NIFTI_PAIR",
+            "NIFTI_PAIR_GZ",
+            "NIFTI_PAIR_ZST",
+            "NIFTI_PAIR_BZ2",
+        ];
+        for t in types
+            .iter()
+            .flat_map(|t| [t.to_string(), t.replace("NIFTI", "NIFTI2")])
+        {
+            let stem = dir.path().join(&t);
+            let (name, version) = output_name(&stem.to_string_lossy(), &t).unwrap();
+            write_like(
+                Path::new(&name),
+                &template,
+                version,
+                false,
+                &vols,
+                DataType::F32,
+                "test",
+                true,
+                2,
+                FIX,
+            )
+            .unwrap();
+            let files = ImageFiles::of(&name).unwrap();
+            let read = |p: &Path| {
+                let raw = std::fs::read(p).unwrap();
+                Compression::of_file(p).unwrap().decompress(raw).unwrap()
+            };
+            let h = read(&files.header);
+            let block = if version == NiftiVersion::V1 {
+                348
+            } else {
+                540
+            };
+            assert_eq!(h.len(), block + 4, "{t}");
+            assert_eq!(h[block..], [0, 0, 0, 0], "{t}");
+            if version == NiftiVersion::V1 {
+                assert_eq!(
+                    i32::from_le_bytes(h[32..36].try_into().unwrap()),
+                    16384,
+                    "{t}"
+                );
+                assert_eq!(h[38], b'r', "{t}");
+            }
+            assert_eq!(read(files.data.as_deref().unwrap()).len(), 96, "{t}");
+        }
+        // a single NIfTI-1 file: extents and regular too, the data at 352
+        let (name, version) =
+            output_name(&dir.path().join("one").to_string_lossy(), "NIFTI").unwrap();
+        write_like(
+            Path::new(&name),
+            &template,
+            version,
+            false,
+            &vols,
+            DataType::F32,
+            "test",
+            true,
+            2,
+            FIX,
+        )
+        .unwrap();
+        let h = std::fs::read(&name).unwrap();
+        assert_eq!(h.len(), 352 + 96);
+        assert_eq!(i32::from_le_bytes(h[32..36].try_into().unwrap()), 16384);
+        assert_eq!(h[38], b'r');
+    }
 
     /// FSL-09: integer outputs truncated and wrapped (mcflirt on x86-64), or rounded and
     /// clamped (corrected).
@@ -982,6 +1097,71 @@ mod tests {
 
     /// Every output type written and read back by content, a pair whose header FSL-60 renamed
     /// included: the same header fields and values as the `.nii.gz` file.
+    /// The time step as FSL's image layer reads it, through both readers and every output type
+    /// (plain, gzip, zstd, bzip2; single files and pairs): its magnitude, 1 for a series of time
+    /// step 0, a 3D image's 0 kept (observed: `validation/investigations/fsl-pair-header/
+    /// time_step.py`, 66 runs of FSL 6.0.7.23's programs).
+    #[test]
+    fn the_time_step_as_fsl_reads_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let cases: [(&[usize], f64, f64); 6] = [
+            (&[3, 2, 2, 2], 0.0, 1.0),
+            (&[3, 2, 2, 2], -2.0, 2.0),
+            (&[3, 2, 2, 1], 0.0, 1.0),
+            (&[3, 2, 2], 0.0, 0.0),
+            (&[3, 2, 2], -2.0, 2.0),
+            (&[3, 2, 2, 2], 2.5, 2.5),
+        ];
+        for (k, (shape, stored, read)) in cases.into_iter().enumerate() {
+            let mut h = NiftiHeader::new(NiftiVersion::V1, shape, DataType::F32).unwrap();
+            h.pixdim[4] = stored;
+            h.pixdim[5] = -3.0;
+            let mut t = h.clone();
+            time_step_as_read(&mut t);
+            assert_eq!(t.pixdim[4], read, "case {k}");
+            assert_eq!(t.pixdim[5], -3.0);
+            if shape.len() == 4 && shape[3] == 1 {
+                // mcflirt's writer writes one volume 3D (§10.1): the rule alone
+                continue;
+            }
+            let n = shape.iter().product::<usize>();
+            let nv = n / 12;
+            let vols: Vec<Volume> = (0..nv)
+                .map(|v| {
+                    Volume::new(
+                        [3, 2, 2],
+                        [1.0; 3],
+                        (0..12).map(|i| (i + v) as f32).collect(),
+                    )
+                })
+                .collect();
+            for ty in OUTPUT_TYPES {
+                let at = dir.path().join(format!("c{k}"));
+                let (name, version) = output_name(&at.to_string_lossy(), ty).unwrap();
+                let files = ImageFiles::of(&name).unwrap();
+                // the stored header written as it is (the writer keeps the template's pixdim)
+                write_like_files(
+                    &files,
+                    &h,
+                    version,
+                    false,
+                    &vols,
+                    DataType::F32,
+                    "t",
+                    true,
+                    1,
+                    FIX,
+                )
+                .unwrap();
+                let s = read_series_files(&files, 1).unwrap();
+                assert_eq!(s.header.pixdim[4], read, "case {k} {ty}");
+                assert_eq!(s.header.pixdim[5], -3.0, "case {k} {ty}");
+                let (hs, _) = read_stored_files(&files, 1).unwrap();
+                assert_eq!(hs.pixdim[4], read, "case {k} {ty}");
+            }
+        }
+    }
+
     #[test]
     fn compressed_types_round_trip() {
         let dir = tempfile::tempdir().unwrap();

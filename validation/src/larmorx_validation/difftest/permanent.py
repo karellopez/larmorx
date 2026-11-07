@@ -129,6 +129,7 @@ SUITES: dict[str, tuple[str, str]] = {
     "fsl-maths": ("fsl-maths-original", "original"),
     "fsl-stats": ("fsl-stats-original", "original"),
     "fsl-prelude-replica": ("fsl-prelude", "replica"),
+    "fsl-prelude": ("fsl-prelude-original", "original"),
 }
 
 

@@ -512,3 +512,30 @@ sum; FSL 28.73 s), `-kernel sphere 6 -fmean` on the T1w 8.14 s (5.41 s; FSL 227.
 same memory (the benchmark report). Converting each source row to double once per kernel row
 (to take the conversion out of the inner loop) measured slower (4.43 s and 8.62 s) and was not
 kept.
+
+## 32. The time step as FSL's image layer reads it; the FFT's twiddle factors (PRELUDE's clean-room part, relay 3, 2026-11-07)
+
+**The time step.** FSL's image layer reads an image's time step (`pixdim[4]`) as its magnitude,
+and as 1 for an image with a time axis (`dim[0]` 4 or more, one volume or several) whose time
+step is 0, and every output keeps it (`specs/flirt.md` §4.1 states the same reading;
+black-box: `validation/investigations/fsl-pair-header/time_step.py`, FSL 6.0.7.23 through the
+oracle cache). fslmaths' and fslroi's originals wrote the stored value (a series of 0: 0 where
+FSL writes 1; of -2: -2 where FSL writes 2; `-mul`, `-Tmean`, a one-volume series and a 3D image
+of -2 alike). Corrected in the shared readers (`hmc::image::time_step_as_read`, every FSL
+original); the permanent cases `time-step-zero-series` and `time-step-negative-series` (a
+four-operation chain on a series of time step 0, `-bin` on a series of -2) pass. The record
+`fsl-maths` re-made from `f005a08`: 454 cases, 386 pass, 63 rejected by both, 5 expected divergences, 0 failures; compared with the record before it, only the two new
+permanent cases (the suite compares every header field).
+
+**The FFT's twiddle factors (`specs/fslmaths.md` §10.2, §19's GLIBC-07; the next-steps item of the
+spec answers of 2026-11-06): not applicable as stated.** FSL computes large convolutions through
+Kiss FFT, whose twiddle factors are glibc's double `sincos` (not always correctly rounded); the
+original has no FFT: where FSL takes its FFT (§10.2's criterion) it computes the same convolution
+as a direct sum in double precision rounded once (finding 31), which is closer to the exact
+convolution than FSL's FFT and within §21's thresholds of it; so it has no twiddle factors to
+compute with glibc's `sincos` (`larmorx_core::math::sincos_glibc`, from `specs/glibc-dbl.md`, is
+there). For `reproduce` to give FSL's FFT bits, the original would need FSL's FFT itself, which
+§10.2 names but does not specify (the factorisation of each length and its radix order, the
+butterflies' arithmetic, the order of the axes, the real-to-complex handling and the scaling):
+**a question for a spec writer**. §19's GLIBC-07 row ("the original's twiddles are still correctly
+rounded in both modes") is to be corrected: the original has none.

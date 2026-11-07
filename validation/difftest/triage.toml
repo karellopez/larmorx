@@ -3893,3 +3893,37 @@ signature = ["D13 notices in both modes"]
 status = "harness"
 explanation = "Final check 2026-11-07-volreg-final-check: 13 cases named AFNI-99 (9: 169, 3935, 8279, ...) or AFNI-97 (4: 1062, 4016, 11015, ...) in one mode only. Each mode compares the displacements, or meets a lone Fourier row beyond the row length, on its own registration, and the two registrations differ in their last bits (GLIBC-07: correctly rounded sines and cosines by default, glibc's with reproduce) or in their start (AFNI-86, -92, -93), so a value on a rounding boundary, or a runaway rotation, may be met in one mode alone. The descriptor allows AFNI-99 in one mode always and AFNI-97 with -twopass or -nocoarserot (one_mode), as the suite allows AFNI-92 and AFNI-87"
 link = "docs/findings/afni-volreg.md"
+
+# PRELUDE's clean-room original: its trial of 2026-11-06 (oracles/difftest/2026-11-06-prelude-original:
+# 23,780 cases, 22,109 agree, 14 GLIBC-07 notices, 1,657 differ), every finding re-checked with the final
+# build (validation/investigations/fsl-prelude-original/recheck.py: 1,650 agree)
+[[difference]]
+tool = "fsl-prelude-original"
+implementation = "original"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "1,650 cases: a series whose time step (pixdim[4]) is 0 or negative; FSL reads it as its magnitude, and as 1 for an image with a time axis and a time step of 0, and every output keeps it (the complex image of -c its magnitude, a 0 kept); the original kept the stored value (docs/findings/fsl-prelude-original.md, finding 3; validation/investigations/fsl-pair-header/time_step.py)"
+link = "validation/difftest/cases/fsl-prelude-original/time-step-zero-series.json"
+
+[[difference]]
+tool = "fsl-prelude-original"
+implementation = "original"
+signature = ["every file bit-identical"]
+status = "open"
+explanation = "6 cases (prelude-trial 2118, 4559, 5595, 17296, 17334, 22975): oblique inputs whose qform or sform offset is 0; FSL writes a residual of its own matrix arithmetic there (qoffset or srow's last value 1.8e-15 to 3.6e-15) where the original writes 0, every other header field and every value identical; for a spec writer: the arithmetic of the offsets FSL writes back (specs/bet.md §3.3 and §8.2 step 7)"
+link = "oracles/difftest/2026-11-06-prelude-original/findings/fsl-prelude-original/prelude-trial-02118-original.json"
+
+[[difference]]
+tool = "fsl-prelude-original"
+implementation = "original"
+signature = ["every file bit-identical", "stdout identical"]
+status = "open"
+explanation = "1 case (prelude-trial 4928): FSL-271 reproduced in the slices mode (-s) with a magnitude of more slices and fewer rows than the phase (shrunk: a 1 x 4 x 1 phase, a 1 x 3 x 2 magnitude): FSL's mask at the phase's voxel indices is [1, 1, 1, 0], the original's [1, 1, 1, 1] (the saved masks identical); the default refuses (FSL-271) in both; for a spec writer: §9.1's FSL-271 reading in the slices mode when the source has another number of slices"
+link = "oracles/difftest/2026-11-06-prelude-original/findings/fsl-prelude-original/prelude-trial-04928-original.json"
+
+[[difference]]
+tool = "fsl-prelude-original"
+implementation = "original"
+signature = ["notice: GLIBC-07"]
+status = "explained"
+explanation = "14 cases: GLIBC-07 named where the correctly rounded arctangent and glibc's atan2f differ on a voxel of a complex image, whether or not an output changes (the voxel outside the mask, or the phase's last bit absorbed), as specs/prelude.md §6.4 says; the suite reports it in the replica suite's D13 check (the replica never names GLIBC-07)"

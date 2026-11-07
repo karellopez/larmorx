@@ -904,3 +904,22 @@ costs decided their matrices, whatever the zero's sign where relay 4's traces pa
 displacement checks are no longer needed (their matrices FSL's). The two failures left are the
 weighted `normcorr` and `woods` costs' last bits (relay 4). FAST's record (its `-a` priors
 registered by this FLIRT) and BET's are unchanged.
+
+## The weighted `normcorr`'s count per point (PRELUDE's clean-room part, relay 3, 2026-11-07)
+
+The spec writer's answer of 2026-11-06 (`specs/flirt.md` §6.4, `specs/mcflirt.md` §6.4, from the
+record's `real/weights-normcorr`): the count `N`'s first running total `C` takes **each
+contributing point's weight as the point is visited**, over the whole grid, never restarted; at
+every row's end `C` is added to `A`, at every slice's end `A` to `N`. The original added each
+row's total at the row's end, which rounds otherwise with fractional weights (the edge factors,
+a reference weight filtered from a mask). Now (`larmorx_mri::hmc::cost`, shared with
+`lx.mri.hmc`): each slice keeps its points' weights in visiting order (runs of unit weights as
+their lengths, the other weights as they are, the rows' ends), the slices are sampled in parallel
+in groups of four per thread and replayed in slice order (`sample_fold`, `CorrTotal::add`; a run
+of unit weights added as its one-by-one additions round, `add_ones`, unit-tested against them on
+817 starts from below 1 to beyond 2^24, eight run lengths each), so the same bits at any thread count and at most a
+group's weights in memory. The record `fsl-flirt` re-made from `f005a08`: 339 cases, 239 pass, 89 rejected by both, 10 expected divergences, 1 failure;
+`real/weights-normcorr` passes (it failed: 0.5083 mm at the 95th percentile, FSL's own band
+0.1879), its matrix and `real/cost-normcorr`'s now FSL's as text (no displacement is measured);
+`real/weights-woods` still fails (its path parts at a `woods` jump, §6.4: open). Nothing else
+moved.

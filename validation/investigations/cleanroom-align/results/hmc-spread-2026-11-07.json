@@ -1,0 +1,1032 @@
+[
+ {
+  "case": "syn/orientation/ras-unflipped/reffile",
+  "recorded": "oracles/fsl-6.0.7.23/mcflirt-haswell/runs/syn/orientation/ras-unflipped/reffile",
+  "larmorx_vs_mcflirt": {
+   "rms_p95": 0.11016756218518299,
+   "rms_median": 0.029519350580176597,
+   "rms_max": 0.11330178416856053,
+   "param_mm_median": 0.0033409999999953754,
+   "param_deg_median": 0.013289180821649038
+  },
+  "mcflirt_truth": {},
+  "larmorx_truth": {},
+  "larmorx_identical_text": 0,
+  "perturbations": [
+   {
+    "kind": "float32",
+    "family": "control",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 2.5314518306166698e-14,
+     "rms_median": 1.1544689029995076e-14,
+     "rms_max": 2.8162536727091747e-14,
+     "param_mm_median": 0.0,
+     "param_deg_median": 0.0
+    },
+    "mcflirt_identical_text": 12,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.11016756218518299,
+     "rms_median": 0.029519350580176597,
+     "rms_max": 0.11330178416856053,
+     "param_mm_median": 0.0033409999999953754,
+     "param_deg_median": 0.013289180821649038
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 2.661032474258621e-14,
+     "rms_median": 1.227733591542369e-14,
+     "rms_max": 2.8521221911861614e-14,
+     "param_mm_median": 0.0,
+     "param_deg_median": 0.0
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-1",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.07352367375409984,
+     "rms_median": 0.030612974086112153,
+     "rms_max": 0.10236918371757506,
+     "param_mm_median": 0.003313000000012778,
+     "param_deg_median": 0.0071098393659164896
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.07344470804365248,
+     "rms_median": 0.040601368148774325,
+     "rms_max": 0.0778206001255108,
+     "param_mm_median": 0.0034757499999997776,
+     "param_deg_median": 0.017237934800123814
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.09360002076640245,
+     "rms_median": 0.03334088122604387,
+     "rms_max": 0.11424701479300356,
+     "param_mm_median": 0.003885750000009125,
+     "param_deg_median": 0.018556816307606794
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-2",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.08701564632290727,
+     "rms_median": 0.04462359906311052,
+     "rms_max": 0.09780822520288063,
+     "param_mm_median": 0.0035163750000037908,
+     "param_deg_median": 0.019075251524839097
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.08219441388386013,
+     "rms_median": 0.034921253323943996,
+     "rms_max": 0.09908871666749838,
+     "param_mm_median": 0.0029801250000005552,
+     "param_deg_median": 0.01572563100449407
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.10499086084980873,
+     "rms_median": 0.038500024194684804,
+     "rms_max": 0.11377102282118842,
+     "param_mm_median": 0.004271749999993801,
+     "param_deg_median": 0.01615961369834154
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-3",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.07831386358126764,
+     "rms_median": 0.04465190030989894,
+     "rms_max": 0.08141362304872414,
+     "param_mm_median": 0.004626000000005348,
+     "param_deg_median": 0.014658903750362448
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.07397134446305755,
+     "rms_median": 0.04240628301080375,
+     "rms_max": 0.07525374594785825,
+     "param_mm_median": 0.0031673749999896472,
+     "param_deg_median": 0.018744896033511545
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.059286377233198934,
+     "rms_median": 0.02551924606502448,
+     "rms_max": 0.06634536936205283,
+     "param_mm_median": 0.003030250000009005,
+     "param_deg_median": 0.012174772466821407
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-4",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.06997112966109284,
+     "rms_median": 0.046116978610012495,
+     "rms_max": 0.07697278477441562,
+     "param_mm_median": 0.004348750000005452,
+     "param_deg_median": 0.018917422444039073
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.09863790206234559,
+     "rms_median": 0.046173097534569094,
+     "rms_max": 0.10330495321851446,
+     "param_mm_median": 0.003876499999996952,
+     "param_deg_median": 0.020351523249831145
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.08987345307887916,
+     "rms_median": 0.0425309552651823,
+     "rms_max": 0.11325505780467739,
+     "param_mm_median": 0.003463750000015864,
+     "param_deg_median": 0.021208142603743874
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-5",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.13095536111833547,
+     "rms_median": 0.04576812478693519,
+     "rms_max": 0.16649065740410263,
+     "param_mm_median": 0.00671274999999838,
+     "param_deg_median": 0.012411929581788782
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.08406114454425204,
+     "rms_median": 0.04993562728024784,
+     "rms_max": 0.0931062235947366,
+     "param_mm_median": 0.005470750000000635,
+     "param_deg_median": 0.025235483483242796
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.09374096785716095,
+     "rms_median": 0.03608394637583619,
+     "rms_max": 0.11969612131780025,
+     "param_mm_median": 0.004310000000003811,
+     "param_deg_median": 0.01819079938819511
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-6",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.0695725421354535,
+     "rms_median": 0.03485871050905216,
+     "rms_max": 0.07396838188689331,
+     "param_mm_median": 0.003915125000002462,
+     "param_deg_median": 0.016781816290236777
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.09264704999086107,
+     "rms_median": 0.049060923424188094,
+     "rms_max": 0.09696255061845366,
+     "param_mm_median": 0.0036163749999928996,
+     "param_deg_median": 0.013260191690521672
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.0931097802625809,
+     "rms_median": 0.05019324713242259,
+     "rms_max": 0.10840616996104856,
+     "param_mm_median": 0.005246374999998693,
+     "param_deg_median": 0.016404906286839792
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-7",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.0647120466414006,
+     "rms_median": 0.031188859096484875,
+     "rms_max": 0.06678107920747096,
+     "param_mm_median": 0.003211999999997772,
+     "param_deg_median": 0.012642362180757719
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.06847982542550919,
+     "rms_median": 0.0402428887870097,
+     "rms_max": 0.07967031162480885,
+     "param_mm_median": 0.003025250000003865,
+     "param_deg_median": 0.015421939818143035
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.07030466006099127,
+     "rms_median": 0.03444373905170832,
+     "rms_max": 0.07637534412989291,
+     "param_mm_median": 0.00299262500000097,
+     "param_deg_median": 0.01215486525611589
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "lastbit-8",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.08865347573713896,
+     "rms_median": 0.045797751442261905,
+     "rms_max": 0.09679088860644815,
+     "param_mm_median": 0.005190500000004761,
+     "param_deg_median": 0.02029595652763689
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.10274902602328241,
+     "rms_median": 0.04454823619742329,
+     "rms_max": 0.11298475466476887,
+     "param_mm_median": 0.004888125000004351,
+     "param_deg_median": 0.022082853933190642
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.09424479509442688,
+     "rms_median": 0.039287882785302694,
+     "rms_max": 0.1013780801165844,
+     "param_mm_median": 0.0038405000000096834,
+     "param_deg_median": 0.018140031061151796
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "noise",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.07684975480180356,
+     "rms_median": 0.033782757424223896,
+     "rms_max": 0.09947065112476505,
+     "param_mm_median": 0.0036003750000119794,
+     "param_deg_median": 0.013395891375391527
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.08187656558225044,
+     "rms_median": 0.03624242342515299,
+     "rms_max": 0.08536025778391898,
+     "param_mm_median": 0.0030643750000010073,
+     "param_deg_median": 0.014049703711008664
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.09514176568437283,
+     "rms_median": 0.044276209827128085,
+     "rms_max": 0.10615602989168609,
+     "param_mm_median": 0.0041227499999934025,
+     "param_deg_median": 0.015873878924894443
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "noise2",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.0820046918223247,
+     "rms_median": 0.05161082910458216,
+     "rms_max": 0.09712831469233453,
+     "param_mm_median": 0.003422000000014691,
+     "param_deg_median": 0.015262919646885139
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.07161695479131153,
+     "rms_median": 0.03409641329836671,
+     "rms_max": 0.09559276218091309,
+     "param_mm_median": 0.0035413750000046207,
+     "param_deg_median": 0.01395182115779343
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.100939968127625,
+     "rms_median": 0.048163760773268255,
+     "rms_max": 0.11566274348947453,
+     "param_mm_median": 0.004545750000005455,
+     "param_deg_median": 0.01558947814127775
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "noise3",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.11385780568508976,
+     "rms_median": 0.03541565406995213,
+     "rms_max": 0.1869095586215938,
+     "param_mm_median": 0.00413199999999847,
+     "param_deg_median": 0.015805565050165022
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.058187849723198064,
+     "rms_median": 0.03649723873257628,
+     "rms_max": 0.05965943645135274,
+     "param_mm_median": 0.002573250000008187,
+     "param_deg_median": 0.013617823684418101
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.08906373052002164,
+     "rms_median": 0.03874056456933692,
+     "rms_max": 0.10901631895794696,
+     "param_mm_median": 0.0036173749999939275,
+     "param_deg_median": 0.0179623552306563
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   },
+   {
+    "kind": "reverse",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 0.10090021226025939,
+     "rms_median": 0.04719510312779748,
+     "rms_max": 0.1334266517738006,
+     "param_mm_median": 0.0065357500000011726,
+     "param_deg_median": 0.014900053581744743
+    },
+    "mcflirt_identical_text": 2,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.08627217561036353,
+     "rms_median": 0.04235579432921506,
+     "rms_max": 0.09347532270259223,
+     "param_mm_median": 0.003633999999994586,
+     "param_deg_median": 0.02100822959244142
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 0.07986261195812841,
+     "rms_median": 0.0365937816547558,
+     "rms_max": 0.0944247171278216,
+     "param_mm_median": 0.007295625000018902,
+     "param_deg_median": 0.01049056150098537
+    },
+    "mcflirt_truth": {},
+    "larmorx_truth": {}
+   }
+  ],
+  "summary": {
+   "lastbit": {
+    "runs": 8,
+    "mcflirt_own_worst": {
+     "rms_p95": 0.13095536111833547,
+     "rms_median": 0.046116978610012495,
+     "rms_max": 0.16649065740410263,
+     "param_mm_median": 0.00671274999999838,
+     "param_deg_median": 0.02029595652763689
+    },
+    "larmorx_vs_its_mcflirt_worst": {
+     "rms_p95": 0.10274902602328241,
+     "rms_median": 0.04993562728024784,
+     "rms_max": 0.11298475466476887,
+     "param_mm_median": 0.005470750000000635,
+     "param_deg_median": 0.025235483483242796
+    },
+    "larmorx_own_worst": {
+     "rms_p95": 0.10499086084980873,
+     "rms_median": 0.05019324713242259,
+     "rms_max": 0.11969612131780025,
+     "param_mm_median": 0.005246374999998693,
+     "param_deg_median": 0.021208142603743874
+    }
+   },
+   "band": {
+    "runs": 4,
+    "mcflirt_own_worst": {
+     "rms_p95": 0.11385780568508976,
+     "rms_median": 0.05161082910458216,
+     "rms_max": 0.1869095586215938,
+     "param_mm_median": 0.0065357500000011726,
+     "param_deg_median": 0.015805565050165022
+    },
+    "larmorx_vs_its_mcflirt_worst": {
+     "rms_p95": 0.08627217561036353,
+     "rms_median": 0.04235579432921506,
+     "rms_max": 0.09559276218091309,
+     "param_mm_median": 0.003633999999994586,
+     "param_deg_median": 0.02100822959244142
+    },
+    "larmorx_own_worst": {
+     "rms_p95": 0.100939968127625,
+     "rms_median": 0.048163760773268255,
+     "rms_max": 0.11566274348947453,
+     "param_mm_median": 0.007295625000018902,
+     "param_deg_median": 0.0179623552306563
+    }
+   }
+  }
+ },
+ {
+  "case": "syn/content/ramp/reffile",
+  "recorded": "oracles/fsl-6.0.7.23/mcflirt-haswell/runs/syn/content/ramp/reffile",
+  "larmorx_vs_mcflirt": {
+   "rms_p95": 13.270311294460782,
+   "rms_median": 4.224206678162481,
+   "rms_max": 13.421516131654244,
+   "param_mm_median": 0.11429574999999659,
+   "param_deg_median": 0.037872580487522754,
+   "identifiable_mm_max": 0.3419297500000198
+  },
+  "mcflirt_truth": {
+   "truth_rms_mean": 8.037719156266618,
+   "truth_identifiable_mm_max": 0.18315599999999677
+  },
+  "larmorx_truth": {
+   "truth_rms_mean": 3.239792465172683,
+   "truth_identifiable_mm_max": 0.3492667500000124
+  },
+  "larmorx_identical_text": 1,
+  "perturbations": [
+   {
+    "kind": "float32",
+    "family": "control",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 1.2923943114349672e-14,
+     "rms_median": 1.550714049348876e-15,
+     "rms_max": 1.3306830652921714e-14,
+     "param_mm_median": 0.0,
+     "param_deg_median": 0.0,
+     "identifiable_mm_max": 0.0
+    },
+    "mcflirt_identical_text": 5,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 13.270311294460782,
+     "rms_median": 4.224206678162481,
+     "rms_max": 13.421516131654244,
+     "param_mm_median": 0.11429574999999659,
+     "param_deg_median": 0.037872580487522754,
+     "identifiable_mm_max": 0.3419297500000198
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 1.9034823017898403e-14,
+     "rms_median": 6.7940135989037116e-15,
+     "rms_max": 2.1198902177663296e-14,
+     "param_mm_median": 0.0,
+     "param_deg_median": 0.0,
+     "identifiable_mm_max": 0.0
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 8.037719156266618,
+     "truth_identifiable_mm_max": 0.18315599999999677
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 3.239792465172683,
+     "truth_identifiable_mm_max": 0.3492667500000124
+    }
+   },
+   {
+    "kind": "lastbit-1",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 13.712038440667843,
+     "rms_median": 7.9906523221218695,
+     "rms_max": 14.016722241841368,
+     "param_mm_median": 0.09361800000000642,
+     "param_deg_median": 0.04297182657759547,
+     "identifiable_mm_max": 0.37600100000000225
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 5.991653549020449,
+     "rms_median": 2.5091272161323466,
+     "rms_max": 6.620449057337171,
+     "param_mm_median": 0.3390070000000094,
+     "param_deg_median": 0.03833087077578514,
+     "identifiable_mm_max": 0.3390070000000094
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.244000182461219,
+     "rms_median": 5.601612904310375,
+     "rms_max": 6.317606521547799,
+     "param_mm_median": 0.3356565000000131,
+     "param_deg_median": 0.041138363356353076,
+     "identifiable_mm_max": 0.3765617500000218
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.7785267545532086,
+     "truth_identifiable_mm_max": 0.19284500000000548
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 4.880091446131663,
+     "truth_identifiable_mm_max": 0.1461620000000039
+    }
+   },
+   {
+    "kind": "lastbit-2",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 12.618172296092874,
+     "rms_median": 3.1890885188107516,
+     "rms_max": 13.305172134272501,
+     "param_mm_median": 0.10315499999998679,
+     "param_deg_median": 0.02796033818285539,
+     "identifiable_mm_max": 0.11637774999998385
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 6.220772487399886,
+     "rms_median": 1.8962683771433075,
+     "rms_max": 7.183173043028214,
+     "param_mm_median": 0.1612187500000033,
+     "param_deg_median": 0.032715886546396865,
+     "identifiable_mm_max": 0.45921200000000795
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.227855825742618,
+     "rms_median": 2.5540373651130577,
+     "rms_max": 6.948901259688354,
+     "param_mm_median": 0.1931109999999876,
+     "param_deg_median": 0.06728436838444982,
+     "identifiable_mm_max": 0.2052987500000114
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 3.2548314649874954,
+     "truth_identifiable_mm_max": 0.2082002499999902
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 2.7724256006131176,
+     "truth_identifiable_mm_max": 0.39996999999999616
+    }
+   },
+   {
+    "kind": "lastbit-3",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 14.207686417604405,
+     "rms_median": 10.194669558971011,
+     "rms_max": 14.332485193824319,
+     "param_mm_median": 0.07041900000000112,
+     "param_deg_median": 0.020693281954970683,
+     "identifiable_mm_max": 0.493070000000003
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 3.8567244043174482,
+     "rms_median": 1.6654763990386556,
+     "rms_max": 4.266360355572103,
+     "param_mm_median": 0.07163100000001066,
+     "param_deg_median": 0.03346073143164602,
+     "identifiable_mm_max": 0.1955030000000022
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.949129646494924,
+     "rms_median": 3.3098062308805454,
+     "rms_max": 7.389806623462356,
+     "param_mm_median": 0.112986499999991,
+     "param_deg_median": 0.07981304493904005,
+     "identifiable_mm_max": 0.07358500000000845
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.3684447851878643,
+     "truth_identifiable_mm_max": 0.5004069999999956
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 3.255728219229252,
+     "truth_identifiable_mm_max": 0.3049039999999934
+    }
+   },
+   {
+    "kind": "lastbit-4",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 15.793298327949307,
+     "rms_median": 8.153271174946902,
+     "rms_max": 17.039158788644432,
+     "param_mm_median": 0.07347874999999249,
+     "param_deg_median": 0.09459542807988514,
+     "identifiable_mm_max": 0.19534900000000732
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 1.715614924512463,
+     "rms_median": 1.6430198564146674,
+     "rms_max": 1.7278723425548754,
+     "param_mm_median": 0.05243650000000599,
+     "param_deg_median": 0.06485885956375076,
+     "identifiable_mm_max": 0.17170375000000604
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 5.62889247105557,
+     "rms_median": 3.7192822743835685,
+     "rms_max": 6.020822348550808,
+     "param_mm_median": 0.09228000000000236,
+     "param_deg_median": 0.051508932161984725,
+     "identifiable_mm_max": 0.29877825000002645
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 3.734815498843196,
+     "truth_identifiable_mm_max": 0.20268599999999992
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 2.7359408153993,
+     "truth_identifiable_mm_max": 0.22979825000000176
+    }
+   },
+   {
+    "kind": "lastbit-5",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 16.233744727699563,
+     "rms_median": 11.052879116937424,
+     "rms_max": 16.508873626759904,
+     "param_mm_median": 0.09398800000001017,
+     "param_deg_median": 0.02796033818285539,
+     "identifiable_mm_max": 0.3824419999999975
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 6.6095955757105775,
+     "rms_median": 1.0643092767389333,
+     "rms_max": 6.947005835143756,
+     "param_mm_median": 0.0002709999999979118,
+     "param_deg_median": 0.0,
+     "identifiable_mm_max": 0.35371700000000317
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 10.303932014413038,
+     "rms_median": 6.213445589351754,
+     "rms_max": 10.776562807946187,
+     "param_mm_median": 0.18766475000001037,
+     "param_deg_median": 0.06084814896816134,
+     "identifiable_mm_max": 0.3392617500000199
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 4.164258104754225,
+     "truth_identifiable_mm_max": 0.3812889999999953
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 5.406427804662654,
+     "truth_identifiable_mm_max": 0.08174825000000396
+    }
+   },
+   {
+    "kind": "lastbit-6",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 17.287277025924613,
+     "rms_median": 10.512809609819175,
+     "rms_max": 17.389125147792225,
+     "param_mm_median": 0.049709499999991635,
+     "param_deg_median": 0.015011491960031454,
+     "identifiable_mm_max": 0.10297225000000765
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 1.0094574915251744,
+     "rms_median": 0.5513501267212739,
+     "rms_max": 1.0239162079635453,
+     "param_mm_median": 0.0022490000000061627,
+     "param_deg_median": 3.5652913761437656e-09,
+     "identifiable_mm_max": 0.03985925000000634
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.335037193571411,
+     "rms_median": 4.090624891846056,
+     "rms_max": 6.435424129931437,
+     "param_mm_median": 0.32955275000001905,
+     "param_deg_median": 0.07946927034484011,
+     "identifiable_mm_max": 0.32955275000001905
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 3.959355519522525,
+     "truth_identifiable_mm_max": 0.08018374999998912
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 3.8409909393684103,
+     "truth_identifiable_mm_max": 0.12004299999999546
+    }
+   },
+   {
+    "kind": "lastbit-7",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 13.159667951456864,
+     "rms_median": 8.332988583847724,
+     "rms_max": 14.089465667334416,
+     "param_mm_median": 0.0896630000000016,
+     "param_deg_median": 0.027616563586642308,
+     "identifiable_mm_max": 0.09396449999999845
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 6.696451545936874,
+     "rms_median": 1.384118617096306,
+     "rms_max": 7.753223796225106,
+     "param_mm_median": 0.0009050000000030423,
+     "param_deg_median": 0.01621470516932913,
+     "identifiable_mm_max": 0.12013625000000161
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 9.653381251879292,
+     "rms_median": 3.883985429714979,
+     "rms_max": 10.668370099456833,
+     "param_mm_median": 0.09751800000000799,
+     "param_deg_median": 0.07946926922518259,
+     "identifiable_mm_max": 0.4085087500000242
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.732042318563481,
+     "truth_identifiable_mm_max": 0.222857999999988
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 4.200489061266078,
+     "truth_identifiable_mm_max": 0.1027217499999864
+    }
+   },
+   {
+    "kind": "lastbit-8",
+    "family": "lastbit",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 14.135069318941309,
+     "rms_median": 6.601164146028595,
+     "rms_max": 14.77315366214452,
+     "param_mm_median": 0.18120799999999804,
+     "param_deg_median": 0.04297182657759547,
+     "identifiable_mm_max": 0.197266500000012
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 3.913926534505186,
+     "rms_median": 2.855061447114193,
+     "rms_max": 3.9475471541121894,
+     "param_mm_median": 0.21657725000000028,
+     "param_deg_median": 0.033288841088174356,
+     "identifiable_mm_max": 0.22793550000001517
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 7.3544185018774835,
+     "rms_median": 5.005682071911882,
+     "rms_max": 7.593297364438729,
+     "param_mm_median": 0.30656050000001756,
+     "param_deg_median": 0.03787254261491543,
+     "identifiable_mm_max": 0.30656050000001756
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.8411240267292035,
+     "truth_identifiable_mm_max": 0.17387100000000544
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 4.018937389937983,
+     "truth_identifiable_mm_max": 0.21382499999999993
+    }
+   },
+   {
+    "kind": "noise",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 13.105210740014698,
+     "rms_median": 4.022693255446797,
+     "rms_max": 13.859038038997097,
+     "param_mm_median": 0.03653724999999497,
+     "param_deg_median": 0.04297182657759547,
+     "identifiable_mm_max": 0.23658000000000357
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 3.3327024950414876,
+     "rms_median": 1.4763663571968133,
+     "rms_max": 3.4315385320332727,
+     "param_mm_median": 5.149999999787269e-05,
+     "param_deg_median": 0.0,
+     "identifiable_mm_max": 0.05244000000000426
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 3.8104501932194714,
+     "rms_median": 3.404987133766054,
+     "rms_max": 3.820292334698967,
+     "param_mm_median": 0.15667000000000542,
+     "param_deg_median": 0.08267787093358449,
+     "identifiable_mm_max": 0.406551250000021
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 1.5179215287831012,
+     "truth_identifiable_mm_max": 0.19290800000000274
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 2.2512533828885033,
+     "truth_identifiable_mm_max": 0.19290800000000274
+    }
+   },
+   {
+    "kind": "noise2",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 12.737746595659361,
+     "rms_median": 7.481090615418487,
+     "rms_max": 13.32709648828421,
+     "param_mm_median": 0.06570499999997992,
+     "param_deg_median": 0.014553122269591802,
+     "identifiable_mm_max": 0.2366049999999973
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 0.7707387374441035,
+     "rms_median": 8.159051175337347e-15,
+     "rms_max": 0.9116238333059012,
+     "param_mm_median": 0.0,
+     "param_deg_median": 0.0,
+     "identifiable_mm_max": 0.20230899999999963
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.744542149853067,
+     "rms_median": 4.289694362555903,
+     "rms_max": 7.338056846660617,
+     "param_mm_median": 0.4076347499999997,
+     "param_deg_median": 0.037872580487522754,
+     "identifiable_mm_max": 0.4076347499999997
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.1967252335409975,
+     "truth_identifiable_mm_max": 0.24664700000001005
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 2.176901335898422,
+     "truth_identifiable_mm_max": 0.24664700000001005
+    }
+   },
+   {
+    "kind": "noise3",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 10.965666135988931,
+     "rms_median": 7.644829623013305,
+     "rms_max": 11.425113342780415,
+     "param_mm_median": 0.0418679999999938,
+     "param_deg_median": 0.04297182657759547,
+     "identifiable_mm_max": 0.4331499999999977
+    },
+    "mcflirt_identical_text": 0,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 3.349374229019249,
+     "rms_median": 3.1685444993923157,
+     "rms_max": 3.3597178126109686,
+     "param_mm_median": 0.01543599999999401,
+     "param_deg_median": 0.014323944579855075,
+     "identifiable_mm_max": 0.39093400000000145
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.177039022118681,
+     "rms_median": 2.622377105761257,
+     "rms_max": 6.775919365947951,
+     "param_mm_median": 0.21797224999998832,
+     "param_deg_median": 0.051508932161984725,
+     "identifiable_mm_max": 0.36592775000001154
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 2.0213023120058056,
+     "truth_identifiable_mm_max": 0.37657000000000096
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 2.921636454783656,
+     "truth_identifiable_mm_max": 0.18497800000000097
+    }
+   },
+   {
+    "kind": "reverse",
+    "family": "band",
+    "mcflirt_vs_mcflirt": {
+     "rms_p95": 11.971413372556723,
+     "rms_median": 4.358186827621542,
+     "rms_max": 12.918864523317152,
+     "param_mm_median": 0.052565500000014254,
+     "param_deg_median": 0.024980958284777227,
+     "identifiable_mm_max": 0.12068200000000218
+    },
+    "mcflirt_identical_text": 2,
+    "larmorx_vs_its_mcflirt": {
+     "rms_p95": 5.480882610674508,
+     "rms_median": 3.4288821122295747,
+     "rms_max": 5.491690172936539,
+     "param_mm_median": 0.11429574999999659,
+     "param_deg_median": 0.00143239434137859,
+     "identifiable_mm_max": 0.11615450000000749
+    },
+    "larmorx_vs_larmorx": {
+     "rms_p95": 6.516966349904847,
+     "rms_median": 1.223450071638371,
+     "rms_max": 7.064006216637642,
+     "param_mm_median": 0.0786257500000005,
+     "param_deg_median": 0.012891546457606623,
+     "identifiable_mm_max": 0.40551875000001303
+    },
+    "mcflirt_truth": {
+     "truth_rms_mean": 3.5803006288774264,
+     "truth_identifiable_mm_max": 0.09395800000000065
+    },
+    "larmorx_truth": {
+     "truth_rms_mean": 3.1854133477946127,
+     "truth_identifiable_mm_max": 0.09395800000000065
+    }
+   }
+  ],
+  "summary": {
+   "lastbit": {
+    "runs": 8,
+    "mcflirt_own_worst": {
+     "rms_p95": 17.287277025924613,
+     "rms_median": 11.052879116937424,
+     "rms_max": 17.389125147792225,
+     "param_mm_median": 0.18120799999999804,
+     "param_deg_median": 0.09459542807988514,
+     "identifiable_mm_max": 0.493070000000003
+    },
+    "larmorx_vs_its_mcflirt_worst": {
+     "rms_p95": 6.696451545936874,
+     "rms_median": 2.855061447114193,
+     "rms_max": 7.753223796225106,
+     "param_mm_median": 0.3390070000000094,
+     "param_deg_median": 0.06485885956375076,
+     "identifiable_mm_max": 0.45921200000000795
+    },
+    "larmorx_own_worst": {
+     "rms_p95": 10.303932014413038,
+     "rms_median": 6.213445589351754,
+     "rms_max": 10.776562807946187,
+     "param_mm_median": 0.3356565000000131,
+     "param_deg_median": 0.07981304493904005,
+     "identifiable_mm_max": 0.4085087500000242
+    },
+    "mcflirt_truth_range": {
+     "truth_rms_mean": [
+      2.3684447851878643,
+      4.164258104754225
+     ],
+     "truth_identifiable_mm_max": [
+      0.08018374999998912,
+      0.5004069999999956
+     ]
+    },
+    "larmorx_truth_range": {
+     "truth_rms_mean": [
+      2.7359408153993,
+      5.406427804662654
+     ],
+     "truth_identifiable_mm_max": [
+      0.08174825000000396,
+      0.39996999999999616
+     ]
+    }
+   },
+   "band": {
+    "runs": 4,
+    "mcflirt_own_worst": {
+     "rms_p95": 13.105210740014698,
+     "rms_median": 7.644829623013305,
+     "rms_max": 13.859038038997097,
+     "param_mm_median": 0.06570499999997992,
+     "param_deg_median": 0.04297182657759547,
+     "identifiable_mm_max": 0.4331499999999977
+    },
+    "larmorx_vs_its_mcflirt_worst": {
+     "rms_p95": 5.480882610674508,
+     "rms_median": 3.4288821122295747,
+     "rms_max": 5.491690172936539,
+     "param_mm_median": 0.11429574999999659,
+     "param_deg_median": 0.014323944579855075,
+     "identifiable_mm_max": 0.39093400000000145
+    },
+    "larmorx_own_worst": {
+     "rms_p95": 6.744542149853067,
+     "rms_median": 4.289694362555903,
+     "rms_max": 7.338056846660617,
+     "param_mm_median": 0.4076347499999997,
+     "param_deg_median": 0.08267787093358449,
+     "identifiable_mm_max": 0.4076347499999997
+    },
+    "mcflirt_truth_range": {
+     "truth_rms_mean": [
+      1.5179215287831012,
+      3.5803006288774264
+     ],
+     "truth_identifiable_mm_max": [
+      0.09395800000000065,
+      0.37657000000000096
+     ]
+    },
+    "larmorx_truth_range": {
+     "truth_rms_mean": [
+      2.176901335898422,
+      3.1854133477946127
+     ],
+     "truth_identifiable_mm_max": [
+      0.09395800000000065,
+      0.24664700000001005
+     ]
+    }
+   }
+  }
+ }
+]

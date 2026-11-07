@@ -39,8 +39,7 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
 /// FLIRT's, FAST's, topup's, applytopup's, fslmaths', fslstats', fslroi's and
-/// standard_space_roi's programs are `larmorx_fsl::cli`; a test checks the list); `prelude` has
-/// only its replica yet (2026-11-06).
+/// standard_space_roi's and prelude's programs are `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -512,27 +511,21 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        // every FSL tool but prelude has its clean-room original (fslroi and
-        // standard_space_roi since 2026-11-05); prelude has only its replica (2026-11-06)
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["prelude"]
-        );
-        // every FSL tool but mcflirt (`mri hmc`) and the replica without an original is
-        // larmorx_fsl's
-        assert_eq!(&FSL_TOOLS[1..FSL_TOOLS.len() - 1], larmorx_fsl::cli::TOOLS);
-        assert_eq!(FSL_TOOLS[FSL_TOOLS.len() - 1], "prelude");
+        // every FSL tool has its clean-room original (prelude's since 2026-11-06)
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
         };
-        // prelude has no clean-room original yet (2026-11-06): `original` is an error that names
-        // the replica's package (exit 127)
+        // prelude runs its clean-room original (2026-11-06): no -o, the compulsory block and
+        // the usage (exit 1)
         let (code, _, err) = run_options(&["lx", "fsl", "prelude"], &original);
-        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert_eq!(code, 1);
         assert!(
-            err.contains("no clean-room original of fsl prelude yet")
-                && err.contains("larmorx-nc package"),
+            err.contains("COMPULSORY options have not been set")
+                && err.contains("prelude (Version 2.0 in c# minor)"),
             "{err}"
         );
         // fast runs its clean-room original (2026-11-03): no arguments, the usage (exit 1)

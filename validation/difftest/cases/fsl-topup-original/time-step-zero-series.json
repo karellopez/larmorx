@@ -1,0 +1,248 @@
+{
+ "defect": null,
+ "description": "topup on a series of time step 0 (fMRIPrep's call: its --iout series compared whole): FSL writes the time step as its image layer reads it (its magnitude, 1 for a series of 0); the clean-room originals wrote the stored value",
+ "expect": "pass",
+ "found": {
+  "detail": "validation/investigations/fsl-pair-header/time_step.py: 47 of 66 runs of the FSL originals differed in pixdim[4] before the shared readers' fix",
+  "n": 2,
+  "seed": "time-step",
+  "shrink_moves": [],
+  "signature": [
+   "time step as read"
+  ]
+ },
+ "id": "time-step-zero-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "program": "topup",
+   "volumes": 2
+  },
+  "features": {
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "acquisition transposed": false,
+   "bias0": -0.004,
+   "bias1": -0.002,
+   "bias2": -0.002,
+   "dtype": "float64",
+   "extreme": false,
+   "field Hz": 25.0,
+   "field centre0": 0.3,
+   "field centre1": 0.5,
+   "field centre2": -0.5,
+   "field gradient0": -4.0,
+   "field gradient1": -4.0,
+   "field gradient2": -2.0,
+   "field width": 0.6,
+   "head axis0": 0.9,
+   "head axis1": 0.85,
+   "head axis2": 0.9,
+   "head centre0": -0.06,
+   "head centre1": 0.02,
+   "head centre2": 0.02,
+   "head fraction": 0.4,
+   "in-plane gradient only": true,
+   "in-plane voxel": 4.0,
+   "kind": "fmriprep",
+   "movements": true,
+   "noise": 1.0,
+   "nx": 16,
+   "ny": 20,
+   "nz": 16,
+   "orientation": "oblique",
+   "origin0": 26.5,
+   "origin1": -33.5,
+   "origin2": 44.75,
+   "phase encodings": "y pair",
+   "qfac": -1,
+   "qform_code": 0,
+   "read-out time": 0.015,
+   "read-out times differ": false,
+   "reversed first": false,
+   "rot10": -1,
+   "rot11": 0,
+   "rot12": 0,
+   "rot1n": 103,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "16x20x16",
+   "shift10": -0.75,
+   "shift11": -0.5,
+   "shift12": 0.75,
+   "slice thickness": 2.0,
+   "spacing0": 2.5,
+   "spacing1": 2.5,
+   "spacing2": 1.2,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "--config={in:b02b0}",
+     "--datain={in:acq}",
+     "--imain={in:pair}",
+     "--out=pair_base",
+     "--iout=pair_corrected",
+     "--fout=pair_field",
+     "--jacout=jac",
+     "--logout=pair_topup.log",
+     "--rbmout=xfm",
+     "--dfout=warpfield"
+    ],
+    "name": "fmriprep",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "acq": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "0 1 0 0.01500000\n0 -1 0 0.01500000\n"
+   },
+   "b02b0": {
+    "kind": "text",
+    "suffix": ".cnf",
+    "text": "# Resolution (knot-spacing) of warps in mm\n--warpres=14,12,10,6,4,4,4\n# Subsampling level (a value of 2 indicates that a 2x2x2 neighbourhood is collapsed to 1 voxel)\n--subsamp=2,2,2,1,1,1,1\n# FWHM of gaussian smoothing\n--fwhm=6,4,3,2,1,0,0\n# Maximum number of iterations\n--miter=5,5,5,10,10,20,20\n# Relative weight of regularisation\n--lambda=0.001,0.0001,0.000005,0.0000005,0.00000005,0.0000000005,0.00000000001\n# If set to 1 lambda is multiplied by the current average squared difference\n--ssqlambda=1\n# Regularisation model\n--regmod=bending_energy\n# If set to 1 movements are estimated along with the field\n--estmov=0\n# 0=Levenberg-Marquardt, 1=Scaled Conjugate Gradient\n--minmet=0,0,0,1,1,1,1\n# Quadratic or cubic splines\n--splineorder=3\n# Precision for calculation and storage of Hessian\n--numprec=double\n# Linear or spline interpolation\n--interp=spline\n# If set to 1 the images are individually scaled to a common mean intensity \n--scale=1"
+   },
+   "pair": {
+    "content": {
+     "axes": [
+      0.9,
+      0.85,
+      0.9
+     ],
+     "bias": [
+      -0.004,
+      -0.002,
+      -0.002,
+      0.0
+     ],
+     "centre": [
+      -2.0,
+      0.5,
+      0.5
+     ],
+     "noise": 1.0,
+     "seed": 103392875,
+     "size": 13.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "distortion": {
+     "centre": [
+      0.3,
+      0.5,
+      -0.5
+     ],
+     "gradient": [
+      -4.0,
+      -4.0,
+      0.0
+     ],
+     "hz": 25.0,
+     "volumes": [
+      [
+       1,
+       0.015
+      ],
+      [
+       1,
+       -0.015
+      ]
+     ],
+     "width": 0.6
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -23.25,
+      -45.0,
+      3.5
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      31,
+      3,
+      -2,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      4.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "motion": [
+     {
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "quaternion": [
+       103,
+       -1,
+       0,
+       0
+      ],
+      "translation": [
+       -0.75,
+       -0.5,
+       0.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     16,
+     20,
+     16,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": 0.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 2,
+  "options": [
+   "--config",
+   "--fout",
+   "--iout",
+   "--jacout",
+   "--rbmout",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "fMRIPrep's call"
+  ],
+  "seed": "time-step",
+  "tool": "fsl-topup-original"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-topup",
+ "tier": "smoke",
+ "tool": "fsl-topup-original"
+}

@@ -300,9 +300,10 @@ scales and skews kept whatever the command's dof); the search's `P` keeps each s
 once; with `reproduce` and NaN centres (FSL-14) an optimisation starts from the identity's
 parameters where its own are NaN, and a NaN pre-image is outside (the background value): 52 of
 the 57 trial findings with non-finite voxels agree (37 before). Open: FSL-91's and FSL-92's
-`reproduce` traces part at the sign of a zero skew under gimbal lock, and the weighted `normcorr`
-and `woods` registrations at their costs' last bits
-([findings](../findings/fsl-flirt-original.md), "numerics, `-debug` and NaN centres").
+`reproduce` traces part at the sign of a zero skew under gimbal lock, and the weighted `woods`
+registration at its cost's last bits ([findings](../findings/fsl-flirt-original.md), "numerics,
+`-debug` and NaN centres"; the weighted `normcorr` FSL's matrix as text since 2026-11-07, its
+count's running total taking each point's weight as the point is visited).
 
 ## Upstream defects (D13)
 
@@ -393,5 +394,5 @@ The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
 ported). Known differences: with NaN or infinite input voxels in `reproduce` mode (FSL-14), the sign of
 NaN results can differ from FSL's (`nan` against `-nan`; the values are NaN in both); FSL-91's and
-FSL-92's `reproduce` runs (every cost equal) and the weighted `normcorr` and `woods`
-registrations of the record part from FSL's paths (the catch-up's findings, above).
+FSL-92's `reproduce` runs (every cost equal) and the weighted `woods` registration of the
+record part from FSL's paths (the catch-up's findings, above).

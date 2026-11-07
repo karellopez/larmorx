@@ -724,34 +724,51 @@ fn run(
             },
         ));
     }
-    // the Jacobian's scales (specs/topup.md §7.3): a coefficient field's derivatives per voxel
-    // of the field's grid times the image's voxel size over the field's (1 on its own grid); a
-    // field image's per voxel of the images' grid (1), or FSL's (FSL-134 reproduced: both
-    // displacements in units of the image's x voxel size, divided by the field image's own
-    // voxel sizes)
-    let mut jac_scale = if field_image {
-        [1.0, 1.0]
-    } else {
-        [voxel[0] / field_voxel[0], voxel[1] / field_voxel[1]]
-    };
-    let fsl_scale = [voxel[0] / field_voxel[0], voxel[0] / field_voxel[1]];
-    if field_image
-        && !lsr
-        && ((images.iter().any(|i| i.scan.pe[0] != 0.0) && fsl_scale[0] != 1.0)
-            || (images.iter().any(|i| i.scan.pe[1] != 0.0) && fsl_scale[1] != 1.0))
-    {
-        notices.push(Notice::new(
-            &defects::FSL_134,
-            mode,
-            match mode {
-                UpstreamDefects::Fix => "the field image's Jacobian per voxel along y (FSL's in units of the x voxel size)",
-                UpstreamDefects::Reproduce => "the field image's Jacobian along y in units of the x voxel size, as FSL's",
-            },
-        ));
-        if mode == UpstreamDefects::Reproduce {
-            jac_scale = fsl_scale;
+    // the Jacobian's scales (specs/topup.md §7.3) and the defects they name
+    let encoded = [0, 1].map(|a| images.iter().any(|i| i.scan.pe[a] != 0.0));
+    let scales = jac_scales(field_image, voxel, field_voxel, encoded, mode);
+    if !lsr {
+        if !scales.fsl273.is_empty() {
+            let axes: Vec<String> = scales
+                .fsl273
+                .iter()
+                .map(|&a| {
+                    format!(
+                        "{} (the field's {} mm, the images' {} mm)",
+                        ["x", "y"][a],
+                        fmt::g(field_voxel[a]),
+                        fmt::g(voxel[a])
+                    )
+                })
+                .collect();
+            let what = if field_image { "field image" } else { "field" };
+            notices.push(Notice::new(
+                &defects::FSL_273,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => format!(
+                        "--method=jac: the Jacobian of the displacement applied along {} (FSL's scaled by the images' voxel size over the {what}'s)",
+                        axes.join(", ")
+                    ),
+                    UpstreamDefects::Reproduce => format!(
+                        "--method=jac: the Jacobian scaled along {} by the images' voxel size over the {what}'s, as FSL's",
+                        axes.join(", ")
+                    ),
+                },
+            ));
+        }
+        if scales.fsl134 {
+            notices.push(Notice::new(
+                &defects::FSL_134,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => "the field image's Jacobian per voxel along y (FSL's in units of the x voxel size)",
+                    UpstreamDefects::Reproduce => "the field image's Jacobian along y in units of the x voxel size, as FSL's",
+                },
+            ));
         }
     }
+    let jac_scale = scales.scale;
     let s = apply::Settings {
         dims,
         voxel,
@@ -968,9 +985,79 @@ fn write_output(
     }
 }
 
+/// The Jacobian's scales along x and y of `--method=jac` (`specs/topup.md` §7.3) and the defects
+/// they name.
+struct JacScales {
+    scale: [f64; 2],
+    /// FSL-273: the encoded axes whose field voxel size is not the images'.
+    fsl273: Vec<usize>,
+    /// FSL-134: a field image's y term in units of the images' x voxel size, where it differs.
+    fsl134: bool,
+}
+
+/// By default 1 along both axes, the Jacobian of the displacement applied (laid at the images'
+/// voxel indices in the images' voxel sizes: a coefficient field's derivatives per voxel of its
+/// own grid, a field image's per voxel of the images'); with `reproduce` FSL's: a coefficient
+/// field's the images' voxel size over the field's (`dx / fx`, `dy / fy`: FSL-273), a field
+/// image's the images' x voxel size over the field image's own (`dx / fx`, `dx / fy`: FSL-273
+/// along an encoded axis whose voxel sizes differ, FSL-134 along y when the images' x and y
+/// voxel sizes differ).
+fn jac_scales(
+    field_image: bool,
+    voxel: [f64; 3],
+    field_voxel: [f64; 3],
+    encoded: [bool; 2],
+    mode: UpstreamDefects,
+) -> JacScales {
+    let fsl = if field_image {
+        [voxel[0] / field_voxel[0], voxel[0] / field_voxel[1]]
+    } else {
+        [voxel[0] / field_voxel[0], voxel[1] / field_voxel[1]]
+    };
+    JacScales {
+        scale: match mode {
+            UpstreamDefects::Fix => [1.0, 1.0],
+            UpstreamDefects::Reproduce => fsl,
+        },
+        fsl273: (0..2)
+            .filter(|&a| encoded[a] && field_voxel[a] != voxel[a])
+            .collect(),
+        fsl134: field_image && encoded[1] && voxel[0] != voxel[1],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// FSL-273 and FSL-134's scales (`specs/topup.md` §7.3; black box:
+    /// `validation/investigations/cleanroom-topup/jac_fsl273.py`).
+    #[test]
+    fn jacobian_scales_both_modes() {
+        let (fix, rep) = (UpstreamDefects::Fix, UpstreamDefects::Reproduce);
+        // a coefficient field on the images' grid: 1 in both modes, nothing named
+        let s = jac_scales(false, [3.0, 6.0, 3.0], [3.0, 6.0, 3.0], [false, true], rep);
+        assert_eq!(
+            (s.scale, s.fsl273.is_empty(), s.fsl134),
+            ([1.0, 1.0], true, false)
+        );
+        // made on 6 mm voxels along y, applied to images of 4 mm: FSL's dy / fy (FSL-273)
+        let s = jac_scales(false, [3.0, 4.0, 3.0], [3.0, 6.0, 3.0], [false, true], rep);
+        assert_eq!((s.scale, s.fsl273.clone()), ([1.0, 4.0 / 6.0], vec![1]));
+        let s = jac_scales(false, [3.0, 4.0, 3.0], [3.0, 6.0, 3.0], [false, true], fix);
+        assert_eq!((s.scale, s.fsl273), ([1.0, 1.0], vec![1]));
+        // an axis not encoded is not named
+        let s = jac_scales(false, [2.0, 4.0, 3.0], [3.0, 4.0, 3.0], [false, true], rep);
+        assert!(s.fsl273.is_empty());
+        // a field image: the y term in units of the x voxel size (FSL-134), its own voxel sizes
+        let s = jac_scales(true, [3.0, 4.0, 3.0], [3.0, 4.0, 3.0], [false, true], rep);
+        assert_eq!(
+            (s.scale, s.fsl273.is_empty(), s.fsl134),
+            ([1.0, 0.75], true, true)
+        );
+        let s = jac_scales(true, [3.0, 3.0, 3.0], [3.0, 6.0, 3.0], [false, true], fix);
+        assert_eq!((s.scale, s.fsl273, s.fsl134), ([1.0, 1.0], vec![1], false));
+    }
 
     /// `--topup`'s base name under a folder whose name holds a dot, with the platform's own
     /// separators (docs/api/fsl-topup.md, "File names on Windows"): no extension; `\` a

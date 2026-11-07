@@ -15,11 +15,13 @@
 //!   `specs/topup.md` the same way.
 //! - [`maths`]: FSL's image calculator `fslmaths`, written from `specs/fslmaths.md` the same
 //!   way.
+//! - [`prelude`]: PRELUDE's phase unwrapping (`prelude`), written from `specs/prelude.md` and
+//!   Jenkinson's paper (Magnetic Resonance in Medicine 49, 2003) the same way.
 //! - [`data`]: FSL's standard images, found where the user has them or fetched once (FSL's
 //!   data, read at run time, never shipped: `specs/bet.md` §5.4).
 //! - [`cli`]: the command lines (`larmorx fsl bet2`, `bet`, `betsurf`, `flirt`, `convert_xfm`,
 //!   FLIRT's other programs, `fast`, `topup`, `fslmaths`, `fslstats`, `fslroi`,
-//!   `standard_space_roi`; FSL's arguments).
+//!   `standard_space_roi`, `prelude`; FSL's arguments).
 #![forbid(unsafe_code)]
 // Fixed 3-vectors and 3 x 3 matrices read best indexed; comparisons written so that NaN takes
 // the branch FSL's own comparisons give it.
@@ -32,4 +34,5 @@ pub mod data;
 pub mod fast;
 pub mod flirt;
 pub mod maths;
+pub mod prelude;
 pub mod topup;

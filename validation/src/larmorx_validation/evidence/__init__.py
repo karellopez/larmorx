@@ -33,7 +33,8 @@ TOOLS: dict[str, str] = {
     "fsl-topup": "fsl_topup",
     "fsl-maths": "fsl_maths",
     "fsl-stats": "fsl_stats",
-    "fsl-prelude": "fsl_prelude",
+    # the replica's page (fsl_prelude) with the clean-room original's panels, cases and speed
+    "fsl-prelude": "fsl_prelude_original",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

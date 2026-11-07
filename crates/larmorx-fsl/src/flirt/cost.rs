@@ -12,7 +12,8 @@ use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::math::Libm;
 
 use larmorx_mri::hmc::cost::{
-    self as hcost, Accumulator, CorrSlice, NormCorrCount, PointWeight, TestBins, TestVolume,
+    self as hcost, Accumulator, CorrSlice, CorrTotal, NormCorrCount, PointWeight, TestBins,
+    TestVolume,
 };
 use larmorx_mri::hmc::interp::trilinear_inside;
 use larmorx_mri::hmc::volume::Volume;
@@ -291,18 +292,24 @@ impl Pair {
         };
         match cost {
             Cost::NormCorr => {
-                let slices = hcost::sample_weighted(
+                // the count's running total `C` takes each point's weight as it is visited
+                // (§6.4), the slices folded in order
+                let total = hcost::sample_fold(
                     &self.reference,
                     &tv,
                     &b,
                     parallel,
                     weight,
                     CorrSlice::default,
+                    CorrTotal::default(),
+                    |t, s| t.add(s),
                 );
                 if weight.is_some() {
-                    1.0 - hcost::correlation(&slices, true, NormCorrCount::Mcflirt)
+                    1.0 - total.correlation(true, NormCorrCount::Mcflirt)
                 } else {
-                    1.0 - hcost::correlation(&slices, tv.weighted(), NormCorrCount::Mcflirt).abs()
+                    1.0 - total
+                        .correlation(tv.weighted(), NormCorrCount::Mcflirt)
+                        .abs()
                 }
             }
             Cost::LeastSq => self.least_squares(&tv, &b, parallel, weight),

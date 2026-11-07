@@ -247,3 +247,71 @@ cache keeps a run's files, not its empty directories, so the trial's replays fro
 it (the first run, mcflirt live, had no such difference). The descriptor runs those mcflirt calls
 live now (`difftest/tools/mri_hmc.py`'s `makes_empty_directory`;
 `validation/tests/test_mri_hmc_descriptor.py`).
+
+## The count per point and `leastsquares` as FLIRT's (PRELUDE's clean-room part, relay 3, 2026-11-07)
+
+**The count.** The spec writer's answer of 2026-11-06 (`specs/mcflirt.md` §6.4, from FLIRT's record:
+`specs/flirt.md` §6.4): the count `N`'s first running total `C` takes each contributing point's
+weight as the point is visited, over the whole grid; at every row's end `C` is added to `A`, at
+every slice's end `A` to `N`. The original added each row's total at the row's end, which rounds
+otherwise where the weights are fractional (the edge factors within the smoothing distance of the
+test volume's bounds). Now each slice keeps its points' weights in visiting order (runs of unit
+weights as their lengths, the other weights as they are), the slices are sampled in parallel in
+groups of four per thread and replayed in slice order (`hmc::cost::sample_fold`,
+`CorrTotal::add`, `add_ones`): the same bits at any thread count. **Black box**
+(`validation/investigations/cleanroom-align/count_trace.py`: mcflirt 6.0.7.23's `-verbose 20`
+through the oracle cache against two traced builds, `reproduce`): the per-point count follows
+mcflirt's evaluated matrices longer on every recorded run traced: the first matrix that differs
+from mcflirt's comes at evaluation 39 instead of 3 (`syn/geometry/single-volume/reffile`), 41
+instead of 9 (`ras-unflipped/reffile`), 33 instead of 8 (`ras-unflipped/default`), 31 instead of
+23 (`motion/small/default` and `meanvol`), 35 instead of 7 (`motion/small/reffile`), 39 instead
+of 7 (`motion/small/dof12`); `syn/content/ramp/reffile` parts at its second evaluation in both
+(48 matrices identical instead of 3). Where the paths still part after some 30 to 40 evaluations
+is open (the line search's last bits, as before). Speed: on ds000005's fMRIPrep call 16.6 s
+against 15.7 s at one thread (a loaded machine), 2.05 against 2.13 s at 14.
+
+**`leastsquares`** (`specs/mcflirt.md` appendix A, the spec writer's answer of 2026-11-06): FLIRT's
+`leastsq` unchanged: `(w·δ)·δ` and `w` (with `-smooth 0` `δ·δ` and the count) in three
+single-precision levels (row, slice, total), the quotient in single precision, `(max − min)²` of
+the two volumes' finite values when the weight (count) is not above 1; the original summed in
+double precision. Unit test `hmc::cost::tests::least_squares_sums_three_levels`.
+
+**The record** `mri-hmc` re-made (`--jobs 1`; first from `f005a08`: 170 cases, 145 pass, 20
+rejected by both, 3 expected divergences, 2 failures; before: 169, 145, 20, 3, 1). The matrices identical
+to mcflirt's as text: 231 of 11,476 (54 before); the 95th percentile of the matrix RMS deviation
+lower in 65 cases, higher in 42, the same in 10 of 117 (median ratio 0.98); ds000005's default
+run 35 of 240 matrices identical (1 before). `real/ds003345/default` passes (it failed: p95
+0.0279 mm, now 0.0235), and the new permanent case (`time-step-negative-series`, the time step as
+read) passes; two synthetic cases near their thresholds now miss them: `syn/content/ramp/reffile`
+(a ramp, which only an x translation can align: that translation 0.342 mm from mcflirt's, 0.181
+before, threshold 0.3; the other parameters are not constrained) and
+`syn/orientation/ras-unflipped/reffile` (p95 0.110 mm, 0.066 before, threshold 0.1). Both
+follow mcflirt's path longer than before (above) and part later (at the 41st evaluation of
+`ras-unflipped/reffile` the printed matrices differ in the sixth decimal of one translation: the
+parameters had already parted below the printed digits, in the line search's arithmetic).
+
+**mcflirt's own spread on these two runs** (2026-11-07,
+`validation/investigations/cleanroom-align/hmc_spread.py`, FSL 6.0.7.23 through the oracle cache,
+never kept; [`results/hmc-spread-2026-11-07.json`](../../validation/investigations/cleanroom-align/results/hmc-spread-2026-11-07.json)):
+the series and the reference as float32 with every nonzero voxel moved one unit in the last place
+up or down at random (8 realisations, about 1e-7 of each value; a float32 copy with the same
+values, the control, gives mcflirt's recorded matrices as text), and the band's perturbations of
+`parity/mri_hmc_band.py` (noise of ±0.5 three times, the volumes reversed). On
+`ras-unflipped/reffile` mcflirt's matrices move 0.065 to 0.131 mm from its recorded ones at the
+95th percentile (median of the 8: 0.078; the band's 0.077 to 0.114), so larmorx's 0.110 lies
+within mcflirt's own spread; on the same perturbed inputs larmorx ends 0.058 to 0.103 mm from
+mcflirt, and 0.059 to 0.105 from itself. On `ramp/reffile` mcflirt's x translation moves 0.094 to
+0.493 mm (median 0.197; the band's 0.121 to 0.433) and its other parameters 11 to 17 mm at the
+95th percentile (not constrained by a ramp), so larmorx's 0.342 lies within it; from the applied
+shifts (the largest over the volumes, decomposed about the reference's field-of-view centre as the
+suite does) larmorx 0.35 mm, mcflirt 0.18, mcflirt on the perturbed inputs 0.08 to 0.50, larmorx
+0.08 to 0.40. Neither is a mistake or a defect: both are the search's sensitivity to its last
+bits, which mcflirt shares at the same size. The suite counts the two as expected divergences
+with these numbers in their reasons (`parity/mri_hmc.py`'s `PATH_DIVERGENCES`: only when every
+failed check is one of the estimates' metrics and the run lies within mcflirt's measured spread;
+every check still runs and is reported), as it counts `difftest/phantom-several-minima`. The
+record (`docs/validation/mri-hmc.md`) re-made from `a3f1d34` (`--jobs 1`): 145 pass, 20 rejected
+by both, 5 expected divergences, 0 failures, every status and measured value as in its making
+from `1df84f3`; only the two reasons changed, to these numbers (the site's case explorer shows
+them).
+`real/ds000005/opt-cost-leastsquares` passes (p95 0.0227 mm, 0.0220 before).

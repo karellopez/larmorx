@@ -157,6 +157,7 @@ PAGES = [
         "BET",
         "fsl",
         [
+            ("clean-room original", "fsl-bet", "experimental", None, None),
             ("larmorx-nc replica", "fsl-bet-replica-full", "validated", None, None),
             ("larmorx-nc replica, FSL 6.0.7.23", "fsl-bet-replica", "validated", None, None),
         ],
@@ -193,7 +194,10 @@ PAGES = [
         "/tools/fsl-topup/",
         "topup and applytopup",
         "fsl",
-        [("larmorx-nc replica", "fsl-topup-replica", "experimental", None, None)],
+        [
+            ("clean-room original", "fsl-topup", "experimental", None, None),
+            ("larmorx-nc replica", "fsl-topup-replica", "experimental", None, None),
+        ],
     ),
     (
         "/tools/fsl-maths/",
@@ -217,7 +221,10 @@ PAGES = [
         "/tools/fsl-prelude/",
         "prelude",
         "fsl",
-        [("larmorx-nc replica", "fsl-prelude-replica", "experimental", None, None)],
+        [
+            ("clean-room original", "fsl-prelude", "experimental", None, None),
+            ("larmorx-nc replica", "fsl-prelude-replica", "experimental", None, None),
+        ],
     ),
     (
         "/tools/resample-series/",

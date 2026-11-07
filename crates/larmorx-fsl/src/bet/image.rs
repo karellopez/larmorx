@@ -297,7 +297,11 @@ pub fn write(
         };
         notices.push(Notice::new(&defects::FSL_56, o.defects, detail));
     }
-    if files.standard_names()
+    // A single file named as larmorx's NIfTI writer names it goes through that writer; a pair
+    // through this module's own (its header file holds NIfTI's four extension bytes, which
+    // larmorx's writer leaves out of a pair without extensions: [`write_pieces`]).
+    if files.data.is_none()
+        && files.standard_names()
         && matches!(compression, Compression::None | Compression::Gzip)
         && !(fsl56 && o.defects.reproduce())
     {
@@ -329,7 +333,11 @@ fn storage_order<T: Copy>(mut v: Vec<T>, nx: usize, flipped: bool) -> Vec<T> {
     v
 }
 
-/// Writes the header block and the data, each file compressed as its name says.
+/// Writes the header block and the data, each file compressed as its name says. The header
+/// block is followed, in a single file and in a pair's header file alike, by NIfTI's four
+/// extension bytes (1 when extensions follow, else 0) and the extensions: a pair's header file
+/// is 352 bytes without extensions (NIfTI-2: 544), as FSL 6.0.7.23 writes it for every pair type
+/// (observed: `validation/investigations/fsl-pair-header`, every program of this crate's family).
 fn write_pieces(
     files: &ImageFiles,
     mut h: NiftiHeader,
@@ -357,17 +365,13 @@ fn write_pieces(
     };
     h.vox_offset = offset as f64;
     let mut head = h.to_bytes();
-    if single {
-        let mut ext = Vec::new();
-        ext.extend_from_slice(&[u8::from(!h.extensions.is_empty()), 0, 0, 0]);
-        for e in &h.extensions {
-            e.write(&mut ext, h.byte_order)
-                .map_err(|e| ImageError::Invalid(e.to_string()))?;
-        }
-        // the extensions in full, the data after them: with FSL-56 reproduced only the
-        // recorded offset is FSL's (observed), so a reader finds the data elsewhere
-        head.extend_from_slice(&ext);
+    head.extend_from_slice(&[u8::from(!h.extensions.is_empty()), 0, 0, 0]);
+    for e in &h.extensions {
+        e.write(&mut head, h.byte_order)
+            .map_err(|e| ImageError::Invalid(e.to_string()))?;
     }
+    // the extensions in full, the data after them: with FSL-56 reproduced only the recorded
+    // offset is FSL's (observed), so a reader finds the data elsewhere
     let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
         let io = |e: std::io::Error| ImageError::Invalid(format!("{}: {e}", p.display()));
         let file = std::fs::File::create(p).map_err(io)?;
@@ -552,6 +556,8 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
     h.scl_slope = 1.0;
     h.scl_inter = 0.0;
     h.intent_code = 0;
+    // the time step as FSL's image layer reads it (its magnitude; 1 for a time axis of 0)
+    larmorx_mri::hmc::image::time_step_as_read(&mut h);
     let volumes = vols.len();
     let first = vols
         .first()
@@ -686,7 +692,8 @@ pub fn read_series_lean(
             n_threads,
         },
     )?;
-    let header = img.header;
+    let mut header = img.header;
+    larmorx_mri::hmc::image::time_step_as_read(&mut header);
     let shape = img.data.shape().to_vec();
     let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
     let per: usize = dims.iter().product();
@@ -773,5 +780,95 @@ pub(crate) fn analyze_header(files: &ImageFiles) -> bool {
     match raw {
         Ok(raw) => raw.len() >= 348 && &raw[344..347] != b"ni1" && &raw[344..347] != b"n+1",
         Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_io::nifti::Extension;
+
+    /// The pair types of `FSLOUTPUTTYPE` (the header file's name, its NIfTI version).
+    const PAIRS: [&str; 8] = [
+        "NIFTI_PAIR",
+        "NIFTI_PAIR_GZ",
+        "NIFTI_PAIR_ZST",
+        "NIFTI_PAIR_BZ2",
+        "NIFTI2_PAIR",
+        "NIFTI2_PAIR_GZ",
+        "NIFTI2_PAIR_ZST",
+        "NIFTI2_PAIR_BZ2",
+    ];
+
+    fn written(dir: &Path, stem: &str, t: &str, template: &NiftiHeader, ext: bool) -> Vec<u8> {
+        let (name, version) = output_file(&dir.join(stem).to_string_lossy(), t).unwrap();
+        let o = Output {
+            template,
+            flipped: false,
+            shape: [3, 2, 2],
+            volumes: 1,
+            cal: None,
+            extensions: ext,
+            defects: UpstreamDefects::Fix,
+            n_threads: 2,
+            descrip: "test",
+            rewrite_quaternion: true,
+        };
+        write(
+            &name,
+            version,
+            &o,
+            Values::F32((0..12).map(|v| v as f32).collect()),
+        )
+        .unwrap();
+        let files = ImageFiles::of(&name).unwrap();
+        if let Some(d) = &files.data {
+            let raw = std::fs::read(d).unwrap();
+            let data = Compression::of_file(d).unwrap().decompress(raw).unwrap();
+            assert_eq!(data.len(), 48, "{t}: the data file holds the data only");
+        }
+        let raw = std::fs::read(&files.header).unwrap();
+        Compression::of_file(&files.header)
+            .unwrap()
+            .decompress(raw)
+            .unwrap()
+    }
+
+    /// FSL 6.0.7.23 writes a pair's header file as the header block, NIfTI's four extension
+    /// bytes and the extensions, for every pair type (observed with fslmaths, fslroi, bet2,
+    /// flirt, mcflirt, prelude, topup and applytopup: `validation/investigations/fsl-pair-header`).
+    #[test]
+    fn pair_headers_hold_the_extension_bytes_for_every_type() {
+        let dir = tempfile::tempdir().unwrap();
+        let plain = NiftiHeader::new(NiftiVersion::V1, &[3, 2, 2], DataType::F32).unwrap();
+        let mut with_ext = plain.clone();
+        with_ext
+            .extensions
+            .push(Extension::new(6, b"larmorx pair test".to_vec()));
+        for t in PAIRS {
+            let block = if t.starts_with("NIFTI2") { 540 } else { 348 };
+            let h = written(dir.path(), &format!("a-{t}"), t, &plain, false);
+            assert_eq!(h.len(), block + 4, "{t}");
+            assert_eq!(h[block..], [0, 0, 0, 0], "{t}");
+            // the input's extensions kept: the flag 1, then the extension (8 + 17 bytes, in 32)
+            let h = written(dir.path(), &format!("b-{t}"), t, &with_ext, true);
+            assert_eq!(h.len(), block + 4 + 32, "{t}");
+            assert_eq!(h[block..block + 4], [1, 0, 0, 0], "{t}");
+            assert_eq!(&h[block + 12..block + 29], b"larmorx pair test", "{t}");
+            // extensions not kept: as without any
+            let h = written(dir.path(), &format!("c-{t}"), t, &with_ext, false);
+            assert_eq!(h.len(), block + 4, "{t}");
+            // a pair's vox_offset is 0
+            let vox = if block == 348 {
+                f64::from(f32::from_le_bytes(h[108..112].try_into().unwrap()))
+            } else {
+                f64::from_le_bytes(h[168..176].try_into().unwrap())
+            };
+            assert_eq!(vox, 0.0, "{t}");
+        }
+        // a single file: the extension bytes, then the data at vox_offset 352
+        let h = written(dir.path(), "single", "NIFTI", &plain, false);
+        assert_eq!(h.len(), 352 + 48);
+        assert_eq!(h[348..352], [0, 0, 0, 0]);
     }
 }

@@ -302,13 +302,13 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's PRELUDE (2026-11-06): the replica; its clean-room original is to be written from
-    // specs/prelude.md (the next part).
+    // FSL's PRELUDE (2026-11-06): the replica, and its clean-room original (`larmorx_fsl::cli`,
+    // written from specs/prelude.md).
     Replica {
         family: "fsl",
         tool: "prelude",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
 ];
 
@@ -764,19 +764,16 @@ mod tests {
         );
         assert!(choose_with(Implementation::Original, volreg, never).is_err());
         assert_eq!(replica_only("ants").count(), 0);
-        // every FSL tool but prelude has its clean-room original (fslroi and
-        // standard_space_roi since 2026-11-05); prelude has only its replica (2026-11-06)
-        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["prelude"]);
+        // every FSL tool has its clean-room original (prelude's since 2026-11-06)
+        assert_eq!(replica_only("fsl").count(), 0);
         let prelude = lookup("fsl", "prelude").unwrap();
         assert!(matches!(
             choose_with(Implementation::Auto, prelude, found),
             Ok(Choice::Replica(_))
         ));
-        let e = choose_with(Implementation::Auto, prelude, missing).unwrap_err();
-        assert!(
-            e.to_string()
-                .contains("no clean-room original of fsl prelude"),
-            "{e}"
+        assert_eq!(
+            choose_with(Implementation::Auto, prelude, missing),
+            Ok(Choice::Original)
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");

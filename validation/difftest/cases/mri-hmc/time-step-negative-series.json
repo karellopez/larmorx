@@ -1,0 +1,248 @@
+{
+ "defect": null,
+ "description": "mcflirt's engine on a series of time step -2: FSL writes the time step as its image layer reads it (its magnitude, 1 for a series of 0); the clean-room originals wrote the stored value",
+ "expect": "pass",
+ "found": {
+  "detail": "validation/investigations/fsl-pair-header/time_step.py: 47 of 66 runs of the FSL originals differed in pixdim[4] before the shared readers' fix",
+  "n": 10,
+  "seed": "time-step",
+  "shrink_moves": [],
+  "signature": [
+   "time step as read"
+  ]
+ },
+ "id": "time-step-negative-series",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": false,
+   "-plots": true,
+   "-rmsabs": false,
+   "-rmsrel": true,
+   "bins": false,
+   "cost": false,
+   "dof": false,
+   "dtype": "float32",
+   "extreme": false,
+   "final": false,
+   "first at rest": false,
+   "fudge": false,
+   "gdt": false,
+   "meanvol": false,
+   "noise": 0.0,
+   "nx": 28,
+   "ny": 31,
+   "nz": 7,
+   "oblique": false,
+   "reffile": false,
+   "refvol": false,
+   "rot b": 0,
+   "rot c": -1,
+   "rot d": 2,
+   "rot scale": 6,
+   "rotation": false,
+   "scaling": false,
+   "shift0": 0.5,
+   "shift1": -0.5,
+   "shift2": -0.25,
+   "shift3": 0.5,
+   "slice spacing": 4.0,
+   "smooth": false,
+   "spacing": 3.5,
+   "stages": false,
+   "stats": false,
+   "tissues": "epi",
+   "volumes": 4
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-plots",
+     "-rmsrel"
+    ],
+    "name": "outputs",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 0.0,
+     "seed": 1071879879,
+     "size": 41.16,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -47.25,
+      -52.5,
+      -10.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.5,
+      3.5,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       36,
+       -2,
+       0,
+       1
+      ],
+      "translation": [
+       -0.75,
+       -0.25,
+       1.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       56,
+       -1,
+       -1,
+       -1
+      ],
+      "translation": [
+       1.5,
+       1.75,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       53,
+       1,
+       1,
+       -1
+      ],
+      "translation": [
+       0.0,
+       0.25,
+       0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       51,
+       0,
+       -1,
+       2
+      ],
+      "translation": [
+       0.5,
+       -0.5,
+       -0.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     28,
+     31,
+     7,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "tr": -2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 10,
+  "options": [
+   "-plots",
+   "-rmsrel"
+  ],
+  "seed": "time-step",
+  "tool": "mri-hmc"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "mri-hmc",
+ "tier": "smoke",
+ "tool": "mri-hmc"
+}

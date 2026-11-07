@@ -1,0 +1,382 @@
+{
+ "defect": null,
+ "description": "AFNI-99 named only where a maximum displacement the run prints or writes changes: -cubic -final Fourier -zpad 0 on an int16 head series stored RAS (quaternion identity: axes L2R, P2A, I2S), whose float32 maximum displacements differ between the two modes below the messages' two decimals",
+ "expect": "pass",
+ "found": {
+  "detail": "AFNI-99: no values changed",
+  "n": 6,
+  "seed": "volreg-trial",
+  "shrink_moves": [],
+  "signature": [
+   "notice: AFNI-99"
+  ]
+ },
+ "id": "afni99-notice-unchanged",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "p.1D",
+    "m.aff12.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": true,
+   "1Dmatrix_save": true,
+   "base index": true,
+   "base value": 0,
+   "content": "head",
+   "controls": true,
+   "delta value": "0.7",
+   "dfile": false,
+   "dtype": "int16",
+   "edging": false,
+   "external base": false,
+   "extreme": false,
+   "final": true,
+   "final value": "Fourier",
+   "first at rest": true,
+   "float": false,
+   "maxdisp1D": false,
+   "maxite value": "1",
+   "method": true,
+   "method value": "cubic",
+   "noclip": false,
+   "noise": 3.0,
+   "nomaxdisp": false,
+   "nx": 27,
+   "ny": 27,
+   "nz": 12,
+   "oblique": false,
+   "rot b": 0,
+   "rot c": -1,
+   "rot d": -2,
+   "rot scale": 2,
+   "rot_thresh value": "0.1",
+   "savedisp": false,
+   "shift0": 0.5,
+   "shift1": 0.0,
+   "shift2": -0.5,
+   "shift3": 1.0,
+   "shift4": 2.0,
+   "shift5": 0.5,
+   "slice spacing": 4.0,
+   "slope": false,
+   "spacing": 2.0,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "tshift": false,
+   "twopass": false,
+   "verbose": false,
+   "volumes": 6,
+   "weight": false,
+   "wtinp": false,
+   "x_thresh value": "0.3",
+   "zpad": true,
+   "zpad value": "0"
+  },
+  "groups": [
+   {
+    "args": [
+     "-cubic"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-final",
+     "Fourier"
+    ],
+    "name": "final",
+    "optional": true
+   },
+   {
+    "args": [
+     "-zpad",
+     "0"
+    ],
+    "name": "zpad",
+    "optional": true
+   },
+   {
+    "args": [
+     "-base",
+     "0"
+    ],
+    "name": "base",
+    "optional": true
+   },
+   {
+    "args": [
+     "-maxite",
+     "1"
+    ],
+    "name": "maxite",
+    "optional": true
+   },
+   {
+    "args": [
+     "-x_thresh",
+     "0.3"
+    ],
+    "name": "x_thresh",
+    "optional": true
+   },
+   {
+    "args": [
+     "-rot_thresh",
+     "0.1"
+    ],
+    "name": "rot_thresh",
+    "optional": true
+   },
+   {
+    "args": [
+     "-delta",
+     "0.7"
+    ],
+    "name": "delta",
+    "optional": true
+   },
+   {
+    "args": [
+     "-1Dfile",
+     "p.1D"
+    ],
+    "name": "1Dfile",
+    "optional": true
+   },
+   {
+    "args": [
+     "-1Dmatrix_save",
+     "m.aff12.1D"
+    ],
+    "name": "1Dmatrix_save",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 1855783504,
+     "size": 22.68,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -26.0,
+      -26.0,
+      -11.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       55,
+       -1,
+       1,
+       1
+      ],
+      "translation": [
+       -1.0,
+       -1.25,
+       -1.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       51,
+       2,
+       0,
+       -2
+      ],
+      "translation": [
+       0.75,
+       0.0,
+       0.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       32,
+       -2,
+       2,
+       0
+      ],
+      "translation": [
+       0.0,
+       -0.25,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       49,
+       0,
+       -2,
+       0
+      ],
+      "translation": [
+       1.0,
+       -2.0,
+       -0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       35,
+       0,
+       -1,
+       -2
+      ],
+      "translation": [
+       0.5,
+       0.0,
+       -0.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     27,
+     27,
+     12,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 6,
+  "options": [
+   "-1Dfile",
+   "-1Dmatrix_save",
+   "-base",
+   "-cubic",
+   "-delta",
+   "-final",
+   "-maxite",
+   "-rot_thresh",
+   "-x_thresh",
+   "-zpad",
+   "12 slices",
+   "6 volumes",
+   "int16 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-volreg",
+ "tier": "smoke",
+ "tool": "afni-volreg"
+}

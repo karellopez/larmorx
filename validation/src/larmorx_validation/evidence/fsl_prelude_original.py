@@ -680,6 +680,12 @@ SPEED_SERIES = [
 _KEYS = ("fsl_s", "replica_s", "original-1_s", "original-12_s")
 
 
+def _map_label(cell: str) -> str:
+    """``128 × 128 × 128 (66,020)``: a generated map's size and its regions."""
+    m = re.fullmatch(r"(.+?) \(([\d,]+)\)", cell)
+    return f"a generated map, {m.group(1)} voxels ({m.group(2)} regions)" if m else cell
+
+
 def _call_label(call: str) -> str:
     run, est = call.split("/", 1)
     return f"fMRIPrep's call, {run.removesuffix('-noreconall')} ({est})"
@@ -696,7 +702,7 @@ def _speed(ctx: core.Context, calls: dict, large: list[dict], machine: str) -> t
             tool, op = s["id"].split("|")
             results.append({"tool": tool, "operation": op, "input": call, "median": r[key]})
     for row in large:
-        name = f"a generated map of {row['map']} regions"
+        name = _map_label(row["map"])
         labels[name] = name
         order.append(name)
         for s, run in zip(SPEED_SERIES, row["runs"], strict=True):
@@ -726,7 +732,7 @@ def _speed(ctx: core.Context, calls: dict, large: list[dict], machine: str) -> t
     for row in large:
         cells = [common.cell("not run") if run is None else common.cell(
             f"{run[0]:.3g} s, {run[1]} MiB") for run in row["runs"]]  # fmt: skip
-        trows.append({"head": f"a generated map of {row['map']} regions",
+        trows.append({"head": _map_label(row["map"]),
                       "cells": [*cells, common.cell("each program's output the same bits")]})  # fmt: skip
     table = common.table(
         "benchmark", "The benchmark: seconds, and peak memory on the generated maps",

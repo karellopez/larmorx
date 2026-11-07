@@ -38,3 +38,18 @@ What they gave (relay 1, 2026-11-06; the original built from this branch, the re
   cases), run as a black box with the original standing in for the replica's program: all agree
   (68 pass, 20 refused by both); its first run found the pair header's four extension bytes the
   original then lacked (352 bytes, as FSL writes them).
+
+## The site (relay 4, 2026-11-07)
+
+PRELUDE's page (`python -m larmorx_validation evidence fsl-prelude --site <site>`) is the replica's
+(`evidence/fsl_prelude.py`, called as a black box) extended by `evidence/fsl_prelude_original.py`:
+the original's runs of each example's call live in the figures cache's
+`fsl-prelude/<replica's entry>-original` (`python -m larmorx_validation.evidence.fsl_prelude_original`
+computes the missing ones; `... refresh <why>` computes them again after a change of the original),
+each output stored as the earlier panel that holds the same values or encoded on the example's
+grid; every panel the module matches with a file is decoded from the page's blobs and checked
+against it before anything is added. The pages of FLIRT, topup, fslmaths and the head-motion
+correction were brought to their records' movements in this part with each module's own
+`refresh_original` (fslmaths: `fsl_maths_original.refresh`), then exported from one clean commit.
+Each page was counted before and after with `../cleanroom-bet/site_inventory.py` (after >= before
+on all of them), and checked with the site's number and viewer checks (`tools/review/shoot.mjs`).

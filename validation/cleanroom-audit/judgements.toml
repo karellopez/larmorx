@@ -214,6 +214,15 @@ judgement = "covered by the same agent's declaration (exposure 2)"
 
 # ------------------------------------------------- edits of clean-room code by other roles
 
+[[access]]
+agent = "ab67a91e24eb199bf"
+line = 398
+time = "2026-11-06T21:55:56Z"
+declared = "not needed"
+shown = "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)"
+nature = "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard"
+judgement = "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)"
+
 [[edit]]
 agent = "orchestrator"
 commit = "0feafe98f"

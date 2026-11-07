@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-06-prelude-replica",
+ "dossier": "2026-11-07-3dvolreg-replica",
  "edits": [
   {
    "added": null,
@@ -106,11 +106,11 @@
   }
  ],
  "evidence": {
-  "accesses": 236300,
-  "agents": 188,
+  "accesses": 245116,
+  "agents": 198,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 263,
-  "archived_files": 263,
+  "archive_checksums_matched": 275,
+  "archived_files": 275,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -127,32 +127,36 @@
    "2026-11-06-session-transcripts-prelude-replica": {
     "files": 8,
     "sha256": "92c15b7729c67a730fa1598e1e18da3e4f663be837f1acac70aba816322aa37f"
+   },
+   "2026-11-07-session-transcripts-3dvolreg-replica": {
+    "files": 30,
+    "sha256": "9c2bf802d659d95d1aba2ea0de7b44e89b0c19bb2ca6f4edaf3bfadebd7906a0"
    }
   },
-  "commits_printed": 2302,
-  "distinct_transcripts": 192,
+  "commits_printed": 2390,
+  "distinct_transcripts": 202,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 104,
+   "agents_without_worktree": 113,
    "bad_lines": 0,
-   "calls_without_result": 14,
+   "calls_without_result": 15,
    "compaction_parent_missing": 2,
    "compactions": 64,
-   "refused_calls": 1401,
-   "refused_calls_restricted_accesses": 648,
+   "refused_calls": 1418,
+   "refused_calls_restricted_accesses": 656,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 6044
+   "unresolved_paths": 6105
   },
-  "last_record": "2026-11-06 20:09 UTC",
-  "live_files": 192,
-  "live_files_also_archived": 191,
+  "last_record": "2026-11-07 02:50 UTC",
+  "live_files": 202,
+  "live_files_also_archived": 201,
   "sessions": 4,
-  "tool_calls": 69790,
+  "tool_calls": 72322,
   "tool_calls_by_tool": [
    [
     "Agent",
-    190
+    200
    ],
    [
     "Artifact",
@@ -164,7 +168,7 @@
    ],
    [
     "Bash",
-    57922
+    60314
    ],
    [
     "CronCreate",
@@ -176,7 +180,7 @@
    ],
    [
     "Edit",
-    3826
+    3852
    ],
    [
     "Monitor",
@@ -184,7 +188,7 @@
    ],
    [
     "Read",
-    1903
+    1940
    ],
    [
     "ReadNotifications",
@@ -192,7 +196,7 @@
    ],
    [
     "SendMessage",
-    85
+    86
    ],
    [
     "Skill",
@@ -200,7 +204,7 @@
    ],
    [
     "SubagentHandback",
-    200
+    210
    ],
    [
     "TaskOutput",
@@ -208,11 +212,11 @@
    ],
    [
     "TaskStop",
-    148
+    153
    ],
    [
     "ToolSearch",
-    133
+    136
    ],
    [
     "WebFetch",
@@ -224,12 +228,12 @@
    ],
    [
     "Write",
-    5170
+    5218
    ]
   ],
-  "transcript_bytes": 5704296952,
-  "transcript_files": 455,
-  "unique_paths": 50498
+  "transcript_bytes": 5895613360,
+  "transcript_files": 477,
+  "unique_paths": 52179
  },
  "levels": [
   [
@@ -310,7 +314,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "95ea64a8",
-  "verdicts_repository": "2d8a5e09"
+  "verdicts_repository": "dfbf46c5"
  },
  "overview": {
   "agents_by_role": [
@@ -320,7 +324,7 @@
    ],
    [
     "clean-room implementer",
-    62
+    67
    ],
    [
     "documentation",
@@ -336,28 +340,28 @@
    ],
    [
     "replica author",
-    63
+    67
    ],
    [
     "spec writer",
-    15
+    16
    ]
   ],
   "attributed_by": [
    [
     "printed",
-    193
+    205
    ],
    [
     "subject",
-    10
+    11
    ]
   ],
-  "commits": 203,
+  "commits": 216,
   "commits_by_role": [
    [
     "clean-room implementer",
-    199
+    212
    ],
    [
     "integration",
@@ -368,8 +372,8 @@
     3
    ]
   ],
-  "implementers": 62,
-  "register_restricted_lines": 1417,
+  "implementers": 67,
+  "register_restricted_lines": 1453,
   "single_file_scopes": {
    "checked": 58,
    "shown": 0
@@ -3709,6 +3713,28 @@
    ],
    "shown": "3 option-string lines of the topup replica's parity suite",
    "time": "2026-11-05 09:00 UTC"
+  },
+  {
+   "agent": "ab67a91e24eb199bf",
+   "declared": "not needed",
+   "description": "PRELUDE clean-room, relay 2",
+   "files": [
+    "<scratch>/prelude-cr-1/standin/larmorx-nc"
+   ],
+   "judged": true,
+   "judgement": "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)",
+   "kind": "restricted material",
+   "line": 398,
+   "nature": "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard",
+   "register": null,
+   "rules": [
+    [
+     "R10 content (FSL)",
+     1
+    ]
+   ],
+   "shown": "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)",
+   "time": "2026-11-06 21:55 UTC"
   }
  ],
  "tools": [
@@ -5038,25 +5064,25 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 2,
-     "seen": 342,
+     "seen": 411,
      "written": 8
     },
     {
      "group": "the clean-room code",
      "run": 24,
-     "seen": 2673,
-     "written": 377
+     "seen": 3002,
+     "written": 388
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 1673,
-     "seen": 2782,
-     "written": 294
+     "run": 1766,
+     "seen": 3320,
+     "written": 321
     },
     {
      "group": "the documentation site and the test-data catalog",
      "run": 14,
-     "seen": 71,
+     "seen": 72,
      "written": 0
     },
     {
@@ -5068,13 +5094,13 @@
     {
      "group": "random-testing permanent cases",
      "run": 11,
-     "seen": 26,
-     "written": 0
+     "seen": 34,
+     "written": 1
     },
     {
      "group": "the original programs, run or named as black boxes",
      "run": 60,
-     "seen": 32,
+     "seen": 33,
      "written": 0
     },
     {
@@ -5085,9 +5111,9 @@
     },
     {
      "group": "oracle outputs and inputs",
-     "run": 104,
-     "seen": 475,
-     "written": 51
+     "run": 135,
+     "seen": 588,
+     "written": 72
     },
     {
      "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
@@ -5097,35 +5123,35 @@
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 2831,
-     "seen": 1392,
-     "written": 856
+     "run": 3179,
+     "seen": 1548,
+     "written": 919
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
-     "run": 163,
-     "seen": 197,
-     "written": 0
+     "run": 185,
+     "seen": 210,
+     "written": 1
     },
     {
      "group": "restricted material (by rule and kind below)",
-     "run": 39,
-     "seen": 77,
-     "written": 9
+     "run": 44,
+     "seen": 90,
+     "written": 13
     }
    ],
    "cannot_see": {
     "compactions": 3,
-    "listings": 616,
-    "program_runs": 2359,
-    "unresolved": 190,
-    "without_worktree": 6
+    "listings": 704,
+    "program_runs": 2530,
+    "unresolved": 226,
+    "without_worktree": 8
    },
-   "commits": 34,
+   "commits": 40,
    "commits_by_role": [
     [
      "clean-room implementer",
-     34
+     40
     ]
    ],
    "family": "FSL",
@@ -5149,6 +5175,26 @@
      ],
      "shown": "6 body lines and 5 headings of the register's restricted sections (AFNI 3dAutomask and 3dUnifize, FSL mcflirt: AFNI-75, FSL-20, FSL-21, FSL-65, FSL-66), printed by a search of the whole register for those identifiers, before the agent implemented them",
      "time": "2026-10-30 03:46 UTC"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "declared": "not needed",
+     "description": "PRELUDE clean-room, relay 2",
+     "files": [
+      "<scratch>/prelude-cr-1/standin/larmorx-nc"
+     ],
+     "judged": true,
+     "judgement": "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)",
+     "line": 398,
+     "nature": "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard",
+     "rules": [
+      [
+       "R10 content",
+       1
+      ]
+     ],
+     "shown": "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)",
+     "time": "2026-11-06 21:55 UTC"
     }
    ],
    "first": "2026-10-10",
@@ -5244,15 +5290,37 @@
      "description": "Clean-room catch-up, relay 7 (sub-task 5)",
      "first": "2026-11-05",
      "last": "2026-11-05"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "commits": 2,
+     "description": "PRELUDE clean-room, relay 2",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 4,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-06",
+     "last": "2026-11-07"
     }
    ],
-   "last": "2026-11-05",
+   "last": "2026-11-07",
    "name": "the head-motion correction (lx.mri.hmc, mcflirt's behaviour)",
    "other_roles": [],
    "restricted": [
     {
-     "after": 1,
-     "agents": 3,
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "content",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 7,
+     "agents": 5,
      "before": 4,
      "level": "names",
      "rule": "R10",
@@ -5260,9 +5328,17 @@
     },
     {
      "after": 0,
-     "agents": 1,
-     "before": 1,
+     "agents": 2,
+     "before": 4,
      "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 1,
+     "agents": 2,
+     "before": 2,
+     "level": "mention",
      "rule": "R10",
      "scope": "this family"
     },
@@ -5276,8 +5352,8 @@
     },
     {
      "after": 0,
-     "agents": 6,
-     "before": 24,
+     "agents": 7,
+     "before": 32,
      "level": "build-cache",
      "rule": "R10",
      "scope": "this family"
@@ -5396,8 +5472,8 @@
     },
     {
      "after": 0,
-     "agents": 5,
-     "before": 18,
+     "agents": 6,
+     "before": 26,
      "level": "build-cache",
      "rule": "R10",
      "scope": "another family"
@@ -5458,7 +5534,8 @@
     8,
     9,
     11,
-    19
+    19,
+    21
    ],
    "verdict": {
     "status": "reviewed (every finding judged)",
@@ -5470,20 +5547,20 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 281,
+     "seen": 327,
      "written": 0
     },
     {
      "group": "the clean-room code",
      "run": 1,
-     "seen": 2869,
-     "written": 402
+     "seen": 3142,
+     "written": 406
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 955,
-     "seen": 2551,
-     "written": 299
+     "run": 973,
+     "seen": 2837,
+     "written": 306
     },
     {
      "group": "the documentation site and the test-data catalog",
@@ -5500,13 +5577,13 @@
     {
      "group": "random-testing permanent cases",
      "run": 11,
-     "seen": 9,
+     "seen": 15,
      "written": 0
     },
     {
      "group": "the original programs, run or named as black boxes",
      "run": 15,
-     "seen": 3,
+     "seen": 4,
      "written": 0
     },
     {
@@ -5518,8 +5595,8 @@
     {
      "group": "oracle outputs and inputs",
      "run": 183,
-     "seen": 491,
-     "written": 80
+     "seen": 526,
+     "written": 90
     },
     {
      "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
@@ -5529,9 +5606,9 @@
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 1774,
-     "seen": 1058,
-     "written": 513
+     "run": 1879,
+     "seen": 1103,
+     "written": 532
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
@@ -5548,22 +5625,22 @@
     {
      "group": "restricted material (by rule and kind below)",
      "run": 15,
-     "seen": 55,
-     "written": 4
+     "seen": 67,
+     "written": 8
     }
    ],
    "cannot_see": {
     "compactions": 3,
-    "listings": 595,
-    "program_runs": 1700,
+    "listings": 640,
+    "program_runs": 1739,
     "unresolved": 55,
-    "without_worktree": 10
+    "without_worktree": 12
    },
-   "commits": 35,
+   "commits": 37,
    "commits_by_role": [
     [
      "clean-room implementer",
-     35
+     37
     ]
    ],
    "family": "FSL",
@@ -5675,17 +5752,55 @@
      "description": "Clean-room catch-up, relay 8 (sub-task 6)",
      "first": "2026-11-05",
      "last": "2026-11-05"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 2",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-07",
+     "last": "2026-11-07"
     }
    ],
-   "last": "2026-11-05",
+   "last": "2026-11-07",
    "name": "BET (bet, bet2, betsurf)",
    "other_roles": [],
    "restricted": [
     {
      "after": 1,
-     "agents": 2,
+     "agents": 1,
+     "before": 0,
+     "level": "content",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 7,
+     "agents": 4,
      "before": 2,
      "level": "names",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 3,
+     "agents": 1,
+     "before": 0,
+     "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 3,
+     "agents": 2,
+     "before": 0,
+     "level": "mention",
      "rule": "R10",
      "scope": "this family"
     },
@@ -5699,8 +5814,8 @@
     },
     {
      "after": 6,
-     "agents": 9,
-     "before": 15,
+     "agents": 10,
+     "before": 23,
      "level": "build-cache",
      "rule": "R10",
      "scope": "this family"
@@ -5803,8 +5918,8 @@
     },
     {
      "after": 2,
-     "agents": 3,
-     "before": 8,
+     "agents": 4,
+     "before": 16,
      "level": "build-cache",
      "rule": "R10",
      "scope": "another family"
@@ -5862,7 +5977,8 @@
     11,
     18,
     19,
-    20
+    20,
+    21
    ],
    "verdict": {
     "status": "clean, with notes",
@@ -5874,20 +5990,20 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 397,
+     "seen": 443,
      "written": 0
     },
     {
      "group": "the clean-room code",
      "run": 1,
-     "seen": 3479,
-     "written": 196
+     "seen": 3763,
+     "written": 200
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 1413,
-     "seen": 2378,
-     "written": 130
+     "run": 1431,
+     "seen": 2688,
+     "written": 138
     },
     {
      "group": "the defect register (its restricted lines are counted below)",
@@ -5898,13 +6014,13 @@
     {
      "group": "random-testing permanent cases",
      "run": 6,
-     "seen": 18,
+     "seen": 24,
      "written": 0
     },
     {
      "group": "the original programs, run or named as black boxes",
      "run": 1,
-     "seen": 0,
+     "seen": 1,
      "written": 0
     },
     {
@@ -5922,14 +6038,14 @@
     {
      "group": "oracle outputs and inputs",
      "run": 141,
-     "seen": 332,
-     "written": 46
+     "seen": 368,
+     "written": 57
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 3288,
-     "seen": 2129,
-     "written": 793
+     "run": 3401,
+     "seen": 2176,
+     "written": 815
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
@@ -5946,22 +6062,22 @@
     {
      "group": "restricted material (by rule and kind below)",
      "run": 22,
-     "seen": 140,
-     "written": 2
+     "seen": 152,
+     "written": 6
     }
    ],
    "cannot_see": {
     "compactions": 1,
-    "listings": 556,
-    "program_runs": 1900,
+    "listings": 605,
+    "program_runs": 1944,
     "unresolved": 132,
-    "without_worktree": 14
+    "without_worktree": 16
    },
-   "commits": 41,
+   "commits": 43,
    "commits_by_role": [
     [
      "clean-room implementer",
-     41
+     43
     ]
    ],
    "family": "FSL",
@@ -6080,9 +6196,23 @@
      "description": "Clean-room catch-up, relay 10 (BET+hmc site)",
      "first": "2026-11-05",
      "last": "2026-11-05"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 2",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-07",
+     "last": "2026-11-07"
     }
    ],
-   "last": "2026-11-05",
+   "last": "2026-11-07",
    "name": "FLIRT and its programs (convert_xfm, applyxfm4D, avscale, ...)",
    "other_roles": [],
    "restricted": [
@@ -6096,17 +6226,33 @@
     },
     {
      "after": 1,
-     "agents": 2,
+     "agents": 1,
+     "before": 0,
+     "level": "content",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 7,
+     "agents": 4,
      "before": 2,
      "level": "names",
      "rule": "R10",
      "scope": "this family"
     },
     {
-     "after": 0,
-     "agents": 1,
+     "after": 3,
+     "agents": 2,
      "before": 1,
      "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 3,
+     "agents": 2,
+     "before": 0,
+     "level": "mention",
      "rule": "R10",
      "scope": "this family"
     },
@@ -6120,8 +6266,8 @@
     },
     {
      "after": 7,
-     "agents": 10,
-     "before": 14,
+     "agents": 11,
+     "before": 22,
      "level": "build-cache",
      "rule": "R10",
      "scope": "this family"
@@ -6224,8 +6370,8 @@
     },
     {
      "after": 2,
-     "agents": 2,
-     "before": 4,
+     "agents": 3,
+     "before": 12,
      "level": "build-cache",
      "rule": "R10",
      "scope": "another family"
@@ -6284,7 +6430,8 @@
     15,
     16,
     17,
-    20
+    20,
+    21
    ],
    "verdict": {
     "status": "clean, with notes",
@@ -6526,25 +6673,25 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 155,
+     "seen": 190,
      "written": 0
     },
     {
      "group": "the clean-room code",
      "run": 6,
-     "seen": 1886,
-     "written": 69
+     "seen": 2073,
+     "written": 72
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
      "run": 963,
-     "seen": 1487,
-     "written": 68
+     "seen": 1632,
+     "written": 72
     },
     {
      "group": "random-testing permanent cases",
      "run": 0,
-     "seen": 11,
+     "seen": 17,
      "written": 1
     },
     {
@@ -6562,8 +6709,8 @@
     {
      "group": "oracle outputs and inputs",
      "run": 166,
-     "seen": 195,
-     "written": 34
+     "seen": 207,
+     "written": 39
     },
     {
      "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
@@ -6573,9 +6720,9 @@
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 1691,
-     "seen": 1036,
-     "written": 567
+     "run": 1771,
+     "seen": 1072,
+     "written": 579
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
@@ -6598,16 +6745,16 @@
    ],
    "cannot_see": {
     "compactions": 0,
-    "listings": 276,
-    "program_runs": 1296,
+    "listings": 302,
+    "program_runs": 1324,
     "unresolved": 34,
-    "without_worktree": 11
+    "without_worktree": 12
    },
-   "commits": 25,
+   "commits": 26,
    "commits_by_role": [
     [
      "clean-room implementer",
-     25
+     26
     ]
    ],
    "family": "FSL",
@@ -6705,15 +6852,22 @@
      "description": "Clean-room catch-up, relay 8 (sub-task 6)",
      "first": "2026-11-05",
      "last": "2026-11-05"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-07",
+     "last": "2026-11-07"
     }
    ],
-   "last": "2026-11-05",
+   "last": "2026-11-07",
    "name": "topup and applytopup",
    "other_roles": [],
    "restricted": [
     {
-     "after": 1,
-     "agents": 1,
+     "after": 3,
+     "agents": 2,
      "before": 0,
      "level": "names",
      "rule": "R10",
@@ -6724,6 +6878,14 @@
      "agents": 1,
      "before": 1,
      "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 2,
+     "agents": 1,
+     "before": 0,
+     "level": "mention",
      "rule": "R10",
      "scope": "this family"
     },
@@ -7393,43 +7555,43 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 474,
+     "seen": 552,
      "written": 0
     },
     {
      "group": "the clean-room code",
      "run": 4,
-     "seen": 5070,
-     "written": 570
+     "seen": 5525,
+     "written": 589
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 3496,
-     "seen": 5670,
-     "written": 519
+     "run": 3595,
+     "seen": 6353,
+     "written": 552
     },
     {
      "group": "the documentation site and the test-data catalog",
      "run": 0,
-     "seen": 6,
+     "seen": 7,
      "written": 0
     },
     {
      "group": "the defect register (its restricted lines are counted below)",
      "run": 0,
-     "seen": 35,
+     "seen": 36,
      "written": 0
     },
     {
      "group": "random-testing permanent cases",
      "run": 11,
-     "seen": 54,
-     "written": 1
+     "seen": 62,
+     "written": 2
     },
     {
      "group": "the original programs, run or named as black boxes",
      "run": 20,
-     "seen": 3,
+     "seen": 5,
      "written": 0
     },
     {
@@ -7446,9 +7608,9 @@
     },
     {
      "group": "oracle outputs and inputs",
-     "run": 404,
-     "seen": 695,
-     "written": 156
+     "run": 436,
+     "seen": 815,
+     "written": 178
     },
     {
      "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
@@ -7458,15 +7620,15 @@
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 6092,
-     "seen": 3621,
-     "written": 1641
+     "run": 6463,
+     "seen": 3814,
+     "written": 1728
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
-     "run": 1007,
-     "seen": 563,
-     "written": 188
+     "run": 1029,
+     "seen": 583,
+     "written": 189
     },
     {
      "group": "the web",
@@ -7476,27 +7638,48 @@
     },
     {
      "group": "restricted material (by rule and kind below)",
-     "run": 40,
-     "seen": 181,
-     "written": 7
+     "run": 49,
+     "seen": 231,
+     "written": 11
     }
    ],
    "cannot_see": {
     "compactions": 3,
-    "listings": 1108,
-    "program_runs": 4540,
-    "unresolved": 194,
-    "without_worktree": 27
+    "listings": 1224,
+    "program_runs": 4733,
+    "unresolved": 230,
+    "without_worktree": 29
    },
-   "commits": 65,
+   "commits": 69,
    "commits_by_role": [
     [
      "clean-room implementer",
-     65
+     69
     ]
    ],
    "family": "FSL",
-   "findings": [],
+   "findings": [
+    {
+     "agent": "ab67a91e24eb199bf",
+     "declared": "not needed",
+     "description": "PRELUDE clean-room, relay 2",
+     "files": [
+      "<scratch>/prelude-cr-1/standin/larmorx-nc"
+     ],
+     "judged": true,
+     "judgement": "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)",
+     "line": 398,
+     "nature": "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard",
+     "rules": [
+      [
+       "R10 content",
+       1
+      ]
+     ],
+     "shown": "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)",
+     "time": "2026-11-06 21:55 UTC"
+    }
+   ],
    "first": "2026-10-30",
    "id": "FSL/fsl-shared",
    "implementers": [
@@ -7758,33 +7941,78 @@
      "description": "Fix Windows path test in larmorx-fsl",
      "first": "2026-11-05",
      "last": "2026-11-05"
+    },
+    {
+     "agent": "af4a71de4e2ee037f",
+     "commits": 2,
+     "description": "PRELUDE clean-room, relay 1",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 2",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 1,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-07",
+     "last": "2026-11-07"
     }
    ],
-   "last": "2026-11-05",
+   "last": "2026-11-07",
    "name": "larmorx-fsl's shared code (images, options, messages, data)",
    "other_roles": [],
    "restricted": [
     {
      "after": 0,
-     "agents": 1,
-     "before": 2,
+     "agents": 2,
+     "before": 7,
      "level": "names",
      "rule": "R01",
      "scope": "this family"
     },
     {
-     "after": 1,
-     "agents": 2,
-     "before": 3,
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "content",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 2,
+     "agents": 1,
+     "before": 0,
+     "level": "scope",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 13,
+     "agents": 5,
+     "before": 17,
      "level": "names",
      "rule": "R10",
      "scope": "this family"
     },
     {
-     "after": 0,
-     "agents": 2,
-     "before": 2,
+     "after": 1,
+     "agents": 4,
+     "before": 8,
      "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 11,
+     "agents": 3,
+     "before": 3,
+     "level": "mention",
      "rule": "R10",
      "scope": "this family"
     },
@@ -7798,16 +8026,16 @@
     },
     {
      "after": 5,
-     "agents": 18,
-     "before": 33,
+     "agents": 20,
+     "before": 44,
      "level": "build-cache",
      "rule": "R10",
      "scope": "this family"
     },
     {
      "after": 2,
-     "agents": 4,
-     "before": 4,
+     "agents": 5,
+     "before": 12,
      "level": "metadata",
      "rule": "R10",
      "scope": "this family"
@@ -7822,8 +8050,8 @@
     },
     {
      "after": 0,
-     "agents": 1,
-     "before": 1,
+     "agents": 2,
+     "before": 3,
      "level": "names",
      "rule": "R11",
      "scope": "this family"
@@ -7838,8 +8066,8 @@
     },
     {
      "after": 0,
-     "agents": 2,
-     "before": 2,
+     "agents": 3,
+     "before": 7,
      "level": "names",
      "rule": "R13",
      "scope": "this family"
@@ -7934,8 +8162,8 @@
     },
     {
      "after": 0,
-     "agents": 3,
-     "before": 10,
+     "agents": 4,
+     "before": 18,
      "level": "build-cache",
      "rule": "R10",
      "scope": "another family"
@@ -7998,10 +8226,11 @@
     16,
     17,
     18,
-    19
+    19,
+    21
    ],
    "verdict": {
-    "status": "clean, with notes",
+    "status": "reviewed (every finding judged)",
     "words": "clean (the orchestrator's merge resolution in its package manifest)"
    }
   },
@@ -8361,6 +8590,233 @@
    "verdict": {
     "status": "clean, with notes",
     "words": "clean (a declared port of fdlibm's permissive code; glibc's source never opened)"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 79,
+     "written": 0
+    },
+    {
+     "group": "the clean-room code",
+     "run": 0,
+     "seen": 469,
+     "written": 19
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 124,
+     "seen": 580,
+     "written": 36
+    },
+    {
+     "group": "the defect register (its restricted lines are counted below)",
+     "run": 0,
+     "seen": 1,
+     "written": 0
+    },
+    {
+     "group": "random-testing permanent cases",
+     "run": 0,
+     "seen": 6,
+     "written": 0
+    },
+    {
+     "group": "the original programs, run or named as black boxes",
+     "run": 0,
+     "seen": 2,
+     "written": 0
+    },
+    {
+     "group": "oracle outputs and inputs",
+     "run": 7,
+     "seen": 167,
+     "written": 30
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 347,
+     "seen": 158,
+     "written": 98
+    },
+    {
+     "group": "the system, the home directory, the workspace and the archive",
+     "run": 1,
+     "seen": 19,
+     "written": 3
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 18,
+     "seen": 56,
+     "written": 10
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 110,
+    "program_runs": 195,
+    "unresolved": 14,
+    "without_worktree": 2
+   },
+   "commits": 10,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     10
+    ]
+   ],
+   "family": "FSL",
+   "findings": [
+    {
+     "agent": "ab67a91e24eb199bf",
+     "declared": "not needed",
+     "description": "PRELUDE clean-room, relay 2",
+     "files": [
+      "<scratch>/prelude-cr-1/standin/larmorx-nc"
+     ],
+     "judged": true,
+     "judgement": "not restricted material; a false match of R10 on the file's name (judged by the orchestrator at 3dvolreg's replica merge, 2026-11-07)",
+     "line": 398,
+     "nature": "no replica code: the file shares only the replica program's name; it was printed to check its recursion guard",
+     "rules": [
+      [
+       "R10 content",
+       1
+      ]
+     ],
+     "shown": "the implementer's own stand-in script, written by the implementer in its scratch folder and named larmorx-nc so that the replica's parity suite, run as a black box, runs the clean-room original instead (`<scratch>/prelude-cr-1/standin/larmorx-nc`: a shell script calling `larmorx fsl prelude` with the original forced)",
+     "time": "2026-11-06 21:55 UTC"
+    }
+   ],
+   "first": "2026-11-06",
+   "id": "FSL/prelude",
+   "implementers": [
+    {
+     "agent": "af4a71de4e2ee037f",
+     "commits": 5,
+     "description": "PRELUDE clean-room, relay 1",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "ab67a91e24eb199bf",
+     "commits": 3,
+     "description": "PRELUDE clean-room, relay 2",
+     "first": "2026-11-06",
+     "last": "2026-11-06"
+    },
+    {
+     "agent": "a9e2f00fd73245bd2",
+     "commits": 2,
+     "description": "PRELUDE clean-room, relay 3",
+     "first": "2026-11-06",
+     "last": "2026-11-07"
+    }
+   ],
+   "last": "2026-11-07",
+   "name": "prelude (phase unwrapping)",
+   "other_roles": [],
+   "restricted": [
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 5,
+     "level": "names",
+     "rule": "R01",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "content",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 2,
+     "level": "scope",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 2,
+     "agents": 3,
+     "before": 24,
+     "level": "names",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 2,
+     "before": 7,
+     "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 3,
+     "agents": 3,
+     "before": 11,
+     "level": "mention",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 2,
+     "before": 11,
+     "level": "build-cache",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 8,
+     "level": "metadata",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 2,
+     "level": "names",
+     "rule": "R11",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 5,
+     "level": "names",
+     "rule": "R13",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 8,
+     "level": "build-cache",
+     "rule": "R10",
+     "scope": "another family"
+    }
+   ],
+   "similarity": null,
+   "slips": [
+    21
+   ],
+   "verdict": {
+    "status": "reviewed (every finding judged)",
+    "words": ""
    }
   }
  ]

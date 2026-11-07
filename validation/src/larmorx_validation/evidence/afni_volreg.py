@@ -832,17 +832,53 @@ def command(s) -> str:
     return common.clip(" ".join(x for x in (env, " ".join(parts), files) if x), 600)
 
 
-def cases(rec, examples: dict[str, str]) -> list[dict]:
+def d13_cases(md: str) -> dict[str, list[str]]:
+    """The defects the record's D13 section names per case (``- AFNI-99: ... : `case`, ...``;
+    a defect's list is cut after its first cases)."""
+    out: dict[str, list[str]] = {}
+    for line in md.splitlines():
+        m = re.match(r"\s*- ((?:AFNI|GLIBC)-\d+)(?: \(not named\))?: \d+ case", line)
+        if m:
+            for c in re.findall(r"`([^`]+/[^`]+)`", line):
+                out.setdefault(c, []).append(m.group(1))
+    return out
+
+
+#: Why AFNI-99 meets every fMRIPrep call: its inputs (RobustAverage's sliced volumes, every
+#: oracle run's) are stored LAS, the second axis posterior to anterior.
+FMRIPREP_AFNI99 = (
+    "the maximum displacements of -maxdisp1D, as every fMRIPrep input of the record is stored "
+    "with its second axis posterior to anterior; the registered volumes, and so fMRIPrep's "
+    "reference, are the same in both modes"
+)
+
+
+def cases(rec, examples: dict[str, str], md: str = "") -> list[dict]:
     from larmorx_validation.parity.afni_volreg import _scenario_list
 
     defs = {cid: (desc, s) for cid, _cat, desc, s in _scenario_list()}
+    listed = d13_cases(md)
     out = []
     for r in rec.results:
         desc, s = defs.get(r["case"], ("", None))
         v, why = am.case_verdict(r, desc, "replica", s.fix_refuses if s is not None else None)
-        named = sorted(set(re.findall(r"\bAFNI-\d+\b", desc)) & CORRECTED)
-        if named and "a defect of the register" in why:
-            why = why.replace("a defect of the register", ", ".join(named))
+        named = sorted(
+            (set(re.findall(r"\bAFNI-\d+\b", desc)) & CORRECTED) | set(listed.get(r["case"], []))
+        )
+        if "a defect of the register" in why:
+            if named == ["GLIBC-07"]:
+                why = why.replace(
+                    "corrects a defect of the register and names it",
+                    "computes with correctly rounded maths where glibc 2.35's is not correctly "
+                    "rounded (GLIBC-07, not named)",
+                )
+            elif named:
+                why = why.replace("a defect of the register", ", ".join(named))
+            elif r["category"] == "fmriprep":
+                why = why.replace("a defect of the register", "AFNI-99").replace(
+                    "values change (the record's D13 section)",
+                    f"values change: {FMRIPREP_AFNI99} (the record's D13 section)",
+                )
         out.append(
             {
                 "id": r["case"],
@@ -937,7 +973,8 @@ def export(ctx: core.Context) -> dict:
     examples = {
         f"fmriprep/{LABEL}": "fmriprep-volreg",
     }
-    cs = cases(rec, examples)
+    md = (ctx.repo / f"docs/validation/{TOOL}-replica.md").read_text(encoding="utf-8")
+    cs = cases(rec, examples, md)
     e = entry(ctx)
     return {
         "schema": 1,

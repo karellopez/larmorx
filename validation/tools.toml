@@ -400,7 +400,7 @@ status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full);
 id = "mri-hmc"
 larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
 reference = "mcflirt (FSL 6.0.7.23 since 2026-10-29, on OpenBLAS's Haswell kernels: the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`, and FSL-20, -21, -65, -66's cases run live)"
-status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's, docs/findings/mri-hmc-original.md)"
+status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's within mcflirt's own spread, docs/findings/mri-hmc-original.md)"
 
 [[record]]
 id = "fsl-mcflirt-replica"

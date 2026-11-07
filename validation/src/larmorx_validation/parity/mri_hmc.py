@@ -87,24 +87,32 @@ DEGENERATE: dict[str, int | None] = {
 DEGENERATE_MM = 0.3
 
 #: Recorded synthetic runs whose search paths part from mcflirt's and end beyond the parameter
-#: thresholds (made for real BOLD runs) while every other check passes: expected divergences
-#: with their reasons, every check still run and reported (docs/findings/mri-hmc-original.md,
-#: "The count per point"; the paths: validation/investigations/cleanroom-align/count_trace.py).
+#: thresholds (made for real BOLD runs) while every other check passes, and whose distance from
+#: mcflirt lies within mcflirt's own spread on the same run: its inputs moved one unit in the last
+#: place, 8 realisations, and the band's perturbations of ``mri_hmc_band`` (FSL 6.0.7.23, through
+#: the oracle cache, never kept; validation/investigations/cleanroom-align/hmc_spread.py and its
+#: results/hmc-spread-2026-11-07.json). Expected divergences with their reasons, every check still
+#: run and reported (docs/findings/mri-hmc-original.md, "The count per point"). A run beyond
+#: mcflirt's own spread is never listed here: it fails with its numbers.
 PATH_DIVERGENCES = {
     "syn/orientation/ras-unflipped/reffile": (
-        "Since the weighted correlation's count takes each point's weight as the point is visited "
-        "(specs/mcflirt.md §6.4, 2026-11-07), larmorx's evaluated matrices are mcflirt's for the "
-        "first 41 evaluations (9 before; count_trace.py, mcflirt's -verbose 20), then part in the "
-        "line search's last digits (open) and end 0.110 mm from mcflirt's at the 95th percentile "
-        "(0.066 before), just beyond the 0.1 mm made for real BOLD runs; the other checks pass."
+        "larmorx's evaluated matrices are mcflirt's for the first 41 evaluations (count_trace.py, "
+        "mcflirt's -verbose 20), then part in a translation's 6th decimal and end 0.110 mm from "
+        "mcflirt's at the 95th percentile, beyond the 0.1 mm made for real BOLD runs but within "
+        "mcflirt's own spread on this run (hmc_spread.py): its inputs moved one unit in the last "
+        "place move mcflirt's matrices 0.065 to 0.131 mm from its recorded ones (8 realisations; "
+        "the band's noise and reverse 0.077 to 0.114), and larmorx on the same inputs ends 0.058 "
+        "to 0.103 mm from mcflirt; the other checks pass."
     ),
     "syn/content/ramp/reffile": (
         "A ramp along x, which only the x translation can align (the other parameters are not "
-        "constrained by the data): larmorx's and mcflirt's paths part at the second evaluation "
-        "with either count (48 matrices identical to mcflirt's with the per-point count of "
-        "specs/mcflirt.md §6.4, 3 before; count_trace.py), and the x translation ends 0.342 mm "
-        "from mcflirt's (0.181 before; threshold 0.3; from the applied shifts mcflirt 0.14 mm, "
-        "larmorx 0.41): open, with where the paths part."
+        "constrained by the data: mcflirt's own matrices move 11 to 17 mm at the 95th percentile "
+        "when its inputs move in their last bits): the x translation ends 0.342 mm from mcflirt's "
+        "(threshold 0.3), within mcflirt's own spread on this run (hmc_spread.py): its inputs "
+        "moved one unit in the last place move its x translation by 0.094 to 0.493 mm (8 "
+        "realisations; the band's noise and reverse 0.121 to 0.433), and larmorx on the same "
+        "inputs ends 0.040 to 0.459 mm from mcflirt; from the applied shifts larmorx 0.35 mm, "
+        "mcflirt 0.18 (0.08 to 0.50 on the perturbed inputs)."
     ),
 }
 #: The checks a path divergence may fail: the estimates and what follows from them.

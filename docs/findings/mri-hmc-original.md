@@ -286,12 +286,31 @@ read) passes; two synthetic cases near their thresholds now miss them: `syn/cont
 (a ramp, which only an x translation can align: that translation 0.342 mm from mcflirt's, 0.181
 before, threshold 0.3; the other parameters are not constrained) and
 `syn/orientation/ras-unflipped/reffile` (p95 0.110 mm, 0.066 before, threshold 0.1). Both
-follow mcflirt's path longer than before (above) and part later: open, with the parting point
-(at the 41st evaluation of `ras-unflipped/reffile` the printed matrices differ in the sixth decimal
-of one translation: the parameters had already parted below the printed digits, in the line
-search's arithmetic). The suite counts these two as expected divergences with their reasons
-(`parity/mri_hmc.py`'s `PATH_DIVERGENCES`: only when every failed check is one of the estimates'
-metrics; every check still runs and is reported), as it counts `difftest/phantom-several-minima`;
-the record is re-made with it (`docs/validation/mri-hmc.md`: 145 pass, 20 rejected by both, 5
-expected divergences, 0 failures expected).
+follow mcflirt's path longer than before (above) and part later (at the 41st evaluation of
+`ras-unflipped/reffile` the printed matrices differ in the sixth decimal of one translation: the
+parameters had already parted below the printed digits, in the line search's arithmetic).
+
+**mcflirt's own spread on these two runs** (2026-11-07,
+`validation/investigations/cleanroom-align/hmc_spread.py`, FSL 6.0.7.23 through the oracle cache,
+never kept; [`results/hmc-spread-2026-11-07.json`](../../validation/investigations/cleanroom-align/results/hmc-spread-2026-11-07.json)):
+the series and the reference as float32 with every nonzero voxel moved one unit in the last place
+up or down at random (8 realisations, about 1e-7 of each value; a float32 copy with the same
+values, the control, gives mcflirt's recorded matrices as text), and the band's perturbations of
+`parity/mri_hmc_band.py` (noise of ±0.5 three times, the volumes reversed). On
+`ras-unflipped/reffile` mcflirt's matrices move 0.065 to 0.131 mm from its recorded ones at the
+95th percentile (median of the 8: 0.078; the band's 0.077 to 0.114), so larmorx's 0.110 lies
+within mcflirt's own spread; on the same perturbed inputs larmorx ends 0.058 to 0.103 mm from
+mcflirt, and 0.059 to 0.105 from itself. On `ramp/reffile` mcflirt's x translation moves 0.094 to
+0.493 mm (median 0.197; the band's 0.121 to 0.433) and its other parameters 11 to 17 mm at the
+95th percentile (not constrained by a ramp), so larmorx's 0.342 lies within it; from the applied
+shifts (the largest over the volumes, decomposed about the reference's field-of-view centre as the
+suite does) larmorx 0.35 mm, mcflirt 0.18, mcflirt on the perturbed inputs 0.08 to 0.50, larmorx
+0.08 to 0.40. Neither is a mistake or a defect: both are the search's sensitivity to its last
+bits, which mcflirt shares at the same size. The suite counts the two as expected divergences
+with these numbers in their reasons (`parity/mri_hmc.py`'s `PATH_DIVERGENCES`: only when every
+failed check is one of the estimates' metrics and the run lies within mcflirt's measured spread;
+every check still runs and is reported), as it counts `difftest/phantom-several-minima`. The
+record (`docs/validation/mri-hmc.md`, made from `1df84f3`: 145 pass, 20 rejected by both, 5
+expected divergences, 0 failures) keeps these statuses; its two reasons are the earlier words,
+without the spread, until the record is next re-made.
 `real/ds000005/opt-cost-leastsquares` passes (p95 0.0227 mm, 0.0220 before).

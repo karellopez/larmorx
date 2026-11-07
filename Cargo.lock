@@ -377,6 +377,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-sdcflows"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-transform",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-transform"
 version = "0.0.1"
 dependencies = [

@@ -1,12 +1,12 @@
 # Parity: fslmaths (clean-room original)
 
-**All cases agree.** 452 cases on the `standard` tier: 384 pass, 63 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 454 cases on the `standard` tier: 386 pass, 63 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl fslmaths` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/fslmaths.md, Apache-2.0)
 - **Reference:** fslmaths from FSL 6.0.7.23 (fsl-avwutils 2209.6), the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths --tier standard`
-- **Original programs:** 447 runs: 406 from the oracle cache, 41 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity fsl-maths --tier standard`
+- **Original programs:** 449 runs: 408 from the oracle cache, 41 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -29,7 +29,7 @@
 | cli | 24 | 14 | 10 | 0 | 0 |
 | conv | 29 | 25 | 2 | 2 | 0 |
 | d13 | 82 | 56 | 26 | 0 | 0 |
-| difftest | 17 | 14 | 3 | 0 | 0 |
+| difftest | 19 | 16 | 3 | 0 | 0 |
 | dilall | 4 | 4 | 0 | 0 | 0 |
 | dim | 38 | 33 | 5 | 0 | 0 |
 | dog | 5 | 5 | 0 | 0 | 0 |
@@ -134,7 +134,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (be3db916dce3) |
+| larmorx | 0.0.1 (f005a08f6328) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -603,4 +603,6 @@ Random testing (one trial, 2026-11-03, `<workspace>/oracles/difftest/2026-11-03-
 | `difftest/subsamp2-qform-quaternion` | pass | 8/8 | -subsamp2 of an image with qfac -1: the qform's quaternion from FSL's product of matrices (findings 24) |
 | `difftest/tfce-double-image` | pass | 7/7 | -tfce of a float64 image: FSL's single-precision result (findings 26) |
 | `difftest/tfce-step-before-size` | both-error | 4/4 | -tfce of a thin image without positive values: the step's message first (findings 26) |
+| `difftest/time-step-negative-series` | pass | 7/7 | fslmaths on a series of time step -2: FSL writes the time step as its image layer reads it (its magnitude, 1 for a seri… |
+| `difftest/time-step-zero-series` | pass | 7/7 | fslmaths on a series of time step 0: FSL writes the time step as its image layer reads it (its magnitude, 1 for a serie… |
 | `difftest/ztop-nan-sign` | pass | 7/7 | -ztop of the default NaN: the positive NaN (findings 30) |

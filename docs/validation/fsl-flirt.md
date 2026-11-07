@@ -1,12 +1,12 @@
 # Parity: FLIRT (clean-room original)
 
-**2 case(s) fail.** 339 cases on the `standard` tier: 238 pass, 89 rejected by both, 10 expected divergences, 2 failures.
+**1 case(s) fail.** 339 cases on the `standard` tier: 239 pass, 89 rejected by both, 10 expected divergences, 1 failures.
 
 - **Validated:** `larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/flirt.md on the shared registration engine of larmorx-mri, Apache-2.0)
 - **Reference:** flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
-- **Original programs:** 333 runs: 318 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt --tier standard`
+- **Original programs:** 332 runs: 317 from the oracle cache, 15 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -31,17 +31,11 @@
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
 | out | 1 | 1 | 0 | 0 | 0 |
 | programs | 140 | 83 | 53 | 4 | 0 |
-| real | 62 | 60 | 0 | 0 | 2 |
+| real | 62 | 61 | 0 | 0 | 1 |
 | schedule | 30 | 23 | 7 | 0 | 0 |
 | verbose | 21 | 21 | 0 | 0 | 0 |
 
 ## Failures
-
-### `real/weights-normcorr`
-
-weights with -cost normcorr
-
-- **out.mat: 95th-percentile displacement over the reference's brain** (p95 displacement (mm) = 0.5083, threshold 0.1 or FSL's own variability): maximum 0.6078 mm, RMS deviation 1.3187 mm; FSL's own p95 on a perturbed input 0.1879 mm
 
 ### `real/weights-woods`
 
@@ -162,7 +156,7 @@ weights with -cost woods
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (a835ddd3a69f) |
+| larmorx | 0.0.1 (f005a08f6328) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -191,7 +185,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/dof9` | pass | 5/5 | -dof 9 |
 | `real/cost-mutualinfo` | pass | 5/5 | -cost mutualinfo (and -searchcost corratio) |
 | `real/cost-normmi` | pass | 5/5 | -cost normmi (and -searchcost corratio) |
-| `real/cost-normcorr` | pass | 6/6 | -cost normcorr (and -searchcost corratio) |
+| `real/cost-normcorr` | pass | 5/5 | -cost normcorr (and -searchcost corratio) |
 | `real/cost-leastsq` | pass | 5/5 | -cost leastsq (and -searchcost corratio) |
 | `real/cost-woods` | pass | 5/5 | -cost woods (and -searchcost corratio) |
 | `real/cost-labeldiff` | pass | 6/6 | -cost labeldiff (and -searchcost corratio) |
@@ -207,7 +201,7 @@ The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, `convert_xf
 | `real/minsampling` | pass | 5/5 | -minsampling 4 |
 | `real/forcescaling` | pass | 5/5 | -forcescaling |
 | `real/weights` | pass | 5/5 | -refweight and -inweight |
-| `real/weights-normcorr` | fail | 5/6 | weights with -cost normcorr |
+| `real/weights-normcorr` | pass | 5/5 | weights with -cost normcorr |
 | `real/weights-leastsq` | pass | 5/5 | weights with -cost leastsq |
 | `real/weights-normmi` | pass | 5/5 | weights with -cost normmi |
 | `real/weights-mutualinfo` | pass | 5/5 | weights with -cost mutualinfo |

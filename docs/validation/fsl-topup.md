@@ -1,12 +1,12 @@
 # Parity: topup (clean-room original)
 
-**All cases agree.** 185 cases on the `standard` tier: 104 pass, 67 rejected by both, 14 expected divergences, 0 failures.
+**All cases agree.** 187 cases on the `standard` tier: 106 pass, 67 rejected by both, 14 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl topup` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/topup.md, Apache-2.0)
 - **Reference:** topup from FSL 6.0.7.23 (fsl-topup 2203.5), the conda build at `~/fsl-6.0.7.23`, one thread
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-05 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
-- **Original programs:** 196 runs: 175 from the oracle cache, 21 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity fsl-topup --tier standard`
+- **Original programs:** 199 runs: 176 from the oracle cache, 23 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -27,10 +27,10 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| at | 74 | 43 | 25 | 6 | 0 |
+| at | 75 | 44 | 25 | 6 | 0 |
 | cfg | 16 | 10 | 4 | 2 | 0 |
 | debug | 5 | 5 | 0 | 0 | 0 |
-| difftest | 9 | 9 | 0 | 0 | 0 |
+| difftest | 10 | 10 | 0 | 0 | 0 |
 | err | 39 | 3 | 36 | 0 | 0 |
 | fmriprep | 2 | 2 | 0 | 0 | 0 |
 | opt | 37 | 29 | 2 | 6 | 0 |
@@ -131,7 +131,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5a44c8f498f9) |
+| larmorx | 0.0.1 (fa354111cf74) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -283,7 +283,8 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `at/jac-x` | pass | 8/8 | Jacobian modulation along x |
 | `at/jac-quadratic` | pass | 8/8 | a field of quadratic splines |
 | `at/jac-field` | pass | 8/8 | --topup naming a field image (topup's --fout): no movements |
-| `at/jac-field-aniso` | pass | 8/8 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
+| `at/jac-field-aniso` | pass | 9/9 | a field image and voxels of 6 x 4 mm in plane (the Jacobian of the y displacements) |
+| `at/jac-coef-aniso` | pass | 9/9 | topup's coefficients (a field of 6 x 6 mm voxels in plane) on images of 6 x 4 mm voxels of the same shape: FSL scales t… |
 | `at/jac-no-movpar` | pass | 8/8 | coefficients without their _movpar.txt (no movements) |
 | `at/jac-oblique` | pass | 8/8 | a phase-encoding vector along x and y |
 | `at/jac-z` | pass | 8/8 | phase encoding along z (FSL-144: FSL leaves the z component out silently; the default refuses) |
@@ -331,4 +332,5 @@ The cases are the replica suite's (`fsl-topup-replica`); FSL's runs are served f
 | `difftest/scg-every-iteration-counts` | pass | 12/12 | --miter counts every iteration of the scaled conjugate gradients, the rejected ones too (a level of 3 iterations whose … |
 | `difftest/scg-regulariser-weight` | pass | 28/28 | scaled conjugate gradients at a level whose start has Reg > 0: the gradient at x + sigma d takes the current point's re… |
 | `difftest/scg-rejected-last-step` | pass | 13/13 | a level of scaled conjugate gradients (--miter=1) whose one step is rejected: FSL counts it and ends the level at the r… |
+| `difftest/time-step-zero-series` | pass | 38/38 | topup on a series of time step 0 (fMRIPrep's call: its --iout series compared whole): FSL writes the time step as its i… |
 | `difftest/trace-verbose` | pass | 22/22 | --trace with -v: FSL prints a stage's Entering line inside a cost line; the suite takes the stages out |

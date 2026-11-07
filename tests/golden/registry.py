@@ -1092,9 +1092,12 @@ def image_math_operations() -> list[str]:
 #: of ``lx.fsl.fast``, ``lx.fsl.topup``, ``lx.fsl.applytopup`` and the fslmaths and fslstats
 #: functions below). ``lx.fsl.fslroi`` and ``lx.fsl.standard_space_roi`` had only their
 #: replicas from 2026-11-04 to 2026-11-05, when their clean-room originals came (their cases
-#: below). Since 2026-11-06 ``lx.fsl.prelude`` runs a tool with only its replica (FSL's
-#: prelude).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.fsl.prelude": "fsl prelude"}
+#: below). Since 2026-11-06 ``lx.fsl.prelude`` and ``lx.afni.volreg`` run tools with only their
+#: replicas (FSL's prelude, AFNI's 3dvolreg).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
+    "lx.fsl.prelude": "fsl prelude",
+    "lx.afni.volreg": "afni 3dvolreg",
+}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -3304,6 +3307,15 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     o = lx.afni.fmriprep_unifize_options()
     return {"options": np.array([o["clfrac"], o["radius"], *o["percentiles"], float(o["t2"])])}
+
+
+@case("py.afni.fmriprep_volreg_options", covers=("lx.afni.fmriprep_volreg_options",))
+def _(ctx: Context) -> dict[str, Any]:
+    o = lx.afni.fmriprep_volreg_options()
+    return {
+        "options": np.array([float(o["twopass"]), float(o["zpad"])]),
+        "method": o["interpolation"],
+    }
 
 
 @case("py.afni.fmriprep_slice_timing", covers=("lx.afni.fmriprep_slice_timing",))

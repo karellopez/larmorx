@@ -1,0 +1,371 @@
+{
+ "defect": "AFNI-97",
+ "description": "-Fourier -final NN -twopass -twoblur 4.5 -wtinp on a uint16 series 21 degrees oblique: the fit runs to rotations of 160 degrees, and AFNI crashes in the final pass (AFNI-97); the default clears the lone row alone, names AFNI-97 and writes every output",
+ "expect": "crash",
+ "fix_writes": "AFNI-97",
+ "found": {
+  "detail": "every file written is compared: AFNI [], larmorx ['o.nii']; exit status: ; messages before AFNI's crash: line 12: AFNI '', larmorx '++ Max displacement in automask = 66.86 (mm) at sub-brick 4'; AFNI does not crash: Fatal Signal 11 (SIGSEGV) received",
+  "n": 176,
+  "seed": "volreg-trial",
+  "shrink_moves": [
+   "dropped dfile (-dfile d.txt)",
+   "dropped 1Dfile (-1Dfile p.1D)",
+   "dropped wtinp (-wtinp)",
+   "dropped twoblur (-twoblur 4.5)",
+   "dropped final (-final NN)",
+   "input: axis 1 40 -> 20 voxels",
+   "input: axis 1 20 -> 10 voxels",
+   "input: axis 0 39 -> 19 voxels",
+   "input (and its grid): origin at 0",
+   "input: axis 0 19 -> 9 voxels",
+   "input: float32 storage"
+  ],
+  "signature": [
+   "AFNI does not crash",
+   "every file written is compared",
+   "exit status",
+   "messages before AFNI's crash"
+  ]
+ },
+ "id": "fourier-lone-row-default",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "p.1D",
+    "d.txt"
+   ]
+  },
+  "features": {
+   "1Dfile": true,
+   "1Dmatrix_save": false,
+   "base index": false,
+   "coarse": false,
+   "content": "head",
+   "controls": false,
+   "dfile": true,
+   "dtype": "uint16",
+   "edging": false,
+   "external base": false,
+   "extreme": false,
+   "final": true,
+   "final value": "NN",
+   "first at rest": false,
+   "float": false,
+   "maxdisp1D": false,
+   "method": true,
+   "method value": "Fourier",
+   "noclip": false,
+   "nocoarserot": false,
+   "noise": 3.0,
+   "nomaxdisp": false,
+   "nx": 39,
+   "ny": 40,
+   "nz": 17,
+   "oblique": true,
+   "qa": 12,
+   "qb": 1,
+   "qd": 2,
+   "rot b": -1,
+   "rot c": 0,
+   "rot d": -2,
+   "rot scale": 4,
+   "savedisp": false,
+   "shift0": -4.0,
+   "shift1": -3.5,
+   "shift2": 1.0,
+   "shift3": 1.0,
+   "shift4": 4.0,
+   "shift5": 4.0,
+   "sinit": false,
+   "slice spacing": 3.5,
+   "spacing": 3.5,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tshift": false,
+   "twoblur": true,
+   "twoblur value": "4.5",
+   "twodup": false,
+   "twopass": true,
+   "verbose": false,
+   "volumes": 6,
+   "weight": false,
+   "wtinp": true,
+   "zpad": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-Fourier"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-final",
+     "NN"
+    ],
+    "name": "final",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twopass"
+    ],
+    "name": "twopass",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twoblur",
+     "4.5"
+    ],
+    "name": "twoblur",
+    "optional": true
+   },
+   {
+    "args": [
+     "-wtinp"
+    ],
+    "name": "wtinp",
+    "optional": true
+   },
+   {
+    "args": [
+     "-1Dfile",
+     "p.1D"
+    ],
+    "name": "1Dfile",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dfile",
+     "d.txt"
+    ],
+    "name": "dfile",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 2039472443,
+     "size": 57.33,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -66.5,
+      -68.25,
+      -28.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      12,
+      1,
+      0,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.5,
+      3.5,
+      3.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       33,
+       -2,
+       -2,
+       -2
+      ],
+      "translation": [
+       1.75,
+       -1.25,
+       -1.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       37,
+       0,
+       1,
+       0
+      ],
+      "translation": [
+       -1.75,
+       -3.5,
+       2.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       20,
+       0,
+       -1,
+       1
+      ],
+      "translation": [
+       0.5,
+       -1.5,
+       -1.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       16,
+       -2,
+       0,
+       0
+      ],
+      "translation": [
+       -0.5,
+       -0.25,
+       0.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       47,
+       -1,
+       -2,
+       0
+      ],
+      "translation": [
+       -3.5,
+       3.5,
+       -3.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       59,
+       -1,
+       0,
+       -2
+      ],
+      "translation": [
+       -4.0,
+       -3.5,
+       1.0
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     39,
+     40,
+     17,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 176,
+  "options": [
+   "-1Dfile",
+   "-Fourier",
+   "-dfile",
+   "-final",
+   "-twoblur",
+   "-twopass",
+   "-wtinp",
+   "17 slices",
+   "6 volumes",
+   "uint16 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "afni-volreg",
+ "tier": "standard",
+ "tool": "afni-volreg"
+}

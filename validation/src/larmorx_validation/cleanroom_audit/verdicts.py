@@ -76,6 +76,7 @@ TOOL_NAMES = {
     ("AFNI", "tshift"): "3dTshift",
     ("AFNI", "automask"): "3dAutomask",
     ("AFNI", "unifize"): "3dUnifize",
+    ("AFNI", "volreg"): "3dvolreg",
     ("AFNI", "afni-shared"): "larmorx-afni's shared code (datasets, FFT, messages, options)",
     ("FSL", "hmc"): "the head-motion correction (lx.mri.hmc, mcflirt's behaviour)",
     ("FSL", "bet"): "BET (bet, bet2, betsurf)",
@@ -104,7 +105,7 @@ def tool_of(rel: str) -> tuple[str, str] | None:
     if crate == "mri":
         return ("FSL", "hmc")
     if crate == "afni":
-        for t in ("tshift", "automask", "unifize"):
+        for t in ("tshift", "automask", "unifize", "volreg"):
             if re.search(rf"(^|/){t}(/|\.rs$)", p):
                 return ("AFNI", t)
         return ("AFNI", "afni-shared")
@@ -979,7 +980,7 @@ def verdict(entry: dict) -> dict:
 #: Files a clean-room brief may forbid (R16): the replicas' parity suites and evidence modules.
 BRIEF_RESTRICTED = re.compile(
     r"^validation/src/larmorx_validation/(?:parity|evidence|difftest/tools)/"
-    r"(?:\w*replica\w*|fsl_mcflirt\w*)\.py$"
+    r"(?:\w*replica\w*|fsl_mcflirt\w*|afni_volreg)\.py$"
 )
 CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-path"})
 #: Files the clean-room briefs forbid from the clean-room fixes part on (2026-10-29): the
@@ -987,7 +988,7 @@ CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-pat
 #: investigations of replica parts and spec writers.
 BRIEF_FILES = re.compile(
     r"^validation/difftest/triage\.toml$|^validation/investigations/(?:fsl-bet|fsl-fast|fsl-flirt|"
-    r"fsl-maths|fsl-mcflirt-replica|fsl-prelude|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
+    r"afni-volreg|fsl-maths|fsl-mcflirt-replica|fsl-prelude|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
     r"version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site)/|"
     r"^validation/investigations/glibc-dbl/tables\.py$"
 )

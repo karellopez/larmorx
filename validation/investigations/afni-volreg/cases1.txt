@@ -1,0 +1,36 @@
+# 3dvolreg cases for batch.py: <input> <mode> <options...> (inputs from make_series.py and variants.py)
+probe/s1.nii.gz reproduce -prefix o.nii.gz
+probe/s1.nii.gz reproduce -Fourier -prefix o.nii.gz -dfile d.txt
+probe/s1.nii.gz reproduce -cubic -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -quintic -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -linear -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -heptic -final NN -prefix o.nii.gz
+probe/s1.nii.gz reproduce -final Fourier -prefix o.nii.gz
+probe/s1.nii.gz reproduce -final cubic -noclip -prefix o.nii.gz
+probe/s1.nii.gz reproduce -zpad 0 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -zpad 2 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -base 3 -prefix o.nii.gz -1Dmatrix_save m.1D
+probe/s1.nii.gz reproduce -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -twoblur 3 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -coarse 1 1 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -coarse 0 0 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -sinit -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -twopass -nomaxdisp -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -edging 3 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -edging 10% -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -maxite 2 -x_thresh 0.1 -rot_thresh 0.1 -delta 1 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -wtinp -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -weight weight.nii.gz[1] -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -base base3d.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D -dfile d.txt
+probe/s1.nii.gz reproduce -twopass -base base3d.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D
+probe/s1.nii.gz reproduce -rotcom -prefix NULL -1Dfile p.1D
+probe/s1.nii.gz reproduce -verbose -prefix o.nii.gz
+probe/s1.nii.gz reproduce -verbose -verbose -twopass -Fourier -prefix o.nii.gz
+probe/s2_short.nii.gz reproduce -prefix o.nii.gz -1Dfile p.1D -dfile d.txt
+probe/s2_short.nii.gz reproduce -float -prefix o.nii.gz
+probe/s2_scaled.nii.gz reproduce -prefix o.nii.gz -1Dfile p.1D
+probe/s3_oblique.nii.gz reproduce -Fourier -twopass -prefix o.nii.gz -1Dfile p.1D -1Dmatrix_save m.1D -maxdisp1D md.1D
+probe/s4_sagittal.nii.gz reproduce -Fourier -twopass -prefix o.nii.gz -1Dfile p.1D -1Dmatrix_save m.1D -maxdisp1D md.1D
+probe/s5_byte.nii.gz reproduce -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -nocoarserot -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz fix -Fourier -twopass -1Dfile o.1D -1Dmatrix_save o.aff12.1D -prefix o.nii.gz -zpad 4 -maxdisp1D o_md.1D

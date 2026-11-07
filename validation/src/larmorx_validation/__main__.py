@@ -35,6 +35,7 @@ PARITY_MODULES = {
     "afni-tshift": "afni_tshift",
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
+    "afni-volreg": "afni_volreg",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
     "mri-hmc": "mri_hmc",
@@ -84,7 +85,7 @@ BENCH_SUITES = tuple(BENCH_MODULES)
 
 
 #: Suites that can also validate a replica binary (docs/licensing.md).
-REPLICA_SUITES = ("afni-tshift", "afni-automask", "afni-unifize", "fsl-bet")
+REPLICA_SUITES = ("afni-tshift", "afni-automask", "afni-unifize", "afni-volreg", "fsl-bet")
 
 
 def _parity_suite(name: str, implementation: str = "original"):

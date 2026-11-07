@@ -878,6 +878,23 @@ AFNI_MODULE_TOOLS = {
     "cli::automask": "automask",
     "unifize": "unifize",
     "cli::unifize": "unifize",
+    "vecmat": "volreg",
+    "eispack": "volreg",
+    "shear": "volreg",
+    "rot3d": "volreg",
+    "blur": "volreg",
+    "lsqfit": "volreg",
+    "align3d": "volreg",
+    "volreg": "volreg",
+    "cli::volreg": "volreg",
+}
+#: AFNI files that the replica's PROVENANCE also names under its environment row (3dvolreg's
+#: variables are read there) but that are 3dvolreg's own (the 3dvolreg replica part's handoff).
+AFNI_FILE_TOOLS = {
+    "src/3dvolreg.c": "volreg",
+    "src/mri_3dalign.c": "volreg",
+    "src/thd_rot3d.c": "volreg",
+    "src/edt_blur.c": "volreg",
 }
 #: glibc's functions with a clean-room original (larmorx-core): the upstream files and the
 #: nearest restricted Rust code (the replica: an earlier translation from glibc, or for the
@@ -1035,7 +1052,9 @@ def afni_upstream_tools(provenance: str) -> dict[str, str]:
         tool = AFNI_MODULE_TOOLS.get(m[1], "afni-shared")
         for f in re.findall(r"`(src/[^`]+)`", m[2]):
             named.setdefault(f, set()).add(tool)
-    return {f: (t.pop() if len(t) == 1 else "afni-shared") for f, t in named.items()}
+    out = {f: (t.pop() if len(t) == 1 else "afni-shared") for f, t in named.items()}
+    out.update({f: t for f, t in AFNI_FILE_TOOLS.items() if f in out})
+    return out
 
 
 @dataclass

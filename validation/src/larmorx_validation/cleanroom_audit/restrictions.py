@@ -197,6 +197,7 @@ SOURCE_FINDINGS: dict[str, tuple[str, str, str]] = {
     "fsl-topup.md": ("FSL", "2026-11-03T05:19:40+01:00", "2026-11-03T07:38:52+01:00"),
     "fsl-maths.md": ("FSL", "2026-11-03T08:53:55+01:00", "2026-11-03T16:40:04+01:00"),
     "fsl-prelude.md": ("FSL", "2026-11-06T17:30:33+01:00", "2026-11-06T21:07:11+01:00"),
+    "afni-volreg.md": ("AFNI", "2026-11-06T22:01:36+01:00", "2026-11-07T03:46:30+01:00"),
 }
 
 #: validation/probes/<folder> -> family (R14); folders not listed: by their name's prefix.

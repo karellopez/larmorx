@@ -1119,7 +1119,8 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
 #: ``LARMORX_IMPLEMENTATION=replica``, in the same process), at one thread, on fMRIPrep's calls:
 #: 3dTshift on a BOLD series of 64 x 64 x 40 voxels and 160 volumes (``{bold}``), 3dAutomask on
 #: its mean (``{mean}``), 3dUnifize ``-T2`` on a head of 160 x 192 x 160 voxels (``{t1}``) and
-#: ``-EPI`` on the series. Every output is AFNI's byte for byte in ``reproduce`` (the header's
+#: ``-EPI`` on the series, 3dvolreg's RobustAverage call on its first 20 volumes (``{bold20}``;
+#: since 2026-11-06). Every output is AFNI's byte for byte in ``reproduce`` (the header's
 #: four extension bytes aside: larmorx writes no AFNI history extension).
 #:
 #: Measured on 2026-10-29 (``validation/investigations/afni-move/memory.py``: AFNI, the Python entry
@@ -1145,6 +1146,14 @@ AFNI_CASES = [
     ),
     ("3dUnifize", "-T2 -clfrac 0.2 -prefix {out}/uni.nii.gz -input {t1}"),
     ("3dUnifize", "-EPI -prefix {out}/epi.nii.gz -input {bold}"),
+    # 3dvolreg (2026-11-06): RobustAverage's call (fMRIPrep's BOLD reference) on 20 volumes of
+    # the series (-maxdisp1D left out: its file holds the command line, whose output paths
+    # differ between the two directories).
+    (
+        "3dvolreg",
+        "-Fourier -twopass -zpad 4 -1Dfile {out}/o.1D -1Dmatrix_save {out}/o.aff12.1D "
+        "-prefix {out}/o.nii.gz {bold20}",
+    ),
 ]
 
 
@@ -1167,6 +1176,7 @@ def _afni_inputs(d: Path) -> dict[str, str]:
     bold = brain[..., None] * (1 + 0.01 * np.sin(t / 7.0)) + rng.normal(0, 8, (*shape, 160))
     save("bold.nii.gz", bold.astype(np.float32), (3.0, 3.0, 3.5, 2.0))
     save("mean.nii.gz", bold.mean(axis=-1).astype(np.float32), (3.0, 3.0, 3.5))
+    save("bold20.nii.gz", bold[..., :20].astype(np.float32), (3.0, 3.0, 3.5, 2.0))
     shape = (160, 192, 160)
     i, j, k = np.indices(shape, dtype=np.float32)
     r = np.sqrt((i - 80) ** 2 + (j - 96) ** 2 + ((k - 80) * 1.1) ** 2)

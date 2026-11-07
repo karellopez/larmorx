@@ -1,0 +1,327 @@
+{
+ "defect": "AFNI-97",
+ "description": "-heptic -final Fourier -twopass -verbose: AFNI crashes (AFNI-97) after its open progress line 'Starting final pass ... 0..1'; larmorx ends the line before its error",
+ "expect": "crash",
+ "found": {
+  "detail": "every file written is compared: AFNI [], larmorx ['md.1D', 'md_delt.1D', 'o.nii']; exit status: ; messages before AFNI's crash: line 20: AFNI '++ Starting final pass on 5 sub-bricks: 0..1', larmorx '++ Starting final pass on 5 sub-bricks: 0..1..2..3..4..'; AFNI does not crash: Fatal Signal 11 (SIGSEGV) received",
+  "n": 2840,
+  "seed": "volreg-trial",
+  "shrink_moves": [],
+  "signature": [
+   "AFNI does not crash",
+   "every file written is compared",
+   "exit status",
+   "messages before AFNI's crash"
+  ]
+ },
+ "id": "crash-after-progress-line",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "md.1D",
+    "md_delt.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": false,
+   "1Dmatrix_save": false,
+   "base index": false,
+   "coarse": false,
+   "content": "head",
+   "controls": false,
+   "dfile": false,
+   "dtype": "float32",
+   "edging": false,
+   "external base": false,
+   "extreme": false,
+   "final": true,
+   "final value": "Fourier",
+   "first at rest": true,
+   "float": false,
+   "maxdisp1D": true,
+   "method": true,
+   "method value": "heptic",
+   "noclip": false,
+   "nocoarserot": false,
+   "noise": 3.0,
+   "nomaxdisp": false,
+   "nx": 37,
+   "ny": 25,
+   "nz": 16,
+   "oblique": false,
+   "rot b": -2,
+   "rot c": 2,
+   "rot d": -1,
+   "rot scale": 5,
+   "savedisp": false,
+   "shift0": -0.5,
+   "shift1": -0.25,
+   "shift2": -0.75,
+   "shift3": 2.0,
+   "shift4": 1.0,
+   "sinit": false,
+   "slice spacing": 3.0,
+   "spacing": 3.5,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "tshift": false,
+   "twoblur": false,
+   "twodup": false,
+   "twopass": true,
+   "verbose": true,
+   "volumes": 5,
+   "weight": false,
+   "wtinp": false,
+   "zpad": true,
+   "zpad value": "0"
+  },
+  "groups": [
+   {
+    "args": [
+     "-heptic"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-final",
+     "Fourier"
+    ],
+    "name": "final",
+    "optional": true
+   },
+   {
+    "args": [
+     "-zpad",
+     "0"
+    ],
+    "name": "zpad",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twopass"
+    ],
+    "name": "twopass",
+    "optional": true
+   },
+   {
+    "args": [
+     "-verbose"
+    ],
+    "name": "verbose",
+    "optional": true
+   },
+   {
+    "args": [
+     "-maxdisp1D",
+     "md.1D"
+    ],
+    "name": "maxdisp1D",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 873768439,
+     "size": 36.75,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -63.0,
+      -42.0,
+      -26.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.5,
+      3.5,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       16,
+       2,
+       -1,
+       2
+      ],
+      "translation": [
+       1.0,
+       0.25,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       29,
+       1,
+       2,
+       2
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       26,
+       -2,
+       2,
+       1
+      ],
+      "translation": [
+       -1.75,
+       0.25,
+       -2.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       12,
+       -2,
+       2,
+       -1
+      ],
+      "translation": [
+       -0.5,
+       -0.25,
+       -0.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     37,
+     25,
+     16,
+     5
+    ],
+    "suffix": ".nii",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 2840,
+  "options": [
+   "-final",
+   "-heptic",
+   "-maxdisp1D",
+   "-twopass",
+   "-verbose",
+   "-zpad",
+   "16 slices",
+   "5 volumes",
+   "float32 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "afni-volreg",
+ "tier": "standard",
+ "tool": "afni-volreg"
+}

@@ -31,9 +31,16 @@ SETTINGS_NO_EFFECT = _SETTINGS_NO_EFFECT - {"AFNI_1D_ZERO_TEXT"}
 
 
 def check_settings(
-    afni_settings: Mapping[str, str] | None, function: str, program: str
+    afni_settings: Mapping[str, str] | None,
+    function: str,
+    program: str,
+    *,
+    applied: frozenset[str] = SETTINGS_APPLIED,
+    no_effect: frozenset[str] = SETTINGS_NO_EFFECT,
 ) -> dict[str, str]:
-    """``afni_settings`` as a plain dict, after checking each name and value."""
+    """``afni_settings`` as a plain dict, after checking each name and value against the
+    variables the program reads (``applied``) and those that change nothing it returns
+    (``no_effect``)."""
     if afni_settings is None:
         return {}
     if not isinstance(afni_settings, Mapping):
@@ -50,7 +57,7 @@ def check_settings(
                 f"afni_settings: {function} sets {name} itself (a path is one file; plain "
                 f"messages, read as warnings); leave it out"
             )
-        if name not in SETTINGS_APPLIED and name not in SETTINGS_NO_EFFECT:
+        if name not in applied and name not in no_effect:
             raise ValueError(
                 f"afni_settings: AFNI's {program} does not read {name!r} (names are case-sensitive)"
             )

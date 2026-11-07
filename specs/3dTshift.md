@@ -290,8 +290,13 @@ then +4 (no other order of the eight terms reproduces AFNI; this one does, bit f
 every synthetic case). The weights are formed as `c · ∏(f − k)` in double with the constant
 first and the factors in increasing `k`, then rounded to float32; this is exact for linear
 and cubic on real slice times, but for quintic and heptic some fractions give weights that
-differ from AFNI's in the last float32 bits (unresolved: float32 arithmetic, exact
-fractions, other factor orders and an unrounded fraction all match worse).
+differ from AFNI's in the last float32 bits. **Answered** (2026-11-07, 3dvolreg's spec writer:
+3dTshift and 3dvolreg shift their rows with the same AFNI arithmetic): the weights are formed
+as `specs/3dvolreg.md` §5.6 gives them, with `x = f`: `x²` is the float32 product `x·x`, every
+other operation is in double, left to right exactly as the factored forms there are written
+(the leading factor, then each parenthesis, the constant last), and the weight is then rounded
+to float32; so formed, the polynomial shifts of 3dvolreg's model are AFNI's bit for bit
+(`validation/investigations/3dvolreg-spec/`).
 
 ### 5.3 Weighted sinc: `-wsinc5`, `-wsinc9`
 Radius R = 5 or 9. The weight of the sample at distance `x` from the source position is

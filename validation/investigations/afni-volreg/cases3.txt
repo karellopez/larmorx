@@ -1,0 +1,63 @@
+# 3dvolreg cases of relay 2 for batch.py (inputs from make_series.py, variants.py, variants2.py)
+# -tshift
+probe/s6_st.nii.gz reproduce -tshift 0 -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz fix -tshift 1 -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz reproduce -verbose -tshift 2 -base 1 -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz reproduce -tshift 0 -twopass -Fourier -prefix o.nii.gz -dfile d.txt
+probe/s6_stneg.nii.gz reproduce -tshift 0 -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -tshift 0 -prefix o.nii.gz
+probe/s6_st4.nii.gz reproduce -tshift 0 -prefix o.nii.gz
+probe/base3d.nii.gz reproduce -tshift 0 -base s1.nii.gz -prefix o.nii.gz
+probe/s6_st.nii.gz reproduce -tshift -1
+# -savedisp, -SAVEDISP
+probe/s1.nii.gz reproduce -savedisp sd.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz fix -SAVEDISP SD.nii -prefix o.nii.gz -verbose
+probe/s3_oblique.nii.gz reproduce -savedisp sd.nii.gz -prefix NULL
+probe/s1.nii.gz reproduce -savedisp .nii -prefix o.nii.gz
+# -rotparent, -gridparent
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -prefix o.nii.gz -1Dfile p.1D -dfile d.txt
+probe/s1.nii.gz reproduce -verbose -rotparent rp.nii.gz -gridparent gp27.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -gridparent gp24.nii.gz -prefix o.nii.gz -Fourier -final cubic
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -gridparent gp27m.nii.gz -prefix o.nii.gz -noclip -final linear
+probe/s6_st.nii.gz reproduce -verbose -rotparent rp_st.nii.gz -gridparent gp27m.nii.gz -prefix o.nii.gz
+probe/s6_st.nii.gz reproduce -tshift 0 -rotparent rp_st.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -gridparent gp22.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -gridparent gpx.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -gridparent gpsp.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -gridparent gp27.nii.gz -prefix o.nii.gz -1Dfile p.1D
+probe/s1.nii.gz reproduce -rotparent s1.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -rotparent rp.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -gridparent gp27.nii.gz -gridparent gp27.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent nothere.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s3_oblique.nii.gz reproduce -rotparent rp_obl.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -twopass -twodup -base base_shift.nii.gz -gridparent gp27.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -twopass -twodup -base base_shift.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -rotparent rp.nii.gz -savedisp sd.nii.gz -gridparent gp27.nii.gz -prefix o.nii.gz
+probe/s2_short.nii.gz reproduce -rotparent rp.nii.gz -prefix o.nii.gz
+# -twodup
+probe/s1.nii.gz reproduce -twopass -twodup -base base_shift.nii.gz -prefix o.nii.gz -1Dmatrix_save m.1D
+probe/s1.nii.gz reproduce -twodup -base base_shift.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -twopass -twodup -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz reproduce -twopass -twodup -base base_shift.nii.gz -savedisp sd.nii.gz -prefix o.nii.gz
+# messages in the order of the scan
+probe/s1.nii.gz reproduce -base base3d.nii.gz -verbose -prefix o.nii.gz
+probe/s1.nii.gz reproduce -verbose -base s2_short.nii.gz -prefix o.nii.gz
+probe/s1.nii.gz reproduce -verbose -weight weight.nii.gz[1] -base 2 -prefix o.nii.gz
+probe/s1.nii.gz reproduce -weight weight.nii.gz[5] -prefix o.nii.gz
+probe/s1.nii.gz reproduce -weight nothere.nii.gz[0] -prefix o.nii.gz
+probe/s1.nii.gz reproduce -base nothere.nii.gz -prefix o.nii.gz
+# AFNI-89, AFNI-93: a constant series, one slice, four slices
+probe/s7_const.nii.gz reproduce -prefix o.nii.gz
+probe/s7_const.nii.gz fix -prefix o.nii.gz
+probe/s7_nz1.nii.gz reproduce -prefix o.nii.gz
+probe/s7_nz4.nii.gz reproduce -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s7_nz4.nii.gz fix -twopass -prefix o.nii.gz -1Dfile p.1D
+probe/s7_nz4.nii.gz reproduce -twopass -nocoarserot -prefix o.nii.gz -1Dfile p.1D
+# DSET_BRIKNAME in the -verbose messages (a qform or sform of code 2 adds the directory)
+probe/s1.nii.gz reproduce -verbose -base base3d.nii.gz -weight weight.nii.gz[0] -prefix o.nii.gz
+probe/s5_byte.nii.gz reproduce -verbose -prefix o.nii.gz -1Dfile p.1D
+probe/s6_st.nii.gz reproduce -verbose -tshift 0 -base weight.nii.gz -prefix o.nii.gz
+probe/base3d.nii.gz reproduce -verbose -base s1.nii.gz -prefix o.nii.gz
+probe/s7_const.nii.gz reproduce -twopass -prefix o.nii.gz
+probe/s7_nz1.nii.gz reproduce -twopass -prefix o.nii.gz

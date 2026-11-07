@@ -29,6 +29,7 @@ and lives in the main package.
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
 | Arm's Optimized Routines (v19.11: the `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and double `exp`, `log`, `pow` glibc 2.35 ships) | MIT | ✓ main package since 2026-11-04 (`larmorx_core::math`'s `*_glibc`, `LICENSES/MIT-arm-optimized-routines.txt`): one translation for `reproduce`, the AFNI replicas and the FSL replicas' core (the AFNI replicas' `sincosf.rs` from 2026-10-29) | not needed |
 | fdlibm (as glibc 2.35 carries it: `atanf`, `atan2f`, `tanhf`, `expm1f`; netlib's fdlibm 5.3: `tanh`) | Sun's notice (`LicenseRef-fdlibm`) | ✓ main package (`larmorx_core::math`'s `atanf_glibc`, `atan2f_glibc` since 2026-11-04 and `tanh_glibc`; the AFNI replicas' `tanhf`, `expm1f`) | not needed |
+| EISPACK (`svd`, `pythag`: Argonne National Laboratory, 1983) and f2c's libf2c (`d_sign`), as AFNI 26.3.05 carries them (`src/eispack/`, `src/f2c/`) | EISPACK: freely available (netlib; AFNI's `LICENSE.txt`: "License: Free"); libf2c: AT&T Bell Laboratories and Bellcore's permission notice (`src/f2c/Notice`) | ✓ main package since 2026-11-06 (`crates/larmorx-afni-replica/src/eispack.rs`: 3dvolreg's 3 × 3 singular value decomposition; the notice in `NOTICE`) | the clean-room original of 3dvolreg may use any SVD of a rotation (`specs/3dvolreg.md`) |
 | the GNU C Library 2.35's own code (IBM's Accurate Mathematical Library: the double `sin`, `cos`, `sincos`, `tan`, `asin`, `acos`, `atan`; `cbrtf`) | LGPL-2.1-or-later | ✗ never copied or translated (verification tools and a spec writer's model in `crates-gpl/tools/` only) | ✓ main package, from behaviour specs: `cbrtf_glibc` (`specs/cbrtf.md`), `sin`, `cos`, `sincos` (`specs/glibc-dbl.md`, its tables from definitions); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (the user, 2026-11-04) |
 
 ## Packages
@@ -222,7 +223,7 @@ command-line binary. Code from different families is never linked into one binar
   [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)): \"As of May 12, 2026, MCW
   has granted NIH a Creative Commons Attribution License (CC BY 4.0) for all of the code under
   its copyright\" (`doc/README/README.copyright`); every MCW file's header now says CC BY 4.0, and
-  none of the 55 AFNI files the replicas derive from is GPL. **The AFNI replicas moved into the
+  none of the 55 AFNI files the replicas derived from then is GPL; 3dvolreg's replica (2026-11-06) added 22, none GPL either: 13 of MCW's (CC BY 4.0 in their headers), 6 of the NIH's (no header: public domain) and EISPACK's `eis_svd.c` and `eis_pythag.c` with libf2c's `d_sign.c` (above). **The AFNI replicas moved into the
   main package on 2026-10-29** (decided by the user): `crates/larmorx-afni-replica`, Apache-2.0,
   with CC BY 4.0's attribution (section 3(a): the creator, the copyright notice, the licence and
   its URI, the disclaimer, the source and its tag, the modification) in every MCW-derived file's

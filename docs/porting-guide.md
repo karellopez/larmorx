@@ -62,7 +62,7 @@ The clean-room implementer must not open the upstream source, the replica crates
 and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
 [findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
-[findings/afni-licence-routines.md](findings/afni-licence-routines.md),
+[findings/afni-licence-routines.md](findings/afni-licence-routines.md), [findings/afni-volreg.md](findings/afni-volreg.md),
 [findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [findings/fsl-bet.md](findings/fsl-bet.md), [findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
 [defect register](findings/upstream-defects.md) marked **restricted**. What the implementer
 learns from black-box runs goes back into the spec, marked (observed). The models are

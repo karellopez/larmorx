@@ -1,0 +1,268 @@
+{
+ "defect": null,
+ "description": "-twopass on blobs with a large scale difference: AFNI's 'might not converge.' leaves its line open, and larmorx's notices followed on it; the comparison keeps AFNI's text before a notice",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: AFNI's, byte for byte: stderr line 6: AFNI '   3dvolreg might not converge.', larmorx '(nothing)'",
+  "n": 10259,
+  "seed": "volreg-trial",
+  "shrink_moves": [],
+  "signature": [
+   "messages: AFNI's, byte for byte"
+  ]
+ },
+ "id": "notice-after-open-line",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "o.nii",
+    "p.1D"
+   ]
+  },
+  "features": {
+   "1Dfile": true,
+   "1Dmatrix_save": false,
+   "base index": false,
+   "blobs": 2,
+   "coarse": false,
+   "content": "blobs",
+   "controls": false,
+   "dfile": false,
+   "dtype": "int16",
+   "edging": true,
+   "edging value": "5%",
+   "external base": false,
+   "extreme": false,
+   "final": false,
+   "first at rest": false,
+   "float": true,
+   "maxdisp1D": false,
+   "method": true,
+   "method value": "heptic",
+   "noclip": false,
+   "nocoarserot": false,
+   "nomaxdisp": true,
+   "nx": 31,
+   "ny": 24,
+   "nz": 6,
+   "oblique": false,
+   "rot b": -1,
+   "rot c": -1,
+   "rot d": 1,
+   "rot scale": 3,
+   "savedisp": false,
+   "shift0": -0.5,
+   "shift1": 0.25,
+   "shift2": -0.25,
+   "sinit": false,
+   "slice spacing": 4.0,
+   "slope": false,
+   "spacing": 3.0,
+   "suffix": ".nii.gz",
+   "tshift": false,
+   "twoblur": true,
+   "twoblur value": "3",
+   "twodup": false,
+   "twopass": true,
+   "verbose": false,
+   "volumes": 2,
+   "weight": false,
+   "wtinp": false,
+   "zpad": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-heptic"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twopass"
+    ],
+    "name": "twopass",
+    "optional": true
+   },
+   {
+    "args": [
+     "-twoblur",
+     "3"
+    ],
+    "name": "twoblur",
+    "optional": true
+   },
+   {
+    "args": [
+     "-edging",
+     "5%"
+    ],
+    "name": "edging",
+    "optional": true
+   },
+   {
+    "args": [
+     "-float"
+    ],
+    "name": "float",
+    "optional": true
+   },
+   {
+    "args": [
+     "-nomaxdisp"
+    ],
+    "name": "nomaxdisp",
+    "optional": true
+   },
+   {
+    "args": [
+     "-1Dfile",
+     "p.1D"
+    ],
+    "name": "1Dfile",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "o.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 2,
+     "seed": 1646084631,
+     "size": 20.0,
+     "type": "blobs"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -45.0,
+      -34.5,
+      -7.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       20,
+       -2,
+       1,
+       -2
+      ],
+      "translation": [
+       -0.75,
+       1.25,
+       -1.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       44,
+       -1,
+       -1,
+       1
+      ],
+      "translation": [
+       -0.5,
+       0.25,
+       -0.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     31,
+     24,
+     6,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 10259,
+  "options": [
+   "-1Dfile",
+   "-edging",
+   "-float",
+   "-heptic",
+   "-nomaxdisp",
+   "-twoblur",
+   "-twopass",
+   "2 volumes",
+   "6 slices",
+   "int16 input"
+  ],
+  "seed": "volreg-trial",
+  "tool": "afni-volreg"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-volreg",
+ "tier": "standard",
+ "tool": "afni-volreg"
+}

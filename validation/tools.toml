@@ -143,6 +143,14 @@ page = "/tools/afni-unifize/"
 use = ["larmorx afni 3dUnifize", "lx.afni.unifize"]
 how = "clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution)"
 validation = "original: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [{afni-unifize-replica.identical} of {afni-unifize-replica.written}](record:afni-unifize-replica) compared cases that write outputs bit-identical at 1, 2 and 6 threads"
+[[tool]]
+id = "afni-volreg"
+title = "3dvolreg (rigid-body registration of a series)"
+eco = "afni"
+page = "/tools/afni-volreg/"
+use = ["larmorx afni 3dvolreg", "lx.afni.volreg"]
+how = "exact replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined); clean-room original: the next part, from `specs/3dvolreg.md`"
+validation = "replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on six oracle runs' BOLD references and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings)"
 
 [[tool]]
 id = "mri-hmc"
@@ -298,6 +306,12 @@ status = "`validated`"
 id = "afni-unifize-replica"
 larmorx = "`larmorx afni 3dUnifize` and `lx.afni.unifize` with the replica (`crates/larmorx-afni-replica`, in-process)"
 reference = "3dUnifize (AFNI 26.3.05 binary, 1, 2 and 6 OpenMP threads; AFNI 25.2.09 beside it, the version step; fMRIPrep 25.2.6's AFNI)"
+status = "`validated`"
+
+[[record]]
+id = "afni-volreg-replica"
+larmorx = "`larmorx afni 3dvolreg` and `lx.afni.volreg` with the replica (`crates/larmorx-afni-replica`, in-process)"
+reference = "3dvolreg (AFNI 26.3.05 binary, one thread: no OpenMP loop; AFNI 25.2.09 beside it, the version step; fMRIPrep 25.2.6's AFNI); fMRIPrep's calls also against fMRIPrep's own outputs"
 status = "`validated`"
 
 [[record]]

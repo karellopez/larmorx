@@ -126,7 +126,7 @@ at a time:
    replica, its spec writer also answering the waiting spec questions (**done** 2026-11-06: the replica FSL
    6.0.7.23's bytes in every compared case of its record, fMRIPrep's seven calls included; `specs/prelude.md`;
    FSL-261 to FSL-273; the questions answered and those still open below, "The questions for a spec writer,
-   gathered"); (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05) and (5) its clean-room
+   gathered"); (3) PRELUDE's clean-room original; (4) 3dvolreg's replica (AFNI 26.3.05; **done** 2026-11-07: every compared case of its record bit-identical, fMRIPrep's RobustAverage and PEPOLAR calls included; `specs/3dvolreg.md`; AFNI-86 to AFNI-99; follow-ups below) and (5) its clean-room
    original; (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
    then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);
    (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);
@@ -724,6 +724,36 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From 3dvolreg's replica part (2026-11-06 and 07).**
+  - *For 3dvolreg's clean-room original (the next part):* from `specs/3dvolreg.md` (§12: AFNI-86 to
+    AFNI-99's defaults; §11: what may be built for speed; §14: the validation plan, within
+    thresholds where the shear decomposition's evaluation decides the last bits, §5.3 and §16). The
+    spec writer's model `validation/investigations/3dvolreg-spec/` (written from the spec and
+    black-box runs) may be read and run; the replica author's helpers
+    `validation/investigations/afni-volreg/`, the probe `validation/probes/afni-volreg-trace/` and
+    the replica's suite, random-testing descriptor and evidence modules (`afni_volreg.py` in
+    `parity/`, `difftest/tools/`, `evidence/`) are closed to the implementer, who runs them as black
+    boxes. The site page's clean-room panels wait for the original (`evidence.afni_volreg`).
+  - *3dTshift's clean-room original:* `specs/3dTshift.md` §5.2's open point is answered (the
+    quintic and heptic weights' last bits: `f²` a float32 product, the rest double in the factored
+    forms of `specs/3dvolreg.md` §5.6, the constant last); the original to follow it where its
+    weights differ.
+  - *The AFNI tools (shared):* sub-brick selectors (`dset[n]`) are refused by every larmorx AFNI
+    tool (the completeness parts); larmorx writes no AFNI extension, so a larmorx 3dvolreg output
+    cannot be a `-rotparent` (AFNI's can), and AFNI-96 (a rotparent without its centres) has no
+    suite case until it does; AFNI's obliquity report names the dataset with `./` added for a qform
+    or sform of code 2, the shared reader without it (3dvolreg's own messages add it); AFNI
+    announces a dataset's conversion to float once per run, which 3dvolreg's replica follows
+    (another tool opening several datasets would need the same).
+  - *AFNI-92's notice* (3dvolreg's replica) is given whenever `-nomaxdisp -twopass` runs the
+    coarse rotation search, not only where its mask changes the result (telling would take a
+    second search); the suite and random testing allow it (`silent_ok`), as for AFNI-86 and -93.
+  - *The clean-room AFNI crate:* output names of about 228 to 255 bytes cannot be written (a
+    temporary name over the system's 255-byte limit; the replica's fixed 2026-11-06): to test with
+    a 240-byte `-prefix` (the bug report, behaviour only, in the part's handoff).
+  - *The final validation phase:* the full tier (7 more fMRIPrep calls of the data panel, in the
+    suite's `CALLS`), AFNI-90's `-maxdisp1D` cut (a 998-byte path), `-@` from standard input (checked
+    by hand), random testing at length.
 - **From PRELUDE's replica part (2026-11-06).**
   - *For PRELUDE's clean-room original (the next part):* from `specs/prelude.md` (§9: FSL-261 to
     FSL-272's defaults, FSL-272 included; §10: what may be built for speed; §11: the validation
@@ -1755,6 +1785,14 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading
   (algorithms, not code, are reused). The user may prefer the earlier behaviour instead (NaNs last
   in both modes, with a warning). No **decide** entry in the register.
+- **3dvolreg's clean-room original and bit-identity** (`specs/3dvolreg.md` §16; 2026-11-07): AFNI's
+  shear decomposition is generated code whose last double bits decide the polynomial methods' last
+  bits (four of its six axis orders tie for rotations about one axis, every derivative image). The
+  spec states the mathematics and the original is validated within thresholds (the spec's model:
+  parameters within 0.0012, volumes within 2.7e-5 of their largest value); describing AFNI's own
+  evaluation, operation by operation, would make the original bit-identical but put AFNI's code
+  into the spec. **Recommendation: no** (the replica gives AFNI's bits; the difference is a
+  fraction of the convergence threshold).
 
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's

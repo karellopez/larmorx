@@ -210,6 +210,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     # The GPL replicas of 3dAutomask and 3dUnifize: the same counts from their own records.
     "afni-automask-replica": _unifize,
     "afni-unifize-replica": _unifize,
+    # 3dvolreg's replica (2026-11-06): the same counts.
+    "afni-volreg-replica": _unifize,
     "fsl-bet": _bet,
     "fsl-bet-replica": _bet,
     "fsl-bet-replica-full": _bet,

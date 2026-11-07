@@ -13,8 +13,9 @@ corrected, never deleted.
 > mcflirt" were written from AFNI's MCW (GPL) and FSL's (non-commercial) source, through
 > [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md); the section "Restricted: AFNI 3dAutomask and
 > 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md); the section
-> "Restricted: FSL BET, FLIRT, FAST, topup, fslmaths and fslstats" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
-> [fsl-fast.md](fsl-fast.md), [fsl-topup.md](fsl-topup.md) and [fsl-maths.md](fsl-maths.md). **Clean-room implementers must not read those sections.** The
+> "Restricted: AFNI 3dvolreg" through [afni-volreg.md](afni-volreg.md) (AFNI 26.3.05's source); the section
+> "Restricted: FSL BET, FLIRT, FAST, topup, fslmaths, fslstats and prelude" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
+> [fsl-fast.md](fsl-fast.md), [fsl-topup.md](fsl-topup.md), [fsl-maths.md](fsl-maths.md) and [fsl-prelude.md](fsl-prelude.md). **Clean-room implementers must not read those sections.** The
 > section "FSL: black-box findings" was found by running FSL's programs: anyone may read it. The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
@@ -289,6 +290,19 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | e (c? until 2026-10-23) | none | refused by default in both implementations (a fatal error naming AFNI-48; with `-EPI`, which implies `-T2` itself, it runs as in AFNI); `reproduce` keeps AFNI's behaviour | – (rule B, 2026-10-23) |
 | AFNI-49 † | 3dUnifize | the help gives `-clfrac`'s default as 0.1, then says it was raised to 0.2 in 2016; the code uses 0.2 | f | none | 0.2; larmorx's docs say so | – |
 | AFNI-75 † | 3dUnifize | `-EPI` sets the neighbourhood's radius from the voxel size ("-EPI changes -Urad to N voxels"), unbounded: on micrometre voxels N is about 6100 and the ball of neighbours has about 10¹² points; AFNI fills the machine until it is stopped | c (rule C for the method, 2026-10-25) | none (fMRIPrep does not call `-EPI`; its voxels are millimetres) | the method kept; by default both implementations compute the ball's memory first (AFNI's method: (4/3·π·r³ + 1)·(24 + 4·w) bytes) and stop at once, naming AFNI-75 with the GiB needed, the radius, the voxels and the likely cause (micrometre units), the same words in both (the replica since 2026-10-25, the clean-room original since 2026-10-30, specs/3dUnifize.md §9.1); reproduce attempts it as AFNI does (the original keeps only the ball's lines that reach the grid: the same values, little memory) | – |
+| AFNI-86 † | 3dvolreg (`-nocoarserot`) | `-nocoarserot` is read as `-noclip` (its first four letters are tested first): the registered volumes are no longer clipped and `-twopass`'s coarse rotation search stays on | e | none (fMRIPrep does not pass it) | rule A: as the help says by default (the search off, the clipping kept), named; `reproduce` AFNI's reading; the replica 2026-11-06 (`twopass/nocoarserot`, `edge cases/*-nocoarserot`) | original |
+| AFNI-87 † | 3dvolreg (byte datasets) | a byte dataset's registered volumes are each stretched from their own minimum and maximum to 0..255.9 and truncated, not rounded | c | none (fMRIPrep's BOLD series are not bytes) | rule A: rounded and clamped bytes by default, named where they differ; `reproduce` AFNI's stretch; the replica 2026-11-06 (`datatypes/byte`, `messages/verbose-byte`) | original |
+| AFNI-88 † | 3dvolreg (an option's value missing) | an option that needs a value, given as the last argument, reads past the arguments: a crash (`-savedisp`'s check is off by one); `-input`, `-rotparent`, `-gridparent` and `-1Dmatrix_save` give a message instead | a | none | an error (exit status 1) in both modes, AFNI's own message where it has one; the replica 2026-11-06 (`errors/*-last`) | original |
+| AFNI-89 † | 3dvolreg | a base whose least squares cannot be set up (a constant volume, all-zero weights, a dimension below 2) prints the fit's errors, then crashes at the first registered volume | a | none | AFNI's messages, then an error (exit status 1) in both modes; the replica 2026-11-06 (`edge cases/constant-twopass`, permanent case `constant-twopass-lsqfit`) | original |
+| AFNI-90 † | 3dvolreg (output names) | a `-prefix`, `-dfile` or `-1Dfile` value, or `-weight`'s dataset name, of 256 bytes or more overflows a fixed buffer (AFNI aborts: "buffer overflow detected"); `-maxdisp1D`'s name is cut to its first 997 bytes | a, e | none | rule A: every name kept whole by default, named; `reproduce` refuses the long names where AFNI aborts and cuts `-maxdisp1D`'s; the replica 2026-11-06 (`defects/prefix-255`, `defects/prefix-256`) | original |
+| AFNI-92 † | 3dvolreg (`-nomaxdisp`) | `-maxdisp` (the default) leaves the automask's clip fraction at 0.333 for the rest of the run, so `-nomaxdisp`, an option about an output, changes `-twopass`'s coarse rotation search (its mask with 0.5) | c | none (fMRIPrep keeps `-maxdisp`) | rule A: the same search with and without by default, named; `reproduce` AFNI's; the replica 2026-11-06 (`twopass/nomaxdisp`) | original |
+| AFNI-93 † | 3dvolreg (`-twopass`) | on a volume too thin for the coarse search's edge every candidate's region holds no voxel and scores 0, so the first candidate wins: a start shifted by −2 steps along z and rotated by −9°, −18°, −9° | c | none (BOLD volumes are thick enough) | rule A: such candidates are not taken by default (no shift, no rotation), named; `reproduce` AFNI's; the replica 2026-11-06 (`edge cases/four-slices-twopass`, `four-slices-nocoarserot`) | original |
+| AFNI-94 † | 3dvolreg (`-twopass -coarse 1`) | on a volume of 120 voxels or more along every axis the subsampled coarse search halves its step to 0 and never ends | a | none (fMRIPrep's `-coarse` is the default) | an error before the work, in both modes; the replica 2026-11-06 (`defects/coarse-1-large`, 120³ voxels) | original |
+| AFNI-95 † | 3dvolreg (`-base`) | a second `-base` is refused only when the first was a dataset or an index above 0: `-base 0 -base 3` registers to volume 3 | e | none | rule B: refused by default ("Can't have two -base arguments", exit status 1), named; `reproduce` AFNI's; the replica 2026-11-06 (`errors/base-twice`) | original |
+| AFNI-96 † | 3dvolreg (`-rotparent`) | a `-rotparent` dataset with `VOLREG_MATVEC_000000` but without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE`, or with fewer than 3 numbers in one, is read through a null pointer or past the attribute | a | none | an error (exit status 1) in both modes, naming the attribute; the replica 2026-11-06 (read from the source; no suite case: such a dataset needs a hand-made AFNI extension, larmorx writes none) | original |
+| AFNI-97 † | 3dvolreg (`-Fourier`, `-final Fourier`) | a rotation whose shear shifts the last of an odd count of rows, and the previous pair's second row, beyond the row length clears the missing second row through a null pointer: a crash (rotations far beyond a head's motion, as a runaway first pass reaches) | a | none (fMRIPrep's head motions are small) | rule A: the row cleared alone by default, as AFNI clears a pair, named; `reproduce` stops where AFNI crashes, after AFNI's messages; the replica 2026-11-06 (random testing's trial; permanent cases `fourier-lone-row-default`, `fourier-lone-row-null`) | original |
+| AFNI-98 † | 3dvolreg (messages) | with `-input`, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: `(null)` when there is none | f | none | rule A: the dataset's name by default; `reproduce` AFNI's text; the replica 2026-11-07 (`errors/base-beyond-input`, `base-beyond-input-stray`) | original |
+| AFNI-99 † | 3dvolreg (`-maxdisp`, `-savedisp`) | the maximum displacements and `-savedisp`'s fields convert the matrix to the dataset's axes with their signs but leave the voxel positions unsigned: for an axis stored L2R, P2A or S2I (RAS and LAS storage among them) they are the displacements of the position mirrored about the axis' centre (the same data stored RAS and LPS: 1.718 against 1.672 mm; `-savedisp`'s fields off by up to 12.3 mm) | c | none for the registered volumes; the `-maxdisp1D` values fMRIPrep writes and does not use (RobustAverage takes the registered volumes only) | rule A: the displacements of the voxels themselves by default, named where a value printed or written changes; `reproduce` AFNI's; the replica 2026-11-07 (every fMRIPrep call's `-maxdisp1D` files, `outputs/savedisp-oblique`, `datatypes/s3_oblique`, `s4_sagittal`; the site's example, LAS against LPS) | original |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | – (decided 2026-10-23, rule C: mcflirt's behaviour kept; the corrected count stays opt-in) |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -461,25 +475,25 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | original |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so (its coefficient-field default to follow, `specs/topup.md` §7.3) | original (coefficient fields) |
 
-**Counts** (408 entries, recounted from the table on 2026-11-06, after PRELUDE's replica part (FSL-261 to FSL-273)
+**Counts** (421 entries, recounted from the table on 2026-11-07, after 3dvolreg's replica part (AFNI-86 to AFNI-99; AFNI-91 unused)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 93 | |
+| (a) crash, undefined behaviour, out of bounds | 99 | |
 | (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 201 | 10 |
+| (c) deterministic bug that changes results | 205 | 10 |
 | (d) imprecision | 25 | |
-| (e) command-line or parsing quirk | 60 | |
-| (f) documentation or message only | 14 | |
+| (e) command-line or parsing quirk | 62 | |
+| (f) documentation or message only | 15 | |
 | explained, not a defect | 2 | |
 
-The gap column today (2026-11-06): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
+The gap column today (2026-11-07): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
 kept, rule C); one rule 8.
 
-Twelve entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
-FSL-135 and FSL-159 (a), FSL-08 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
+Fifteen entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
+FSL-135, FSL-159, FSL-268 and FSL-269 (a), FSL-08 and AFNI-90 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
 column (2026-10-12, after completing 3dTshift, part 2b, and AFNI-26's switch): no **yes**, no
 **replica** and no **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18,
 -19, -22 and -23, closed by the clean-room original that day, and AFNI-26, added the same day
@@ -818,6 +832,17 @@ does not own (FSL-268's and FSL-269's sorts reaching outside the values) `reprod
 FSL-263's and FSL-265's undefined values are filled with zeros and named. The spec writer of the
 same part found FSL-273 in applytopup (`--method=jac` with a field of other voxel sizes): the topup
 replica corrects it by default. PRELUDE's clean-room original is the next part (`specs/prelude.md`).
+**The 3dvolreg replica** (`crates/larmorx-afni-replica`, 2026-11-06 and 07; AFNI 26.3.05's
+`3dvolreg`, [afni-volreg.md](afni-volreg.md)): AFNI-86 to AFNI-99 (AFNI-91 unused), each with
+`reproduce`: corrected by default AFNI-86, -87, -90, -92, -93, -97, -98 and -99 (rule A); refused
+by default AFNI-95 (rule B); refused in both modes AFNI-88, -89, -94 and -96 (crashes, an endless
+loop, a null pointer; AFNI's messages first where it prints them). AFNI-97's `reproduce` stops where
+AFNI crashes. Kept in both modes and documented, without an ID (rule C): the blur's row-end mirrors
+(measured, rule D: at most 1.5e-5° and 1.1e-5 mm), `-twopass`'s first-pass weight built from the
+base and the first volume even when they are one, the nearest-neighbour shift's floor, the help's
+`-maxite 66` and `AFNI_ROTA_ZPAD`, `-maxdisp1D -`'s `-_delt` file. The AFNI tools' shared entries
+apply as in 3dTshift (AFNI-01 on `-tshift`'s path, -11, -12, -18, -21, -26; GLIBC-07). 3dvolreg's
+clean-room original is the next part (`specs/3dvolreg.md`).
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -4508,6 +4533,46 @@ reads as FSL, without a notice). **D13 gap:** none.
 - **larmorx:** both replicas apply the factor by default, named whenever a negative factor is
   met (with the number of mask voxels it changes, in 3dAutomask); `reproduce` drops it.
 - **D13 / gap:** done.
+
+## Restricted: AFNI 3dvolreg (source-derived)
+
+> **Clean-room implementers: do not read this section.** Written from AFNI 26.3.05's source (MCW's
+> files, CC BY 4.0, and NIH's), through [afni-volreg.md](afni-volreg.md). The clean-room
+> original's implementer works from `specs/3dvolreg.md`.
+
+### AFNI-86 to AFNI-99: 3dvolreg (AFNI 26.3.05) †
+
+Found while translating AFNI 26.3.05's `3dvolreg` (`3dvolreg.c`, `mri_3dalign.c`, `mri_lsqfit.c`,
+`thd_rot3d.c`, `thd_shear3d.c`, `thd_shift2.c`, `edt_blur.c`, `thd_rotangles.c` and the routines
+they call; the same text in 25.2.09) for the replica (2026-11-06 and 07; the restricted findings
+[afni-volreg.md](afni-volreg.md) have the mechanisms and the measurements, the replica's probe
+`validation/probes/afni-volreg-trace/`). AFNI-86: `VL_command_line` tests
+`strncmp(Argv[Iarg],"-noclip",4)` before `strcmp(...,"-nocoarserot")`. AFNI-87: the byte output
+goes through `mri_to_byte`, which scales each image from its own range by `255.9/(max - min)`.
+AFNI-88: `Argv[++Iarg]` read without a check by `-params`, `-maxite`, `-x_thresh`, `-rot_thresh`,
+`-delta`, `-final`, `-twoblur`, `-zpad`, `-prefix`, `-dfile`, `-1Dfile`, `-base`, `-coarse`,
+`-edging`, `-weight`, `-tshift`, `-maxdisp1D`; `-savedisp` tests `++Iarg > Argc` (one too late).
+AFNI-89: `mri_3dalign_setup`'s `mri_startup_lsqfit` fails ("vectors are all 0"), its NULL basis is
+used by `mri_3dalign_one`. AFNI-90: `VL_prefix`, `VL_dfile`, `VL_1Dfile` are `char[256]` filled by
+`strcpy`, `-weight`'s name `memcpy`'d into `char dname[256]` (`_FORTIFY_SOURCE` aborts);
+`MCW_strncpy(VL_dmaxfile, ..., 998)`. AFNI-92: `THD_automask_set_clipfrac(0.333f)` for `-maxdisp`
+is never reset before `new_get_best_shiftrot`'s automask. AFNI-93: `voldif`'s and `new_voldif`'s
+region (the voxels at least `(num+1)·del` from every face) is empty on a thin volume, every score
+0, the first candidate kept. AFNI-94: `new_get_best_shiftrot` halves `del` for its subsampled
+search (`nx`, `ny` and `nz` all at least 120): `del` 1 becomes 0 and the search loop never moves.
+AFNI-95: the "two -base" test is `VL_imbase != NULL || VL_nbase > 0`. AFNI-96: `-rotparent`'s
+`atr->fl[0..2]` read from `THD_find_float_atr` without a NULL or length test. AFNI-97:
+`fft_shift2` (`thd_shift2.c`) zero-fills `f` and `g` when both shifts exceed the row, without the
+`g != NULL` test of the other `*_shift2`; `apply_xshear`, `apply_yshear`, `apply_zshear`
+(`thd_rot3d.c`) pass `g = NULL` and the previous pair's `a1` for the last of an odd count of rows
+(gdb: `memset` in `fft_shift2` under `apply_3shear`). AFNI-98: the messages print `Argv[Iarg]`,
+past the options after `-input`. AFNI-99: `VL_get_displacments` and the `-maxdisp` loop convert
+`VOLREG_MATVEC` with `DBLE_mat_to_dicomm` (signed) but take the positions from
+`THD_3dind_to_3dmm_no_wod` (DICOM-valued along each axis, unsigned). Cases: the replica's record
+`afni-volreg-replica` (its `errors/`, `defects/`, `edge cases/`, `twopass/`, `datatypes/`,
+`outputs/` and `fmriprep/` categories), the permanent random-testing cases
+`validation/difftest/cases/afni-volreg/`, the unit tests of `larmorx-afni-replica` (`volreg`,
+`shift`, `cli::volreg`) and the golden cases `3dvolreg.*`.
 
 ## Restricted: FSL mcflirt (source-derived)
 

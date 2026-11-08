@@ -18,6 +18,7 @@ upstream.
 |---|---|---|
 | `bspline::bspline_grid`, `DEFAULT_*_ZOOMS_MM` | sdcflows `sdcflows/interfaces/bspline.py` (`bspline_grid`, the constants); nibabel 5.4.2 `nibabel/affines.py` (`voxel_sizes`, `apply_affine`) | Apache-2.0, MIT |
 | `bspline::grid_bspline_weights`, `AxisWeights`, `LevelWeights`, `NOT_ALIGNED` | sdcflows `sdcflows/transform.py` (`grid_bspline_weights`); SciPy `scipy/interpolate/_bsplines.py` (`BSpline.__call__`), `scipy/interpolate/src/__fitpack.cc` (`_find_interval`, `_deBoor_D`, `_evaluate_spline`), `scipy/sparse/_lil.py` and `_csparsetools.pyx` (`lil_insert`: exact zeros not stored) | Apache-2.0, BSD-3-Clause |
+| `bspline::SampleWeights`, `ExactLevel`, `extended_interval` (the corrections of SDC-01 and SDC-02) | larmorx's own: the same recursion (`_deBoor_D`) on sdcflows' uniform knots continued beyond the grid; every sample's weights at its own coordinates (nibabel's `apply_affine`, sdcflows' rounding and product order); written from the register's description, checked against sdcflows' construction with the knots continued and an independent numpy construction (`validation/investigations/sdcflows-fieldmap/measure_sdc01_02.py`) | Apache-2.0 |
 | `bspline::Collocation` (`matvec_f32`, `rmatvec_f32`, `to_csr`), the dense-axis rule | SciPy `scipy/sparse/_construct.py` (`kron`: BSR with a dense right operand when `2 * nnz >= rows * cols`, else COO; `hstack`), `_coo.py` / `_compressed.py` (`tocsr`, `sum_duplicates`: sorted, zeros kept), `sparsetools/csr.h` (`csr_matvec`, `csr_matvecs`), `sparsetools/csc.h` (`csc_matvec`), `sparse/linalg/_interface.py` (`MatrixLinearOperator`, `_AdjointMatrixOperator`) | BSD-3-Clause |
 | `blas::sdot`, `dot_f32`, `norm_f32` | OpenBLAS `interface/dot.c`, `kernel/x86_64/sdot.c`, `kernel/x86_64/sdot_microk_haswell-2.c` (`KERNEL.HASWELL`, `KERNEL.ZEN`); numpy `numpy/_core/src/multiarray/arraytypes.c.src` (`FLOAT_dot`), `numpy/_core/src/common/cblasfuncs.c` (`cblas_matrixproduct`, `_select_matrix_shape`: a one-element vector is a scalar), `numpy/linalg/_linalg.py` (`norm`) | BSD-3-Clause |
 | `ridge::cg_f32`, `ridge::Operator`, `CsrOperator` | SciPy `scipy/sparse/linalg/_isolve/iterative.py` (`cg`, `_get_atol_rtol`), `_isolve/utils.py` (`make_system`, `IdentityOperator`), `sparse/linalg/_interface.py` (`aslinearoperator`, `MatrixLinearOperator`, `_AdjointMatrixOperator`), `sparsetools/csr.h` (`csr_matvec`), `sparsetools/csc.h` (`csc_matvec`) | BSD-3-Clause |
@@ -52,8 +53,16 @@ nipype's `PRELUDE` call through `lx.fsl.prelude`) (its files written through `lx
 `crates/larmorx-io/PROVENANCE.md`), from sdcflows 2.17.1 (Apache-2.0), nibabel 5.4.2 and nitransforms 25.1.0
 (MIT) and nipype 1.12.0's `utils/filemanip.py` and `interfaces/fsl/epi.py` (Apache-2.0).
 
-The D13 switches of this port (`upstream_defects`): SDC-04 (`au2rads` of a constant phase map),
-SDC-05 (an integer or float32 readout time in `apply`), SDC-07 (`TOPUPCoeffReorient`'s negation
-for a BIDS `i` direction, measured: `validation/investigations/sdcflows-fieldmap/
-measure_sdc_g.py`), SDC-08 (`apply` on a positive-axes series read from a file), SDC-09
-(`SubtractPhases` without `EchoTime`).
+The D13 switches of this port (`upstream_defects`; `docs/findings/sdcflows-fieldmap.md`):
+SDC-01 (weights beyond the control grid: the cubic B-spline's; measured,
+`measure_sdc01_02.py`), SDC-02 (a rotated sampling grid: the weights at every voxel's position;
+measured), SDC-04 (`au2rads` of a constant phase map), SDC-05 (an integer or float32 readout
+time in `apply`), SDC-06 (a 4D field map of one volume: its first three zooms), SDC-07
+(`TOPUPCoeffReorient`'s negation for a BIDS `i` direction, measured: `measure_sdc_g.py`),
+SDC-08 (`apply` on a positive-axes series read from a file), SDC-09 (`SubtractPhases` without
+`EchoTime`), SDC-10 (`B0FieldTransform.fit`'s approximation built and sampled where the
+transform puts the target; measured). SDC-03 (`CheckRegister`'s signed translation test) waits
+for its FreeSurfer branch.
+
+Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`; `init_fmap_wf`
+needs part B's magnitude preparation and masks.

@@ -54,7 +54,7 @@ NEWEST = "newest"
 SHARED = "shared"
 ENV = "LARMORX_PYTHON"
 #: The parity suites whose originals are Python libraries (they default to ``newest``).
-SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg")
+SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg", "sdcflows-fieldmap")
 #: The suites that report the originals' own step (their comparisons record digests).
 STEP_SUITES = ("resample-series",)
 #: Random testing's tools of the same originals.

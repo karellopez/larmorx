@@ -331,7 +331,8 @@ class B0FieldTransform:
         (``"fix"``, with a warning) and fail as in sdcflows with ``"reproduce"``: a readout
         time given as an integer or a numpy float32 (a ``TypeError``, SDC-05), and a series
         read from a file whose axes already run to R, A and S (an ``AttributeError``,
-        SDC-08).
+        SDC-08). The field itself is :meth:`fit`'s, with its corrections (SDC-01, SDC-02,
+        SDC-10) or sdcflows' field.
         """
         _defects.check(upstream_defects)
         lazy = _is_proxy(moving)

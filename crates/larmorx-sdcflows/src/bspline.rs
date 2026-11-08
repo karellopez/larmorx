@@ -264,7 +264,8 @@ impl SampleWeights {
         let f = x.floor();
         let lo = (f - 1.0).max(0.0);
         let hi = (f + 2.0).min(n_knots as f64 - 1.0);
-        if !(lo <= hi) {
+        // (x is not NaN here: `find_interval` returned an interval)
+        if lo > hi {
             return out;
         }
         for kk in (lo as usize)..=(hi as usize) {
@@ -1002,9 +1003,9 @@ mod tests {
         .unwrap();
         let c32 = f32col.to_csr(1).unwrap();
         let mut want = vec![0.0f32; c32.shape[1]];
-        for s in 0..c32.shape[0] {
+        for (s, &ys) in y.iter().enumerate() {
             for e in c32.indptr[s]..c32.indptr[s + 1] {
-                want[c32.indices[e]] += (c32.data[e] as f32) * y[s];
+                want[c32.indices[e]] += (c32.data[e] as f32) * ys;
             }
         }
         let got = f32col.rmatvec_f32(&y, 3).unwrap();

@@ -6656,6 +6656,118 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+def _magnitude_files(
+    ctx: Context,
+    oblique: bool = False,
+    prefix: str = "",
+    zooms: tuple[float, float, float] = (2.0, 2.0, 2.5),
+) -> list[str]:
+    """Two int16 magnitudes of the synthetic head (the second dimmer and noisier), as a field
+    map's magnitude1 and magnitude2."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, zooms, oblique=oblique)
+    out = []
+    for i, (lo, seed) in enumerate(((120, 90), (80, 92))):
+        data = np.where(brain, lo + ints(seed, SHAPE_HEAD, 0, 60), ints(seed + 1, SHAPE_HEAD, 0, 9))
+        path = ctx.out(f"{prefix}sub-01_magnitude{i + 1}.nii.gz")
+        lx.save((data.astype(np.int16), aff), path)
+        out.append(path)
+    return out
+
+
+@case(
+    "py.niworkflows.intra_modal_merge",
+    covers=(
+        "lx.niworkflows.intra_modal_merge",
+        "lx.niworkflows.as_closest_canonical",
+        "lx.niworkflows.reorient",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' IntraModalMerge: sdcflows' magnitude merge (two int16 files, no head
+    motion, not reoriented), a field map's (not zero-based), the RAS reorientation of an oblique
+    pair, head-motion correction (mcflirt's clean-room original), grand-mean scaling (PIPE-18
+    corrected) and one 3D file (passed through)."""
+    mags = _magnitude_files(ctx)
+    obl = _magnitude_files(ctx, oblique=True, prefix="obl-")
+    out: dict[str, Any] = {}
+    runs = {
+        "magmrg": (mags, {"hmc": False, "to_ras": False}),
+        "fmapmrg": (mags, {"hmc": False, "to_ras": False, "zero_based_avg": False}),
+        "ras": (obl, {"hmc": False, "to_ras": True}),
+        "hmc": (mags, {"hmc": True, "to_ras": False, "hmc_implementation": "original"}),
+        "one": (mags[:1], {"hmc": False, "to_ras": False}),
+    }
+    for name, (files, kw) in runs.items():
+        r = lx.niworkflows.intra_modal_merge(files, out_dir=ctx.out(name), **kw)
+        out[f"{name}.merged"] = Nifti(r.out_file)
+        out[f"{name}.avg"] = Nifti(r.out_avg)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        g = lx.niworkflows.intra_modal_merge(
+            mags, hmc=False, to_ras=False, grand_mean_scaling=True, out_dir=ctx.out("gms")
+        )
+    out["gms.avg"] = Nifti(g.out_avg)
+    can = lx.niworkflows.as_closest_canonical(lx.io.load_nibabel(obl[0]))
+    out["canonical.data"] = np.asarray(can.data)
+    out["canonical.affine"] = np.asarray(can.affine)
+    os.makedirs(ctx.out("reor"), exist_ok=True)
+    out["reorient"] = Nifti(lx.niworkflows.reorient(obl[1], newpath=ctx.out("reor")))
+    return out
+
+
+@case(
+    "py.sdcflows.workflows",
+    covers=(
+        "lx.sdcflows.brainextraction_workflow",
+        "lx.sdcflows.magnitude_workflow",
+        "lx.sdcflows.fmap_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' brain-extraction, magnitude and field-map workflows on the synthetic head:
+    the brain extraction of one magnitude, the magnitude workflow of two, and the field-map
+    workflow from a phase difference (PRELUDE's clean-room original) and from a field map in
+    rad/s (smooth fields; 1 mm voxels: a small control grid, so the fits are quick)."""
+    mags = _magnitude_files(ctx, zooms=(1.0, 1.0, 1.0))
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        bx = lx.sdcflows.brainextraction_workflow(mags[0], out_dir=ctx.out("bx"))
+    for k in ("out_file", "out_mask", "out_probseg", "out_brain"):
+        out[f"bx.{k}"] = Nifti(getattr(bx, k))
+    out["bx.n4"] = Nifti(bx.n4_file)
+    mw = lx.sdcflows.magnitude_workflow(mags, out_dir=ctx.out("mag"))
+    out["mag.ref"] = Nifti(mw.fmap_ref)
+    out["mag.mask"] = Nifti(mw.fmap_mask)
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    # smooth fields (plain arithmetic) inside the head, so the fits converge quickly
+    i, j, k = np.indices(SHAPE_HEAD)
+    phase = np.where(brain, 1800 + 6 * i - 4 * j + 3 * k, ints(95, SHAPE_HEAD, 0, 4096))
+    pd = ctx.out("sub-01_phasediff.nii.gz")
+    lx.save((phase.astype(np.int16), aff), pd)
+    hz = ctx.out("sub-01_fieldmap.nii.gz")
+    field = ((5 * i - 3 * j + 2 * k) - 40).astype(np.float32) / np.float32(4.0)
+    lx.save((field, aff), hz)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fw = lx.sdcflows.fmap_workflow(
+            mags,
+            [(pd, {"EchoTime1": 0.00492, "EchoTime2": 0.00738})],
+            out_dir=ctx.out("fmap-phasediff"),
+            prelude_implementation="original",
+        )
+        mapped = lx.sdcflows.fmap_workflow(
+            mags[:1], [(hz, {"Units": "rad/s"})], "mapped", out_dir=ctx.out("fmap-mapped")
+        )
+    for name, r in (("phasediff", fw), ("mapped", mapped)):
+        out[f"fmap.{name}.fmap"] = Nifti(r.fmap)
+        out[f"fmap.{name}.coeff"] = Nifti(r.fmap_coeff[0])
+        out[f"fmap.{name}.mask"] = Nifti(r.fmap_mask)
+    return out
+
+
 @case("py.niworkflows.intensity_clip", covers=("lx.niworkflows.intensity_clip",))
 def _(ctx: Context) -> dict[str, Any]:
     """niworkflows' IntensityClip: the defaults (int16), uint8 inverted, float32 without the

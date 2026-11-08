@@ -37,7 +37,6 @@ def programs(series: str, volume: str) -> dict[str, list[str]]:
 
 def main() -> int:
     import nibabel as nib
-
     from larmorx_validation import oracle_cache
 
     series = str(bb.INPUTS / "lps_f32.nii.gz")
@@ -74,14 +73,21 @@ def main() -> int:
                     code = r.returncode
                 else:
                     env["LARMORX_IMPLEMENTATION"] = "original"
-                    r = subprocess.run([bb.LX, "afni", prog, *argv], cwd=d, env=env,
-                                       capture_output=True, timeout=600)
+                    r = subprocess.run(
+                        [bb.LX, "afni", prog, *argv],
+                        cwd=d,
+                        env=env,
+                        capture_output=True,
+                        timeout=600,
+                    )
                     code = r.returncode
                 row.append((code, (d / name).is_file()))
             ok = row[0] == row[1]
             bad += not ok
-            print(f"{prog:10} {n:3}  AFNI exit {row[0][0]} written {row[0][1]}   "
-                  f"original exit {row[1][0]} written {row[1][1]}   {'same' if ok else 'DIFFERENT'}")
+            print(
+                f"{prog:10} {n:3}  AFNI exit {row[0][0]} written {row[0][1]}   "
+                f"original exit {row[1][0]} written {row[1][1]}   {'same' if ok else 'DIFFERENT'}"
+            )
     return 1 if bad else 0
 
 

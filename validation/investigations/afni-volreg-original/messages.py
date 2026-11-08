@@ -95,8 +95,9 @@ def run(who: str, args: list[str], extra: dict[str, str], d: Path):
         )
     impl = "replica" if who == "afni" else "original"
     env.update(LARMORX_IMPLEMENTATION=impl, LARMORX_UPSTREAM_DEFECTS=mode)
-    return subprocess.run([bb.LX, "afni", "3dvolreg", *args], cwd=d, env=env,
-                          capture_output=True, timeout=600)
+    return subprocess.run(
+        [bb.LX, "afni", "3dvolreg", *args], cwd=d, env=env, capture_output=True, timeout=600
+    )
 
 
 def main(argv: list[str]) -> int:

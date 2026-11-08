@@ -57,13 +57,21 @@ def phantom(shape, zooms, motions, rng_seed=5):
         blobs.append((*c, *r, rng.uniform(-300, 400)))
     ii, jj, kk = np.meshgrid(np.arange(nx), np.arange(ny), np.arange(nz), indexing="ij")
     centre = (np.array(shape) - 1) / 2
-    pos = np.stack([(ii - centre[0]) * zooms[0], (jj - centre[1]) * zooms[1], (kk - centre[2]) * zooms[2]])
+    pos = np.stack(
+        [(ii - centre[0]) * zooms[0], (jj - centre[1]) * zooms[1], (kk - centre[2]) * zooms[2]]
+    )
     out = []
     for ax, ay, az, sx, sy, sz in motions:
         a = np.radians([ax, ay, az])
-        rx = np.array([[1, 0, 0], [0, np.cos(a[0]), -np.sin(a[0])], [0, np.sin(a[0]), np.cos(a[0])]])
-        ry = np.array([[np.cos(a[1]), 0, np.sin(a[1])], [0, 1, 0], [-np.sin(a[1]), 0, np.cos(a[1])]])
-        rz = np.array([[np.cos(a[2]), -np.sin(a[2]), 0], [np.sin(a[2]), np.cos(a[2]), 0], [0, 0, 1]])
+        rx = np.array(
+            [[1, 0, 0], [0, np.cos(a[0]), -np.sin(a[0])], [0, np.sin(a[0]), np.cos(a[0])]]
+        )
+        ry = np.array(
+            [[np.cos(a[1]), 0, np.sin(a[1])], [0, 1, 0], [-np.sin(a[1]), 0, np.cos(a[1])]]
+        )
+        rz = np.array(
+            [[np.cos(a[2]), -np.sin(a[2]), 0], [np.sin(a[2]), np.cos(a[2]), 0], [0, 0, 1]]
+        )
         r = rz @ ry @ rx
         p = np.einsum("ij,jxyz->ixyz", r.T, pos - np.array([sx, sy, sz])[:, None, None, None])
         v = np.zeros(shape)
@@ -151,7 +159,16 @@ def make_more_inputs() -> None:
 
 
 FMRIPREP = ["-Fourier", "-twopass", "-zpad", "4"]
-OUTPUTS = ["-prefix", "out.nii", "-1Dfile", "p.1D", "-1Dmatrix_save", "m.aff12.1D", "-maxdisp1D", "md.1D"]
+OUTPUTS = [
+    "-prefix",
+    "out.nii",
+    "-1Dfile",
+    "p.1D",
+    "-1Dmatrix_save",
+    "m.aff12.1D",
+    "-maxdisp1D",
+    "md.1D",
+]
 
 #: case name -> (input, options)
 CASES: dict[str, tuple[str, list[str]]] = {
@@ -186,14 +203,23 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "ras-savedisp": ("ras_i16.nii.gz", ["-savedisp", "sd.nii"]),
     "ds000005": ("@ds000005-run-01_sliced.nii.gz", []),
     # relay 2: -twodup, -SAVEDISP, AFNI-89's candidates, -rotparent / -gridparent, -verbose x2
-    "twodup": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup"]),
-    "twodup-base3d": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base3d.nii.gz"), "-twodup"]),
+    "twodup": (
+        "%s1.nii.gz",
+        ["-twopass", "-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup"],
+    ),
+    "twodup-base3d": (
+        "%s1.nii.gz",
+        ["-twopass", "-base", str(SUITE_INPUTS / "base3d.nii.gz"), "-twodup"],
+    ),
     "twodup-onepass": ("%s1.nii.gz", ["-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup"]),
     "savedisp-s1": ("%s1.nii.gz", ["-savedisp", "sd.nii"]),
     "SAVEDISP": ("%s1.nii.gz", ["-SAVEDISP", "sd.nii"]),
     "SAVEDISP-ras": ("ras_i16.nii.gz", ["-SAVEDISP", "sd.nii"]),
     "zero-weight": ("%s1.nii.gz", ["-weight", str(INPUTS / "zeros_w.nii.gz") + "[0]"]),
-    "zero-weight-twopass": ("%s1.nii.gz", ["-twopass", "-weight", str(INPUTS / "zeros_w.nii.gz") + "[0]"]),
+    "zero-weight-twopass": (
+        "%s1.nii.gz",
+        ["-twopass", "-weight", str(INPUTS / "zeros_w.nii.gz") + "[0]"],
+    ),
     "const-big-twopass": ("const_big.nii.gz", ["-twopass"]),
     "const-big": ("const_big.nii.gz", []),
     "halfconst-twopass": ("halfconst.nii.gz", ["-twopass"]),
@@ -205,7 +231,15 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "afni90-weight": ("lps_f32.nii.gz", ["-weight", "w" * 300 + ".nii[0]"]),
     "afni90-maxdisp": ("lps_f32.nii.gz", ["-maxdisp1D", "m" * 250 + ".1D"]),
     "afni98-input": ("lps_f32.nii.gz", ["-input", str(INPUTS / "lps_f32.nii.gz"), "-base", "9"]),
-    "afni98-weight": ("lps_f32.nii.gz", ["-input", str(INPUTS / "lps_f32.nii.gz"), "-weight", str(SUITE_INPUTS / "gp27.nii.gz") + "[0]"]),
+    "afni98-weight": (
+        "lps_f32.nii.gz",
+        [
+            "-input",
+            str(INPUTS / "lps_f32.nii.gz"),
+            "-weight",
+            str(SUITE_INPUTS / "gp27.nii.gz") + "[0]",
+        ],
+    ),
     "rp-nocentre": ("%s1.nii.gz", ["-rotparent", str(INPUTS / "rp_nocentre.nii.gz")]),
     "rp-nobase": ("%s1.nii.gz", ["-rotparent", str(INPUTS / "rp_nobase.nii.gz")]),
     "s1-linear-noclip": ("%s1.nii.gz", ["-linear", "-noclip"]),
@@ -213,20 +247,92 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "rp": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
     "rp-verbose": ("%s1.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
     "rp-fourier": ("%s1.nii.gz", ["-Fourier", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
-    "rp-linear-noclip": ("%s1.nii.gz", ["-linear", "-noclip", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-linear-noclip": (
+        "%s1.nii.gz",
+        ["-linear", "-noclip", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")],
+    ),
     "rp-twopass": ("%s1.nii.gz", ["-twopass", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
-    "rp-gp24": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp24.nii.gz")]),
-    "rp-gp27": ("%s1.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
-    "rp-gp27m": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27m.nii.gz")]),
-    "rp-gp22": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp22.nii.gz")]),
-    "rp-gpsp": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gpsp.nii.gz")]),
-    "rp-gpx": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gpx.nii.gz")]),
+    "rp-gp24": (
+        "%s1.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp24.nii.gz"),
+        ],
+    ),
+    "rp-gp27": (
+        "%s1.nii.gz",
+        [
+            "-verbose",
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp27.nii.gz"),
+        ],
+    ),
+    "rp-gp27m": (
+        "%s1.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp27m.nii.gz"),
+        ],
+    ),
+    "rp-gp22": (
+        "%s1.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp22.nii.gz"),
+        ],
+    ),
+    "rp-gpsp": (
+        "%s1.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gpsp.nii.gz"),
+        ],
+    ),
+    "rp-gpx": (
+        "%s1.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gpx.nii.gz"),
+        ],
+    ),
     "gp-alone": ("%s1.nii.gz", ["-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
     "rp-noattr": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "s1.nii.gz")]),
     "rp-st": ("%s6_st.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp_st.nii.gz")]),
-    "rp-st-gp27": ("%s6_st.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp_st.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
+    "rp-st-gp27": (
+        "%s6_st.nii.gz",
+        [
+            "-rotparent",
+            str(SUITE_INPUTS / "rp_st.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp27.nii.gz"),
+        ],
+    ),
     "rp-obl": ("%s3_oblique.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp_obl.nii.gz")]),
-    "rp-twodup": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
+    "rp-twodup": (
+        "%s1.nii.gz",
+        [
+            "-twopass",
+            "-base",
+            str(SUITE_INPUTS / "base_shift.nii.gz"),
+            "-twodup",
+            "-rotparent",
+            str(SUITE_INPUTS / "rp.nii.gz"),
+            "-gridparent",
+            str(SUITE_INPUTS / "gp27.nii.gz"),
+        ],
+    ),
     "ds000005-fmriprep": ("@ds000005-run-01_sliced.nii.gz", FMRIPREP),
 }
 
@@ -276,10 +382,15 @@ def run(prog: str, case: str, d: Path, mode: str = "reproduce", threads: str = "
             runner="afni-volreg-original-blackbox",
             timeout=1200,
         )
-    env = {**env, "OMP_NUM_THREADS": threads, "LARMORX_UPSTREAM_DEFECTS": mode,
-           "LARMORX_IMPLEMENTATION": prog}
-    return subprocess.run([LX, "afni", "3dvolreg", *args], cwd=d, env=env, capture_output=True,
-                          timeout=1200)
+    env = {
+        **env,
+        "OMP_NUM_THREADS": threads,
+        "LARMORX_UPSTREAM_DEFECTS": mode,
+        "LARMORX_IMPLEMENTATION": prog,
+    }
+    return subprocess.run(
+        [LX, "afni", "3dvolreg", *args], cwd=d, env=env, capture_output=True, timeout=1200
+    )
 
 
 def _out(r) -> bytes:
@@ -324,16 +435,22 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
     pa, pb = _table(a / "p.1D"), _table(b / "p.1D")
     d = np.abs(pa - pb)
     res["params_identical_lines"] = int(
-        sum(x == y for x, y in zip((a / "p.1D").read_text().splitlines(), (b / "p.1D").read_text().splitlines()))
+        sum(
+            x == y
+            for x, y in zip(
+                (a / "p.1D").read_text().splitlines(),
+                (b / "p.1D").read_text().splitlines(),
+                strict=False,
+            )
+        )
     )
     res["params_max_diff"] = float(d.max())
     res["params_median_diff"] = float(np.median(d))
-    _, opts = CASES[case]
     xt, rt = 0.01, 0.02
     hdr = nib.load(a / "out.nii").header
     vox = np.array(hdr.get_zooms()[:3], float)
     ok = True
-    for row_a, row_b in zip(pa, pb):
+    for row_a, row_b in zip(pa, pb, strict=False):
         for q in range(6):
             lim = (rt if q < 3 else xt * vox.max()) + 0.005 * abs(row_a[q])
             ok &= abs(row_a[q] - row_b[q]) <= lim
@@ -344,7 +461,9 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
     res["matrix_trans_max"] = float(np.abs(ma[:, [3, 7, 11]] - mb[:, [3, 7, 11]]).max())
     if (a / "md.1D").exists() and (b / "md.1D").exists():
         res["maxdisp_max"] = float(np.abs(_table(a / "md.1D") - _table(b / "md.1D")).max())
-        res["maxdelta_max"] = float(np.abs(_table(a / "md_delt.1D") - _table(b / "md_delt.1D")).max())
+        res["maxdelta_max"] = float(
+            np.abs(_table(a / "md_delt.1D") - _table(b / "md_delt.1D")).max()
+        )
     names = sorted({f.name[3:-4] for f in [*a.glob("sd_*.nii"), *b.glob("sd_*.nii")]})
     for axis in names:
         fa, fb = a / f"sd_{axis}.nii", b / f"sd_{axis}.nii"
@@ -357,7 +476,10 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
             res[f"savedisp_{axis}_max"] = float(np.abs(da - db).max())
     va = np.asarray(nib.load(a / "out.nii").dataobj, dtype=np.float64)
     vb = np.asarray(nib.load(b / "out.nii").dataobj, dtype=np.float64)
-    res["dtype"] = (str(nib.load(a / "out.nii").get_data_dtype()), str(nib.load(b / "out.nii").get_data_dtype()))
+    res["dtype"] = (
+        str(nib.load(a / "out.nii").get_data_dtype()),
+        str(nib.load(b / "out.nii").get_data_dtype()),
+    )
     if va.shape != vb.shape:
         res["shape"] = (va.shape, vb.shape)
         return res
@@ -366,12 +488,34 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
     res["volume_rel_mean"] = float(np.abs(va - vb).mean() / big)
     res["volume_identical"] = bool(np.array_equal(va, vb))
     ha, hb = nib.load(a / "out.nii").header, nib.load(b / "out.nii").header
-    keys = ["dim", "pixdim", "qform_code", "sform_code", "quatern_b", "quatern_c", "quatern_d",
-            "qoffset_x", "qoffset_y", "qoffset_z", "srow_x", "srow_y", "srow_z", "datatype",
-            "scl_slope", "scl_inter", "xyzt_units", "toffset", "slice_code", "slice_start",
-            "slice_end", "slice_duration", "dim_info"]
-    diff = [k for k in keys
-            if not np.array_equal(np.asarray(ha[k]), np.asarray(hb[k]), equal_nan=True)]
+    keys = [
+        "dim",
+        "pixdim",
+        "qform_code",
+        "sform_code",
+        "quatern_b",
+        "quatern_c",
+        "quatern_d",
+        "qoffset_x",
+        "qoffset_y",
+        "qoffset_z",
+        "srow_x",
+        "srow_y",
+        "srow_z",
+        "datatype",
+        "scl_slope",
+        "scl_inter",
+        "xyzt_units",
+        "toffset",
+        "slice_code",
+        "slice_start",
+        "slice_end",
+        "slice_duration",
+        "dim_info",
+    ]
+    diff = [
+        k for k in keys if not np.array_equal(np.asarray(ha[k]), np.asarray(hb[k]), equal_nan=True)
+    ]
     res["header_differs"] = diff
     return res
 
@@ -397,8 +541,11 @@ def main(argv: list[str]) -> int:
                 outs = {}
                 for prog in ("replica", "original"):
                     r = run(prog, case, work / case / f"{prog}-{mode}", mode)
-                    lines = [ln for ln in _err(r).decode(errors="replace").splitlines()
-                             if "upstream defect" in ln or ln.startswith("**")]
+                    lines = [
+                        ln
+                        for ln in _err(r).decode(errors="replace").splitlines()
+                        if "upstream defect" in ln or ln.startswith("**")
+                    ]
                     outs[prog] = (r.returncode, lines)
                 same = outs["replica"] == outs["original"]
                 print(f"== {case} [{mode}] {'same' if same else 'DIFFERENT'}")
@@ -423,8 +570,11 @@ def main(argv: list[str]) -> int:
             rb = run("original", case, b, mode)
             t2 = time.perf_counter()
             res = compare(case, a, b, ra, rb)
-            res["seconds"] = {"afni": round(t1 - t0, 2), "afni_cached": bool(getattr(ra, "cached", False)),
-                              "original": round(t2 - t1, 2)}
+            res["seconds"] = {
+                "afni": round(t1 - t0, 2),
+                "afni_cached": bool(getattr(ra, "cached", False)),
+                "original": round(t2 - t1, 2),
+            }
             rows.append(res)
             print(json.dumps(res, default=str))
         return 0

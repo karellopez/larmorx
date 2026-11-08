@@ -87,6 +87,9 @@
 
 use crate::openblas;
 
+pub mod lstsq;
+pub use lstsq::{Lstsq, LstsqError, lstsq};
+
 /// The LAPACK release whose arithmetic a call follows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LapackRelease {
@@ -146,11 +149,16 @@ fn round64(m: u128, e: i32, sticky: bool) -> Ext {
     Ext { m: q as u64, e }
 }
 
-/// `fmul %st(0), %st`: `x²` rounded to the extended format (`x` finite, nonzero, normal).
+/// `fmul %st(0), %st`: `x²` rounded to the extended format (`x` finite and nonzero; the
+/// extended exponent range holds the square of every double, subnormals included).
 fn ext_square(x: f64) -> Ext {
     let bits = x.abs().to_bits();
-    let m = (bits & ((1u64 << 52) - 1)) | (1u64 << 52);
-    let e = ((bits >> 52) & 0x7ff) as i32 - 1075;
+    let biased = ((bits >> 52) & 0x7ff) as i32;
+    let (m, e) = if biased == 0 {
+        (bits & ((1u64 << 52) - 1), -1074)
+    } else {
+        ((bits & ((1u64 << 52) - 1)) | (1u64 << 52), biased - 1075)
+    };
     round64(u128::from(m) * u128::from(m), 2 * e, false)
 }
 
@@ -199,26 +207,69 @@ fn ext_sqrt_to_f64(a: Ext) -> f64 {
     // half-integer).
     let r = s0 + u128::from(rem > s0);
     let exp = (a.e - k) / 2;
-    // Then to 53 bits, from the 64-bit value alone (r ≤ 2^64).
+    // Then `fstpl`: from the 64-bit value alone (r ≤ 2^64) to a double.
+    round_to_f64(r, exp)
+}
+
+/// `r · 2^exp` (`r > 0`) rounded to a double, to nearest with ties to even: 53 bits in the
+/// normal range, fewer as a subnormal, infinity above the largest double (what an x87 store
+/// to a double does in the default rounding mode).
+fn round_to_f64(r: u128, exp: i32) -> f64 {
     let width = 128 - r.leading_zeros() as i32;
-    let cut = width - 53;
-    let mut q = r >> cut;
-    let rest = r & ((1u128 << cut) - 1);
-    let half = 1u128 << (cut - 1);
-    if rest > half || (rest == half && q & 1 == 1) {
-        q += 1;
+    let lead = exp + width - 1;
+    // Significant bits available at this magnitude (the unit is 2^-1074 for subnormals).
+    let keep = if lead >= -1022 {
+        53
+    } else {
+        53 - (-1022 - lead)
+    };
+    let shift = width - keep;
+    let mut unit = exp + shift;
+    let mut q = if shift <= 0 {
+        r << (-shift)
+    } else if shift > width {
+        0
+    } else {
+        let q = if shift >= 128 { 0 } else { r >> shift };
+        let rest = if shift >= 128 {
+            r
+        } else {
+            r & ((1u128 << shift) - 1)
+        };
+        let half = 1u128 << (shift - 1);
+        q + u128::from(rest > half || (rest == half && q & 1 == 1))
+    };
+    if q == 0 {
+        return 0.0;
     }
-    // q ≤ 2^53 converts exactly; scaling by a power of two in the normal range is exact.
-    (q as f64) * 2f64.powi(exp + cut)
+    if q >> 53 != 0 {
+        // The carry of a rounding up to 2^53.
+        q >>= 1;
+        unit += 1;
+    }
+    let qw = 128 - q.leading_zeros() as i32;
+    let top = unit + qw - 1;
+    if top > 1023 {
+        f64::INFINITY
+    } else if top >= -1022 {
+        let mant = ((q << (53 - qw)) as u64) & ((1u64 << 52) - 1);
+        f64::from_bits((((top + 1023) as u64) << 52) | mant)
+    } else {
+        debug_assert_eq!(unit, -1074);
+        f64::from_bits(q as u64)
+    }
 }
 
 // ------------------------------------------------------------------------------------------
 // BLAS: OpenBLAS's interfaces and Haswell kernels on these lengths
 
-/// `DNRM2(N, X, INCX)` (`interface/nrm2.c`, `kernel/x86_64/nrm2.S`), `n < 8` elements:
-/// `|x0|` for one element; else the squares summed in order into an x87 accumulator cleared to
-/// +0, the root in extended precision, stored as a double. Values outside 2^-400 … 2^400 (no
-/// such entry reaches this module from a NIfTI affine) take the plain double formula.
+/// `DNRM2(N, X, INCX)` (`interface/nrm2.c`, `kernel/x86_64/nrm2.S`): `|x0|` for one element;
+/// else the squares summed into four x87 accumulators cleared to +0 (the kernel's main loop,
+/// unit and other strides alike: element `k` of the first `8·⌊n/8⌋` goes to accumulator
+/// `k mod 4`; the last `n mod 8` elements all go to accumulator 0, in order), combined as
+/// `acc3 + ((acc2 + acc0) + acc1)`, the root in extended precision, stored as a double (for
+/// `n < 8` this is the plain sum in order). The extended exponent range holds every square and
+/// sum, so only the final store can underflow or overflow.
 fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
     if n == 0 {
         return 0.0;
@@ -226,27 +277,28 @@ fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
     if n == 1 {
         return x[off].abs();
     }
-    assert!(n < 8, "dnrm2 is ported for fewer than 8 elements");
     let vals: Vec<f64> = (0..n).map(|i| x[off + i * inc]).collect();
     if vals.iter().any(|v| !v.is_finite()) {
+        // An infinity gives +inf, a NaN a NaN (x87 and the double formula agree).
         return vals.iter().map(|v| v * v).sum::<f64>().sqrt();
     }
-    let in_range = |v: &f64| *v == 0.0 || (v.abs() > 2f64.powi(-400) && v.abs() < 2f64.powi(400));
-    if !vals.iter().all(in_range) {
-        return vals.iter().map(|v| v * v).sum::<f64>().sqrt();
-    }
-    let mut acc: Option<Ext> = None;
-    for &v in &vals {
+    // Adding +0 to an extended value is exact, so a cleared accumulator is `None`.
+    let add = |a: Option<Ext>, b: Option<Ext>| match (a, b) {
+        (None, x) | (x, None) => x,
+        (Some(a), Some(b)) => Some(ext_add(a, b)),
+    };
+    let mut acc: [Option<Ext>; 4] = [None; 4];
+    let main = n & !7;
+    for (k, &v) in vals.iter().enumerate() {
         if v == 0.0 {
             continue;
         }
-        let sq = ext_square(v);
-        acc = Some(match acc {
-            None => sq,
-            Some(a) => ext_add(a, sq),
-        });
+        let lane = if k < main { k % 4 } else { 0 };
+        acc[lane] = add(acc[lane], Some(ext_square(v)));
     }
-    match acc {
+    // .L998: `faddp %st, %st(2)`, then twice `faddp %st, %st(1)`.
+    let total = add(acc[3], add(add(acc[2], acc[0]), acc[1]));
+    match total {
         None => 0.0,
         Some(a) => ext_sqrt_to_f64(a),
     }
@@ -1520,13 +1572,28 @@ fn dgebd2(
 /// `DBDSQR('U', N, NCVT, NRU, 0, D, E, VT, LDVT, U, LDU, ...)` with `NCVT = NRU = N` (`vt`
 /// and `u` column-major `n × n`). Returns LAPACK's `info` (0 on convergence).
 fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut [f64]) -> usize {
+    let (ncvt, nru) = (n, n);
+    dbdsqr_upper_ncc(n, d, e, (vt, ncvt, n), (u, nru, n), (&mut [], 0, 1), true)
+}
+
+/// `DBDSQR('U', N, NCVT, NRU, NCC, D, E, VT, LDVT, U, LDU, C, LDC, ...)`: `vt` (`ncvt` columns,
+/// leading dimension `ldvt`), `u` (`nru` rows, `ldu`) and `c` (`ncc` columns, `ldc`), each
+/// column-major with its block at offset 0. `clear_negative_zero`: LAPACK 3.12.1's "avoid
+/// -ZERO" when the singular values are made positive (3.12.0 has no such step). Returns
+/// LAPACK's `info` (0 on convergence).
+fn dbdsqr_upper_ncc(
+    n: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    (vt, ncvt, ldvt): (&mut [f64], usize, usize),
+    (u, nru, ldu): (&mut [f64], usize, usize),
+    (cm, ncc, ldc): (&mut [f64], usize, usize),
+    clear_negative_zero: bool,
+) -> usize {
     const MAXITR: usize = 6;
-    let ncvt = n;
-    let nru = n;
-    let ldvt = n;
-    let ldu = n;
     let vat = |i: usize, j: usize| (i - 1) + (j - 1) * ldvt;
     let uat = |i: usize, j: usize| (i - 1) + (j - 1) * ldu;
+    let cat = |i: usize, j: usize| (i - 1) + (j - 1) * ldc;
     macro_rules! dd {
         ($k:expr) => {
             d[$k - 1]
@@ -1632,6 +1699,7 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
                 dd!(m) = sigmn;
                 drot(ncvt, vt, vat(m - 1, 1), ldvt, vat(m, 1), ldvt, cosr, sinr);
                 drot(nru, u, uat(1, m - 1), 1, uat(1, m), 1, cosl, sinl);
+                drot(ncc, cm, cat(m - 1, 1), ldc, cat(m, 1), ldc, cosl, sinl);
                 m -= 2;
                 continue 'main;
             }
@@ -1742,6 +1810,7 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
                         work[nm13..nm13 + k - 1].to_vec(),
                     );
                     dlasr(false, true, nru, k, &c, &s, u, uat(1, ll), ldu);
+                    dlasr(true, true, k, ncc, &c, &s, cm, cat(ll, 1), ldc);
                     if ee!(m - 1).abs() <= thresh {
                         ee!(m - 1) = 0.0;
                     }
@@ -1778,6 +1847,7 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
                     dlasr(true, false, k, ncvt, &c, &s, vt, vat(ll, 1), ldvt);
                     let (c, s) = (work[0..k - 1].to_vec(), work[nm1..nm1 + k - 1].to_vec());
                     dlasr(false, false, nru, k, &c, &s, u, uat(1, ll), ldu);
+                    dlasr(true, false, k, ncc, &c, &s, cm, cat(ll, 1), ldc);
                     if ee!(ll).abs() <= thresh {
                         ee!(ll) = 0.0;
                     }
@@ -1817,6 +1887,7 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
                     work[nm13..nm13 + k - 1].to_vec(),
                 );
                 dlasr(false, true, nru, k, &c, &s, u, uat(1, ll), ldu);
+                dlasr(true, true, k, ncc, &c, &s, cm, cat(ll, 1), ldc);
                 if ee!(m - 1).abs() <= thresh {
                     ee!(m - 1) = 0.0;
                 }
@@ -1860,12 +1931,13 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
                 dlasr(true, false, k, ncvt, &c, &s, vt, vat(ll, 1), ldvt);
                 let (c, s) = (work[0..k - 1].to_vec(), work[nm1..nm1 + k - 1].to_vec());
                 dlasr(false, false, nru, k, &c, &s, u, uat(1, ll), ldu);
+                dlasr(true, false, k, ncc, &c, &s, cm, cat(ll, 1), ldc);
             }
         }
     }
     // label 160: all singular values converged, so make them positive.
     for i in 1..=n {
-        if dd!(i) == 0.0 {
+        if clear_negative_zero && dd!(i) == 0.0 {
             dd!(i) = 0.0;
         }
         if dd!(i) < 0.0 {
@@ -1889,6 +1961,7 @@ fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut 
             dd!(n + 1 - i) = smin;
             dswap(ncvt, vt, vat(isub, 1), ldvt, vat(n + 1 - i, 1), ldvt);
             dswap(nru, u, uat(1, isub), 1, uat(1, n + 1 - i), 1);
+            dswap(ncc, cm, cat(isub, 1), ldc, cat(n + 1 - i, 1), ldc);
         }
     }
     0
@@ -2116,6 +2189,32 @@ mod tests {
         assert_eq!(dnrm2(2, &[3.0, 4.0], 0, 1), 5.0);
         assert_eq!(dnrm2(2, &[1.0, 1.0], 0, 1), 2f64.sqrt());
         assert_eq!(dnrm2(1, &[-2.5], 0, 1), 2.5);
+        // The main loop's four accumulators: nine ones sum exactly; tiny and huge entries keep
+        // the extended range.
+        assert_eq!(dnrm2(9, &[1.0; 9], 0, 1), 3.0);
+        assert_eq!(dnrm2(2, &[3e-300, 4e-300], 0, 1), 5e-300);
+        assert_eq!(dnrm2(2, &[3e300, 4e300], 0, 1), 5e300);
+        assert_eq!(dnrm2(2, &[f64::MAX, f64::MAX], 0, 1), f64::INFINITY);
+        let tiny = f64::from_bits(3);
+        assert_eq!(dnrm2(1, &[tiny], 0, 1), tiny);
+        assert_eq!(dnrm2(2, &[tiny, 0.0], 0, 1), tiny);
+    }
+
+    #[test]
+    fn rounding_to_double() {
+        assert_eq!(round_to_f64(3, 0), 3.0);
+        assert_eq!(round_to_f64((1u128 << 53) + 1, 0), 9007199254740992.0);
+        assert_eq!(round_to_f64((1u128 << 53) + 3, 0), 9007199254740996.0);
+        assert_eq!(round_to_f64(u128::from(u64::MAX), -64), 1.0);
+        assert_eq!(round_to_f64(1, -1074), f64::from_bits(1));
+        assert_eq!(round_to_f64(1, -1075), 0.0);
+        assert_eq!(round_to_f64(3, -1076), f64::from_bits(1));
+        assert_eq!(round_to_f64(3, -1075), f64::from_bits(2));
+        assert_eq!(round_to_f64(1, 1024), f64::INFINITY);
+        assert_eq!(round_to_f64((1u128 << 53) - 1, 971), f64::MAX);
+        assert_eq!(round_to_f64((1u128 << 54) - 1, 970), f64::INFINITY);
+        // The largest subnormal rounding up into the normal range.
+        assert_eq!(round_to_f64((1u128 << 53) - 1, -1075), f64::MIN_POSITIVE);
     }
 
     #[test]

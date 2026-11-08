@@ -1014,7 +1014,7 @@ def _named_in(named: dict[str, tuple[int, list[str]]], tid: str) -> dict:
     if not found:
         return common.cell("–")
     more = f" and {n - 1} more" if n > 1 else ""
-    return common.cell(f"`{found[0]}`{more}")
+    return common.cell(f"`{min(found, key=len)}`{more}")  # the shortest: the column stays narrow
 
 
 def _corrections_table(ctx: core.Context, links: dict, rec) -> dict:

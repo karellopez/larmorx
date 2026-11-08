@@ -206,6 +206,8 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "afni90-maxdisp": ("lps_f32.nii.gz", ["-maxdisp1D", "m" * 250 + ".1D"]),
     "afni98-input": ("lps_f32.nii.gz", ["-input", str(INPUTS / "lps_f32.nii.gz"), "-base", "9"]),
     "afni98-weight": ("lps_f32.nii.gz", ["-input", str(INPUTS / "lps_f32.nii.gz"), "-weight", str(SUITE_INPUTS / "gp27.nii.gz") + "[0]"]),
+    "s1-linear-noclip": ("%s1.nii.gz", ["-linear", "-noclip"]),
+    "s1-linear": ("%s1.nii.gz", ["-linear"]),
     "rp": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
     "rp-verbose": ("%s1.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
     "rp-fourier": ("%s1.nii.gz", ["-Fourier", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),

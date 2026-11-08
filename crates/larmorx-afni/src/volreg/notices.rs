@@ -164,3 +164,20 @@ pub fn afni_94(mode: UpstreamDefects) -> Notice {
 pub const AFNI_94_FATAL: &str = "-coarse with a step of 1 voxel on a volume of 120 or more \
     voxels along every axis: the subsampled coarse search would have a step of 0 (AFNI loops \
     forever; AFNI-94); use -coarse 2 or more";
+
+/// AFNI-96: a `-rotparent` without its centre attribute (or with fewer than 3 numbers).
+pub fn afni_96(name: &str, mode: UpstreamDefects) -> Notice {
+    Notice::new(
+        &defects::AFNI_96,
+        mode,
+        format!(
+            "the -rotparent dataset has no {name} attribute of 3 numbers: AFNI reads it through a \
+             null pointer or past its end"
+        ),
+    )
+}
+
+/// AFNI-96's error, in both modes (rule B).
+pub fn afni_96_fatal(name: &str) -> String {
+    format!("the -rotparent dataset has no {name} attribute of 3 numbers (AFNI-96)")
+}

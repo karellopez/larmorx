@@ -69,6 +69,15 @@ impl Edging {
     }
 }
 
+/// `-rotparent`'s transformation (§8.9) in dataset order (mm, about the grid centre), and the
+/// zero slices `-gridparent` adds before and after along the slice axis.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RotParent {
+    pub r: grid::M3,
+    pub t: [f64; 3],
+    pub pad: [usize; 2],
+}
+
 /// The parameters of a run (§3), as the command line sets them.
 #[derive(Clone, Debug)]
 pub struct VolregParams {
@@ -102,6 +111,8 @@ pub struct VolregParams {
     pub savedisp: bool,
     /// `-verbose` (0, 1, 2).
     pub verbose: u8,
+    /// `-rotparent` (with `-gridparent`'s padding).
+    pub rotparent: Option<RotParent>,
     pub firfac: Option<f64>,
     pub firold: bool,
     pub n_threads: usize,
@@ -134,6 +145,7 @@ impl Default for VolregParams {
             float_output: false,
             savedisp: false,
             verbose: 0,
+            rotparent: None,
             firfac: None,
             firold: false,
             n_threads: 0,
@@ -732,9 +744,12 @@ fn run_in_pool(
             "++ Starting final pass on {nt} sub-bricks: "
         )));
     }
+    // With -rotparent the volumes are registered, not resampled: their output comes after
+    // (§8.9), from the input kept as it is.
+    let resample = p.output && p.rotparent.is_none();
     let float_out = p.float_output || matches!(bricks.data, BrickData::Float(_));
     let mut out_float: Option<Vec<f32>> =
-        (p.output && float_out && !matches!(bricks.data, BrickData::Float(_)))
+        (resample && float_out && !matches!(bricks.data, BrickData::Float(_)))
             .then(|| vec![0f32; total * nt]);
     struct One {
         fitted: Fitted,
@@ -780,7 +795,7 @@ fn run_in_pool(
         let init = if p.twopass { first[t] } else { None };
         let basis = basis.as_ref().expect("checked above (AFNI-89)");
         let fitted = basis.register(y, init, &iteration, work, chat.as_mut());
-        if p.output {
+        if resample {
             let tf = basis.transform(&fitted.params);
             let tf = match tf {
                 rotate::Transform::Angles { axes, shift, .. } => rotate::Transform::Angles {
@@ -808,10 +823,14 @@ fn run_in_pool(
         } else {
             out.copy_from_slice(y);
         }
-        let rmsnew = if p.output { rms_of(out) } else { rmsold };
+        let rmsnew = if resample { rms_of(out) } else { rmsold };
         One {
             fitted,
-            rms: [rmsold, rmsnew],
+            rms: if p.rotparent.is_some() {
+                [0.0, 0.0]
+            } else {
+                [rmsold, rmsnew]
+            },
             warning: None,
             chat,
             stretched: false,
@@ -834,7 +853,7 @@ fn run_in_pool(
                     // The volume read in place: the output goes to `buf`, then back.
                     register_one(t, slot, &mut work, &mut buf)
                 };
-                if p.output {
+                if resample {
                     slot.copy_from_slice(&buf);
                 }
                 results.push(r);
@@ -866,7 +885,7 @@ fn run_in_pool(
                     })
                     .collect();
                 let r = register_one(t, &y, &mut work, &mut buf);
-                if p.output {
+                if resample {
                     for (s, &x) in slot.iter_mut().zip(buf.iter()) {
                         *s = f64::from(x).clamp(-32767.0, 32767.0).round_ties_even() as i16;
                     }
@@ -888,7 +907,7 @@ fn run_in_pool(
                     })
                     .collect();
                 let mut r = register_one(t, &y, &mut work, &mut buf);
-                if p.output {
+                if resample {
                     let (lo, hi) = buf
                         .iter()
                         .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
@@ -1042,17 +1061,30 @@ fn run_in_pool(
         }
         mine
     });
-    let registered = p.output.then(|| match out_float {
-        Some(v) => Bricks {
-            shape: bricks.shape,
-            data: BrickData::Float(v),
-            factors: vec![0.0; nt],
-        },
-        None => Bricks {
-            shape: bricks.shape,
-            data: bricks.data,
-            factors: vec![0.0; nt],
-        },
+    let registered = match (&p.rotparent, p.output) {
+        (Some(rp), true) => Some(rotparent_series(
+            &bricks,
+            grid,
+            &reported,
+            rp,
+            p,
+            &mut notices,
+        )),
+        _ => None,
+    };
+    let registered = registered.or_else(|| {
+        p.output.then(|| match out_float {
+            Some(v) => Bricks {
+                shape: bricks.shape,
+                data: BrickData::Float(v),
+                factors: vec![0.0; nt],
+            },
+            None => Bricks {
+                shape: bricks.shape,
+                data: bricks.data,
+                factors: vec![0.0; nt],
+            },
+        })
     });
     Ok(VolregOutput {
         registered,
@@ -1066,6 +1098,109 @@ fn run_in_pool(
         maxdisp_messages,
         notices,
     })
+}
+
+/// `-rotparent`'s output (§8.9 steps 6 and 7): each volume, zero-padded along the slice axis as
+/// `-gridparent` requires, resampled once "from a matrix" by the rotparent's transformation
+/// composed with the volume's own (its reported parameters rounded to 4 decimals), with the
+/// final method, clipped to the padded volume's range; stored as the registered series is.
+fn rotparent_series(
+    bricks: &Bricks,
+    grid: &Grid,
+    reported: &[[f32; 6]],
+    rp: &RotParent,
+    p: &VolregParams,
+    notices: &mut Vec<Notice>,
+) -> Bricks {
+    let [nx, ny, nz, nt] = bricks.shape;
+    let nz2 = nz + rp.pad[0] + rp.pad[1];
+    let n2 = [nx, ny, nz2];
+    let (total, total2) = (nx * ny * nz, nx * ny * nz2);
+    let trig = Trig::of(p.mode);
+    let (axes, signs) = grid.angle_axes();
+    let resampler = Resampler {
+        method: p.final_method,
+        zpad: p.zpad,
+        trig,
+    };
+    let float_out = p.float_output || matches!(bricks.data, BrickData::Float(_));
+    let mut work = Work::default();
+    let mut padded = vec![0f32; total2];
+    let mut out = vec![0f32; total2];
+    let mut series = vec![0f32; if float_out { total2 * nt } else { 0 }];
+    let mut shorts = Vec::new();
+    let mut bytes = Vec::new();
+    let mut stretched_any = false;
+    for (t, r) in reported.iter().enumerate() {
+        let y = volume_f32(bricks, t);
+        padded.fill(0.0);
+        padded[nx * ny * rp.pad[0]..nx * ny * rp.pad[0] + total].copy_from_slice(&y);
+        // The parameters as printed with %.4f and read back as float32.
+        let q: [f32; 6] = r.map(|x| cfmt::fixed(f64::from(x), 4).parse::<f32>().unwrap_or(x));
+        let theta: [f64; 3] = [0, 1, 2].map(|k| -f64::from(fit::to_radians(q[k] * signs[k])));
+        let q1 = rotate::rot3(axes, theta, trig);
+        let d1 = grid.internal_shifts([q[3], q[4], q[5]]).map(f64::from);
+        let m = rotate::mul(&rp.r, &q1);
+        let rd = rotate::mul_vec(&rp.r, d1);
+        let shift = [0, 1, 2].map(|k| rd[k] + rp.t[k]);
+        let tf = rotate::Transform::Matrix { m, shift };
+        resampler.apply(&padded, n2, grid.sizes(), &tf, &mut out, &mut work);
+        if p.clip && p.final_method.clips() {
+            let (lo, hi) = padded
+                .iter()
+                .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+                    (a.min(x), b.max(x))
+                });
+            for v in out.iter_mut() {
+                *v = v.clamp(lo, hi);
+            }
+        }
+        match &bricks.data {
+            _ if float_out => series[t * total2..(t + 1) * total2].copy_from_slice(&out),
+            BrickData::Short(_) => shorts.extend(
+                out.iter()
+                    .map(|&x| f64::from(x).clamp(-32767.0, 32767.0).round_ties_even() as i16),
+            ),
+            _ => {
+                let (lo, hi) = out
+                    .iter()
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+                        (a.min(x), b.max(x))
+                    });
+                let rounded: Vec<u8> = out
+                    .iter()
+                    .map(|&x| f64::from(x).clamp(0.0, 255.0).round_ties_even() as u8)
+                    .collect();
+                let hi2 = if hi <= lo { lo + 1.0 } else { hi };
+                let s = 255.9 / (f64::from(hi2) - f64::from(lo));
+                let stretched: Vec<u8> = out
+                    .iter()
+                    .map(|&x| (s * f64::from(x - lo)).trunc() as u8)
+                    .collect();
+                stretched_any |= stretched != rounded;
+                bytes.extend(if p.mode.reproduce() {
+                    stretched
+                } else {
+                    rounded
+                });
+            }
+        }
+    }
+    if stretched_any {
+        defects::push_once(notices, notices::afni_87(p.mode));
+    }
+    let data = if float_out {
+        BrickData::Float(series)
+    } else if matches!(bricks.data, BrickData::Short(_)) {
+        BrickData::Short(shorts)
+    } else {
+        BrickData::Byte(bytes)
+    };
+    Bricks {
+        shape: [nx, ny, nz2, nt],
+        data,
+        factors: vec![0.0; nt],
+    }
 }
 
 /// `-savedisp`'s displacements (§10.3) on the input's grid: three float32 series.

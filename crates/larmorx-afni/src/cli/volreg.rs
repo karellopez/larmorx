@@ -159,8 +159,10 @@ struct Options {
     weight: Option<(String, usize, AfniImage)>,
     twodup: bool,
     tshift: Option<usize>,
-    rotparent: Option<String>,
-    gridparent: Option<String>,
+    /// `-rotparent`: the dataset's name and its VOLREG attributes.
+    rotparent: Option<(String, RotAttrs)>,
+    /// `-gridparent`: the dataset's name and the dataset.
+    gridparent: Option<(String, Box<AfniImage>)>,
     float: bool,
     rest: Vec<String>,
     /// The arguments after the global options (for `-maxdisp1D`'s first line).
@@ -190,6 +192,17 @@ fn edging_value(v: &str) -> Result<Edging, &'static str> {
     }
 }
 
+thread_local! {
+    /// Whether this run already printed the obliquity report's long warning (§9.3: for the run's
+    /// first oblique dataset only); reset at the start of every run.
+    static OBLIQUE_SEEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The obliquity report's long warning (the paragraph before the one-line report).
+fn long_oblique_warning(m: &Message) -> bool {
+    matches!(m, Message::Warning(t) if t.starts_with("  If you are performing spatial transformations"))
+}
+
 /// Opens a dataset as 3dvolreg reads it (its messages and notices to `log`).
 fn open(
     name: &str,
@@ -207,6 +220,9 @@ fn open(
     let (mut messages, mut notices) = (Vec::new(), Vec::new());
     let found = crate::input::resolve(name, settings, mode, &mut messages, &mut notices);
     for m in &messages {
+        if long_oblique_warning(m) && OBLIQUE_SEEN.with(|s| s.replace(true)) {
+            continue;
+        }
         log.message(m);
     }
     for n in &notices {
@@ -219,6 +235,9 @@ fn open(
     let mut image = dataset::read(&found.path, &found.shown, n_threads, mode, settings)
         .map_err(|e| e.to_string())?;
     for m in std::mem::take(&mut image.messages) {
+        if long_oblique_warning(&m) && OBLIQUE_SEEN.with(|s| s.replace(true)) {
+            continue;
+        }
         log.message(&m);
     }
     for n in std::mem::take(&mut image.notices) {
@@ -677,7 +696,16 @@ fn parse(
             if o.rotparent.is_some() {
                 return Err(Stop::Raw("** Can't use -2 -rotparent options!".into()));
             }
-            o.rotparent = Some(v.to_owned());
+            let Ok((image, _)) = open(v, settings, mode, n_threads, log) else {
+                return Err(Stop::Raw("** Can't open -rotparent dataset!\n".into()));
+            };
+            let attrs = rot_attrs(&image);
+            if attrs.matvec.len() < 12 {
+                return Err(Stop::Raw(
+                    "** -rotparent dataset doesn't have VOLREG attributes!?".into(),
+                ));
+            }
+            o.rotparent = Some((v.to_owned(), attrs));
             i += 2;
             continue;
         }
@@ -688,7 +716,10 @@ fn parse(
             if o.gridparent.is_some() {
                 return Err(Stop::Raw("** Can't use -2 -gridparent options!".into()));
             }
-            o.gridparent = Some(v.to_owned());
+            let Ok((image, _)) = open(v, settings, mode, n_threads, log) else {
+                return Err(Stop::Raw("** Can't open -gridparent dataset!\n".into()));
+            };
+            o.gridparent = Some((v.to_owned(), Box::new(image)));
             i += 2;
             continue;
         }
@@ -701,6 +732,56 @@ fn parse(
     }
     o.rest = args[i..].to_vec();
     Ok(o)
+}
+
+/// The VOLREG attributes `-rotparent` reads from a dataset's AFNI extension (§8.9).
+#[derive(Clone, Debug, Default)]
+struct RotAttrs {
+    matvec: Vec<f32>,
+    center_old: Option<Vec<f32>>,
+    center_base: Option<Vec<f32>>,
+}
+
+/// The numbers of the attribute `name` in AFNI's header extension (code 4) of `image`: the
+/// text between the attribute's `>` and `</AFNI_atr>`, read as C's `strtod` then float32.
+fn attribute(image: &AfniImage, name: &str) -> Option<Vec<f32>> {
+    let key = format!("atr_name=\"{name}\"");
+    for ext in image.header.extensions.iter().filter(|e| e.code == 4) {
+        let text = String::from_utf8_lossy(ext.trimmed_content());
+        let Some(at) = text.find(&key) else {
+            continue;
+        };
+        let rest = &text[at + key.len()..];
+        let start = rest.find('>')? + 1;
+        let end = rest[start..].find("</AFNI_atr>")? + start;
+        let values = rest[start..end]
+            .split_whitespace()
+            .filter_map(|w| w.trim_matches('"').parse::<f64>().ok())
+            .map(|v| v as f32)
+            .collect();
+        return Some(values);
+    }
+    None
+}
+
+fn rot_attrs(image: &AfniImage) -> RotAttrs {
+    RotAttrs {
+        matvec: attribute(image, "VOLREG_MATVEC_000000").unwrap_or_default(),
+        center_old: attribute(image, "VOLREG_CENTER_OLD"),
+        center_base: attribute(image, "VOLREG_CENTER_BASE"),
+    }
+}
+
+/// The cardinal (plumb) matrix of a grid, as NIfTI holds it (RAS: DICOM's x and y negated).
+fn cardinal_matrix(g: &Grid) -> crate::geometry::M34 {
+    let mut m: crate::geometry::M34 = [[0.0; 4]; 3];
+    for j in 0..3 {
+        let r = g.orient[j].dicom_axis();
+        let ras = |v: f32| if r < 2 { -v } else { v };
+        m[r][j] = ras(g.delta[j]);
+        m[r][3] = ras(g.origin[j]);
+    }
+    m
 }
 
 /// AFNI-90: a name of 256 bytes or more aborts AFNI at its option (`reproduce`); kept whole by
@@ -835,6 +916,7 @@ pub fn main_with_settings(
         let _ = out.write_all(USAGE.as_bytes());
         return 0;
     }
+    OBLIQUE_SEEN.with(|s| s.set(false));
     let globals = take_global_options_of(args, &mut settings, mode, &PROGRAM);
     let mut log = Log::new(out, err, &settings, mode);
     if !settings.yes("AFNI_QUIET_STARTUP") {
@@ -1100,10 +1182,107 @@ fn execute(
         log.info("Input weight file overrides -wtinp option!");
         o.wtinp = false;
     }
-    if o.rotparent.is_some() {
-        return Err(Stop::Fatal(
-            "larmorx: -rotparent is not supported by the clean-room original yet".into(),
-        ));
+    // §8.9: -gridparent's checks and padding, -rotparent's transformation.
+    let mut out_grid = grid.clone();
+    let mut pad = [0usize; 2];
+    let mut gp_grid = None;
+    if let Some((_, gp)) = &o.gridparent {
+        let gs = gp.bricks.shape;
+        let g = Grid::from_geometry(&gp.geometry, [gs[0], gs[1], gs[2]], mode);
+        let spacing = (0..3).any(|a| (g.delta[a] - grid.delta[a]).abs() > 0.01 * g.delta[a].abs());
+        if spacing || g.orient != grid.orient {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent dataset and input dataset don't\n** match in grid spacing and/or orientation!".into(),
+            ));
+        }
+        if gs[0] != nx || gs[1] != ny {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent and input datasets\n** don't match in x,y dimensions!".into(),
+            ));
+        }
+        if gs[2] < nz {
+            return Err(Stop::Raw(
+                "** Fatal Error:\n** -gridparent has fewer slices than input dataset!".into(),
+            ));
+        }
+        let extra = gs[2] - nz;
+        if extra > 0 {
+            let (n1, n2) = (extra / 2, extra - extra / 2);
+            pad = if grid.delta[2] > 0.0 {
+                [n1, n2]
+            } else {
+                [n2, n1]
+            };
+            if o.verbose > 0 {
+                let (first, second) = grid.orient[2].letters();
+                let (lo, hi) = if "RAI".contains(first) {
+                    (first, second)
+                } else {
+                    (second, first)
+                };
+                log.info(&format!(
+                    "Zero padding to match -gridparent: -{lo} {n1}  -{hi} {n2}"
+                ));
+            }
+        }
+        out_grid.n[2] = gs[2];
+        out_grid.origin = g.origin;
+        gp_grid = Some(g);
+    }
+    let mut rotparent = None;
+    let mut ndz = 0i64;
+    if let Some((_, attrs)) = &o.rotparent {
+        // AFNI-96: the centres must be there, three numbers each (an error in both modes).
+        let mut centre = |c: &Option<Vec<f32>>, name: &str| -> Result<[f64; 3], Stop> {
+            match c {
+                Some(v) if v.len() >= 3 => Ok([0, 1, 2].map(|k| f64::from(v[k]))),
+                _ => {
+                    log.notice(&notices::afni_96(name, mode));
+                    Err(Stop::Fatal(notices::afni_96_fatal(name)))
+                }
+            }
+        };
+        let s2 = centre(&attrs.center_old, "VOLREG_CENTER_OLD")?;
+        let s1 = centre(&attrs.center_base, "VOLREG_CENTER_BASE")?;
+        let mv: Vec<f64> = attrs.matvec.iter().map(|&x| f64::from(x)).collect();
+        let r: volreg::grid::M3 = [
+            [mv[0], mv[1], mv[2]],
+            [mv[4], mv[5], mv[6]],
+            [mv[8], mv[9], mv[10]],
+        ];
+        let mut t = [mv[3], mv[7], mv[11]];
+        let rtr = volreg::rotate::mul(&volreg::rotate::transpose(&r), &r);
+        let mut off = 0.0f64;
+        for (i, row) in rtr.iter().enumerate() {
+            for (j, &v) in row.iter().enumerate() {
+                off += (v - if i == j { 1.0 } else { 0.0 }).abs();
+            }
+        }
+        if off as f32 > 0.01 {
+            return Err(Stop::Raw("** -rotparent matrix not orthogonal!".into()));
+        }
+        // E2: the centre of the padded input grid (the input's origin moved by the low padding),
+        // before the origin becomes the gridparent's (observed).
+        let mut padded_grid = grid.clone();
+        padded_grid.n[2] = out_grid.n[2];
+        padded_grid.origin[2] = grid.origin[2] - pad[0] as f32 * grid.delta[2];
+        let e2 = padded_grid.centre().map(f64::from);
+        let e1 = gp_grid.as_ref().map_or(e2, |g| g.centre().map(f64::from));
+        let d2 = [0, 1, 2].map(|k| e2[k] - s2[k]);
+        let rd = volreg::rotate::mul_vec(&r, d2);
+        for k in 0..3 {
+            t[k] += rd[k] - (e1[k] - s1[k]);
+        }
+        let p = out_grid.p(true);
+        let pt = volreg::rotate::transpose(&p);
+        let rd = volreg::rotate::mul(&pt, &volreg::rotate::mul(&r, &p));
+        let td = volreg::rotate::mul_vec(&pt, t);
+        ndz = (td[2] / f64::from(grid.delta[2].abs())).round_ties_even() as i64;
+        // Only a dataset with slice offsets has them adjusted (observed: no line without).
+        if o.verbose > 0 && ndz != 0 && image.slice_timing.is_some() {
+            log.info(&format!("adjusting time-offsets by {ndz} slices"));
+        }
+        rotparent = Some(volreg::RotParent { r: rd, t: td, pad });
     }
     // §8.1: the output.
     let output = o.prefix != "NULL";
@@ -1204,6 +1383,7 @@ fn execute(
         float_output,
         savedisp: o.savedisp.is_some(),
         verbose: o.verbose,
+        rotparent,
         firfac: settings
             .get("AFNI_BLUR_FIRFAC")
             .and_then(|v| super::leading_number(v).map(|(x, _)| x)),
@@ -1217,11 +1397,40 @@ fn execute(
     let header = image.header.clone();
     let mut geometry = image.geometry.clone();
     // After -tshift the output has no slice offsets and a time origin of 0.
-    let (tr, toffset, slice_timing) = if shifted {
+    let (tr, toffset, mut slice_timing) = if shifted {
         (image.tr, 0.0, None)
     } else {
         (image.tr, image.toffset, image.slice_timing.clone())
     };
+    // §8.9: -gridparent's origin (and its padded grid written plumb); the slice offsets padded
+    // and moved by -rotparent's slices.
+    if o.gridparent.is_some() {
+        if pad != [0, 0] {
+            geometry.m = cardinal_matrix(&out_grid);
+        } else {
+            let g = cardinal_matrix(&out_grid);
+            for i in 0..3 {
+                geometry.m[i][3] = g[i][3];
+            }
+        }
+        geometry.qform_mm = None;
+    }
+    if params.rotparent.is_some()
+        && let Some(h) = slice_timing.as_mut()
+    {
+        let nz2 = out_grid.n[2] as i64;
+        let old = h.times.clone();
+        h.times = (0..nz2)
+            .map(|k| {
+                let src = k - ndz - pad[0] as i64;
+                if (0..old.len() as i64).contains(&src) {
+                    old[src as usize]
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+    }
     let result = volreg::run(image.bricks, &grid, &params);
     let r = match result {
         Ok(r) => r,

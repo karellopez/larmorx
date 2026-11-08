@@ -226,6 +226,22 @@ impl Grid {
     }
 }
 
+impl Grid {
+    /// The internal shifts along the dataset axes of reported shifts `(dS, dL, dP)` (the
+    /// inverse of [`Grid::reported_shifts`]).
+    pub fn internal_shifts(&self, r: [f32; 3]) -> [f32; 3] {
+        let [ds, dl, dp] = r;
+        self.orient.map(|o| match o {
+            Orient::R2L => dl,
+            Orient::L2R => -dl,
+            Orient::P2A => -dp,
+            Orient::A2P => dp,
+            Orient::I2S => ds,
+            Orient::S2I => -ds,
+        })
+    }
+}
+
 /// The determinant, by the rule of Sarrus in a fixed order.
 pub fn det(a: &M3) -> f64 {
     a[0][0] * a[1][1] * a[2][2] - a[0][0] * a[1][2] * a[2][1] - a[1][0] * a[0][1] * a[2][2]

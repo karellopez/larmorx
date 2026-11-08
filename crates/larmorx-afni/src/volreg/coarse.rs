@@ -517,11 +517,13 @@ impl Searcher {
             };
         };
         let mut marks = String::new();
-        let vb = if r.big {
+        let sub;
+        let vb: &[f32] = if r.big {
             marks.push('x');
-            subsample(v, self.n, &s.blur).0
+            sub = subsample(v, self.n, &s.blur).0;
+            &sub
         } else {
-            v.to_vec()
+            v
         };
         marks.push('w');
         marks.push_str(&format!("[{}%]", crate::cfmt::f1(f64::from(r.pct))));
@@ -538,11 +540,12 @@ impl Searcher {
             .plans
             .par_iter()
             .map_init(
-                || ([Vec::new(), Vec::new()], vec![0f32; vb.len()]),
+                || ([Vec::new(), Vec::new()], Vec::new()),
                 |(bufs, out), plan| match plan {
-                    None => best_shift(&vb, &self.reg, r.m, &self.cands, true, s.take_empty),
+                    None => best_shift(vb, &self.reg, r.m, &self.cands, true, s.take_empty),
                     Some(p) => {
-                        p.apply(&vb, r.m, out, bufs);
+                        out.resize(vb.len(), 0.0);
+                        p.apply(vb, r.m, out, bufs);
                         best_shift(out, &self.reg, r.m, &self.cands, true, s.take_empty)
                     }
                 },

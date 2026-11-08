@@ -775,12 +775,13 @@ fn run_in_pool(
                 || (Work::default(), vec![0f32; total]),
                 |(work, buf), (t, slot)| {
                     let f = factors[t];
-                    let y: Vec<f32> = if f != 0.0 && f != 1.0 {
-                        slot.iter().map(|&x| f * x).collect()
+                    let r = if f != 0.0 && f != 1.0 {
+                        let y: Vec<f32> = slot.iter().map(|&x| f * x).collect();
+                        register_one(t, &y, work, buf)
                     } else {
-                        slot.to_vec()
+                        // The volume read in place: the output goes to `buf`, then back.
+                        register_one(t, slot, work, buf)
                     };
-                    let r = register_one(t, &y, work, buf);
                     if p.output {
                         slot.copy_from_slice(buf);
                     }

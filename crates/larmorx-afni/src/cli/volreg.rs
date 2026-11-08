@@ -1244,12 +1244,8 @@ fn execute(
         write_text(&delta_name(mm), &b, Some("*+"), true, log);
     }
     let mut notices = r.notices.clone();
-    if let Some(reg) = &r.registered {
-        let mut bricks = reg.clone();
-        if let BrickData::Float(_) = bricks.data {
-        } else if float_output {
-            unreachable!("float output is float");
-        }
+    let mut r = r;
+    if let Some(mut bricks) = r.registered.take() {
         bricks.factors = vec![0.0; nt];
         let slices = slice_timing
             .as_ref()

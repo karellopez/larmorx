@@ -313,34 +313,36 @@ impl Basis {
             })
             .collect();
         let r = settings.resampler;
-        let images: Vec<Vec<f32>> = tfs
-            .par_iter()
-            .flat_map_iter(|(a, b)| [*a, *b])
-            .map_init(Work::default, |work, tf| {
-                let mut out = vec![0f32; total];
-                r.apply(base, n, sizes, &tf, &mut out, work);
-                out
+        let names = ["d/d(th1)", "d/d(th2)", "d/d(th3)", "d/dx", "d/dy", "d/dz"];
+        // Each derivative image from its two resamplings, trimmed at once: at most two full
+        // volumes per derivative in flight.
+        let derivatives: Vec<(Vec<f32>, f32, f32)> = (0..6)
+            .into_par_iter()
+            .map_init(Work::default, |work, p| {
+                let (plus_tf, minus_tf) = &tfs[p];
+                let mut plus = vec![0f32; total];
+                r.apply(base, n, sizes, plus_tf, &mut plus, work);
+                let mut minus = vec![0f32; total];
+                r.apply(base, n, sizes, minus_tf, &mut minus, work);
+                let kappa = if p < 3 {
+                    (f64::from(settings.sinit) * 0.5 * (std::f64::consts::PI / 180.0)
+                        / f64::from(eps_rot)) as f32
+                } else {
+                    settings.sinit * 0.5f32 / (dfac * sizes[p - 3])
+                };
+                for (pv, &qv) in plus.iter_mut().zip(&minus) {
+                    *pv = kappa * (qv - *pv);
+                }
+                drop(minus);
+                let (lo, hi) = if chatty { range(&plus) } else { (0.0, 0.0) };
+                (bounds.cut(&plus, n), lo, hi)
             })
             .collect();
-        let names = ["d/d(th1)", "d/d(th2)", "d/d(th3)", "d/dx", "d/dy", "d/dz"];
         let mut refs: Vec<Vec<f32>> = Vec::with_capacity(7);
         refs.push(bounds.cut(base, n));
-        for p in 0..6 {
-            let (plus, minus) = (&images[2 * p], &images[2 * p + 1]);
-            let (eps, kappa) = if p < 3 {
-                let k = (f64::from(settings.sinit) * 0.5 * (std::f64::consts::PI / 180.0)
-                    / f64::from(eps_rot)) as f32;
-                (eps_rot, k)
-            } else {
-                let e = dfac * sizes[p - 3];
-                (e, settings.sinit * 0.5f32 / e)
-            };
-            let d: Vec<f32> = plus
-                .iter()
-                .zip(minus)
-                .map(|(&pv, &qv)| kappa * (qv - pv))
-                .collect();
+        for (p, (d, lo, hi)) in derivatives.into_iter().enumerate() {
             if chatty {
+                let eps = if p < 3 { eps_rot } else { dfac * sizes[p - 3] };
                 lines.push(format!(
                     "  initializing {}[delta={}]",
                     names[p],
@@ -348,7 +350,6 @@ impl Basis {
                 ));
                 lines.push(":".to_owned());
                 lines.push(":".to_owned());
-                let (lo, hi) = range(&d);
                 lines.push(format!(
                     "  {} range: min={}  max={}\n",
                     names[p],
@@ -356,7 +357,7 @@ impl Basis {
                     cfmt::g32(hi)
                 ));
             }
-            refs.push(bounds.cut(&d, n));
+            refs.push(d);
         }
         if chatty {
             lines.push("  initializing least squares\n".to_owned());

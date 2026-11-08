@@ -23,9 +23,21 @@ upstream.
 | `ridge::cg_f32`, `ridge::Operator`, `CsrOperator` | SciPy `scipy/sparse/linalg/_isolve/iterative.py` (`cg`, `_get_atol_rtol`), `_isolve/utils.py` (`make_system`, `IdentityOperator`), `sparse/linalg/_interface.py` (`aslinearoperator`, `MatrixLinearOperator`, `_AdjointMatrixOperator`), `sparsetools/csr.h` (`csr_matvec`), `sparsetools/csc.h` (`csc_matvec`) | BSD-3-Clause |
 | `ridge::ridge_sparse_cg`, `RidgeFit`, `RidgeSystem` | scikit-learn `sklearn/linear_model/_ridge.py` (`Ridge.fit`, `_BaseRidge.fit`, `_ridge_regression`, `resolve_solver_for_numpy`, `_solve_sparse_cg`), `sklearn/linear_model/_base.py` (`_preprocess_data`), `sklearn/utils/fixes.py` (`_sparse_linalg_cg`), `sklearn/utils/_param_validation.py` and `validation.py` (the messages) | BSD-3-Clause |
 | `approx::bspline_approx`, `Recenter`, `median_f32`, `mean_f32`, `mode_f32` | sdcflows `sdcflows/interfaces/bspline.py` (`BSplineApprox._run_interface`); numpy `numpy/lib/_function_base_impl.py` (`median`, `_median`), `numpy/_core/_methods.py` (`_mean`, `_count_reduce_items`), `numpy/_core/src/umath/loops_utils.h.src` (`FLOAT_pairwise_sum`), `loops_arithm_fp.dispatch.c.src` (the reduction); SciPy `scipy/stats/_stats_py.py` (`mode`) | Apache-2.0, BSD-3-Clause |
+| `approx::bspline_approx_logged` | the same; the records sdcflows writes before it raises | Apache-2.0 |
+| `tools::rescale_affine`, `voxel_sizes`, `resample_to_zooms_grid`, `apply_affine` | sdcflows `sdcflows/utils/tools.py` (`resample_to_zooms`); nibabel 5.4.2 `nibabel/affines.py` (`rescale_affine`, `voxel_sizes`, `apply_affine`) | Apache-2.0, MIT |
+| `tools::affine_coordinates`, `identity_coordinates` | nitransforms 25.1.0 `nitransforms/resampling.py` (`apply`), `base.py` (`ImageGrid.ndcoords`, `index`, `_as_homogeneous`, `_apply_affine`), `linear.py` (`Affine.map`) | MIT |
 | `npy::py_repr`, `py_format_2e` | CPython's float `repr` ("short" style) and `format(x, ".2e")`, as the original messages print numbers (behaviour only) | (no code) |
 | `npy::floor_divide`, `allclose_zero`, `cross`, `norm3`, `grids_aligned` | numpy `numpy/_core/src/npymath/npy_math_internal.h.src` (`npy_divmod`, `npy_floor_divide`), `numpy/_core/numeric.py` (`cross`, `isclose`, `allclose`), `numpy/linalg/_linalg.py` (`norm`) | BSD-3-Clause |
 
 The 4×4 products and inverses and nibabel's `apply_affine` come from `larmorx-transform`
 (`openblas::matmul4`, `inv4`, `resample_series::apply_affine`, `apply_affine_single`: numpy on
 OpenBLAS's Haswell kernels; their provenance is in that crate's `PROVENANCE.md`).
+
+The Python layer (`python/larmorx/sdcflows/`) ports the rest of each interface with numpy's own
+elementwise arithmetic and the bindings above: `approx.py` (`BSplineApprox`'s loading, masks,
+resize, files, headers and log records; nipype's `split_filename` and `fname_presuffix`),
+`tools.py` (`resample_to_zooms`), `coeffs.py` (`TOPUPCoeffReorient` / `_fix_topup_fieldcoeff`,
+`TransformCoefficients` / `_move_coeff`, `reorient_pedir`; nibabel's `as_reoriented`,
+`set_intent`), `transform.py` (`B0FieldTransform.fit`, `deoblique_and_zooms`,
+`ensure_positive_cosines`; nibabel's `strided_scalar`), from sdcflows 2.17.1 (Apache-2.0),
+nibabel 5.4.2 and nitransforms 25.1.0 (MIT) and nipype 1.12.0's `utils/filemanip.py` (Apache-2.0).

@@ -6,8 +6,9 @@
 //! standalone binaries and the Python console scripts (through `larmorx._core`).
 //!
 //! Tools with a bit-exact replica run it by default: built in (AFNI's programs, in this
-//! process), or as the program of its own package when that is found (`larmorx-nc`), else the
-//! clean-room original ([`replica`], `docs/licensing.md`).
+//! process), or as the program of its own package when that is found (`larmorx-nc`,
+//! `larmorx-gpl`), else the clean-room original ([`replica`], `docs/licensing.md`); a tool with a
+//! replica only (tedana's t2smap) says how to install it.
 #![forbid(unsafe_code)]
 
 pub mod replica;
@@ -34,7 +35,12 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
     ("ants", larmorx_ants::cli::TOOLS),
     ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
+    ("tedana", TEDANA_TOOLS),
 ];
+
+/// The tedana tools: those with a replica only (`larmorx-gpl`, a separate program), until their
+/// clean-room originals exist (`specs/t2smap.md`).
+const TEDANA_TOOLS: &[&str] = &["t2smap"];
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
@@ -441,7 +447,8 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_IMPLEMENTATION"), "{out}");
-        assert!(!out.contains("LARMORX_GPL_BIN"), "{out}");
+        // larmorx-gpl's program again since 2026-11-08 (tedana's t2smap)
+        assert!(out.contains("LARMORX_GPL_BIN"), "{out}");
 
         let (code, out, _) = run_capture(&["some/dir/lx.exe", "-h"]);
         assert_eq!(code, 0);
@@ -638,6 +645,63 @@ mod tests {
             err.contains("cannot run the replica of fsl mcflirt"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn tedana_t2smap_has_only_its_replica() {
+        let (code, out, _) = run_capture(&["lx", "--help"]);
+        assert_eq!(code, 0);
+        assert!(out.contains("  tedana t2smap\n"), "{out}");
+        assert!(
+            out.contains("tedana t2smap: larmorx-gpl (GPL-3.0-only), a separate program"),
+            "{out}"
+        );
+        assert!(out.contains("LARMORX_GPL_BIN"), "{out}");
+        // `original`: there is none yet
+        let (code, _, err) = run_capture(&["lx", "tedana", "t2smap", "-h"]);
+        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert!(
+            err.contains("no clean-room original of tedana t2smap yet")
+                && err.contains("pip install larmorx-gpl"),
+            "{err}"
+        );
+        let (code, _, err) = run_capture(&["lx", "tedana", "tedana"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(
+            err.starts_with("error: unknown tedana tool 'tedana' (available: t2smap)"),
+            "{err}"
+        );
+    }
+
+    /// `larmorx tedana t2smap ...` runs `larmorx-gpl tedana t2smap ...` when the program is
+    /// found (a stand-in shell script here), with the arguments unchanged and its exit status.
+    #[cfg(unix)]
+    #[test]
+    fn tedana_t2smap_runs_the_larmorx_gpl_program() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let program = tmp.path().join("larmorx-gpl");
+        std::fs::write(
+            &program,
+            "#!/bin/sh\necho \"args: $*\"\necho \"to stderr\" >&2\nexit 3\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let options = Options {
+            implementation: Some(Implementation::Auto),
+            replica_dirs: vec![tmp.path().to_path_buf()],
+            ..Options::default()
+        };
+        if std::env::var_os("LARMORX_GPL_BIN").is_some_and(|v| !v.is_empty()) {
+            return; // this machine names its own larmorx-gpl
+        }
+        let (code, out, err) = run_options(
+            &["lx", "tedana", "t2smap", "-d", "e1.nii", "-e", "0.014"],
+            &options,
+        );
+        assert_eq!(code, 3);
+        assert_eq!(out, "args: tedana t2smap -d e1.nii -e 0.014\n");
+        assert_eq!(err, "to stderr\n");
     }
 
     #[test]

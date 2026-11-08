@@ -31,11 +31,12 @@ dependencies = ["numpy>=1.26"]
 # Pipeline-only dependencies (PLAN.md §2.2); library users do not need them.
 prep = ["templateflow", "matplotlib", "nilearn", "pandas", "jinja2"]
 # Everything (the user's decision of 2026-10-16): the pipeline's dependencies and every replica
-# package, the FSL replicas (crates-nc/, FSL Licence: non-commercial) included; larmorx-freesurfer
-# joins when it exists, and larmorx-gpl with Connectome Workbench's replicas. Not on PyPI yet:
-# build them with `maturin build --release`. The AFNI replicas are part of larmorx itself since
-# 2026-10-29 (the `exact` extra, which installed them as larmorx-gpl, is gone with it).
-all = ["larmorx[prep]", "larmorx-nc"]
+# package, the FSL replicas (crates-nc/, FSL Licence: non-commercial) and the GPL family's
+# (crates-gpl/, GNU GPL version 3: tedana's t2smap since 2026-11-08, later Connectome Workbench's)
+# included; larmorx-freesurfer joins when it exists. Not on PyPI yet: build them with
+# `maturin build --release`. The AFNI replicas are part of larmorx itself since 2026-10-29 (the
+# `exact` extra, which installed them as an earlier larmorx-gpl, is gone with it).
+all = ["larmorx[prep]", "larmorx-nc", "larmorx-gpl"]
 
 [project.scripts]
 larmorx = "larmorx.cli:main"

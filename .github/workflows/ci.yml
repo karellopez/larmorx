@@ -47,14 +47,15 @@ jobs:
       - name: SPDX licence headers (docs/licensing.md)
         run: python scripts/check_spdx.py
 
-  # The FSL replica workspace (crates-nc/, the FSL Licence's larmorx-nc), a Cargo workspace of
-  # its own (docs/licensing.md): format, lint, build and test on the same six platforms as the
-  # wheels, in one job per platform. Its tests include the golden tests
-  # (larmorx-nc-cli/tests/golden.rs) and the check of FSL's original source, which the FSL Licence
-  # requires in every copy (fsl-source/, tests/notices.rs). Tests that need an oracle skip where
-  # it is absent. Until 2026-10-29 the job also built and tested crates-gpl (the AFNI replicas,
-  # now crates/larmorx-afni-replica in the main workspace, tested by the test job); crates-gpl
-  # holds only verification tools run by hand, so CI no longer builds it. The job keeps its name.
+  # The replica workspaces of other licence families, each a Cargo workspace of its own
+  # (docs/licensing.md): format, lint, build and test on the same six platforms as the wheels, in
+  # one job per platform. crates-nc/ (the FSL Licence's larmorx-nc): its tests include the golden
+  # tests (larmorx-nc-cli/tests/golden.rs) and the check of FSL's original source, which the FSL
+  # Licence requires in every copy (fsl-source/, tests/notices.rs). crates-gpl/ (the GNU GPL's
+  # larmorx-gpl: tedana's t2smap since 2026-11-08): the program's two crates, with its golden
+  # tests (larmorx-gpl-cli/tests/golden.rs) and the check of the notices it carries; its
+  # verification tools (tools/, glibc's translations) are run by hand on Linux and not built
+  # here. Tests that need an oracle skip where it is absent.
   gpl:
     name: gpl (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
@@ -81,6 +82,7 @@ jobs:
         with:
           workspaces: |
             crates-nc
+            crates-gpl
       - name: rustfmt (crates-nc)
         run: cargo fmt --all --check
       - name: clippy (crates-nc)
@@ -89,6 +91,21 @@ jobs:
       - name: cargo test (crates-nc)
         run: |
           cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
+            "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+      - name: rustfmt (crates-gpl)
+        working-directory: crates-gpl
+        run: cargo fmt --all --check
+      - name: clippy (crates-gpl)
+        working-directory: crates-gpl
+        run: cargo clippy -p larmorx-gpl-tedana -p larmorx-gpl-cli --all-targets --locked -- -D warnings
+      - name: cargo test (crates-gpl)
+        working-directory: crates-gpl
+        run: |
+          cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli --locked 2>&1 | tee cargo-test.log || {
             "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
             exit 1
           }

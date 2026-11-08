@@ -43,7 +43,8 @@ pub struct Env {
 }
 
 /// Python's `os.path.abspath`: joined to the working directory and normalised (`.`, `..` and
-/// repeated separators removed lexically).
+/// repeated separators removed lexically); on Windows (`ntpath`) with the drive or share and
+/// backslashes.
 pub fn py_abspath(p: &str) -> String {
     let base = if Path::new(p).is_absolute() {
         PathBuf::from(p)
@@ -53,16 +54,22 @@ pub fn py_abspath(p: &str) -> String {
             .join(p)
     };
     let mut parts: Vec<String> = Vec::new();
+    let mut prefix = String::new();
     for c in base.components() {
         match c {
             Component::ParentDir => {
                 parts.pop();
             }
             Component::Normal(s) => parts.push(s.to_string_lossy().into_owned()),
+            Component::Prefix(d) => prefix = d.as_os_str().to_string_lossy().into_owned(),
             _ => {}
         }
     }
-    format!("/{}", parts.join("/"))
+    if cfg!(windows) {
+        format!("{prefix}\\{}", parts.join("\\"))
+    } else {
+        format!("/{}", parts.join("/"))
+    }
 }
 
 /// An `OSError` as Python prints it: `[Errno N] <strerror>: '<path>'`, with its subclass.
@@ -928,8 +935,13 @@ mod tests {
 
     #[test]
     fn abspath_normalises() {
-        assert_eq!(py_abspath("/a/./b//c/../d"), "/a/b/d");
-        assert_eq!(py_abspath("/"), "/");
+        if cfg!(windows) {
+            assert_eq!(py_abspath(r"C:\a\.\b\\c\..\d"), r"C:\a\b\d");
+            assert_eq!(py_abspath("C:/a/b"), r"C:\a\b");
+        } else {
+            assert_eq!(py_abspath("/a/./b//c/../d"), "/a/b/d");
+            assert_eq!(py_abspath("/"), "/");
+        }
         assert_eq!(infer_prefix("sub"), "sub_");
         assert_eq!(infer_prefix("sub_"), "sub_");
         assert_eq!(infer_prefix(""), "");

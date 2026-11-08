@@ -14,3 +14,8 @@ path = "src/main.rs"
 [dependencies]
 larmorx-core.workspace = true
 larmorx-gpl-tedana.workspace = true
+
+[dev-dependencies]
+flate2.workspace = true
+sha2.workspace = true
+tempfile.workspace = true

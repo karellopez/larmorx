@@ -248,3 +248,134 @@ def test_phase_maps_to_radians_and_hz():
         lx.sdcflows.delta_te({})
     fmap = lx.sdcflows.phdiff2fmap(rads, 0.0025).image
     np.testing.assert_allclose(fmap.data, rads.data / (2 * np.pi * 0.0025), rtol=1e-6)
+
+
+# --- relay 7: the random-testing trial's findings ----------------------------------------------
+
+
+def _translated(shape, zooms, offset):
+    aff = np.diag([*zooms, 1.0])
+    aff[:3, 3] = offset
+    return lx.Image(np.zeros(shape, np.float32), aff)
+
+
+def test_field_is_float64_where_scipys_stacked_matrix_is():
+    """scipy's kron of an axis with no weights is an empty float64 matrix, and the stack of the
+    levels then float64: B0FieldTransform's field is float64, summed in float64."""
+    fmap = _image((10, 10, 8), (2.0, 2.0, 2.5))
+    coarse = lx.sdcflows.bspline_grid(fmap, (100.0, 100.0, 40.0))
+    fine = lx.sdcflows.bspline_grid(fmap, (16.0, 16.0, 10.0))
+    rng = np.random.default_rng(7)
+    levels = [
+        lx.Image(rng.uniform(-50, 50, g.shape).astype(np.float32), g.affine) for g in (coarse, fine)
+    ]
+    near = _translated((3, 3, 3), (2.0, 2.0, 2.0), (-2.0, -2.0, -2.0))
+    t = lx.sdcflows.B0FieldTransform(coeffs=levels)
+    t.fit(near)
+    assert t.mapped.data.dtype == np.float32
+    # beyond the fine grid's support, within the coarse grid's
+    far = _translated((3, 3, 3), (2.0, 2.0, 2.0), (150.0, 0.0, 0.0))
+    t = lx.sdcflows.B0FieldTransform(coeffs=levels)
+    t.fit(far)
+    assert t.mapped.data.dtype == np.float64
+    w = lx.sdcflows.collocation_matrix(far, [coarse])
+    assert lx.sdcflows.collocation_matrix(far, [fine]).nnz == 0 and w.nnz > 0
+    coef = np.asarray(levels[0].data, np.float32).ravel()
+    want = np.zeros(w.shape[0])
+    for r in range(w.shape[0]):
+        s = 0.0
+        for jj in range(w.indptr[r], w.indptr[r + 1]):
+            s += float(w.data[jj]) * float(coef[w.indices[jj]])
+        want[r] = s
+    assert np.asarray(t.mapped.data).ravel().tobytes() == want.tobytes()
+    # no weights at all: float64 zeros
+    t = lx.sdcflows.B0FieldTransform(coeffs=levels[1:])
+    t.fit(far)
+    assert t.mapped.data.dtype == np.float64 and not np.asarray(t.mapped.data).any()
+
+
+def test_median_of_an_empty_mask_is_numpys_x86_nan(tmp_path):
+    """numpy's median (and mean) of no values is 0/0's NaN on x86, its sign bit set; after a
+    resize the error map is that NaN everywhere."""
+    rng = np.random.default_rng(3)
+    data = rng.uniform(-20, 20, (8, 6, 5)).astype(np.float32)
+    fmap = lx.Image(data, np.diag([0.5, 1.0, 1.0, 1.0]))
+    mask = lx.Image(np.zeros((8, 6, 5), np.uint8), fmap.affine)
+    for recenter in ("median", "mean"):
+        r = lx.sdcflows.bspline_approx(fmap, mask, recenter=recenter, zooms_min=1.0)
+        err = np.asarray(r.error.data)
+        assert np.isnan(err).all() and np.signbit(err).all()
+
+
+def test_notices_only_where_a_value_changes(tmp_path):
+    from larmorx._defects import UpstreamDefectWarning
+
+    # SDC-02 on a single voxel: the separable product is the exact one
+    fmap = _image((10, 10, 8), (2.0, 2.0, 2.5))
+    grid = lx.sdcflows.bspline_grid(fmap, (40.0, 40.0, 20.0))
+    coeff = lx.Image(np.ones(grid.shape, np.float32), grid.affine)
+    rot = np.eye(4)
+    c, s = np.cos(0.3), np.sin(0.3)
+    rot[:2, :2] = [[c, -s], [s, c]]
+    one = lx.Image(np.zeros((1, 1, 1), np.float32), rot)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        lx.sdcflows.B0FieldTransform(coeffs=[coeff]).fit(one)
+    assert not [x for x in w if issubclass(x.category, UpstreamDefectWarning)]
+    # ... and named on a rotated grid of several voxels
+    many = lx.Image(np.zeros((4, 4, 3), np.float32), rot)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        lx.sdcflows.B0FieldTransform(coeffs=[coeff]).fit(many)
+    assert "SDC-02" in " ".join(str(x.message) for x in w)
+
+
+def test_sdc07_is_not_named_when_the_shape_is_not_topups(tmp_path):
+    from larmorx._defects import UpstreamDefectWarning
+
+    ref = lx.Image(np.zeros((8, 6, 4), np.float32), np.diag([-2.0, 2.0, 2.0, 1.0]))
+    bad = lx.Image(np.ones((9, 9, 9), np.float32), np.diag([2.0, 2.0, 2.0, 1.0]))
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError, match="does not meet the expected shape"):
+            lx.sdcflows.topup_coeff_reorient([bad], ref, "i")
+    assert not [x for x in w if issubclass(x.category, UpstreamDefectWarning)]
+
+
+def test_stored_and_low_memory_fits_give_the_same_bits():
+    rng = np.random.default_rng(11)
+    shape = (14, 12, 9)
+    data = rng.normal(0, 30, shape).astype(np.float32)
+    mask = (rng.uniform(size=shape) > 0.3).astype(np.uint8)
+    fmap = lx.Image(data, np.diag([3.0, 3.0, 3.5, 1.0]))
+    m = lx.Image(mask, fmap.affine)
+    spacing = [(40.0, 40.0, 20.0), (16.0, 16.0, 10.0)]
+    a = lx.sdcflows.bspline_approx(fmap, m, bs_spacing=spacing, n_threads=1)
+    b = lx.sdcflows.bspline_approx(fmap, m, bs_spacing=spacing, n_threads=1, low_memory=True)
+    c = lx.sdcflows.bspline_approx(fmap, m, bs_spacing=spacing, n_threads=4)
+    for x in (b, c):
+        for ca, cb in zip(a.coefficients, x.coefficients, strict=True):
+            assert np.asarray(ca.data).tobytes() == np.asarray(cb.data).tobytes()
+        assert np.asarray(a.field.data).tobytes() == np.asarray(x.field.data).tobytes()
+
+
+def test_infinity_message_names_numpys_dtype(tmp_path):
+    data = np.zeros((4, 4, 4), np.float32)
+    data[1, 2, 3] = np.inf
+    p = tmp_path / "fmap.nii"
+    lx.save(lx.Image(data, np.eye(4)), p)
+    with pytest.raises(ValueError, match=r"dtype\('<f4'\)\.$"):
+        lx.sdcflows.bspline_approx(p, recenter=False)
+    with pytest.raises(ValueError, match=r"dtype\('float32'\)\.$"):
+        lx.sdcflows.bspline_approx(lx.Image(data, np.eye(4)), recenter=False)
+
+
+def test_a_3d_mask_fits_a_4d_field_map_of_one_volume():
+    rng = np.random.default_rng(5)
+    data = rng.normal(0, 30, (10, 9, 8)).astype(np.float32)
+    aff = np.diag([3.0, 3.0, 3.0, 1.0])
+    mask = lx.Image((rng.uniform(size=(10, 9, 8)) > 0.2).astype(np.uint8), aff)
+    r3 = lx.sdcflows.bspline_approx(lx.Image(data, aff), mask)
+    r4 = lx.sdcflows.bspline_approx(lx.Image(data[..., None], aff), mask)
+    assert r4.field.shape == (10, 9, 8, 1)
+    assert np.asarray(r3.field.data).tobytes() == np.asarray(r4.field.data).tobytes()

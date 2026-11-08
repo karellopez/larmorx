@@ -78,6 +78,33 @@ platform writes the scale factors nibabel writes on x86-64 Linux. Checked agains
 infinities, constant and empty arrays: `validation/investigations/sdcflows-fieldmap/
 check_nibabel_write.py`), byte for byte after decompression.
 
+## `lx.io.load_nibabel(path, *, dtype=None, scaled=True, n_threads=1)`, `lx.io.nibabel_affine(header)`
+
+`lx.load` with the affine **nibabel** reads from the header (`nb.load(path).affine`,
+`header.get_best_affine()`), for ports of Python programs that read through nibabel: the sform
+when `sform_code > 0`; the qform when `qform_code > 0`, which nibabel builds in `np.longdouble`
+(`quaternions.fillpositive` and `quat2mat`, then `R @ diag(pixdim)`): x87's extended format on
+x86-64 Linux, emulated exactly (rational arithmetic rounded to 64-bit significands, then once
+to float64), so every platform gets Linux's bits; else nibabel's base affine
+(`shape_zoom_affine`, `-0.0` translations of the singleton axes included).
+`lx.io.nibabel_affine(header)` is that affine for any header. `lx.load`'s own qform is float64
+arithmetic, the same on every platform but not nibabel's in the last bit or a zero's sign.
+
+The headers these ports write store the qform as nibabel's `set_qform` does
+(`lx.io.save_nibabel`, and `lx.io.nibabel_header.header_for_image` / `set_xform`): the voxel
+sizes `√((a0² + a1²) + a2²)`, `qfac` from `numpy.linalg.det`, the closest rotation from
+`numpy.linalg.svd` and the quaternion from `numpy.linalg.eigh` (`mat2quat`), with numpy's
+linear algebra replicated operation for operation (`larmorx_transform::numpy_linalg`: LAPACK's
+`dgesdd` and `dsyevd` paths for these sizes on OpenBLAS's Haswell kernels; checked on 4,048
+matrices against numpy 2.5.4 and 2.3.5, `validation/investigations/sdcflows-fieldmap/
+check_numpy_linalg.py`). numpy 2.5.4's OpenBLAS 0.3.34 bundles LAPACK 3.12.1 and numpy 2.3.5's
+0.3.30 LAPACK 3.12.0, which apply a Householder reflector differently (`DLARF1F`, `DLARF`): the
+float32 quaternion of about 2 % of oblique affines differs between the two in its last bit.
+larmorx follows 3.12.1; `lx.io.nibabel_header.use_lapack("3.12.0")` selects the older release
+(for validation against numpy 2.3.5). `lx.io.nibabel_header.io_orientation` is nibabel's
+`io_orientation` with the same SVD (the axis a rotation with two equal candidates picks).
+`lx.save` and `lx.load` keep larmorx's own arithmetic.
+
 ## From nibabel to larmorx
 
 | nibabel | larmorx |

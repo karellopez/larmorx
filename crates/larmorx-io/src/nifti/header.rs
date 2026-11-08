@@ -1127,4 +1127,50 @@ mod tests {
         );
         assert_eq!(NiftiHeader::sniff(b"\0\0\0\0"), Err(HeaderError::NotNifti));
     }
+
+    #[test]
+    fn nibabels_quaternions_with_numpys_lapack() {
+        // nibabel 5.4.2's set_qform on x86-64 with numpy 2.5.4 (LAPACK 3.12.1) and 2.3.5
+        // (3.12.0): a rotation whose exact quaternion has d = 0 keeps a last bit of numpy's SVD.
+        let q = [5.0f64, 3.0, 3.0, 0.0];
+        let n = (q.iter().map(|v| v * v).sum::<f64>()).sqrt();
+        let [w, x, y, z] = q.map(|v| v / n);
+        let r = [
+            [
+                1.0 - 2.0 * (y * y + z * z),
+                2.0 * (x * y - z * w),
+                2.0 * (x * z + y * w),
+            ],
+            [
+                2.0 * (x * y + z * w),
+                1.0 - 2.0 * (x * x + z * z),
+                2.0 * (y * z - x * w),
+            ],
+            [
+                2.0 * (x * z - y * w),
+                2.0 * (y * z + x * w),
+                1.0 - 2.0 * (x * x + y * y),
+            ],
+        ];
+        let a = Affine::from_linear(r, [0.0, 0.0, 0.0]);
+        for (release, d) in [
+            (LapackRelease::V3_12_1, 0x255b_344du32),
+            (LapackRelease::V3_12_0, 0x248b_e45c),
+        ] {
+            let p = nibabel_qform(&a, release).unwrap();
+            let bits = p.quaternion.map(|v| (v as f32).to_bits());
+            assert_eq!(&bits[1..], &[0x3eea_3ce1, 0x3eea_3ce1, d]);
+            assert_eq!(p.qfac, 1.0);
+        }
+        // a signed permutation: exact halves
+        let perm = Affine::from_rows([
+            [0.0, -2.0, 0.0, 10.0],
+            [0.0, 0.0, 3.0, -20.0],
+            [-1.5, 0.0, 0.0, 5.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let p = nibabel_qform(&perm, LapackRelease::V3_12_1).unwrap();
+        assert_eq!(p.quaternion.map(|v| v as f32), [0.5, -0.5, 0.5, 0.5]);
+        assert_eq!(p.zooms, [1.5, 2.0, 3.0]);
+    }
 }

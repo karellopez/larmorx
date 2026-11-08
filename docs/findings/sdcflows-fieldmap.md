@@ -77,6 +77,24 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   field map, 126 million for ds002603's 128³) at least three times (scikit-learn's copies, the
   adjoint's conjugate copy). larmorx applies `X` from the per-axis weights without storing it.
 
+### scipy's float64 stacks and numpy's NaN of nothing
+
+- **An empty `kron` is float64.** `scipy.sparse.kron(A, B)` returns the zero matrix as a new
+  float64 `coo` when `A` or `B` has no stored value, whatever their type. A sampling grid with
+  an axis no knot reaches (a target beyond a control grid's support) gives that level a float64
+  block, and `sparse_hstack` then a float64 matrix: `B0FieldTransform`'s field is float64 (zeros,
+  or, beside a level that does reach the target, its sums in float64: the float32 weights and
+  coefficients converted exactly, each row summed from +0). larmorx follows
+  (`Collocation::scipy_upcasts`, `matvec_f64_upcast`); the field's file is float32 either way
+  (the header's type).
+- **The NaN of an empty mask.** numpy's `median` and `mean` of no values are `0.0 / 0`, whose
+  NaN on x86 has its sign bit set (0xffc00000 in float32); a NaN among the values is returned as
+  it is (`_median_nancheck`); SciPy's `mode` of nothing is `np.nan` (positive). After a resize
+  sdcflows' error map is that NaN everywhere; larmorx gives the same bits.
+- **scikit-learn's dtype in its message.** "Input y contains infinity or a value too large for
+  dtype('<f4')." when nibabel returned the file's raw array (an unscaled little-endian float32
+  file: the header's dtype keeps its explicit byte order), "dtype('float32')" otherwise.
+
 ### numpy's small rules
 
 - **NEP 50.** A Python float times a float32 array stays float32; a numpy float64 scalar makes it
@@ -110,6 +128,47 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   extended operations against `np.longdouble`, 782 writes against nibabel 5.4.2).
 - An in-memory header has `scl_slope`/`scl_inter` NaN and `vox_offset` 0 until it is written;
   numpy's 16-byte `intent_name` truncates "B-Spline coefficients" to "B-Spline coeffic" (kept).
+- **The qform nibabel writes.** `set_qform(affine)` takes the voxel sizes
+  `√((a0² + a1²) + a2²)`, `qfac` from `numpy.linalg.det(R) > 0` (numpy's
+  `sign · exp(Σ log|u_ii|)` on OpenBLAS's `dgetrf`), the closest rotation `P @ Qs` from
+  `numpy.linalg.svd(R)` (LAPACK `dgesdd`, path 5a for 3 × 3) and the quaternion from
+  `numpy.linalg.eigh` of Bar-Itzhack's `K / 3` (`dsyevd`), negated when `w < 0`. The last bits,
+  and the signs of zeros (a signed permutation: `0 · x` products and `q *= -1`), are LAPACK's
+  and its BLAS kernels'. The relay-6 trial found larmorx's own closed-form quaternion
+  (`larmorx_core::rotation`, Shepperd) different in more than 60 % of its sampled differences.
+  larmorx now replicates numpy's linear algebra for these sizes
+  (`larmorx_transform::numpy_linalg`): every routine on the path is unblocked; gfortran
+  compiled LAPACK without fused multiply-adds; on the Haswell kernels `drot` (its micro-kernel
+  file is compiled with FMA: `x' = fma(c, x, s·y)`, `y' = fma(c, y, -(s·x))`, strided too) and
+  `dgemv_t`'s tails are fused, `dnrm2` is x87 (`nrm2.S`: squares summed in extended precision,
+  the root rounded to 64 bits, then to a double), the others plain (checked in the
+  disassembly of numpy's `libscipy_openblas64_`). `check_numpy_linalg.py`: 4,048 matrices
+  (signed permutations, rational rotations, rotations with last-bit noise, scaled and sheared
+  affines, random matrices) bit-identical to numpy 2.5.4 and 2.3.5 (svd, eigh, det, nibabel's
+  quaternions, signs of zeros included).
+- **LAPACK 3.12.0 to 3.12.1 (OpenBLAS 0.3.30 to 0.3.34) changes nibabel's quaternions.** LAPACK
+  3.12.1 applies a Householder reflector with `DLARF1F` (its leading 1 implicit: the product
+  of the other rows, then the first row added), 3.12.0 with `DLARF` (the 1 stored, inside
+  `dgemv`'s sum): `dorm2r`, `dorml2` and `dgebd2` change (`dbdsqr`, `dlascl`, `dlacpy`,
+  `ilaenv` change only on paths not reached here). The float64 quaternions of 70 to 90 % of
+  rotations differ in the last bits and the float32 (NIfTI-1) fields of 2 to 3 % of oblique
+  ones (`check_numpy_linalg.py`'s matrices; none of the signed permutations): nibabel 5.4.2
+  itself writes other quaternions with numpy 2.3.5 (and fMRIPrep 25.2.6's conda-forge OpenBLAS
+  0.3.30) than with numpy 2.5.4. larmorx follows 3.12.1 (the newest), and selects 3.12.0 for the
+  checks in the older environment (`lx.io.nibabel_header.use_lapack`); the originals' step of
+  the records shows it as a change of the headers, with this reason.
+- **The qform nibabel reads** (`get_qform`) is computed in `np.longdouble`
+  (`quaternions.MAX_FLOAT`): x87's extended format on x86-64 Linux. `fillpositive`'s
+  `w = √(1 - (b² + c² + d²))` (numpy's longdouble `matmul` loop: from 0, each product and sum
+  rounded), `quat2mat`, then `R @ diag(pixdim)` (`LONGDOUBLE_dot`: from 0) rounded once to
+  float64. 216 of the 717 images of relay 6's findings had a qform-only affine whose last bits
+  or zero signs differ from `lx.load`'s float64 qform; `lx.io.load_nibabel` reads them as
+  nibabel does (exact rational arithmetic), and so do every orientation decision
+  (`io_orientation` with numpy's SVD: a rotation with two equal axis candidates picks by its
+  last bits, which decides whether `ensure_positive_cosines` reorients and so which error
+  `apply` raises).
+- **The base affine** of a header with neither code (`shape_zoom_affine`) has `-0.0`
+  translations along singleton axes (`-0.0 · zoom`).
 
 ## The defects (SDC-01 to SDC-10)
 

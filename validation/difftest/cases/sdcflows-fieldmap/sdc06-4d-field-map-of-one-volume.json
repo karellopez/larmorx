@@ -1,0 +1,233 @@
+{
+ "defect": "SDC-06",
+ "description": "BSplineApprox of a 4D field map of one volume with a 3D brain mask: larmorx fits it with its first three zooms (sdcflows fails with numpy's broadcasting ValueError; reproduce gives it), SDC-06 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 18,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc06-4d-field-map-of-one-volume",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": "mode",
+    "ridge_alpha": 1.0,
+    "zooms_min": 1.0
+   }
+  },
+  "features": {
+   "4D of one volume": true,
+   "axis0": 1.2,
+   "axis1": 0.95,
+   "axis2": 0.8,
+   "bias0": -0.0025,
+   "bias1": -0.0025,
+   "bias2": -0.01,
+   "bias3": -0.0025,
+   "bs_spacing": 1,
+   "call": "bspline_approx",
+   "centre0": -2.0,
+   "centre1": 2.0,
+   "centre2": 4.0,
+   "content": "head",
+   "dtype": "uint8",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 1.0,
+   "inter": 10.0,
+   "mask": true,
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": -54.0,
+   "origin1": -33.5,
+   "origin2": 27.25,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "recenter": "mode",
+   "ridge_alpha": 1.0,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "19x22x20",
+   "size": 17.5,
+   "slope": 0.01,
+   "spacing0": 2.0,
+   "spacing1": 4.0,
+   "spacing2": 1.2,
+   "tissues": "epi",
+   "units": "mm",
+   "zooms_min": 1.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "axes": [
+      1.15,
+      0.9,
+      1.05
+     ],
+     "bias": [
+      0.0025,
+      0.005,
+      0.0,
+      -0.0025
+     ],
+     "centre": [
+      -5.0,
+      4.0,
+      4.5
+     ],
+     "noise": 6.0,
+     "seed": 179544598,
+     "size": 21.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -54.0,
+      -33.5,
+      27.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 10.0,
+     "slope": 0.01
+    },
+    "shape": [
+     19,
+     22,
+     20,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mask": {
+    "content": {
+     "axes": [
+      1.2,
+      0.95,
+      0.8
+     ],
+     "bias": [
+      -0.0025,
+      -0.0025,
+      -0.01,
+      -0.0025
+     ],
+     "centre": [
+      -2.0,
+      2.0,
+      4.0
+     ],
+     "noise": 3.0,
+     "seed": 540905339,
+     "size": 17.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -54.0,
+      -33.5,
+      27.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     19,
+     22,
+     20
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 18,
+  "options": [
+   "1 level(s)",
+   "4D field map of one volume (SDC-06)",
+   "alpha 1.0",
+   "bspline_approx",
+   "extrapolate",
+   "mask",
+   "recenter mode",
+   "zooms_min 1.0"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

@@ -1,0 +1,141 @@
+{
+ "defect": null,
+ "description": "fmap_to_disp and disp_to_fmap of an oblique scaled int16 field map: nibabel's quaternions in both outputs (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "displacements displacements: every output bit-identical: differ: ['disp-header', 'disp-file', 'fmap-header', 'fmap-file']",
+  "n": 881,
+  "seed": "sdc-try",
+  "shrink_moves": [],
+  "signature": [
+   "displacements displacements: every output bit-identical"
+  ]
+ },
+ "id": "nibabel-quaternion-displacements",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "displacements",
+   "itk": false,
+   "pe_dir": "j-",
+   "ro_time": 0.05
+  },
+  "features": {
+   "ITK vectors": false,
+   "axis0": 1.15,
+   "axis1": 0.75,
+   "axis2": 1.2,
+   "blobs": 2,
+   "call": "displacements",
+   "centre0": -6.0,
+   "centre1": 1.5,
+   "centre2": 4.0,
+   "content": "blobs",
+   "dtype": "int16",
+   "extreme": false,
+   "inter": 10.0,
+   "orientation": "oblique",
+   "origin0": -56.0,
+   "origin1": 22.75,
+   "origin2": 33.75,
+   "other EPI grid": false,
+   "pe_dir": "j-",
+   "qfac": -1,
+   "qform_code": 3,
+   "range": "plain",
+   "ro_time": 0.05,
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "4x5x8",
+   "size": 24.5,
+   "slope": 1.5,
+   "spacing0": 4.0,
+   "spacing1": 1.0,
+   "spacing2": 1.5,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "displacements"
+    ],
+    "name": "displacements",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "axes": [
+      1.15,
+      0.75,
+      1.2
+     ],
+     "centre": [
+      -6.0,
+      1.5,
+      4.0
+     ],
+     "n": 2,
+     "seed": 415736684,
+     "size": 24.5,
+     "type": "blobs"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -56.0,
+      22.75,
+      33.75
+     ],
+     "qfac": -1,
+     "qform_code": 3,
+     "quaternion": [
+      11,
+      0,
+      3,
+      -3
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      4.0,
+      1.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 10.0,
+     "slope": 1.5
+    },
+    "shape": [
+     4,
+     5,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 881,
+  "options": [
+   "RAS+",
+   "displacements",
+   "pe j-"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

@@ -1230,6 +1230,41 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("io.load_nibabel", covers=("lx.io.load_nibabel", "lx.io.nibabel_affine"))
+def _(ctx: Context) -> dict[str, Any]:
+    """nibabel's header arithmetic: an oblique qform (the rotation of the rational quaternion
+    (2, 1, -1, 3), exact rationals) stored as nibabel's set_qform stores it (numpy's SVD and
+    eigh replicated), read back as nibabel's get_qform reads it (x87 extended precision); the
+    base affine of a header without codes (its -0.0 translations)."""
+    from larmorx.io.nibabel_header import header_for_image
+
+    w, x, y, z = 2.0, 1.0, -1.0, 3.0
+    n2 = w * w + x * x + y * y + z * z
+    rot = np.array(
+        [
+            [n2 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), n2 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), n2 - 2 * (x * x + y * y)],
+        ]
+    ) / n2
+    aff = np.eye(4)
+    aff[:3, :3] = rot * np.array([2.5, 2.0, 3.0])
+    aff[:3, 3] = [-90.0, 12.5, 33.0]
+    data = anat().data.astype(np.float32)
+    fields = header_for_image(data.shape, "float32", aff)
+    fields.update(qform_code=1, sform_code=0)
+    path = ctx.out("qform-only.nii")
+    _core.nifti_write(str(path), data, fields, 1, 1)
+    img = lx.io.load_nibabel(path)
+    base = dict(fields, qform_code=0, sform_code=0)
+    return {
+        "file": File(path),
+        "affine": np.asarray(img.affine),
+        "data": img.data,
+        "base_affine": lx.io.nibabel_affine(NiftiHeader.from_dict(base)),
+    }
+
+
 @case("io.nifti2")
 def _(ctx: Context) -> dict[str, Any]:
     """NIfTI-2: written and read back."""

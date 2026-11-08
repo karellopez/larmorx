@@ -39,6 +39,17 @@ The voxel data and the header are written by this crate's NIfTI writer
 (`_core.nifti_header_for_image`, `_core.nifti_write`). Moved here from `lx.sdcflows`, where the
 sdcflows port (field maps, part A) first needed it.
 
+## nibabel's header arithmetic (`src/nifti/header.rs`: `nibabel_qform`, `set_qform_nibabel`; `src/nifti/mod.rs`: `header_for_image_nibabel`; `python/larmorx/io/nibabel_header.py`)
+
+**Ported** from nibabel 5.4.2 (MIT licence, © the NiBabel developers) and numpy 2.5.4
+(BSD-3-Clause):
+
+| larmorx | Upstream |
+|---|---|
+| `nibabel_qform`, `NibabelQform`, `NiftiHeader::set_qform_nibabel`, `set_affine_nibabel`, `header_for_image_nibabel`; `nibabel_header.header_for_image`, `set_xform` | nibabel `nifti1.py` (`Nifti1Header.set_qform`, `Nifti1Pair._affine2header`), `quaternions.py` (`mat2quat`); numpy `linalg/_linalg.py` (`svd`, `eigh`, `det`) through `larmorx_transform::numpy_linalg` (its provenance there) |
+| `nibabel_header.nibabel_affine`, `load_nibabel`, `_get_qform`, `_base_affine`, `_ext_sqrt`, `_ext_to_float64` | nibabel `nifti1.py` (`get_best_affine`, `get_qform`, `get_qform_quaternion`, `quaternion_threshold`), `nifti2.py` (`quaternion_threshold`), `analyze.py` (`get_base_affine`), `affines.py` (`shape_zoom_affine`), `quaternions.py` (`fillpositive`, `quat2mat`, `MAX_FLOAT`); numpy's `longdouble` `matmul` inner loop and `LONGDOUBLE_dot` (`arraytypes.c.src`), emulated exactly with the writer's `_Extended` (x87's 64-bit significand) |
+| `nibabel_header.io_orientation`, `ensure_positive_cosines` | nibabel `orientations.py` (`io_orientation`); sdcflows `utils/tools.py` (`ensure_positive_cosines`, Apache-2.0); the polar factor through `numpy_linalg::io_orientation_polar` |
+
 ## Parallel gzip (`src/gzip.rs`)
 
 **Original implementation** of the parallel-deflate method popularised by pigz (Mark Adler): fixed-size blocks, each compressed independently with the preceding 32 KiB as a dictionary and ended with a sync flush. No pigz code was used. Deflate itself is [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) (Zlib licence), through [flate2](https://github.com/rust-lang/flate2-rs) (MIT/Apache-2.0).

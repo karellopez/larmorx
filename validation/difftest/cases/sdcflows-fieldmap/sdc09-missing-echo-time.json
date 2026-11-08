@@ -1,0 +1,161 @@
+{
+ "defect": "SDC-09",
+ "description": "SubtractPhases without EchoTime: larmorx raises a clear ValueError (sdcflows a TypeError of comparing None; reproduce gives it), SDC-09 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 403,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc09-missing-echo-time",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "phase",
+   "echo_times": [
+    0.004,
+    null
+   ],
+   "subtract": true
+  },
+  "features": {
+   "call": "phase",
+   "content": "noise",
+   "dtype": "int16",
+   "echo times": 2,
+   "extreme": false,
+   "inter": 0.0,
+   "orientation": "plumb",
+   "origin0": -1.75,
+   "origin1": -6.0,
+   "origin2": 23.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "12x7x19",
+   "slope": 2.0,
+   "spacing0": 1.5,
+   "spacing1": 0.8,
+   "spacing2": 4.0,
+   "two phases": true,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "phase"
+    ],
+    "name": "phase",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "phase1": {
+    "content": {
+     "seed": 1968868728,
+     "type": "noise"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -1.75,
+      -6.0,
+      23.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      0.8,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     7,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "phase2": {
+    "content": {
+     "seed": 1578218437,
+     "type": "noise"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -1.75,
+      -6.0,
+      23.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      0.8,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 0.0,
+     "slope": 2.0
+    },
+    "shape": [
+     12,
+     7,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 403,
+  "options": [
+   "echo times [0.004, None]",
+   "phase"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "B",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

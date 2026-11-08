@@ -1,0 +1,213 @@
+{
+ "defect": null,
+ "description": "BSplineApprox of an unscaled little-endian float32 file holding an infinity: scikit-learn's message names dtype('<f4'), the raw array nibabel returns (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "bspline_approx: every output bit-identical: \"ValueError: Input y contains infinity or a value too large for dtype('<f4').\" vs \"ValueError: Input y contains infinity or a value too large for dtype('float32').\"",
+  "n": 2790,
+  "seed": "sdc-try2",
+  "shrink_moves": [
+   "fmap: axis 0 19 -> 9 voxels",
+   "fmap: axis 2 19 -> 9 voxels",
+   "fmap: axis 1 14 -> 7 voxels",
+   "fmap: axis 0 9 -> 4 voxels",
+   "fmap: axis 2 9 -> 4 voxels",
+   "fmap: axis 1 7 -> 3 voxels",
+   "fmap: axis 0 4 -> 2 voxels",
+   "fmap: axis 2 4 -> 2 voxels",
+   "fmap: axis 1 3 -> 1 voxels",
+   "fmap: axis 0 2 -> 1 voxels",
+   "fmap: axis 2 2 -> 1 voxels",
+   "fmap (and its grid): unit spacing",
+   "fmap (and its grid): origin at 0",
+   "fmap (and its grid): sform = qform",
+   "fmap: content noise -> constant",
+   "mask: float32 storage",
+   "mask: content head -> constant"
+  ],
+  "signature": [
+   "bspline_approx: every output bit-identical"
+  ]
+ },
+ "id": "infinity-message-dtype",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      16.0,
+      16.0,
+      10.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": false,
+    "ridge_alpha": 0.01,
+    "zooms_min": 1.0
+   }
+  },
+  "features": {
+   "4D of one volume": false,
+   "axis0": 1.1,
+   "axis1": 0.9,
+   "axis2": 0.8,
+   "bias0": -0.0075,
+   "bias1": 0.0075,
+   "bias2": 0.0075,
+   "bias3": -0.01,
+   "bs_spacing": 0,
+   "call": "bspline_approx",
+   "centre0": -2.5,
+   "centre1": -4.5,
+   "centre2": -1.5,
+   "content": "head",
+   "dtype": "uint8",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 1.0,
+   "mask": true,
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": 58.25,
+   "origin1": -22.25,
+   "origin2": 17.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "recenter": false,
+   "ridge_alpha": 0.01,
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "19x14x19",
+   "shear0": 0.075,
+   "shear1": 0.075,
+   "shear2": 0.0,
+   "size": 29.0,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 1.0,
+   "specials": 1,
+   "tissues": "epi",
+   "units": "mm",
+   "zooms_min": 1.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 2113769586,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "inf"
+     ]
+    }
+   },
+   "mask": {
+    "content": {
+     "seed": 178928388,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 2790,
+  "options": [
+   "1 level(s)",
+   "alpha 0.01",
+   "bspline_approx",
+   "extrapolate",
+   "mask",
+   "recenter False",
+   "zooms_min 1.0"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

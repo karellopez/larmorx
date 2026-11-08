@@ -1,0 +1,198 @@
+{
+ "defect": "SDC-02",
+ "description": "B0FieldTransform.fit on a target rotated relative to the coefficients: larmorx evaluates the B-spline at every voxel's own position (sdcflows multiplies per-axis weights taken from one index each; reproduce gives it), SDC-02 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 3,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc02-rotated-sampling-grid",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": true,
+   "call": "fit",
+   "coefficients": {
+    "amplitude": 20.0,
+    "seed": 441178943,
+    "spacings": [
+     [
+      100.0,
+      100.0,
+      40.0
+     ]
+    ]
+   },
+   "xfm": {
+    "centre": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quaternion": [
+     27,
+     -2,
+     0,
+     1
+    ],
+    "translation": [
+     -1.5,
+     1.0,
+     3.25
+    ]
+   }
+  },
+  "features": {
+   "approx": true,
+   "call": "fit",
+   "coefficient Hz": 20.0,
+   "content": "constant",
+   "dtype": "float32",
+   "extreme": false,
+   "orientation": "oblique",
+   "origin0": 35.0,
+   "origin1": -46.75,
+   "origin2": -46.5,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "rot b": -2,
+   "rot c": 0,
+   "rot d": 1,
+   "rot scale": 4,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "18x8x11",
+   "shift0": -1.5,
+   "shift1": 1.0,
+   "shift2": 3.25,
+   "spacing0": 2.0,
+   "spacing1": 0.8,
+   "spacing2": 2.0,
+   "spacings": 2,
+   "target": "aligned",
+   "target shift0": 16.0,
+   "target shift1": 9.0,
+   "target shift2": 8.5,
+   "target spacing0": 4.0,
+   "target spacing1": 0.5,
+   "target spacing2": 0.8,
+   "transform": "rigid",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "fit"
+    ],
+    "name": "fit",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 361593587,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      35.0,
+      -46.75,
+      -46.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      22,
+      2,
+      -2,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      0.8,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     5,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "seed": 851981639,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      51.0,
+      -37.75,
+      -38.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      22,
+      2,
+      -2,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      0.5,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     18,
+     8,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 3,
+  "options": [
+   "fit",
+   "target aligned",
+   "transform rigid"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

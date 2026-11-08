@@ -1330,4 +1330,57 @@ mod tests {
         assert_eq!(col.rmatvec_f32(&y, 1).unwrap(), xty);
         assert_eq!(col.matvec_f32(&v, None, 1).unwrap(), xv);
     }
+
+    #[test]
+    fn the_stored_matrix_gives_the_operators_bits() {
+        // A rotated sampling grid (an exact level, SDC-02 corrected) and an aligned one with
+        // dense axes beside it.
+        let (c, s) = (0.4f64.cos(), 0.4f64.sin());
+        let target: Mat4 = [
+            [2.0 * c, -2.0 * s, 0.0, -9.0],
+            [2.0 * s, 2.0 * c, 0.0, -7.0],
+            [0.0, 0.0, 2.5, -10.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let levels = vec![
+            grid_bspline_weights(
+                [9, 8, 7],
+                &target,
+                [5, 5, 4],
+                &diag([8.0, 8.0, 10.0], [-16.0, -16.0, -15.0]),
+                WeightType::Float32,
+                UpstreamDefects::Fix,
+            )
+            .unwrap(),
+            grid_bspline_weights(
+                [9, 8, 7],
+                &target,
+                [3, 3, 3],
+                &diag([20.0, 20.0, 20.0], [-20.0, -20.0, -20.0]),
+                WeightType::Float32,
+                UpstreamDefects::Reproduce,
+            )
+            .unwrap(),
+        ];
+        assert!(levels[0].exact.is_some());
+        let col = Collocation::new(levels).unwrap();
+        let stored = col.store(3).unwrap().unwrap();
+        assert_eq!(stored.shape(), col.shape());
+        let v: Vec<f32> = (0..col.shape()[1])
+            .map(|i| (i as f32 * 0.37).sin())
+            .collect();
+        let y: Vec<f32> = (0..col.shape()[0])
+            .map(|i| (i as f32 * 0.11).cos())
+            .collect();
+        for t in [1, 4] {
+            assert_eq!(
+                stored.matvec_f32(&v, t).unwrap(),
+                col.matvec_f32(&v, None, 1).unwrap()
+            );
+            assert_eq!(
+                stored.rmatvec_f32(&y, t).unwrap(),
+                col.rmatvec_f32(&y, 1).unwrap()
+            );
+        }
+    }
 }

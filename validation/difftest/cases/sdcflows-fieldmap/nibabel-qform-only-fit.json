@@ -1,0 +1,168 @@
+{
+ "defect": null,
+ "description": "B0FieldTransform.fit on a target with a qform only: nibabel's qform affine (extended precision), the field's affine bit for bit (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "fit fit: every output bit-identical: (24, 15, 19); differ: ['affine']",
+  "n": 98,
+  "seed": "sdc-try",
+  "shrink_moves": [],
+  "signature": [
+   "fit fit: every output bit-identical"
+  ]
+ },
+ "id": "nibabel-qform-only-fit",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": false,
+   "call": "fit",
+   "coefficients": {
+    "amplitude": 60.0,
+    "seed": 1759239628,
+    "spacings": [
+     [
+      100.0,
+      100.0,
+      40.0
+     ]
+    ]
+   },
+   "xfm": null
+  },
+  "features": {
+   "approx": false,
+   "call": "fit",
+   "coefficient Hz": 60.0,
+   "content": "constant",
+   "dtype": "float32",
+   "extreme": false,
+   "orientation": "oblique",
+   "origin0": 52.25,
+   "origin1": -51.0,
+   "origin2": -22.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "24x15x19",
+   "spacing0": 1.0,
+   "spacing1": 1.5,
+   "spacing2": 1.2,
+   "spacings": 2,
+   "target": "rotated",
+   "transform": "none",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "fit"
+    ],
+    "name": "fit",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1081587624,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      26.0,
+      -13.75,
+      -3.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      -1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      2.0,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     14,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "seed": 1008747012,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      52.25,
+      -51.0,
+      -22.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      37,
+      1,
+      -3,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.0,
+      1.5,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     24,
+     15,
+     19
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 98,
+  "options": [
+   "fit",
+   "target rotated",
+   "transform none"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

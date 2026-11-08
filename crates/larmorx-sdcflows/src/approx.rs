@@ -503,4 +503,20 @@ mod tests {
             0.0 + ((((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]))) + a[8]);
         assert_eq!(pairwise_sum(&a).to_bits(), want.to_bits());
     }
+
+    #[test]
+    fn numpys_nan_of_no_values_and_of_nan_values() {
+        // np.median / np.mean of an empty slice: 0.0 / 0, x86's default NaN (sign bit set).
+        assert_eq!(median_f32(&[]).to_bits(), 0xffc0_0000);
+        assert_eq!(mean_f32(&[]).to_bits(), 0xffc0_0000);
+        // a NaN among the values is returned as it is (here a positive one)
+        assert_eq!(
+            median_f32(&[1.0, f32::NAN, 2.0]).to_bits(),
+            f32::NAN.to_bits()
+        );
+        // scipy.stats.mode of no values: np.nan
+        assert_eq!(mode_f32(&[]).to_bits(), f32::NAN.to_bits());
+        let neg = f32::from_bits(0xffc0_0001);
+        assert_eq!(mode_f32(&[neg, neg, 1.0]).to_bits(), neg.to_bits());
+    }
 }

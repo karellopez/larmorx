@@ -85,7 +85,7 @@ and an `lx.UpstreamDefectWarning` (SDC-02) says so.
 
 `lx.sdcflows.bspline_approx(in_data, in_mask=None, bs_spacing=((16, 16, 10),), ridge_alpha=1e-4,
 recenter="median", extrapolate=True, zooms_min=1.0, debug=False, *, out_dir=None, name=None,
-n_threads=1, upstream_defects="fix")` → `BSplineApproxResult`.
+n_threads=1, upstream_defects="fix", low_memory=False)` → `BSplineApproxResult`.
 
 | `BSplineApprox` input | larmorx | Meaning |
 |---|---|---|
@@ -97,6 +97,7 @@ n_threads=1, upstream_defects="fix")` → `BSplineApproxResult`.
 | `extrapolate` | `extrapolate` | also evaluate the fit outside the mask |
 | `zooms_min` | `zooms_min` | a finer field map (and its mask) is resampled to `max(zooms, zooms_min)` first (`resample_to_zooms`), fitted there and evaluated on the original grid; 0 never resizes |
 | `debug` | `debug` | accepted; sdcflows' interface never reads it |
+| (none) | `low_memory` | the fit reads the stored collocation matrix (the default: its rows and their transpose, 16 bytes per weight, below the 24 or more scikit-learn holds for sdcflows' fit, and faster at one thread than scikit-learn); `True` evaluates the weights at every product of the solver (memory of the order of the voxels and knots, slower); the same bits either way |
 | outputs `out_field`, `out_coeff`, `out_error`, `out_extrapolated`, `out_intercept` | `field`, `coefficients`, `error`, `extrapolated` (images), `intercept` (0.0); with `out_dir`: `out_field`, `out_coeff`, `out_error`, `out_extrapolated` (paths); also `center`, `n_inside`, `n_iter` | the field inside the mask (0 outside; `cal_max` = max \|field\|, `cal_min` = −`cal_max`); the coefficients of each grid (`<in>_coeff000.nii.gz`, ...); `(data − field) × mask` in the input's stored type, scaled as nibabel writes it (`lx.io.save_nibabel`; `cal_min` 0, `cal_max` its maximum); the field everywhere (`<in>_extra`, or the field's own file when the mask holds every voxel; absent without `extrapolate`) |
 
 Log records on the `larmorx.sdcflows` logger, with sdcflows' texts: "Resampling image with
@@ -106,6 +107,14 @@ fit attempt 0: max(|coeffs|) = …" (debug; the number in Python's float repr). 
 largest coefficient reaches 1e4 raises sdcflows' `RuntimeError` "Spline fit of input file …
 failed. Extreme value … detected in spline coefficients." (sdcflows tries three times on the
 same inputs; the fit is deterministic, so larmorx fits once, with the same outcome and records).
+
+Files and images are read and written with nibabel's own arithmetic (`lx.io.load_nibabel`,
+`lx.io.save_nibabel`): a qform-only input's affine as nibabel reads it, every written qform as
+nibabel's `set_qform` stores it (numpy's SVD and eigh replicated), and orientations by nibabel's
+`io_orientation` with numpy's SVD. A mask of a 4D field map of one volume may be 3D (SDC-06
+corrected). scikit-learn's message for an infinite value names numpy's dtype as sdcflows' data
+has it (`dtype('<f4')` for an unscaled little-endian float32 file, as nibabel returns the raw
+array).
 
 ## The field given by its coefficients
 

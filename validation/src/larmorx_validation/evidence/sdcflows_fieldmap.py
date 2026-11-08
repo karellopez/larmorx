@@ -1363,6 +1363,8 @@ def _refit_table(ctx: core.Context, links: dict) -> dict:
                 continue
             a = _stored(e.dir / name / "larmorx-fix-4d" / fa)
             b = _stored(e.dir / name / "sdcflows-3d" / fb)
+            if a.size == b.size:  # the field keeps the input's 4D shape of one volume
+                a = a.reshape(b.shape)
             same &= _diff_count(a, b) == 0
         err_s = runs["sdcflows-4d"].get("error") or "fits"
         err_l = runs["larmorx-4d"].get("error") or "fits"
@@ -1373,7 +1375,7 @@ def _refit_table(ctx: core.Context, links: dict) -> dict:
             "sub": f"{' × '.join(map(str, r['shape']))} voxels",
             "cells": [common.cell(common.clip(err_s, 120)),
                       common.cell("the same error" if err_s == err_l else common.clip(err_l, 120)),
-                      common.cell(("the 3D map's fit, every value" if same else "differs")
+                      common.cell(("the 3D map's fit, every value (stored in the input's 4D shape)" if same else "differs")
                                   + (f"; names {', '.join(named)}" if named else "")),
                       {"verdict": "d13" if ok else "open"}],
             "verdict": "d13" if ok else "open",

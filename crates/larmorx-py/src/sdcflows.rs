@@ -7,16 +7,18 @@
 
 use larmorx_core::linalg::Mat4;
 use larmorx_sdcflows::SdcError;
+use larmorx_sdcflows::approx::{self, ApproxParams, Fitting, Grid, LogRecord, Recenter};
+use larmorx_sdcflows::blas;
 use larmorx_sdcflows::bspline::{self, Collocation, Csr, WeightType};
 use larmorx_sdcflows::ridge::{self, CsrOperator, RidgeFit, RidgeSystem};
-use larmorx_sdcflows::blas;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 fn sdc_err(e: SdcError) -> PyErr {
     match e {
-        SdcError::Threads(m) => PyRuntimeError::new_err(m),
+        SdcError::Threads(m) | SdcError::Runtime(m) => PyRuntimeError::new_err(m),
         // numpy.linalg.LinAlgError is a ValueError subclass; the wrapper re-raises it as one.
         other => PyValueError::new_err(other.to_string()),
     }
@@ -308,6 +310,132 @@ fn sdcflows_ridge_collocation<'py>(
     Ok(fit_out(py, fit))
 }
 
+/// A grid's data, shape, affine and mask, owned.
+type OwnedGrid = (Vec<f32>, [usize; 3], Mat4, Option<Vec<bool>>);
+
+type GridIn<'a> = (
+    PyReadonlyArray1<'a, f32>,
+    [usize; 3],
+    PyReadonlyArray2<'a, f64>,
+    Option<PyReadonlyArray1<'a, bool>>,
+);
+
+/// sdcflows' `BSplineApprox` on a loaded field map: `data` (float32, C order, flat) on the grid
+/// `shape` / `affine` with header `zooms`, `mask` (bool, flat; None: every voxel), `spacings`
+/// (`bs_spacing`), `recenter` ("median", "mode", "mean" or "none"); `resampled` = `(data,
+/// shape, affine, mask)` of the grid `resample_to_zooms` gave when sdcflows resizes. A dict
+/// with `grids` ([(shape, affine)]), `coefficients`, `center`, `n_inside`, `field`, `error`,
+/// `extrapolated` (None without `extrapolate`), `extreme`, `info`, `n_iter`, `system`, `log`
+/// ([(level, message)]).
+#[pyfunction]
+#[pyo3(signature = (data, shape, affine, zooms, spacings, mask = None, ridge_alpha = 1e-4, recenter = "median", extrapolate = true, name = "", resampled = None, n_threads = 1))]
+#[allow(clippy::too_many_arguments)]
+fn sdcflows_bspline_approx<'py>(
+    py: Python<'py>,
+    data: PyReadonlyArray1<'_, f32>,
+    shape: [usize; 3],
+    affine: PyReadonlyArray2<'_, f64>,
+    zooms: Vec<f64>,
+    spacings: Vec<[f64; 3]>,
+    mask: Option<PyReadonlyArray1<'_, bool>>,
+    ridge_alpha: f64,
+    recenter: &str,
+    extrapolate: bool,
+    name: &str,
+    resampled: Option<GridIn<'_>>,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyDict>> {
+    let recenter = match recenter {
+        "median" => Recenter::Median,
+        "mode" => Recenter::Mode,
+        "mean" => Recenter::Mean,
+        "none" => Recenter::None,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "recenter must be 'median', 'mode', 'mean' or 'none', not {other:?}"
+            )));
+        }
+    };
+    let aff = mat4(&affine)?;
+    let data = data.as_array().to_vec();
+    let mask: Option<Vec<bool>> = mask.map(|m| m.as_array().to_vec());
+    let res: Option<OwnedGrid> = match resampled {
+        None => None,
+        Some((d, s, a, m)) => Some((
+            d.as_array().to_vec(),
+            s,
+            mat4(&a)?,
+            m.map(|m| m.as_array().to_vec()),
+        )),
+    };
+    let params = ApproxParams {
+        zooms,
+        spacings,
+        ridge_alpha,
+        recenter,
+        extrapolate,
+        name: name.to_string(),
+    };
+    let out = py
+        .detach(|| {
+            let original = Grid {
+                data: &data,
+                shape,
+                affine: &aff,
+                mask: mask.as_deref(),
+            };
+            let fitting = match &res {
+                None => Fitting::Original,
+                Some((d, s, a, m)) => Fitting::Resampled(Grid {
+                    data: d,
+                    shape: *s,
+                    affine: a,
+                    mask: m.as_deref(),
+                }),
+            };
+            approx::bspline_approx(original, fitting, &params, n_threads)
+        })
+        .map_err(sdc_err)?;
+    let d = PyDict::new(py);
+    let grids: Vec<([usize; 3], Bound<'py, PyArray2<f64>>)> = out
+        .grids
+        .iter()
+        .map(|g| {
+            let a: Vec<Vec<f64>> = g.affine.iter().map(|r| r.to_vec()).collect();
+            Ok((g.shape, PyArray2::from_vec2(py, &a)?))
+        })
+        .collect::<PyResult<_>>()?;
+    d.set_item("grids", grids)?;
+    let coefs: Vec<Bound<'py, PyArray1<f32>>> = out
+        .coefficients
+        .into_iter()
+        .map(|c| PyArray1::from_vec(py, c))
+        .collect();
+    d.set_item("coefficients", coefs)?;
+    d.set_item("center", out.center)?;
+    d.set_item("n_inside", out.n_inside)?;
+    d.set_item("field", PyArray1::from_vec(py, out.field))?;
+    d.set_item("error", PyArray1::from_vec(py, out.error))?;
+    d.set_item(
+        "extrapolated",
+        out.extrapolated.map(|e| PyArray1::from_vec(py, e)),
+    )?;
+    d.set_item("extreme", out.extreme)?;
+    d.set_item("info", out.fit.info)?;
+    d.set_item("n_iter", out.fit.iterations)?;
+    d.set_item("system", system_name(out.fit.system))?;
+    let log: Vec<(&str, String)> = out
+        .log
+        .into_iter()
+        .map(|r| match r {
+            LogRecord::Info(m) => ("info", m),
+            LogRecord::Debug(m) => ("debug", m),
+        })
+        .collect();
+    d.set_item("log", log)?;
+    Ok(d)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sdcflows_bspline_grid, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_collocation_csr, m)?)?;
@@ -316,5 +444,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sdcflows_cg_csr, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_ridge_csr, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_ridge_collocation, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_bspline_approx, m)?)?;
     Ok(())
 }

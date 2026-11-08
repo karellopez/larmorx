@@ -13,6 +13,8 @@
 //! - [`bspline`]: the B-spline control grid (`bspline_grid`) and the tensor-product cubic
 //!   B-spline weights of a sampling grid (`grid_bspline_weights`), applied as the collocation
 //!   matrix without storing it ([`bspline::Collocation`]), or stored as scipy's CSR matrix.
+//! - [`approx`]: `BSplineApprox`, the B-spline approximation of a field map (centring, the
+//!   ridge fit, the field, the error and the extrapolation).
 //! - [`blas`]: numpy's float32 dot product and norm over OpenBLAS's Haswell `sdot` kernel.
 //! - [`ridge`]: scikit-learn's ridge regression on a sparse float32 matrix (`sparse_cg`, both
 //!   of its systems) with SciPy's conjugate gradients, on the collocation operator or a stored
@@ -24,6 +26,7 @@
 //! another crate.
 #![forbid(unsafe_code)]
 
+pub mod approx;
 pub mod blas;
 pub mod bspline;
 pub mod npy;
@@ -38,6 +41,10 @@ pub enum SdcError {
     /// `numpy.linalg.inv` of a singular matrix.
     #[error("Singular matrix")]
     Singular,
+    /// What sdcflows raises as `RuntimeError` (a failed spline fit); the message is the
+    /// original's.
+    #[error("{0}")]
+    Runtime(String),
     /// The thread pool could not start.
     #[error("{0}")]
     Threads(String),

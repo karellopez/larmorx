@@ -833,3 +833,22 @@ def sdcflows_ridge_collocation(
     n_threads: int = 1,
 ) -> tuple[np.ndarray, int, int, str]:
     """The same fit on sdcflows' float32 collocation matrix, without storing it."""
+
+def sdcflows_bspline_approx(
+    data: np.ndarray,
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    zooms: list[float],
+    spacings: list[tuple[float, float, float]],
+    mask: np.ndarray | None = None,
+    ridge_alpha: float = 1e-4,
+    recenter: str = "median",
+    extrapolate: bool = True,
+    name: str = "",
+    resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None]
+    | None = None,
+    n_threads: int = 1,
+) -> dict[str, Any]:
+    """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
+    grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
+    system, log."""

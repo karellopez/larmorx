@@ -57,10 +57,10 @@
 /// The assembly kernel of `sdot_microk_haswell-2.c` on the first `n1` elements (`n1` a
 /// multiple of 32): the float it stores.
 fn haswell_kernel(x: &[f32], y: &[f32]) -> f32 {
-    debug_assert!(x.len() == y.len() && x.len() % 32 == 0);
+    debug_assert!(x.len() == y.len() && x.len().is_multiple_of(32));
     // acc[k][j]: lane j of ymm(4 + k).
     let mut acc = [[0.0f32; 8]; 4];
-    for (xb, yb) in x.chunks_exact(32).zip(y.chunks_exact(32)) {
+    for (xb, yb) in x.as_chunks::<32>().0.iter().zip(y.as_chunks::<32>().0) {
         for (k, a) in acc.iter_mut().enumerate() {
             for (j, lane) in a.iter_mut().enumerate() {
                 let i = 8 * k + j;
@@ -69,7 +69,8 @@ fn haswell_kernel(x: &[f32], y: &[f32]) -> f32 {
         }
     }
     // vextractf128 + vaddps: low half plus high half, per accumulator.
-    let h: [[f32; 4]; 4] = std::array::from_fn(|k| std::array::from_fn(|j| acc[k][j + 4] + acc[k][j]));
+    let h: [[f32; 4]; 4] =
+        std::array::from_fn(|k| std::array::from_fn(|j| acc[k][j + 4] + acc[k][j]));
     // vaddps xmm4, xmm5 -> xmm4; vaddps xmm6, xmm7 -> xmm6; vaddps xmm4, xmm6 -> xmm4.
     let s: [f32; 4] = std::array::from_fn(|j| {
         let s45 = h[1][j] + h[0][j];
@@ -129,7 +130,9 @@ mod tests {
         let mut s = seed;
         (0..n)
             .map(|_| {
-                s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                s = s
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let m = ((s >> 40) as i64 - (1 << 23)) as f32;
                 m * f32::from(((s >> 20) & 7) as u8 + 1) / 4096.0
             })
@@ -147,7 +150,10 @@ mod tests {
         assert_eq!(dot_f32(&[], &[]).to_bits(), 0.0f32.to_bits());
         // One element: numpy's scalar product keeps the signed zero; two: sdot's +0 start.
         assert_eq!(dot_f32(&[-0.0], &[1.0]).to_bits(), (-0.0f32).to_bits());
-        assert_eq!(dot_f32(&[-0.0, 0.0], &[1.0, -1.0]).to_bits(), 0.0f32.to_bits());
+        assert_eq!(
+            dot_f32(&[-0.0, 0.0], &[1.0, -1.0]).to_bits(),
+            0.0f32.to_bits()
+        );
     }
 
     #[test]
@@ -156,7 +162,9 @@ mod tests {
         let (x, y) = (values(32, 3), values(32, 4));
         let p: Vec<f32> = x.iter().zip(&y).map(|(a, b)| a * b).collect();
         let h = |k: usize, j: usize| p[8 * k + j + 4] + p[8 * k + j];
-        let s: Vec<f32> = (0..4).map(|j| (h(3, j) + h(2, j)) + (h(1, j) + h(0, j))).collect();
+        let s: Vec<f32> = (0..4)
+            .map(|j| (h(3, j) + h(2, j)) + (h(1, j) + h(0, j)))
+            .collect();
         let want = (s[0] + s[1]) + (s[2] + s[3]);
         assert_eq!(sdot(&x, &y).to_bits(), want.to_bits());
         assert_eq!(norm_f32(&[3.0, 4.0]), 5.0);

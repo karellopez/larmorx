@@ -4,8 +4,8 @@
 sdcflows' ``BSplineApprox`` fits the field's B-spline coefficients with
 ``sklearn.linear_model.Ridge(alpha, fit_intercept=False).fit(colmat, data)``; for a sparse
 matrix scikit-learn's ``auto`` solver is ``sparse_cg``: SciPy's conjugate gradients on the
-normal equations ``(XᵀX + αI) c = Xᵀy``, or on the kernel system ``(X Xᵀ + αI) w = y`` when there
-are more columns than rows. This is that fit, bit for bit (scikit-learn 1.9.1 and 1.6.1, SciPy
+normal equations ``(XᵀX + alpha*I) c = Xᵀy``, or on the kernel system
+``(X Xᵀ + alpha*I) w = y`` when there are more columns than rows. This is that fit, bit for bit (scikit-learn 1.9.1 and 1.6.1, SciPy
 1.18.1 and 1.15.3, numpy on OpenBLAS's Haswell ``sdot``;
 ``crates/larmorx-sdcflows/src/ridge.rs``), with scikit-learn's checks and messages.
 """
@@ -65,7 +65,9 @@ def _finite(values: np.ndarray, name: str, nan_message: str | None = None) -> No
     if values.dtype.kind in "fc" and not np.isfinite(values).all():
         if np.isnan(values).any():
             raise ValueError(nan_message or f"Input {name} contains NaN.")
-        raise ValueError(f"Input {name} contains infinity or a value too large for {values.dtype!r}.")
+        raise ValueError(
+            f"Input {name} contains infinity or a value too large for {values.dtype!r}."
+        )
 
 
 def _as_csr(X: Any) -> CsrMatrix:
@@ -129,8 +131,7 @@ def ridge_sparse_cg(
         )
     if y.shape[0] != rows:
         raise ValueError(
-            "Found input variables with inconsistent numbers of samples: "
-            f"[{rows}, {y.shape[0]}]"
+            f"Found input variables with inconsistent numbers of samples: [{rows}, {y.shape[0]}]"
         )
     coef, info, iterations, system = _core.sdcflows_ridge_csr(
         np.ascontiguousarray(m.data, dtype=np.float32),

@@ -11,6 +11,8 @@
 //!   output, then the second product subtracted).
 //! - [`norm3`]: `numpy.linalg.norm(v)` of a 3-vector along an axis, `sqrt(add.reduce(v * v))`,
 //!   the reduction left to right.
+//! - [`py_repr`], [`py_format_2e`]: Python's `repr()` and `f"{x:.2e}"` of a float (the messages
+//!   sdcflows, SciPy and scikit-learn write with numbers in them).
 //!
 //! numpy: Copyright (c) 2005-2025, NumPy Developers. All rights reserved. Redistribution and
 //! use in source and binary forms, with or without modification, are permitted provided that
@@ -131,5 +133,101 @@ mod tests {
         rot[1][0] = s;
         rot[1][1] = c;
         assert!(!grids_aligned(&eye, &rot));
+    }
+}
+
+/// Python's `repr()` of a float (`float_repr_style` "short": the shortest decimal that reads
+/// back as the same double, the one nearest the exact value, ties to even; scientific
+/// notation when the decimal point would sit 4 or more places left of the first digit or more
+/// than 16 places right of it; positional numbers keep a ".0").
+pub fn py_repr(x: f64) -> String {
+    if x.is_nan() {
+        return "nan".into();
+    }
+    if x.is_infinite() {
+        return if x > 0.0 { "inf".into() } else { "-inf".into() };
+    }
+    if x == 0.0 {
+        return if x.is_sign_negative() {
+            "-0.0".into()
+        } else {
+            "0.0".into()
+        };
+    }
+    // Rust's shortest round trip gives the digit count; the correctly rounded string of that
+    // many digits is the nearest one (Rust may pick another of the same length on a tie).
+    let short = format!("{x:e}");
+    let n = short
+        .split_once('e')
+        .map_or(0, |(m, _)| m.chars().filter(char::is_ascii_digit).count());
+    let exact = format!("{:.*e}", n.saturating_sub(1), x);
+    let chosen = if exact.parse::<f64>() == Ok(x) {
+        exact
+    } else {
+        short
+    };
+    let (mant, exp) = chosen.split_once('e').unwrap_or((&chosen, "0"));
+    let negative = mant.starts_with('-');
+    let digits: String = mant.chars().filter(char::is_ascii_digit).collect();
+    let digits = digits.trim_end_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    let e: i32 = exp.parse().unwrap_or(0);
+    let decpt = e + 1;
+    let body = if decpt <= -4 || decpt > 16 {
+        let (first, rest) = digits.split_at(1);
+        let mut m = first.to_string();
+        if !rest.is_empty() {
+            m.push('.');
+            m.push_str(rest);
+        }
+        format!("{m}e{}{:02}", if e < 0 { '-' } else { '+' }, e.abs())
+    } else if decpt <= 0 {
+        format!("0.{}{digits}", "0".repeat((-decpt) as usize))
+    } else if decpt as usize >= digits.len() {
+        format!("{digits}{}.0", "0".repeat(decpt as usize - digits.len()))
+    } else {
+        let (a, b) = digits.split_at(decpt as usize);
+        format!("{a}.{b}")
+    };
+    if negative { format!("-{body}") } else { body }
+}
+
+/// Python's `f"{x:.2e}"` of a float.
+pub fn py_format_2e(x: f64) -> String {
+    if x.is_nan() {
+        return "nan".into();
+    }
+    if x.is_infinite() {
+        return if x > 0.0 { "inf".into() } else { "-inf".into() };
+    }
+    let s = format!("{x:.2e}");
+    let (m, e) = s.split_once('e').unwrap_or((&s, "0"));
+    let (sign, digits) = e.strip_prefix('-').map_or(("+", e), |d| ("-", d));
+    format!("{m}e{sign}{digits:0>2}")
+}
+
+#[cfg(test)]
+mod repr_tests {
+    use super::*;
+
+    #[test]
+    fn python_repr_and_format() {
+        // the float32 791.06524658203125: a tie at 16 digits, Python keeps the even digit
+        assert_eq!(py_repr(f64::from(791.065_25_f32)), "791.0652465820312");
+        assert_eq!(py_repr(f64::from(1_319.524_5_f32)), "1319.5245361328125");
+        assert_eq!(py_repr(85_199_288.0), "85199288.0");
+        assert_eq!(py_repr(1e-5), "1e-05");
+        assert_eq!(py_repr(0.0001), "0.0001");
+        assert_eq!(py_repr(1e16), "1e+16");
+        assert_eq!(py_repr(1e15), "1000000000000000.0");
+        assert_eq!(py_repr(-1.0), "-1.0");
+        assert_eq!(py_repr(-0.5), "-0.5");
+        assert_eq!(py_repr(0.1), "0.1");
+        assert_eq!(py_repr(1.5e-7), "1.5e-07");
+        assert_eq!(py_repr(-0.0), "-0.0");
+        assert_eq!(py_repr(f64::NAN), "nan");
+        assert_eq!(py_format_2e(12345.0), "1.23e+04");
+        assert_eq!(py_format_2e(0.000123), "1.23e-04");
+        assert_eq!(py_format_2e(f64::NAN), "nan");
     }
 }

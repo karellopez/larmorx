@@ -53,3 +53,49 @@ def test_rotated_target_warns_and_two_levels_stack():
     assert both.shape[1] == coarse.data.size + grid.data.size
     with pytest.raises(ValueError, match="float32 and float64"):
         lx.sdcflows.grid_bspline_weights(img, grid, dtype="float16")
+
+
+def _csr(dense):
+    dense = np.asarray(dense, np.float32)
+    rows, cols = np.nonzero(dense)
+    indptr = np.searchsorted(rows, np.arange(dense.shape[0] + 1))
+    return lx.sdcflows.CsrMatrix(
+        dense[rows, cols], cols.astype(np.int32), indptr.astype(np.int32), dense.shape
+    )
+
+
+def test_ridge_solves_both_systems():
+    rng = np.random.default_rng(0)
+    tall = rng.standard_normal((40, 6)) * (rng.random((40, 6)) < 0.5)
+    y = rng.standard_normal(40).astype(np.float32)
+    fit = lx.sdcflows.ridge_sparse_cg(_csr(tall), y, alpha=1e-3, tol=1e-8)
+    a = tall.astype(np.float64)
+    want = np.linalg.solve(a.T @ a + 1e-3 * np.eye(6), a.T @ y)
+    np.testing.assert_allclose(fit.coef, want, rtol=1e-3, atol=1e-4)
+    assert (fit.system, fit.info, fit.intercept, fit.coef.dtype) == ("normal", 0, 0.0, np.float32)
+    wide = rng.standard_normal((5, 12))
+    fit = lx.sdcflows.ridge_sparse_cg(_csr(wide), y[:5], alpha=1e-2, tol=1e-8)
+    b = wide.astype(np.float64)
+    want = b.T @ np.linalg.solve(b @ b.T + 1e-2 * np.eye(5), y[:5])
+    np.testing.assert_allclose(fit.coef, want, rtol=1e-3, atol=1e-4)
+    assert fit.system == "kernel"
+
+
+def test_ridge_messages_are_scikit_learns():
+    eye = _csr(np.eye(3))
+    with pytest.raises(
+        ValueError,
+        match=r"The 'alpha' parameter of Ridge must be a float in the range \[0\.0, inf\) or an array-like\. Got -1\.0 instead\.",
+    ):
+        lx.sdcflows.ridge_sparse_cg(eye, np.ones(3), alpha=-1.0)
+    with pytest.raises(ValueError, match=r"^Input y contains NaN\.$"):
+        lx.sdcflows.ridge_sparse_cg(eye, np.array([1.0, np.nan, 1.0]))
+    with pytest.raises(ValueError, match=r"inconsistent numbers of samples: \[3, 4\]"):
+        lx.sdcflows.ridge_sparse_cg(eye, np.ones(4))
+    with pytest.raises(ValueError, match="only float32"):
+        lx.sdcflows.ridge_sparse_cg(
+            lx.sdcflows.CsrMatrix(
+                *[np.asarray(a) for a in (np.ones(3), [0, 1, 2], [0, 1, 2, 3])], (3, 3)
+            ),
+            np.ones(3),
+        )

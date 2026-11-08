@@ -55,9 +55,9 @@
 use larmorx_core::parallel::with_threads;
 use rayon::prelude::*;
 
-use crate::SdcError;
 use crate::blas::{dot_f32, norm_f32};
 use crate::bspline::{Collocation, Csr};
+use crate::{SdcError, npy};
 
 /// A float32 matrix as scipy applies it: `matvec` is `X @ v` (`csr_matvec`: each row a float32
 /// sum from +0 of the rounded products in storage order), `rmatvec` is `X.T @ y` through the
@@ -204,21 +204,6 @@ pub struct CgResult {
     pub iterations: usize,
 }
 
-/// A float as Python's `repr` writes it (for SciPy's messages).
-fn py_repr(v: f64) -> String {
-    if v.is_nan() {
-        return "nan".into();
-    }
-    let s = format!("{v:?}");
-    match s.split_once('e') {
-        Some((m, e)) => {
-            let (sign, digits) = e.strip_prefix('-').map_or(("+", e), |d| ("-", d));
-            format!("{m}e{sign}{digits:0>2}")
-        }
-        None => s,
-    }
-}
-
 /// SciPy's `cg(A, b, rtol=rtol, atol=atol, maxiter=maxiter)` for a float32 system, `matvec`
 /// the operator `A @ v`, from x0 = 0 without a preconditioner.
 pub fn cg_f32<F>(
@@ -237,7 +222,7 @@ where
         return Err(SdcError::Invalid(format!(
             "'scipy.sparse.linalg.cg' called with invalid `atol`={}; if set, `atol` must be a \
              real, non-negative number.",
-            py_repr(atol)
+            npy::py_repr(atol)
         )));
     }
     let candidate = rtol * f64::from(bnrm2);
@@ -342,23 +327,31 @@ pub fn ridge_sparse_cg<O: Operator>(
         return Err(SdcError::Invalid(format!(
             "The 'alpha' parameter of Ridge must be a float in the range [0.0, inf) or an \
              array-like. Got {} instead.",
-            py_repr(alpha)
+            npy::py_repr(alpha)
         )));
     }
     if tol.is_nan() || tol < 0.0 {
         return Err(SdcError::Invalid(format!(
             "The 'tol' parameter of Ridge must be a float in the range [0.0, inf). Got {} \
              instead.",
-            py_repr(tol)
+            npy::py_repr(tol)
         )));
     }
     let a32 = alpha as f32;
     let regularised = |t: Vec<f32>, v: &[f32]| -> Vec<f32> {
-        t.into_iter().zip(v).map(|(ti, &vi)| ti + a32 * vi).collect()
+        t.into_iter()
+            .zip(v)
+            .map(|(ti, &vi)| ti + a32 * vi)
+            .collect()
     };
     if n_features > n_samples {
         let res = cg_f32(
-            |v| Ok(regularised(x.matvec(&x.rmatvec(v, n_threads)?, n_threads)?, v)),
+            |v| {
+                Ok(regularised(
+                    x.matvec(&x.rmatvec(v, n_threads)?, n_threads)?,
+                    v,
+                ))
+            },
             y,
             tol,
             0.0,
@@ -373,7 +366,12 @@ pub fn ridge_sparse_cg<O: Operator>(
     } else {
         let b = x.rmatvec(y, n_threads)?;
         let res = cg_f32(
-            |v| Ok(regularised(x.rmatvec(&x.matvec(v, n_threads)?, n_threads)?, v)),
+            |v| {
+                Ok(regularised(
+                    x.rmatvec(&x.matvec(v, n_threads)?, n_threads)?,
+                    v,
+                ))
+            },
             &b,
             tol,
             0.0,
@@ -416,13 +414,15 @@ mod tests {
         let m = csr(&[&[(1, 2.0), (0, 1.0)], &[(1, 3.0)], &[(0, 4.0)]], 2);
         assert_eq!(m.matvec(&[1.0, 10.0], 2).unwrap(), vec![21.0, 30.0, 4.0]);
         assert_eq!(m.rmatvec(&[1.0, 1.0, 1.0], 2).unwrap(), vec![5.0, 5.0]);
-        assert!(CsrOperator::new(Csr {
-            shape: [1, 1],
-            indptr: vec![0, 1],
-            indices: vec![1],
-            data: vec![1.0],
-        })
-        .is_err());
+        assert!(
+            CsrOperator::new(Csr {
+                shape: [1, 1],
+                indptr: vec![0, 1],
+                indices: vec![1],
+                data: vec![1.0],
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -430,7 +430,10 @@ mod tests {
         let m = csr(&[&[(0, 1.0)], &[(1, 1.0)], &[(2, 1.0)]], 3);
         let fit = ridge_sparse_cg(&m, &[1.0, 2.0, 3.0], 0.0, 1e-4, None, 1).unwrap();
         assert_eq!(fit.coef, vec![1.0, 2.0, 3.0]);
-        assert_eq!((fit.info, fit.iterations, fit.system), (0, 1, RidgeSystem::Normal));
+        assert_eq!(
+            (fit.info, fit.iterations, fit.system),
+            (0, 1, RidgeSystem::Normal)
+        );
         // More columns than rows: the kernel system.
         let wide = csr(&[&[(0, 1.0)], &[(1, 1.0)]], 3);
         let fit = ridge_sparse_cg(&wide, &[1.0, 2.0], 0.0, 1e-4, None, 1).unwrap();
@@ -448,8 +451,5 @@ mod tests {
         assert_eq!((r.x, r.info), (vec![0.0, 0.0], 0));
         let e = cg_f32(id, &[1.0], 1e-4, -1e-5, None).unwrap_err();
         assert!(e.to_string().contains("`atol`=-1e-05;"), "{e}");
-        assert_eq!(py_repr(-1.0), "-1.0");
-        assert_eq!(py_repr(1e16), "1e+16");
-        assert_eq!(py_repr(-0.5), "-0.5");
     }
 }

@@ -75,7 +75,7 @@ def blas_core() -> str:
             for i in threadpool_info()
             if i.get("user_api") == "blas"
         )
-    except Exception as e:  # noqa: BLE001 - informational only
+    except Exception as e:
         return f"unknown ({e})"
 
 
@@ -323,7 +323,9 @@ def check_fits() -> None:
         ("synthetic-kernel-3x3x2", (3, 3, 2), (2.0, 2.0, 2.0), HF, 4),
         ("synthetic-single-slice", (32, 30, 1), (3.0, 3.0, 4.0), HF, 5),
     ]:
-        img, field, mask = synthetic(shape, zooms, seed, flips=(-1, 1, 1) if "LAS" in name else (1, 1, 1))
+        img, field, mask = synthetic(
+            shape, zooms, seed, flips=(-1, 1, 1) if "LAS" in name else (1, 1, 1)
+        )
         fit_both(name, img, field, mask, sps)
     for run, node in ORACLE:
         if QUICK and run == "ds002603-sub-01":
@@ -338,7 +340,9 @@ def check_fits() -> None:
         mask = np.asanyarray(nb.load(maskf).dataobj) > 1e-4
         coeffs = sorted((base / "bs_filter").glob("*_coeff000.nii.gz"))
         ref = np.asanyarray(nb.load(coeffs[0]).dataobj).reshape(-1) if coeffs else None
-        fit_both(f"{run}/{node.rsplit('/', 1)[-1]}", fmap, fmap.get_fdata(dtype="float32"), mask, HF, ref)
+        fit_both(
+            f"{run}/{node.rsplit('/', 1)[-1]}", fmap, fmap.get_fdata(dtype="float32"), mask, HF, ref
+        )
 
 
 def main() -> int:

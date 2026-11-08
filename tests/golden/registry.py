@@ -7276,3 +7276,219 @@ def _(ctx: Context) -> dict[str, Any]:
     except fm.FieldmapMetadataError as err:
         out["pipe20.error"] = str(err).split(" (")[0]
     return out
+
+
+# --- SciPy's affine_transform; sdcflows' SyN preprocessing and niworkflows' EPI reference ----
+
+
+@case("py.ndimage.affine_transform", covers=("lx.ndimage.affine_transform",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A general matrix (SciPy 1.16's and 1.15's order of its sums), a diagonal given as a
+    vector (``zoom_shift``) and a homogeneous 4 x 4 matrix, at orders 0, 1 and 3, an integer
+    output and two boundary modes."""
+    data = _ndimage_input()
+    m = np.array([[0.75, 0.125, 0.0], [-0.0625, 0.875, 0.25], [0.03125, 0.0, 1.125]])
+    off = np.array([0.5, -1.25, 0.75])
+    out: dict[str, Any] = {}
+    for order in (0, 1, 3):
+        for spv in ("1.15.3", "1.18.1"):
+            out[f"matrix.{order}.{spv}"] = lx.ndimage.affine_transform(
+                data, m, off, output_shape=(13, 9, 8), order=order, scipy_version=spv
+            )
+        out[f"zoom.{order}"] = lx.ndimage.affine_transform(
+            data, np.array([1 / 3, 0.5, 1.25]), off, output_shape=(20, 18, 6), order=order,
+            mode="nearest",
+        )  # fmt: skip
+    h = np.eye(4)
+    h[:3, :3] = m
+    h[:3, 3] = off
+    out["homogeneous.int16"] = lx.ndimage.affine_transform(
+        data.astype(np.int16), h, output=np.int16, order=0, mode="grid-constant", cval=-3.0
+    )
+    return out
+
+
+def _syn_inputs(ctx: Context) -> dict[str, Any]:
+    """A 4-volume oblique EPI series (beyond 28.6 degrees: sdcflows makes it plumb), a T1w-like
+    head (1.5 mm, axis-aligned), its brain mask, an MNI-to-T1w affine and a coarse prior on the
+    atlas's grid."""
+    shape = SHAPE_HEAD
+    brain = ellipsoid(shape, 4, 5)
+    vols = [
+        np.where(brain, 220 - (40 if v == 0 else 0) + ints(200 + v, shape, 0, 25), ints(209, shape, 0, 6))
+        for v in range(4)
+    ]  # fmt: skip
+    epi = ctx.out("sub-01_task-rest_bold.nii.gz")
+    lx.save((np.stack(vols, axis=-1).astype(np.int16), affine(shape, (2.5, 2.5, 2.75))), epi)
+    ashape = (32, 30, 28)
+    anat = ctx.out("sub-01_desc-preproc_T1w.nii.gz")
+    aff = affine(ashape, (2.25, 2.25, 2.5), oblique=False)
+    lx.save((phantom(ashape, 210).astype(np.int16), aff), anat)
+    mask = ctx.out("sub-01_desc-brain_mask.nii.gz")
+    lx.save((ellipsoid(ashape, 7, 10).astype(np.uint8), aff), mask)
+    xfm = ctx.out("from-MNI_to-T1w.txt")
+    lx.transforms.write(
+        xfm,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([1.0, 0.02, 0.0, -0.01, 1.0, 0.0, 0.0, 0.0, 1.0, 1.5, -2.0, 0.5]),
+            np.array([0.0, 0.0, 0.0]),
+        ),
+    )
+    prior = ctx.out("prior.nii.gz")
+    paff = np.diag([8.0, 8.0, 8.0, 1.0])
+    paff[:3, 3] = (1.0, 1.0, 1.0)
+    lx.save(((ints(211, (32, 32, 32), 0, 8)).astype(np.float32), paff), prior)
+    return {"epi": epi, "anat": anat, "mask": mask, "xfm": xfm, "prior": prior}
+
+
+@case(
+    "py.sdcflows.syn_preprocessing",
+    covers=(
+        "lx.sdcflows.syn_preprocessing_workflow",
+        "lx.sdcflows.deoblique",
+        "lx.sdcflows.reoblique",
+        "lx.sdcflows.set_dtype",
+        "lx.sdcflows.merge_meta",
+        "lx.sdcflows.obliquity",
+        "lx.sdcflows.fmap_atlas",
+        "lx.sdcflows.fmap_atlas_affine",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_syn_preprocessing_wf as fMRIPrep calls it (non-steady states detected, the
+    prior: a synthetic one through sdcflows' atlas affine), Reoblique of its plumb reference, and
+    the atlas's checksum refusing another file."""
+    inp = _syn_inputs(ctx)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = lx.sdcflows.syn_preprocessing_workflow(
+            [inp["epi"]], [{"PhaseEncodingDirection": "j-"}], inp["anat"], inp["mask"], inp["xfm"],
+            out_dir=ctx.out("syn"), auto_bold_nss=True, prior_file=inp["prior"],
+            ants_random_seed=7,
+        )  # fmt: skip
+    out: dict[str, Any] = {
+        name: Nifti(getattr(res, name))
+        for name in ("deob_epi", "sampling_ref", "epi_mask", "anat_ref", "anat_mask", "sd_prior")
+    }
+    out["epi_ref"] = Nifti(res.epi_ref[0])
+    out["xfm"] = lx.transforms.read(res.epi2anat_xfm[0])[0].parameters
+    out["meta"] = np.asarray([ord(c) for c in res.epi_ref[1]["PhaseEncodingDirection"]])
+    out["plumb"] = np.asarray(
+        [lx.sdcflows.obliquity(lx.io.load_nibabel(p).affine).max() > 0.5 for p in (inp["epi"], res.deob_epi)]
+    )  # fmt: skip
+    field = ctx.out("field.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(212, SHAPE_HEAD, -40, 40).astype(np.float32), lx.io.load_nibabel(res.deob_epi).affine, None),
+        field,
+    )  # fmt: skip
+    epi3 = ctx.out("epi3.nii.gz")
+    img = lx.io.load_nibabel(inp["epi"])
+    lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, img.header), epi3)
+    r = lx.sdcflows.reoblique(epi3, res.deob_epi, field, res.epi_mask, out_dir=ctx.out("reob"))
+    out["reob.epi"] = Nifti(r[0])
+    out["reob.field"] = Nifti(r[1])
+    out["reob.mask"] = Nifti(r[2])
+    out["int16"] = np.asarray([lx.sdcflows.set_dtype(epi3) == epi3])
+    out["atlas_affine"] = File(lx.sdcflows.fmap_atlas_affine())
+    old = os.environ.get("LARMORX_SDCFLOWS_ATLAS")
+    os.environ["LARMORX_SDCFLOWS_ATLAS"] = inp["prior"]
+    try:
+        lx.sdcflows.fmap_atlas()
+        refused = False
+    except ValueError:
+        refused = True
+    finally:
+        if old is None:
+            os.environ.pop("LARMORX_SDCFLOWS_ATLAS", None)
+        else:
+            os.environ["LARMORX_SDCFLOWS_ATLAS"] = old
+    out["atlas_refused"] = np.asarray([refused])
+    return out
+
+
+@case(
+    "py.niworkflows.epi_reference",
+    covers=(
+        "lx.niworkflows.epi_reference_workflow",
+        "lx.niworkflows.validate_image",
+        "lx.niworkflows.nonsteady_states_detector",
+        "lx.niworkflows.is_outlier",
+        "lx.niworkflows.binarize",
+        "lx.niworkflows.generate_sampling_reference",
+        "lx.niworkflows.resample_img_nearest",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' ValidateImage (a valid header, a missing sform, no x-form at all),
+    NonsteadyStatesDetector and nipype's is_outlier (PIPE-23 fixed and reproduced), Binarize,
+    GenerateSamplingReference (nilearn 0.14 and 0.11, a field-of-view mask, a target resolution,
+    xform code 4), nilearn 0.11's whole-voxel copy, and init_epi_reference_wf (one input; two
+    need mri_robust_template)."""
+    inp = _syn_inputs(ctx)
+    out: dict[str, Any] = {}
+    img = lx.io.load_nibabel(inp["epi"])
+    hdr = img.header
+    assert hdr is not None
+    for name, fields in (
+        ("valid", {}),
+        ("sform0", {"sform_code": 0}),
+        ("none", {"sform_code": 0, "qform_code": 0}),
+    ):
+        p = ctx.out(f"val_{name}.nii.gz")
+        lx.io.save_nibabel(lx.Image(img.data, img.affine, hdr.replace(**fields)), p)
+        v = lx.niworkflows.validate_image(p, out_dir=ctx.out(f"v_{name}"))
+        out[f"validate.{name}"] = Nifti(v.out_file)
+        out[f"validate.{name}.report"] = File(v.out_report)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        nss = lx.niworkflows.nonsteady_states_detector(inp["epi"], n_volumes=10)
+        out["nss"] = np.asarray([*nss.t_mask, nss.n_dummy])
+        flat = np.asarray([5.0, 5.0, 5.0, 9.0, 5.0], dtype=np.float32)
+        out["is_outlier"] = np.asarray(
+            [
+                lx.niworkflows.is_outlier(np.asarray([9.0, 8.5, 1.0, 1.2, 0.9, 1.1, 1.0])),
+                lx.niworkflows.is_outlier(flat),
+                lx.niworkflows.is_outlier(flat, upstream_defects="reproduce"),
+            ]
+        )
+        b = lx.niworkflows.binarize(inp["prior"], 3.0, out_dir=ctx.out("bin"))
+        out["binarize.masked"] = Nifti(b.out_file)
+        out["binarize.mask"] = Nifti(b.out_mask)
+        for tag, kw in (
+            ("0.14", {}),
+            ("0.11", {"nilearn_version": "0.11.1", "scipy_version": "1.15.3"}),
+            ("fov", {"fov_mask": None}),
+            ("res", {"target_resolution": (2.0, 2.5, 3.0), "xform_code": 4}),
+        ):
+            if "fov_mask" in kw:
+                fm = ctx.out("fov_mask.nii.gz")
+                lx.save((ellipsoid(SHAPE_HEAD, 1, 2).astype(np.uint8), img.affine), fm)
+                kw = {"fov_mask": fm}
+            ref3 = ctx.out(f"epi3_{tag}.nii.gz")
+            lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, hdr), ref3)
+            out[f"sampling.{tag}"] = Nifti(
+                lx.niworkflows.generate_sampling_reference(ref3, inp["anat"], out_dir=ctx.out(f"s_{tag}"), **kw)
+            )  # fmt: skip
+        anat = lx.io.load_nibabel(inp["anat"])
+        shifted = np.array(anat.affine, copy=True)
+        shifted[:3, 3] += (3.0, -1.5, 4.5)
+        copy = lx.niworkflows.resample_img_nearest(
+            anat, shifted, (30, 30, 24), nilearn_version="0.11.1"
+        )
+        out["copy011"] = np.asarray(copy.data)
+        ref = lx.niworkflows.epi_reference_workflow(
+            inp["epi"], auto_bold_nss=True, out_dir=ctx.out("ref")
+        )
+        out["ref"] = Nifti(ref.epi_ref_file)
+        out["ref.n4"] = Nifti(ref.per_run_ref_files[0])
+        out["ref.drift"] = np.asarray(ref.drift_factors[0])
+        try:
+            lx.niworkflows.epi_reference_workflow(
+                [inp["epi"], inp["epi"]], t_masks=[None, None], out_dir=ctx.out("ref2")
+            )
+            two = False
+        except NotImplementedError:
+            two = True
+    out["two_inputs_refused"] = np.asarray([two])
+    return out

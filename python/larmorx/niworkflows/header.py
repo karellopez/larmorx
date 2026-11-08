@@ -166,6 +166,19 @@ def _srow_sform(fields: dict) -> np.ndarray:
     return out
 
 
+def _as_stored(fields: dict) -> dict:
+    """Header fields with the x-form values rounded to the header's storage (``float32`` in
+    NIfTI-1), as nibabel's header holds them after ``set_qform`` / ``set_sform``."""
+    if int(fields.get("version", 1)) != 1:
+        return fields
+    out = dict(fields)
+    for k in ("quatern_b", "quatern_c", "quatern_d", "qoffset_x", "qoffset_y", "qoffset_z"):
+        out[k] = float(np.float32(out[k]))
+    for k in ("pixdim", "srow_x", "srow_y", "srow_z"):
+        out[k] = [float(v) for v in np.asarray(out[k], dtype=np.float32)]
+    return out
+
+
 def _det_is_zero(m: np.ndarray) -> bool:
     """``np.linalg.det(m) == 0`` for a 4 x 4 affine (its last row 0, 0, 0, 1): LAPACK's LU of
     the 3 x 3 block, as numpy computes it, has a zero pivot (``det(-a) = -det(a)`` exactly, so
@@ -179,34 +192,43 @@ def _det_is_zero(m: np.ndarray) -> bool:
 
 
 def _axangle_and_translation(diff: np.ndarray) -> tuple[float, float]:
-    """transforms3d's ``decompose44(diff)`` translation norm and ``mat2axangle`` angle of its
-    rotation (numpy's linear algebra; the report prints two significant digits)."""
+    """transforms3d 0.4.2's ``decompose44(diff)``: the translation's norm and the rotation's
+    angle (``mat2axangle``). The decomposition is computed as transforms3d computes it (numpy's
+    vector dot products: :func:`larmorx._core.numpy_dot`); the rotation's axis comes from
+    ``numpy.linalg.eig`` and the angle from ``math.atan2``, as there. The report prints two
+    significant digits; for a change at the precision of a qform the angle is rounding noise."""
     import math
 
+    from larmorx import _core
+
     t = diff[:-1, -1]
-    rzs = diff[:-1, :-1]
-    zs = np.linalg.cholesky(np.dot(rzs.T, rzs)).T
-    z = np.diag(zs).copy()
-    shears = zs / z[:, np.newaxis]
-    r = np.dot(rzs, np.linalg.inv(zs))
+    m0, m1, m2 = (np.array(c, dtype=np.float64) for c in np.array(diff[:-1, :-1]).T)
+    sx = math.sqrt(np.sum(m0**2))
+    m0 /= sx
+    sx_sxy = _core.numpy_dot(m0, m1)
+    m1 -= sx_sxy * m0
+    sy = math.sqrt(np.sum(m1**2))
+    m1 /= sy
+    sx_sxz = _core.numpy_dot(m0, m2)
+    sy_syz = _core.numpy_dot(m1, m2)
+    m2 -= sx_sxz * m0 + sy_syz * m1
+    sz = math.sqrt(np.sum(m2**2))
+    m2 /= sz
+    r = np.array([m0, m1, m2]).T
     if np.linalg.det(r) < 0:
-        z[0] *= -1
-        zs[0] *= -1
-        r = np.dot(rzs, np.linalg.inv(zs))
-    del shears
-    m = np.asarray(r, dtype=np.float64)
-    lam, w = np.linalg.eig(m.T)
+        r[:, 0] *= -1
+    lam, w = np.linalg.eig(r.T)
     i = np.where(np.abs(lam - 1.0) < 1e-5)[0]
     if not len(i):
         raise ValueError("no unit eigenvector corresponding to eigenvalue 1")
     direction = np.real(w[:, i[-1]]).squeeze()
-    cosa = (np.trace(m) - 1.0) / 2.0
+    cosa = (np.trace(r) - 1.0) / 2.0
     if abs(direction[2]) > 1e-8:
-        sina = (m[1, 0] + (cosa - 1.0) * direction[0] * direction[1]) / direction[2]
+        sina = (r[1, 0] + (cosa - 1.0) * direction[0] * direction[1]) / direction[2]
     elif abs(direction[1]) > 1e-8:
-        sina = (m[0, 2] + (cosa - 1.0) * direction[0] * direction[2]) / direction[1]
+        sina = (r[0, 2] + (cosa - 1.0) * direction[0] * direction[2]) / direction[1]
     else:
-        sina = (m[2, 1] + (cosa - 1.0) * direction[1] * direction[2]) / direction[0]
+        sina = (r[2, 1] + (cosa - 1.0) * direction[1] * direction[2]) / direction[0]
     angle = math.atan2(sina, cosa)
     return angle, float(np.sqrt(np.sum(t * t)))
 
@@ -275,11 +297,13 @@ def validate_image(
         description = '<p class="elem-desc">The sform has been copied from qform.</p>\n'
     elif (valid_sform and sform_code > 0) and (not matching_affines or qform_code == 0):
         fields = set_xform(fields, "qform", sform, sform_code)
-        new_qform = _get_qform(NiftiHeader.from_dict(fields))
+        new_qform = _get_qform(NiftiHeader.from_dict(_as_stored(fields)))
         if valid_qform:
             if np.allclose(new_qform, qform) and qform_code > 0:
                 return unchanged()
-            diff = np.linalg.inv(qform) @ new_qform
+            from larmorx.transforms._linalg import inv, matmul
+
+            diff = matmul(inv(qform), new_qform)
             angle, total_trans = _axangle_and_translation(diff)
             xyz_code = int(fields["xyzt_units"]) % 8
             if xyz_code not in _XYZ_UNITS:

@@ -103,6 +103,13 @@ def epi_reference_workflow(
     files = [os.path.abspath(os.fspath(f)) for f in in_files]
     if not auto_bold_nss and t_masks is not None and len(t_masks) != len(files):
         raise ValueError(f"{len(files)} inputs but {len(t_masks)} t_masks")
+    if len(files) != 1:
+        # StructuralReference runs mri_robust_template for several inputs (each node's output
+        # is one 3D volume, so one input is always the one-file shortcut)
+        raise NotImplementedError(
+            "a reference of several EPI inputs needs FreeSurfer's mri_robust_template "
+            "(niworkflows' StructuralReference), which waits for larmorx's FreeSurfer port"
+        )
     wf = os.path.join(os.path.abspath(os.fspath(out_dir)), "epi_reference_wf")
 
     def node(name: str, i: int | None = None) -> str:

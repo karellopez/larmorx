@@ -354,6 +354,7 @@ def syn_preprocessing_workflow(
     auto_bold_nss: bool = False,
     t1w_inversion: bool = False,
     sd_prior: bool = True,
+    prior_file: str | os.PathLike[str] | None = None,
     ants_random_seed: int | None = None,
     niworkflows_version: str = NIWORKFLOWS_VERSION,
     numpy_version: str = "2.5.4",
@@ -377,7 +378,9 @@ def syn_preprocessing_workflow(
     ``atlas_threshold`` (``Binarize``). The nodes write into ``out_dir`` as nipype's do.
 
     fMRIPrep 25.2.6 calls it with ``auto_bold_nss=True``, its BOLD and SBRef files and their
-    metadata, the T1w and its mask, and the MNI-to-T1w transform. ``ants_random_seed`` is what
+    metadata, the T1w and its mask, and the MNI-to-T1w transform. ``prior_file`` replaces
+    sdcflows' atlas (a larmorx addition, for tests and other priors; its affine to MNI is still
+    sdcflows'). ``ants_random_seed`` is what
     ANTs reads from ``ANTS_RANDOM_SEED`` (fMRIPrep sets it). ``t1w_inversion`` is accepted and
     unused, as in sdcflows. ``debug`` (sdcflows' fast settings: the anatomical image regridded
     to 2 mm with niworkflows' ``RegridToZooms``) waits for that port (``NotImplementedError``).
@@ -523,7 +526,7 @@ def syn_preprocessing_workflow(
         transforms = [*forward, os.fspath(std2anat_xfm), fmap_atlas_affine()]
         prior2epi, commands["prior2epi"] = _apply_transforms(
             node("prior2epi"),
-            fmap_atlas(),
+            os.fspath(prior_file) if prior_file is not None else fmap_atlas(),
             sampling,
             transforms,
             [True, False, False],

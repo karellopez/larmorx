@@ -83,3 +83,23 @@ its `skimage` module (`ball`, `threshold_otsu`, `random_walker`), and numpy's `p
 without a component (SDC-h) and no brain seed after the erosion: errors by default,
 `upstream_defects='reproduce'` gives sdcflows' results (IDs in the part's defects relay).
 
+
+## Part B: the PEPOLAR estimation (`python/larmorx/sdcflows/pepolar.py`, relay 5)
+
+**Ported** in Python (no new Rust; numpy's add-reduce order is `larmorx_core::numpy::reduce`,
+bound as `_core.numpy_add_reduce`) from sdcflows 2.17.1 (Apache-2.0): `utils/epimanip.py`
+(`get_trt`), `interfaces/epi.py` (`GetReadoutTime`, `SelectPEVolumes`, `SortPEBlips`),
+`interfaces/utils.py` (`UniformGrid`, `ReorientImageAndMetadata`, `PadSlices` /
+`_pad_num_slices`), `workflows/fit/pepolar.py` (`init_topup_wf`, `_select_topup_config`,
+`_topup_mats_to_world`), and, for `wiring="2.15"`, sdcflows 2.15.1's `workflows/fit/pepolar.py`
+(identical in 2.15.2); nipype 1.12.0's `interfaces/fsl/epi.py` (`TOPUP`: the command line,
+`_generate_encfile`, `_list_outputs`; Apache-2.0); nitransforms 25.1.0's
+`resampling.apply` (one affine, a 3D image: `tools::affine_coordinates` above) and `io/fsl.py`
+(`FSLLinearTransform.to_ras`, `_fsl_aff_adapt`; MIT). sdcflows' own topup configurations
+(`python/larmorx/sdcflows/data/flirtsch/b02b0.cnf`, `b02b0_quick.cnf`, `b02b0_{1,2,4}_quick.cnf`)
+are copied unchanged from sdcflows 2.17.1's `sdcflows/data/flirtsch/` (Apache-2.0); FSL's
+`b02b0_{1,2,4}.cnf` (FSL Licence) are not shipped (D9). niworkflows' `RobustAverage`,
+`MergeSeries` and `ReorientImage` (with nibabel 5.4.2's `axcodes2ornt`, `aff2axcodes`,
+`ornt_transform`, `as_reoriented`, `squeeze_image`, `four_to_three`, `concat_images`; MIT) are in
+`python/larmorx/niworkflows/` (niworkflows 1.15.4, Apache-2.0; the same in 1.15.2). Switch:
+SDC-12 (`ReorientImageAndMetadata` reorients to the upper-cased code it checked).

@@ -444,6 +444,10 @@ def numpy_percentile_weak(a: np.ndarray, q: float, numpy_version: str) -> float:
     """``numpy.percentile(a, q)`` (linear) with a Python-number ``q`` as numpy
     ``numpy_version`` (``"2.3"``, ``"2.5"``, ...) computes it; the value in the array's type."""
 
+def numpy_add_reduce(a: np.ndarray, numpy_version: str) -> float:
+    """``numpy.add.reduce(a, axis=None)`` of a float32 or float64 array taken in C order, as
+    numpy ``numpy_version`` adds it (pairwise from 2.3; chunks of 8192 before)."""
+
 def numpy_percentile(a: np.ndarray, q: list[float]) -> list[float]:
     """``numpy.percentile(a, q)`` (linear) with a list ``q``: float64 values."""
 

@@ -11,17 +11,42 @@ and scikit-image arithmetic under them.
 
 from larmorx.niworkflows.images import (
     IntraModalMergeResult,
+    RobustAverageResult,
     as_closest_canonical,
+    as_reoriented,
+    four_to_three,
     intra_modal_merge,
     reorient,
+    robust_average,
+    squeeze_image,
 )
-from larmorx.niworkflows.nibabel import IntensityClipResult, intensity_clip
+from larmorx.niworkflows.nibabel import (
+    IntensityClipResult,
+    aff2axcodes,
+    axcodes2ornt,
+    intensity_clip,
+    merge_series,
+    ornt_transform,
+    reorient_file,
+    reorient_image,
+)
 
 __all__ = [
     "IntensityClipResult",
     "IntraModalMergeResult",
+    "RobustAverageResult",
+    "aff2axcodes",
     "as_closest_canonical",
+    "as_reoriented",
+    "axcodes2ornt",
+    "four_to_three",
     "intensity_clip",
     "intra_modal_merge",
+    "merge_series",
+    "ornt_transform",
     "reorient",
+    "reorient_file",
+    "reorient_image",
+    "robust_average",
+    "squeeze_image",
 ]

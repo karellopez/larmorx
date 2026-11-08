@@ -593,6 +593,22 @@ fn numpy_percentile_weak(a: &Bound<'_, PyAny>, q: f64, numpy_version: &str) -> P
     np::quantile::percentile_linear_weak(&v, q, rel).map_err(pct_err)
 }
 
+/// `numpy.add.reduce(a, axis=None)` of a float32 or float64 array whose elements are taken in
+/// C order (a C-contiguous block of a reduction), as numpy release `numpy_version` adds them
+/// (`larmorx_core::numpy::reduce::add_reduce_ordered`: pairwise over the whole array from 2.3,
+/// chunks of 8192 before); the result in the array's type (as a Python float).
+#[pyfunction]
+fn numpy_add_reduce(a: &Bound<'_, PyAny>, numpy_version: &str) -> PyResult<f64> {
+    use larmorx_core::numpy::reduce::{SumOrder, add_reduce_ordered};
+    let order = SumOrder::from_version(numpy_version)
+        .ok_or_else(|| PyValueError::new_err(format!("not a numpy version: {numpy_version:?}")))?;
+    if let Ok(x) = a.extract::<PyReadonlyArrayDyn<'_, f32>>() {
+        return Ok(f64::from(add_reduce_ordered(&float_values(&x), order)));
+    }
+    let x: PyReadonlyArrayDyn<'_, f64> = a.extract()?;
+    Ok(add_reduce_ordered(&float_values(&x), order))
+}
+
 /// `numpy.percentile(a, q)` (linear, `axis=None`) with a list `q`: float64 results.
 #[pyfunction]
 fn numpy_percentile(a: &Bound<'_, PyAny>, q: Vec<f64>) -> PyResult<Vec<f64>> {
@@ -699,6 +715,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ndimage_sum_labels, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_percentile_weak, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_percentile, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_add_reduce, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_median, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_exp_f32, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_clip_f32, m)?)?;

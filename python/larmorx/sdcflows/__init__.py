@@ -34,6 +34,11 @@ Rust (``larmorx-sdcflows``):
 - :func:`brain_masker`, :func:`brain_extraction`, :func:`binary_dilation`, :func:`union`:
   sdcflows' masks (``brain_masker``, ``BrainExtraction``, ``BinaryDilation``, ``Union``), with
   scikit-image's random walker (:mod:`larmorx.skimage`).
+- :func:`get_trt`, :func:`get_readout_time`, :func:`select_pe_volumes`, :func:`sort_pe_blips`,
+  :func:`uniform_grid`, :func:`pad_slices`, :func:`reorient_image_and_metadata`,
+  :func:`select_topup_config`, :func:`topup_config_file`, :func:`topup_node`,
+  :func:`topup_mats_to_world`, :func:`topup_workflow`: the PEPOLAR estimation
+  (``init_topup_wf`` in sdcflows 2.17.1's and 2.15's wirings, FSL's ``topup`` through ``lx.fsl``).
 - :func:`brainextraction_workflow`, :func:`magnitude_workflow`, :func:`fmap_workflow`:
   ``init_brainextraction_wf``, ``init_magnitude_wf`` and ``init_fmap_wf`` (phase difference
   and direct field maps) as plain functions, each node through larmorx's ports.
@@ -71,6 +76,26 @@ from larmorx.sdcflows.masks import (
     brain_extraction,
     brain_masker,
     union,
+)
+from larmorx.sdcflows.pepolar import (
+    GetReadoutTimeResult,
+    SelectPEVolumesResult,
+    SortPEBlipsResult,
+    TopupNodeResult,
+    TopupWorkflowResult,
+    UniformGridResult,
+    get_readout_time,
+    get_trt,
+    pad_slices,
+    reorient_image_and_metadata,
+    select_pe_volumes,
+    select_topup_config,
+    sort_pe_blips,
+    topup_config_file,
+    topup_mats_to_world,
+    topup_node,
+    topup_workflow,
+    uniform_grid,
 )
 from larmorx.sdcflows.phase import (
     CheckRegisterResult,
@@ -116,10 +141,16 @@ __all__ = [
     "CsrMatrix",
     "DisplacementsResult",
     "FmapWorkflowResult",
+    "GetReadoutTimeResult",
     "MagnitudeWorkflowResult",
     "PhaseResult",
     "PhdiffWorkflowResult",
     "RidgeResult",
+    "SelectPEVolumesResult",
+    "SortPEBlipsResult",
+    "TopupNodeResult",
+    "TopupWorkflowResult",
+    "UniformGridResult",
     "apply_coeffs_field",
     "au2rads",
     "binary_dilation",
@@ -137,16 +168,28 @@ __all__ = [
     "displacements_field_to_fieldmap",
     "fmap_to_disp",
     "fmap_workflow",
+    "get_readout_time",
+    "get_trt",
     "grid_bspline_weights",
     "magnitude_workflow",
+    "pad_slices",
     "phdiff2fmap",
     "phdiff_workflow",
+    "reorient_image_and_metadata",
     "reorient_pedir",
     "resample_to_zooms",
     "rescale_affine",
     "ridge_sparse_cg",
+    "select_pe_volumes",
+    "select_topup_config",
+    "sort_pe_blips",
     "subtract_phases",
     "topup_coeff_reorient",
+    "topup_config_file",
+    "topup_mats_to_world",
+    "topup_node",
+    "topup_workflow",
     "transform_coefficients",
+    "uniform_grid",
     "union",
 ]

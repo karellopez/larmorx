@@ -36,11 +36,11 @@ import os
 import tempfile
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _core, _defects
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nibabel_header import header_for_image, io_orientation, load_nibabel
@@ -49,9 +49,14 @@ from larmorx.io.nifti import NiftiHeader
 
 __all__ = [
     "IntraModalMergeResult",
+    "RobustAverageResult",
     "as_closest_canonical",
+    "as_reoriented",
+    "four_to_three",
     "intra_modal_merge",
     "reorient",
+    "robust_average",
+    "squeeze_image",
 ]
 
 #: The newest numpy release (the arithmetic of ``grand_mean_scaling``'s percentile).
@@ -119,10 +124,18 @@ def as_closest_canonical(img: Image) -> Image:
     the image itself when its axes are already closest to RAS; otherwise its data flipped and
     transposed, the affine composed with the inverse orientation, and the header's
     ``dim_info`` axes moved with them (``Nifti1Image.as_reoriented``)."""
+    return as_reoriented(img, io_orientation(np.asarray(img.affine, dtype=np.float64)))
+
+
+def as_reoriented(img: Image, ornt: Any) -> Image:
+    """nibabel's ``Nifti1Image.as_reoriented(ornt)``: the image itself for the identity;
+    otherwise ``apply_orientation`` of its data, the affine composed with
+    ``inv_ornt_aff(ornt, shape)`` (numpy's ``dot``) and the header made by the image
+    constructor, with the ``dim_info`` axes moved."""
     from larmorx.transforms._linalg import matmul
     from larmorx.transforms.resample import _apply_orientation, _inv_ornt_aff
 
-    ornt = io_orientation(np.asarray(img.affine, dtype=np.float64))
+    ornt = np.asarray(ornt)
     if np.array_equal(ornt, _IDENTITY_ORNT):
         return img
     data = _apply_orientation(np.asanyarray(img.data), ornt)
@@ -162,6 +175,21 @@ def _constructed(img: Image, data: np.ndarray) -> Image:
     return Image(data, img.affine, NiftiHeader.from_dict(fields))
 
 
+def squeeze_image(img: Image) -> Image:
+    """nibabel's ``squeeze_image``: trailing axes of length 1 after the third dropped (the
+    image itself when there are none)."""
+    return _squeezed(img)
+
+
+def four_to_three(img: Image) -> list[Image]:
+    """nibabel's ``four_to_three``: the volumes of a 4D image, each made by the image
+    constructor from the 4D header (``ValueError`` for other shapes)."""
+    arr = np.asanyarray(img.data)
+    if arr.ndim != 4:
+        raise ValueError("Expecting four dimensions")
+    return [_constructed(img, arr[..., i]) for i in range(arr.shape[3])]
+
+
 def _squeezed(img: Image) -> Image:
     """nibabel's ``squeeze_image``: trailing axes of length 1 after the third dropped."""
     shape = tuple(np.asarray(img.data).shape)
@@ -178,8 +206,8 @@ def _squeezed(img: Image) -> Image:
     return _constructed(img, np.asanyarray(img.data).reshape(shape[:slen]))
 
 
-def _concat(images: Sequence[Image]) -> Image:
-    """nibabel's ``concat_images(images)`` (``axis=None``, affines checked): a ``float64``
+def _concat(images: Sequence[Image], check_affines: bool = True) -> Image:
+    """nibabel's ``concat_images(images, check_affines)`` (``axis=None``): a ``float64``
     array of shape ``(n,) + shape0`` filled with each image's values and rolled to
     ``shape0 + (n,)``, with the first image's affine and header."""
     img0 = images[0]
@@ -196,7 +224,7 @@ def _concat(images: Sequence[Image]) -> Image:
                 f"shape {shape} for image {i} not compatible with first image shape {shape0} "
                 "with axis == None"
             )
-        if not np.all(np.asarray(img.affine, dtype=np.float64) == affine):
+        if check_affines and not np.all(np.asarray(img.affine, dtype=np.float64) == affine):
             raise ValueError(f"Affine for image {i} does not match affine for first image")
         out[i] = np.asanyarray(img.data)
     return _constructed(img0, np.rollaxis(out, 0, out.ndim))
@@ -391,3 +419,197 @@ def _mcflirt(in_file: str, cwd: str, implementation: str) -> tuple[str, tuple[st
         os.path.join(cwd, os.path.basename(out) + ".mat", f"MAT_{t:04d}") for t in range(nvols)
     )
     return out, mats, out + ".par"
+
+
+@dataclass(frozen=True)
+class RobustAverageResult:
+    """``RobustAverage``'s outputs: ``out_file`` (the average: ``<in>_average``, or the input
+    itself for a 3D image, ``<in>_squeezed`` for one volume), ``out_volumes`` (the clipped,
+    drift-corrected volumes it registered: ``<in>_sliced``, or the input), ``out_drift`` (the
+    global signal's drift per volume), ``out_hmc`` (3dvolreg's ``.aff12.1D`` matrices, or
+    mcflirt's matrices with ``mc_method="FSL"``) and ``out_hmc_volumes`` (the registered
+    series). Paths are ``None`` when nothing was written (no ``out_dir``) or not produced."""
+
+    out_file: str | None
+    out_volumes: str | None
+    out_drift: tuple[float, ...]
+    out_hmc: str | tuple[str, ...] | None = None
+    out_hmc_volumes: str | None = None
+
+
+def _gs_drift(data: np.ndarray, numpy_version: str) -> np.ndarray:
+    """``np.mean(data, axis=(0, 1, 2))`` of the ``float32`` series ``concat_images`` made (its
+    fourth axis outermost in memory, each volume a C-ordered block): each volume's values
+    summed in numpy ``numpy_version``'s order (pairwise over the block from numpy 2.3, in chunks
+    of 8192 before), divided by the count in ``float64`` and cast to ``float32``."""
+    count = np.float64(int(np.prod(data.shape[:3])))
+    sums = [
+        _core.numpy_add_reduce(np.ascontiguousarray(data[..., t]), numpy_version)
+        for t in range(data.shape[3])
+    ]
+    return (np.asarray(sums, dtype=np.float32).astype(np.float64) / count).astype(np.float32)
+
+
+def _volreg_nipype(
+    in_file: str,
+    cwd: str,
+    two_pass: bool,
+    num_threads: int | None,
+    implementation: str,
+    upstream_defects: str,
+) -> tuple[str, str]:
+    """nipype's ``Volreg(in_file, interp='Fourier', args='-twopass', zpad=4,
+    outputtype='NIFTI_GZ')`` run in ``cwd``: ``3dvolreg -twopass -Fourier -1Dfile <stem>.1D
+    -1Dmatrix_save <stem>.aff12.1D -prefix <stem>_volreg.nii.gz -zpad 4 -maxdisp1D
+    <stem>_md.1D <in>`` (``-twopass`` only with ``two_pass``), through larmorx's 3dvolreg (the
+    bit-exact replica by default). The registered series and the matrices file."""
+    from larmorx.afni import _common
+    from larmorx.afni.volreg import _run_original
+    from larmorx.sdcflows.approx import _split_filename
+
+    stem = _split_filename(in_file)[1]
+    names = {
+        "oned": f"{stem}.1D",
+        "mat": f"{stem}.aff12.1D",
+        "out": f"{stem}_volreg.nii.gz",
+        "md": f"{stem}_md.1D",
+    }
+    selected = _replica.select("afni", "3dvolreg", implementation)
+    at = (lambda n: n) if selected is not None else (lambda n: os.path.join(cwd, n))
+    argv = ["-twopass"] if two_pass else []
+    argv += ["-Fourier", "-1Dfile", at(names["oned"]), "-1Dmatrix_save", at(names["mat"])]
+    argv += ["-prefix", at(names["out"]), "-zpad", "4", "-maxdisp1D", at(names["md"]), in_file]
+    threads = 1 if num_threads is None else max(int(num_threads), 1)
+    if selected is None:
+        _run_original(argv, threads, upstream_defects, {})
+    else:
+        _common.run_replica(
+            selected, argv, cwd, n_threads=threads, upstream_defects=upstream_defects, settings={}
+        )
+    return os.path.join(cwd, names["out"]), os.path.join(cwd, names["mat"])
+
+
+def _mcflirt_sinc(in_file: str, cwd: str, implementation: str) -> str:
+    """nipype's ``MCFLIRT(in_file, ref_vol=0, interpolation='sinc')`` in ``cwd``: ``mcflirt -in
+    <in> -out <cwd>/<in>_mcf.nii.gz -refvol 0 -sinc_final`` through larmorx's ``fsl
+    mcflirt``; the corrected series."""
+    import io
+
+    from larmorx import cli
+
+    out = _fname_presuffix(in_file, "_mcf", cwd)
+    for ext in (".nii.gz", ".nii"):
+        if out.endswith(ext):
+            out = out[: -len(ext)] + ".nii.gz"
+            break
+    argv = ["larmorx", "fsl", "mcflirt", "-in", in_file, "-out", out, "-refvol", "0"]
+    argv += ["-sinc_final"]
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+        code = cli.run(argv, implementation=implementation)
+    if code != 0:
+        raise RuntimeError(f"mcflirt failed (exit {code}): {err.getvalue().strip()}")
+    return out
+
+
+def robust_average(
+    in_file: str | os.PathLike[str],
+    t_mask: Sequence[bool] | None = None,
+    mc_method: Literal["AFNI", "FSL"] | None = "AFNI",
+    nonnegative: bool = True,
+    two_pass: bool = True,
+    *,
+    num_threads: int | None = None,
+    out_dir: str | os.PathLike[str] | None = None,
+    numpy_version: str = NUMPY_NEWEST,
+    volreg_implementation: str = "auto",
+    mcflirt_implementation: str = "auto",
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> RobustAverageResult:
+    """niworkflows' ``RobustAverage``: a robust average of a series.
+
+    - A 3D image is the result itself; a series of one volume (after nibabel's
+      ``squeeze_image``) is written as ``<in>_squeezed``.
+    - Otherwise the volumes of ``t_mask`` (all by default; its length must be the series',
+      and it must keep one volume: ``ValueError``s) are gathered (nibabel's ``four_to_three``
+      and ``concat_images``), read as ``float32``, clipped to ``[0, p99.8]`` (``[p0.2, p99.8]``
+      without ``nonnegative``; numpy ``numpy_version``'s percentile), divided by the global
+      signal's drift (each volume's mean over the brightest's, numpy's summation order:
+      :func:`_gs_drift`), clipped again, and written as ``<in>_sliced`` with the input's
+      header (its extensions cleared).
+    - One volume kept: the gathered volume is the average. Otherwise the volumes are
+      registered: AFNI's ``3dvolreg -Fourier [-twopass] -zpad 4`` with nipype's output names
+      (``mc_method="AFNI"``, the default; ``volreg_implementation``) or FSL's ``mcflirt -refvol
+      0 -sinc_final`` (``"FSL"``), or not at all (``None``); the result clipped once more and
+      its median over the volumes written as ``<in>_average`` with the gathered volumes' header.
+
+    ``num_threads`` is nipype's (3dvolreg's ``OMP_NUM_THREADS``: no effect on its result).
+    Files go into ``out_dir`` (nipype's node directory), else into a temporary directory."""
+    _defects.check(upstream_defects)
+    in_file = os.fspath(in_file)
+    with _workdir(out_dir) as (cwd, keep):
+
+        def kept(p: Any) -> Any:
+            return p if keep or p is None or p == in_file else None
+
+        img = load_nibabel(in_file)
+        if np.asarray(img.data).ndim == 3:
+            return RobustAverageResult(in_file, in_file, (1.0,))
+        if img.header is not None:
+            img = img.replace(header=img.header.replace(extensions=()))
+        img = _squeezed(img)
+        if np.asarray(img.data).ndim == 3:
+            out = _fname_presuffix(in_file, "_squeezed", cwd)
+            save_nibabel(img, out, n_threads=n_threads)
+            return RobustAverageResult(kept(out), in_file, (1.0,))
+        img_len = int(img.shape[3])
+        mask = [True] * img_len if t_mask is None else list(t_mask)
+        if len(mask) != img_len:
+            raise ValueError(f"Image length ({img_len} timepoints) unmatched by mask ({len(mask)})")
+        n_volumes = sum(mask)
+        if n_volumes < 1:
+            raise ValueError("At least one volume should be selected for slicing")
+        out_file = _fname_presuffix(in_file, "_average", cwd)
+        out_volumes = _fname_presuffix(in_file, "_sliced", cwd)
+        sliced = _concat([v for v, t in zip(four_to_three(img), mask, strict=False) if t])
+        data = np.asarray(sliced.data, dtype=np.float32)
+        flat = np.ascontiguousarray(data).reshape(-1)
+        hi = np.float32(_core.numpy_percentile_weak(flat, 99.8, numpy_version))
+        lo = (
+            0.0
+            if nonnegative
+            else np.float32(_core.numpy_percentile_weak(flat, 0.2, numpy_version))
+        )
+        data = np.clip(data, a_min=lo, a_max=hi)
+        gs_drift = _gs_drift(data, numpy_version)
+        gs_drift /= gs_drift.max()
+        drift = tuple(float(i) for i in gs_drift)
+        data /= gs_drift
+        data = np.clip(data, a_min=0.0 if nonnegative else data.min(), a_max=data.max())
+        save_nibabel(_constructed(sliced, data), out_volumes, n_threads=n_threads)
+        if n_volumes == 1:
+            save_nibabel(_squeezed(sliced), out_file, n_threads=n_threads)
+            return RobustAverageResult(kept(out_file), kept(out_volumes), (1.0,))
+        out_hmc: str | tuple[str, ...] | None = None
+        out_hmc_volumes = None
+        if mc_method == "AFNI":
+            out_hmc_volumes, out_hmc = _volreg_nipype(
+                out_volumes, cwd, two_pass, num_threads, volreg_implementation, upstream_defects
+            )
+        elif mc_method == "FSL":
+            out_hmc_volumes = _mcflirt_sinc(out_volumes, cwd, mcflirt_implementation)
+        elif mc_method is not None:
+            raise ValueError(f"mc_method must be 'AFNI', 'FSL' or None, not {mc_method!r}")
+        if out_hmc_volumes is not None:
+            data = np.asarray(load_nibabel(out_hmc_volumes, dtype=np.float32).data)
+        data = np.clip(data, a_min=0.0 if nonnegative else data.min(), a_max=data.max())
+        median = np.asarray(_core.numpy_median(data, axis=3))
+        save_nibabel(_constructed(sliced, median), out_file, n_threads=n_threads)
+        return RobustAverageResult(
+            kept(out_file),
+            kept(out_volumes),
+            drift,
+            kept(out_hmc),
+            kept(out_hmc_volumes),
+        )

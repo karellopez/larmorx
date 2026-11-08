@@ -194,16 +194,16 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
 - **The record** [`tedana-t2smap-replica`](../validation/tedana-t2smap-replica.md) (the parity
   suite, tedana 26.0.3 as a program through the oracle-output cache, in both library
   environments: numpy 2.5.4 / SciPy 1.18.1 and numpy 2.3.5 / SciPy 1.15.3, OpenBLAS on its
-  Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread): 51 cases, 34 bit-identical
+  Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread): 69 cases, 44 bit-identical
   (every output file, header, log line and Python warning, the exit status and the last error
-  line), 17 rejected by both alike, 0 failures: fMRIPrep's four multi-echo calls (ds003592,
+  line), 25 rejected by both alike, 0 failures: fMRIPrep's four multi-echo calls (ds003592,
   ds000210's two tasks and ds000258 with curvefit, ds003592's with loglin), 32 synthetic cases
   (every option and path: no mask, scaled int16, z-concatenated, PAID, `--fitmode ts`,
   `--verbose`, nine echoes, one volume, existing outputs) and the failure cases of every defect;
   each case's D13 fix pass (a defect named exactly where the default changes an output); tedana's
   own step between the releases and its spread (numpy's AVX-512 kernels, threads, tedana 25.0.1
   in fMRIPrep's image) reported; fMRIPrep's own files compared with tedana 26.0.3's and with the
-  default's. The random-testing fixes below came after it; the permanent cases join it.
+  default's; and random testing's 18 permanent cases (below).
 - **Random testing** (`difftest --tools tedana-t2smap`, [the descriptor](../validation/difftest.md)):
   the trial (30 minutes, 3,886 random cases: two to six echoes, every option, data type, file form,
   geometry and special sample) found 59 differences and 11 imprecise notices, all fixed (nibabel's

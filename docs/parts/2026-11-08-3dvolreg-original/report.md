@@ -63,3 +63,23 @@ AFNI-86..99 one-line descriptions (two name AFNI routines); relays 3 to 5 their 
 diff hunk header one fragment of another tool's (GLIBC-07) entry; relay 3 the spec model's scripts with `--help`
 (run, not read); relay 5 a draft import line of another tool's evidence module, never run; relay 6 its own transcript
 metadata and the field maps relay's description line.
+
+### Merge notes (the orchestrator, 2026-11-08)
+- Merged into main d742dc58 without conflicts. The site's `volreg-original-pages` (ab94b11c) into the site's main
+  e4b3757 (b9d118cc); `evidence-blobs` 1b956fc → a4fa3b63 (the manifest's SHA-256 f8a73e3c4db1bb65 matches; no blob
+  replaced, 13 added).
+- HANDOFF.toml's 55 operations applied (10 files); `register_counts.py` 421 entries (no gap marked "original" left;
+  the counts line's date); `tables --site`, `tables --check`, the summary re-exported; the site build 0 problems. Two
+  stale texts corrected: the site's planned FSL line (PRELUDE's clean-room original done; FNIRT and its family after
+  FreeSurfer) and the register's D13 paragraph ("PRELUDE's clean-room original is the next part").
+- The clean-room audit's merge step: 8 agents archived. It first stopped on relay 3's commit 17a186cc, which no agent's
+  record made: the command carrying its subject started 30 s before the commit (a wheel build and the formatters
+  first, in the background) and the attribution's window opened 15 s before. The window for a command carrying the
+  commit's subject now opens 30 minutes before (as for a printed hash), with a test, and the summary no longer stops
+  on an unattributed commit. Re-run: 0 blocking; six items judged in `judgements.toml` (the part's own scratch and
+  triage entries, the handoff relay's own metadata, one register heading); 3dvolreg's verdict "clean".
+- Verified (`verify-merge.sh` on 5e66d1e2, 10:10-10:43, 8 threads): the three Rust workspaces' gates, the GPL and nc
+  builds, the Python gates, the smoke tier and golden (every checksum unchanged, only the header); re-runs against the
+  committed records, no status or detail differs: `afni-volreg-original` 251/251, `afni-volreg-replica` 190/190,
+  `afni-tshift` 317/317, `afni-automask` 130/130, `afni-unifize` 129/129 (the shared output code changed); 3dvolreg's
+  page and the summary re-exported unchanged.

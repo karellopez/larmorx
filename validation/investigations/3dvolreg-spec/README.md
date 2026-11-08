@@ -64,7 +64,8 @@ resampling (`TIES = "random:<seed>"`: AFNI decides each resampling its own way, 
 `-wtinp`. `thresholds.py` holds the revised §14.3 (each registered volume's limit from its own
 rotation, fMRIPrep's median held to the limit its volumes imply, the nearest-neighbour rule for
 `-final NN`) on 21 cases with six tie choices each, fMRIPrep's calls on the data panel's runs with
-the most motion and the most ties included: RESULT_THR. `savedisp.py`: §10.3's arithmetic gives
+the most motion and the most ties included: 0 failures in 126 runs (ds005454's six run as six
+calls with `--ties`, each in its own work folder). `savedisp.py`: §10.3's arithmetic gives
 AFNI's nineteen `-SAVEDISP` datasets bit for bit (0 of 4,815,360 values on `s1`, 0 of 52,920,320
 on ds000005); the textbook forms of the line's coefficients change 3,983 normalised values on
 ds000005. `spread.py` on the trial of 2026-11-08 (a sample of 123 findings and a seeded one of

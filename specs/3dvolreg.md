@@ -1676,7 +1676,11 @@ ill-conditioned fits, the tie re-examination, the trial's open verdicts):
   cases: `s1` with `-twopass -Fourier -final NN` and with `-wtinp`, and fMRIPrep's call on the
   data panel's runs with the most motion and the most ties (ds000256 `nofeedback`, ds000228,
   ds004958, ds005454, their inputs re-made by the clean-room suite in fMRIPrep's image).
-  RESULT_THRESHOLDS
+  **0 failures in 126 runs** (21 cases × 6 tie choices). On `nofeedback` the model's volumes use
+  up to 0.68 of `L_v` like AFNI's own variants, its median's mean 1.2e-4 to 8.7e-4 against
+  `L_med` = 5.2e-3 (its largest voxel 1.4e-2 to 2.0e-2); on ds005454 the median's largest voxel
+  is 1.1e-4 to 1.9e-4 (the earlier 1e-4 would fail every tie choice); `-final NN`: 55,946 to
+  93,145 differing voxels per tie choice, none against the nearest-neighbour rule.
 - `savedisp.py`: §10.3's arithmetic applied to AFNI's own `-savedisp` values against AFNI's
   `-SAVEDISP` datasets: 0 of 4,815,360 values differ on `s1`, 0 of 52,920,320 on ds000005 (the
   textbook forms of the line's coefficients: 3,983 normalised values differ on ds000005);

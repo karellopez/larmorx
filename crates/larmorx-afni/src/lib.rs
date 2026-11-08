@@ -29,6 +29,7 @@ pub mod settings;
 pub mod timing;
 pub mod tshift;
 pub mod unifize;
+pub mod volreg;
 pub mod x87;
 
 pub use dataset::{BrickData, Bricks};

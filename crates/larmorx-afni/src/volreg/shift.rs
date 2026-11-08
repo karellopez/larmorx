@@ -114,7 +114,7 @@ fn weights(method: Method, x: f32) -> ([f32; 8], [i64; 8], usize) {
 /// The integer and fractional parts of the position of a shift by `alpha` (§5.6): `ia` the
 /// floor of `−alpha` (one lower for an exact negative integer), `x = −alpha − ia` in float32.
 /// `None` when the row becomes all zeros.
-fn split(alpha: f32, n: usize) -> Option<(i64, f32)> {
+pub(crate) fn split(alpha: f32, n: usize) -> Option<(i64, f32)> {
     let beta = -alpha;
     if !(beta.abs() < 1.0e9) {
         return None;
@@ -268,6 +268,7 @@ pub struct FourierWork {
     data: Vec<Complex<f64>>,
     scratch: Vec<Complex<f64>>,
     spec: Vec<[f32; 2]>,
+    gspec: Vec<[f32; 2]>,
     /// `2π/L` rounded to float32.
     dk: f32,
 }
@@ -279,7 +280,8 @@ impl FourierWork {
             fft: plan(l),
             data: vec![Complex::new(0.0, 0.0); l],
             scratch: vec![Complex::new(0.0, 0.0); l],
-            spec: vec![[0.0; 2]; l],
+            spec: vec![[0.0; 2]; l / 2 + 1],
+            gspec: vec![[0.0; 2]; l / 2 + 1],
             dk: (2.0 * std::f64::consts::PI / l as f64) as f32,
         }
     }
@@ -331,13 +333,20 @@ pub fn shift_fourier_pair(
     let l = work.l;
     let n = f.len();
     let half = l / 2;
-    for (m, d) in work.data.iter_mut().enumerate() {
-        let re = if m < n { f64::from(f[m]) } else { 0.0 };
-        let im = match &g {
-            Some(g) if m < n => f64::from(g[m]),
-            _ => 0.0,
-        };
-        *d = Complex::new(re, im);
+    match &g {
+        Some(g) => {
+            for ((d, &a), &b) in work.data.iter_mut().zip(f.iter()).zip(g.iter()) {
+                *d = Complex::new(f64::from(a), f64::from(b));
+            }
+        }
+        None => {
+            for (d, &a) in work.data.iter_mut().zip(f.iter()) {
+                *d = Complex::new(f64::from(a), 0.0);
+            }
+        }
+    }
+    for d in &mut work.data[n..] {
+        *d = Complex::new(0.0, 0.0);
     }
     work.fft.forward(&mut work.data, &mut work.scratch);
     let x = |k: usize| -> [f32; 2] {
@@ -346,7 +355,7 @@ pub fn shift_fourier_pair(
     };
     // Separate the two spectra (each twice its size): F in `spec`, G in `scratch`'s first half.
     let mut fs = std::mem::take(&mut work.spec);
-    let mut gs = vec![[0f32; 2]; half + 1];
+    let mut gs = std::mem::take(&mut work.gspec);
     let x0 = x(0);
     fs[0] = [2.0 * x0[0], 0.0];
     gs[0] = [2.0 * x0[1], 0.0];
@@ -369,6 +378,7 @@ pub fn shift_fourier_pair(
     }
     work.data[half] = Complex::new(f64::from(fs[half][0]), f64::from(gs[half][0]));
     work.spec = fs;
+    work.gspec = gs;
     work.fft.inverse(&mut work.data, &mut work.scratch);
     let factor = 0.5f32 / l as f32;
     for m in 0..n {

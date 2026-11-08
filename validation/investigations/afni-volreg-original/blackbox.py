@@ -199,6 +199,8 @@ def _lines(text: bytes) -> list[str]:
             continue
         if line.startswith("++ implementation:") or line.startswith("++ upstream defects:"):
             continue
+        if "upstream defect AFNI-" in line or "upstream defect GLIBC-" in line:
+            continue
         line = re.sub(r"CPU time for (\w+ pass|realignment)=\S+ s", r"CPU time for \1=0 s", line)
         line = re.sub(r"\[=\S+ s/sub-brick\]", "[=0 s/sub-brick]", line)
         out.append(line)

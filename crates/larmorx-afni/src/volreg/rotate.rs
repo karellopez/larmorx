@@ -404,7 +404,7 @@ fn flip(v: &mut [f32], dims: [usize; 3], a: usize, b: usize) {
 }
 
 /// The float32 coefficients of a shear and whether it is skipped (§5.5).
-fn coefficients(sh: &Shear, dims: [usize; 3]) -> Option<(f32, f32, f32, [f32; 2])> {
+pub(crate) fn coefficients(sh: &Shear, dims: [usize; 3]) -> Option<(f32, f32, f32, [f32; 2])> {
     let (a, b, s) = (sh.a as f32, sh.b as f32, sh.s as f32);
     let others: Vec<usize> = (0..3).filter(|&x| x != sh.axis).collect();
     let centre = [0, 1].map(|m| 0.5f32 * (dims[others[m]] as f32 - 1.0));

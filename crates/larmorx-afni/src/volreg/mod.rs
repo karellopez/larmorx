@@ -430,14 +430,11 @@ fn run_in_pool(
             &mut messages,
         );
         twopass_blur(&mut b1, n, p.twoblur, &blur);
+        let searcher = coarse_on.then(|| coarse::Searcher::new(&b1, n, sizes, &coarse_settings));
         let search = |v: &[f32]| -> Found {
-            if !coarse_on {
-                return Found::default();
-            }
-            if coarse_settings.rotations {
-                coarse::rotation_and_shift(v, &b1, n, sizes, &coarse_settings)
-            } else {
-                coarse::shift_only(v, &b1, n, &coarse_settings)
+            match &searcher {
+                Some(s) => s.search(v),
+                None => Found::default(),
             }
         };
         let initial = |f: &Found| -> Option<[f32; 6]> {

@@ -14,8 +14,8 @@ use crate::automask::{self, MaskSettings};
 
 use super::blur::{self, BlurSettings};
 use super::grid::M3;
-use super::rotate::{Resampler, Transform, Trig, Work, rot3};
-use super::shift::Method;
+use super::rotate::{self, Transform, Trig, rot3};
+use super::shift;
 
 /// The coarse search's settings.
 #[derive(Clone, Copy, Debug)]
@@ -130,28 +130,35 @@ fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
     }
 }
 
-/// The scores of `cands` for the volume `v` over `reg` (eight candidates per sweep).
+/// The scores of `cands` for the volume `v` over `reg`, eight candidates per sweep (sixteen
+/// independent float32 chains, each summed in AFNI's order).
 fn scores(v: &[f32], reg: &Region, cands: &[[i32; 3]], n: [usize; 3], weighted: bool) -> Vec<f32> {
+    const B: usize = 8;
     let [nx, ny, _] = n;
-    let off: Vec<i64> = cands
+    let off: Vec<isize> = cands
         .iter()
-        .map(|c| i64::from(c[0]) + nx as i64 * (i64::from(c[1]) + ny as i64 * i64::from(c[2])))
+        .map(|c| c[0] as isize + nx as isize * (c[1] as isize + ny as isize * c[2] as isize))
         .collect();
     let mut out = Vec::with_capacity(cands.len());
-    for chunk in off.chunks(8) {
+    for chunk in off.chunks(B) {
         let m = chunk.len();
-        let mut svv = [0f32; 8];
-        let mut sbv = [0f32; 8];
-        for (t, &p) in reg.idx.iter().enumerate() {
-            let (wv, wbv) = (reg.w[t], reg.wb[t]);
-            for c in 0..m {
-                let x = v[(p as i64 - chunk[c]) as usize];
-                if weighted {
-                    svv[c] += (wv * x) * x;
-                } else {
-                    svv[c] += x * x;
+        let mut o = [0isize; B];
+        o[..m].copy_from_slice(chunk);
+        let mut svv = [0f32; B];
+        let mut sbv = [0f32; B];
+        for ((&p, &wv), &wbv) in reg.idx.iter().zip(&reg.w).zip(&reg.wb) {
+            let p = p as isize;
+            let x: [f32; B] = std::array::from_fn(|c| v[(p - o[c]) as usize]);
+            if weighted {
+                for c in 0..B {
+                    svv[c] += (wv * x[c]) * x[c];
+                    sbv[c] += wbv * x[c];
                 }
-                sbv[c] += wbv * x;
+            } else {
+                for c in 0..B {
+                    svv[c] += x[c] * x[c];
+                    sbv[c] += wbv * x[c];
+                }
             }
         }
         for c in 0..m {
@@ -171,8 +178,7 @@ fn best_shift(
     v: &[f32],
     reg: &Region,
     n: [usize; 3],
-    del: i32,
-    num: i32,
+    cands: &[[i32; 3]],
     weighted: bool,
     take_empty: bool,
 ) -> ([i32; 3], f32) {
@@ -180,11 +186,10 @@ fn best_shift(
     if reg.empty && !take_empty {
         return best;
     }
-    let cands = candidates(del, num);
     let s = if reg.empty {
         vec![0f32; cands.len()]
     } else {
-        scores(v, reg, &cands, n, weighted)
+        scores(v, reg, cands, n, weighted)
     };
     for (c, sc) in cands.iter().zip(s) {
         if sc < best.1 {
@@ -192,19 +197,6 @@ fn best_shift(
         }
     }
     best
-}
-
-/// The shift-only search (`-nocoarserot`): `v` against `b` without a weight.
-pub fn shift_only(v: &[f32], b: &[f32], n: [usize; 3], s: &CoarseSettings) -> Found {
-    let e = i64::from(s.del) * i64::from(s.num + 1);
-    let reg = region(b, None, n, e);
-    let (shift, _) = best_shift(v, &reg, n, s.del, s.num, false, s.take_empty);
-    Found {
-        angles: [0.0; 3],
-        shift,
-        marks: String::new(),
-        empty_region: reg.empty,
-    }
 }
 
 /// The volume subsampled by 2 (`B'[i,j,k] = B[2i,2j,2k]`) after the coarse blur.
@@ -263,90 +255,320 @@ fn rotation_weight(b: &[f32], n: [usize; 3], s: &CoarseSettings) -> (Vec<f32>, f
     (w, pct)
 }
 
-/// The rotation-and-shift search (the default) of `v` against `b` on a grid of `n` voxels of
-/// sizes `sizes`.
-pub fn rotation_and_shift(
-    v: &[f32],
-    b: &[f32],
-    n: [usize; 3],
-    sizes: [f32; 3],
-    s: &CoarseSettings,
-) -> Found {
-    let mut marks = String::new();
-    let big = n.iter().all(|&d| d >= 120);
-    let (vb, bb, m, del, sizes) = if big {
-        marks.push('x');
-        let (vs, m) = subsample(v, n, &s.blur);
-        let (bs, _) = subsample(b, n, &s.blur);
-        (vs, bs, m, s.del / 2, sizes.map(|d| 2.0 * d))
-    } else {
-        (v.to_vec(), b.to_vec(), n, s.del, sizes)
-    };
-    marks.push('w');
-    let (w, pct) = rotation_weight(&bb, m, s);
-    marks.push_str(&format!("[{}%]", crate::cfmt::f1(f64::from(pct))));
-    let e = i64::from(del) * i64::from(s.num + 1);
-    let reg = region(&bb, Some(&w), m, e);
-    if reg.empty && !s.take_empty {
-        marks.push_str(&".".repeat(45));
-        return Found {
-            angles: [0.0; 3],
-            shift: [0; 3],
-            marks,
-            empty_region: true,
-        };
-    }
-    let mut rotations = Vec::with_capacity(45);
-    for a in -1i32..=1 {
-        for bi in -2i32..=2 {
-            for c in -1i32..=1 {
-                rotations.push([9 * a, 9 * bi, 9 * c]);
-            }
-        }
-    }
-    let resampler = Resampler {
-        method: Method::NN,
-        zpad: s.zpad,
-        trig: s.trig,
-    };
-    let deg = std::f64::consts::PI / 180.0;
-    let results: Vec<([i32; 3], f32)> = rotations
-        .par_iter()
-        .map_init(Work::default, |work, rot| {
-            if *rot == [0, 0, 0] {
-                return best_shift(&vb, &reg, m, del, s.num, true, s.take_empty);
-            }
-            let theta = [0, 1, 2].map(|q| -deg * f64::from(s.signs[q]) * f64::from(rot[q]));
-            let mat: M3 = rot3(s.axes, theta, s.trig);
-            let mut out = vec![0f32; vb.len()];
-            let tf = Transform::Matrix {
-                m: mat,
-                shift: [0.0; 3],
+/// A row of a nearest-neighbour shear whose shift moves it out of the row: all zeros.
+const ZERO_ROW: i32 = i32::MIN;
+
+/// One shear of a nearest-neighbour rotation: its axis and the integer offset `ia` of every row
+/// (§5.6: the sample `i + ia`), indexed by the other two axes in index order, with the pair rule
+/// of §5.5.
+struct NnShear {
+    axis: usize,
+    ia: Vec<i32>,
+}
+
+/// A nearest-neighbour rotation as an index map: the flip and the shears of its plan, on the
+/// padded grid `dims` (padding `z`).
+struct NnPlan {
+    dims: [usize; 3],
+    z: usize,
+    flip: Option<(usize, usize)>,
+    shears: Vec<NnShear>,
+}
+
+impl NnPlan {
+    /// The plan of `p` (from [`rotate::plan`]) on a grid of `n` voxels padded by `z`; `None`
+    /// when the plan has no shears (the volume stays as it was).
+    fn new(p: &rotate::Plan, n: [usize; 3], z: usize) -> Option<NnPlan> {
+        let shears = p.shears.as_ref()?;
+        let dims = n.map(|d| d + 2 * z);
+        let mut out = Vec::new();
+        for sh in shears {
+            let Some((a, b, s, _)) = rotate::coefficients(sh, dims) else {
+                continue;
             };
-            resampler.apply(&vb, m, sizes, &tf, &mut out, work);
-            best_shift(&out, &reg, m, del, s.num, true, s.take_empty)
+            let others: Vec<usize> = (0..3).filter(|&x| x != sh.axis).collect();
+            let (u, w) = (others[0], others[1]);
+            let cu = 0.5f32 * (dims[u] as f32 - 1.0);
+            let cw = 0.5f32 * (dims[w] as f32 - 1.0);
+            let (nu, nw, len) = (dims[u], dims[w], dims[sh.axis]);
+            let mut ia = vec![0i32; nu * nw];
+            let cell = |alpha: f32| match shift::split(alpha, len) {
+                Some((i, _)) => i as i32,
+                None => ZERO_ROW,
+            };
+            for wi in 0..nw {
+                let mut ui = 0;
+                while ui < nu {
+                    let a0 = a * (ui as f32 - cu) + b * (wi as f32 - cw) + s;
+                    ia[ui + nu * wi] = cell(a0);
+                    if ui + 1 < nu {
+                        ia[ui + 1 + nu * wi] = cell(a0 + a);
+                    }
+                    ui += 2;
+                }
+            }
+            out.push(NnShear { axis: sh.axis, ia });
+        }
+        Some(NnPlan {
+            dims,
+            z,
+            flip: p.flip,
+            shears: out,
         })
-        .collect();
-    let mut best = 1.0e38f32;
-    let mut found = (0usize, [0i32; 3]);
-    for (q, &(shift, score)) in results.iter().enumerate() {
-        if score < best {
-            best = score;
-            found = (q, shift);
-            marks.push('*');
-        } else {
-            marks.push('.');
+    }
+
+    /// `v` (a volume of `n` voxels) rotated into `out` by the plan's integer row shifts, one
+    /// pass per shear over the padded volume (`bufs`: two padded work volumes).
+    fn apply(&self, v: &[f32], n: [usize; 3], out: &mut [f32], bufs: &mut [Vec<f32>; 2]) {
+        let [px, py, pz] = self.dims;
+        let z = self.z;
+        let total = px * py * pz;
+        let [a, b] = bufs;
+        a.clear();
+        a.resize(total, 0.0);
+        b.clear();
+        b.resize(total, 0.0);
+        for k in 0..n[2] {
+            for j in 0..n[1] {
+                let at = z + px * (j + z + py * (k + z));
+                a[at..at + n[0]].copy_from_slice(&v[n[0] * (j + n[1] * k)..][..n[0]]);
+            }
+        }
+        if let Some((f, g)) = self.flip {
+            let rev = |axis: usize, i: usize| {
+                if axis == f || axis == g {
+                    self.dims[axis] - 1 - i
+                } else {
+                    i
+                }
+            };
+            for k in 0..pz {
+                for j in 0..py {
+                    for i in 0..px {
+                        b[i + px * (j + py * k)] = a[rev(0, i) + px * (rev(1, j) + py * rev(2, k))];
+                    }
+                }
+            }
+            std::mem::swap(a, b);
+        }
+        let plane = px * py;
+        for sh in &self.shears {
+            let (src, dst): (&[f32], &mut [f32]) = (a, b);
+            match sh.axis {
+                0 => {
+                    // Rows along x; the table indexed by (y, z).
+                    for (r, row) in dst.chunks_mut(px).enumerate() {
+                        let ia = sh.ia[r];
+                        let srow = &src[px * r..px * r + px];
+                        row.fill(0.0);
+                        if ia == ZERO_ROW {
+                            continue;
+                        }
+                        let ia = ia as isize;
+                        let lo = (-ia).max(0) as usize;
+                        let hi = (px as isize - ia).min(px as isize).max(0) as usize;
+                        if lo < hi {
+                            let s0 = (lo as isize + ia) as usize;
+                            row[lo..hi].copy_from_slice(&srow[s0..s0 + (hi - lo)]);
+                        }
+                    }
+                }
+                1 => {
+                    // Rows along y; the table indexed by (x, z).
+                    for (k, dpl) in dst.chunks_mut(plane).enumerate() {
+                        let spl = &src[plane * k..plane * (k + 1)];
+                        let tab = &sh.ia[px * k..px * (k + 1)];
+                        for j in 0..py {
+                            let drow = &mut dpl[px * j..px * (j + 1)];
+                            for (i, (d, &ia)) in drow.iter_mut().zip(tab).enumerate() {
+                                let jj = j as i64 + i64::from(ia);
+                                *d = if ia != ZERO_ROW && jj >= 0 && jj < py as i64 {
+                                    spl[i + px * jj as usize]
+                                } else {
+                                    0.0
+                                };
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Rows along z; the table indexed by (x, y).
+                    for (k, dpl) in dst.chunks_mut(plane).enumerate() {
+                        for (q, (d, &ia)) in dpl.iter_mut().zip(&sh.ia).enumerate() {
+                            let kk = k as i64 + i64::from(ia);
+                            *d = if ia != ZERO_ROW && kk >= 0 && kk < pz as i64 {
+                                src[q + plane * kk as usize]
+                            } else {
+                                0.0
+                            };
+                        }
+                    }
+                }
+            }
+            std::mem::swap(a, b);
+        }
+        for k in 0..n[2] {
+            for j in 0..n[1] {
+                let at = z + px * (j + z + py * (k + z));
+                out[n[0] * (j + n[1] * k)..][..n[0]].copy_from_slice(&a[at..at + n[0]]);
+            }
         }
     }
-    let mut shift = found.1;
-    if big {
-        shift = shift.map(|x| 2 * x);
+}
+
+/// A coarse search against one base, prepared once per run (the base's region, weight and sums,
+/// and the 44 rotations' index maps), then run on each volume.
+pub struct Searcher {
+    settings: CoarseSettings,
+    n: [usize; 3],
+    cands: Vec<[i32; 3]>,
+    reg: Region,
+    /// The rotation search: the grid searched (subsampled when every axis has 120 voxels or
+    /// more), the weight's percentage, and the 45 rotations with their maps (`None`: identity,
+    /// or a rotation that leaves the volume unchanged).
+    rotations: Option<Rotations>,
+}
+
+struct Rotations {
+    big: bool,
+    m: [usize; 3],
+    pct: f32,
+    angles: Vec<[i32; 3]>,
+    plans: Vec<Option<NnPlan>>,
+}
+
+impl Searcher {
+    /// The search of §8.6 against the base `b` (a volume of `n` voxels of sizes `sizes`).
+    pub fn new(b: &[f32], n: [usize; 3], sizes: [f32; 3], s: &CoarseSettings) -> Searcher {
+        if !s.rotations {
+            let e = i64::from(s.del) * i64::from(s.num + 1);
+            return Searcher {
+                settings: *s,
+                n,
+                cands: candidates(s.del, s.num),
+                reg: region(b, None, n, e),
+                rotations: None,
+            };
+        }
+        let big = n.iter().all(|&d| d >= 120);
+        let (bb, m, del, sizes) = if big {
+            let (bs, m) = subsample(b, n, &s.blur);
+            (bs, m, s.del / 2, sizes.map(|d| 2.0 * d))
+        } else {
+            (b.to_vec(), n, s.del, sizes)
+        };
+        let (w, pct) = rotation_weight(&bb, m, s);
+        let e = i64::from(del) * i64::from(s.num + 1);
+        let reg = region(&bb, Some(&w), m, e);
+        let mut angles = Vec::with_capacity(45);
+        for a in -1i32..=1 {
+            for bi in -2i32..=2 {
+                for c in -1i32..=1 {
+                    angles.push([9 * a, 9 * bi, 9 * c]);
+                }
+            }
+        }
+        let deg = std::f64::consts::PI / 180.0;
+        let small = m.iter().any(|&d| d < 2);
+        let plans = angles
+            .par_iter()
+            .map(|rot| {
+                if *rot == [0, 0, 0] || small {
+                    return None;
+                }
+                let theta = [0, 1, 2].map(|q| -deg * f64::from(s.signs[q]) * f64::from(rot[q]));
+                let mat: M3 = rot3(s.axes, theta, s.trig);
+                let tf = Transform::Matrix {
+                    m: mat,
+                    shift: [0.0; 3],
+                };
+                let p = rotate::plan(&tf, sizes, s.trig);
+                if p.shears.is_none() {
+                    rotate::NO_SHEARS.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+                NnPlan::new(&p, m, s.zpad)
+            })
+            .collect();
+        Searcher {
+            settings: *s,
+            n,
+            cands: candidates(del, s.num),
+            reg,
+            rotations: Some(Rotations {
+                big,
+                m,
+                pct,
+                angles,
+                plans,
+            }),
+        }
     }
-    Found {
-        angles: rotations[found.0].map(|x| x as f32),
-        shift,
-        marks,
-        empty_region: reg.empty,
+
+    /// The search for the volume `v` (on the base's grid).
+    pub fn search(&self, v: &[f32]) -> Found {
+        let s = &self.settings;
+        let Some(r) = &self.rotations else {
+            let (shift, _) = best_shift(v, &self.reg, self.n, &self.cands, false, s.take_empty);
+            return Found {
+                angles: [0.0; 3],
+                shift,
+                marks: String::new(),
+                empty_region: self.reg.empty,
+            };
+        };
+        let mut marks = String::new();
+        let vb = if r.big {
+            marks.push('x');
+            subsample(v, self.n, &s.blur).0
+        } else {
+            v.to_vec()
+        };
+        marks.push('w');
+        marks.push_str(&format!("[{}%]", crate::cfmt::f1(f64::from(r.pct))));
+        if self.reg.empty && !s.take_empty {
+            marks.push_str(&".".repeat(45));
+            return Found {
+                angles: [0.0; 3],
+                shift: [0; 3],
+                marks,
+                empty_region: true,
+            };
+        }
+        let results: Vec<([i32; 3], f32)> = r
+            .plans
+            .par_iter()
+            .map_init(
+                || ([Vec::new(), Vec::new()], vec![0f32; vb.len()]),
+                |(bufs, out), plan| match plan {
+                    None => best_shift(&vb, &self.reg, r.m, &self.cands, true, s.take_empty),
+                    Some(p) => {
+                        p.apply(&vb, r.m, out, bufs);
+                        best_shift(out, &self.reg, r.m, &self.cands, true, s.take_empty)
+                    }
+                },
+            )
+            .collect();
+        let mut best = 1.0e38f32;
+        let mut found = (0usize, [0i32; 3]);
+        for (q, &(shift, score)) in results.iter().enumerate() {
+            if score < best {
+                best = score;
+                found = (q, shift);
+                marks.push('*');
+            } else {
+                marks.push('.');
+            }
+        }
+        let mut shift = found.1;
+        if r.big {
+            shift = shift.map(|x| 2 * x);
+        }
+        Found {
+            angles: r.angles[found.0].map(|x| x as f32),
+            shift,
+            marks,
+            empty_region: self.reg.empty,
+        }
     }
 }
 
@@ -381,7 +603,68 @@ mod tests {
             }
         }
         let reg = region(&b, None, n, 4);
-        let (shift, _) = best_shift(&v, &reg, n, 2, 1, false, false);
+        let (shift, _) = best_shift(&v, &reg, n, &candidates(2, 1), false, false);
         assert_eq!(shift, [2, 0, 0]);
+    }
+}
+
+#[cfg(test)]
+mod timing {
+    use super::*;
+
+    /// `cargo test --release -p larmorx-afni coarse_timing -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn coarse_timing() {
+        larmorx_core::parallel::with_threads(1, timed).unwrap();
+    }
+
+    fn timed() {
+        let n = [64usize, 64, 34];
+        let total = n[0] * n[1] * n[2];
+        let b: Vec<f32> = (0..total).map(|p| ((p * 7919) % 1000) as f32).collect();
+        let w: Vec<f32> = (0..total).map(|p| if p % 3 == 0 { 0.0 } else { 0.5 }).collect();
+        let reg = region(&b, Some(&w), n, 6);
+        let cands = candidates(2, 2);
+        let t = std::time::Instant::now();
+        let mut acc = 0.0f32;
+        for _ in 0..45 {
+            acc += scores(&b, &reg, &cands, n, true)[0];
+        }
+        eprintln!("45 x 33 scores over {} voxels: {:?} ({acc})", reg.idx.len(), t.elapsed());
+        let deg = std::f64::consts::PI / 180.0;
+        let mat = rot3([2, 0, 1], [-9.0 * deg, 18.0 * deg, -9.0 * deg], Trig::Correct);
+        let tf = Transform::Matrix { m: mat, shift: [0.0; 3] };
+        let p = rotate::plan(&tf, [3.0, 3.0, 4.0], Trig::Correct);
+        let plan = NnPlan::new(&p, n, 4).unwrap();
+        let mut out = vec![0f32; total];
+        let t = std::time::Instant::now();
+        let mut bufs = [Vec::new(), Vec::new()];
+        for _ in 0..44 {
+            plan.apply(&b, n, &mut out, &mut bufs);
+        }
+        eprintln!("44 NN rotations: {:?}", t.elapsed());
+        let r = rotate::Resampler { method: shift::Method::NN, zpad: 4, trig: Trig::Correct };
+        let mut work = rotate::Work::default();
+        let t = std::time::Instant::now();
+        for _ in 0..44 {
+            r.apply(&b, n, [3.0, 3.0, 4.0], &tf, &mut out, &mut work);
+        }
+        eprintln!("44 NN rotations by shears: {:?}", t.elapsed());
+        for m in [shift::Method::Linear, shift::Method::Heptic, shift::Method::Fourier] {
+            let r = rotate::Resampler { method: m, zpad: 4, trig: Trig::Correct };
+            let t = std::time::Instant::now();
+            for _ in 0..10 {
+                r.apply(&b, n, [3.0, 3.0, 4.0], &tf, &mut out, &mut work);
+            }
+            eprintln!("10 {m:?} rotations: {:?}", t.elapsed());
+        }
+        let bs = BlurSettings { firfac: None, old: false, trig: Trig::Correct };
+        let mut v = b.clone();
+        let t = std::time::Instant::now();
+        for _ in 0..10 {
+            blur::fir(&mut v, n, [2.0; 3], [1.0; 3], 2.5, false, &bs);
+        }
+        eprintln!("10 blurs (sigma 2): {:?}", t.elapsed());
     }
 }

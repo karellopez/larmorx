@@ -27,6 +27,7 @@ mod log;
 mod log_glibc;
 mod logf;
 mod logf_glibc;
+mod logf_numpy;
 mod pow;
 mod pow_glibc;
 mod powf;
@@ -41,7 +42,7 @@ mod tan;
 mod tanh;
 mod tanh_glibc;
 mod tanhf;
-mod x86_nan;
+pub(crate) mod x86_nan;
 
 pub use powi::powi;
 
@@ -168,6 +169,13 @@ glibc_dispatch!(
     /// The natural logarithm for `f32` with glibc 2.35's bits (x86-64, FMA build: `__logf_fma`,
     /// the current symbol `logf@@GLIBC_2.27`; 0.82 ulp).
     logf_glibc::logf_glibc(x: f32) -> f32
+);
+glibc_dispatch!(
+    /// numpy's natural logarithm for `f32` (`numpy.log` on a `float32` array) as numpy 2.x's
+    /// x86-64 builds compute it on CPUs with AVX2 and FMA3 or AVX-512F: numpy's own kernel
+    /// (BSD-3-Clause), not the C library's (at most 3.83 ulp, numpy's measure), for `reproduce`
+    /// only ([`logf`] is the default). tedana's log-linear fit (`logf_numpy.rs`).
+    logf_numpy::logf_numpy(x: f32) -> f32
 );
 glibc_dispatch!(
     /// `e^x` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__expf_fma`; 0.502 ulp).
@@ -389,6 +397,7 @@ mod fma {
     fma_glibc!(sincosf_glibc::cosf_glibc(y: f32) -> f32);
     fma_glibc!(sincosf_glibc::sincosf_glibc(y: f32) -> (f32, f32));
     fma_glibc!(logf_glibc::logf_glibc(x: f32) -> f32);
+    fma_glibc!(logf_numpy::logf_numpy(x: f32) -> f32);
     fma_glibc!(expf_glibc::expf_glibc(x: f32) -> f32);
     fma_glibc!(powf_glibc::powf_glibc(x: f32, y: f32) -> f32);
     fma_glibc!(exp_glibc::exp_glibc(x: f64) -> f64);

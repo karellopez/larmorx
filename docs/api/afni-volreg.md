@@ -75,7 +75,8 @@ rmsnew), `max_displacement` and `max_delta_displacement` (with `maxdisp=True`), 
 (with `save_displacements=True`: the x, y and z displacement series). `lx.afni.fmriprep_volreg_options()`
 gives fMRIPrep's arguments. The arguments are checked before anything runs (`ValueError`);
 AFNI's fatal errors (a base with fewer than 100 non-zero voxels, mismatched grids, ...) are
-`larmorx.ReplicaError`s with AFNI's message.
+`larmorx.ReplicaError`s with AFNI's message from the replica, `ValueError`s with it from the
+original.
 
 ### Option mapping
 

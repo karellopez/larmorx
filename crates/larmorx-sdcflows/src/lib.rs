@@ -13,6 +13,10 @@
 //! - [`bspline`]: the B-spline control grid (`bspline_grid`) and the tensor-product cubic
 //!   B-spline weights of a sampling grid (`grid_bspline_weights`), applied as the collocation
 //!   matrix without storing it ([`bspline::Collocation`]), or stored as scipy's CSR matrix.
+//! - [`blas`]: numpy's float32 dot product and norm over OpenBLAS's Haswell `sdot` kernel.
+//! - [`ridge`]: scikit-learn's ridge regression on a sparse float32 matrix (`sparse_cg`, both
+//!   of its systems) with SciPy's conjugate gradients, on the collocation operator or a stored
+//!   CSR matrix.
 //! - [`npy`]: the numpy element rules this needs (float floor division, `allclose`, `cross`).
 //!
 //! This crate is the **port** (a replica of a permissive upstream, in the main package). The
@@ -20,8 +24,10 @@
 //! another crate.
 #![forbid(unsafe_code)]
 
+pub mod blas;
 pub mod bspline;
 pub mod npy;
+pub mod ridge;
 
 /// An sdcflows function cannot run on its inputs (the Python original raises).
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]

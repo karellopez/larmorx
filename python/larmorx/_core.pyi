@@ -792,3 +792,44 @@ def sdcflows_collocation_apply(
 ) -> np.ndarray:
     """``X @ v`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32 collocation
     matrix, in scipy's summation order, without storing the matrix."""
+
+def sdcflows_dot_f32(x: np.ndarray, y: np.ndarray) -> float:
+    """``np.dot(x, y)`` of two float32 vectors (numpy over OpenBLAS's Haswell ``sdot``)."""
+
+def sdcflows_cg_csr(
+    data: np.ndarray,
+    indices: np.ndarray,
+    indptr: np.ndarray,
+    shape: tuple[int, int],
+    b: np.ndarray,
+    rtol: float = 1e-5,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> tuple[np.ndarray, int, int]:
+    """SciPy's ``cg`` for a float32 CSR matrix: ``(x, info, iterations)``."""
+
+def sdcflows_ridge_csr(
+    data: np.ndarray,
+    indices: np.ndarray,
+    indptr: np.ndarray,
+    shape: tuple[int, int],
+    y: np.ndarray,
+    alpha: float = 1.0,
+    tol: float = 1e-4,
+    max_iter: int | None = None,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, int, int, str]:
+    """scikit-learn's ``Ridge(fit_intercept=False)`` ``sparse_cg`` fit of a float32 CSR
+    matrix: ``(coef, info, iterations, system)``."""
+
+def sdcflows_ridge_collocation(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    y: np.ndarray,
+    alpha: float = 1e-4,
+    tol: float = 1e-4,
+    max_iter: int | None = None,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, int, int, str]:
+    """The same fit on sdcflows' float32 collocation matrix, without storing it."""

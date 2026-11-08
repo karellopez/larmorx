@@ -7,6 +7,9 @@ Rust (``larmorx-sdcflows``):
 
 - :func:`bspline_grid`, :func:`grid_bspline_weights`, :func:`collocation_matrix`: the B-spline
   control grid of a field map and the tensor-product cubic B-spline weights of a sampling grid.
+- :func:`ridge_sparse_cg`: scikit-learn's ridge regression of a sparse float32 matrix (the
+  ``sparse_cg`` solver, with SciPy's conjugate gradients), the fit sdcflows' ``BSplineApprox``
+  runs.
 """
 
 from larmorx.sdcflows.bspline import (
@@ -19,6 +22,7 @@ from larmorx.sdcflows.bspline import (
     collocation_matrix,
     grid_bspline_weights,
 )
+from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
 
 __all__ = [
     "DEFAULT_HF_ZOOMS_MM",
@@ -26,7 +30,9 @@ __all__ = [
     "DEFAULT_ZOOMS_MM",
     "NOT_ALIGNED",
     "CsrMatrix",
+    "RidgeResult",
     "bspline_grid",
     "collocation_matrix",
     "grid_bspline_weights",
+    "ridge_sparse_cg",
 ]

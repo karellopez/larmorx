@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Bindings for `larmorx_sdcflows` (sdcflows' field-map estimation, ported): the B-spline
-//! control grid and the collocation matrix of one or more control grids on a sampling grid.
-//! Matrices are float64 4×4 arrays; the GIL is released while computing.
+//! control grid and the collocation matrix of one or more control grids on a sampling grid;
+//! numpy's float32 dot product (OpenBLAS's Haswell `sdot`), SciPy's `cg` and scikit-learn's
+//! `sparse_cg` ridge solver. Matrices are float64 4×4 arrays; the GIL is released while
+//! computing.
 
 use larmorx_core::linalg::Mat4;
 use larmorx_sdcflows::SdcError;
-use larmorx_sdcflows::bspline::{self, Collocation, WeightType};
+use larmorx_sdcflows::bspline::{self, Collocation, Csr, WeightType};
+use larmorx_sdcflows::ridge::{self, CsrOperator, RidgeFit, RidgeSystem};
+use larmorx_sdcflows::blas;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -164,9 +168,153 @@ fn sdcflows_collocation_apply<'py>(
     Ok(PyArray1::from_vec(py, out))
 }
 
+/// `np.dot(x, y)` of two float32 vectors (numpy's `FLOAT_dot` over OpenBLAS's Haswell `sdot`).
+#[pyfunction]
+fn sdcflows_dot_f32(x: PyReadonlyArray1<'_, f32>, y: PyReadonlyArray1<'_, f32>) -> PyResult<f32> {
+    let (x, y) = (x.as_array(), y.as_array());
+    if x.len() != y.len() {
+        return Err(PyValueError::new_err("shapes not aligned"));
+    }
+    let (x, y): (Vec<f32>, Vec<f32>) = (x.to_vec(), y.to_vec());
+    Ok(blas::dot_f32(&x, &y))
+}
+
+fn csr_from_py(
+    data: PyReadonlyArray1<'_, f32>,
+    indices: PyReadonlyArray1<'_, i64>,
+    indptr: PyReadonlyArray1<'_, i64>,
+    shape: (usize, usize),
+) -> PyResult<Csr<f32>> {
+    let idx = |a: PyReadonlyArray1<'_, i64>| -> PyResult<Vec<usize>> {
+        a.as_array()
+            .iter()
+            .map(|&i| usize::try_from(i).map_err(|_| PyValueError::new_err("negative index")))
+            .collect()
+    };
+    Ok(Csr {
+        shape: [shape.0, shape.1],
+        indptr: idx(indptr)?,
+        indices: idx(indices)?,
+        data: data.as_array().to_vec(),
+    })
+}
+
+fn system_name(s: RidgeSystem) -> &'static str {
+    match s {
+        RidgeSystem::Normal => "normal",
+        RidgeSystem::Kernel => "kernel",
+    }
+}
+
+type FitOut<'py> = (Bound<'py, PyArray1<f32>>, usize, usize, &'static str);
+
+fn fit_out<'py>(py: Python<'py>, fit: RidgeFit) -> FitOut<'py> {
+    (
+        PyArray1::from_vec(py, fit.coef),
+        fit.info,
+        fit.iterations,
+        system_name(fit.system),
+    )
+}
+
+/// SciPy's `cg(A, b, rtol=rtol, atol=atol, maxiter=maxiter)` for a float32 CSR matrix `A`:
+/// `(x, info, iterations)`.
+#[pyfunction]
+#[pyo3(signature = (data, indices, indptr, shape, b, rtol = 1e-5, atol = 0.0, maxiter = None))]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+fn sdcflows_cg_csr<'py>(
+    py: Python<'py>,
+    data: PyReadonlyArray1<'_, f32>,
+    indices: PyReadonlyArray1<'_, i64>,
+    indptr: PyReadonlyArray1<'_, i64>,
+    shape: (usize, usize),
+    b: PyReadonlyArray1<'_, f32>,
+    rtol: f64,
+    atol: f64,
+    maxiter: Option<usize>,
+) -> PyResult<(Bound<'py, PyArray1<f32>>, usize, usize)> {
+    let csr = csr_from_py(data, indices, indptr, shape)?;
+    if shape.0 != shape.1 {
+        return Err(PyValueError::new_err(format!(
+            "expected square matrix, but got shape=({:?},)",
+            shape
+        )));
+    }
+    let b = b.as_array().to_vec();
+    let res = py
+        .detach(|| -> Result<_, SdcError> {
+            let op = CsrOperator::new(csr)?;
+            use ridge::Operator;
+            ridge::cg_f32(|v| op.matvec(v, 1), &b, rtol, atol, maxiter)
+        })
+        .map_err(sdc_err)?;
+    Ok((PyArray1::from_vec(py, res.x), res.info, res.iterations))
+}
+
+/// scikit-learn's `Ridge(alpha, fit_intercept=False, tol=tol, max_iter=max_iter).fit(X, y)
+/// .coef_` for a float32 CSR matrix `X` (the `sparse_cg` solver): `(coef, info, iterations,
+/// system)`, system "normal" or "kernel".
+#[pyfunction]
+#[pyo3(signature = (data, indices, indptr, shape, y, alpha = 1.0, tol = 1e-4, max_iter = None, n_threads = 1))]
+#[allow(clippy::too_many_arguments)]
+fn sdcflows_ridge_csr<'py>(
+    py: Python<'py>,
+    data: PyReadonlyArray1<'_, f32>,
+    indices: PyReadonlyArray1<'_, i64>,
+    indptr: PyReadonlyArray1<'_, i64>,
+    shape: (usize, usize),
+    y: PyReadonlyArray1<'_, f32>,
+    alpha: f64,
+    tol: f64,
+    max_iter: Option<usize>,
+    n_threads: usize,
+) -> PyResult<FitOut<'py>> {
+    let csr = csr_from_py(data, indices, indptr, shape)?;
+    let y = y.as_array().to_vec();
+    let fit = py
+        .detach(|| -> Result<_, SdcError> {
+            let op = CsrOperator::new(csr)?;
+            ridge::ridge_sparse_cg(&op, &y, alpha, tol, max_iter, n_threads)
+        })
+        .map_err(sdc_err)?;
+    Ok(fit_out(py, fit))
+}
+
+/// The same fit on sdcflows' float32 collocation matrix of `levels` on the sampling grid
+/// (`Ridge(alpha, fit_intercept=False).fit(colmat, y)`), applied without storing the matrix.
+#[pyfunction]
+#[pyo3(signature = (target_shape, target_affine, levels, y, alpha = 1e-4, tol = 1e-4, max_iter = None, n_threads = 1))]
+#[allow(clippy::too_many_arguments)]
+fn sdcflows_ridge_collocation<'py>(
+    py: Python<'py>,
+    target_shape: [usize; 3],
+    target_affine: PyReadonlyArray2<'_, f64>,
+    levels: Vec<([usize; 3], PyReadonlyArray2<'_, f64>)>,
+    y: PyReadonlyArray1<'_, f32>,
+    alpha: f64,
+    tol: f64,
+    max_iter: Option<usize>,
+    n_threads: usize,
+) -> PyResult<FitOut<'py>> {
+    let t = mat4(&target_affine)?;
+    let levels = levels_from_py(levels)?;
+    let y = y.as_array().to_vec();
+    let fit = py
+        .detach(|| -> Result<_, SdcError> {
+            let (col, _) = collocation(target_shape, &t, &levels, WeightType::Float32)?;
+            ridge::ridge_sparse_cg(&col, &y, alpha, tol, max_iter, n_threads)
+        })
+        .map_err(sdc_err)?;
+    Ok(fit_out(py, fit))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sdcflows_bspline_grid, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_collocation_csr, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_collocation_apply, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_dot_f32, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_cg_csr, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_ridge_csr, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_ridge_collocation, m)?)?;
     Ok(())
 }

@@ -250,9 +250,7 @@ def volreg(
         if save_displacements:
             outputs += ["-savedisp", out("sd.nii")]
         if selected is None:
-            _run_original(
-                [*args, *outputs, source], n_threads, upstream_defects, settings
-            )
+            _run_original([*args, *outputs, source], n_threads, upstream_defects, settings)
         else:
             _common.run_replica(
                 selected,

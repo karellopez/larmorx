@@ -1240,13 +1240,16 @@ def _(ctx: Context) -> dict[str, Any]:
 
     w, x, y, z = 2.0, 1.0, -1.0, 3.0
     n2 = w * w + x * x + y * y + z * z
-    rot = np.array(
-        [
-            [n2 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-            [2 * (x * y + z * w), n2 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-            [2 * (x * z - y * w), 2 * (y * z + x * w), n2 - 2 * (x * x + y * y)],
-        ]
-    ) / n2
+    rot = (
+        np.array(
+            [
+                [n2 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                [2 * (x * y + z * w), n2 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                [2 * (x * z - y * w), 2 * (y * z + x * w), n2 - 2 * (x * x + y * y)],
+            ]
+        )
+        / n2
+    )
     aff = np.eye(4)
     aff[:3, :3] = rot * np.array([2.5, 2.0, 3.0])
     aff[:3, 3] = [-90.0, 12.5, 33.0]

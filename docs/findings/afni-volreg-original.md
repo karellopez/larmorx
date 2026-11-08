@@ -124,7 +124,7 @@ ties decide (explained); two at the edge of 3 times the spread estimated from 12
 (`triage.py --seeds 36`; explained: the spread is a sampled estimate, as the spec writer found
 cases at its edge too, 6.90 against 6.89 thresholds).
 
-**AFNI-97's first trigger**: the trial found the condition AFNI-97 describes (a Fourier rotation
+**AFNI-97 in the original's trial**: the trial met the condition AFNI-97 describes (a Fourier rotation
 shifting the last of an odd count of rows beyond the row with the previous pair's second shift):
 AFNI's runaway first passes on small uint8 or int16 series with `-Fourier -twopass` (rotations of
 hundreds of degrees), where AFNI crashes and the replica reproduces the crash as an error. The

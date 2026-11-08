@@ -212,6 +212,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "afni-unifize-replica": _unifize,
     # 3dvolreg's replica (2026-11-06): the same counts.
     "afni-volreg-replica": _unifize,
+    # 3dvolreg's clean-room original (2026-11-08): fMRIPrep's calls counted as BET's
+    "afni-volreg-original": _bet,
     "fsl-bet": _bet,
     "fsl-bet-replica": _bet,
     "fsl-bet-replica-full": _bet,

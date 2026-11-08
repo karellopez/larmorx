@@ -285,9 +285,12 @@ file:
   linked; `check_workflows.py` `direct`): the magnitude's and the field map's merges and
   `clipper_pre` are fMRIPrep's files, the brain mask identical in every voxel, but the B-spline
   fit's field differs everywhere by at most 0.067 Hz (scikit-learn's CG on the image's AVX-512
-  `sdot`), where the seven phase-difference fits of the old laptop's runs are bit-identical. To
-  confirm with the records (the image's topup and `BSplineApprox` with and without
-  `OPENBLAS_CORETYPE=Haswell` on one of them).
+  `sdot`), where the seven phase-difference fits of the old laptop's runs are bit-identical.
+  **Confirmed on ds006736** (relay 8): the orchestrator re-made the seven runs with
+  `OPENBLAS_CORETYPE=Haswell` (`oracles/logs/fmap-queue-haswell.log`); on the re-made
+  `ds006736-sub-004-noreconall` the image's topup gives FSL 6.0.7.23's files (7/7 images,
+  `descrip` apart, 2/2 matrices, the field identical in every voxel) and its regrid is
+  fMRIPrep's file again (`check_pepolar.py` `image`). The other re-made runs: relay 8's notes.
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 
@@ -331,9 +334,8 @@ interface 28.5 s, larmorx 12.3-13.1 s (4 threads).
   ro_time`) then applies no field map, although the run has one assigned and the reports name
   its method. The interface documents it as its design ("downstream interfaces should be
   prepared to handle this"), so it is kept; larmorx warns (`fix`). fMRIPrep stops with
-  "Missing readout time information" only when an estimator needs the readout time; the BOLD
-  steps of larmorprepx (relay 8) should stop the same way when a run with a field map has none
-  (to decide there, rule A or B at the pipeline's level).
+  "Missing readout time information" only when an estimator needs the readout time. At the
+  pipeline's level, relay 8 decided rule B (below).
 - **PIPE-22 (rule C, kept).** nitransforms writes ITK text parameters with `"%g"`: six
   significant digits, read back by every later `ReconstructFieldmap`. Measured: the BOLD grid's
   corners move by at most 7.9e-05 mm on the 7 transforms. A correction would bring no measurable
@@ -344,6 +346,53 @@ interface 28.5 s, larmorx 12.3-13.1 s (4 threads).
   arithmetic as `resample_series`' coordinates, so `larmorx_transform::nitransforms` serves
   both. SciPy's `map_coordinates` gets the float32 field (float64 where the sparse product
   upcasts) and returns that type; the header is the target's, with the intent and `cal_max`.
+
+## fMRIPrep's field-map nodes of a BOLD run, composed (relay 8)
+
+`larmorx.pipelines.larmorprepx.fieldmaps` wires the ports as fMRIPrep 25.2.7's BOLD workflows
+wire them: `bold_fit_fieldmap` (`init_bold_fit_wf`'s stage 3 and stage 4's field-map branch:
+`fmapref_buffer`, `fmap_select`, `fmapreg_wf`, `itk_mat2txt`, `boldref_fmap`,
+`distortion_params`, `unwarp_boldref`, `skullstrip_bold_wf`) and `resampling_fieldmap`
+(`bold_native_wf`'s and every `init_bold_volumetric_resample_wf`'s `fmap_select`,
+`distortion_params`, `fmap2target`, `inverses`, `fmap_recon`). Checked by `check_bold_stage.py`
+on fMRIPrep's inputs of the four earlier runs (7 BOLD fits, 21 resampling workflows; and the
+re-made ds006736): **every node file identical to fMRIPrep's in both environments**, with
+fMRIPrep's own `DerivativesDataSink` as the sink (so the later nodes read the derivative files,
+as in fMRIPrep, named as fMRIPrep names them): 14 fits (registering, and with fMRIPrep's
+transform given) × 14 node outputs, 70 `skullstrip_bold_wf` files, the three derivatives; the
+21 resampling workflows' selections, inversion flags, transform lists, distortion parameters
+and field maps. A call of `bold_fit_fieldmap` takes about 1 s (21 calls in 20.5 s, 6 threads).
+
+- **fMRIPrep's later nodes read the derivatives.** `boldref_fmap` reads the `desc-fmap_xfm.txt`
+  derivative (a copy of `itk_mat2txt`'s `out_fwd.tfm`), `skullstrip_bold_wf` the
+  `desc-coreg_boldref` derivative (a copy of `unwarp_boldref`'s image: the header needs no
+  fix), and the BOLD mask downstream is the `desc-brain_mask` derivative, which
+  `DerivativesDataSink` rewrites: fslmaths' float32 mask becomes `uint8` (`np.rint`, its default
+  type for masks). The data the later nodes read are the node files' either way; the names of
+  the skull-stripping files follow the input's. larmorx takes a `sink` callable for these three
+  requests; the port of `DerivativesDataSink` (relay 10) is its first real sink.
+- **niworkflows' log line is wrong** (a candidate for relay 10): `DerivativesDataSink` logs
+  "Changing <file> dtype from float32 to float32" when it converts the mask to `uint8`: its
+  `LOGGER.warning('Changing %s dtype from %s to %s', out_file, orig_dtype, orig_dtype)` names the
+  original type twice. Only the message; the file is right.
+- **The registration's threads do not reach the later nodes.** fMRIPrep's ANTs ran the
+  registration with 8 threads (`NSLOTS`); larmorx gives ANTs' one-thread result: the parameters
+  differ by 1.3e-13 to 6.7e-13 on the earlier runs (4.3e-12 on ds006736), and nitransforms'
+  `"%g"` (PIPE-22) writes the same `out_fwd.tfm` text on all 8: every node after it is
+  fMRIPrep's file even with fMRIPrep's own registration.
+- **PIPE-20 at the pipeline level: rule B.** A BOLD run with a field map whose metadata give no
+  readout time (or no phase-encoding direction) cannot be corrected as asked: fMRIPrep
+  resamples it without the field map while its report names the correction (the summary's
+  distortion-correction line is the estimator's method) and its derivatives' sidecars list the
+  field map among their sources. That is no design pipelines rely on (fMRIPrep itself stops with
+  "Missing readout time information. See documentation for `--fallback-total-readout-time`."
+  when an estimator lacks the readout time, `workflows/base.py`), and the input cannot be
+  completed by larmorx: so a clear error (`FieldmapMetadataError`, fMRIPrep's message, the run
+  and the estimator named), with `--fallback-total-readout-time` (`fallback_total_readout_time`)
+  as the way on. The interface itself (`lx.transforms.distortion_parameters`) keeps its
+  documented undefined outputs (rule C, relay 7). `reproduce` resamples without the field map,
+  as fMRIPrep, with an `UpstreamDefectWarning` (checked: `reproduce` = fMRIPrep's
+  `ResampleSeries` without `ro_time` on the same files).
 
 ## Candidates for the register (the part's defects relay decides them)
 
@@ -362,5 +411,6 @@ interface 28.5 s, larmorx 12.3-13.1 s (4 threads).
   `int16` (PIPE-a).
 - PIPE-18 and PIPE-19 (above) are already numbered and switched in `lx.niworkflows`
   (`intra_modal_merge`), PIPE-20 to PIPE-22 (relay 7) in `lx.transforms` and
-  `lx.niworkflows.concatenate_xfms`; the register's entries and `larmorx_core::defects` wait for
-  the part's defects relay.
+  `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
+  `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8); the register's entries and
+  `larmorx_core::defects` wait for the part's defects relay.

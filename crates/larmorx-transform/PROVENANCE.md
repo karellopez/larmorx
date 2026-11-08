@@ -88,6 +88,16 @@ nitransforms 25.1.0's (MIT) `manip.TransformChain.asaffine`, `linear.Affine.__ma
 `python/larmorx/niworkflows/nitransforms.py` (niworkflows 1.15.4's `interfaces/nitransforms.py`:
 `ConcatenateXFMs`, `concatenate_xfms`, `XFM_FMT`; Apache-2.0, the same in 1.15.2).
 
+**fMRIPrep's field-map nodes of a BOLD run** (field maps part B, relay 8; Python, no new Rust):
+`python/larmorx/pipelines/larmorprepx/fieldmaps.py` ports fMRIPrep 25.2.7's (Apache-2.0; the same
+in 25.2.6) wiring of them as plain functions: `workflows/bold/fit.py` (`init_bold_fit_wf`'s stage 3
+and stage 4's field-map branch, `init_bold_native_wf`'s field-map nodes, `_select_ref`),
+`workflows/bold/apply.py` (`init_bold_volumetric_resample_wf`'s field-map nodes, `_gen_inverses`),
+`workflows/bold/outputs.py` (the `DerivativesDataSink` settings of `init_ds_registration_wf`,
+`init_ds_boldref_wf`, `init_ds_boldmask_wf`), `utils/bids.py` (`dismiss_echo`'s default) and
+`workflows/base.py` (the Jacobian rule, the missing-readout-time message), with niworkflows
+1.15.4's `utils/connections.listify` and nipype 1.12.0's `Merge` (Apache-2.0).
+
 ## numpy's small linear algebra (`numpy_linalg`)
 
 **Ported** from the OpenBLAS 0.3.34 and 0.3.30 release tarballs (BSD-3-Clause; the LAPACK they

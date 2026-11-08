@@ -623,7 +623,9 @@ mod timing {
         let n = [64usize, 64, 34];
         let total = n[0] * n[1] * n[2];
         let b: Vec<f32> = (0..total).map(|p| ((p * 7919) % 1000) as f32).collect();
-        let w: Vec<f32> = (0..total).map(|p| if p % 3 == 0 { 0.0 } else { 0.5 }).collect();
+        let w: Vec<f32> = (0..total)
+            .map(|p| if p % 3 == 0 { 0.0 } else { 0.5 })
+            .collect();
         let reg = region(&b, Some(&w), n, 6);
         let cands = candidates(2, 2);
         let t = std::time::Instant::now();
@@ -631,10 +633,21 @@ mod timing {
         for _ in 0..45 {
             acc += scores(&b, &reg, &cands, n, true)[0];
         }
-        eprintln!("45 x 33 scores over {} voxels: {:?} ({acc})", reg.idx.len(), t.elapsed());
+        eprintln!(
+            "45 x 33 scores over {} voxels: {:?} ({acc})",
+            reg.idx.len(),
+            t.elapsed()
+        );
         let deg = std::f64::consts::PI / 180.0;
-        let mat = rot3([2, 0, 1], [-9.0 * deg, 18.0 * deg, -9.0 * deg], Trig::Correct);
-        let tf = Transform::Matrix { m: mat, shift: [0.0; 3] };
+        let mat = rot3(
+            [2, 0, 1],
+            [-9.0 * deg, 18.0 * deg, -9.0 * deg],
+            Trig::Correct,
+        );
+        let tf = Transform::Matrix {
+            m: mat,
+            shift: [0.0; 3],
+        };
         let p = rotate::plan(&tf, [3.0, 3.0, 4.0], Trig::Correct);
         let plan = NnPlan::new(&p, n, 4).unwrap();
         let mut out = vec![0f32; total];
@@ -644,22 +657,38 @@ mod timing {
             plan.apply(&b, n, &mut out, &mut bufs);
         }
         eprintln!("44 NN rotations: {:?}", t.elapsed());
-        let r = rotate::Resampler { method: shift::Method::NN, zpad: 4, trig: Trig::Correct };
+        let r = rotate::Resampler {
+            method: shift::Method::NN,
+            zpad: 4,
+            trig: Trig::Correct,
+        };
         let mut work = rotate::Work::default();
         let t = std::time::Instant::now();
         for _ in 0..44 {
             r.apply(&b, n, [3.0, 3.0, 4.0], &tf, &mut out, &mut work);
         }
         eprintln!("44 NN rotations by shears: {:?}", t.elapsed());
-        for m in [shift::Method::Linear, shift::Method::Heptic, shift::Method::Fourier] {
-            let r = rotate::Resampler { method: m, zpad: 4, trig: Trig::Correct };
+        for m in [
+            shift::Method::Linear,
+            shift::Method::Heptic,
+            shift::Method::Fourier,
+        ] {
+            let r = rotate::Resampler {
+                method: m,
+                zpad: 4,
+                trig: Trig::Correct,
+            };
             let t = std::time::Instant::now();
             for _ in 0..10 {
                 r.apply(&b, n, [3.0, 3.0, 4.0], &tf, &mut out, &mut work);
             }
             eprintln!("10 {m:?} rotations: {:?}", t.elapsed());
         }
-        let bs = BlurSettings { firfac: None, old: false, trig: Trig::Correct };
+        let bs = BlurSettings {
+            firfac: None,
+            old: false,
+            trig: Trig::Correct,
+        };
         let mut v = b.clone();
         let t = std::time::Instant::now();
         for _ in 0..10 {

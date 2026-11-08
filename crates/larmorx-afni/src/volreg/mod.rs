@@ -19,6 +19,7 @@ pub mod blur;
 pub mod coarse;
 pub mod fit;
 pub mod grid;
+pub mod notices;
 pub mod report;
 pub mod rotate;
 pub mod shift;
@@ -626,19 +627,7 @@ fn run_in_pool(
         }
     }
     if empty_region {
-        let detail = match mode {
-            UpstreamDefects::Fix => {
-                "the coarse search's region has no voxel (an axis of at most \
-                 2*del*(num+1) voxels): no coarse shift or rotation is taken; AFNI scores every \
-                 candidate 0 and takes the first (a shift of -del*num along z, a rotation of -9, \
-                 -18, -9 degrees)"
-            }
-            UpstreamDefects::Reproduce => {
-                "the coarse search's region has no voxel: every \
-                 candidate scores 0 and the first is taken, as AFNI does"
-            }
-        };
-        defects::push_once(&mut notices, Notice::new(&defects::AFNI_93, mode, detail));
+        defects::push_once(&mut notices, notices::afni_93(mode));
     }
 
     // §8.7: the final pass.
@@ -916,17 +905,7 @@ fn run_in_pool(
         rms.push(r.rms);
     }
     if stretched {
-        let detail = match mode {
-            UpstreamDefects::Fix => {
-                "the registered byte volumes are rounded and clamped to \
-                 0..255; AFNI stretches each over 0..255.9 from its own range"
-            }
-            UpstreamDefects::Reproduce => {
-                "each registered byte volume is stretched over \
-                 0..255.9 from its own range, as AFNI does"
-            }
-        };
-        defects::push_once(&mut notices, Notice::new(&defects::AFNI_87, mode, detail));
+        defects::push_once(&mut notices, notices::afni_87(mode));
     }
     // §8.7 step 5: the reported parameters.
     let reported: Vec<[f32; 6]> = fitted
@@ -994,20 +973,7 @@ fn run_in_pool(
             )
         };
         if shown(&md) != shown(&other) {
-            let detail = match mode {
-                UpstreamDefects::Fix => {
-                    "the maximum displacements are those of the voxels \
-                     themselves; AFNI converts the motion to the dataset's axes with their \
-                     signs but not the voxels' positions, so for an axis stored L2R, P2A or S2I \
-                     it reports the displacements of the mirrored positions"
-                }
-                UpstreamDefects::Reproduce => {
-                    "the maximum displacements are those of the \
-                     positions mirrored along the axes stored L2R, P2A or S2I, as AFNI computes \
-                     them"
-                }
-            };
-            defects::push_once(&mut notices, Notice::new(&defects::AFNI_99, mode, detail));
+            defects::push_once(&mut notices, notices::afni_99_maxdisp(mode));
         }
         if verbose {
             let mut line = String::from("++ Max displacements (mm) for each sub-brick:\n");
@@ -1032,9 +998,18 @@ fn run_in_pool(
         )));
         maxdisp = Some(md);
     }
-    let displacements = p
-        .savedisp
-        .then(|| displacement_series(grid, &reported, mode, trig));
+    let displacements = p.savedisp.then(|| {
+        let mine = displacement_series(grid, &reported, mode.reproduce(), trig);
+        let other = displacement_series(grid, &reported, mode.fix(), trig);
+        let differs = mine
+            .iter()
+            .zip(&other)
+            .any(|(a, b)| a.iter().zip(b).any(|(x, y)| x.to_bits() != y.to_bits()));
+        if differs {
+            defects::push_once(&mut notices, notices::afni_99_savedisp(mode));
+        }
+        mine
+    });
     let registered = p.output.then(|| match out_float {
         Some(v) => Bricks {
             shape: bricks.shape,
@@ -1065,7 +1040,7 @@ fn run_in_pool(
 fn displacement_series(
     grid: &Grid,
     reported: &[[f32; 6]],
-    mode: UpstreamDefects,
+    signed: bool,
     trig: Trig,
 ) -> [Vec<f32>; 3] {
     let [nx, ny, nz] = grid.n;
@@ -1078,7 +1053,7 @@ fn displacement_series(
         vec![0f32; total * nt],
     ];
     for (t, p) in reported.iter().enumerate() {
-        let (rd, td) = report::dataset_transform(grid, p, mode.reproduce(), trig);
+        let (rd, td) = report::dataset_transform(grid, p, signed, trig);
         for k in 0..nz {
             for j in 0..ny {
                 for i in 0..nx {

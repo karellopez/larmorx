@@ -19,7 +19,7 @@ use crate::output::refused;
 use crate::settings::{self, AfniSettings, Program, take_global_options_of};
 use crate::timing;
 use crate::volreg::grid::Grid;
-use crate::volreg::{self, Base, Edging, Method, VolregParams, report};
+use crate::volreg::{self, Base, Edging, Method, VolregParams, notices, report};
 
 use super::common::{self, Failure, Target, check_nifti, strtod, strtol_int};
 use super::threads;
@@ -225,19 +225,7 @@ fn open(
 
 /// The AFNI-88 notice and error for an option given last without its value.
 fn needs_value(opt: &str, mode: UpstreamDefects, log: &mut Log<'_>) -> Stop {
-    let verb = match mode {
-        UpstreamDefects::Fix => "corrected",
-        UpstreamDefects::Reproduce => "reproduced",
-    };
-    let _ = verb;
-    log.notice(&Notice::new(
-        &defects::AFNI_88,
-        mode,
-        format!(
-            "{opt} is the last argument and needs a value: AFNI reads past the end of its \
-             arguments (a crash)"
-        ),
-    ));
+    log.notice(&notices::afni_88(opt, mode));
     Stop::Fatal(format!(
         "need argument after {opt} (AFNI-88: AFNI crashes here)"
     ))
@@ -678,31 +666,12 @@ fn parse(
     Ok(o)
 }
 
-/// The AFNI-95 notice.
 fn afni_95(mode: UpstreamDefects) -> Notice {
-    let detail = match mode {
-        UpstreamDefects::Fix => {
-            "a second -base after -base 0: refused; AFNI accepts it (the last \
-                                 -base wins)"
-        }
-        UpstreamDefects::Reproduce => "a second -base after -base 0 replaces it, as AFNI does",
-    };
-    Notice::new(&defects::AFNI_95, mode, detail)
+    notices::afni_95(mode)
 }
 
-/// The AFNI-86 notice.
 fn afni_86(mode: UpstreamDefects) -> Notice {
-    let detail = match mode {
-        UpstreamDefects::Fix => {
-            "-nocoarserot turns the coarse rotation search off, as its help says; AFNI reads it \
-             as -noclip (its first four letters), which turns the clipping off instead"
-        }
-        UpstreamDefects::Reproduce => {
-            "-nocoarserot is read as -noclip (its first four letters): the clipping is turned off \
-             and the coarse rotation search stays on, as AFNI does"
-        }
-    };
-    Notice::new(&defects::AFNI_86, mode, detail)
+    notices::afni_86(mode)
 }
 
 /// `-maxdisp1D`'s delta file: `_delt` before a known extension, else appended.
@@ -1142,13 +1111,8 @@ fn execute(
         n_threads,
         mode,
     };
-    if !o.maxdisp && mode.fix() && o.twopass && params.coarse_rotation {
-        late.push(Notice::new(
-            &defects::AFNI_92,
-            mode,
-            "-nomaxdisp leaves the coarse rotation search's automask at the clip fraction \
-             0.333; AFNI changes it to 0.5",
-        ));
+    if !o.maxdisp && o.twopass && params.coarse_rotation && coarse.0 > 0 && coarse.1 > 0 {
+        late.push(notices::afni_92(mode));
     }
     let header = image.header.clone();
     let geometry = image.geometry.clone();

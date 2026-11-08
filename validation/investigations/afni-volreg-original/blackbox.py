@@ -105,6 +105,18 @@ def make_inputs() -> None:
     img.set_qform(ras, 1)
     img.set_sform(ras, 1)
     nib.save(img, INPUTS / "ras_i16.nii.gz")
+    # uint8 (AFNI-87), a thin series (6 slices: the coarse search's region is empty, AFNI-93),
+    # a constant series (AFNI-89 with -twopass).
+    u8 = np.clip(np.round(data * (250.0 / data.max())), 0, 255).astype(np.uint8)
+    img = nib.Nifti1Image(u8, lps)
+    img.set_qform(lps, 1)
+    nib.save(img, INPUTS / "lps_u8.nii.gz")
+    img = nib.Nifti1Image(np.ascontiguousarray(data[:, :, 9:15, :]), lps)
+    img.set_qform(lps, 1)
+    nib.save(img, INPUTS / "thin_f32.nii.gz")
+    img = nib.Nifti1Image(np.full((20, 22, 12, 3), 100.0, np.float32), lps)
+    img.set_qform(lps, 1)
+    nib.save(img, INPUTS / "const_f32.nii.gz")
     print("inputs in", INPUTS)
 
 
@@ -133,6 +145,11 @@ CASES: dict[str, tuple[str, list[str]]] = {
     # it; copied here as model_syn.nii.gz)
     "syn-linear": ("model_syn.nii.gz", ["-linear"]),
     "syn-default": ("model_syn.nii.gz", []),
+    "u8": ("lps_u8.nii.gz", []),
+    "thin-twopass": ("thin_f32.nii.gz", ["-twopass"]),
+    "const-twopass": ("const_f32.nii.gz", ["-twopass"]),
+    "nomaxdisp-twopass": ("lps_f32.nii.gz", ["-nomaxdisp", "-twopass"]),
+    "ras-savedisp": ("ras_i16.nii.gz", ["-savedisp", "sd.nii"]),
     "ds000005": ("@ds000005-run-01_sliced.nii.gz", []),
     "ds000005-fmriprep": ("@ds000005-run-01_sliced.nii.gz", FMRIPREP),
 }
@@ -162,7 +179,8 @@ def run(prog: str, case: str, d: Path, mode: str = "reproduce", threads: str = "
     if d.exists() and any(d.iterdir()):
         raise SystemExit(f"{d} is not empty: every run gets a fresh directory")
     d.mkdir(parents=True, exist_ok=True)
-    args = [*opts, *OUTPUTS, str(input_path(src))]
+    outputs = OUTPUTS if "-nomaxdisp" not in opts else OUTPUTS[:-2]
+    args = [*opts, *outputs, str(input_path(src))]
     env = clean_env(d)
     if prog == "afni":
         return oracle_cache.run(
@@ -278,6 +296,25 @@ def main(argv: list[str]) -> int:
         sys.stdout.buffer.write(_out(r))
         sys.stderr.buffer.write(_err(r))
         return r.returncode or 0
+    if argv[0] == "notices":
+        # larmorx's own lines (notices, errors) of the replica and the original, both modes
+        work = Path(tempfile.mkdtemp(prefix="volreg-notices_", dir=os.environ.get("VOLREG_WORK")))
+        for case in argv[1:]:
+            for mode in ("fix", "reproduce"):
+                outs = {}
+                for prog in ("replica", "original"):
+                    r = run(prog, case, work / case / f"{prog}-{mode}", mode)
+                    lines = [ln for ln in _err(r).decode(errors="replace").splitlines()
+                             if "upstream defect" in ln or ln.startswith("**")]
+                    outs[prog] = (r.returncode, lines)
+                same = outs["replica"] == outs["original"]
+                print(f"== {case} [{mode}] {'same' if same else 'DIFFERENT'}")
+                for prog, (code, lines) in outs.items():
+                    if not same or prog == "replica":
+                        print(f"  {prog}: exit {code}")
+                        for ln in lines:
+                            print("    " + ln)
+        return 0
     if argv[0] == "check":
         cases = argv[1:] or list(CASES)
         work = Path(tempfile.mkdtemp(prefix="volreg-bb_", dir=os.environ.get("VOLREG_WORK")))

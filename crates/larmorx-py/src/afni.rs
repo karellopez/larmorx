@@ -684,7 +684,37 @@ fn afni_unifize_file<'py>(
     )
 }
 
+/// 3dvolreg's clean-room original with its original arguments (the command line), AFNI's
+/// variables `afni_settings` (with the ones the wrappers fix) in place of the process
+/// environment: returns `(exit status, standard output, standard error)`. The GIL is released
+/// while it runs; paths in `args` should be absolute (relative ones start in the process's
+/// directory).
+#[pyfunction]
+#[pyo3(signature = (args, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
+fn afni_volreg_cli(
+    py: Python<'_>,
+    args: Vec<String>,
+    n_threads: usize,
+    upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
+) -> PyResult<(u8, String, String)> {
+    let mode = defects_mode(upstream_defects)?;
+    let settings = settings_of(afni_settings);
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = py.detach(|| {
+        larmorx_afni::cli::volreg::main_with_settings(
+            &args, mode, settings, n_threads, &mut out, &mut err,
+        )
+    });
+    Ok((
+        code,
+        String::from_utf8_lossy(&out).into_owned(),
+        String::from_utf8_lossy(&err).into_owned(),
+    ))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(afni_volreg_cli, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_file, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_array, m)?)?;
     m.add_function(wrap_pyfunction!(afni_automask_file, m)?)?;

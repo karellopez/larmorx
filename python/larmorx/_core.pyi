@@ -294,6 +294,15 @@ def afni_unifize_file(
     ``save_scale``), the automasked input (with ``save_automask``), AFNI's warnings and
     upstream-defect notices. ``ValueError`` for AFNI's fatal errors and for ``t2`` above 2."""
 
+def afni_volreg_cli(
+    args: list[str],
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    afni_settings: list[tuple[str, str]] | None = None,
+) -> tuple[int, str, str]:
+    """3dvolreg's clean-room original with its original arguments and AFNI's variables
+    ``afni_settings`` (the process environment is not read): ``(exit status, stdout, stderr)``."""
+
 # --- SciPy-compatible interpolation (larmorx/ndimage.py) --------------------------------------
 
 def ndimage_map_coordinates(

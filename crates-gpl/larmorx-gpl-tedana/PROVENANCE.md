@@ -58,7 +58,22 @@ pandas 3.0.6's `to_csv` of a float frame (numpy's `astype(str)`, `na_rep`; BSD-3
 `average` with its two summation orders (the weights of `fitmode ts` are echo-innermost in
 memory: pairwise), numpy's layout of a
 boolean index on the last axis (the excluded-volume copy, whose temporal mean numpy sums in
-order), and nibabel's choice of image class by extension and magic.
+order), and nibabel's choice of image class by extension and magic. Since relay 7b (random
+testing, 2026-11-08): nibabel's `img.affine` through `larmorx_io`'s `best_affine_nibabel` (its
+qform in x87 extended precision); numpy's floating-point warnings of `_methods.py`'s `_mean`
+and `_var` (reduce, subtract), `_nanfunctions_impl.py`'s `nanvar` (subtract) and
+`_function_base_impl.py`'s `_lerp` (subtract, multiply, add) on infinite values, with their
+lines in numpy 2.5.4 and 2.3.5 (`decay::Libraries`); numpy 2.3.5's `percentile` dividing `q` by
+`a.dtype.type(100)` (a float32 rank for float32 data); pandas' `DataFrame` shape error of an
+empty table (BSD-3-Clause).
+
+## Verification (relay 7b, 2026-11-08)
+
+Random testing (`difftest --tools tedana-t2smap`; `validation/difftest/triage.toml`): the trial
+`oracles/difftest/2026-11-08-t2smap-replica` (3,886 cases) and its fixes; every case of the trial
+that did not agree agrees with the final build (70 of 70,
+`validation/investigations/t2smap/recheck_trial.py`); 17 permanent cases in
+`validation/difftest/cases/tedana-t2smap/`.
 
 ## Verification (relay 5a, 2026-11-08)
 

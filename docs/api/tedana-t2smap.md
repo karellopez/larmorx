@@ -31,7 +31,7 @@ Until the original exists, the replica is the only implementation: `implementati
 the command that installs it). The program is found through `LARMORX_GPL_BIN`, then the Python
 environment's scripts directory, then `PATH`.
 
-**Status: `experimental`** (the record `tedana-t2smap-replica` comes with this part's tests).
+**Status: `experimental`** (the record `tedana-t2smap-replica`, random testing; below).
 
 ## Usage
 
@@ -158,6 +158,9 @@ Corrected by default (D13; [the register](upstream-defects.md)), each with a not
 | TED-13 | `--dummy-scans` that removes every volume fails after numpy's warnings; a negative count shifts `--exclude`'s indices | refused with a clear error |
 | TED-14 | `--debug`'s message on the T2* floor counts echoes times voxels as voxels | the voxels counted |
 | TED-15 | `--combmode paid` with a voxel whose good echoes are constant (every voxel of a one-volume series) fails with `ZeroDivisionError: Weights sum to zero` | those voxels weighted equally; a one-volume series refused with a clear error |
+| TED-16 | `--exclude` that removes every volume: nothing is fitted, and every voxel's T2* (500 ms) and S0 (1) are written with exit status 0 | refused with a clear error |
+| TED-17 | a single voxel left for the fit fails with `IndexError: too many indices for array` | fitted |
+| TED-18 | when more than 99.5 % of the limited T2* map's values are 0 (voxels of one good echo), its cap is 0 and every limited T2* is set to 0 | no cap of 0 or less, on either map |
 
 TED-06 (a curve fit whose log-linear start lies outside its bounds, T2* <= 0 or S0 below the
 voxel's lowest signal, is a silent failure keeping the log-linear estimate: 1,919 of the 1,930
@@ -167,30 +170,54 @@ in the register.
 
 **Maths.** By default the replica's mathematical functions are correctly rounded
 (`larmorx_core::math`): the float32 logarithm of the log-linear fit and the float64 `exp` and `log`
-of the fit's model, the floors, the RMSE, the weights and nilearn's smoothing kernel. With
-`reproduce` they are tedana's: numpy's own float32 `log` kernel (on x86-64 CPUs with AVX2/FMA3,
-which differs from the correctly rounded one in about 5 % of the values: NP-03) and the C
-library's `exp` and `log` (glibc 2.35, numpy's path without AVX-512: GLIBC-07; on AVX-512 CPUs
-numpy uses its own SVML kernels, NP-04, so tedana's last bits depend on the CPU and the oracle
-runs with them off, `NPY_DISABLE_CPU_FEATURES`). The notices naming GLIBC-07 and NP-03 where the
-default's functions change a written value come with the record (relay 7 of the part).
+of the fit's model, the floors, the RMSE, the weights and nilearn's smoothing kernel, and the
+powers of SciPy's curve fit. With `reproduce` they are tedana's: numpy's own float32 `log` kernel
+(on x86-64 CPUs with AVX2/FMA3, which differs from the correctly rounded one in about 5 % of the
+values: NP-03) and the C library's `exp`, `log` and `pow` (glibc 2.35, numpy's path without
+AVX-512: GLIBC-07; on AVX-512 CPUs numpy uses its own SVML kernels, NP-04, so tedana's last bits
+depend on the CPU and the oracle runs with them off, `NPY_DISABLE_CPU_FEATURES`).
+
+The notices are exact, in both modes: while the run computes, a witness per family of functions
+(numpy's float32 log; the float64 functions and the powers) notes whether the other mode's choice
+would have given another value on any argument. If one did, the stages from the mask to the
+combination run again with the other mode's functions, writing nothing: nothing is named when no
+written value and no printed line changes; otherwise each family that changes something alone is
+named (NP-03, GLIBC-07) with the values and lines it changes, or both together when only the two
+together change something (numpy's float32 log moves a curve fit's start, and on that path glibc's
+`exp` differs). The default run therefore takes up to three passes more than the computation
+itself (three on fMRIPrep's calls, where each family alone changes values), still faster than
+tedana (below); `reproduce` names them the same way.
 
 ## Validation
 
-- **Replica against tedana 26.0.3** (`validation/investigations/t2smap/`, in both library
+- **The record** [`tedana-t2smap-replica`](../validation/tedana-t2smap-replica.md) (the parity
+  suite, tedana 26.0.3 as a program through the oracle-output cache, in both library
   environments: numpy 2.5.4 / SciPy 1.18.1 and numpy 2.3.5 / SciPy 1.15.3, OpenBLAS on its
-  Haswell kernels, numpy's AVX-512 kernels off): every output file, header and log line, the exit
-  status and the last error line identical on 33 cases (fMRIPrep's four multi-echo calls on
-  ds003592, ds000210 and ds000258 with curvefit, ds003592's with loglin, and 28 synthetic cases:
-  no mask, scaled int16, z-concatenated, PAID, `--fitmode ts`, `--verbose`, nine echoes, one
-  volume, failures); the command line on 109 cases (help at 19 widths, every error), the defects'
-  failure cases on 11; the numerics beneath (numpy's reductions, percentiles and float32 log,
-  `lstsq`, SciPy's `curve_fit` on tedana's own 169,344 calls) bit for bit. The record
-  `tedana-t2smap-replica` (the parity suite through the oracle cache) comes next.
+  Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread): 51 cases, 34 bit-identical
+  (every output file, header, log line and Python warning, the exit status and the last error
+  line), 17 rejected by both alike, 0 failures: fMRIPrep's four multi-echo calls (ds003592,
+  ds000210's two tasks and ds000258 with curvefit, ds003592's with loglin), 32 synthetic cases
+  (every option and path: no mask, scaled int16, z-concatenated, PAID, `--fitmode ts`,
+  `--verbose`, nine echoes, one volume, existing outputs) and the failure cases of every defect;
+  each case's D13 fix pass (a defect named exactly where the default changes an output); tedana's
+  own step between the releases and its spread (numpy's AVX-512 kernels, threads, tedana 25.0.1
+  in fMRIPrep's image) reported; fMRIPrep's own files compared with tedana 26.0.3's and with the
+  default's. The random-testing fixes below came after it; the permanent cases join it.
+- **Random testing** (`difftest --tools tedana-t2smap`, [the descriptor](../validation/difftest.md)):
+  the trial (30 minutes, 3,886 random cases: two to six echoes, every option, data type, file form,
+  geometry and special sample) found 59 differences and 11 imprecise notices, all fixed (nibabel's
+  extended-precision qform and its headers of new images, NIfTI-2 outputs, series with no volume
+  left, numpy's warnings on infinite samples and empty arrays, numpy 2.3.5's float32 percentile
+  rank, the maths notices) or registered (TED-16, TED-17, TED-18); every one agrees with the final
+  build, 17 kept as permanent cases (`validation/difftest/cases/tedana-t2smap/`). CHECK-TRIAL
+- **Beneath**: the command line on 109 cases (help at 19 widths, every error), the numerics bit
+  for bit (numpy's reductions, percentiles and float32 log, `lstsq` on tedana's own calls, SciPy's
+  `curve_fit` on tedana's own 169,344 calls), nibabel's qform on 4,000 headers.
 - **Golden**: larmorx-gpl's 10 cases (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`: each fit type
   and mode, both combinations and naming conventions, the variance maps, no mask, both mask
   methods, dummy scans and an excluded volume, float32 and int16, a z-concatenated file, echo
   times in ms, both library environments, both modes, a failure) on every platform (CI's `gpl`
   job).
-- **Speed and memory** (fMRIPrep's ds003592 curvefit call, one thread): 11.1 s and 494 MiB, where
-  tedana 26.0.3 takes about 55 s and 1.27 GB.
+- **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 call): 545 MiB (curvefit)
+  and 543 MiB (loglin) at the peak, against tedana's 1,243 and 1,224 MiB.
+- **Speed**: SPEED-TABLE

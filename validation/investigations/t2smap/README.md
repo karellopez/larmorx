@@ -224,3 +224,22 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   converge in all, but their residuals are below the log-linear estimate's in only 15 to 29 %
   (the data do not decay). Decision: rule C (TED-06: tedana's design, kept and documented: the
   voxels stay failures with the log-linear estimate).
+
+## Random testing and speed (relay 7b)
+
+- `replica/check_affine.py --example <target>/release/examples/nibabel_affine --work <empty dir>`
+  (build: `cargo build --release --manifest-path crates-gpl/Cargo.toml -p larmorx-gpl-tedana
+  --example nibabel_affine`): the affine the replica reads (larmorx-io's
+  `NiftiHeader::best_affine_nibabel`: nibabel's `get_qform` in x87 extended precision) against
+  nibabel's `img.affine` on 4,000 generated NIfTI-1 and NIfTI-2 headers (axis permutations and
+  flips, rational and random quaternions, `w` near its threshold, tiny rotations, both `qfac`,
+  sform and qform codes): all identical (2026-11-08). Random testing had found the outputs'
+  `srow` holding `-0.0` where tedana's hold `+0.0`.
+- `recheck_trial.py <night>` (inside `boxed.sh 16`, `LARMORX_GPL_BIN` set): every case of a
+  random-testing night of `tedana-t2smap` that did not agree, drawn again from the night's seed
+  and run with the current replica: the trial's triage (2026-11-08: 70 of 70 agree with the final
+  build; logs `oracles/logs/t2smap-1-relay7b-recheck*.log`).
+- `bench_calls.py --work <empty dir> --threads 14 --repeat 3 --json docs/benchmarks/tedana-t2smap.json`
+  (inside a box): fMRIPrep's multi-echo calls, tedana 26.0.3 (once, through `oracle_cache.run`,
+  never stored) against the replica in `reproduce` and in its default mode at one and 14
+  threads (the best of three), every replica run's files checked: `docs/benchmarks/tedana-t2smap.md`.

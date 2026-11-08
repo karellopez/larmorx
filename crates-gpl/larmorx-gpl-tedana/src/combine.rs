@@ -290,8 +290,8 @@ fn paid_warnings(
     for &v in idx {
         for e in 0..n {
             let row = &data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols];
-            let pos = row.iter().any(|&x| x == f32::INFINITY);
-            let neg = row.iter().any(|&x| x == f32::NEG_INFINITY);
+            let pos = row.contains(&f32::INFINITY);
+            let neg = row.contains(&f32::NEG_INFINITY);
             if row.iter().any(|x| x.is_nan()) {
                 continue;
             }

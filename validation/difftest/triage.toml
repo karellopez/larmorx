@@ -4048,3 +4048,127 @@ signature = ["notice: SCI-02"]
 status = "harness"
 explanation = "1 case (sdc-trial 294008: apply of a uint8 series, order 2, grid-constant, cval -5): lx.ndimage names SCI-02 when the spline prefilter pads an integer input with a cval its type cannot hold, whether or not a sample point reaches the padding (a condition whose effect the comparison may not see); the suite's fix pass of apply accepts SCI-02 without a change (silent_ok), as it does no other defect"
 link = "validation/difftest/cases/sdcflows-fieldmap/sci02-padding-condition-notice.json"
+
+# ---------------------------------------------------------------- tedana-t2smap (2026-11-08)
+# The t2smap part's replica (larmorx-gpl tedana t2smap against tedana 26.0.3, both kept Python
+# environments). Two 2-minute probes (seed t2smap-probe: 90, then 195 cases) found nibabel's
+# qform signs and tedana's own log-linear step (both below). The trial:
+# oracles/difftest/2026-11-08-t2smap-replica, seed t2smap-trial, 30 minutes, 12 jobs at one
+# thread, 1.5 GiB per case, box 24 GiB, larmorx a519ad06: 3,886 cases, 3,816 agree, 11 notices,
+# 59 differences; every one of the 70 run again with the final build (9e5e57cd,
+# validation/investigations/t2smap/recheck_trial.py) agrees. Permanent cases in
+# validation/difftest/cases/tedana-t2smap/ (17).
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: files", "shared: files"]
+status = "fixed"
+explanation = "Header bytes of every output (probe 2 and others): for an image with only a qform, nibabel's img.affine is get_qform in numpy's longdouble (x87 extended precision; np.dot from +0), so its zeros are +0.0 where larmorx-io's float64 product gives -0.0, and oblique entries can differ in the last bit; the replica reads it as nibabel does (larmorx-io's NiftiHeader::best_affine_nibabel, check_affine.py: 4,000 headers identical)"
+link = "validation/difftest/cases/tedana-t2smap/qform-signed-zero.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: files", "shared: files"]
+status = "fixed"
+explanation = "2 cases (1078, 1386): an affine equal to the fresh header's own base affine kept both codes 0 in the replica; nibabel's Nifti1Image(data, affine) sets the sform (code 2) and qform (code 0) unconditionally (_affine2header), the allclose test is only the update at writing"
+link = "validation/difftest/cases/tedana-t2smap/fresh-header-base-affine.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: files", "shared: files"]
+status = "fixed"
+explanation = "NIfTI-2 echoes without --mask (407 and 8 others): _convert_to_nifti1 returns any Nifti1Image as it is and a Nifti2Image is one, so the reference stays NIfTI-2 and nilearn's mask and every output with it (the replica wrote NIfTI-1); a user mask is always made a Nifti1Image"
+link = "validation/difftest/cases/tedana-t2smap/nifti2-computed-mask.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: last error line", "newest: messages", "shared: last error line", "shared: messages"]
+status = "fixed"
+explanation = "No volume left (6, 54, 183, 276, 868, 1177 and others; reproduce only where every volume is a dummy scan, TED-13): numpy's lstsq of no rows returns zeros and T2* = 1/0 (its divide warning), then pandas' 'Shape of passed values is (0, 3), indices imply (0, 9)' in the confounds table (nanpercentile of an empty array returns nanmean's (0,)); a curve fit's first bound, np.min of an empty column, raises outside curve_fit's try; the replica's lstsq did not take zero rows, and a fit mode ts panicked"
+link = "validation/difftest/cases/tedana-t2smap/dummy-scans-every-volume.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: last error line", "newest: messages", "shared: last error line", "shared: messages"]
+status = "register"
+defect = "TED-16"
+explanation = "--exclude removing every volume: tedana fits nothing (T2* 500 ms, S0 1 everywhere) and exits 0 with a curve fit's or the dropout method's unrelated errors otherwise; registered TED-16 (rule B): a clear error by default, reproduce follows tedana"
+link = "validation/difftest/cases/tedana-t2smap/ted16-exclude-every-volume.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: exit status", "newest: files", "newest: last error line", "newest: messages"]
+status = "register"
+defect = "TED-17"
+explanation = "A single voxel to fit (44, 2286, 2671): fit_loglinear's np.squeeze of the one-voxel mask column is 0-dimensional and indexing it raises IndexError; registered TED-17 (rule A): fitted by default, reproduce raises tedana's error"
+link = "validation/difftest/cases/tedana-t2smap/ted17-single-voxel.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: messages", "shared: messages"]
+status = "register"
+defect = "TED-18"
+explanation = "A limited T2* map whose 99.5th percentile is 0 (1500: more than 99.5 % of its values from voxels of one good echo): the cap sets every limited T2* to 0 and the RMSE divides by it (decay.py:83's divide warning, missing in the replica); registered TED-18 (rule A): no cap of 0 or less by default (TED-05's full-map cap followed it), reproduce caps as tedana"
+link = "validation/difftest/cases/tedana-t2smap/ted18-cap-zero.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["newest: messages", "shared: messages"]
+status = "fixed"
+explanation = "numpy's floating-point warnings the replica did not print (182, 464, 940, 1137, 1184, 1476, 1533, 1636, 1889 and others): 'Mean of empty slice' over an empty axis whatever the result's size; the scalar 0/0 of --n-independent-echos with no good voxel (utils.py:213, 230); PAID's mean and std of infinite samples (_methods.py: reduce, subtract; lines per release); nanstd's subtraction and nanpercentile's interpolation on an infinite RMSE (_nanfunctions_impl.py, _function_base_impl.py's _lerp)"
+link = "validation/difftest/cases/tedana-t2smap/rmse-infinite-percentiles.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["shared: messages", "shared: files"]
+status = "fixed"
+explanation = "The shared environment only (3459): numpy 2.3.5's percentile divides q by a.dtype.type(100), so for float32 means the dropout rank is ceil((n - 1) * float32(0.33)) in float32 (301 means: rank 100; numpy 2.5.4: 99), another exemplar voxel and thresholds"
+link = "validation/difftest/cases/tedana-t2smap/shared-percentile-float32.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "The default's maths notices (981, 1299, 2410; and the notices 917, 1160 the other way): one family of functions alone changed values the other's choice took back, or changed values only together with it (numpy's float32 log moves a curve fit's start, on which path glibc's exp differs); the program now runs the other mode's functions altogether first, names nothing when they change nothing, else each family that changes something alone, or both"
+link = "validation/difftest/cases/tedana-t2smap/maths-notices-joint.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["notice: TED-07", "notice: TED-04", "notice: GLIBC-07"]
+status = "fixed"
+explanation = "Notices without a visible change: TED-07 where both variance maps hold the same float32 values (now named only where the swap changes one, outside the one-echo voxels: TED-08's); TED-04 for a mask of another shape, for which tedana's own path raises nilearn's error (now only for a 3D mask of the data's shape); GLIBC-07 as the maths notices above"
+link = "validation/difftest/cases/tedana-t2smap/ted07-equal-variances.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["tedana's step: shared -> newest releases"]
+status = "harness"
+explanation = "Probes 39 and 60: tedana's own log-linear T2* differs between the releases in a noise voxel (up to 93 % relative): numpy 2.5.4's LAPACK 3.12.1 (dgelsd's QR through dlarf1f) moves the slope's last bits, which T2* = 1/slope magnifies near zero; the replica follows each release, and the suite now reports the step with that reason instead of requiring a log-linear fit identical"
+
+# The check of the final build (9e5e57cd): oracles/difftest/2026-11-08-t2smap-replica-check, seed
+# t2smap-check, 10 minutes, 12 jobs: 1,268 cases, 1,267 agree, 1 notice, no difference.
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["notice: TED-15"]
+status = "harness"
+explanation = "1 case (t2smap-check 1240: a one-volume PAID series run twice without --overwrite): TED-15 was named by the first run, whose error (the default's clear error, tedana's ZeroDivisionError) the comparison did not see, the second run failing alike on the existing files; the suite's fix pass now compares the first of two runs too"
+link = "validation/difftest/cases/tedana-t2smap/ted15-first-of-two-runs.json"
+
+[[difference]]
+tool = "tedana-t2smap"
+implementation = "replica"
+signature = ["harness: segmentation fault at exit"]
+status = "harness"
+explanation = "The check's harness process ended with SIGSEGV after writing its report (every case judged): the part's Python extension had been replaced in place (cp) while the night ran; the part's wheel script now replaces it by an atomic rename"

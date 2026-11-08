@@ -521,6 +521,15 @@ def fix_pass(checks: CheckList, args: list[str], reproduced: Run, base: Path) ->
     named = first.stderr + f.stderr if f is not first else f.stderr
     entries = defects.notices_in(named)
     others = []
+    if f is not first:
+        # The first of two runs: its outcome is visible too (its error, before the second run
+        # meets the files it wrote), so a defect it names is compared with reproduce's first run.
+        d1 = Path(tempfile.mkdtemp(prefix="fix1_", dir=base))
+        r1 = run_replica("newest", once, d1)
+        if first.code != r1.code:
+            others.append(f"the first run's exit {r1.code} -> {first.code}")
+        elif first.code != 0 and last_error(first) != last_error(r1):
+            others.append("the first run's error")
     if f.code != reproduced.code:
         others.append(f"exit {reproduced.code} -> {f.code}")
     elif f.code != 0 and last_error(f) != last_error(reproduced):

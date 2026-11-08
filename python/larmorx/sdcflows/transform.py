@@ -35,8 +35,8 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
-from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.bspline import NOT_ALIGNED
 from larmorx.sdcflows.tools import _as_loaded, _header, rescale_affine
 from larmorx.transforms._linalg import inv, matmul
@@ -281,7 +281,7 @@ class B0FieldTransform:
 
         The result is float32 in memory, always 4D (a 3D input gives one volume), back in the
         input's orientation, with the input's header and ``output_dtype`` (by default the
-        input's stored type) as its data type: :func:`larmorx.sdcflows.save_nibabel` writes
+        input's stored type) as its data type: :func:`larmorx.io.save_nibabel` writes
         it as sdcflows does (scaled into an integer type). ``num_threads`` (sdcflows' bound
         on the volumes resampled at once) is accepted and does not change the result;
         ``n_threads`` sets the threads (0 = all).
@@ -581,7 +581,7 @@ def apply_coeffs_field(
     data are rotated relative to the coefficients) and applied by
     :meth:`B0FieldTransform.apply`. With ``out_dir`` the corrected data and the field are
     written there as ``<in_data>_sdc`` and ``<in_data>_field`` (nibabel's writer:
-    :func:`larmorx.sdcflows.save_nibabel`).
+    :func:`larmorx.io.save_nibabel`).
     """
     if fmap2data_xfm is not None and data2fmap_xfm is not None:
         raise ValueError("fmap2data_xfm and data2fmap_xfm are mutually exclusive")

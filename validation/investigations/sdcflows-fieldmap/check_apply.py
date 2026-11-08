@@ -52,7 +52,7 @@ from sdcflows.transform import disp_to_fmap as sdc_disp_to_fmap
 from sdcflows.transform import fmap_to_disp as sdc_fmap_to_disp
 
 from larmorx import sdcflows as lxs
-from larmorx.sdcflows import save_nibabel
+from larmorx.io import save_nibabel
 
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"

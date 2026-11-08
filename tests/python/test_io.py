@@ -319,3 +319,50 @@ def test_mmap_falls_back_for_compressed_and_scaled_files(tmp_path):
     assert scaled.dtype == np.float64  # scaled: read normally
     raw = lx.load(path, mmap=True, scaled=False)
     np.testing.assert_array_equal(raw.data, stored)
+
+
+def test_save_nibabel_scales_floats_into_the_header_type(tmp_path):
+    from larmorx.io.nifti import NiftiHeader
+
+    data = np.linspace(-3.5, 120.25, 60, dtype=np.float32).reshape(5, 4, 3)
+    hdr = NiftiHeader.from_dict(
+        lx._core.nifti_header_for_image([5, 4, 3], "int16", np.eye(4), None, None)
+    )
+    img = lx.Image(data, np.eye(4), hdr)
+    lx.io.save_nibabel(img, tmp_path / "x.nii.gz")
+    back = lx.load(tmp_path / "x.nii.gz", dtype=np.float32)
+    stored = lx.load(tmp_path / "x.nii.gz", scaled=False)
+    assert stored.data.dtype == np.int16
+    slope = (120.25 + 3.5) / 65535
+    np.testing.assert_allclose(back.data, data, atol=slope)
+    stored_values, s, _ = lx.io.nibabel_stored(data, np.int16)
+    assert stored_values.min() == -32768 and stored_values.max() == 32767
+    assert s == float(np.float32(slope))
+
+
+def test_save_nibabel_errors_and_types(tmp_path):
+    from larmorx.io.nifti import NiftiHeader
+
+    hdr = NiftiHeader.from_dict(
+        lx._core.nifti_header_for_image([2, 2, 2], "uint8", np.eye(4), None, None)
+    )
+    # A constant float image: nibabel stores zeros with the value as the intercept (probed).
+    img = lx.Image(np.full((2, 2, 2), 7.0, dtype=np.float32), np.eye(4), hdr)
+    lx.io.save_nibabel(img, tmp_path / "c.nii")
+    raw = lx.load(tmp_path / "c.nii", scaled=False)
+    assert raw.data.dtype == np.uint8 and np.all(raw.data == 0)
+    assert (raw.header.scl_slope, raw.header.scl_inter) == (1.0, 7.0)
+    assert np.all(lx.load(tmp_path / "c.nii").data == 7.0)
+    # Without a header, the array's own type; dtype= overrides the header's.
+    lx.io.save_nibabel(lx.Image(np.arange(8.0).reshape(2, 2, 2), np.eye(4)), tmp_path / "f.nii")
+    assert lx.load(tmp_path / "f.nii", scaled=False).data.dtype == np.float64
+    lx.io.save_nibabel(img, tmp_path / "d.nii", dtype=np.float32)
+    assert lx.load(tmp_path / "d.nii", scaled=False).data.dtype == np.float32
+    # An infinite value is clipped to the type's range, as nibabel 5.4.2 stores it (values,
+    # slope and intercept probed with nibabel itself).
+    inf = np.array([np.inf, 0, 1, 2, 3, 4, 5, 6], np.float32).reshape(2, 2, 2)
+    lx.io.save_nibabel(lx.Image(inf, np.eye(4), hdr), tmp_path / "inf.nii")
+    stored = lx.load(tmp_path / "inf.nii", scaled=False)
+    assert stored.data.ravel().tolist() == [255, 0, 42, 85, 128, 170, 212, 255]
+    assert stored.header.scl_slope == np.float32(0.0235294122248888)
+    assert stored.header.scl_inter == 0.0

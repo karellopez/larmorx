@@ -48,14 +48,8 @@ nibabel's `axcodes2ornt`; nitransforms' `Affine.from_filename(fmt='itk')` and `~
 `subtract_phases`, `phdiff2fmap`, `delta_te`; `interfaces/fmap.py`: `PhaseMap2rads`,
 `SubtractPhases`, `Phasediff2Fieldmap`, `CheckB0Units`, `CheckRegister` with
 `_check_gross_geometry` and `_conform_img`; `workflows/fit/fieldmap.py`: `init_phdiff_wf`, with
-nipype's `PRELUDE` call through `lx.fsl.prelude`) and `_nibabel_write.py` (nibabel 5.4.2's
-writer with its scaling: `arraywriters.py` `make_array_writer`, `ArrayWriter`,
-`SlopeArrayWriter`, `SlopeInterArrayWriter`; `volumeutils.py` `array_to_file`, `_write_data`,
-`finite_range`, `best_write_scale_ftype`, `_ftype4scaled_finite`, `working_type`,
-`_dt_min_max`, `better_float_of`, `_matching_float`; `casting.py` `shared_range`,
-`floor_exact`, `ceil_exact`, `floor_log2`, `int_abs`; `analyze.py` `to_file_map`;
-`nifti1.py` `set_slope_inter`'s checks; x87's extended precision of `best_float()` in exact
-rational arithmetic), from sdcflows 2.17.1 (Apache-2.0), nibabel 5.4.2 and nitransforms 25.1.0
+nipype's `PRELUDE` call through `lx.fsl.prelude`) (its files written through `lx.io.save_nibabel`, nibabel's scaled writer: its provenance in
+`crates/larmorx-io/PROVENANCE.md`), from sdcflows 2.17.1 (Apache-2.0), nibabel 5.4.2 and nitransforms 25.1.0
 (MIT) and nipype 1.12.0's `utils/filemanip.py` and `interfaces/fsl/epi.py` (Apache-2.0).
 
 The D13 switches of this port (`upstream_defects`): SDC-04 (`au2rads` of a constant phase map),

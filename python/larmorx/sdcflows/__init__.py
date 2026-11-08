@@ -30,11 +30,11 @@ Rust (``larmorx-sdcflows``):
   :func:`check_b0_units`, :func:`check_register`, :func:`phdiff_workflow`: the
   phase-difference preparation (``PhaseMap2rads``, ``SubtractPhases``, ``Phasediff2Fieldmap``,
   ``CheckB0Units``, ``CheckRegister``, ``init_phdiff_wf`` with PRELUDE through ``lx.fsl``).
-- :func:`save_nibabel`: an image written as nibabel writes it (its header's data type, scaled
-  into an integer type), as sdcflows' outputs are written.
+
+sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
+integer type): :func:`larmorx.io.save_nibabel`.
 """
 
-from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.approx import BSplineApproxResult, bspline_approx
 from larmorx.sdcflows.bspline import (
     DEFAULT_HF_ZOOMS_MM,
@@ -113,7 +113,6 @@ __all__ = [
     "resample_to_zooms",
     "rescale_affine",
     "ridge_sparse_cg",
-    "save_nibabel",
     "subtract_phases",
     "topup_coeff_reorient",
     "transform_coefficients",

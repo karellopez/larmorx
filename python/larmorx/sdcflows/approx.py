@@ -22,8 +22,8 @@ import numpy as np
 
 from larmorx import _core
 from larmorx.image import Image
+from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
-from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.bspline import DEFAULT_HF_ZOOMS_MM
 from larmorx.sdcflows.tools import _as_loaded, _header, resample_to_zooms
 
@@ -44,7 +44,7 @@ class BSplineApproxResult:
       an image on its control grid.
     - ``error``: ``(data - field) * mask`` (float32) with the input's header (``out_error``,
       written in the input's stored type as nibabel writes it: scaled into an integer type;
-      :func:`larmorx.sdcflows.save_nibabel`).
+      :func:`larmorx.io.save_nibabel`).
     - ``extrapolated``: the field with its extrapolation outside the mask
       (``out_extrapolated``); the ``field`` itself when the mask holds every voxel; ``None``
       without ``extrapolate``.

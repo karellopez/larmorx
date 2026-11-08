@@ -29,8 +29,8 @@ import numpy as np
 
 from larmorx import _core
 from larmorx.image import Image
+from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
-from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.tools import _as_loaded
 from larmorx.sdcflows.transform import _apply_affine
 from larmorx.transforms._linalg import inv

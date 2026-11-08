@@ -1207,6 +1207,28 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("io.save_nibabel", covers=("lx.io.save_nibabel", "lx.io.nibabel_stored"))
+def _(ctx: Context) -> dict[str, Any]:
+    """nibabel's scaled writer: a float image (NaN and an infinity included) written in its
+    int16 header's type (slope and intercept from the x87-precision path), and the stored
+    values of a uint8 scaling without writing."""
+    data = (anat().data.astype(np.float32) * np.float32(0.37)) - np.float32(41.5)
+    data[0, 0, 0] = np.nan
+    data[1, 0, 0] = np.inf
+    header = NiftiHeader.from_dict(
+        _core.nifti_header_for_image(list(data.shape), "int16", anat().affine, None, None)
+    )
+    path = ctx.out("scaled.nii.gz")
+    lx.io.save_nibabel(lx.Image(data, anat().affine, header), path, n_threads=2)
+    stored, slope, inter = lx.io.nibabel_stored(bold().data[..., 0], np.uint8)
+    return {
+        "file": Nifti(path),
+        "file.gz": File(path),
+        "stored": stored,
+        "scale": np.array([slope, inter]),
+    }
+
+
 @case("io.nifti2")
 def _(ctx: Context) -> dict[str, Any]:
     """NIfTI-2: written and read back."""

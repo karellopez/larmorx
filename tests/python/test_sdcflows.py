@@ -101,25 +101,6 @@ def test_ridge_messages_are_scikit_learns():
         )
 
 
-def test_save_nibabel_scales_floats_into_the_header_type(tmp_path):
-    from larmorx.io.nifti import NiftiHeader
-
-    data = np.linspace(-3.5, 120.25, 60, dtype=np.float32).reshape(5, 4, 3)
-    hdr = NiftiHeader.from_dict(
-        lx._core.nifti_header_for_image([5, 4, 3], "int16", np.eye(4), None, None)
-    )
-    img = lx.Image(data, np.eye(4), hdr)
-    lx.sdcflows.save_nibabel(img, tmp_path / "x.nii.gz")
-    back = lx.load(tmp_path / "x.nii.gz", dtype=np.float32)
-    stored = lx.load(tmp_path / "x.nii.gz", scaled=False)
-    assert stored.data.dtype == np.int16
-    slope = (120.25 + 3.5) / 65535
-    np.testing.assert_allclose(back.data, data, atol=slope)
-    stored_values, s, _ = lx.sdcflows._nibabel_write.nibabel_stored(data, np.int16)
-    assert stored_values.min() == -32768 and stored_values.max() == 32767
-    assert s == float(np.float32(slope))
-
-
 def test_unwarp_with_a_zero_field_is_the_identity_and_conversions_invert():
     shape = (12, 10, 6)
     img = _image(shape, (3.0, 3.0, 4.0))

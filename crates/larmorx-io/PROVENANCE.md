@@ -22,6 +22,23 @@
 
 The numerical algorithms for the polar decomposition (scaled Newton iteration, Higham 1986) and the rotation-to-quaternion conversion (Shepperd 1978) are standard methods implemented from their publications, in `larmorx-core`.
 
+## nibabel's scaled writer (`python/larmorx/io/nibabel_writer.py`)
+
+**Ported** from nibabel 5.4.2 (MIT licence, © the NiBabel developers; the release in
+`upstream.tsv`), in Python with numpy's own arithmetic (the SPDX header names both licences):
+
+| larmorx | nibabel 5.4.2 |
+|---|---|
+| `_SlopeInterWriter` (`calc_scale`, `_do_scaling`, `_iu2iu`, `_range_scale`, `_writing_range`, `needs_nan2zero`) | `arraywriters.py`: `make_array_writer`, `ArrayWriter`, `SlopeArrayWriter`, `SlopeInterArrayWriter`, `get_slope_inter` |
+| `_array_to_stored`, `_write_data`, `_finite_range`, `_best_write_scale_ftype`, `_ftype4scaled_finite`, `_working_type`, `_dt_min_max`, `_better_float_of`, `_matching_float` | `volumeutils.py`: `array_to_file`, `_write_data`, `finite_range`, `best_write_scale_ftype`, `_ftype4scaled_finite`, `working_type`, `_dt_min_max`, `better_float_of`, `_matching_float` |
+| `_shared_range`, `_floor_exact`, `_ceil_exact`, `_floor_log2`, `_int_abs` | `casting.py`: `shared_range`, `floor_exact`, `ceil_exact`, `floor_log2`, `int_abs` |
+| `nibabel_stored` (the scaling computed when the header's `scl_slope`/`scl_inter` are unset), its slope and intercept checks | `analyze.py` `AnalyzeImage.to_file_map`; `nifti1.py` `Nifti1Header.set_slope_inter` |
+| `_Extended` | `casting.best_float()`'s `np.longdouble` on x86-64 Linux (x87 extended precision), emulated in exact rational arithmetic rounded to 64 bits, so every platform gives x86-64 Linux's slope and intercept |
+
+The voxel data and the header are written by this crate's NIfTI writer
+(`_core.nifti_header_for_image`, `_core.nifti_write`). Moved here from `lx.sdcflows`, where the
+sdcflows port (field maps, part A) first needed it.
+
 ## Parallel gzip (`src/gzip.rs`)
 
 **Original implementation** of the parallel-deflate method popularised by pigz (Mark Adler): fixed-size blocks, each compressed independently with the preceding 32 KiB as a dictionary and ended with a sync flush. No pigz code was used. Deflate itself is [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) (Zlib licence), through [flate2](https://github.com/rust-lang/flate2-rs) (MIT/Apache-2.0).

@@ -8,7 +8,7 @@ Ported from sdcflows 2.17.1 (Apache-2.0, the NiPreps developers):
 ``Phasediff2Fieldmap``, ``CheckB0Units``, ``CheckRegister`` with ``_check_gross_geometry`` and
 ``_conform_img``) and ``sdcflows/workflows/fit/fieldmap.py`` (``init_phdiff_wf``: PRELUDE
 through :func:`larmorx.fsl.prelude`), with nibabel's (5.4.2, MIT) loading, headers and
-writer (:func:`larmorx.sdcflows.save_nibabel`). The arithmetic is numpy's own, as sdcflows
+writer (:func:`larmorx.io.save_nibabel`). The arithmetic is numpy's own, as sdcflows
 calls it.
 
 Each function returns its images and, with ``out_dir``, writes sdcflows' files there
@@ -35,8 +35,8 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader, load
-from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.approx import _fname_presuffix
 from larmorx.sdcflows.tools import _as_loaded, _header
 from larmorx.transforms.resample import _io_orientation, _ornt2axcodes

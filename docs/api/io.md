@@ -53,6 +53,31 @@ Header fields that nibabel fixes when it reads a file (zero or negative voxel si
 
 The header is the image's header, updated as nibabel updates it: the qform/sform and their codes are kept when the image affine is still `allclose` to the header's, and replaced by the affine (sform code 2 "aligned", qform code 0 "unknown") otherwise. Without a header, the result is the header nibabel writes for a new `Nifti1Image(data, affine)`.
 
+## `lx.io.save_nibabel(image, path, *, dtype=None, version=None, compression_level=2, n_threads=1)`
+
+Writes the image as nibabel's `img.to_filename(path)` writes it, for ports of Python programs
+that write through nibabel (sdcflows' interfaces, fMRIPrep's own steps): the voxel data are
+stored in the **header's** data type (`dtype` overrides it; without a header, the array's
+type), and float data that do not fit an integer type are scaled by nibabel's rules, with the
+`scl_slope` and `scl_inter` nibabel writes. The header is the one `lx.save` writes (nibabel's
+`update_header`). The same options as `lx.save`.
+
+| nibabel 5.4.2 | larmorx |
+|---|---|
+| `nb.Nifti1Image(data, affine, header).to_filename(p)` | `lx.io.save_nibabel(lx.Image(data, affine, header), p)` |
+| `ArrayWriter` / `SlopeArrayWriter` / `SlopeInterArrayWriter` (`arraywriters.make_array_writer`): the slope and intercept of a float-to-integer scaling, NaN to 0, infinities clipped | the same rules, the same values |
+| `volumeutils.array_to_file` (the stored values: `rint((x - inter) / slope)` clipped) | `lx.io.nibabel_stored(data, dtype)` gives `(stored, slope, intercept)` without writing |
+| `WriterError`, `ScalingError`, `HeaderDataError` | `lx.io.WriterError`, `lx.io.ScalingError`, `lx.io.HeaderDataError` (raised where nibabel raises them) |
+
+nibabel computes the slope and intercept in `np.longdouble` (`best_float()`), which is x87's
+80-bit extended type on x86-64 Linux and float64 on the other platforms, so nibabel itself
+writes other scale factors on macOS, Windows and Linux aarch64. larmorx computes those few
+scalar operations in exact rational arithmetic rounded to a 64-bit significand, so every
+platform writes the scale factors nibabel writes on x86-64 Linux. Checked against nibabel
+5.4.2 on 60,000 extended-precision operations and 782 writes (every integer type, NaN,
+infinities, constant and empty arrays: `validation/investigations/sdcflows-fieldmap/
+check_nibabel_write.py`), byte for byte after decompression.
+
 ## From nibabel to larmorx
 
 | nibabel | larmorx |
@@ -60,7 +85,7 @@ The header is the image's header, updated as nibabel updates it: the qform/sform
 | `nib.load(p)` then `img.dataobj` / `img.get_fdata()` | `lx.load(p)` / `lx.load(p, dtype=np.float64)` |
 | `img.affine`, `img.header` | `img.affine`, `img.header` (a typed dataclass of every header field) |
 | `nib.Nifti1Image(data, affine, header)` | `lx.Image(data, affine, header)` or `img.with_data(data)` |
-| `nib.save(img, p)` | `lx.save(img, p)` |
+| `nib.save(img, p)` | `lx.save(img, p)`; `lx.io.save_nibabel(img, p)` for nibabel's scaling into the header's type |
 | `img.header.get_zooms()`, `get_xyzt_units()` | `img.header.zooms`, `spatial_unit` / `time_unit`, `img.tr` |
 | `img.header.get_qform()`, `get_sform()`, `get_slope_inter()` | `img.header.qform`, `sform`, `slope_inter` |
 
@@ -69,7 +94,7 @@ The header is the image's header, updated as nibabel updates it: the qform/sform
 | Situation | nibabel | larmorx | Why |
 |---|---|---|---|
 | Byte order of returned arrays | the file's | native | native arrays are faster in numpy and required by the Rust kernels; values are identical |
-| Saving a float array with an integer header type | rescales into the header's type | stores the array's type (use `dtype=` to convert) | no silent precision loss |
+| Saving a float array with an integer header type | rescales into the header's type | `lx.save` stores the array's type (use `dtype=` to convert); `lx.io.save_nibabel` rescales as nibabel does | no silent precision loss by default |
 | Default gzip level | 1 (zlib) | 2 (zlib-rs) | zlib-rs's level 1 is a much faster strategy that compresses ~15% less; its level 2 matches zlib's level-1 size and is still faster |
 | Gzip detection | by file name | by the file's first bytes | a gzipped `.nii` (or a plain `.nii.gz`) is read instead of failing |
 | Single file with `vox_offset` 0 | reads the header bytes as voxel data | error | the data would be garbage |

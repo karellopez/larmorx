@@ -29,7 +29,7 @@ import nibabel as nb
 import numpy as np
 
 from larmorx.image import Image
-from larmorx.sdcflows._nibabel_write import _Extended, save_nibabel
+from larmorx.io.nibabel_writer import _Extended, save_nibabel
 
 FAILS: list[str] = []
 INT_TYPES = ("int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64")

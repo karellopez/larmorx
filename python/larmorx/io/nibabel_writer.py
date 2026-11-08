@@ -2,10 +2,11 @@
 """nibabel's NIfTI writer with its scaling: an image stored in its header's data type.
 
 nibabel writes an in-memory image (``img.to_filename``) in the type its header names, not the
-array's: float data written to an integer type are scaled (``scl_slope``, ``scl_inter``), as
-sdcflows' outputs are when they keep an input's integer header (``BSplineApprox``'s error map,
-``B0FieldTransform.apply``'s corrected series, ``CheckB0Units``' field map). ``lx.save``
-stores the array's own type; :func:`save_nibabel` stores what nibabel stores.
+array's: float data written to an integer type are scaled (``scl_slope``, ``scl_inter``), as the
+outputs of Python programs that keep an input's integer header are (sdcflows' ``BSplineApprox``
+error map, ``B0FieldTransform.apply``'s corrected series and ``CheckB0Units``' field map;
+fMRIPrep's own steps). ``lx.save`` stores the array's own type; :func:`save_nibabel` stores
+what nibabel stores.
 
 Ported from nibabel 5.4.2 (MIT, Copyright the NiBabel developers):
 ``arraywriters.py`` (``make_array_writer``, ``ArrayWriter``, ``SlopeArrayWriter``,

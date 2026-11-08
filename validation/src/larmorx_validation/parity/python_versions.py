@@ -58,7 +58,7 @@ SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg", "sdcflo
 #: The suites that report the originals' own step (their comparisons record digests).
 STEP_SUITES = ("resample-series", "sdcflows-fieldmap")
 #: Random testing's tools of the same originals.
-TOOLS = ("resample-series", "nifti-io")
+TOOLS = ("resample-series", "nifti-io", "sdcflows-fieldmap")
 STEP_RECORD = "LARMORX_PYTHON_STEP_RECORD"
 STEP_FROM = "LARMORX_PYTHON_STEP_FROM"
 #: How many times the step runs the shared releases' cases (their originals' own variation).

@@ -160,6 +160,10 @@ def run_case(case: Case, checks: CheckList) -> None:
     ws = _workspace()
     if ws is not None:
         os.environ.setdefault("LARMORX_WORKSPACE", str(ws))
+    if isinstance(case.payload, tuple) and case.payload[0] == "random":
+        with pv.case(case.id):
+            _random_case(case.payload[1], checks)
+        return
     module = _load(case.payload)
     import stepdigest  # the scripts' own folder, on sys.path once a script is loaded
 
@@ -188,6 +192,196 @@ def run_case(case: Case, checks: CheckList) -> None:
     )
     if n == 0:
         raise Outcome(SKIPPED, "no comparison ran (the oracle runs or packages are missing)")
+
+
+# ------------------------------------------------------------------------------------------------
+# Random testing's cases (difftest/tools/sdcflows_fieldmap.py) and their permanent cases
+
+
+def _random_case(spec: dict, checks: CheckList) -> None:
+    """One drawn call: sdcflows against larmorx's ``reproduce`` through the investigation's
+    comparators (one line each, every output bit for bit), the originals' step, and the D13 fix
+    pass (larmorx's default against ``reproduce``)."""
+    import tempfile
+
+    from larmorx_validation.difftest import inputs
+
+    recipe = spec["recipe"]
+    e = recipe["extra"]
+    call = e["call"]
+    files = {name: str(inputs.path(k)) for name, k in spec["files"].items()}
+    _load("check_weights.py")
+    import stepdigest
+
+    with tempfile.TemporaryDirectory(prefix="lx-sdcflows-dt_") as t:
+        tmp = Path(t)
+        stepdigest.reset()
+        out = _Lines(stepdigest)
+        old = sys.stdout
+        sys.stdout = out
+        try:
+            fix_inputs = _compare(call, e, files, tmp)
+        finally:
+            sys.stdout = old
+        for kind, name, detail, digest in out.reported:
+            ok = kind == "OK"
+            checks(
+                f"{name}: every output bit-identical",
+                ok,
+                value=0 if ok else 1,
+                detail=detail[:400],
+            )
+            if digest is not None:
+                _step(checks, name, digest)
+        if not out.reported:
+            raise Outcome(SKIPPED, f"the comparator of {call} reported nothing")
+        if fix_inputs is not None:
+            _fix_pass(call, e, fix_inputs, checks)
+
+
+def _rigid(x: dict | None):
+    if x is None:
+        return None
+    from larmorx_validation.difftest import gen
+
+    m = np.eye(4)
+    m[:3, :3] = gen.rotation(x["quaternion"])
+    m[:3, 3] = x["translation"]
+    return m
+
+
+def _coefficient_files(fmap: str, c: dict, tmp: Path) -> list[str]:
+    """The coefficients of the recipe on the field map's control grids (larmorx's grids,
+    sdcflows' bit for bit), seeded values within the amplitude, written as float32 files."""
+    import larmorx as lx
+
+    out = []
+    for i, sp in enumerate(c["spacings"]):
+        g = lx.sdcflows.bspline_grid(fmap, sp)
+        rng = np.random.default_rng([int(c["seed"]), i])
+        data = (rng.uniform(-1.0, 1.0, tuple(g.shape)) * c["amplitude"]).astype(np.float32)
+        path = tmp / f"lvl{i}_coeff000.nii.gz"
+        lx.save((np.asfortranarray(data), np.asarray(g.affine)), path)
+        out.append(str(path))
+    return out
+
+
+def _ro_time(value):
+    return 1 if value == "int 1" else value
+
+
+def _compare(call: str, e: dict, files: dict[str, str], tmp: Path) -> dict | None:
+    """Runs the comparator of ``call``; returns what the fix pass needs (``None``: no switch)."""
+    if call == "bspline_approx":
+        m = _load("check_bspline_approx.py")
+        params = dict(e["params"])
+        params["bs_spacing"] = [tuple(s) for s in params["bs_spacing"]]
+        if isinstance(params["zooms_min"], list):
+            params["zooms_min"] = tuple(params["zooms_min"])
+        mask = files.get("mask")
+        m.case("bspline_approx", files["fmap"], mask, mine_kw={"upstream_defects": "reproduce"},
+               **params)  # fmt: skip
+        return {"args": (files["fmap"], mask), "kw": params}
+    if call in ("fit", "apply"):
+        coeffs = _coefficient_files(files["fmap"], e["coefficients"], tmp)
+        xfm = _rigid(e.get("xfm"))
+        if call == "fit":
+            m = _load("check_b0field.py")
+            m.fit_case("fit", coeffs, files["moving"], xfm, e["approx"])
+            return {"coeffs": coeffs, "target": files["moving"], "xfm": xfm, "approx": e["approx"]}
+        m = _load("check_apply.py")
+        kw = dict(e["kw"])
+        kw.update(xfm_data2fmap=xfm, approx=e["approx"])
+        ro = _ro_time(e["ro_time"])
+        m.apply_case("apply", coeffs, files["moving"], e["pe_dir"], ro, **kw)
+        return {"coeffs": coeffs, "moving": files["moving"], "pe": e["pe_dir"], "ro": ro, "kw": kw}
+    if call == "topup":
+        m = _load("check_coeffs.py")
+        coeff = m.topup_coeff(tmp / "coef_fieldcoef.nii.gz", files["ref"],
+                              tuple(e["factors"]), e["wrong_shape"])  # fmt: skip
+        m.topup_case("topup", [coeff], files["ref"], e["pe_dir"])
+        return {"coeffs": [str(coeff)], "ref": files["ref"], "pe": e["pe_dir"]}
+    if call == "displacements":
+        m = _load("check_apply.py")
+        epi = files.get("epi", files["fmap"])
+        m.disp_case("displacements", files["fmap"], epi, e["ro_time"], e["pe_dir"], e["itk"])
+        return None
+    # phase
+    import larmorx as lx
+
+    m = _load("check_phase.py")
+    m.rads_case("PhaseMap2rads", files["phase1"], upstream_defects="reproduce")
+    if not e.get("subtract"):
+        return {"phase1": files["phase1"]}
+    try:
+        rads = [lx.sdcflows.au2rads(files[k], out_dir=tmp) for k in ("phase1", "phase2")]
+    except ValueError:  # a constant phase map (SDC-04 corrected): compared above
+        return {"phase1": files["phase1"]}
+    metas = [{} if te is None else {"EchoTime": te} for te in e["echo_times"]]
+    phases = [str(r.out_file) for r in rads]
+    m.sub_case("SubtractPhases", phases, metas, upstream_defects="reproduce")
+    return {"phase1": files["phase1"], "phases": phases, "metas": metas}
+
+
+def _larmorx_outputs(call: str, f: dict, mode: str) -> tuple[list[np.ndarray] | str, list[str]]:
+    """larmorx's outputs of the call in ``mode`` (or its error's text) and the defects it names
+    (its notices, and the IDs its error message names)."""
+    import warnings
+
+    import larmorx as lx
+    from larmorx_validation.parity import defects
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        try:
+            if call == "bspline_approx":
+                r = lx.sdcflows.bspline_approx(*f["args"], **f["kw"], upstream_defects=mode)
+                arrays = [r.field.data, r.error.data, *(c.data for c in r.coefficients)]
+                if r.extrapolated is not None:
+                    arrays.append(r.extrapolated.data)
+            elif call == "fit":
+                t = lx.sdcflows.B0FieldTransform(coeffs=f["coeffs"])
+                t.fit(f["target"], f["xfm"], f["approx"], upstream_defects=mode)
+                arrays = [t.mapped.data]
+            elif call == "apply":
+                t = lx.sdcflows.B0FieldTransform(coeffs=f["coeffs"])
+                arrays = [t.apply(f["moving"], f["pe"], f["ro"], **f["kw"],
+                                  upstream_defects=mode).data]  # fmt: skip
+            elif call == "topup":
+                r = lx.sdcflows.topup_coeff_reorient(f["coeffs"], f["ref"], f["pe"],
+                                                     upstream_defects=mode)  # fmt: skip
+                arrays = [c.data for c in r.coefficients]
+            else:
+                arrays = [lx.sdcflows.au2rads(f["phase1"], upstream_defects=mode).image.data]
+                if "phases" in f:
+                    arrays.append(
+                        lx.sdcflows.subtract_phases(
+                            f["phases"], f["metas"], upstream_defects=mode
+                        ).image.data
+                    )
+        except Exception as exc:  # the error is the result
+            text = f"{type(exc).__name__}: {exc}"
+            named = re.findall(r"\b(SDC-\d\d)\b", text)
+            return text, list(dict.fromkeys([*defects.warning_entries(w), *named]))
+    return arrays, defects.warning_entries(w)
+
+
+def _fix_pass(call: str, e: dict, f: dict, checks: CheckList) -> None:
+    from larmorx_validation.parity import defects
+
+    fixed, entries = _larmorx_outputs(call, f, "fix")
+    reproduced, _ = _larmorx_outputs(call, f, "reproduce")
+    other = ""
+    change = defects.Change(0, 0, 0.0)
+    if isinstance(fixed, str) or isinstance(reproduced, str):
+        if fixed != reproduced:
+            other = f"fix: {str(fixed)[:120]}; reproduce: {str(reproduced)[:120]}"
+    elif len(fixed) != len(reproduced):
+        other = f"{len(fixed)} outputs in fix, {len(reproduced)} in reproduce"
+    else:
+        for a, b in zip(fixed, reproduced, strict=True):
+            change = change + defects.Change.of(a, b)
+    defects.add_fix_check(checks, entries, change, other_changes=other)
 
 
 class _Lines(io.StringIO):

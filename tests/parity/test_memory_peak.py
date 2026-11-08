@@ -1354,3 +1354,103 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
         )
         if mode == "reproduce":
             assert _stored(a_dir) == _stored(r_dir), f"{program} {args}"
+
+
+#: sdcflows' field-map estimation (field maps part A, 2026-11-08): fMRIPrep's calls of
+#: ``BSplineApprox`` (its ``bs_filter`` nodes of ds002422's first estimator, 64 x 64 x 24, and of
+#: ds005454's, 112 x 112 x 70) and ``ApplyCoeffsField`` on ds005454's coefficients, registration
+#: and first 20 BOLD volumes (160 x 160 x 96, int16), sdcflows 2.17.1 in the newest Python
+#: environment (``python_versions``) against ``lx.sdcflows``, each in a process of its own
+#: (``validation/investigations/sdcflows-fieldmap/memory_call.py``), one thread; larmorx in both
+#: D13 modes, its files sdcflows' byte for byte in ``reproduce`` (decompressed). The original's
+#: run goes through the oracle cache as every original's does: the interpreter is keyed, its
+#: packages are not, so the releases (and numpy's BLAS kernels) are an argument of the call, which
+#: refuses to run with others. The allowance is the memory rule's: 1.1 times sdcflows' peak plus
+#: ``OVERHEAD_MIB`` (both sides pay the interpreter).
+SDCFLOWS_RUNS = "fmriprep-25.2.6"
+SDCFLOWS_CASES = [
+    ("fit-ds002422", "fit", "ds002422-sub-02", "sub_02_wf/fmap_preproc_wf/wf_auto_00000"),
+    ("fit-ds005454", "fit", "ds005454-sub-16", "sub_16_wf/fmap_preproc_wf/wf_gre16"),
+    ("apply-ds005454", "apply", "ds005454-sub-16", "sub_16_wf"),
+]
+
+
+def _sdcflows_inputs(tmp: Path, ws: Path, call: str, run: str, node: str) -> list[str] | None:
+    base = ws / "oracles" / SDCFLOWS_RUNS / f"{run}-noreconall" / "work" / "fmriprep_25_2_wf"
+    if call == "fit":
+        wf = base / node
+        fmaps = sorted((wf / "phdiff_wf" / "compfmap").glob("*_fmap.nii.gz"))
+        mask = wf / "magnitude_wf" / "brainextraction_wf" / "masker" / "clipped_mask.nii.gz"
+        return [str(fmaps[0]), str(mask)] if fmaps and mask.is_file() else None
+    coeffs = sorted((base / node).glob("fmap_preproc_wf/wf_gre16/bs_filter/*_coeff000.nii.gz"))
+    xfm = (
+        base / node / "bold_task_rest_wf/bold_fit_wf/fmapreg_wf/coregister/"
+        "transform0GenericAffine.mat"
+    )
+    bold = (
+        Path.home() / ".cache" / "larmorx-testdata" / "data" / "openneuro" / "ds005454"
+        / "sub-16" / "func" / "sub-16_task-rest_bold.nii.gz"
+    )  # fmt: skip
+    if not coeffs or not xfm.is_file() or not bold.is_file():
+        return None
+    img = nib.load(bold)
+    head = tmp / "sub-16_task-rest_bold.nii.gz"
+    sub = img.slicer[..., :20]
+    nib.Nifti1Image(np.asanyarray(sub.dataobj), img.affine, img.header).to_filename(head)
+    return [str(head), str(coeffs[0]), str(xfm), "0.0429303", "j-"]
+
+
+@pytest.mark.parametrize(("name", "call", "run", "node"), SDCFLOWS_CASES)
+def test_sdcflows_port_needs_no_more_memory_than_sdcflows(tmp_path, name, call, run, node):
+    pv = pytest.importorskip("larmorx_validation.parity.python_versions")
+    newest = pv.prefix(pv.NEWEST)
+    if newest is None:
+        pytest.skip("the newest Python environment (oracles/python-newest) was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    inputs = _sdcflows_inputs(tmp_path, pv.workspace(), call, run, node)
+    if inputs is None:
+        pytest.skip(f"{run}'s oracle run or BOLD series was not found")
+    script = (
+        Path(__file__).resolve().parents[2]
+        / "validation" / "investigations" / "sdcflows-fieldmap" / "memory_call.py"
+    )  # fmt: skip
+    py = str(newest / "bin" / "python")
+    env = {
+        **{k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_CORETYPE": os.environ.get("OPENBLAS_CORETYPE", "Haswell"),
+    }
+    done = subprocess.run(
+        [py, "-P", "-c", f"import runpy; print(runpy.run_path({str(script)!r})['releases']())"],
+        capture_output=True, text=True, env=env, check=True,
+    )  # fmt: skip
+    releases = done.stdout.strip()
+    s_dir = tmp_path / "sdcflows"
+    s_dir.mkdir()
+    code, sdc_mib = _original_peak(
+        [py, "-P", str(script), "sdcflows", call, *inputs, "--env", releases],
+        env,
+        None,
+        _emptier(s_dir),
+        s_dir,
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+        code, mib = _peak(
+            [sys.executable, "-P", str(script), "larmorx", call, *inputs, "--defects", mode],
+            l_env,
+            r_dir,
+        )
+        assert code == 0
+        print(f"{name} ({mode}): larmorx {mib:.1f} MiB, sdcflows {sdc_mib:.1f} MiB")
+        assert mib <= allowance(sdc_mib), (
+            f"{name} ({mode}): larmorx {mib:.0f} MiB, sdcflows {sdc_mib:.0f} MiB"
+        )
+        if mode == "reproduce":
+            assert _stored(s_dir) == _stored(r_dir), name

@@ -198,37 +198,6 @@ pub fn rotcom_line(method: &str, clip: bool, zpad: usize, p: &[f32; 6]) -> Strin
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::volreg::grid::Orient;
-
-    #[test]
-    fn the_base_line_has_negative_zero_translations() {
-        let g = Grid {
-            n: [40, 44, 24],
-            orient: [Orient::R2L, Orient::A2P, Orient::I2S],
-            delta: [3.0, 3.0, 3.5],
-            origin: [-58.5, -64.5, -40.25],
-        };
-        let p = reported(&g, [0.0; 3], [0.0; 3]);
-        assert_eq!(
-            oned_line(&p),
-            "  0.0000   0.0000   0.0000   0.0000   0.0000   0.0000"
-        );
-        let c = g.centre();
-        let m = matrix_line(&p, c, c, Trig::Correct);
-        let text = matrix_text(&m);
-        let words: Vec<&str> = text.split_whitespace().collect();
-        assert_eq!(
-            words,
-            [
-                "1", "0", "0", "-0", "0", "1", "0", "-0", "0", "0", "1", "-0"
-            ]
-        );
-    }
-}
-
 /// `-SAVEDISP`'s sixteen products (§10.3): each dataset's suffix and the counts of X, Y and Z.
 pub const SAVEDISP_PRODUCTS: [(&str, [usize; 3]); 16] = [
     ("DXX", [2, 0, 0]),
@@ -263,7 +232,7 @@ fn legendre(x: f32, a: usize) -> f32 {
 /// voxel by voxel over the volumes, the linear trend removed (3dTshift's fit; skipped with fewer
 /// than 3 volumes), then every value multiplied by `1/max |value|` (left alone when it is 0).
 pub fn normalise_displacements(series: &mut [f32], total: usize) {
-    let nt = if total == 0 { 0 } else { series.len() / total };
+    let nt = series.len().checked_div(total).unwrap_or(0);
     let mut v = vec![0f32; nt];
     for p in 0..total {
         for (t, x) in v.iter_mut().enumerate() {
@@ -297,4 +266,35 @@ pub fn savedisp_product(d: &[Vec<f32>; 3], counts: [usize; 3], total: usize) -> 
         .collect();
     normalise_displacements(&mut out, total);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::volreg::grid::Orient;
+
+    #[test]
+    fn the_base_line_has_negative_zero_translations() {
+        let g = Grid {
+            n: [40, 44, 24],
+            orient: [Orient::R2L, Orient::A2P, Orient::I2S],
+            delta: [3.0, 3.0, 3.5],
+            origin: [-58.5, -64.5, -40.25],
+        };
+        let p = reported(&g, [0.0; 3], [0.0; 3]);
+        assert_eq!(
+            oned_line(&p),
+            "  0.0000   0.0000   0.0000   0.0000   0.0000   0.0000"
+        );
+        let c = g.centre();
+        let m = matrix_line(&p, c, c, Trig::Correct);
+        let text = matrix_text(&m);
+        let words: Vec<&str> = text.split_whitespace().collect();
+        assert_eq!(
+            words,
+            [
+                "1", "0", "0", "-0", "0", "1", "0", "-0", "0", "0", "1", "-0"
+            ]
+        );
+    }
 }

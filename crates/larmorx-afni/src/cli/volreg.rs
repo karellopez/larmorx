@@ -1414,8 +1414,8 @@ fn execute(
             geometry.m = cardinal_matrix(&out_grid);
         } else {
             let g = cardinal_matrix(&out_grid);
-            for i in 0..3 {
-                geometry.m[i][3] = g[i][3];
+            for (row, c) in geometry.m.iter_mut().zip(&g) {
+                row[3] = c[3];
             }
         }
         geometry.qform_mm = None;

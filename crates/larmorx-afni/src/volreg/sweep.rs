@@ -54,7 +54,7 @@ impl Stage {
     fn alpha(&self, ui: usize, wi: usize) -> f32 {
         let first =
             |u: usize| self.a * (u as f32 - self.cu) + self.b * (wi as f32 - self.cw) + self.s;
-        if ui % 2 == 0 {
+        if ui.is_multiple_of(2) {
             first(ui)
         } else {
             first(ui - 1) + self.a
@@ -128,7 +128,7 @@ fn edge_sum(
 fn dot(n: usize, w: impl Fn(usize) -> f32, r: impl Fn(usize) -> f32) -> f32 {
     let mut acc = w(0) * r(0);
     for t in 1..n {
-        acc = acc + w(t) * r(t);
+        acc += w(t) * r(t);
     }
     acc
 }
@@ -208,6 +208,7 @@ fn shear_x(st: &Stage, method: Method, k: usize, px: usize, src: &[f32], dst: &m
 
 /// The y-shear of plane `k` (`src` to `dst`): column `x` shifted along y by its own shift,
 /// computed across x over runs of columns with the same integer offset.
+#[allow(clippy::too_many_arguments)]
 fn shear_y(
     st: &Stage,
     method: Method,
@@ -369,7 +370,7 @@ fn shear_z(method: Method, zr: &ZRows, k: usize, dims: [usize; 3], src: &[f32], 
                     &zr.w[..0]
                 }
             });
-            if ki + ia + kmin >= 0 && ki + ia + kmax <= pzi - 1 {
+            if ki + ia + kmin >= 0 && ki + ia + kmax < pzi {
                 if x1 - x0 < SHORT {
                     for (x, o) in d.iter_mut().enumerate() {
                         *o = dot(
@@ -500,6 +501,7 @@ pub struct Volumes {
 /// Applies the plan `p` (with shears) to `vol` (a volume of `n`, padded by `z`) with the
 /// polynomial `method` (or NN), writing the window `win` of the result into `out` (its
 /// voxels, x fastest).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply(
     method: Method,
     p: &Plan,

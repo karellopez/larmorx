@@ -351,6 +351,7 @@ fn pencils(st: &Stage, dims: [usize; 3], trig: Trig, src: Option<&[f32]>, dst: &
 
 /// Applies the plan `p` (with shears) with the Fourier method to `vol` (a volume of `n`,
 /// padded by `z`), writing the window `win` into `out`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply(
     p: &Plan,
     vol: &[f32],

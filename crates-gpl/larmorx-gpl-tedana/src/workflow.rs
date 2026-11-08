@@ -843,6 +843,7 @@ pub fn save_stage(
         &adaptive,
         &t2s_full,
         cols,
+        settings.fit_ts,
         mode,
         maths,
         threads,

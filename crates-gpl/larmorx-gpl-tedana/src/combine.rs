@@ -79,7 +79,8 @@ fn groups(am: &[i64]) -> Vec<(usize, Vec<usize>)> {
 
 /// `make_optcom(data, tes, adaptive_mask, t2s=t2s, combmode=combmode)`: `data` the
 /// `(voxels, echoes, volumes)` float32 array, `am` per voxel, `t2s` the full map in ms
-/// (C-ordered `(voxels, cols)`, `cols` 1 or the volumes; unused for `paid`). The combined
+/// (C-ordered `(voxels, cols)`, `cols` 1 or the volumes; unused for `paid`; `volume_wise`: a map
+/// per volume, `fitmode ts`, even of one volume). The combined
 /// series `(voxels, volumes)`, float64 rounded to float32 (as t2smap saves it).
 #[allow(clippy::too_many_arguments)]
 pub fn make_optcom(
@@ -90,6 +91,7 @@ pub fn make_optcom(
     am: &[i64],
     t2s: &[f64],
     cols: usize,
+    volume_wise: bool,
     mode: CombMode,
     maths: &Maths,
     n_threads: usize,
@@ -124,7 +126,8 @@ pub fn make_optcom(
         }
         CombMode::T2s => log.info(
             Site("combine", "make_optcom", 202),
-            if cols == 1 {
+            // tedana: `t2s.ndim == 1`; `fitmode ts` gives a 2D map even for one volume.
+            if !volume_wise {
                 "Optimally combining data with voxel-wise T2* estimates"
             } else {
                 "Optimally combining data with voxel- and volume-wise T2* estimates"

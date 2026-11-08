@@ -361,7 +361,8 @@ def messages(r: Run) -> list[str]:
     """tedana's log lines (the run directory masked) and Python's warnings, their file named
     from its package (``tedana/decay.py``, ``numpy/...``) as the replica prints it."""
     out = []
-    lines = r.stderr.replace(str(r.cwd), "<run>").splitlines()
+    # a progress bar's frames end in carriage returns: each its own line, then left out
+    lines = r.stderr.replace(str(r.cwd), "<run>").replace("\r", "\n").splitlines()
     for line in lines:
         if line.startswith(("INFO ", "WARNING ", "DEBUG ")):
             out.append(line)
@@ -585,7 +586,8 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
             )
         )
     base.mkdir(parents=True, exist_ok=True)
-    for name, args in stages.make_synthetic(base) + outputs.make_extra(base):
+    extra = outputs.make_extra(base)
+    for name, args in stages.make_synthetic(base) + extra + _with_masks(base, extra):
         tier = "smoke" if name in SMOKE else "standard"
         out.append((f"syn/{name}", tier, _describe(args), ("syn", name, args)))
     fdir = base / "failures"
@@ -624,6 +626,26 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
                 ("spread", f"syn-{fit}", [*echoes, *te_ms, *mask, "--fittype", fit]),
             )
         )
+    return out
+
+
+def _with_masks(base: Path, extra: list[tuple[str, list[str]]]) -> list[tuple[str, list[str]]]:
+    """The nine-echo and one-volume cases of ``check_outputs.py`` again with a mask of ones:
+    without ``--mask`` nilearn finds no mask in their small images (TED-03), so they stop before
+    the fit; with it they reach the paths they are for (nine echoes per volume and over all
+    volumes, the weights' pairwise sum; a single volume)."""
+    import nibabel as nb
+
+    out = []
+    for name, args in extra:
+        if not name.startswith(("x-nine", "x-one-volume")):
+            continue
+        first = next(a for a in args if a.endswith(".nii.gz"))
+        img = nb.load(first)
+        mask = base / "extra" / f"ones-{name.split('-')[1]}.nii.gz"
+        if not mask.is_file():
+            nb.Nifti1Image(np.ones(img.shape[:3], np.uint8), img.affine).to_filename(mask)
+        out.append((f"{name}-mask", [*args, "--mask", str(mask)]))
     return out
 
 

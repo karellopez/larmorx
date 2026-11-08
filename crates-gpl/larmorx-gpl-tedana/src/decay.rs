@@ -310,8 +310,9 @@ fn np_min(values: impl Iterator<Item = f32>) -> f32 {
     m
 }
 
-/// One voxel's `curve_fit`: `Ok((s0, t2s, pcov))` or a failure.
-type VoxelFit = Option<([f64; 2], [[f64; 2]; 2])>;
+/// One voxel's `curve_fit`: `Some((popt, pcov, warned))` (`warned`: SciPy's `OptimizeWarning`,
+/// the covariance could not be estimated), or a failure.
+type VoxelFit = Option<([f64; 2], [[f64; 2]; 2], bool)>;
 
 /// `fit_monoexponential(data_cat, echo_times, adaptive_mask, n_threads=n_threads)`.
 #[allow(clippy::too_many_arguments)]
@@ -375,7 +376,7 @@ pub fn fit_monoexponential(
                 &libm,
             )
             .ok()
-            .map(|r| (r.popt, r.pcov))
+            .map(|r| (r.popt, r.pcov, r.warn_cov))
         };
         let results: Vec<VoxelFit> = parallel::with_threads(ctx.n_threads, || {
             idx.par_iter().map(|&v| fit_one(v)).collect()
@@ -383,11 +384,21 @@ pub fn fit_monoexponential(
         .map_err(|e| PyError::new("RuntimeError", e.to_string(), "joblib Parallel"))?;
         log.progress_done(bar);
         maths.note_libm(&libm);
+        if results.iter().any(|r| matches!(r, Some((_, _, true)))) {
+            // SciPy's curve_fit warns (stacklevel 2: tedana's call), once per place.
+            log.warn(
+                "tedana/decay.py",
+                111,
+                "OptimizeWarning",
+                "Covariance of the parameters could not be estimated",
+                "popt, cov = scipy.optimize.curve_fit(",
+            );
+        }
         let mut fail_count = 0usize;
         for (&v, r) in idx.iter().zip(&results) {
             match r {
                 None => fail_count += 1,
-                Some((popt, _)) => {
+                Some((popt, _, _)) => {
                     s0_init[v] = popt[0];
                     t2s_init[v] = popt[1];
                 }
@@ -419,7 +430,7 @@ pub fn fit_monoexponential(
             }
             match r {
                 None => failures[v] = true,
-                Some((_, pcov)) => {
+                Some((_, pcov, _)) => {
                     t2s_var[v] = pcov[1][1];
                     s0_var[v] = pcov[0][0];
                     covar[v] = pcov[0][1];

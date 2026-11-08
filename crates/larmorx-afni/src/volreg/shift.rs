@@ -54,7 +54,7 @@ impl Method {
 
 /// The first sample offset and the weights of a polynomial method at fraction `x`, in the
 /// order the terms are summed (§5.6), with each weight's sample offset.
-fn weights(method: Method, x: f32) -> ([f32; 8], [i64; 8], usize) {
+pub(crate) fn weights(method: Method, x: f32) -> ([f32; 8], [i64; 8], usize) {
     let xd = f64::from(x);
     let x2 = f64::from(x * x);
     let w = |v: f64| v as f32;
@@ -141,13 +141,14 @@ pub fn shift_poly(method: Method, f: &[f32], alpha: f32, out: &mut [f32]) {
     };
     let ni = n as i64;
     if method == Method::NN {
-        for (i, o) in out.iter_mut().enumerate() {
-            let j = i as i64 + ia;
-            *o = if (0..ni).contains(&j) {
-                f[j as usize]
-            } else {
-                0.0
-            };
+        // out[i] = f[i + ia] where that sample exists, else 0.
+        let lo = (-ia).clamp(0, ni) as usize;
+        let hi = (ni - ia).clamp(0, ni) as usize;
+        out[..lo].fill(0.0);
+        out[hi.max(lo)..].fill(0.0);
+        if lo < hi {
+            let s0 = (lo as i64 + ia) as usize;
+            out[lo..hi].copy_from_slice(&f[s0..s0 + (hi - lo)]);
         }
         return;
     }

@@ -14,8 +14,9 @@ use crate::automask::{self, MaskSettings};
 
 use super::blur::{self, BlurSettings};
 use super::grid::M3;
-use super::rotate::{self, Transform, Trig, rot3};
+use super::rotate::{self, Resampler, Transform, Trig, Work, rot3};
 use super::shift;
+use super::sweep::Window;
 
 /// The coarse search's settings.
 #[derive(Clone, Copy, Debug)]
@@ -70,9 +71,12 @@ fn candidates(del: i32, num: i32) -> Vec<[i32; 3]> {
 }
 
 /// The base's part of a shift search: the region's voxels (with the weight's positive voxels
-/// only), their `W·b`, and the base's sums.
+/// only) as indices into the support box, their `W` and `W·b`, and the base's sums.
 struct Region {
-    idx: Vec<usize>,
+    /// The box the search reads: the region dilated by the largest shift (`[del, N − del)`
+    /// per axis). Every volume searched is first cut (or rotated) into a buffer of this box.
+    support: Window,
+    idx: Vec<u32>,
     w: Vec<f32>,
     wb: Vec<f32>,
     sbb: f32,
@@ -81,11 +85,24 @@ struct Region {
     empty: bool,
 }
 
-fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
+fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64, dn: i64) -> Region {
     let [nx, ny, nz] = n;
     let range = |len: usize| (e.max(0) as usize)..((len as i64 - e).max(0) as usize);
     let (ri, rj, rk) = (range(nx), range(ny), range(nz));
     let empty = ri.is_empty() || rj.is_empty() || rk.is_empty();
+    // The support: the region dilated by the largest shift, within the grid.
+    let mut lo = [0usize; 3];
+    let mut sn = [0usize; 3];
+    for (a, r) in [&ri, &rj, &rk].into_iter().enumerate() {
+        if empty {
+            continue;
+        }
+        let l = (r.start as i64 - dn).max(0) as usize;
+        let h = ((r.end as i64 + dn) as usize).min(n[a]);
+        lo[a] = l;
+        sn[a] = h - l;
+    }
+    let support = Window { lo, n: sn };
     let mut idx = Vec::new();
     let mut ws = Vec::new();
     let mut wb = Vec::new();
@@ -94,12 +111,13 @@ fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
         for j in rj.clone() {
             for i in ri.clone() {
                 let p = i + nx * (j + ny * k);
+                let q = (i - lo[0] + sn[0] * (j - lo[1] + sn[1] * (k - lo[2]))) as u32;
                 let bv = b[p];
                 match w {
                     Some(w) => {
                         let wv = w[p];
                         if wv > 0.0 {
-                            idx.push(p);
+                            idx.push(q);
                             ws.push(wv);
                             let t = wv * bv;
                             wb.push(t);
@@ -107,7 +125,7 @@ fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
                         }
                     }
                     None => {
-                        idx.push(p);
+                        idx.push(q);
                         ws.push(1.0);
                         wb.push(bv);
                         sbb += bv * bv;
@@ -121,6 +139,7 @@ fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
         total += x * x;
     }
     Region {
+        support,
         idx,
         w: ws,
         wb,
@@ -130,54 +149,56 @@ fn region(b: &[f32], w: Option<&[f32]>, n: [usize; 3], e: i64) -> Region {
     }
 }
 
-/// The scores of `cands` for the volume `v` over `reg`, eight candidates per sweep (sixteen
-/// independent float32 chains, each summed in AFNI's order).
-fn scores(v: &[f32], reg: &Region, cands: &[[i32; 3]], n: [usize; 3], weighted: bool) -> Vec<f32> {
+/// The scores of `cands` for the volume `v` (the support box) over `reg`: each candidate's
+/// sums are float32 and sequential in the region's order (the spec's), eight candidates per
+/// sweep (independent chains); the groups of candidates run in parallel.
+fn scores(v: &[f32], reg: &Region, cands: &[[i32; 3]], weighted: bool) -> Vec<f32> {
     const B: usize = 8;
-    let [nx, ny, _] = n;
+    let [bx, by, _] = reg.support.n;
     let off: Vec<isize> = cands
         .iter()
-        .map(|c| c[0] as isize + nx as isize * (c[1] as isize + ny as isize * c[2] as isize))
+        .map(|c| c[0] as isize + bx as isize * (c[1] as isize + by as isize * c[2] as isize))
         .collect();
-    let mut out = Vec::with_capacity(cands.len());
-    for chunk in off.chunks(B) {
-        let m = chunk.len();
-        let mut o = [0isize; B];
-        o[..m].copy_from_slice(chunk);
-        let mut svv = [0f32; B];
-        let mut sbv = [0f32; B];
-        for ((&p, &wv), &wbv) in reg.idx.iter().zip(&reg.w).zip(&reg.wb) {
-            let p = p as isize;
-            let x: [f32; B] = std::array::from_fn(|c| v[(p - o[c]) as usize]);
-            if weighted {
-                for c in 0..B {
-                    svv[c] += (wv * x[c]) * x[c];
-                    sbv[c] += wbv * x[c];
-                }
-            } else {
-                for c in 0..B {
-                    svv[c] += x[c] * x[c];
-                    sbv[c] += wbv * x[c];
+    let groups: Vec<[f32; B]> = off
+        .par_chunks(B)
+        .map(|chunk| {
+            let m = chunk.len();
+            let mut o = [0isize; B];
+            o[..m].copy_from_slice(chunk);
+            let mut svv = [0f32; B];
+            let mut sbv = [0f32; B];
+            for ((&p, &wv), &wbv) in reg.idx.iter().zip(&reg.w).zip(&reg.wb) {
+                let p = p as isize;
+                let x: [f32; B] = std::array::from_fn(|c| v[(p - o[c]) as usize]);
+                if weighted {
+                    for c in 0..B {
+                        svv[c] += (wv * x[c]) * x[c];
+                        sbv[c] += wbv * x[c];
+                    }
+                } else {
+                    for c in 0..B {
+                        svv[c] += x[c] * x[c];
+                        sbv[c] += wbv * x[c];
+                    }
                 }
             }
-        }
-        for c in 0..m {
-            out.push(if svv[c] > 0.0 {
-                reg.sbb - sbv[c] * sbv[c] / svv[c]
-            } else {
-                reg.sbb
-            });
-        }
-    }
-    out
+            std::array::from_fn(|c| {
+                if svv[c] > 0.0 {
+                    reg.sbb - sbv[c] * sbv[c] / svv[c]
+                } else {
+                    reg.sbb
+                }
+            })
+        })
+        .collect();
+    groups.iter().flatten().copied().take(cands.len()).collect()
 }
 
-/// The best shift of `v` against the base of `reg`: the first candidate strictly better than
-/// the best so far, from no shift with the score `Σ B²`.
+/// The best shift of `v` (the support box) against the base of `reg`: the first candidate
+/// strictly better than the best so far, from no shift with the score `Σ B²`.
 fn best_shift(
     v: &[f32],
     reg: &Region,
-    n: [usize; 3],
     cands: &[[i32; 3]],
     weighted: bool,
     take_empty: bool,
@@ -189,7 +210,7 @@ fn best_shift(
     let s = if reg.empty {
         vec![0f32; cands.len()]
     } else {
-        scores(v, reg, cands, n, weighted)
+        scores(v, reg, cands, weighted)
     };
     for (c, sc) in cands.iter().zip(s) {
         if sc < best.1 {
@@ -255,167 +276,6 @@ fn rotation_weight(b: &[f32], n: [usize; 3], s: &CoarseSettings) -> (Vec<f32>, f
     (w, pct)
 }
 
-/// A row of a nearest-neighbour shear whose shift moves it out of the row: all zeros.
-const ZERO_ROW: i32 = i32::MIN;
-
-/// One shear of a nearest-neighbour rotation: its axis and the integer offset `ia` of every row
-/// (§5.6: the sample `i + ia`), indexed by the other two axes in index order, with the pair rule
-/// of §5.5.
-struct NnShear {
-    axis: usize,
-    ia: Vec<i32>,
-}
-
-/// A nearest-neighbour rotation as an index map: the flip and the shears of its plan, on the
-/// padded grid `dims` (padding `z`).
-struct NnPlan {
-    dims: [usize; 3],
-    z: usize,
-    flip: Option<(usize, usize)>,
-    shears: Vec<NnShear>,
-}
-
-impl NnPlan {
-    /// The plan of `p` (from [`rotate::plan`]) on a grid of `n` voxels padded by `z`; `None`
-    /// when the plan has no shears (the volume stays as it was).
-    fn new(p: &rotate::Plan, n: [usize; 3], z: usize) -> Option<NnPlan> {
-        let shears = p.shears.as_ref()?;
-        let dims = n.map(|d| d + 2 * z);
-        let mut out = Vec::new();
-        for sh in shears {
-            let Some((a, b, s, _)) = rotate::coefficients(sh, dims) else {
-                continue;
-            };
-            let others: Vec<usize> = (0..3).filter(|&x| x != sh.axis).collect();
-            let (u, w) = (others[0], others[1]);
-            let cu = 0.5f32 * (dims[u] as f32 - 1.0);
-            let cw = 0.5f32 * (dims[w] as f32 - 1.0);
-            let (nu, nw, len) = (dims[u], dims[w], dims[sh.axis]);
-            let mut ia = vec![0i32; nu * nw];
-            let cell = |alpha: f32| match shift::split(alpha, len) {
-                Some((i, _)) => i as i32,
-                None => ZERO_ROW,
-            };
-            for wi in 0..nw {
-                let mut ui = 0;
-                while ui < nu {
-                    let a0 = a * (ui as f32 - cu) + b * (wi as f32 - cw) + s;
-                    ia[ui + nu * wi] = cell(a0);
-                    if ui + 1 < nu {
-                        ia[ui + 1 + nu * wi] = cell(a0 + a);
-                    }
-                    ui += 2;
-                }
-            }
-            out.push(NnShear { axis: sh.axis, ia });
-        }
-        Some(NnPlan {
-            dims,
-            z,
-            flip: p.flip,
-            shears: out,
-        })
-    }
-
-    /// `v` (a volume of `n` voxels) rotated into `out` by the plan's integer row shifts, one
-    /// pass per shear over the padded volume (`bufs`: two padded work volumes).
-    fn apply(&self, v: &[f32], n: [usize; 3], out: &mut [f32], bufs: &mut [Vec<f32>; 2]) {
-        let [px, py, pz] = self.dims;
-        let z = self.z;
-        let total = px * py * pz;
-        let [a, b] = bufs;
-        a.clear();
-        a.resize(total, 0.0);
-        b.clear();
-        b.resize(total, 0.0);
-        for k in 0..n[2] {
-            for j in 0..n[1] {
-                let at = z + px * (j + z + py * (k + z));
-                a[at..at + n[0]].copy_from_slice(&v[n[0] * (j + n[1] * k)..][..n[0]]);
-            }
-        }
-        if let Some((f, g)) = self.flip {
-            let rev = |axis: usize, i: usize| {
-                if axis == f || axis == g {
-                    self.dims[axis] - 1 - i
-                } else {
-                    i
-                }
-            };
-            for k in 0..pz {
-                for j in 0..py {
-                    for i in 0..px {
-                        b[i + px * (j + py * k)] = a[rev(0, i) + px * (rev(1, j) + py * rev(2, k))];
-                    }
-                }
-            }
-            std::mem::swap(a, b);
-        }
-        let plane = px * py;
-        for sh in &self.shears {
-            let (src, dst): (&[f32], &mut [f32]) = (a, b);
-            match sh.axis {
-                0 => {
-                    // Rows along x; the table indexed by (y, z).
-                    for (r, row) in dst.chunks_mut(px).enumerate() {
-                        let ia = sh.ia[r];
-                        let srow = &src[px * r..px * r + px];
-                        row.fill(0.0);
-                        if ia == ZERO_ROW {
-                            continue;
-                        }
-                        let ia = ia as isize;
-                        let lo = (-ia).max(0) as usize;
-                        let hi = (px as isize - ia).min(px as isize).max(0) as usize;
-                        if lo < hi {
-                            let s0 = (lo as isize + ia) as usize;
-                            row[lo..hi].copy_from_slice(&srow[s0..s0 + (hi - lo)]);
-                        }
-                    }
-                }
-                1 => {
-                    // Rows along y; the table indexed by (x, z).
-                    for (k, dpl) in dst.chunks_mut(plane).enumerate() {
-                        let spl = &src[plane * k..plane * (k + 1)];
-                        let tab = &sh.ia[px * k..px * (k + 1)];
-                        for j in 0..py {
-                            let drow = &mut dpl[px * j..px * (j + 1)];
-                            for (i, (d, &ia)) in drow.iter_mut().zip(tab).enumerate() {
-                                let jj = j as i64 + i64::from(ia);
-                                *d = if ia != ZERO_ROW && jj >= 0 && jj < py as i64 {
-                                    spl[i + px * jj as usize]
-                                } else {
-                                    0.0
-                                };
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    // Rows along z; the table indexed by (x, y).
-                    for (k, dpl) in dst.chunks_mut(plane).enumerate() {
-                        for (q, (d, &ia)) in dpl.iter_mut().zip(&sh.ia).enumerate() {
-                            let kk = k as i64 + i64::from(ia);
-                            *d = if ia != ZERO_ROW && kk >= 0 && kk < pz as i64 {
-                                src[q + plane * kk as usize]
-                            } else {
-                                0.0
-                            };
-                        }
-                    }
-                }
-            }
-            std::mem::swap(a, b);
-        }
-        for k in 0..n[2] {
-            for j in 0..n[1] {
-                let at = z + px * (j + z + py * (k + z));
-                out[n[0] * (j + n[1] * k)..][..n[0]].copy_from_slice(&a[at..at + n[0]]);
-            }
-        }
-    }
-}
-
 /// A coarse search against one base, prepared once per run (the base's region, weight and sums,
 /// and the 44 rotations' index maps), then run on each volume.
 pub struct Searcher {
@@ -434,7 +294,8 @@ struct Rotations {
     m: [usize; 3],
     pct: f32,
     angles: Vec<[i32; 3]>,
-    plans: Vec<Option<NnPlan>>,
+    /// The rotations' plans (§5.1 "from a matrix"; `None` for no rotation).
+    plans: Vec<Option<rotate::Plan>>,
 }
 
 impl Searcher {
@@ -442,11 +303,12 @@ impl Searcher {
     pub fn new(b: &[f32], n: [usize; 3], sizes: [f32; 3], s: &CoarseSettings) -> Searcher {
         if !s.rotations {
             let e = i64::from(s.del) * i64::from(s.num + 1);
+            let dn = i64::from(s.del) * i64::from(s.num);
             return Searcher {
                 settings: *s,
                 n,
                 cands: candidates(s.del, s.num),
-                reg: region(b, None, n, e),
+                reg: region(b, None, n, e, dn),
                 rotations: None,
             };
         }
@@ -459,7 +321,8 @@ impl Searcher {
         };
         let (w, pct) = rotation_weight(&bb, m, s);
         let e = i64::from(del) * i64::from(s.num + 1);
-        let reg = region(&bb, Some(&w), m, e);
+        let dn = i64::from(del) * i64::from(s.num);
+        let reg = region(&bb, Some(&w), m, e, dn);
         let mut angles = Vec::with_capacity(45);
         for a in -1i32..=1 {
             for bi in -2i32..=2 {
@@ -482,11 +345,7 @@ impl Searcher {
                     m: mat,
                     shift: [0.0; 3],
                 };
-                let p = rotate::plan(&tf, sizes, s.trig);
-                if p.shears.is_none() {
-                    rotate::NO_SHEARS.store(true, std::sync::atomic::Ordering::Relaxed);
-                }
-                NnPlan::new(&p, m, s.zpad)
+                Some(rotate::plan(&tf, sizes, s.trig))
             })
             .collect();
         Searcher {
@@ -505,10 +364,25 @@ impl Searcher {
     }
 
     /// The search for the volume `v` (on the base's grid).
+    ///
+    /// The rotations are searched one after another, each rotated (or cut) into one buffer of
+    /// the support box by planes in parallel, its candidates scored in parallel groups: the
+    /// memory is one box, whatever the thread count.
     pub fn search(&self, v: &[f32]) -> Found {
         let s = &self.settings;
+        let mut buf = vec![
+            0f32;
+            if self.reg.empty {
+                0
+            } else {
+                self.reg.support.len()
+            }
+        ];
         let Some(r) = &self.rotations else {
-            let (shift, _) = best_shift(v, &self.reg, self.n, &self.cands, false, s.take_empty);
+            if !self.reg.empty {
+                rotate::cut_window(v, self.n, &self.reg.support, &mut buf);
+            }
+            let (shift, _) = best_shift(&buf, &self.reg, &self.cands, false, s.take_empty);
             return Found {
                 angles: [0.0; 3],
                 shift,
@@ -536,24 +410,22 @@ impl Searcher {
                 empty_region: true,
             };
         }
-        let results: Vec<([i32; 3], f32)> = r
-            .plans
-            .par_iter()
-            .map_init(
-                || ([Vec::new(), Vec::new()], Vec::new()),
-                |(bufs, out), plan| match plan {
-                    None => best_shift(vb, &self.reg, r.m, &self.cands, true, s.take_empty),
-                    Some(p) => {
-                        out.resize(vb.len(), 0.0);
-                        p.apply(vb, r.m, out, bufs);
-                        best_shift(out, &self.reg, r.m, &self.cands, true, s.take_empty)
-                    }
-                },
-            )
-            .collect();
         let mut best = 1.0e38f32;
         let mut found = (0usize, [0i32; 3]);
-        for (q, &(shift, score)) in results.iter().enumerate() {
+        let nn = Resampler {
+            method: shift::Method::NN,
+            zpad: s.zpad,
+            trig: s.trig,
+        };
+        let mut work = Work::default();
+        for (q, plan) in r.plans.iter().enumerate() {
+            if !self.reg.empty {
+                match plan {
+                    None => rotate::cut_window(vb, r.m, &self.reg.support, &mut buf),
+                    Some(p) => nn.apply_window(p, vb, r.m, &self.reg.support, &mut buf, &mut work),
+                }
+            }
+            let (shift, score) = best_shift(&buf, &self.reg, &self.cands, true, s.take_empty);
             if score < best {
                 best = score;
                 found = (q, shift);
@@ -605,8 +477,10 @@ mod tests {
                 }
             }
         }
-        let reg = region(&b, None, n, 4);
-        let (shift, _) = best_shift(&v, &reg, n, &candidates(2, 1), false, false);
+        let reg = region(&b, None, n, 4, 2);
+        let mut buf = vec![0f32; reg.support.len()];
+        rotate::cut_window(&v, n, &reg.support, &mut buf);
+        let (shift, _) = best_shift(&buf, &reg, &candidates(2, 1), false, false);
         assert_eq!(shift, [2, 0, 0]);
     }
 }
@@ -623,18 +497,27 @@ mod timing {
     }
 
     fn timed() {
-        let n = [64usize, 64, 34];
+        let n: [usize; 3] = match std::env::var("VOLREG_TIMING_GRID") {
+            Ok(g) => {
+                let v: Vec<usize> = g.split('x').map(|x| x.parse().unwrap()).collect();
+                [v[0], v[1], v[2]]
+            }
+            Err(_) => [64, 64, 34],
+        };
         let total = n[0] * n[1] * n[2];
         let b: Vec<f32> = (0..total).map(|p| ((p * 7919) % 1000) as f32).collect();
         let w: Vec<f32> = (0..total)
             .map(|p| if p % 3 == 0 { 0.0 } else { 0.5 })
             .collect();
-        let reg = region(&b, Some(&w), n, 6);
-        let cands = candidates(2, 2);
+        let e: i64 = std::env::var("VOLREG_TIMING_E").map_or(6, |e| e.parse().unwrap());
+        let reg = region(&b, Some(&w), n, e, e * 2 / 3);
+        let cands = candidates((e / 3) as i32, 2);
+        let mut boxv = vec![0f32; reg.support.len()];
+        rotate::cut_window(&b, n, &reg.support, &mut boxv);
         let t = std::time::Instant::now();
         let mut acc = 0.0f32;
         for _ in 0..45 {
-            acc += scores(&b, &reg, &cands, n, true)[0];
+            acc += scores(&boxv, &reg, &cands, true)[0];
         }
         eprintln!(
             "45 x 33 scores over {} voxels: {:?} ({acc})",
@@ -652,14 +535,22 @@ mod timing {
             shift: [0.0; 3],
         };
         let p = rotate::plan(&tf, [3.0, 3.0, 4.0], Trig::Correct);
-        let plan = NnPlan::new(&p, n, 4).unwrap();
+        let nn = rotate::Resampler {
+            method: shift::Method::NN,
+            zpad: 4,
+            trig: Trig::Correct,
+        };
         let mut out = vec![0f32; total];
+        let mut work = rotate::Work::default();
         let t = std::time::Instant::now();
-        let mut bufs = [Vec::new(), Vec::new()];
         for _ in 0..44 {
-            plan.apply(&b, n, &mut out, &mut bufs);
+            nn.apply_window(&p, &b, n, &reg.support, &mut boxv, &mut work);
         }
-        eprintln!("44 NN rotations: {:?}", t.elapsed());
+        eprintln!(
+            "44 NN rotations (support box, {} voxels): {:?}",
+            reg.support.len(),
+            t.elapsed()
+        );
         let r = rotate::Resampler {
             method: shift::Method::NN,
             zpad: 4,
@@ -686,6 +577,16 @@ mod timing {
                 r.apply(&b, n, [3.0, 3.0, 4.0], &tf, &mut out, &mut work);
             }
             eprintln!("10 {m:?} rotations: {:?}", t.elapsed());
+            let small = Transform::Angles {
+                theta: [0.0087, -0.0052, 0.007],
+                axes: [2, 0, 1],
+                shift: [0.6, -0.3, 0.2],
+            };
+            let t = std::time::Instant::now();
+            for _ in 0..10 {
+                r.apply(&b, n, [3.0, 3.0, 4.0], &small, &mut out, &mut work);
+            }
+            eprintln!("10 small {m:?} rotations: {:?}", t.elapsed());
         }
         let bs = BlurSettings {
             firfac: None,

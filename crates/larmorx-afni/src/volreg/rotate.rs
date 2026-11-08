@@ -308,11 +308,11 @@ pub struct Resampler {
     pub trig: Trig,
 }
 
-/// The reusable buffers of resamplings on one grid.
+/// The reusable buffers of resamplings on one grid: the padded input and one more padded
+/// volume (`super::sweep::Volumes`).
 #[derive(Default)]
 pub struct Work {
-    pad: Vec<f32>,
-    scratch: Vec<f32>,
+    vols: super::sweep::Volumes,
 }
 
 /// Sets when a resampling found no decomposition (AFNI's "can't compute shear
@@ -330,16 +330,48 @@ impl Resampler {
         out: &mut [f32],
         work: &mut Work,
     ) {
-        out.copy_from_slice(vol);
         if n.iter().any(|&d| d < 2) {
+            out.copy_from_slice(vol);
             return;
         }
         let p = plan(tf, sizes, self.trig);
-        self.apply_plan(&p, n, out, work);
+        self.apply_window(&p, vol, n, &super::sweep::Window::full(n), out, work);
     }
 
-    /// `vol` transformed in place by the plan `p`.
-    pub fn apply_plan(&self, p: &Plan, n: [usize; 3], vol: &mut [f32], work: &mut Work) {
+    /// The window `win` of `vol` (a volume of `n` voxels) transformed by the plan `p`, into
+    /// `out` (the window's voxels). A plan without shears leaves the volume as it was.
+    pub fn apply_window(
+        &self,
+        p: &Plan,
+        vol: &[f32],
+        n: [usize; 3],
+        win: &super::sweep::Window,
+        out: &mut [f32],
+        work: &mut Work,
+    ) {
+        if p.shears.is_none() || n.iter().any(|&d| d < 2) {
+            if p.shears.is_none() {
+                NO_SHEARS.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+            cut_window(vol, n, win, out);
+            return;
+        }
+        if self.method != Method::Fourier {
+            super::sweep::apply(self.method, p, vol, n, self.zpad, win, out, &mut work.vols);
+            return;
+        }
+        if *win == super::sweep::Window::full(n) {
+            out.copy_from_slice(vol);
+            self.apply_rows(p, n, out, work);
+        } else {
+            let mut full = vol.to_vec();
+            self.apply_rows(p, n, &mut full, work);
+            cut_window(&full, n, win, out);
+        }
+    }
+
+    /// `vol` transformed in place by the plan `p`, row by row (the Fourier method).
+    fn apply_rows(&self, p: &Plan, n: [usize; 3], vol: &mut [f32], work: &mut Work) {
         let Some(shears) = &p.shears else {
             NO_SHEARS.store(true, std::sync::atomic::Ordering::Relaxed);
             return;
@@ -347,7 +379,7 @@ impl Resampler {
         let z = self.zpad;
         let dims = [n[0] + 2 * z, n[1] + 2 * z, n[2] + 2 * z];
         let total = dims[0] * dims[1] * dims[2];
-        let (buf, scratch) = (&mut work.pad, &mut work.scratch);
+        let (buf, scratch) = (&mut work.vols.pad, &mut work.vols.mid);
         if z > 0 {
             buf.clear();
             buf.resize(total, 0.0);
@@ -379,6 +411,20 @@ impl Resampler {
             vol.copy_from_slice(buf);
         }
     }
+}
+
+/// The window `win` of `vol` (a volume of `n`) copied into `out`.
+pub(crate) fn cut_window(vol: &[f32], n: [usize; 3], win: &super::sweep::Window, out: &mut [f32]) {
+    let [wx, wy, _] = win.n;
+    out.par_chunks_mut((wx * wy).max(1))
+        .enumerate()
+        .for_each(|(kk, plane)| {
+            let k = win.lo[2] + kk;
+            for jj in 0..wy {
+                let at = win.lo[0] + n[0] * (win.lo[1] + jj + n[1] * k);
+                plane[wx * jj..wx * (jj + 1)].copy_from_slice(&vol[at..at + wx]);
+            }
+        });
 }
 
 /// Flips the content along axes `a` and `b` about the grid centre.
@@ -618,6 +664,137 @@ mod tests {
         let one = rot3([2, 0, 1], [0.0, 0.0, 0.01], Trig::Correct);
         assert!(best_order(&one, e).is_none());
         assert!(decompose(&one, e, Trig::Correct).is_some());
+    }
+
+    /// The sweeps give the row-by-row shears' values bit for bit, for every polynomial method
+    /// and nearest neighbour: flips, paddings, odd sizes, short rows, shifts beyond the row.
+    #[test]
+    fn sweeps_are_the_row_by_row_shears() {
+        let mut seed = 12345u64;
+        let mut rnd = || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((seed >> 33) as f64) / f64::from(1u32 << 31)
+        };
+        let cases: Vec<([usize; 3], [f32; 3], usize, Transform)> = vec![
+            (
+                [20, 18, 12],
+                [3.0, 3.0, 4.0],
+                4,
+                Transform::Angles {
+                    theta: [0.05, -0.02, 0.03],
+                    axes: [2, 0, 1],
+                    shift: [1.3, -0.7, 2.1],
+                },
+            ),
+            (
+                [21, 17, 9],
+                [2.0, 2.5, 3.0],
+                0,
+                Transform::Angles {
+                    theta: [0.0; 3],
+                    axes: [2, 0, 1],
+                    shift: [0.4, 0.0, 0.0],
+                },
+            ),
+            (
+                [16, 15, 13],
+                [1.0, 1.0, 1.0],
+                3,
+                Transform::Angles {
+                    theta: [0.3, 0.2, -0.25],
+                    axes: [1, 2, 0],
+                    shift: [-3.0, 9.5, 0.2],
+                },
+            ),
+            (
+                [14, 12, 10],
+                [3.0, 3.0, 3.0],
+                2,
+                Transform::Matrix {
+                    m: rot3([0, 1, 2], [3.0, 0.1, -0.05], Trig::Correct),
+                    shift: [1.0, 0.0, -2.0],
+                },
+            ),
+            (
+                [13, 11, 9],
+                [2.0, 3.0, 2.0],
+                1,
+                Transform::Matrix {
+                    m: rot3([2, 0, 1], [0.01, 3.05, 0.02], Trig::Correct),
+                    shift: [0.0, 0.5, 0.0],
+                },
+            ),
+            (
+                [12, 10, 3],
+                [2.0, 2.0, 4.0],
+                4,
+                Transform::Angles {
+                    theta: [0.01, 0.0, 0.0],
+                    axes: [2, 0, 1],
+                    shift: [0.0, 0.0, 40.0],
+                },
+            ),
+            (
+                [9, 3, 7],
+                [1.0, 2.0, 1.0],
+                0,
+                Transform::Angles {
+                    theta: [0.02, 0.01, 0.03],
+                    axes: [2, 0, 1],
+                    shift: [25.0, 0.3, -0.2],
+                },
+            ),
+            (
+                [18, 16, 14],
+                [3.0, 3.0, 3.5],
+                4,
+                Transform::Matrix {
+                    m: rot3([2, 0, 1], [-0.157, 0.314, -0.157], Trig::Correct),
+                    shift: [0.0; 3],
+                },
+            ),
+        ];
+        for (c, (n, sizes, zpad, tf)) in cases.into_iter().enumerate() {
+            let total = n[0] * n[1] * n[2];
+            let v: Vec<f32> = (0..total)
+                .map(|_| (rnd() * 2000.0 - 300.0) as f32)
+                .collect();
+            for method in [
+                Method::NN,
+                Method::Linear,
+                Method::Cubic,
+                Method::Quintic,
+                Method::Heptic,
+            ] {
+                let r = Resampler {
+                    method,
+                    zpad,
+                    trig: Trig::Correct,
+                };
+                let p = plan(&tf, sizes, Trig::Correct);
+                let mut rows = v.clone();
+                r.apply_rows(&p, n, &mut rows, &mut Work::default());
+                let mut swept = vec![0f32; total];
+                r.apply(&v, n, sizes, &tf, &mut swept, &mut Work::default());
+                let same = rows
+                    .iter()
+                    .zip(&swept)
+                    .all(|(a, b)| a.to_bits() == b.to_bits());
+                assert!(same, "case {c} {method:?} flip {:?}", p.flip);
+                // A window: the same values.
+                let win = super::super::sweep::Window {
+                    lo: [1, 2, 1],
+                    n: [n[0] - 3, n[1] - 3, n[2] - 2],
+                };
+                let mut part = vec![0f32; win.len()];
+                r.apply_window(&p, &v, n, &win, &mut part, &mut Work::default());
+                let mut cut = vec![0f32; win.len()];
+                cut_window(&rows, n, &win, &mut cut);
+                assert_eq!(part, cut, "window, case {c} {method:?}");
+            }
+        }
     }
 
     #[test]

@@ -232,7 +232,7 @@ impl Outputs {
         };
         let fresh = NiftiHeader::new(NiftiVersion::V1, shape, dtype).map_err(herr)?;
         let close = |h: &NiftiHeader| {
-            h.best_affine()
+            h.best_affine_nibabel()
                 .is_ok_and(|b| self.affine.allclose(&b, 1e-5, 1e-8))
         };
         let mut hdr = fresh.clone();

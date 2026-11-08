@@ -53,6 +53,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "fsl-prelude-original": ("fsl_prelude_original", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
     "sdcflows-fieldmap": ("sdcflows_fieldmap", "TOOL"),
+    "tedana-t2smap": ("tedana_t2smap", "TOOL"),
 }
 
 #: Tools that test the harness itself: run only when named, never part of ``all``.

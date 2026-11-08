@@ -230,7 +230,11 @@ def describe_image(a: Path, b: Path, ba: bytes, bb: bytes) -> str:
     if len(ba) != len(bb):
         return f"lengths {len(ba)} vs {len(bb)}"
     ha, hb = nb.load(a).header, nb.load(b).header
-    fields = [k for k in ha if not np.array_equal(ha[k], hb[k], equal_nan=True)]
+    fields = [
+        k
+        for k in ha
+        if not np.array_equal(ha[k], hb[k], equal_nan=np.asarray(ha[k]).dtype.kind in "fc")
+    ]
     if ba[:352] != bb[:352]:
         return f"header fields differ: {fields}"
     da = np.frombuffer(ba[352:], dtype=np.uint8)

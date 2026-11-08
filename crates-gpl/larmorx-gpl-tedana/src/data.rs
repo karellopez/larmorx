@@ -117,7 +117,8 @@ pub fn load_header(path: &str) -> Result<Header, PyError> {
     let mut fixed = header.clone();
     fixed.apply_load_fixes().map_err(io_error)?;
     let shape = fixed.shape().map_err(io_error)?;
-    let affine = fixed.best_affine().map_err(io_error)?;
+    // nibabel's `img.affine`, bit for bit (its qform in x87 extended precision).
+    let affine = fixed.best_affine_nibabel().map_err(io_error)?;
     Ok(Header {
         path: p.to_path_buf(),
         class,

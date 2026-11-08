@@ -132,6 +132,7 @@ SUITES: dict[str, tuple[str, str]] = {
     "fsl-stats": ("fsl-stats-original", "original"),
     "fsl-prelude-replica": ("fsl-prelude", "replica"),
     "fsl-prelude": ("fsl-prelude-original", "original"),
+    "tedana-t2smap-replica": ("tedana-t2smap", "replica"),
 }
 
 

@@ -42,8 +42,8 @@ from the package); the files written; every image's decompressed bytes (every he
 value); the confounds table's text; the registry; ``dataset_description.json`` but for the
 fields that describe the host and Python (D6); ``t2smap_call.sh``. Then tedana's own step from
 the shared releases to the newest (reported: SciPy 1.18's ``least_squares`` moves curve fits'
-last bits; a log-linear fit must not change), and the default ``fix`` pass against the
-reproduced run (a defect named exactly when the outputs differ).
+last bits; numpy 2.5.4's LAPACK 3.12.1 now and then a log-linear fit's), and the default ``fix``
+pass against the reproduced run (a defect named exactly when the outputs differ).
 """
 
 from __future__ import annotations
@@ -91,6 +91,14 @@ STEP_REASON = (
     "SciPy 1.15.3 -> 1.18.1 changed least_squares' trust-region reflective method and "
     "approx_derivative (the order of its steps; the SVD factors' memory order): the curve fit's "
     "last bits (relay 4: 39,211 of ds003592's 52,826 fits, median relative 9e-10)"
+)
+#: Why a log-linear fit's outputs change from the shared releases to the newest (random testing,
+#: 2026-11-08: none of the record's cases, a voxel now and then on random series).
+LOGLIN_STEP_REASON = (
+    "numpy 2.3.5 -> 2.5.4 changed LAPACK 3.12.0 -> 3.12.1 (dgelsd's QR applies its reflectors "
+    "with dlarf1f instead of dlarf): the last bits of some voxels' log-linear slope, which T2* = "
+    "1/slope magnifies where the slope is near zero (a flat or noisy voxel); the replica follows "
+    "each release"
 )
 #: The known reasons tedana 26.0.3's outputs differ from fMRIPrep's (tedana 25.0.1's).
 FMRIPREP_REASON = (
@@ -702,14 +710,14 @@ def _main_case(
         tn, ts = runs["newest"][0], runs["shared"][0]
         diffs = value_differences(ts.out, tn.out)
         total, detail = _summarise(diffs)
-        curvefit = "curvefit" in args
+        reason = STEP_REASON if "curvefit" in args else LOGLIN_STEP_REASON
         checks(
             "tedana's step: shared -> newest releases",
-            total == 0 or curvefit,
+            True,
             metric="values that differ",
             value=total,
-            threshold="reported (a log-linear fit identical)",
-            detail=(detail if total == 0 else f"{detail}; {STEP_REASON}")[:600],
+            threshold="reported",
+            detail=(detail if total == 0 else f"{detail}; {reason}")[:600],
         )
         fr = fix_pass(checks, args, runs["newest"][1], root)
         if defect is not None:
@@ -864,7 +872,11 @@ def suite() -> Suite:
                 "host and Python fields, D6)",
             ),
             ("Both environments", "each against the replica with its libraries"),
-            ("tedana's own step", "reported; a log-linear fit identical in both releases"),
+            (
+                "tedana's own step",
+                "reported, with its reason (SciPy's trust-region method for a curve fit; LAPACK "
+                "3.12.0 -> 3.12.1 in numpy's lstsq for a log-linear fit, now and then)",
+            ),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),
         ],
         cases=cases,

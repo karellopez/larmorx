@@ -241,6 +241,60 @@ shown = "the first 90 characters of the first message of nine agents of the sess
 nature = "role lines of the agents' briefs; no source, no replica code, no source-derived finding"
 judgement = "no contamination of substance; declared in the part's clean-room statements (relay 5)"
 
+[[access]]
+agent = "a406152e7bc33e465"
+line = 301
+time = "2026-11-08T06:54:59Z"
+declared = "covered"
+shown = "a listing of the part's own relay 3 scratch folder and the counts of relay 3's triage of the original's random-testing trial (`<scratch>/volreg-cr-3/triage-trial.json`), which relay 4 was told to judge again"
+nature = "the same part's clean-room work: the original's own runs judged against AFNI's black-box outputs; no source, no replica code"
+judgement = "not restricted material: R18 matches every scratch folder, here the implementer's own part's (3dvolreg's clean-room original, relays 3 and 4)"
+
+[[access]]
+agent = "a7d6c92c90c4edce3"
+line = 216
+time = "2026-11-08T07:57:27Z"
+declared = "covered"
+shown = "the summary of the original's random-testing trial and the counts and first row of relay 4's re-triage (`<scratch>/volreg-cr-4/triage-1200-final.json`), read for the site's random-testing panel"
+nature = "the same part's clean-room work (the original's runs against AFNI's black-box outputs)"
+judgement = "not restricted material: the implementer's own part's scratch (R18 matches every scratch folder)"
+
+[[access]]
+agent = "a7d6c92c90c4edce3"
+line = 221
+time = "2026-11-08T07:57:33Z"
+declared = "covered"
+shown = "the same re-triage file and the part's own block of `validation/difftest/triage.toml` (its header and first entry, written by relays 3 and 4 of the same part)"
+nature = "the same part's clean-room work; no other tool's entry shown"
+judgement = "not restricted material: the implementer's own part's scratch and triage entries"
+
+[[access]]
+agent = "a7d6c92c90c4edce3"
+line = 297
+time = "2026-11-08T08:07:45Z"
+declared = "covered"
+shown = "relay 4's re-triage rows, rewritten without temporary paths into `validation/investigations/afni-volreg-original/retriage-2026-11-08.json` (the five findings' rows printed)"
+nature = "the same part's clean-room work, committed as the site's evidence"
+judgement = "not restricted material: the implementer's own part's scratch"
+
+[[access]]
+agent = "ad8d9af0a170fa8c4"
+line = 151
+time = "2026-11-08T08:48:46Z"
+declared = "yes"
+shown = "two harness metadata files (its own and the field maps relay's: agent type, the launch's one-line description) and the first 600 bytes of its own transcript (its own prompt), read to find its own agent id for the audit's archive"
+nature = "harness metadata and the agent's own prompt; no source, no replica code, no source-derived finding"
+judgement = "no contamination of substance; declared in the part's clean-room statements (relay 6)"
+
+[[access]]
+agent = "ad8d9af0a170fa8c4"
+line = 209
+time = "2026-11-08T08:51:08Z"
+declared = "no"
+shown = "the defect register's four top-level headings from line 867 to the first restricted section's heading, where the command stopped ('## Restricted: AFNI 3dTshift (source-derived)': its title only), read to find the end of the open part it was to edit"
+nature = "a section's title; none of its content"
+judgement = "no slip of substance: the title names the section and holds nothing source-derived; the command stopped on it (judged by the orchestrator at 3dvolreg's clean-room merge, 2026-11-08)"
+
 [[edit]]
 agent = "orchestrator"
 commit = "0feafe98f"
@@ -283,6 +337,7 @@ judgement = "plumbing in larmorx's own words, nothing AFNI-derived; the only edi
 "AFNI/tshift" = "clean: no agent with access to AFNI's source or the replica's code wrote its algorithms; one declared exposure (AFNI-26: 9 lines of the GPL replica and 2 of the register, all restating behaviour the spec gave) and the integration agent's 9 lines of plumbing"
 "AFNI/automask" = "clean (names of restricted files, build caches and black-box runs only)"
 "AFNI/unifize" = "clean: the declared exposure of AFNI-75's register lines (behaviour the spec states) and one undeclared replica line that calls larmorx's own memory check"
+"AFNI/volreg" = "clean: six relays wrote it from specs/3dvolreg.md and black-box runs; the two spec writers (who read AFNI's source) changed only the spec and its model, brought in by the orchestrator; the declared exposures are AFNI-86 to AFNI-99's one-line register descriptions (behaviour the spec states), one fragment of another tool's triage entry and one register heading"
 "AFNI/afni-shared" = "clean: the replica author's port sat in the crate's folder for 59 seconds before any clean-room work and was quarantined, never committed there; the orchestrator's licence headers and a test path"
 "FSL/hmc" = "clean: the declared AFNI-75 exposure's FSL-20, FSL-21, FSL-65 and FSL-66 lines were seen before those were implemented: behaviour lines the spec states, declared and assessed at the merge of 2026-10-30"
 "FSL/bet" = "clean (one register heading seen after the work, declared)"

@@ -398,7 +398,9 @@ def tool_similarity(sim: dict, key: str) -> dict | None:
 
 
 def _counter_rows(c: collections.Counter) -> list[list]:
-    return [[k, n] for k, n in sorted(c.items())]
+    # an unattributed commit's "how" is None: listed last, as "unattributed"
+    rows = sorted(c.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))
+    return [[k if k is not None else "unattributed", n] for k, n in rows]
 
 
 def extract(scan: Path, verdicts_dir: Path, similarity_dir: Path, judgements: Judgements) -> dict:

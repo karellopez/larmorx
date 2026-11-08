@@ -306,7 +306,8 @@ def attribute(
     edits: dict[str, list[tuple[float, str]]],
 ) -> dict[str, dict]:
     """Each commit's maker: ``printed`` (the hash printed by an agent that ran a commit command
-    within ten minutes of the commit's date), ``subject`` (a commit command carrying its subject),
+    within ten minutes of the commit's date), ``subject`` (a commit command carrying its subject,
+    from thirty minutes before the commit to fifteen after),
     ``time`` (a commit command within two minutes by an agent that edited one of its files in the
     three hours before), ``printed-only`` (the first print within thirty minutes), or None.
 
@@ -359,9 +360,11 @@ def attribute(
             for key, lst in cmds.items():
                 for t, k in lst:
                     d = t - cd
-                    if not -15 <= d <= 900:
-                        continue
                     by_subject = bool(subj) and subj in _norm(k["command"])
+                    # a command carrying the subject can start long before its commit (a build
+                    # or a formatter first, its output in the background): as a printed hash
+                    if not (-1800 if by_subject else -15) <= d <= 900:
+                        continue
                     edited = any(
                         p in files and cd - 3 * 3600 <= te <= cd + 60
                         for te, p in edits.get(key, [])

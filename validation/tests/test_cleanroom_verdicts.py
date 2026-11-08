@@ -152,6 +152,30 @@ def test_attribute_from_a_hash_in_the_commit_command_output():
     assert got["e" * 40]["maker"] == "s/agent-r5"
 
 
+def test_attribute_by_subject_from_a_command_that_started_before_its_commit():
+    # 2026-11-08: a relay ran its wheel build and the formatters first, then `git commit -qm`, in
+    # one background command 30 s before the commit's date; no hash was printed in the transcript
+    commits = {
+        "f" * 40: _commit("f" * 40, "2026-11-08T04:11:56+00:00", "3dvolreg original (WIP): x")
+    }
+    commands = [
+        {
+            "key": "s/agent-r3",
+            "line": 1308,
+            "ts": "2026-11-08T04:11:26Z",
+            "command": 'wheel.sh; cargo fmt --all && git commit -q -m "3dvolreg original (WIP): x"',
+        },
+        {
+            "key": "s/agent-other",
+            "line": 4,
+            "ts": "2026-11-08T03:30:00Z",  # 42 minutes before: too early even with the subject
+            "command": 'git commit -q -m "3dvolreg original (WIP): x"',
+        },
+    ]
+    got = vd.attribute(commits, [], commands, {})
+    assert (got["f" * 40]["maker"], got["f" * 40]["how"]) == ("s/agent-r3", "subject")
+
+
 REGISTER_V1 = """# Upstream defects
 ## Summary
 | AFNI-26 † | 3dTshift | a failed write exits 0 |

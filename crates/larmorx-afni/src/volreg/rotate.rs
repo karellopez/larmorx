@@ -170,15 +170,66 @@ const ORDERS: [[usize; 3]; 6] = [
     [2, 1, 0],
 ];
 
+/// Which side of §5.3's exact ties a validation run takes (`LARMORX_VOLREG_TIES`, read once):
+/// unset, the smallest computed norm (the spec's rule); `first`, `last`, or `0` to `5`, that
+/// order among those whose norms are within a relative 1e-12 of the smallest (in §5.3's order of
+/// the six; the index taken modulo their number). Orders whose norms are equal in exact
+/// arithmetic (two axes of the same voxel size) are then decided one way or another at every
+/// resampling: `validation/investigations/afni-volreg-original/triage.py` measures how far the
+/// results move, the spread that §14.3's thresholds allow for. Not a user setting.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ties {
+    Smallest,
+    Index(usize),
+    Last,
+}
+
+fn ties() -> Ties {
+    static TIES: std::sync::OnceLock<Ties> = std::sync::OnceLock::new();
+    *TIES.get_or_init(|| match std::env::var("LARMORX_VOLREG_TIES").as_deref() {
+        Ok("first") => Ties::Index(0),
+        Ok("last") => Ties::Last,
+        Ok(k) => k.parse().map(Ties::Index).unwrap_or(Ties::Smallest),
+        Err(_) => Ties::Smallest,
+    })
+}
+
 fn best_order(q: &M3, e: [f64; 3]) -> Option<[Shear; 4]> {
+    let mode = ties();
+    let pick = if mode == Ties::Smallest {
+        None
+    } else {
+        // the orders within the tie window of the smallest norm, in §5.3's order
+        let norms: Vec<Option<f64>> = ORDERS
+            .iter()
+            .map(|o| {
+                let qp: M3 = std::array::from_fn(|m| std::array::from_fn(|n| q[o[m]][o[n]]));
+                solve_full(&qp, [e[o[0]], e[o[1]], e[o[2]]]).map(|(norm, _)| norm)
+            })
+            .collect();
+        let floor = norms.iter().flatten().fold(f64::INFINITY, |m, &x| m.min(x));
+        let tied: Vec<usize> = (0..6)
+            .filter(|&i| norms[i].is_some_and(|x| x <= floor * (1.0 + 1e-12)))
+            .collect();
+        match (mode, tied.len()) {
+            (_, 0) => None,
+            (Ties::Last, n) => Some(tied[n - 1]),
+            (Ties::Index(k), n) => Some(tied[k % n]),
+            (Ties::Smallest, _) => None,
+        }
+    };
     let mut best: Option<(f64, [Shear; 4])> = None;
-    for o in ORDERS {
+    for (index, o) in ORDERS.into_iter().enumerate() {
         let qp: M3 = std::array::from_fn(|m| std::array::from_fn(|n| q[o[m]][o[n]]));
         let ep = [e[o[0]], e[o[1]], e[o[2]]];
         let Some((norm, coef)) = solve_full(&qp, ep) else {
             continue;
         };
-        if best.as_ref().is_some_and(|(b, _)| norm >= *b) {
+        let take = match pick {
+            None => !best.as_ref().is_some_and(|(b, _)| norm >= *b),
+            Some(p) => index == p,
+        };
+        if !take {
             continue;
         }
         let along = [0usize, 1, 2, 0];

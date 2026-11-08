@@ -193,7 +193,15 @@ fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Trim {
         }
     }
     if !any || hi == [0, 0, 0] {
-        let lo = if any { lo } else { [0; 3] };
+        // the bounds: 0s for an all-zero weight; the search's start (N, -1 per axis) when the
+        // cluster is empty but some weight is not (observed in random testing)
+        let (lo, hi): ([i64; 3], [i64; 3]) = if any {
+            (lo.map(|x| x as i64), hi.map(|x| x as i64))
+        } else if w.iter().all(|&x| x == 0.0) {
+            ([0; 3], [0; 3])
+        } else {
+            (n.map(|x| x as i64), [-1; 3])
+        };
         log.push(format!(
             " + skipping empty trim, {{xyz}}{{a,b}} = {},{}, {},{}, {},{}\n",
             lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]

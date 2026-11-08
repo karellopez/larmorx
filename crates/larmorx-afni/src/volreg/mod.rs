@@ -322,10 +322,12 @@ fn setup_lines(log: SetupLog, once: &mut BlurOnce, messages: &mut Vec<Message>) 
 }
 
 /// `-verbose`'s line of a coarse search.
-fn coarse_line(k: usize, found: &Found, rotations: bool) -> String {
+fn coarse_line(k: usize, found: &Found, rotations: bool, signs: [f32; 3]) -> String {
     let s = found.shift;
     if rotations {
-        let a = found.angles;
+        // AFNI prints the internal angles: the candidate's times the axis's sign, so a zero of
+        // an axis with a negative sign is `-0` (observed in random testing)
+        let a = [0, 1, 2].map(|q| found.angles[q] * signs[q]);
         let marks = if found.non_3d {
             interleaved_non_3d(&found.marks)
         } else {
@@ -555,7 +557,12 @@ fn run_in_pool(
                 let f = search(&v0);
                 push_non_3d(&f, verbose && coarse_on, &mut messages);
                 if verbose && coarse_on {
-                    messages.push(Message::Info(coarse_line(0, &f, coarse_settings.rotations)));
+                    messages.push(Message::Info(coarse_line(
+                        0,
+                        &f,
+                        coarse_settings.rotations,
+                        coarse_settings.signs,
+                    )));
                 }
                 empty_region |= f.empty_region;
                 let s = f.shift;
@@ -686,8 +693,9 @@ fn run_in_pool(
                 (0, Some(f)) => (f.clone(), None),
                 _ => {
                     let f = search(&v);
-                    let line = (verbose && coarse_on)
-                        .then(|| coarse_line(t, &f, coarse_settings.rotations));
+                    let line = (verbose && coarse_on).then(|| {
+                        coarse_line(t, &f, coarse_settings.rotations, coarse_settings.signs)
+                    });
                     (f, line)
                 }
             };

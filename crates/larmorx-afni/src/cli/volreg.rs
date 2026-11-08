@@ -713,7 +713,9 @@ fn parse(
                     return Err(Stop::Raw("** Can't open -rotparent dataset!\n\n".into()));
                 }
                 Err(why) => {
-                    return Err(Stop::Raw(format!("** Can't open -rotparent dataset {v}: {why}")));
+                    return Err(Stop::Raw(format!(
+                        "** Can't open -rotparent dataset {v}: {why}"
+                    )));
                 }
             };
             let attrs = rot_attrs(&image);
@@ -750,7 +752,9 @@ fn parse(
                     return Err(Stop::Raw("** Can't open -gridparent dataset!\n\n".into()));
                 }
                 Err(why) => {
-                    return Err(Stop::Raw(format!("** Can't open -gridparent dataset {v}: {why}")));
+                    return Err(Stop::Raw(format!(
+                        "** Can't open -gridparent dataset {v}: {why}"
+                    )));
                 }
             };
             o.gridparent = Some((v.to_owned(), Box::new(image)));
@@ -1685,7 +1689,11 @@ fn afni_98_name(o: &Options, arg_name: &str, mode: UpstreamDefects, log: &mut Lo
     if afni != arg_name {
         log.notice(&notices::afni_98(mode));
     }
-    if mode.reproduce() { afni } else { arg_name.to_owned() }
+    if mode.reproduce() {
+        afni
+    } else {
+        arg_name.to_owned()
+    }
 }
 
 /// The system's refusal of an output whose file name is longer than 255 bytes (AFNI-90's names

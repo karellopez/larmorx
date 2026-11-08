@@ -2418,6 +2418,10 @@ _MINMAX = re.compile(r"^\+\+ (Min |Mean|Max ): ")
 _MAXD = re.compile(
     r"^\+\+ Max (displacement in automask|delta displ  in automask) = (\S+) \(mm\) at sub-brick (\d+)$"
 )
+_FAILED_BASIS = (
+    "** ERROR: Choleski factorization failure",
+    "\x1b[7m** ERROR:\x1b[0m Choleski factorization failure",
+)
 _COARSE = re.compile(r"^(\+\+ Getting best coarse \S+ \[\d+\]:\S*?)([*.]*) ([-\d ]+: [-\d ]+)$")
 
 
@@ -3201,6 +3205,11 @@ class Compare:
                 self.report("coarse search: progress marks differ", lines[i][:60])
                 return ""
             return "the coarse search's result"
+        if x.startswith(_FAILED_BASIS) and _NUM.sub("#", x) == _NUM.sub("#", y):
+            # a basis whose least squares fail (§7.3): its sums follow from the decomposition's
+            # ties (§5.3); the line's text compared, its numbers reported
+            self.report("the failed basis's numbers", f"{x} vs {y}")
+            return ""
         return "text"
 
     def _maxdisp_values(self, delta: bool) -> np.ndarray | None:
@@ -3452,6 +3461,18 @@ def _named_files(argv: list[str]) -> list[Path]:
     return out
 
 
+def _d13_messages(lines: list[str]) -> list[str]:
+    """The messages the D13 pass compares: the fits' lines left out, the numbers masked but in
+    the maximum displacements' lines (AFNI-99 is named where what they print differs, §12)."""
+    out = []
+    for i, x in enumerate(lines):
+        if x.startswith(("First fit", "Delta fit", "Total fit", "Iteration")):
+            continue
+        keep = _MAXD.match(x) or (i > 0 and lines[i - 1].startswith("++ Max displacements (mm)"))
+        out.append(x if keep else _NUM.sub("#", x))
+    return out
+
+
 def _d13(
     checks: CheckList, fix: Ran, rep: Ran, fix_dir: Path, rep_dir: Path, ff: dict, rf: dict
 ) -> list[str]:
@@ -3462,16 +3483,8 @@ def _d13(
         others.append(f"exit status {rep.code} -> {fix.code}")
     if sorted(ff) != sorted(rf):
         others.append("the files written")
-    ma = [
-        _NUM.sub("#", x)
-        for x in message_lines(fix.stderr, run_dir=fix_dir)
-        if not x.startswith(("First fit", "Delta fit", "Total fit", "Iteration"))
-    ]
-    mb = [
-        _NUM.sub("#", x)
-        for x in message_lines(rep.stderr, run_dir=rep_dir)
-        if not x.startswith(("First fit", "Delta fit", "Total fit", "Iteration"))
-    ]
+    ma = _d13_messages(message_lines(fix.stderr, run_dir=fix_dir))
+    mb = _d13_messages(message_lines(rep.stderr, run_dir=rep_dir))
     if _strip_colours(ma) != _strip_colours(mb):
         others.append("the messages")
     change = defects.Change(0, 0, 0.0)

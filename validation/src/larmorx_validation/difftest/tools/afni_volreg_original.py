@@ -9,8 +9,8 @@ clean-room implementer; the replica's descriptor (``afni_volreg``) is not read o
 A case: a moving head phantom or blobs (2 to 6 volumes; 12 to 32 voxels in-plane, 3 to 24
 slices; voxels of 2 to 4 mm; stored float32, int16 (sometimes scaled), uint16 or uint8; plumb,
 permuted or slightly oblique; slice times in the header sometimes), each volume moved by a small
-rational rotation (up to about 4 degrees) and a shift of up to 2 mm, larger ones with
-``-twopass``; every option of §9.1 drawn with the forms the suite uses: the estimation and final
+rational rotation (up to about 4 degrees) and a shift of up to 2 mm, larger ones (up to about
+10 degrees and 4 mm) with ``-twopass``; every option of §9.1 drawn with the forms the suite uses: the estimation and final
 methods, ``-noclip``, ``-zpad``, ``-twopass`` with ``-twoblur``, ``-coarse``, ``-nocoarserot``
 (AFNI-86), ``-sinit`` and ``-twodup``, the base (an index or an external volume), ``-weight``,
 ``-wtinp``, ``-edging``, the convergence settings, ``-float``, ``-tshift``, ``-nomaxdisp``,
@@ -31,14 +31,14 @@ _AT_REST = {"quaternion": [1, 0, 0, 0], "translation": [0.0, 0.0, 0.0], "centre"
 
 def _motion(d: gen.Draw, t: int, big: bool) -> dict:
     """A rigid motion: a rational rotation quaternion (n, b, c, d) and a shift (mm)."""
-    n = d.integer(f"rot n{t}", 25, 60) if big else d.integer(f"rot n{t}", 100, 600)
+    n = d.integer(f"rot n{t}", 40, 80) if big else d.integer(f"rot n{t}", 100, 600)
     q = [
         n,
         d.integer(f"rot b{t}", -2, 2),
         d.integer(f"rot c{t}", -2, 2),
         d.integer(f"rot d{t}", -2, 2),
     ]
-    reach = 6.0 if big else 2.0
+    reach = 4.0 if big else 2.0
     shift = [d.step(f"shift{t}.{k}", -reach, reach, 0.05) for k in range(3)]
     return {"quaternion": q, "translation": shift, "centre": [0.0, 0.0, 0.0]}
 

@@ -992,22 +992,43 @@ def _defect_rows(ctx: core.Context) -> list[tuple[str, str, str, str]]:
     text = (ctx.repo / FINDINGS).read_text(encoding="utf-8")
     out = []
     for m in re.finditer(r"^\| (TED-\d+) \| (.*?) \| ([^|]*?) \| (.*?) \|\s*$", text, re.M):
-        tid, what, rule, default = (g.strip().replace("`", "") for g in m.groups())
-        out.append((tid, what.replace(" (below)", ""), rule, default))
+        tid, what, rule, default = (g.strip() for g in m.groups())
+        # the findings' working notes (which step of the part measured what, with its script)
+        what = re.sub(r" \(relay \w+, [^)]*\)", "", what).replace(" (below)", "")
+        out.append((tid, what, rule, default))
     return out
 
 
-def _corrections_table(ctx: core.Context, links: dict, cases: list[dict]) -> dict:
+def _record_cases(rec) -> dict[str, tuple[int, list[str]]]:
+    """Each defect -> how many of the record's cases named it by default, and the first ones
+    the record lists (its D13 list)."""
+    out: dict[str, tuple[int, list[str]]] = {}
+    pat = r"^\s*- ([A-Z]+-\d+): (\d+) case\(s\) named it.*?: ((?:`[^`]+`(?:, )?)+)"
+    for m in re.finditer(pat, rec.text, re.M):
+        out[m.group(1)] = (int(m.group(2)), re.findall(r"`([^`]+)`", m.group(3)))
+    return out
+
+
+def _named_in(named: dict[str, tuple[int, list[str]]], tid: str) -> dict:
+    n, found = named.get(tid, (0, []))
+    if not found:
+        return common.cell("–")
+    more = f" and {n - 1} more" if n > 1 else ""
+    return common.cell(f"`{found[0]}`{more}")
+
+
+def _corrections_table(ctx: core.Context, links: dict, rec) -> dict:
+    named = _record_cases(rec)
+    for r in rec.results:  # a defect's own case that names nothing by default (TED-16: refused)
+        k = re.match(r"(?:fail/\d+-|difftest/)ted-?(\d+)\b", r["case"])
+        if k and f"TED-{k.group(1)}" not in named:
+            named[f"TED-{k.group(1)}"] = (1, [r["case"]])
     rows = []
     for tid, what, rule, default in _defect_rows(ctx):
-        key = tid.lower()
-        case = next((c["id"] for c in cases if c["id"].endswith(key)
-                     or c["id"].startswith(f"difftest/{tid.lower().replace('-', '')}")), None)  # fmt: skip
         rows.append({
             "head": f"[{tid}](repo:{links.get(tid, FINDINGS)})",
-            "cells": [common.cell(common.clip(what.replace("`", ""), 300)), common.cell(rule),
-                      common.cell(common.clip(default.replace("`", ""), 200)),
-                      common.cell(f"`{case}`" if case else "–")],
+            "cells": [common.cell(what), common.cell(rule), common.cell(default),
+                      _named_in(named, tid)],
         })  # fmt: skip
     for tid, what, rule, default in (
         ("NP-03", "numpy's float32 log is numpy's own kernel on x86-64 CPUs with AVX2/FMA3 or "
@@ -1024,17 +1045,19 @@ def _corrections_table(ctx: core.Context, links: dict, cases: list[dict]) -> dic
         rows.append({
             "head": f"[{tid}](repo:{links.get(tid, FINDINGS)})",
             "cells": [common.cell(what), common.cell(rule), common.cell(default),
-                      common.cell("–")],
+                      _named_in(named, tid)],
         })  # fmt: skip
     return common.table(
         "corrections",
         "tedana's defects found by the replica (TED-01 to TED-18) and the maths entries",
-        ["Entry", "What tedana does", "Rule", "larmorx's default", "The record's case"],
+        ["Entry", "What tedana does", "Rule", "larmorx's default", "The record's cases"],
         rows,
         note="Each decided by rules A to D (A: corrected by default; B: a clear error; C: kept "
         "and documented; D: measured first), each with `upstream_defects='reproduce'` "
         "(LARMORX_UPSTREAM_DEFECTS=reproduce) giving tedana's behaviour, its errors and messages "
-        "included; the findings: docs/findings/tedana-t2smap.md. fMRIPrep's calls meet TED-05 "
+        "included; the findings: docs/findings/tedana-t2smap.md. The record's cases: those whose "
+        "default mode named the entry (the record's D13 list), else the entry's own case. "
+        "fMRIPrep's calls meet TED-05 "
         "(every call), TED-08 (three of the four curve fits) and the maths entries; the others "
         "need options or inputs fMRIPrep does not give.",
     )
@@ -1382,7 +1405,7 @@ def export(ctx: core.Context) -> dict:
     tables = [
         _calls_table(rec, bench),
         _spread_table(rec),
-        _corrections_table(ctx, links, cases),
+        _corrections_table(ctx, links, rec),
         _files_table(ctx),
         _memory_table(ctx),
         *trial_tables,

@@ -705,6 +705,16 @@ fn parse(
                     "** -rotparent dataset doesn't have VOLREG attributes!?".into(),
                 ));
             }
+            // AFNI-96: the centres must be there, three numbers each (an error in both modes).
+            for (name, c) in [
+                ("VOLREG_CENTER_OLD", &attrs.center_old),
+                ("VOLREG_CENTER_BASE", &attrs.center_base),
+            ] {
+                if c.as_ref().is_none_or(|c| c.len() < 3) {
+                    log.notice(&notices::afni_96(v, name, mode));
+                    return Err(Stop::Fatal(notices::afni_96_fatal(v, name)));
+                }
+            }
             o.rotparent = Some((v.to_owned(), attrs));
             i += 2;
             continue;
@@ -1232,18 +1242,13 @@ fn execute(
     let mut rotparent = None;
     let mut ndz = 0i64;
     if let Some((_, attrs)) = &o.rotparent {
-        // AFNI-96: the centres must be there, three numbers each (an error in both modes).
-        let mut centre = |c: &Option<Vec<f32>>, name: &str| -> Result<[f64; 3], Stop> {
-            match c {
-                Some(v) if v.len() >= 3 => Ok([0, 1, 2].map(|k| f64::from(v[k]))),
-                _ => {
-                    log.notice(&notices::afni_96(name, mode));
-                    Err(Stop::Fatal(notices::afni_96_fatal(name)))
-                }
-            }
+        // The centres (checked at the scan, AFNI-96).
+        let centre = |c: &Option<Vec<f32>>| -> [f64; 3] {
+            let v = c.as_deref().unwrap_or(&[0.0; 3]);
+            [0, 1, 2].map(|k| f64::from(v[k]))
         };
-        let s2 = centre(&attrs.center_old, "VOLREG_CENTER_OLD")?;
-        let s1 = centre(&attrs.center_base, "VOLREG_CENTER_BASE")?;
+        let s2 = centre(&attrs.center_old);
+        let s1 = centre(&attrs.center_base);
         let mv: Vec<f64> = attrs.matvec.iter().map(|&x| f64::from(x)).collect();
         let r: volreg::grid::M3 = [
             [mv[0], mv[1], mv[2]],

@@ -2,9 +2,13 @@
 """3dvolreg's clean-room original (``larmorx afni 3dvolreg``, crate larmorx-afni, written from
 ``specs/3dvolreg.md``) against AFNI 26.3.05's 3dvolreg, with the replica's default as a black
 box: each case is one command line, judged by the original's suite
-(``larmorx_validation.parity.afni_volreg_original.run_argv``: §14.3's thresholds against AFNI
-with ``reproduce``, the replica's default against the original's, the D13 pass). Written by the
-clean-room implementer; the replica's descriptor (``afni_volreg``) is not read or used.
+(``larmorx_validation.parity.afni_volreg_original.run_argv``: §14.3's fixed requirements against
+AFNI with ``reproduce``, the replica's default against the original's, the D13 pass; the coarse
+search's results reported, not required; where the fixed requirements fail, §14.3's "The ties'
+spread": a runaway, beyond 15 degrees or 20 mm or AFNI-97, held to the output's structure, else
+the parameters and registered volumes held to 3 times the original's own spread over 12 seeded
+tie draws, ``LARMORX_VOLREG_TIES=random:<k>``). Written by the clean-room implementer; the
+replica's descriptor (``afni_volreg``) is not read or used.
 
 A case: a moving head phantom or blobs (2 to 6 volumes; 12 to 32 voxels in-plane, 3 to 24
 slices; voxels of 2 to 4 mm; stored float32, int16 (sometimes scaled), uint16 or uint8; plumb,

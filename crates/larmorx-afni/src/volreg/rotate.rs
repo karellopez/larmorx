@@ -170,32 +170,119 @@ const ORDERS: [[usize; 3]; 6] = [
     [2, 1, 0],
 ];
 
-/// Which side of §5.3's exact ties a validation run takes (`LARMORX_VOLREG_TIES`, read once):
-/// unset, the smallest computed norm (the spec's rule); `first`, `last`, or `0` to `5`, that
-/// order among those whose norms are within a relative 1e-12 of the smallest (in §5.3's order of
-/// the six; the index taken modulo their number). Orders whose norms are equal in exact
-/// arithmetic (two axes of the same voxel size) are then decided one way or another at every
-/// resampling: `validation/investigations/afni-volreg-original/triage.py` measures how far the
-/// results move, the spread that §14.3's thresholds allow for. Not a user setting.
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// Which side of §5.3's exact ties a validation run takes (`LARMORX_VOLREG_TIES`, read at the
+/// start of every run by [`reset_ties`]): unset, the smallest computed norm (the spec's rule);
+/// `first`, `last`, or `0` to `5`, that order among those whose norms are within a relative
+/// 1e-12 of the smallest (in §5.3's order of the six; the index taken modulo their number), the
+/// same side at every resampling; `random:<seed>` (§14.3, "The ties' spread"), a uniform draw
+/// among those orders at every resampling that meets a tie (every derivative image, every
+/// iteration, the output, every coarse rotation of every volume), from a generator seeded with
+/// `<seed>` and started afresh by every run. Orders whose norms are equal in exact arithmetic
+/// (two axes of the same voxel size) are then decided one way or another: the parity suite and
+/// random testing measure the original's own spread under the ties with 12 seeded runs. Not a
+/// user setting. The resamplings that meet ties are planned one after another in a fixed order
+/// (the volumes, the derivative images, the iterations and the coarse rotations are sequential;
+/// only the work inside each resampling is parallel), so a seeded run gives the same bits at any
+/// thread count.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Ties {
     Smallest,
     Index(usize),
     Last,
+    Random,
 }
 
-fn ties() -> Ties {
-    static TIES: std::sync::OnceLock<Ties> = std::sync::OnceLock::new();
-    *TIES.get_or_init(|| match std::env::var("LARMORX_VOLREG_TIES").as_deref() {
-        Ok("first") => Ties::Index(0),
-        Ok("last") => Ties::Last,
-        Ok(k) => k.parse().map(Ties::Index).unwrap_or(Ties::Smallest),
-        Err(_) => Ties::Smallest,
-    })
+/// The tie setting of the current run and its generator's state (SplitMix64).
+struct TieState {
+    mode: Ties,
+    rng: u64,
+}
+
+static TIE_STATE: std::sync::Mutex<TieState> = std::sync::Mutex::new(TieState {
+    mode: Ties::Smallest,
+    rng: 0,
+});
+
+fn tie_state() -> std::sync::MutexGuard<'static, TieState> {
+    TIE_STATE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The tie setting a value of `LARMORX_VOLREG_TIES` names, with the generator's seed.
+fn parse_ties(value: Option<&str>) -> Result<(Ties, u64), String> {
+    let Some(v) = value else {
+        return Ok((Ties::Smallest, 0));
+    };
+    let bad = || {
+        format!(
+            "larmorx: LARMORX_VOLREG_TIES='{v}' is not one of first, last, 0 to 5 or \
+             random:<seed> (a validation setting)"
+        )
+    };
+    match v {
+        "first" => Ok((Ties::Index(0), 0)),
+        "last" => Ok((Ties::Last, 0)),
+        _ => {
+            if let Some(seed) = v.strip_prefix("random:") {
+                seed.parse::<u64>()
+                    .map(|s| (Ties::Random, s))
+                    .map_err(|_| bad())
+            } else {
+                match v.parse::<usize>() {
+                    Ok(k) if k < 6 => Ok((Ties::Index(k), 0)),
+                    _ => Err(bad()),
+                }
+            }
+        }
+    }
+}
+
+/// Reads `LARMORX_VOLREG_TIES` and starts the run's tie generator afresh (each run of the
+/// program calls it first); an invalid value is an error.
+pub(crate) fn reset_ties() -> Result<(), String> {
+    let value = std::env::var("LARMORX_VOLREG_TIES").ok();
+    let (mode, seed) = parse_ties(value.as_deref())?;
+    *tie_state() = TieState { mode, rng: seed };
+    Ok(())
+}
+
+/// Whether ties are drawn at every resampling (`random:<seed>`).
+pub(crate) fn ties_random() -> bool {
+    tie_state().mode == Ties::Random
+}
+
+/// The next value of the SplitMix64 generator whose state is `s`.
+fn splitmix64(s: &mut u64) -> u64 {
+    *s = s.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = *s;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// The order a tie of `tied` orders (indices in §5.3's order, at least one) is decided for.
+fn decide(tied: &[usize]) -> Option<usize> {
+    let n = tied.len();
+    if n == 0 {
+        return None;
+    }
+    let mut st = tie_state();
+    match st.mode {
+        Ties::Smallest => None,
+        Ties::Last => Some(tied[n - 1]),
+        Ties::Index(k) => Some(tied[k % n]),
+        Ties::Random => {
+            if n == 1 {
+                return Some(tied[0]);
+            }
+            // a uniform draw (the bias of the 64-bit product is below 2^-61)
+            let r = splitmix64(&mut st.rng);
+            Some(tied[((u128::from(r) * n as u128) >> 64) as usize])
+        }
+    }
 }
 
 fn best_order(q: &M3, e: [f64; 3]) -> Option<[Shear; 4]> {
-    let mode = ties();
+    let mode = tie_state().mode;
     let pick = if mode == Ties::Smallest {
         None
     } else {
@@ -211,12 +298,7 @@ fn best_order(q: &M3, e: [f64; 3]) -> Option<[Shear; 4]> {
         let tied: Vec<usize> = (0..6)
             .filter(|&i| norms[i].is_some_and(|x| x <= floor * (1.0 + 1e-12)))
             .collect();
-        match (mode, tied.len()) {
-            (_, 0) => None,
-            (Ties::Last, n) => Some(tied[n - 1]),
-            (Ties::Index(k), n) => Some(tied[k % n]),
-            (Ties::Smallest, _) => None,
-        }
+        decide(&tied)
     };
     let mut best: Option<(f64, [Shear; 4])> = None;
     for (index, o) in ORDERS.into_iter().enumerate() {
@@ -693,6 +775,38 @@ fn shear(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tie_setting_is_read_strictly() {
+        assert_eq!(parse_ties(None), Ok((Ties::Smallest, 0)));
+        assert_eq!(parse_ties(Some("first")), Ok((Ties::Index(0), 0)));
+        assert_eq!(parse_ties(Some("last")), Ok((Ties::Last, 0)));
+        assert_eq!(parse_ties(Some("5")), Ok((Ties::Index(5), 0)));
+        assert_eq!(parse_ties(Some("random:12")), Ok((Ties::Random, 12)));
+        for bad in ["6", "random:", "random:x", "random:-1", "smallest", ""] {
+            assert!(parse_ties(Some(bad)).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn seeded_draws_are_uniform_and_repeatable() {
+        let draw = |seed: u64, n: usize| {
+            let mut s = seed;
+            (0..6000)
+                .map(|_| ((u128::from(splitmix64(&mut s)) * n as u128) >> 64) as usize)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(draw(7, 4), draw(7, 4));
+        assert_ne!(draw(7, 4), draw(8, 4));
+        let counts = draw(3, 4).iter().fold([0usize; 4], |mut c, &k| {
+            c[k] += 1;
+            c
+        });
+        assert!(
+            counts.iter().all(|&c| (1350..1650).contains(&c)),
+            "{counts:?}"
+        );
+    }
 
     fn close(a: &M3, b: &M3, tol: f64) -> bool {
         (0..3).all(|i| (0..3).all(|j| (a[i][j] - b[i][j]).abs() < tol))

@@ -425,6 +425,15 @@ fn run_in_pool(
     // AFNI-97 and a decomposition that failed: flags of this run's resamplings.
     fourier::LONE_ROW_BEYOND.store(false, std::sync::atomic::Ordering::Relaxed);
     rotate::NO_SHEARS.store(false, std::sync::atomic::Ordering::Relaxed);
+    // The tie setting of this run (a validation switch), its generator started afresh.
+    if let Err(fatal) = rotate::reset_ties() {
+        return Err(VolregError {
+            messages,
+            notices,
+            fatal,
+            fatal_error: true,
+        });
+    }
     let lone_row = || fourier::LONE_ROW_BEYOND.load(std::sync::atomic::Ordering::Relaxed);
     let afni_97_stop = |messages: Vec<Message>| VolregError {
         messages,

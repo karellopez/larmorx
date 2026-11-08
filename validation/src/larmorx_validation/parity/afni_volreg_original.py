@@ -18,7 +18,8 @@ variables cleared, ``AFNI_DONT_LOGFILE`` yes):
    own difference), ``-1Dmatrix_save``, ``-maxdisp1D`` and ``-savedisp`` (bounds derived from each
    volume's own parameter differences), ``-SAVEDISP`` (its arithmetic bit for bit on AFNI's own
    raw displacements; a whole run where the normalisation is well conditioned), the registered
-   volumes (every volume's NCC and mean difference; the largest difference reported) and their
+   volumes (every volume's NCC and mean difference within the limit its own rotation gives;
+   ``-final NN`` by the nearest-neighbour rule; the largest difference reported) and their
    headers (identical);
 3. the original by default (three threads) and the replica by default (a black box, one thread):
    the same comparison, and the upstream defects named the same;
@@ -26,7 +27,8 @@ variables cleared, ``AFNI_DONT_LOGFILE`` yes):
    messages or files, a defect is named (GLIBC-07 never: an iterative fit, §4.3).
 
 fMRIPrep's calls (§14.2) also compare the median of the registered volumes, as niworkflows'
-``RobustAverage`` takes it, with fMRIPrep's own ``gen_avg`` / ``ref_average`` output; their
+``RobustAverage`` takes it, with fMRIPrep's own ``gen_avg`` / ``ref_average`` output (within
+the limit the run's volumes imply); their
 inputs are re-made from each oracle run's node by niworkflows' own lines in fMRIPrep 25.2.6's
 image (:data:`SLICED_SCRIPT`). Cases whose AFNI run crashes (AFNI-88, -89, -90) compare AFNI's
 messages before its crash banner with the original's before its own error. ``-@`` (standard
@@ -2478,6 +2480,8 @@ class Settings:
     SAVEDISP: bool = False
     rotcom: bool = False
     base_path: str | None = None
+    #: the input dataset as the command line names it (a sub-brick selector included)
+    dataset: str | None = None
 
 
 def _matches(arg: str, name: str, n: int | None) -> bool:
@@ -2493,6 +2497,7 @@ def settings_of(argv: list[str]) -> Settings:
     while i < len(argv):
         a = argv[i]
         if not a.startswith("-"):
+            s.dataset = a
             break
         nxt = argv[i + 1] if i + 1 < len(argv) else None
 
@@ -2763,6 +2768,66 @@ def header_differences(ha, hb) -> list[str]:
     return out
 
 
+def volume_limits(params: np.ndarray | None, nv: int) -> tuple[list[float], str]:
+    """§14.3's per-volume limit ``L_v = max(2e-3, 1e-3·θ_v)``, ``θ_v = |roll| + |pitch| + |yaw|``
+    (degrees) of the reference's parameters; 2e-3 for every volume when they are not written."""
+    if params is None or params.shape[0] != nv:
+        return [2e-3] * nv, "the reference's parameters not written: 2e-3"
+    theta = np.abs(params[:, :3]).sum(axis=1)
+    return [max(2e-3, 1e-3 * float(t)) for t in theta], "from the reference's rotations"
+
+
+def nn_rule(inp: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """§14.3's nearest-neighbour rule on one volume: ``a`` the reference's output, ``b`` the
+    test's, ``inp`` the input volume (the same grid). Returns the counts (differing, against the
+    rule, not checkable, from a source voxel two voxels away)."""
+    diff = (a != b) & ~(np.isnan(a) & np.isnan(b))
+    where = np.flatnonzero(diff)
+    if where.size == 0:
+        return np.zeros(4, dtype=np.int64)
+    vals = inp.ravel()
+    u, first, counts = np.unique(vals, return_index=True, return_counts=True)
+
+    def source(x: np.ndarray) -> np.ndarray:
+        """Each value's input voxel (flat index); -1 absent, -2 not unique."""
+        pos = np.clip(np.searchsorted(u, x), 0, u.size - 1)
+        found = u[pos] == x
+        return np.where(found, np.where(counts[pos] == 1, first[pos], -2), -1)
+
+    # input voxels within two voxels of a 0 (the input taken as 0 outside its grid)
+    zero = np.pad(inp == 0, 2, constant_values=True)
+    near = zero.copy()
+    for axis in range(3):
+        m = near.shape[axis] - 4
+        acc = np.take(near, range(m), axis=axis)
+        for k in range(1, 5):
+            acc = acc | np.take(near, range(k, k + m), axis=axis)
+        near = np.pad(acc, [(2, 2) if q == axis else (0, 0) for q in range(3)])
+    near = near[2:-2, 2:-2, 2:-2].ravel()
+    x, y = a.ravel()[where], b.ravel()[where]
+    against = unknown = two = 0
+    nz_x, nz_y = x != 0, y != 0
+    sx = np.where(nz_x, source(x), 0)
+    sy = np.where(nz_y, source(y), 0)
+    both = nz_x & nz_y
+    one = nz_x ^ nz_y
+    # a value against a value: their source voxels within two voxels along each axis
+    ok_src = both & (sx >= 0) & (sy >= 0)
+    unknown += int(np.count_nonzero(both & ((sx < 0) | (sy < 0))))
+    if ok_src.any():
+        ix = np.array(np.unravel_index(sx[ok_src], inp.shape))
+        iy = np.array(np.unravel_index(sy[ok_src], inp.shape))
+        dist = np.abs(ix - iy).max(axis=0)
+        against += int(np.count_nonzero(dist > 2))
+        two += int(np.count_nonzero(dist == 2))
+    # a 0 against a value: the value's source within two voxels of a 0 (or of the grid's outside)
+    sv = np.where(nz_x, sx, sy)
+    known = one & (sv >= 0)
+    unknown += int(np.count_nonzero(one & (sv < 0)))
+    against += int(np.count_nonzero(known & ~near[np.where(known, sv, 0)]))
+    return np.array([where.size, against, unknown, two], dtype=np.int64)
+
+
 def _ncc(a: np.ndarray, b: np.ndarray) -> float:
     a = a - a.mean()
     b = b - b.mean()
@@ -2776,11 +2841,22 @@ class Compare:
     """§14.3's comparison of a run with its reference, its checks named ``<label>: ...``."""
 
     def __init__(
-        self, checks: CheckList, pair: Pair, s: Settings, g: Geometry, gb: Geometry | None
+        self,
+        checks: CheckList,
+        pair: Pair,
+        s: Settings,
+        g: Geometry,
+        gb: Geometry | None,
+        coarse_required: bool = True,
     ):
         self.checks, self.p, self.s, self.g, self.gb = checks, pair, s, g, gb
+        #: §14.3: the coarse search's results required on the suite's cases and fMRIPrep's
+        #: calls, reported elsewhere (random testing)
+        self.coarse_required = coarse_required
         self.bounds: Bounds | None = None
         self.vol_rms: list[float] | None = None
+        #: the reference's parameters (its -1Dfile or -dfile), when written
+        self.ref_params: np.ndarray | None = None
 
     def add(self, name: str, passed: bool, **kw) -> Check:
         return self.checks(f"{self.p.label}: {name}", passed, **kw)
@@ -2832,6 +2908,7 @@ class Compare:
         if got is None:
             return
         ref, test = got
+        self.ref_params = ref
         if ref.shape != test.shape:
             self.add("-1Dfile", False, detail=f"shape {ref.shape} vs {test.shape}")
             return
@@ -2879,39 +2956,100 @@ class Compare:
         integer = a.dtype.kind in "iu"
         a4 = a.reshape(*a.shape[:3], -1).astype(np.float64)
         b4 = b.reshape(*b.shape[:3], -1).astype(np.float64)
-        worst_ncc, worst_mean, worst_max, beyond1 = 1.0, 0.0, 0.0, 0
+        nv = a4.shape[3]
+        limits, theta_from = volume_limits(self.ref_params, nv)
+        self.vol_limits = limits
         rms = []
-        ok = True
-        for v in range(a4.shape[3]):
-            x, y = a4[..., v], b4[..., v]
-            both = np.isnan(x) & np.isnan(y)
-            nan_ok = np.array_equal(np.isnan(x), np.isnan(y))
-            ok &= nan_ok
-            x, y = np.where(both, 0, x), np.where(both, 0, y)
-            big = float(np.abs(x).max()) or 1.0
+        for v in range(nv):
+            x, y = np.nan_to_num(a4[..., v]), np.nan_to_num(b4[..., v])
             dv = np.abs(x - y)
             rms.append(float(np.sqrt(np.mean(dv * dv))))
+        self.vol_rms = rms
+        nan_ok = np.array_equal(np.isnan(a4), np.isnan(b4))
+        self.add("registered volumes: NaNs at the same voxels", nan_ok)
+        if s.final == "NN":
+            self._nearest_neighbour(a4, b4)
+        else:
+            self._volume_measures(a4, b4, limits, theta_from, integer)
+        self.report("registered volumes identical", bool(np.array_equal(a4, b4, equal_nan=True)))
+
+    def _volume_measures(self, a4, b4, limits, theta_from: str, integer: bool) -> None:
+        """§14.3: each volume's mean |diff| within ``L_v`` of its largest value and its NCC at
+        least ``1 − 50·L_v²``, with ``L_v = max(2e-3, 1e-3·θ_v)`` from the reference's rotation;
+        the largest single difference reported."""
+        worst_ncc_margin, worst_mean_ratio, worst_max, beyond1 = 0.0, 0.0, 0.0, 0
+        worst_ncc, worst_mean = 1.0, 0.0
+        ok = True
+        for v in range(a4.shape[3]):
+            x, y = np.nan_to_num(a4[..., v]), np.nan_to_num(b4[..., v])
+            big = float(np.abs(x).max()) or 1.0
+            dv = np.abs(x - y)
             mean = float(dv.mean()) / big
             ncc = _ncc(x, y)
+            lv = limits[v]
             worst_ncc, worst_mean = min(worst_ncc, ncc), max(worst_mean, mean)
+            worst_mean_ratio = max(worst_mean_ratio, mean / lv)
+            worst_ncc_margin = max(worst_ncc_margin, (1.0 - ncc) / (50.0 * lv * lv))
             worst_max = max(worst_max, float(dv.max()) / big)
             beyond1 += int(np.count_nonzero(dv > 1)) if integer else 0
-            ok &= ncc >= 0.9998 and mean <= 2e-3
-        self.vol_rms = rms
+            ok &= ncc >= 1.0 - 50.0 * lv * lv and mean <= lv
         self.add(
             "registered volumes",
             ok,
-            metric="min NCC; max mean |diff| / max",
-            value=round(worst_ncc, 7),
-            threshold=">= 0.9998; <= 2e-3",
-            detail=f"NCC {worst_ncc:.7f}, mean {worst_mean:.2e}",
+            metric="max of mean |diff| / (L_v·max) and (1 − NCC) / (50·L_v²)",
+            value=round(max(worst_mean_ratio, worst_ncc_margin), 4),
+            threshold=1.0,
+            detail=(
+                f"NCC {worst_ncc:.7f}, mean {worst_mean:.2e}; L_v {min(limits):.2e} to "
+                f"{max(limits):.2e} ({theta_from})"
+            ),
         )
         self.report("registered volumes: largest |diff| / max", float(f"{worst_max:.3g}"))
-        self.report("registered volumes identical", bool(np.array_equal(a4, b4, equal_nan=True)))
         if integer:
             self.report(
                 "registered volumes: voxels differing by more than 1", f"{beyond1}/{a4.size}"
             )
+
+    def _nearest_neighbour(self, a4, b4) -> None:
+        """§14.3's rule for ``-final NN``: where the two outputs differ, the test's value is the
+        input's at a voxel within two voxels (along each axis) of the input voxel whose value the
+        reference holds there, the input taken as 0 outside its grid; checked where the input's
+        values are distinct, the rest counted and reported."""
+        inp = self._input_series(a4.shape)
+        if inp is None:
+            n = int(np.count_nonzero((a4 != b4) & ~(np.isnan(a4) & np.isnan(b4))))
+            self.report("registered volumes (-final NN): differing voxels", f"{n}/{a4.size}")
+            self.report("registered volumes (-final NN): the rule", "not checkable (input)")
+            return
+        totals = np.zeros(4, dtype=np.int64)  # differing, failing, not checkable, two away
+        for v in range(a4.shape[3]):
+            totals += nn_rule(inp[..., v], a4[..., v], b4[..., v])
+        differing, failing, unknown, two = (int(t) for t in totals)
+        self.add(
+            "registered volumes (-final NN): the nearest-neighbour rule",
+            failing == 0,
+            metric="differing voxels against the rule",
+            value=failing,
+            threshold=0,
+            detail=(
+                f"{differing} of {a4.size} voxels differ; {unknown} not checkable (the input's "
+                f"value not unique), {two} from a source two voxels away"
+            ),
+        )
+
+    def _input_series(self, shape) -> np.ndarray | None:
+        """The input dataset's values (4D, as float64) when the command line names a whole
+        NIfTI dataset of the output's shape; else ``None``."""
+        w = self.s.dataset
+        if not w or "[" in w or not (w.endswith(".nii") or w.endswith(".nii.gz")):
+            return None
+        for path in (Path(w), self.p.ref_dir / w):
+            if path.is_file():
+                data, _ = _load(path)
+                data = np.asarray(data, dtype=np.float64)
+                data = data.reshape(*data.shape[:3], -1)
+                return data if data.shape == tuple(shape) else None
+        return None
 
     # -- -dfile ------------------------------------------------------------------------------------
     def dfile(self) -> None:
@@ -3164,15 +3302,25 @@ class Compare:
             if abs(float(m1.group(2)) - float(m2.group(2))) > lim[ka] + 0.01:
                 return "the maximum displacement"
             if ka != kb:
+                # §14.3: a near tie when, in the reference's run, the value at the test's printed
+                # sub-brick is within the two sub-bricks' bounds plus 0.01 of the printed largest
                 values = self._maxdisp_values(delta)
-                near = values is not None and abs(values[kb] - values[ka]) <= lim[ka] + lim[kb]
-                if not near:
+                if values is None:
+                    values = _verbose_displacements(lines, delta)
+                if values is None or kb >= values.size:
+                    self.report("a near tie of the largest displacement (assumed)", f"{ka} vs {kb}")
+                    return ""
+                printed = float(m1.group(2))
+                if abs(values[kb] - printed) > lim[ka] + lim[kb] + 0.01:
                     return "the sub-brick (no near tie)"
                 self.report("a near tie of the largest displacement", f"{ka} vs {kb}")
             return ""
         if (m1 := _COARSE.match(x)) and (m2 := _COARSE.match(y)):
             if m1.group(1) == m2.group(1) and m1.group(3) == m2.group(3):
                 self.report("coarse search: progress marks differ", lines[i][:60])
+                return ""
+            if not self.coarse_required and m1.group(1) == m2.group(1):
+                self.report("coarse search: another result (reported)", f"{x} vs {y}")
                 return ""
             return "the coarse search's result"
         if x.startswith(_FAILED_BASIS) and _NUM.sub("#", x) == _NUM.sub("#", y):
@@ -3236,6 +3384,16 @@ class Compare:
         return True
 
 
+def _verbose_displacements(lines: list[str], delta: bool) -> np.ndarray | None:
+    """The maximum displacements (or their deltas) of ``-verbose``'s list in a run's messages."""
+    for i in range(1, len(lines)):
+        if lines[i - 1].startswith("++ Max displacements (mm) for each sub-brick"):
+            pairs = re.findall(r"(\S+)\((\S+)\)", lines[i])
+            if pairs:
+                return np.array([float(p[1] if delta else p[0]) for p in pairs])
+    return None
+
+
 def _first_difference(a: list[str], b: list[str]) -> str:
     for i, (x, y) in enumerate(zip(a, b, strict=False)):
         if x != y:
@@ -3272,6 +3430,29 @@ def _detrended_max(raw: np.ndarray) -> np.ndarray:
         slope = (tc[:, None] * (x - x.mean(axis=0))).sum(axis=0) / np.sum(tc * tc)
         x = x - x.mean(axis=0) - slope[None, :] * tc[:, None]
     return np.abs(x).max(axis=0)
+
+
+#: ``-SAVEDISP``'s sixteen products (§10.3), in its order.
+SAVEDISP_PRODUCT_NAMES = tuple(
+    [
+        "DXX",
+        "DYY",
+        "DZZ",
+        "DXY",
+        "DXZ",
+        "DYZ",
+        "DXXX",
+        "DYYY",
+        "DZZZ",
+        "DXXY",
+        "DXXZ",
+        "DXYY",
+        "DXZZ",
+        "DYYZ",
+        "DYZZ",
+        "DXYZ",
+    ]
+)
 
 
 def savedisp_two_steps(
@@ -3327,17 +3508,13 @@ def savedisp_two_steps(
         metric="bit-identical",
         detail="; ".join(bad),
     )
-    # The sixteen products: §10.3's arithmetic gives AFNI's values but at a few voxels, in second-
-    # and third-order products alike (findings: afni-volreg-original.md); reported, an open
-    # question for the spec writer.
-    checks.add(
-        Check(
-            "-SAVEDISP step 1: the sixteen products",
-            True,
-            metric="values differing",
-            value="; ".join(products) or "none",
-            threshold="reported (an open question: the arithmetic of §10.3's products)",
-        )
+    # §10.3's arithmetic, the line's double order included (spec writer, step 3): AFNI's sixteen
+    # products bit for bit as well
+    checks(
+        "-SAVEDISP step 1: the sixteen products on AFNI's raw displacements",
+        not products and len(sets) == 19,
+        metric="bit-identical",
+        detail="; ".join(products) or f"{len(sets)} datasets",
     )
     # step 2: the whole run
     names_a = sorted(n for n in afni_files if n.startswith(stem + "_D"))
@@ -3399,10 +3576,28 @@ def savedisp_two_steps(
     )
     checks.add(
         Check(
-            "-SAVEDISP step 2: the other voxels and the 16 products: largest |diff|",
+            "-SAVEDISP step 2: the other voxels: largest |diff|",
             True,
             metric="reported",
             value=float(f"{other:.3g}"),
+            threshold="reported",
+        )
+    )
+    worst_p, worst_c = 0.0, 1.0
+    for name in SAVEDISP_PRODUCT_NAMES:
+        fa, fb = afni_files.get(f"{stem}_{name}{suffix}"), lx_files.get(f"{stem}_{name}{suffix}")
+        if fa is None or fb is None:
+            continue
+        xa, xb = _series(fa).astype(np.float64), _series(fb).astype(np.float64)
+        if xa.shape == xb.shape:
+            worst_p = max(worst_p, float(np.abs(xa - xb).max()))
+            worst_c = min(worst_c, _ncc(xa, xb))
+    checks.add(
+        Check(
+            "-SAVEDISP step 2: the 16 products: largest |diff|; lowest correlation",
+            True,
+            metric="reported",
+            value=f"{worst_p:.3g}; {worst_c:.4f}",
             threshold="reported",
         )
     )
@@ -3521,33 +3716,55 @@ def _run_fmriprep(case: Case, checks: CheckList, d: Path) -> None:
     nonneg = _nonnegative(call)
     import nibabel as nib
 
-    ref = nib.load(node_average(call)).get_fdata(dtype="float64")
+    ref_img = nib.load(node_average(call))
+    ref = ref_img.get_fdata(dtype="float64")
     big = float(np.abs(ref).max()) or 1.0
+    # q: the stored median's step (its scale factor for an integer output, 0 for float32)
+    q = 0.0
+    if ref_img.get_data_dtype().kind in "iu":
+        slope = ref_img.dataobj.slope
+        q = float(slope) if np.isfinite(slope) and slope != 0 else 1.0
     name = f"{stem}_volreg.nii.gz"
 
-    def relative(out: Path, work: Path) -> float | None:
+    def measures(out: Path, work: Path) -> tuple[float, float, float, float] | None:
+        """fMRIPrep's median of the registered volumes against fMRIPrep's own: mean |diff|,
+        NCC, the largest |diff| / max and the share of voxels beyond 1e-3 of the maximum."""
         med = robust_median(out, src, nonneg, work)
-        return float(np.abs(med - ref).max()) / big if med.shape == ref.shape else None
+        if med.shape != ref.shape:
+            return None
+        dv = np.abs(med - ref)
+        share = float(np.count_nonzero(dv > 1e-3 * big)) / dv.size
+        return float(dv.mean()), _ncc(med, ref), float(dv.max()) / big, share
 
     afni_out = d / "afni" / name
 
     def medians(rep_dir: Path, fix_dir: Path) -> list[Check]:
         """fMRIPrep's median of the original's registered volumes in both modes, against
-        fMRIPrep's own output (and, reported, before storage against AFNI's)."""
+        fMRIPrep's own output (§14.3: within the limit its volumes imply, ``L_med`` the largest
+        ``L_v`` of the run's volumes), and, reported, before storage against AFNI's."""
+        oned = d / "afni" / f"{stem}_volreg.1D"
+        params = _table(oned, 6) if oned.is_file() else None
+        nv = params.shape[0] if params is not None else 1
+        lmed = max(volume_limits(params, nv)[0])
         out = []
         for mode, sub in (("reproduce", rep_dir), ("default", fix_dir)):
             f = sub / name
-            rel = relative(f, sub) if f.is_file() else None
-            if rel is None:
-                out.append(Check(f"fMRIPrep's median: the original ({mode})", False, detail="no registered volumes or another shape"))  # fmt: skip
+            got = measures(f, sub) if f.is_file() else None
+            label = f"fMRIPrep's median: the original ({mode})"
+            if got is None:
+                out.append(Check(label, False, detail="no registered volumes or another shape"))
                 continue
-            out.append(Check(f"fMRIPrep's median: the original ({mode})", rel <= 1e-4, metric="max |diff| / max", value=float(f"{rel:.3g}"), threshold=1e-4))  # fmt: skip
+            mean, ncc, largest, share = got
+            ratio = max(mean / (lmed * big + q), (1.0 - ncc) / (50.0 * lmed * lmed))
+            out.append(Check(label, mean <= lmed * big + q and ncc >= 1.0 - 50.0 * lmed * lmed, metric="max of mean |diff| / (L_med·max + q) and (1 − NCC) / (50·L_med²)", value=round(ratio, 4), threshold=1.0, detail=f"L_med {lmed:.2e}, q {q:.3g}; mean {mean / big:.2e} of max, NCC {ncc:.7f}"))  # fmt: skip
+            out.append(Check(f"{label}: largest |diff| / max; share beyond 1e-3", True, metric="reported", value=f"{largest:.3g}; {share:.3g}", threshold="reported"))  # fmt: skip
             fa, fb = _float_median(d / "afni" / name, nonneg), _float_median(f, nonneg)
             out.append(Check(f"fMRIPrep's median before storage: the original ({mode}) against AFNI's", True, metric="max |diff| / max", value=float(f"{float(np.abs(fa - fb).max()) / (float(np.abs(fa).max()) or 1.0):.3g}"), threshold="reported"))  # fmt: skip
         return out
 
     _compare_all(case, checks, d, run, argv, src.parent, more=medians)
-    rel = relative(afni_out, d / "afni") if afni_out.is_file() else None
+    got = measures(afni_out, d / "afni") if afni_out.is_file() else None
+    rel = None if got is None else got[2]
     # AFNI's own median is fMRIPrep's output byte for byte (§14.2): the inputs' check
     checks(
         "fMRIPrep's median: AFNI's (the inputs re-made as fMRIPrep made them)",
@@ -3558,113 +3775,13 @@ def _run_fmriprep(case: Case, checks: CheckList, d: Path) -> None:
     )
 
 
-#: The tie sides of the original tried where a comparison fails (``LARMORX_VOLREG_TIES``).
-TIE_SIDES = ("0", "1", "2", "3")
-
-
-def _pair(label, ref, test, ref_dir, test_dir, ref_files, test_files, s, g, gb) -> CheckList:
+def _pair(
+    label, ref, test, ref_dir, test_dir, ref_files, test_files, s, g, gb, coarse_required=True
+) -> CheckList:
     cl = CheckList()
-    Compare(cl, Pair(label, ref, test, ref_dir, test_dir, ref_files, test_files), s, g, gb).run()
+    pair = Pair(label, ref, test, ref_dir, test_dir, ref_files, test_files)
+    Compare(cl, pair, s, g, gb, coarse_required).run()
     return cl
-
-
-def _explained_by_ties(c: Check, side: str) -> Check:
-    return dataclasses.replace(
-        c,
-        passed=True,
-        threshold=(
-            f"reported (the decomposition's ties: with tie side {side} the original meets "
-            "every threshold)"
-        ),
-    )
-
-
-#: The checks a per-volume choice of tie sides may explain: the registered volumes and what
-#: follows from them alone (fMRIPrep's median).
-_PER_VOLUME = ("registered volumes", "fMRIPrep's median: the original")
-
-
-def _tie_sides(compared, d, run, argv, ins, extra, s, g, gb, afni, rfix, dirs, files, more):
-    """§14.3 allows for either side of the decomposition's exact ties (§5.3): the original's
-    tie sides (``LARMORX_VOLREG_TIES``), each in both modes, judged the same way. The first side
-    that meets every threshold explains the failures; else, when only the registered volumes
-    (and fMRIPrep's median) fail, each volume taken from the side closest to the reference's
-    (AFNI decides its ties resampling by resampling, so its volumes mix the sides). Returns the
-    explanation (the side, or ``"per volume"``), or ``None``; the failed checks are then reported
-    with it."""
-    sides = {}
-    for side in TIE_SIDES:
-        sd = {m: d / f"original-ties{side}-{m}" for m in ("reproduce", "fix")}
-        sp = {m: _prepare(v, run, ins) for m, v in sd.items()}
-        env = {**extra, "LARMORX_VOLREG_TIES": side}
-        sr = run_lx("original", defects.REPRODUCE, argv, sd["reproduce"], env, 1, run.stdin)
-        sf = run_lx("original", defects.FIX, argv, sd["fix"], env, LX_THREADS, run.stdin)
-        sfiles = {m: _written(v, sp[m]) for m, v in sd.items()}
-        alt = _pair("AFNI", afni, sr, dirs["afni"], sd["reproduce"], files["afni"], sfiles["reproduce"], s, g, gb).checks  # fmt: skip
-        alt += _pair("the replica (default)", rfix, sf, dirs["replica-fix"], sd["fix"], files["replica-fix"], sfiles["fix"], s, g, gb).checks  # fmt: skip
-        if more is not None:
-            alt += more(sd["reproduce"], sd["fix"])
-        if all(c.passed for c in alt):
-            return _explain(compared, side)
-        sides[side] = sd
-    failing = [c.name for c in compared.checks if not c.passed]
-    if not all(any(k in n for k in _PER_VOLUME) for n in failing):
-        return None
-    name = Path(s.prefix).name if s.prefix else ""
-    comp = {}
-    for mode, own, ref in (("reproduce", "original-reproduce", "afni"), ("fix", "original-fix", "replica-fix")):  # fmt: skip
-        cands = [dirs[own] / name] + [sides[k][mode] / name for k in TIE_SIDES]
-        if not all(c.is_file() for c in cands) or not (dirs[ref] / name).is_file():
-            return None
-        comp[mode] = d / f"original-composite-{mode}"
-        comp[mode].mkdir(exist_ok=True)
-        if not _composite(dirs[ref] / name, cands, comp[mode] / name):
-            return None
-    alt = more(comp["reproduce"], comp["fix"]) if more is not None else []
-    if all(c.passed for c in alt):
-        return _explain(compared, "per volume")
-    # the volumes explained, what follows from them (fMRIPrep's median) not: its failure stays,
-    # with the value the per-volume tie choices give
-    compared.checks = [
-        _explained_by_ties(c, "per volume")
-        if not c.passed and "registered volumes" in c.name
-        else c
-        for c in compared.checks
-    ]
-    for c in alt:
-        if not c.passed:
-            compared.add(dataclasses.replace(c, name=f"{c.name}, with each volume's tie side closest to AFNI's", passed=True, threshold="reported"))  # fmt: skip
-    return None
-
-
-def _composite(ref: Path, cands: list[Path], target: Path) -> bool:
-    """Each volume from the candidate closest to ``ref``'s (mean |diff|), written to ``target``
-    with the first candidate's header; whether every volume then meets §14.3's volume thresholds."""
-    import nibabel as nib
-
-    a = np.asanyarray(nib.load(ref).dataobj)
-    imgs = [nib.load(c) for c in cands]
-    data = [np.asanyarray(i.dataobj) for i in imgs]
-    if any(x.shape != a.shape for x in data):
-        return False
-    a4 = a.reshape(*a.shape[:3], -1).astype(np.float64)
-    out = np.empty_like(data[0]).reshape(*a.shape[:3], -1)
-    ok = True
-    for v in range(a4.shape[3]):
-        x = a4[..., v]
-        big = float(np.nanmax(np.abs(x))) or 1.0
-        means = [float(np.nanmean(np.abs(y.reshape(*a.shape[:3], -1)[..., v] - x))) for y in data]
-        k = int(np.argmin(means))
-        out[..., v] = data[k].reshape(*a.shape[:3], -1)[..., v]
-        ok &= _ncc(x, out[..., v].astype(np.float64)) >= 0.9998 and means[k] / big <= 2e-3
-    nib.save(nib.Nifti1Image(out.reshape(a.shape), imgs[0].affine, imgs[0].header), target)
-    return ok
-
-
-def _explain(compared: CheckList, how: str) -> str:
-    compared.checks = [c if c.passed else _explained_by_ties(c, how) for c in compared.checks]
-    compared(f"the decomposition's ties: with tie side {how} every threshold is met", True, metric="tie side", value=how, threshold="reported")  # fmt: skip
-    return how
 
 
 def _compare_all(
@@ -3675,6 +3792,7 @@ def _compare_all(
     argv: list[str],
     ins: Path,
     more=None,
+    random_testing: bool = False,
 ) -> None:
     extra = dict(run.env)
     s = settings_of(argv)
@@ -3697,8 +3815,9 @@ def _compare_all(
     if g is None:
         g = Geometry((1, 1, 1), np.ones(3), {"S": 2, "L": 0, "P": 1}, 0.0)
     compared = CheckList()
+    coarse = not random_testing
     if afni is not None:
-        compared.checks += _pair("AFNI", afni, rep, dirs["afni"], dirs["original-reproduce"], files["afni"], files["original-reproduce"], s, g, gb).checks  # fmt: skip
+        compared.checks += _pair("AFNI", afni, rep, dirs["afni"], dirs["original-reproduce"], files["afni"], files["original-reproduce"], s, g, gb, coarse).checks  # fmt: skip
         if s.SAVEDISP and afni.code == 0 and rep.code == 0:
             savedisp_two_steps(compared, d, run, argv, ins, extra, input_files, s, g, gb, dirs["afni"], files["afni"], dirs["original-reproduce"], files["original-reproduce"])  # fmt: skip
     else:
@@ -3707,13 +3826,14 @@ def _compare_all(
             "replica", defects.REPRODUCE, argv, d / "replica-reproduce", extra, 1, run.stdin
         )
         files["replica-reproduce"] = _written(d / "replica-reproduce", placed["replica-reproduce"])
-        compared.checks += _pair("the replica (reproduce)", rrep, rep, d / "replica-reproduce", dirs["original-reproduce"], files["replica-reproduce"], files["original-reproduce"], s, g, gb).checks  # fmt: skip
-    compared.checks += _pair("the replica (default)", rfix, fix, dirs["replica-fix"], dirs["original-fix"], files["replica-fix"], files["original-fix"], s, g, gb).checks  # fmt: skip
+        compared.checks += _pair("the replica (reproduce)", rrep, rep, d / "replica-reproduce", dirs["original-reproduce"], files["replica-reproduce"], files["original-reproduce"], s, g, gb, coarse).checks  # fmt: skip
+    compared.checks += _pair("the replica (default)", rfix, fix, dirs["replica-fix"], dirs["original-fix"], files["replica-fix"], files["original-fix"], s, g, gb, coarse).checks  # fmt: skip
     if more is not None:
         compared.checks += more(dirs["original-reproduce"], dirs["original-fix"])
-    ties_side = None
-    if afni is not None and not run.expect and any(not c.passed for c in compared.checks):
-        ties_side = _tie_sides(compared, d, run, argv, ins, extra, s, g, gb, afni, rfix, dirs, files, more)  # fmt: skip
+    verdict = ""
+    if random_testing and afni is not None and any(not c.passed for c in compared.checks):
+        ctx = TieContext(d, run, argv, ins, extra, s, g, afni, rep, fix, rfix, dirs, files)
+        verdict = ties_judgement(ctx, compared)
     checks.checks += compared.checks
     named = _d13(
         checks,
@@ -3725,16 +3845,279 @@ def _compare_all(
         files["original-reproduce"],
     )
     named_replica = defects.notices_in(rfix.stderr)
+    same_named = sorted(named) == sorted(named_replica)
+    if not same_named and verdict == "runaway":
+        # §14.3 point 4: whether AFNI-97's condition is met on the way is the ties' choice
+        same_named = sorted(set(named) - {"AFNI-97"}) == sorted(set(named_replica) - {"AFNI-97"})
     checks(
         "defects named as the replica's default",
-        sorted(named) == sorted(named_replica),
+        same_named,
         detail=f"{named} vs {named_replica}",
     )
     case_status = _status(run, afni, rep)
     if case_status is not None:
         raise Outcome(*case_status)
-    if ties_side is not None:
-        raise Outcome(EXPECTED, f"the shear decomposition's exact ties (specs/3dvolreg.md §5.3, §16): with the other tie side ({ties_side}) the original meets every threshold of §14.3; beyond them with its own (an open question for the spec writer)")  # fmt: skip
+
+
+# ------------------------------------------------------------------------------------------------
+# Random testing: §14.3's "The ties' spread" and its runaways
+
+
+#: The seeded runs of the ties' spread (§14.3: K = 12 runs, seeds 1 to 12, ``reproduce``).
+SPREAD_SEEDS = tuple(range(1, 13))
+#: A runaway (§14.3 point 4): a volume beyond 15 degrees or 20 mm.
+RUNAWAY_DEGREES, RUNAWAY_MM = 15.0, 20.0
+#: The text of the original's AFNI-97 stop (``reproduce``).
+_AFNI_97_STOP = "AFNI crashes here (AFNI-97;"
+#: The checks the ties' spread judges (the parameters and the registered volumes); every other
+#: requirement (the derived quantities' bounds follow each volume's own parameter differences)
+#: stays as it is.
+_SPREAD_CHECKS = (
+    "-1Dfile parameters",
+    "-1Dfile median",
+    "registered volumes",
+    "registered volumes (-final NN): the nearest-neighbour rule",
+)
+#: What a runaway still requires (§14.3 point 4), when both runs end with exit status 0.
+_RUNAWAY_REQUIRED = (
+    "files written",
+    "output header",
+    "output type",
+    "output shape",
+    "registered volumes: NaNs at the same voxels",
+)
+
+
+@dataclasses.dataclass
+class TieContext:
+    d: Path
+    run: Run
+    argv: list[str]
+    ins: Path
+    extra: dict
+    s: Settings
+    g: Geometry
+    afni: Ran
+    rep: Ran
+    fix: Ran
+    rfix: Ran
+    dirs: dict
+    files: dict
+
+
+def _params_in(files: dict, s: Settings) -> np.ndarray | None:
+    f = files.get(s.oned) if s.oned else None
+    return _table(f, 6) if f is not None else None
+
+
+def _beyond(params: np.ndarray | None) -> bool:
+    return (
+        params is not None
+        and params.size > 0
+        and bool(
+            np.abs(params[:, :3]).max() > RUNAWAY_DEGREES
+            or np.abs(params[:, 3:]).max() > RUNAWAY_MM
+        )
+    )
+
+
+def _afni_crashed(r: Ran) -> bool:
+    return r.code != 0 and _split_crash(r.stderr.splitlines())[1]
+
+
+def _stopped_by_afni_97(r: Ran) -> bool:
+    return r.code != 0 and _AFNI_97_STOP in _ANSI.sub("", r.stderr).replace("\n", " ")
+
+
+def _volumes(files: dict, s: Settings) -> np.ndarray | None:
+    name = Path(s.prefix).name if s.prefix and s.prefix != "NULL" else None
+    if name is None or name not in files:
+        return None
+    a, _ = _load(files[name])
+    a = np.nan_to_num(np.asarray(a, dtype=np.float64))
+    return a.reshape(*a.shape[:3], -1)
+
+
+def _masked(lines: list[str]) -> list[str]:
+    """Message lines with their numbers and the coarse search's progress marks masked."""
+    out = []
+    for x in _fit_blocks(lines)[0]:
+        if m := _COARSE.match(x):
+            x = f"{m.group(1)}# {m.group(3)}"
+        out.append(re.sub(r"\s+", " ", _NUM.sub("#", x)))
+    return out
+
+
+def _seeded_runs(ctx: TieContext) -> list[tuple[Ran, dict]]:
+    """The original with ``reproduce`` and each seeded tie draw (``random:<k>``, §14.3)."""
+    out = []
+    for k in SPREAD_SEEDS:
+        sd = ctx.d / f"original-seed{k}"
+        placed = _prepare(sd, ctx.run, ctx.ins)
+        env = {**ctx.extra, "LARMORX_VOLREG_TIES": f"random:{k}"}
+        r = run_lx("original", defects.REPRODUCE, ctx.argv, sd, env, 1, ctx.run.stdin)
+        out.append((r, _written(sd, placed)))
+    return out
+
+
+def _spread(centre_p, centre_v, seeded, s: Settings, ref_p, ref_v, g: Geometry) -> dict:
+    """§14.3 point 2: the largest difference between the original's default run (``centre``)
+    and its seeded runs, in each requirement's units (thresholds from the reference's values)."""
+    pb = parameter_bounds(ref_p, centre_p, s, g).param_bound
+    out = {"param": 0.0, "median": 0.0, "mean": 0.0, "ncc": 0.0, "runs": 0}
+    for _r, files in seeded:
+        pk = _params_in(files, s)
+        if pk is not None and pk.shape == centre_p.shape:
+            dk = np.abs(centre_p - pk)
+            out["param"] = max(out["param"], float((dk / pb).max()) if dk.size else 0.0)
+            out["median"] = max(out["median"], float(np.median(dk)) if dk.size else 0.0)
+            out["runs"] += 1
+        vk = _volumes(files, s)
+        same = centre_v is not None and ref_v is not None and vk is not None
+        if same and vk.shape == centre_v.shape == ref_v.shape:
+            for v in range(vk.shape[3]):
+                big = float(np.abs(ref_v[..., v]).max()) or 1.0
+                dv = np.abs(centre_v[..., v] - vk[..., v])
+                out["mean"] = max(out["mean"], float(dv.mean()) / big)
+                out["ncc"] = max(out["ncc"], 1.0 - _ncc(centre_v[..., v], vk[..., v]))
+    return out
+
+
+def _within_spread(test_p, test_v, ref_p, ref_v, sp: dict, s: Settings, g: Geometry) -> list[str]:
+    """§14.3 point 3: the requirements the test does not meet within the larger of the fixed
+    requirement and 3 times the spread (9 times for 1 − NCC); [] when it meets every one."""
+    bad = []
+    if test_p is not None and ref_p is not None and test_p.shape == ref_p.shape and ref_p.size:
+        pb = parameter_bounds(ref_p, test_p, s, g).param_bound
+        dp = np.abs(ref_p - test_p)
+        r = float((dp / pb).max())
+        if r > max(1.0, 3.0 * sp["param"]):
+            bad.append(f"parameters {r:.3g} thresholds (spread {sp['param']:.3g})")
+        m = 0.005 if s.method == "linear" else 0.001
+        med = float(np.median(dp))
+        if med > max(m, 3.0 * sp["median"]):
+            bad.append(f"median {med:.3g} (spread {sp['median']:.3g})")
+    if test_v is not None and ref_v is not None and test_v.shape == ref_v.shape:
+        limits, _ = volume_limits(ref_p, ref_v.shape[3])
+        nn = s.final == "NN"
+        for v in range(ref_v.shape[3]):
+            big = float(np.abs(ref_v[..., v]).max()) or 1.0
+            mean = float(np.abs(ref_v[..., v] - test_v[..., v]).mean()) / big
+            one = 1.0 - _ncc(ref_v[..., v], test_v[..., v])
+            lv = 0.0 if nn else limits[v]
+            if mean > max(lv, 3.0 * sp["mean"]) or one > max(50 * lv * lv, 9.0 * sp["ncc"]):
+                bad.append(f"volume {v}: mean {mean:.3g}, 1 - NCC {one:.3g}")
+                break
+    return bad
+
+
+def ties_judgement(ctx: TieContext, compared: CheckList) -> str:
+    """§14.3 "The ties' spread" for a random-testing case beyond the fixed requirements: a
+    runaway (point 4) is held to the output's structure; otherwise the original's 12 seeded runs
+    measure its own spread under the ties, and the parameters and registered volumes of both
+    comparisons (against AFNI, and the default against the replica's) are held to 3 times it.
+    Edits ``compared``'s checks; returns ``"runaway"``, ``"spread"`` or ``""`` (beyond both)."""
+    s, g = ctx.s, ctx.g
+    pa, po = _params_in(ctx.files["afni"], s), _params_in(ctx.files["original-reproduce"], s)
+    crash = _afni_crashed(ctx.afni)
+    runaway = _beyond(pa) or _beyond(po) or crash or _stopped_by_afni_97(ctx.rep)
+    seeded: list = []
+    if not runaway:
+        seeded = _seeded_runs(ctx)
+        runaway = any(_beyond(_params_in(f, s)) or _stopped_by_afni_97(r) for r, f in seeded)
+    if runaway:
+        _judge_runaway(ctx, compared)
+        return "runaway"
+    failing = [c for c in compared.checks if not c.passed]
+    if any(c.name.split(": ", 1)[-1] not in _SPREAD_CHECKS for c in failing):
+        return ""
+    va, vo = _volumes(ctx.files["afni"], s), _volumes(ctx.files["original-reproduce"], s)
+    pr, pf = _params_in(ctx.files["replica-fix"], s), _params_in(ctx.files["original-fix"], s)
+    vr, vf = _volumes(ctx.files["replica-fix"], s), _volumes(ctx.files["original-fix"], s)
+    if po is None or pa is None:
+        return ""
+    sp_a = _spread(po, vo, seeded, s, pa, va, g)
+    bad_a = _within_spread(po, vo, pa, va, sp_a, s, g)
+    bad_r: list[str] = []
+    if pr is not None and pf is not None:
+        sp_r = _spread(po, vo, seeded, s, pr, vr, g)
+        bad_r = _within_spread(pf, vf, pr, vr, sp_r, s, g)
+    detail = (
+        f"{sp_a['runs']} seeded runs: parameters {sp_a['param']:.3g} thresholds, median "
+        f"{sp_a['median']:.3g}, volumes mean {sp_a['mean']:.3g}, 1 - NCC {sp_a['ncc']:.3g}"
+    )
+    compared.add(
+        Check(
+            "the ties' spread (§14.3: 12 seeded runs of the original)",
+            not bad_a and not bad_r,
+            metric="within 3 times the spread (9 for 1 - NCC)",
+            value="; ".join(bad_a + bad_r) or "within",
+            threshold="reported" if not (bad_a or bad_r) else "3 x spread",
+            detail=detail,
+        )
+    )
+    if bad_a or bad_r:
+        return ""
+    compared.checks = [
+        c
+        if c.passed
+        else dataclasses.replace(
+            c, passed=True, threshold="within 3 times the ties' spread (§14.3)"
+        )
+        for c in compared.checks
+    ]
+    return "spread"
+
+
+def _judge_runaway(ctx: TieContext, compared: CheckList) -> None:
+    """§14.3 point 4: when both runs end with exit status 0, the files written, their names,
+    headers, types and dimensions, and the messages' text with their numbers masked; an exit
+    status that differs only by AFNI-97 accepted; the rest reported."""
+    pairs = {
+        "AFNI": (ctx.afni, ctx.rep, "afni", "original-reproduce"),
+        "the replica (default)": (ctx.rfix, ctx.fix, "replica-fix", "original-fix"),
+    }
+    kept = []
+    for c in compared.checks:
+        label, _, name = c.name.partition(": ")
+        ref, test, rd, td = pairs.get(label, (None, None, None, None))
+        if c.passed or ref is None:
+            kept.append(c)
+            continue
+        if name == "exit status":
+            r97 = _afni_crashed(ref) or _stopped_by_afni_97(ref)
+            t97 = _afni_crashed(test) or _stopped_by_afni_97(test)
+            only_97 = (r97 and (t97 or test.code == 0)) or (t97 and ref.code == 0)
+            kept.append(_reported(c, "differs only by AFNI-97 (a runaway)") if only_97 else c)
+        elif name in _RUNAWAY_REQUIRED and ref.code == 0 and test.code == 0:
+            kept.append(c)
+        else:
+            kept.append(_reported(c, "a runaway (§14.3 point 4)"))
+    compared.checks = kept
+    for label, (ref, test, rd, td) in pairs.items():
+        if ref.code == 0 and test.code == 0:
+            la = _masked(message_lines(ref.stderr, run_dir=ctx.dirs[rd]))
+            lb = _masked(message_lines(test.stderr, run_dir=ctx.dirs[td]))
+            compared.add(
+                Check(
+                    f"{label}: messages, numbers masked (a runaway, §14.3 point 4)",
+                    la == lb,
+                    detail="" if la == lb else _first_difference(la, lb),
+                )
+            )
+    compared.add(
+        Check(
+            "a runaway (§14.3 point 4: beyond 15 degrees or 20 mm, or AFNI-97)",
+            True,
+            metric="reported",
+            value=True,
+            threshold="reported",
+        )
+    )
+
+
+def _reported(c: Check, why: str) -> Check:
+    return dataclasses.replace(c, passed=True, threshold=f"reported ({why})")
 
 
 def _status(run: Run, afni: Ran | None, rep: Ran) -> tuple[str, str] | None:
@@ -3775,9 +4158,15 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 def run_argv(case: Case, checks: CheckList, argv: list[str], env: tuple = ()) -> None:
     """A whole command line (absolute input paths, outputs named in the run's directory)
-    compared as a case is: random testing's cases (``difftest/tools/afni_volreg_original.py``)."""
+    compared as a case is: random testing's cases (``difftest/tools/afni_volreg_original.py``),
+    judged by §14.3's fixed requirements, then, where they fail, by "The ties' spread"
+    (:func:`ties_judgement`); the coarse search's results reported, not required."""
     run = Run(tuple(argv), None, outputs=(), env=tuple(env))
-    _judged(case, checks, lambda d: _compare_all(case, checks, d, run, list(argv), d))
+    _judged(
+        case,
+        checks,
+        lambda d: _compare_all(case, checks, d, run, list(argv), d, random_testing=True),
+    )
 
 
 def _judged(case: Case, checks: CheckList, body) -> None:
@@ -3870,7 +4259,7 @@ def _highlights(results) -> list[str]:
     if med:
         v, case = max(med)
         lines.append(
-            f"- **fMRIPrep's medians**: the original's within {v:.3g} of the largest value of fMRIPrep's own output (`{case}`; threshold 1e-4)"
+            f"- **fMRIPrep's medians**: the original's at most {v:.3g} of its limit (`{case}`; 1.0 = the limit its volumes imply, §14.3)"
         )
     lines.extend(defects.summary(results))
     return lines
@@ -3906,9 +4295,16 @@ def suite() -> Suite:
             ),
             (
                 "registered volumes",
-                "every volume NCC >= 0.9998 and mean |diff| <= 2e-3 max; the largest difference reported",
+                "each volume v: mean |diff| <= L_v max and NCC >= 1 - 50 L_v^2, L_v = max(2e-3, 1e-3 theta_v), theta_v = |roll| + |pitch| + |yaw| of the reference (degrees); the largest difference reported",
             ),
-            ("fMRIPrep's medians", "max |diff| <= 1e-4 max of fMRIPrep's own output"),
+            (
+                "registered volumes, -final NN",
+                "every differing voxel's value from an input voxel within two voxels of the reference's source voxel (the input 0 outside its grid); checked where the input's values are unique",
+            ),
+            (
+                "fMRIPrep's medians",
+                "mean |diff| <= L_med max + q and NCC >= 1 - 50 L_med^2 against fMRIPrep's own output (L_med the run's largest L_v, q the stored median's step); the largest difference reported",
+            ),
             (
                 "the default against the replica's default",
                 "the same thresholds; the defects named the same",

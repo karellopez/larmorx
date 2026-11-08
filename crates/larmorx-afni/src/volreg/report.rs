@@ -223,14 +223,37 @@ fn legendre(x: f32, a: usize) -> f32 {
     match a {
         0 => 1.0,
         1 => x,
-        2 => 1.5 * x * x - 0.5,
-        _ => (2.5 * x * x - 1.5) * x,
+        2 => ((1.5 * x) * x) - 0.5,
+        _ => (((2.5 * x) * x) - 1.5) * x,
     }
 }
 
-/// `-SAVEDISP`'s normalisation (§10.3) of a series of volumes of `total` voxels, in place:
-/// voxel by voxel over the volumes, the linear trend removed (3dTshift's fit; skipped with fewer
-/// than 3 volumes), then every value multiplied by `1/max |value|` (left alone when it is 0).
+/// The line of `-SAVEDISP`'s detrending (§10.3 step 1) of one voxel's series `v` (at least 3
+/// values): the double sums `S0` (from `v_0`) and `S1` (from 0, float32 products `v_i·i`), then
+/// the intercept and slope in the spec's order of operations, each rounded to float32. The
+/// order decides the float32 values now and then (the textbook forms change some of them), and
+/// the normalisation magnifies such a step (spec §10.3, "The arithmetic, exactly").
+fn savedisp_line(v: &[f32]) -> (f32, f32) {
+    let mut s0 = f64::from(v[0]);
+    for &x in &v[1..] {
+        s0 += f64::from(x);
+    }
+    let mut s1 = 0f64;
+    for (i, &x) in v.iter().enumerate().skip(1) {
+        s1 += f64::from(x * i as f32);
+    }
+    let n = v.len();
+    let nf = n as f64;
+    let q = (n * n) as f64;
+    let a = ((2.0 / (nf + 1.0)) * (1.0 / nf)) * (((2.0 * (nf * s0)) - 3.0 * s1) - s0);
+    let b = ((-6.0 / (q - 1.0)) * (1.0 / nf)) * (((-s0) - 2.0 * s1) + nf * s0);
+    (a as f32, b as f32)
+}
+
+/// `-SAVEDISP`'s normalisation (§10.3 steps 1 to 3) of a series of volumes of `total` voxels,
+/// in place: voxel by voxel over the volumes, the linear trend removed (skipped with fewer than
+/// 3 volumes; `v_i − (a + b·i)` in float32, `b·i` first), then every value multiplied by
+/// `1/max |value|` (float32; left alone when the maximum is 0).
 pub fn normalise_displacements(series: &mut [f32], total: usize) {
     let nt = series.len().checked_div(total).unwrap_or(0);
     let mut v = vec![0f32; nt];
@@ -239,7 +262,10 @@ pub fn normalise_displacements(series: &mut [f32], total: usize) {
             *x = series[t * total + p];
         }
         if nt >= 3 {
-            crate::tshift::series::detrend(&mut v, crate::tshift::series::Removal::Trend);
+            let (a, b) = savedisp_line(&v);
+            for (i, x) in v.iter_mut().enumerate() {
+                *x -= a + b * i as f32;
+            }
         }
         let max = v.iter().fold(0f32, |m, &x| m.max(x.abs()));
         if max != 0.0 {
@@ -259,8 +285,7 @@ pub fn normalise_displacements(series: &mut [f32], total: usize) {
 pub fn savedisp_product(d: &[Vec<f32>; 3], counts: [usize; 3], total: usize) -> Vec<f32> {
     let mut out: Vec<f32> = (0..d[0].len())
         .map(|q| {
-            legendre(d[0][q], counts[0])
-                * legendre(d[1][q], counts[1])
+            (legendre(d[0][q], counts[0]) * legendre(d[1][q], counts[1]))
                 * legendre(d[2][q], counts[2])
         })
         .collect();
@@ -272,6 +297,15 @@ pub fn savedisp_product(d: &[Vec<f32>; 3], counts: [usize; 3], total: usize) -> 
 mod tests {
     use super::*;
     use crate::volreg::grid::Orient;
+
+    #[test]
+    fn the_savedisp_line_of_a_line_is_exact() {
+        let v: Vec<f32> = (0..20).map(|i| 3.0 + 0.5 * i as f32).collect();
+        assert_eq!(savedisp_line(&v), (3.0, 0.5));
+        let mut s = v.clone();
+        normalise_displacements(&mut s, 1);
+        assert!(s.iter().all(|&x| x == 0.0));
+    }
 
     #[test]
     fn the_base_line_has_negative_zero_translations() {

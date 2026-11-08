@@ -305,7 +305,13 @@ struct Rotations {
     m: [usize; 3],
     pct: f32,
     angles: Vec<[i32; 3]>,
-    /// The rotations' plans (§5.1 "from a matrix"; `None` for no rotation).
+    /// The rotations' transformations (`None` for no rotation) and the voxel sizes they are
+    /// planned for.
+    tfs: Vec<Option<Transform>>,
+    sizes: [f32; 3],
+    /// The rotations' plans (§5.1 "from a matrix"; `None` for no rotation), made once per run;
+    /// with the validation switch `random:<seed>`, made again for every volume (each coarse
+    /// rotation is a resampling whose ties are drawn afresh).
     plans: Vec<Option<rotate::Plan>>,
     /// The grid is not 3D (an axis of one voxel): every rotation but the identity fails.
     non_3d: bool,
@@ -346,21 +352,29 @@ impl Searcher {
         }
         let deg = std::f64::consts::PI / 180.0;
         let small = m.iter().any(|&d| d < 2);
-        let plans = angles
-            .par_iter()
+        // The rotations' transformations and plans, one after another (a fixed order: the
+        // validation switch `random:<seed>` draws its tie choices in it; 45 small solves).
+        let tfs: Vec<Option<Transform>> = angles
+            .iter()
             .map(|rot| {
                 if *rot == [0, 0, 0] || small {
                     return None;
                 }
                 let theta = [0, 1, 2].map(|q| -deg * f64::from(s.signs[q]) * f64::from(rot[q]));
                 let mat: M3 = rot3(s.axes, theta, s.trig);
-                let tf = Transform::Matrix {
+                Some(Transform::Matrix {
                     m: mat,
                     shift: [0.0; 3],
-                };
-                Some(rotate::plan(&tf, sizes, s.trig))
+                })
             })
             .collect();
+        let plans = if rotate::ties_random() {
+            Vec::new()
+        } else {
+            tfs.iter()
+                .map(|tf| tf.as_ref().map(|tf| rotate::plan(tf, sizes, s.trig)))
+                .collect()
+        };
         Searcher {
             settings: *s,
             n,
@@ -371,6 +385,8 @@ impl Searcher {
                 m,
                 pct,
                 angles,
+                tfs,
+                sizes,
                 plans,
                 non_3d: small,
             }),
@@ -434,7 +450,18 @@ impl Searcher {
             trig: s.trig,
         };
         let mut work = Work::default();
-        for (q, plan) in r.plans.iter().enumerate() {
+        let drawn: Vec<Option<rotate::Plan>>;
+        let plans = if rotate::ties_random() {
+            drawn = r
+                .tfs
+                .iter()
+                .map(|tf| tf.as_ref().map(|tf| rotate::plan(tf, r.sizes, s.trig)))
+                .collect();
+            &drawn
+        } else {
+            &r.plans
+        };
+        for (q, plan) in plans.iter().enumerate() {
             if !self.reg.empty {
                 match plan {
                     None => rotate::cut_window(vb, r.m, &self.reg.support, &mut buf),

@@ -1345,7 +1345,8 @@ def _estimators_table(ctx: core.Context) -> dict:
             "Verdict",
         ],
         rows,
-        note="Each estimator of the five oracle runs that have one, step by step on the inputs "
+        note="Each phase-difference estimator of the four oracle runs that have one (ds001600 has "
+        "three, ds002422 two), step by step on the inputs "
         "fMRIPrep's nodes were given (the examples above show three): larmorx (1 thread, "
         "reproduce mode) against sdcflows 2.17.1 (newest releases) output by output; against "
         "fMRIPrep 25.2.6's own files (the phase difference, the field map, the extrapolated "
@@ -1610,7 +1611,7 @@ def trial(ctx: core.Context) -> tuple[list[dict], dict]:
         trows,
         note="validation/difftest/triage.toml (block sdcflows-fieldmap, 2026-11-08); each "
         "difference has a permanent case (validation/difftest/cases/sdcflows-fieldmap/), run "
-        "by the record. The two short probes before the trial (relays 6 and 7) found larmorx's "
+        "by the record. Two short random-testing runs before the trial (the same day) found larmorx's "
         "mistakes in nibabel's header arithmetic, SciPy's float64 stacks and numpy's NaN, all "
         "fixed, each with a permanent case.",
     )

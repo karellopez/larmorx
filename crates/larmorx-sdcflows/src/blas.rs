@@ -10,7 +10,9 @@
 //!   `np.linalg.norm`; numpy 2.5.4 and 2.3.5): `double sum = 0.; sum += cblas_sdot(n, x, 1, y,
 //!   1)` in chunks of `CBLAS_INT_MAX / 2 + 1` elements (one chunk with the 64-bit integers of
 //!   scipy-openblas64), then `(float)sum`. With one chunk this is the `sdot` result unchanged.
-//!   `np.linalg.norm` of a float32 vector is `sqrt(x.dot(x))` in float32.
+//!   numpy treats a one-element vector as a scalar (`cblasfuncs.c`, `_select_matrix_shape`):
+//!   its dot product is the plain float product. `np.linalg.norm` of a float32 vector is
+//!   `sqrt(x.dot(x))` in float32.
 //! - **OpenBLAS** (`interface/dot.c`, `kernel/x86_64/sdot.c` with
 //!   `sdot_microk_haswell-2.c`, selected by `KERNEL.HASWELL` and `KERNEL.ZEN`): no threads.
 //!   For unit strides, the first `n1 = n & -32` elements go through the assembly kernel: four
@@ -99,14 +101,18 @@ pub fn sdot(x: &[f32], y: &[f32]) -> f32 {
     dot as f32
 }
 
-/// `np.dot(x, y)` of two contiguous float32 vectors: numpy's `FLOAT_dot` over OpenBLAS's
-/// `sdot` (a double sum of one chunk, cast back to float).
+/// `np.dot(x, y)` of two contiguous float32 vectors, as numpy's `cblas_matrixproduct`
+/// (`numpy/_core/src/common/cblasfuncs.c`) computes it: a vector of one element counts as a
+/// scalar there, so the result is the float product `x[0] * y[0]` (a signed zero stays
+/// signed); empty vectors give +0 (the zeroed output); longer ones go to `FLOAT_dot` over
+/// OpenBLAS's `sdot` (a double sum of one chunk, cast back to float).
 pub fn dot_f32(x: &[f32], y: &[f32]) -> f32 {
-    let mut sum = 0.0f64;
-    if !x.is_empty() {
-        sum += f64::from(sdot(x, y));
+    assert_eq!(x.len(), y.len(), "dot of vectors of different lengths");
+    match x.len() {
+        0 => 0.0,
+        1 => y[0] * x[0],
+        _ => (0.0f64 + f64::from(sdot(x, y))) as f32,
     }
-    sum as f32
 }
 
 /// `np.linalg.norm(x)` of a float32 vector: `sqrt(x.dot(x))` in float32.
@@ -139,7 +145,9 @@ mod tests {
         }
         assert_eq!(sdot(&x, &y).to_bits(), (d as f32).to_bits());
         assert_eq!(dot_f32(&[], &[]).to_bits(), 0.0f32.to_bits());
-        assert_eq!(dot_f32(&[-0.0], &[1.0]).to_bits(), 0.0f32.to_bits());
+        // One element: numpy's scalar product keeps the signed zero; two: sdot's +0 start.
+        assert_eq!(dot_f32(&[-0.0], &[1.0]).to_bits(), (-0.0f32).to_bits());
+        assert_eq!(dot_f32(&[-0.0, 0.0], &[1.0, -1.0]).to_bits(), 0.0f32.to_bits());
     }
 
     #[test]

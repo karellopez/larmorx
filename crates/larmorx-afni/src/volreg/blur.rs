@@ -126,79 +126,132 @@ fn source(p: i64, n: usize, ends: Ends) -> Option<usize> {
     (0..n).contains(&q).then_some(q as usize)
 }
 
-/// One output of the FIR sums (§6.1) from the samples `at(q)` = the pair `r[i−q] + r[i+q]`.
-#[inline]
-fn fir_sum(w: &[f32], centre: f32, pair: impl Fn(usize) -> f32) -> f32 {
+/// The FIR sums of §6.1 for a whole line at once: `out[i]` from the centre line `c` and, for
+/// `q = 1 … m`, the lines `lines(q) = (r[· − q], r[· + q])`; every output's terms in the spec's
+/// order (for `m ≤ 7` the outermost pair first and the centre last, else the centre first),
+/// each pair summed before its product. `acc` is a line of scratch.
+fn fir_lines<'a>(
+    w: &[f32],
+    c: &[f32],
+    lines: impl Fn(usize) -> (&'a [f32], &'a [f32]),
+    out: &mut [f32],
+    acc: &mut [f32],
+) {
     let m = w.len() - 1;
+    let n = out.len();
+    let acc = &mut acc[..n];
     if m <= 7 {
-        let mut acc = w[m] * pair(m);
+        let (a, b) = lines(m);
+        for i in 0..n {
+            acc[i] = w[m] * (a[i] + b[i]);
+        }
         for q in (1..m).rev() {
-            acc += w[q] * pair(q);
+            let (a, b) = lines(q);
+            for i in 0..n {
+                acc[i] += w[q] * (a[i] + b[i]);
+            }
         }
-        acc + w[0] * centre
+        for i in 0..n {
+            out[i] = acc[i] + w[0] * c[i];
+        }
     } else {
-        let mut acc = w[0] * centre;
-        for (q, &wq) in w.iter().enumerate().skip(1) {
-            acc += wq * pair(q);
+        for i in 0..n {
+            acc[i] = w[0] * c[i];
         }
-        acc
+        for (q, &wq) in w.iter().enumerate().skip(1) {
+            let (a, b) = lines(q);
+            for i in 0..n {
+                acc[i] += wq * (a[i] + b[i]);
+            }
+        }
+        out.copy_from_slice(acc);
     }
 }
 
-/// Blurs the rows of `v` along x with taps `w` (in place).
+/// Blurs the rows of `v` along x with taps `w` (in place), a plane per task.
 fn blur_x(v: &mut [f32], dims: [usize; 3], w: &[f32]) {
     let nx = dims[0];
     let m = w.len() - 1;
     if nx < m + 1 {
         return;
     }
-    v.par_chunks_mut(nx).for_each_init(
-        || vec![0f32; nx + 2 * m],
-        |ext, row| {
-            for (p, e) in ext.iter_mut().enumerate() {
-                let s = source(p as i64 - m as i64, nx, Ends::HalfEnd);
-                *e = s.map_or(0.0, |s| row[s]);
-            }
-            for (i, r) in row.iter_mut().enumerate() {
-                let c = i + m;
-                *r = fir_sum(w, ext[c], |q| ext[c - q] + ext[c + q]);
+    v.par_chunks_mut(nx * dims[1]).for_each_init(
+        || (vec![0f32; nx + 2 * m], vec![0f32; nx]),
+        |(ext, acc), plane| {
+            for row in plane.chunks_exact_mut(nx) {
+                for (p, e) in ext.iter_mut().enumerate() {
+                    let s = source(p as i64 - m as i64, nx, Ends::HalfEnd);
+                    *e = s.map_or(0.0, |s| row[s]);
+                }
+                let ext: &[f32] = ext;
+                let lines = |q: usize| (&ext[m - q..m - q + nx], &ext[m + q..m + q + nx]);
+                fir_lines(w, &ext[m..m + nx], lines, row, acc);
             }
         },
     );
 }
 
-/// The two input lines `q` steps before and after an output line (`None`: zeros).
-type Pair<'a> = (Option<&'a [f32]>, Option<&'a [f32]>);
-
-/// Blurs along y (`axis` 1) or z (`axis` 2): each output x line from whole input x lines.
-fn blur_yz(v: &mut [f32], dims: [usize; 3], w: &[f32], axis: usize, ends: Ends) {
-    let [nx, ny, nz] = dims;
-    let n = dims[axis];
+/// Blurs along y (in place), a plane per task: each output x line from the plane's lines.
+fn blur_y(v: &mut [f32], dims: [usize; 3], w: &[f32], ends: Ends) {
+    let [nx, ny, _] = dims;
     let m = w.len() - 1;
-    if n < m + 1 {
+    if ny < m + 1 {
         return;
     }
-    let src = v.to_vec();
-    let line = |j: usize, k: usize| -> &[f32] { &src[nx * (j + ny * k)..][..nx] };
-    v.par_chunks_mut(nx).enumerate().for_each(|(row, out)| {
-        let (j, k) = (row % ny, row / ny);
-        let t = if axis == 1 { j } else { k };
-        let at = |p: i64| -> Option<&[f32]> {
-            source(p, n, ends).map(|s| if axis == 1 { line(s, k) } else { line(j, s) })
-        };
-        let neighbours: Vec<Pair<'_>> = (0..=m)
-            .map(|q| (at(t as i64 - q as i64), at(t as i64 + q as i64)))
-            .collect();
-        let centre = neighbours[0].0.expect("the row itself");
-        for i in 0..nx {
-            let pair = |q: usize| {
-                let (a, b) = neighbours[q];
-                a.map_or(0.0, |a| a[i]) + b.map_or(0.0, |b| b[i])
+    let zeros = vec![0f32; nx];
+    v.par_chunks_mut(nx * ny).for_each_init(
+        || (vec![0f32; nx * ny], vec![0f32; nx]),
+        |(copy, acc), plane| {
+            copy.copy_from_slice(plane);
+            let copy: &[f32] = copy;
+            let line = |p: i64| -> &[f32] {
+                source(p, ny, ends).map_or(&zeros[..], |s| &copy[nx * s..nx * (s + 1)])
             };
-            out[i] = fir_sum(w, centre[i], pair);
+            for (j, out) in plane.chunks_exact_mut(nx).enumerate() {
+                let t = j as i64;
+                let lines = |q: usize| (line(t - q as i64), line(t + q as i64));
+                fir_lines(w, &copy[nx * j..nx * (j + 1)], lines, out, acc);
+            }
+        },
+    );
+}
+
+/// The columns per task of the z blur.
+const COLUMNS: usize = 1024;
+
+/// Blurs along z (in place): blocks of columns (the same voxels of every plane) gathered into
+/// a buffer of their own, blurred along z, written back.
+fn blur_z(v: &mut [f32], dims: [usize; 3], w: &[f32], ends: Ends) {
+    let [nx, ny, nz] = dims;
+    let m = w.len() - 1;
+    if nz < m + 1 {
+        return;
+    }
+    let plane = nx * ny;
+    let blocks = plane.div_ceil(COLUMNS);
+    let mut parts: Vec<Vec<&mut [f32]>> = (0..blocks).map(|_| Vec::with_capacity(nz)).collect();
+    for pl in v.chunks_mut(plane) {
+        for (b, part) in pl.chunks_mut(COLUMNS).enumerate() {
+            parts[b].push(part);
+        }
+    }
+    parts.into_par_iter().for_each(|mut slices| {
+        let len = slices[0].len();
+        let mut copy = vec![0f32; nz * len];
+        for (k, sl) in slices.iter().enumerate() {
+            copy[k * len..(k + 1) * len].copy_from_slice(sl);
+        }
+        let zeros = vec![0f32; len];
+        let mut acc = vec![0f32; len];
+        let line = |p: i64| -> &[f32] {
+            source(p, nz, ends).map_or(&zeros[..], |s| &copy[len * s..len * (s + 1)])
+        };
+        for (k, out) in slices.iter_mut().enumerate() {
+            let t = k as i64;
+            let lines = |q: usize| (line(t - q as i64), line(t + q as i64));
+            fir_lines(w, &copy[len * k..len * (k + 1)], lines, out, &mut acc);
         }
     });
-    let _ = nz;
 }
 
 /// The FIR blur of §6.1 with σ (mm) per axis over steps `delta` (mm), factor F, and an optional
@@ -231,9 +284,9 @@ pub fn fir(
                 } else {
                     Ends::HalfEnd
                 };
-                blur_yz(v, dims, &w, 1, ends);
+                blur_y(v, dims, &w, ends);
             }
-            _ => blur_yz(v, dims, &w, 2, Ends::Both),
+            _ => blur_z(v, dims, &w, Ends::Both),
         }
     }
 }

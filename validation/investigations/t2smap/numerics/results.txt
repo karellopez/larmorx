@@ -105,3 +105,13 @@ logf_numpy: 64/64 chunks identical (4294967296 inputs); correctly rounded logf: 
 logf over positive finite (2139095039 inputs): numpy vs correctly rounded 78427614 differ (max 4 ulp), numpy vs glibc 78438378, glibc vs correctly rounded 416908
 logf over [1, 2^24] (201326593 inputs): numpy vs correctly rounded 10947841 differ (max 3 ulp), numpy vs glibc 10955142, glibc vs correctly rounded 167180
 RUN-BOTH-DONE
+
+=== lstsq_columns.py (OPENBLAS_CORETYPE=Haswell; columns bit-identical to the full 1-thread solve)
+numpy 2.3.5
+m=600 nrhs=5003: alone 239/300, shifted {1: 5001, 2: 5001, 3: 5001} of 5003, threads {2: 4999, 4: 4995, 14: 4992} of 5003
+m=100 nrhs=1001: alone 256/300, shifted {1: 1001, 2: 1000, 3: 1001} of 1001, threads {2: 1001, 4: 1001, 14: 1001} of 1001
+m=5 nrhs=777: alone 300/300, shifted {1: 777, 2: 777, 3: 777} of 777, threads {2: 777, 4: 777, 14: 777} of 777
+numpy 2.5.4
+m=600 nrhs=5003: alone 235/300, shifted {1: 5001, 2: 5001, 3: 5001} of 5003, threads {2: 4999, 4: 4995, 14: 4989} of 5003
+m=100 nrhs=1001: alone 262/300, shifted {1: 999, 2: 999, 3: 1001} of 1001, threads {2: 1001, 4: 1001, 14: 1001} of 1001
+m=5 nrhs=777: alone 300/300, shifted {1: 777, 2: 777, 3: 777} of 777, threads {2: 777, 4: 777, 14: 777} of 777

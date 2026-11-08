@@ -64,3 +64,12 @@ numpy 2.5.4 / SciPy 1.18.1):
   floats (3.7 %, at most 4 ulp) and on 10,947,841 of the 201,326,593 floats in `[1, 2^24]` (5.4 %,
   at most 3 ulp: tedana's `log(|x| + 1)`); glibc's `logf` differs from the correctly rounded one on
   416,908 and 167,180 of them.
+
+`lstsq_columns.py` measures whether `numpy.linalg.lstsq`'s solution for one column of B (one voxel
+of tedana's log-linear fit, all voxels of one adaptive-mask value solved at once by LAPACK's
+`dgelsd`) depends on the other columns and on BLAS threads. It does: about a fifth of the columns
+solved alone differ in their last bits from the same columns in the full solve (239 and 235 of 300
+identical, m = 600 rows), a shift of the columns by 1 to 3 places changes 2 of 5,003, and 2, 4 or
+14 BLAS threads change 4 to 14 of 5,003 (tedana's `--n-threads`); with one volume (m = echoes) every
+column is the same in every arrangement. So the replica follows `dgelsd` on the whole batch with
+OpenBLAS's kernels at one thread (fMRIPrep's call), column blocking included.

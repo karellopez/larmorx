@@ -1652,7 +1652,10 @@ def _speed(bench) -> dict | None:
         "environment, OPENBLAS_NUM_THREADS=1 as fMRIPrep's nodes; every output byte-identical). "
         "BSplineApprox has no thread option: sdcflows' fit runs on one thread; larmorx's at "
         "one thread stores the collocation matrix, at 14 evaluates the weights at every "
-        "product (the same bits).",
+        "product (the same bits). ds001600's three one-thread fits ran after the benchmark's "
+        "first calls in the same process and took longer than in a fresh process (the "
+        "report's footnote 1: the stored matrix's speed depends on what the process ran "
+        "before, an open follow-up).",
     }
 
 

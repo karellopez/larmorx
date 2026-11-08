@@ -34,7 +34,7 @@ def _header_diff(a, b) -> list[str]:
     if not hasattr(hb, "keys"):  # a larmorx header
         hb = nb.Nifti1Header(hb.to_bytes()) if hb.version == 1 else nb.Nifti2Header(hb.to_bytes())
     skip = ("vox_offset", "scl_slope", "scl_inter")
-    return [k for k in ha.keys() if k not in skip and ha[k].tobytes() != hb[k].tobytes()]
+    return [k for k in ha.keys() if k not in skip and ha[k].tobytes() != hb[k].tobytes()]  # noqa: SIM118
 
 
 def _data(img) -> np.ndarray:
@@ -96,7 +96,9 @@ def cause(recipe: dict) -> list[str]:
                                            upstream_defects="reproduce")  # fmt: skip
             oc = o.out_coeff if isinstance(o.out_coeff, list) else [o.out_coeff]
             pairs = [("field", o.out_field, m.out_field), ("error", o.out_error, m.out_error)]
-            pairs += [(f"coeff{i}", a, b) for i, (a, b) in enumerate(zip(oc, m.out_coeff))]
+            pairs += [
+                (f"coeff{i}", a, b) for i, (a, b) in enumerate(zip(oc, m.out_coeff, strict=False))
+            ]
             out = []
             for label, a, b in pairs:
                 out += _compare_images(label, nb.load(a), nb.load(b))

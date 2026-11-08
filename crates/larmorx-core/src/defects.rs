@@ -359,7 +359,7 @@ defects! {
     TED_03 = "TED-03", "tedana", true,
         "t2smap without --mask computes one with nilearn's compute_epi_mask; when that finds no voxel (nilearn's MaskWarning: Computed an empty mask) t2smap goes on and fails in the adaptive mask with IndexError: index -1 is out of bounds for axis 0 with size 0, and an image with too few voxels for its threshold fails with ValueError: attempt to get argmax of an empty sequence";
     TED_04 = "TED-04", "tedana", true,
-        "t2smap applies a user mask by voxel index without comparing its affine with the data's (tedana's own TODO), so a mask of the same shape in another space is used silently";
+        "t2smap applies a user mask by voxel index without comparing its affine with the data's, so a mask of the same shape in another space is used silently";
     TED_05 = "TED-05", "tedana", true,
         "t2smap caps only the limited T2* map (values above ten times its 99.5th percentile set to it); the full map, from which the optimal combination is weighted and which fMRIPrep keeps as its T2* map, holds the fit's largest values (up to 239,794 s on fMRIPrep's ds003592 call, in 2 to 34 voxels of its four multi-echo calls), where tedana 25.0.1's t2smap capped the full map too";
     TED_07 = "TED-07", "tedana", true,
@@ -383,7 +383,7 @@ defects! {
     TED_16 = "TED-16", "tedana", true,
         "t2smap --exclude accepts a list that removes every volume (with or without --dummy-scans): the adaptive mask is then made from no volume and the log-linear fit solves no rows, so every voxel's T2* is 1/0 (infinite, then set to 500 ms) and S0 is 1, and t2smap writes these maps and the combination they weight with exit status 0 (the curve fit fails with numpy's ValueError of an empty minimum, the dropout method with the argmax of an empty sequence)";
     TED_17 = "TED-17", "tedana", true,
-        "t2smap fails with IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed when a single voxel is left for the fit (a one-voxel mask, or one voxel with good signal): fit_loglinear squeezes its (voxels x echo counts) mask column to a 0-dimensional array before indexing it (both fit types and fit modes)";
+        "t2smap fails with IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed when a single voxel is left for the fit (a one-voxel mask, or one voxel with good signal), with both fit types and both fit modes";
     TED_18 = "TED-18", "tedana", true,
         "t2smap caps the limited T2* map at its 99.5th percentile, which is 0 when more than 99.5 % of its values are 0 (the voxels with one good echo, which the limited map sets to 0): every positive limited T2* is then set to 0, so the limited map holds no estimate and the RMSE is computed with T2* = 0 (numpy's divide-by-zero warning)";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,

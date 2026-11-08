@@ -461,10 +461,19 @@ impl LevelWeights {
     }
 
     /// Whether SDC-02 changes this level's weights: the sampling grid is rotated relative to
-    /// the control grid and sdcflows' separable product or the exact weights store a weight
-    /// (both empty give the same zero rows).
+    /// the control grid, some index of it moves another axis' coordinate (else the separable
+    /// product is the exact one, a single voxel for instance), and sdcflows' separable product
+    /// or the exact weights store a weight (both empty give the same zero rows).
     pub fn sdc02_changes(&self) -> bool {
         if self.aligned {
+            return false;
+        }
+        // The separable product takes axis `a`'s coordinate from index `a` alone; it is the
+        // exact one wherever no other index of the sampling grid moves that coordinate.
+        let mixes = (0..3).any(|a| {
+            (0..3).any(|b| b != a && self.to_grid[a][b] != 0.0 && self.axes[b].n_samples > 1)
+        });
+        if !mixes {
             return false;
         }
         if !self.axes.iter().any(|a| a.nnz() == 0) {
@@ -680,6 +689,83 @@ pub struct Csr<T> {
     pub data: Vec<T>,
 }
 
+/// A [`Collocation`] stored as scipy holds its matrix (`csr_matvec`'s rows) and as its
+/// transpose reads it (`csc_matvec` on `X.T`: every column's samples in ascending order), with
+/// 32-bit indices: 16 bytes per stored weight, against at least 24 in scikit-learn's fit
+/// (sdcflows' matrix, the copy `_preprocess_data` makes, and the copy every adjoint product
+/// makes with `X.conj()`), so its peak stays within the memory rule. The products give the
+/// [`Collocation`]'s bits: the same weights in the same order.
+#[derive(Clone, Debug)]
+pub struct StoredCollocation {
+    shape: [usize; 2],
+    indptr: Vec<usize>,
+    cols: Vec<u32>,
+    data: Vec<f32>,
+    col_ptr: Vec<usize>,
+    row_idx: Vec<u32>,
+    cdata: Vec<f32>,
+}
+
+impl StoredCollocation {
+    /// `(rows, cols)`.
+    pub fn shape(&self) -> [usize; 2] {
+        self.shape
+    }
+
+    /// The stored weights.
+    pub fn nnz(&self) -> usize {
+        self.data.len()
+    }
+
+    /// `X @ v`: each row a float32 sum from +0 in ascending column order.
+    pub fn matvec_f32(&self, v: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
+        let [rows, cols] = self.shape;
+        if v.len() != cols {
+            return Err(SdcError::Invalid(format!(
+                "dimension mismatch: the matrix has {cols} columns, the vector {} values",
+                v.len()
+            )));
+        }
+        Ok(with_threads(n_threads, || {
+            (0..rows)
+                .into_par_iter()
+                .with_min_len(1024)
+                .map(|r| {
+                    let mut sum = 0.0f32;
+                    for jj in self.indptr[r]..self.indptr[r + 1] {
+                        sum += self.data[jj] * v[self.cols[jj] as usize];
+                    }
+                    sum
+                })
+                .collect()
+        })?)
+    }
+
+    /// `X.T @ y`: each column a float32 sum from +0 in ascending sample order.
+    pub fn rmatvec_f32(&self, y: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
+        let [rows, cols] = self.shape;
+        if y.len() != rows {
+            return Err(SdcError::Invalid(format!(
+                "dimension mismatch: the matrix has {rows} rows, the vector {} values",
+                y.len()
+            )));
+        }
+        Ok(with_threads(n_threads, || {
+            (0..cols)
+                .into_par_iter()
+                .with_min_len(16)
+                .map(|c| {
+                    let mut sum = 0.0f32;
+                    for k in self.col_ptr[c]..self.col_ptr[c + 1] {
+                        sum += self.cdata[k] * y[self.row_idx[k] as usize];
+                    }
+                    sum
+                })
+                .collect()
+        })?)
+    }
+}
+
 impl Collocation {
     /// The levels side by side; every level must have been computed on the same sampling grid.
     pub fn new(levels: Vec<LevelWeights>) -> Result<Collocation, SdcError> {
@@ -841,6 +927,92 @@ impl Collocation {
         Ok(with_threads(n_threads, || {
             (0..n).into_par_iter().with_min_len(1024).map(row).collect()
         })?)
+    }
+
+    /// The matrix stored, rows and columns ([`StoredCollocation`]): the fit's operator by
+    /// default (one pass to build, then each product reads it instead of evaluating the
+    /// weights). `None` when a row or column index does not fit in 32 bits.
+    pub fn store(&self, n_threads: usize) -> Result<Option<StoredCollocation>, SdcError> {
+        self.check_f32()?;
+        let [n_rows, n_cols] = self.shape();
+        if u32::try_from(n_rows).is_err() || u32::try_from(n_cols).is_err() {
+            return Ok(None);
+        }
+        // The row lengths, then the rows written in place, chunk by chunk.
+        let counts: Vec<usize> = with_threads(n_threads, || {
+            (0..n_rows)
+                .into_par_iter()
+                .with_min_len(1024)
+                .map(|r| {
+                    let mut k = 0usize;
+                    self.for_row(r, |_, _| k += 1);
+                    k
+                })
+                .collect()
+        })?;
+        let mut indptr = Vec::with_capacity(n_rows + 1);
+        indptr.push(0usize);
+        for c in &counts {
+            indptr.push(indptr.last().copied().unwrap_or(0) + c);
+        }
+        drop(counts);
+        let nnz = indptr[n_rows];
+        let mut cols = vec![0u32; nnz];
+        let mut data = vec![0.0f32; nnz];
+        const CHUNK: usize = 4096;
+        let mut pieces = Vec::with_capacity(n_rows.div_ceil(CHUNK));
+        let (mut rest_c, mut rest_d) = (cols.as_mut_slice(), data.as_mut_slice());
+        let mut start = 0;
+        while start < n_rows {
+            let end = (start + CHUNK).min(n_rows);
+            let len = indptr[end] - indptr[start];
+            let (c, rc) = rest_c.split_at_mut(len);
+            let (d, rd) = rest_d.split_at_mut(len);
+            pieces.push((start, end, c, d));
+            rest_c = rc;
+            rest_d = rd;
+            start = end;
+        }
+        with_threads(n_threads, || {
+            pieces.into_par_iter().for_each(|(start, end, c, d)| {
+                let mut k = 0;
+                for r in start..end {
+                    self.for_row(r, |col, w| {
+                        c[k] = col as u32;
+                        d[k] = w as f32;
+                        k += 1;
+                    });
+                }
+            });
+        })?;
+        // The transpose: a stable counting sort by column (every column's samples ascending).
+        let mut col_ptr = vec![0usize; n_cols + 1];
+        for &c in &cols {
+            col_ptr[c as usize + 1] += 1;
+        }
+        for c in 0..n_cols {
+            col_ptr[c + 1] += col_ptr[c];
+        }
+        let mut next = col_ptr.clone();
+        let mut row_idx = vec![0u32; nnz];
+        let mut cdata = vec![0.0f32; nnz];
+        for r in 0..n_rows {
+            for jj in indptr[r]..indptr[r + 1] {
+                let c = cols[jj] as usize;
+                row_idx[next[c]] = r as u32;
+                cdata[next[c]] = data[jj];
+                next[c] += 1;
+            }
+        }
+        Ok(Some(StoredCollocation {
+            shape: [n_rows, n_cols],
+            indptr,
+            cols,
+            data,
+            col_ptr,
+            row_idx,
+            cdata,
+        }))
     }
 
     /// `X.T @ y` for float32 `X` and `y`, as scipy computes it through the transposed (CSC)

@@ -122,7 +122,9 @@ def nibabel_qform(affine: np.ndarray, lapack: str = "3.12.1") -> dict[str, Any]:
 def numpy_linalg_small(kind: str, a: np.ndarray, lapack: str = "3.12.1") -> Any:
     """numpy.linalg's ``svd`` (3 x 3: ``(u, s[None], vt)``), ``eigh`` (4 x 4, lower: ``(w[None],
     v)``) or ``det(a) > 0`` (``kind="det_positive"``) as numpy computes them with OpenBLAS's
-    Haswell kernels and LAPACK ``lapack``; ``None`` where numpy raises ``LinAlgError``."""
+    Haswell kernels and LAPACK ``lapack``, or nibabel's ``io_orientation`` polar factor
+    (``kind="io_polar"``: ``P[:, keep] @ Qs[keep]``); ``None`` where numpy raises
+    ``LinAlgError``."""
 
 def nifti_header_info(header: dict[str, Any]) -> dict[str, Any]:
     """Shape, dtype, zooms, affines, scaling and serialised bytes of header fields."""
@@ -880,10 +882,13 @@ def sdcflows_bspline_approx(
     resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None] | None = None,
     n_threads: int = 1,
     upstream_defects: str = "fix",
+    low_memory: bool = False,
 ) -> dict[str, Any]:
     """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
     grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
-    system, log, beyond (whether SDC-01 changed, or would have changed, the weights)."""
+    system, log, beyond (whether SDC-01 changed, or would have changed, the weights). The fit
+    reads the stored collocation matrix, or, with ``low_memory``, evaluates the weights at
+    every product (the same bits)."""
 
 def sdcflows_rescale_affine(
     affine: np.ndarray,

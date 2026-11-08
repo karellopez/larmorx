@@ -24,12 +24,13 @@ from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import io_orientation as _io_orientation
 from larmorx.io.nibabel_header import set_xform as _nb_set_xform
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.approx import _fname_presuffix
 from larmorx.sdcflows.tools import _as_loaded, _header
 from larmorx.transforms._linalg import inv, matmul
-from larmorx.transforms.resample import _inv_ornt_aff, _io_orientation, _ornt_transform
+from larmorx.transforms.resample import _inv_ornt_aff, _ornt_transform
 
 __all__ = [
     "COEFF_INTENT_NAME",

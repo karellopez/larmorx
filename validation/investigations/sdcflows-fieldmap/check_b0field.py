@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from stepdigest import oracle
 
 from larmorx import sdcflows as lxs
+from larmorx.io import save_nibabel
 from larmorx.sdcflows.transform import B0FieldTransform, deoblique_and_zooms
 
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
@@ -153,7 +154,7 @@ def fit_case(name, coeffs, target, xfm=None, approx=True):
     with tempfile.TemporaryDirectory() as t:
         a, b = Path(t) / "a.nii.gz", Path(t) / "b.nii.gz"
         ref.mapped.to_filename(a)
-        mine.mapped.save(b)
+        save_nibabel(mine.mapped, b)  # nibabel's to_filename, as sdcflows writes it
         wd = np.asanyarray(ref.mapped.dataobj)
         checks = {
             "data": wd.dtype == mine.mapped.data.dtype

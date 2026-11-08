@@ -2072,6 +2072,32 @@ pub fn det3_is_positive(a: &[[f64; 3]; 3]) -> bool {
     }
 }
 
+/// nibabel's `io_orientation` polar step (`orientations.py`, nibabel 5.4.2): `P, S, Qs =
+/// numpy.linalg.svd(RS, full_matrices=False)` (for a square matrix `dgesdd`'s `JOBZ='S'` path
+/// is `JOBZ='A'`'s), `keep = S > S.max() * 3 * eps`, `R = numpy.dot(P[:, keep], Qs[keep])`.
+/// `None` where numpy raises `LinAlgError`.
+pub fn io_orientation_polar(rs: &[[f64; 3]; 3], release: LapackRelease) -> Option<[[f64; 3]; 3]> {
+    let (p, s, qs) = svd3(rs, release)?;
+    let smax = s
+        .iter()
+        .fold(f64::NEG_INFINITY, |m, &v| if v > m { v } else { m });
+    let tol = smax * 3.0 * f64::EPSILON;
+    let keep: Vec<usize> = (0..3).filter(|&k| s[k] > tol).collect();
+    let k = keep.len();
+    if k == 0 {
+        return Some([[0.0; 3]; 3]);
+    }
+    let a: Vec<f64> = (0..3)
+        .flat_map(|i| keep.iter().map(move |&c| (i, c)))
+        .map(|(i, c)| p[i][c])
+        .collect();
+    let b: Vec<f64> = keep.iter().flat_map(|&r| qs[r]).collect();
+    let c = openblas::gemm(&a, &b, 3, k, 3);
+    Some(std::array::from_fn(|i| {
+        std::array::from_fn(|j| c[i * 3 + j])
+    }))
+}
+
 /// `numpy.dot(p, q)` of two float64 3 × 3 matrices (OpenBLAS's Haswell `dgemm`).
 pub fn matmul3(p: &[[f64; 3]; 3], q: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
     let a: Vec<f64> = p.iter().flatten().copied().collect();

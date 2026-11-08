@@ -35,7 +35,9 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_header import ensure_positive_cosines
 from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import io_orientation as _io_orientation
 from larmorx.io.nibabel_header import set_xform as _nb_set_xform
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
@@ -45,10 +47,8 @@ from larmorx.transforms._linalg import inv, matmul
 from larmorx.transforms.resample import (
     _apply_orientation,
     _inv_ornt_aff,
-    _io_orientation,
     _ornt2axcodes,
     _ornt_transform,
-    ensure_positive_cosines,
 )
 
 __all__ = [
@@ -348,16 +348,26 @@ class B0FieldTransform:
         pc_header = hdr
         if pc_data is not data:
             pc_header = _rebuilt_header(hdr, pc_data.shape, pc_affine, _disk_dtype(hdr, data))
+        deferred: list[Any] = []
         if self.mapped is not None:
             warnings.warn(ALREADY_FIT, UserWarning, stacklevel=2)
         else:
-            self.fit(
-                Image(pc_data, pc_affine, pc_header),
-                xfm_data2fmap=xfm_data2fmap,
-                approx=approx,
-                n_threads=n_threads,
-                upstream_defects=upstream_defects,
-            )
+            # The field's D13 notices are named once the series is unwarped (a series that
+            # cannot be unwarped fails alike in both modes, with nothing corrected).
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                self.fit(
+                    Image(pc_data, pc_affine, pc_header),
+                    xfm_data2fmap=xfm_data2fmap,
+                    approx=approx,
+                    n_threads=n_threads,
+                    upstream_defects=upstream_defects,
+                )
+            for w in caught:
+                if issubclass(w.category, _defects.UpstreamDefectWarning):
+                    deferred.append(w.message)
+                else:
+                    warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
         newshape = pc_data.shape[:3] + tuple(d for d in pc_data.shape[3:] if d > 1)
         vols = pc_data.reshape(newshape)
         n_volumes = vols.shape[3] if vols.ndim == 4 else 1
@@ -417,6 +427,8 @@ class B0FieldTransform:
             resampled[..., t] = values
         if not allow_negative:
             resampled[resampled < 0] = cval
+        for message in deferred:
+            warnings.warn(message, stacklevel=2)
         moved_header = _rebuilt_header(pc_header, resampled.shape, pc_affine, out_dtype)
         return _reoriented(Image(resampled, pc_affine, moved_header), axcodes)
 

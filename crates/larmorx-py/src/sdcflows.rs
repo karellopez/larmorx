@@ -402,7 +402,7 @@ type GridIn<'a> = (
 /// `extrapolated` (None without `extrapolate`), `extreme`, `info`, `n_iter`, `system`, `log`
 /// ([(level, message)]).
 #[pyfunction]
-#[pyo3(signature = (data, shape, affine, zooms, spacings, mask = None, ridge_alpha = 1e-4, recenter = "median", extrapolate = true, name = "", resampled = None, n_threads = 1, upstream_defects = "fix"))]
+#[pyo3(signature = (data, shape, affine, zooms, spacings, mask = None, ridge_alpha = 1e-4, recenter = "median", extrapolate = true, name = "", resampled = None, n_threads = 1, upstream_defects = "fix", low_memory = false))]
 #[allow(clippy::too_many_arguments)]
 fn sdcflows_bspline_approx<'py>(
     py: Python<'py>,
@@ -419,6 +419,7 @@ fn sdcflows_bspline_approx<'py>(
     resampled: Option<GridIn<'_>>,
     n_threads: usize,
     upstream_defects: &str,
+    low_memory: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let defects = mode_from_py(upstream_defects)?;
     let recenter = match recenter {
@@ -452,6 +453,7 @@ fn sdcflows_bspline_approx<'py>(
         extrapolate,
         name: name.to_string(),
         defects,
+        low_memory,
     };
     let out = py.detach(|| {
         let original = Grid {

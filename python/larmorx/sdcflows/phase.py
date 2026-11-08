@@ -36,12 +36,13 @@ from larmorx import _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import io_orientation as _io_orientation
 from larmorx.io.nibabel_header import load_nibabel, nibabel_affine
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.approx import _fname_presuffix
 from larmorx.sdcflows.tools import _as_loaded, _header
-from larmorx.transforms.resample import _io_orientation, _ornt2axcodes
+from larmorx.transforms.resample import _ornt2axcodes
 
 __all__ = [
     "CheckRegisterResult",

@@ -82,6 +82,10 @@ pub struct ApproxParams {
     /// SDC-01 (weights beyond the control grid) corrected or reproduced; the control grids
     /// cover the field map, so only a resampled grid larger than them can reach it.
     pub defects: UpstreamDefects,
+    /// Fit with the weights evaluated at every product instead of stored
+    /// ([`bspline::StoredCollocation`], the default): O(voxels + knots) memory, slower at one
+    /// thread; the same bits.
+    pub low_memory: bool,
 }
 
 /// A log record sdcflows writes (`nipype.interface`), in order.
@@ -375,7 +379,16 @@ pub fn bspline_approx_logged(
         };
         return Err(SdcError::Invalid(format!("Input y contains {what}.")));
     }
-    let fit = ridge::ridge_sparse_cg(&colmat, &y, params.ridge_alpha, 1e-4, None, n_threads)?;
+    let stored = if params.low_memory {
+        None
+    } else {
+        colmat.store(n_threads)?
+    };
+    let fit = match &stored {
+        Some(m) => ridge::ridge_sparse_cg(m, &y, params.ridge_alpha, 1e-4, None, n_threads)?,
+        None => ridge::ridge_sparse_cg(&colmat, &y, params.ridge_alpha, 1e-4, None, n_threads)?,
+    };
+    drop(stored);
     let extreme = fit.coef.iter().fold(0.0f32, |acc, c| {
         let a = c.abs();
         if acc.is_nan() || a.is_nan() {

@@ -128,6 +128,14 @@ def _mask_of(mask_img: Image, data_shape: tuple[int, ...]) -> np.ndarray:
     """``np.asanyarray(masknii.dataobj) > 1e-4`` (nibabel's scaled values, numpy's comparison
     rules), checked against the field map's grid as ``data[mask]`` checks it."""
     mask = np.asanyarray(mask_img.data) > 1e-4
+    if (
+        len(data_shape) > 3
+        and all(n == 1 for n in data_shape[3:])
+        and mask.shape == tuple(data_shape[:3])
+    ):
+        # A 4D field map of one volume (SDC-06 corrected: fitted as its volume) with the
+        # brain mask of that volume.
+        mask = mask.reshape(data_shape)
     if mask.shape != tuple(data_shape):
         np.zeros(data_shape, dtype=np.float32)[mask]  # numpy's IndexError
         raise IndexError(
@@ -182,6 +190,20 @@ def _spatial_zooms(
     return zooms[:3]
 
 
+def _raw_little_float32(hdr: NiftiHeader) -> bool:
+    """Whether nibabel's ``get_fdata(dtype="float32")`` returns the file's raw array (its
+    dtype ``'<f4'``): little-endian float32 data with no scaling."""
+    si = hdr.slope_inter
+    dt = hdr.data_dtype
+    return (
+        dt is not None
+        and dt.kind == "f"
+        and dt.itemsize == 4
+        and hdr.byte_order == "<"
+        and (si is None or tuple(si) == (1.0, 0.0))
+    )
+
+
 def bspline_approx(
     in_data: Any,
     in_mask: Any = None,
@@ -196,6 +218,7 @@ def bspline_approx(
     name: str | None = None,
     n_threads: int = 1,
     upstream_defects: UpstreamDefectsName = "fix",
+    low_memory: bool = False,
 ) -> BSplineApproxResult:
     """sdcflows' ``BSplineApprox``: approximate a field map with tensor-product cubic
     B-splines, which smooths it and extrapolates it beyond the brain mask.
@@ -240,6 +263,11 @@ def bspline_approx(
         volumes is refused with a clear error, and weights beyond the control grids are the
         B-spline's (SDC-01; the control grids cover the field map, so only a resampled grid
         larger than them reaches it).
+    low_memory
+        Fit with the B-spline weights evaluated at every product of the solver (memory of the
+        order of the voxels and knots) instead of the stored collocation matrix (the default:
+        16 bytes per weight, below the 24 or more scikit-learn holds for sdcflows' fit, and
+        faster); the result is the same, bit for bit.
 
     The log records sdcflows writes (``nipype.interface``) go to the ``larmorx.sdcflows``
     logger, with sdcflows' texts. A fit whose largest coefficient reaches 1e4 raises
@@ -305,11 +333,19 @@ def bspline_approx(
             resampled,
             int(n_threads),
             upstream_defects,
+            bool(low_memory),
         )
     except (RuntimeError, ValueError) as err:
         # the records sdcflows writes before it raises
         for level, message in getattr(err, "log", ()):
             LOGGER.log(_LEVELS[level], message)
+        text = str(err)
+        tail = "dtype('float32')."
+        if text.endswith(tail) and is_path and not need_resize and _raw_little_float32(hdr):
+            # scikit-learn prints y's dtype: nibabel's get_fdata(dtype="float32") of an
+            # unscaled little-endian float32 file is the raw array, whose dtype keeps the
+            # header's explicit byte order ('<f4')
+            raise ValueError(text[: -len(tail)] + "dtype('<f4').") from None
         raise
     for level, message in out["log"]:
         LOGGER.log(_LEVELS[level], message)

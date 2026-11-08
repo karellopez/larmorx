@@ -47,7 +47,9 @@ from larmorx import _core
 from larmorx.io.nibabel_writer import _Extended, _round
 
 __all__ = [
+    "ensure_positive_cosines",
     "header_for_image",
+    "io_orientation",
     "load_nibabel",
     "nibabel_affine",
     "set_xform",
@@ -98,6 +100,60 @@ def set_xform(fields: dict, which: str, affine: Any, code: int) -> dict:
         nibabel=True,
         lapack=_LAPACK.get(),
     )
+
+
+def io_orientation(affine: Any) -> np.ndarray:
+    """nibabel's ``io_orientation(affine)`` (nibabel 5.4.2), its polar step through numpy's
+    LAPACK as numpy computes it (``_core.numpy_linalg_small("io_polar")``): the
+    ``(axis, flip)`` of every input axis, NaN for a dropped one. Which axis a rotation with two
+    equal candidates picks depends on those last bits."""
+    affine = np.asarray(affine, dtype=np.float64)
+    q, p = affine.shape[0] - 1, affine.shape[1] - 1
+    if (q, p) != (3, 3):
+        from larmorx.transforms.resample import _io_orientation
+
+        return _io_orientation(affine)
+    rzs = affine[:q, :p]
+    zooms = np.sqrt(np.sum(rzs * rzs, axis=0))
+    zooms[zooms == 0] = 1
+    rs = rzs / zooms
+    r = _core.numpy_linalg_small("io_polar", np.ascontiguousarray(rs), _LAPACK.get())
+    if r is None:
+        raise np.linalg.LinAlgError("SVD did not converge")
+    r = np.array(r, dtype=np.float64)
+    ornt = np.ones((p, 2), dtype=np.int8) * np.nan
+    in_axes = np.argsort(np.min(-(r**2), axis=0), kind="stable")
+    for in_ax in in_axes:
+        col = r[:, in_ax]
+        if not np.allclose(col, 0):
+            out_ax = np.argmax(np.abs(col))
+            ornt[in_ax, 0] = out_ax
+            ornt[in_ax, 1] = -1 if col[out_ax] < 0 else 1
+            r[out_ax, :] = 0
+    return ornt
+
+
+def ensure_positive_cosines(data: np.ndarray, affine: Any):
+    """``lx.transforms.ensure_positive_cosines`` with nibabel's own :func:`io_orientation`
+    (sdcflows' ``ensure_positive_cosines`` of a nibabel image)."""
+    from larmorx.transforms._linalg import matmul
+    from larmorx.transforms.resample import (
+        _apply_orientation,
+        _inv_ornt_aff,
+        _ornt2axcodes,
+        _ornt_transform,
+    )
+
+    in_ornt = io_orientation(affine)
+    axcodes = _ornt2axcodes(in_ornt)
+    out_ornt = in_ornt.copy()
+    out_ornt[:, 1] = 1
+    xfm = _ornt_transform(in_ornt, out_ornt)
+    if np.array_equal(xfm, [[0, 1], [1, 1], [2, 1]]):
+        return data, affine, axcodes
+    new_data = _apply_orientation(data, xfm)
+    new_affine = matmul(affine, _inv_ornt_aff(xfm, data.shape))
+    return new_data, new_affine, axcodes
 
 
 # ------------------------------------------------------------------------------------------------

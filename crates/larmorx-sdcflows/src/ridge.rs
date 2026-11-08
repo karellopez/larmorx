@@ -56,7 +56,7 @@ use larmorx_core::parallel::with_threads;
 use rayon::prelude::*;
 
 use crate::blas::{dot_f32, norm_f32};
-use crate::bspline::{Collocation, Csr};
+use crate::bspline::{Collocation, Csr, StoredCollocation};
 use crate::{SdcError, npy};
 
 /// A float32 matrix as scipy applies it: `matvec` is `X @ v` (`csr_matvec`: each row a float32
@@ -78,6 +78,20 @@ impl Operator for Collocation {
 
     fn matvec(&self, v: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
         self.matvec_f32(v, None, n_threads)
+    }
+
+    fn rmatvec(&self, y: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
+        self.rmatvec_f32(y, n_threads)
+    }
+}
+
+impl Operator for StoredCollocation {
+    fn shape(&self) -> [usize; 2] {
+        StoredCollocation::shape(self)
+    }
+
+    fn matvec(&self, v: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
+        self.matvec_f32(v, n_threads)
     }
 
     fn rmatvec(&self, y: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {

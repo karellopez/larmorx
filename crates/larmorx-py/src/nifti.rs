@@ -489,14 +489,20 @@ pub fn numpy_linalg_small<'py>(
         PyArray::from_owned_array(py, arr).into_any()
     };
     match kind {
-        "svd" | "det_positive" => {
+        "svd" | "det_positive" | "io_polar" => {
             if v.shape() != [3, 3] {
                 return Err(PyValueError::new_err(
-                    "svd and det_positive take a 3x3 matrix",
+                    "svd, det_positive and io_polar take a 3x3 matrix",
                 ));
             }
             let m = mat(3, 3);
             let a3: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| m[i][j]));
+            if kind == "io_polar" {
+                return match numpy_linalg::io_orientation_polar(&a3, release) {
+                    None => Ok(py.None().into_bound(py)),
+                    Some(r) => Ok(to_py(r.iter().map(|x| x.to_vec()).collect())),
+                };
+            }
             if kind == "det_positive" {
                 return Ok(numpy_linalg::det3_is_positive(&a3)
                     .into_pyobject(py)?
@@ -529,7 +535,7 @@ pub fn numpy_linalg_small<'py>(
             }
         }
         other => Err(PyValueError::new_err(format!(
-            "kind must be 'svd', 'eigh' or 'det_positive', not {other:?}"
+            "kind must be 'svd', 'eigh', 'det_positive' or 'io_polar', not {other:?}"
         ))),
     }
 }

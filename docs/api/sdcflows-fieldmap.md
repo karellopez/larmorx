@@ -26,13 +26,16 @@ reductions and dot products over OpenBLAS 0.3.34's Haswell kernels (BSD-3-Clause
 `reorient_image` (Apache-2.0). Provenance: [larmorx-sdcflows](../../crates/larmorx-sdcflows/PROVENANCE.md).
 A clean-room original of these programs comes later (the user, 2026-11-06), in another crate.
 
-**Status: `experimental`** until its validation record (the part's next step). Every function
-below has been compared with sdcflows itself, run in-process, in both kept environments
+**Status: `validated`** against sdcflows itself, run in-process, in both kept environments
 (`oracles/python-newest`: sdcflows 2.17.1, scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4;
 the shared `.venv`: SciPy 1.15.3, numpy 2.3.5) and on fMRIPrep 25.2.6's own files of the oracle
-runs: every output is **bit-identical** (the checks in
+runs (see the [validation record](../validation/sdcflows-fieldmap.md): 37 cases, 821 checks,
+every output **bit-identical**; the checks in
 [validation/investigations/sdcflows-fieldmap](../../validation/investigations/sdcflows-fieldmap/README.md);
-the findings in [sdcflows-fieldmap.md](../findings/sdcflows-fieldmap.md)).
+the findings in [sdcflows-fieldmap.md](../findings/sdcflows-fieldmap.md)). The record's step
+from the shared releases to the newest: 4 of its 37 cases changed in sdcflows' own outputs, all
+from numpy's LAPACK 3.12.0 → 3.12.1 (the quaternions nibabel writes, an orientation tie),
+which larmorx reproduces in each release.
 
 **Speed:** the fit of fMRIPrep's field maps (weights and ridge solve) takes 0.3 to 3.8 s on 14
 threads where scikit-learn takes 1.9 to 28 s (ds002603's 128³ field map: 2,097,152 voxels ×

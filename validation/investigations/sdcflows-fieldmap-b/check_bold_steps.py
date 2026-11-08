@@ -22,6 +22,9 @@ are the installed ones; boxed):
 - ``recon``: every ``boldref_fmap`` and ``fmap_recon`` node: larmorx (``reproduce``) against
   fMRIPrep's own file (data and header bytes) and against ``ReconstructFieldmap`` run here, with
   the path each took (direct or resampled) and the ``fix`` result;
+- ``unwarp``: every ``unwarp_boldref`` node (``ResampleSeries`` with the reconstructed field,
+  ``lx.transforms.resample_series``): against fMRIPrep's own file and ``ResampleSeries`` run here
+  (``reproduce``), and ``fix`` (PIPE-03 can change it only with the Jacobian);
 - ``synth``: synthetic coefficient grids and targets for the paths no run takes: the direct
   evaluation (RAS and LAS targets, two levels, a target beyond the grid), the canonical "hack",
   the error of a rotated reference, a displacement field; PIPE-21 shown (the mirrored field of
@@ -368,6 +371,72 @@ def sec_recon(t: Tally, runs: list[str], nt: int, times: list[float]) -> None:
 
 
 # ------------------------------------------------------------------------------------------
+# unwarp_boldref (ResampleSeries with the reconstructed field)
+
+
+def _save_like_fmriprep(img, path: Path) -> None:
+    from larmorx.io.nibabel_writer import save_nibabel
+
+    save_nibabel(img, path)
+
+
+def sec_unwarp(t: Tally, runs: list[str], nt: int) -> None:
+    from fmriprep.interfaces.resampling import ResampleSeries
+    from nipype.interfaces.base import isdefined
+    from nipype.utils.filemanip import loadpkl
+
+    import larmorx as lx
+
+    for node in nodes(runs, "unwarp_boldref"):
+        raw = dict(loadpkl(node / "_inputs.pklz"))
+        inputs = {k: v for k, v in raw.items() if isdefined(v)}
+        for k in ("in_file", "ref_file", "fieldmap"):
+            inputs[k] = host(node, inputs[k])
+        ref_file = next(node.glob("*resampled.nii*"))
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            res = ResampleSeries(**inputs).run(cwd=str(tmp))
+            orig = Path(res.outputs.out_file)
+            for mode in ("reproduce", "fix"):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    img = lx.transforms.resample_series(
+                        inputs["in_file"],
+                        inputs["ref_file"],
+                        list(inputs.get("transforms") or []),
+                        inverse=list(inputs.get("inverse") or [False]) or [False],
+                        fieldmap=inputs["fieldmap"],
+                        pe_dir=inputs.get("pe_dir"),
+                        ro_time=inputs.get("ro_time"),
+                        jacobian=inputs["jacobian"],
+                        order=inputs["order"],
+                        mode=inputs["mode"],
+                        cval=inputs["cval"],
+                        prefilter=inputs["prefilter"],
+                        output_dtype=inputs["output_data_type"],
+                        n_threads=nt,
+                        upstream_defects=mode,
+                    )
+                out = tmp / mode / ref_file.name
+                out.parent.mkdir()
+                _save_like_fmriprep(img, out)
+                if mode == "reproduce":
+                    t.add("unwarp = fMRIPrep's own file", cw.nii_same(out, ref_file), label(node))
+                    t.add("unwarp = ResampleSeries here", cw.nii_same(out, orig), label(node))
+                else:
+                    same = cw.nii_same(out, ref_file)
+                    if not same:
+                        print(
+                            f"INFO unwarp fix differs (PIPE-03, jacobian {inputs['jacobian']}): {label(node)}"
+                        )
+                    t.add(
+                        "unwarp fix = reproduce where PIPE-03 cannot apply",
+                        same or inputs["jacobian"],
+                        label(node),
+                    )
+
+
+# ------------------------------------------------------------------------------------------
 # Synthetic cases
 
 
@@ -631,7 +700,7 @@ def sec_synth(t: Tally, nt: int) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sections", default="dparams,concat,recon,synth")
+    ap.add_argument("--sections", default="dparams,concat,recon,unwarp,synth")
     ap.add_argument("--runs", default=",".join(RUNS_DEFAULT))
     ap.add_argument("--threads", type=int, default=4)
     args = ap.parse_args()
@@ -656,12 +725,16 @@ def main() -> int:
         sec_concat(t, runs)
     if "recon" in secs:
         sec_recon(t, runs, args.threads, times)
+    if "unwarp" in secs:
+        sec_unwarp(t, runs, args.threads)
     if "synth" in secs:
         sec_synth(t, args.threads)
     print(
         f"times: ReconstructFieldmap {times[0]:.1f} s, larmorx (reproduce) {times[1]:.1f} s; total {time.perf_counter() - t0:.0f} s"
     )
-    return t.report()
+    bad = t.report()
+    print("ALL OK" if bad == 0 else f"FAIL {bad}")
+    return bad
 
 
 if __name__ == "__main__":

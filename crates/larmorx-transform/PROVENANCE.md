@@ -76,6 +76,18 @@ ITK readers (`io/itk.py`: `ITKLinearTransform`, `ITKLinearTransformArray`,
 (`orientations.py`: `io_orientation`, `ornt_transform`, `ornt2axcodes`, `inv_ornt_aff`,
 `apply_orientation`; `affines.from_matvec`).
 
+**fMRIPrep's field-map steps** (field maps part B, relay 7; Python, no new Rust):
+`python/larmorx/transforms/fieldmap.py` ports fMRIPrep 25.2.7's `interfaces/resampling.py`
+(Apache-2.0; the same file in 25.2.6): `ReconstructFieldmap._run_interface`,
+`reconstruct_fieldmap`, `as_affine`, `aligned` and `DistortionParameters._run_interface`, with
+nitransforms 25.1.0's (MIT) `manip.TransformChain.asaffine`, `linear.Affine.__matmul__` and
+`resampling.apply` (`base.ImageGrid.ndcoords`/`index`, `_as_homogeneous`), and sdcflows
+2.17.1's `utils/tools.ensure_positive_cosines` (Apache-2.0; the B-spline sum is part A's
+`larmorx_sdcflows::bspline`). `chain.py`'s `_itk_linear_text` ports nitransforms 25.1.0's
+`io/itk.py` writer (`ITKLinearTransform.from_ras`, `__str__`, `to_string`), used by
+`python/larmorx/niworkflows/nitransforms.py` (niworkflows 1.15.4's `interfaces/nitransforms.py`:
+`ConcatenateXFMs`, `concatenate_xfms`, `XFM_FMT`; Apache-2.0, the same in 1.15.2).
+
 ## numpy's small linear algebra (`numpy_linalg`)
 
 **Ported** from the OpenBLAS 0.3.34 and 0.3.30 release tarballs (BSD-3-Clause; the LAPACK they

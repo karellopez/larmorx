@@ -86,6 +86,26 @@ node files: `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`.
 | `apply_mask(in_file, in_mask, *, threshold=0.5, out_dir=".", n_threads=1)` → the path | `nibabel.ApplyMask` | the data as nibabel's `dataobj` reads it times `mask > threshold` (a 4D image: every volume), the header kept, `<in>_masked`; other sizes: `ValueError('Image and mask sizes do not match.')`; other affines (`np.allclose`): `ValueError('Image and mask affines are not similar enough.')` |
 | `key_select(keys, key, **fields)` → `{field: value, ..., "key": key}` | `utility.KeySelect` | the item at `key`'s index of each field; niworkflows' `ValueError`s: no fields, duplicated keys, a key not in `keys`, a field that is a string, empty or of another length |
 
+## `concatenate_xfms`: `ConcatenateXFMs`
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `in_xfms` | `in_xfms` | ITK text (`.txt`, `.tfm`) or MATLAB (`.mat`) files, read as nitransforms' `linear.load(fmt="itk")` reads them (`lx.transforms.load_itk_linear`: the parameters as float32 from text, the centre of rotation as float32); another suffix: `KeyError` (niworkflows' `XFM_FMT`); `.lta`: `NotImplementedError` (FreeSurfer's part) |
+| `out_fmt="itk"` | `out_fmt` (`itk`, `fs`) | `fs` (LTA): `NotImplementedError` until FreeSurfer's part |
+| `inverse=False` | `inverse` | the inverse too (`np.linalg.inv`'s bits), `out_inv.tfm` |
+| `reference`, `moving` | `reference`, `moving` | only the LTA format reads them; checked to exist (nipype's `File(exists=True)`) |
+| `out_dir=None` | the node's folder | `out_fwd.tfm` (and `out_inv.tfm`); nothing written without it |
+| → `ConcatenateXfmsResult(affine, text, inverse_text, out_xfm, out_inv)` | `out_xfm`, `out_inv` | the files listed in the order they apply, combined as nitransforms' `TransformChain.asaffine` (each next matrix multiplied from the left, numpy's products) and written as nitransforms' `ITKLinearTransform.from_ras(...).to_string()`: `LPS @ ras @ LPS` with `"%g"`, six significant digits, `AffineTransform_float_3_3`, `FixedParameters: 0 0 0` (the centre folded into the translation) |
+
+fMRIPrep's `itk_mat2txt` (`bold_fit_wf`) writes the registration's `transform0GenericAffine.mat`
+this way; its `out_fwd.tfm` becomes the `desc-fmap_xfm.txt` derivative that every later
+`ReconstructFieldmap` reads. The six digits move the BOLD grid's corners by at most 7.9e-05 mm on
+the oracle runs (PIPE-22, rule C: kept, a correction that brings no measurable gain). A file holding several transforms
+(a series) is not combined (`NotImplementedError`: fMRIPrep passes single affines). Checked: the 7
+`itk_mat2txt` nodes of the earlier runs byte for byte (and their derivatives), niworkflows' own
+interface on them with `inverse`, and every input format combined
+(`check_bold_steps.py`'s `concat`).
+
 ## `skullstrip_bold_workflow`: `init_skullstrip_bold_wf`
 
 | larmorx | niworkflows | Notes |

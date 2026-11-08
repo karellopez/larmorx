@@ -289,6 +289,62 @@ file:
   confirm with the records (the image's topup and `BSplineApprox` with and without
   `OPENBLAS_CORETYPE=Haswell` on one of them).
 
+## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
+
+fMRIPrep 25.2.7's `fmriprep/interfaces/resampling.py` (the same file in 25.2.6 and in the
+environments' fMRIPrep) and niworkflows 1.15.4's `interfaces/nitransforms.py` (the same in
+1.15.2), ported as `lx.transforms.reconstruct_fieldmap(_node)`, `lx.transforms.distortion_parameters`
+and `lx.niworkflows.concatenate_xfms`. Checked by `check_bold_steps.py` on the four earlier runs
+with field maps applied to BOLD runs (ds002422's three runs, ds002603's two, ds005040's PEPOLAR
+run, ds005454's run; old laptop, Haswell kernels): **all identical in both environments**, against
+fMRIPrep's own files and against the interfaces run here: 28 `ReconstructFieldmap` files (data
+and header bytes; 14 on the BOLD reference, 7 on the T1w reference, 7 on MNI152NLin2009cAsym at
+2 mm through the T1w-to-MNI composite `.h5`), 28 `DistortionParameters` outputs (with 13
+synthetic metadata sets for every branch), the 7 `out_fwd.tfm` files byte for byte (and the
+`desc-fmap_xfm.txt` derivatives they become), and the 7 `unwarp_boldref` images the fields go
+into (`lx.transforms.resample_series`, `ResampleSeries`). Times on the 28 nodes: fMRIPrep's
+interface 28.5 s, larmorx 12.3-13.1 s (4 threads).
+
+- **Two paths, one taken.** `reconstruct_fieldmap` evaluates the B-spline sum directly on the
+  target only when the transforms collapse to one affine and the projected target is "aligned"
+  with the coefficients: the norms of the cross products of the axis columns within 1e-3. The
+  columns carry the voxel sizes (3 mm × 3 mm here), so the test is in mm² and fails for any
+  rotation above about 1e-4 rad: all 28 nodes take the resampled path (the field on the field
+  map's reference, then nitransforms' cubic resampling through the chain). The direct path is
+  reached by an identity or a pure translation (`check_bold_steps.py`'s `synth` covers it on
+  RAS and LAS targets, two levels and a target beyond the grid: identical to fMRIPrep's
+  `reproduce`).
+- **PIPE-21 (rule A, corrected by default).** The direct path returns the field on the target
+  projected into the field map's space with its axes made positive (sdcflows'
+  `ensure_positive_cosines`), with that projected affine, while `ResampleSeries` reads the field
+  voxel for voxel on the target's grid (`fmap_hz` is added to the target's coordinates): for a
+  target with an axis against its world axis, a LAS BOLD reference as every run here has, the
+  field is applied mirrored along that axis. Measured on a LAS target with the identity: up to
+  159 Hz from the field on the target's grid; fMRIPrep's array is exactly the reversed one.
+  larmorx returns the same values on the target's grid (voxel order and affine), equal to the
+  resampled path's field there; `reproduce` gives fMRIPrep's image. It changes nothing on the
+  earlier runs (none is direct); the SyN runs (their field map is estimated on the BOLD
+  reference) are the ones to look at when they are re-made.
+- **PIPE-20 (rule C, kept).** `DistortionParameters` catches `KeyError` and `ValueError`: a BOLD
+  run without a readout time (no `TotalReadoutTime`, echo spacing or fallback) or without
+  `PhaseEncodingDirection` gets undefined outputs, and `ResampleSeries` (`if pe_dir and
+  ro_time`) then applies no field map, although the run has one assigned and the reports name
+  its method. The interface documents it as its design ("downstream interfaces should be
+  prepared to handle this"), so it is kept; larmorx warns (`fix`). fMRIPrep stops with
+  "Missing readout time information" only when an estimator needs the readout time; the BOLD
+  steps of larmorprepx (relay 8) should stop the same way when a run with a field map has none
+  (to decide there, rule A or B at the pipeline's level).
+- **PIPE-22 (rule C, kept).** nitransforms writes ITK text parameters with `"%g"`: six
+  significant digits, read back by every later `ReconstructFieldmap`. Measured: the BOLD grid's
+  corners move by at most 7.9e-05 mm on the 7 transforms. A correction would bring no measurable
+  gain.
+- The resampled path's coordinates are nitransforms' `apply`: `ImageGrid.ndcoords` of the target,
+  each chain step rounding its points to float32 (an affine's `_as_homogeneous`, a displacement
+  field's `reference.index(np.array(x, dtype="float32"))`), then the field's `ras2vox`; the same
+  arithmetic as `resample_series`' coordinates, so `larmorx_transform::nitransforms` serves
+  both. SciPy's `map_coordinates` gets the float32 field (float64 where the sparse product
+  upcasts) and returns that type; the header is the target's, with the intent and `cal_max`.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -305,5 +361,6 @@ file:
 - niworkflows' `_advanced_clip` of a constant image: 0 / 0, then `round(255 * NaN)` cast to
   `int16` (PIPE-a).
 - PIPE-18 and PIPE-19 (above) are already numbered and switched in `lx.niworkflows`
-  (`intra_modal_merge`); the register's entries and `larmorx_core::defects` wait for the
-  part's defects relay.
+  (`intra_modal_merge`), PIPE-20 to PIPE-22 (relay 7) in `lx.transforms` and
+  `lx.niworkflows.concatenate_xfms`; the register's entries and `larmorx_core::defects` wait for
+  the part's defects relay.

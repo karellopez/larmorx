@@ -7026,3 +7026,127 @@ def _(ctx: Context) -> dict[str, Any]:
         ),
     }
     return out
+
+
+# --- fMRIPrep's field-map steps of the BOLD workflows --------------------------------------------
+
+
+def _coeff_grid(ctx: Context) -> tuple[str, str, str, str]:
+    """A B-spline coefficient grid (LAS, 12 mm knots), its field map's reference (LAS, 3 mm,
+    inside the grid), a LAS target (2.5 mm) and an ITK transform with a small shear (not aligned
+    with the grid: fMRIPrep's resampled path)."""
+    las = np.diag([-12.0, 12.0, 12.0, 1.0])
+    las[:3, 3] = (48.0, -54.0, -42.0)
+    coeff = ctx.out("fmap_coeff.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image((ints(140, (9, 10, 8), -64, 65) / 2).astype(np.float32), las, None), coeff
+    )
+    ref_aff = np.diag([-3.0, 3.0, 3.0, 1.0])
+    ref_aff[:3, 3] = (36.0, -42.0, -30.0)
+    fref = ctx.out("fmap_ref.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(141, (24, 26, 20), 0, 100).astype(np.int16), ref_aff, None), fref
+    )
+    t_aff = np.diag([-2.5, 2.5, 3.0, 1.0])
+    t_aff[:3, 3] = (30.0, -35.0, -24.0)
+    target = ctx.out("boldref.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(142, (24, 28, 16), 0, 200).astype(np.int16), t_aff, None), target
+    )
+    xfm = ctx.out("boldref2fmap.txt")
+    lx.transforms.write(
+        xfm,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([1.0, 0.03, 0.0, -0.02, 1.0, 0.01, 0.0, 0.0, 1.0, 1.25, -0.5, 0.75]),
+            np.array([0.5, -1.0, 2.0]),
+        ),
+    )
+    return coeff, fref, target, xfm
+
+
+@case(
+    "py.transforms.reconstruct_fieldmap",
+    covers=(
+        "lx.transforms.reconstruct_fieldmap",
+        "lx.transforms.reconstruct_fieldmap_node",
+        "lx.transforms.aligned",
+        "lx.transforms.as_affine",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's ReconstructFieldmap: the resampled path (a sheared transform, inverted: the
+    field on the reference's positive grid, then nitransforms' cubic resampling onto the LAS
+    target) and the direct path (the identity: the B-spline sum on the projected target), with
+    PIPE-21 corrected (the target's grid) and reproduced (mirrored along x, fMRIPrep's)."""
+    coeff, fref, target, xfm = _coeff_grid(ctx)
+    res = lx.transforms.reconstruct_fieldmap_node(
+        [coeff], target, fref, [xfm], [True], out_dir=ctx.out("rec")
+    )
+    out: dict[str, Any] = {"resampled": Nifti(str(res.out_file))}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for mode in ("fix", "reproduce"):
+            img = lx.transforms.reconstruct_fieldmap(
+                coeff, fref, target, None, upstream_defects=mode, n_threads=2
+            )
+            out[f"direct.{mode}"] = np.ascontiguousarray(img.data)
+            out[f"direct.{mode}.affine"] = img.affine
+    chain = lx.transforms.load_transforms([xfm, xfm], [True, False])
+    combined = lx.transforms.as_affine(chain)
+    out["as_affine"] = combined.matrix
+    out["aligned"] = np.asarray(
+        [
+            lx.transforms.aligned(combined.matrix, np.eye(4)),
+            lx.transforms.aligned(np.eye(4), np.diag([-2.0, 3.0, 1.0, 1.0])),
+        ]
+    )
+    return out
+
+
+@case("py.transforms.distortion_parameters", covers=("lx.transforms.distortion_parameters",))
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's DistortionParameters: the readout time from the echo spacing and the number of
+    phase-encoding steps, the estimated one, a fallback, and no readout time (PIPE-20: None)."""
+    epi = ctx.out("epi.nii.gz")
+    lx.io.save_nibabel(lx.Image(np.zeros((8, 10, 6), np.float32), np.eye(4), None), epi)
+    base = {"PhaseEncodingDirection": "j-"}
+    rows = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for meta, fb in (
+            ({"EffectiveEchoSpacing": 0.000625, **base}, None),
+            ({"EstimatedEffectiveEchoSpacing": 0.00075, **base}, "estimated"),
+            (dict(base), 0.0375),
+            (dict(base), None),
+        ):
+            r = lx.transforms.distortion_parameters(meta, epi, fb)
+            rows.append(
+                [
+                    np.nan if r.readout_time is None else r.readout_time,
+                    -1.0 if r.pe_direction is None else float(len(r.pe_direction)),
+                ]
+            )
+    return {"params": np.asarray(rows, dtype=np.float64)}
+
+
+@case("py.niworkflows.concatenate_xfms", covers=("lx.niworkflows.concatenate_xfms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' ConcatenateXFMs: an ITK text and a MATLAB file combined (numpy's products),
+    written with nitransforms' "%g" (six digits, the centre folded in), with the inverse."""
+    txt, mat = ctx.out("a.txt"), ctx.out("b.mat")
+    lx.transforms.write(txt, AFFINE_XFM)
+    lx.transforms.write(
+        mat,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([0.99, 0.02, -0.01, -0.03, 1.01, 0.02, 0.01, -0.02, 0.98, -0.75, 1.5, 2.25]),
+            np.array([1.0, -2.0, 0.5]),
+        ),
+    )
+    res = lx.niworkflows.concatenate_xfms([txt, mat], inverse=True, out_dir=ctx.out("cat"))
+    return {
+        "affine": res.affine,
+        "text": res.text,
+        "inverse_text": res.inverse_text,
+    }

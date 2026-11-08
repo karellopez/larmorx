@@ -20,11 +20,11 @@ import nibabel as nb
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import measure_sdc_g as m  # noqa: E402
+import measure_sdc_g as m
+from larmorx_validation import oracle_cache
+from larmorx_validation.parity import fsl_versions
 
-import larmorx as lx  # noqa: E402
-from larmorx_validation import oracle_cache  # noqa: E402
-from larmorx_validation.parity import fsl_versions  # noqa: E402
+import larmorx as lx
 
 
 def main() -> int:

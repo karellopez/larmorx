@@ -156,7 +156,11 @@ pub fn make_adaptive_mask(
                 "tedana/utils.py, in make_adaptive_mask",
             ));
         }
-        let perc = percentile_higher(&pool, 33.0).ok_or_else(|| {
+        let perc = match libraries {
+            Libraries::Newest => percentile_higher(&pool, 33.0),
+            Libraries::Shared => percentile_higher_shared(&pool),
+        }
+        .ok_or_else(|| {
             PyError::new(
                 "IndexError",
                 "index -1 is out of bounds for axis 0 with size 0",
@@ -390,6 +394,25 @@ pub fn make_adaptive_mask(
     }
     let mask = adaptive.iter().map(|&a| a != 0).collect();
     Ok((mask, adaptive))
+}
+
+/// `np.percentile(first_echo, 33, method="higher")` as numpy 2.3.5 computes it: `q =
+/// np.true_divide(33, a.dtype.type(100))` is float32 for float32 data (numpy 2.5.4 divides by
+/// the Python int, in float64), so the rank is `ceil((n - 1) · float32(0.33))` in float32 (random
+/// testing, 2026-11-08: 301 means give rank 100 there, 99 in numpy 2.5.4). The pool holds no zero
+/// (tedana takes the non-zero means), so any order of equal values gives the same value.
+fn percentile_higher_shared(a: &[f32]) -> Option<f32> {
+    if a.is_empty() {
+        return None;
+    }
+    if let Some(&nan) = a.iter().find(|x| x.is_nan()) {
+        return Some(nan);
+    }
+    let q = 33.0f32 / 100.0f32;
+    let rank = ((a.len() - 1) as f32 * q).ceil() as usize;
+    let mut v = a.to_vec();
+    v.sort_by(f32::total_cmp);
+    Some(v[rank])
 }
 
 #[cfg(test)]

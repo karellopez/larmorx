@@ -1,0 +1,295 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): an infinite RMSE: numpy's warnings of nanstd's subtraction and of nanpercentile's interpolation",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 12: ['numpy/lib/_nanfunctions_impl.py:1845: RuntimeWarning: invalid value encountered in subtract'] / ['INFO     t2smap:t2smap_workflow:521 Computing optimal combination']; shared: messages: line 12: ['numpy/lib/_nanfunctions_impl.py:1863: RuntimeWarning: invalid value encountered in subtract'] / ['INFO     t2smap:t2smap_workflow:521 Computing optimal combination']",
+  "n": 1889,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "newest: messages",
+   "shared: messages"
+  ]
+ },
+ "id": "rmse-infinite-percentiles",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -7.5,
+     -4.0,
+     -6.5
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     11,
+     -2,
+     -2,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     1.0,
+     0.8,
+     1.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "ones",
+    "suffix": ".nii.gz",
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.0,
+    "noise": 0.05,
+    "rising": 0.05,
+    "s0": {
+     "axes": [
+      1.0,
+      1.25,
+      1.05
+     ],
+     "bias": [
+      -0.0025,
+      0.0025,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.25,
+      0.25,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 1797237005,
+     "size": 1.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 140209710,
+    "t2": [
+     26.0,
+     62.0
+    ]
+   },
+   "shape": [
+    20,
+    6,
+    10,
+    2
+   ],
+   "specials": [
+    {
+     "echo": 0,
+     "kind": "negative"
+    },
+    {
+     "echo": 0,
+     "kind": "inf"
+    }
+   ],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    11,
+    19,
+    30,
+    42
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 2.0,
+    "tunits": "sec"
+   },
+   "units": "ms",
+   "zcat": false
+  },
+  "features": {
+   "--exclude spelling": "plain",
+   "--fittype spelling": "equals",
+   "--mask spelling": "plain",
+   "--verbose spelling": "plain",
+   "S0 noise": 3.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 26.0,
+   "T2* range ms": 36.0,
+   "TE gap ms": 15,
+   "TE gap1 ms": 8,
+   "TE gap2 ms": 11,
+   "TE gap3 ms": 12,
+   "TE oddity": "none",
+   "TE units": "ms",
+   "TE1 ms": 11,
+   "axis0": 1.0,
+   "axis1": 1.25,
+   "axis2": 1.05,
+   "background": "noise",
+   "bias0": -0.0025,
+   "bias1": 0.0025,
+   "bias2": 0.0,
+   "bias3": 0.0,
+   "big-endian": false,
+   "centre0": 6.0,
+   "centre1": 6.0,
+   "centre2": -2.5,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.0,
+   "dtype": "float32",
+   "dummy scans": false,
+   "echoes": 4,
+   "even gaps": false,
+   "exclude": true,
+   "exclude a": 0,
+   "exclude form": "one",
+   "exclude up to the end": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 0.65,
+   "log level": "info",
+   "mask": "ones",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 0.0,
+   "nt": 8,
+   "nx": 20,
+   "ny": 6,
+   "nz": 10,
+   "one slice": false,
+   "orientation": "oblique",
+   "origin0": 43.0,
+   "origin1": -39.0,
+   "origin2": 39.0,
+   "prefix": true,
+   "prefix text": "a",
+   "qfac": 1,
+   "qform_code": 1,
+   "rising share": 0.05,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "20x6x10x2",
+   "size": 11.5,
+   "spacing0": 1.0,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "special count": 2,
+   "special samples": true,
+   "special0": "negative",
+   "special0 echo": "first",
+   "special1": "inf",
+   "special1 echo": "first",
+   "suffix": ".nii.gz",
+   "temporal noise": 0.05,
+   "tissues": "epi",
+   "tr": 2.0,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": true,
+   "volumes": "few",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fittype=curvefit"
+    ],
+    "name": "fittype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--exclude",
+     "0"
+    ],
+    "name": "exclude",
+    "optional": true
+   },
+   {
+    "args": [
+     "--prefix",
+     "a"
+    ],
+    "name": "prefix",
+    "optional": true
+   },
+   {
+    "args": [
+     "--verbose"
+    ],
+    "name": "verbose",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 1889,
+  "options": [
+   "2 volume(s)",
+   "4 echoes",
+   "TE in ms",
+   "exclude",
+   "file .nii.gz",
+   "fitmode all",
+   "fittype curvefit",
+   "mask ones",
+   "prefix",
+   "special samples: negative, inf",
+   "stored float32",
+   "verbose"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

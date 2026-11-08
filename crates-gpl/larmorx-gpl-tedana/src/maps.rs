@@ -340,6 +340,24 @@ pub fn rmse_of_fit_decay_ts(
         })
         .collect();
     let sd = nanstd_axis(&rmse, [1, n_samples, n_vols], 0);
+    // nanvar subtracts each volume's mean (inf where the volume holds an infinite RMSE: data
+    // with an infinite sample) from its values: inf - inf.
+    let infinite_column = (0..n_vols).any(|t| {
+        (0..n_samples).any(|v| rmse[v * n_vols + t].is_infinite())
+            && !(0..n_samples).any(|v| {
+                let x = rmse[v * n_vols + t];
+                x.is_infinite() && x.is_sign_negative()
+            })
+    });
+    if infinite_column {
+        log.warn(
+            "numpy/lib/_nanfunctions_impl.py",
+            libraries.nanvar_subtract_line(),
+            "RuntimeWarning",
+            "invalid value encountered in subtract",
+            "np.subtract(arr, avg, out=arr, casting='unsafe', where=where)",
+        );
+    }
     if sd.bad_dof {
         log.warn(
             "numpy/lib/_nanfunctions_impl.py",
@@ -349,13 +367,9 @@ pub fn rmse_of_fit_decay_ts(
             "var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,",
         );
     }
-    let percentiles = nanpercentile_linear_axis0(
-        &rmse,
-        n_samples,
-        n_vols,
-        &[0.0, 2.0, 25.0, 50.0, 75.0, 98.0, 100.0],
-    )
-    .expect("percentiles in [0, 100]");
+    let percentiles = nanpercentile_linear_axis0(&rmse, n_samples, n_vols, &QUANTILES)
+        .expect("percentiles in [0, 100]");
+    lerp_warnings(&rmse, n_samples, n_vols, &QUANTILES, libraries, log);
     if percentiles.all_nan_column {
         log.warn(
             "numpy/lib/_nanfunctions_impl.py",
@@ -370,5 +384,77 @@ pub fn rmse_of_fit_decay_ts(
         mean,
         std: sd.values,
         percentiles,
+    }
+}
+
+/// The confounds table's percentiles.
+const QUANTILES: [f64; 7] = [0.0, 2.0, 25.0, 50.0, 75.0, 98.0, 100.0];
+
+/// numpy's floating-point warnings of `nanpercentile(rmse, QUANTILES, axis=0)` on infinite
+/// values: `_lerp(a, b, gamma)` per volume (`apply_along_axis`), with `a`, `b` the neighbouring
+/// ranks of its sorted numbers and the virtual index `(n - 1) · q`, as
+/// `larmorx_core::numpy::quantile::nanpercentile_linear_axis0` computes them: `b - a` (float32) of
+/// two equal infinities, `(b - a) · gamma` of an infinite difference by 0, `a + ...` of opposite
+/// infinities, `(b - a) · (1 - gamma)` by 0, and `b - ...` (where `gamma >= 0.5`) of equal
+/// infinities; each warning once per place, in a volume's order of operations.
+fn lerp_warnings(
+    rmse: &[f32],
+    n_samples: usize,
+    n_vols: usize,
+    q: &[f64],
+    libraries: Libraries,
+    log: &mut Log<'_>,
+) {
+    let [l_diff, l_add, l_sub] = libraries.lerp_lines();
+    let same_inf = |x: f64, y: f64| x.is_infinite() && x == y;
+    let opposite_inf = |x: f64, y: f64| x.is_infinite() && y.is_infinite() && x != y;
+    for t in 0..n_vols {
+        let mut col: Vec<f32> = (0..n_samples)
+            .map(|v| rmse[v * n_vols + t])
+            .filter(|x| !x.is_nan())
+            .collect();
+        if !col.iter().any(|x| x.is_infinite()) {
+            continue;
+        }
+        col.sort_by(f32::total_cmp);
+        let n = col.len();
+        let mut flags = [false; 5];
+        for &p in q {
+            let vi = (n - 1) as f64 * (p / 100.0);
+            let (prev, next, prev_idx) = if vi >= (n - 1) as f64 {
+                (n - 1, n - 1, -1.0)
+            } else {
+                let f = vi.floor();
+                (f as usize, f as usize + 1, f)
+            };
+            let gamma = vi - prev_idx;
+            let (lo, hi) = (col[prev], col[next]);
+            flags[0] |= same_inf(f64::from(hi), f64::from(lo));
+            let d = f64::from(hi - lo);
+            let prod = d * gamma;
+            flags[1] |= d.is_infinite() && gamma == 0.0;
+            flags[2] |= opposite_inf(f64::from(lo), prod);
+            let prod2 = d * (1.0 - gamma);
+            flags[3] |= d.is_infinite() && 1.0 - gamma == 0.0;
+            flags[4] |= gamma >= 0.5 && same_inf(f64::from(hi), prod2);
+        }
+        let warn = [
+            (l_diff, "invalid value encountered in subtract"),
+            (l_add, "invalid value encountered in multiply"),
+            (l_add, "invalid value encountered in add"),
+            (l_sub, "invalid value encountered in multiply"),
+            (l_sub, "invalid value encountered in subtract"),
+        ];
+        for (k, &((line, source), message)) in warn.iter().enumerate() {
+            if flags[k] {
+                log.warn(
+                    "numpy/lib/_function_base_impl.py",
+                    line,
+                    "RuntimeWarning",
+                    message,
+                    source,
+                );
+            }
+        }
     }
 }

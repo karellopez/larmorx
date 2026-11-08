@@ -1,0 +1,258 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): every volume a dummy scan with the decay method: numpy's lstsq of no rows, then pandas' shape error in the confounds table (TED-13 refuses it by default)",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 7: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice'] / []; shared: messages: line 7: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice.'] / []",
+  "n": 6,
+  "seed": "t2smap-trial",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "dropped n-independent-echos (--n-ind 4)",
+   "dropped mask (--mask @mask)",
+   "dropped masktype (--masktype decay)"
+  ],
+  "signature": [
+   "newest: files",
+   "newest: last error line",
+   "newest: messages",
+   "shared: files",
+   "shared: last error line",
+   "shared: messages"
+  ]
+ },
+ "id": "dummy-scans-every-volume",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     6.0,
+     -1.75,
+     9.75
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     2.0,
+     1.0,
+     3.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "ones",
+    "suffix": ".nii.gz",
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.1,
+    "noise": 0.05,
+    "rising": 0.0,
+    "s0": {
+     "axes": [
+      0.8,
+      0.75,
+      1.0
+     ],
+     "bias": [
+      0.0025,
+      0.0075,
+      -0.01,
+      -0.005
+     ],
+     "centre": [
+      0.0,
+      -0.5,
+      0.5
+     ],
+     "noise": 1.0,
+     "seed": 1508826327,
+     "size": 5.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "seed": 623920566,
+    "t2": [
+     27.0,
+     42.0
+    ]
+   },
+   "shape": [
+    2,
+    2,
+    1,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    11,
+    24,
+    37
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 2.5,
+    "tunits": "sec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--dummy-scans spelling": "plain",
+   "--mask spelling": "plain",
+   "--n-independent-echos spelling": "abbreviated",
+   "S0 noise": 1.0,
+   "S0 tissues": "t2",
+   "T2* low ms": 27.0,
+   "T2* range ms": 15.0,
+   "TE gap ms": 13,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 11,
+   "axis0": 0.8,
+   "axis1": 0.75,
+   "axis2": 1.0,
+   "background": "noise",
+   "bias0": 0.0025,
+   "bias1": 0.0075,
+   "bias2": -0.01,
+   "bias3": -0.005,
+   "big-endian": false,
+   "centre0": 0.5,
+   "centre1": -3.0,
+   "centre2": 2.5,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.1,
+   "dtype": "float32",
+   "dummy count": 2,
+   "dummy scans": true,
+   "echoes": 4,
+   "even gaps": true,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "default",
+   "head size": 0.7,
+   "independent echoes": 4,
+   "log level": "info",
+   "mask": "ones",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "masktype": true,
+   "masktypes": 0,
+   "n-independent-echos": true,
+   "n-threads 1": false,
+   "noise": 1.0,
+   "nt": 6,
+   "nx": 7,
+   "ny": 21,
+   "one slice": true,
+   "orientation": "axes+oblique",
+   "origin0": -50.5,
+   "origin1": 2.0,
+   "origin2": 53.0,
+   "prefix": false,
+   "qfac": -1,
+   "qform_code": 4,
+   "rising share": 0.0,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "7x21x1x2",
+   "size": 29.5,
+   "spacing0": 2.0,
+   "spacing1": 1.0,
+   "spacing2": 3.0,
+   "special samples": false,
+   "suffix": ".nii.gz",
+   "temporal noise": 0.05,
+   "tissues": "t1",
+   "tr": 2.5,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "few",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--dummy-scans",
+     "2"
+    ],
+    "name": "dummy scans",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 6,
+  "options": [
+   "2 volume(s)",
+   "4 echoes",
+   "TE in s",
+   "dummy scans (all)",
+   "file .nii.gz",
+   "fitmode all",
+   "fittype default",
+   "mask ones",
+   "masktype decay",
+   "n-independent-echos",
+   "stored float32"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

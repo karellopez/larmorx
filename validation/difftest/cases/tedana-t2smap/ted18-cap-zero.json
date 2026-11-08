@@ -1,0 +1,280 @@
+{
+ "defect": "TED-18",
+ "description": "random testing (2026-11-08): a limited T2* map whose 99.5th percentile is 0: the cap sets every limited value to 0 and the RMSE divides by it (TED-18, no cap of 0 by default)",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 8: ['tedana/decay.py:83: RuntimeWarning: divide by zero encountered in divide'] / ['INFO     t2smap:t2smap_workflow:521 Computing optimal combination']; shared: messages: line 8: ['tedana/decay.py:83: RuntimeWarning: divide by zero encountered in divide'] / ['INFO     t2smap:t2smap_workflow:521 Computing optimal combination']",
+  "n": 1500,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "newest: messages",
+   "shared: messages"
+  ]
+ },
+ "id": "ted18-cap-zero",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     8.0,
+     32.0,
+     9.25
+    ],
+    "qfac": 1,
+    "qform_code": 4,
+    "quaternion": [
+     -6,
+     26,
+     0,
+     -32
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     0.8,
+     4.0,
+     1.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "head",
+    "suffix": ".nii",
+    "threshold": 0.6,
+    "value": 1.0
+   },
+   "series": {
+    "background": "zeros",
+    "dropout": 0.02,
+    "noise": 0.02,
+    "rising": 0.05,
+    "s0": {
+     "axes": [
+      0.95,
+      1.1,
+      0.8
+     ],
+     "bias": [
+      0.0,
+      0.0025,
+      0.005,
+      0.0025
+     ],
+     "centre": [
+      -0.5,
+      0.75,
+      0.5
+     ],
+     "noise": 0.0,
+     "seed": 226537090,
+     "size": 3.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 944832328,
+    "t2": [
+     22.0,
+     40.0
+    ]
+   },
+   "shape": [
+    9,
+    18,
+    1,
+    6
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "unsorted",
+   "tes": [
+    16,
+    26
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 2.0,
+    "tunits": "sec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--combmode spelling": "plain",
+   "--convention spelling": "plain",
+   "--mask spelling": "plain",
+   "--verbose spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 22.0,
+   "T2* range ms": 18.0,
+   "TE gap ms": 18,
+   "TE gap1 ms": 10,
+   "TE oddity": "unsorted",
+   "TE units": "s",
+   "TE1 ms": 16,
+   "axis0": 0.95,
+   "axis1": 1.1,
+   "axis2": 0.8,
+   "background": "zeros",
+   "bias0": 0.0,
+   "bias1": 0.0025,
+   "bias2": 0.005,
+   "bias3": 0.0025,
+   "big-endian": false,
+   "centre0": -4.0,
+   "centre1": 5.5,
+   "centre2": 5.0,
+   "combmode": "paid",
+   "content": "head",
+   "convention orig": true,
+   "dropout share": 0.02,
+   "dtype": "float32",
+   "dummy scans": false,
+   "echoes": 2,
+   "even gaps": false,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "default",
+   "head size": 1.0,
+   "log level": "info",
+   "mask": "head",
+   "mask dtype": "uint8",
+   "mask given": true,
+   "mask suffix": ".nii",
+   "mask threshold": 0.6,
+   "mask value": 0.5,
+   "masktype": true,
+   "masktypes": 3,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 6.0,
+   "nt": 6,
+   "nx": 9,
+   "ny": 18,
+   "one slice": true,
+   "orientation": "axes+oblique",
+   "origin0": 30.75,
+   "origin1": -27.25,
+   "origin2": -57.25,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 4,
+   "rising share": 0.05,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "9x18x1x6",
+   "size": 22.0,
+   "spacing0": 0.8,
+   "spacing1": 4.0,
+   "spacing2": 1.0,
+   "special samples": false,
+   "suffix": ".nii.gz",
+   "temporal noise": 0.02,
+   "tissues": "epi",
+   "tr": 2.0,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": true,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "--combmode",
+     "paid"
+    ],
+    "name": "combmode",
+    "optional": true
+   },
+   {
+    "args": [
+     "--masktype",
+     "dropout",
+     "decay",
+     "none"
+    ],
+    "name": "masktype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--convention",
+     "orig"
+    ],
+    "name": "convention",
+    "optional": true
+   },
+   {
+    "args": [
+     "--verbose"
+    ],
+    "name": "verbose",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 1500,
+  "options": [
+   "2 echoes",
+   "6 volume(s)",
+   "TE in s",
+   "TEs unsorted",
+   "combmode paid",
+   "convention orig",
+   "file .nii.gz",
+   "fitmode all",
+   "fittype default",
+   "mask head",
+   "masktype dropout decay none",
+   "stored float32",
+   "verbose"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

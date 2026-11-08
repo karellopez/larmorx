@@ -1,0 +1,259 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): a change of one voxel's RMSE that needs both of the other mode's function families: NP-03 and GLIBC-07 named together",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: 23 of 45708 values, max |diff| 5.84e-05 changed",
+  "n": 1299,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass"
+  ]
+ },
+ "id": "maths-notices-joint",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -3.75,
+     -7.0,
+     -9.0
+    ],
+    "qfac": 1,
+    "qform_code": 3,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     0.5,
+     1.0,
+     2.0
+    ],
+    "units": "mm"
+   },
+   "series": {
+    "background": "zeros",
+    "dropout": 0.0,
+    "noise": 0.005,
+    "rising": 0.0,
+    "s0": {
+     "axes": [
+      1.1,
+      1.0,
+      0.95
+     ],
+     "bias": [
+      0.0075,
+      0.0,
+      -0.0025,
+      -0.01
+     ],
+     "centre": [
+      0.25,
+      0.25,
+      0.5
+     ],
+     "noise": 0.0,
+     "seed": 737524963,
+     "size": 2.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 999989367,
+    "t2": [
+     12.0,
+     60.0
+    ]
+   },
+   "shape": [
+    16,
+    15,
+    10,
+    12
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float64",
+    "scaling": null,
+    "suffix": ".nii"
+   },
+   "te_oddity": "none",
+   "tes": [
+    9,
+    21
+   ],
+   "timing": {
+    "slice_code": 0,
+    "slice_duration": 0.1,
+    "slice_end": 9,
+    "slice_start": 0,
+    "tr": 1.0,
+    "tunits": "sec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--convention spelling": "plain",
+   "--fittype spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 12.0,
+   "T2* range ms": 48.0,
+   "TE gap ms": 14,
+   "TE gap1 ms": 12,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 9,
+   "axis0": 1.1,
+   "axis1": 1.0,
+   "axis2": 0.95,
+   "background": "zeros",
+   "bias0": 0.0075,
+   "bias1": 0.0,
+   "bias2": -0.0025,
+   "bias3": -0.01,
+   "big-endian": false,
+   "centre0": 2.5,
+   "centre1": 2.0,
+   "centre2": 6.0,
+   "combmode": "default",
+   "content": "head",
+   "convention orig": true,
+   "dropout share": 0.0,
+   "dtype": "float64",
+   "dummy scans": false,
+   "echoes": 2,
+   "even gaps": false,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 3,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 0.6,
+   "log level": "info",
+   "mask given": false,
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": true,
+   "noise": 0.0,
+   "nt": 12,
+   "nx": 22,
+   "ny": 21,
+   "nz": 10,
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": -52.0,
+   "origin1": 43.25,
+   "origin2": 25.5,
+   "prefix": true,
+   "prefix text": "x_",
+   "qfac": 1,
+   "qform_code": 3,
+   "rising share": 0.0,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "22x21x10x12",
+   "size": 25.0,
+   "slice_code": 6,
+   "spacing0": 0.5,
+   "spacing1": 1.0,
+   "spacing2": 2.0,
+   "special samples": false,
+   "suffix": ".nii",
+   "temporal noise": 0.005,
+   "tissues": "t2",
+   "tr": 1.0,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--fittype",
+     "curvefit"
+    ],
+    "name": "fittype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--convention",
+     "orig"
+    ],
+    "name": "convention",
+    "optional": true
+   },
+   {
+    "args": [
+     "--prefix",
+     "x_"
+    ],
+    "name": "prefix",
+    "optional": true
+   },
+   {
+    "args": [
+     "--n-threads",
+     "1"
+    ],
+    "name": "n-threads",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 1299,
+  "options": [
+   "12 volume(s)",
+   "2 echoes",
+   "TE in s",
+   "convention orig",
+   "file .nii",
+   "fitmode all",
+   "fittype curvefit",
+   "n-threads 1",
+   "no mask",
+   "prefix",
+   "stored float64"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

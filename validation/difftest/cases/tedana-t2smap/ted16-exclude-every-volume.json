@@ -1,0 +1,258 @@
+{
+ "defect": "TED-16",
+ "description": "random testing (2026-11-08): --exclude removing every volume: tedana fits nothing and writes T2* = 500 ms, S0 = 1 (TED-16, refused by default)",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 8: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice'] / []; shared: messages: line 8: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice.'] / []",
+  "n": 276,
+  "seed": "t2smap-trial",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "dropped debug (--debug)",
+   "dropped fittype (--fittype curvefit)",
+   "dropped mask (--mask=@mask)",
+   "dropped masktype (--masktype decay)"
+  ],
+  "signature": [
+   "newest: last error line",
+   "newest: messages",
+   "shared: last error line",
+   "shared: messages"
+  ]
+ },
+ "id": "ted16-exclude-every-volume",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -12.0,
+     -13.75,
+     2.25
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     0.5,
+     2.5,
+     3.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "ones",
+    "suffix": ".nii.gz",
+    "value": 1.0
+   },
+   "series": {
+    "background": "zeros",
+    "dropout": 0.1,
+    "noise": 0.0,
+    "rising": 0.01,
+    "s0": {
+     "axes": [
+      1.2,
+      0.9,
+      1.15
+     ],
+     "bias": [
+      0.0075,
+      0.005,
+      -0.0025,
+      0.0
+     ],
+     "centre": [
+      -0.25,
+      0.0,
+      -0.5
+     ],
+     "noise": 3.0,
+     "seed": 2076097850,
+     "size": 2.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 410559495,
+    "t2": [
+     16.0,
+     31.0
+    ]
+   },
+   "shape": [
+    2,
+    2,
+    2,
+    1
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    15,
+    35,
+    55
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 0.5,
+    "tunits": "sec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--exclude spelling": "equals",
+   "--fittype spelling": "plain",
+   "--mask spelling": "equals",
+   "S0 noise": 3.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 16.0,
+   "T2* range ms": 15.0,
+   "TE gap ms": 20,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 15,
+   "axis0": 1.2,
+   "axis1": 0.9,
+   "axis2": 1.15,
+   "background": "zeros",
+   "bias0": 0.0075,
+   "bias1": 0.005,
+   "bias2": -0.0025,
+   "bias3": 0.0,
+   "big-endian": false,
+   "centre0": -4.0,
+   "centre1": -0.5,
+   "centre2": -6.0,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.1,
+   "dtype": "float32",
+   "echoes": 3,
+   "even gaps": true,
+   "exclude": true,
+   "exclude a": 0,
+   "exclude form": "one",
+   "exclude up to the end": false,
+   "extreme": false,
+   "few volumes": 3,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 0.85,
+   "log level": "debug",
+   "mask": "ones",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "masktype": true,
+   "masktypes": 1,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 3.0,
+   "nt": 11,
+   "nx": 10,
+   "ny": 12,
+   "nz": 9,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": -52.75,
+   "origin1": -30.5,
+   "origin2": -13.75,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 1,
+   "rising share": 0.01,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "10x12x9x1",
+   "size": 9.0,
+   "spacing0": 0.5,
+   "spacing1": 2.5,
+   "spacing2": 3.0,
+   "special samples": false,
+   "suffix": ".nii.gz",
+   "temporal noise": 0.0,
+   "tissues": "epi",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "one",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--exclude=0"
+    ],
+    "name": "exclude",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 276,
+  "options": [
+   "1 volume(s)",
+   "3 echoes",
+   "TE in s",
+   "exclude",
+   "file .nii.gz",
+   "fitmode all",
+   "fittype curvefit",
+   "log debug",
+   "mask ones",
+   "masktype decay",
+   "stored float32"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": "B",
+ "status": "register",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

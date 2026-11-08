@@ -106,6 +106,44 @@ impl Libraries {
         }
     }
 
+    /// `nanvar`'s subtraction of the mean (`invalid value encountered in subtract` with an
+    /// infinite RMSE).
+    pub fn nanvar_subtract_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 1845,
+            Libraries::Shared => 1863,
+        }
+    }
+
+    /// `_lerp`'s three lines (`b - a`; `a + (b - a) * t`; `b - (b - a) * (1 - t)`) and their
+    /// source texts, numpy's percentiles of infinite values.
+    pub fn lerp_lines(self) -> [(u32, &'static str); 3] {
+        match self {
+            Libraries::Newest => [
+                (4609, "diff_b_a = b - a"),
+                (
+                    4610,
+                    "lerp_interpolation = add(a, diff_b_a * t, out=... if out is None else out)",
+                ),
+                (
+                    4611,
+                    "subtract(b, diff_b_a * (1 - t), out=lerp_interpolation, where=t >= 0.5,",
+                ),
+            ],
+            Libraries::Shared => [
+                (4671, "diff_b_a = subtract(b, a)"),
+                (
+                    4673,
+                    "lerp_interpolation = asanyarray(add(a, diff_b_a * t, out=out))",
+                ),
+                (
+                    4674,
+                    "subtract(b, diff_b_a * (1 - t), out=lerp_interpolation, where=t >= 0.5,",
+                ),
+            ],
+        }
+    }
+
     pub fn nanquantile_line(self) -> u32 {
         match self {
             Libraries::Newest => 1593,

@@ -150,7 +150,10 @@ PAGES = [
         "/tools/afni-volreg/",
         "3dvolreg",
         "afni",
-        [("larmorx replica", "afni-volreg-replica", "validated", None, None)],
+        [
+            ("clean-room original", "afni-volreg-original", "experimental", None, None),
+            ("larmorx replica", "afni-volreg-replica", "validated", None, None),
+        ],
     ),
     (
         "/tools/fsl-bet/",

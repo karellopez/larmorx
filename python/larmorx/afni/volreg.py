@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dvolreg``: rigid-body (6-parameter) registration of every volume of a series to a base
-volume, the bit-exact replica of AFNI 26.3.05's program.
+volume, as AFNI 26.3.05's program does.
 
-``implementation="auto"`` (the default) and ``"replica"`` run the replica (part of larmorx, in
-this process); larmorx has no clean-room original of 3dvolreg yet (``"original"`` raises
-``NotImplementedError``). The replica gives AFNI's registered series, parameters, matrices and
-displacements bit for bit (``docs/validation/afni-volreg.md``).
+``implementation="auto"`` (the default) and ``"replica"`` run the bit-exact replica (part of
+larmorx, in this process), which gives AFNI's registered series, parameters, matrices and
+displacements bit for bit (``docs/validation/afni-volreg-replica.md``); ``"original"`` runs the
+clean-room original (Apache-2.0, written from ``specs/3dvolreg.md``, built for speed), which
+gives AFNI's results within the thresholds of the spec (§14.3).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
 ``coarse_rotation=False`` turns the coarse rotation search off, as documented (AFNI reads
@@ -21,13 +22,14 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _defects, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.afni import _common
@@ -179,8 +181,8 @@ def volreg(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"original"`` raises
-        ``NotImplementedError`` (no clean-room original yet).
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"original"``: the
+        clean-room original.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -199,9 +201,8 @@ def volreg(
     Raises
     ------
     ValueError
-        Invalid arguments.
-    NotImplementedError
-        ``implementation="original"``.
+        Invalid arguments; with the original, AFNI's fatal errors (a base with fewer than 100
+        non-zero voxels, mismatched grids, ...).
     larmorx.ReplicaError
         The replica ran and failed (AFNI's fatal errors: a base with fewer than 100 non-zero
         voxels, mismatched grids, ...).
@@ -219,8 +220,7 @@ def volreg(
     if isinstance(weight_index, bool) or not isinstance(weight_index, int) or weight_index < 0:
         raise ValueError(f"weight_index must be a non-negative int, not {weight_index!r}")
     selected = _replica.select("afni", "3dvolreg", implementation)
-    assert selected is not None  # no clean-room original: select raises for "original"
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with _common.temporary_directory("larmorx-volreg-") as tmp:
         source = _common.write_input(image, tmp, n_threads)
         args = list(options)
@@ -239,21 +239,27 @@ def volreg(
                 if not isinstance(value, (str, os.PathLike)):
                     raise TypeError(f"{flag[1:]} must be a path to a NIfTI file of AFNI's")
                 args += [flag, os.path.abspath(os.fspath(value))]
-        outputs = ["-prefix", "out.nii", "-1Dfile", "p.1D", "-1Dmatrix_save", "m.aff12.1D"]
-        outputs += ["-dfile", "d.txt"]
-        if maxdisp:
-            outputs += ["-maxdisp1D", "md.1D"]
-        if save_displacements:
-            outputs += ["-savedisp", "sd.nii"]
-        _common.run_replica(
-            selected,
-            [*args, *outputs, source],
-            tmp,
-            n_threads=n_threads,
-            upstream_defects=upstream_defects,
-            settings=settings,
-        )
         path = lambda name: os.path.join(tmp, name)  # noqa: E731
+        # Relative names for the replica (run in tmp), absolute ones for the original (run in
+        # this process).
+        out = path if selected is None else (lambda name: name)
+        outputs = ["-prefix", out("out.nii"), "-1Dfile", out("p.1D")]
+        outputs += ["-1Dmatrix_save", out("m.aff12.1D"), "-dfile", out("d.txt")]
+        if maxdisp:
+            outputs += ["-maxdisp1D", out("md.1D")]
+        if save_displacements:
+            outputs += ["-savedisp", out("sd.nii")]
+        if selected is None:
+            _run_original([*args, *outputs, source], n_threads, upstream_defects, settings)
+        else:
+            _common.run_replica(
+                selected,
+                [*args, *outputs, source],
+                tmp,
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                settings=settings,
+            )
         read = lambda name: _common.read_output(path(name), n_threads, impl)  # noqa: E731
         table = lambda name, cols: np.loadtxt(path(name), comments="#", ndmin=2)[:, cols]  # noqa: E731
         has_md = maxdisp and os.path.exists(path("md.1D"))
@@ -269,6 +275,28 @@ def volreg(
                 if save_displacements
                 else None
             ),
+        )
+
+
+def _run_original(
+    args: list[str], n_threads: int, upstream_defects: str, settings: dict[str, str]
+) -> None:
+    """Runs the clean-room original's command line in this process; its warnings become Python
+    warnings, a failure a ``ValueError`` with AFNI's message."""
+    code, _, stderr = _core.afni_volreg_cli(
+        args,
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
+        afni_settings=sorted(settings.items()) or None,
+    )
+    for line in stderr.splitlines():
+        if line.startswith("*+ WARNING: "):
+            text = line.removeprefix("*+ WARNING: ")
+            warnings.warn(_defects.parse_line(text) or text, stacklevel=4)
+    if code != 0:
+        errors = [ln for ln in stderr.splitlines() if ln.startswith("**")]
+        raise ValueError(
+            "3dvolreg (clean-room original) failed: " + (" ".join(errors) or stderr.strip())
         )
 
 

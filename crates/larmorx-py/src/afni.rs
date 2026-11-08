@@ -684,7 +684,85 @@ fn afni_unifize_file<'py>(
     )
 }
 
+/// 3dvolreg's clean-room original with its original arguments (the command line), AFNI's
+/// variables `afni_settings` (with the ones the wrappers fix) in place of the process
+/// environment: returns `(exit status, standard output, standard error)`. The GIL is released
+/// while it runs; paths in `args` should be absolute (relative ones start in the process's
+/// directory).
+#[pyfunction]
+#[pyo3(signature = (args, n_threads = 1, upstream_defects = "fix", afni_settings = None))]
+fn afni_volreg_cli(
+    py: Python<'_>,
+    args: Vec<String>,
+    n_threads: usize,
+    upstream_defects: &str,
+    afni_settings: Option<Vec<(String, String)>>,
+) -> PyResult<(u8, String, String)> {
+    let mode = defects_mode(upstream_defects)?;
+    let settings = settings_of(afni_settings);
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = py.detach(|| {
+        larmorx_afni::cli::volreg::main_with_settings(
+            &args, mode, settings, n_threads, &mut out, &mut err,
+        )
+    });
+    Ok((
+        code,
+        String::from_utf8_lossy(&out).into_owned(),
+        String::from_utf8_lossy(&err).into_owned(),
+    ))
+}
+
+/// 3dvolreg's `-SAVEDISP` arithmetic (`specs/3dvolreg.md` §10.3) on three raw displacement
+/// series, each `(volumes, voxels)` float32 as `-savedisp` writes them: the three normalised,
+/// then their sixteen products, as `(suffix, series)` in the order the program writes them
+/// (`DX`, `DY`, `DZ`, `DXX`, ...). The validation applies it to AFNI's own raw `-savedisp`
+/// values (§14.3, "`-SAVEDISP`" step 1); the command line runs the same functions.
+#[pyfunction]
+fn afni_volreg_savedisp<'py>(
+    py: Python<'py>,
+    dx: numpy::PyReadonlyArray2<'py, f32>,
+    dy: numpy::PyReadonlyArray2<'py, f32>,
+    dz: numpy::PyReadonlyArray2<'py, f32>,
+) -> PyResult<Vec<(String, Bound<'py, numpy::PyArray2<f32>>)>> {
+    use larmorx_afni::volreg::report;
+    use numpy::PyUntypedArrayMethods;
+    let shape = dx.shape().to_vec();
+    if dy.shape() != shape.as_slice() || dz.shape() != shape.as_slice() {
+        return Err(PyValueError::new_err(
+            "the three displacement series must have the same shape",
+        ));
+    }
+    let (nt, total) = (shape[0], shape[1]);
+    let take = |a: &numpy::PyReadonlyArray2<'py, f32>| -> Vec<f32> {
+        a.as_array().iter().copied().collect()
+    };
+    let mut d = [take(&dx), take(&dy), take(&dz)];
+    let sets = py.detach(move || {
+        for s in d.iter_mut() {
+            report::normalise_displacements(s, total);
+        }
+        let mut sets: Vec<(String, Vec<f32>)> = ["DX", "DY", "DZ"]
+            .iter()
+            .zip(d.iter())
+            .map(|(n, s)| ((*n).to_owned(), s.clone()))
+            .collect();
+        for &(name, counts) in report::SAVEDISP_PRODUCTS.iter() {
+            sets.push((name.to_owned(), report::savedisp_product(&d, counts, total)));
+        }
+        sets
+    });
+    sets.into_iter()
+        .map(|(name, v)| {
+            let a = numpy::ndarray::Array2::from_shape_vec((nt, total), v).map_err(value_err)?;
+            Ok((name, PyArray::from_owned_array(py, a)))
+        })
+        .collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(afni_volreg_cli, m)?)?;
+    m.add_function(wrap_pyfunction!(afni_volreg_savedisp, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_file, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_array, m)?)?;
     m.add_function(wrap_pyfunction!(afni_automask_file, m)?)?;

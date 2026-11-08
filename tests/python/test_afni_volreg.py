@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lx.afni.volreg`` with the replica built into larmorx (no clean-room original yet): the
-wrapper passes 3dvolreg's options, runs the replica in this process and reads its outputs back.
-The replica itself is checked by its golden tests and against AFNI
-(``validation/investigations/afni-volreg/``, the parity suite)."""
+"""``lx.afni.volreg`` with the replica built into larmorx and the clean-room original: the
+wrapper passes 3dvolreg's options, runs either in this process and reads its outputs back. Both
+are checked by their golden tests and against AFNI (the parity suites; the original's black-box
+checks in ``validation/investigations/afni-volreg-original/``)."""
 
 from __future__ import annotations
 
@@ -53,10 +53,21 @@ def test_fmriprep_call_and_displacements(tmp_path):
     assert all(d.data.shape == (24, 20, 12, 3) for d in r.displacements)
 
 
-def test_original_and_bad_arguments(tmp_path):
+def test_the_original_agrees_with_the_replica(tmp_path):
     path = series(tmp_path)
-    with pytest.raises(NotImplementedError, match="no clean-room original"):
-        lx.afni.volreg(path, implementation="original")
+    o = lx.afni.volreg(path, implementation="original")
+    r = lx.afni.volreg(path, implementation="replica")
+    assert o.registered.implementation.kind == "original"
+    assert o.registered.data.shape == r.registered.data.shape
+    # specs/3dvolreg.md §14.3: the convergence thresholds (0.02 degrees, 0.01 voxels).
+    assert np.abs(o.parameters - r.parameters).max() < 0.03
+    assert np.all(o.parameters[0] == 0)
+    with pytest.raises(ValueError, match="nonzero voxel"):
+        lx.afni.volreg((np.zeros((8, 8, 8, 2), np.float32), np.eye(4)), implementation="original")
+
+
+def test_bad_arguments(tmp_path):
+    path = series(tmp_path)
     with pytest.raises(ValueError, match="interpolation"):
         lx.afni.volreg(path, interpolation="spline")
     with pytest.raises(ValueError, match="twoblur"):

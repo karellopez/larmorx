@@ -149,8 +149,8 @@ title = "3dvolreg (rigid-body registration of a series)"
 eco = "afni"
 page = "/tools/afni-volreg/"
 use = ["larmorx afni 3dvolreg", "lx.afni.volreg"]
-how = "exact replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined); clean-room original: the next part, from `specs/3dvolreg.md`"
-validation = "replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on six oracle runs' BOLD references and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings)"
+how = "clean-room original, `experimental` (2026-11-08: every option, message and failure case of `specs/3dvolreg.md`, AFNI-86 to AFNI-99 handled as the replica handles them, each with `reproduce`; built for speed: fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count); exact replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined)"
+validation = "original: [{afni-volreg-original.pass} of {afni-volreg-original.compared}](record:afni-volreg-original) compared cases within `specs/3dvolreg.md` §14.3's limits against AFNI 26.3.05, its default within them of the replica's default (exit statuses, messages, files written and headers exact; the numbers that the shear decomposition's ties decide within limits measured from AFNI's own spread under those ties): fMRIPrep's {afni-volreg-original.fmriprep} RobustAverage and PEPOLAR calls (their medians at most 0.115 of their limits from fMRIPrep's own outputs), every option, data type, message and failure case; {afni-volreg-original.both} more rejected by both alike; [2.8 to 5.2 times faster than AFNI](repo:docs/benchmarks/afni-volreg.md) on one thread, 9 to 15 times on 14; replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on six oracle runs' BOLD references and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings)"
 
 [[tool]]
 id = "mri-hmc"
@@ -307,6 +307,12 @@ id = "afni-unifize-replica"
 larmorx = "`larmorx afni 3dUnifize` and `lx.afni.unifize` with the replica (`crates/larmorx-afni-replica`, in-process)"
 reference = "3dUnifize (AFNI 26.3.05 binary, 1, 2 and 6 OpenMP threads; AFNI 25.2.09 beside it, the version step; fMRIPrep 25.2.6's AFNI)"
 status = "`validated`"
+
+[[record]]
+id = "afni-volreg-original"
+larmorx = "`lx.afni.volreg(implementation=\"original\")`, `larmorx afni 3dvolreg` (clean-room, `crates/larmorx-afni`)"
+reference = "3dvolreg (AFNI 26.3.05 binary, one thread: no OpenMP loop; through the oracle cache); the replica's default (a black box); fMRIPrep's calls also against fMRIPrep's own outputs (their medians)"
+status = "`experimental` ({afni-volreg-original.pass} of {afni-volreg-original.compared} compared cases within `specs/3dvolreg.md` §14.3's limits, fMRIPrep's {afni-volreg-original.fmriprep} calls included; {afni-volreg-original.both} rejected by both, with the same messages and status; {afni-volreg-original.expected} expected divergences: larmorx writes no AFNI .HEAD/.BRIK dataset (twice) and refuses AFNI-96's short attribute, which AFNI reads past)"
 
 [[record]]
 id = "afni-volreg-replica"

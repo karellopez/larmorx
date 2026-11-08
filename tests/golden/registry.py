@@ -1094,8 +1094,9 @@ def image_math_operations() -> list[str]:
 #: replicas from 2026-11-04 to 2026-11-05, when their clean-room originals came (their cases
 #: below). ``lx.fsl.prelude`` ran a tool with only its replica (FSL's prelude) from 2026-11-06
 #: until its clean-room original came the next day (its cases below); since 2026-11-06
-#: ``lx.afni.volreg`` runs a tool with only its replica (AFNI's 3dvolreg).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.afni.volreg": "afni 3dvolreg"}
+#: ``lx.afni.volreg`` ran a tool with only its replica (AFNI's 3dvolreg) from 2026-11-06 until its
+#: clean-room original came on 2026-11-08 (its cases below).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -3314,6 +3315,115 @@ def _(ctx: Context) -> dict[str, Any]:
         "options": np.array([float(o["twopass"]), float(o["zpad"])]),
         "method": o["interpolation"],
     }
+
+
+def _volreg_numbers(path: str) -> np.ndarray:
+    """A 3dvolreg text output's numbers, its comment lines (``-maxdisp1D``'s first holds the
+    command line, with the run's paths) set aside."""
+    rows = [
+        [float(x) for x in line.split()]
+        for line in Path(path).read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    return np.array(rows, dtype=np.float64)
+
+
+#: 3dvolreg's text outputs of a case: option -> file name.
+VOLREG_TEXT = {"-1Dfile": "p.1D", "-dfile": "d.1D", "-1Dmatrix_save": "m.aff12.1D"}
+
+
+def _volreg(ctx: Context, src: str, *opts: str, upstream_defects: str = "fix") -> dict[str, Any]:
+    """3dvolreg's clean-room original (the ``larmorx`` command line runs the original) with
+    every text output and ``-maxdisp1D``: the registered dataset, the text files as bytes, the
+    maximum displacements as numbers; standard output (``-rotcom``)."""
+    out = ctx.out("out.nii")
+    texts = {opt: ctx.out(name) for opt, name in VOLREG_TEXT.items()}
+    md = ctx.out("md.1D")
+    words = [w for opt, path in texts.items() for w in (opt, path)]
+    stdout = cli("afni", "3dvolreg", *opts, "-prefix", out, *words, "-maxdisp1D", md, src, upstream_defects=upstream_defects)  # fmt: skip
+    got: dict[str, Any] = {"out": Nifti(out), "stdout": stdout}
+    for opt, path in texts.items():
+        got[VOLREG_TEXT[opt]] = File(path)
+    got["md"] = _volreg_numbers(md)
+    got["md_delt"] = _volreg_numbers(ctx.out("md_delt.1D"))
+    return got
+
+
+@case("cli.afni.3dvolreg", covers=("cli:afni 3dvolreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The default heptic method on the oblique float32 series (fractional shifts): the
+    registered volumes, the parameters, ``-dfile``'s rms, the matrices, the maximum
+    displacements."""
+    return _volreg(ctx, ctx.file("bold.nii"))
+
+
+@case("cli.afni.3dvolreg.fmriprep", covers=("cli:afni 3dvolreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's call (``-Fourier -twopass -zpad 4``): the first pass on blurred volumes, the
+    coarse rotation and shift searches, the Fourier resampling (row pairs, padded lengths)."""
+    return _volreg(ctx, ctx.file("bold.nii"), "-Fourier", "-twopass", "-zpad", "4")
+
+
+@case("cli.afni.3dvolreg.options", covers=("cli:afni 3dvolreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """An int16 series (rounded and clamped output), cubic without clipping or padding, a
+    weight from the input (``-wtinp``), ``-savedisp``'s three datasets and ``-rotcom``'s
+    commands."""
+    img = bold()
+    data = np.asfortranarray(np.round(np.asarray(img.data) * 3).astype(np.int16))
+    src = ctx.out("bold_i16.nii")
+    lx.save(lx.Image(data, img.affine, header_for(data, img.affine, pixdim=(1.0, 3.0, 3.0, 3.25, 2.0, 1.0, 1.0, 1.0), xyzt_units=10)), src)  # fmt: skip
+    sd = ctx.out("sd.nii")
+    got = _volreg(ctx, src, "-cubic", "-noclip", "-zpad", "0", "-wtinp", "-savedisp", sd, "-rotcom")  # fmt: skip
+    for axis in ("DX", "DY", "DZ"):
+        got[f"sd_{axis}"] = Nifti(ctx.out(f"sd_{axis}.nii"))
+    return got
+
+
+@case("cli.afni.3dvolreg.reproduce", covers=("cli:afni 3dvolreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """AFNI's defects reproduced: a uint8 series stretched by each volume's range (AFNI-87),
+    the maximum displacements with the axes' signs (AFNI-99), glibc's sine and cosine
+    (GLIBC-07), with -twopass (its coarse searches) and ``-final linear``."""
+    img = bold()
+    data = np.asfortranarray(np.clip(np.round(np.asarray(img.data) / 4), 0, 255).astype(np.uint8))
+    src = ctx.out("bold_u8.nii")
+    lx.save(lx.Image(data, img.affine, header_for(data, img.affine, pixdim=(1.0, 3.0, 3.0, 3.25, 2.0, 1.0, 1.0, 1.0), xyzt_units=10)), src)  # fmt: skip
+    return _volreg(ctx, src, "-twopass", "-final", "linear", upstream_defects=REPRODUCE)
+
+
+@case("cli.afni.3dvolreg.SAVEDISP", covers=("cli:afni 3dvolreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``-SAVEDISP`` without an output dataset (``-prefix NULL``): the three displacements
+    normalised and their sixteen products."""
+    sd = ctx.out("sd.nii")
+    cli("afni", "3dvolreg", "-quintic", "-prefix", "NULL", "-SAVEDISP", sd, ctx.file("bold.nii"))
+    names = ("DX", "DY", "DZ", "DXX", "DYY", "DZZ", "DXY", "DXZ", "DYZ", "DXXX", "DYYY", "DZZZ",
+             "DXXY", "DXXZ", "DXYY", "DXZZ", "DYYZ", "DYZZ", "DXYZ")  # fmt: skip
+    return {f"sd_{n}": Nifti(ctx.out(f"sd_{n}.nii")) for n in names}
+
+
+@case("py.afni.volreg", covers=("lx.afni.volreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The clean-room original on an image in memory, the base an external volume: the
+    registered series, the reported parameters, the matrices, the rms, the maximum
+    displacements and the per-voxel displacements."""
+    img = bold()
+    base = lx.Image(np.asfortranarray(np.asarray(img.data)[..., 2]), img.affine)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # AFNI-99's notice (corrected)
+        r = lx.afni.volreg(img, base=base, interpolation="quintic", save_displacements=True, implementation=ORIGINAL)  # fmt: skip
+    out = {
+        **image_outputs("registered", r.registered, header=True),
+        "parameters": r.parameters,
+        "matrices": r.matrices,
+        "rms": r.rms,
+        "max_displacement": r.max_displacement,
+        "max_delta_displacement": r.max_delta_displacement,
+    }
+    for axis, d in zip("XYZ", r.displacements, strict=True):
+        out[f"d{axis}"] = d.data
+    return out
 
 
 @case("py.afni.fmriprep_slice_timing", covers=("lx.afni.fmriprep_slice_timing",))

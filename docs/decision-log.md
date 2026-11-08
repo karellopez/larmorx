@@ -2018,3 +2018,19 @@ together at the end.
 - **Two agents at once by role, from now until FreeSurfer** (the user: "you can use 2 agents at the same times as
   before, now with the relays we save usage, so we can for now go ahed with 2 before starting with freesurfer"):
   the arrangement of 2026-11-02 (CLAUDE.md, "Agents at once"), with relay agents.
+
+## 2026-11-07 and 08: 3dvolreg's clean-room original (the orchestrator, on the spec writers' recommendations and the rules)
+- **Bit-identity not sought** (`specs/3dvolreg.md` §16, 2026-11-07; recommended by the replica part's spec
+  writer, decided by the orchestrator unless the user objects; "Waiting for the user" in next-steps): the
+  spec does not describe AFNI's own evaluation of the shear decomposition, whose last double bits choose
+  between axis orders of equal norm (the ties) at every resampling; the clean-room original is held to the
+  thresholds of §5.3 and §14.3 there, everything else exact.
+- **The limits measured from AFNI's own spread under the ties** (the spec writer's step 3, 2026-11-08, on the
+  questions of the original's first record and random-testing trial): each registered volume within
+  `max(2e-3, 1e-3 θ_v)` of its largest value (θ_v its total rotation in degrees), fMRIPrep's median within the
+  limit its volumes imply, `-final NN` by a nearest-neighbour rule; a validation switch
+  `LARMORX_VOLREG_TIES=random:<seed>` and the rule of 12 seeded runs for the original's own spread in random
+  testing; runaways (beyond 15° or 20 mm, or AFNI-97) held to the output's structure; the record's
+  re-examination with one global tie side for a whole run not accepted (a single point of the spread).
+- **No spec-writer step for relay 4's three questions** (2026-11-08): the record has no failure and the
+  trial's sampled differences are explained; they stay open in next-steps.

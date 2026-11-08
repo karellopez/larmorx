@@ -5,6 +5,11 @@
 
 /// `%g`.
 pub fn g(v: f64) -> String {
+    g_prec(v, 6)
+}
+
+/// `%.<p>g`.
+pub fn g_prec(v: f64, p: usize) -> String {
     if v.is_nan() {
         return if v.is_sign_negative() { "-nan" } else { "nan" }.into();
     }
@@ -14,15 +19,15 @@ pub fn g(v: f64) -> String {
     if v == 0.0 {
         return if v.is_sign_negative() { "-0" } else { "0" }.into();
     }
-    const P: i32 = 6;
-    let sci = format!("{:.*e}", (P - 1) as usize, v);
+    let p = p.max(1);
+    let sci = format!("{:.*e}", p - 1, v);
     let (mantissa, exp) = sci.split_once('e').expect("an exponent");
     let x: i32 = exp.parse().expect("an exponent");
-    if !(-4..P).contains(&x) {
+    if !(-4..p as i32).contains(&x) {
         let sign = if x < 0 { '-' } else { '+' };
         format!("{}e{sign}{:02}", strip(mantissa), x.abs())
     } else {
-        let decimals = (P - 1 - x).max(0) as usize;
+        let decimals = (p as i32 - 1 - x).max(0) as usize;
         strip(&format!("{v:.decimals$}")).to_owned()
     }
 }
@@ -36,6 +41,42 @@ pub fn f(v: f64) -> String {
         return if v < 0.0 { "-inf" } else { "inf" }.into();
     }
     format!("{v:.6}")
+}
+
+/// `%<w>.<p>g`: right-aligned in `w` characters.
+pub fn g_width(v: f64, w: usize, p: usize) -> String {
+    format!("{:>w$}", g_prec(v, p))
+}
+
+/// `%.<d>f` (C's `nan`, `inf` for those values).
+pub fn fixed(v: f64, d: usize) -> String {
+    if v.is_nan() {
+        return if v.is_sign_negative() { "-nan" } else { "nan" }.into();
+    }
+    if v.is_infinite() {
+        return if v < 0.0 { "-inf" } else { "inf" }.into();
+    }
+    format!("{v:.d$}")
+}
+
+/// `%<w>.<d>f`.
+pub fn fixed_width(v: f64, w: usize, d: usize) -> String {
+    format!("{:>w$}", fixed(v, d))
+}
+
+/// `%+.<d>f`.
+pub fn fixed_signed(v: f64, d: usize) -> String {
+    let s = fixed(v, d);
+    if s.starts_with('-') || s.starts_with('+') {
+        s
+    } else {
+        format!("+{s}")
+    }
+}
+
+/// `%.1f`.
+pub fn f1(v: f64) -> String {
+    fixed(v, 1)
 }
 
 /// `%g` of a float32 value (C promotes it to double).
@@ -71,5 +112,11 @@ mod tests {
         assert_eq!(g(100000.0), "100000");
         assert_eq!(f(f64::from(36.869_896f32)), "36.869896");
         assert_eq!(f(0.5), "0.500000");
+        assert_eq!(g_width(1.0, 13, 6), "            1");
+        assert_eq!(g_width(-0.0, 13, 6), "           -0");
+        assert_eq!(g_prec(1.23456, 4), "1.235");
+        assert_eq!(fixed_width(-0.0, 8, 4), " -0.0000");
+        assert_eq!(fixed_signed(0.25, 3), "+0.250");
+        assert_eq!(fixed_signed(-0.25, 3), "-0.250");
     }
 }

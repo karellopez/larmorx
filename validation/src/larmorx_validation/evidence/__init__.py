@@ -26,7 +26,8 @@ TOOLS: dict[str, str] = {
     "afni-tshift": "afni_tshift",
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
-    "afni-volreg": "afni_volreg",
+    # the replica's page (afni_volreg) with the clean-room original's panels, cases and speed
+    "afni-volreg": "afni_volreg_original",
     "fsl-bet": "fsl_bet",
     "fsl-flirt": "fsl_flirt",
     "fsl-fast": "fsl_fast",

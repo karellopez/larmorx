@@ -1,0 +1,494 @@
+# HANDOFF.toml of 3dvolreg's clean-room original part (relay 6, 2026-11-08): the exact changes to the shared
+# documents, applied in order by scripts/orchestration/apply_handoff.py (run from the larmorx checkout, with
+# --site <the site's checkout>); the reasons are in HANDOFF.md beside this file. Afterwards:
+# `python -m larmorx_validation tables --site <site>`, `register_counts.py`, the evidence summary.
+
+[[op]]
+do = "block"
+kind = "tool"
+id = "afni-volreg"
+text = '''
+[[tool]]
+id = "afni-volreg"
+title = "3dvolreg (rigid-body registration of a series)"
+eco = "afni"
+page = "/tools/afni-volreg/"
+use = ["larmorx afni 3dvolreg", "lx.afni.volreg"]
+how = "clean-room original, `experimental` (2026-11-08: every option, message and failure case of `specs/3dvolreg.md`, AFNI-86 to AFNI-99 handled as the replica handles them, each with `reproduce`; built for speed: fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count); exact replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined)"
+validation = "original: [{afni-volreg-original.pass} of {afni-volreg-original.compared}](record:afni-volreg-original) compared cases within `specs/3dvolreg.md` §14.3's limits against AFNI 26.3.05, its default within them of the replica's default (exit statuses, messages, files written and headers exact; the numbers that the shear decomposition's ties decide within limits measured from AFNI's own spread under those ties): fMRIPrep's {afni-volreg-original.fmriprep} RobustAverage and PEPOLAR calls (their medians at most 0.115 of their limits from fMRIPrep's own outputs), every option, data type, message and failure case; {afni-volreg-original.both} more rejected by both alike; [2.8 to 5.2 times faster than AFNI](repo:docs/benchmarks/afni-volreg.md) on one thread, 9 to 15 times on 14; replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on six oracle runs' BOLD references and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings)"'''
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = '''
+[[record]]
+id = "afni-volreg-replica"
+'''
+new = '''
+[[record]]
+id = "afni-volreg-original"
+larmorx = "`lx.afni.volreg(implementation=\"original\")`, `larmorx afni 3dvolreg` (clean-room, `crates/larmorx-afni`)"
+reference = "3dvolreg (AFNI 26.3.05 binary, one thread: no OpenMP loop; through the oracle cache); the replica's default (a black box); fMRIPrep's calls also against fMRIPrep's own outputs (their medians)"
+status = "`experimental` ({afni-volreg-original.pass} of {afni-volreg-original.compared} compared cases within `specs/3dvolreg.md` §14.3's limits, fMRIPrep's {afni-volreg-original.fmriprep} calls included; {afni-volreg-original.both} rejected by both, with the same messages and status; {afni-volreg-original.expected} expected divergences: larmorx writes no AFNI .HEAD/.BRIK dataset (twice) and refuses AFNI-96's short attribute, which AFNI reads past)"
+
+[[record]]
+id = "afni-volreg-replica"
+'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-86 † | 3dvolreg (`-nocoarserot`) | `-nocoarserot` is read as `-noclip` (its first four letters are tested first): the registered volumes are no longer clipped and `-twopass`'s coarse rotation search stays on | e | none (fMRIPrep does not pass it) | rule A: as the help says by default (the search off, the clipping kept), named; `reproduce` AFNI's reading; the replica 2026-11-06 (`twopass/nocoarserot`, `edge cases/*-nocoarserot`) | original |"
+new = "| AFNI-86 † | 3dvolreg (`-nocoarserot`) | `-nocoarserot` is read as `-noclip` (its first four letters are tested first): the registered volumes are no longer clipped and `-twopass`'s coarse rotation search stays on | e | none (fMRIPrep does not pass it) | rule A: as the help says by default (the search off, the clipping kept), named; `reproduce` AFNI's reading; the replica 2026-11-06 (`twopass/nocoarserot`, `edge cases/*-nocoarserot`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni86`, `afni86-alone`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-87 † | 3dvolreg (byte datasets) | a byte dataset's registered volumes are each stretched from their own minimum and maximum to 0..255.9 and truncated, not rounded | c | none (fMRIPrep's BOLD series are not bytes) | rule A: rounded and clamped bytes by default, named where they differ; `reproduce` AFNI's stretch; the replica 2026-11-06 (`datatypes/byte`, `messages/verbose-byte`) | original |"
+new = "| AFNI-87 † | 3dvolreg (byte datasets) | a byte dataset's registered volumes are each stretched from their own minimum and maximum to 0..255.9 and truncated, not rounded | c | none (fMRIPrep's BOLD series are not bytes) | rule A: rounded and clamped bytes by default, named where they differ; `reproduce` AFNI's stretch; the replica 2026-11-06 (`datatypes/byte`, `messages/verbose-byte`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `uint8`, `uint8-fourier`, `verbose-byte`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-88 † | 3dvolreg (an option's value missing) | an option that needs a value, given as the last argument, reads past the arguments: a crash (`-savedisp`'s check is off by one); `-input`, `-rotparent`, `-gridparent` and `-1Dmatrix_save` give a message instead | a | none | an error (exit status 1) in both modes, AFNI's own message where it has one; the replica 2026-11-06 (`errors/*-last`) | original |"
+new = "| AFNI-88 † | 3dvolreg (an option's value missing) | an option that needs a value, given as the last argument, reads past the arguments: a crash (`-savedisp`'s check is off by one); `-input`, `-rotparent`, `-gridparent` and `-1Dmatrix_save` give a message instead | a | none | an error (exit status 1) in both modes, AFNI's own message where it has one; the replica 2026-11-06 (`errors/*-last`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni88-prefix`, `-input`, `-rotparent`, `-matrix`, `-base`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-89 † | 3dvolreg | a base whose least squares cannot be set up (a constant volume, all-zero weights, a dimension below 2) prints the fit's errors, then crashes at the first registered volume | a | none | AFNI's messages, then an error (exit status 1) in both modes; the replica 2026-11-06 (`edge cases/constant-twopass`, permanent case `constant-twopass-lsqfit`) | original |"
+new = "| AFNI-89 † | 3dvolreg | a base whose least squares cannot be set up (a constant volume, all-zero weights, a dimension below 2) prints the fit's errors, then crashes at the first registered volume | a | none | AFNI's messages, then an error (exit status 1) in both modes; the replica 2026-11-06 (`edge cases/constant-twopass`, permanent case `constant-twopass-lsqfit`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni89-const`, `afni89-half`, `afni89-weight`, `afni89-weight-twopass`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-90 † | 3dvolreg (output names) | a `-prefix`, `-dfile` or `-1Dfile` value, or `-weight`'s dataset name, of 256 bytes or more overflows a fixed buffer (AFNI aborts: \"buffer overflow detected\"); `-maxdisp1D`'s name is cut to its first 997 bytes | a, e | none | rule A: every name kept whole by default, named; `reproduce` refuses the long names where AFNI aborts and cuts `-maxdisp1D`'s; the replica 2026-11-06 (`defects/prefix-255`, `defects/prefix-256`) | original |"
+new = "| AFNI-90 † | 3dvolreg (output names) | a `-prefix`, `-dfile` or `-1Dfile` value, or `-weight`'s dataset name, of 256 bytes or more overflows a fixed buffer (AFNI aborts: \"buffer overflow detected\"); `-maxdisp1D`'s name is cut to its first 997 bytes | a, e | none | rule A: every name kept whole by default, named; `reproduce` refuses the long names where AFNI aborts and cuts `-maxdisp1D`'s; the replica 2026-11-06 (`defects/prefix-255`, `defects/prefix-256`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni90-prefix`, `-dfile`, `-1dfile`, `-weight`; `afni90-maxdisp`, a `-maxdisp1D` name of 254 bytes written) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-92 † | 3dvolreg (`-nomaxdisp`) | `-maxdisp` (the default) leaves the automask's clip fraction at 0.333 for the rest of the run, so `-nomaxdisp`, an option about an output, changes `-twopass`'s coarse rotation search (its mask with 0.5) | c | none (fMRIPrep keeps `-maxdisp`) | rule A: the same search with and without by default, named; `reproduce` AFNI's; the replica 2026-11-06 (`twopass/nomaxdisp`) | original |"
+new = "| AFNI-92 † | 3dvolreg (`-nomaxdisp`) | `-maxdisp` (the default) leaves the automask's clip fraction at 0.333 for the rest of the run, so `-nomaxdisp`, an option about an output, changes `-twopass`'s coarse rotation search (its mask with 0.5) | c | none (fMRIPrep keeps `-maxdisp`) | rule A: the same search with and without by default, named; `reproduce` AFNI's; the replica 2026-11-06 (`twopass/nomaxdisp`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni92`; named when the first pass with the coarse rotation search starts, as the replica names it) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-93 † | 3dvolreg (`-twopass`) | on a volume too thin for the coarse search's edge every candidate's region holds no voxel and scores 0, so the first candidate wins: a start shifted by −2 steps along z and rotated by −9°, −18°, −9° | c | none (BOLD volumes are thick enough) | rule A: such candidates are not taken by default (no shift, no rotation), named; `reproduce` AFNI's; the replica 2026-11-06 (`edge cases/four-slices-twopass`, `four-slices-nocoarserot`) | original |"
+new = "| AFNI-93 † | 3dvolreg (`-twopass`) | on a volume too thin for the coarse search's edge every candidate's region holds no voxel and scores 0, so the first candidate wins: a start shifted by −2 steps along z and rotated by −9°, −18°, −9° | c | none (BOLD volumes are thick enough) | rule A: such candidates are not taken by default (no shift, no rotation), named; `reproduce` AFNI's; the replica 2026-11-06 (`edge cases/four-slices-twopass`, `four-slices-nocoarserot`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni93`, `afni93-one-slice`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-94 † | 3dvolreg (`-twopass -coarse 1`) | on a volume of 120 voxels or more along every axis the subsampled coarse search halves its step to 0 and never ends | a | none (fMRIPrep's `-coarse` is the default) | an error before the work, in both modes; the replica 2026-11-06 (`defects/coarse-1-large`, 120³ voxels) | original |"
+new = "| AFNI-94 † | 3dvolreg (`-twopass -coarse 1`) | on a volume of 120 voxels or more along every axis the subsampled coarse search halves its step to 0 and never ends | a | none (fMRIPrep's `-coarse` is the default) | an error before the work, in both modes; the replica 2026-11-06 (`defects/coarse-1-large`, 120³ voxels); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni94`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-95 † | 3dvolreg (`-base`) | a second `-base` is refused only when the first was a dataset or an index above 0: `-base 0 -base 3` registers to volume 3 | e | none | rule B: refused by default (\"Can't have two -base arguments\", exit status 1), named; `reproduce` AFNI's; the replica 2026-11-06 (`errors/base-twice`) | original |"
+new = "| AFNI-95 † | 3dvolreg (`-base`) | a second `-base` is refused only when the first was a dataset or an index above 0: `-base 0 -base 3` registers to volume 3 | e | none | rule B: refused by default (\"Can't have two -base arguments\", exit status 1), named; `reproduce` AFNI's; the replica 2026-11-06 (`errors/base-twice`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni95`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-96 † | 3dvolreg (`-rotparent`) | a `-rotparent` dataset with `VOLREG_MATVEC_000000` but without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE`, or with fewer than 3 numbers in one, is read through a null pointer or past the attribute | a | none | an error (exit status 1) in both modes, naming the attribute; the replica 2026-11-06 (read from the source; no suite case: such a dataset needs a hand-made AFNI extension, larmorx writes none) | original |"
+new = "| AFNI-96 † | 3dvolreg (`-rotparent`) | a `-rotparent` dataset with `VOLREG_MATVEC_000000` but without `VOLREG_CENTER_OLD` or `VOLREG_CENTER_BASE`, or with fewer than 3 numbers in one, is read through a null pointer or past the attribute | a | none | an error (exit status 1) in both modes, naming the attribute; the replica 2026-11-06 (read from the source; no suite case: such a dataset needs a hand-made AFNI extension, larmorx writes none); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni96-centre` and `afni96-base`, AFNI-written `-rotparent` datasets with an attribute dropped, where AFNI crashes; `afni96-short`, a centre of two numbers, an expected divergence: AFNI reads past it and goes on) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-97 † | 3dvolreg (`-Fourier`, `-final Fourier`) | a rotation whose shear shifts the last of an odd count of rows, and the previous pair's second row, beyond the row length clears the missing second row through a null pointer: a crash (rotations far beyond a head's motion, as a runaway first pass reaches) | a | none (fMRIPrep's head motions are small) | rule A: the row cleared alone by default, as AFNI clears a pair, named; `reproduce` stops where AFNI crashes, after AFNI's messages; the replica 2026-11-06 (random testing's trial; permanent cases `fourier-lone-row-default`, `fourier-lone-row-null`) | original |"
+new = "| AFNI-97 † | 3dvolreg (`-Fourier`, `-final Fourier`) | a rotation whose shear shifts the last of an odd count of rows, and the previous pair's second row, beyond the row length clears the missing second row through a null pointer: a crash (rotations far beyond a head's motion, as a runaway first pass reaches) | a | none (fMRIPrep's head motions are small) | rule A: the row cleared alone by default, as AFNI clears a pair, named; `reproduce` stops where AFNI crashes, after AFNI's messages; the replica 2026-11-06 (random testing's trial; permanent cases `fourier-lone-row-default`, `fourier-lone-row-null`); the clean-room original the same since 2026-11-08 (no suite case: its random-testing trial met it on AFNI's runaway first passes, small uint8 or int16 series with `-Fourier -twopass`; whether a run meets it follows the ties, so random testing accepts an exit status that differs only by AFNI-97) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-98 † | 3dvolreg (messages) | with `-input`, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: `(null)` when there is none | f | none | rule A: the dataset's name by default; `reproduce` AFNI's text; the replica 2026-11-07 (`errors/base-beyond-input`, `base-beyond-input-stray`) | original |"
+new = "| AFNI-98 † | 3dvolreg (messages) | with `-input`, the messages about a base index beyond the volumes and a weight of another size print the argument after the options instead of the dataset: `(null)` when there is none | f | none | rule A: the dataset's name by default; `reproduce` AFNI's text; the replica 2026-11-07 (`errors/base-beyond-input`, `base-beyond-input-stray`); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni98-base`, `afni98-weight`) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| AFNI-99 † | 3dvolreg (`-maxdisp`, `-savedisp`) | the maximum displacements and `-savedisp`'s fields convert the matrix to the dataset's axes with their signs but leave the voxel positions unsigned: for an axis stored L2R, P2A or S2I (RAS and LAS storage among them) they are the displacements of the position mirrored about the axis' centre (the same data stored RAS and LPS: 1.718 against 1.672 mm; `-savedisp`'s fields off by up to 12.3 mm) | c | none for the registered volumes; the `-maxdisp1D` values fMRIPrep writes and does not use (RobustAverage takes the registered volumes only) | rule A: the displacements of the voxels themselves by default, named where a value printed or written changes; `reproduce` AFNI's; the replica 2026-11-07 (every fMRIPrep call's `-maxdisp1D` files, `outputs/savedisp-oblique`, `datatypes/s3_oblique`, `s4_sagittal`; the site's example, LAS against LPS) | original |"
+new = "| AFNI-99 † | 3dvolreg (`-maxdisp`, `-savedisp`) | the maximum displacements and `-savedisp`'s fields convert the matrix to the dataset's axes with their signs but leave the voxel positions unsigned: for an axis stored L2R, P2A or S2I (RAS and LAS storage among them) they are the displacements of the position mirrored about the axis' centre (the same data stored RAS and LPS: 1.718 against 1.672 mm; `-savedisp`'s fields off by up to 12.3 mm) | c | none for the registered volumes; the `-maxdisp1D` values fMRIPrep writes and does not use (RobustAverage takes the registered volumes only) | rule A: the displacements of the voxels themselves by default, named where a value printed or written changes; `reproduce` AFNI's; the replica 2026-11-07 (every fMRIPrep call's `-maxdisp1D` files, `outputs/savedisp-oblique`, `datatypes/s3_oblique`, `s4_sagittal`; the site's example, LAS against LPS); the clean-room original the same since 2026-11-08 (record `afni-volreg-original`: `afni99-lps`, `afni99-ras`, `afni99-savedisp` and every fMRIPrep call's `-maxdisp1D` files, 17 cases) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+apply as in 3dTshift (AFNI-01 on `-tshift`'s path, -11, -12, -18, -21, -26; GLIBC-07). 3dvolreg's
+clean-room original is the next part (`specs/3dvolreg.md`).'''
+new = '''
+apply as in 3dTshift (AFNI-01 on `-tshift`'s path, -11, -12, -18, -21, -26; GLIBC-07). 3dvolreg's
+clean-room original (`crates/larmorx-afni`, 2026-11-08, from `specs/3dvolreg.md` and black-box runs of
+AFNI and the replica; [afni-volreg-original.md](afni-volreg-original.md)) handles every one as the
+replica does (the same defaults, `reproduce` and refusals), and the shared entries as 3dTshift's
+original; its random-testing
+trial met AFNI-97 on AFNI's runaway Fourier first passes (small uint8 or int16 series with `-Fourier
+-twopass`). No new defect was found (AFNI-100 to AFNI-110 unused).'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+The gap column today (2026-11-07): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
+kept, rule C); one rule 8; **original** only for 3dvolreg's thirteen (AFNI-86 to AFNI-99 but AFNI-91, its clean-room original next): PRELUDE's clean-room original closed FSL-261 to FSL-273's (2026-11-07); '''
+new = '''
+The gap column today (2026-11-08): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
+kept, rule C); one rule 8; no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); '''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-86 | 3dvolreg `-nocoarserot` | `larmorx afni 3dvolreg`, `lx.afni.volreg(coarse_rotation=False)` (the replica; its clean-room original: the next part) | read as `-noclip`: the clipping goes off, the coarse rotation search stays on | the coarse rotation search off, the clipping kept, as the help says |"
+new = "| AFNI-86 | 3dvolreg `-nocoarserot` | `larmorx afni 3dvolreg`, `lx.afni.volreg(coarse_rotation=False)` (both implementations; the clean-room original since 2026-11-08) | read as `-noclip`: the clipping goes off, the coarse rotation search stays on | the coarse rotation search off, the clipping kept, as the help says |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-87 | 3dvolreg | a byte dataset (the replica) | each registered volume stretched from its own range to 0..255 and truncated | rounded and clamped bytes |"
+new = "| AFNI-87 | 3dvolreg | a byte dataset (both implementations) | each registered volume stretched from its own range to 0..255 and truncated | rounded and clamped bytes |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-90 | 3dvolreg `-prefix`, `-dfile`, `-1Dfile`, `-weight`, `-maxdisp1D` | `larmorx afni 3dvolreg` (the replica) | names of 256 bytes or more abort the program (a fixed buffer); `-maxdisp1D`'s name cut to 997 bytes | every name kept whole; `reproduce` refuses the long names and cuts `-maxdisp1D`'s |"
+new = "| AFNI-90 | 3dvolreg `-prefix`, `-dfile`, `-1Dfile`, `-weight`, `-maxdisp1D` | `larmorx afni 3dvolreg` (both implementations) | names of 256 bytes or more abort the program (a fixed buffer); `-maxdisp1D`'s name cut to 997 bytes | every name kept whole; `reproduce` refuses the long names and cuts `-maxdisp1D`'s |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-92 | 3dvolreg `-nomaxdisp` | `larmorx afni 3dvolreg -nomaxdisp -twopass`, `lx.afni.volreg(maxdisp=False, twopass=True)` (the replica) | changes `-twopass`'s coarse rotation search (its automask's clip fraction) | the same search with and without |"
+new = "| AFNI-92 | 3dvolreg `-nomaxdisp` | `larmorx afni 3dvolreg -nomaxdisp -twopass`, `lx.afni.volreg(maxdisp=False, twopass=True)` (both implementations) | changes `-twopass`'s coarse rotation search (its automask's clip fraction) | the same search with and without |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-93 | 3dvolreg `-twopass` | volumes too thin for the coarse search's edge (the replica) | every candidate scores 0 and the first wins: a start 2 steps along z and rotated by −9°, −18°, −9° | such candidates not taken |"
+new = "| AFNI-93 | 3dvolreg `-twopass` | volumes too thin for the coarse search's edge (both implementations) | every candidate scores 0 and the first wins: a start 2 steps along z and rotated by −9°, −18°, −9° | such candidates not taken |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-95 | 3dvolreg `-base` | `larmorx afni 3dvolreg -base 0 -base 3` (the replica) | accepted, the last wins | refused (exit status 1); `reproduce` AFNI's |"
+new = "| AFNI-95 | 3dvolreg `-base` | `larmorx afni 3dvolreg -base 0 -base 3` (both implementations) | accepted, the last wins | refused (exit status 1); `reproduce` AFNI's |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-97 | 3dvolreg `-Fourier` | rotations far beyond a head's motion (the replica) | a crash (a row cleared through a null pointer) | the row cleared alone, as AFNI clears a pair; `reproduce` stops where AFNI crashes |"
+new = "| AFNI-97 | 3dvolreg `-Fourier` | rotations far beyond a head's motion (both implementations) | a crash (a row cleared through a null pointer) | the row cleared alone, as AFNI clears a pair; `reproduce` stops where AFNI crashes |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-98 | 3dvolreg `-input` | `larmorx afni 3dvolreg -input` (the replica) | two messages name `(null)` or a stray argument instead of the dataset | the dataset's name |"
+new = "| AFNI-98 | 3dvolreg `-input` | `larmorx afni 3dvolreg -input` (both implementations) | two messages name `(null)` or a stray argument instead of the dataset | the dataset's name |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "| AFNI-99 | 3dvolreg `-maxdisp`, `-maxdisp1D`, `-savedisp` | `larmorx afni 3dvolreg`, `lx.afni.volreg` (the replica), inputs stored with an axis L2R, P2A or S2I (RAS and LAS among them) | the displacements of the positions mirrored along those axes (the same data stored RAS and LPS: 1.718 against 1.672 mm) | the displacements of the voxels themselves, named where a value printed or written changes |"
+new = "| AFNI-99 | 3dvolreg `-maxdisp`, `-maxdisp1D`, `-savedisp` | `larmorx afni 3dvolreg`, `lx.afni.volreg` (both implementations), inputs stored with an axis L2R, P2A or S2I (RAS and LAS among them) | the displacements of the positions mirrored along those axes (the same data stored RAS and LPS: 1.718 against 1.672 mm) | the displacements of the voxels themselves, named where a value printed or written changes |"
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "pointer) are refused in both modes. Its clean-room original is the next part."
+new = '''
+pointer) are refused in both modes. Its clean-room original (2026-11-08, `crates/larmorx-afni`)
+has the same switch and the same defaults, with AFNI-97's stop in `reproduce` where AFNI crashes;
+its record's fix pass shows each correction where it applies
+([afni-volreg-original.md](../validation/afni-volreg-original.md)).'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "240 cases, 1,777 outputs"
+new = "246 cases, 1,863 outputs"
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "No CI job or runner was added. Parity, benchmarks and real data still never run in CI."
+text = '''
+The main package's checksums were recorded on 2026-11-08 from d6151e1 (5744b597; 3dvolreg's
+clean-room original, relay 3; the parity smoke tier passing: 2,853 tests): 6 cases added,
+`cli.afni.3dvolreg`, `.fmriprep`, `.options`, `.reproduce`, `.SAVEDISP` and `py.afni.volreg` (the
+clean-room original, below; 86 outputs, about 0.1 s together), every other checksum unchanged;
+verified from 88ecca2 (f90bf8f3, relay 4: `-SAVEDISP`'s line in §10.3's order, the
+`random:<seed>` validation switch; the smoke tier passing: 2,853 tests): every checksum unchanged,
+the header's commit only.'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "| Command line, AFNI, MRI and FSL | 74 |"
+new = "| Command line, AFNI, MRI and FSL | 79 |"
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "`cli.fsl.prelude.reproduce` (FSL-261's ramps in the slices mode, FSL-262's last-volume mask and labels) |"
+new = "`cli.fsl.prelude.reproduce` (FSL-261's ramps in the slices mode, FSL-262's last-volume mask and labels); 3dvolreg's clean-room original (2026-11-08): `cli.afni.3dvolreg` (the default heptic method with every text output and `-maxdisp1D`), `cli.afni.3dvolreg.fmriprep` (fMRIPrep's `-Fourier -twopass -zpad 4`), `.options` (an int16 series, `-cubic -noclip -zpad 0 -wtinp`, `-savedisp`, `-rotcom`), `.reproduce` (a uint8 series with `-twopass -final linear`: AFNI-87, AFNI-99, GLIBC-07 reproduced), `.SAVEDISP` (`-prefix NULL`: the nineteen datasets) |"
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "| `lx.afni` | 6 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects=\"reproduce\"`; `afni_settings` in the clean-room original (`AFNI_NIFTI_SCALE=NO`, NIfTI-2); `fmriprep_slice_timing`; `fmriprep_volreg_options` (fMRIPrep's 3dvolreg arguments, 2026-11-06; `lx.afni.volreg` itself is a replica-only function until its clean-room original, its cases the replica's below) |"
+new = "| `lx.afni` | 7 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects=\"reproduce\"`; `afni_settings` in the clean-room original (`AFNI_NIFTI_SCALE=NO`, NIfTI-2); `fmriprep_slice_timing`; `fmriprep_volreg_options` (fMRIPrep's 3dvolreg arguments, 2026-11-06); `volreg` (the clean-room original, since 2026-11-08: an in-memory series with an external base volume, quintic, every result and the per-voxel displacements; the replica's cases below) |"
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "- **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize):"
+new = '''
+- **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize, and 3dvolreg since
+  2026-11-08):'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+`lx.afni.volreg` is a
+  replica-only function (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until 3dvolreg's
+  clean-room original;'''
+new = '''
+`lx.afni.volreg` was a
+  replica-only function (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until 3dvolreg's
+  clean-room original (2026-11-08, below);'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "  the cases' lists of named defects follow it."
+text = '''
+- **3dvolreg, the clean-room original** (2026-11-08, six cases in `tests/golden/registry.py` on
+  `bold()`, 16 × 14 × 12 × 4 float32 voxels on an oblique 3 × 3 × 3.25 mm grid, its volumes moved by
+  fractions of a voxel): `cli.afni.3dvolreg` (the default heptic method: the registered series,
+  `-1Dfile`, `-dfile`, `-1Dmatrix_save` and `-maxdisp1D`), `.fmriprep` (fMRIPrep's `-Fourier -twopass
+  -zpad 4`: the blurred first pass, the coarse rotation and shift searches, the Fourier rows in
+  pairs), `.options` (an int16 series: rounded and clamped output; `-cubic -noclip -zpad 0 -wtinp`,
+  `-savedisp`'s three datasets, `-rotcom`'s commands), `.reproduce` (a uint8 series with `-twopass
+  -final linear` and `LARMORX_UPSTREAM_DEFECTS=reproduce`: AFNI-87's stretch, AFNI-99's mirrored
+  displacements, glibc's sine and cosine, GLIBC-07), `.SAVEDISP` (`-quintic -prefix NULL -SAVEDISP`:
+  the three displacements normalised and their sixteen products) and `py.afni.volreg`
+  (`lx.afni.volreg(implementation="original")` on an in-memory series with an external base volume,
+  quintic, `save_displacements`: the registered series with its header, the parameters, matrices,
+  rms, maximum displacements and per-voxel displacements); 86 outputs; the text files by their
+  bytes, `-maxdisp1D`'s by its numbers (its comment line holds the command line, with the case's
+  paths); `lx.afni.volreg` left `REPLICA_ONLY_FUNCTIONS`, empty again. Recorded from d6151e1,
+  verified from 88ecca2 (above).'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+AFNI-86 to AFNI-99; follow-ups below) and (5) its clean-room
+   original; (6, 7)'''
+new = '''
+AFNI-86 to AFNI-99; follow-ups below) and (5) its clean-room
+   original (**done** 2026-11-08: from `specs/3dvolreg.md` and black-box runs alone, built for speed; every compared case of its record within §14.3's limits against AFNI 26.3.05, its default within them of the replica's (251 cases: 185 pass, 63 refused by both alike, 3 expected divergences, none failing), fMRIPrep's ten RobustAverage and PEPOLAR calls included (their medians at most 0.115 of their limits from fMRIPrep's own outputs); fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count; with it, output names of 228 to 255 bytes written by all four AFNI originals; follow-ups below); (6, 7)'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  - *For 3dvolreg's clean-room original (the next part):* from `specs/3dvolreg.md` (§12: AFNI-86 to"
+new = '''
+  - *For 3dvolreg's clean-room original:* **done** 2026-11-08 (its part's follow-ups, above), from
+    `specs/3dvolreg.md` (§12: AFNI-86 to'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "The site page's clean-room panels wait for the original (`evidence.afni_volreg`)."
+new = '''
+The site page's clean-room panels: done (`evidence.afni_volreg_original`, which calls
+    `evidence.afni_volreg` as a black box and extends its page).'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+  - *The clean-room AFNI crate:* output names of about 228 to 255 bytes cannot be written (a
+    temporary name over the system's 255-byte limit; the replica's fixed 2026-11-06): to test with
+    a 240-byte `-prefix` (the bug report, behaviour only, in the part's handoff).'''
+new = '''
+  - *The clean-room AFNI crate:* output names of about 228 to 255 bytes cannot be written (a
+    temporary name over the system's 255-byte limit; the replica's fixed 2026-11-06): **done**
+    2026-11-08 (3dvolreg's clean-room original part, relay 1: `output::hidden_name`; 3dTshift,
+    3dAutomask, 3dUnifize and 3dvolreg write names of 200 to 255 bytes as AFNI does, 24 of 24
+    black-box cases, `validation/investigations/afni-volreg-original/longnames.py`; the unit test
+    `output::tests::long_output_names`).'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+fraction of the convergence threshold).
+
+
+Decided 2026-10-22'''
+new = '''
+fraction of the convergence threshold). The clean-room original was built so (the orchestrator,
+  2026-11-07, on this recommendation, unless the user objects): its record of 2026-11-08 within
+  §14.3's limits, revised by the spec writer from AFNI's own spread under the ties, none failing
+  ([afni-volreg-original.md](validation/afni-volreg-original.md)).
+
+
+Decided 2026-10-22'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''
+- **From 3dvolreg's clean-room original part (2026-11-08; six relays and two spec-writer steps;
+  [findings](findings/afni-volreg-original.md), record [afni-volreg-original](validation/afni-volreg-original.md),
+  [benchmarks](benchmarks/afni-volreg.md)).** Done in the part besides the original: output names of
+  228 to 255 bytes in every AFNI clean-room original (the replica part's report, below); the spec
+  writer's eight answers (step 2) and five (step 3: the limits measured from AFNI's own spread under
+  the shear decomposition's ties, the validation switch `LARMORX_VOLREG_TIES=random:<seed>` and the
+  rule of 12 seeded runs, runaways held to the output's structure, `-final NN`'s nearest-neighbour
+  rule, `-SAVEDISP`'s trend line in §10.3's order). Left:
+  - *The questions for a spec writer, still open* (relay 4; no spec-writer step now: the record has no
+    failure and the trial's sample is explained):
+    - `specs/3dvolreg.md` §14.3 ("the defects named as the replica's default"): AFNI-99 named at a
+      rounding boundary of the printed two-decimal maximum displacement (3 of the trial's 1,200 sampled
+      differences, case 5378: the original 2.02 mm by default and 2.01 with `reproduce`, the replica
+      2.02 in both; the parameters' last digits, which the ties decide, choose): to allow there?
+    - §14.3 "The ties' spread": three times a spread estimated from 12 seeded runs is a sampled bound;
+      2 of the 1,200 at its edge (cases 13852 and 18762: 1.21 and 1.02 times it), within it with 36 runs
+      (`triage.py --seeds 36`): more runs, or a margin?
+    - the notices' order (the spec states none): the original prints them phase by phase as the
+      replica does (the option scan's and the setup's by ID, AFNI-92 when the first pass with the
+      coarse rotation search starts, then the run's and the output's by ID): to state.
+  - *The final validation phase:* the full tier on the revised limits (its eight full-only cases: seven
+    more data-panel BOLD runs and `e120-twopass`; last run before the spec writer's step 3, when
+    ds000228's median, 2.4e-4 of its largest value, failed the fixed 1e-4 of then); AFNI's own
+    variability from perturbed inputs beside the ties' spread; random testing at length (the trial:
+    21,710 cases in half an hour); `AFNI_MESSAGE_PREFIX` has no suite case of 3dvolreg's.
+  - *Speed:* the benchmark ran on a shared machine (load 23 to 26 of 32 threads; the ratios are the
+    information): to re-measure on the quiet machine. On large grids the first pass's coarse search
+    leads (44 nearest-neighbour rotations per volume, 8.3 ms each on ds005454's grid, and their
+    float32 scores, kept sequential for the spec's "first strictly better"), then the final pass's
+    Fourier resampling (a batched double-precision FFT): restrict the rotations to the planes the
+    scores read; a float32 batched FFT; SIMD with runtime dispatch (the crate forbids `unsafe`: an
+    audited module).
+  - *Random testing's harness:* the harness leaves its generated inputs in `/tmp`
+    (`lx-difftest-inputs_*`: 43,366 folders, 1.7 GB on 2026-11-08, from every night and triage):
+    to remove them, or keep them in the night's folder; a night whose extension is rebuilt in place
+    while it runs ends with SIGSEGV after its cases (the trial's, rebuilt with `difftest --report`):
+    give each night its own copy of the build.'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "3dvolreg's replica (2026-11-07: AFNI 26.3.05's `3dvolreg` complete, `validated`; its clean-room original next) | "
+new = "3dvolreg's replica (2026-11-07: AFNI 26.3.05's `3dvolreg` complete, `validated`) and clean-room original (2026-11-08: complete, `experimental`, within `specs/3dvolreg.md` §14.3's limits of AFNI's results, built for speed) | "
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "`afni-unifize-replica`, `afni-volreg-replica` |"
+new = "`afni-unifize-replica`, `afni-volreg-original`, `afni-volreg-replica` |"
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''
+Next: 3dvolreg's clean-room original,
+field maps,'''
+new = '''
+3dvolreg's clean-room original (2026-11-08: from `specs/3dvolreg.md` and black-box runs alone; every compared case of its record within §14.3's limits against AFNI 26.3.05 and its default within them of the replica's, fMRIPrep's ten RobustAverage and PEPOLAR calls included; fMRIPrep's calls 2.8 to 5.2 times AFNI's speed on one thread, the same bits at any thread count; output names of 228 to 255 bytes in every AFNI original). Next: the
+field maps,'''
+
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = '''
+## 2026-11-07 and 08: 3dvolreg's clean-room original (the orchestrator, on the spec writers' recommendations and the rules)
+- **Bit-identity not sought** (`specs/3dvolreg.md` §16, 2026-11-07; recommended by the replica part's spec
+  writer, decided by the orchestrator unless the user objects; "Waiting for the user" in next-steps): the
+  spec does not describe AFNI's own evaluation of the shear decomposition, whose last double bits choose
+  between axis orders of equal norm (the ties) at every resampling; the clean-room original is held to the
+  thresholds of §5.3 and §14.3 there, everything else exact.
+- **The limits measured from AFNI's own spread under the ties** (the spec writer's step 3, 2026-11-08, on the
+  questions of the original's first record and random-testing trial): each registered volume within
+  `max(2e-3, 1e-3 θ_v)` of its largest value (θ_v its total rotation in degrees), fMRIPrep's median within the
+  limit its volumes imply, `-final NN` by a nearest-neighbour rule; a validation switch
+  `LARMORX_VOLREG_TIES=random:<seed>` and the rule of 12 seeded runs for the original's own spread in random
+  testing; runaways (beyond 15° or 20 mm, or AFNI-97) held to the output's structure; the record's
+  re-examination with one global tie side for a whole run not accepted (a single point of the spread).
+- **No spec-writer step for relay 4's three questions** (2026-11-08): the record has no failure and the
+  trial's sampled differences are explained; they stay open in next-steps.'''
+
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = "    text: 3dvolreg's clean-room original (its exact replica is done); 3dQwarp, 3dSkullStrip, 3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit, 3dFWHMx/3dClustSim, ...)."
+new = "    text: 3dQwarp, 3dSkullStrip, 3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit, 3dFWHMx/3dClustSim, ...) (3dTshift, 3dAutomask, 3dUnifize and 3dvolreg are done, each an exact replica and a clean-room original)."
+
+[[op]]
+do = "edit"
+file = "site:site.yml"
+old = "an exact replica in larmorx, fMRIPrep's calls bit for bit; the clean-room original next.\" }"
+new = "a clean-room original (experimental, since 2026-11-08) within its specification's limits of AFNI's results, 2.8 to 5.2 times AFNI's speed on one thread, and an exact replica in larmorx, fMRIPrep's calls bit for bit.\" }"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "**Last updated: 2026-11-07.**"
+new = "**Last updated: 2026-11-08.**"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| 1 | **AFNI: 3dvolreg** | The rigid-body registration fMRIPrep runs for every BOLD reference (niworkflows' RobustAverage: up to 20 volumes aligned before their median) and sdcflows for its PEPOLAR reference averages: a replica and a clean-room original | The replica complete (2026-11-07), below; next its clean-room original |
+'''
+new = ""
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 2 | **Field maps** |"
+new = "| 1 | **Field maps** |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 3 | **FreeSurfer 8.2.0** |"
+new = "| 2 | **FreeSurfer 8.2.0** |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 4 | **Surfaces** |"
+new = "| 3 | **Surfaces** |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 5 | **Confounds** |"
+new = "| 4 | **Confounds** |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 6 | **larmorprepx** |"
+new = "| 5 | **larmorprepx** |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| Completed | Step |
+|---|---|
+'''
+new = '''
+| Completed | Step |
+|---|---|
+| 2026-11-08 | **3dvolreg's clean-room original.** AFNI's rigid-body registration written again from its behavioural specification and black-box runs of AFNI alone, never its source, and built for speed: each rotation's four shears swept plane by plane in the cache, the Fourier rows transformed four pairs at a time, the coarse search's rotations on its support box only, every step parallel inside each volume with the same bits at any thread count, so fMRIPrep's calls run 2.8 to 5.2 times faster than AFNI on one thread (1.5 to 1.9 times the replica's speed) and 9 to 15 times on 14 threads, with AFNI's memory plus at most 10 % and 8 MiB on one thread; every option, message and failure case: exit statuses, messages, files and headers exactly AFNI's, the numbers within the specification's limits, measured from AFNI's own spread where exact ties in its shear decomposition decide AFNI's last bits, in every compared case of its record (251 cases: 185 pass, 63 refused by both alike, 3 expected divergences: AFNI's own .HEAD/.BRIK format, which LARMORX does not write, and a malformed attribute AFNI reads past), fMRIPrep's ten RobustAverage and PEPOLAR calls included (their medians at most 0.115 of their limits from fMRIPrep's own outputs; a child's high-motion run at 0.68 of one volume's limit); AFNI-86 to AFNI-99 handled as the replica handles them; with it, output names of 228 to 255 bytes written by all four AFNI originals. [The page](/tools/afni-volreg/) |
+'''

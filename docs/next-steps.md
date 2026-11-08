@@ -127,7 +127,7 @@ at a time:
    6.0.7.23's bytes in every compared case of its record, fMRIPrep's seven calls included; `specs/prelude.md`;
    FSL-261 to FSL-273; the questions answered and those still open below, "The questions for a spec writer,
    gathered"); (3) PRELUDE's clean-room original (**done** 2026-11-07: from `specs/prelude.md` and black-box runs alone; with `reproduce` every file FSL 6.0.7.23's bytes, by default the replica's default bit for bit but GLIBC-07's last bits of complex images' phases, in every compared case of its record (166: 138 pass, 28 refused by both alike), fMRIPrep's seven calls included (also against fMRIPrep's own outputs); fMRIPrep's two large calls 97 and 211 times FSL's speed and 2.5 to 2.8 times the replica's on one thread, the same bits at any thread count; with it the spec answers' clean-room follow-ups and every FSL original's pair headers and time step; follow-ups below); (4) 3dvolreg's replica (AFNI 26.3.05; **done** 2026-11-07: every compared case of its record bit-identical, fMRIPrep's RobustAverage and PEPOLAR calls included; `specs/3dvolreg.md`; AFNI-86 to AFNI-99; follow-ups below) and (5) its clean-room
-   original; (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
+   original (**done** 2026-11-08: from `specs/3dvolreg.md` and black-box runs alone, built for speed; every compared case of its record within §14.3's limits against AFNI 26.3.05, its default within them of the replica's (251 cases: 185 pass, 63 refused by both alike, 3 expected divergences, none failing), fMRIPrep's ten RobustAverage and PEPOLAR calls included (their medians at most 0.115 of their limits from fMRIPrep's own outputs); fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count; with it, output names of 228 to 255 bytes written by all four AFNI originals; follow-ups below); (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
    then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);
    (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
@@ -724,6 +724,43 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From 3dvolreg's clean-room original part (2026-11-08; six relays and two spec-writer steps;
+  [findings](findings/afni-volreg-original.md), record [afni-volreg-original](validation/afni-volreg-original.md),
+  [benchmarks](benchmarks/afni-volreg.md)).** Done in the part besides the original: output names of
+  228 to 255 bytes in every AFNI clean-room original (the replica part's report, below); the spec
+  writer's eight answers (step 2) and five (step 3: the limits measured from AFNI's own spread under
+  the shear decomposition's ties, the validation switch `LARMORX_VOLREG_TIES=random:<seed>` and the
+  rule of 12 seeded runs, runaways held to the output's structure, `-final NN`'s nearest-neighbour
+  rule, `-SAVEDISP`'s trend line in §10.3's order). Left:
+  - *The questions for a spec writer, still open* (relay 4; no spec-writer step now: the record has no
+    failure and the trial's sample is explained):
+    - `specs/3dvolreg.md` §14.3 ("the defects named as the replica's default"): AFNI-99 named at a
+      rounding boundary of the printed two-decimal maximum displacement (3 of the trial's 1,200 sampled
+      differences, case 5378: the original 2.02 mm by default and 2.01 with `reproduce`, the replica
+      2.02 in both; the parameters' last digits, which the ties decide, choose): to allow there?
+    - §14.3 "The ties' spread": three times a spread estimated from 12 seeded runs is a sampled bound;
+      2 of the 1,200 at its edge (cases 13852 and 18762: 1.21 and 1.02 times it), within it with 36 runs
+      (`triage.py --seeds 36`): more runs, or a margin?
+    - the notices' order (the spec states none): the original prints them phase by phase as the
+      replica does (the option scan's and the setup's by ID, AFNI-92 when the first pass with the
+      coarse rotation search starts, then the run's and the output's by ID): to state.
+  - *The final validation phase:* the full tier on the revised limits (its eight full-only cases: seven
+    more data-panel BOLD runs and `e120-twopass`; last run before the spec writer's step 3, when
+    ds000228's median, 2.4e-4 of its largest value, failed the fixed 1e-4 of then); AFNI's own
+    variability from perturbed inputs beside the ties' spread; random testing at length (the trial:
+    21,710 cases in half an hour); `AFNI_MESSAGE_PREFIX` has no suite case of 3dvolreg's.
+  - *Speed:* the benchmark ran on a shared machine (load 23 to 26 of 32 threads; the ratios are the
+    information): to re-measure on the quiet machine. On large grids the first pass's coarse search
+    leads (44 nearest-neighbour rotations per volume, 8.3 ms each on ds005454's grid, and their
+    float32 scores, kept sequential for the spec's "first strictly better"), then the final pass's
+    Fourier resampling (a batched double-precision FFT): restrict the rotations to the planes the
+    scores read; a float32 batched FFT; SIMD with runtime dispatch (the crate forbids `unsafe`: an
+    audited module).
+  - *Random testing's harness:* the harness leaves its generated inputs in `/tmp`
+    (`lx-difftest-inputs_*`: 43,366 folders, 1.7 GB on 2026-11-08, from every night and triage):
+    to remove them, or keep them in the night's folder; a night whose extension is rebuilt in place
+    while it runs ends with SIGSEGV after its cases (the trial's, rebuilt with `difftest --report`):
+    give each night its own copy of the build.
 - **From PRELUDE's clean-room original part (2026-11-07; five relays; [findings](findings/fsl-prelude-original.md),
   record [fsl-prelude](validation/fsl-prelude.md), [benchmarks](benchmarks/fsl-prelude.md)).** Done
   in the part besides the original: the spec answers' clean-room follow-ups of 2026-11-06 (PRELUDE's
@@ -778,7 +815,8 @@ The items below keep their history.
       evaluated matrices still part from `lx.mri.hmc`'s after some 30 to 40 evaluations
       (`count_trace.py`: the sixth decimal of one translation, in the line search).
 - **From 3dvolreg's replica part (2026-11-06 and 07).**
-  - *For 3dvolreg's clean-room original (the next part):* from `specs/3dvolreg.md` (§12: AFNI-86 to
+  - *For 3dvolreg's clean-room original:* **done** 2026-11-08 (its part's follow-ups, above), from
+    `specs/3dvolreg.md` (§12: AFNI-86 to
     AFNI-99's defaults; §11: what may be built for speed; §14: the validation plan, within
     thresholds where the shear decomposition's evaluation decides the last bits, §5.3 and §16). The
     spec writer's model `validation/investigations/3dvolreg-spec/` (written from the spec and
@@ -786,7 +824,8 @@ The items below keep their history.
     `validation/investigations/afni-volreg/`, the probe `validation/probes/afni-volreg-trace/` and
     the replica's suite, random-testing descriptor and evidence modules (`afni_volreg.py` in
     `parity/`, `difftest/tools/`, `evidence/`) are closed to the implementer, who runs them as black
-    boxes. The site page's clean-room panels wait for the original (`evidence.afni_volreg`).
+    boxes. The site page's clean-room panels: done (`evidence.afni_volreg_original`, which calls
+    `evidence.afni_volreg` as a black box and extends its page).
   - *3dTshift's clean-room original:* `specs/3dTshift.md` §5.2's open point is answered (the
     quintic and heptic weights' last bits: `f²` a float32 product, the rest double in the factored
     forms of `specs/3dvolreg.md` §5.6, the constant last); the original to follow it where its
@@ -802,8 +841,11 @@ The items below keep their history.
     coarse rotation search, not only where its mask changes the result (telling would take a
     second search); the suite and random testing allow it (`silent_ok`), as for AFNI-86 and -93.
   - *The clean-room AFNI crate:* output names of about 228 to 255 bytes cannot be written (a
-    temporary name over the system's 255-byte limit; the replica's fixed 2026-11-06): to test with
-    a 240-byte `-prefix` (the bug report, behaviour only, in the part's handoff).
+    temporary name over the system's 255-byte limit; the replica's fixed 2026-11-06): **done**
+    2026-11-08 (3dvolreg's clean-room original part, relay 1: `output::hidden_name`; 3dTshift,
+    3dAutomask, 3dUnifize and 3dvolreg write names of 200 to 255 bytes as AFNI does, 24 of 24
+    black-box cases, `validation/investigations/afni-volreg-original/longnames.py`; the unit test
+    `output::tests::long_output_names`).
   - *The final validation phase:* the full tier (7 more fMRIPrep calls of the data panel, in the
     suite's `CALLS`), AFNI-90's `-maxdisp1D` cut (a 998-byte path), `-@` from standard input (checked
     by hand), random testing at length.
@@ -1851,7 +1893,10 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   parameters within 0.0012, volumes within 2.7e-5 of their largest value); describing AFNI's own
   evaluation, operation by operation, would make the original bit-identical but put AFNI's code
   into the spec. **Recommendation: no** (the replica gives AFNI's bits; the difference is a
-  fraction of the convergence threshold).
+  fraction of the convergence threshold). The clean-room original was built so (the orchestrator,
+  2026-11-07, on this recommendation, unless the user objects): its record of 2026-11-08 within
+  §14.3's limits, revised by the spec writer from AFNI's own spread under the ties, none failing
+  ([afni-volreg-original.md](validation/afni-volreg-original.md)).
 
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's

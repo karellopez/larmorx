@@ -12,7 +12,7 @@ crate `larmorx-ndimage` (filters, morphology and measurements; the interpolation
 `IntensityClip`.
 
 **Status: experimental** (field maps part B, relay 2, 2026-11-08). Results are SciPy's bit for
-bit: on 9,000 to 10,000 seeded cases per environment (every element type, 1- to 4-D, C,
+bit: on 39,436 seeded cases per environment (every element type, 1- to 4-D, C,
 Fortran and strided layouts, every mode, origins, footprints, non-flat structures, NaN,
 infinities, signed zeros, ties; the exceptions and their messages) and on fMRIPrep's own inputs
 (the nine `brainextraction_wf` nodes of the oracle runs: `IntensityClip` built from these pieces

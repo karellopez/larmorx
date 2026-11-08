@@ -132,6 +132,9 @@ mod tests {
         let base = format!("{}/p", dir.display());
         let mut p = Profiler::new(Some(&base), "_a b/c.txt").unwrap();
         let k = p.start_entry("Begins run");
+        // the keys are the clock's time: on a coarse clock (macOS) two entries started at once
+        // share it, and the second is the duplicate-key line
+        std::thread::sleep(std::time::Duration::from_millis(2));
         let l = p.start_entry("Begins level 1");
         p.end_entry(l);
         p.end_entry(12.5);

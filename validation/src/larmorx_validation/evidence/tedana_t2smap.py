@@ -743,7 +743,7 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
     files = {label: _out(e, label) / OPTCOM for label, *_ in RUNS}
     files["fmriprep"] = node / OPTCOM
     full = {k: _stored(v) for k, v in files.items()}
-    for pid in ("tedana", "replica", "replica-fix", "fmriprep", "tedana-avx512"):
+    for pid in ("tedana", "replica", "replica-14", "replica-fix", "fmriprep", "tedana-avx512"):
         role, label, sub = PANELS[pid]
         ex.add(exm.Panel(pid, role, label, sub, {"optcom": vols(full[pid])}))
     outputs = [{"id": "optcom", "label": "Optimally combined series", "unit": ""}]

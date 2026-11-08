@@ -47,7 +47,7 @@ TWO_PI = 2.0 * np.pi
 #: workflow name), what the field map is.
 FMRIPREP = [
     ("fmriprep-ds005454", "ds005454-sub-16-noreconall", "wf_gre16",
-     "a GRE phase difference (Siemens, 3 T) of a multiband study"),
+     "a GRE phase difference (Siemens, 7 T) of a multiband study"),
     ("fmriprep-ds002603", "ds002603-sub-01-noreconall", "wf_auto_00000",
      "a Philips phase difference at 2 mm (`acq-Mm2`), 128 × 128 × 128 voxels"),
     ("fmriprep-ds002422-run01", "ds002422-sub-02-noreconall", "wf_auto_00000",

@@ -44,6 +44,9 @@ Rust (``larmorx-sdcflows``):
   and direct field maps) as plain functions, each node through larmorx's ports.
 - :func:`coeff2epi_workflow`, :func:`registration_settings`: ``init_coeff2epi_wf`` (the field
   map's reference registered to the target EPI with ANTs) and sdcflows' ANTs settings files.
+- :func:`syn_preprocessing_workflow`, :func:`deoblique`, :func:`reoblique`, :func:`set_dtype`,
+  :func:`merge_meta`, :func:`obliquity`, :func:`fmap_atlas`, :func:`fmap_atlas_affine`: the
+  fieldmap-less (SyN) preprocessing (``init_syn_preprocessing_wf``) and its helpers.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -117,6 +120,17 @@ from larmorx.sdcflows.registration import (
     registration_settings,
 )
 from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
+from larmorx.sdcflows.syn import (
+    SynPreprocessingResult,
+    deoblique,
+    fmap_atlas,
+    fmap_atlas_affine,
+    merge_meta,
+    obliquity,
+    reoblique,
+    set_dtype,
+    syn_preprocessing_workflow,
+)
 from larmorx.sdcflows.tools import resample_to_zooms, rescale_affine
 from larmorx.sdcflows.transform import (
     ApplyCoeffsFieldResult,
@@ -156,6 +170,7 @@ __all__ = [
     "RidgeResult",
     "SelectPEVolumesResult",
     "SortPEBlipsResult",
+    "SynPreprocessingResult",
     "TopupNodeResult",
     "TopupWorkflowResult",
     "UniformGridResult",
@@ -172,19 +187,25 @@ __all__ = [
     "coeff2epi_workflow",
     "collocation_matrix",
     "delta_te",
+    "deoblique",
     "deoblique_and_zooms",
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
+    "fmap_atlas",
+    "fmap_atlas_affine",
     "fmap_to_disp",
     "fmap_workflow",
     "get_readout_time",
     "get_trt",
     "grid_bspline_weights",
     "magnitude_workflow",
+    "merge_meta",
+    "obliquity",
     "pad_slices",
     "phdiff2fmap",
     "phdiff_workflow",
     "registration_settings",
+    "reoblique",
     "reorient_image_and_metadata",
     "reorient_pedir",
     "resample_to_zooms",
@@ -192,8 +213,10 @@ __all__ = [
     "ridge_sparse_cg",
     "select_pe_volumes",
     "select_topup_config",
+    "set_dtype",
     "sort_pe_blips",
     "subtract_phases",
+    "syn_preprocessing_workflow",
     "topup_coeff_reorient",
     "topup_config_file",
     "topup_mats_to_world",

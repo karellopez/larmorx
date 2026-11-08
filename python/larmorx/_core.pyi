@@ -353,6 +353,25 @@ def ndimage_map_coordinates(
     """``scipy.ndimage.map_coordinates`` for a 1- to 4-D ``input`` and ``(ndim, n)`` float64
     ``coordinates``: the ``n`` values in the ``output`` dtype, and upstream-defect notices."""
 
+def ndimage_affine_transform3(
+    input: np.ndarray,
+    matrix: list[float],
+    offset: list[float],
+    output_shape: list[int],
+    order: int = 3,
+    mode: str = "constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+    output: str = "float64",
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    scipy_version: str = "1.18.1",
+) -> tuple[np.ndarray, list[Notice]]:
+    """``scipy.ndimage.affine_transform`` of a 3-D ``input``: ``matrix`` 9 values (a 3 x 3
+    matrix, row by row: its offset added first, or last before SciPy 1.16, ``scipy_version``) or
+    3 (a diagonal: SciPy's ``zoom_shift`` path); the output's values in Fortran order and the
+    upstream-defect notices."""
+
 def ndimage_spline_filter1d(
     input: np.ndarray,
     order: int = 3,
@@ -579,6 +598,13 @@ def ants_program(
     writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``. The program runs in
     the D13 mode ``upstream_defects``; its notices are lines of ``stderr``."""
+
+def ants_file_program(
+    program: str, args: list[str], n_threads: int, upstream_defects: str
+) -> tuple[int, str, str]:
+    """Run ``antsApplyTransforms`` with ``args`` on files (transform files read as the program
+    reads them), on ``n_threads`` threads, in the D13 mode ``upstream_defects``:
+    ``(exit_code, stdout, stderr)``."""
 
 def ants_image_math_operations() -> list[tuple[str, str]]:
     """The ImageMath operations larmorx implements: ``(name, usage)``."""

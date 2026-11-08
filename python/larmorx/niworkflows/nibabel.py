@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """niworkflows' ``interfaces/nibabel.py`` (niworkflows 1.15.4, the same in 1.15.2):
-``IntensityClip``, ``MergeSeries`` and ``ReorientImage`` (``reorient_file``, ``reorient_image``),
+``IntensityClip``, ``Binarize``, ``MergeSeries`` and ``ReorientImage`` (``reorient_file``,
+``reorient_image``),
 with nibabel's (5.4.2, MIT) ``axcodes2ornt``, ``aff2axcodes`` and ``ornt_transform``.
 
 numpy's ``percentile`` of a Python-number ``q`` differs between numpy 2.2/2.3 (``float32``
@@ -24,9 +25,11 @@ from larmorx.io.nibabel_header import load_nibabel
 from larmorx.io.nibabel_writer import save_nibabel
 
 __all__ = [
+    "BinarizeResult",
     "IntensityClipResult",
     "aff2axcodes",
     "axcodes2ornt",
+    "binarize",
     "intensity_clip",
     "merge_series",
     "ornt_transform",
@@ -115,6 +118,47 @@ def intensity_clip(
             out = out.replace(header=hdr.replace(cal_max=float(np.float32(data.max()))))
         save_nibabel(out, path, dtype=dtype, n_threads=n_threads)
     return IntensityClipResult(out, path)
+
+
+@dataclass(frozen=True)
+class BinarizeResult:
+    """``Binarize``'s files: the image with every value at or below the threshold set to 0
+    (``out_file``: ``<in>_masked``) and the mask of the values above it (``out_mask``:
+    ``<in>_mask``, ``uint8``)."""
+
+    out_file: str
+    out_mask: str
+
+
+def binarize(
+    in_file: str | os.PathLike[str],
+    thresh_low: float,
+    *,
+    out_dir: str | os.PathLike[str] = ".",
+    n_threads: int = 1,
+) -> BinarizeResult:
+    """niworkflows' ``Binarize``: ``get_fdata()`` of ``in_file`` (``float64``) above
+    ``thresh_low`` (a NaN is not above), the rest set to 0, written with the input's header in
+    its stored type as ``<in>_masked``; the mask written as ``uint8`` with the same header as
+    ``<in>_mask`` (both in ``out_dir``, nibabel's writer)."""
+    from larmorx import _nipype
+
+    in_file = os.fspath(in_file)
+    img = load_nibabel(in_file, n_threads=n_threads)
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = _nipype.fname_presuffix(in_file, suffix="_masked", newpath=out_dir)
+    out_mask = _nipype.fname_presuffix(in_file, suffix="_mask", newpath=out_dir)
+    data = np.array(load_nibabel(in_file, dtype=np.float64, n_threads=n_threads).data, copy=True)
+    mask = data > float(thresh_low)
+    data[~mask] = 0.0
+    save_nibabel(Image(data, img.affine, img.header), out_file, n_threads=n_threads)
+    save_nibabel(
+        Image(mask.astype("uint8"), img.affine, img.header),
+        out_mask,
+        dtype=np.uint8,
+        n_threads=n_threads,
+    )
+    return BinarizeResult(out_file, out_mask)
 
 
 def axcodes2ornt(axcodes: Sequence[str | None]) -> np.ndarray:

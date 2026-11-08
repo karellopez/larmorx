@@ -25,8 +25,9 @@ setting is written ``6.0``).
 
 Not ported (nothing on these paths reaches them): nipype's version checks of inputs (``min_ver``,
 ``max_ver``: ``fixed_image_mask``, ``moving_image_mask`` belong to ANTs <= 2.1.0 and raise here),
-its ``xor``/``requires`` checks beyond the ones that change the line, and the
-``antsApplyTransforms`` run (its command line is formatted; it runs with the SyN steps).
+and its ``xor``/``requires`` checks beyond the ones that change the line.
+``antsApplyTransforms`` runs through larmorx's port of the program on files (its transform
+files read as the program reads them), as nipype runs it.
 """
 
 # nipype formats with Python's % operator (``%g``, ``%d`` of floats and booleans), which this
@@ -1552,7 +1553,7 @@ def run(
 ) -> Command:
     """Run ``cmd`` in its node directory (made) through larmorx's port of its program, as
     nipype runs it: ANTs' programs in this process (``n_threads``: nipype's ``NSLOTS`` when
-    ``None``), FSL's ``bet``, ``fslmaths`` and ``topup`` through their replica (``larmorx-nc``)
+    ``None``; ``antsApplyTransforms`` on files), FSL's ``bet``, ``fslmaths`` and ``topup`` through their replica (``larmorx-nc``)
     or clean-room original (``implementation``), AFNI's through their built-in replica, with
     nipype's ``FSLOUTPUTTYPE``. The interface's files (TOPUP's encoding file) are written
     first. A failure raises :class:`RuntimeError` with the program's messages; its notices
@@ -1588,6 +1589,12 @@ def run(
                 on_message(line)
 
     program = cmd.program
+    if program == "antsApplyTransforms":
+        code, out, err = _core.ants_file_program(program, cmd.run_argv(), threads, upstream_defects)
+        warn_lines(err)
+        if code != 0:
+            raise RuntimeError(f"{program} failed (exit {code}): {err.strip()[-2000:]}")
+        return cmd
     if program in _ANTS_PROGRAMS:
         argv = cmd.run_argv()
         seeded = ants_random_seed is not None and program == "antsRegistration"

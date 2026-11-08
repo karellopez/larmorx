@@ -4,7 +4,9 @@
 
 Ported from niworkflows 1.15.4 (Apache-2.0, the NiPreps developers; the same in 1.15.2,
 fMRIPrep 25.2.6's): ``utils/images.py`` (``_copyxform``: :func:`copy_xform`),
-``interfaces/header.py`` (``CopyHeader``: :func:`copy_header`), ``interfaces/nibabel.py``
+``interfaces/header.py`` (``CopyHeader``: :func:`copy_header`; ``ValidateImage``:
+:func:`validate_image`, with transforms3d 0.4.2's ``decompose44`` and ``mat2axangle``, BSD-2-Clause,
+for its report's text), ``interfaces/nibabel.py``
 (``ApplyMask``: :func:`apply_mask`), ``interfaces/utility.py`` (``KeySelect``:
 :func:`key_select`) and ``func/util.py`` (``init_skullstrip_bold_wf``:
 :func:`skullstrip_bold_workflow`, FSL's ``bet``, AFNI's ``3dAutomask`` and ``fslmaths`` run with
@@ -32,11 +34,13 @@ from larmorx.io.nifti import NiftiHeader
 
 __all__ = [
     "SkullstripBoldResult",
+    "ValidateImageResult",
     "apply_mask",
     "copy_header",
     "copy_xform",
     "key_select",
     "skullstrip_bold_workflow",
+    "validate_image",
 ]
 
 
@@ -137,6 +141,207 @@ def apply_mask(
         msk = msk[..., np.newaxis]
     save_nibabel(Image(data * msk, img.affine, img.header), out, n_threads=n_threads)
     return out
+
+
+#: nibabel's ``unit_codes`` labels of the spatial units.
+_XYZ_UNITS = {0: "unknown", 1: "meter", 2: "mm", 3: "micron"}
+
+
+@dataclass(frozen=True)
+class ValidateImageResult:
+    """``ValidateImage``'s outputs: ``out_file`` (the input itself, or ``<in>_valid`` with the
+    fixed x-forms), ``out_report`` (``report.html`` in ``out_dir``: empty, or the HTML
+    snippet) and ``warning`` (the snippet's title, ``None`` when nothing changed)."""
+
+    out_file: str
+    out_report: str
+    warning: str | None
+
+
+def _srow_sform(fields: dict) -> np.ndarray:
+    """nibabel's ``get_sform()`` (the srow rows, whatever the code)."""
+    out = np.eye(4)
+    for i, row in enumerate(("srow_x", "srow_y", "srow_z")):
+        out[i, :] = np.asarray(fields[row], dtype=np.float64)
+    return out
+
+
+def _det_is_zero(m: np.ndarray) -> bool:
+    """``np.linalg.det(m) == 0`` for a 4 x 4 affine (its last row 0, 0, 0, 1): LAPACK's LU of
+    the 3 x 3 block, as numpy computes it, has a zero pivot (``det(-a) = -det(a)`` exactly, so
+    neither is positive only then)."""
+    from larmorx import _core
+
+    a = np.ascontiguousarray(m[:3, :3], dtype=np.float64)
+    pos = _core.numpy_linalg_small("det_positive", a)
+    neg = _core.numpy_linalg_small("det_positive", np.ascontiguousarray(-a))
+    return not pos and not neg
+
+
+def _axangle_and_translation(diff: np.ndarray) -> tuple[float, float]:
+    """transforms3d's ``decompose44(diff)`` translation norm and ``mat2axangle`` angle of its
+    rotation (numpy's linear algebra; the report prints two significant digits)."""
+    import math
+
+    t = diff[:-1, -1]
+    rzs = diff[:-1, :-1]
+    zs = np.linalg.cholesky(np.dot(rzs.T, rzs)).T
+    z = np.diag(zs).copy()
+    shears = zs / z[:, np.newaxis]
+    r = np.dot(rzs, np.linalg.inv(zs))
+    if np.linalg.det(r) < 0:
+        z[0] *= -1
+        zs[0] *= -1
+        r = np.dot(rzs, np.linalg.inv(zs))
+    del shears
+    m = np.asarray(r, dtype=np.float64)
+    lam, w = np.linalg.eig(m.T)
+    i = np.where(np.abs(lam - 1.0) < 1e-5)[0]
+    if not len(i):
+        raise ValueError("no unit eigenvector corresponding to eigenvalue 1")
+    direction = np.real(w[:, i[-1]]).squeeze()
+    cosa = (np.trace(m) - 1.0) / 2.0
+    if abs(direction[2]) > 1e-8:
+        sina = (m[1, 0] + (cosa - 1.0) * direction[0] * direction[1]) / direction[2]
+    elif abs(direction[1]) > 1e-8:
+        sina = (m[0, 2] + (cosa - 1.0) * direction[0] * direction[2]) / direction[1]
+    else:
+        sina = (m[2, 1] + (cosa - 1.0) * direction[1] * direction[2]) / direction[0]
+    angle = math.atan2(sina, cosa)
+    return angle, float(np.sqrt(np.sum(t * t)))
+
+
+def validate_image(
+    in_file: str | os.PathLike[str],
+    *,
+    out_dir: str | os.PathLike[str] = ".",
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> ValidateImageResult:
+    """niworkflows' ``ValidateImage``: the x-forms of ``in_file`` checked against
+    niworkflows' truth table. Valid, matching qform and sform with codes above 0 (or a qform
+    that only differs by the precision a qform can hold): the input itself and an empty
+    report. Otherwise ``<in>_valid`` in ``out_dir`` with the sform copied from a valid qform
+    (``Note on orientation: sform matrix set``), the qform from a valid sform (``Note on
+    orientation: qform matrix overwritten``, with the angle and translation of the change, or
+    ``WARNING - Invalid qform information``), or both set to nibabel's base affine with code 1
+    (``WARNING - Missing orientation information``); the report (``report.html``) holds the
+    HTML snippet. Files are read and written as nibabel does.
+
+    PIPE-24: the report names the translation's unit with nibabel's ``get_xyzt_units``, which
+    raises ``KeyError`` for a spatial unit code 4 to 7 (no NIfTI unit); larmorx reports such a
+    translation in mm, as for an unknown unit (``upstream_defects="reproduce"``: the
+    ``KeyError``)."""
+    from textwrap import indent
+
+    from larmorx import _defects
+    from larmorx.io.nibabel_header import _get_qform, nibabel_affine
+
+    _defects.check(upstream_defects)
+    in_file = os.fspath(in_file)
+    img = load_nibabel(in_file, n_threads=n_threads)
+    assert img.header is not None
+    fields = img.header.to_dict()
+    os.makedirs(out_dir, exist_ok=True)
+    report = os.path.join(os.path.abspath(os.fspath(out_dir)), "report.html")
+
+    def unchanged() -> ValidateImageResult:
+        open(report, "w").close()
+        return ValidateImageResult(in_file, report, None)
+
+    sform_code = int(fields["sform_code"])
+    qform_code = int(fields["qform_code"])
+    valid_qform = False
+    qform = None
+    try:
+        qform = _get_qform(img.header)
+        valid_qform = True
+    except ValueError:
+        pass
+    sform = _srow_sform(fields)
+    if _det_is_zero(sform):
+        valid_sform = False
+    else:
+        rzs = sform[:3, :3]
+        zooms = np.sqrt(np.sum(rzs * rzs, axis=0))
+        hdr_zooms = np.asarray(img.header.pixdim, dtype=np.float32)[1 : int(fields["dim"][0]) + 1]
+        valid_sform = bool(np.allclose(zooms, tuple(hdr_zooms)[:3]))
+    matching_affines = valid_qform and bool(np.allclose(qform, sform))
+    if matching_affines and qform_code > 0 and sform_code > 0:
+        return unchanged()
+    if valid_qform and qform_code > 0 and (sform_code == 0 or not valid_sform):
+        fields = set_xform(fields, "sform", qform, qform_code)
+        warning_txt = "Note on orientation: sform matrix set"
+        description = '<p class="elem-desc">The sform has been copied from qform.</p>\n'
+    elif (valid_sform and sform_code > 0) and (not matching_affines or qform_code == 0):
+        fields = set_xform(fields, "qform", sform, sform_code)
+        new_qform = _get_qform(NiftiHeader.from_dict(fields))
+        if valid_qform:
+            if np.allclose(new_qform, qform) and qform_code > 0:
+                return unchanged()
+            diff = np.linalg.inv(qform) @ new_qform
+            angle, total_trans = _axangle_and_translation(diff)
+            xyz_code = int(fields["xyzt_units"]) % 8
+            if xyz_code not in _XYZ_UNITS:
+                if upstream_defects == "reproduce":
+                    raise KeyError(xyz_code)
+                _defects.warn(
+                    [
+                        (
+                            "PIPE-24",
+                            "niworkflows ValidateImage",
+                            upstream_defects,
+                            f"spatial unit code {xyz_code} is no NIfTI unit: the report gives "
+                            "the translation in mm, as for an unknown unit (niworkflows raises "
+                            "KeyError)",
+                        )
+                    ]
+                )
+            xyz_unit = _XYZ_UNITS.get(xyz_code, "unknown")
+            if xyz_unit == "unknown":
+                xyz_unit = "mm"
+            warning_txt = "Note on orientation: qform matrix overwritten"
+            description = f"""\
+    <p class="elem-desc">
+    The qform has been copied from sform.
+    The difference in angle is {angle:.02g} radians.
+    The difference in translation is {total_trans:.02g}{xyz_unit}.
+    </p>
+    """
+        elif qform_code > 0:
+            warning_txt = "WARNING - Invalid qform information"
+            description = """\
+<p class="elem-desc">
+    The qform matrix found in the file header is invalid.
+    The qform has been copied from sform.
+    Checking the original qform information from the data produced
+    by the scanner is advised.
+</p>
+"""
+        else:
+            warning_txt = "Note on orientation: qform matrix overwritten"
+            description = '<p class="elem-desc">The qform has been copied from sform.</p>'
+    else:
+        from larmorx.io.nibabel_header import _base_affine
+
+        affine = _base_affine(img.header)
+        fields = set_xform(fields, "sform", affine, 1)
+        fields = set_xform(fields, "qform", affine, 1)
+        warning_txt = "WARNING - Missing orientation information"
+        description = """\
+<p class="elem-desc">
+    FMRIPREP could not retrieve orientation information from the image header.
+    The qform and sform matrices have been set to a default, LAS-oriented affine.
+    Analyses of this dataset MAY BE INVALID.
+</p>
+"""
+    snippet = f'<h3 class="elem-title">{warning_txt}</h3>\n{description}\n'
+    out_fname = _nipype.fname_presuffix(in_file, suffix="_valid", newpath=out_dir)
+    header = NiftiHeader.from_dict(fields)
+    save_nibabel(Image(img.data, nibabel_affine(header), header), out_fname, n_threads=n_threads)
+    with open(report, "w", encoding="utf-8") as fobj:
+        fobj.write(indent(snippet, "\t" * 3))
+    return ValidateImageResult(out_fname, report, warning_txt)
 
 
 def key_select(keys: Sequence[Any], key: Any, **fields: Sequence[Any]) -> dict[str, Any]:

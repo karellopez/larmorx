@@ -20,7 +20,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.approx import _fname_presuffix
@@ -146,14 +147,16 @@ def topup_coeff_reorient(
     pe_dir: str,
     *,
     out_dir: str | os.PathLike[str] | None = None,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> CoefficientsResult:
     """sdcflows' ``TOPUPCoeffReorient``: TOPUP's B-spline coefficients (``--fout``'s
     ``fieldcoef`` files) placed in the space of the field-map reference.
 
     TOPUP stores its coefficients flipped left-right (FSL's internal LAS order) with the
-    control-point spacings as voxel sizes. For each file this flips the first axis, negates
-    the coefficients when the phase-encoding direction of the reference reoriented to RAS is
-    the first axis (``i``), checks that the grid is TOPUP's for the reference (``shape //
+    control-point spacings as voxel sizes. For each file this flips the first axis (sdcflows
+    also negates the coefficients when the phase-encoding direction of the reference
+    reoriented to RAS is written ``i``: SDC-07, below), checks that the grid is TOPUP's for the
+    reference (``shape //
     spacing + 3`` where the spacing is above 1), and gives the coefficients an affine with the
     reference's (RAS) directions and the control-point spacing, centred on the reference
     (qform and sform code 1), with ``cal_max``/``cal_min`` and the intent "estimate"
@@ -163,7 +166,15 @@ def topup_coeff_reorient(
     TOPUP estimated the field on; ``pe_dir``: its phase-encoding direction (``i``, ``j-``, ...
     or ``x``, ``y-``, ...). With ``out_dir``, the files are written there as
     ``<coeff>_fixed``.
+
+    ``upstream_defects``: TOPUP's coefficients are a field in Hz, a scalar the left-right flip
+    does not change; sdcflows negates them for a left-right phase encoding written with BIDS'
+    letter (``i``, ``i-``; fMRIPrep passes FSL's ``x``, which it does not negate), which
+    inverts the field (measured: ``validation/investigations/sdcflows-fieldmap/
+    measure_sdc_g.py``, r = -0.999 with the true field). larmorx keeps the sign (``"fix"``,
+    with a warning) or negates as sdcflows (``"reproduce"``) (SDC-07).
     """
+    _defects.check(upstream_defects)
     if pe_dir not in PE_DIRS_TOPUP:
         raise ValueError(f"pe_dir must be one of {PE_DIRS_TOPUP}, not {pe_dir!r}")
     coeffs = _listify(in_coeff)
@@ -178,7 +189,16 @@ def topup_coeff_reorient(
         order = np.argsort(ref_ornt[:, 0])
         ras_shape = np.array([ref.shape[int(a)] for a in order])
     coeff_pe_dir = reorient_pedir(pe_dir, ref_ornt)
-    reverse_pe = -1.0 if coeff_pe_dir[0] == "i" else 1.0
+    reverse_pe = 1.0
+    if coeff_pe_dir[0] == "i":
+        if upstream_defects == "reproduce":
+            reverse_pe = -1.0
+        verb = "negated as sdcflows negates them" if reverse_pe < 0 else "kept"
+        detail = (
+            f"the coefficients of a phase encoding along {coeff_pe_dir!r} are {verb} "
+            "(sdcflows negates TOPUP's field for a BIDS 'i' direction)"
+        )
+        _defects.warn([("SDC-07", "sdcflows", upstream_defects, detail)])
     out = []
     for c in coeffs:
         img = _as_loaded(c)

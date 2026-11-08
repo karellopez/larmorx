@@ -131,14 +131,32 @@ def topup_case(name, coeffs, ref, pe_dir, oracle_files=()):
             return node.run(cwd=t1).outputs.out_coeff
 
         want, err_ref = outcome(ref_run)
+        # sdcflows' bytes with upstream_defects="reproduce" (SDC-07 negates an i direction)
         got, err = outcome(
-            lambda: lxs.topup_coeff_reorient([str(c) for c in coeffs], str(ref), pe_dir, out_dir=t2)
+            lambda: lxs.topup_coeff_reorient(
+                [str(c) for c in coeffs],
+                str(ref),
+                pe_dir,
+                out_dir=t2,
+                upstream_defects="reproduce",
+            )
         )
         if err_ref or err:
             report(name, err_ref == err, f"{err_ref!r} vs {err!r}")
             return
         want = want if isinstance(want, list) else [want]
         checks = {"count": len(want) == len(got.out_coeff)}
+        # the corrected default: the same files, but never negated (and a warning if it was)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            fixed = lxs.topup_coeff_reorient([str(c) for c in coeffs], str(ref), pe_dir)
+        flipped = any("SDC-07" in str(x.message) for x in w)
+        sign = -1.0 if flipped else 1.0
+        checks["SDC-07 fix"] = all(
+            np.array_equal(a.data, sign * b.data, equal_nan=True)
+            and a.affine.tobytes() == b.affine.tobytes()
+            for a, b in zip(fixed.coefficients, got.coefficients, strict=True)
+        )
         for i, (a, b) in enumerate(zip(want, got.out_coeff, strict=False)):
             checks[f"name{i}"] = Path(a).name == b.name
             checks[f"bytes{i}"] = raw(a) == raw(b)

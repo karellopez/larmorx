@@ -332,6 +332,8 @@ defects! {
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
     SDC_05 = "SDC-05", "sdcflows", true,
         "B0FieldTransform.apply accepts a readout time only as a Python float or a list: an integer or a numpy float32 readout time fails with a TypeError";
+    SDC_07 = "SDC-07", "sdcflows", true,
+        "TOPUPCoeffReorient negates TOPUP's field coefficients (a field in Hz) when the phase-encoding direction, reoriented to RAS, is written with BIDS' letter i, which inverts the field (measured r = -0.999 with the true field; FSL's letter x, which fMRIPrep passes, is not negated)";
     SDC_08 = "SDC-08", "sdcflows", true,
         "B0FieldTransform.apply (and ApplyCoeffsField) fails with an AttributeError on a series read from a file whose axes already run to R, A and S (no reorientation): numpy's rollaxis is given nibabel's ArrayProxy, which has no transpose";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,

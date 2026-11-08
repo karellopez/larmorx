@@ -45,6 +45,7 @@ from typing import Any
 import numpy as np
 
 import larmorx as lx
+import larmorx.pipelines.larmorprepx.fieldmaps  # lx.pipelines, for NAMESPACES
 from larmorx import _core
 from larmorx.io import NiftiHeader
 from larmorx.transforms import ItkTransform
@@ -1040,6 +1041,7 @@ NAMESPACES = (
     "lx.sdcflows",
     "lx.skimage",
     "lx.niworkflows",
+    "lx.pipelines.larmorprepx.fieldmaps",
     "lx",
 )
 
@@ -7150,3 +7152,127 @@ def _(ctx: Context) -> dict[str, Any]:
         "text": res.text,
         "inverse_text": res.inverse_text,
     }
+
+
+# --- larmorprepx: fMRIPrep's field-map nodes of a BOLD run ----------------------------------
+
+
+@case(
+    "py.larmorprepx.fieldmaps",
+    covers=(
+        "lx.pipelines.larmorprepx.fieldmaps.bold_fit_fieldmap",
+        "lx.pipelines.larmorprepx.fieldmaps.resampling_fieldmap",
+        "lx.pipelines.larmorprepx.fieldmaps.select_ref",
+        "lx.pipelines.larmorprepx.fieldmaps.gen_inverses",
+        "lx.pipelines.larmorprepx.fieldmaps.fieldmap_jacobian",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's field-map nodes of a BOLD fit on the synthetic EPI pair (the field map's
+    reference the first, the BOLD the second; 8 mm B-spline knots; a single-band reference
+    chosen; sloppy registration with a seed; BET's and fslmaths' clean-room originals) with a
+    sink copying the derivatives, the same with the transform given, a resampling workflow's
+    nodes onto a 2 mm grid through one more affine, and PIPE-20 (no readout time) reproduced."""
+    from larmorx.pipelines.larmorprepx import fieldmaps as fm
+
+    epis = _epi_pair(ctx, volumes=1)
+    masks, refs = [], []
+    for i, (e, shift) in enumerate(zip(epis, (1, -1), strict=True)):
+        m = ctx.out(f"fmask{i}.nii.gz")
+        lx.save(
+            (
+                ellipsoid(SHAPE_HEAD, 4, 5, shift=shift).astype(np.uint8),
+                affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+            ),
+            m,
+        )
+        masks.append(m)
+        img = lx.io.load_nibabel(e)
+        r = ctx.out(f"fref{i}.nii.gz")
+        lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, None), r)
+        refs.append(r)
+    coeff = ctx.out("sub-01_fmapid-auto00000_desc-coeff_fieldmap.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(
+            (ints(150, (6, 6, 6), -40, 41) / 4).astype(np.float32),
+            affine((6, 6, 6), (8.0, 8.0, 8.0), oblique=False),
+            None,
+        ),
+        coeff,
+    )
+    estimates = fm.FieldmapEstimates(
+        fmap_id=["auto_00000", "auto_00001"],
+        fmap_ref=[refs[0], refs[1]],
+        fmap_coeff=[[coeff], [coeff]],
+        fmap_mask=[masks[0], masks[1]],
+        sdc_method=["PEB/PEPOLAR (phase-encoding based / PE-POLARity)", "FMB"],
+    )
+    meta = {"PhaseEncodingDirection": "i", "EffectiveEchoSpacing": 0.0005}
+
+    def sink(req: Any) -> str:
+        folder = Path(ctx.out("derivatives"))
+        folder.mkdir(exist_ok=True)
+        dst = folder / f"{req.role}{''.join(Path(req.in_file).suffixes)}"
+        shutil.copyfile(req.in_file, dst)
+        return str(dst)
+
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = fm.bold_fit_fieldmap(
+            epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
+            out_dir=ctx.out("fit"), sbref_files=[refs[1]], jacobian=True, sloppy=True,
+            ants_random_seed=42, sink=sink, fsl_implementation="original", n_threads=2,
+        )  # fmt: skip
+        pre = fm.bold_fit_fieldmap(
+            epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
+            out_dir=ctx.out("pre"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+            fsl_implementation="original",
+        )  # fmt: skip
+        target = ctx.out("t1w_ref.nii.gz")
+        lx.save(
+            (
+                np.zeros((16, 15, 14), np.int16),
+                affine((16, 15, 14), (2.0, 2.0, 2.0), oblique=False),
+            ),
+            target,
+        )
+        to_anat = ctx.out("boldref2anat.txt")
+        lx.transforms.write(to_anat, AFFINE_XFM)
+        rs = fm.resampling_fieldmap(
+            "auto_00000", estimates, target, fit.boldref2fmap_xfm, meta, epis[1], [to_anat],
+            out_dir=ctx.out("rs"),
+        )  # fmt: skip
+        p20 = fm.bold_fit_fieldmap(
+            epis[1], {"PhaseEncodingDirection": "i"}, "auto_00000", estimates, refs[1], refs[1],
+            masks[1], out_dir=ctx.out("p20"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+            fsl_implementation="original", upstream_defects="reproduce",
+        )  # fmt: skip
+    out["fit.xfm"] = Path(fit.boldref2fmap_xfm).read_text(encoding="utf-8")
+    for name in ("fieldmap", "unwarped_boldref", "coreg_boldref", "bold_mask"):
+        out[f"fit.{name}"] = Nifti(getattr(fit, name))
+        out[f"pre.{name}"] = Nifti(getattr(pre, name))
+    out["fit.params"] = np.asarray([fit.readout_time, float(len(fit.pe_direction))])
+    out["rs.fieldmap"] = Nifti(rs.out_file)
+    out["rs.inverse"] = np.asarray(rs.inverse)
+    out["p20.unwarped"] = Nifti(p20.unwarped_boldref)
+    out["helpers"] = np.asarray(
+        [
+            fit.sdc_boldref == refs[1],
+            fm.select_ref([], [refs[0]]) == refs[0],
+            fm.gen_inverses(None) == [True],
+            fm.fieldmap_jacobian("PEPOLAR"),
+            fm.fieldmap_jacobian("PHASEDIFF"),
+            fm.fieldmap_jacobian("MAPPED", force=["fmap-jacobian"]),
+            p20.readout_time is None,
+        ]
+    )
+    try:
+        fm.bold_fit_fieldmap(
+            epis[1], {"PhaseEncodingDirection": "i"}, "auto_00000", estimates, refs[1],
+            refs[1], masks[1], out_dir=ctx.out("err"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+        )  # fmt: skip
+        out["pipe20.error"] = ""
+    except fm.FieldmapMetadataError as err:
+        out["pipe20.error"] = str(err).split(" (")[0]
+    return out

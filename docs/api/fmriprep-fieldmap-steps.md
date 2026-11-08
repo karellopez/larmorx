@@ -22,7 +22,10 @@ clean-room original comes later (the user, 2026-11-06).
 `ReconstructFieldmap` files (data and header bytes), 28 `DistortionParameters` outputs, and the 7
 `unwarp_boldref` images the reconstructed fields go into (`lx.transforms.resample_series`).
 `validation/investigations/sdcflows-fieldmap-b/check_bold_steps.py`; the record comes with the
-part's records.
+part's records. The BOLD runs' field-map nodes composed as larmorprepx composes them
+(`larmorx.pipelines.larmorprepx.fieldmaps`, below) are bit-identical to fMRIPrep's files on the
+same runs: every node of the 7 BOLD fits (14 calls: registering and with the transform given)
+and of the 21 resampling workflows, in both environments (`check_bold_stage.py`).
 
 ## `reconstruct_fieldmap(coefficients, fmap_reference, target, transforms=None, inverse=False, *, n_threads=1, upstream_defects="fix")` → `Image`
 
@@ -79,7 +82,7 @@ level with an axis of no weights); the file is float32.
 
 | ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
 |---|---|---|---|---|
-| PIPE-20 | C (kept) | `DistortionParameters` turns a missing readout time or phase-encoding direction into undefined outputs, so the BOLD run is resampled without its field map although one is assigned to it (its documented design: "downstream interfaces should be prepared to handle this") | the same `None` outputs, and a `UserWarning` naming the missing value and `--fallback-total-readout-time` | the same outputs, no warning |
+| PIPE-20 | C for the interface, B for the pipeline | `DistortionParameters` turns a missing readout time or phase-encoding direction into undefined outputs (its documented design: "downstream interfaces should be prepared to handle this"), so the BOLD run is resampled without its field map although one is assigned to it, and fMRIPrep's report still names the correction | `distortion_parameters`: the same `None` outputs, and a `UserWarning` naming the missing value and `--fallback-total-readout-time`; larmorprepx's `bold_fit_fieldmap` and `resampling_fieldmap`: a `FieldmapMetadataError` with fMRIPrep's own message for a missing readout time ("Missing readout time information. See documentation for `--fallback-total-readout-time`.", the message fMRIPrep stops with when an estimator lacks one) | the same outputs, no warning; the larmorprepx functions resample without the field map, as fMRIPrep, with an `UpstreamDefectWarning` |
 | PIPE-21 | A | the direct evaluation returns the field on the target projected into the field map's space and made positive: the projected affine, and for a target with an axis against its world axis (a LAS BOLD reference) the voxels reversed along it, while `ResampleSeries` reads the field voxel for voxel on the target's grid: a mirrored field (a LAS target with the identity: up to 159 Hz from the field on the target's grid in `check_bold_steps.py`'s `synth`) | the same values on the target's grid: its voxel order and affine (equal to the resampled path's field) | fMRIPrep's image bit for bit |
 
 Only the direct path is affected; none of the earlier oracle runs' 28 nodes takes it (a
@@ -89,3 +92,72 @@ registration's rotation fails `aligned`): PIPE-21 changes nothing there.
 
 - A series of affines in `transforms` (a head-motion file) raises `ValueError`: it cannot place
   a field map (nitransforms would treat the series as one affine of the wrong shape).
+
+## larmorprepx: the field-map nodes of a BOLD run
+
+`larmorx.pipelines.larmorprepx.fieldmaps` composes the steps above as fMRIPrep 25.2.7's BOLD
+workflows wire them (`workflows/bold/fit.py`, `workflows/bold/apply.py`, `workflows/base.py`),
+plain functions with no graph: each node is a call of its larmorx port, in fMRIPrep's order, its
+files in a folder named as fMRIPrep's node. The steps before them (the estimators, the
+motion-correction reference, niworkflows' `init_enhance_and_skullstrip_bold_wf`) are the caller's
+until larmorx ports them.
+
+### `bold_fit_fieldmap(bold_file, metadata, fieldmap_id, estimates, hmc_boldref, coreg_ref, coreg_mask, *, out_dir, sbref_files=None, boldref2fmap_xfm=None, jacobian=False, fallback_total_readout_time=None, sloppy=False, debug=False, ants_random_seed=None, sink=None, fsl_implementation="auto", n_threads=1, upstream_defects="fix")` → `BoldFitFieldmapResult`
+
+`init_bold_fit_wf`'s stage 3 ("Register fieldmap to boldref and reconstruct in BOLD space") and
+stage 4's field-map branch, for a run with a field map:
+
+| Node (fMRIPrep) | larmorx | Inputs |
+|---|---|---|
+| `fmapref_buffer` (`_select_ref`) | `select_ref(sbref_files, hmc_boldref)` | the first single-band reference, else the motion-correction reference |
+| `fmap_select` (`KeySelect`) | `lx.niworkflows.key_select` | `estimates` (`FieldmapEstimates`: `fmap_id`, `fmap_ref`, `fmap_coeff`, `fmap_mask`, `sdc_method`) at `fieldmap_id` |
+| `fmapreg_wf` (sdcflows' `init_coeff2epi_wf`) | `lx.sdcflows.coeff2epi_workflow` | `coreg_ref`, `coreg_mask` (`init_enhance_and_skullstrip_bold_wf`'s `bias_corrected_file`, `mask_file`), the estimator's reference and mask; `sloppy`, `debug`, `ants_random_seed`; skipped when `boldref2fmap_xfm` is given ("Found fieldmap transform - skipping registration") |
+| `itk_mat2txt` (`ConcatenateXFMs(out_fmt='itk')`) | `lx.niworkflows.concatenate_xfms` | the registration's transform; then the `desc-fmap_xfm` derivative (`sink`) |
+| `boldref_fmap` (`ReconstructFieldmap(inverse=[True])`) | `lx.transforms.reconstruct_fieldmap_node` | the coefficients onto the reference of `fmapref_buffer` through the transform, inverted |
+| `distortion_params` (`DistortionParameters`) | `lx.transforms.distortion_parameters` | `metadata`, `bold_file`, `fallback_total_readout_time`; PIPE-20 at the pipeline level |
+| `unwarp_boldref` (`ResampleSeries(jacobian)`) | `lx.transforms.resample_series` | `coreg_ref` onto `fmapref_buffer`'s grid with the field map, written as `<coreg_ref>resampled`; then the `desc-coreg_boldref` derivative |
+| `skullstrip_bold_wf` | `lx.niworkflows.skullstrip_bold_workflow` | the coregistration reference; then the `desc-brain_mask` derivative |
+
+| Argument | fMRIPrep | Notes |
+|---|---|---|
+| `jacobian` | `init_bold_wf(jacobian=...)` | `fieldmap_jacobian(method, force, ignore)`: `--force fmap-jacobian` always, `--ignore fmap-jacobian` never, otherwise PEPOLAR only |
+| `fallback_total_readout_time` | `--fallback-total-readout-time` | `"estimated"` or a readout time in s |
+| `sloppy`, `debug` | `--sloppy`, `--debug fieldmaps` | sdcflows' testing registration settings; the registration's warped images |
+| `ants_random_seed` | `ANTS_RANDOM_SEED` (fMRIPrep's `--random-seed`) | unseeded, ANTs seeds its sampling from the clock |
+| `sink` | `DerivativesDataSink` | called with each `DerivativeRequest(role, in_file, source_file, entities, sources)` (`role`: `boldref2fmap_xfm`, `coreg_boldref`, `bold_mask`; `entities`: fMRIPrep's `desc`, `suffix`, `from`, `to`, `mode`, `extension`, `compress`, `dismiss_entities`); it returns the file the later nodes read, as fMRIPrep's later nodes read the derivative files. Without it they read the node files (the same data; the skull-stripping files then take the node file's name) |
+| `fsl_implementation` | | BET's and fslmaths' implementation (`auto`, `replica`, `original`) |
+| `n_threads` | `omp_nthreads` | the results do not depend on it (ANTs' registration gives its one-thread result) |
+| `out_dir` | the BOLD fit's folder | required: `fmapreg_wf/`, `itk_mat2txt/`, `boldref_fmap/`, `unwarp_boldref/`, `skullstrip_bold_wf/` |
+
+`BoldFitFieldmapResult`: `sdc_boldref`, `fmap_ref`, `fmap_coeff`, `fmap_mask`, `sdc_method` (the
+report's distortion-correction line), `boldref2fmap_xfm` (the file the later nodes read),
+`registration` and `itk_mat2txt` (`None` when the transform was given), `fieldmap`,
+`readout_time`, `pe_direction`, `unwarped_boldref`, `coreg_boldref`, `skullstrip`, `bold_mask`,
+`derivatives` (the requests).
+
+### `resampling_fieldmap(fieldmap_id, estimates, target_ref_file, boldref2fmap_xfm, metadata, in_file=None, boldref2target=None, *, fallback_total_readout_time=None, out_dir=None, n_threads=1, upstream_defects="fix")` → `ResamplingFieldmapResult`
+
+The field-map nodes of `init_bold_native_wf` (`boldref2target` `None`: the field map on the
+coregistration reference) and of each `init_bold_volumetric_resample_wf` (`bold_anat_wf`,
+`bold_std_wf`'s spaces: `boldref2target` the transforms from the BOLD reference to the target,
+`[boldref2anat]` or `[boldref2anat, anat2std]`; `target_ref_file` `gen_ref`'s grid):
+`fmap_select`, `distortion_params` (`in_file`: the raw BOLD in `bold_native_wf`, the minimally
+processed one in the resampling workflows), `fmap2target` (`[boldref2fmap_xfm, *boldref2target]`,
+nipype's `Merge`), `inverses` (`gen_inverses`: `[True, False, ...]`) and `boldref_fmap` /
+`fmap_recon` (written to `out_dir` when given). The result (`fmap_ref`, `fmap_coeff`,
+`transforms`, `inverse`, `fieldmap`, `out_file`, `readout_time`, `pe_direction`) feeds
+`lx.transforms.resample_series` (`fieldmap`, `ro_time`, `pe_dir`). fMRIPrep gives the resampling
+workflows no field map for a multi-echo run: the caller's rule.
+
+`FieldmapMetadataError` (a `ValueError`): no readout time or no phase-encoding direction for a run
+with a field map (PIPE-20, `upstream_defects="fix"`).
+
+Checked by `validation/investigations/sdcflows-fieldmap-b/check_bold_stage.py` (`fit`,
+`resampling`, `pipe20`) on the earlier oracle runs (ds002422, ds002603, ds005040, ds005454):
+`fmapref_buffer`, `fmap_select`, both dilated masks, `itk_mat2txt`, the three derivatives (through
+fMRIPrep's own `DerivativesDataSink` as the sink: names and files), `boldref_fmap`,
+`distortion_params`, `unwarp_boldref` and the 70 `skullstrip_bold_wf` files identical; the
+registration within 6.7e-13 of fMRIPrep's (its ANTs ran with 8 threads; its `"%g"` text identical);
+the 21 resampling workflows' `fmap_select`, `inverses`, `fmap2target`, `distortion_params` and
+field maps identical; PIPE-20's error, and `reproduce` = fMRIPrep's `ResampleSeries` without a
+readout time.

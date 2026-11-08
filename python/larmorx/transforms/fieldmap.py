@@ -34,7 +34,8 @@ Kept and documented (rule C): PIPE-20, ``DistortionParameters`` turns a missing 
 or phase-encoding direction (``KeyError``, ``ValueError``) into undefined outputs, and the
 BOLD run is then resampled without the field map although one is assigned to it (fMRIPrep's
 documented design: "downstream interfaces should be prepared to handle this"); larmorx gives
-``None`` as fMRIPrep and warns.
+``None`` as fMRIPrep and warns. The pipeline above it stops instead (rule B at the pipeline
+level: ``larmorx.pipelines.larmorprepx.fieldmaps``).
 
 nitransforms: Copyright (c) 2021 The NiPy developers; nibabel: Copyright (c) 2009-2019 Matthew
 Brett and the NiBabel developers. MIT License; the notices are in the NOTICE file of larmorx.

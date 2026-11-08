@@ -359,8 +359,8 @@ not the identity). fMRIPrep does not use this path.
 `resample_to_zooms` (`BSplineApprox`'s resize when a voxel size is below `zooms_min`) resamples
 with nitransforms' `Affine.apply`, which squeezes the target points and asserts that they are
 2-D: a new grid of one voxel (a field map whose whole extent is below `zooms_min`) raises a bare
-`AssertionError`, and the fit is not made. Found by the random-testing trial of 2026-11-08 (14
-cases; the smallest a 4 × 4 × 4 field map at 1 mm with `zooms_min` 4). **Rule A**: the voxel is
+`AssertionError`, and the fit is not made. Found by the random-testing trial of 2026-11-08 (10
+of its 14 differences; the smallest a 4 × 4 × 4 field map at 1 mm with `zooms_min` 4). **Rule A**: the voxel is
 resampled and the fit made (the coefficients' grids are the original image's), named;
 `reproduce` raises the bare `AssertionError`. fMRIPrep's field maps never meet it.
 

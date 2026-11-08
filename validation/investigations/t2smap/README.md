@@ -176,7 +176,11 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   curvefit, and loglin for ds003592) and 13 synthetic series (seeded; float32 and scaled int16,
   options and data types). `--libraries shared` runs the shared environment's tedana (numpy
   2.3.5, SciPy 1.15.3) against `LARMORX_TEDANA_LIBRARIES=shared`. Results (2026-11-08): 18 of 18
-  identical in the newest environment (logs `oracles/logs/t2smap-1-relay5a-stages-*.log`).
+  identical in both environments (logs `oracles/logs/t2smap-1-relay5a-stages-*.log`).
 - `check_parser.py`: tedana's parser in-process (`COLUMNS` per case) against `t2smap_parse`: 109
   cases (help at 19 widths, every argparse and `is_valid_file` error, abbreviations, `=` forms,
   short-option clusters, negative numbers, `--`): all identical.
+- `check_failures.py --t2smap <env>/bin/t2smap --replica <target>/release/larmorx-gpl --work
+  <dir>`: tedana's failure cases on tiny seeded echoes (TED-01, 02, 04, 10, 11, 12, 13 and three
+  clear errors of tedana's own): with `reproduce` the replica ends as tedana does (status, last
+  line of standard error), by default it names the defect. 11 cases, all as expected.

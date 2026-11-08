@@ -32,6 +32,9 @@ def make(d: Path) -> None:
     for i, te in enumerate([0.014, 0.030, 0.046]):
         sig = (s0 * np.exp(-te / t2))[..., None] * (1 + 0.02 * rng.standard_normal(shape))
         nb.Nifti1Image(sig.astype(np.float32), aff).to_filename(d / f"e{i + 1}.nii.gz")
+    nan1 = nb.load(d / "e1.nii.gz").get_fdata(dtype=np.float32)
+    nan1[2, 2, 1, 3] = np.nan  # TED-01: a NaN first-echo sample inside the mask
+    nb.Nifti1Image(nan1, aff).to_filename(d / "nan-e1.nii.gz")
     m = np.zeros(shape[:3], np.uint8)
     m[1:5, 1:5, :] = 1
     nb.Nifti1Image(m, aff).to_filename(d / "mask.nii.gz")
@@ -42,6 +45,7 @@ D3 = ["-d", "e1.nii.gz", "e2.nii.gz", "e3.nii.gz"]
 TE3 = ["-e", "0.014", "0.030", "0.046"]
 M = ["--mask", "mask.nii.gz"]
 CASES = [
+    ("TED-01", ["-d", "nan-e1.nii.gz", "e2.nii.gz", "e3.nii.gz", *TE3, *M]),
     ("TED-02", [*D3, *TE3, *M, "--exclude", "5"]),
     (None, [*D3, *TE3, *M, "--exclude", "6"]),
     ("TED-10", [*D3, "-e", "inf", "inf", "inf", *M]),

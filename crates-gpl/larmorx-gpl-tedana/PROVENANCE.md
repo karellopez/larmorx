@@ -57,7 +57,8 @@ order), and nibabel's choice of image class by extension and magic.
 - `check_stages.py`: tedana's own adaptive mask and fit (`make_adaptive_mask`, `fit_decay`,
   `fit_decay_ts` as they return) against the replica's (`LARMORX_UPSTREAM_DEFECTS=reproduce`), bit
   for bit, and the messages up to "Computing T2* map" line by line: 18 cases, all identical, in
-  the newest environment (tedana 26.0.3, numpy 2.5.4, SciPy 1.18.1) — fMRIPrep's four multi-echo
+  the newest environment (tedana 26.0.3, numpy 2.5.4, SciPy 1.18.1) and in the shared one (numpy
+  2.3.5, SciPy 1.15.3, with `LARMORX_TEDANA_LIBRARIES=shared`) — fMRIPrep's four multi-echo
   calls (ds003592 sub-280, ds000210 sub-02 rest and cuedSGT, ds000258 sub-21262; curvefit, and
   loglin for ds003592) and 13 synthetic cases (float32 and scaled int16 echoes, TEs in seconds and
   milliseconds, three and four echoes, `--fitmode ts` with both fits, every `--masktype`,
@@ -66,3 +67,5 @@ order), and nibabel's choice of image class by extension and magic.
 - `check_parser.py`: the command line against tedana's parser in-process: 109 cases (help at 19
   widths, every error argparse and `is_valid_file` give, abbreviations, `=` forms, clusters,
   negative numbers, `--`), all identical (exit status, standard output and error, values).
+- `check_failures.py`: 11 failure cases (the TED defects' and tedana's own clear errors): with
+  `reproduce` tedana's exit status and last line, by default the defect named.

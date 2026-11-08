@@ -408,7 +408,7 @@ fn neighbours(g: usize, shape: [usize; 3], out: &mut [(usize, usize, usize); 6])
     c
 }
 
-fn solve<D: NpFloat, G: NpFloat, W: NpFloat>(
+fn solve<D: NpFloat, G: NpFloat, W: Plain>(
     rw: &RandomWalker<'_, D>,
     prep: &Prepared,
     spacing: [G; 3],
@@ -608,10 +608,7 @@ fn solve<D: NpFloat, G: NpFloat, W: NpFloat>(
         Mode::CgJ => Some(diag.iter().map(|&d| W::from_f64(1.0).div(d)).collect()),
         Mode::Cg => None,
     };
-    let solved: Vec<(Vec<W>, usize, usize)> = rhs
-        .into_par_iter()
-        .map(|b| cg(&ell, minv.as_deref(), b, rw.tol))
-        .collect();
+    let solved = cg_lockstep(&ell, minv.as_deref(), rhs, rw.tol);
     let mut warnings = Vec::new();
     if solved.iter().any(|s| s.1 > 0) {
         warnings.push(RwWarning::NotConverged);
@@ -653,79 +650,296 @@ fn solve<D: NpFloat, G: NpFloat, W: NpFloat>(
     })
 }
 
-/// `y = A @ p` (`csr_matvecs`: each row's products added in the row's order, from +0).
-fn matvec<W: NpFloat>(a: &Ell<W>, p: &[W], y: &mut [W]) {
-    y.par_iter_mut()
-        .enumerate()
-        .with_min_len(2048)
-        .for_each(|(i, yi)| {
-            let mut sum = W::ZERO;
-            for t in 7 * i..7 * i + a.lens[i] as usize {
-                sum = sum.add(a.vals[t].mul(p[a.cols[t] as usize]));
+/// The float types of the system with IEEE arithmetic as Rust computes it: identical to SSE's
+/// except for the NaN a result gets (payload and sign), so the fast paths below compute with it
+/// and recompute every result that is a NaN with [`NpFloat`]'s exact rules.
+trait Plain: NpFloat {
+    /// `a + b` (IEEE).
+    fn fadd(self, b: Self) -> Self;
+    /// `a - b` (IEEE).
+    fn fsub(self, b: Self) -> Self;
+    /// `a * b` (IEEE).
+    fn fmul(self, b: Self) -> Self;
+}
+
+macro_rules! plain {
+    ($t:ty) => {
+        impl Plain for $t {
+            #[inline(always)]
+            fn fadd(self, b: Self) -> Self {
+                self + b
             }
-            *yi = sum;
+            #[inline(always)]
+            fn fsub(self, b: Self) -> Self {
+                self - b
+            }
+            #[inline(always)]
+            fn fmul(self, b: Self) -> Self {
+                self * b
+            }
+        }
+    };
+}
+plain!(f32);
+plain!(f64);
+
+/// The elements of one fast-path block of the vector updates.
+const BLOCK: usize = 256;
+/// The rows of one task of the products `A @ p`.
+const ROWS: usize = 2048;
+
+/// Row `i` of `A @ p` (`csr_matvecs`: the row's products added in its order, from +0). A NaN
+/// anywhere in the sum makes the sum a NaN, so a sum that is not a NaN met none and is SSE's.
+#[inline(always)]
+fn row<W: Plain>(vals: &[W], cols: &[u32], p: &[W]) -> W {
+    let mut s = W::ZERO;
+    for (&v, &c) in vals.iter().zip(cols) {
+        s = s.fadd(v.fmul(p[c as usize]));
+    }
+    if s.is_nan() {
+        let mut e = W::ZERO;
+        for (&v, &c) in vals.iter().zip(cols) {
+            e = e.add(v.mul(p[c as usize]));
+        }
+        return e;
+    }
+    s
+}
+
+/// Row `i` of `A @ p0` and `A @ p1` at once (the matrix read once).
+#[inline(always)]
+fn row2<W: Plain>(vals: &[W], cols: &[u32], p0: &[W], p1: &[W]) -> (W, W) {
+    let mut s0 = W::ZERO;
+    let mut s1 = W::ZERO;
+    for (&v, &c) in vals.iter().zip(cols) {
+        let c = c as usize;
+        s0 = s0.fadd(v.fmul(p0[c]));
+        s1 = s1.fadd(v.fmul(p1[c]));
+    }
+    if s0.is_nan() || s1.is_nan() {
+        return (row(vals, cols, p0), row(vals, cols, p1));
+    }
+    (s0, s1)
+}
+
+/// `y = A @ p`.
+fn matvec<W: Plain>(a: &Ell<W>, p: &[W], y: &mut [W]) {
+    y.par_chunks_mut(ROWS).enumerate().for_each(|(ci, ys)| {
+        for (j, yi) in ys.iter_mut().enumerate() {
+            let i = ci * ROWS + j;
+            let len = a.lens[i] as usize;
+            *yi = row(&a.vals[7 * i..7 * i + len], &a.cols[7 * i..7 * i + len], p);
+        }
+    });
+}
+
+/// `y0 = A @ p0` and `y1 = A @ p1` in one pass over the matrix.
+fn matvec2<W: Plain>(a: &Ell<W>, p0: &[W], p1: &[W], y0: &mut [W], y1: &mut [W]) {
+    y0.par_chunks_mut(ROWS)
+        .zip(y1.par_chunks_mut(ROWS))
+        .enumerate()
+        .for_each(|(ci, (c0, c1))| {
+            for (j, (o0, o1)) in c0.iter_mut().zip(c1.iter_mut()).enumerate() {
+                let i = ci * ROWS + j;
+                let len = a.lens[i] as usize;
+                let (v0, v1) = row2(
+                    &a.vals[7 * i..7 * i + len],
+                    &a.cols[7 * i..7 * i + len],
+                    p0,
+                    p1,
+                );
+                *o0 = v0;
+                *o1 = v1;
+            }
         });
 }
 
-/// SciPy's `cg(A, b, rtol=tol, atol=0, M=M)` from x0 = 0: the solution, `info` and the
-/// iterations run.
-fn cg<W: NpFloat>(a: &Ell<W>, minv: Option<&[W]>, b: Vec<W>, rtol: f64) -> (Vec<W>, usize, usize) {
-    let n = b.len();
-    let bnrm2 = W::np_dot(&b, &b).sqrt();
-    // _get_atol_rtol: max(float(atol), float(rtol) * float(b_norm)) with atol = 0.
-    let cand = rtol * bnrm2.to_f64();
-    let atol = if cand > 0.0 { cand } else { 0.0 };
-    if bnrm2 == W::ZERO {
-        return (b, 0, 0);
-    }
-    let maxiter = 10 * n;
-    // `norm(r) < atol`: numpy compares a float32 norm with the Python float in float32.
-    let atol_w = W::from_f64(atol);
-    let mut x = vec![W::ZERO; n];
-    let mut r = b;
-    let mut p = vec![W::ZERO; n];
-    let mut q = vec![W::ZERO; n];
-    let mut z = vec![W::ZERO; n];
-    let mut rho_prev = W::ZERO;
-    for iteration in 0..maxiter {
-        if W::np_dot(&r, &r).sqrt() < atol_w {
-            return (x, 0, iteration);
-        }
-        // z = psolve(r): the Jacobi preconditioner's `0 + m * r` (dia_matvec), or r itself.
-        let zr: &[W] = match minv {
-            Some(m) => {
-                z.par_iter_mut()
-                    .zip(m)
-                    .zip(&r)
-                    .with_min_len(8192)
-                    .for_each(|((zi, &mi), &ri)| *zi = W::ZERO.add(mi.mul(ri)));
-                &z
+/// `z = 0 + m * r` (`dia_matvec` of the Jacobi preconditioner).
+fn precondition<W: Plain>(m: &[W], r: &[W], z: &mut [W]) {
+    z.par_chunks_mut(BLOCK * 32)
+        .zip(m.par_chunks(BLOCK * 32))
+        .zip(r.par_chunks(BLOCK * 32))
+        .for_each(|((zs, ms), rs)| {
+            let mut nan = false;
+            for ((zi, &mi), &ri) in zs.iter_mut().zip(ms).zip(rs) {
+                let v = W::ZERO.fadd(mi.fmul(ri));
+                nan |= v.is_nan();
+                *zi = v;
             }
-            None => &r,
-        };
-        let rho_cur = W::np_dot(&r, zr);
-        if iteration > 0 {
-            let beta = rho_cur.div(rho_prev);
-            p.par_iter_mut()
-                .zip(zr)
-                .with_min_len(8192)
-                .for_each(|(pi, &zi)| *pi = pi.mul(beta).add(zi));
-        } else {
-            p.copy_from_slice(zr);
+            if nan {
+                for ((zi, &mi), &ri) in zs.iter_mut().zip(ms).zip(rs) {
+                    *zi = W::ZERO.add(mi.mul(ri));
+                }
+            }
+        });
+}
+
+/// `p = p * beta + z` (SciPy's `p *= beta; p += z`).
+fn update_p<W: Plain>(p: &mut [W], z: &[W], beta: W) {
+    p.par_chunks_mut(BLOCK * 32)
+        .zip(z.par_chunks(BLOCK * 32))
+        .for_each(|(ps, zs)| {
+            for (pb, zb) in ps.chunks_mut(BLOCK).zip(zs.chunks(BLOCK)) {
+                let mut t = [W::ZERO; BLOCK];
+                let mut nan = false;
+                for ((ti, &pi), &zi) in t.iter_mut().zip(pb.iter()).zip(zb) {
+                    *ti = pi.fmul(beta).fadd(zi);
+                    nan |= ti.is_nan();
+                }
+                if nan {
+                    for ((ti, &pi), &zi) in t.iter_mut().zip(pb.iter()).zip(zb) {
+                        *ti = pi.mul(beta).add(zi);
+                    }
+                }
+                pb.copy_from_slice(&t[..pb.len()]);
+            }
+        });
+}
+
+/// `x += alpha * p` and `r -= alpha * q` (SciPy's `axpy` calls), in one pass.
+fn update_xr<W: Plain>(x: &mut [W], r: &mut [W], p: &[W], q: &[W], alpha: W) {
+    x.par_chunks_mut(BLOCK * 32)
+        .zip(r.par_chunks_mut(BLOCK * 32))
+        .zip(p.par_chunks(BLOCK * 32))
+        .zip(q.par_chunks(BLOCK * 32))
+        .for_each(|(((xs, rs), ps), qs)| {
+            for (((xb, rb), pb), qb) in xs
+                .chunks_mut(BLOCK)
+                .zip(rs.chunks_mut(BLOCK))
+                .zip(ps.chunks(BLOCK))
+                .zip(qs.chunks(BLOCK))
+            {
+                let mut tx = [W::ZERO; BLOCK];
+                let mut tr = [W::ZERO; BLOCK];
+                let mut nan = false;
+                for k in 0..xb.len() {
+                    tx[k] = xb[k].fadd(alpha.fmul(pb[k]));
+                    tr[k] = rb[k].fsub(alpha.fmul(qb[k]));
+                    nan |= tx[k].is_nan() | tr[k].is_nan();
+                }
+                if nan {
+                    for k in 0..xb.len() {
+                        tx[k] = xb[k].add(alpha.mul(pb[k]));
+                        tr[k] = rb[k].sub(alpha.mul(qb[k]));
+                    }
+                }
+                xb.copy_from_slice(&tx[..xb.len()]);
+                rb.copy_from_slice(&tr[..rb.len()]);
+            }
+        });
+}
+
+/// One label's conjugate-gradient state.
+struct Cg<W> {
+    x: Vec<W>,
+    r: Vec<W>,
+    p: Vec<W>,
+    q: Vec<W>,
+    z: Vec<W>,
+    atol: W,
+    rho_prev: W,
+    rho_cur: W,
+    /// `(info, iterations)` once it has stopped.
+    done: Option<(usize, usize)>,
+}
+
+/// SciPy's `cg(A, b, rtol=tol, atol=0, M=M)` from x0 = 0 for every label's right-hand side: the
+/// solutions, `info` and the iterations run. The labels' systems run in lockstep, so each
+/// product with `A` reads the matrix once for two labels; every label's arithmetic is SciPy's,
+/// in SciPy's order, and stops at its own iteration.
+fn cg_lockstep<W: Plain>(
+    a: &Ell<W>,
+    minv: Option<&[W]>,
+    bs: Vec<Vec<W>>,
+    rtol: f64,
+) -> Vec<(Vec<W>, usize, usize)> {
+    let mut st: Vec<Cg<W>> = bs
+        .into_iter()
+        .map(|b| {
+            let n = b.len();
+            let bnrm2 = W::np_dot(&b, &b).sqrt();
+            // _get_atol_rtol: max(float(atol), float(rtol) * float(b_norm)) with atol = 0.
+            let cand = rtol * bnrm2.to_f64();
+            let atol = if cand > 0.0 { cand } else { 0.0 };
+            let done = if bnrm2 == W::ZERO { Some((0, 0)) } else { None };
+            // the solution of a zero right-hand side is `b` itself (SciPy returns it)
+            let (x, r) = if done.is_some() {
+                (b, Vec::new())
+            } else {
+                (vec![W::ZERO; n], b)
+            };
+            let m = if done.is_some() { 0 } else { n };
+            Cg {
+                x,
+                r,
+                p: vec![W::ZERO; m],
+                q: vec![W::ZERO; m],
+                z: if minv.is_some() {
+                    vec![W::ZERO; m]
+                } else {
+                    Vec::new()
+                },
+                // `norm(r) < atol`: numpy compares a float32 norm with the Python float in
+                // float32.
+                atol: W::from_f64(atol),
+                rho_prev: W::ZERO,
+                rho_cur: W::ZERO,
+                done,
+            }
+        })
+        .collect();
+    let n = a.lens.len();
+    let maxiter = 10 * n;
+    for iteration in 0..maxiter {
+        for s in st.iter_mut().filter(|s| s.done.is_none()) {
+            if W::np_dot(&s.r, &s.r).sqrt() < s.atol {
+                s.done = Some((0, iteration));
+                continue;
+            }
+            // z = psolve(r): the Jacobi preconditioner's `0 + m * r`, or r itself.
+            let rho_cur = match minv {
+                Some(m) => {
+                    precondition(m, &s.r, &mut s.z);
+                    W::np_dot(&s.r, &s.z)
+                }
+                None => W::np_dot(&s.r, &s.r),
+            };
+            let zr: &[W] = if minv.is_some() { &s.z } else { &s.r };
+            if iteration > 0 {
+                let beta = rho_cur.div(s.rho_prev);
+                update_p(&mut s.p, zr, beta);
+            } else {
+                s.p.copy_from_slice(zr);
+            }
+            s.rho_cur = rho_cur;
         }
-        matvec(a, &p, &mut q);
-        let alpha = rho_cur.div(W::np_dot(&p, &q));
-        x.par_iter_mut()
-            .zip(&p)
-            .with_min_len(8192)
-            .for_each(|(xi, &pi)| *xi = xi.add(alpha.mul(pi)));
-        r.par_iter_mut()
-            .zip(&q)
-            .with_min_len(8192)
-            .for_each(|(ri, &qi)| *ri = ri.sub(alpha.mul(qi)));
-        rho_prev = rho_cur;
+        let active: Vec<usize> = (0..st.len()).filter(|&i| st[i].done.is_none()).collect();
+        if active.is_empty() {
+            break;
+        }
+        for pair in active.chunks(2) {
+            if let [i, j] = *pair {
+                let (lo, hi) = st.split_at_mut(j);
+                let (si, sj) = (&mut lo[i], &mut hi[0]);
+                matvec2(a, &si.p, &sj.p, &mut si.q, &mut sj.q);
+            } else {
+                let s = &mut st[pair[0]];
+                matvec(a, &s.p, &mut s.q);
+            }
+        }
+        for &i in &active {
+            let s = &mut st[i];
+            let alpha = s.rho_cur.div(W::np_dot(&s.p, &s.q));
+            update_xr(&mut s.x, &mut s.r, &s.p, &s.q, alpha);
+            s.rho_prev = s.rho_cur;
+        }
     }
-    (x, maxiter, maxiter)
+    st.into_iter()
+        .map(|s| {
+            let (info, its) = s.done.unwrap_or((maxiter, maxiter));
+            (s.x, info, its)
+        })
+        .collect()
 }
 
 #[cfg(test)]

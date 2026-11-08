@@ -34,6 +34,9 @@ Rust (``larmorx-sdcflows``):
 - :func:`brain_masker`, :func:`brain_extraction`, :func:`binary_dilation`, :func:`union`:
   sdcflows' masks (``brain_masker``, ``BrainExtraction``, ``BinaryDilation``, ``Union``), with
   scikit-image's random walker (:mod:`larmorx.skimage`).
+- :func:`brainextraction_workflow`, :func:`magnitude_workflow`, :func:`fmap_workflow`:
+  ``init_brainextraction_wf``, ``init_magnitude_wf`` and ``init_fmap_wf`` (phase difference
+  and direct field maps) as plain functions, each node through larmorx's ports.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -89,6 +92,14 @@ from larmorx.sdcflows.transform import (
     apply_coeffs_field,
     deoblique_and_zooms,
 )
+from larmorx.sdcflows.workflows import (
+    BrainExtractionWorkflowResult,
+    FmapWorkflowResult,
+    MagnitudeWorkflowResult,
+    brainextraction_workflow,
+    fmap_workflow,
+    magnitude_workflow,
+)
 
 __all__ = [
     "DEFAULT_HF_ZOOMS_MM",
@@ -98,11 +109,14 @@ __all__ = [
     "ApplyCoeffsFieldResult",
     "B0FieldTransform",
     "BSplineApproxResult",
+    "BrainExtractionWorkflowResult",
     "BrainMaskerResult",
     "CheckRegisterResult",
     "CoefficientsResult",
     "CsrMatrix",
     "DisplacementsResult",
+    "FmapWorkflowResult",
+    "MagnitudeWorkflowResult",
     "PhaseResult",
     "PhdiffWorkflowResult",
     "RidgeResult",
@@ -111,6 +125,7 @@ __all__ = [
     "binary_dilation",
     "brain_extraction",
     "brain_masker",
+    "brainextraction_workflow",
     "bspline_approx",
     "bspline_grid",
     "check_b0_units",
@@ -121,7 +136,9 @@ __all__ = [
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
     "fmap_to_disp",
+    "fmap_workflow",
     "grid_bspline_weights",
+    "magnitude_workflow",
     "phdiff2fmap",
     "phdiff_workflow",
     "reorient_pedir",

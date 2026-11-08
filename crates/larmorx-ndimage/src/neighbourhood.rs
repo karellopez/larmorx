@@ -182,6 +182,48 @@ impl Neighbourhood {
         self.rel.len()
     }
 
+    /// The elements that stay inside the array on every axis but the last at the line through
+    /// `p` (constant modes): their relative offsets (`rel`) and displacements along the last axis
+    /// (`dx`), in the footprint's order; returns whether any element falls outside on those axes.
+    pub(crate) fn line_elements(
+        &self,
+        p: &[usize],
+        rel: &mut Vec<isize>,
+        dx: &mut Vec<isize>,
+    ) -> bool {
+        rel.clear();
+        dx.clear();
+        let last = self.ndim - 1;
+        let mut outside = false;
+        for e in 0..self.rel.len() {
+            let k = &self.elems[e * self.ndim..(e + 1) * self.ndim];
+            let inside = (0..last).all(|d| {
+                let c = p[d] as isize + k[d] as isize - self.centre[d];
+                c >= 0 && c < self.shape[d] as isize
+            });
+            if inside {
+                rel.push(self.rel[e]);
+                dx.push(k[last] as isize - self.centre[last]);
+            } else {
+                outside = true;
+            }
+        }
+        outside
+    }
+
+    /// The input offset of position `p`.
+    #[inline]
+    pub(crate) fn base(&self, p: &[usize]) -> usize {
+        p.iter().zip(&self.strides).map(|(i, s)| i * s).sum()
+    }
+
+    /// Every true element's offset relative to the position, in the footprint's order (valid
+    /// where [`Neighbourhood::interior`] holds).
+    #[inline]
+    pub(crate) fn relative(&self) -> &[isize] {
+        &self.rel
+    }
+
     /// Whether the footprint around `p` stays inside the array on every axis.
     #[inline]
     pub(crate) fn interior(&self, p: &[usize]) -> bool {
@@ -197,7 +239,7 @@ impl Neighbourhood {
     #[inline]
     pub(crate) fn offsets(&self, p: &[usize], out: &mut [usize]) {
         if self.interior(p) {
-            let base: usize = p.iter().zip(&self.strides).map(|(i, s)| i * s).sum();
+            let base = self.base(p);
             for (o, &r) in out.iter_mut().zip(&self.rel) {
                 *o = (base as isize + r) as usize;
             }

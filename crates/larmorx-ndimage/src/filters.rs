@@ -129,33 +129,54 @@ pub fn min_or_max_filter<T: NdElement, O: NdElement>(
         &mut out,
         || vec![0usize; n],
         |p, o, offs| {
-            nb.offsets(p, offs);
-            let read = |e: usize| {
-                let off = offs[e];
-                if off == BORDER { cv } else { input[off] }
+            let res = if nb.interior(p) {
+                let base = nb.base(p) as isize;
+                let rel = nb.relative();
+                extreme(n, ss.as_deref(), minimum, |e| {
+                    input[(base + rel[e]) as usize]
+                })
+            } else {
+                nb.offsets(p, offs);
+                extreme(n, ss.as_deref(), minimum, |e| {
+                    let off = offs[e];
+                    if off == BORDER { cv } else { input[off] }
+                })
             };
-            let mut res = read(0).to_f64();
-            if let Some(ss) = &ss {
-                res = larmorx_core::numpy::NpFloat::add(res, ss[0]);
-            }
-            for e in 1..n {
-                let mut tmp = read(e);
-                if let Some(ss) = &ss {
-                    tmp = tmp.add_cast(ss[e]);
-                }
-                let t = tmp.to_f64();
-                if minimum {
-                    if t < res {
-                        res = t;
-                    }
-                } else if t > res {
-                    res = t;
-                }
-            }
             *o = O::from_f64_safe(res);
         },
     );
     Ok(out)
+}
+
+/// `NI_MinOrMaxFilter`'s value at one position from the footprint's `n` elements (`get(e)`), in
+/// the footprint's order (the module's rules: a double running result, the structure's values
+/// added).
+#[inline(always)]
+fn extreme<T: NdElement>(
+    n: usize,
+    ss: Option<&[f64]>,
+    minimum: bool,
+    get: impl Fn(usize) -> T,
+) -> f64 {
+    let mut res = get(0).to_f64();
+    if let Some(ss) = ss {
+        res = larmorx_core::numpy::NpFloat::add(res, ss[0]);
+    }
+    for e in 1..n {
+        let mut tmp = get(e);
+        if let Some(ss) = ss {
+            tmp = tmp.add_cast(ss[e]);
+        }
+        let t = tmp.to_f64();
+        if minimum {
+            if t < res {
+                res = t;
+            }
+        } else if t > res {
+            res = t;
+        }
+    }
+    res
 }
 
 /// `NI_ExtendLine`: the line's `size_before` and `size_after` extensions in `buffer` (the line
@@ -444,13 +465,20 @@ pub fn rank_filter<T: NdElement, O: NdElement>(
         &mut out,
         || (vec![0usize; n], vec![0.0f64; n]),
         |p, o, (offs, buf)| {
-            nb.offsets(p, offs);
-            for (b, &off) in buf.iter_mut().zip(offs.iter()) {
-                *b = if off == BORDER {
-                    cv
-                } else {
-                    input[off].to_f64()
-                };
+            if nb.interior(p) {
+                let base = nb.base(p) as isize;
+                for (b, &r) in buf.iter_mut().zip(nb.relative()) {
+                    *b = input[(base + r) as usize].to_f64();
+                }
+            } else {
+                nb.offsets(p, offs);
+                for (b, &off) in buf.iter_mut().zip(offs.iter()) {
+                    *b = if off == BORDER {
+                        cv
+                    } else {
+                        input[off].to_f64()
+                    };
+                }
             }
             let v = T::from_f64(ni_select(buf, 0, n - 1, rank));
             *o = O::from_f64_safe(v.to_f64());

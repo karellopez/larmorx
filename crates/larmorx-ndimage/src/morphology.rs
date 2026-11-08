@@ -16,8 +16,27 @@
 
 use rayon::prelude::*;
 
-use crate::neighbourhood::{BORDER, Neighbourhood};
+use crate::neighbourhood::Neighbourhood;
 use crate::{Extend, Footprint, Layout, NdElement, NdimageError, c_strides, unravel};
+
+/// The top bit of every byte of a 64-bit word.
+const LANES_HI: u64 = 0x8080_8080_8080_8080;
+/// The low seven bits of every byte.
+const LANES_LO7: u64 = 0x7f7f_7f7f_7f7f_7f7f;
+
+/// The top bit of each byte of `w` set where that byte is not zero.
+#[inline(always)]
+fn nonzero_lanes(w: u64) -> u64 {
+    (((w & LANES_LO7).wrapping_add(LANES_LO7)) | w) & LANES_HI
+}
+
+/// The eight bytes at `at` as a little-endian word (byte `k` in bits `8k..8k + 8`).
+#[inline(always)]
+fn word(bytes: &[u8], at: usize) -> u64 {
+    let mut a = [0u8; 8];
+    a.copy_from_slice(&bytes[at..at + 8]);
+    u64::from_le_bytes(a)
+}
 
 /// The truth of a mask element as `NI_BinaryErosion2` reads it: the mask cast to `int8`
 /// (`np.asarray(mask, dtype=np.int8)`), so `0.5` or `256` are false there although true in the
@@ -97,11 +116,22 @@ pub fn center_is_true(structure: &Footprint, origins: &[isize]) -> Result<bool, 
 /// One pass of `NI_BinaryErosion` from `read(offset)` (the input's truth at an input offset)
 /// into a C-ordered 0/1 output; returns whether any element changed and, when `list`, the
 /// C-order positions of those that did.
+///
+/// The value is the logical AND (or, with `invert`, the NOR) of the structure's elements, so it
+/// does not depend on the order they are read in; the scan stops at the first element that
+/// decides it, as SciPy's does. Each line along the last axis is prepared once: the structure's
+/// elements that stay inside the array on the other axes (their offsets and their displacement
+/// along the line), and whether any element falls outside on those axes (with a false border
+/// value, that decides every position of the line). With the input's bytes (`bytes`: a one-byte
+/// type, its last axis contiguous) and no mask, eight consecutive positions are decided at once,
+/// each element read as one 64-bit word whose bytes are the eight positions' (the same logical
+/// value per position).
 #[allow(clippy::too_many_arguments)]
-fn pass(
+fn pass<R: Fn(usize) -> bool + Sync>(
     layout: &Layout,
     nb: &Neighbourhood,
-    read: &(dyn Fn(usize) -> bool + Sync),
+    read: &R,
+    bytes: Option<&[u8]>,
     mask: Option<&(dyn Fn(&[usize]) -> bool + Sync)>,
     border_value: bool,
     invert: bool,
@@ -114,44 +144,122 @@ fn pass(
     let ndim = layout.ndim();
     let n = nb.len();
     let shape = &layout.shape;
-    let line = if ndim == 0 { 1 } else { shape[ndim - 1] };
+    if ndim == 0 {
+        // a 0-D array: its one element and the structure's one element (itself)
+        let here = 0;
+        let inp = u8::from(read(here));
+        let msk = mask.is_none_or(|m| m(&[]));
+        let v = if !msk || (cit && inp == f) {
+            inp
+        } else if n > 0 && read(here) == invert {
+            f
+        } else {
+            t
+        };
+        out[0] = v;
+        let ch = v != inp;
+        return (ch, if ch && list { vec![0] } else { Vec::new() });
+    }
+    let last = ndim - 1;
+    let line = shape[last];
+    let nx = line as isize;
+    let fast = bytes.is_some() && mask.is_none() && layout.strides[last] == 1;
     let results: Vec<(bool, Vec<usize>)> = out
         .par_chunks_mut(line.max(1))
         .enumerate()
         .map_init(
-            || (vec![0usize; n], vec![0usize; ndim]),
-            |(offs, p), (li, chunk)| {
+            || {
+                (
+                    Vec::<isize>::with_capacity(n),
+                    Vec::<isize>::with_capacity(n),
+                    vec![0usize; ndim],
+                )
+            },
+            |(lrel, ldx, p), (li, chunk)| {
                 let mut changed = false;
                 let mut changes = Vec::new();
-                if ndim > 0 {
-                    unravel(li * line, shape, p);
-                }
-                for (j, o) in chunk.iter_mut().enumerate() {
-                    if ndim > 0 {
-                        p[ndim - 1] = j;
-                    }
-                    let here = layout.offset(p);
-                    let inp = u8::from(read(here));
-                    let msk = mask.is_none_or(|m| m(p));
-                    let (value, ch) = if !msk {
-                        (inp, false)
-                    } else if cit && inp == f {
-                        (inp, false)
-                    } else {
-                        nb.offsets(p, offs);
-                        let mut v = t;
-                        for &off in offs.iter() {
-                            if off == BORDER {
-                                if !bdr {
-                                    v = f;
+                unravel(li * line, shape, p);
+                let out_other = nb.line_elements(p, lrel, ldx);
+                // every position of the line not kept by the mask or the centre is the eroded
+                // value
+                let decided = out_other && !bdr;
+                let (min_dx, max_dx) = (
+                    ldx.iter().copied().min().unwrap_or(0),
+                    ldx.iter().copied().max().unwrap_or(0),
+                );
+                // [xa, xb): the positions whose elements all stay inside along the line
+                let xa = (-min_dx).max(0).min(nx) as usize;
+                let xb = (nx - max_dx.max(0)).max(xa as isize) as usize;
+                let blk = if fast && !decided && xb >= xa + 8 {
+                    xa + (xb - xa) / 8 * 8
+                } else {
+                    xa
+                };
+                if let Some(bytes) = bytes
+                    && blk > xa
+                {
+                    for j in (xa..blk).step_by(8) {
+                        p[last] = j;
+                        let here = layout.offset(p);
+                        let mut acc = if invert { 0 } else { LANES_HI };
+                        for &r in lrel.iter() {
+                            let w = nonzero_lanes(word(bytes, (here as isize + r) as usize));
+                            if invert {
+                                acc |= w;
+                                if acc == LANES_HI {
                                     break;
                                 }
                             } else {
-                                let nn = if read(off) { t } else { f };
-                                if nn == 0 {
-                                    v = f;
+                                acc &= w;
+                                if acc == 0 {
                                     break;
                                 }
+                            }
+                        }
+                        let inp = nonzero_lanes(word(bytes, here));
+                        for k in 0..8 {
+                            let v = ((acc >> (8 * k + 7)) & 1) as u8;
+                            chunk[j + k] = v;
+                            if v != ((inp >> (8 * k + 7)) & 1) as u8 {
+                                changed = true;
+                                if list {
+                                    changes.push(li * line + j + k);
+                                }
+                            }
+                        }
+                    }
+                }
+                let blocked = !changes.is_empty();
+                for (j, o) in chunk.iter_mut().enumerate() {
+                    if j >= xa && j < blk {
+                        continue;
+                    }
+                    p[last] = j;
+                    let here = layout.offset(p);
+                    let inp = u8::from(read(here));
+                    let msk = mask.is_none_or(|m| m(p));
+                    let (value, ch) = if !msk || (cit && inp == f) {
+                        (inp, false)
+                    } else if decided {
+                        (f, f != inp)
+                    } else {
+                        let x = j as isize;
+                        let inside = j >= xa && j < xb;
+                        let mut v = t;
+                        for (&r, &dx) in lrel.iter().zip(ldx.iter()) {
+                            if !inside {
+                                let xx = x + dx;
+                                if xx < 0 || xx >= nx {
+                                    if !bdr {
+                                        v = f;
+                                        break;
+                                    }
+                                    continue;
+                                }
+                            }
+                            if read((here as isize + r) as usize) == invert {
+                                v = f;
+                                break;
                             }
                         }
                         (v, v != inp)
@@ -163,6 +271,10 @@ fn pass(
                             changes.push(li * line + j);
                         }
                     }
+                }
+                if blocked {
+                    // the positions in increasing order, as one position at a time gives them
+                    changes.sort_unstable();
                 }
                 (changed, changes)
             },
@@ -239,6 +351,7 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
             layout,
             &nb,
             &read_in,
+            T::as_bytes(input),
             mask_at.as_deref(),
             args.border_value,
             args.invert,
@@ -253,6 +366,7 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
             layout,
             &nb,
             &read_in,
+            T::as_bytes(input),
             mask_at.as_deref(),
             args.border_value,
             args.invert,
@@ -284,6 +398,7 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
         layout,
         &nb,
         &read_in,
+        T::as_bytes(input),
         mask_at.as_deref(),
         args.border_value,
         args.invert,
@@ -301,6 +416,7 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
             &out_layout,
             &nb_out,
             &read_prev,
+            Some(&prev),
             mask_at.as_deref(),
             args.border_value,
             args.invert,

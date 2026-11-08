@@ -297,11 +297,21 @@ pub trait NdElement: Copy + Send + Sync + PartialOrd + Default + 'static {
     /// the type (integer promotion and truncation for the narrow integers, wrapping for the
     /// wide ones).
     fn add_cast(self, s: f64) -> Self;
+    /// The values as bytes when the type is `u8` (numpy's `bool` and `uint8`): the binary
+    /// operations then decide eight positions at once.
+    fn as_bytes(values: &[Self]) -> Option<&[u8]> {
+        let _ = values;
+        None
+    }
 }
 
 macro_rules! narrow_int {
     ($t:ty, $unsigned:expr) => {
+        narrow_int!($t, $unsigned, {});
+    };
+    ($t:ty, $unsigned:expr, { $($extra:tt)* }) => {
         impl NdElement for $t {
+            $($extra)*
             #[inline]
             fn nonzero(self) -> bool {
                 self != 0
@@ -330,7 +340,12 @@ macro_rules! narrow_int {
     };
 }
 
-narrow_int!(u8, true);
+narrow_int!(u8, true, {
+    #[inline]
+    fn as_bytes(values: &[Self]) -> Option<&[u8]> {
+        Some(values)
+    }
+});
 narrow_int!(i8, false);
 narrow_int!(u16, true);
 narrow_int!(i16, false);

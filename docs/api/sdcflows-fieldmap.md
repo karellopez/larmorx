@@ -202,9 +202,26 @@ out_corrected, out_field)`.
 | `check_register(mag_files, fmap_files, rot_thresh=0.02, trans_thresh=1.0, *, out_dir=None)` → `CheckRegisterResult(mag_files, fmap_files)` | `CheckRegister` (`_check_gross_geometry`, `_conform_img`) | "Images have shape mismatch: …", "Images have orientation mismatch: …" (logged as critical, raised as `ValueError`); images whose affine differs from the first magnitude's are rewritten with it ("Copying affine to …"). **Two magnitudes with different affines** need FreeSurfer's `mri_robust_register`: `NotImplementedError` until the FreeSurfer part (no oracle run reaches it) |
 | `phdiff_workflow(magnitude, phase, phase_meta, mask, *, out_dir=None, prelude_implementation="auto", n_threads=1, upstream_defects="fix")` → `PhdiffWorkflowResult(rads, phase_diff, unwrapped, fieldmap)` | `workflows/fit/fieldmap.py: init_phdiff_wf`: `PhaseMap2rads` per map, `SubtractPhases`, FSL's PRELUDE (nipype), `Phasediff2Fieldmap` | PRELUDE through `lx.fsl.prelude` (`prelude_implementation`: `"auto"`, `"original"`, `"replica"`); its output written as `<phase>_unwrapped` |
 
-`init_fmap_wf` (the whole estimator: magnitude preparation, brain mask, the fit) needs part B's
-magnitude preparation and masks; until then `phdiff_workflow` and `bspline_approx` take the
-magnitude reference and mask as inputs.
+## The brain-extraction, magnitude and field-map workflows (part B)
+
+sdcflows' graphs as plain functions (`python/larmorx/sdcflows/workflows.py`): each node runs
+as nipype runs it, writes its files where nipype's node folder holds them under `out_dir`
+(without it, a temporary folder: only the images are returned) and the next node reads them
+back. `numpy_version` and `scipy_version` select the libraries' arithmetic where their releases
+differ (`IntensityClip`'s and `brain_masker`'s percentiles, numpy 2.2's buffered sums, the
+random walker's row order; fMRIPrep 25.2.6's image: `"2.2.6"`, `"1.15.2"`); `upstream_defects`
+reaches every node (by default ANTs' N4 leaves the clipped image's zero background out of its
+fit: ANTS-40); `n_threads` never changes a result.
+
+| larmorx | sdcflows | Nodes (folders) and outputs |
+|---|---|---|
+| `brainextraction_workflow(in_file, bspline_dist=None, *, out_dir=None, numpy_version, scipy_version, upstream_defects="fix", n_threads=1)` → `BrainExtractionWorkflowResult` | `ancillary.init_brainextraction_wf` (`inputnode.bspline_dist`) | `clipper_pre` (`IntensityClip()`), `n4` (`N4BiasFieldCorrection -d 3 --convergence [ 50x50x50x50x50, 1e-07 ] --shrink-factor 4`, `--bspline-fitting [ %g ]` with `bspline_dist`; nipype's `copy_header`: ANTs' values in the input's header and stored type), `clipper_post` (`IntensityClip(p_min=0.01, p_max=99.9)`), `masker` (`BrainExtraction`); `out_file`, `out_brain`, `out_mask`, `out_probseg` |
+| `magnitude_workflow(magnitude, *, out_dir=None, ...)` → `MagnitudeWorkflowResult` | `fit/fieldmap.py: init_magnitude_wf` | `magmrg` (`IntraModalMerge(hmc=False, to_ras=False)`: `lx.niworkflows.intra_modal_merge`), `brainextraction_wf`; `fmap_ref`, `fmap_mask`, `fmap_probseg` |
+| `fmap_workflow(magnitude, fieldmap, mode="phasediff", *, sloppy=False, debug=False, out_dir=None, numpy_version, scipy_version, prelude_implementation="auto", upstream_defects="fix", n_threads=1)` → `FmapWorkflowResult` | `fit/fieldmap.py: init_fmap_wf(sloppy, debug, mode)` (`inputnode.magnitude`, `inputnode.fieldmap`: `(path, metadata)` pairs) | `check_register`, `magnitude_wf`; `"phasediff"`: `phdiff_wf` (`phdiff_workflow`, PRELUDE's file named `<phase>_unwrapped.nii.gz` as nipype's FSL output type gives it); any other mode (sdcflows' direct branch): `fmapmrg` (`IntraModalMerge(zero_based_avg=False, hmc=False, to_ras=False)`), `units` (`CheckB0Units` with the first map's `Units`: `KeyError('Units')` without); `bs_filter` (`BSplineApprox(bs_spacing=[(16, 16, 10)], extrapolate=not debug, zooms_min=4 if sloppy)` in `fmap_mask`); `fmap` (the extrapolated field; the fit in `debug`), `fmap_ref`, `fmap_mask`, `fmap_coeff`, `method` |
+
+Checked node file by node file against sdcflows' own nipype graphs (`upstream_defects="reproduce"`;
+ANTs' N4 at one thread with correctly rounded maths and FSL's PRELUDE through the oracle cache):
+`validation/investigations/sdcflows-fieldmap-b/check_workflows.py`.
 
 ## Upstream defects (D13)
 

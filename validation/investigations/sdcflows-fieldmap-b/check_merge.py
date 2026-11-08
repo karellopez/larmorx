@@ -555,7 +555,8 @@ def magmrg_nodes() -> list[Path]:
         out += sorted(
             run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/magnitude_wf/magmrg")
         )
-    return out
+    # finished nodes only (a run still going is skipped)
+    return [n for n in out if (n / "result_magmrg.pklz").exists()]
 
 
 def bids_root(node: Path) -> Path:

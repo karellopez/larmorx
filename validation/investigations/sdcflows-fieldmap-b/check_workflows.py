@@ -176,12 +176,14 @@ def compare_tree(t: Tally, label: str, ref_root: Path, mine_root: Path, what: st
 
 
 def bx_nodes() -> list[Path]:
+    """The finished ``brainextraction_wf`` nodes of the oracle runs (a run still going is
+    skipped: its ``masker`` has no result yet)."""
     out = []
     for run in sorted(RUNS.iterdir()):
         base = "work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*"
         out += sorted(run.glob(f"{base}/brainextraction_wf"))
         out += sorted(run.glob(f"{base}/magnitude_wf/brainextraction_wf"))
-    return out
+    return [n for n in out if (n / "masker" / "result_masker.pklz").exists()]
 
 
 def node_inputs(node: Path) -> dict[str, str]:
@@ -240,6 +242,12 @@ def phasediff_estimators() -> list[tuple[str, list[str], list[str], list[dict]]]
         for chk in sorted(
             run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/check_register")
         ):
+            # phase-difference estimators whose fit has finished (direct maps: no calc_phdiff)
+            calc = chk.parent / "phdiff_wf" / "calc_phdiff" / "_report" / "report.rst"
+            if not (
+                calc.exists() and (chk.parent / "bs_filter" / "result_bs_filter.pklz").exists()
+            ):
+                continue
             inputs = node_inputs(chk)
             meta = ast.literal_eval(
                 node_inputs(chk.parent / "phdiff_wf" / "calc_phdiff")["in_meta"]

@@ -314,11 +314,12 @@ impl Basis {
             .collect();
         let r = settings.resampler;
         let names = ["d/d(th1)", "d/d(th2)", "d/d(th3)", "d/dx", "d/dy", "d/dz"];
-        // Each derivative image from its two resamplings, trimmed at once: at most two full
-        // volumes per derivative in flight.
+        // Each derivative image from its two resamplings (parallel inside), trimmed at once:
+        // one derivative at a time, so at most two full volumes in flight.
+        let mut work = Work::default();
         let derivatives: Vec<(Vec<f32>, f32, f32)> = (0..6)
-            .into_par_iter()
-            .map_init(Work::default, |work, p| {
+            .map(|p| {
+                let work = &mut work;
                 let (plus_tf, minus_tf) = &tfs[p];
                 let mut plus = vec![0f32; total];
                 r.apply(base, n, sizes, plus_tf, &mut plus, work);

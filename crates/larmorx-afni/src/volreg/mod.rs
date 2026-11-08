@@ -10,10 +10,11 @@
 //! messages [`run`] returns, in AFNI's order.
 //!
 //! Built for speed (`docs/porting-guide.md`, "Clean-room originals"): the volumes of each pass
-//! are registered in parallel (each one's result computed by the same sequence of operations
-//! whatever the thread count), the series is registered in place (each output volume replaces
-//! its input volume), the basis is built once per pass with its twelve resamplings in parallel,
-//! and the rows of every shear are shifted in parallel.
+//! are registered one after another, each one's work parallel inside (the shears by planes,
+//! the coarse search's rotations and scores, the blurs), so the memory is one volume's work
+//! whatever the thread count and every result is computed by the same sequence of operations
+//! whatever the thread count; the series is registered in place (each output volume replaces
+//! its input volume) and the basis is built once per pass.
 
 pub mod blur;
 pub mod coarse;
@@ -25,8 +26,6 @@ pub mod report;
 pub mod rotate;
 pub mod shift;
 pub mod sweep;
-
-use rayon::prelude::*;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 
@@ -579,44 +578,46 @@ fn run_in_pool(
             rot_thresh: p.twoblur * p.rot_thresh,
             max_iter: p.max_iter,
         };
-        let bricks_ref = &bricks;
-        let results: Vec<(Option<[f32; 6]>, Option<String>, bool)> = (0..nt)
-            .into_par_iter()
-            .map_init(Work::default, |work, t| {
-                if skipped(t) {
-                    return (Some([0.0; 6]), None, false);
+        // One volume at a time, each one's resamplings and searches parallel inside: the
+        // memory is one volume's work whatever the thread count.
+        let mut work = Work::default();
+        let mut results: Vec<(Option<[f32; 6]>, Option<String>, bool)> = Vec::with_capacity(nt);
+        for t in 0..nt {
+            if skipped(t) {
+                results.push((Some([0.0; 6]), None, false));
+                continue;
+            }
+            let mut v = volume_f32(&bricks, t);
+            if empty_ish(&v) {
+                results.push((Some([0.0; 6]), None, false));
+                continue;
+            }
+            twopass_blur(&mut v, n, p.twoblur, &blur);
+            let (f, line) = match (t, &found0) {
+                (0, Some(f)) => (f.clone(), None),
+                _ => {
+                    let f = search(&v);
+                    let line = (verbose && coarse_on)
+                        .then(|| coarse_line(t, &f, coarse_settings.rotations));
+                    (f, line)
                 }
-                let mut v = volume_f32(bricks_ref, t);
-                if empty_ish(&v) {
-                    return (Some([0.0; 6]), None, false);
-                }
-                twopass_blur(&mut v, n, p.twoblur, &blur);
-                let (f, line) = match (t, &found0) {
-                    (0, Some(f)) => (f.clone(), None),
-                    _ => {
-                        let f = search(&v);
-                        let line = (verbose && coarse_on)
-                            .then(|| coarse_line(t, &f, coarse_settings.rotations));
-                        (f, line)
-                    }
-                };
-                let init = initial(&f);
-                let r = basis.register(&v, init, &it1, work, None);
-                let deg = r.radians.map(fit::to_degrees);
-                (
-                    Some([
-                        deg[0],
-                        deg[1],
-                        deg[2],
-                        r.params[3],
-                        r.params[4],
-                        r.params[5],
-                    ]),
-                    line,
-                    f.empty_region,
-                )
-            })
-            .collect();
+            };
+            let init = initial(&f);
+            let r = basis.register(&v, init, &it1, &mut work, None);
+            let deg = r.radians.map(fit::to_degrees);
+            results.push((
+                Some([
+                    deg[0],
+                    deg[1],
+                    deg[2],
+                    r.params[3],
+                    r.params[4],
+                    r.params[5],
+                ]),
+                line,
+                f.empty_region,
+            ));
+        }
         for (t, (r, line, empty)) in results.into_iter().enumerate() {
             first[t] = r;
             if let Some(l) = line {
@@ -769,124 +770,104 @@ fn run_in_pool(
         }
     };
     let factors = bricks.factors.clone();
-    let results: Vec<One> = match (&mut bricks.data, out_float.as_mut()) {
-        (BrickData::Float(v), _) => v
-            .par_chunks_mut(total)
-            .enumerate()
-            .map_init(
-                || (Work::default(), vec![0f32; total]),
-                |(work, buf), (t, slot)| {
+    // One volume at a time (each one's resamplings parallel inside), registered in place.
+    let mut work = Work::default();
+    let mut buf = vec![0f32; total];
+    let scaled = |t: usize| factors[t] != 0.0 && factors[t] != 1.0;
+    let mut results: Vec<One> = Vec::with_capacity(nt);
+    match (&mut bricks.data, out_float.as_mut()) {
+        (BrickData::Float(v), _) => {
+            for (t, slot) in v.chunks_mut(total).enumerate() {
+                let r = if scaled(t) {
                     let f = factors[t];
-                    let r = if f != 0.0 && f != 1.0 {
-                        let y: Vec<f32> = slot.iter().map(|&x| f * x).collect();
-                        register_one(t, &y, work, buf)
-                    } else {
-                        // The volume read in place: the output goes to `buf`, then back.
-                        register_one(t, slot, work, buf)
-                    };
-                    if p.output {
-                        slot.copy_from_slice(buf);
-                    }
-                    r
-                },
-            )
-            .collect(),
+                    let y: Vec<f32> = slot.iter().map(|&x| f * x).collect();
+                    register_one(t, &y, &mut work, &mut buf)
+                } else {
+                    // The volume read in place: the output goes to `buf`, then back.
+                    register_one(t, slot, &mut work, &mut buf)
+                };
+                if p.output {
+                    slot.copy_from_slice(&buf);
+                }
+                results.push(r);
+            }
+        }
         (data, Some(of)) => {
-            let shape = [nx, ny, nz, nt];
             let view = Bricks {
-                shape,
-                data: data.clone(),
+                shape: [nx, ny, nz, nt],
+                data: std::mem::replace(data, BrickData::Float(Vec::new())),
                 factors: factors.clone(),
             };
-            of.par_chunks_mut(total)
-                .enumerate()
-                .map_init(Work::default, |work, (t, slot)| {
-                    let y = volume_f32(&view, t);
-                    register_one(t, &y, work, slot)
-                })
-                .collect()
+            for (t, slot) in of.chunks_mut(total).enumerate() {
+                let y = volume_f32(&view, t);
+                results.push(register_one(t, &y, &mut work, slot));
+            }
+            *data = view.data;
         }
-        (BrickData::Short(v), None) => v
-            .par_chunks_mut(total)
-            .enumerate()
-            .map_init(
-                || (Work::default(), vec![0f32; total]),
-                |(work, buf), (t, slot)| {
-                    let f = factors[t];
-                    let scale = f != 0.0 && f != 1.0;
-                    let y: Vec<f32> = slot
-                        .iter()
-                        .map(|&x| {
-                            if scale {
-                                f * f32::from(x)
-                            } else {
-                                f32::from(x)
-                            }
-                        })
-                        .collect();
-                    let r = register_one(t, &y, work, buf);
-                    if p.output {
-                        for (s, &x) in slot.iter_mut().zip(buf.iter()) {
-                            *s = f64::from(x).clamp(-32767.0, 32767.0).round_ties_even() as i16;
-                        }
-                    }
-                    r
-                },
-            )
-            .collect(),
-        (BrickData::Byte(v), None) => v
-            .par_chunks_mut(total)
-            .enumerate()
-            .map_init(
-                || (Work::default(), vec![0f32; total]),
-                |(work, buf), (t, slot)| {
-                    let f = factors[t];
-                    let scale = f != 0.0 && f != 1.0;
-                    let y: Vec<f32> = slot
-                        .iter()
-                        .map(|&x| {
-                            if scale {
-                                f * f32::from(x)
-                            } else {
-                                f32::from(x)
-                            }
-                        })
-                        .collect();
-                    let mut r = register_one(t, &y, work, buf);
-                    if p.output {
-                        let (lo, hi) = buf
-                            .iter()
-                            .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
-                                (a.min(x), b.max(x))
-                            });
-                        let rounded: Vec<u8> = buf
-                            .iter()
-                            .map(|&x| f64::from(x).clamp(0.0, 255.0).round_ties_even() as u8)
-                            .collect();
-                        if mode.reproduce() {
-                            // AFNI-87: each volume stretched over 0..255.9 from its own range.
-                            let hi = if hi <= lo { lo + 1.0 } else { hi };
-                            let s = 255.9 / (f64::from(hi) - f64::from(lo));
-                            for (o, &x) in slot.iter_mut().zip(buf.iter()) {
-                                *o = (s * f64::from(x - lo)).trunc() as u8;
-                            }
+        (BrickData::Short(v), None) => {
+            for (t, slot) in v.chunks_mut(total).enumerate() {
+                let f = factors[t];
+                let y: Vec<f32> = slot
+                    .iter()
+                    .map(|&x| {
+                        if scaled(t) {
+                            f * f32::from(x)
                         } else {
-                            slot.copy_from_slice(&rounded);
+                            f32::from(x)
                         }
-                        let stretched: Vec<u8> = {
-                            let hi2 = if hi <= lo { lo + 1.0 } else { hi };
-                            let s = 255.9 / (f64::from(hi2) - f64::from(lo));
-                            buf.iter()
-                                .map(|&x| (s * f64::from(x - lo)).trunc() as u8)
-                                .collect()
-                        };
-                        r.stretched = stretched != rounded;
+                    })
+                    .collect();
+                let r = register_one(t, &y, &mut work, &mut buf);
+                if p.output {
+                    for (s, &x) in slot.iter_mut().zip(buf.iter()) {
+                        *s = f64::from(x).clamp(-32767.0, 32767.0).round_ties_even() as i16;
                     }
-                    r
-                },
-            )
-            .collect(),
-    };
+                }
+                results.push(r);
+            }
+        }
+        (BrickData::Byte(v), None) => {
+            for (t, slot) in v.chunks_mut(total).enumerate() {
+                let f = factors[t];
+                let y: Vec<f32> = slot
+                    .iter()
+                    .map(|&x| {
+                        if scaled(t) {
+                            f * f32::from(x)
+                        } else {
+                            f32::from(x)
+                        }
+                    })
+                    .collect();
+                let mut r = register_one(t, &y, &mut work, &mut buf);
+                if p.output {
+                    let (lo, hi) = buf
+                        .iter()
+                        .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+                            (a.min(x), b.max(x))
+                        });
+                    let rounded: Vec<u8> = buf
+                        .iter()
+                        .map(|&x| f64::from(x).clamp(0.0, 255.0).round_ties_even() as u8)
+                        .collect();
+                    // AFNI-87: each volume stretched over 0..255.9 from its own range.
+                    let hi2 = if hi <= lo { lo + 1.0 } else { hi };
+                    let s = 255.9 / (f64::from(hi2) - f64::from(lo));
+                    let stretched: Vec<u8> = buf
+                        .iter()
+                        .map(|&x| (s * f64::from(x - lo)).trunc() as u8)
+                        .collect();
+                    r.stretched = stretched != rounded;
+                    slot.copy_from_slice(if mode.reproduce() {
+                        &stretched
+                    } else {
+                        &rounded
+                    });
+                }
+                results.push(r);
+            }
+        }
+    }
     let mut fitted = Vec::with_capacity(nt);
     let mut rms = Vec::with_capacity(nt);
     let mut stretched = false;

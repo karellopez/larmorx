@@ -3,9 +3,9 @@
 # larmorx-gpl writes on Linux x86_64 (images by header and data, with sampled values),
 # its exit status and the upstream defects it names. Every platform must reproduce them
 # (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 68f1126d3382b0d35d4433063e919c76181a74f4 on 2026-11-08 (Linux x86_64)
+# Recorded from e86180ff999929e3d21b3ba4bb8ed2d4f6159345 on 2026-11-08 (Linux x86_64)
 # case	output	sha256	type	sample
-curvefit.shared.reproduce	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+curvefit.shared.reproduce	named defects	b44a1e44ee663122b9b94de6c66d3ef27e26092caa9d67c028dda8fa8b73ee45	-	-
 curvefit.shared.reproduce	out/S0map.nii.gz.data	5f12a725b6141ccaa26a81ce3fa2bcf5e7fd51f0e6ec134ffba265d5fccd3faf	float32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.shared.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 curvefit.shared.reproduce	out/T2starmap.nii.gz.data	340b6f5a7149d797002892969965b708347b688968626cadeee36d6c7534d586	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -27,7 +27,7 @@ curvefit.shared.reproduce	out/desc-rmse_statmap.nii.gz.header	bf75711422af22efd9
 curvefit.shared.reproduce	out/desc-tedana_registry.json	7498730634ba97655f47b039e066412abf3d874e8f972de96a5f448c5d7cc9a2	-	-
 curvefit.shared.reproduce	out/t2smap_call.sh	50d7c56a1d29d7b5d8af32bfe79c3a4f80d0e645748e78dc2982dfd7da4eb9a4	-	-
 curvefit.shared.reproduce	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-curvefit.ts.paid.reproduce	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+curvefit.ts.paid.reproduce	named defects	b44a1e44ee663122b9b94de6c66d3ef27e26092caa9d67c028dda8fa8b73ee45	-	-
 curvefit.ts.paid.reproduce	out/S0map.nii.gz.data	e0261765b9d93bdfa359f36600e361cb8a2adb8d965eadce9e0b58336c7f8049	float32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.ts.paid.reproduce	out/S0map.nii.gz.header	ff421c0ff0013e61b6041a45402fd6320381903ffdb6dde6be8142c3275e4a38	-	-
 curvefit.ts.paid.reproduce	out/T2starmap.nii.gz.data	70f96b305e0ccb9d0d091f662fa3bc5d7e7795c87822bc1ce500278ba1ce2a66	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -49,7 +49,7 @@ curvefit.ts.paid.reproduce	out/desc-rmse_statmap.nii.gz.header	bf75711422af22efd
 curvefit.ts.paid.reproduce	out/desc-tedana_registry.json	7498730634ba97655f47b039e066412abf3d874e8f972de96a5f448c5d7cc9a2	-	-
 curvefit.ts.paid.reproduce	out/t2smap_call.sh	fb633a51f34bbb0b060cdfe93d5a6a6dd85c1a900e47a598da1458a0adeaaf95	-	-
 curvefit.ts.paid.reproduce	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-curvefit.verbose.orig	named defects	d83a3df6d7a441a3ee6589fed44868904e70d39be4979153406bc71ae7681f4d	-	-
+curvefit.verbose.orig	named defects	cc477cc817def99b4d8ab7fdd4c4b914183e765c48a3aff56b2058cba8b088ca	-	-
 curvefit.verbose.orig	out/sub-01_adaptive_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.verbose.orig	out/sub-01_adaptive_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.verbose.orig	out/sub-01_confounds.tsv	7f99324bf58d30bb414723406715010d28245d03db13bda42b15b10104f219a8	-	-
@@ -77,7 +77,7 @@ curvefit.verbose.orig	out/sub-01_ts_OC.nii.gz.data	f9283bf432e6f227e70be3a5c8365
 curvefit.verbose.orig	out/sub-01_ts_OC.nii.gz.header	ff421c0ff0013e61b6041a45402fd6320381903ffdb6dde6be8142c3275e4a38	-	-
 curvefit.verbose.orig	out/t2smap_call.sh	7c8bff60529ba65638ead2a4b63a9527ada6bda35609d6776772e2561027fa86	-	-
 curvefit.verbose.orig	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-curvefit.verbose.orig.reproduce	named defects	55c18453ffe98cc81cbff35ecc8f1719b2a011650e4672b74e66c56c84a5ab86	-	-
+curvefit.verbose.orig.reproduce	named defects	df757160e3b11f791186f73a56c602c19f52861abeb16c58686fcbee6383d538	-	-
 curvefit.verbose.orig.reproduce	out/sub-01_adaptive_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.verbose.orig.reproduce	out/sub-01_adaptive_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.verbose.orig.reproduce	out/sub-01_confounds.tsv	7f99324bf58d30bb414723406715010d28245d03db13bda42b15b10104f219a8	-	-
@@ -108,7 +108,7 @@ curvefit.verbose.orig.reproduce	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578
 exclude.ted02	named defects	e3f612f8d4cfc5d6343458b70c07d5dc39acb1e5ffd807f80a1fd854a55b1e56	-	-
 exclude.ted02	out/t2smap_call.sh	b35ab374286676fc3d25a4e67750f848788474ee6f696c8f1845a3df9067f6e4	-	-
 exclude.ted02	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
-loglin	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+loglin	named defects	99c7b4b588228c27b8074ec2e1ae4dc0cfcfb39613d5b37dd4de862de86517fd	-	-
 loglin	out/S0map.nii.gz.data	e5526dc0445edbece12d0c2b156b00732767a4e6d8a1e5a2ac466c374071a054	float32	0000000000000000000000000000000000000000000000000000000000000000
 loglin	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 loglin	out/T2starmap.nii.gz.data	ff5885140982da25af91395a20e4fd76689c05f1ddc3e66bc1414fac77923149	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -128,7 +128,7 @@ loglin	out/desc-rmse_statmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf
 loglin	out/desc-tedana_registry.json	663fa776b40a1dd3faeeaa5a10ddc48a9683909038ab12e2af489793be91b634	-	-
 loglin	out/t2smap_call.sh	c4bcf40a6999c9576b2f496d0c7ab74d76e3f36e05a17d3fe71be603862bfb9f	-	-
 loglin	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-loglin.reproduce	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+loglin.reproduce	named defects	b44a1e44ee663122b9b94de6c66d3ef27e26092caa9d67c028dda8fa8b73ee45	-	-
 loglin.reproduce	out/S0map.nii.gz.data	60fa176bc00d9e4dbd82f455f511f79babcdddb77f0664543b9bd9c5c48a174e	float32	0000000000000000000000000000000000000000000000000000000000000000
 loglin.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 loglin.reproduce	out/T2starmap.nii.gz.data	8a93a9de1d531a730a9df94f4ebc347ab12d7c01e67b75a9c735a0860e12cce3	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -148,7 +148,7 @@ loglin.reproduce	out/desc-rmse_statmap.nii.gz.header	bf75711422af22efd949eb40501
 loglin.reproduce	out/desc-tedana_registry.json	663fa776b40a1dd3faeeaa5a10ddc48a9683909038ab12e2af489793be91b634	-	-
 loglin.reproduce	out/t2smap_call.sh	c4bcf40a6999c9576b2f496d0c7ab74d76e3f36e05a17d3fe71be603862bfb9f	-	-
 loglin.reproduce	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-nomask.float32.ms	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+nomask.float32.ms	named defects	99c7b4b588228c27b8074ec2e1ae4dc0cfcfb39613d5b37dd4de862de86517fd	-	-
 nomask.float32.ms	out/S0map.nii.gz.data	943132b26a3d09964675ed4bdb375e2887764172f742a59909895812876ec904	float32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 nomask.float32.ms	out/T2starmap.nii.gz.data	95a4be27b56ac5a0269232151fa804aa397da26016933fbcf1aef36dc5e36569	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -168,7 +168,7 @@ nomask.float32.ms	out/desc-rmse_statmap.nii.gz.header	bf75711422af22efd949eb4050
 nomask.float32.ms	out/desc-tedana_registry.json	663fa776b40a1dd3faeeaa5a10ddc48a9683909038ab12e2af489793be91b634	-	-
 nomask.float32.ms	out/t2smap_call.sh	f8f840106c3a192d7071530f4b257313cf1d336ac40baa4250abb1defbf28c06	-	-
 nomask.float32.ms	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-nomask.float32.ms.reproduce	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+nomask.float32.ms.reproduce	named defects	b44a1e44ee663122b9b94de6c66d3ef27e26092caa9d67c028dda8fa8b73ee45	-	-
 nomask.float32.ms.reproduce	out/S0map.nii.gz.data	a4c88c26d377c957612304aac9d0ef459b5803b5ee8b1f843891da869e1b25ce	float32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 nomask.float32.ms.reproduce	out/T2starmap.nii.gz.data	f04b890a88ac677465931935b715c2b4d25cee9f8c62fc1f3c9314e475b1e1f0	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -188,7 +188,7 @@ nomask.float32.ms.reproduce	out/desc-rmse_statmap.nii.gz.header	bf75711422af22ef
 nomask.float32.ms.reproduce	out/desc-tedana_registry.json	663fa776b40a1dd3faeeaa5a10ddc48a9683909038ab12e2af489793be91b634	-	-
 nomask.float32.ms.reproduce	out/t2smap_call.sh	f8f840106c3a192d7071530f4b257313cf1d336ac40baa4250abb1defbf28c06	-	-
 nomask.float32.ms.reproduce	status	9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa	-	0
-zcat.masktype-none	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
+zcat.masktype-none	named defects	99c7b4b588228c27b8074ec2e1ae4dc0cfcfb39613d5b37dd4de862de86517fd	-	-
 zcat.masktype-none	out/S0map.nii.gz.data	076efc2a8963df490410033de4432a399ab69cf8a5b3ee33728805f93b267bb1	float32	0000000000000000000000000000000000000000000000000000000000000000
 zcat.masktype-none	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 zcat.masktype-none	out/T2starmap.nii.gz.data	7d4cfa4ec052eb215c81933ee296ebee846ecd411f3d3f9ba3503a048145c98c	float32	0000000000000000000000000000000000000000000000000000000000000000

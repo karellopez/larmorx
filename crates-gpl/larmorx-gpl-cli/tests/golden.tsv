@@ -3,7 +3,7 @@
 # larmorx-gpl writes on Linux x86_64 (images by header and data, with sampled values),
 # its exit status and the upstream defects it names. Every platform must reproduce them
 # (docs/validation/golden.md). Do not edit by hand.
-# Recorded from abd204e6bd0de6e15376b36d24fca87fb21c373b+dirty on 2026-11-08 (Linux x86_64)
+# Recorded from 68f1126d3382b0d35d4433063e919c76181a74f4 on 2026-11-08 (Linux x86_64)
 # case	output	sha256	type	sample
 curvefit.shared.reproduce	named defects	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	-	-
 curvefit.shared.reproduce	out/S0map.nii.gz.data	5f12a725b6141ccaa26a81ce3fa2bcf5e7fd51f0e6ec134ffba265d5fccd3faf	float32	0000000000000000000000000000000000000000000000000000000000000000

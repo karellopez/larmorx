@@ -456,6 +456,19 @@ fn run_in_pool(
             &mut messages,
         );
         twopass_blur(&mut b1, n, p.twoblur, &blur);
+        // AFNI-94: the subsampled rotation search's step of 0 (an error in both modes).
+        if coarse_on
+            && coarse_settings.rotations
+            && n.iter().all(|&d| d >= 120)
+            && p.coarse.0 / 2 == 0
+        {
+            return Err(VolregError {
+                messages,
+                notices: vec![notices::afni_94(mode)],
+                fatal: notices::AFNI_94_FATAL.into(),
+                fatal_error: true,
+            });
+        }
         let searcher = coarse_on.then(|| coarse::Searcher::new(&b1, n, sizes, &coarse_settings));
         let search = |v: &[f32]| -> Found {
             match &searcher {

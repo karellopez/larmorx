@@ -120,6 +120,8 @@ impl From<Failure> for Stop {
 
 /// The parsed command line.
 struct Options {
+    /// Notices of the option scan printed at the end (AFNI-90's).
+    late: Vec<Notice>,
     dataset: Option<String>,
     input_image: Option<(AfniImage, String)>,
     by_input: bool,
@@ -262,6 +264,7 @@ fn parse(
         maxdisp: true,
         maxdisp1d: None,
         savedisp: None,
+        late: Vec::new(),
         matrix_save: None,
         sinit: true,
         max_iter: 23,
@@ -513,18 +516,23 @@ fn parse(
         }
         if starts(arg, "-prefix", 4) {
             let v = need!(1);
+            long_name("-prefix name", v, mode, log, &mut o)?;
             o.prefix = v.to_owned();
             o.prefix_refused = refused(v, settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES"));
             i += 2;
             continue;
         }
         if starts(arg, "-dfile", 4) {
-            o.dfile = Some(need!(1).to_owned());
+            let v = need!(1);
+            long_name("-dfile name", v, mode, log, &mut o)?;
+            o.dfile = Some(v.to_owned());
             i += 2;
             continue;
         }
         if starts(arg, "-1Dfile", 4) {
-            o.oned = Some(need!(1).to_owned());
+            let v = need!(1);
+            long_name("-1Dfile name", v, mode, log, &mut o)?;
+            o.oned = Some(v.to_owned());
             i += 2;
             continue;
         }
@@ -605,6 +613,16 @@ fn parse(
                 return Err(Stop::Raw("** Illegal weight dataset after -weight".into()));
             };
             let name = &v[..at];
+            // AFNI-90: the weight dataset is opened here, so the notice comes at once.
+            if name.len() >= 256 {
+                log.notice(&notices::afni_90("-weight dataset name", name.len(), mode));
+                if mode.reproduce() {
+                    return Err(Stop::Fatal(notices::afni_90_fatal(
+                        "-weight dataset name",
+                        name.len(),
+                    )));
+                }
+            }
             let index = crate::cli::atoi(&v[at + 1..]);
             let index = if v[at + 1..]
                 .trim_start()
@@ -683,6 +701,26 @@ fn parse(
     }
     o.rest = args[i..].to_vec();
     Ok(o)
+}
+
+/// AFNI-90: a name of 256 bytes or more aborts AFNI at its option (`reproduce`); kept whole by
+/// default, with the notice at the end.
+fn long_name(
+    what: &str,
+    v: &str,
+    mode: UpstreamDefects,
+    log: &mut Log<'_>,
+    o: &mut Options,
+) -> Result<(), Stop> {
+    if v.len() < 256 {
+        return Ok(());
+    }
+    if mode.reproduce() {
+        log.notice(&notices::afni_90(what, v.len(), mode));
+        return Err(Stop::Fatal(notices::afni_90_fatal(what, v.len())));
+    }
+    o.late.push(notices::afni_90(what, v.len(), mode));
+    Ok(())
 }
 
 fn afni_95(mode: UpstreamDefects) -> Notice {
@@ -848,7 +886,7 @@ fn execute(
     log.verbose = o.verbose > 0;
     log.larmorx_info(IMPLEMENTATION);
     log.larmorx_info(&format!("upstream defects: {mode} ({})", defects::ENV));
-    let mut late: Vec<Notice> = Vec::new();
+    let mut late: Vec<Notice> = std::mem::take(&mut o.late);
     if o.nocoarserot {
         late.push(afni_86(mode));
     }
@@ -1139,19 +1177,6 @@ fn execute(
         } else {
             log.info("WARNING: some error during -tshift operation!");
         }
-    }
-    if o.twopass && coarse.0 == 1 && [nx, ny, nz].iter().all(|&d| d >= 120) && coarse.1 > 0 {
-        log.notice(&Notice::new(
-            &defects::AFNI_94,
-            mode,
-            "-twopass with a coarse step of 1 on a grid of 120 or more voxels along every axis: \
-             the subsampled search's step is 0 and AFNI never ends",
-        ));
-        return Err(Stop::Fatal(
-            "the coarse step 1 halves to 0 on this grid (AFNI-94: AFNI never ends here); use \
-             -coarse 2 or more"
-                .into(),
-        ));
     }
     let float_output = o.float || scaled;
     let final_method = o.final_method.unwrap_or(o.method);

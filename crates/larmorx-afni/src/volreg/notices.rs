@@ -125,3 +125,42 @@ pub fn afni_89(mode: UpstreamDefects) -> Notice {
 pub const AFNI_89_FATAL: &str = "the base's least squares could not be set up (the messages \
     above say why: all-zero weights, or a base whose rotated and shifted copies do not change \
     under the weight); AFNI crashes here (AFNI-89)";
+
+/// AFNI-90: a name of 256 bytes or more (`what`: "-prefix name", "-weight dataset name", ...).
+pub fn afni_90(what: &str, bytes: usize, mode: UpstreamDefects) -> Notice {
+    let d = pick(
+        mode,
+        &format!(
+            "the {what} has {bytes} bytes: kept whole; AFNI copies it into a 256-byte buffer and \
+             aborts (buffer overflow detected)"
+        ),
+        &format!(
+            "the {what} has {bytes} bytes, more than AFNI's 256-byte buffer holds: AFNI aborts \
+             (buffer overflow detected)"
+        ),
+    );
+    Notice::new(&defects::AFNI_90, mode, d)
+}
+
+/// AFNI-90's error with `reproduce` (AFNI aborts at the option).
+pub fn afni_90_fatal(what: &str, bytes: usize) -> String {
+    format!(
+        "the {what} has {bytes} bytes; AFNI's buffer holds 255 and AFNI aborts here (*** buffer \
+         overflow detected ***, AFNI-90)"
+    )
+}
+
+/// AFNI-94: the subsampled coarse search's step of 0.
+pub fn afni_94(mode: UpstreamDefects) -> Notice {
+    Notice::new(
+        &defects::AFNI_94,
+        mode,
+        "-twopass's coarse search with a step of 1 voxel on a volume of 120 or more voxels along \
+         every axis: the subsampled search's step is 0, which AFNI repeats forever",
+    )
+}
+
+/// AFNI-94's error, in both modes (rule B).
+pub const AFNI_94_FATAL: &str = "-coarse with a step of 1 voxel on a volume of 120 or more \
+    voxels along every axis: the subsampled coarse search would have a step of 0 (AFNI loops \
+    forever; AFNI-94); use -coarse 2 or more";

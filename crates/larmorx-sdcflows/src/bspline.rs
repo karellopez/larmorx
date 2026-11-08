@@ -75,13 +75,7 @@ pub fn bspline_grid(
     zooms: &[f64],
     control_zooms_mm: [f64; 3],
 ) -> Result<ControlGrid, SdcError> {
-    let zoom = |c: usize| -> f64 {
-        if zooms.len() == 1 {
-            zooms[0]
-        } else {
-            zooms[c]
-        }
-    };
+    let zoom = |c: usize| -> f64 { if zooms.len() == 1 { zooms[0] } else { zooms[c] } };
     if zooms.len() != 3 && zooms.len() != 1 {
         return Err(SdcError::Invalid(format!(
             "operands could not be broadcast together with shapes (3,3) ({},) ",
@@ -121,7 +115,10 @@ pub fn bspline_grid(
     //                    - apply_affine(bs_affine, 0.5 * (bs_shape - 1))
     let half = |s: usize| 0.5 * (s as f64 - 1.0);
     let c_img = apply_affine_single(affine, [half(shape[0]), half(shape[1]), half(shape[2])]);
-    let c_bs = apply_affine_single(&bs, [half(bs_shape[0]), half(bs_shape[1]), half(bs_shape[2])]);
+    let c_bs = apply_affine_single(
+        &bs,
+        [half(bs_shape[0]), half(bs_shape[1]), half(bs_shape[2])],
+    );
     for r in 0..3 {
         bs[r][3] = c_img[r] - c_bs[r];
     }
@@ -420,7 +417,9 @@ pub fn grid_bspline_weights(
     let patterns = if empty {
         None
     } else {
-        Some(std::array::from_fn(|a| AxisPattern::new(&axes[a], dense[a])))
+        Some(std::array::from_fn(|a| {
+            AxisPattern::new(&axes[a], dense[a])
+        }))
     };
     Ok(LevelWeights {
         axes,
@@ -458,10 +457,9 @@ impl Collocation {
             .first()
             .ok_or_else(|| SdcError::Invalid("need at least one array to concatenate".into()))?;
         let sample_shape = std::array::from_fn(|a| first.axes[a].n_samples);
-        if levels
-            .iter()
-            .any(|l| (0..3).any(|a| l.axes[a].n_samples != sample_shape[a]) || l.dtype != first.dtype)
-        {
+        if levels.iter().any(|l| {
+            (0..3).any(|a| l.axes[a].n_samples != sample_shape[a]) || l.dtype != first.dtype
+        }) {
             return Err(SdcError::Invalid(
                 "the levels' weights were computed on different sampling grids".into(),
             ));
@@ -592,7 +590,11 @@ impl Collocation {
             sum
         };
         Ok(with_threads(n_threads, || {
-            (0..self.n_cols).into_par_iter().with_min_len(16).map(col).collect()
+            (0..self.n_cols)
+                .into_par_iter()
+                .with_min_len(16)
+                .map(col)
+                .collect()
         })?)
     }
 
@@ -721,8 +723,14 @@ mod tests {
     fn products_follow_the_stored_pattern() {
         let target = diag([2.0, 2.5, 3.0], [-19.0, -21.25, -9.0]);
         let g = bspline_grid([20, 18, 7], &target, &[2.0, 2.5, 3.0], DEFAULT_HF_ZOOMS_MM).unwrap();
-        let w = grid_bspline_weights([20, 18, 7], &target, g.shape, &g.affine, WeightType::Float32)
-            .unwrap();
+        let w = grid_bspline_weights(
+            [20, 18, 7],
+            &target,
+            g.shape,
+            &g.affine,
+            WeightType::Float32,
+        )
+        .unwrap();
         assert!(w.aligned);
         assert_eq!(g.shape, [5, 5, 4]);
         // probe_colmat.py (sdcflows on SciPy 1.15.3 and 1.18.1): 191,520 stored, 71,136 zeros

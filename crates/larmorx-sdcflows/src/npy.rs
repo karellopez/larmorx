@@ -61,7 +61,9 @@ pub fn floor_divide(a: f64, b: f64) -> f64 {
 /// `numpy.allclose(values, 0, atol=atol)`: every `|v - 0| <= atol + 1e-5 * |0|` (a NaN is never
 /// close; an infinity is not close to 0).
 pub fn allclose_zero(values: &[f64], atol: f64) -> bool {
-    values.iter().all(|&v| (v - 0.0).abs() <= atol + 1e-5 * 0.0f64.abs())
+    values
+        .iter()
+        .all(|&v| (v - 0.0).abs() <= atol + 1e-5 * 0.0f64.abs())
 }
 
 /// `numpy.cross(a, b)` of two 3-vectors.

@@ -758,3 +758,37 @@ def mri_hmc_world(
     """``ras``, ``itk`` (``(N, 4, 4)``) and ``fd`` (``(N,)``) of mcflirt-convention matrices and
     motion parameters computed by the ``larmorx-nc`` replica, for the series at ``series``
     registered to the reference at ``reference`` (``None``: the series' grid)."""
+
+# --- sdcflows' field-map estimation, ported (larmorx/sdcflows) ---------------------------------
+
+def sdcflows_bspline_grid(
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    zooms: list[float],
+    control_zooms_mm: tuple[float, float, float],
+) -> tuple[tuple[int, int, int], np.ndarray]:
+    """sdcflows' ``bspline_grid``: the control grid's shape and affine for an image of
+    ``shape`` and ``affine`` whose header zooms are ``zooms``."""
+
+def sdcflows_collocation_csr(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    dtype: str = "float32",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[bool]]:
+    """``sparse_hstack([grid_bspline_weights(target, level) ...]).tocsr()``: data (float64,
+    holding the matrix type's values), indices, indptr (int64), shape, one alignment flag per
+    level."""
+
+def sdcflows_collocation_apply(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    v: np.ndarray,
+    transpose: bool = False,
+    rows: np.ndarray | None = None,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``X @ v`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32 collocation
+    matrix, in scipy's summation order, without storing the matrix."""

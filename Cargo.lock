@@ -359,6 +359,7 @@ dependencies = [
  "larmorx-interp",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-sdcflows",
  "larmorx-transform",
  "numpy",
  "pyo3",

@@ -362,6 +362,36 @@ either side of every tie. Every other statement of this spec was checked bit for
 of §15 with the decomposition's double values made AFNI's: then it reproduces AFNI's outputs
 exactly (§15).
 
+**AFNI's own spread under the ties** (spec writer, 2026-11-08, step 3). Measured with AFNI's
+arithmetic and AFNI's choice at every resampling replaced by another choice (the first or the last
+of the tied orders everywhere, the one after AFNI's, or a seeded draw at every resampling: 15
+variants per case; a scratch measurement of the spec writer, not kept): with AFNI's own choices
+it gives AFNI's outputs bit for bit, so the variants show how far AFNI's result moves when only
+the ties are decided otherwise, the most a clean-room implementation can be expected to agree.
+- **AFNI mixes the sides, resampling by resampling.** fMRIPrep's call on ds000256's high-motion
+  run (`nofeedback`, 64 × 64 × 32 voxels of 4 mm: all three axes tie) meets 334 ties: 12 in the
+  derivative images, 71 in the fits' iterations, 11 in the 20 output resamplings and 240 in the
+  coarse search's rotations; AFNI takes the first of the tied orders in 190 of them and another
+  in 144, both in every stage. No single side, taken everywhere, reproduces it.
+- **Real data** (fMRIPrep's call on 16 runs: seven of §14.2's and the data panel's nine): the parameters move
+  by at most 0.48 of their thresholds (ds000256 `nofeedback`, rotations to 4.7°; 0.06 or less on
+  the others), the registered volumes' mean |diff| by up to 3.4e-3 of their largest value and NCC
+  down to 0.99978 (`nofeedback`'s volume with 5.2° of rotation), fMRIPrep's median by up to 2.0e-2
+  at single voxels (mean 9.0e-4). The volumes' differences grow with each volume's rotation: at
+  most 6.8e-4 of the largest value per degree of `|roll| + |pitch| + |yaw|` (§14.3).
+- **Random testing's phantoms** (small grids with sharp edges, larger motions): the fits can be
+  very ill-conditioned with respect to the ties (the roll nearly collinear with the shifts on a
+  small grid): over the variants, AFNI's parameters move by a median of 25 thresholds and up to
+  256 in the sampled findings that converge beyond the thresholds, up to 782 in those that stop
+  at their iteration limit, and whether a
+  fit runs away (beyond 15° or 20 mm), and whether AFNI-97's crash happens on the way, changes
+  with the choices too. §14.3's "The ties' spread" says how such cases are judged.
+- **With the same choice the arithmetic agrees.** The clean-room original taking the first tied
+  order everywhere (`LARMORX_VOLREG_TIES=0`, §14.3) against AFNI's arithmetic taking it too: every
+  parameter within its threshold in 117 of 121 sampled random-testing findings (all 4 others
+  runaways of hundreds of degrees): the remaining differences are the ties, not a behaviour this
+  spec misses.
+
 ### 5.4 Zero padding (`-zpad n`)
 
 If n > 0, the volume is padded with n zero voxels on both sides of every axis before the flip and
@@ -1210,6 +1240,36 @@ products are made from the three normalised datasets; how both are validated: §
 "`-SAVEDISP`" (spec writer, 2026-11-08: the normalisation magnifies small differences of the raw
 values).
 
+**The arithmetic, exactly** (spec writer, 2026-11-08, step 3; **(observed)**: with it, the
+nineteen datasets made from AFNI's own `-savedisp` values are AFNI's `-SAVEDISP` datasets bit
+for bit, 0 of 4,815,360 values differing on the suite's `s1` and 0 of 52,920,320 on fMRIPrep's
+ds000005 input, `validation/investigations/3dvolreg-spec/savedisp.py`). For one voxel's series
+`v_0 … v_{n−1}` (float32; n the number of volumes, at least 3):
+1. **The line.** `S0 = v_0 + v_1 + … + v_{n−1}` and `S1 = (v_1·1) + (v_2·2) + … + (v_{n−1}·(n−1))`
+   in double, each sum accumulated in that order (S0 starting from `v_0`, S1 from 0), each
+   product `v_i·i` a float32 product; `N = n` and `Q = n·n` (an integer product) as doubles; then,
+   each operation in double in the order the parentheses give,
+   `a = ((2/(N+1))·(1/N))·(((2·(N·S0)) − 3·S1) − S0)` and
+   `b = ((−6/(Q−1))·(1/N))·(((−S0) − 2·S1) + N·S0)`, each rounded to float32. This order is part
+   of the behaviour: a or b is decided by the double's last bits now and then, and the
+   normalisation's division by a small largest value turns that one float32 step into a visible
+   difference (the textbook forms `(2(2n−1)·S0 − 6·S1)/(n(n+1))` and `(12·S1 − 6(n−1)·S0)/(n(n²−1))`,
+   equal in exact arithmetic, change 3,983 of ds000005's 8,355,840 normalised `_DX`, `_DY`, `_DZ`
+   values; none of `s1`'s, whose 6 volumes rarely meet such a case).
+2. **Detrended:** `w_i = v_i − (a + b·i)` in float32 (`b·i` first, then `a +`, then the
+   subtraction; for i = 0 the same, `b·0 = 0`).
+3. **Normalised:** `m = max_i |w_i|` (float32); when `m ≠ 0`, `r = 1/m` (float32) and every value
+   `w_i·r` (float32); when `m = 0`, the values stay as they are.
+4. **The products**, from the three normalised series `X`, `Y`, `Z` of the voxel (the values
+   `_DX`, `_DY`, `_DZ` hold): `P_2(x) = ((1.5·x)·x) − 0.5`, `P_3(x) = (((2.5·x)·x) − 1.5)·x`
+   (float32, the constants float32), `P_1(x) = x`, `P_0 = 1`, and the value
+   `(P_a(X)·P_b(Y))·P_c(Z)` (float32); each product series is then detrended and normalised by
+   steps 1 to 3. Any other association changes many values, not a few (on `s1`: `1.5·(x·x)`
+   40 % to 58 % of each product's values, the polynomials in double 46 % to 70 %, `X·(Y·Z)` for
+   `_DXYZ` 25 %); a difference at a few voxels comes from steps 1 to 3 (the original of
+   2026-11-08 differs from this arithmetic applied to its own `_DX`, `_DY`, `_DZ` at 233 of `s1`'s
+   4,055,040 product values and 13,648 of ds000005's: `savedisp.py --original`).
+
 ## 11. A faster implementation: what must stay, what may change
 
 **Must stay** (it decides the results):
@@ -1378,21 +1438,31 @@ and the maximum displacements, 0.01 mm, were stricter than the parameters they f
 failed respectively every volume whose angles differ by more than about 0.0006° and the cubic
 and linear runs, with every parameter within its threshold.)
 
+(spec writer, 2026-11-08, step 3: measured against AFNI's own spread under the ties on real
+high-motion data and random testing's findings, §5.3. The registered volumes' limit now grows
+with each volume's rotation, fMRIPrep's median is held to the limit its volumes imply, `-final
+NN` has a nearest-neighbour rule, and fits that are ill-conditioned with respect to the ties, or
+run away, are judged by "The ties' spread" below. `thresholds.py` holds the revised requirements
+on 21 cases with six tie choices each, fMRIPrep's calls on ds000256 `nofeedback`, ds000228,
+ds004958 and ds005454 included; `spread.py` holds the ties' spread on random testing's findings:
+§15.)
+
 | Quantity | Requirement |
 |---|---|
 | exit status | the same |
-| messages | byte for byte, except: the CPU times; the numbers that follow from the parameters (the two `Max displacement` messages and `-verbose`'s ` %.2f(%.2f)` list: within the derived bounds below plus 0.01, the printed sub-brick the same unless another volume's value is within that bound of the largest, a near tie, reported); `-verbose -verbose` (next row) |
+| messages | byte for byte, except: the CPU times; the numbers that follow from the parameters (the two `Max displacement` messages and `-verbose`'s ` %.2f(%.2f)` list: within the derived bounds below plus 0.01, the printed sub-brick the same unless it is a near tie, reported: (spec writer, 2026-11-08, step 3) in AFNI's run, the value at the original's printed sub-brick is within the sum of the two sub-bricks' derived bounds plus 0.01 (the two-decimal printing) of AFNI's printed largest, taken from AFNI's `-maxdisp1D` values when written, else from the `-verbose` list, else the near tie is assumed and reported); `-verbose -verbose` (next row) |
 | `-verbose -verbose` | the lines that come before any resampling exactly (` + wtrim: ...`, `weight range`, ` # zero weights`, the workspace: §9.3); each derivative image's range within 10 % of the larger magnitude (the tie choices move them by up to 1.4 % with heptic, 5.5 % with linear); the fit lines (`First fit`, `Delta fit`, `Total fit`, `Iteration complete at <k> steps`) the same text with their numbers masked where both runs iterate as often; their numbers, and a different count, reported, not required (the first fit's coefficients move by up to 4e-3 relative with heptic, 4e-2 with linear) |
-| coarse search results (`-verbose`'s coarse lines) | the same rotation and shift for every volume; a difference is reported with its scores and must come from a near tie |
+| coarse search results (`-verbose`'s coarse lines) | the same rotation and shift for every volume on §14.1's named cases and §14.2's calls; elsewhere a difference is reported, not required (spec writer, 2026-11-08, step 3): the search's 44 nearest-neighbour rotations meet the ties too (240 ties on ds000256 `nofeedback`), and on random testing's phantoms AFNI's own result changes with them (measured: AFNI `0 9 -9 : 0 0 0`, its tie variants `-9 18 -9 : 0 -2 0` and `0 -0 -9 : 0 0 0`); the coarse result only starts the first pass, and the final parameters are judged by the rows below |
 | parameters (`-1Dfile`, `-dfile`, `-rotcom`) | per volume `|Δ angle| ≤ φ_t + k·|angle|` and `|Δ shift| ≤ x_t·δ_n + k·|shift|` (δ_n the voxel size along the shift's axis; `angle` and `shift` AFNI's), and the median of all `|Δ|` ≤ m (degrees or mm): **k = 0.005 and m = 0.001** for the estimation methods heptic, quintic, cubic and Fourier (measured: within `φ_t` and `x_t·δ_n` alone, at most 0.013° and 0.0035 mm, cubic on `s1`); **k = 0.03 and m = 0.005 for `-linear`** (measured: up to 0.051° at a roll of 2.4°, which needs k = 0.015, and a median of 0.0031); the estimation method decides, not `-final`, and `-twopass`'s linear first pass does not count (its result only starts the final pass) |
 | `-dfile`'s rmsold, rmsnew | rmsold identical (it compares the input with the base); rmsnew within `rms(y_AFNI − y)` (the two registered volumes' difference: the triangle inequality) `+ 1e-3·rmsnew` (the float32 sums and the `%11.4g` printing), for float32 outputs, `+ 1` for int16, taken from a run that writes the registered dataset; otherwise reported (measured: rmsnew moves by up to 11 % with `-linear`, 4.5 % cubic, 1.7 % heptic, 0.2 % Fourier on `s1`) |
 | matrices (`-1Dmatrix_save`) | derived (below): rotation entries within `α_v + 1e-6`; translations within `τ_v + α_v·(|t| + |c_b|) + 1e-6·(|t| + |c_b| + |c_i|) + 1e-5·|u|` |
 | maximum displacements (`-maxdisp1D`, the messages) | derived: each volume's within `α_v·r + τ_v + 0.001`, each delta within the sum of its volume's and the previous volume's bounds |
 | `-savedisp` | derived: each voxel's three values within `α_v·|x − c| + τ_v + 1e-6·(1 + |u|)` |
 | `-SAVEDISP` | in two steps, below: its normalisation and its 16 products exactly, on AFNI's own raw displacements; a whole run's 19 datasets by names, order, count, headers and types exactly, and by value only where the normalisation is well conditioned |
-| registered volumes, float32 | every volume NCC ≥ 0.9998 and mean `|diff|` ≤ 2e-3·max `|AFNI|`, whether or not its parameters agree (the output's own resampling meets the ties); the largest single difference reported, not required (measured: NCC ≥ 0.99994 and mean ≤ 1.1e-3, both `-linear` on `s1`; at most 7.3e-4 with the other methods, 3.2e-4 on fMRIPrep's inputs; single voxels at the volume's edges up to 2.9e-2 of the largest value with `-linear`, 1.7e-2 cubic, 5.9e-3 heptic on ds000005, also where every parameter agrees within 1e-4) |
+| registered volumes, float32 | (spec writer, 2026-11-08, step 3: the limit grows with each volume's rotation) for volume v, with `θ_v = |roll| + |pitch| + |yaw|` of AFNI's `-1Dfile` line (degrees) and `L_v = max(2e-3, 1e-3·θ_v)`: mean `|diff|` ≤ `L_v`·max `|AFNI_v|` (the volume's own largest value) and NCC ≥ `1 − 50·L_v²` (up to 2°: 2e-3 and 0.9998, as before), whether or not its parameters agree (the output's own resampling meets the ties); the largest single difference reported, not required. Measured: AFNI's own spread under the ties (§5.3) on fMRIPrep's call over 16 real runs reaches 0.68 of `L_v` and 0.16 of the NCC's allowance (ds000256 `nofeedback`: mean 3.4e-3 at 5.2°, 2.3e-3 at 4.2°; the earlier fixed 2e-3 and 0.9998 failed four of its volumes), the clean-room original the same; earlier measurements: NCC ≥ 0.99994 and mean ≤ 1.1e-3 with `-linear` on `s1`; single voxels at the volume's edges up to 2.9e-2 of the largest value with `-linear`, 1.7e-2 cubic, 5.9e-3 heptic on ds000005, 5.2e-2 Fourier on `nofeedback`, also where every parameter agrees within 1e-4 |
 | registered volumes, int16 / uint8 | the same measures on the stored values; the fraction of voxels that differ by more than 1 reported |
-| fMRIPrep's medians | on §14.2's calls, max `|diff|` ≤ 1e-4·max of fMRIPrep's own `gen_avg` / `ref_average` output (measured: at most 3.2e-5 on ds000005 and ds003592; the synthetic `s1` with fMRIPrep's call, a motion of 3° and 5 mm that no fMRIPrep input of §14.2 has, 1.3e-3: reported) |
+| registered volumes, `-final NN` | (spec writer, 2026-11-08, step 3) the nearest-neighbour rule instead of the measures above: at every voxel where the original's output and AFNI's differ, the original's value is the input's value at a voxel within two voxels along each axis of the input voxel whose value AFNI's output holds there, the input taken as 0 outside its grid (so a 0 against a value is accepted when that value's voxel lies within one voxel of a face of the input grid: the edge of the rotated field of view); checked where the input's values are distinct (the suite's float32 series), elsewhere the share of differing voxels reported; the parameters as above. Each of the four shears rounds its rows' shifts down to whole voxels, so a tie decided the other way moves whole rows by one voxel, and two shears along the same axis by up to two: most voxels can differ (measured: AFNI's own tie variants change up to 81 % of a volume's voxels on `s1` with `-twopass -Fourier -final NN`, NCC 0.9917; over 3,656,469 differing voxels of five float32 cases (the two suites' `s1` series with `-twopass -Fourier`, heptic and `-linear -noclip`, and a 48 × 48 × 36 isotropic series), AFNI's tie variants (9 to 11 per case) and the original's 5 runs alike, none against the rule: 3,533,151 from a source voxel one voxel away, 198 two voxels away, 108,961 a 0 against a value from a face, 99 a 0 against a value one voxel inside it, 14,060 not checkable; a rule of one voxel would leave the 297 at two) |
+| fMRIPrep's medians | (spec writer, 2026-11-08, step 3: the median's limit follows from the volumes') on §14.2's calls and the data panel's runs, against fMRIPrep's own `gen_avg` / `ref_average` output: mean `|diff|` ≤ `L_med`·max + q and NCC ≥ `1 − 50·L_med²`, with `L_med` the largest `L_v` of the run's volumes and q the stored median's step (its scale factor for an int16 output, 0 for float32); the largest difference and the share of voxels beyond 1e-3 of the maximum reported. At each voxel the median moves by at most the largest of its volumes' differences there (the median of the same number of values is 1-Lipschitz in each), so it cannot be held to more than the volumes; measured over AFNI's own tie variants on the 16 runs: at most 0.17 of `L_med` (ds000256 `nofeedback`: mean 9.0e-4, the largest single voxel 2.0e-2, 29 % of its voxels beyond 1e-3; on the runs with less motion the largest voxel 1.2e-6 to 3.5e-4, so the earlier 1e-4 on the largest voxel failed ds000228, ds005454, ds004958 and ds000256's baseline by AFNI's own ties) |
 | headers, types, dimensions, geometry, time fields | identical |
 
 Bit-identity is reported per category, not required. PLAN.md §11.3's motion-parameter criterion
@@ -1435,7 +1505,10 @@ heptic, 24 % with `-linear`). They are therefore validated in two steps:
 1. **The arithmetic, exactly.** AFNI's `-savedisp` run with the same arguments gives the raw
    displacements that `-SAVEDISP` normalises (the same float32 values: AFNI is deterministic and
    normalises them in place before writing). The original's normalisation and its 16 products,
-   applied to those raw datasets, must give AFNI's 19 `-SAVEDISP` datasets bit for bit.
+   applied to those raw datasets, must give AFNI's 19 `-SAVEDISP` datasets bit for bit (spec
+   writer, 2026-11-08, step 3: §10.3's arithmetic, its double order for the line included, does,
+   on every value of `s1` and ds000005; `savedisp.py` checks it, and with `--original` lists where
+   an implementation's products depart from it).
 2. **A whole run.** Names, order, count, headers and types exactly; the raw displacements
    (`-savedisp`) at the derived threshold above; the three normalised displacements `_DX`, `_DY`,
    `_DZ` by value only at the voxels where the normalisation is well conditioned: with `τ` the
@@ -1444,6 +1517,64 @@ heptic, 24 % with `-linear`). They are therefore validated in two steps:
    `6·τ/(m − 3·τ)` (the detrending is a projection that at most triples a difference, the
    division at most doubles it). The other voxels and the 16 products are reported (largest
    difference, correlation), not required.
+
+**The ties' spread** (spec writer, 2026-11-08, step 3: the rule for ill-conditioned fits, where
+the requirements above cannot hold because AFNI's own result moves beyond them with the ties,
+§5.3 "AFNI's own spread under the ties"). The requirements above (the fixed ones) hold on
+§14.1's named cases, on §14.2's calls and the data panel's runs, without any other rule. In
+random testing (§14.4), whose small phantoms with sharp edges and larger motions make fits
+ill-conditioned with respect to the ties, a case that fails them is judged by the original's own
+spread under the ties instead, which an implementation measures from its own runs:
+1. **The switch.** The original provides a validation-only setting that decides each tie by a
+   seeded draw, independently at every resampling (every derivative image, every iteration, the
+   output, every coarse rotation): `LARMORX_VOLREG_TIES=random:<seed>`, a uniform choice among
+   the orders whose norms are within a relative 1e-12 of the smallest, from a generator seeded
+   with `<seed>` and started afresh by every run (the model's `TIES = "random:<seed>"`, §15).
+   Its global sides (`first`, `last`, an index) remain, but do not measure the spread (point 6).
+2. **The spread.** K = 12 runs with seeds 1 to 12, each with the case's arguments in `reproduce`.
+   For each quantity, the spread is the largest difference, over the 12 runs and over the case's
+   volumes, between the original's default run and a seeded run, in the requirement's own units:
+   each parameter's |difference| divided by its threshold (§14.3's per-volume thresholds, from
+   AFNI's values), the median of all |differences| (degrees or mm), each registered volume's mean
+   |diff| divided by AFNI's largest value of that volume, and 1 − NCC.
+3. **The requirement.** Each quantity of the original against AFNI within the larger of its fixed
+   requirement and 3 times its spread (9 times for 1 − NCC). The quantities derived from the
+   parameters (matrices, maximum displacements, `-savedisp`, the numbers in messages) keep their
+   derived bounds, which follow each volume's own parameter differences and so need no spread.
+   Measured (the spread taken over AFNI's arithmetic with 12 seeded draws as a stand-in for the
+   original's, the spec writer's scratch measurement): on the parameters and the registered
+   volumes, 0 failures in 103 converging findings of a seeded sample of the trial (`oracles/difftest/2026-11-08-volreg-original-trial`) for the
+   original's default as the centre, and also for AFNI's arithmetic with the first side
+   everywhere as the centre; with 2 times the spread 1 failure; with each volume's own spread
+   instead of the case's, 1 to 2 failures at 3 times. The model of §15 holds the rule with its
+   own 12 seeded runs (`spread.py`): the result is in §15.
+4. **Runaways.** A case in which AFNI's run or any of the original's runs (its default and its 12
+   seeded runs) has a volume beyond 15° or 20 mm, or ends with AFNI-97 (AFNI's crash, or the
+   original's AFNI-97 error with `reproduce`), is outside the small motions 3dvolreg is made for
+   (§1), and the ties decide what happens in it: whether a fit runs away at all, which volume, and
+   whether AFNI-97's condition is met on the way (measured over AFNI's own tie variants: in 6 of
+   18 sampled runaways some variants stay below 15° and 20 mm; in a finding whose AFNI run stays
+   at 10.7° all 15 variants go beyond 16°; in 7 findings where AFNI and the original ended with
+   different exit statuses, AFNI-97's condition came in 2 to 12 of AFNI's 16 variants, AFNI's own
+   run included or not). Required: when both end with exit status 0, the files written, their names, headers,
+   types and dimensions, and the messages' text with their numbers masked; an exit status that
+   differs only by AFNI-97 (AFNI's crash, or the original's AFNI-97 stop) accepted; the
+   parameters, volumes and derived numbers reported, not required. Not required either: that
+   both runs away (AFNI's own choices make that a coin toss).
+5. **Fits that stop at their iteration limit** need no rule of their own: the ties' spread covers
+   them (measured: all 20 sampled such findings within AFNI's own tie spread; such a fit oscillates
+   between two points with increments that do not shrink, and the ties choose where it stops).
+6. **The suite's re-examination with the global sides** (each of the four sides everywhere, or each
+   volume taken from the side closest to AFNI's) is not a reading of "either side of every tie":
+   AFNI decides each resampling its own way (§5.3: 190 and 144 of 334 ties on one run), so a
+   global side is one point of the spread, not its extent; measured on the same 103 findings, 3
+   times the spread of the original's four global sides still leaves 41 failing on the parameters
+   alone (AFNI's result up to 1,356 times that spread away), against 0 with the seeded spread.
+   On §14.1's and §14.2's cases the revised requirements need no re-examination (they hold for
+   every tie choice measured, §15; the suite's record of 2026-11-08 failed, or declared expected
+   divergences, only where they were revised: the volumes and median of high-motion runs and
+   `-final NN`); in random testing the seeded spread above replaces it.
+   The per-volume composite of global sides should not be used to pass a case.
 
 **AFNI's own variability.** AFNI is deterministic and single-threaded: repeated runs, AFNI 25.2.09
 and fMRIPrep's own AFNI give the same bits **(observed)**, so there is no natural spread. A band
@@ -1458,7 +1589,28 @@ reversed), as for mcflirt (`specs/mcflirt.md` §14).
   implementation; one trial (`difftest --tools afni-volreg --budget 0.5`, boxed) before the gates;
   its differences triaged into `validation/difftest/triage.toml` (the replica's trial of
   2026-11-06: 39,751 cases, all agreeing after AFNI-97's correction). The replica's permanent cases
-  are not read by the clean-room implementer (porting guide §1).
+  are not read by the clean-room implementer (porting guide §1). (spec writer, 2026-11-08, step
+  3) The original's cases are judged by §14.3's fixed requirements first and, where they fail, by
+  "The ties' spread" (its 12 seeded runs, runaways by its point 4); a case beyond both is a
+  finding to triage. What the trial's open verdicts were (a seeded sample of 1,200 of its 10,325
+  differences, judged again by the clean-room part's `triage.py`), measured against AFNI's own tie
+  variants on 123 of them (all 23 "parameters within their bounds but another check failed", 45
+  of the 133 "converged and beyond", 20 "not converged", 20 "runaway", 15 "within the ties'
+  spread"): 117 of the 121 comparable ones lie within AFNI's own spread (the original's distance
+  from AFNI no larger than the farthest of AFNI's 15 variants; the 4 others at its edge, 6.90
+  against 6.89 thresholds, 31 against 28, 218 against 211, 24.34 against 24.32), and the original
+  taking the first side everywhere agrees with AFNI's arithmetic taking it too in 117 of 121 (all 4
+  others runaways): the ties, not a missed behaviour. The 23, one by one: 8 fail only
+  `-SAVEDISP`'s products (not the ties: §10.3's double order for the line, now stated); 7 the
+  registered volumes (1 passes the revised fixed limit, 1 is a `-final NN` case within the
+  nearest-neighbour rule, 51 differing voxels all from a neighbouring source voxel, 5 lie within
+  the seeded spread); 6 the parameters' median (all 6 within the seeded spread: ill-conditioned
+  phantoms whose parameters spread over up to 36 thresholds); 5 messages (3 pass with the final
+  build, 1 is the sub-brick of a near tie, now defined in §14.3's messages row, 1 the coarse
+  search's result, now reported, not required); 1 the parameters against the replica's default
+  (1.05 thresholds, where the seeded spread is 0.98 thresholds). With the revised requirements every
+  one of the 23 passes. (Measured with AFNI's arithmetic and its own tie variants: the spec writer's
+  scratch tools, not kept.)
 - **Golden:** at least one case per code path of the original (heptic, Fourier with `-twopass`,
   `-zpad`, the clipping off, int16, `-savedisp`), inputs ≤ 32³ × 4 of plain arithmetic, in
   `crates/larmorx-cli/tests/` beside the replica's.
@@ -1475,7 +1627,7 @@ decomposition §5.3's stable formulas, the FFT numpy's); `check.py` runs AFNI 26
 a black box and the model on the same input and compares the `-1Dfile` lines, the
 `-1Dmatrix_save` lines, the `-maxdisp1D` values and the registered volumes (`README.md` there:
 how to run it). Not modelled: `-tshift`, `-rotparent`/`-gridparent`, `-savedisp`, `-weight`,
-`-wtinp`, the FFT blur, the messages. The clean-room implementer may read and run it.
+the FFT blur, the messages (`-wtinp` is modelled since step 3). The clean-room implementer may read and run it.
 
 **Results (2026-11-07, 16 cases):** a synthetic moving series (40 × 44 × 24 × 5, float32, LPS
 storage) with the default heptic method, `-linear`, `-cubic`, `-quintic`, `-Fourier`, `-final NN`,
@@ -1511,6 +1663,35 @@ reading) and `-twopass -coarse 2 1` (the shift-only search); the same series sto
   `-twopass`, `-edging`, `-twoblur`, `-delta`) and prints its errors or the parameters it ends
   with.
 
+**Added 2026-11-08, step 3** (spec writer; the implementer's questions after its records: §14.3's
+volume and median limits on real high-motion data, `-final NN`, `-SAVEDISP`'s products,
+ill-conditioned fits, the tie re-examination, the trial's open verdicts):
+- `model.py`: `TIES = "random:<seed>"` (a seeded draw among the tied orders at every resampling,
+  the generator started afresh by each run); `Settings.wtinp` (`-wtinp`, §8.7 step 2); the 2 × 2
+  system of §5.3 solved by Cramer's rule where the elimination's pivot rounds to exactly 0 (a
+  coarse rotation's exact sines and cosines; it stopped the model on 2 random-testing findings).
+- `thresholds.py`: six tie choices per case (the three before and `random:1` to `random:3`), the
+  revised requirements of §14.3 (each volume's limit `L_v` from its own rotation, fMRIPrep's
+  median held to the volumes' limit, the nearest-neighbour rule for `-final NN`), and six more
+  cases: `s1` with `-twopass -Fourier -final NN` and with `-wtinp`, and fMRIPrep's call on the
+  data panel's runs with the most motion and the most ties (ds000256 `nofeedback`, ds000228,
+  ds004958, ds005454, their inputs re-made by the clean-room suite in fMRIPrep's image).
+  RESULT_THRESHOLDS
+- `savedisp.py`: §10.3's arithmetic applied to AFNI's own `-savedisp` values against AFNI's
+  `-SAVEDISP` datasets: 0 of 4,815,360 values differ on `s1`, 0 of 52,920,320 on ds000005 (the
+  textbook forms of the line's coefficients: 3,983 normalised values differ on ds000005);
+  `--original` compares an implementation's products with §10.3 applied to its own three
+  normalised datasets (the original of 2026-11-08: 233 values on `s1`, 13,648 on ds000005).
+- `spread.py`: §14.3's "The ties' spread" on random testing's findings: their inputs made again
+  from the recipes, the command lines read into the model's settings (§9.1's scan; findings with
+  `-tshift`, `-weight`, an external `-base`, `-float` or a `-twoblur` above 14 left out), AFNI
+  through the oracle cache and the model 13 times (the spec's rule as the centre, 12 seeded
+  draws). On the trial of 2026-11-08, the spec writer's sample of 123 findings and a seeded sample
+  of 300 (`--sample 300 --seed 7`): 208 converging findings, every one within the rule (24 by the
+  fixed requirements, 184 by the seeded spread: the model, too, is beyond the fixed requirements
+  on most of these phantoms), 52 runaways, 1 input AFNI refuses, 162 with options the model does
+  not implement; 0 failures.
+
 ## 16. Open points
 
 - **Bit-identity needs AFNI's evaluation of the shear decomposition's norms** (§5.3,
@@ -1526,3 +1707,10 @@ reading) and `-twopass -coarse 2 1` (the shift-only search); the same series sto
   difference is within the thresholds that follow from the convergence thresholds, `-linear`'s
   wider ones included.)
 - For Fourier the FFT's last bits are AFNI's own (§5.6) and not specified.
+- (spec writer, 2026-11-08, step 3) The decision on bit-identity above stands (the orchestrator,
+  2026-11-07): the requirements of §14.3 allow for AFNI's own spread under the ties, measured,
+  and nothing more. The line's double order stated in §10.3 for `-SAVEDISP` is the same fit as
+  `specs/3dTshift.md` §4 step 2's, whose text leaves that order open; for 3dTshift a different
+  order can change an output value by one float32 step now and then (nothing magnifies it there),
+  which its thresholds allow, so that spec is not changed here (for the orchestrator: it could
+  gain the same sentence if 3dTshift's original is ever held to bit-identity).

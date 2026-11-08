@@ -8,14 +8,19 @@ Usage (inside a memory box; one case per call, so several can run side by side):
     python -P validation/investigations/3dvolreg-spec/thresholds.py <work folder> --summary
 
 For each case, AFNI 26.3.05's 3dvolreg runs through the oracle cache (``afni_run.py``) and the
-model (``model.py``) runs three times, once per way of breaking §5.3's exact ties (``TIES``:
-the smallest computed norm, the first and the last of the tied orders): three results a
-clean-room implementation may get from the spec alone. Each is held to §14.3's requirements for
+model (``model.py``) runs six times, once per way of breaking §5.3's exact ties (``TIES``:
+the smallest computed norm, the first and the last of the tied orders, and three seeded draws at
+every resampling, ``TIE_CHOICES``): results a clean-room implementation may get from the spec
+alone. Each is held to §14.3's requirements for
 the parameters (per volume and the median), the matrices, the maximum displacements and their
 deltas, the registered volumes and, for the cases marked so, ``-savedisp``'s displacements and
 ``-SAVEDISP``'s normalised displacements where they are well conditioned. The derived thresholds
-follow from each volume's own parameter differences (§14.3, "Derived quantities"). Written from
-the spec and black-box runs only.
+follow from each volume's own parameter differences (§14.3, "Derived quantities"). Since the
+spec writer's step 3 (2026-11-08): the registered volumes' limit grows with each volume's own
+rotation (``volume_limit``), fMRIPrep's median is held to the volumes' limit, ``-final NN`` to
+the nearest-neighbour rule (``nn_unexplained``), and the cases include fMRIPrep's calls on the
+data panel's runs with the most motion and the most ties (ds000256's ``nofeedback``, ds000228,
+ds004958, ds005454). Written from the spec and black-box runs only.
 """
 
 from __future__ import annotations
@@ -70,7 +75,49 @@ CASES = {
         {"method": "fourier", "twopass": True},
         False,
     ),
+    # (spec writer, 2026-11-08, step 3) -final NN under the ties, and fMRIPrep's calls on the real
+    # runs with the most motion and the most ties (isotropic voxels: all three axes tie)
+    "s1-twopass-nn": (
+        "s1.nii.gz",
+        ("-twopass", "-Fourier", "-final", "NN"),
+        {"method": "fourier", "twopass": True, "final": "nn"},
+        False,
+    ),
+    "s1-wtinp": ("s1.nii.gz", ("-wtinp",), {"wtinp": True}, False),
+    "ds000256-nofeedback-fmriprep": (
+        "ds000256-nofeedback_sliced.nii.gz",
+        FMRIPREP,
+        {"method": "fourier", "twopass": True},
+        False,
+    ),
+    "ds000228-fmriprep": (
+        "ds000228_sliced.nii.gz",
+        FMRIPREP,
+        {"method": "fourier", "twopass": True},
+        False,
+    ),
+    "ds004958-fmriprep": (
+        "ds004958_sliced.nii.gz",
+        FMRIPREP,
+        {"method": "fourier", "twopass": True},
+        False,
+    ),
+    "ds005454-fmriprep": (
+        "ds005454_sliced.nii.gz",
+        FMRIPREP,
+        {"method": "fourier", "twopass": True},
+        False,
+    ),
 }
+
+#: The ways of breaking §5.3's exact ties each case is run with: the spec's rule on the model's own
+#: evaluation, the first and the last tied order everywhere, and three seeded draws at every
+#: resampling (AFNI decides each resampling its own way, §14.3 "The ties' spread").
+TIE_CHOICES = ("smallest", "first", "last", "random:1", "random:2", "random:3")
+
+#: The fMRIPrep inputs re-made by the clean-room original's suite (the data panel's runs), besides
+#: the replica suite's.
+SLICED_PANEL = A.WORKSPACE / "oracles/inputs/afni-volreg-original/fmriprep"
 
 
 def input_path(kind: str, work: Path) -> Path:
@@ -80,8 +127,47 @@ def input_path(kind: str, work: Path) -> Path:
             C.moving_series(p)
         return p
     if kind.startswith("ds"):
-        return SLICED / kind
+        return SLICED / kind if (SLICED / kind).is_file() else SLICED_PANEL / kind
     return INPUTS / kind
+
+
+def volume_limit(theta: float) -> float:
+    """§14.3's registered-volume limit L_v for a volume whose AFNI angles add to ``theta``
+    degrees: max(2e-3, 1e-3 theta) of AFNI's largest value for the mean |diff|, and 1 - NCC at
+    most 50 L_v**2 (spec writer, 2026-11-08, step 3)."""
+    return max(2e-3, 1e-3 * theta)
+
+
+def nn_unexplained(a: np.ndarray, b: np.ndarray, x: np.ndarray) -> tuple[int, int, int]:
+    """§14.3's rule for -final NN: at each voxel where AFNI's output ``a`` and ``b`` differ, ``b``
+    holds the input's value at a voxel within two voxels (along each axis) of the input voxel whose
+    value ``a`` holds, the input taken as 0 outside its grid (so a 0 against a value is explained
+    when that value's voxel is within one voxel of a face: two voxels from outside). Checked where
+    the input's values are distinct. Returns (differing voxels, unexplained, not checkable: a
+    value the input holds more than once)."""
+    u, idx, cnt = np.unique(x.ravel(), return_index=True, return_counts=True)
+    where = {float(v): int(i) for v, i, c in zip(u, idx, cnt, strict=True) if c == 1}
+    last = np.array(x.shape) - 1
+    differing = np.argwhere(a != b)
+    bad = amb = 0
+    for p in differing:
+        va, vb = float(a[tuple(p)]), float(b[tuple(p)])
+        if va == 0 or vb == 0:
+            k = where.get(vb if va == 0 else va)
+            if k is None:
+                amb += 1
+                continue
+            q = np.array(np.unravel_index(k, x.shape))
+            bad += int(not (np.any(q <= 1) or np.any(q >= last - 1)))
+            continue
+        ka, kb = where.get(va), where.get(vb)
+        if ka is None or kb is None:
+            amb += 1
+            continue
+        qa = np.array(np.unravel_index(ka, x.shape))
+        qb = np.array(np.unravel_index(kb, x.shape))
+        bad += int(np.abs(qa - qb).max() > 2)
+    return len(differing), bad, amb
 
 
 def lines(path: Path) -> list[str]:
@@ -191,7 +277,10 @@ def run_case(name: str, work: Path) -> dict:
     cb = grid.centre().astype(np.float64)
     r_half = 0.5 * math.sqrt(sum(((grid.n[a] - 1) * float(grid.delta[a])) ** 2 for a in range(3)))
     out = {"case": name, "variants": {}}
-    for ties in ("smallest", "first", "last"):
+    nn = kw.get("final") == "nn"
+    xin = np.asarray(img.dataobj).astype(np.float64) if nn else None
+    theta = np.abs(pa[:, :3]).sum(axis=1)
+    for ties in TIE_CHOICES:
         M.TIES = ties
         try:
             res = M.volreg(str(inp), M.Settings(**kw))
@@ -236,30 +325,39 @@ def run_case(name: str, work: Path) -> dict:
             den = math.sqrt((ac * ac).sum() * (bc * bc).sum())
             ncc = float((ac * bc).sum() / den) if den > 0 else 1.0
             diff = np.abs(a - b) / big
-            per_volume.append(
-                {
-                    "params within 1e-4": bool(np.all(dp[v] <= 1e-4 + 1e-9)),
-                    "identical": bool(np.all(a == b)),
-                    "max": float(diff.max()),
-                    "p99.9": float(np.quantile(diff, 0.999)),
-                    "mean": float(diff.mean()),
-                    "ncc": ncc,
-                }
-            )
+            # §14.3 (step 3): each volume's limit from its own AFNI angles; its largest value
+            big_v = float(np.abs(a).max()) or 1.0
+            entry = {
+                "params within 1e-4": bool(np.all(dp[v] <= 1e-4 + 1e-9)),
+                "identical": bool(np.all(a == b)),
+                "max": float(diff.max()),
+                "p99.9": float(np.quantile(diff, 0.999)),
+                "mean": float(diff.mean()),
+                "mean_v": float(np.abs(a - b).mean()) / big_v,
+                "ncc": ncc,
+                "L": volume_limit(float(theta[v])),
+            }
+            if nn:
+                entry["nn"] = nn_unexplained(a, b, xin[..., v] if xin.ndim == 4 else xin)
+            per_volume.append(entry)
         fails["volumes"] = sum(not volume_ok(x, fourier) for x in per_volume)
         worst_ncc = min(x["ncc"] for x in per_volume)
         if tuple(opts) == tuple(FMRIPREP):
             # RobustAverage's reference: the median of the registered volumes (§2), from AFNI's
-            # volumes (fMRIPrep's own output, byte for byte) and from the model's
-            med_a = np.median(ad.astype(np.float32), axis=3)
-            med_m = np.median(mdat.astype(np.float32), axis=3)
-            rel = float(np.abs(med_a - med_m).max() / np.abs(med_a).max())
-            # §14.3 holds fMRIPrep's real inputs (§14.2) to it; on s1 it is reported
-            if kind.startswith("ds"):
-                fails["fMRIPrep's median"] = int(rel > 1e-4)
+            # volumes (fMRIPrep's own output, byte for byte) and from the model's; its limit
+            # follows from the volumes' (§14.3, step 3): the largest L_v of the run
+            med_a = np.median(ad.astype(np.float32), axis=3).astype(np.float64)
+            med_m = np.median(mdat.astype(np.float32), axis=3).astype(np.float64)
+            mbig = float(np.abs(med_a).max())
+            l_med = max(volume_limit(float(t)) for t in theta)
+            rel = float(np.abs(med_a - med_m).max() / mbig)
+            med_mean = float(np.abs(med_a - med_m).mean() / mbig)
+            mc, nc = med_a - med_a.mean(), med_m - med_m.mean()
+            med_ncc = float((mc * nc).sum() / math.sqrt((mc * mc).sum() * (nc * nc).sum()))
+            fails["fMRIPrep's median"] = int(med_mean > l_med or med_ncc < 1 - 50 * l_med**2)
             fmriprep_median = rel
         else:
-            fmriprep_median = None
+            fmriprep_median = med_mean = med_ncc = l_med = None
         info = {
             "max |d| angle": float(dp[:, :3].max()),
             "max |d| shift": float(dp[:, 3:].max()),
@@ -275,6 +373,9 @@ def run_case(name: str, work: Path) -> dict:
             "volumes": per_volume,
             "fourier": fourier,
             "fMRIPrep's median max |diff| / max": fmriprep_median,
+            "fMRIPrep's median mean |diff| / max": med_mean,
+            "fMRIPrep's median NCC": med_ncc,
+            "fMRIPrep's median limit": l_med,
         }
         if savedisp:
             ua = np.stack(
@@ -325,10 +426,17 @@ def run_case(name: str, work: Path) -> dict:
 
 
 def volume_ok(x: dict, fourier: bool) -> bool:
-    """§14.3's registered float32 volumes: every volume NCC >= 0.9998 and mean |diff| <= 2e-3 of
-    AFNI's largest value, whether or not its parameters agree (the output's own resampling meets
-    §5.3's ties); the largest single difference is reported, not required."""
-    return x["ncc"] >= 0.9998 and x["mean"] <= 2e-3
+    """§14.3's registered float32 volumes (spec writer, 2026-11-08, step 3): every volume's mean
+    |diff| at most L_v of AFNI's largest value of that volume and its NCC at least 1 - 50 L_v**2,
+    L_v = max(2e-3, 1e-3 theta_v) (theta_v the sum of AFNI's three angles of the volume, in
+    degrees; 2e-3 and 0.9998 up to 2 degrees), whether or not its parameters agree (the output's
+    own resampling meets §5.3's ties); the largest single difference reported, not required.
+    With -final NN the rule of nearest neighbours instead: every differing voxel's value from a
+    voxel within two voxels of AFNI's source voxel (``nn_unexplained``)."""
+    if "nn" in x:
+        return x["nn"][1] == 0
+    lim = x.get("L", 2e-3)
+    return x["ncc"] >= 1 - 50 * lim * lim and x.get("mean_v", x["mean"]) <= lim
 
 
 def detrend_normmax_raw(series: np.ndarray) -> np.ndarray:
@@ -372,8 +480,23 @@ def summary(work: Path) -> int:
                     if "SAVEDISP voxels compared" in i
                     else ""
                 )
-                + (f"  fMRIPrep's median {med:.1e}" if med is not None else "")
+                + (
+                    f"  fMRIPrep's median max {med:.1e} mean {i["fMRIPrep's median mean |diff| / max"]:.1e}"
+                    f" (limit {i["fMRIPrep's median limit"]:.1e}) NCC {i["fMRIPrep's median NCC"]:.7f}"
+                    if med is not None and i.get("fMRIPrep's median limit") is not None
+                    else ""
+                )
             )
+            nnv = [x["nn"] for x in vols if "nn" in x]
+            if nnv:
+                print(
+                    "       -final NN: differing voxels",
+                    sum(x[0] for x in nnv),
+                    "unexplained",
+                    sum(x[1] for x in nnv),
+                    "not checkable",
+                    sum(x[2] for x in nnv),
+                )
             print("       volumes:", v["info"]["volume measures"])
             if nf:
                 print("       FAILS:", {k: n for k, n in v["fails"].items() if n})
@@ -386,7 +509,14 @@ def main() -> int:
     work.mkdir(parents=True, exist_ok=True)
     if sys.argv[2] == "--summary":
         return summary(work)
-    for name in sys.argv[2:]:
+    names = sys.argv[2:]
+    if "--ties" in names:
+        # some of the tie choices only (one work folder per call: a large case split over calls)
+        k = names.index("--ties")
+        global TIE_CHOICES
+        TIE_CHOICES = tuple(names[k + 1].split(","))
+        names = names[:k] + names[k + 2 :]
+    for name in names:
         res = run_case(name, work)
         (work / f"{name}.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
         for ties, v in res["variants"].items():

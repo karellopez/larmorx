@@ -233,7 +233,14 @@ def _decompose(q, e):
     c1 = (q[2, 2] - f - bz * q[1, 2]) / az
     cy = q[1, 2] - q10 * c1
     A = np.array([[q10, q20], [q11, q21]])
-    b2, c2 = np.linalg.solve(A, np.array([q[0, 0] - f, q[0, 1] - f * b1]))
+    rhs = np.array([q[0, 0] - f, q[0, 1] - f * b1])
+    try:
+        b2, c2 = np.linalg.solve(A, rhs)
+    except np.linalg.LinAlgError:
+        # (2026-11-08, step 3) the elimination's pivot can round to exactly 0 although den is not
+        # 0 (a coarse rotation's exact sines and cosines): the same solution by Cramer's rule
+        b2 = -(rhs[0] * q21 - q20 * rhs[1]) / den
+        c2 = -(q10 * rhs[1] - q11 * rhs[0]) / den
     sy = e[1]
     sz = e[2] - bz * e[1]
     sx = e[0] - b2 * e[1] - c2 * e[2]
@@ -256,7 +263,17 @@ ORDERS = [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]
 #: this model's own evaluation); ``"first"`` / ``"last"``: the first / last order whose computed
 #: norm is within a relative 1e-12 of the smallest -- the two sides of every such tie, which
 #: ``thresholds.py`` uses to measure how much the choice moves the results.
+#: ``"random:<seed>"`` (spec writer, 2026-11-08, step 3): at every resampling whose orders tie, one
+#: of the tied orders drawn by a generator seeded with ``<seed>`` and restarted by each
+#: :func:`volreg` (AFNI decides each resampling its own way: §14.3, "The ties' spread").
 TIES = "smallest"
+_TIE_RNG: list = [None]
+
+
+def _tie_rng_reset() -> None:
+    _TIE_RNG[0] = (
+        np.random.default_rng(int(TIES.split(":", 1)[1])) if TIES.startswith("random:") else None
+    )
 
 
 def shear_best(Q, d):
@@ -283,7 +300,13 @@ def shear_best(Q, d):
         _, o, sh = next(c for c in cands if c[0] == smallest)
     else:
         near = [c for c in cands if c[0] <= smallest * (1 + 1e-12)]
-        _, o, sh = near[0] if TIES == "first" else near[-1]
+        if TIES.startswith("random:"):
+            if _TIE_RNG[0] is None:
+                _tie_rng_reset()
+            pick = int(_TIE_RNG[0].integers(len(near))) if len(near) > 1 else 0
+            _, o, sh = near[pick]
+        else:
+            _, o, sh = near[0] if TIES == "first" else near[-1]
     out = []
     for ax, coef, s in sh:
         c = [0.0, 0.0, 0.0]
@@ -734,6 +757,8 @@ class Settings:
     edging: tuple = ("percent", 5.0)
     maxdisp: bool = True
     base_index: int = 0
+    #: -wtinp (§8.7 step 2, §7.1 item 3): the final pass's weight from the input's volume 0
+    wtinp: bool = False
 
 
 @dataclass
@@ -971,6 +996,7 @@ class Result:
 
 def volreg(path: str, s: Settings, st: State | None = None) -> Result:
     st = st or State()
+    _tie_rng_reset()
     img = nib.load(path)
     grid = read_grid(img)
     vols, kind = read_volumes(img)
@@ -1048,7 +1074,10 @@ def volreg(path: str, s: Settings, st: State | None = None) -> Result:
                 Vk, iv, F32(s.twoblur * F32(s.x_t)), F32(s.twoblur * F32(s.phi_t)), maxite
             )
             init[k] = [F32(F64(t) * (180.0 / PI)) for t in th] + dd
-    bas = Basis(base, delta, axes, None, edges, False, s.method, F32(s.dfac), s.zpad, st)
+    if s.wtinp:
+        bas = Basis(base, delta, axes, vols[0], None, True, s.method, F32(s.dfac), s.zpad, st)
+    else:
+        bas = Basis(base, delta, axes, None, edges, False, s.method, F32(s.dfac), s.zpad, st)
     res = Result([], [], kind, [], [], [], [])
     P = grid.P()
     ci = grid.centre()

@@ -871,7 +871,7 @@ def _example_coefficients(ctx: core.Context) -> dict:
             )
         if x["id"] == "lx-fmriprep" and same["lx-fmriprep"]:
             x["reason"] = "fMRIPrep 25.2.6's own coefficient file holds the same values."
-    at, _k2 = common.centre_view(ex, "axial")
+    at = [int(s) // 2 for s in grid.shape]  # every slice is whole: the middle one
     default = {
         "output": "coeff",
         "plane": "axial",
@@ -973,16 +973,23 @@ def _example_apply(ctx: core.Context, links: dict) -> dict:
           "the original against itself: the version step"),
     ]  # fmt: skip
     outputs = [{"id": "corrected", "label": "Unwarped series", "unit": ""}]
+
+    def units(pid: str) -> np.ndarray:
+        """The run's values in the image's units (stored integers × scale + intercept)."""
+        sc, it = scales[pid]
+        if sc is None:
+            return full[pid]
+        return full[pid].astype(np.float64) * sc + it
+
     for x in diffs:
         sa, sb = scales[x["a"]], scales[x["b"]]
-        same_scale = sa == sb
-        x["metrics"] = {
-            "corrected": core.compare(full[x["a"]], full[x["b"]],
-                                      **({"scale": sa[0] or 1.0, "inter": sa[1]}
-                                         if same_scale and sa[0] else {}))
-        }  # fmt: skip
-        if not same_scale:
-            x["metrics"]["corrected"]["identical"] = False
+        if sa == sb:
+            kw = {"scale": sa[0], "inter": sa[1]} if sa[0] is not None else {}
+            m = core.compare(full[x["a"]], full[x["b"]], **kw)
+        else:  # each file has its own scale factor: compared in the image's units
+            m = core.compare(units(x["a"]), units(x["b"]))
+            m["identical"] = False
+        x["metrics"] = {"corrected": m}
         r = ex.compare(x["a"], x["b"], "corrected")
         x["display"] = {"corrected": r["display"]}
     same = common.identical(diffs)
@@ -993,7 +1000,7 @@ def _example_apply(ctx: core.Context, links: dict) -> dict:
         fields["larmorx-fix"].astype(np.float64).reshape(mask.shape)
         - fields["larmorx-14"].astype(np.float64).reshape(mask.shape)
     )[mask]
-    sd = np.abs(full["larmorx-fix"].astype(np.float64) - full["larmorx-14"])
+    sm = next(x for x in diffs if x["id"] == "fix-lx")["metrics"]["corrected"]
     for x in diffs:
         if x["id"] == "fix-lx" and x["verdict"] == "d13" and named == ["SDC-02"]:
             x["reason"] = (
@@ -1004,8 +1011,9 @@ def _example_apply(ctx: core.Context, links: dict) -> dict:
                 "warning \"Image's and B-Spline's grids are not aligned\"); larmorx evaluates "
                 "the B-spline at each voxel's own position. The field on the series' grid "
                 f"changes by {float(np.sqrt(np.mean(fd * fd))):.2f} Hz RMS (largest "
-                f"{float(fd.max()):.1f} Hz) inside the brain mask, the unwarped series in "
-                f"{int(np.count_nonzero(sd)):,} of its {sd.size:,} values. "
+                f"{float(fd.max()):.1f} Hz) inside the brain mask; the unwarped series by "
+                f"{sm['rms']:.3g} RMS over all its values (largest {sm['max_abs']:.4g}; the "
+                f"series' range {sm['range']:.4g}). "
                 "`upstream_defects='reproduce'` gives sdcflows' series."
             )
         if x["id"] == "lx-sdc" and same["lx-sdc"]:

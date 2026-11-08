@@ -8,8 +8,9 @@
 //!   without `--overwrite` is tedana's `RuntimeError` before anything is written;
 //! - images through nilearn's `masking.unmask` and `new_img_like(..., copy_header=False)`: the
 //!   values put back at the mask's voxels (zeros elsewhere) in a **fresh** nibabel header with
-//!   the mask's affine (sform code 2, qform code 0 with nibabel's quaternion; an affine nibabel
-//!   finds close to the fresh header's own keeps both codes 0), float64 stored as float32 and
+//!   the mask's affine (sform code 2, qform code 0 with nibabel's quaternion, whatever the
+//!   affine: random testing found an affine equal to the fresh header's own written so too),
+//!   float64 stored as float32 and
 //!   int64 as int32, a 4D image given the reference's zooms (`set_zooms`, the repetition time
 //!   included), gzip-compressed;
 //! - the confounds table as pandas' `to_csv(sep="\t", lineterminator="\n", na_rep="n/a",
@@ -168,6 +169,10 @@ pub struct Outputs {
     pub voxels: Vec<usize>,
     /// `reference_img.header.get_zooms()`.
     pub ref_zooms: Vec<f64>,
+    /// The mask image's NIfTI version: nilearn's `unmask` (`new_img_like`) keeps its class, so
+    /// a mask computed from a NIfTI-2 reference (a `Nifti2Image` is a `Nifti1Image`, which
+    /// `_convert_to_nifti1` returns as it is) makes every output a NIfTI-2 file.
+    pub version: NiftiVersion,
     /// nibabel's qform arithmetic (numpy's LAPACK).
     pub release: LapackRelease,
     pub n_threads: usize,
@@ -230,16 +235,17 @@ impl Outputs {
                 "nibabel/nifti1.py",
             )
         };
-        let fresh = NiftiHeader::new(NiftiVersion::V1, shape, dtype).map_err(herr)?;
+        let fresh = NiftiHeader::new(self.version, shape, dtype).map_err(herr)?;
         let close = |h: &NiftiHeader| {
             h.best_affine_nibabel()
                 .is_ok_and(|b| self.affine.allclose(&b, 1e-5, 1e-8))
         };
-        let mut hdr = fresh.clone();
-        if !close(&fresh) {
-            hdr.set_affine_nibabel(&self.affine, self.release)
-                .map_err(herr)?;
-        }
+        // Nifti1Image(data, affine) with no header sets the sform (code 2) and the qform (code
+        // 0) unconditionally (Nifti1Pair.__init__'s _affine2header), even for an affine equal
+        // to the fresh header's own.
+        let mut hdr = fresh;
+        hdr.set_affine_nibabel(&self.affine, self.release)
+            .map_err(herr)?;
         if shape.len() == 4 {
             if self.ref_zooms.len() != 4 {
                 return Err(PyError::new(
@@ -256,7 +262,11 @@ impl Outputs {
                 ));
             }
             for (k, &z) in self.ref_zooms.iter().enumerate() {
-                hdr.pixdim[k + 1] = f64::from(z as f32);
+                // pixdim: float32 in a NIfTI-1 header, float64 in a NIfTI-2 one.
+                hdr.pixdim[k + 1] = match self.version {
+                    NiftiVersion::V1 => f64::from(z as f32),
+                    NiftiVersion::V2 => z,
+                };
             }
             if !close(&hdr) {
                 hdr.set_affine_nibabel(&self.affine, self.release)

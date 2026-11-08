@@ -23,7 +23,7 @@
 //! the same cap (as tedana 25.0.1 capped it). TED-14, the floor's debug message counts echoes
 //! times voxels as voxels (`E · V`): by default it counts the voxels.
 
-use larmorx_core::defects::{Notices, TED_05, TED_14};
+use larmorx_core::defects::{Notices, TED_05, TED_14, TED_18};
 use larmorx_core::numpy::NpFloat;
 use larmorx_core::numpy::quantile::{
     Percentiles, nanpercentile_linear_axis0, scoreatpercentile_lower,
@@ -141,15 +141,34 @@ pub fn modify_t2s_s0_maps(
     log.debug(Site("decay", "modify_t2s_s0_maps", 624), || {
         format!("Setting cap on T2* map at {}", format_fixed(cap10, 5))
     });
-    for t in t2s_limited.iter_mut() {
-        if *t > cap10 {
-            *t = cap;
+    // TED-18: a 99.5th percentile of 0 (more than 99.5 % of the limited map's values 0: voxels
+    // of one good echo) makes the cap 0, and tedana sets every positive limited T2* to 0. By
+    // default no cap of 0 or less is applied (to either map).
+    let degenerate = cap <= 0.0;
+    if degenerate {
+        let positive = t2s_limited.iter().filter(|&&t| t > cap10).count();
+        if positive > 0 {
+            notices.add(
+                &TED_18,
+                format!(
+                    "the limited T2* map's cap is {} ms (its 99.5th percentile), so tedana \
+                     sets its {positive} value(s) above it to it",
+                    format_fixed(cap, 3)
+                ),
+            );
+        }
+    }
+    if !(degenerate && notices.fix()) {
+        for t in t2s_limited.iter_mut() {
+            if *t > cap10 {
+                *t = cap;
+            }
         }
     }
     // TED-05: tedana 26.0.3 caps only the limited map; the full map (the combination's weights,
     // the T2* map fMRIPrep uses) keeps values of up to days. By default it gets the same cap.
     let above = t2s.iter().filter(|&&t| t > cap10).count();
-    if above > 0 {
+    if above > 0 && !degenerate {
         notices.add(
             &TED_05,
             format!(
@@ -260,6 +279,39 @@ pub fn rmse_of_fit_decay_ts(
             });
     })
     .expect("a thread pool");
+    // `s0 * np.exp(-tes / t2star)` (decay.py:83) warns once: a T2* of 0 (the limited map's,
+    // after a cap of 0: TED-18) divides by zero, and an infinite S0 times exp(-inf) = 0 is
+    // invalid.
+    let (mut div0, mut inf0) = (false, false);
+    for (v, &a) in am.iter().enumerate() {
+        if a < 2 || a as usize > ne || n_vols == 0 {
+            continue;
+        }
+        for c in 0..cols {
+            if t2s[v * cols + c] == 0.0 {
+                div0 = true;
+                inf0 |= s0[v * cols + c].is_infinite();
+            }
+        }
+    }
+    if div0 {
+        log.warn(
+            "tedana/decay.py",
+            83,
+            "RuntimeWarning",
+            "divide by zero encountered in divide",
+            "return s0 * np.exp(-tes / t2star)",
+        );
+    }
+    if inf0 {
+        log.warn(
+            "tedana/decay.py",
+            83,
+            "RuntimeWarning",
+            "invalid value encountered in multiply",
+            "return s0 * np.exp(-tes / t2star)",
+        );
+    }
     let sum_map = nansum_axis(&rmse, [n_samples, n_vols, 1]);
     let map: Vec<f32> = (0..n_samples)
         .map(|v| {

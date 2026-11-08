@@ -93,8 +93,10 @@ pub enum LstsqError {
     /// is not finite.
     #[error("SVD did not converge in Linear Least Squares")]
     DidNotConverge,
-    /// A shape this port does not follow (it follows `n = 2`, `m >= 2`).
-    #[error("lstsq is ported for a design of two columns and at least two rows, not {m} x {n}")]
+    /// A shape this port does not follow (it follows `n = 2` with `m = 0` or `m >= 2`).
+    #[error(
+        "lstsq is ported for a design of two columns and no or at least two rows, not {m} x {n}"
+    )]
     Unsupported { m: usize, n: usize },
     #[error(transparent)]
     Threads(#[from] parallel::ThreadPoolError),
@@ -118,11 +120,21 @@ pub fn lstsq(
     release: LapackRelease,
     n_threads: usize,
 ) -> Result<Lstsq, LstsqError> {
-    if n != 2 || m < 2 {
+    if n != 2 || m == 1 {
         return Err(LstsqError::Unsupported { m, n });
     }
     if a.len() != m * n || b.len() != m * nrhs {
         return Err(LstsqError::IncompatibleDimensions);
+    }
+    if m == 0 {
+        // No rows (tedana's fit of a series whose every volume was removed): DGELSD returns at
+        // once (rank 0, no singular values) and _linalg.py sets x to 0 (`if m == 0: x[...] = 0`).
+        return Ok(Lstsq {
+            x: vec![0.0; n * nrhs],
+            residuals: Vec::new(),
+            rank: 0,
+            s: Vec::new(),
+        });
     }
     // _linalg.py: rcond = finfo(float64).eps * max(n, m) (exact: a power of two times m).
     let rcond = rcond.unwrap_or(f64::EPSILON * m.max(n) as f64);
@@ -823,6 +835,13 @@ mod tests {
         let a = design(&[10.0, 20.0], 2);
         let out = lstsq(&a, 4, 2, &mut [], 0, None, LapackRelease::V3_12_1, 1).unwrap();
         assert!(out.x.is_empty() && out.rank == 2);
+        // No rows: numpy's x of zeros (+0), rank 0, no singular values or residuals.
+        for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
+            let out = lstsq(&[], 0, 2, &mut [], 3, None, release, 1).unwrap();
+            assert_eq!(out.x.len(), 6);
+            assert!(out.x.iter().all(|v| v.to_bits() == 0));
+            assert!(out.rank == 0 && out.s.is_empty() && out.residuals.is_empty());
+        }
     }
 
     #[test]

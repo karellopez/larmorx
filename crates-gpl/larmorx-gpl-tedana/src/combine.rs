@@ -26,6 +26,7 @@ use larmorx_core::numpy::NpFloat;
 use larmorx_core::numpy::reduce::{mean_axis, pairwise_sum, std_axis};
 use rayon::prelude::*;
 
+use crate::decay::Libraries;
 use crate::log::{Log, PyError, Site};
 use crate::maths::Maths;
 
@@ -94,6 +95,7 @@ pub fn make_optcom(
     volume_wise: bool,
     mode: CombMode,
     maths: &Maths,
+    libraries: Libraries,
     n_threads: usize,
     log: &mut Log<'_>,
     notices: &mut Notices,
@@ -184,6 +186,9 @@ pub fn make_optcom(
                 }
             })
             .collect();
+        if mode == CombMode::Paid {
+            paid_warnings(data, n_echos, n_vols, n, &idx, libraries, log);
+        }
         // numpy checks every sum of weights of the group before averaging.
         let mut zero = Vec::new();
         for (k, w) in weights.iter().enumerate() {
@@ -264,4 +269,60 @@ pub fn make_optcom(
         }
     }
     Ok(combined)
+}
+
+/// numpy's floating-point warnings of PAID's `data.mean(axis=-1)` and `data.std(axis=-1)` over
+/// one group's series (each warning once per place): a series holding both infinities (and no
+/// NaN) sums to NaN (`invalid value encountered in reduce`, in the mean and in the variance's
+/// mean), one holding infinities of one sign (and no NaN) has an infinite mean, from which its
+/// infinite samples subtract to NaN (`invalid value encountered in subtract`). (A series with a
+/// NaN as well can raise the first in an order-dependent way; not followed.)
+fn paid_warnings(
+    data: &[f32],
+    n_echos: usize,
+    n_vols: usize,
+    n: usize,
+    idx: &[usize],
+    libraries: Libraries,
+    log: &mut Log<'_>,
+) {
+    let (mut both, mut single) = (false, false);
+    for &v in idx {
+        for e in 0..n {
+            let row = &data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols];
+            let pos = row.iter().any(|&x| x == f32::INFINITY);
+            let neg = row.iter().any(|&x| x == f32::NEG_INFINITY);
+            if row.iter().any(|x| x.is_nan()) {
+                continue;
+            }
+            both |= pos && neg;
+            single |= pos != neg;
+        }
+    }
+    if both {
+        log.warn(
+            "numpy/_core/_methods.py",
+            libraries.methods_mean_sum_line(),
+            "RuntimeWarning",
+            "invalid value encountered in reduce",
+            "ret = umr_sum(arr, axis, dtype, out, keepdims, where=where)",
+        );
+        log.warn(
+            "numpy/_core/_methods.py",
+            libraries.methods_var_sum_line(),
+            "RuntimeWarning",
+            "invalid value encountered in reduce",
+            "arrmean = umr_sum(arr, axis, dtype, keepdims=True, where=where)",
+        );
+    }
+    if single {
+        let (line, source) = libraries.methods_var_subtract();
+        log.warn(
+            "numpy/_core/_methods.py",
+            line,
+            "RuntimeWarning",
+            "invalid value encountered in subtract",
+            source,
+        );
+    }
 }

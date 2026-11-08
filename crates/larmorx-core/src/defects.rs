@@ -380,6 +380,12 @@ defects! {
         "t2smap --debug's message on the T2* floor counts echoes times voxels as voxels (T2* values for N/E·V voxels), so its count and percentage are wrong for more than one echo";
     TED_15 = "TED-15", "tedana", true,
         "t2smap --combmode paid weights each echo by its temporal signal-to-noise ratio, 0 where the echo's standard deviation over time is 0, so a voxel whose good echoes are constant (and every voxel of a one-volume series) has weights summing to zero and t2smap fails with numpy's ZeroDivisionError: Weights sum to zero, can't be normalized";
+    TED_16 = "TED-16", "tedana", true,
+        "t2smap --exclude accepts a list that removes every volume (with or without --dummy-scans): the adaptive mask is then made from no volume and the log-linear fit solves no rows, so every voxel's T2* is 1/0 (infinite, then set to 500 ms) and S0 is 1, and t2smap writes these maps and the combination they weight with exit status 0 (the curve fit fails with numpy's ValueError of an empty minimum, the dropout method with the argmax of an empty sequence)";
+    TED_17 = "TED-17", "tedana", true,
+        "t2smap fails with IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed when a single voxel is left for the fit (a one-voxel mask, or one voxel with good signal): fit_loglinear squeezes its (voxels x echo counts) mask column to a 0-dimensional array before indexing it (both fit types and fit modes)";
+    TED_18 = "TED-18", "tedana", true,
+        "t2smap caps the limited T2* map at its 99.5th percentile, which is 0 when more than 99.5 % of its values are 0 (the voxels with one good echo, which the limited map sets to 0): every positive limited T2* is then set to 0, so the limited map holds no estimate and the RMSE is computed with T2* = 0 (numpy's divide-by-zero warning)";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

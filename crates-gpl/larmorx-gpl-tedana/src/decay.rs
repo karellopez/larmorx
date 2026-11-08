@@ -20,7 +20,7 @@
 //! infinite sample in one voxel makes every voxel of its count NaN in the log-linear fit (one
 //! least-squares problem for all of them); by default that voxel alone is NaN.
 
-use larmorx_core::defects::{Notices, TED_09};
+use larmorx_core::defects::{Notices, TED_09, TED_17};
 use larmorx_core::parallel;
 use larmorx_optim::{Scipy, curve_fit2};
 use larmorx_transform::numpy_linalg::{LapackRelease, lstsq};
@@ -82,6 +82,30 @@ impl Libraries {
 
     /// The line of `numpy/lib/_nanfunctions_impl.py`'s `_nanquantile_unchecked` that reduces
     /// (its all-NaN warning).
+    /// numpy's `_methods.py` lines of `_mean`'s sum, `_var`'s sum and `_var`'s subtraction
+    /// (`invalid value encountered in reduce` / `subtract` with infinite samples), and the last
+    /// one's source text.
+    pub fn methods_mean_sum_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 132,
+            Libraries::Shared => 134,
+        }
+    }
+
+    pub fn methods_var_sum_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 168,
+            Libraries::Shared => 170,
+        }
+    }
+
+    pub fn methods_var_subtract(self) -> (u32, &'static str) {
+        match self {
+            Libraries::Newest => (188, "x = um.subtract(arr, arrmean, out=...)"),
+            Libraries::Shared => (190, "x = asanyarray(arr - arrmean)"),
+        }
+    }
+
     pub fn nanquantile_line(self) -> u32 {
         match self {
             Libraries::Newest => 1593,
@@ -161,6 +185,18 @@ pub fn fit_loglinear(
     let mut s0 = vec![0.0f64; md];
     let reproduce = notices.reproduce();
     let maths = ctx.maths;
+    if md == 1 && !echos_to_run(am).is_empty() {
+        // `np.squeeze(echo_masks[..., i_echo])` of one voxel is 0-dimensional, and indexing
+        // it fails at the first echo count.
+        notices.add(&TED_17, "a single voxel is left for the fit");
+        if reproduce {
+            return Err(PyError::new(
+                "IndexError",
+                "too many indices for array: array is 0-dimensional, but 1 were indexed",
+                "tedana/decay.py, in fit_loglinear",
+            ));
+        }
+    }
     for echo_num in echos_to_run(am) {
         let n = echo_num as usize;
         let idx = group(am, echo_num, true);
@@ -345,6 +381,14 @@ pub fn fit_monoexponential(
         let idx = group(am, echo_num, false);
         let x: Vec<f64> = (0..n * n_vols).map(|r| tes[r / n_vols.max(1)]).collect();
         let bar = log.progress(&format!("{echo_num}-echo monoexponential"), idx.len());
+        if n_vols == 0 && !idx.is_empty() {
+            // No volume to fit (all of them excluded): the first voxel's bound,
+            // np.min(data_2d[:, voxel]) of an empty column, raises outside curve_fit's try.
+            return Err(PyError::value_error(
+                "zero-size array to reduction operation minimum which has no identity",
+                "numpy/_core/fromnumeric.py, in min",
+            ));
+        }
         let fit_one = |v: usize| -> VoxelFit {
             let y: Vec<f64> = (0..n)
                 .flat_map(|e| {

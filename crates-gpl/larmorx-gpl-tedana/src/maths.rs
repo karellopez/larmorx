@@ -62,10 +62,17 @@ impl Maths {
 
     /// These functions with the other choice for `family`, without the witness.
     pub fn with_other(&self, family: Family) -> Maths {
+        self.with_others(&[family])
+    }
+
+    /// These functions with the other choice for each of `families`, without the witness.
+    pub fn with_others(&self, families: &[Family]) -> Maths {
         let (mut l, mut e) = (self.numpy_logf, self.numpy_explog);
-        match family {
-            Family::Logf => l = !l,
-            Family::ExpLog => e = !e,
+        for family in families {
+            match family {
+                Family::Logf => l = !l,
+                Family::ExpLog => e = !e,
+            }
         }
         Maths {
             numpy_logf: l,

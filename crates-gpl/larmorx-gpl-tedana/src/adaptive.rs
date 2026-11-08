@@ -111,7 +111,9 @@ pub fn make_adaptive_mask(
     let mut masks: Vec<Vec<i64>> = vec![base];
 
     let echo_means = if has("dropout") || has("decay") {
-        if n_vols == 0 && n_samples * n_echos > 0 {
+        // numpy warns of a mean over an empty axis whatever the result's size (no voxels
+        // included), and of the division 0 / 0 only where there are values to divide.
+        if n_vols == 0 {
             log.warn(
                 "tedana/utils.py",
                 145,
@@ -119,13 +121,15 @@ pub fn make_adaptive_mask(
                 libraries.mean_of_empty_slice(),
                 "echo_means = data.mean(axis=-1)  # temporal mean of echos",
             );
-            log.warn(
-                "numpy/_core/_methods.py",
-                libraries.methods_divide_line(),
-                "RuntimeWarning",
-                "invalid value encountered in divide",
-                "ret = um.true_divide(",
-            );
+            if n_samples * n_echos > 0 {
+                log.warn(
+                    "numpy/_core/_methods.py",
+                    libraries.methods_divide_line(),
+                    "RuntimeWarning",
+                    "invalid value encountered in divide",
+                    "ret = um.true_divide(",
+                );
+            }
         }
         temporal_means(data, n_samples, n_echos, n_vols, time_outer)
     } else {
@@ -331,6 +335,23 @@ pub fn make_adaptive_mask(
             .iter()
             .filter(|&&a| (a as f64) < t3 && a >= 1)
             .count();
+        // numpy int64 scalars: 0 / 0 (no good voxel) is NaN, with numpy's warning.
+        let zero_good = |log: &mut Log<'_>, line: u32, source: &str| {
+            if good == 0.0 {
+                log.warn(
+                    "tedana/utils.py",
+                    line,
+                    "RuntimeWarning",
+                    "invalid value encountered in scalar divide",
+                    source,
+                );
+            }
+        };
+        zero_good(
+            log,
+            213,
+            "perc_3dof_voxels = 100 * n_3dof_voxels / np.sum(adaptive_mask >= 1)",
+        );
         let perc3 = 100.0 * n3 as f64 / good;
         if perc3 > 0.0 {
             log.warning(
@@ -349,6 +370,11 @@ pub fn make_adaptive_mask(
                 .iter()
                 .filter(|&&a| (a as f64) < tdof && a >= 1)
                 .count();
+            zero_good(
+                log,
+                230,
+                "perc_dof_voxels = 100 * n_dof_voxels / np.sum(adaptive_mask >= 1)",
+            );
             let percdof = 100.0 * ndof as f64 / good;
             log.warning(
                 Site("utils", "make_adaptive_mask", 231),

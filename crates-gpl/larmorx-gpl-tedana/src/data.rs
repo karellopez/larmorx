@@ -6,9 +6,10 @@
 //! the fast path of boolean indexing, and nilearn's `apply_mask` when it fails), with nibabel's
 //! classes and scaling.
 //!
-//! nibabel reads NIfTI-1 single files as `Nifti1Image`, which tedana uses as they are; NIfTI-1
-//! pairs and NIfTI-2 images it converts (`_convert_to_nifti1`: the data, the affine and the
-//! zooms into a new `Nifti1Image`, squeezed to three dimensions for a mask). The values are the
+//! nibabel reads NIfTI-1 single files as `Nifti1Image` and NIfTI-2 single files as
+//! `Nifti2Image` (a subclass of `Nifti1Image`), which tedana uses as they are; pairs it converts
+//! (`_convert_to_nifti1`: the data, the affine and the zooms into a new `Nifti1Image`, squeezed
+//! to three dimensions for a mask). The values are the
 //! same either way: float32 from the stored type, through float64 where the header scales them.
 //! Other formats nibabel reads (ANALYZE, MGH, AFNI, MINC, PAR/REC, compressed with bzip2 or
 //! zstd) are refused with a clear message (a documented gap, decision D5).
@@ -205,7 +206,10 @@ pub struct UserMask {
 pub fn load_user_mask(path: &str, n_threads: usize) -> Result<UserMask, PyError> {
     let h = load_header(path)?;
     let mut shape = h.shape.clone();
-    if h.class != ImageClass::Nifti1Image && shape.len() > 3 {
+    // `_convert_to_nifti1` returns any `Nifti1Image` as it is, a `Nifti2Image` (a subclass)
+    // included: only pairs are converted and squeezed.
+    let converted = !matches!(h.class, ImageClass::Nifti1Image | ImageClass::Nifti2Image);
+    if converted && shape.len() > 3 {
         // `nb.funcs.squeeze_image`: trailing axes of length 1 beyond the third.
         while shape.len() > 3 && *shape.last().expect("non-empty") == 1 {
             shape.pop();

@@ -16,12 +16,13 @@ use std::path::{Component, Path, PathBuf};
 
 use larmorx_core::defects::{
     GLIBC_07, NP_03, Notices, TED_02, TED_03, TED_04, TED_07, TED_08, TED_10, TED_12, TED_13,
-    UpstreamDefects,
+    TED_16, UpstreamDefects,
 };
 use larmorx_core::numpy::NpFloat;
 use larmorx_core::python::argparse::{formatter_width, py_repr_str};
 use larmorx_core::python::json::Value;
 use larmorx_core::python::number::parse_int;
+use larmorx_io::nifti::NiftiVersion;
 
 use crate::adaptive::make_adaptive_mask;
 use crate::combine::{CombMode, make_optcom};
@@ -431,9 +432,14 @@ pub fn fit_stage(
              https://github.com/ME-ICA/tedana/issues/1313.",
         );
     }
-    // TED-04: the mask's affine against the data's (tedana does not compare them).
+    // TED-04: the mask's affine against the data's (tedana does not compare them). Only a 3D
+    // mask of the data's shape goes through tedana's fast path silently; any other ends in
+    // nilearn's own checks, which raise the same error (random testing, 2026-11-08).
     let first = data::load_header(&settings.data[0])?;
-    if user_mask && !affines_close(&mask.header.affine, &first.affine) {
+    let fast = mask.shape.len() == 3
+        && reference.shape.len() >= 3
+        && mask.shape[..3] == reference.shape[..3];
+    if user_mask && fast && !affines_close(&mask.header.affine, &first.affine) {
         notices.add(&TED_04, "the mask's affine differs from the data's");
         if notices.fix() {
             return Err(PyError::value_error(
@@ -571,6 +577,21 @@ pub fn fit_stage(
     }
     let fit_vols: Vec<usize> = (0..n_vols).filter(|&t| use_volumes[t]).collect();
     let nf = fit_vols.len();
+    if nf == 0 && n_vols > 0 {
+        notices.add(
+            &TED_16,
+            format!("--exclude removes all {n_vols} volumes from the adaptive mask and the fit"),
+        );
+        if notices.fix() {
+            return Err(PyError::value_error(
+                format!(
+                    "--exclude leaves no volume for the adaptive mask and the T2*/S0 fit (all \
+                     {n_vols} volumes excluded)"
+                ),
+                wf,
+            ));
+        }
+    }
     let e = masked.n_echos;
     let mut fit_data = vec![0.0f32; n_samp * e * nf];
     for (k, block) in fit_data.chunks_mut(nf.max(1)).enumerate().take(n_samp * e) {
@@ -607,6 +628,17 @@ pub fn fit_stage(
         affine: mask.header.affine,
         voxels: masked.voxels.clone(),
         ref_zooms: reference.zooms.clone(),
+        // A user mask is made a Nifti1Image (load_mask); a computed one has the reference's
+        // class: a NIfTI-2 first echo stays a Nifti2Image (z-concatenated data: a new
+        // Nifti1Image).
+        version: if !user_mask
+            && settings.data.len() > 1
+            && reference.header.class == data::ImageClass::Nifti2Image
+        {
+            NiftiVersion::V2
+        } else {
+            NiftiVersion::V1
+        },
         release: env.libraries.lapack(),
         n_threads: threads,
         registry: Vec::new(),
@@ -744,10 +776,21 @@ pub fn save_stage(
             Some(&denoise),
         )?;
         if settings.verbose {
-            notices.add(
-                &TED_07,
-                "the T2* and S0 variance maps hold their own variances",
-            );
+            let t2v = fit.t2s_var.as_ref().expect("curvefit");
+            let s0v = fit.s0_var.as_ref().expect("curvefit");
+            // Named where the swap changes a written value (not when both maps hold the same
+            // float32 values, e.g. every fit failed); the voxels of one good echo are TED-08's
+            // (tedana writes 0 in both maps there).
+            let differ = (0..t2v.len()).any(|k| {
+                am_fit[k / cols] != 1
+                    && f32::from_f64(t2v[k]).to_bits() != f32::from_f64(s0v[k]).to_bits()
+            });
+            if differ {
+                notices.add(
+                    &TED_07,
+                    "the T2* and S0 variance maps hold their own variances",
+                );
+            }
             if fit.count1_fitted > 0 {
                 notices.add(
                     &TED_08,
@@ -758,8 +801,6 @@ pub fn save_stage(
                     ),
                 );
             }
-            let t2v = fit.t2s_var.as_ref().expect("curvefit");
-            let s0v = fit.s0_var.as_ref().expect("curvefit");
             let (first, second) = if reproduce { (s0v, t2v) } else { (t2v, s0v) };
             let cov = fit.covar.as_ref().expect("curvefit");
             outputs.save_img(
@@ -809,6 +850,15 @@ pub fn save_stage(
         threads,
         log,
     );
+    if n_vols == 0 {
+        // No volume left (every one a dummy scan; TED-13 refuses it by default, and the dropout
+        // method has failed before): nanpercentile of an empty array returns nanmean's (0,)
+        // instead of (7, 0), so column_stack makes 3 columns for the table's 9 names.
+        return Err(PyError::value_error(
+            "Shape of passed values is (0, 3), indices imply (0, 9)",
+            "pandas/core/internals/construction.py, in _check_values_indices_shape_match",
+        ));
+    }
     outputs.save_img("rmse img", ImgData::F32(&rmse.map), None, None)?;
     outputs.save_tsv("confounds tsv", &confounds_tsv(&rmse))?;
     drop(rmse);
@@ -846,6 +896,7 @@ pub fn save_stage(
         settings.fit_ts,
         mode,
         maths,
+        libraries,
         threads,
         log,
         notices,
@@ -979,11 +1030,9 @@ fn run(
     let kept = std::sync::Arc::new(std::mem::take(&mut outputs.kept));
     end(&setup, &mut outputs, env, log)?;
     drop(outputs);
-    for family in [Family::Logf, Family::ExpLog] {
-        if !maths.differed(family) {
-            continue;
-        }
-        let other = maths.with_other(family);
+    // One pass with another choice of `families`: what it would write and print differently.
+    let pass = |families: &[Family]| {
+        let other = maths.with_others(families);
         let mut sink: Vec<u8> = Vec::new();
         let mut plog = log.fork(&mut sink);
         let mut scratch = Notices::new(env.mode);
@@ -999,13 +1048,44 @@ fn run(
         .map(|o| o.diffs);
         let plines = plog.take_capture();
         drop(plog);
-        let changed = lines_differing(&lines, &plines);
-        if let Some(detail) = maths_detail(family, env.mode, res.as_ref(), changed) {
-            let defect = match family {
-                Family::Logf => &NP_03,
-                Family::ExpLog => &GLIBC_07,
-            };
-            notices.add(defect, detail);
+        (res, lines_differing(&lines, &plines))
+    };
+    let defect = |family: Family| match family {
+        Family::Logf => &NP_03,
+        Family::ExpLog => &GLIBC_07,
+    };
+    let flagged: Vec<Family> = [Family::Logf, Family::ExpLog]
+        .into_iter()
+        .filter(|&f| maths.differed(f))
+        .collect();
+    if flagged.is_empty() {
+        return Ok(());
+    }
+    // First the other mode's functions altogether (both families: what `reproduce` would compute
+    // against the default, or the reverse). Nothing changes there: nothing is named, though one
+    // family alone might change values the other's choice then takes back (random testing,
+    // 2026-11-08). Otherwise each flagged family alone, named where it alone changes something;
+    // when neither does, the change needs both (numpy's float32 log moves a curve fit's start,
+    // and on that path glibc's exp differs from the correctly rounded one where it did not on
+    // the default's), and both are named with the joint effect.
+    let both = [Family::Logf, Family::ExpLog];
+    let (res, changed) = pass(&both);
+    if maths_detail(Family::Logf, env.mode, res.as_ref(), changed, true).is_none() {
+        return Ok(());
+    }
+    let mut named = false;
+    for &family in &flagged {
+        let (r, c) = pass(&[family]);
+        if let Some(detail) = maths_detail(family, env.mode, r.as_ref(), c, false) {
+            notices.add(defect(family), detail);
+            named = true;
+        }
+    }
+    if !named {
+        for family in both {
+            if let Some(detail) = maths_detail(family, env.mode, res.as_ref(), changed, true) {
+                notices.add(defect(family), detail);
+            }
         }
     }
     Ok(())
@@ -1024,6 +1104,7 @@ fn maths_detail(
     mode: UpstreamDefects,
     res: Result<&Vec<Diff>, &PyError>,
     lines: usize,
+    joint: bool,
 ) -> Option<String> {
     let (what, other) = match (family, mode) {
         (Family::Logf, UpstreamDefects::Fix) => (
@@ -1068,6 +1149,11 @@ fn maths_detail(
             }
             format!("give {}", parts.join(" and "))
         }
+    };
+    let other = if joint {
+        format!("{other} together with the other family's choice (NP-03 and GLIBC-07)")
+    } else {
+        other.to_owned()
     };
     Some(format!("{what}; {other} would {effect}"))
 }
@@ -1125,18 +1211,25 @@ mod tests {
     fn maths_notices_only_for_changed_outputs() {
         let none: Vec<Diff> = vec![("T2starmap.nii.gz".into(), 0)];
         let fix = UpstreamDefects::Fix;
-        assert_eq!(maths_detail(Family::Logf, fix, Ok(&none), 0), None);
-        let d = maths_detail(Family::ExpLog, fix, Ok(&none), 2).unwrap();
+        assert_eq!(maths_detail(Family::Logf, fix, Ok(&none), 0, false), None);
+        let d = maths_detail(Family::ExpLog, fix, Ok(&none), 2, false).unwrap();
         assert!(d.ends_with("would give 2 other printed line(s)"), "{d}");
         let some: Vec<Diff> = vec![("S0map.nii.gz".into(), 3), ("T2starmap.nii.gz".into(), 0)];
-        let d = maths_detail(Family::Logf, UpstreamDefects::Reproduce, Ok(&some), 0).unwrap();
+        let d = maths_detail(
+            Family::Logf,
+            UpstreamDefects::Reproduce,
+            Ok(&some),
+            0,
+            false,
+        )
+        .unwrap();
         assert!(
             d.starts_with("the log-linear fit takes numpy's own")
                 && d.ends_with("would give 3 other written value(s) (S0map.nii.gz 3)"),
             "{d}"
         );
         let e = PyError::value_error("x", "here");
-        let d = maths_detail(Family::ExpLog, fix, Err(&e), 0).unwrap();
+        let d = maths_detail(Family::ExpLog, fix, Err(&e), 0, false).unwrap();
         assert!(
             d.ends_with("would make the run fail with ValueError: x"),
             "{d}"

@@ -80,6 +80,11 @@ CHANGES = {
     "its own (scipy/ndimage/src/ni_splines.c), so its last term reads the original first "
     "coefficient: SCI-03 fixed upstream, with the scaling's rounding of its own "
     "(modes nearest, reflect and grid-mirror, orders 2 to 5)",
+    "LAPACK-3.12.1": "numpy's OpenBLAS 0.3.31 and later bundle LAPACK 3.12.1, whose DLARF1F "
+    "(dorm2r, dorml2, dgebd2) moves the last bits of numpy.linalg.svd and eigh, so nibabel "
+    "5.4.2 writes other NIfTI quaternions (quatern_b, c, d) for some oblique affines; every "
+    "other byte identical (the digest with those fields zeroed; "
+    "docs/findings/sdcflows-fieldmap.md)",
 }
 
 #: Spline modes whose prefilter uses the reflect initialisation.

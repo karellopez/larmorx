@@ -26,6 +26,11 @@ LICENSE=/usr/local/freesurfer/license.txt
 NPROCS="${NPROCS:-8}"
 OMP="${OMP:-8}"
 SEED="${SEED:-0}"
+# OpenBLAS's kernels (numpy's and FSL's in the image) are chosen by the CPU: an AVX-512 machine gives other
+# last bits than an AVX2 one (fMRIPrep's own topup gave other field maps on this machine, 2026-11-08).
+# Haswell's kernels on every machine, as the earlier runs (an AVX2 laptop) and the workspace's oracles
+# (docs/findings/numpy-blas.md).
+CORETYPE="${OPENBLAS_CORETYPE_ORACLE:-Haswell}"
 
 [[ $# -ge 3 ]] || { sed -n '3,16p' "$0"; exit 2; }
 BIDS="$(cd "$1" && pwd)"; PARTICIPANT="$2"; NAME="$3"; shift 3
@@ -51,12 +56,13 @@ ARGS=(/data /out participant --participant-label "$PARTICIPANT" -w /work
   echo "participant: $PARTICIPANT"
   echo "arguments: ${ARGS[*]}"
   echo "seeds: --random-seed $SEED --skull-strip-fixed-seed; threads: --nprocs $NPROCS --omp-nthreads $OMP"
+  echo "OpenBLAS kernels: OPENBLAS_CORETYPE=$CORETYPE in the container"
   echo "host: $(uname -srm), $(nproc) CPUs, $(free -g | awk '/Mem:/ {print $2}') GB RAM"
   echo "started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$RUN/RUN_INFO.txt"
 
 set +e
-APPTAINERENV_TEMPLATEFLOW_HOME=/templateflow apptainer run --cleanenv --home "$RUN/home:/home/fmriprep" \
+APPTAINERENV_TEMPLATEFLOW_HOME=/templateflow APPTAINERENV_OPENBLAS_CORETYPE="$CORETYPE" apptainer run --cleanenv --home "$RUN/home:/home/fmriprep" \
   -B "$BIDS:/data:ro" -B "$RUN/out:/out" -B "$RUN/work:/work" \
   -B "$LICENSE:/opt/license.txt:ro" -B "$WS/oracles/templateflow:/templateflow" \
   "$IMAGE" "${ARGS[@]}" > "$RUN/fmriprep.log" 2>&1

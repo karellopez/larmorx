@@ -314,3 +314,446 @@ exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds004958, the panel's files of ds004958 hard-linked from the test-data cache
   (larmorx validation/investigations/panel-oracle-runs/bids_view.py, commit 3e8abda8b0d22df0bdd2e617712f007d16b22737)
 ```
+## The runs of 2026-11-08 (tedana's `t2smap` and the field maps' part B)
+
+Made by the orchestrator, boxed (`scripts/orchestration/boxed.sh 24`), one after the other at `--nprocs 4 --omp-nthreads 4`
+with `--fs-no-reconall`, on a machine shared with two development agents (times are not benchmarks). The two
+multi-echo runs are for `t2smap`'s replica (its decision D8); the seven others reach the field-map paths no earlier run
+reached (the field maps' part B, its decision D8 (a) to (c)). The views are written by
+`validation/investigations/fmap-oracle-runs/derived_views.py`: hard links of the test-data cache, every changed sidecar a
+new file with its SHA-256 and the original's in `RUN_INFO.txt`; no image data changed. Every run ended with exit status 0,
+and every program node is classified by the pipeline-stage catalogue (the SyN nodes by a roadmap entry until the part
+ports them).
+
+| Run | What it adds | Minutes |
+|---|---|---:|
+| `ds000210-sub-02-noreconall` | three-echo BOLD (`t2smap`): the cued-SGT task and a rest run | 39 |
+| `ds000258-sub-21262-noreconall` | three-echo BOLD (`t2smap`; echoes 12, 28, 44 ms) | 35 |
+| `ds000228-sub-pixar008-noreconall-syn` | `--use-syn-sdc` on the panel's child (SyN field-map-less estimation) | 46 |
+| `ds004884-sub-M2079-noreconall-syn` | `--use-syn-sdc` on the panel's stroke | 68 |
+| `ds005003-sub-RS001-noreconall-syn` | `--use-syn-sdc` on the panel's glioma | 73 |
+| `ds006736-sub-004-noreconall` | PEPOLAR: two opposite-direction EPIs (view: `IntendedFor` narrowed to the one cached BOLD) | 45 |
+| `ds004958-sub-fsm64ps-noreconall-pepolar` | PEPOLAR: the spin-echo AP/PA pair linked to the rest BOLD (view) | 54 |
+| `ds002603-sub-01-noreconall-epi` | PEPOLAR from EPI and BOLD: the phase difference unlinked (view), two estimators | 51 |
+| `ds005752-sub-ON01016-noreconall-direct` | a direct field map in Hz linked to the two BOLD runs (view) | 39 |
+
+### ds000210-sub-02-noreconall
+
+```text
+fMRIPrep oracle run: ds000210-sub-02-noreconall
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds000210
+participant: 02
+arguments: /data /out participant --participant-label 02 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T12:37:10Z
+finished: 2026-11-08T13:16:32Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds000210, the catalog collection openneuro-ds000210's cached files hard-linked (larmorx-testdata 52124bc; made by the orchestrator, 2026-11-08, for tedana's t2smap: its two 3-echo runs)
+```
+
+### ds000258-sub-21262-noreconall
+
+```text
+fMRIPrep oracle run: ds000258-sub-21262-noreconall
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds000258
+participant: 21262
+arguments: /data /out participant --participant-label 21262 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T13:16:59Z
+finished: 2026-11-08T13:51:40Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds000258, the catalog collection openneuro-ds000258's cached files hard-linked (larmorx-testdata 52e371a: echoes 1-3 added for this run; made by the orchestrator, 2026-11-08, for tedana's t2smap: one 4-echo run)
+```
+
+### ds000228-sub-pixar008-noreconall-syn
+
+```text
+fMRIPrep oracle run: ds000228-sub-pixar008-noreconall-syn
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds000228
+participant: pixar008
+arguments: /data /out participant --participant-label pixar008 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T13:52:23Z
+finished: 2026-11-08T14:37:54Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds000228 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+```
+
+### ds004884-sub-M2079-noreconall-syn
+
+```text
+fMRIPrep oracle run: ds004884-sub-M2079-noreconall-syn
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds004884
+participant: M2079
+arguments: /data /out participant --participant-label M2079 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T14:38:05Z
+finished: 2026-11-08T15:45:47Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds004884 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+```
+
+### ds005003-sub-RS001-noreconall-syn
+
+```text
+fMRIPrep oracle run: ds005003-sub-RS001-noreconall-syn
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds005003
+participant: RS001
+arguments: /data /out participant --participant-label RS001 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T15:46:00Z
+finished: 2026-11-08T16:59:19Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds005003 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+```
+
+### ds006736-sub-004-noreconall
+
+```text
+fMRIPrep oracle run: ds006736-sub-004-noreconall
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds006736
+participant: 004
+arguments: /data /out participant --participant-label 004 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T17:01:31Z
+finished: 2026-11-08T17:46:40Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds006736 (field maps part B, 2026-11-08)
+BIDS view ds006736: the cached files of ds006736 (sub-004) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-004/fmap/sub-004_dir-AP_epi.json: original 073a417b7c5f1bd37552f144428ff212c84b6486219f6f70432bb5637707e32f, derived 08a27bd436206b9a7df8e503bfaf1aeca746ecd2c41129e8c74c955ba7908335, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
+sub-004/fmap/sub-004_dir-PA_epi.json: original 6486ded73a7c5856a6cabe9e9e0b306119509ee2cb5de68294171325c9533557, derived ff1cbb027ce505476f51e55877a01e0e454a51646a75cb1d55cc7e2e6e054864, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
+```
+
+### ds004958-sub-fsm64ps-noreconall-pepolar
+
+```text
+fMRIPrep oracle run: ds004958-sub-fsm64ps-noreconall-pepolar
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds004958-pepolar
+participant: fsm64ps
+arguments: /data /out participant --participant-label fsm64ps -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T17:46:54Z
+finished: 2026-11-08T18:40:50Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds004958-pepolar (field maps part B, 2026-11-08)
+BIDS view ds004958-pepolar: the cached files of ds004958 (sub-fsm64ps) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-AP_epi.json: original 8f2e0f71e4a28022732d3781da1b74c6ac2143b37713be5825a054eebe624405, derived 1a326fc2f87ff6825e218a1e2f8df88adfba1861e84f16aff4c46285e82b9579, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
+sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-PA_epi.json: original ad6fbf2230a58b40003559e17332c29d478a62580efe3a8562580f6a6957594a, derived 51cc4219571aa133b431f0266a7e224789a1bcb9f9ef945bfc627ccfa79a0302, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
+```
+
+### ds002603-sub-01-noreconall-epi
+
+```text
+fMRIPrep oracle run: ds002603-sub-01-noreconall-epi
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds002603-epi
+participant: 01
+arguments: /data /out participant --participant-label 01 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T18:41:03Z
+finished: 2026-11-08T19:32:06Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds002603-epi (field maps part B, 2026-11-08)
+BIDS view ds002603-epi: the cached files of ds002603 (sub-01) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-01/fmap/sub-01_acq-Mm2_phasediff.json: original 293096011449029bab0d56f4db67c4f0d6ff8a5d1c4651bc8d774ded4a11aba6, derived c5e7451597f19b03c78c12856a722440014599713d85e1339c6cb2a8d93cd1c8, IntendedFor removed
+```
+
+### ds005752-sub-ON01016-noreconall-direct
+
+```text
+fMRIPrep oracle run: ds005752-sub-ON01016-noreconall-direct
+image: docker://nipreps/fmriprep@sha256:ccde6053b426c03111e0c1f18797e855b23491fb87c4dc4e9f46f7a9e232784e (tag 25.2.6)
+image file: <workspace>/oracles/images/fmriprep-25.2.6.sif, sha256 7f84379b40f399876909ecf7c236105d6b7c43fdec5111fb7b03f8dee204ac10
+fmriprep: fMRIPrep v25.2.6
+apptainer: apptainer version 1.4.5
+BIDS input: <workspace>/oracles/bids-views/ds005752-direct
+participant: ON01016
+arguments: /data /out participant --participant-label ON01016 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
+seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
+started: 2026-11-08T19:32:17Z
+finished: 2026-11-08T20:11:16Z
+exit status: 0
+BIDS view: <workspace>/oracles/bids-views/ds005752-direct (field maps part B, 2026-11-08)
+BIDS view ds005752-direct: the cached files of ds005752 (sub-ON01016) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-ON01016/ses-01/fmap/sub-ON01016_ses-01_acq-bold_fieldmap.json: original 783eda358368a9063ac9e017412fbad5c5ced4961b5ad0fef94c6bac03d1aa01, derived 69d15efd91f16c8855792cd282f2079eb7d57a03d67925610d300b6dafc72b74, IntendedFor = ['ses-01/func/sub-ON01016_ses-01_task-rest_dir-forward_bold.nii.gz', 'ses-01/func/sub-ON01016_ses-01_task-rest_dir-reverse_bold.nii.gz']
+```
+
+## sdcflows 2.17.1's own runs (2026-11-08)
+
+sdcflows' BIDS app, the newest release, on eight field-map datasets (the field maps' part B, D8 (d)), in
+`<workspace>/oracles/python-sdcflows-2.17` (the newest environment's packages with niworkflows 1.15.4), with the
+workspace's oracle builds (ANTs 2.6.5, AFNI 26.3.05, FSL 6.0.7.23), boxed, 4 threads, `--no-fmapless`
+(`validation/investigations/fmap-oracle-runs/run_sdcflows_oracle.sh`; outputs `<workspace>/oracles/sdcflows-2.17.1/<run>/`).
+The app estimates every field map it finds, linked to a BOLD run or not. Every run ended with exit status 0 and no
+crash file.
+
+| Run | Estimators | Minutes |
+|---|---|---:|
+| `ds005040-sub-002` | 1 PEPOLAR | 2 |
+| `ds006736-sub-004` | 1 PEPOLAR | 2 |
+| `ds004958-sub-fsm64ps-pepolar` | 1 phase difference, 1 PEPOLAR | 7 |
+| `ds002603-sub-01` | 1 phase difference, 2 PEPOLAR | 3 |
+| `ds001600-sub-1` | 3 phase difference, 1 PEPOLAR | 4 |
+| `ds005454-sub-16` | 1 phase difference | 1 |
+| `ds002422-sub-02` | 2 phase difference | 1 |
+| `ds005752-sub-ON01016-direct` | 1 direct (Hz) | 1 |
+
+### sdcflows ds005040-sub-002
+
+```text
+sdcflows oracle run: ds005040-sub-002
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: ~/.cache/larmorx-testdata/data/openneuro/ds005040
+participant: 002
+arguments: ~/.cache/larmorx-testdata/data/openneuro/ds005040 <workspace>/oracles/sdcflows-2.17.1/ds005040-sub-002/out participant --participant-label 002 -w <workspace>/oracles/sdcflows-2.17.1/ds005040-sub-002/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:19:39Z
+finished: 2026-11-08T20:21:52Z
+exit status: 0
+```
+
+### sdcflows ds006736-sub-004
+
+```text
+sdcflows oracle run: ds006736-sub-004
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: <workspace>/oracles/bids-views/ds006736
+participant: 004
+arguments: <workspace>/oracles/bids-views/ds006736 <workspace>/oracles/sdcflows-2.17.1/ds006736-sub-004/out participant --participant-label 004 -w <workspace>/oracles/sdcflows-2.17.1/ds006736-sub-004/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:21:53Z
+BIDS view: <workspace>/oracles/bids-views/ds006736
+BIDS view ds006736: the cached files of ds006736 (sub-004) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-004/fmap/sub-004_dir-AP_epi.json: original 073a417b7c5f1bd37552f144428ff212c84b6486219f6f70432bb5637707e32f, derived 08a27bd436206b9a7df8e503bfaf1aeca746ecd2c41129e8c74c955ba7908335, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
+sub-004/fmap/sub-004_dir-PA_epi.json: original 6486ded73a7c5856a6cabe9e9e0b306119509ee2cb5de68294171325c9533557, derived ff1cbb027ce505476f51e55877a01e0e454a51646a75cb1d55cc7e2e6e054864, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
+finished: 2026-11-08T20:23:41Z
+exit status: 0
+```
+
+### sdcflows ds004958-sub-fsm64ps-pepolar
+
+```text
+sdcflows oracle run: ds004958-sub-fsm64ps-pepolar
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: <workspace>/oracles/bids-views/ds004958-pepolar
+participant: fsm64ps
+arguments: <workspace>/oracles/bids-views/ds004958-pepolar <workspace>/oracles/sdcflows-2.17.1/ds004958-sub-fsm64ps-pepolar/out participant --participant-label fsm64ps -w <workspace>/oracles/sdcflows-2.17.1/ds004958-sub-fsm64ps-pepolar/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:23:42Z
+BIDS view: <workspace>/oracles/bids-views/ds004958-pepolar
+BIDS view ds004958-pepolar: the cached files of ds004958 (sub-fsm64ps) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-AP_epi.json: original 8f2e0f71e4a28022732d3781da1b74c6ac2143b37713be5825a054eebe624405, derived 1a326fc2f87ff6825e218a1e2f8df88adfba1861e84f16aff4c46285e82b9579, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
+sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-PA_epi.json: original ad6fbf2230a58b40003559e17332c29d478a62580efe3a8562580f6a6957594a, derived 51cc4219571aa133b431f0266a7e224789a1bcb9f9ef945bfc627ccfa79a0302, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
+finished: 2026-11-08T20:30:36Z
+exit status: 0
+```
+
+### sdcflows ds002603-sub-01
+
+```text
+sdcflows oracle run: ds002603-sub-01
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: <workspace>/oracles/bids-views/ds002603
+participant: 01
+arguments: <workspace>/oracles/bids-views/ds002603 <workspace>/oracles/sdcflows-2.17.1/ds002603-sub-01/out participant --participant-label 01 -w <workspace>/oracles/sdcflows-2.17.1/ds002603-sub-01/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:30:36Z
+finished: 2026-11-08T20:33:37Z
+exit status: 0
+```
+
+### sdcflows ds001600-sub-1
+
+```text
+sdcflows oracle run: ds001600-sub-1
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: ~/.cache/larmorx-testdata/data/openneuro/ds001600
+participant: 1
+arguments: ~/.cache/larmorx-testdata/data/openneuro/ds001600 <workspace>/oracles/sdcflows-2.17.1/ds001600-sub-1/out participant --participant-label 1 -w <workspace>/oracles/sdcflows-2.17.1/ds001600-sub-1/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:33:38Z
+finished: 2026-11-08T20:37:55Z
+exit status: 0
+```
+
+### sdcflows ds005454-sub-16
+
+```text
+sdcflows oracle run: ds005454-sub-16
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: ~/.cache/larmorx-testdata/data/openneuro/ds005454
+participant: 16
+arguments: ~/.cache/larmorx-testdata/data/openneuro/ds005454 <workspace>/oracles/sdcflows-2.17.1/ds005454-sub-16/out participant --participant-label 16 -w <workspace>/oracles/sdcflows-2.17.1/ds005454-sub-16/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:37:55Z
+finished: 2026-11-08T20:39:00Z
+exit status: 0
+```
+
+### sdcflows ds002422-sub-02
+
+```text
+sdcflows oracle run: ds002422-sub-02
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: <workspace>/oracles/bids-views/ds002422
+participant: 02
+arguments: <workspace>/oracles/bids-views/ds002422 <workspace>/oracles/sdcflows-2.17.1/ds002422-sub-02/out participant --participant-label 02 -w <workspace>/oracles/sdcflows-2.17.1/ds002422-sub-02/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:39:00Z
+finished: 2026-11-08T20:39:47Z
+exit status: 0
+```
+
+### sdcflows ds005752-sub-ON01016-direct
+
+```text
+sdcflows oracle run: ds005752-sub-ON01016-direct
+sdcflows: SDCFlows 2.17.1
+environment: <workspace>/oracles/python-sdcflows-2.17 (nibabel==5.4.2 nipype==1.12.0 niworkflows==1.15.4 numpy==2.5.4 scipy==1.18.1 )
+BIDS input: <workspace>/oracles/bids-views/ds005752-direct
+participant: ON01016
+arguments: <workspace>/oracles/bids-views/ds005752-direct <workspace>/oracles/sdcflows-2.17.1/ds005752-sub-ON01016-direct/out participant --participant-label ON01016 -w <workspace>/oracles/sdcflows-2.17.1/ds005752-sub-ON01016-direct/work --nprocs 4 --omp-nthreads 4 --no-fmapless --notrack -v
+threads: --nprocs 4 --omp-nthreads 4
+programs:
+  topup 0d8ce02a76b99a9d882723e0b6a619b9aa9ab27c786e24910f1c8421903a888a ~/fsl-6.0.7.23/bin/topup
+  applytopup e9ba10fb0c311132eb0a05082b3352a072f796433774c0eeb2d5a0b4c6955a52 ~/fsl-6.0.7.23/bin/applytopup
+  3dvolreg 95c56fe68dbe412317592d7625db4beacb817f47532a2a75cd19af40136573ab <workspace>/oracles/afni-26.3.05/bin/3dvolreg
+  3dAutomask 659c987eb26c1a3857a7db0235a1e4b441d61c9ff58af760cc7392866d978e4d <workspace>/oracles/afni-26.3.05/bin/3dAutomask
+  N4BiasFieldCorrection 30ee3122cd50f1e1ba7cce81d41b5970ae21c78d3785904e22a5625bba83f0d8 <workspace>/oracles/ants-2.6.5/bin/N4BiasFieldCorrection
+  antsRegistration 11578310c0de71c59b5a012cca66acced9c2dd2349f949e55d9b4ec375719e8c <workspace>/oracles/ants-2.6.5/bin/antsRegistration
+  antsApplyTransforms 562f0f01b475a3eaba690679715b76601877e531cf9cd77f05fa7c3741a45f86 <workspace>/oracles/ants-2.6.5/bin/antsApplyTransforms
+  DenoiseImage a8f58d5886efea618aca0ac70f805a0a31430f69ef3024767886c4ff8c9c5a28 <workspace>/oracles/ants-2.6.5/bin/DenoiseImage
+  ImageMath 32f9385166cfef0955929f4fc0779c100690c7ea9cdb28d54aff1ae82d3d9c15 <workspace>/oracles/ants-2.6.5/bin/ImageMath
+host: Linux 6.8.0-124-generic x86_64, 4 CPUs, 124 GB RAM
+started: 2026-11-08T20:39:48Z
+BIDS view: <workspace>/oracles/bids-views/ds005752-direct
+BIDS view ds005752-direct: the cached files of ds005752 (sub-ON01016) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
+sub-ON01016/ses-01/fmap/sub-ON01016_ses-01_acq-bold_fieldmap.json: original 783eda358368a9063ac9e017412fbad5c5ced4961b5ad0fef94c6bac03d1aa01, derived 69d15efd91f16c8855792cd282f2079eb7d57a03d67925610d300b6dafc72b74, IntendedFor = ['ses-01/func/sub-ON01016_ses-01_task-rest_dir-forward_bold.nii.gz', 'ses-01/func/sub-ON01016_ses-01_task-rest_dir-reverse_bold.nii.gz']
+finished: 2026-11-08T20:40:27Z
+exit status: 0
+```
+

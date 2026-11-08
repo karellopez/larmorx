@@ -99,6 +99,12 @@ def nifti_header_for_image(
 ) -> dict[str, Any]:
     """The header fields nibabel would write for an image."""
 
+def nifti_set_xform(
+    header: dict[str, Any], which: str, affine: np.ndarray, code: int
+) -> dict[str, Any]:
+    """nibabel's ``header.set_sform(affine, code)`` (``which="sform"``) or
+    ``header.set_qform(affine, code)`` (``"qform"``) on header fields."""
+
 def nifti_header_info(header: dict[str, Any]) -> dict[str, Any]:
     """Shape, dtype, zooms, affines, scaling and serialised bytes of header fields."""
 
@@ -852,3 +858,34 @@ def sdcflows_bspline_approx(
     """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
     grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
     system, log."""
+
+def sdcflows_rescale_affine(
+    affine: np.ndarray,
+    shape: tuple[int, int, int],
+    zooms: tuple[float, float, float],
+    new_shape: tuple[float, float, float],
+) -> np.ndarray:
+    """nibabel's ``rescale_affine(affine, shape, zooms, new_shape)`` (numpy's BLAS order)."""
+
+def sdcflows_resample_to_zooms_grid(
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    pre_zooms: tuple[float, float, float],
+    zooms: tuple[float, float, float],
+) -> tuple[tuple[float, float, float], np.ndarray]:
+    """The grid of sdcflows' ``resample_to_zooms``: ``np.rint(shape * pre_zooms / zooms)``
+    (float64 values) and its affine."""
+
+def sdcflows_affine_coordinates(
+    ref_shape: tuple[int, int, int],
+    ref_affine: np.ndarray,
+    moving_affine: np.ndarray,
+    matrix: np.ndarray | None = None,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``(3, n)`` voxel coordinates in the moving image of every reference voxel (Fortran
+    order), as nitransforms' ``Affine(matrix, reference=ref).apply(moving)`` computes them (the
+    identity without ``matrix``)."""
+
+def sdcflows_apply_affine(affine: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """nibabel's ``apply_affine(affine, points)`` for ``(n, 3)`` points (numpy's BLAS order)."""

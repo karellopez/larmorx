@@ -11,6 +11,7 @@ use larmorx_sdcflows::approx::{self, ApproxParams, Fitting, Grid, LogRecord, Rec
 use larmorx_sdcflows::blas;
 use larmorx_sdcflows::bspline::{self, Collocation, Csr, WeightType};
 use larmorx_sdcflows::ridge::{self, CsrOperator, RidgeFit, RidgeSystem};
+use larmorx_sdcflows::tools;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -376,26 +377,43 @@ fn sdcflows_bspline_approx<'py>(
         extrapolate,
         name: name.to_string(),
     };
-    let out = py
-        .detach(|| {
-            let original = Grid {
-                data: &data,
-                shape,
-                affine: &aff,
-                mask: mask.as_deref(),
-            };
-            let fitting = match &res {
-                None => Fitting::Original,
-                Some((d, s, a, m)) => Fitting::Resampled(Grid {
-                    data: d,
-                    shape: *s,
-                    affine: a,
-                    mask: m.as_deref(),
-                }),
-            };
-            approx::bspline_approx(original, fitting, &params, n_threads)
+    let out = py.detach(|| {
+        let original = Grid {
+            data: &data,
+            shape,
+            affine: &aff,
+            mask: mask.as_deref(),
+        };
+        let fitting = match &res {
+            None => Fitting::Original,
+            Some((d, s, a, m)) => Fitting::Resampled(Grid {
+                data: d,
+                shape: *s,
+                affine: a,
+                mask: m.as_deref(),
+            }),
+        };
+        let mut log = Vec::new();
+        let r = approx::bspline_approx_logged(original, fitting, &params, n_threads, &mut log);
+        (r, log)
+    });
+    let (out, log) = out;
+    let log: Vec<(&str, String)> = log
+        .into_iter()
+        .map(|r| match r {
+            LogRecord::Info(m) => ("info", m),
+            LogRecord::Debug(m) => ("debug", m),
         })
-        .map_err(sdc_err)?;
+        .collect();
+    let out = match out {
+        Ok(o) => o,
+        Err(e) => {
+            // the records sdcflows wrote before it raised, on the exception (`err.log`)
+            let err = sdc_err(e);
+            err.value(py).setattr("log", log)?;
+            return Err(err);
+        }
+    };
     let d = PyDict::new(py);
     let grids: Vec<([usize; 3], Bound<'py, PyArray2<f64>>)> = out
         .grids
@@ -424,16 +442,90 @@ fn sdcflows_bspline_approx<'py>(
     d.set_item("info", out.fit.info)?;
     d.set_item("n_iter", out.fit.iterations)?;
     d.set_item("system", system_name(out.fit.system))?;
-    let log: Vec<(&str, String)> = out
-        .log
-        .into_iter()
-        .map(|r| match r {
-            LogRecord::Info(m) => ("info", m),
-            LogRecord::Debug(m) => ("debug", m),
-        })
-        .collect();
     d.set_item("log", log)?;
     Ok(d)
+}
+
+fn mat4_to_py<'py>(py: Python<'py>, m: &Mat4) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let a: Vec<Vec<f64>> = m.iter().map(|r| r.to_vec()).collect();
+    Ok(PyArray2::from_vec2(py, &a)?)
+}
+
+/// nibabel's `rescale_affine(affine, shape, zooms, new_shape)`.
+#[pyfunction]
+fn sdcflows_rescale_affine<'py>(
+    py: Python<'py>,
+    affine: PyReadonlyArray2<'_, f64>,
+    shape: [usize; 3],
+    zooms: [f64; 3],
+    new_shape: [f64; 3],
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let m = mat4(&affine)?;
+    mat4_to_py(py, &tools::rescale_affine(&m, shape, zooms, new_shape))
+}
+
+/// The grid sdcflows' `resample_to_zooms` resamples onto: `(np.rint(shape * pre_zooms /
+/// zooms), rescale_affine(...))`, the shape as float64 values.
+#[pyfunction]
+fn sdcflows_resample_to_zooms_grid<'py>(
+    py: Python<'py>,
+    shape: [usize; 3],
+    affine: PyReadonlyArray2<'_, f64>,
+    pre_zooms: [f64; 3],
+    zooms: [f64; 3],
+) -> PyResult<([f64; 3], Bound<'py, PyArray2<f64>>)> {
+    let m = mat4(&affine)?;
+    let (n, a) = tools::resample_to_zooms_grid(shape, &m, pre_zooms, zooms);
+    Ok((n, mat4_to_py(py, &a)?))
+}
+
+/// The `(3, n)` voxel coordinates in the moving image of every reference voxel (Fortran
+/// order) for nitransforms' `Affine(matrix, reference=ref).apply(moving)` (the identity when
+/// `matrix` is None).
+#[pyfunction]
+#[pyo3(signature = (ref_shape, ref_affine, moving_affine, matrix = None, n_threads = 1))]
+fn sdcflows_affine_coordinates<'py>(
+    py: Python<'py>,
+    ref_shape: [usize; 3],
+    ref_affine: PyReadonlyArray2<'_, f64>,
+    moving_affine: PyReadonlyArray2<'_, f64>,
+    matrix: Option<PyReadonlyArray2<'_, f64>>,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let r = mat4(&ref_affine)?;
+    let m = mat4(&moving_affine)?;
+    let x = match matrix {
+        Some(a) => mat4(&a)?,
+        None => tools::IDENTITY,
+    };
+    let pts = py
+        .detach(|| tools::affine_coordinates(ref_shape, &r, &x, &m, n_threads))
+        .map_err(sdc_err)?;
+    let n = pts.len();
+    let flat: Vec<f64> = (0..3).flat_map(|c| pts.iter().map(move |p| p[c])).collect();
+    let arr = numpy::ndarray::Array2::from_shape_vec((3, n), flat)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(PyArray2::from_owned_array(py, arr))
+}
+
+/// nibabel's `apply_affine(aff, pts)` for `(n, 3)` float64 points (numpy's BLAS order).
+#[pyfunction]
+fn sdcflows_apply_affine<'py>(
+    py: Python<'py>,
+    affine: PyReadonlyArray2<'_, f64>,
+    points: PyReadonlyArray2<'_, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let m = mat4(&affine)?;
+    let a = points.as_array();
+    if a.ncols() != 3 {
+        return Err(PyValueError::new_err("points must have shape (n, 3)"));
+    }
+    let pts: Vec<[f64; 3]> = a.rows().into_iter().map(|r| [r[0], r[1], r[2]]).collect();
+    let out = tools::apply_affine(&m, &pts);
+    Ok(PyArray2::from_owned_array(
+        py,
+        numpy::ndarray::Array2::from_shape_fn((out.len(), 3), |(i, j)| out[i][j]),
+    ))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -445,5 +537,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sdcflows_ridge_csr, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_ridge_collocation, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_bspline_approx, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_rescale_affine, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_resample_to_zooms_grid, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_affine_coordinates, m)?)?;
+    m.add_function(wrap_pyfunction!(sdcflows_apply_affine, m)?)?;
     Ok(())
 }

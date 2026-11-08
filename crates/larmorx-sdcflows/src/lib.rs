@@ -19,6 +19,8 @@
 //! - [`ridge`]: scikit-learn's ridge regression on a sparse float32 matrix (`sparse_cg`, both
 //!   of its systems) with SciPy's conjugate gradients, on the collocation operator or a stored
 //!   CSR matrix.
+//! - [`tools`]: sdcflows' grid helpers (`resample_to_zooms`' grid, nibabel's `rescale_affine`)
+//!   and nitransforms' identity resampling coordinates.
 //! - [`npy`]: the numpy element rules this needs (float floor division, `allclose`, `cross`).
 //!
 //! This crate is the **port** (a replica of a permissive upstream, in the main package). The
@@ -31,6 +33,7 @@ pub mod blas;
 pub mod bspline;
 pub mod npy;
 pub mod ridge;
+pub mod tools;
 
 /// An sdcflows function cannot run on its inputs (the Python original raises).
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]

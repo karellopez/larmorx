@@ -272,6 +272,22 @@ pub fn bspline_approx(
     params: &ApproxParams,
     n_threads: usize,
 ) -> Result<Approx, SdcError> {
+    let mut log = Vec::new();
+    let mut out = bspline_approx_logged(original, fitting, params, n_threads, &mut log)?;
+    out.log = log;
+    Ok(out)
+}
+
+/// [`bspline_approx`] with its log records pushed to `log` as sdcflows writes them, also when
+/// it fails (sdcflows logs the fit's description and every attempt before raising). The
+/// returned [`Approx::log`] is empty.
+pub fn bspline_approx_logged(
+    original: Grid<'_>,
+    fitting: Fitting<'_>,
+    params: &ApproxParams,
+    n_threads: usize,
+    log: &mut Vec<LogRecord>,
+) -> Result<Approx, SdcError> {
     let n_orig = check_grid(&original)?;
     let mut grids = Vec::with_capacity(params.spacings.len());
     for s in &params.spacings {
@@ -305,7 +321,6 @@ pub fn bspline_approx(
         .mask
         .map_or(n_fit, |m| m.iter().filter(|k| **k).count());
     let colmat = collocation(fit_grid.shape, fit_grid.affine, &grids)?;
-    let mut log = Vec::new();
     let mut knots: Vec<String> = grids
         .iter()
         .map(|g| format!("{}x{}x{}", g.shape[0], g.shape[1], g.shape[2]))
@@ -410,7 +425,7 @@ pub fn bspline_approx(
         extrapolated,
         extreme,
         fit,
-        log,
+        log: Vec::new(),
     })
 }
 

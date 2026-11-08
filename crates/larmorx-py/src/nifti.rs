@@ -393,6 +393,31 @@ pub fn nifti_header_for_image<'py>(
     header_to_dict(py, &header)
 }
 
+/// nibabel's `header.set_sform(affine, code)` or `header.set_qform(affine, code)` on header
+/// fields (`which` is "sform" or "qform"): the affine stored in that form with that code (the
+/// qform also sets the voxel sizes and `qfac`, without shears).
+#[pyfunction]
+pub fn nifti_set_xform<'py>(
+    py: Python<'py>,
+    header: &Bound<'_, PyDict>,
+    which: &str,
+    affine: PyReadonlyArray2<'_, f64>,
+    code: i32,
+) -> PyResult<Bound<'py, PyDict>> {
+    let mut h = header_from_dict(header)?;
+    let a = affine_from_py(&affine)?;
+    match which {
+        "sform" => h.set_sform(&a, code),
+        "qform" => h.set_qform(&a, code).map_err(header_err)?,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "which must be 'sform' or 'qform', not {other:?}"
+            )));
+        }
+    }
+    header_to_dict(py, &h)
+}
+
 /// Quantities derived from a header dict: shape, data type, zooms, the affines and scaling.
 #[pyfunction]
 pub fn nifti_header_info<'py>(
@@ -458,6 +483,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(nifti_parse_header, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_write, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_for_image, m)?)?;
+    m.add_function(wrap_pyfunction!(nifti_set_xform, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_info, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_itk_geometry, m)?)?;
     Ok(())

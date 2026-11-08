@@ -843,7 +843,7 @@ def _example_coefficients(ctx: core.Context) -> dict:
     grid = core.Grid.around(cimg, show, margin=0)
     ex = exm.Example(ctx, grid, show)
     ex.add(exm.Panel("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own coefficients",
-                     "`bs_filter`'s `*_coeff000` file (sdcflows 2.15.1 in its image)",
+                     "bs_filter's *_coeff000 file (sdcflows 2.15.1 in its image)",
                      {"coeff": _stored(own["coeff"])}))  # fmt: skip
     for pid, label, role, lab, sub in RUN_PANELS:
         ex.add(exm.Panel(pid, role, lab, sub, {"coeff": _stored(_files(e, label)["coeff"])}))
@@ -1131,7 +1131,7 @@ def _example_sdc10(ctx: core.Context, links: dict) -> dict:
     ex = exm.Example(ctx, grid, show)
     ref, rs, ri = common.stored(t["target"])
     ex.add(exm.Panel("bref", "input", f"ds002603 sub-01: BOLD reference ({p.split('_')[-1]})",
-                     "fMRIPrep's `desc-hmc_boldref`, an oblique grid", {"all": ref}, scale=rs,
+                     "fMRIPrep's desc-hmc_boldref, an oblique grid", {"all": ref}, scale=rs,
                      inter=ri))  # fmt: skip
     arrays = {
         k: _stored(e.dir / p / k / "field.nii.gz")

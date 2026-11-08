@@ -4,9 +4,9 @@ environment, through ``oracle_cache.run`` with a reason never to store the run: 
 one kind the cache cannot serve) against the replica (``larmorx-gpl tedana t2smap``) in
 ``reproduce`` mode and in its default mode (which runs the stages from the mask on again for each
 family of maths functions whose other choice changes a value, to name NP-03 and GLIBC-07 exactly),
-at one thread and at ``--threads``; every replica run's files checked against tedana's
-(``reproduce``: identical; the default: the same file names) and the runs at several threads
-against one thread's (identical bits).
+at one thread and at ``--threads``; every replica run's values checked against tedana's
+(``reproduce``: every image's and the confounds table's values identical) and the default's runs
+at several threads against one thread's (identical values).
 
 The calls: the four ``t2smap_node`` working directories of the multi-echo oracle runs
 (``curvefit``, fMRIPrep's default) and ds003592's again with ``--fittype loglin``. Usage (inside a
@@ -110,8 +110,11 @@ def main() -> int:
                     out = d / "out"
                     keep = False
                     if mode == "reproduce":
-                        if rep := tt.compare_files(ref, out):
-                            sys.exit(f"{name}: reproduce differs from tedana: {rep}")
+                        # every image's and the table's values (the call and the description
+                        # name --n-threads, which tedana's run does not have)
+                        diffs = {k: v for k, v in tt.value_differences(ref, out).items() if v[0]}
+                        if diffs:
+                            sys.exit(f"{name}: reproduce differs from tedana: {diffs}")
                     elif fix_one is None:
                         fix_one, keep = out, True
                         row["fix_named"] = _named(err)

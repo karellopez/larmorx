@@ -185,8 +185,9 @@ written value and no printed line changes; otherwise each family that changes so
 named (NP-03, GLIBC-07) with the values and lines it changes, or both together when only the two
 together change something (numpy's float32 log moves a curve fit's start, and on that path glibc's
 `exp` differs). The default run therefore takes up to three passes more than the computation
-itself (three on fMRIPrep's calls, where each family alone changes values), still faster than
-tedana (below); `reproduce` names them the same way.
+itself (three on fMRIPrep's calls, where each family alone changes values), so that the default
+and `reproduce` (which names them the same way) take about as long as tedana at one thread and
+3 to 4 times less at 14 (below).
 
 ## Validation
 
@@ -209,7 +210,8 @@ tedana (below); `reproduce` names them the same way.
   extended-precision qform and its headers of new images, NIfTI-2 outputs, series with no volume
   left, numpy's warnings on infinite samples and empty arrays, numpy 2.3.5's float32 percentile
   rank, the maths notices) or registered (TED-16, TED-17, TED-18); every one agrees with the final
-  build, 17 kept as permanent cases (`validation/difftest/cases/tedana-t2smap/`). CHECK-TRIAL
+  build, 17 kept as permanent cases (`validation/difftest/cases/tedana-t2smap/`); a 10-minute check of
+  the final build: 1,268 cases, no difference (one notice, made exact: an 18th permanent case).
 - **Beneath**: the command line on 109 cases (help at 19 widths, every error), the numerics bit
   for bit (numpy's reductions, percentiles and float32 log, `lstsq` on tedana's own calls, SciPy's
   `curve_fit` on tedana's own 169,344 calls), nibabel's qform on 4,000 headers.
@@ -220,4 +222,9 @@ tedana (below); `reproduce` names them the same way.
   job).
 - **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 call): 545 MiB (curvefit)
   and 543 MiB (loglin) at the peak, against tedana's 1,243 and 1,224 MiB.
-- **Speed**: SPEED-TABLE
+- **Speed** ([benchmarks](../benchmarks/tedana-t2smap.md); fMRIPrep's four curvefit calls and
+  ds003592's loglin call, best of two runs, a shared machine): tedana 26.0.3 takes 29 to 46 s on
+  the curve-fit calls and 6 s on the log-linear one at one thread; the replica, whose both modes
+  run the maths notices' passes (four in all on these calls), 31 to 45 s at one thread (0.8 to 1.1
+  times tedana's speed) and 9 to 13 s at 14 threads (3 to 4 times), and 10 s / 8 s on the
+  log-linear call (tedana is faster there). The clean-room original is to be the fast one.

@@ -58,12 +58,12 @@ AFNI is public domain; newer NIH programs call MCW library routines
 | Replica author | everything | the replica in the licence family's workspace, with SPDX headers and the upstream's notices |
 
 The clean-room implementer must not open the upstream source, the replica crates
-(`crates/larmorx-afni-replica`, `crates-gpl/` with its glibc tools, among them `tools/glibc-reference`
+(`crates/larmorx-afni-replica`, `crates-gpl/` with tedana's replica and its glibc tools, among them `tools/glibc-reference`
 and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
 [findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
 [findings/afni-licence-routines.md](findings/afni-licence-routines.md), [findings/afni-volreg.md](findings/afni-volreg.md),
-[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [findings/fsl-bet.md](findings/fsl-bet.md), [findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
+[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [findings/fsl-bet.md](findings/fsl-bet.md), [findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [findings/tedana-t2smap.md](findings/tedana-t2smap.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
 [defect register](findings/upstream-defects.md) marked **restricted**. What the implementer
 learns from black-box runs goes back into the spec, marked (observed). The models are
 [specs/3dTshift.md](../specs/3dTshift.md) and [specs/mcflirt.md](../specs/mcflirt.md); the

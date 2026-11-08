@@ -25,10 +25,12 @@ and lives in the main package.
 | FSL | FSL Licence: non-commercial. Modification and transmission allowed "without financial return", if the licence conditions are imposed on the receiver and all original and amended source is included (`~/fsl/LICENCE.FSL`) | ✓ `larmorx-nc`, under the FSL Licence's terms | ✓ main package |
 | FreeSurfer | FreeSurfer Software License v1.0: derived works and redistribution allowed, also commercially, if the licence text with its required preface ships with them, notices are kept and modifications marked. Every user inherits "research use only" and an indemnity in MGH's favour | ✓ `larmorx-freesurfer` (planned, D3) | not planned (not required; revisit for single parts if needed) |
 | MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, in the surfaces track, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded). First step: a patent check of FastPD and HOCR |
-| tedana | LGPL-2.1 | possible in an LGPL package; not planned | ✓ main package (from the published equations) |
+| tedana | LGPL-2.1 (only: its `LICENSE` is the LGPL-2.1 text, its documentation names "version 2.1", no "any later version" and no file headers) | ✓ `larmorx-gpl` since 2026-11-08 (`crates-gpl/larmorx-gpl-tedana`: an exact replica of tedana 26.0.3's `t2smap`, GPL-3.0-only under LGPL-2.1's section 3, which lets a copy of the library carry the ordinary GPL instead; the user, 2026-11-08) | ✓ main package (planned: `crates/larmorx-tedana`, from `specs/t2smap.md`, the published equations and black-box runs) |
+| nilearn (`compute_epi_mask`, as tedana calls it) | BSD-3-Clause | ✓ main package since 2026-11-08 (`larmorx_interp::nilearn`; the notice in `NOTICE`) | not needed |
+| CPython 3.12.16 (`argparse`, `textwrap`, `json`'s encoder, Python's number parsing and printing: a ported Python program's command line and messages) | PSF License Version 2 | ✓ main package since 2026-11-08 (`larmorx_core::python`, re-expressed in Rust; the licence and the summary of changes its clause 3 asks for in `NOTICE`) | not needed |
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
 | sdcflows (the NiPreps developers; its field-map estimation) | Apache-2.0 | ✓ main package since 2026-11-08 (`crates/larmorx-sdcflows`, `lx.sdcflows`: an exact port of sdcflows 2.17.1, the field maps' part A; the notice in `NOTICE`) | not needed for the licence; a later clean-room original of every program (the user, 2026-11-06), in another crate |
-| scikit-learn, SciPy, numpy, OpenBLAS and the reference LAPACK OpenBLAS bundles (their arithmetic on the paths the ports reach: `Ridge`'s `sparse_cg`, `cg`, `BSpline`, sparse products, `ndimage`, numpy's reductions, `sdot`, `svd`, `eigh`, `det`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`; the notices in `NOTICE`) | not needed |
+| scikit-learn, SciPy, numpy, OpenBLAS and the reference LAPACK OpenBLAS bundles (their arithmetic on the paths the ports reach: `Ridge`'s `sparse_cg`, `cg`, `BSpline`, sparse products, `ndimage`, numpy's reductions, `sdot`, `svd`, `eigh`, `det`; since 2026-11-08 for tedana's replica numpy's percentiles, float32 `log`, float printing and `lstsq`, SciPy's `curve_fit` and `scoreatpercentile`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`, `larmorx_core::numpy`, `larmorx-optim`; the notices in `NOTICE`) | not needed |
 | Arm's Optimized Routines (v19.11: the `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and double `exp`, `log`, `pow` glibc 2.35 ships) | MIT | ✓ main package since 2026-11-04 (`larmorx_core::math`'s `*_glibc`, `LICENSES/MIT-arm-optimized-routines.txt`): one translation for `reproduce`, the AFNI replicas and the FSL replicas' core (the AFNI replicas' `sincosf.rs` from 2026-10-29) | not needed |
 | fdlibm (as glibc 2.35 carries it: `atanf`, `atan2f`, `tanhf`, `expm1f`; netlib's fdlibm 5.3: `tanh`) | Sun's notice (`LicenseRef-fdlibm`) | ✓ main package (`larmorx_core::math`'s `atanf_glibc`, `atan2f_glibc` since 2026-11-04 and `tanh_glibc`; the AFNI replicas' `tanhf`, `expm1f`) | not needed |
 | EISPACK (`svd`, `pythag`: Argonne National Laboratory, 1983) and f2c's libf2c (`d_sign`), as AFNI 26.3.05 carries them (`src/eispack/`, `src/f2c/`) | EISPACK: freely available (netlib; AFNI's `LICENSE.txt`: "License: Free"); libf2c: AT&T Bell Laboratories and Bellcore's permission notice (`src/f2c/Notice`) | ✓ main package since 2026-11-06 (`crates/larmorx-afni-replica/src/eispack.rs`: 3dvolreg's 3 × 3 singular value decomposition; the notice in `NOTICE`) | the clean-room original of 3dvolreg may use any SVD of a rotation (`specs/3dvolreg.md`) |
@@ -42,7 +44,7 @@ command-line binary. Code from different families is never linked into one binar
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
 | `larmorx` | Apache-2.0 | everything permissive, plus every original | – |
-| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never published as a wheel) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
+| `larmorx-gpl` | GPL-3.0 (the program; its tedana-derived crate GPL-3.0-only, the rest GPL-3.0-or-later) | tedana's `t2smap` replica (since 2026-11-08: the `larmorx-gpl` program and its binary-only wheel); replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never in the wheel) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
 | `larmorx-nc` | the FSL Licence's terms (non-commercial, source included) | replicas of FSL | `larmorx` |
 | `larmorx-freesurfer` | FreeSurfer Software License | replicas of FreeSurfer | `larmorx` |
 
@@ -54,7 +56,7 @@ command-line binary. Code from different families is never linked into one binar
   `LicenseRef-FSL`): it installs the `larmorx-nc` program into the environment's scripts
   directory and nothing that Python can import. `larmorx-gpl` was packaged the same way for the
   AFNI replicas until 2026-10-29 (its wheel, program and `larmorx[exact]` extra are in git
-  history); it will be again for Workbench. `larmorx-nc`'s wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
+  history); since 2026-11-08 it is again, for tedana's `t2smap` (below), and will be for Workbench. `larmorx-nc`'s wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
   Armadillo, fslpy, fdlibm, Arm and SGI STL (HP/SGI) notices (`crates-nc/NOTICE`), the
   Apache-2.0 text and `NOTICE` of the larmorx crate it includes and Arm's MIT licence
   (`crates-nc/LICENSES/`), and, because the
@@ -81,6 +83,26 @@ command-line binary. Code from different families is never linked into one binar
   `defaultschedule.h`, `convert_xfm.cc`; FSL's `bbr.sch` copied with them), whose files are in
   `crates-nc/fsl-source/fsl-flirt/` (`scripts/fsl_source.py`; the wheel's licence files now
   include `fsl-source/*/*/*` for the schedule).
+- **`larmorx-gpl`, tedana's `t2smap`** (2026-11-08, the user's decision): tedana is LGPL-2.1
+  only; its section 3 lets a copy of the library carry the ordinary GPL instead ("If a newer
+  version than version 2 of the ordinary GNU General Public License has appeared, then you can
+  specify that version instead"), so the tedana-derived crate `crates-gpl/larmorx-gpl-tedana` is
+  GPL-3.0-only (every file's header says so: "converted from tedana's LGPL-2.1 under its section
+  3", with the modification notices), and GPL-3.0 accepts the Apache-2.0 crates it links. The
+  program `larmorx-gpl` (`crates-gpl/larmorx-gpl-cli`; `larmorx-gpl tedana t2smap <t2smap's
+  arguments>`) is a binary-only wheel (`crates-gpl/pyproject.toml`, licence `GPL-3.0-only`;
+  `larmorx[all]` installs it), whose licence files are the GPL-3.0 text (`crates-gpl/LICENSE`),
+  tedana 26.0.3's `LICENSE` byte for byte (`crates-gpl/LICENSES/LGPL-2.1-tedana.txt`),
+  `crates-gpl/NOTICE` (tedana's notice "Copyright 2023, The ME-ICA Developers", what was translated
+  and modified, the section 3 conversion, the Apache crates included, where the source is), the
+  Apache-2.0 text and `NOTICE` of the larmorx crates it includes (`crates-gpl/LICENSES/`), the
+  workspace's Cargo files and the two crates' Rust source; the complete Corresponding Source is
+  this repository at the release's commit, which `crates-gpl/NOTICE` names (GPL-3.0 section 6).
+  `crates-gpl/larmorx-gpl-cli/tests/notices.rs` checks the copies (whenever `NOTICE` changes,
+  `crates-gpl/LICENSES/NOTICE-larmorx.txt` must be the same file, as crates-nc's copy). The
+  workspace's glibc tools stay out of the wheel. The permissive numerics the replica needs
+  (numpy's, SciPy's, nilearn's, CPython's) are in the main package's Apache crates, so nothing
+  BSD, MIT or PSF is relicensed; the clean-room original will be in the main package.
 - **FSL 6.0.7.23** (checked 2026-10-29): the replicas follow it; `crates-nc/fsl-source/` holds
   its original files of everything the translation now comes from (68 files, `MANIFEST.tsv`
   with each package's version and SHA-256; fsl-znzlib 2511.3's C++ files replace 2111.0's
@@ -243,7 +265,8 @@ command-line binary. Code from different families is never linked into one binar
 - replicas of permissive upstreams, with their notices (`NOTICE`, `PROVENANCE.md`);
 - the replica directories (`crates-gpl/`, `crates-nc/`, `crates-freesurfer/`), each under
   its upstream's terms:
-  - GPL: the GPL text, the upstream copyright notices, changes marked. Once wheels ship,
+  - GPL: the GPL text, the upstream copyright notices, changes marked (tedana's `t2smap`,
+    since 2026-11-08: its LGPL-2.1 text and notice beside the GPL's). Once wheels ship,
     the GPL requires the source to be public anyway.
   - FSL: free of charge only, the FSL Licence passed on, FSL's original source included.
   - FreeSurfer: the licence with its required preface, notices kept, marked as modified, no

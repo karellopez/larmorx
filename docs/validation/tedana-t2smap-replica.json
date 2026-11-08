@@ -1,0 +1,1045 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "7b9cb9c37eb9",
+  "larmorx_testdata_commit": "52e371aab0ac",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "above one thread: not yet 3 identical runs": 3,
+   "never cached: runs twice in one directory (the existing outputs decide)": 16,
+   "not storable: its output a_dataset_description.json holds a temporary path (lx-tedana-dt_t6667now)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_2tpfasza)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_2w04nj29)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_6z1fbsy4)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_p621td6v)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_v3e3x1n9)": 2,
+   "not storable: its output dataset_description.json holds a temporary path (lx-tedana-dt_xrh0bigi)": 2,
+   "not storable: its output sub-01_dataset_description.json holds a temporary path (lx-tedana-dt_f9sqgrp3)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_6bgv5_i4)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt__1drjv3n)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_drqsbvaa)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_erm_povj)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_nql91zbg)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_obu_izex)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_r8rxz_dy)": 2,
+   "not storable: its output t2smap_call.sh holds a temporary path (lx-tedana-dt_rhj43oop)": 2
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 51,
+  "saved_seconds": 765.1,
+  "served": 104
+ },
+ "reference": "tedana 26.0.3's t2smap in both kept environments: newest (numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1) and shared (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3); numpy's OpenBLAS on the Haswell kernels, numpy's AVX-512 kernels off (D2), one BLAS thread; fMRIPrep 25.2.6's own files (tedana 25.0.1) reported",
+ "results": [
+  {
+   "case": "fmriprep/ds000210-sub-02-cuedSGT-curvefit",
+   "category": "fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 13029,
+    "fMRIPrep's files (tedana 25.0.1) -> larmorx's default": 12117,
+    "fMRIPrep's files (tedana 25.0.1) -> tedana 26.0.3": 12295,
+    "tedana's step: shared -> newest releases": 12285
+   },
+   "seconds": 143.19,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000210-sub-02-rest-curvefit",
+   "category": "fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 13736,
+    "fMRIPrep's files (tedana 25.0.1) -> larmorx's default": 12602,
+    "fMRIPrep's files (tedana 25.0.1) -> tedana 26.0.3": 12565,
+    "tedana's step: shared -> newest releases": 13130
+   },
+   "seconds": 190.419,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000258-sub-21262-rest-curvefit",
+   "category": "fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 32978,
+    "fMRIPrep's files (tedana 25.0.1) -> larmorx's default": 34918,
+    "fMRIPrep's files (tedana 25.0.1) -> tedana 26.0.3": 35226,
+    "tedana's step: shared -> newest releases": 29028
+   },
+   "seconds": 175.315,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds003592-sub-280-rest-curvefit",
+   "category": "fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 39865,
+    "fMRIPrep's files (tedana 25.0.1) -> larmorx's default": 42180,
+    "fMRIPrep's files (tedana 25.0.1) -> tedana 26.0.3": 41897,
+    "tedana's step: shared -> newest releases": 28808
+   },
+   "seconds": 184.116,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds003592-sub-280-rest-loglin",
+   "category": "fmriprep",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 164720,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 38.293,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-loglin",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 871,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.462,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-curvefit",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 38,
+    "tedana's step: shared -> newest releases": 4
+   },
+   "seconds": 0.629,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-i16-ms",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 13,
+    "tedana's step: shared -> newest releases": 12
+   },
+   "seconds": 0.608,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-ts-loglin",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3960,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.617,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-ts-curve",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 24,
+    "tedana's step: shared -> newest releases": 74
+   },
+   "seconds": 1.296,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-decay",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 887,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.145,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-both",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 887,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.154,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-none",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 38,
+    "tedana's step: shared -> newest releases": 4
+   },
+   "seconds": 0.373,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-exclude",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 38,
+    "tedana's step: shared -> newest releases": 21
+   },
+   "seconds": 0.322,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-nind",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 871,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.221,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-zcat",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 982,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.177,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-mask4d",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 982,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.173,
+   "status": "pass"
+  },
+  {
+   "case": "syn/syn-inf",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 10441,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.175,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nomask-f32",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1905,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.198,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nomask-i16-curvefit",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11,
+    "tedana's step: shared -> newest releases": 4
+   },
+   "seconds": 0.311,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nomask-zcat",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1905,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.217,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-paid",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1697,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.198,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-paid-ts",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3892,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.29,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-verbose-orig-prefix",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2031,
+    "tedana's step: shared -> newest releases": 432
+   },
+   "seconds": 0.354,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-verbose-ts",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18229,
+    "tedana's step: shared -> newest releases": 10064
+   },
+   "seconds": 1.034,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nine-ts",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-nine-all",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-one-volume",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: The mask is invalid as it is empty: it masks all data.",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.025,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-one-volume-ts",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: The mask is invalid as it is empty: it masks all data.",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-paid-const",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ZeroDivisionError: Weights sum to zero, can't be normalized",
+   "reported": {
+    "D13 fix pass": 1375,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.1,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-small-nomask",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-exists",
+   "category": "syn",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. RuntimeError: File <run>/out/desc-adaptiveGoodSignal_mask.nii.gz already exists. In order to allow overwrite please use the --overwrite option in the command line or the overwrite parameter in the Python API.",
+   "reported": {
+    "D13 fix pass": 2033,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 8.358,
+   "status": "both-error"
+  },
+  {
+   "case": "syn/x-overwrite",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2033,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 8.406,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nine-ts-mask",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 687,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.115,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-nine-all-mask",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 289,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.145,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-one-volume-mask",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 51,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.142,
+   "status": "pass"
+  },
+  {
+   "case": "syn/x-one-volume-ts-mask",
+   "category": "syn",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 51,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.088,
+   "status": "pass"
+  },
+  {
+   "case": "fail/00-ted-01",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: attempt to get argmax of an empty sequence",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.032,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/01-ted-02",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index 5 is out of bounds for axis 0 with size 5",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/02-refused",
+   "category": "fail",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: The maximum exclude index (6) is greater than the number of timepoints in the data (5).",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.069,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/03-ted-10",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. numpy.linalg.LinAlgError: SVD did not converge in Linear Least Squares",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.064,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/04-refused",
+   "category": "fail",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: Second dimension of data (2) does not match number of echoes provided (tes; 1)",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/05-ted-12",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: invalid index to scalar variable.",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.026,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/06-ted-12",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: all the input array dimensions except for the concatenation axis must match exactly, but along dimension 0, the array at index 0 has size 2 and the array at index 1 has size 1",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/07-refused",
+   "category": "fail",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: Second dimension of data (3) does not match number of echoes provided (tes; 2)",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/08-ted-13",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ValueError: attempt to get argmax of an empty sequence",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/09-ted-11",
+   "category": "fail",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. ZeroDivisionError: division by zero",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "fail/10-ted-04",
+   "category": "fail",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "spread/ds003592-sub-280-rest-curvefit",
+   "category": "spread",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "the replica at --n-threads 4": 0
+   },
+   "reason": "",
+   "reported": {
+    "tedana's spread: --n-threads 4": 1,
+    "tedana's spread: numpy's AVX-512 kernels on": 22899,
+    "tedana's spread: tedana 25.0.1 (fMRIPrep 25.2.6's image)": 176938,
+    "tedana's spread: the shared releases (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3)": 28808
+   },
+   "seconds": 89.888,
+   "status": "pass"
+  },
+  {
+   "case": "spread/syn-curvefit",
+   "category": "spread",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "the replica at --n-threads 4": 0
+   },
+   "reason": "",
+   "reported": {
+    "tedana's spread: --n-threads 4": 0,
+    "tedana's spread: numpy's AVX-512 kernels on": 8,
+    "tedana's spread: tedana 25.0.1 (fMRIPrep 25.2.6's image)": 447,
+    "tedana's spread: the shared releases (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3)": 5
+   },
+   "seconds": 4.136,
+   "status": "pass"
+  },
+  {
+   "case": "spread/syn-loglin",
+   "category": "spread",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "the replica at --n-threads 4": 0
+   },
+   "reason": "",
+   "reported": {
+    "tedana's spread: --n-threads 4": 0,
+    "tedana's spread: numpy's AVX-512 kernels on": 0,
+    "tedana's spread: tedana 25.0.1 (fMRIPrep 25.2.6's image)": 1646,
+    "tedana's spread: the shared releases (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3)": 0
+   },
+   "seconds": 2.302,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/curvefit-no-volume",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 3.931,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/dummy-scans-every-volume",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 3.865,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/empty-mean-no-voxel",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.169,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/fresh-header-base-affine",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 2
+   },
+   "seconds": 4.554,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/independent-echoes-no-good-voxel",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.455,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/maths-notices-joint",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 23,
+    "tedana's step: shared -> newest releases": 28
+   },
+   "seconds": 4.641,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/nifti2-computed-mask",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 19,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.299,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/np03-taken-back",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.094,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/paid-infinite-sample",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 266,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.087,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/qform-signed-zero",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 22,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 3.999,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/rmse-infinite-percentiles",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2233,
+    "tedana's step: shared -> newest releases": 348
+   },
+   "seconds": 5.686,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/shared-percentile-float32",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 313
+   },
+   "seconds": 5.044,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/ted04-other-shape",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica.  [ 0.   0.   0.   1. ]]",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 8.582,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/ted07-equal-variances",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.206,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/ted15-first-of-two-runs",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. RuntimeError: File <run>/out/sub-01_adaptive_mask.nii.gz already exists. In order to allow overwrite please use the --overwrite option in the command line or the overwrite parameter in the Python API.",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 8.234,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/ted16-exclude-every-volume",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: index -1 is out of bounds for axis 0 with size 0",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.544,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/ted17-single-voxel",
+   "category": "difftest",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "reason": "tedana exits 1; the same from the replica. IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed",
+   "reported": {
+    "D13 fix pass": 0,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 4.406,
+   "status": "both-error"
+  },
+  {
+   "case": "difftest/ted18-cap-zero",
+   "category": "difftest",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11,
+    "tedana's step: shared -> newest releases": 0
+   },
+   "seconds": 3.682,
+   "status": "pass"
+  }
+ ],
+ "suite": "tedana-t2smap-replica",
+ "summary": {
+  "both-error": 25,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 44,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

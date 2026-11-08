@@ -93,3 +93,40 @@ dscal.c,daxpy.c,ddot.c,drot.c,drot_microk_haswell-2.c,dsymv_L.c,dgemv_n_4.c,dgem
 `kernel/generic/ger.c`, `driver/level2/syr2_k.c` (the Haswell selection, `KERNEL.HASWELL`),
 with the fused operations of the build numpy ships (checked in the disassembly of its
 `libscipy_openblas64_`). The logic is re-expressed in Rust; no code was copied.
+
+`numpy_linalg::lstsq` (2026-11-08, the t2smap replica part; tedana's log-linear fit):
+`numpy.linalg.lstsq` of an `m × 2` design and any number of right-hand sides, from the same
+tarballs and numpy 2.5.4 and 2.3.5 (`numpy/linalg/umath_linalg.cpp`'s `lstsq` and `abs2`,
+`numpy/linalg/_linalg.py`'s `lstsq`): LAPACK `dgelsd.f` (paths 1 and 1a), `dgeqrf.f`,
+`dgeqr2.f`, `dormqr.f`, `dorm2r.f`, `dgebrd.f`, `dgebd2.f`, `dormbr.f`, `dormlq.f`,
+`dorml2.f`, `dlalsd.f` (`N <= SMLSIZ`), `dlasdq.f`, `dbdsqr.f` (now with `NCC`, and 3.12.1's
+"avoid -ZERO" by release), `dlascl.f` (with its argument check), `dlaset.f`, `dlange.f`,
+`dlanst.f`, `dlasrt.f`, `dlacpy.f`; the BLAS on long vectors and many columns:
+`kernel/x86_64/{dgemv_t_4.c, dgemv_t_microk_haswell-4.c}` (row blocks of 2048, the 4×4
+microkernel and the SSE2 4×2 and 4×1 kernels, the contracted tails), `daxpy.c` with
+`daxpy_microk_haswell-2.c`, `drot.c`'s strided loop, `nrm2.S`'s four-accumulator main loop
+(and the x87 range of every double), `dgemm_kernel_4x8_haswell.S`'s `2×N` paths with
+`kernel/generic/gemm_small_matrix_permit.c`, `interface/gemm.c` and `driver/level3/level3.c`
+(checked in the disassembly of both `libscipy_openblas64_` builds: GCC 14.2 for 0.3.34, GCC
+10.2 for 0.3.30). Verified bit for bit against numpy 2.3.5 and 2.5.4 on 550 cases each
+(`validation/investigations/t2smap/numerics/check_lstsq.py`), tedana's own calls on fMRIPrep's
+three multi-echo `t2smap` calls included. The logic is re-expressed in Rust; no code was
+copied.
+
+`numpy_linalg::gesdd` and `numpy_linalg::blas` (2026-11-08, the t2smap replica part; SciPy's
+`curve_fit` for tedana's monoexponential fit, `larmorx-optim`): the thin SVD of an `m × 2`
+matrix, `scipy.linalg.svd(a, full_matrices=False)` and `numpy.linalg.svd(a,
+full_matrices=False)` (`dgesdd` with `JOBZ='S'`), from the same tarballs' `lapack-netlib/SRC/`
+(`dgesdd.f` paths 3 and 5s, `dgeqrf.f`, `dgeqr2.f`, `dorgqr.f`, `dorg2r.f`, `dgebrd.f`,
+`dgebd2.f`, `dbdsdc.f`, `dlasdq.f`, `dbdsqr.f`, `dormbr.f`, `dormqr.f`, `dorm2r.f`,
+`dormlq.f`, `dorml2.f`, `dlacpy.f`, `dlaset.f`, `dlange.f`, `dlascl.f`) and SciPy 1.18.1 and
+1.15.3 `scipy/linalg/_decomp_svd.py` (BSD-3-Clause; SciPy's `scipy-openblas32` 0.3.31.dev and
+0.3.28 builds, GCC 10.2, bundle LAPACK 3.12.0's routines: no `dlarf1f`); and `numpy.dot` of
+vectors and matrices on the shapes `least_squares` gives it, from `interface/{gemv,dot}.c`,
+`kernel/x86_64/{ddot.c, ddot_microk_haswell-2.c, dgemv_n_4.c, dgemv_t_4.c}` and numpy 2.5.4 and
+2.3.5 `numpy/_core/src/common/cblasfuncs.c` (`cblas_matrixproduct`: row-major `dgemv` for a
+C-contiguous matrix, column-major for another) and `numpy/_core/src/multiarray/arraytypes.c.src`
+(`DOUBLE_dot`). Verified bit for bit against SciPy 1.18.1/numpy 2.5.4 and SciPy 1.15.3/numpy
+2.3.5 (`validation/investigations/t2smap/numerics/check_curve_fit.py`: 54 products, 69 SciPy
+and 67 numpy SVDs, and `curve_fit` on synthetic, edge and real voxels). The logic is re-expressed
+in Rust; no code was copied.

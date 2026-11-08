@@ -38,10 +38,10 @@ module and commands are spelled `larmorx` (and `larmorprepx` for the planned pip
 - **Two ways of reimplementing, kept apart by licence** ([licensing](docs/licensing.md)):
   - tools with permissive licences (ANTs and ITK, Apache-2.0) are ported from their source,
     with each Rust function's origin recorded in the crate's `PROVENANCE.md`;
-  - where the licence is restrictive (FSL, Workbench), a **clean-room original** is
+  - where the licence is restrictive (FSL, tedana, Workbench), a **clean-room original** is
     written from a behavioural specification, documentation and runs of the original program,
     never from its source; an exact replica, where one exists, is a separate package under the
-    upstream's licence (e.g. `larmorx-nc`) that runs as a separate program. AFNI's tools have
+    upstream's licence (`larmorx-nc` for FSL, `larmorx-gpl` for tedana's `t2smap`) that runs as a separate program. AFNI's tools have
     both inside larmorx since AFNI 26.3.05 released its MCW code under CC BY 4.0. Tools with both
     take `implementation="auto" | "replica" | "original"`.
 - **Validated, with documented differences.** Every tool has a validation record comparing it
@@ -80,6 +80,7 @@ distribution ([overview](docs/overview.md)):
 ```bash
 pip install larmorx                  # the library and the larmorx / lx commands   (planned)
 pip install larmorx                  # the exact AFNI replicas included (CC BY 4.0's attribution)
+pip install "larmorx[all]"           # + the replica packages: larmorx-nc (FSL), larmorx-gpl (tedana) (planned)
 pip install "larmorx[prep]"          # + the larmorprepx pipeline                   (planned)
 ```
 
@@ -106,7 +107,7 @@ lx.save(t1w_n4, "t1w_n4.nii.gz")
 ## Supported tools
 
 Implemented and validated against the original programs (ANTs 2.6.5, AFNI 26.3.05, FSL 6.0.7.23,
-nibabel, fMRIPrep's resampler, sdcflows 2.17.1). Each line links to its validation record; API pages are in [docs/api](docs/api/),
+nibabel, fMRIPrep's resampler, sdcflows 2.17.1, tedana 26.0.3). Each line links to its validation record; API pages are in [docs/api](docs/api/),
 benchmark reports in [docs/benchmarks](docs/benchmarks/).
 The table is generated from [validation/tools.toml](validation/tools.toml) and the records
 (`python -m larmorx_validation tables`). Beside the records, every tool is tested against its
@@ -128,6 +129,7 @@ original with random valid inputs and options, a night at a time
 | Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [97 cases](docs/validation/ants-atropos.md): 27 of 58 compared bit-identical to ANTs, 58 of 58 with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [3 of 17](docs/validation/ants-atropos-panel.md) as built, 17 of 17 with correctly rounded maths, the classes identical in all |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
 | sdcflows' field-map estimation (the B-spline field fit, the field evaluated and applied, the phase-difference preparation) | `lx.sdcflows.bspline_approx`, `lx.sdcflows.B0FieldTransform`, `lx.sdcflows.apply_coeffs_field`, `lx.sdcflows.phdiff_workflow`, `lx.io.save_nibabel` | port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic) | [37 cases](docs/validation/sdcflows-fieldmap.md): 37 of 37 bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one |
+| tedana's t2smap (the T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination) | `larmorx tedana t2smap`, `larmorx-gpl tedana t2smap`, `lx.tedana.t2smap` | exact replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18 corrected by default or refused, each with `reproduce`, but TED-06, kept); the clean-room original later, in the main package | replica: [44 of 44](docs/validation/tedana-t2smap-replica.md) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's 5 multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; 25 more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls |
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [282 of 282](docs/validation/afni-tshift.md) compared agree, 180 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [282 of 282](docs/validation/afni-tshift-replica.md) bit-identical |
 | 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [130 cases](docs/validation/afni-automask.md), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [101 of 101](docs/validation/afni-automask-replica.md) compared cases that write outputs bit-identical |
 | 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [129 cases](docs/validation/afni-unifize.md), none failing: 44 of 99 compared cases that write outputs bit-identical to AFNI, the other 55 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [97 of 97](docs/validation/afni-unifize-replica.md) compared cases that write outputs bit-identical at 1, 2 and 6 threads |
@@ -157,7 +159,8 @@ The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
    clean-room originals of BET, FLIRT, FAST, topup, `fslmaths` and `fslstats` are done).
 3. **sdcflows' field-map estimation, part B** (PEPOLAR's and SyN's steps, sdcflows' masks and
    command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the
-   phase-difference preparation, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome
+   phase-difference preparation, is done), **multi-echo**: tedana's `t2smap`, its clean-room original (the exact
+   replica, in `larmorx-gpl`, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome
    Workbench- and MSM-compatible surface tools, the confounds.
 4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
    fMRIPrep-compatible derivatives and reports out), written in plain Python on the library,
@@ -204,7 +207,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 ruff check && ruff format --check
 ```
 
-The FSL replicas are a separate Cargo workspace: `cd crates-nc && cargo test --workspace`; `crates-gpl` holds only verification tools (`crates-gpl/README.md`)
+The FSL replicas are a separate Cargo workspace: `cd crates-nc && cargo test --workspace`; `crates-gpl` holds tedana's `t2smap` replica (`cd crates-gpl && cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli`) and verification tools (`crates-gpl/README.md`)
 (build its wheel with `maturin build --release`).
 
 Parity checks and benchmarks need the test data (`larmorx-testdata`, github.com/karellopez/larmorx-testdata, kept next to this one; its data panel, `docs/panel.md` there, is the fixed set every tool is validated on), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
@@ -222,9 +225,10 @@ python -m larmorx_validation tables --check                     # the generated 
 |---|---|
 | `crates/larmorx-core`, `crates/larmorx-io`, `crates/larmorx-hdf5` | shared foundation: images, grids, linear algebra, correctly rounded maths, NIfTI and transform files, HDF5 in pure Rust |
 | `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-image` | ITK transforms, interpolators and image filters |
+| `crates/larmorx-optim` | SciPy's optimizers: `curve_fit` with bounds (`least_squares`' trust-region reflective method) |
 | `crates/larmorx-registration`, `crates/larmorx-ants` | ITK's v4 registration framework; the ANTs programs |
 | `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, 3dAutomask, 3dUnifize; head-motion correction |
-| `crates-gpl/` | the GPL-3.0-or-later workspace, reserved for Workbench's replicas; today the AFNI replicas' verification tools (`crates-gpl/README.md`) |
+| `crates-gpl/` | the GPL workspace (`larmorx-gpl`): tedana's `t2smap` replica (`larmorx-gpl-tedana`, GPL-3.0-only, and the `larmorx-gpl` program), later Workbench's replicas; the AFNI replicas' verification tools (`crates-gpl/README.md`) |
 | `crates/larmorx-afni-replica` | the AFNI replicas (3dTshift, 3dAutomask, 3dUnifize), Apache-2.0 with CC BY 4.0's attribution |
 | `crates-nc/` | the FSL replicas (`larmorx-nc`, FSL Licence, non-commercial: mcflirt, BET; the shared core `larmorx-nc-core`), a separate Cargo workspace with FSL's original source in `fsl-source/` |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |

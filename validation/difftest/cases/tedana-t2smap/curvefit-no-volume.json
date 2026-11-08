@@ -1,0 +1,264 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): a curve fit of no volume: the first voxel's np.min bound of an empty column raises outside curve_fit's try",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 7: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice'] / []; shared: messages: line 7: ['tedana/utils.py:145: RuntimeWarning: Mean of empty slice.'] / []",
+  "n": 54,
+  "seed": "t2smap-trial",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "dropped combmode (--combmode paid)",
+   "dropped fittype (--fitt curvefit)",
+   "dropped mask (--mask @mask)",
+   "dropped masktype (--masktype decay none)"
+  ],
+  "signature": [
+   "newest: last error line",
+   "newest: messages",
+   "shared: last error line",
+   "shared: messages"
+  ]
+ },
+ "id": "curvefit-no-volume",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -12.0,
+     -13.25,
+     20.0
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     4.0,
+     1.2,
+     4.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "box",
+    "suffix": ".nii.gz",
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.0,
+    "noise": 0.05,
+    "rising": 0.01,
+    "s0": {
+     "axes": [
+      1.05,
+      1.05,
+      0.95
+     ],
+     "bias": [
+      -0.0075,
+      -0.005,
+      -0.0075,
+      -0.01
+     ],
+     "centre": [
+      -2.75,
+      2.75,
+      -2.75
+     ],
+     "noise": 0.0,
+     "seed": 778073744,
+     "size": 14.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 1272082596,
+    "t2": [
+     12.0,
+     36.0
+    ]
+   },
+   "shape": [
+    2,
+    2,
+    2,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    9,
+    22,
+    33
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 2.0,
+    "tunits": "sec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--combmode spelling": "plain",
+   "--dummy-scans spelling": "plain",
+   "--fittype spelling": "abbreviated",
+   "--mask spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 12.0,
+   "T2* range ms": 24.0,
+   "TE gap ms": 10,
+   "TE gap1 ms": 13,
+   "TE gap2 ms": 11,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 9,
+   "axis0": 1.05,
+   "axis1": 1.05,
+   "axis2": 0.95,
+   "background": "noise",
+   "bias0": -0.0075,
+   "bias1": -0.005,
+   "bias2": -0.0075,
+   "bias3": -0.01,
+   "big-endian": false,
+   "centre0": -6.0,
+   "centre1": 6.0,
+   "centre2": -6.0,
+   "combmode": "paid",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.0,
+   "dtype": "int16",
+   "dummy count": 2,
+   "dummy scans": true,
+   "echoes": 3,
+   "even gaps": false,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 1.0,
+   "log level": "info",
+   "mask": "box",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "masktype": true,
+   "masktypes": 2,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 1.0,
+   "nt": 6,
+   "nx": 11,
+   "ny": 23,
+   "nz": 7,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": 22.75,
+   "origin1": -41.75,
+   "origin2": -30.0,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 0,
+   "rising share": 0.01,
+   "run twice": "no",
+   "scaled": false,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x23x7x2",
+   "size": 22.0,
+   "spacing0": 4.0,
+   "spacing1": 1.2,
+   "spacing2": 4.0,
+   "special samples": false,
+   "suffix": "nifti2",
+   "temporal noise": 0.05,
+   "tissues": "t2",
+   "tr": 2.0,
+   "tunits": "sec",
+   "units": "unknown",
+   "verbose": false,
+   "volumes": "few",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--dummy-scans",
+     "2"
+    ],
+    "name": "dummy scans",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 54,
+  "options": [
+   "2 volume(s)",
+   "3 echoes",
+   "TE in s",
+   "combmode paid",
+   "dummy scans (all)",
+   "file nifti2",
+   "fitmode all",
+   "fittype curvefit",
+   "mask box",
+   "masktype decay none",
+   "stored int16"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

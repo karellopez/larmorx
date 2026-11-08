@@ -134,7 +134,14 @@ at a time:
    speed at 14 threads with 22 to 32 % of sdcflows' peak memory; with it nibabel's scaled writer and header
    arithmetic in `lx.io`; follow-ups below); (7) part B (PEPOLAR's and SyN's Python steps, sdcflows' masks,
    niworkflows' helpers, `init_fmap_wf` complete, fMRIPrep's own field-map steps; last, sdcflows' command line);
-   (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);
+   (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original;
+   the replica **done** 2026-11-08: an exact replica of tedana 26.0.3's `t2smap` in `larmorx-gpl` (GPL-3.0 under
+   LGPL-2.1's section 3; the user, 2026-11-08), every compared case of its record bit-identical to tedana in both
+   library environments (69: 44 pass, 25 refused by both alike), fMRIPrep's five calls on three oracle runs
+   included, also against fMRIPrep's own files; TED-01 to TED-18, NP-03, NP-04; 44 % of tedana's peak memory, 3.0
+   to 4.2 times its speed at 14 threads on fMRIPrep's curve-fit calls; `specs/t2smap.md` with its model for the
+   clean-room original, next;
+   follow-ups below);
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
    confound steps: nothing from FreeSurfer); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
    then `mri_coreg`, `lta_convert`, `mri_robust_template`, which fMRIPrep runs without `recon-all`), surfaces
@@ -731,6 +738,43 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From tedana's `t2smap` replica (2026-11-08; thirteen relays; [findings](findings/tedana-t2smap.md),
+  restricted; record [tedana-t2smap-replica](validation/tedana-t2smap-replica.md),
+  [benchmarks](benchmarks/tedana-t2smap.md), [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Done
+  in the part besides the replica: numpy's reductions, percentiles, float32 `log`, float printing and `lstsq`
+  (`larmorx_core::numpy`, `math::logf_numpy`, `larmorx_transform::numpy_linalg::lstsq`), SciPy's bounded
+  `curve_fit` (`crates/larmorx-optim`), nilearn's `compute_epi_mask` (`larmorx_interp::nilearn`), CPython's
+  `argparse`, `textwrap`, `json` and number formats (`larmorx_core::python`) and nibabel's `get_qform` in
+  extended precision (`larmorx_io::nifti::nibabel_affine`), all in the main package for the next Python
+  programs' ports. Left:
+  - *The clean-room original* (next): `crates/larmorx-tedana`, from `specs/t2smap.md` and its model
+    (`validation/investigations/t2smap-spec/`: `model.py`, `check.py` with §17.3's thresholds, `measure.py`),
+    built for speed; the one-pass notice rule (§15.2); its implementer opens nothing the spec's header names
+    (tedana's source and every installed copy, `crates-gpl/`, `docs/findings/tedana-t2smap.md`,
+    `validation/investigations/t2smap/`, the replica's suite module, difftest descriptor and permanent cases);
+    the audit's tedana family (R07) is in place. Its brief also forbids the replica's record, evidence module and
+    site page (their descriptions name a few things of tedana's source: decision log, the replica's entry).
+  - *Before the clean-room part:* fMRIPrep's runs `ds000210-sub-02-noreconall` and `ds000258-sub-21262-noreconall`
+    were made with OpenBLAS's AVX-512 kernels (the main machine's own; the earlier runs had Haswell's, an AVX2
+    laptop; `scripts/run_fmriprep_oracle.sh` sets Haswell's since 2026-11-08, its `RUN_INFO.txt` says which): make
+    them again with Haswell's (archive the present ones), then re-make the replica record's real calls and the
+    page's fMRIPrep panels from them in the clean-room part (ds000258's 581 values that numpy's AVX-512 kernels
+    explain should then agree).
+  - *Duplicates to merge:* `larmorx_sdcflows`' own numpy mean and pairwise sum (`npy.rs`, `approx.rs`) could use
+    `larmorx_core::numpy`; `larmorx_sdcflows::npy::py_repr` duplicates `larmorx_core::python::number::float_repr`.
+  - *Formats* (D5): inputs nibabel reads but `larmorx-io` does not (AFNI's BRIK, MINC, PAR/REC) are refused with
+    a clear message: with the completeness parts.
+  - *The replica's speed:* at one thread 0.8 to 1.1 times tedana's on fMRIPrep's curve-fit calls, 0.6 on the
+    log-linear one (up to four passes for the exact maths notices: the orchestrator's decision, 2026-11-08;
+    `numpy_linalg` without SIMD, its crate forbidding `unsafe`); the clean-room original is the fast one.
+  - *Portable tests:* the BET temporary-folder tests (`test_bet_temporary_folders_hold_no_option_text`) and the
+    oracle cache's key test refuse a TMPDIR whose path holds `-h` (a scratch folder named after the home
+    directory): the part ran the Python gates and the smoke tier with TMPDIR unset; make the tests independent of it.
+  - *tedana's releases:* follow tedana's newer releases in steps (26.0.3 the newest on 2026-11-08); the step to
+    fMRIPrep 25.2.6's tedana 25.0.1 (TED-05's cap; the curve fit's libraries: 176,938 values of ds003592's maps)
+    is in the record's spread cases.
+  - *The final phase:* multi-echo data beyond the panel's ds003592 (ds000210, ds000258 as oracle runs), the full
+    tier and heavy random testing.
 - **From the field maps' part A (sdcflows' port, 2026-11-08; eleven relays;
   [findings](findings/sdcflows-fieldmap.md), record [sdcflows-fieldmap](validation/sdcflows-fieldmap.md),
   [benchmarks](benchmarks/sdcflows-fieldmap.md), [API](api/sdcflows-fieldmap.md)).** Done in the part besides
@@ -764,6 +808,10 @@ The items below keep their history.
     linked to its BOLD runs; the PEPOLAR runs with part B), random testing at length (the trial: 335,471
     cases in half an hour), sdcflows' own unwarping on the panel's series (SDC-02 measured at 1.5 to
     4.6 Hz RMS in the brain with fMRIPrep's registrations).
+  - *A temporary folder holding `-h`* (tedana's `t2smap` replica, 2026-11-08): BET's temporary-folder tests
+    (`test_bet_temporary_folders_hold_no_option_text` and the oracle cache's key test) fail when TMPDIR's path
+    holds an option's text (the agents' scratch folders start `/tmp/claude-1000/-home-...`); the gates ran with
+    TMPDIR unset. Make the tests independent of TMPDIR's name (CLAUDE.md, "Portable tests").
   - *The harness:* three tests of `validation/tests` fail only under pytest-xdist (serially, as the gates
     run them, all pass): the oracle cache's `test_above_one_thread_a_run_is_served_after_three_identical_runs`
     and `test_exit_status_and_failures_are_cached` (`-n 8`), and random testing's

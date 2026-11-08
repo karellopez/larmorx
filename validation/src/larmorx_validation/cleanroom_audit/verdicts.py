@@ -984,6 +984,9 @@ def verdict(entry: dict) -> dict:
 BRIEF_RESTRICTED = re.compile(
     r"^validation/src/larmorx_validation/(?:parity|evidence|difftest/tools)/"
     r"(?:\w*replica\w*|fsl_mcflirt\w*|afni_volreg)\.py$"
+    # tedana's t2smap replica's random-testing descriptor and evidence module (2026-11-08; its suite
+    # matches above)
+    r"|^validation/src/larmorx_validation/(?:difftest/tools|evidence)/tedana_t2smap\.py$"
 )
 CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-path"})
 #: Files the clean-room briefs forbid from the clean-room fixes part on (2026-10-29): the
@@ -992,8 +995,12 @@ CONTENT_OPS = frozenset({"read", "search-hit", "copy", "diff-shown", "script-pat
 BRIEF_FILES = re.compile(
     r"^validation/difftest/triage\.toml$|^validation/investigations/(?:fsl-bet|fsl-fast|fsl-flirt|"
     r"afni-volreg|fsl-maths|fsl-mcflirt-replica|fsl-prelude|fsl-topup|flirt-spec-answers|bet-spec-answers|spec-answers-\w+|"
-    r"version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site)/|"
-    r"^validation/investigations/glibc-dbl/tables\.py$"
+    r"version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site|t2smap|"
+    r"tedana-t2smap-site)/|"
+    r"^validation/investigations/glibc-dbl/tables\.py$|"
+    # the t2smap replica's record and permanent cases: their descriptions name a few things of tedana's
+    # source (a routine, a TODO, line numbers; the orchestrator at the merge, 2026-11-08)
+    r"^docs/validation/tedana-t2smap-replica\.(?:md|json)$|^validation/difftest/cases/tedana-t2smap/"
 )
 BRIEF_FILES_SINCE = "2026-10-29T01:20:00+01:00"
 #: A replica author's triage entry in an output (TOML or a printed dict).

@@ -61,3 +61,5 @@ sdcflows-2.15.1	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflo
 scikit-learn-1.9.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.9.1.tar.gz	sha256:629cada3e33e2b9bf376cdc7614a47a4140b8aedc1d836579e359736fbd82977	BSD-3-Clause	tags
 scikit-learn-1.6.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.6.1.tar.gz	sha256:b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e	BSD-3-Clause	tags
 scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags
+tedana-26.0.3	https://files.pythonhosted.org/packages/source/t/tedana/tedana-26.0.3.tar.gz	sha256:3d767a09c2ae3a1e8fc0c62e8c86655de677ebd6424af1f7818af0e3c3aa5b2f	LGPL-2.1-only	tags
+tedana-25.0.1	https://files.pythonhosted.org/packages/source/t/tedana/tedana-25.0.1.tar.gz	sha256:b85742f83f7c853dc709cae8c9aa37f34fd964971fe986296861ad5286c4ccfa	LGPL-2.1-only	tags

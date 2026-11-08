@@ -256,3 +256,40 @@ Each file carries numpy's (and SciPy's) notice. Bit-identical to numpy 2.3.5 / S
 numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
 `validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana
 reaches, lengths around the pairwise blocks, axes of length 1, NaN, signed zeros, infinities).
+
+## numpy's printing of floats (`src/numpy/format.rs`)
+
+**Ported** from numpy 2.5.4 (BSD-3-Clause, unchanged from 2.3.5 on this path):
+`numpy/_core/arrayprint.py` (`array2string` with the default print options, `FloatingFormat` in
+`'maxprec'` mode at precision 8, `_formatArray`, `_extendLine` at line width 75) and the scalar
+`str()` of `float32`/`float64` (`numpy/_core/src/multiarray/scalartypes.c.src`, `floattype_str`:
+positional between 1e-4 and 1e16, else scientific with a two-digit exponent); the digits are
+Dragon4's shortest of the element's own type (`numpy/_core/src/multiarray/dragon4.c`), which Rust's
+float formatting gives, cut at 8 decimals with ties to even. Arrays of more than 1000 elements
+(numpy's summary) are not ported. Used by tedana's replica (`crates-gpl/larmorx-gpl-tedana`) for
+the adaptive mask's threshold message and nilearn's affine messages. Verified in that crate's
+`validation/investigations/t2smap/replica/check_stages.py` (the messages, line by line) and the
+unit tests here.
+
+## Python's command-line parsing and number formats (`src/python/`)
+
+**Ported** from CPython 3.12.16 (PSF License Version 2, "Copyright (c) 2001-2024 Python Software
+Foundation; All Rights Reserved"): `Lib/argparse.py` (`ArgumentParser` for options: `parse_args`,
+`_parse_known_args`, `_parse_optional`, `_get_option_tuples`, `_match_argument`, `_get_values`,
+`_get_value`, `_check_value`, `error`; `HelpFormatter` and `ArgumentDefaultsHelpFormatter`:
+`_format_usage` and its wrapping, `_format_actions_usage`, `_format_action`,
+`_format_action_invocation`, `_format_args`, `_expand_help`, `_split_lines`, `_fill_text`; the
+`store`, `store_true`, `help` and `version` actions), `Lib/textwrap.py` (`TextWrapper.wrap` with
+its default options: `wordsep_re`, `_wrap_chunks`, `_handle_long_word`), `Lib/shutil.py`
+(`get_terminal_size`'s `COLUMNS`), `Objects/floatobject.c` and `Python/pystrtod.c` (`float(str)`,
+`repr(float)`, `'%.Nf'`), `Objects/longobject.c` (`int(str)` in base 10, its underscores and its
+4,300-digit limit). Positional arguments, subparsers, mutually exclusive groups and `fromfile`
+prefixes are not ported (no ported program uses them). Unicode digits and Unicode's
+non-printable categories beyond the control characters are approximations (documented in the
+module). `json` (2026-11-08): `Lib/json/encoder.py` (`json.dump` with an indent: `_make_iterencode`,
+`py_encode_basestring_ascii`, `float.__repr__` and the special values), for tedana's JSON files.
+`repr(float)` and numpy's float printing choose, between two shortest forms equally close to the
+value, the one with an even last digit, as `_Py_dg_dtoa` mode 0 and numpy's Dragon4 do
+(`numpy::format::shortest_ties_even`; Rust's own shortest form can pick the other: 920.45343017578125
+prints as `920.4534301757812`, found in tedana's confounds table). Verified against tedana 26.0.3's parser in-process: 109 cases, all identical
+(`validation/investigations/t2smap/replica/check_parser.py`), and the unit tests here.

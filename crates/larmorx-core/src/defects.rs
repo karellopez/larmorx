@@ -330,6 +330,8 @@ defects! {
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
+    NP_03 = "NP-03", "numpy", true,
+        "numpy's float32 log on x86-64 CPUs with AVX2 and FMA3 or AVX-512 is numpy's own kernel, which is not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] get a result up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), and the C library's logf on other CPUs: tedana's t2smap takes it for its log-linear T2* and S0 fit (the logarithm of float32 data plus 1), so its maps' last bits, and the curve fit started from them, depend on the CPU";
     SDC_01 = "SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,
@@ -350,12 +352,46 @@ defects! {
         "B0FieldTransform.fit with approx (the default of ApplyCoeffsField and of sdcflows' unwarping workflow), on a target not aligned with the coefficients, builds its intermediate grid around the target as given and resamples it at the target's own coordinates, so the data-to-field-map transform is ignored: the field is taken where the target lies before the registration (measured on ds002603's BOLD references, registrations of 2.5 to 3.7 mm: 7.7 to 8.5 Hz RMS, up to 87 Hz in the brain)";
     SDC_11 = "SDC-11", "sdcflows", true,
         "resample_to_zooms (BSplineApprox's resize to zooms_min) onto a grid of a single voxel fails with nitransforms' bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point), so a field map whose whole extent is below zooms_min cannot be fitted";
+    TED_01 = "TED-01", "tedana", true,
+        "t2smap's adaptive mask (dropout) takes the 33rd percentile of the first echo's non-zero temporal means, which is NaN when one of them is NaN (a NaN sample, or no volume left), so no voxel equals it and t2smap fails with ValueError: attempt to get argmax of an empty sequence";
+    TED_02 = "TED-02", "tedana", true,
+        "t2smap --exclude accepts an index equal to the number of volumes (its check is greater than, not greater than or equal), then fails with numpy's IndexError";
+    TED_03 = "TED-03", "tedana", true,
+        "t2smap without --mask computes one with nilearn's compute_epi_mask; when that finds no voxel (nilearn's MaskWarning: Computed an empty mask) t2smap goes on and fails in the adaptive mask with IndexError: index -1 is out of bounds for axis 0 with size 0, and an image with too few voxels for its threshold fails with ValueError: attempt to get argmax of an empty sequence";
+    TED_04 = "TED-04", "tedana", true,
+        "t2smap applies a user mask by voxel index without comparing its affine with the data's, so a mask of the same shape in another space is used silently";
+    TED_05 = "TED-05", "tedana", true,
+        "t2smap caps only the limited T2* map (values above ten times its 99.5th percentile set to it); the full map, from which the optimal combination is weighted and which fMRIPrep keeps as its T2* map, holds the fit's largest values (up to 239,794 s on fMRIPrep's ds003592 call, in 2 to 34 voxels of its four multi-echo calls), where tedana 25.0.1's t2smap capped the full map too";
+    TED_07 = "TED-07", "tedana", true,
+        "t2smap --fittype curvefit --verbose writes the variance of S0 as the T2* variance map and the variance of T2* as the S0 variance map (curve_fit's covariance diagonal unpacked in the wrong order)";
+    TED_08 = "TED-08", "tedana", true,
+        "t2smap --fittype curvefit fits a voxel with one good echo with two echoes and keeps its estimate in the full maps, but a failure of that fit is not marked in the failures map, nor are its variances in the --verbose maps";
+    TED_09 = "TED-09", "tedana", true,
+        "t2smap's log-linear fit (also the start of curvefit) solves every voxel with the same number of good echoes as one least-squares problem, so one infinite sample (an infinite value, or an integer scaled beyond float32) makes the T2* and S0 of all those voxels NaN";
+    TED_10 = "TED-10", "tedana", true,
+        "t2smap accepts an infinite echo time (-e inf ...: all values at least 1, so taken as milliseconds) and fails in numpy's least squares with LinAlgError: SVD did not converge in Linear Least Squares";
+    TED_11 = "TED-11", "tedana", true,
+        "t2smap --n-independent-echos 0 fails with Python's ZeroDivisionError";
+    TED_12 = "TED-12", "tedana", true,
+        "t2smap accepts a single echo (one echo time) and fails later with an unrelated numpy error: IndexError: invalid index to scalar variable (dropout) or a ValueError of numpy's column_stack (log-linear fit)";
+    TED_13 = "TED-13", "tedana", true,
+        "t2smap --dummy-scans accepts a count that removes every volume (then fails with ValueError: attempt to get argmax of an empty sequence after numpy's 'Mean of empty slice' warnings) and a negative count (which shifts --exclude's indices up instead of removing volumes)";
+    TED_14 = "TED-14", "tedana", true,
+        "t2smap --debug's message on the T2* floor counts echoes times voxels as voxels (T2* values for N/E·V voxels), so its count and percentage are wrong for more than one echo";
+    TED_15 = "TED-15", "tedana", true,
+        "t2smap --combmode paid weights each echo by its temporal signal-to-noise ratio, 0 where the echo's standard deviation over time is 0, so a voxel whose good echoes are constant (and every voxel of a one-volume series) has weights summing to zero and t2smap fails with numpy's ZeroDivisionError: Weights sum to zero, can't be normalized";
+    TED_16 = "TED-16", "tedana", true,
+        "t2smap --exclude accepts a list that removes every volume (with or without --dummy-scans): the adaptive mask is then made from no volume and the log-linear fit solves no rows, so every voxel's T2* is 1/0 (infinite, then set to 500 ms) and S0 is 1, and t2smap writes these maps and the combination they weight with exit status 0 (the curve fit fails with numpy's ValueError of an empty minimum, the dropout method with the argmax of an empty sequence)";
+    TED_17 = "TED-17", "tedana", true,
+        "t2smap fails with IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed when a single voxel is left for the fit (a one-voxel mask, or one voxel with good signal), with both fit types and both fit modes";
+    TED_18 = "TED-18", "tedana", true,
+        "t2smap caps the limited T2* map at its 99.5th percentile, which is 0 when more than 99.5 % of its values are 0 (the voxels with one good echo, which the limited map sets to 0): every positive limited T2* is then set to 0, so the limited map holds no estimate and the RMSE is computed with T2* = 0 (numpy's divide-by-zero warning)";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,
         "tanh (double precision) is not correctly rounded: about one argument in five gets a result one unit in the last place from the exact value, and FSL's bet2 takes its surface's smoothness weight from it at every step, so where such a last bit survives (most of all where a self-intersecting surface is rerun, which amplifies it) the surface and the brain mask are other than the exact tanh gives";
     GLIBC_07 = "GLIBC-07", "glibc 2.35", true,
-        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place";
+        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place; and numpy's float64 exp and log are the C library's on x86-64 CPUs without AVX-512 (and SciPy's powers C's pow), which tedana's t2smap takes for its S0, its curve fit's model, the T2* floor, the RMSE and the combination's weights";
     AFNI_01 = "AFNI-01", "AFNI", true,
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,

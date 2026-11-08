@@ -12,6 +12,7 @@
 //!   `"linear"` method) along the first axis, SciPy's `scoreatpercentile(...,
 //!   interpolation_method="lower")`.
 //!
+//! - [`format`]: numpy's `str()` of a float array (the messages' numbers).
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
 //!   (for `reproduce`).
 //!
@@ -37,6 +38,7 @@
 //! OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //! POSSIBILITY OF SUCH DAMAGE.
 
+pub mod format;
 pub mod quantile;
 pub mod reduce;
 pub mod umath;
@@ -57,6 +59,8 @@ pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {
     fn sub(self, b: Self) -> Self;
     /// `a * b` as SSE computes it.
     fn mul(self, b: Self) -> Self;
+    /// `a / b` as SSE computes it.
+    fn div(self, b: Self) -> Self;
     /// The square root (IEEE: exact rounding; a NaN passes on).
     fn sqrt(self) -> Self;
     /// The value as `f64` (exact).
@@ -83,6 +87,10 @@ impl NpFloat for f32 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f32(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f32(self, b)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {
@@ -141,6 +149,10 @@ impl NpFloat for f64 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f64(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f64(self, b)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {

@@ -3,7 +3,7 @@
  "description": "a 4D B-spline displacement-field stage: the runner reads the 4D composite by its HDF5 parameters",
  "expect": "pass",
  "found": {
-  "detail": "upstream_defects=upstream_defects)]\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/karelo/VScode_projects/super_fmriprep/larmorx/.claude/worktrees/agent-ab7de196daece3c4e/python/larmorx/transforms/itk.py\", line 151, in _read_parts\n    parts, notices = _core.itk_transform_read(os.fspath(path), precision, upstream_defects)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: /tmp/lx-reg-33zy1d3u/larmorx/rComposite.h5: unknown transform type \"DisplacementFieldTransform_double_4_4\"\n",
+  "detail": "upstream_defects=upstream_defects)]\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<workspace>/larmorx/.claude/worktrees/agent-ab7de196daece3c4e/python/larmorx/transforms/itk.py\", line 151, in _read_parts\n    parts, notices = _core.itk_transform_read(os.fspath(path), precision, upstream_defects)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: /tmp/lx-reg-33zy1d3u/larmorx/rComposite.h5: unknown transform type \"DisplacementFieldTransform_double_4_4\"\n",
   "n": 379,
   "seed": "20261025",
   "shrink_moves": [

@@ -1,0 +1,258 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): a qform-only image: nibabel's get_qform in x87 extended precision sums from +0, so the outputs' srow hold +0.0 where a float64 product gives -0.0",
+ "expect": "pass",
+ "found": {
+  "detail": ", in compare_files\n    rep = _investigation(\"check_outputs\").compare_dirs(t_out, r_out)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<workspace>/larmorx/.claude/worktrees/agent-ac7d861cd17e74f0d/validation/investigations/t2smap/replica/check_outputs.py\", line 201, in compare_dirs\n    rep[name] = describe_image(a, b, ba, bb)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: ufunc 'isnan' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''\n",
+  "n": 2,
+  "seed": "t2smap-probe",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 1",
+   "tool move 1",
+   "tool move 1",
+   "tool move 4",
+   "dropped verbose (--verbose)",
+   "dropped exclude (--exclude 5,4:5)",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0",
+   "tool move 0"
+  ],
+  "signature": [
+   "exception"
+  ]
+ },
+ "id": "qform-signed-zero",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -24.0,
+     -11.5,
+     5.25
+    ],
+    "qfac": -1,
+    "qform_code": 4,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 0,
+    "spacing": [
+     3.0,
+     1.2,
+     1.5
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "head",
+    "suffix": ".nii.gz",
+    "threshold": 0.6,
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.0,
+    "noise": 0.02,
+    "rising": 0.01,
+    "s0": {
+     "axes": [
+      0.9,
+      0.75,
+      1.25
+     ],
+     "bias": [
+      0.0075,
+      -0.005,
+      -0.01,
+      -0.005
+     ],
+     "centre": [
+      2.25,
+      2.0,
+      0.75
+     ],
+     "noise": 0.0,
+     "seed": 1103374456,
+     "size": 11.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "seed": 29091282,
+    "t2": [
+     26.0,
+     38.0
+    ]
+   },
+   "shape": [
+    4,
+    5,
+    4,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    19,
+    38
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 0.5,
+    "tunits": "unknown"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--exclude spelling": "plain",
+   "--mask spelling": "plain",
+   "--verbose spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "t2",
+   "T2* low ms": 26.0,
+   "T2* range ms": 12.0,
+   "TE gap ms": 11,
+   "TE gap1 ms": 19,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 19,
+   "axis0": 0.9,
+   "axis1": 0.75,
+   "axis2": 1.25,
+   "background": "noise",
+   "bias0": 0.0075,
+   "bias1": -0.005,
+   "bias2": -0.01,
+   "bias3": -0.005,
+   "big-endian": false,
+   "centre0": 6.0,
+   "centre1": 5.5,
+   "centre2": 2.0,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.0,
+   "dtype": "float32",
+   "dummy scans": false,
+   "echoes": 2,
+   "even gaps": false,
+   "exclude": true,
+   "exclude a": 4,
+   "exclude b": 10,
+   "exclude form": "both",
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "default",
+   "head size": 0.9,
+   "log level": "info",
+   "mask": "head",
+   "mask dtype": "uint8",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "mask threshold": 0.6,
+   "mask value": 1.0,
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 0.0,
+   "nt": 12,
+   "nx": 17,
+   "ny": 20,
+   "nz": 8,
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": 44.5,
+   "origin1": -52.5,
+   "origin2": 58.0,
+   "prefix": false,
+   "qfac": -1,
+   "qform_code": 4,
+   "rising share": 0.01,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "17x20x8x12",
+   "size": 21.5,
+   "spacing0": 3.0,
+   "spacing1": 1.2,
+   "spacing2": 1.5,
+   "special samples": false,
+   "suffix": ".nii",
+   "temporal noise": 0.02,
+   "tissues": "t1",
+   "tr": 0.5,
+   "tunits": "unknown",
+   "units": "mm",
+   "verbose": true,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 2,
+  "options": [
+   "12 volume(s)",
+   "2 echoes",
+   "TE in s",
+   "exclude",
+   "file .nii",
+   "fitmode all",
+   "fittype default",
+   "mask head",
+   "stored float32",
+   "verbose"
+  ],
+  "seed": "t2smap-probe",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

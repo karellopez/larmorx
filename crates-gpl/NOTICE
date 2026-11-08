@@ -1,13 +1,55 @@
 larmorx-gpl
 Copyright 2026 Karel Lopez Vilaret
 
-This directory is reserved for larmorx-gpl, the package of bit-exact replicas of GPL-licensed
-neuroimaging tools (Connectome Workbench's, still to come), licensed under the GNU General Public
-License, version 3 or (at your option) any later version (see LICENSE). It comes with ABSOLUTELY
-NO WARRANTY. Its source code is published at https://github.com/karellopez/larmorx (directory
-crates-gpl/). It holds no package today: the AFNI replicas it held from 2026-10 moved into the
-main larmorx package on 2026-10-29, when AFNI 26.3.05 released the Medical College of Wisconsin's
-code under CC BY 4.0 (their notices are in the repository's NOTICE).
+larmorx-gpl holds bit-exact replicas of neuroimaging tools of the GPL licence family: Rust
+translations of their source code, written to give their output bit for bit. Today it holds one,
+tedana's t2smap. The larmorx-gpl program (crates larmorx-gpl-cli and larmorx-gpl-tedana) is
+distributed under the GNU General Public License, version 3 only (see LICENSE). It comes with
+ABSOLUTELY NO WARRANTY. Each translated file names its licence in an SPDX header and its origin in
+a comment; each crate's PROVENANCE.md lists the upstream files it was translated from and the
+changes made.
+
+The program is a separate work from larmorx (Apache-2.0), which runs it as a separate process
+when it is installed and exchanges files with it only. It does not present itself as tedana or
+as any other upstream tool, and it is not endorsed by tedana's developers.
+
+Source code. The source of this directory (the tedana translation and the program) is in every
+larmorx-gpl wheel (its licence files). The program's complete Corresponding Source, with the
+larmorx crates it is built with (crates/ of the repository) and the Rust crates its Cargo.lock
+pins, is published at https://github.com/karellopez/larmorx (directory crates-gpl/, at the
+commit of each release; the release's tag names it).
+
+
+Translated works
+================
+
+tedana 26.0.3 (TE-Dependent ANAlysis of multi-echo fMRI), Copyright 2023, The ME-ICA Developers
+(https://github.com/ME-ICA/tedana) - GNU Lesser General Public License, version 2.1
+  Translated: the t2smap workflow and command line (tedana/workflows/t2smap.py, parser_utils.py)
+  and the parts of tedana/decay.py, combine.py, utils.py, io.py and
+  resources/config/outputs.json it uses (crate larmorx-gpl-tedana; PROVENANCE.md lists them).
+  Its licence text, as tedana ships it, is LICENSES/LGPL-2.1-tedana.txt. tedana names version
+  2.1 of the LGPL and no later version, and none of its files carries another notice.
+  Modified: translated from Python to Rust in 2026 by Karel Lopez Vilaret; the defects of
+  tedana's that change results are corrected by default and reproduced on request
+  (LARMORX_UPSTREAM_DEFECTS=reproduce; the TED entries of the repository's
+  docs/findings/upstream-defects.md); the maths default to correctly rounded functions.
+  Section 3 of the LGPL version 2.1 permits applying the terms of the ordinary GNU General
+  Public License to a copy of the library instead, naming a version newer than 2: this
+  translation is distributed under the GNU General Public License, version 3 only, so that it
+  can include the Apache-2.0 larmorx crates it is built with. The change is irreversible for
+  this copy (section 3).
+
+
+Included works
+==============
+
+The program includes crates of larmorx (larmorx-core, larmorx-io, larmorx-interp,
+larmorx-transform, larmorx-optim), Copyright 2026 Karel Lopez Vilaret, licensed under the Apache
+License, Version 2.0 (LICENSES/Apache-2.0.txt), with the notices of the works they were
+translated from (numpy, SciPy, OpenBLAS and the reference LAPACK, CPython, nibabel, nilearn and
+others) in LICENSES/NOTICE-larmorx.txt, a copy of the repository's NOTICE. Apache-2.0 code may be
+included in a work licensed under the GNU GPL version 3.
 
 
 Verification tools (tools/, never distributed)

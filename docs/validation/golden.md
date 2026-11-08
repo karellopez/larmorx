@@ -13,16 +13,23 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 ## Where they are
 
-| | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
-|---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 262 cases, 2,053 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 52 cases, 129 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 134 cases, 746 outputs |
-| Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
-| Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
-| Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
-| Recorded by | `python scripts/record_golden.py` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-cli --test afni_replica_golden` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) |
-| CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-<platform>` (its `afni-replica/` folder) | `golden-mismatches-gpl-<platform>` |
+| | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) | `larmorx-gpl` (tedana's `t2smap`) |
+|---|---|---|---|---|
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 262 cases, 2,053 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 52 cases, 129 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 134 cases, 746 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 10 cases, 203 outputs |
+| Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |
+| Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` | `cargo test` |
+| Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` | job `gpl`, `cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli --locked` in `crates-gpl` (since 2026-11-08) |
+| Recorded by | `python scripts/record_golden.py` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-cli --test afni_replica_golden` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden` (in `crates-gpl`) |
+| CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-<platform>` (its `afni-replica/` folder) | `golden-mismatches-gpl-<platform>` | `golden-mismatches-gpl-<platform>` (the same artifact) |
 
 No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+`larmorx-gpl`'s checksums (tedana's `t2smap` replica, 10 cases, 203 outputs) were recorded on
+2026-11-08 from 68f1126d and again from e86180ff (the maths notices: only the named-defects lines
+of nine cases changed, every data checksum unchanged; unchanged since, through the TQDM_DISABLE fix
+and the notice texts of relay 10). The `gpl` jobs' added steps (rustfmt, clippy and `cargo test` of
+`larmorx-gpl-tedana` and `larmorx-gpl-cli`, the workspace's tools left out) measured 2.4 s, 4.5 s
+and 8.3 s on the main machine from an empty target directory: about a minute per job cold on
+GitHub's runners, six job-minutes per CI run, less with the cache (rule 10's estimate, 2026-11-08).
 The main package's checksums were recorded on 2026-11-08 from 14ff7709 (the field maps' part A,
 relay 8; the parity smoke tier passing: 2,880 tests): 16 cases added, `io.save_nibabel`,
 `io.load_nibabel` and fourteen `py.sdcflows.*` (below; 190 outputs, about 1.9 s together,
@@ -163,6 +170,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 | `larmorx-nc fsl mcflirt` | 24 | int16 (the default outputs, int16 written), float32 with a reference file, `-stages 4` and `-sinc_final`, `-meanvol` with `-spline_final` and `-dof 12`, every cost (`mutualinfo` with `-nn_final` and `-bins 64`, `normmi`, `corratio`, `woods`, `leastsquares` with `-smooth 0`), `-init` with `-fudge` and `-rotation 2`, the in-plane mode on a 3-slice slab (and `-2d`), `-stats`, `-gdt`, uint8 and int8 input, NaN and infinite voxels, big-endian float32 in the neurological order written as NIfTI-2, a TR in milliseconds; mcflirt's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced (FSL-03, -04, -08, -09, -10, -14); every file written fingerprinted (images by header and data, `.mat`, `.par`, `.rms`); each case checks the defects named on standard error; FSL-59 reproduced (`-nn_final` resampled trilinearly, as FSL 6.0.7.23) with zstd outputs (`FSLOUTPUTTYPE=NIFTI_ZST`) |
 | `larmorx-nc fsl bet`, `bet2`, `betsurf`, `standard_space_roi`, `fslroi` | 21 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it); `--binaryMask` (FSL 6.0.7.23) with bzip2 outputs (`NIFTI_BZ2`), and `bet` with zstd outputs (`NIFTI_ZST`); since 2026-11-04 `bet -S -m`, `-B -s` and `-A2` on generated standard images (`LARMORX_FSL_DATA`: a template head of other noise on the same grid, int16, its dilated brain mask and an eye block, uint8; neither FSL's data nor larmorx-nc's own copy), standard_space_roi with `-ssref` (the FOV mask and cut; `-maskMASK`, `-roiMASK`, `-d`), fslroi's box and spatial forms and an int8 image corrected and reproduced (FSL-217) |
+| `larmorx-gpl tedana t2smap` (the replica; `lx.tedana.t2smap` and `larmorx tedana t2smap` run it) | 10 | a generated 16 × 14 × 8 × 4 three-echo series of integer ratios (every 17th head voxel rising, every 23rd losing its last echo), relative paths: the log-linear fit (default and `reproduce`), the curve fit with `--verbose`, `--convention orig`, a prefix and two threads (both modes), the shared libraries' step (`reproduce`), `--fitmode ts` with PAID (`reproduce`), no mask with float32 data, echo times in ms, the dropout decay, `--dummy-scans 1`, `--exclude 0` and `--debug` (both modes), a z-concatenated file with `--masktype none`, TED-02's refusal (exit 1); every file written (images by header and data), `t2smap_call.sh`, `dataset_description.json` without its `Node` block, the exit status and the defects named |
 
 What the coverage test enumerates:
 
@@ -648,7 +656,8 @@ resampled series), so a regression would show in CI.
   (`implementation="original"`, and the command line with it forced), so an installed
   the replica cannot change them (2026-10-11, `docs/licensing.md`, "Choosing at run time").
   The replicas' cases are in `crates/larmorx-cli/tests/afni_replica_golden.rs` (moved from
-  `crates-gpl/larmorx-gpl-cli/tests/golden.rs` on 2026-10-29 with the replicas; the checksums
+  `crates-gpl/larmorx-gpl-cli/tests/golden.rs` on 2026-10-29 with the replicas, which since 2026-11-08
+  holds tedana's `t2smap` replica's 10 cases instead; the checksums
   did not change: recorded from 8218894, they pass through the in-process replica).
 - `golden.json` records the numpy version it was made with; the golden tests use only
   elementwise numpy operations in their inputs, which do not change between numpy versions.

@@ -3,7 +3,8 @@
 Every defect or questionable behaviour found so far in the tools and pipelines larmorx
 reproduces: ANTs and ITK, AFNI, FSL, fMRIPrep and its libraries (nipype, niworkflows,
 sMRIPrep, sdcflows, nitransforms; sdcflows' field-map estimation, ported bit for bit in the
-field maps' part A, has its own family, SDC-), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
+field maps' part A, has its own family, SDC-; tedana's `t2smap`, translated bit for bit in the
+`larmorx-gpl` replica, has the family TED-), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
 each: the evidence, what it does to fMRIPrep users, what larmorx does today, and what decision
 D13 ("correct by default, faithful on request", CLAUDE.md) requires. Collected 2026-10-11 from
 the other files in `docs/findings/`, the specs, the validation records and `docs/analysis/`.
@@ -16,7 +17,8 @@ corrected, never deleted.
 > 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md); the section
 > "Restricted: AFNI 3dvolreg" through [afni-volreg.md](afni-volreg.md) (AFNI 26.3.05's source); the section
 > "Restricted: FSL BET, FLIRT, FAST, topup, fslmaths, fslstats and prelude" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
-> [fsl-fast.md](fsl-fast.md), [fsl-topup.md](fsl-topup.md), [fsl-maths.md](fsl-maths.md) and [fsl-prelude.md](fsl-prelude.md). **Clean-room implementers must not read those sections.** The
+> [fsl-fast.md](fsl-fast.md), [fsl-topup.md](fsl-topup.md), [fsl-maths.md](fsl-maths.md) and [fsl-prelude.md](fsl-prelude.md); the section "Restricted: tedana t2smap" through
+> [tedana-t2smap.md](tedana-t2smap.md) (tedana 26.0.3's source, LGPL-2.1). **Clean-room implementers must not read those sections.** The
 > section "FSL: black-box findings" was found by running FSL's programs: anyone may read it. The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
@@ -240,6 +242,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SCI-05 | SciPy `map_coordinates` | a NaN coordinate with orders 2 to 5 and mode `nearest` (the suite's 3D float32 inputs, `prefilter=False` mostly): the output there is NaN in every run, but its sign and payload vary between runs on the same inputs (SciPy 1.15.3 and 1.18.1 alike) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit; NaN values compared alike); not reproduced; the resample-series step counts NaN values alike and runs the shared releases twice (2026-10-30) | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD (`lx.transforms`); numpy's own SVD, as x86-64 Linux computes it, in `lx.sdcflows`' orientation decisions (2026-11-08) | – |
+| NP-03 | numpy float32 `log` | on x86-64 CPUs with AVX2 and FMA3 or AVX-512 numpy's own kernel, not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), the C library's `logf` on other CPUs: results depend on the CPU | d | every multi-echo run's T2* and S0 (tedana's log-linear fit and the curve fit's start: 32,950 values of fMRIPrep's ds003592 call) | correctly rounded by default, named exactly where a written value or printed line changes; `reproduce` numpy's kernel (`larmorx_core::math::logf_numpy`, numpy's on all 2^32 inputs; the t2smap replica, 2026-11-08) | – |
+| NP-04 | numpy float64 `exp` and `log` on AVX-512 | on x86-64 CPUs with AVX-512 numpy's own (SVML) kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0], `log` on 0.10 % in [0, 10]); the C library's elsewhere: results depend on the CPU | d | multi-echo runs on AVX-512 machines (22,899 values of fMRIPrep's ds003592 call differ from the AVX2 path) | the non-AVX-512 path is the reference (the C library's functions, GLIBC-07; the oracles run with `NPY_DISABLE_CPU_FEATURES`); the AVX-512 kernels not reproduced, their spread measured in the t2smap replica's record (2026-11-08) | – (decided 2026-11-08) |
 | NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-02 | nibabel | `vox_offset` 0: header read as data | c | none | refuses | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-03 | nibabel | complex data: imaginary part dropped | c | none | raises | – (decided 2026-10-23: larmorx's behaviour kept) |
@@ -250,7 +254,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
 | GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in both implementations (2026-10-30: the clean-room original, then the replica, whose last-bit warning is gone) | – |
 | GLIBC-06 | glibc 2.35 | `tanh` (double) not correctly rounded: one unit (rarely two) in the last place on 21.3 % of 805 million random arguments and on 22,506 of CORE-MATH's 62,880 worst cases; FSL's `bet2` takes its smoothness weight from it at every vertex of every iteration, and the reruns of a surface whose first pass self-intersects amplify that last bit into another surface and mask (`specs/bet.md` §4.5, §8.1) | d | every BET run's surface (measured on the standard tier's 13 real images: the same outputs on 9; other masks on the three rerun cases, Dice 0.9959, 0.9848, 0.9920, and ds000005's BOLD first volume, 0.9966) | glibc's bits in both modes for now (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to glibc 2.35's on 12.9 billion arguments); the correctly rounded `larmorx_core::math::tanh` (CORE-MATH) ported and verified, its notice wired (2026-10-30, BET's clean-room part 2a). BET's default keeps glibc's bits (the user, 2026-10-31, rule C: the correctly rounded surface is another surface, not a more accurate one, and its exact notice would make a run 1.9 times slower); the correctly rounded `tanh` on request | – (decided 2026-10-31: glibc's bits kept by default) |
-| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases); in FSL's and AFNI's programs the single-precision `sinf`, `cosf`, `atan2f`, `expf`, `logf` and `powf` too (the functions themselves: GLIBC-02, GLIBC-03), whose last bits reach fslmaths' kernels, `-bptf`, `-tfce` and `-roc`, fslstats' `-e` and `-E`, 3dTshift's `-wsinc5` and `-wsinc9` weights (about 1 % of them), and the paths of the iterative programs (FLIRT and its programs, mcflirt's mutual information, FAST, topup's smoothing, bet2's powers, betsurf's blurring). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) through `larmorx_core::math`'s `*_glibc` functions: `exp`, `log`, `pow` and the single-precision ones translated from the permissive code glibc carries (Arm's Optimized Routines, fdlibm), and `sin`, `cos` and `sincos` (IBM's Accurate Mathematical Library in glibc, LGPL, never copied or translated) written by a clean-room implementer from a behaviour spec (`specs/glibc-dbl.md`; its table of sines and cosines from a definition, no glibc data; 768 of 768 blocks and 184 special arguments of the black-box record, 1.18 × 10^10 fresh arguments per function against the system's glibc, 0 differ, 2026-11-04); `tan`, `asin`, `acos` and `atan` correctly rounded in both modes (the user's decision of 2026-11-04: glibc's tables for them are searched and fitted data that no definition reproduces), the record's `fn/double-tan` an expected divergence. The clean-room originals' `reproduce` uses them since 2026-11-04 (fslmaths' double functions, kernels, `-bptf`, `-tfce`, `-roc`; fslstats' `-e`, `-E`; FLIRT and its programs; mcflirt's mutual information; FAST; topup's smoothing; bet2's powers; betsurf's blurring; 3dTshift's weighted sinc; since 2026-11-06 prelude's `-c` arctangent, `atan2f`): FAST's fMRIPrep calls and 41 FLIRT cases, the default registration among them, now give FSL's bytes; named in both modes only where a value differs exactly (fslmaths' voxelwise functions, fslstats, avscale, makerot, `convert_xfm -fixscaleskew`, 3dTshift, prelude's `-c` phases), never by the iterative programs or fslmaths' filters (the user's decision of 2026-11-04); fslmaths' clean-room FFT none (a direct sum). The replicas: `exp`, `log`, `pow` (fslmaths' replica 2026-11-03); `sin`, `cos`, `sincos` since 2026-11-04 (step (b), BET's `-S`/`-B`/`-A`/`-A2` part, relay 1), wherever FSL's and AFNI's sources call them: fslmaths' double `-sin` and `-cos` (named exactly where a voxel changes), the FFT convolution's twiddle factors (Armadillo's 65,792 factors of the lengths 1 to 256 and their transforms bit for bit; `difftest/fft-twiddles-glibc-sincos` a pass; a filter, named nothing), the sinc kernels' windows (FLIRT, applyxfm4D, mcflirt; the same float kernels in both modes at every width from 1 to 1001), avscale's half transforms (named where its report changes), and the AFNI replicas' FFT tables and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument) | none for `sin`, `cos` and `sincos` (2026-11-04); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (decided) |
+| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases); in FSL's and AFNI's programs the single-precision `sinf`, `cosf`, `atan2f`, `expf`, `logf` and `powf` too (the functions themselves: GLIBC-02, GLIBC-03), whose last bits reach fslmaths' kernels, `-bptf`, `-tfce` and `-roc`, fslstats' `-e` and `-E`, 3dTshift's `-wsinc5` and `-wsinc9` weights (about 1 % of them), and the paths of the iterative programs (FLIRT and its programs, mcflirt's mutual information, FAST, topup's smoothing, bet2's powers, betsurf's blurring). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build; and numpy's float64 `exp` and `log` (the C library's on x86-64 CPUs without AVX-512) and SciPy's powers (C's `pow`), which tedana's `t2smap` takes for its S0, the curve fit's model, the T2* floor, the RMSE and the combination's weights | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums); every multi-echo run's last bits through tedana (810 values of fMRIPrep's ds003592 call) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) through `larmorx_core::math`'s `*_glibc` functions: `exp`, `log`, `pow` and the single-precision ones translated from the permissive code glibc carries (Arm's Optimized Routines, fdlibm), and `sin`, `cos` and `sincos` (IBM's Accurate Mathematical Library in glibc, LGPL, never copied or translated) written by a clean-room implementer from a behaviour spec (`specs/glibc-dbl.md`; its table of sines and cosines from a definition, no glibc data; 768 of 768 blocks and 184 special arguments of the black-box record, 1.18 × 10^10 fresh arguments per function against the system's glibc, 0 differ, 2026-11-04); `tan`, `asin`, `acos` and `atan` correctly rounded in both modes (the user's decision of 2026-11-04: glibc's tables for them are searched and fitted data that no definition reproduces), the record's `fn/double-tan` an expected divergence. The clean-room originals' `reproduce` uses them since 2026-11-04 (fslmaths' double functions, kernels, `-bptf`, `-tfce`, `-roc`; fslstats' `-e`, `-E`; FLIRT and its programs; mcflirt's mutual information; FAST; topup's smoothing; bet2's powers; betsurf's blurring; 3dTshift's weighted sinc; since 2026-11-06 prelude's `-c` arctangent, `atan2f`): FAST's fMRIPrep calls and 41 FLIRT cases, the default registration among them, now give FSL's bytes; named in both modes only where a value differs exactly (fslmaths' voxelwise functions, fslstats, avscale, makerot, `convert_xfm -fixscaleskew`, 3dTshift, prelude's `-c` phases), never by the iterative programs or fslmaths' filters (the user's decision of 2026-11-04); fslmaths' clean-room FFT none (a direct sum). The replicas: `exp`, `log`, `pow` (fslmaths' replica 2026-11-03); `sin`, `cos`, `sincos` since 2026-11-04 (step (b), BET's `-S`/`-B`/`-A`/`-A2` part, relay 1), wherever FSL's and AFNI's sources call them: fslmaths' double `-sin` and `-cos` (named exactly where a voxel changes), the FFT convolution's twiddle factors (Armadillo's 65,792 factors of the lengths 1 to 256 and their transforms bit for bit; `difftest/fft-twiddles-glibc-sincos` a pass; a filter, named nothing), the sinc kernels' windows (FLIRT, applyxfm4D, mcflirt; the same float kernels in both modes at every width from 1 to 1001), avscale's half transforms (named where its report changes), and the AFNI replicas' FFT tables and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument). tedana's `t2smap` replica (2026-11-08): numpy's float64 `exp`, `log` and C's `pow` correctly rounded by default, glibc 2.35's bits with `reproduce` (`exp_glibc`, `log_glibc`, numpy's negative `log` as C's +NaN), named exactly where a written value or printed line changes (a second pass, writing nothing); its clean-room original names it in one pass where a written log-linear S0 would differ (`specs/t2smap.md` §15.2) | none for `sin`, `cos` and `sincos` (2026-11-04); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (decided) |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -265,6 +269,24 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SDC-09 | sdcflows `SubtractPhases` | no `EchoTime`: Python's `TypeError` of a comparison with None | c | none | rule B: a `ValueError` naming the metadata; `reproduce` the `TypeError` (field maps part A, 2026-11-08) | – |
 | SDC-10 | sdcflows `B0FieldTransform.fit(approx=True)` (`ApplyCoeffsField`, sdcflows' unwarping workflow) | on a target not aligned with the coefficients the intermediate grid is built around, and resampled at, the target as given: `xfm_data2fmap` is ignored (ds002603's BOLD references: 7.7 to 8.5 Hz RMS, up to 87 Hz, in the brain) | c | none (fMRIPrep uses its own reconstruction) | rule A: built and sampled where the transform puts the target, named; `reproduce` sdcflows' field (field maps part A, 2026-11-08) | – |
 | SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`'s resize to `zooms_min`) | onto a grid of a single voxel it fails with nitransforms' bare `AssertionError` (`assert targets.ndim == 2` after numpy's squeeze of the one target point): a field map whose whole extent is below `zooms_min` cannot be fitted | c | none (fMRIPrep's field maps are larger than `zooms_min`) | rule A: the one voxel resampled and the fit made, named; `reproduce` the `AssertionError` (field maps part A, 2026-11-08: its random-testing trial) | – |
+| TED-01 † | tedana `t2smap` (adaptive mask) | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | c | none | rule A: the percentile and the reference voxels from the finite means (no finite mean at all: a clear error), named; `reproduce` tedana's error (the t2smap replica, 2026-11-08) | – |
+| TED-02 † | tedana `t2smap --exclude` | an index equal to the number of volumes is accepted, then numpy's `IndexError` | e | none | rule B: refused with the check's own message, as a larger index is; `reproduce` tedana's error (2026-11-08) | – |
+| TED-03 † | tedana `t2smap` without `--mask` | when nilearn's `compute_epi_mask` finds no voxel (its `MaskWarning`) the run goes on and fails with `IndexError: index -1 is out of bounds for axis 0 with size 0`; with too few voxels for the adaptive mask's threshold, the argmax `ValueError` | c | none (fMRIPrep passes its BOLD mask) | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-04 † | tedana `t2smap --mask` | a mask is applied by voxel index, its affine never compared with the data's: a mask of the same shape in another space is used silently | c | none (the four real calls' masks have the data's affine) | rule B: refused with nilearn's own "Mask affine ... is different from img affine" message (the mask against the first echo); `reproduce` uses it (2026-11-08) | – |
+| TED-05 † | tedana `t2smap` (26.x) | only the limited T2* map is capped (values above ten times its 99.5th percentile set to it); the full map, which weights the optimal combination and which fMRIPrep keeps as its T2* map, keeps the fit's largest values (up to 239,794 s on fMRIPrep's ds003592 call); tedana 25.0.1 capped the full map too | c | none with fMRIPrep 25.2.6 (tedana 25.0.1); with tedana 26: 2 to 34 voxels of each of fMRIPrep's four multi-echo calls, and the combination's weights there | rule A (tedana's history shows no reason: ME-ICA/tedana#1290): the full map gets the limited map's cap, named with the count; `reproduce` tedana 26.0.3's uncapped map (2026-11-08) | – |
+| TED-06 † | tedana `t2smap --fittype curvefit` | a voxel whose log-linear start lies outside the curve fit's bounds (a T2* ≤ 0: a signal rising with the echo time) is reported as a failed fit and keeps the log-linear estimate | c | every multi-echo run (1,919 of the 1,930 failures on fMRIPrep's four calls) | rule D measured, then C: kept and documented (refits from the clipped start beat the log-linear residuals in only 15 to 29 % of these voxels); no switch (2026-11-08) | – (rule C: kept) |
+| TED-07 † | tedana `t2smap --fittype curvefit --verbose` | the T2* and S0 variance maps are written swapped (each holds the other's variance) | c | none (fMRIPrep does not pass `--verbose`) | rule A: each written under its own name, named; `reproduce` swaps them (2026-11-08) | – |
+| TED-08 † | tedana `t2smap --fittype curvefit` | a voxel with one good echo is fitted with two and kept in the full maps, but a failure of that fit is not marked in the failures map, nor are its variances in the `--verbose` maps | c | none (fMRIPrep keeps the T2* map and the combined series) | rule A: marked and written, named; `reproduce` tedana's maps (2026-11-08) | – |
+| TED-09 † | tedana `t2smap` (the log-linear fit, the curve fit's start) | one infinite sample (or an integer scaled beyond float32) makes the T2* and S0 of every voxel with the same number of good echoes NaN (one least-squares problem for them all) | c | none known (no infinite value in the oracle runs) | rule A: that voxel NaN alone, the others solved without it, named; `reproduce` tedana's (2026-11-08) | – |
+| TED-10 † | tedana `t2smap -e` | an infinite echo time is accepted (taken as milliseconds) and fails in numpy's least squares: `LinAlgError: SVD did not converge in Linear Least Squares` | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-11 † | tedana `t2smap --n-independent-echos 0` | Python's `ZeroDivisionError` | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-12 † | tedana `t2smap` with one echo | accepted, then an unrelated numpy error (`IndexError: invalid index to scalar variable`, or `column_stack`'s `ValueError`) | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-13 † | tedana `t2smap --dummy-scans` | a count that removes every volume fails, after numpy's "Mean of empty slice" warnings, with the argmax `ValueError`; a negative count shifts `--exclude`'s indices up instead | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-14 † | tedana `t2smap --debug` | the T2* floor's message counts echoes times voxels as voxels (its count and percentage are wrong for more than one echo) | f | none | rule A: the voxels counted (a message only); `reproduce` tedana's text (2026-11-08) | – |
+| TED-15 † | tedana `t2smap --combmode paid` | a voxel whose good echoes are constant over time (every voxel of a one-volume series) gets weights summing to zero and the run fails with numpy's `ZeroDivisionError: Weights sum to zero, can't be normalized` | c | none (fMRIPrep combines with `t2s`) | rule A: those voxels weighted equally, named (a one-volume series: rule B, a clear error); `reproduce` tedana's (2026-11-08) | – |
+| TED-16 † | tedana `t2smap --exclude` | a list that removes every volume is accepted: nothing is fitted, and every voxel's T2* (500 ms) and S0 (1) and their combination are written with exit status 0 (the curve fit fails with an empty-minimum `ValueError`, the dropout method with the argmax error) | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08, its random-testing trial) | – |
+| TED-17 † | tedana `t2smap` | a single voxel left for the fit (a one-voxel mask, or one voxel with good signal) fails with `IndexError: too many indices for array` (both fit types and fit modes) | c | none | rule A: fitted, named; `reproduce` tedana's error (2026-11-08, its random-testing trial) | – |
+| TED-18 † | tedana `t2smap` | the limited T2* map's cap is its 99.5th percentile, 0 when more than 99.5 % of its values are 0 (voxels of one good echo): every positive limited T2* is set to 0, and the RMSE computed with T2* = 0 | c | none | rule A: no cap of 0 or less, on either map, named; `reproduce` tedana's (2026-11-08, its random-testing trial) | – |
 | AFNI-01 † | 3dTshift, 3dAutomask, 3dUnifize | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-02 † | 3dTshift, 3dAutomask, 3dUnifize | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-03 † | 3dTshift (3dAutomask, 3dUnifize: no slice timing written) | header slice code 2 (sequential decreasing): no shift (AFNI 25.2.09; **fixed in AFNI 26.3.05**) | c | none | corrected by default in both implementations (replica 2026-10-12); fixed upstream in AFNI 26.3.05 exactly as larmorx corrected it: both implementations follow 26.3.05 in both modes and name it no more (the GPL replicas and the clean-room originals, 2026-10-29) | – |
@@ -487,7 +509,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (432 entries, recounted from the table on 2026-11-08, after the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)
+**Counts** (452 entries, recounted from the table on 2026-11-08, after tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused); before it the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
@@ -495,10 +517,10 @@ entries, decided, count as (c)):
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 99 | |
 | (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 216 | 10 |
-| (d) imprecision | 25 | |
-| (e) command-line or parsing quirk | 62 | |
-| (f) documentation or message only | 15 | |
+| (c) deterministic bug that changes results | 227 | 10 |
+| (d) imprecision | 27 | |
+| (e) command-line or parsing quirk | 68 | |
+| (f) documentation or message only | 16 | |
 | explained, not a defect | 2 | |
 
 The gap column today (2026-11-08): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
@@ -872,6 +894,18 @@ re-quantised into the input's stored type by nibabel's writer, the header's zoom
 affine's (equal on every oracle field map); PIPE-14 (`apply`'s head-motion transforms ignored with
 sdcflows' own warning) kept too. No numpy, SciPy, scikit-learn or OpenBLAS defect was found on
 these paths.
+**The t2smap replica** (`crates-gpl/larmorx-gpl-tedana`, the `larmorx-gpl` program, `lx.tedana.t2smap`,
+2026-11-08; tedana 26.0.3, [tedana-t2smap.md](tedana-t2smap.md), restricted): TED-01 to TED-18
+(TED-19 to TED-30 unused), each with `reproduce` (tedana's result, messages and exit status bit for
+bit) but TED-06: corrected by default TED-01, TED-05, TED-07, TED-08, TED-09, TED-14, TED-17 and
+TED-18 (rule A), TED-15 (rule A; a one-volume series rule B); a clear error by default TED-02,
+TED-03, TED-04, TED-10 to TED-13 and TED-16 (rule B); TED-06 (rule D measured, then C: kept and
+documented, no switch). TED-05: tedana 26's full T2* map is no longer capped, without a reason in
+its history (ME-ICA/tedana#1290; tedana 25.0.1, fMRIPrep 25.2.6's, capped it): rule A. Library
+entries: NP-03 (numpy's float32 `log` kernel; switch and notice), NP-04 (numpy's AVX-512 `exp` and
+`log`; a reference choice, no switch) and GLIBC-07's numpy and SciPy uses (switch and notice). Kept
+as tedana's, not defects: `--debug`'s help promising a TSV log file, the dropout mask appended twice,
+RepLGR lines that go nowhere (the findings).
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -3657,6 +3691,42 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   [next-steps](../next-steps.md)).
 - **D13 / gap:** not D13.
 
+### NP-03 numpy's float32 `log` depends on the CPU and is not correctly rounded — (d)
+- **What:** on x86-64 CPUs with AVX2 and FMA3 or AVX-512, numpy's float32 `log` is numpy's own
+  kernel, which is not correctly rounded: 10,947,841 of the 201,326,593 floats in [1, 2^24] get a
+  result up to 3 units in the last place from the exact value (78.4 million of all positive
+  floats, up to 4); on other CPUs it is the C library's `logf`. tedana's `t2smap` takes it for its
+  log-linear T2* and S0 fit (the logarithm of the float32 data plus 1), so its maps' last bits, and
+  the curve fit started from them, depend on the CPU.
+- **Evidence:** validated: `larmorx_core::math::logf_numpy` gives numpy's float32 `log` on all 2^32
+  inputs, its AVX-512 and AVX2/FMA3 paths, numpy 2.3.5 and 2.5.4
+  (`validation/investigations/t2smap/numerics/`); the fix pass of the record
+  [tedana-t2smap-replica](../validation/tedana-t2smap-replica.md).
+- **fMRIPrep:** every multi-echo run's T2* and S0 maps (32,950 values of fMRIPrep's ds003592 call
+  differ between the two functions, the curve fit's start included).
+- **larmorx:** the t2smap replica (2026-11-08): the correctly rounded `logf` by default;
+  `reproduce` numpy's kernel (`logf_numpy`, dispatched as numpy dispatches it, the same bits on
+  every platform); NP-03 named exactly where a written value or printed line changes (the stages
+  run again with the other function, writing nothing). Its clean-room original names nothing for
+  it (`specs/t2smap.md` §15.2: the one-pass rule).
+- **D13 / gap:** not D13 (class d); the switch and the notice are in place.
+
+### NP-04 numpy's float64 `exp` and `log` on AVX-512 CPUs — (d)
+- **What:** on x86-64 CPUs with AVX-512, numpy's float64 `exp` and `log` are numpy's own (SVML)
+  kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0],
+  tedana's `exp(−TE/T2*)`; `log` on 0.10 % in [0, 10]); on other CPUs they are the C library's
+  (glibc 2.35's: GLIBC-07). tedana's results differ between AVX2 and AVX-512 machines.
+- **Evidence:** measured (`validation/investigations/t2smap/probes/simd_probe.py`; the record
+  [tedana-t2smap-replica](../validation/tedana-t2smap-replica.md)'s spread: 22,899 values of
+  fMRIPrep's ds003592 call differ with the AVX-512 kernels on, 8 of a synthetic curve-fit case, 0
+  of the log-linear ones).
+- **fMRIPrep:** multi-echo runs on AVX-512 machines (numpy chooses its kernels at run time).
+- **larmorx:** the reference is the non-AVX-512 path (the t2smap part's decision D2, 2026-11-08):
+  the replica's `reproduce` follows the C library's functions (`larmorx_core::math`'s
+  `exp_glibc`, `log_glibc`), and its records run numpy with `NPY_DISABLE_CPU_FEATURES` naming the
+  AVX-512 features; the AVX-512 kernels are not reproduced (the record measures their spread).
+- **D13 / gap:** not D13 (class d); no switch (decided 2026-11-08).
+
 ### NIB-01 Compression decided by the file name — (e)
 - **What:** nibabel 5.4 decides gzip from the name: a gzipped file named `.nii` fails, an
   uncompressed `.nii.gz` is not read.
@@ -3826,6 +3896,17 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   user's decision of 2026-11-04, decision log). Not wired: `tan`, `asin`, `acos`, `atan`
   (decided), fslmaths' `-ztop`/`-ptoz`, and mcflirt's and topup's rotations (their specs name
   no glibc function).
+- **tedana's `t2smap`** (the replica, 2026-11-08): numpy's float64 `exp` and `log` are the C
+  library's on x86-64 CPUs without AVX-512 (numpy's wheels bind glibc's `exp@GLIBC_2.2.5` and
+  `log@GLIBC_2.2.5`; numpy's `log` of a negative number gives C's +NaN; on AVX-512 CPUs NP-04), and
+  SciPy's curve fit raises its residuals' powers with C's `pow`: tedana takes them for its S0 (the
+  exponential of the log-linear intercept), the curve fit's model, the T2* floor, the RMSE and the
+  combination's weights. The replica's default uses the correctly rounded functions, `reproduce`
+  glibc 2.35's (`exp_glibc`, `log_glibc`), and names GLIBC-07 exactly where a written value or
+  printed line changes (the stages run again with the other functions, writing nothing): 810
+  values of fMRIPrep's ds003592 call. Its clean-room original names it in one pass, only where a
+  written log-linear S0 would differ (`specs/t2smap.md` §15.2, the orchestrator's decision of
+  2026-11-08 after the user's of 2026-11-04).
 - **D13 / gap:** **reproduce** for the replicas' `sin`, `cos` and `sincos` (step (b), the first
   relay of the BET part: fslmaths' replica's double `-sin` and `-cos` and its FFT's twiddle
   factors on `larmorx_core::math`'s `sin_glibc`, `cos_glibc`, `sincos_glibc`). None for the
@@ -5616,3 +5697,32 @@ record `fsl-prelude-replica` (its `opt/`, `err/` and `panel/` categories), the t
 (`nan_phase_region.py`, `nan_phase_effect.py`) and the measurements
 `validation/investigations/prelude-spec/fsl272_measure.py` and
 `validation/investigations/spec-answers-4/jac_scales.py`.
+
+## Restricted: tedana t2smap (source-derived)
+
+> **Clean-room implementers: do not read this section.** Written from tedana 26.0.3's source
+> (LGPL-2.1), through [tedana-t2smap.md](tedana-t2smap.md). The clean-room original's implementer
+> works from `specs/t2smap.md`.
+
+### TED-01 to TED-18: t2smap (tedana 26.0.3) †
+
+Found while translating tedana 26.0.3's `t2smap` (`tedana/workflows/t2smap.py`, `decay.py`,
+`combine.py`, `utils.py`, `io.py`, `workflows/parser_utils.py` and the numpy, SciPy, nibabel and
+nilearn routines they reach; the same paths in 25.0.1 but TED-05) for the replica (2026-11-08; the
+restricted findings [tedana-t2smap.md](tedana-t2smap.md), "Defects" and "TED-05", have the
+mechanisms, the rules' reasons and the measurements). TED-01: `utils.make_adaptive_mask`'s dropout
+method takes the percentile of the first echo's temporal means with NaN among them. TED-02: the
+exclusion check tests `>` where `>=` is meant. TED-04: the mask is used by index (the source's own
+TODO notes the missing affine check). TED-05: `decay.modify_t2s_s0_maps` caps the limited map only;
+pull request #1290 removed the workflow's cap of the full map with a restructuring that names "the
+ceilings and floors" as moved, not dropped. TED-07: the curve fit's covariance diagonal is unpacked
+in the wrong order. TED-08: the one-echo voxels' failures and variances are not carried into the
+outputs. TED-09: one `numpy.linalg.lstsq` per adaptive-mask group. TED-17: `fit_loglinear` squeezes
+its one-voxel mask column to a 0-dimensional array before indexing it. TED-18: the limited map's
+cap is `scipy.stats.scoreatpercentile(..., 99.5, interpolation_method="lower")` of a map mostly 0.
+TED-06 was measured with `validation/investigations/t2smap/defects/ted06_feasible_start.py`, TED-05
+with `ted05_full_map_cap.py`. Cases: the record `tedana-t2smap-replica` (its `fail/` and `difftest/`
+categories), `validation/investigations/t2smap/replica/check_failures.py`, the permanent
+random-testing cases `validation/difftest/cases/tedana-t2smap/` (TED-16 to TED-18 among them), the
+golden case `exclude.ted02` (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`) and the unit tests of
+`larmorx-gpl-tedana`.

@@ -1038,6 +1038,7 @@ NAMESPACES = (
     "lx.ndimage",
     "lx.io",
     "lx.sdcflows",
+    "lx.tedana",
     "lx",
 )
 
@@ -1096,17 +1097,19 @@ def image_math_operations() -> list[str]:
 #: below). ``lx.fsl.prelude`` ran a tool with only its replica (FSL's prelude) from 2026-11-06
 #: until its clean-room original came the next day (its cases below); since 2026-11-06
 #: ``lx.afni.volreg`` ran a tool with only its replica (AFNI's 3dvolreg) from 2026-11-06 until its
-#: clean-room original came on 2026-11-08 (its cases below).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: clean-room original came on 2026-11-08 (its cases below). ``lx.tedana.t2smap`` runs tedana's
+#: t2smap, whose replica (``larmorx-gpl``, since 2026-11-08) has its cases in ``crates-gpl``.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.tedana.t2smap": "tedana t2smap"}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
-#: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
-#: the FSL replicas'.
+#: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job), the
+#: FSL replicas' and the GPL family's (tedana's t2smap; CI's gpl job runs both workspaces).
 AFNI_REPLICA_GOLDEN = (
     Path(__file__).resolve().parents[2] / "crates/larmorx-cli/tests/afni_replica_golden.rs"
 )
 NC_GOLDEN = Path(__file__).resolve().parents[2] / "crates-nc/larmorx-nc-cli/tests/golden.rs"
-REPLICA_GOLDEN = (AFNI_REPLICA_GOLDEN, NC_GOLDEN)
+GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
+REPLICA_GOLDEN = (AFNI_REPLICA_GOLDEN, NC_GOLDEN, GPL_GOLDEN)
 
 
 def replica_only() -> dict[str, str]:
@@ -1126,7 +1129,8 @@ def replica_only() -> dict[str, str]:
 def required() -> dict[str, str]:
     """Every name that needs a golden case here: ``{key: public name}``. Functions are keyed by
     identity (``fn:<id>``), so aliases (``lx.save``, ``lx.io.save``) count once. The tools and
-    functions with only a replica (:func:`replica_only`) have theirs in ``crates-nc``."""
+    functions with only a replica (:func:`replica_only`) have theirs in ``crates-nc`` or
+    ``crates-gpl``."""
     out = {key: key for key in [*cli_tools(), *image_math_operations()]}
     for fn, name in public_functions().items():
         out[f"fn:{id(fn)}"] = name

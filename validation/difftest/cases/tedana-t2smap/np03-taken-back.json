@@ -1,0 +1,267 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): numpy's float32 log alone changes values that its float64 exp then takes back: nothing named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 917,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "notice: NP-03"
+  ]
+ },
+ "id": "np03-taken-back",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     36.0,
+     -24.0,
+     4.0
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     0,
+     0,
+     1,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     4.0,
+     4.0,
+     4.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "float32",
+    "kind": "head",
+    "suffix": ".nii.gz",
+    "threshold": 0.3,
+    "value": 0.5
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.02,
+    "noise": 0.02,
+    "rising": 0.0,
+    "s0": {
+     "axes": [
+      1.05,
+      1.0,
+      0.85
+     ],
+     "bias": [
+      -0.01,
+      -0.01,
+      0.005,
+      0.005
+     ],
+     "centre": [
+      0.25,
+      2.5,
+      -1.5
+     ],
+     "noise": 0.0,
+     "seed": 635502677,
+     "size": 15.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "seed": 1866328277,
+    "t2": [
+     23.0,
+     64.0
+    ]
+   },
+   "shape": [
+    19,
+    13,
+    3,
+    11
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    13,
+    31,
+    49
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 0.8,
+    "tunits": "unknown"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--fitmode spelling": "plain",
+   "--fittype spelling": "plain",
+   "--mask spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "t2",
+   "T2* low ms": 23.0,
+   "T2* range ms": 41.0,
+   "TE gap ms": 18,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 13,
+   "axis0": 1.05,
+   "axis1": 1.0,
+   "axis2": 0.85,
+   "background": "noise",
+   "bias0": -0.01,
+   "bias1": -0.01,
+   "bias2": 0.005,
+   "bias3": 0.005,
+   "big-endian": false,
+   "centre0": 0.5,
+   "centre1": 5.0,
+   "centre2": -3.0,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.02,
+   "dtype": "float32",
+   "dummy scans": false,
+   "echoes": 3,
+   "even gaps": true,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": true,
+   "fittype": "curvefit",
+   "head size": 0.6,
+   "log level": "info",
+   "mask": "head",
+   "mask dtype": "float32",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "mask threshold": 0.3,
+   "mask value": 0.5,
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 0.0,
+   "nt": 11,
+   "nx": 19,
+   "ny": 13,
+   "nz": 3,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": 37.25,
+   "origin1": 32.5,
+   "origin2": -24.25,
+   "prefix": true,
+   "prefix text": "sub-01",
+   "qfac": 1,
+   "qform_code": 1,
+   "rising share": 0.0,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "19x13x3x11",
+   "size": 25.0,
+   "spacing0": 4.0,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "special samples": false,
+   "suffix": ".nii.gz",
+   "temporal noise": 0.02,
+   "tissues": "t2",
+   "tr": 0.8,
+   "tunits": "unknown",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fittype",
+     "curvefit"
+    ],
+    "name": "fittype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fitmode",
+     "all"
+    ],
+    "name": "fitmode",
+    "optional": true
+   },
+   {
+    "args": [
+     "--prefix",
+     "sub-01"
+    ],
+    "name": "prefix",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 917,
+  "options": [
+   "11 volume(s)",
+   "3 echoes",
+   "TE in s",
+   "file .nii.gz",
+   "fitmode all",
+   "fittype curvefit",
+   "mask head",
+   "prefix",
+   "stored float32"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

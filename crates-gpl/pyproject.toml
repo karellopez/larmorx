@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The larmorx-gpl wheel: the `larmorx-gpl` program only (maturin's "bin" bindings), no Python
+# module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
+# (docs/licensing.md, "A replica package is a program"). Build: `maturin build --release --locked`
+# in this directory.
+#
+# The program includes tedana's t2smap translated to Rust (crates larmorx-gpl-tedana, GPL-3.0-only:
+# tedana is LGPL-2.1-only, distributed under the GNU GPL version 3 as the LGPL's section 3 allows),
+# so the program as a whole is GPL-3.0-only. The wheel carries the licences and notices (LICENSE,
+# NOTICE, LICENSES/: the GPL, tedana's LGPL-2.1 text, the Apache-2.0 text and notices of the larmorx
+# crates it includes) and this workspace's source (the tedana translation and the program); the
+# rest of its Corresponding Source (the larmorx crates and the Rust crates it is built with, as
+# Cargo.lock pins them) is the repository at the release's commit (NOTICE says where). The
+# verification tools of tools/ (glibc's LGPL translations) are not part of the program or the
+# wheel.
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "larmorx-gpl"
+description = "Bit-exact replicas of GPL-family neuroimaging tools (tedana's t2smap), run by larmorx as a separate program; GNU GPL version 3"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = [
+    "LICENSE",
+    "NOTICE",
+    "LICENSES/LGPL-2.1-tedana.txt",
+    "LICENSES/Apache-2.0.txt",
+    "LICENSES/NOTICE-larmorx.txt",
+    "Cargo.toml",
+    "Cargo.lock",
+    "larmorx-gpl-*/Cargo.toml",
+    "larmorx-gpl-*/PROVENANCE.md",
+    "larmorx-gpl-*/src/*.rs",
+    "larmorx-gpl-*/src/**/*.rs",
+]
+keywords = ["neuroimaging", "mri", "fmri", "multi-echo", "tedana", "t2star"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/karellopez/larmorx"
+Source = "https://github.com/karellopez/larmorx/tree/main/crates-gpl"
+Issues = "https://github.com/karellopez/larmorx/issues"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "larmorx-gpl-cli/Cargo.toml"

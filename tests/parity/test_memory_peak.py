@@ -10,7 +10,8 @@ BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and F
 topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES``,
 ``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``:
 fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06) and clean-room original
-(``ORIGINAL_PRELUDE_CASES``, 2026-11-06).
+(``ORIGINAL_PRELUDE_CASES``, 2026-11-06); tedana's t2smap against the ``larmorx-gpl`` replica
+(``T2SMAP_CASES``, 2026-11-08).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -117,21 +118,32 @@ def _emptier(d: Path):
 
 
 def _original_peak(
-    cmd: list[str], env: dict[str, str], family: str, reset, cwd: Path | None = None
+    cmd: list[str],
+    env: dict[str, str],
+    family: str,
+    reset,
+    cwd: Path | None = None,
+    volatile: tuple[str, ...] = (),
 ) -> tuple[int, float]:
     """An original program's exit status and peak (MiB), through the oracle-output cache: served
     (the median of the peaks its entry keeps for this machine; its outputs replayed), or run
     under ``/usr/bin/time``, the first time three times (``reset`` empties its output place before
-    each repeat, so each run starts alike), a run the cache never stores once."""
-    code, mib, _ = _original_run(cmd, env, family, reset, cwd)
+    each repeat, so each run starts alike), a run the cache never stores once; ``volatile``: what
+    its messages hold that changes from run to run (tedana's progress bars)."""
+    code, mib, _ = _original_run(cmd, env, family, reset, cwd, volatile)
     return code, mib
 
 
 def _original_run(
-    cmd: list[str], env: dict[str, str], family: str, reset, cwd: Path | None = None
+    cmd: list[str],
+    env: dict[str, str],
+    family: str,
+    reset,
+    cwd: Path | None = None,
+    volatile: tuple[str, ...] = (),
 ) -> tuple[int, float, str]:
     """:func:`_original_peak` with the original's standard output."""
-    policy = oracle_cache.Policy(threads=1, family=family)
+    policy = oracle_cache.Policy(threads=1, family=family, volatile=volatile)
     peaks = []
     for n in range(3):
         if n:
@@ -682,6 +694,62 @@ def test_prelude_replica_needs_no_more_memory_than_fsl(tmp_path, name, extra):
         )
         if mode == "reproduce":
             assert _blanked(f_dir) == _blanked(r_dir), f"prelude {name}"
+
+
+#: tedana 26.0.3's t2smap (the newest environment, through the suite's launcher) against
+#: ``python -m larmorx tedana t2smap`` (the ``larmorx-gpl`` replica, 2026-11-08): fMRIPrep's call on
+#: ds003592-sub-280 (curve fit; and the log-linear fit), at one thread, both D13 modes (the
+#: default runs the maths' comparison passes, ``crates-gpl/larmorx-gpl-tedana/src/maths.rs``); the
+#: files bit-identical to tedana's in ``reproduce``.
+T2SMAP_CASES = [("fmriprep-curvefit", "curvefit"), ("fmriprep-loglin", "loglin")]
+
+
+@pytest.mark.parametrize(("name", "fit"), T2SMAP_CASES)
+def test_t2smap_replica_needs_no_more_memory_than_tedana(tmp_path, name, fit):
+    tt = pytest.importorskip("larmorx_validation.parity.tedana_t2smap_replica")
+    if tt.replica_binary() is None:
+        pytest.skip("the larmorx-gpl program is not built (crates-gpl)")
+    prog = tt.launcher("newest")
+    if prog is None or not Path("/usr/bin/time").is_file():
+        pytest.skip("tedana's newest environment or /usr/bin/time was not found")
+    calls = [
+        a
+        for n, a in tt._investigation("check_stages").real_cases()
+        if n == "ds003592-sub-280-rest-curvefit"
+    ]
+    if not calls:
+        pytest.skip("the ds003592 fMRIPrep oracle run was not found")
+    words = [fit if a == "curvefit" else a for a in calls[0]] + ["--out-dir", "out"]
+    env = tt._base_env()
+    t_dir = tmp_path / "tedana"
+    t_dir.mkdir()
+    code, t_mib = _original_peak(
+        [str(prog), *words], env, "python", _emptier(t_dir), t_dir, tt.VOLATILE
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_GPL_BIN": str(tt.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak(
+            [sys.executable, "-m", "larmorx", "tedana", "t2smap", *words], l_env, r_dir
+        )
+        assert code == 0
+        print(
+            f"t2smap {name} ({mode}): larmorx {mib:.1f} MiB, tedana {t_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(t_mib, entry), (
+            f"t2smap {name} ({mode}): larmorx {mib:.0f} MiB, tedana {t_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert tt.compare_files(t_dir / "out", r_dir / "out") == {}, f"t2smap {name}"
 
 
 #: PRELUDE's clean-room original (``crates/larmorx-fsl``, 2026-11-06) on the same calls, at one

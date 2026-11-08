@@ -44,6 +44,7 @@ Licences decide what may be translated and where the translation may go
 | AFNI, public-domain (NIH) files | public domain | main package | not needed |
 | AFNI, files copyrighted by the Medical College of Wisconsin (e.g. 3dTshift) | CC BY 4.0 from AFNI 26.3.05 (GPL-2.0-or-later before) | main package (since 2026-10-29) | main package |
 | Connectome Workbench | GPL-2.0-or-later | `larmorx-gpl` | main package |
+| tedana (its `t2smap`) | LGPL-2.1 | `larmorx-gpl` (GPL-3.0 under LGPL-2.1's section 3, since 2026-11-08) | main package (planned) |
 | FSL | FSL Licence (non-commercial) | `larmorx-nc` | main package |
 | FreeSurfer | FreeSurfer Software License 1.0 | `larmorx-freesurfer` | not planned (see below) |
 | MSM_HOCR | non-commercial; parts may not be redistributed; parts patented | **not allowed** | main package (planned) |
@@ -63,6 +64,7 @@ pip install larmorx                  # library + `larmorx`/`lx` commands; origin
 pip install "larmorx[prep]"          # + what the larmorprepx pipeline needs
 pip install larmorx                  # includes the exact AFNI replicas (since 2026-10-29)
 pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)
+pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)
 pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
 pip install "larmorx[all]"           # everything: every replica package too (decided 2026-10-16)
 larmorprepx /data/bids /data/derivatives participant --participant-label 01
@@ -95,8 +97,8 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 - clean-room originals;
 - replicas of permissive upstreams (ANTs/ITK, AFNI's NIH and, since 26.3.05, MCW files (CC BY 4.0), Arm's Optimized Routines, CORE-MATH, nibabel), with
   their copyright notices (`NOTICE`, each crate's `PROVENANCE.md`);
-- GPL replicas (Workbench's, to come) in `crates-gpl/`, with the GPL text, the upstream
-  copyright notices, and changes marked; it holds only verification tools today. Once wheels ship, the GPL requires this source to be public anyway;
+- GPL replicas in `crates-gpl/` (tedana's `t2smap` since 2026-11-08; Workbench's to come), with the GPL text, the upstream
+  licence and copyright notices, and changes marked; and verification tools. Once wheels ship, the GPL requires this source to be public anyway;
 - FSL replicas in `crates-nc/` (decided 2026-10-10: same repository). The FSL Licence
   allows this only free of charge, with its conditions passed on, and "all original and
   amended source code" included, so FSL's own source files for the replicated parts are

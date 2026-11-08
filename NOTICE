@@ -104,7 +104,11 @@ NIfTI-1 reference library (nifti1_io.c, as bundled with ITK v5.4.5) - public dom
 SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
 (scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
 scipy/sparse/linalg: cg; scipy/interpolate: BSpline's de Boor evaluation; scipy/stats: mode, in
-crates/larmorx-sdcflows) - BSD-3-Clause
+crates/larmorx-sdcflows; since 2026-11-08 also scipy/optimize: curve_fit with bounds,
+least_squares' trust-region reflective method and approx_derivative, in crates/larmorx-optim;
+scipy/stats: scoreatpercentile, in crates/larmorx-core/src/numpy; scipy/ndimage:
+gaussian_filter1d, binary morphology and label, in crates/larmorx-interp; for tedana's t2smap)
+- BSD-3-Clause
   Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.
   All rights reserved.
   scipy/ndimage/src/ni_interpolation.c and _interpolation.py:
@@ -145,7 +149,9 @@ OpenBLAS 0.3.30 (the operation order of its Haswell dgemm, dgemv and dgesv paths
 matrices: products and inverses as numpy computes them) and OpenBLAS 0.3.34 (since 2026-11-08:
 the Haswell sdot kernel, in crates/larmorx-sdcflows/src/blas.rs; the BLAS kernels and getrf
 path of numpy's svd, eigh and det of 3x3 and 4x4 matrices, in
-crates/larmorx-transform/src/numpy_linalg.rs) - BSD-3-Clause
+crates/larmorx-transform/src/numpy_linalg.rs; since 2026-11-08 also the Haswell dgemv_t, daxpy,
+drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 SVDs, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - BSD-3-Clause
   Copyright (c) 2011-2014, The OpenBLAS Project
   All rights reserved.
 
@@ -219,7 +225,12 @@ its validation messages; crates/larmorx-sdcflows/src/ridge.rs, since 2026-11-08)
 
 numpy 2.5.4 (the float32 dot product, median, mean and its pairwise sum, and the paths of
 numpy.linalg's svd, eigh and det; crates/larmorx-sdcflows and
-crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and, for tedana's t2smap,
+numpy's reductions, percentiles, weighted average, float32 log kernel and float printing in
+crates/larmorx-core/src/numpy/ and src/math/logf_numpy.rs, numpy.linalg.lstsq in
+crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot product
+(LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs)
+- BSD-3-Clause
   Copyright (c) 2005-2025, NumPy Developers.
   All rights reserved.
 
@@ -255,7 +266,9 @@ crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
 LAPACK 3.12.1 and 3.12.0, as OpenBLAS 0.3.34 and 0.3.30 bundle them (lapack-netlib/SRC: dgesdd,
 dgebrd, dgebd2, dbdsdc, dlasdq, dbdsqr, dormbr, dormqr, dormlq, dorm2r, dorml2, dsyevd, dsytrd,
 dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
-crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - modified BSD licence
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and dgelsd, dgeqrf, dgeqr2,
+dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - modified BSD licence
   Copyright (c) 1992-2023 The University of Tennessee and The University
                           of Tennessee Research Foundation.  All rights
                           reserved.
@@ -305,7 +318,8 @@ nitransforms 25.1.0 (coordinate mapping, transform chains, ITK transform loading
 nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine; since 2026-11-08 also the scaled
 array writer of arraywriters.py and volumeutils.py, nifti1.py's set_qform and get_qform,
 quaternions.py and orientations.io_orientation, in python/larmorx/io/nibabel_writer.py,
-nibabel_header.py and crates/larmorx-io) - MIT License
+nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap) - MIT License
   Copyright (c) 2009-2019 Matthew Brett <matthew.brett@gmail.com>
   Copyright (c) 2010-2013 Stephan Gerhard <git@unidesign.ch>
   Copyright (c) 2006-2014 Michael Hanke <michael.hanke@gmail.com>
@@ -333,6 +347,98 @@ nibabel_header.py and crates/larmorx-io) - MIT License
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
+
+nilearn 0.14.1 (nilearn/masking.py: compute_epi_mask and the helpers it calls, in
+crates/larmorx-interp/src/nilearn.rs, since 2026-11-08, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) The nilearn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
+get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
+usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
+of numbers, in crates/larmorx-core/src/python/, since 2026-11-08, for tedana's t2smap) - PSF
+License Version 2
+  Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+
+  The changes made (the PSF License's clause 3): the behaviours named above are re-expressed in
+  Rust, without copying code; argparse's positional arguments, subparsers, mutually exclusive
+  groups and fromfile prefixes are not reproduced; Unicode digits and Unicode's non-printable
+  categories beyond the control characters are approximated (crates/larmorx-core/PROVENANCE.md).
+
+  The licence, as CPython 3.12.16 distributes it (LICENSE.txt, part B):
+
+  PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+  --------------------------------------------
+
+  1. This LICENSE AGREEMENT is between the Python Software Foundation
+  ("PSF"), and the Individual or Organization ("Licensee") accessing and
+  otherwise using this software ("Python") in source or binary form and
+  its associated documentation.
+
+  2. Subject to the terms and conditions of this License Agreement, PSF hereby
+  grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+  analyze, test, perform and/or display publicly, prepare derivative works,
+  distribute, and otherwise use Python alone or in any derivative version,
+  provided, however, that PSF's License Agreement and PSF's notice of copyright,
+  i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+  2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+  All Rights Reserved" are retained in Python alone or in any derivative version
+  prepared by Licensee.
+
+  3. In the event Licensee prepares a derivative work that is based on
+  or incorporates Python or any part thereof, and wants to make
+  the derivative work available to others as provided herein, then
+  Licensee hereby agrees to include in any such work a brief summary of
+  the changes made to Python.
+
+  4. PSF is making Python available to Licensee on an "AS IS"
+  basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+  DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+  FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+  INFRINGE ANY THIRD PARTY RIGHTS.
+
+  5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+  FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+  A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+  OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+  6. This License Agreement will automatically terminate upon a material
+  breach of its terms and conditions.
+
+  7. Nothing in this License Agreement shall be deemed to create any
+  relationship of agency, partnership, or joint venture between PSF and
+  Licensee.  This License Agreement does not grant permission to use PSF
+  trademarks or trade name in a trademark sense to endorse or promote
+  products or services of Licensee, or any third party.
+
+  8. By copying, installing or otherwise using Python, Licensee
+  agrees to be bound by the terms and conditions of this License
+  Agreement.
 
 fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and
 fmriprep/utils/transforms.py) - Apache License, Version 2.0

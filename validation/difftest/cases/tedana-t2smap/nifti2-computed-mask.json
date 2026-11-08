@@ -1,0 +1,236 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): NIfTI-2 echoes without a mask: the reference stays a Nifti2Image, so nilearn's mask and every output are NIfTI-2",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: files: S0map.nii.gz: lengths 8544 vs 8352; T2starmap.nii.gz: lengths 8544 vs 8352; desc-adaptiveGoodSignal_mask.nii.gz: lengths 8544 vs 8352; desc-limited_S0map.nii.gz: lengths 8544 vs 8352; desc-limited_T2starmap.nii.gz: lengths 8544 vs 8352; desc-optcom_bold.nii.gz: lengths 16544 vs 16352;; shared: files: S0map.nii.gz: lengths 8544 vs 8352; T2starmap.nii.gz: lengths 8544 vs 8352; desc-adaptiveGoodSignal_mask.nii.gz: lengths 8544 vs 8352; desc-limited_S0map.nii.gz: lengths 8544 vs 8352; desc-limited_T2starmap.nii.gz: lengths 8544 vs 8352; desc-optcom_bold.nii.gz: lengths 16544 vs 16352;",
+  "n": 407,
+  "seed": "t2smap-trial",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 0",
+   "tool move 3",
+   "dropped prefix (--prefix a)",
+   "dropped masktype (--masktype none)",
+   "dropped fitmode (--fitmode ts)",
+   "dropped fittype (--fittype loglin)"
+  ],
+  "signature": [
+   "newest: files",
+   "shared: files"
+  ]
+ },
+ "id": "nifti2-computed-mask",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     5.0,
+     -9.5,
+     -28.5
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     1,
+     0,
+     -1,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 0,
+    "spacing": [
+     3.0,
+     1.0,
+     2.5
+    ],
+    "units": "mm"
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.1,
+    "noise": 0.02,
+    "rising": 0.01,
+    "s0": {
+     "axes": [
+      0.95,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      -0.0075,
+      0.0,
+      -0.01,
+      0.0075
+     ],
+     "centre": [
+      0.25,
+      0.5,
+      0.75
+     ],
+     "noise": 3.0,
+     "seed": 541281798,
+     "size": 10.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 1329311975,
+    "t2": [
+     17.0,
+     51.0
+    ]
+   },
+   "shape": [
+    20,
+    20,
+    5,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": "nifti2"
+   },
+   "te_oddity": "none",
+   "tes": [
+    13,
+    23
+   ],
+   "timing": {
+    "slice_code": 0,
+    "slice_duration": 0.2,
+    "slice_end": 4,
+    "slice_start": 0,
+    "tr": 1.0,
+    "tunits": "sec"
+   },
+   "units": "ms",
+   "zcat": false
+  },
+  "features": {
+   "--fitmode spelling": "plain",
+   "--fittype spelling": "plain",
+   "S0 noise": 3.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 17.0,
+   "T2* range ms": 34.0,
+   "TE gap ms": 21,
+   "TE gap1 ms": 10,
+   "TE oddity": "none",
+   "TE units": "ms",
+   "TE1 ms": 13,
+   "axis0": 0.95,
+   "axis1": 1.1,
+   "axis2": 0.9,
+   "background": "noise",
+   "bias0": -0.0075,
+   "bias1": 0.0,
+   "bias2": -0.01,
+   "bias3": 0.0075,
+   "big-endian": false,
+   "centre0": 1.0,
+   "centre1": 1.5,
+   "centre2": 2.5,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.1,
+   "dtype": "float64",
+   "dummy scans": false,
+   "echoes": 2,
+   "even gaps": false,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "ts",
+   "fittype": "loglin",
+   "head size": 1.0,
+   "log level": "info",
+   "mask given": false,
+   "masktype": true,
+   "masktypes": 1,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 0.0,
+   "nt": 6,
+   "nx": 20,
+   "ny": 20,
+   "nz": 5,
+   "one slice": false,
+   "orientation": "axes",
+   "origin0": -8.0,
+   "origin1": -51.0,
+   "origin2": 8.5,
+   "prefix": true,
+   "prefix text": "a",
+   "qfac": 1,
+   "qform_code": 1,
+   "rising share": 0.01,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "20x20x5x6",
+   "size": 23.5,
+   "slice_code": 4,
+   "spacing0": 3.0,
+   "spacing1": 1.0,
+   "spacing2": 2.5,
+   "special samples": false,
+   "suffix": "nifti2",
+   "temporal noise": 0.02,
+   "tissues": "t2",
+   "tr": 1.0,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 407,
+  "options": [
+   "2 echoes",
+   "6 volume(s)",
+   "TE in ms",
+   "file nifti2",
+   "fitmode ts",
+   "fittype loglin",
+   "masktype none",
+   "no mask",
+   "prefix",
+   "stored float64"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

@@ -1,0 +1,21 @@
+[package]
+name = "larmorx-gpl-cli"
+description = "The larmorx-gpl command line: bit-exact replicas of GPL-family tools (tedana's t2smap) with the original programs' arguments"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+autobins = false
+
+[[bin]]
+name = "larmorx-gpl"
+path = "src/main.rs"
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-gpl-tedana.workspace = true
+
+[dev-dependencies]
+flate2.workspace = true
+sha2.workspace = true
+tempfile.workspace = true

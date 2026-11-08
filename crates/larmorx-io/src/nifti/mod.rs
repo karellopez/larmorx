@@ -17,6 +17,7 @@ pub mod datatype;
 pub mod extension;
 pub mod header;
 pub mod itk;
+mod nibabel_affine;
 pub mod paths;
 
 use std::fs::File;

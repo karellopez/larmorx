@@ -1,0 +1,1511 @@
+# HANDOFF.toml of tedana's `t2smap` replica part (relay 10, 2026-11-08): the exact changes to the shared
+# documents, applied in order by scripts/orchestration/apply_handoff.py (run from the merged larmorx checkout,
+# with --site <the merged site checkout>); written against a trial merge of the branch with main 6840f4d8 and
+# of t2smap-pages with the site's 01f901ed. The reasons are in HANDOFF.md beside this file. Afterwards:
+# `python -m larmorx_validation tables --site <site>`, `register_counts.py`, the evidence summary.
+# NOTICE's operations are made three times: the root file and its two copies stay the same file.
+
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = '''
+validation = "[{sdcflows-fieldmap.cases} cases](record:sdcflows-fieldmap)'''
+text = '''
+
+[[tool]]
+id = "tedana-t2smap"
+title = "tedana's t2smap (the T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination)"
+eco = "larmorx"
+page = "/tools/tedana-t2smap/"
+use = ["larmorx tedana t2smap", "larmorx-gpl tedana t2smap", "lx.tedana.t2smap"]
+how = "exact replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18 corrected by default or refused, each with `reproduce`, but TED-06, kept); the clean-room original later, in the main package"
+validation = "replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls"'''
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = '''
+[[record]]
+id = "sdcflows-fieldmap"
+larmorx = "`lx.sdcflows` (`crates/larmorx-sdcflows`), `lx.io.save_nibabel`, `lx.io.load_nibabel`"
+reference = "sdcflows 2.17.1 with scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4 and nibabel 5.4.2 (in-process, `oracles/python-newest`, numpy's OpenBLAS on its Haswell kernels; the step from SciPy 1.15.3 and numpy 2.3.5 in every case), and fMRIPrep 25.2.6's own files of five oracle runs"
+status = "`validated`"
+'''
+new = '''
+[[record]]
+id = "sdcflows-fieldmap"
+larmorx = "`lx.sdcflows` (`crates/larmorx-sdcflows`), `lx.io.save_nibabel`, `lx.io.load_nibabel`"
+reference = "sdcflows 2.17.1 with scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4 and nibabel 5.4.2 (in-process, `oracles/python-newest`, numpy's OpenBLAS on its Haswell kernels; the step from SciPy 1.15.3 and numpy 2.3.5 in every case), and fMRIPrep 25.2.6's own files of five oracle runs"
+status = "`validated`"
+
+[[record]]
+id = "tedana-t2smap-replica"
+larmorx = "`larmorx-gpl tedana t2smap` (`crates-gpl/larmorx-gpl-tedana`); `lx.tedana.t2smap` and `larmorx tedana t2smap` (the replica, GNU GPL version 3)"
+reference = "tedana 26.0.3's t2smap as a program, in both kept library environments (numpy 2.5.4 with OpenBLAS 0.3.34 and SciPy 1.18.1; numpy 2.3.5 with OpenBLAS 0.3.30 and SciPy 1.15.3; OpenBLAS on its Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread); fMRIPrep's calls also against fMRIPrep 25.2.6's own files (tedana 25.0.1)"
+status = "`experimental` ({tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared} compared cases bit-identical in both environments, fMRIPrep's {tedana-t2smap-replica.fmriprep} calls included; {tedana-t2smap-replica.both} rejected by both, with the same messages and status)"
+'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+field maps' part A, has its own family, SDC-), SciPy, numpy'''
+new = '''
+field maps' part A, has its own family, SDC-; tedana's `t2smap`, translated bit for bit in the
+`larmorx-gpl` replica, has the family TED-), SciPy, numpy'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+[fsl-maths.md](fsl-maths.md) and [fsl-prelude.md](fsl-prelude.md). **Clean-room implementers must not read those sections.**'''
+new = '''
+[fsl-maths.md](fsl-maths.md) and [fsl-prelude.md](fsl-prelude.md); the section "Restricted: tedana t2smap" through
+> [tedana-t2smap.md](tedana-t2smap.md) (tedana 26.0.3's source, LGPL-2.1). **Clean-room implementers must not read those sections.**'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = '''
+| NP-02 | nibabel, numpy SVD |'''
+text = '''
+| NP-03 | numpy float32 `log` | on x86-64 CPUs with AVX2 and FMA3 or AVX-512 numpy's own kernel, not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), the C library's `logf` on other CPUs: results depend on the CPU | d | every multi-echo run's T2* and S0 (tedana's log-linear fit and the curve fit's start: 32,950 values of fMRIPrep's ds003592 call) | correctly rounded by default, named exactly where a written value or printed line changes; `reproduce` numpy's kernel (`larmorx_core::math::logf_numpy`, numpy's on all 2^32 inputs; the t2smap replica, 2026-11-08) | – |
+| NP-04 | numpy float64 `exp` and `log` on AVX-512 | on x86-64 CPUs with AVX-512 numpy's own (SVML) kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0], `log` on 0.10 % in [0, 10]); the C library's elsewhere: results depend on the CPU | d | multi-echo runs on AVX-512 machines (22,899 values of fMRIPrep's ds003592 call differ from the AVX2 path) | the non-AVX-512 path is the reference (the C library's functions, GLIBC-07; the oracles run with `NPY_DISABLE_CPU_FEATURES`); the AVX-512 kernels not reproduced, their spread measured in the t2smap replica's record (2026-11-08) | – (decided 2026-11-08) |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+`sincos` has one build | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums) |'''
+new = '''
+`sincos` has one build; and numpy's float64 `exp` and `log` (the C library's on x86-64 CPUs without AVX-512) and SciPy's powers (C's `pow`), which tedana's `t2smap` takes for its S0, the curve fit's model, the T2* floor, the RMSE and the combination's weights | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums); every multi-echo run's last bits through tedana (810 values of fMRIPrep's ds003592 call) |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument) | none for `sin`'''
+new = '''
+and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument). tedana's `t2smap` replica (2026-11-08): numpy's float64 `exp`, `log` and C's `pow` correctly rounded by default, glibc 2.35's bits with `reproduce` (`exp_glibc`, `log_glibc`, numpy's negative `log` as C's +NaN), named exactly where a written value or printed line changes (a second pass, writing nothing); its clean-room original names it in one pass where a written log-linear S0 would differ (`specs/t2smap.md` §15.2) | none for `sin`'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = '''
+| SDC-11 | sdcflows `resample_to_zooms`'''
+text = '''
+| TED-01 † | tedana `t2smap` (adaptive mask) | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | c | none | rule A: the percentile and the reference voxels from the finite means (no finite mean at all: a clear error), named; `reproduce` tedana's error (the t2smap replica, 2026-11-08) | – |
+| TED-02 † | tedana `t2smap --exclude` | an index equal to the number of volumes is accepted, then numpy's `IndexError` | e | none | rule B: refused with the check's own message, as a larger index is; `reproduce` tedana's error (2026-11-08) | – |
+| TED-03 † | tedana `t2smap` without `--mask` | when nilearn's `compute_epi_mask` finds no voxel (its `MaskWarning`) the run goes on and fails with `IndexError: index -1 is out of bounds for axis 0 with size 0`; with too few voxels for the adaptive mask's threshold, the argmax `ValueError` | c | none (fMRIPrep passes its BOLD mask) | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-04 † | tedana `t2smap --mask` | a mask is applied by voxel index, its affine never compared with the data's: a mask of the same shape in another space is used silently | c | none (the four real calls' masks have the data's affine) | rule B: refused with nilearn's own "Mask affine ... is different from img affine" message (the mask against the first echo); `reproduce` uses it (2026-11-08) | – |
+| TED-05 † | tedana `t2smap` (26.x) | only the limited T2* map is capped (values above ten times its 99.5th percentile set to it); the full map, which weights the optimal combination and which fMRIPrep keeps as its T2* map, keeps the fit's largest values (up to 239,794 s on fMRIPrep's ds003592 call); tedana 25.0.1 capped the full map too | c | none with fMRIPrep 25.2.6 (tedana 25.0.1); with tedana 26: 2 to 34 voxels of each of fMRIPrep's four multi-echo calls, and the combination's weights there | rule A (tedana's history shows no reason: ME-ICA/tedana#1290): the full map gets the limited map's cap, named with the count; `reproduce` tedana 26.0.3's uncapped map (2026-11-08) | – |
+| TED-06 † | tedana `t2smap --fittype curvefit` | a voxel whose log-linear start lies outside the curve fit's bounds (a T2* ≤ 0: a signal rising with the echo time) is reported as a failed fit and keeps the log-linear estimate | c | every multi-echo run (1,919 of the 1,930 failures on fMRIPrep's four calls) | rule D measured, then C: kept and documented (refits from the clipped start beat the log-linear residuals in only 15 to 29 % of these voxels); no switch (2026-11-08) | – (rule C: kept) |
+| TED-07 † | tedana `t2smap --fittype curvefit --verbose` | the T2* and S0 variance maps are written swapped (each holds the other's variance) | c | none (fMRIPrep does not pass `--verbose`) | rule A: each written under its own name, named; `reproduce` swaps them (2026-11-08) | – |
+| TED-08 † | tedana `t2smap --fittype curvefit` | a voxel with one good echo is fitted with two and kept in the full maps, but a failure of that fit is not marked in the failures map, nor are its variances in the `--verbose` maps | c | none (fMRIPrep keeps the T2* map and the combined series) | rule A: marked and written, named; `reproduce` tedana's maps (2026-11-08) | – |
+| TED-09 † | tedana `t2smap` (the log-linear fit, the curve fit's start) | one infinite sample (or an integer scaled beyond float32) makes the T2* and S0 of every voxel with the same number of good echoes NaN (one least-squares problem for them all) | c | none known (no infinite value in the oracle runs) | rule A: that voxel NaN alone, the others solved without it, named; `reproduce` tedana's (2026-11-08) | – |
+| TED-10 † | tedana `t2smap -e` | an infinite echo time is accepted (taken as milliseconds) and fails in numpy's least squares: `LinAlgError: SVD did not converge in Linear Least Squares` | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-11 † | tedana `t2smap --n-independent-echos 0` | Python's `ZeroDivisionError` | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-12 † | tedana `t2smap` with one echo | accepted, then an unrelated numpy error (`IndexError: invalid index to scalar variable`, or `column_stack`'s `ValueError`) | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-13 † | tedana `t2smap --dummy-scans` | a count that removes every volume fails, after numpy's "Mean of empty slice" warnings, with the argmax `ValueError`; a negative count shifts `--exclude`'s indices up instead | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
+| TED-14 † | tedana `t2smap --debug` | the T2* floor's message counts echoes times voxels as voxels (its count and percentage are wrong for more than one echo) | f | none | rule A: the voxels counted (a message only); `reproduce` tedana's text (2026-11-08) | – |
+| TED-15 † | tedana `t2smap --combmode paid` | a voxel whose good echoes are constant over time (every voxel of a one-volume series) gets weights summing to zero and the run fails with numpy's `ZeroDivisionError: Weights sum to zero, can't be normalized` | c | none (fMRIPrep combines with `t2s`) | rule A: those voxels weighted equally, named (a one-volume series: rule B, a clear error); `reproduce` tedana's (2026-11-08) | – |
+| TED-16 † | tedana `t2smap --exclude` | a list that removes every volume is accepted: nothing is fitted, and every voxel's T2* (500 ms) and S0 (1) and their combination are written with exit status 0 (the curve fit fails with an empty-minimum `ValueError`, the dropout method with the argmax error) | e | none | rule B: a clear error; `reproduce` tedana's (2026-11-08, its random-testing trial) | – |
+| TED-17 † | tedana `t2smap` | a single voxel left for the fit (a one-voxel mask, or one voxel with good signal) fails with `IndexError: too many indices for array` (both fit types and fit modes) | c | none | rule A: fitted, named; `reproduce` tedana's error (2026-11-08, its random-testing trial) | – |
+| TED-18 † | tedana `t2smap` | the limited T2* map's cap is its 99.5th percentile, 0 when more than 99.5 % of its values are 0 (voxels of one good echo): every positive limited T2* is set to 0, and the RMSE computed with T2* = 0 | c | none | rule A: no cap of 0 or less, on either map, named; `reproduce` tedana's (2026-11-08, its random-testing trial) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+### NIB-01 Compression decided by the file name — (e)'''
+new = '''
+### NP-03 numpy's float32 `log` depends on the CPU and is not correctly rounded — (d)
+- **What:** on x86-64 CPUs with AVX2 and FMA3 or AVX-512, numpy's float32 `log` is numpy's own
+  kernel, which is not correctly rounded: 10,947,841 of the 201,326,593 floats in [1, 2^24] get a
+  result up to 3 units in the last place from the exact value (78.4 million of all positive
+  floats, up to 4); on other CPUs it is the C library's `logf`. tedana's `t2smap` takes it for its
+  log-linear T2* and S0 fit (the logarithm of the float32 data plus 1), so its maps' last bits, and
+  the curve fit started from them, depend on the CPU.
+- **Evidence:** validated: `larmorx_core::math::logf_numpy` gives numpy's float32 `log` on all 2^32
+  inputs, its AVX-512 and AVX2/FMA3 paths, numpy 2.3.5 and 2.5.4
+  (`validation/investigations/t2smap/numerics/`); the fix pass of the record
+  [tedana-t2smap-replica](../validation/tedana-t2smap-replica.md).
+- **fMRIPrep:** every multi-echo run's T2* and S0 maps (32,950 values of fMRIPrep's ds003592 call
+  differ between the two functions, the curve fit's start included).
+- **larmorx:** the t2smap replica (2026-11-08): the correctly rounded `logf` by default;
+  `reproduce` numpy's kernel (`logf_numpy`, dispatched as numpy dispatches it, the same bits on
+  every platform); NP-03 named exactly where a written value or printed line changes (the stages
+  run again with the other function, writing nothing). Its clean-room original names nothing for
+  it (`specs/t2smap.md` §15.2: the one-pass rule).
+- **D13 / gap:** not D13 (class d); the switch and the notice are in place.
+
+### NP-04 numpy's float64 `exp` and `log` on AVX-512 CPUs — (d)
+- **What:** on x86-64 CPUs with AVX-512, numpy's float64 `exp` and `log` are numpy's own (SVML)
+  kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0],
+  tedana's `exp(−TE/T2*)`; `log` on 0.10 % in [0, 10]); on other CPUs they are the C library's
+  (glibc 2.35's: GLIBC-07). tedana's results differ between AVX2 and AVX-512 machines.
+- **Evidence:** measured (`validation/investigations/t2smap/probes/simd_probe.py`; the record
+  [tedana-t2smap-replica](../validation/tedana-t2smap-replica.md)'s spread: 22,899 values of
+  fMRIPrep's ds003592 call differ with the AVX-512 kernels on, 8 of a synthetic curve-fit case, 0
+  of the log-linear ones).
+- **fMRIPrep:** multi-echo runs on AVX-512 machines (numpy chooses its kernels at run time).
+- **larmorx:** the reference is the non-AVX-512 path (the t2smap part's decision D2, 2026-11-08):
+  the replica's `reproduce` follows the C library's functions (`larmorx_core::math`'s
+  `exp_glibc`, `log_glibc`), and its records run numpy with `NPY_DISABLE_CPU_FEATURES` naming the
+  AVX-512 features; the AVX-512 kernels are not reproduced (the record measures their spread).
+- **D13 / gap:** not D13 (class d); no switch (decided 2026-11-08).
+
+### NIB-01 Compression decided by the file name — (e)'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+- **D13 / gap:** **reproduce** for the replicas' `sin`, `cos` and `sincos` (step (b), the first'''
+new = '''
+- **tedana's `t2smap`** (the replica, 2026-11-08): numpy's float64 `exp` and `log` are the C
+  library's on x86-64 CPUs without AVX-512 (numpy's wheels bind glibc's `exp@GLIBC_2.2.5` and
+  `log@GLIBC_2.2.5`; numpy's `log` of a negative number gives C's +NaN; on AVX-512 CPUs NP-04), and
+  SciPy's curve fit raises its residuals' powers with C's `pow`: tedana takes them for its S0 (the
+  exponential of the log-linear intercept), the curve fit's model, the T2* floor, the RMSE and the
+  combination's weights. The replica's default uses the correctly rounded functions, `reproduce`
+  glibc 2.35's (`exp_glibc`, `log_glibc`), and names GLIBC-07 exactly where a written value or
+  printed line changes (the stages run again with the other functions, writing nothing): 810
+  values of fMRIPrep's ds003592 call. Its clean-room original names it in one pass, only where a
+  written log-linear S0 would differ (`specs/t2smap.md` §15.2, the orchestrator's decision of
+  2026-11-08 after the user's of 2026-11-04).
+- **D13 / gap:** **reproduce** for the replicas' `sin`, `cos` and `sincos` (step (b), the first'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+**Counts** (432 entries, recounted from the table on 2026-11-08, after the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)'''
+new = '''
+**Counts** (452 entries, recounted from the table on 2026-11-08, after tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused); before it the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+| (c) deterministic bug that changes results | 216 | 10 |'''
+new = '''
+| (c) deterministic bug that changes results | 227 | 10 |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+| (d) imprecision | 25 | |'''
+new = '''
+| (d) imprecision | 27 | |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+| (e) command-line or parsing quirk | 62 | |'''
+new = '''
+| (e) command-line or parsing quirk | 68 | |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+| (f) documentation or message only | 15 | |'''
+new = '''
+| (f) documentation or message only | 16 | |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+No numpy, SciPy, scikit-learn or OpenBLAS defect was found on
+these paths.
+'''
+new = '''
+No numpy, SciPy, scikit-learn or OpenBLAS defect was found on
+these paths.
+**The t2smap replica** (`crates-gpl/larmorx-gpl-tedana`, the `larmorx-gpl` program, `lx.tedana.t2smap`,
+2026-11-08; tedana 26.0.3, [tedana-t2smap.md](tedana-t2smap.md), restricted): TED-01 to TED-18
+(TED-19 to TED-30 unused), each with `reproduce` (tedana's result, messages and exit status bit for
+bit) but TED-06: corrected by default TED-01, TED-05, TED-07, TED-08, TED-09, TED-14, TED-17 and
+TED-18 (rule A), TED-15 (rule A; a one-volume series rule B); a clear error by default TED-02,
+TED-03, TED-04, TED-10 to TED-13 and TED-16 (rule B); TED-06 (rule D measured, then C: kept and
+documented, no switch). TED-05: tedana 26's full T2* map is no longer capped, without a reason in
+its history (ME-ICA/tedana#1290; tedana 25.0.1, fMRIPrep 25.2.6's, capped it): rule A. Library
+entries: NP-03 (numpy's float32 `log` kernel; switch and notice), NP-04 (numpy's AVX-512 `exp` and
+`log`; a reference choice, no switch) and GLIBC-07's numpy and SciPy uses (switch and notice). Kept
+as tedana's, not defects: `--debug`'s help promising a TSV log file, the dropout mask appended twice,
+RepLGR lines that go nowhere (the findings).
+'''
+
+[[op]]
+do = "append"
+file = "docs/findings/upstream-defects.md"
+text = '''
+## Restricted: tedana t2smap (source-derived)
+
+> **Clean-room implementers: do not read this section.** Written from tedana 26.0.3's source
+> (LGPL-2.1), through [tedana-t2smap.md](tedana-t2smap.md). The clean-room original's implementer
+> works from `specs/t2smap.md`.
+
+### TED-01 to TED-18: t2smap (tedana 26.0.3) †
+
+Found while translating tedana 26.0.3's `t2smap` (`tedana/workflows/t2smap.py`, `decay.py`,
+`combine.py`, `utils.py`, `io.py`, `workflows/parser_utils.py` and the numpy, SciPy, nibabel and
+nilearn routines they reach; the same paths in 25.0.1 but TED-05) for the replica (2026-11-08; the
+restricted findings [tedana-t2smap.md](tedana-t2smap.md), "Defects" and "TED-05", have the
+mechanisms, the rules' reasons and the measurements). TED-01: `utils.make_adaptive_mask`'s dropout
+method takes the percentile of the first echo's temporal means with NaN among them. TED-02: the
+exclusion check tests `>` where `>=` is meant. TED-04: the mask is used by index (the source's own
+TODO notes the missing affine check). TED-05: `decay.modify_t2s_s0_maps` caps the limited map only;
+pull request #1290 removed the workflow's cap of the full map with a restructuring that names "the
+ceilings and floors" as moved, not dropped. TED-07: the curve fit's covariance diagonal is unpacked
+in the wrong order. TED-08: the one-echo voxels' failures and variances are not carried into the
+outputs. TED-09: one `numpy.linalg.lstsq` per adaptive-mask group. TED-17: `fit_loglinear` squeezes
+its one-voxel mask column to a 0-dimensional array before indexing it. TED-18: the limited map's
+cap is `scipy.stats.scoreatpercentile(..., 99.5, interpolation_method="lower")` of a map mostly 0.
+TED-06 was measured with `validation/investigations/t2smap/defects/ted06_feasible_start.py`, TED-05
+with `ted05_full_map_cap.py`. Cases: the record `tedana-t2smap-replica` (its `fail/` and `difftest/`
+categories), `validation/investigations/t2smap/replica/check_failures.py`, the permanent
+random-testing cases `validation/difftest/cases/tedana-t2smap/` (TED-16 to TED-18 among them), the
+golden case `exclude.ted02` (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`) and the unit tests of
+`larmorx-gpl-tedana`.'''
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = '''
+| SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`)'''
+text = '''
+| TED-01 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout mask's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | the percentile and the reference voxels from the finite means; no finite mean at all: a clear error |
+| TED-02 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--exclude` accepts an index equal to the number of volumes, then fails with numpy's IndexError | refused with the check's own message, as a larger index is |
+| TED-03 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | without `--mask`, an empty mask from nilearn (or too few voxels for its threshold) fails later with IndexError or ValueError | refused with a clear error |
+| TED-04 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | a user mask's affine is never compared with the data's | refused with nilearn's message when they differ |
+| TED-05 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | only the limited T2* map is capped; the full map (fMRIPrep's T2* map, the combination's weights) keeps values of up to days (up to 239,794 s on fMRIPrep's calls), where tedana 25.0.1, fMRIPrep's own, capped it | the full map gets the limited map's cap |
+| TED-07 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--verbose`'s T2* and S0 variance maps are swapped | each written under its own name |
+| TED-08 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | a voxel with one good echo is fitted with two, but its curve-fit failure and variances are not reported | its failure marked, its variances written |
+| TED-09 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | one infinite sample makes the T2* and S0 of every voxel with the same number of good echoes NaN | that voxel NaN, the others solved without it |
+| TED-10 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | an infinite echo time fails in numpy's least squares (LinAlgError) | refused with a clear error |
+| TED-11 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--n-independent-echos 0` fails with ZeroDivisionError | refused with a clear error |
+| TED-12 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | a single echo fails later with an unrelated numpy error | refused with a clear error |
+| TED-13 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--dummy-scans` that removes every volume fails after numpy's warnings; a negative count shifts `--exclude`'s indices | refused with a clear error |
+| TED-14 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--debug`'s message on the T2* floor counts echoes times voxels as voxels | the voxels counted |
+| TED-15 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--combmode paid` with a voxel whose good echoes are constant (every voxel of a one-volume series) fails with `ZeroDivisionError: Weights sum to zero` | those voxels weighted equally; a one-volume series refused with a clear error |
+| TED-16 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | `--exclude` that removes every volume: nothing is fitted, and every voxel's T2* (500 ms) and S0 (1) are written with exit status 0 | refused with a clear error |
+| TED-17 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | a single voxel left for the fit fails with `IndexError: too many indices for array` | fitted |
+| TED-18 | tedana `t2smap` | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | when more than 99.5 % of the limited T2* map's values are 0 (voxels of one good echo), its cap is 0 and every limited T2* is set to 0 | no cap of 0 or less, on either map |
+| NP-03 | numpy's float32 `log` (tedana's log-linear fit) | `larmorx tedana t2smap`, `lx.tedana.t2smap` (the replica, `larmorx-gpl`) | numpy's own kernel on x86-64 CPUs with AVX2/FMA3 or AVX-512, not correctly rounded (about 5 % of the values one or more units in the last place away); the C library's `logf` elsewhere | correctly rounded; `reproduce` numpy's kernel, named exactly where a written value changes |'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+`3dTshift -wsinc5`/`-wsinc9` | one unit in the last place'''
+new = '''
+`3dTshift -wsinc5`/`-wsinc9`; `larmorx tedana t2smap` (the replica, `larmorx-gpl`: numpy's float64 `exp` and `log`, SciPy's `pow`) | one unit in the last place'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+`mri_robust_register`, which `lx.sdcflows.check_register` refuses until the FreeSurfer part.
+'''
+new = '''
+`mri_robust_register`, which `lx.sdcflows.check_register` refuses until the FreeSurfer part.
+tedana's `t2smap` replica (2026-11-08, the `larmorx-gpl` program; `lx.tedana.t2smap`,
+`larmorx tedana t2smap`) has the switch for TED-01 to TED-05, TED-07 to TED-18, NP-03 and GLIBC-07:
+by default the corrections above, with `upstream_defects="reproduce"`
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`) tedana 26.0.3's files, messages and exit status bit for bit
+([tedana-t2smap.md](tedana-t2smap.md#upstream-defects)). TED-06 (a curve fit started outside its
+bounds reported as failed, the log-linear estimate kept) is kept in both modes (rule D measured,
+then C); NP-04 (numpy's AVX-512 kernels) is not reproduced: the non-AVX-512 path is the reference.
+'''
+
+[[op]]
+do = "edit"
+file = "upstream.tsv"
+old = '''
+scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags
+'''
+new = '''
+scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags
+tedana-26.0.3	https://files.pythonhosted.org/packages/source/t/tedana/tedana-26.0.3.tar.gz	sha256:3d767a09c2ae3a1e8fc0c62e8c86655de677ebd6424af1f7818af0e3c3aa5b2f	LGPL-2.1-only	tags
+tedana-25.0.1	https://files.pythonhosted.org/packages/source/t/tedana/tedana-25.0.1.tar.gz	sha256:b85742f83f7c853dc709cae8c9aa37f34fd964971fe986296861ad5286c4ccfa	LGPL-2.1-only	tags
+'''
+
+[[op]]
+do = "insert"
+file = "UPSTREAM.md"
+after = '''
+| scikit-learn | BSD-3-Clause | `1.9.1`'''
+text = '''
+| tedana | LGPL-2.1 (only) | `26.0.3`, the newest release (tag `26.0.3` → `e0a18e331abd`; PyPI sdist, SHA-256 `3d767a09c2ae…`, `<workspace>/tags/tedana-26.0.3`) | 25.0.1 (fMRIPrep 25.2.6's image; tag → `9ecc94f3a7d5`, sdist SHA-256 `b85742f83f7c…`, `tags/tedana-25.0.1`): the same paths but the full T2* map's cap (TED-05) | `t2smap` (`workflows/t2smap.py`, `decay.py`, `combine.py`, `utils.py`, `io.py`, `workflows/parser_utils.py`, `resources/config/outputs.json`) in the replica `crates-gpl/larmorx-gpl-tedana` (GPL-3.0-only under LGPL-2.1's section 3; the `larmorx-gpl` program, 2026-11-08). Restricted for clean-room implementers (the audit's R07: the clone, the tags, every installed copy) |
+| nilearn | BSD-3-Clause | `0.14.1` (the installed wheel in both kept environments) | – (fMRIPrep's image has its own; tedana calls it only without `--mask`) | `masking.compute_epi_mask` and the helpers it calls, on SciPy's filters and morphology: `larmorx_interp::nilearn` (2026-11-08, for tedana's replica) |
+| CPython | PSF License Version 2 | `3.12.16` (the shared environment's interpreter) | 3.12.11 (fMRIPrep 25.2.6's image) | `argparse` (options, usage, help, errors), `textwrap`, `json`'s encoder with an indent, `float()`, `int()` and `repr(float)`: `larmorx_core::python` (2026-11-08, for replicas of Python programs' command lines and messages: tedana's `t2smap`) |'''
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = '''
+since 2026-11-08 the float32 `dot`, `median`, `mean` (its pairwise sum) and `linalg.svd`, `eigh`, `det` paths sdcflows and nibabel reach are followed operation by operation (`larmorx_sdcflows`, `larmorx_transform::numpy_linalg`) |'''
+new = '''
+since 2026-11-08 the float32 `dot`, `median`, `mean` (its pairwise sum) and `linalg.svd`, `eigh`, `det` paths sdcflows and nibabel reach are followed operation by operation (`larmorx_sdcflows`, `larmorx_transform::numpy_linalg`), and, for tedana's replica, numpy's reductions (`sum`, `mean`, `var`, `std`, the nan-aware ones, `average`), percentiles, the float32 `log` kernel (`larmorx_core::numpy`, `math::logf_numpy`), float printing (`numpy::format`), `linalg.lstsq` (`numpy_linalg::lstsq`: LAPACK's `dgelsd`) and the extended-precision dot product nibabel's `get_qform` takes (`larmorx_io::nifti::nibabel_affine`) |'''
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = '''
+de Boor evaluation and `stats.mode` as sdcflows reaches them (`larmorx_sdcflows`; 1.18.1, identical on these paths in 1.15.3, whose sdist is `tags/scipy-1.15.3`, SHA-256 `eae3cf522bc7…`) |'''
+new = '''
+de Boor evaluation and `stats.mode` as sdcflows reaches them (`larmorx_sdcflows`; 1.18.1, identical on these paths in 1.15.3, whose sdist is `tags/scipy-1.15.3`, SHA-256 `eae3cf522bc7…`); for tedana's replica `optimize.curve_fit` with bounds (`least_squares`' trust-region reflective method, `approx_derivative`, the covariance: `larmorx-optim`), `stats.scoreatpercentile` (`larmorx_core::numpy::quantile`) and `ndimage`'s `gaussian_filter1d`, binary morphology and `label` (`larmorx_interp::ndimage`), 1.18.1 and 1.15.3 |'''
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = '''
+`reference_src/workbench/` (GPL-2.0-or-later) and `reference_src/MSM_HOCR/` (non-commercial) are kept outside the working tree'''
+new = '''
+tedana's source (LGPL-2.1: the clone `tedana/`, `tags/tedana-*` and every installed copy of the package) is restricted for clean-room implementers since its replica (2026-11-08; the clean-room audit's R07). `reference_src/workbench/` (GPL-2.0-or-later) and `reference_src/MSM_HOCR/` (non-commercial) are kept outside the working tree'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+crates/larmorx-sdcflows) - BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+new = '''
+crates/larmorx-sdcflows; since 2026-11-08 also scipy/optimize: curve_fit with bounds,
+least_squares' trust-region reflective method and approx_derivative, in crates/larmorx-optim;
+scipy/stats: scoreatpercentile, in crates/larmorx-core/src/numpy; scipy/ndimage:
+gaussian_filter1d, binary morphology and label, in crates/larmorx-interp; for tedana's t2smap)
+- BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-sdcflows) - BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+new = '''
+crates/larmorx-sdcflows; since 2026-11-08 also scipy/optimize: curve_fit with bounds,
+least_squares' trust-region reflective method and approx_derivative, in crates/larmorx-optim;
+scipy/stats: scoreatpercentile, in crates/larmorx-core/src/numpy; scipy/ndimage:
+gaussian_filter1d, binary morphology and label, in crates/larmorx-interp; for tedana's t2smap)
+- BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-sdcflows) - BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+new = '''
+crates/larmorx-sdcflows; since 2026-11-08 also scipy/optimize: curve_fit with bounds,
+least_squares' trust-region reflective method and approx_derivative, in crates/larmorx-optim;
+scipy/stats: scoreatpercentile, in crates/larmorx-core/src/numpy; scipy/ndimage:
+gaussian_filter1d, binary morphology and label, in crates/larmorx-interp; for tedana's t2smap)
+- BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc.'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs; since 2026-11-08 also the Haswell dgemv_t, daxpy,
+drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 SVDs, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs; since 2026-11-08 also the Haswell dgemv_t, daxpy,
+drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 SVDs, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs; since 2026-11-08 also the Haswell dgemv_t, daxpy,
+drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 SVDs, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and, for tedana's t2smap,
+numpy's reductions, percentiles, weighted average, float32 log kernel and float printing in
+crates/larmorx-core/src/numpy/ and src/math/logf_numpy.rs, numpy.linalg.lstsq in
+crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot product
+(LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs)
+- BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and, for tedana's t2smap,
+numpy's reductions, percentiles, weighted average, float32 log kernel and float printing in
+crates/larmorx-core/src/numpy/ and src/math/logf_numpy.rs, numpy.linalg.lstsq in
+crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot product
+(LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs)
+- BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+new = '''
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and, for tedana's t2smap,
+numpy's reductions, percentiles, weighted average, float32 log kernel and float printing in
+crates/larmorx-core/src/numpy/ and src/math/logf_numpy.rs, numpy.linalg.lstsq in
+crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot product
+(LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs)
+- BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - modified BSD licence'''
+new = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and dgelsd, dgeqrf, dgeqr2,
+dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - modified BSD licence'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - modified BSD licence'''
+new = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and dgelsd, dgeqrf, dgeqr2,
+dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - modified BSD licence'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - modified BSD licence'''
+new = '''
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and dgelsd, dgeqrf, dgeqr2,
+dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap) - modified BSD licence'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+nibabel_header.py and crates/larmorx-io) - MIT License'''
+new = '''
+nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap) - MIT License'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+nibabel_header.py and crates/larmorx-io) - MIT License'''
+new = '''
+nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap) - MIT License'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+nibabel_header.py and crates/larmorx-io) - MIT License'''
+new = '''
+nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap) - MIT License'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+new = '''
+nilearn 0.14.1 (nilearn/masking.py: compute_epi_mask and the helpers it calls, in
+crates/larmorx-interp/src/nilearn.rs, since 2026-11-08, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) The nilearn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
+get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
+usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
+of numbers, in crates/larmorx-core/src/python/, since 2026-11-08, for tedana's t2smap) - PSF
+License Version 2
+  Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+
+  The changes made (the PSF License's clause 3): the behaviours named above are re-expressed in
+  Rust, without copying code; argparse's positional arguments, subparsers, mutually exclusive
+  groups and fromfile prefixes are not reproduced; Unicode digits and Unicode's non-printable
+  categories beyond the control characters are approximated (crates/larmorx-core/PROVENANCE.md).
+
+  The licence, as CPython 3.12.16 distributes it (LICENSE.txt, part B):
+
+  PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+  --------------------------------------------
+
+  1. This LICENSE AGREEMENT is between the Python Software Foundation
+  ("PSF"), and the Individual or Organization ("Licensee") accessing and
+  otherwise using this software ("Python") in source or binary form and
+  its associated documentation.
+
+  2. Subject to the terms and conditions of this License Agreement, PSF hereby
+  grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+  analyze, test, perform and/or display publicly, prepare derivative works,
+  distribute, and otherwise use Python alone or in any derivative version,
+  provided, however, that PSF's License Agreement and PSF's notice of copyright,
+  i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+  2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+  All Rights Reserved" are retained in Python alone or in any derivative version
+  prepared by Licensee.
+
+  3. In the event Licensee prepares a derivative work that is based on
+  or incorporates Python or any part thereof, and wants to make
+  the derivative work available to others as provided herein, then
+  Licensee hereby agrees to include in any such work a brief summary of
+  the changes made to Python.
+
+  4. PSF is making Python available to Licensee on an "AS IS"
+  basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+  DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+  FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+  INFRINGE ANY THIRD PARTY RIGHTS.
+
+  5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+  FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+  A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+  OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+  6. This License Agreement will automatically terminate upon a material
+  breach of its terms and conditions.
+
+  7. Nothing in this License Agreement shall be deemed to create any
+  relationship of agency, partnership, or joint venture between PSF and
+  Licensee.  This License Agreement does not grant permission to use PSF
+  trademarks or trade name in a trademark sense to endorse or promote
+  products or services of Licensee, or any third party.
+
+  8. By copying, installing or otherwise using Python, Licensee
+  agrees to be bound by the terms and conditions of this License
+  Agreement.
+
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+
+[[op]]
+do = "edit"
+file = "crates-nc/LICENSES/NOTICE-larmorx.txt"
+old = '''
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+new = '''
+nilearn 0.14.1 (nilearn/masking.py: compute_epi_mask and the helpers it calls, in
+crates/larmorx-interp/src/nilearn.rs, since 2026-11-08, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) The nilearn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
+get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
+usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
+of numbers, in crates/larmorx-core/src/python/, since 2026-11-08, for tedana's t2smap) - PSF
+License Version 2
+  Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+
+  The changes made (the PSF License's clause 3): the behaviours named above are re-expressed in
+  Rust, without copying code; argparse's positional arguments, subparsers, mutually exclusive
+  groups and fromfile prefixes are not reproduced; Unicode digits and Unicode's non-printable
+  categories beyond the control characters are approximated (crates/larmorx-core/PROVENANCE.md).
+
+  The licence, as CPython 3.12.16 distributes it (LICENSE.txt, part B):
+
+  PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+  --------------------------------------------
+
+  1. This LICENSE AGREEMENT is between the Python Software Foundation
+  ("PSF"), and the Individual or Organization ("Licensee") accessing and
+  otherwise using this software ("Python") in source or binary form and
+  its associated documentation.
+
+  2. Subject to the terms and conditions of this License Agreement, PSF hereby
+  grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+  analyze, test, perform and/or display publicly, prepare derivative works,
+  distribute, and otherwise use Python alone or in any derivative version,
+  provided, however, that PSF's License Agreement and PSF's notice of copyright,
+  i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+  2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+  All Rights Reserved" are retained in Python alone or in any derivative version
+  prepared by Licensee.
+
+  3. In the event Licensee prepares a derivative work that is based on
+  or incorporates Python or any part thereof, and wants to make
+  the derivative work available to others as provided herein, then
+  Licensee hereby agrees to include in any such work a brief summary of
+  the changes made to Python.
+
+  4. PSF is making Python available to Licensee on an "AS IS"
+  basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+  DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+  FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+  INFRINGE ANY THIRD PARTY RIGHTS.
+
+  5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+  FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+  A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+  OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+  6. This License Agreement will automatically terminate upon a material
+  breach of its terms and conditions.
+
+  7. Nothing in this License Agreement shall be deemed to create any
+  relationship of agency, partnership, or joint venture between PSF and
+  Licensee.  This License Agreement does not grant permission to use PSF
+  trademarks or trade name in a trademark sense to endorse or promote
+  products or services of Licensee, or any third party.
+
+  8. By copying, installing or otherwise using Python, Licensee
+  agrees to be bound by the terms and conditions of this License
+  Agreement.
+
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+
+[[op]]
+do = "edit"
+file = "crates-gpl/LICENSES/NOTICE-larmorx.txt"
+old = '''
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+new = '''
+nilearn 0.14.1 (nilearn/masking.py: compute_epi_mask and the helpers it calls, in
+crates/larmorx-interp/src/nilearn.rs, since 2026-11-08, for tedana's t2smap) - BSD-3-Clause
+  Copyright (c) The nilearn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
+get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
+usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
+of numbers, in crates/larmorx-core/src/python/, since 2026-11-08, for tedana's t2smap) - PSF
+License Version 2
+  Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+
+  The changes made (the PSF License's clause 3): the behaviours named above are re-expressed in
+  Rust, without copying code; argparse's positional arguments, subparsers, mutually exclusive
+  groups and fromfile prefixes are not reproduced; Unicode digits and Unicode's non-printable
+  categories beyond the control characters are approximated (crates/larmorx-core/PROVENANCE.md).
+
+  The licence, as CPython 3.12.16 distributes it (LICENSE.txt, part B):
+
+  PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+  --------------------------------------------
+
+  1. This LICENSE AGREEMENT is between the Python Software Foundation
+  ("PSF"), and the Individual or Organization ("Licensee") accessing and
+  otherwise using this software ("Python") in source or binary form and
+  its associated documentation.
+
+  2. Subject to the terms and conditions of this License Agreement, PSF hereby
+  grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+  analyze, test, perform and/or display publicly, prepare derivative works,
+  distribute, and otherwise use Python alone or in any derivative version,
+  provided, however, that PSF's License Agreement and PSF's notice of copyright,
+  i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+  2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+  All Rights Reserved" are retained in Python alone or in any derivative version
+  prepared by Licensee.
+
+  3. In the event Licensee prepares a derivative work that is based on
+  or incorporates Python or any part thereof, and wants to make
+  the derivative work available to others as provided herein, then
+  Licensee hereby agrees to include in any such work a brief summary of
+  the changes made to Python.
+
+  4. PSF is making Python available to Licensee on an "AS IS"
+  basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+  DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+  FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+  INFRINGE ANY THIRD PARTY RIGHTS.
+
+  5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+  FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+  A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+  OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+  6. This License Agreement will automatically terminate upon a material
+  breach of its terms and conditions.
+
+  7. Nothing in this License Agreement shall be deemed to create any
+  relationship of agency, partnership, or joint venture between PSF and
+  Licensee.  This License Agreement does not grant permission to use PSF
+  trademarks or trade name in a trademark sense to endorse or promote
+  products or services of Licensee, or any third party.
+
+  8. By copying, installing or otherwise using Python, Licensee
+  agrees to be bound by the terms and conditions of this License
+  Agreement.
+
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+| tedana | LGPL-2.1 | possible in an LGPL package; not planned | ✓ main package (from the published equations) |'''
+new = '''
+| tedana | LGPL-2.1 (only: its `LICENSE` is the LGPL-2.1 text, its documentation names "version 2.1", no "any later version" and no file headers) | ✓ `larmorx-gpl` since 2026-11-08 (`crates-gpl/larmorx-gpl-tedana`: an exact replica of tedana 26.0.3's `t2smap`, GPL-3.0-only under LGPL-2.1's section 3, which lets a copy of the library carry the ordinary GPL instead; the user, 2026-11-08) | ✓ main package (planned: `crates/larmorx-tedana`, from `specs/t2smap.md`, the published equations and black-box runs) |
+| nilearn (`compute_epi_mask`, as tedana calls it) | BSD-3-Clause | ✓ main package since 2026-11-08 (`larmorx_interp::nilearn`; the notice in `NOTICE`) | not needed |
+| CPython 3.12.16 (`argparse`, `textwrap`, `json`'s encoder, Python's number parsing and printing: a ported Python program's command line and messages) | PSF License Version 2 | ✓ main package since 2026-11-08 (`larmorx_core::python`, re-expressed in Rust; the licence and the summary of changes its clause 3 asks for in `NOTICE`) | not needed |'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+numpy's reductions, `sdot`, `svd`, `eigh`, `det`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`; the notices in `NOTICE`) | not needed |'''
+new = '''
+numpy's reductions, `sdot`, `svd`, `eigh`, `det`; since 2026-11-08 for tedana's replica numpy's percentiles, float32 `log`, float printing and `lstsq`, SciPy's `curve_fit` and `scoreatpercentile`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`, `larmorx_core::numpy`, `larmorx-optim`; the notices in `NOTICE`) | not needed |'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never published as a wheel) |'''
+new = '''
+| `larmorx-gpl` | GPL-3.0 (the program; its tedana-derived crate GPL-3.0-only, the rest GPL-3.0-or-later) | tedana's `t2smap` replica (since 2026-11-08: the `larmorx-gpl` program and its binary-only wheel); replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never in the wheel) |'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+history); it will be again for Workbench. `larmorx-nc`'s wheel carries'''
+new = '''
+history); since 2026-11-08 it is again, for tedana's `t2smap` (below), and will be for Workbench. `larmorx-nc`'s wheel carries'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+- **FSL 6.0.7.23** (checked 2026-10-29): the replicas follow it;'''
+new = '''
+- **`larmorx-gpl`, tedana's `t2smap`** (2026-11-08, the user's decision): tedana is LGPL-2.1
+  only; its section 3 lets a copy of the library carry the ordinary GPL instead ("If a newer
+  version than version 2 of the ordinary GNU General Public License has appeared, then you can
+  specify that version instead"), so the tedana-derived crate `crates-gpl/larmorx-gpl-tedana` is
+  GPL-3.0-only (every file's header says so: "converted from tedana's LGPL-2.1 under its section
+  3", with the modification notices), and GPL-3.0 accepts the Apache-2.0 crates it links. The
+  program `larmorx-gpl` (`crates-gpl/larmorx-gpl-cli`; `larmorx-gpl tedana t2smap <t2smap's
+  arguments>`) is a binary-only wheel (`crates-gpl/pyproject.toml`, licence `GPL-3.0-only`;
+  `larmorx[all]` installs it), whose licence files are the GPL-3.0 text (`crates-gpl/LICENSE`),
+  tedana 26.0.3's `LICENSE` byte for byte (`crates-gpl/LICENSES/LGPL-2.1-tedana.txt`),
+  `crates-gpl/NOTICE` (tedana's notice "Copyright 2023, The ME-ICA Developers", what was translated
+  and modified, the section 3 conversion, the Apache crates included, where the source is), the
+  Apache-2.0 text and `NOTICE` of the larmorx crates it includes (`crates-gpl/LICENSES/`), the
+  workspace's Cargo files and the two crates' Rust source; the complete Corresponding Source is
+  this repository at the release's commit, which `crates-gpl/NOTICE` names (GPL-3.0 section 6).
+  `crates-gpl/larmorx-gpl-cli/tests/notices.rs` checks the copies (whenever `NOTICE` changes,
+  `crates-gpl/LICENSES/NOTICE-larmorx.txt` must be the same file, as crates-nc's copy). The
+  workspace's glibc tools stay out of the wheel. The permissive numerics the replica needs
+  (numpy's, SciPy's, nilearn's, CPython's) are in the main package's Apache crates, so nothing
+  BSD, MIT or PSF is relicensed; the clean-room original will be in the main package.
+- **FSL 6.0.7.23** (checked 2026-10-29): the replicas follow it;'''
+
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+  - GPL: the GPL text, the upstream copyright notices, changes marked. Once wheels ship,
+    the GPL requires the source to be public anyway.'''
+new = '''
+  - GPL: the GPL text, the upstream copyright notices, changes marked (tedana's `t2smap`,
+    since 2026-11-08: its LGPL-2.1 text and notice beside the GPL's). Once wheels ship,
+    the GPL requires the source to be public anyway.'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+| | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
+|---|---|---|---|'''
+new = '''
+| | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) | `larmorx-gpl` (tedana's `t2smap`) |
+|---|---|---|---|---|'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+[`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 134 cases, 746 outputs |'''
+new = '''
+[`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 134 cases, 746 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 10 cases, 203 outputs |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+[`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |'''
+new = '''
+[`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+| Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |'''
+new = '''
+| Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` | `cargo test` |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+| job `gpl`, `cargo test --workspace --locked` in `crates-nc` |'''
+new = '''
+| job `gpl`, `cargo test --workspace --locked` in `crates-nc` | job `gpl`, `cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli --locked` in `crates-gpl` (since 2026-11-08) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+`LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) |'''
+new = '''
+`LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden` (in `crates-gpl`) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+| `golden-mismatches-gpl-<platform>` |'''
+new = '''
+| `golden-mismatches-gpl-<platform>` | `golden-mismatches-gpl-<platform>` (the same artifact) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+'''
+new = '''
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+`larmorx-gpl`'s checksums (tedana's `t2smap` replica, 10 cases, 203 outputs) were recorded on
+2026-11-08 from 68f1126d and again from e86180ff (the maths notices: only the named-defects lines
+of nine cases changed, every data checksum unchanged; unchanged since, through the TQDM_DISABLE fix
+and the notice texts of relay 10). The `gpl` jobs' added steps (rustfmt, clippy and `cargo test` of
+`larmorx-gpl-tedana` and `larmorx-gpl-cli`, the workspace's tools left out) measured 2.4 s, 4.5 s
+and 8.3 s on the main machine from an empty target directory: about a minute per job cold on
+GitHub's runners, six job-minutes per CI run, less with the cache (rule 10's estimate, 2026-11-08).
+'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = '''
+| `larmorx-nc fsl bet`, `bet2`, `betsurf`, `standard_space_roi`, `fslroi` | 21 |'''
+text = '''
+| `larmorx-gpl tedana t2smap` (the replica; `lx.tedana.t2smap` and `larmorx tedana t2smap` run it) | 10 | a generated 16 × 14 × 8 × 4 three-echo series of integer ratios (every 17th head voxel rising, every 23rd losing its last echo), relative paths: the log-linear fit (default and `reproduce`), the curve fit with `--verbose`, `--convention orig`, a prefix and two threads (both modes), the shared libraries' step (`reproduce`), `--fitmode ts` with PAID (`reproduce`), no mask with float32 data, echo times in ms, the dropout decay, `--dummy-scans 1`, `--exclude 0` and `--debug` (both modes), a z-concatenated file with `--masktype none`, TED-02's refusal (exit 1); every file written (images by header and data), `t2smap_call.sh`, `dataset_description.json` without its `Node` block, the exit status and the defects named |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+  `crates-gpl/larmorx-gpl-cli/tests/golden.rs` on 2026-10-29 with the replicas; the checksums'''
+new = '''
+  `crates-gpl/larmorx-gpl-cli/tests/golden.rs` on 2026-10-29 with the replicas, which since 2026-11-08
+  holds tedana's `t2smap` replica's 10 cases instead; the checksums'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = '''
+| `sdcflows-fieldmap` | `parity.sdcflows_fieldmap`'''
+text = '''
+| `tedana-t2smap` | `parity.tedana_t2smap_replica` (`_main_case` on files the descriptor writes from the recipe: multi-echo series that share one S0 and T2* map; both environments, tedana's step, the D13 fix pass; inputs under TMPDIR, so no random run is cached; the permanent cases in `validation/difftest/cases/tedana-t2smap/` (18)) | replica vs tedana 26.0.3's t2smap | two to six echoes (s or ms; unsorted, mixed, one too few now and then), one file per echo or z-concatenated, 1 to 12 volumes on 6 to 24 voxels across and 1 to 10 slices, drawn geometries, float32/float64/int16 (scaled)/uint16/uint8, little- or big-endian, .nii.gz/.nii/pairs/NIfTI-2, a head phantom's S0 and per-voxel T2*, rising and dropout voxels, temporal noise (none: PAID), NaN/inf/0/negative/-0 samples; masks (ones, a thresholded head of four types and values, a box, 4D of one volume, empty, another grid, another shape) or none; every option, abbreviations and `=` forms, runs twice with and without `--overwrite`; its trial `oracles/difftest/2026-11-08-t2smap-replica` (seed `t2smap-trial`, 30 minutes, 12 jobs at one thread, 1.5 GiB a case: 3,886 cases, 59 differences and 11 notices, all fixed or registered, TED-16 to TED-18; every one agrees with the final build) and a 10-minute check of the final build (`oracles/difftest/2026-11-08-t2smap-replica-check`, seed `t2smap-check`: 1,268 cases, 1,267 agree, 1 notice: TED-15 in a run twice, whose fix pass now compares the first of the two runs, permanent case `ted15-first-of-two-runs`) |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/oracle-cache.md"
+old = '''
+FSL (`FSL*`, `OMP_*`); for every program'''
+new = '''
+FSL (`FSL*`, `OMP_*`), a Python program (the family `python`, 2026-11-08: tedana's `t2smap`; numpy's `NPY_*` (its CPU dispatch), `OPENBLAS_*`, `OMP_*`, `MKL_*`, `PYTHON*`, argparse's `COLUMNS` and tqdm's `TQDM_*`, in the key of that family's runs only); for every program'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/oracle-cache.md"
+old = '''
+| `nifti-io`, `resample-series`, `numpy-linalg`, `itk-geometry` | none | – |'''
+new = '''
+| `tedana-t2smap-replica` | `tedana_t2smap_replica.run_tedana` (a launcher per environment, `oracles/inputs/tedana-t2smap-replica/launcher-<env>/t2smap` with the environment's `ENVIRONMENT.txt` as its build's identity: the interpreter and every distribution's RECORD); `run_fmriprep_tedana` (tedana 25.0.1 in fMRIPrep's image) | 1 (the spread's `--n-threads 4`: after 3 runs) | a command run twice (`--overwrite`), random testing's runs (inputs under TMPDIR: never stored) |
+| `nifti-io`, `resample-series`, `numpy-linalg`, `itk-geometry` | none | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+   (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);'''
+new = '''
+   (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original;
+   the replica **done** 2026-11-08: an exact replica of tedana 26.0.3's `t2smap` in `larmorx-gpl` (GPL-3.0 under
+   LGPL-2.1's section 3; the user, 2026-11-08), every compared case of its record bit-identical to tedana in both
+   library environments (69: 44 pass, 25 refused by both alike), fMRIPrep's five calls on three oracle runs
+   included, also against fMRIPrep's own files; TED-01 to TED-18, NP-03, NP-04; 44 % of tedana's peak memory, 3.0
+   to 4.2 times its speed at 14 threads on fMRIPrep's curve-fit calls; `specs/t2smap.md` with its model for the
+   clean-room original, next;
+   follow-ups below);'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = '''
+## Follow-ups, when they fit'''
+text = '''
+- **From tedana's `t2smap` replica (2026-11-08; thirteen relays; [findings](findings/tedana-t2smap.md),
+  restricted; record [tedana-t2smap-replica](validation/tedana-t2smap-replica.md),
+  [benchmarks](benchmarks/tedana-t2smap.md), [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Done
+  in the part besides the replica: numpy's reductions, percentiles, float32 `log`, float printing and `lstsq`
+  (`larmorx_core::numpy`, `math::logf_numpy`, `larmorx_transform::numpy_linalg::lstsq`), SciPy's bounded
+  `curve_fit` (`crates/larmorx-optim`), nilearn's `compute_epi_mask` (`larmorx_interp::nilearn`), CPython's
+  `argparse`, `textwrap`, `json` and number formats (`larmorx_core::python`) and nibabel's `get_qform` in
+  extended precision (`larmorx_io::nifti::nibabel_affine`), all in the main package for the next Python
+  programs' ports. Left:
+  - *The clean-room original* (next): `crates/larmorx-tedana`, from `specs/t2smap.md` and its model
+    (`validation/investigations/t2smap-spec/`: `model.py`, `check.py` with §17.3's thresholds, `measure.py`),
+    built for speed; the one-pass notice rule (§15.2); its implementer opens nothing the spec's header names
+    (tedana's source and every installed copy, `crates-gpl/`, `docs/findings/tedana-t2smap.md`,
+    `validation/investigations/t2smap/`, the replica's suite module, difftest descriptor and permanent cases);
+    the audit's tedana family (R07) is in place.
+  - *Duplicates to merge:* `larmorx_sdcflows`' own numpy mean and pairwise sum (`npy.rs`, `approx.rs`) could use
+    `larmorx_core::numpy`; `larmorx_sdcflows::npy::py_repr` duplicates `larmorx_core::python::number::float_repr`.
+  - *Formats* (D5): inputs nibabel reads but `larmorx-io` does not (AFNI's BRIK, MINC, PAR/REC) are refused with
+    a clear message: with the completeness parts.
+  - *The replica's speed:* at one thread 0.8 to 1.1 times tedana's on fMRIPrep's curve-fit calls, 0.6 on the
+    log-linear one (up to four passes for the exact maths notices: the orchestrator's decision, 2026-11-08;
+    `numpy_linalg` without SIMD, its crate forbidding `unsafe`); the clean-room original is the fast one.
+  - *Portable tests:* the BET temporary-folder tests (`test_bet_temporary_folders_hold_no_option_text`) and the
+    oracle cache's key test refuse a TMPDIR whose path holds `-h` (a scratch folder named after the home
+    directory): the part ran the Python gates and the smoke tier with TMPDIR unset; make the tests independent of it.
+  - *tedana's releases:* follow tedana's newer releases in steps (26.0.3 the newest on 2026-11-08); the step to
+    fMRIPrep 25.2.6's tedana 25.0.1 (TED-05's cap; the curve fit's libraries: 176,938 values of ds003592's maps)
+    is in the record's spread cases.
+  - *The final phase:* multi-echo data beyond the panel's ds003592 (ds000210, ds000258 as oracle runs), the full
+    tier and heavy random testing.
+'''
+
+[[op]]
+do = "insert"
+file = "docs/status.md"
+after = '''
+| Field maps (ports) |'''
+text = '''
+| Multi-echo (a replica) | tedana's `t2smap` (2026-11-08): the adaptive mask, the T2* and S0 fits (log-linear and SciPy's bounded curve fit, voxelwise or volumewise), the limited maps and their cap, the RMSE and the optimal combination (`t2s`, PAID), every output, message and failure: an exact replica of tedana 26.0.3 in `larmorx-gpl` (`larmorx-gpl tedana t2smap`; `lx.tedana.t2smap`, `larmorx tedana t2smap`), `experimental`, in both library environments; numpy's reductions, percentiles, `lstsq` and float printing, SciPy's `curve_fit`, nilearn's EPI mask and CPython's `argparse` in the main package's crates; its clean-room original next | `tedana-t2smap-replica` |'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''
+the fit 6.5 to 7.8 times scikit-learn's speed at 14 threads). Next: the
+field maps' part B, FreeSurfer,'''
+new = '''
+the fit 6.5 to 7.8 times scikit-learn's speed at 14 threads). tedana's `t2smap` replica (2026-11-08: tedana 26.0.3's T2* and S0 fits and optimal combination, an exact replica in `larmorx-gpl`; every compared case bit-identical to tedana in both library environments, fMRIPrep's five multi-echo calls included, also against fMRIPrep's own files; 44 % of tedana's peak memory). Next: the
+field maps' part B, `t2smap`'s clean-room original, FreeSurfer,'''
+
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = '''
+## 2026-11-08: tedana's `t2smap` replica: what was decided in the part
+- **Versions (D4):** the replica follows tedana 26.0.3, the newest release, with numpy 2.5.4 and SciPy 1.18.1; the
+  record shows per case the step to the shared environment (numpy 2.3.5, SciPy 1.15.3) and, in its spread cases, to
+  fMRIPrep 25.2.6's tedana 25.0.1; no "tedana 25" mode.
+- **numpy's maths (D2):** the reference is numpy's path without AVX-512 (glibc 2.35's float64 `exp` and `log`), the
+  oracles run with `NPY_DISABLE_CPU_FEATURES="X86_V4 AVX512F AVX512CD AVX512_SKX AVX512_CLX AVX512_CNL AVX512_ICL
+  AVX512_SPR"` (the analogue of `OPENBLAS_CORETYPE=Haswell`); the default is correctly rounded, GLIBC-07 and NP-03
+  (numpy's float32 `log` kernel) named where a value differs; numpy's AVX-512 kernels are a register row (NP-04),
+  their effect measured in the record's spread.
+- **Data (D8):** real fMRIPrep 25.2.6 oracle runs on two more multi-echo datasets (ds000210 sub-02, ds000258
+  sub-21262) beside ds003592: fMRIPrep's five `t2smap` calls on three runs.
+- **Inputs and messages (D5, D6):** NIfTI-1/2 and ANALYZE (MGH where `larmorx-io` reads it); other formats nibabel
+  reads refused with a clear message (a documented gap). tedana's log lines exact; Python's warnings and tqdm's bars
+  in their form (no bars with `TQDM_DISABLE`, as tqdm); `dataset_description.json` names larmorx where tedana names
+  itself, the rest of its keys exact.
+- **CI (D7):** the replica's golden cases and lint run in the existing `gpl` jobs (about a minute per job cold, six
+  jobs; no new job or runner).
+- **Testing depth** (the user, 2026-11-08: "Do option A then, remember that for now we are doing smart testing and
+  not extensive one"): the replica as planned, then its clean-room original; smart testing (every code path once,
+  fMRIPrep's real calls on three runs, the defects' edge cases, one short random-testing trial).
+- **The rules' outcomes:** TED-05 (tedana 26's full T2* map uncapped) rule A, after reading tedana's history (pull
+  request #1290 gives no reason; tedana 25.0.1, fMRIPrep's own, capped it); TED-06 (curve fits started outside their
+  bounds) measured, then rule C; the other TED entries rules A and B (the register).
+- **The maths notices:** the replica names NP-03 and GLIBC-07 exactly, per family of functions (up to four passes:
+  slower, accepted for the replica, whose role is exactness); the clean-room original names them in one pass, only
+  where the function's own value is written (`specs/t2smap.md` §15.2; by the precedent of the user's decision of
+  2026-11-04 on GLIBC-06 and GLIBC-07).
+- **The audit (D9):** the tedana family's restrictions (R07) cover `tags/tedana-*` and every installed copy of the
+  package, the replica's crates and its investigations, difftest descriptor and permanent cases.'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+nibabel, fMRIPrep's resampler, sdcflows 2.17.1). Each line'''
+new = '''
+nibabel, fMRIPrep's resampler, sdcflows 2.17.1, tedana 26.0.3). Each line'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+  - where the licence is restrictive (FSL, Workbench), a **clean-room original** is'''
+new = '''
+  - where the licence is restrictive (FSL, tedana, Workbench), a **clean-room original** is'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+upstream's licence (e.g. `larmorx-nc`) that runs as a separate program.'''
+new = '''
+upstream's licence (`larmorx-nc` for FSL, `larmorx-gpl` for tedana's `t2smap`) that runs as a separate program.'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+pip install larmorx                  # the exact AFNI replicas included (CC BY 4.0's attribution)
+'''
+new = '''
+pip install larmorx                  # the exact AFNI replicas included (CC BY 4.0's attribution)
+pip install "larmorx[all]"           # + the replica packages: larmorx-nc (FSL), larmorx-gpl (tedana) (planned)
+'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+phase-difference preparation, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome'''
+new = '''
+phase-difference preparation, is done), **multi-echo**: tedana's `t2smap`, its clean-room original (the exact
+   replica, in `larmorx-gpl`, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+`cd crates-nc && cargo test --workspace`; `crates-gpl` holds only verification tools (`crates-gpl/README.md`)'''
+new = '''
+`cd crates-nc && cargo test --workspace`; `crates-gpl` holds tedana's `t2smap` replica (`cd crates-gpl && cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli`) and verification tools (`crates-gpl/README.md`)'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+| `crates-gpl/` | the GPL-3.0-or-later workspace, reserved for Workbench's replicas; today the AFNI replicas' verification tools (`crates-gpl/README.md`) |'''
+new = '''
+| `crates-gpl/` | the GPL workspace (`larmorx-gpl`): tedana's `t2smap` replica (`larmorx-gpl-tedana`, GPL-3.0-only, and the `larmorx-gpl` program), later Workbench's replicas; the AFNI replicas' verification tools (`crates-gpl/README.md`) |'''
+
+[[op]]
+do = "insert"
+file = "README.md"
+after = '''
+| `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-image`'''
+text = '''
+| `crates/larmorx-optim` | SciPy's optimizers: `curve_fit` with bounds (`least_squares`' trust-region reflective method) |'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+its clean-room original and the field maps' part A (sdcflows' port, 2026-11-08) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the field maps' part B, multi-echo `t2smap` (replica and clean-room), the confounds,'''
+new = '''
+its clean-room original, the field maps' part A (sdcflows' port, 2026-11-08) and tedana's `t2smap` replica (2026-11-08, in `larmorx-gpl`) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the field maps' part B, `t2smap`'s clean-room original, the confounds,'''
+
+[[op]]
+do = "insert"
+file = "CLAUDE.md"
+after = '''
+     - Workbench (GPL-2.0-or-later): `larmorx-gpl`'''
+text = '''
+     - tedana (LGPL-2.1-only): `larmorx-gpl` too (since 2026-11-08, the user: `crates-gpl/larmorx-gpl-tedana`, GPL-3.0-only under LGPL-2.1's section 3, and the `larmorx-gpl` program and wheel, `crates-gpl/larmorx-gpl-cli`; the clean-room original in the main package);'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+`fsl-prelude.md`, the sections of `upstream-defects.md` marked restricted)'''
+new = '''
+`fsl-prelude.md`, `tedana-t2smap.md`, the sections of `upstream-defects.md` marked restricted)'''
+
+[[op]]
+do = "insert"
+file = "CLAUDE.md"
+after = '''
+   - sdcflows 2.17.1 (since 2026-11-08, `lx.sdcflows`;'''
+text = '''
+   - tedana 26.0.3 (since 2026-11-08, the `larmorx-gpl` replica; 25.0.1, fMRIPrep 25.2.6's, kept for the final comparisons) with numpy 2.5.4 / SciPy 1.18.1 (numpy 2.3.5 / SciPy 1.15.3 for the step), nilearn 0.14.1 and CPython 3.12.16's `argparse`, `textwrap`, `json` and number formats'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+| `crates-gpl/` | the GPL-3.0-or-later workspace, reserved for Workbench's replicas; since 2026-10-29 it holds only the verification tools'''
+new = '''
+| `crates-gpl/` | the GPL workspace (`larmorx-gpl`): since 2026-11-08 tedana's `t2smap` replica (`larmorx-gpl-tedana`, GPL-3.0-only, and the program and wheel `larmorx-gpl-cli`), later Workbench's replicas; since 2026-10-29 also the verification tools'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+so refresh `crates-gpl/Cargo.lock` whenever their dependencies change; CI does not build it |'''
+new = '''
+so refresh `crates-gpl/Cargo.lock` whenever their dependencies change; CI's `gpl` jobs check and test the program's two crates (not the tools) |'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+`-transform`, `-interp`, `-image`, `-registration`,'''
+new = '''
+`-transform`, `-interp`, `-image`, `-optim` (SciPy's optimizers), `-registration`,'''
+
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+   (next)            larmorx-optim, -mesh'''
+new = '''
+   larmorx-optim     SciPy's optimizers: curve_fit with bounds (least_squares' trust-region
+                     reflective method, approx_derivative, the covariance)
+   (next)            larmorx-mesh'''
+
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+`crates-nc/` (and later `crates-gpl/`, for Workbench) build their own command-line program;'''
+new = '''
+`crates-nc/` and `crates-gpl/` (tedana's `t2smap` since 2026-11-08; later Workbench) build their own command-line program;'''
+
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+`crates-nc/larmorx-nc-cli/tests/golden.rs` | pytest on the release wheel and `cargo test` in the root workspace and `crates-nc/`, all six platforms |'''
+new = '''
+`crates-nc/larmorx-nc-cli/tests/golden.rs`, `crates-gpl/larmorx-gpl-cli/tests/golden.rs` | pytest on the release wheel and `cargo test` in the root workspace, `crates-nc/` and `crates-gpl/`, all six platforms |'''
+
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+`crates-nc/larmorx-nc-cli/tests/golden.rs` for an FSL one), recorded'''
+new = '''
+`crates-nc/larmorx-nc-cli/tests/golden.rs` for an FSL one, `crates-gpl/larmorx-gpl-cli/tests/golden.rs` for a GPL one), recorded'''
+
+[[op]]
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+A new licence family also needs its own program, wheel (`bindings = "bin"`) and `Package` entry in `larmorx_cli::replica`.'''
+new = '''
+A new licence family also needs its own program, wheel (`bindings = "bin"`) and `Package` entry in `larmorx_cli::replica` (`larmorx-gpl` is the second, 2026-11-08: `crates-gpl/larmorx-gpl-cli`, `LARMORX_GPL`, `LARMORX_GPL_BIN`; a tool whose original takes its own thread option, as tedana's `--n-threads`, keeps it instead of `OMP_NUM_THREADS`).'''
+
+[[op]]
+do = "insert"
+file = "docs/overview.md"
+after = '''
+| Connectome Workbench | GPL-2.0-or-later | `larmorx-gpl` | main package |'''
+text = '''
+| tedana (its `t2smap`) | LGPL-2.1 | `larmorx-gpl` (GPL-3.0 under LGPL-2.1's section 3, since 2026-11-08) | main package (planned) |'''
+
+[[op]]
+do = "insert"
+file = "docs/overview.md"
+after = '''
+pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)'''
+text = '''
+pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)'''
+
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+- GPL replicas (Workbench's, to come) in `crates-gpl/`, with the GPL text, the upstream
+  copyright notices, and changes marked; it holds only verification tools today.'''
+new = '''
+- GPL replicas in `crates-gpl/` (tedana's `t2smap` since 2026-11-08; Workbench's to come), with the GPL text, the upstream
+  licence and copyright notices, and changes marked; and verification tools.'''
+
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''
+(`crates/larmorx-afni-replica`, `crates-gpl/` with its glibc tools,'''
+new = '''
+(`crates/larmorx-afni-replica`, `crates-gpl/` with tedana's replica and its glibc tools,'''
+
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''
+[findings/fsl-prelude.md](findings/fsl-prelude.md), [parts/](parts/)'''
+new = '''
+[findings/fsl-prelude.md](findings/fsl-prelude.md), [findings/tedana-t2smap.md](findings/tedana-t2smap.md), [parts/](parts/)'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''
+            "R07",
+            "tedana's source (LGPL-2.1)",
+            "tedana",
+            DAY_ONE,
+            "2026-11-06T00:00:00+01:00",
+            "docs/licensing.md (an original from the published equations); decision log "
+            "2026-11-06 (t2smap: a replica and a clean-room original)",'''
+new = '''
+            "R07",
+            "tedana's source (LGPL-2.1: the clone, tags/tedana-*, every installed copy's "
+            "site-packages/tedana)",
+            "tedana",
+            DAY_ONE,
+            "2026-11-06T00:00:00+01:00",
+            "docs/licensing.md (an original from the published equations); decision log "
+            "2026-11-06 (t2smap: a replica and a clean-room original); the tags and installed "
+            "copies named at the t2smap replica's merge (D9, 2026-11-08)",'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''
+    "afni-volreg.md": ("AFNI", "2026-11-06T22:01:36+01:00", "2026-11-07T03:46:30+01:00"),
+}'''
+new = '''
+    "afni-volreg.md": ("AFNI", "2026-11-06T22:01:36+01:00", "2026-11-07T03:46:30+01:00"),
+    # the t2smap replica part's brief named it restricted (2026-11-08, relay 1); first commit c04c344e
+    "tedana-t2smap.md": ("tedana", "2026-11-08T17:00:33+01:00", "2026-11-08T17:00:33+01:00"),
+}'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''
+    (re.compile(r"/crates-gpl/tools(/|$)"), "R10", "GNU"),
+    (re.compile(r"/crates-gpl(/|$)"), "R10", "AFNI"),
+    (re.compile(r"/larmorx[-_]gpl([-_][a-z0-9]+)*(/|$)"), "R10", "AFNI"),'''
+new = '''
+    (re.compile(r"/crates-gpl/tools(/|$)"), "R10", "GNU"),
+    # tedana's t2smap replica (2026-11-08): its crate, and the program's crate (AFNI's until 2026-10-29)
+    (re.compile(r"/crates-gpl/larmorx-gpl-tedana(/|$)"), "R10", "tedana"),
+    (re.compile(r"/larmorx[-_]gpl[-_]tedana(/|$)"), "R10", "tedana"),
+    (re.compile(r"/crates-gpl(/|$)"), "R10", "AFNI/tedana"),
+    (re.compile(r"/larmorx[-_]gpl([-_][a-z0-9]+)*(/|$)"), "R10", "AFNI/tedana"),
+    # tedana's source wherever a copy lives: the tags, every installed package (D9, 2026-11-08)
+    (re.compile(r"/tags/tedana-[^/]+(/|$)"), "R07", "tedana"),
+    (re.compile(r"/site-packages/tedana(/|$)"), "R07", "tedana"),'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''
+            return Class("replica-build-output", "R10", "FSL" if "nc" in s else "AFNI")'''
+new = '''
+            return Class("replica-build-output", "R10", "FSL" if "nc" in s else "AFNI/tedana")'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''
+            return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI")'''
+new = '''
+            return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI/tedana")'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/verdicts.py"
+old = '''
+    r"(?:\w*replica\w*|fsl_mcflirt\w*|afni_volreg)\.py$"
+)'''
+new = '''
+    r"(?:\w*replica\w*|fsl_mcflirt\w*|afni_volreg)\.py$"
+    # tedana's t2smap replica's random-testing descriptor (2026-11-08; its suite matches above)
+    r"|^validation/src/larmorx_validation/difftest/tools/tedana_t2smap\.py$"
+)'''
+
+[[op]]
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/verdicts.py"
+old = '''
+version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site)/|'''
+new = '''
+version-\w+|specs-memory|replica-side|afni-move|replica-glibc-dbl|bet-options-site|t2smap)/|'''
+
+[[op]]
+do = "insert"
+file = "validation/tests/test_cleanroom_audit.py"
+after = '''
+        (f"{WS}/tedana/tedana/workflows/t2smap.py", "read", "restricted", "R07"),'''
+text = '''
+        (f"{WS}/tags/tedana-26.0.3/tedana/decay.py", "read", "restricted", "R07"),
+        (f"{WS}/.venv/lib/python3.12/site-packages/tedana/combine.py", "read", "restricted", "R07"),
+        (
+            "/opt/conda/envs/fmriprep/lib/python3.12/site-packages/tedana/io.py",
+            "read",
+            "restricted",
+            "R07",
+        ),
+        (f"{WT}/crates-gpl/larmorx-gpl-tedana/src/decay.rs", "read", "restricted", "R10"),
+        (f"{WT}/docs/findings/tedana-t2smap.md", "read", "restricted", "R11"),'''
+
+[[op]]
+do = "edit"
+file = "site:site.yml"
+old = '''
+  - { title: "sdcflows' field-map estimation", url: "/tools/sdcflows-fieldmap/", eco: larmorx,'''
+new = '''
+  - { title: t2smap, url: "/tools/tedana-t2smap/", eco: larmorx,
+      summary: "tedana's T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination: an exact replica in larmorx-gpl (experimental), every file bit for bit in both library environments, fMRIPrep's calls included, with 44 % of tedana's memory; the clean-room original later." }
+  - { title: "sdcflows' field-map estimation", url: "/tools/sdcflows-fieldmap/", eco: larmorx,'''
+
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = '''
+    text: sdcflows' field-map estimation, part B (PEPOLAR's and SyN's steps, sdcflows' masks and command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the phase-difference preparation, is done), FreeSurfer'''
+new = '''
+    text: sdcflows' field-map estimation, part B (PEPOLAR's and SyN's steps, sdcflows' masks and command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the phase-difference preparation, is done), multi-echo (the clean-room original of tedana's `t2smap`; the exact replica, in `larmorx-gpl`, is done), FreeSurfer'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| 2 | **FreeSurfer 8.2.0** | Every program complete, a replica (`larmorx-freesurfer`) and a clean-room original built for speed: first the reference runs on the [data panel](/data-panel/), then FreeSurfer's shared library, then the programs fMRIPrep runs, slowest first | Planned |
+| 3 | **Surfaces** | Surface tools compatible with Connectome Workbench and MSM | Planned |
+| 4 | **Confounds** | CompCor, DVARS, framewise displacement and fMRIPrep's other confounds | Planned |
+| 5 | **larmorprepx** | The pipeline: BIDS in, fMRIPrep-compatible derivatives and HTML reports out | Planned |'''
+new = '''
+| 2 | **Multi-echo** | tedana's `t2smap`, the T2* and S0 maps and the optimal combination fMRIPrep runs for every multi-echo run: the exact replica (in `larmorx-gpl`) is done ([its page](/tools/tedana-t2smap/)); its clean-room original, built for speed, in LARMORX itself | Replica done; clean-room original next |
+| 3 | **FreeSurfer 8.2.0** | Every program complete, a replica (`larmorx-freesurfer`) and a clean-room original built for speed: first the reference runs on the [data panel](/data-panel/), then FreeSurfer's shared library, then the programs fMRIPrep runs, slowest first | Planned |
+| 4 | **Surfaces** | Surface tools compatible with Connectome Workbench and MSM | Planned |
+| 5 | **Confounds** | CompCor, DVARS, framewise displacement and fMRIPrep's other confounds | Planned |
+| 6 | **larmorprepx** | The pipeline: BIDS in, fMRIPrep-compatible derivatives and HTML reports out | Planned |'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| Completed | Step |
+|---|---|
+'''
+new = '''
+| Completed | Step |
+|---|---|
+| 2026-11-08 | **Multi-echo: tedana's `t2smap` replica.** The T2* and S0 fits and the optimal combination fMRIPrep runs for every multi-echo run, translated from tedana 26.0.3 with numpy's, SciPy's, nibabel's and nilearn's arithmetic, in the `larmorx-gpl` package (GPL-3.0 under LGPL-2.1's section 3): every file, message and exit status bit-identical to tedana in both library environments in every compared case of its record (69: 44 identical, 25 refused by both alike), fMRIPrep's five calls on three oracle runs included; eighteen defects of tedana found (TED-01 to TED-18) and three entries of numpy's and the C library's maths (NP-03, NP-04, GLIBC-07), each corrected by default, refused with a clear error or kept by rule, and reproduced on request; 44 % of tedana's peak memory, 3.0 to 4.2 times its speed at 14 threads on fMRIPrep's curve-fit calls; the specification for the clean-room original. [The page](/tools/tedana-t2smap/) |
+'''

@@ -7,7 +7,8 @@
 //! Apache-2.0 package and runs in the same process ([`Location::Builtin`]: AFNI's 3dTshift,
 //! 3dAutomask and 3dUnifize since 2026-10-29, when AFNI 26.3.05 released the Medical College of
 //! Wisconsin's code under CC BY 4.0). Otherwise it is in a package of the upstream's licence
-//! family (`larmorx-nc`; [`Location::Program`]), which this crate never links: it finds that
+//! family (`larmorx-nc`, `larmorx-gpl`; [`Location::Program`]), which this crate never links: it
+//! finds that
 //! package's program and runs it as a child process, with the tool's original arguments; the
 //! two exchange files only, so the licences stay separate, and this module knows the program's
 //! name and arguments, nothing more.
@@ -16,7 +17,7 @@
 //! (`lx.afni.tshift(..., implementation="auto")`, through `larmorx._core`):
 //! - [`REPLICAS`] lists every tool that has a replica: adding one is one line;
 //! - [`find`] looks for a separate replica's program: the package's environment variable
-//!   (`LARMORX_NC_BIN`), then the directories the caller gives (the Python environment's
+//!   (`LARMORX_NC_BIN`, `LARMORX_GPL_BIN`), then the directories the caller gives (the Python environment's
 //!   scripts directory, or the directory of the `larmorx` binary), then `PATH`;
 //! - [`choose`] applies `auto`, `replica` or `original`;
 //! - [`run`] runs a separate replica's program and passes its output and exit code on
@@ -51,6 +52,18 @@ pub const LARMORX_NC: Package = Package {
     env: "LARMORX_NC_BIN",
     licence: "LicenseRef-FSL",
     install: "pip install larmorx-nc (FSL Licence: non-commercial use only)",
+};
+
+/// The replicas of tools of the GPL licence family (`crates-gpl/`): tedana's t2smap (tedana's
+/// LGPL-2.1 converted to the GNU GPL version 3 under its section 3), later Connectome
+/// Workbench's. A program under the GNU GPL version 3, run as a separate process: larmorx and
+/// it exchange files only (`docs/licensing.md`, "A replica package is a program").
+pub const LARMORX_GPL: Package = Package {
+    name: "larmorx-gpl",
+    program: "larmorx-gpl",
+    env: "LARMORX_GPL_BIN",
+    licence: "GPL-3.0-only",
+    install: "pip install larmorx-gpl (GNU GPL version 3)",
 };
 
 /// The licence of the AFNI replicas' code (`crates/larmorx-afni-replica`): Apache-2.0, with CC
@@ -308,6 +321,14 @@ pub const REPLICAS: &[Replica] = &[
         tool: "prelude",
         location: Location::Program(&LARMORX_NC),
         original: true,
+    },
+    // tedana 26.0.3's t2smap (2026-11-08): the replica only, in larmorx-gpl; its clean-room
+    // original (crates/larmorx-tedana, from specs/t2smap.md) is still to be written.
+    Replica {
+        family: "tedana",
+        tool: "t2smap",
+        location: Location::Program(&LARMORX_GPL),
+        original: false,
     },
 ];
 
@@ -768,6 +789,25 @@ mod tests {
         assert_eq!(replica_only("ants").count(), 0);
         // every FSL tool has its clean-room original (prelude's since 2026-11-06)
         assert_eq!(replica_only("fsl").count(), 0);
+        // tedana's t2smap has only its replica (larmorx-gpl) until its clean-room original
+        let t2smap = lookup("tedana", "t2smap").unwrap();
+        assert_eq!(replica_only("tedana").collect::<Vec<_>>(), ["t2smap"]);
+        assert_eq!(t2smap.package(), Some(&LARMORX_GPL));
+        assert_eq!(t2smap.licence(), "GPL-3.0-only");
+        assert!(matches!(
+            choose_with(Implementation::Auto, t2smap, found),
+            Ok(Choice::Replica(_))
+        ));
+        let e = choose_with(Implementation::Auto, t2smap, missing).unwrap_err();
+        assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
+        assert!(e.to_string().contains("pip install larmorx-gpl"), "{e}");
+        assert!(e.to_string().contains("LARMORX_GPL_BIN"), "{e}");
+        let e = choose_with(Implementation::Original, t2smap, found).unwrap_err();
+        assert!(
+            e.to_string()
+                .contains("no clean-room original of tedana t2smap"),
+            "{e}"
+        );
         let prelude = lookup("fsl", "prelude").unwrap();
         assert!(matches!(
             choose_with(Implementation::Auto, prelude, found),

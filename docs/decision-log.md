@@ -2080,3 +2080,37 @@ together at the end.
   `larmorx-gpl` is therefore published from this part on, not only for Workbench. The permissive numerics it needs
   (numpy's, SciPy's) are in the main package's Apache crates. The clean-room original follows in the main package
   (Apache-2.0), as for AFNI and FSL. `pip install larmorx` stays Apache-only; `larmorx[all]` adds the GPL program.
+
+## 2026-11-08: tedana's `t2smap` replica: what was decided in the part
+- **Versions (D4):** the replica follows tedana 26.0.3, the newest release, with numpy 2.5.4 and SciPy 1.18.1; the
+  record shows per case the step to the shared environment (numpy 2.3.5, SciPy 1.15.3) and, in its spread cases, to
+  fMRIPrep 25.2.6's tedana 25.0.1; no "tedana 25" mode.
+- **numpy's maths (D2):** the reference is numpy's path without AVX-512 (glibc 2.35's float64 `exp` and `log`), the
+  oracles run with `NPY_DISABLE_CPU_FEATURES="X86_V4 AVX512F AVX512CD AVX512_SKX AVX512_CLX AVX512_CNL AVX512_ICL
+  AVX512_SPR"` (the analogue of `OPENBLAS_CORETYPE=Haswell`); the default is correctly rounded, GLIBC-07 and NP-03
+  (numpy's float32 `log` kernel) named where a value differs; numpy's AVX-512 kernels are a register row (NP-04),
+  their effect measured in the record's spread.
+- **Data (D8):** real fMRIPrep 25.2.6 oracle runs on two more multi-echo datasets (ds000210 sub-02, ds000258
+  sub-21262) beside ds003592: fMRIPrep's five `t2smap` calls on three runs.
+- **Inputs and messages (D5, D6):** NIfTI-1/2 and ANALYZE (MGH where `larmorx-io` reads it); other formats nibabel
+  reads refused with a clear message (a documented gap). tedana's log lines exact; Python's warnings and tqdm's bars
+  in their form (no bars with `TQDM_DISABLE`, as tqdm); `dataset_description.json` names larmorx where tedana names
+  itself, the rest of its keys exact.
+- **CI (D7):** the replica's golden cases and lint run in the existing `gpl` jobs (about a minute per job cold, six
+  jobs; no new job or runner).
+- **Testing depth** (the user, 2026-11-08: "Do option A then, remember that for now we are doing smart testing and
+  not extensive one"): the replica as planned, then its clean-room original; smart testing (every code path once,
+  fMRIPrep's real calls on three runs, the defects' edge cases, one short random-testing trial).
+- **The rules' outcomes:** TED-05 (tedana 26's full T2* map uncapped) rule A, after reading tedana's history (pull
+  request #1290 gives no reason; tedana 25.0.1, fMRIPrep's own, capped it); TED-06 (curve fits started outside their
+  bounds) measured, then rule C; the other TED entries rules A and B (the register).
+- **The maths notices:** the replica names NP-03 and GLIBC-07 exactly, per family of functions (up to four passes:
+  slower, accepted for the replica, whose role is exactness); the clean-room original names them in one pass, only
+  where the function's own value is written (`specs/t2smap.md` §15.2; by the precedent of the user's decision of
+  2026-11-04 on GLIBC-06 and GLIBC-07).
+- **The audit (D9):** the tedana family's restrictions (R07) cover `tags/tedana-*` and every installed copy of the
+  package, the replica's crates and its investigations, difftest descriptor and permanent cases.
+- **Words of tedana's source in open files** (the orchestrator at the merge): the replica's record, its permanent
+  random-testing cases and its site page's tables name a few things of tedana's source (a routine, a TODO, line numbers).
+  They stay (the replica's evidence); the clean-room original's brief forbids the replica's record, permanent cases,
+  evidence module and site page, and the audit's brief rules (R16) name the repository's ones, so a reading is flagged.

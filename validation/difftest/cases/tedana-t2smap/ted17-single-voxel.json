@@ -1,0 +1,261 @@
+{
+ "defect": "TED-17",
+ "description": "random testing (2026-11-08): a single voxel left for the fit: fit_loglinear's squeezed mask column is 0-dimensional, IndexError (TED-17, fitted by default)",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: exit status: 1 / 0; newest: last error line: 'IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed' / 'INFO     utils:log_newsletter_info:816 https://groups.google.com/g/tedana-newsletter'; newest: messages: line 7: [] / ['INFO     t2smap:t2smap_workflow:505 Calculating model fit quality metrics']; newest: files: files: differ: ['S0map.nii.gz', 'T2starmap.nii.gz', 'dataset_description.json', 'desc-confounds_timeseries.tsv', 'desc-limited_S0map.nii.gz', 'desc-limited_T2starmap.nii.gz', 'desc-optcom_bold.nii.gz', 'desc-rmse_statmap.nii.gz', 'desc-tedana_registry.json']; shared: exit status: 1 / 0; shared: last error line: 'IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed' / 'INFO     utils:log_newsletter_info:816 https:/",
+  "n": 44,
+  "seed": "t2smap-trial",
+  "shrink_moves": [
+   "tool move 0",
+   "tool move 0",
+   "tool move 3",
+   "tool move 3",
+   "tool move 3",
+   "dropped fittype (--fitt curvefit)"
+  ],
+  "signature": [
+   "newest: exit status",
+   "newest: files",
+   "newest: last error line",
+   "newest: messages",
+   "shared: exit status",
+   "shared: files",
+   "shared: last error line",
+   "shared: messages"
+  ]
+ },
+ "id": "ted17-single-voxel",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -2.5,
+     -2.5,
+     -3.25
+    ],
+    "qfac": 1,
+    "qform_code": 1,
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     0.8,
+     0.8,
+     0.8
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "4d",
+    "suffix": ".nii.gz",
+    "threshold": 0.6,
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.1,
+    "noise": 0.02,
+    "rising": 0.01,
+    "s0": {
+     "axes": [
+      1.2,
+      0.85,
+      1.05
+     ],
+     "bias": [
+      0.01,
+      0.0075,
+      0.0,
+      -0.0075
+     ],
+     "centre": [
+      0.0,
+      -0.5,
+      -0.5
+     ],
+     "noise": 3.0,
+     "seed": 565793858,
+     "size": 3.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 2053740083,
+    "t2": [
+     13.0,
+     53.0
+    ]
+   },
+   "shape": [
+    7,
+    7,
+    9,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".nii.gz"
+   },
+   "te_oddity": "none",
+   "tes": [
+    17,
+    31
+   ],
+   "timing": {
+    "slice_code": 0,
+    "slice_duration": 0.3333,
+    "slice_end": 8,
+    "slice_start": 0,
+    "tr": 3.0,
+    "tunits": "sec"
+   },
+   "units": "ms",
+   "zcat": false
+  },
+  "features": {
+   "--fittype spelling": "abbreviated",
+   "--mask spelling": "plain",
+   "S0 noise": 3.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 13.0,
+   "T2* range ms": 40.0,
+   "TE gap ms": 14,
+   "TE oddity": "none",
+   "TE units": "ms",
+   "TE1 ms": 17,
+   "axis0": 1.2,
+   "axis1": 0.85,
+   "axis2": 1.05,
+   "background": "noise",
+   "bias0": 0.01,
+   "bias1": 0.0075,
+   "bias2": 0.0,
+   "bias3": -0.0075,
+   "big-endian": false,
+   "centre0": 0.0,
+   "centre1": -4.0,
+   "centre2": -4.0,
+   "combmode": "default",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.1,
+   "dtype": "uint8",
+   "dummy scans": false,
+   "echoes": 2,
+   "even gaps": true,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 1.0,
+   "log level": "info",
+   "mask": "4d",
+   "mask dtype": "uint8",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "mask threshold": 0.6,
+   "mask value": 1.0,
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 0.0,
+   "nt": 10,
+   "nx": 7,
+   "ny": 7,
+   "nz": 9,
+   "one slice": false,
+   "orientation": "plumb",
+   "origin0": 26.5,
+   "origin1": -37.25,
+   "origin2": 46.5,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 1,
+   "rising share": 0.01,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "7x7x9x10",
+   "size": 16.0,
+   "slice_code": 4,
+   "spacing0": 0.8,
+   "spacing1": 2.5,
+   "spacing2": 0.5,
+   "special count": 1,
+   "special samples": true,
+   "special0": "inf",
+   "special0 echo": "any",
+   "suffix": ".nii",
+   "temporal noise": 0.02,
+   "tissues": "t1",
+   "tr": 3.0,
+   "tunits": "sec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "series",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 44,
+  "options": [
+   "10 volume(s)",
+   "2 echoes",
+   "TE in ms",
+   "file .nii",
+   "fitmode all",
+   "fittype curvefit",
+   "mask 4d",
+   "special samples: inf",
+   "stored uint8"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

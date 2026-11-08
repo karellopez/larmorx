@@ -1,0 +1,283 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): PAID with an infinite sample: numpy's subtract warning in the standard deviation",
+ "expect": "pass",
+ "found": {
+  "detail": "newest: messages: line 4: ['numpy/_core/_methods.py:188: RuntimeWarning: invalid value encountered in subtract'] / []; shared: messages: line 4: ['numpy/_core/_methods.py:190: RuntimeWarning: invalid value encountered in subtract'] / []",
+  "n": 1137,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "newest: messages",
+   "shared: messages"
+  ]
+ },
+ "id": "paid-infinite-sample",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -8.75,
+     -0.75,
+     3.75
+    ],
+    "qfac": 1,
+    "qform_code": 3,
+    "quaternion": [
+     10,
+     1,
+     3,
+     -2
+    ],
+    "sform": "same",
+    "sform_code": 1,
+    "spacing": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "head",
+    "suffix": ".nii.gz",
+    "threshold": 0.05,
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.0,
+    "noise": 0.05,
+    "rising": 0.05,
+    "s0": {
+     "axes": [
+      0.75,
+      0.75,
+      0.9
+     ],
+     "bias": [
+      0.0025,
+      0.0075,
+      0.0,
+      0.005
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 0.0,
+     "seed": 1555726748,
+     "size": 3.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 2131623754,
+    "t2": [
+     19.0,
+     75.0
+    ]
+   },
+   "shape": [
+    18,
+    9,
+    3,
+    2
+   ],
+   "specials": [
+    {
+     "echo": 0,
+     "kind": "nan"
+    },
+    {
+     "echo": 0,
+     "kind": "inf"
+    }
+   ],
+   "storage": {
+    "big_endian": false,
+    "dtype": "float32",
+    "scaling": null,
+    "suffix": ".hdr"
+   },
+   "te_oddity": "none",
+   "tes": [
+    15,
+    35,
+    45
+   ],
+   "timing": {
+    "slice_code": 0,
+    "tr": 0.5,
+    "tunits": "unknown"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--combmode spelling": "plain",
+   "--fittype spelling": "equals",
+   "--mask spelling": "plain",
+   "S0 noise": 0.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 19.0,
+   "T2* range ms": 56.0,
+   "TE gap ms": 8,
+   "TE gap1 ms": 20,
+   "TE gap2 ms": 10,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 15,
+   "axis0": 0.75,
+   "axis1": 0.75,
+   "axis2": 0.9,
+   "background": "noise",
+   "bias0": 0.0025,
+   "bias1": 0.0075,
+   "bias2": 0.0,
+   "bias3": 0.005,
+   "big-endian": false,
+   "centre0": -0.5,
+   "centre1": -0.5,
+   "centre2": 1.0,
+   "combmode": "paid",
+   "content": "head",
+   "convention bids named": false,
+   "convention orig": false,
+   "dropout share": 0.0,
+   "dtype": "float32",
+   "dummy scans": false,
+   "echoes": 3,
+   "even gaps": false,
+   "exclude": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 0.7,
+   "log level": "quiet",
+   "mask": "head",
+   "mask dtype": "uint8",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "mask threshold": 0.05,
+   "mask value": 1.0,
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 3.0,
+   "nt": 9,
+   "nx": 18,
+   "ny": 9,
+   "nz": 3,
+   "one slice": false,
+   "orientation": "oblique",
+   "origin0": 53.5,
+   "origin1": 36.25,
+   "origin2": 56.5,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 3,
+   "rising share": 0.05,
+   "run twice": "no",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "18x9x3x2",
+   "size": 11.0,
+   "spacing0": 1.0,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "special count": 2,
+   "special samples": true,
+   "special0": "nan",
+   "special0 echo": "first",
+   "special1": "inf",
+   "special1 echo": "first",
+   "suffix": ".hdr",
+   "temporal noise": 0.05,
+   "tissues": "t1",
+   "tr": 0.5,
+   "tunits": "unknown",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "few",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fittype=curvefit"
+    ],
+    "name": "fittype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--combmode",
+     "paid"
+    ],
+    "name": "combmode",
+    "optional": true
+   },
+   {
+    "args": [
+     "--quiet"
+    ],
+    "name": "quiet",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 1137,
+  "options": [
+   "2 volume(s)",
+   "3 echoes",
+   "TE in s",
+   "combmode paid",
+   "file .hdr",
+   "fitmode all",
+   "fittype curvefit",
+   "log quiet",
+   "mask head",
+   "special samples: nan, inf",
+   "stored float32"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

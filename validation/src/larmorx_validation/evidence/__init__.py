@@ -39,6 +39,7 @@ TOOLS: dict[str, str] = {
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "sdcflows-fieldmap": "sdcflows_fieldmap",
+    "tedana-t2smap": "tedana_t2smap",
     "nifti-io": "nifti_io",
 }
 

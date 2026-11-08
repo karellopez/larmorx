@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "machine": "x86_64",
+    "cpu_count": 32,
+    "load_average_end": [
+      8.23,
+      8.21,
+      10.63
+    ],
+    "threads": 14,
+    "repeat": 2,
+    "tedana": "26.0.3",
+    "replica": "larmorx-gpl 0.0.1"
+  },
+  "rows": [
+    {
+      "call": "ds000210-sub-02-cuedSGT-curvefit",
+      "tedana_s": 29.23,
+      "tedana_exit": 0,
+      "reproduce_1_s": 31.013,
+      "reproduce_14_s": 8.91,
+      "fix_named": [
+        "GLIBC-07",
+        "NP-03",
+        "TED-05",
+        "TED-08"
+      ],
+      "fix_1_s": 32.639,
+      "fix_14_s": 9.512
+    },
+    {
+      "call": "ds000210-sub-02-rest-curvefit",
+      "tedana_s": 46.21,
+      "tedana_exit": 0,
+      "reproduce_1_s": 44.742,
+      "reproduce_14_s": 13.329,
+      "fix_named": [
+        "GLIBC-07",
+        "NP-03",
+        "TED-05"
+      ],
+      "fix_1_s": 44.919,
+      "fix_14_s": 13.074
+    },
+    {
+      "call": "ds000258-sub-21262-rest-curvefit",
+      "tedana_s": 32.19,
+      "tedana_exit": 0,
+      "reproduce_1_s": 42.218,
+      "reproduce_14_s": 10.764,
+      "fix_named": [
+        "GLIBC-07",
+        "NP-03",
+        "TED-05",
+        "TED-08"
+      ],
+      "fix_1_s": 41.21,
+      "fix_14_s": 10.387
+    },
+    {
+      "call": "ds003592-sub-280-rest-curvefit",
+      "tedana_s": 44.32,
+      "tedana_exit": 0,
+      "reproduce_1_s": 42.1,
+      "reproduce_14_s": 10.594,
+      "fix_named": [
+        "GLIBC-07",
+        "NP-03",
+        "TED-05",
+        "TED-08"
+      ],
+      "fix_1_s": 42.173,
+      "fix_14_s": 10.649
+    },
+    {
+      "call": "ds003592-sub-280-rest-loglin",
+      "tedana_s": 6.07,
+      "tedana_exit": 0,
+      "reproduce_1_s": 9.989,
+      "reproduce_14_s": 7.942,
+      "fix_named": [
+        "NP-03",
+        "TED-05"
+      ],
+      "fix_1_s": 9.809,
+      "fix_14_s": 7.949
+    }
+  ]
+}

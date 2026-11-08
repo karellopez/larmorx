@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! SciPy's `ndimage` spline interpolation: `map_coordinates`, `spline_filter` and
-//! `spline_filter1d`, ported from SciPy 1.15.2 (`scipy/ndimage/_interpolation.py`,
+//! `spline_filter1d` (and, in [`filters`] and [`morphology`], SciPy 1.18.1's `gaussian_filter1d`,
+//! `correlate1d` in mode `reflect`, binary erosion and dilation and `label` with the default
+//! structure, for nilearn's `compute_epi_mask`), ported from SciPy 1.15.2 (`scipy/ndimage/_interpolation.py`,
 //! `_ni_support.py`, `src/ni_interpolation.c`, `src/ni_splines.c`; BSD-3-Clause, see the
 //! notices in [`splines`] and [`geometric`] and in NOTICE).
 //!
@@ -25,7 +27,9 @@
 //! `docs/api/upstream-defects.md`), corrected by default here until SciPy 1.18 fixed it.
 #![allow(clippy::needless_range_loop)]
 
+pub mod filters;
 mod geometric;
+pub mod morphology;
 pub(crate) mod splines;
 
 pub use geometric::Spline;

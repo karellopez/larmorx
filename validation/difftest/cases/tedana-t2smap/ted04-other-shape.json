@@ -1,0 +1,286 @@
+{
+ "defect": null,
+ "description": "random testing (2026-11-08): a mask of another shape: tedana's path raises nilearn's error itself, TED-04 not named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 963,
+  "seed": "t2smap-trial",
+  "shrink_moves": [],
+  "signature": [
+   "notice: TED-04"
+  ]
+ },
+ "id": "ted04-other-shape",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "geometry": {
+    "origin": [
+     -2.0,
+     -5.0,
+     4.0
+    ],
+    "qfac": 1,
+    "qform_code": 0,
+    "quaternion": [
+     31,
+     -1,
+     37,
+     5
+    ],
+    "sform": "same",
+    "sform_code": 0,
+    "spacing": [
+     0.5,
+     0.5,
+     1.0
+    ],
+    "units": "mm"
+   },
+   "mask": {
+    "dtype": "uint8",
+    "kind": "other shape",
+    "suffix": ".nii.gz",
+    "value": 1.0
+   },
+   "series": {
+    "background": "noise",
+    "dropout": 0.02,
+    "noise": 0.02,
+    "rising": 0.0,
+    "s0": {
+     "axes": [
+      0.75,
+      1.2,
+      1.0
+     ],
+     "bias": [
+      -0.005,
+      -0.01,
+      -0.005,
+      0.005
+     ],
+     "centre": [
+      0.25,
+      -0.25,
+      -0.25
+     ],
+     "noise": 0.0,
+     "seed": 96333977,
+     "size": 3.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "seed": 1595693956,
+    "t2": [
+     23.0,
+     51.0
+    ]
+   },
+   "shape": [
+    17,
+    17,
+    8,
+    2
+   ],
+   "specials": [],
+   "storage": {
+    "big_endian": false,
+    "dtype": "uint8",
+    "scaling": null,
+    "suffix": ".hdr"
+   },
+   "te_oddity": "none",
+   "tes": [
+    15,
+    35,
+    43,
+    65,
+    80
+   ],
+   "timing": {
+    "slice_code": 0,
+    "slice_duration": 100.0,
+    "slice_end": 7,
+    "slice_start": 0,
+    "tr": 800.0,
+    "tunits": "msec"
+   },
+   "units": "s",
+   "zcat": false
+  },
+  "features": {
+   "--convention spelling": "abbreviated",
+   "--exclude spelling": "plain",
+   "--fittype spelling": "abbreviated",
+   "--mask spelling": "abbreviated",
+   "S0 noise": 0.0,
+   "S0 tissues": "epi",
+   "T2* low ms": 23.0,
+   "T2* range ms": 28.0,
+   "TE gap ms": 12,
+   "TE gap1 ms": 20,
+   "TE gap2 ms": 8,
+   "TE gap3 ms": 22,
+   "TE gap4 ms": 15,
+   "TE oddity": "none",
+   "TE units": "s",
+   "TE1 ms": 15,
+   "axis0": 0.75,
+   "axis1": 1.2,
+   "axis2": 1.0,
+   "background": "noise",
+   "bias0": -0.005,
+   "bias1": -0.01,
+   "bias2": -0.005,
+   "bias3": 0.005,
+   "big-endian": false,
+   "centre0": 2.0,
+   "centre1": -3.0,
+   "centre2": -1.5,
+   "combmode": "default",
+   "content": "head",
+   "convention orig": true,
+   "dropout share": 0.02,
+   "dtype": "uint8",
+   "dummy scans": false,
+   "echoes": 5,
+   "even gaps": false,
+   "exclude": true,
+   "exclude a": 0,
+   "exclude b": 0,
+   "exclude form": "two",
+   "exclude up to the end": false,
+   "extreme": false,
+   "few volumes": 2,
+   "fitmode": "all",
+   "fitmode all named": false,
+   "fittype": "curvefit",
+   "head size": 0.75,
+   "log level": "info",
+   "mask": "other shape",
+   "mask given": true,
+   "mask suffix": ".nii.gz",
+   "masktype": false,
+   "n-independent-echos": false,
+   "n-threads 1": false,
+   "noise": 6.0,
+   "nt": 5,
+   "nx": 23,
+   "ny": 17,
+   "nz": 8,
+   "one slice": false,
+   "orientation": "axes+oblique",
+   "origin0": 9.0,
+   "origin1": -18.75,
+   "origin2": -56.0,
+   "prefix": false,
+   "qfac": 1,
+   "qform_code": 0,
+   "rising share": 0.0,
+   "run twice": "-f",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "23x17x8x2",
+   "size": 20.5,
+   "slice_code": 2,
+   "spacing0": 0.5,
+   "spacing1": 0.5,
+   "spacing2": 1.0,
+   "special samples": false,
+   "suffix": ".hdr",
+   "temporal noise": 0.02,
+   "tissues": "t2",
+   "tr": 0.8,
+   "tunits": "msec",
+   "units": "mm",
+   "verbose": false,
+   "volumes": "few",
+   "z-concatenated": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "@data"
+    ],
+    "name": "data",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e",
+     "@tes"
+    ],
+    "name": "echo times",
+    "optional": false
+   },
+   {
+    "args": [
+     "--mask",
+     "@mask"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "--fitt",
+     "curvefit"
+    ],
+    "name": "fittype",
+    "optional": true
+   },
+   {
+    "args": [
+     "--exclude",
+     "0,1"
+    ],
+    "name": "exclude",
+    "optional": true
+   },
+   {
+    "args": [
+     "--conv",
+     "orig"
+    ],
+    "name": "convention",
+    "optional": true
+   },
+   {
+    "args": [
+     "-f",
+     "@twice"
+    ],
+    "name": "twice",
+    "optional": true
+   }
+  ],
+  "inputs": {},
+  "n": 963,
+  "options": [
+   "2 volume(s)",
+   "5 echoes",
+   "TE in s",
+   "convention orig",
+   "exclude",
+   "file .hdr",
+   "fitmode all",
+   "fittype curvefit",
+   "mask other shape",
+   "run twice (-f)",
+   "stored uint8"
+  ],
+  "seed": "t2smap-trial",
+  "tool": "tedana-t2smap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "tedana-t2smap-replica",
+ "tier": "smoke",
+ "tool": "tedana-t2smap"
+}

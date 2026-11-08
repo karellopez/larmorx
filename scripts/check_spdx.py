@@ -12,7 +12,9 @@ names its licence on one of its first lines (after a shebang):
   Wisconsin's code, which AFNI 26.3.05 releases under CC BY 4.0: every file whose header names
   it), `Apache-2.0 AND MIT` (Arm's routines), `Apache-2.0 AND SunPro` (fdlibm). CC BY 4.0 is
   allowed nowhere else.
-- `crates-gpl/`: the expression must start with `GPL-3.0-or-later`.
+- `crates-gpl/`: the expression must start with `GPL-3.0-or-later`; in tedana's replica
+  (`crates-gpl/larmorx-gpl-tedana/`, translated from tedana's LGPL-2.1-only code under its
+  section 3) it is `GPL-3.0-only`.
 - `crates-nc/`: the expression must contain `LicenseRef-FSL`.
 
 Usage:
@@ -113,6 +115,9 @@ AFNI_REPLICA_EXPRESSIONS = {
 }
 MCW = "Medical College of Wisconsin"
 
+#: tedana's replica: GPL version 3 only (tedana names no later LGPL version; docs/licensing.md).
+TEDANA_REPLICA = "crates-gpl/larmorx-gpl-tedana/"
+
 
 def family(rel: Path) -> str | None:
     top = rel.parts[0]
@@ -189,7 +194,10 @@ def main() -> int:
         if args.fix and expr is None and fam == "apache":
             add_header(path, MIXED.get(rel.as_posix(), "Apache-2.0"))
             expr = header(path)
-        msg = problem(fam, expr)
+        if fam == "gpl" and rel.as_posix().startswith(TEDANA_REPLICA):
+            msg = None if expr == "GPL-3.0-only" else f"'{expr}' is not GPL-3.0-only"
+        else:
+            msg = problem(fam, expr)
         if msg is None and rel.as_posix() in MIXED and expr != MIXED[rel.as_posix()]:
             msg = f"'{expr}' should be '{MIXED[rel.as_posix()]}'"
         if msg is None and fam == "apache":

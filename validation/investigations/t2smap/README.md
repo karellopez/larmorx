@@ -243,3 +243,8 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   (inside a box): fMRIPrep's multi-echo calls, tedana 26.0.3 (once, through `oracle_cache.run`,
   never stored) against the replica in `reproduce` and in its default mode at one and 14
   threads (the best of three), every replica run's files checked: `docs/benchmarks/tedana-t2smap.md`.
+- `replay_finding.py <finding.json | case:N> [seed] [--original] [--shared] [--all]` and
+  `replay_fix_pass.py <finding.json | case:N> [seed] [--original]`: one random-testing case run
+  again (tedana against the replica in `reproduce`: statuses, last errors, the messages that
+  differ, the files; the replica's default against `reproduce`: the defects named and the values
+  that differ), the trial's triage tools (2026-11-08).

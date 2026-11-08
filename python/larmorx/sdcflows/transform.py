@@ -35,6 +35,8 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import set_xform as _nb_set_xform
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.bspline import NOT_ALIGNED
@@ -141,10 +143,10 @@ def deoblique_and_zooms(
         ref_shape = new_shape
     shape = tuple(int(n) for n in ref_shape.astype(int))
     fields = hdr.to_dict()
-    fields = _core.nifti_set_xform(fields, "sform", affine, int(hdr.sform_code))
-    fields = _core.nifti_set_xform(fields, "qform", affine, int(hdr.qform_code))
+    fields = _nb_set_xform(fields, "sform", affine, int(hdr.sform_code))
+    fields = _nb_set_xform(fields, "qform", affine, int(hdr.qform_code))
     disk = hdr.data_dtype
-    out = _core.nifti_header_for_image(
+    out = _nb_header_for_image(
         list(shape),
         (disk if disk is not None else np.dtype(np.float64)).name,
         affine,
@@ -276,7 +278,7 @@ class B0FieldTransform:
             cal_max=float(np.float32(cal)),
             cal_min=float(-np.float32(cal)),
         )
-        mhdr = _core.nifti_header_for_image(
+        mhdr = _nb_header_for_image(
             list(proj_shape), "float32", np.ascontiguousarray(proj_affine), fields, 1
         )
         mapped = Image(fmap, proj_affine, NiftiHeader.from_dict(mhdr))
@@ -448,7 +450,7 @@ def _disk_dtype(hdr: NiftiHeader, data: np.ndarray) -> np.dtype:
 def _rebuilt_header(hdr: NiftiHeader, shape: Sequence[int], affine: Any, dtype: Any) -> NiftiHeader:
     """The header nibabel's image constructor makes from ``hdr`` for an array of ``shape``
     placed by ``affine`` (``update_header``), with ``dtype`` stored."""
-    out = _core.nifti_header_for_image(
+    out = _nb_header_for_image(
         [int(n) for n in shape],
         np.dtype(dtype).name,
         np.ascontiguousarray(affine, dtype=np.float64),
@@ -535,7 +537,7 @@ def _resample_onto(
     shape3 = tuple(int(n) for n in target.shape[:3])
     disk = thdr.data_dtype
     tname = (disk if disk is not None else np.asarray(target.data).dtype).name
-    ref = _core.nifti_header_for_image(
+    ref = _nb_header_for_image(
         list(shape3), tname, np.ascontiguousarray(target.affine), thdr.to_dict(), 1
     )
     coords = _core.sdcflows_affine_coordinates(
@@ -554,9 +556,7 @@ def _resample_onto(
         prefilter=True,
         n_threads=n_threads,
     )
-    out = _core.nifti_header_for_image(
-        list(shape3), "float32", np.ascontiguousarray(target.affine), ref, 1
-    )
+    out = _nb_header_for_image(list(shape3), "float32", np.ascontiguousarray(target.affine), ref, 1)
     return Image(
         np.asarray(values).reshape(shape3, order="F"), target.affine, NiftiHeader.from_dict(out)
     )

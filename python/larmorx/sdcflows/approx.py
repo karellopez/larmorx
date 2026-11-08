@@ -23,6 +23,7 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.bspline import DEFAULT_HF_ZOOMS_MM
@@ -146,7 +147,7 @@ def _written_header(
     stored, after ``fields`` were set on it."""
     d = template.to_dict()
     d.update(fields)
-    out = _core.nifti_header_for_image(
+    out = _nb_header_for_image(
         list(shape), dtype, np.ascontiguousarray(affine, dtype=np.float64), d, None
     )
     return NiftiHeader.from_dict(out)
@@ -340,7 +341,7 @@ def bspline_approx(
     coefficients = []
     for (gshape, gaffine), coef in zip(out["grids"], out["coefficients"], strict=True):
         c = np.asarray(coef, dtype=np.float32).reshape(tuple(gshape))
-        fields = _core.nifti_header_for_image(
+        fields = _nb_header_for_image(
             list(c.shape), "float32", np.ascontiguousarray(gaffine), None, version
         )
         coefficients.append(Image(c, np.asarray(gaffine), NiftiHeader.from_dict(fields)))

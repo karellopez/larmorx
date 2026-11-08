@@ -23,6 +23,8 @@ import numpy as np
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import set_xform as _nb_set_xform
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.approx import _fname_presuffix
 from larmorx.sdcflows.tools import _as_loaded, _header
@@ -89,8 +91,8 @@ def _coefficient_header(
     the sform (code 1), ``cal_max = max(|min|, max)``, ``cal_min = -cal_max``, and (TOPUP's)
     the intent "estimate" named "B-Spline coefficients"."""
     fields = hdr.to_dict()
-    fields = _core.nifti_set_xform(fields, "qform", newaff, 1)
-    fields = _core.nifti_set_xform(fields, "sform", newaff, 1)
+    fields = _nb_set_xform(fields, "qform", newaff, 1)
+    fields = _nb_set_xform(fields, "sform", newaff, 1)
     cal = np.float32(_cal_max(data))
     fields["cal_max"] = float(cal)
     fields["cal_min"] = float(-cal)
@@ -105,9 +107,7 @@ def _coefficient_header(
         )
     disk = hdr.data_dtype
     name = (disk if disk is not None else data.dtype).name
-    out = _core.nifti_header_for_image(
-        list(data.shape), name, np.ascontiguousarray(newaff), fields, None
-    )
+    out = _nb_header_for_image(list(data.shape), name, np.ascontiguousarray(newaff), fields, None)
     out["scl_slope"], out["scl_inter"] = hdr.scl_slope, hdr.scl_inter
     return NiftiHeader.from_dict(out)
 
@@ -302,15 +302,15 @@ def _debug_fmapref(
     moved = np.asarray(values).reshape(tshape, order="F")
     thdr = _header(target)
     disk = _header(ref).data_dtype
-    fields = _core.nifti_header_for_image(
+    fields = _nb_header_for_image(
         list(tshape),
         (disk if disk is not None else vol.dtype).name,
         np.ascontiguousarray(target.affine),
         thdr.to_dict(),
         None,
     )
-    fields = _core.nifti_set_xform(fields, "qform", np.ascontiguousarray(target.affine), 1)
-    fields = _core.nifti_set_xform(fields, "sform", np.ascontiguousarray(target.affine), 1)
+    fields = _nb_set_xform(fields, "qform", np.ascontiguousarray(target.affine), 1)
+    fields = _nb_set_xform(fields, "sform", np.ascontiguousarray(target.affine), 1)
     os.makedirs(out_dir, exist_ok=True)
     Image(moved, target.affine, NiftiHeader.from_dict(fields)).save(
         os.path.join(os.fspath(out_dir), "debug_fmapref.nii.gz")

@@ -25,6 +25,27 @@ from pathlib import Path
 
 import numpy as np
 
+
+def numpy_lapack() -> str:
+    """The LAPACK release numpy's OpenBLAS bundles: "3.12.1" from OpenBLAS 0.3.31 (numpy
+    2.5.4's 0.3.34), else "3.12.0" (numpy 2.3.5's 0.3.30)."""
+    version = np.show_config(mode="dicts")["Build Dependencies"]["blas"]["version"]
+    return "3.12.1" if tuple(int(x) for x in version.split(".")[:3]) >= (0, 3, 31) else "3.12.0"
+
+
+def _match_numpy_lapack() -> None:
+    """larmorx writes nibabel's qforms with numpy 2.5.4's LAPACK 3.12.1 arithmetic; in an
+    environment whose numpy bundles 3.12.0 the comparisons use that release
+    (``lx.io.nibabel_header.use_lapack``), as nibabel there does."""
+    try:
+        from larmorx.io.nibabel_header import use_lapack
+    except ImportError:  # an older larmorx
+        return
+    use_lapack(numpy_lapack())
+
+
+_match_numpy_lapack()
+
 _PENDING: list[bytes] = []
 #: The directories of absolute paths (temporary directories differ from run to run).
 _DIRS = re.compile(r"(?:/[^/\s'\"(),:;\[\]]+)+/")

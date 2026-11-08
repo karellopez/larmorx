@@ -709,7 +709,9 @@ def save_nibabel(
         out = data.dtype
     stored, slope, inter = nibabel_stored(data, out.newbyteorder("="))
     template = header.to_dict() if header is not None else None
-    fields = _core.nifti_header_for_image(
+    from larmorx.io.nibabel_header import header_for_image
+
+    fields = header_for_image(
         list(stored.shape),
         stored.dtype.name,
         np.asarray(img.affine, dtype=np.float64),

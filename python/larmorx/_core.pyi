@@ -96,14 +96,33 @@ def nifti_header_for_image(
     affine: np.ndarray,
     template: dict[str, Any] | None = None,
     version: int | None = None,
+    nibabel: bool = False,
+    lapack: str = "3.12.1",
 ) -> dict[str, Any]:
-    """The header fields nibabel would write for an image."""
+    """The header fields nibabel would write for an image; ``nibabel=True`` stores the qform
+    with nibabel's own arithmetic (numpy's SVD, det and eigh as LAPACK ``lapack`` computes
+    them)."""
 
 def nifti_set_xform(
-    header: dict[str, Any], which: str, affine: np.ndarray, code: int
+    header: dict[str, Any],
+    which: str,
+    affine: np.ndarray,
+    code: int,
+    nibabel: bool = False,
+    lapack: str = "3.12.1",
 ) -> dict[str, Any]:
     """nibabel's ``header.set_sform(affine, code)`` (``which="sform"``) or
-    ``header.set_qform(affine, code)`` (``"qform"``) on header fields."""
+    ``header.set_qform(affine, code)`` (``"qform"``) on header fields; ``nibabel=True``
+    stores the qform with nibabel's own arithmetic."""
+
+def nibabel_qform(affine: np.ndarray, lapack: str = "3.12.1") -> dict[str, Any]:
+    """nibabel 5.4.2's ``set_qform`` arithmetic: ``qfac``, ``zooms``, ``quaternion`` (w, x,
+    y, z) and ``translation`` in float64."""
+
+def numpy_linalg_small(kind: str, a: np.ndarray, lapack: str = "3.12.1") -> Any:
+    """numpy.linalg's ``svd`` (3 x 3: ``(u, s[None], vt)``), ``eigh`` (4 x 4, lower: ``(w[None],
+    v)``) or ``det(a) > 0`` (``kind="det_positive"``) as numpy computes them with OpenBLAS's
+    Haswell kernels and LAPACK ``lapack``; ``None`` where numpy raises ``LinAlgError``."""
 
 def nifti_header_info(header: dict[str, Any]) -> dict[str, Any]:
     """Shape, dtype, zooms, affines, scaling and serialised bytes of header fields."""

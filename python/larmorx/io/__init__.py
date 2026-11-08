@@ -7,8 +7,12 @@
   ``img.to_filename`` writes it (the header's data type, float data scaled into an integer type
   with nibabel's ``scl_slope``/``scl_inter``), for ports of Python programs that write through
   nibabel (sdcflows, fMRIPrep's own steps).
+- :func:`load_nibabel`, :func:`nibabel_affine`: an image read as ``nb.load`` gives it (the
+  affine nibabel computes from the header: its qform in x87 extended precision, its base
+  affine), for the same ports.
 """
 
+from larmorx.io.nibabel_header import load_nibabel, nibabel_affine
 from larmorx.io.nibabel_writer import (
     HeaderDataError,
     ScalingError,
@@ -35,6 +39,8 @@ __all__ = [
     "ScalingError",
     "WriterError",
     "load",
+    "load_nibabel",
+    "nibabel_affine",
     "nibabel_stored",
     "read_header",
     "save",

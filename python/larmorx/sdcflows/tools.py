@@ -20,6 +20,8 @@ import numpy as np
 
 from larmorx import _core
 from larmorx.image import Image, as_image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import set_xform as _nb_set_xform
 from larmorx.io.nifti import NiftiHeader
 
 __all__ = ["resample_to_zooms", "rescale_affine"]
@@ -27,11 +29,12 @@ __all__ = ["resample_to_zooms", "rescale_affine"]
 
 def _as_loaded(obj: Any) -> Image:
     """An image as sdcflows' ``nb.load`` gives it: a path is read with nibabel's ``dataobj``
-    values (the stored type, or float64 when the header scales the data)."""
+    values (the stored type, or float64 when the header scales the data) and the affine nibabel
+    computes from its header (``lx.io.load_nibabel``)."""
     if isinstance(obj, (str, os.PathLike)):
-        from larmorx.io.nifti import load
+        from larmorx.io.nibabel_header import load_nibabel
 
-        return load(obj)
+        return load_nibabel(obj)
     return as_image(obj)
 
 
@@ -39,7 +42,7 @@ def _header(img: Image) -> NiftiHeader:
     """The image's header, or the one nibabel makes for ``Nifti1Image(data, affine)``."""
     if img.header is not None:
         return img.header
-    fields = _core.nifti_header_for_image(
+    fields = _nb_header_for_image(
         list(img.shape), np.asarray(img.data).dtype.name, np.asarray(img.affine), None, None
     )
     return NiftiHeader.from_dict(fields)
@@ -111,13 +114,13 @@ def resample_to_zooms(
     new3 = tuple(int(n) for n in int_shape)
     # The reference's header: the input's, the new grid in both forms (their codes kept).
     fields = hdr.to_dict()
-    fields = _core.nifti_set_xform(fields, "sform", affine, int(hdr.sform_code))
-    fields = _core.nifti_set_xform(fields, "qform", affine, int(hdr.qform_code))
+    fields = _nb_set_xform(fields, "sform", affine, int(hdr.sform_code))
+    fields = _nb_set_xform(fields, "qform", affine, int(hdr.qform_code))
     disk = hdr.data_dtype
     disk_name = (disk if disk is not None else data.dtype).name
-    ref = _core.nifti_header_for_image(list(new3), disk_name, affine, fields, None)
+    ref = _nb_header_for_image(list(new3), disk_name, affine, fields, None)
     out_shape = (*new3, 1) if singleton_4d else new3
-    out = _core.nifti_header_for_image(list(out_shape), disk_name, affine, ref, None)
+    out = _nb_header_for_image(list(out_shape), disk_name, affine, ref, None)
     out["scl_slope"], out["scl_inter"] = hdr.scl_slope, hdr.scl_inter
     n = int(np.prod(new3))
     if n == 0:

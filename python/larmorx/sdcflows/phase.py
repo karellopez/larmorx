@@ -32,11 +32,13 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core, _defects
+from larmorx import _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
+from larmorx.io.nibabel_header import load_nibabel, nibabel_affine
 from larmorx.io.nibabel_writer import save_nibabel
-from larmorx.io.nifti import NiftiHeader, load
+from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.approx import _fname_presuffix
 from larmorx.sdcflows.tools import _as_loaded, _header
 from larmorx.transforms.resample import _io_orientation, _ornt2axcodes
@@ -72,7 +74,7 @@ class PhaseResult:
 def _load64(obj: Any) -> Image:
     """``nb.load(path).get_fdata()`` (float64, scaled) with the file's header."""
     if isinstance(obj, (str, os.PathLike)):
-        return load(obj, dtype=np.float64)
+        return load_nibabel(obj, dtype=np.float64)
     img = _as_loaded(obj)
     return Image(np.asarray(img.data, dtype=np.float64), img.affine, img.header)
 
@@ -80,7 +82,7 @@ def _load64(obj: Any) -> Image:
 def _load32(obj: Any) -> Image:
     """``get_fdata(dtype='float32')`` with the file's header."""
     if isinstance(obj, (str, os.PathLike)):
-        return load(obj, dtype=np.float32)
+        return load_nibabel(obj, dtype=np.float32)
     img = _as_loaded(obj)
     return Image(np.asarray(img.data, dtype=np.float32), img.affine, img.header)
 
@@ -94,7 +96,7 @@ def _header_like(hdr: NiftiHeader, data: np.ndarray, affine: Any, **fields: Any)
     hdr)`` (``update_header``: the xforms kept while ``affine`` matches them)."""
     d = hdr.to_dict()
     d.update(fields)
-    out = _core.nifti_header_for_image(
+    out = _nb_header_for_image(
         list(data.shape), data.dtype.name, np.ascontiguousarray(affine, dtype=np.float64), d, 1
     )
     return NiftiHeader.from_dict(out)
@@ -139,7 +141,7 @@ def au2rads(
         data = (data - data.min()) * (2 * np.pi / (data.max() - data.min()))
     data = np.clip(np.float32(data), 0.0, 2 * np.pi)
     hdr = _header(im)
-    affine = hdr.affine
+    affine = nibabel_affine(hdr)  # Nifti1Image(data, None, hdr): get_best_affine
     out_hdr = _header_like(hdr, data, affine, xyzt_units=_XYZT_MM)
     img = Image(data, affine, out_hdr)
     return PhaseResult(img, _write(img, _name(in_file, "phase.nii.gz"), "_rads", out_dir))
@@ -264,7 +266,7 @@ def check_b0_units(
     hdr = _header(img)
     disk = hdr.data_dtype if hdr.data_dtype is not None else data.dtype
     out_hdr = NiftiHeader.from_dict(
-        _core.nifti_header_for_image(
+        _nb_header_for_image(
             list(data.shape),
             np.dtype(disk).name,
             np.ascontiguousarray(img.affine, dtype=np.float64),
@@ -328,8 +330,8 @@ def check_register(
     for lst, what in ((mags, "mag_files"), (fmaps, "fmap_files")):
         if not 1 <= len(lst) <= 2:
             raise ValueError(f"{what} holds one or two images, not {len(lst)}")
-    mag_imgs = [load(p) for p in mags]
-    fmap_imgs = [load(p) for p in fmaps]
+    mag_imgs = [load_nibabel(p) for p in mags]
+    fmap_imgs = [load_nibabel(p) for p in fmaps]
 
     def fail(msg: str | None) -> None:
         if msg is not None:
@@ -359,9 +361,7 @@ def check_register(
         hdr = _header(img)
         disk = hdr.data_dtype if hdr.data_dtype is not None else np.asarray(img.data).dtype
         new_hdr = NiftiHeader.from_dict(
-            _core.nifti_header_for_image(
-                list(img.shape), np.dtype(disk).name, target, hdr.to_dict(), None
-            )
+            _nb_header_for_image(list(img.shape), np.dtype(disk).name, target, hdr.to_dict(), None)
         )
         os.makedirs(cwd, exist_ok=True)
         save_nibabel(Image(np.asanyarray(img.data), target, new_hdr), out_file)

@@ -27,8 +27,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
 from larmorx.image import Image
+from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
 from larmorx.sdcflows.tools import _as_loaded
@@ -59,7 +59,7 @@ def _new_header(
 ) -> NiftiHeader:
     """The header of ``nb.Nifti1Image(data, affine)`` after ``set_intent(intent, name=name)``,
     ``set_xyzt_units('mm')`` and ``fields``."""
-    base = _core.nifti_header_for_image(
+    base = _nb_header_for_image(
         list(data.shape), data.dtype.name, np.ascontiguousarray(affine, dtype=np.float64), None, 1
     )
     base.update(
@@ -71,7 +71,7 @@ def _new_header(
         xyzt_units=_XYZT_MM,
         **fields,
     )
-    out = _core.nifti_header_for_image(
+    out = _nb_header_for_image(
         list(data.shape), data.dtype.name, np.ascontiguousarray(affine, dtype=np.float64), base, 1
     )
     return NiftiHeader.from_dict(out)

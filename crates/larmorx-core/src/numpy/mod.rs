@@ -10,10 +10,13 @@
 //!   weighted `average`, over one axis of a C-ordered array.
 //! - [`quantile`]: `numpy.percentile(..., method="higher")`, `numpy.nanpercentile` (the default
 //!   `"linear"` method) along the first axis, SciPy's `scoreatpercentile(...,
-//!   interpolation_method="lower")`.
+//!   interpolation_method="lower")`; `numpy.percentile` with the default method of a whole array
+//!   (a Python-number `q`, as numpy 2.3 or 2.5 computes it, [`NumpyRelease`], or a list of
+//!   them), `numpy.median` of a whole array and along an axis (sdcflows' `brain_masker`,
+//!   niworkflows' `IntensityClip` and `RobustAverage`).
 //!
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
-//!   (for `reproduce`).
+//!   (for `reproduce`), and `clip` with scalar bounds.
 //!
 //! The arithmetic is x86-64's (SSE) in every respect, NaNs included (`math::x86_nan`), so the
 //! results are the same on every platform.
@@ -42,6 +45,41 @@ pub mod reduce;
 pub mod umath;
 
 use crate::math::x86_nan;
+
+/// The numpy release whose arithmetic a call follows where numpy's releases differ.
+///
+/// numpy 2.5 changed `percentile` and `quantile` for a Python-number `q` (`weak_q`): numpy 2.2
+/// and 2.3 divide `q` by the array's own type's 100 and compute the virtual index and the
+/// interpolation weight in that type (`float32` for `float32` data); numpy 2.5 computes them in
+/// `float64` and rounds the weight to the array's type only in the interpolation
+/// ([`quantile::percentile_linear_weak`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum NumpyRelease {
+    /// numpy 2.2.6 (fMRIPrep 25.2.6's image) and 2.3.5 (the shared environment).
+    V2_3,
+    /// numpy 2.5.4 (the newest environment). The default.
+    #[default]
+    V2_5,
+}
+
+impl NumpyRelease {
+    /// The release for a version string (`"2.3.5"`, `"2.5.4"`; 2.2 and 2.3 are `V2_3`, 2.4 and
+    /// later `V2_5`). `None` for numpy 1.x or text that is not a version.
+    pub fn from_version(version: &str) -> Option<Self> {
+        let mut it = version.split('.');
+        let major: u32 = it.next()?.parse().ok()?;
+        let minor: u32 = it
+            .next()?
+            .trim_end_matches(|c: char| !c.is_ascii_digit())
+            .parse()
+            .ok()?;
+        match (major, minor) {
+            (2, 0..=3) => Some(NumpyRelease::V2_3),
+            (2, _) | (3.., _) => Some(NumpyRelease::V2_5),
+            _ => None,
+        }
+    }
+}
 
 /// The two numpy floating types the reductions run in, with x86-64's arithmetic.
 pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {

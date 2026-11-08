@@ -381,6 +381,81 @@ def ndimage_prepared_coefficients(
 ) -> np.ndarray:
     """The padded, prefiltered coefficients ``map_coordinates`` interpolates (3D float32)."""
 
+# --- SciPy-compatible filters, morphology, labelling (larmorx/_ndimage_filters.py) ------------
+# Inputs of any layout (bool as uint8 views); C-ordered results of the input's type.
+
+def ndimage_min_or_max_filter(
+    input: np.ndarray,
+    footprint: np.ndarray,
+    structure: np.ndarray | None,
+    mode: str,
+    cval: float,
+    origins: list[int],
+    minimum: bool,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``_nd_image.min_or_max_filter``: the minimum or maximum over a boolean ``footprint``,
+    with an optional float64 ``structure`` of the footprint's shape."""
+
+def ndimage_min_or_max_filter1d(
+    input: np.ndarray,
+    size: int,
+    axis: int,
+    mode: str,
+    cval: float,
+    origin: int,
+    minimum: bool,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``_nd_image.min_or_max_filter1d``: the minimum or maximum over ``size`` along ``axis``."""
+
+def ndimage_rank_filter(
+    input: np.ndarray,
+    rank: int,
+    footprint: np.ndarray,
+    mode: str,
+    cval: float,
+    origins: list[int],
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``_nd_image.rank_filter``: the ``rank``-th smallest over a boolean ``footprint``."""
+
+def ndimage_binary_erosion(
+    input: np.ndarray,
+    structure: np.ndarray,
+    origins: list[int],
+    iterations: int,
+    border_value: bool,
+    invert: bool,
+    brute_force: bool,
+    mask: np.ndarray | None = None,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``_binary_erosion`` after the wrapper's checks (``invert``: a dilation with the reversed
+    structure): uint8 0/1 values."""
+
+def ndimage_label(input: np.ndarray, structure: np.ndarray) -> tuple[np.ndarray, int]:
+    """``_ni_label._label`` with SciPy's default output: ``(int32 or int64 labels, number)``."""
+
+def ndimage_sum_labels(input: np.ndarray, labels: np.ndarray, index: list[int]) -> list[float]:
+    """``sum_labels`` for a sequence ``index``: the float64 sum per label, in C order."""
+
+def numpy_percentile_weak(a: np.ndarray, q: float, numpy_version: str) -> float:
+    """``numpy.percentile(a, q)`` (linear) with a Python-number ``q`` as numpy
+    ``numpy_version`` (``"2.3"``, ``"2.5"``, ...) computes it; the value in the array's type."""
+
+def numpy_percentile(a: np.ndarray, q: list[float]) -> list[float]:
+    """``numpy.percentile(a, q)`` (linear) with a list ``q``: float64 values."""
+
+def numpy_median(a: np.ndarray, axis: int | None = None) -> np.ndarray:
+    """``numpy.median(a, axis)`` of a float32 or float64 array."""
+
+def numpy_exp_f32(a: np.ndarray) -> np.ndarray:
+    """numpy's float32 ``exp`` (its AVX2/AVX-512 kernel), elementwise."""
+
+def numpy_clip_f32(a: np.ndarray, a_min: float, a_max: float) -> np.ndarray:
+    """``numpy.clip`` of a float32 array with float32 bounds."""
+
 # --- nitransforms chains and fMRIPrep's one-shot resampler (larmorx/transforms) ---------------
 
 Step = tuple[Any, ...]  # ("affine", 4x4) or ("field", deltas (x, y, z, 3), affine, inverse)

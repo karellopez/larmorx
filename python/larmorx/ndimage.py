@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
-"""SciPy-compatible spline interpolation: ``lx.ndimage``.
+"""SciPy-compatible spline interpolation, filters, morphology and labelling: ``lx.ndimage``.
+
+The filters (minimum, maximum, rank, median, percentile), grey and binary morphology,
+``label`` and ``sum_labels`` are SciPy 1.18.1's, bit for bit, from ``larmorx._ndimage_filters``
+(``docs/api/ndimage-filters.md``). The rest of this text is about the interpolation.
 
 A replica of ``scipy.ndimage``'s ``map_coordinates``, ``spline_filter`` and
 ``spline_filter1d`` (SciPy 1.18.1; first ported from 1.15.2), in Rust. Results are
@@ -29,8 +33,61 @@ import numpy as np
 
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
+from larmorx._ndimage_filters import (
+    binary_closing,
+    binary_dilation,
+    binary_erosion,
+    binary_fill_holes,
+    binary_hit_or_miss,
+    binary_opening,
+    binary_propagation,
+    generate_binary_structure,
+    grey_closing,
+    grey_dilation,
+    grey_erosion,
+    grey_opening,
+    iterate_structure,
+    label,
+    maximum_filter,
+    maximum_filter1d,
+    median_filter,
+    minimum_filter,
+    minimum_filter1d,
+    percentile_filter,
+    rank_filter,
+    sum,
+    sum_labels,
+)
 
-__all__ = ["MODES", "map_coordinates", "spline_filter", "spline_filter1d"]
+__all__ = [
+    "MODES",
+    "binary_closing",
+    "binary_dilation",
+    "binary_erosion",
+    "binary_fill_holes",
+    "binary_hit_or_miss",
+    "binary_opening",
+    "binary_propagation",
+    "generate_binary_structure",
+    "grey_closing",
+    "grey_dilation",
+    "grey_erosion",
+    "grey_opening",
+    "iterate_structure",
+    "label",
+    "map_coordinates",
+    "maximum_filter",
+    "maximum_filter1d",
+    "median_filter",
+    "minimum_filter",
+    "minimum_filter1d",
+    "percentile_filter",
+    "rank_filter",
+    "spline_filter",
+    "spline_filter1d",
+    "sum",
+    "sum_labels",
+]
 
 #: SciPy's boundary modes.
 MODES = (

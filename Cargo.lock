@@ -347,6 +347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-ndimage"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-py"
 version = "0.0.1"
 dependencies = [
@@ -359,6 +368,7 @@ dependencies = [
  "larmorx-interp",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-ndimage",
  "larmorx-sdcflows",
  "larmorx-transform",
  "numpy",

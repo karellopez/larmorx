@@ -4143,6 +4143,107 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+def _ball(r: int) -> np.ndarray:
+    """scikit-image's ``ball(r)`` from integer arithmetic."""
+    g = np.arange(-r, r + 1)
+    z, y, x = np.meshgrid(g, g, g, indexing="ij")
+    return (x * x + y * y + z * z <= r * r).astype(np.uint8)
+
+
+@case("py.ndimage.filters", covers=("lx.ndimage.minimum_filter", "lx.ndimage.maximum_filter", "lx.ndimage.minimum_filter1d", "lx.ndimage.maximum_filter1d", "lx.ndimage.rank_filter", "lx.ndimage.median_filter", "lx.ndimage.percentile_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """The minimum, maximum and rank filters: a non-flat footprint (every mode), a full box
+    (separable), the 1-D filters, a ball median, a percentile, a 1-D rank filter (the running
+    rank), integer and boolean inputs, an output type, origins, NaN and signed zeros."""
+    data = (ints(51, (14, 11, 9), -500, 500) / 8).astype(np.float32)
+    data[3, 4, 5] = np.nan
+    data[5, 5, 5] = -0.0
+    fp = ints(52, (3, 2, 3), 0, 2).astype(bool)
+    fp[1, 0, 1] = True
+    out: dict[str, Any] = {}
+    for mode in ("reflect", "constant", "nearest", "mirror", "wrap"):
+        out[f"min.{mode}"] = lx.ndimage.minimum_filter(data, footprint=fp, mode=mode, cval=1.5)
+    out["max.origin"] = lx.ndimage.maximum_filter(data, footprint=fp, origin=(1, 0, -1))
+    out["max.size"] = lx.ndimage.maximum_filter(data, size=(3, 1, 4), mode="nearest")
+    out["min1d"] = lx.ndimage.minimum_filter1d(data, 4, axis=1, mode="constant", cval=-2.0)
+    out["max1d"] = lx.ndimage.maximum_filter1d(data, 5, axis=0, origin=-1)
+    out["median.ball"] = lx.ndimage.median_filter(data, footprint=_ball(2))
+    out["rank"] = lx.ndimage.rank_filter(data, -3, footprint=fp, mode="mirror")
+    out["percentile"] = lx.ndimage.percentile_filter(data, 30.0, size=3, mode="wrap")
+    u8 = ints(53, (12, 10), 0, 256).astype(np.uint8)
+    out["median.uint8"] = lx.ndimage.median_filter(u8, size=3)
+    out["max.bool"] = lx.ndimage.maximum_filter(u8 > 128, footprint=fp[:, 0, :])
+    out["min.output"] = lx.ndimage.minimum_filter(u8, size=2, output=np.float64)
+    line = (ints(54, (31,), -40, 40) / 4).astype(np.float64)
+    out["rank1d"] = lx.ndimage.rank_filter(line, 2, size=5, mode="reflect")
+    out["median1d.int16"] = lx.ndimage.median_filter(line.astype(np.int16), size=4)
+    return out
+
+
+@case("py.ndimage.grey", covers=("lx.ndimage.grey_erosion", "lx.ndimage.grey_dilation", "lx.ndimage.grey_opening", "lx.ndimage.grey_closing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Grey morphology with a footprint, a size and a non-flat structure (brain_masker's
+    ``grey_closing`` with ``ball(1)``), float32 and uint8 (the structure added in the type)."""
+    data = (ints(55, (13, 12, 10), 0, 2000) / 1999).astype(np.float32)
+    st = ints(56, (3, 3, 3), -2, 3) / 2
+    u8 = ints(57, (16, 15), 0, 256).astype(np.uint8)
+    return {
+        "closing.ball1": lx.ndimage.grey_closing(data, structure=_ball(1)),
+        "opening.structure": lx.ndimage.grey_opening(
+            data, structure=st, mode="constant", cval=0.25
+        ),
+        "erosion.footprint": lx.ndimage.grey_erosion(data, footprint=_ball(1)),
+        "dilation.size": lx.ndimage.grey_dilation(data, size=(2, 3, 2), mode="mirror"),
+        "dilation.uint8": lx.ndimage.grey_dilation(u8, structure=st[1, :, :2], origin=(0, -1)),
+    }
+
+
+@case("py.ndimage.binary", covers=("lx.ndimage.binary_erosion", "lx.ndimage.binary_dilation", "lx.ndimage.binary_opening", "lx.ndimage.binary_closing", "lx.ndimage.binary_propagation", "lx.ndimage.binary_fill_holes", "lx.ndimage.binary_hit_or_miss", "lx.ndimage.generate_binary_structure", "lx.ndimage.iterate_structure"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Binary morphology: one pass, iterations (both strategies), until nothing changes, a
+    mask (its first pass and its int8 propagation), the border value, origins, the balls of
+    brain_masker, propagation, hole filling, hit-or-miss, the structures."""
+    g = np.indices((20, 18, 16)).sum(axis=0)
+    blob = ints(58, (20, 18, 16), 0, 100) < 55 + (g < 25) * 30
+    mask = ints(59, (20, 18, 16), 0, 4) / 2
+    st = lx.ndimage.generate_binary_structure(3, 2)
+    return {
+        "erosion": lx.ndimage.binary_erosion(blob, st, border_value=1),
+        "erosion.iter3": lx.ndimage.binary_erosion(blob, iterations=3),
+        "erosion.iter3.brute": lx.ndimage.binary_erosion(blob, iterations=3, brute_force=True),
+        "dilation.mask": lx.ndimage.binary_dilation(blob, iterations=2, mask=mask),
+        "dilation.until": lx.ndimage.binary_dilation(blob, st, iterations=0, mask=mask > 0.5),
+        "dilation.origin": lx.ndimage.binary_dilation(blob, _ball(1), origin=(1, 0, -1)),
+        "opening.ball3": lx.ndimage.binary_opening(blob.astype(np.float32), _ball(3)),
+        "closing.ball5": lx.ndimage.binary_closing(blob, _ball(5)).astype(np.uint8),
+        "propagation": lx.ndimage.binary_propagation(blob & (g < 12), mask=blob),
+        "fill_holes": lx.ndimage.binary_fill_holes(~blob),
+        "hit_or_miss": lx.ndimage.binary_hit_or_miss(blob, structure1=st),
+        "structure": lx.ndimage.generate_binary_structure(4, 2),
+        "iterate": lx.ndimage.iterate_structure(st, 3),
+    }
+
+
+@case("py.ndimage.label", covers=("lx.ndimage.label", "lx.ndimage.sum_labels", "lx.ndimage.sum"))
+def _(ctx: Context) -> dict[str, Any]:
+    """Labelling (6- and 26-connectivity, a Fortran-ordered input) and the sums per label
+    (brain_masker's largest component)."""
+    blob = ints(60, (17, 15, 13), 0, 100) < 45
+    lab, n = lx.ndimage.label(blob)
+    lab26, n26 = lx.ndimage.label(
+        np.asfortranarray(blob), lx.ndimage.generate_binary_structure(3, 3)
+    )
+    w = (ints(61, (17, 15, 13), -50, 50) / 4).astype(np.float32)
+    return {
+        "label": lab,
+        "count": np.asarray([n, n26]),
+        "label26": lab26,
+        "sizes": lx.ndimage.sum(blob.astype(np.uint8), lab, range(n + 1)),
+        "sums": lx.ndimage.sum_labels(w, lab, np.arange(-1, n + 2)),
+        "sum.scalar": np.asarray(lx.ndimage.sum_labels(w, lab, 3)),
+    }
+
+
 # --- FSL ----------------------------------------------------------------------------------------
 
 

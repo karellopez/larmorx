@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-//! numpy's elementwise `exp` and `log` with the bits of its x86-64 Linux wheels (numpy 2.3.5 and
+//! numpy's elementwise `exp` and `log` (and `clip`) with the bits of its x86-64 Linux wheels (numpy 2.3.5 and
 //! 2.5.4, measured on this project's machines: `validation/investigations/t2smap/numerics/`).
 //!
+//! - `float32` `exp`: numpy's own kernel on CPUs with AVX2 and FMA3 or AVX-512F
+//!   ([`crate::math::expf_numpy`]; numpy 2.3.5 and 2.5.4 have the same kernel, and both widths
+//!   give the same bits); on older x86-64 CPUs the C library's `expf`.
 //! - `float32` `log`: numpy's own kernel on CPUs with AVX2 and FMA3 or AVX-512F
 //!   ([`crate::math::logf_numpy`]); on older x86-64 CPUs numpy calls the C library's `logf`
 //!   (`logf@GLIBC_2.27`, [`crate::math::logf_glibc`]).
@@ -22,6 +25,37 @@
 #[must_use]
 pub fn log_f32(x: f32) -> f32 {
     crate::math::logf_numpy(x)
+}
+
+/// numpy's `float32` `exp` (x86-64, AVX2/FMA3 or AVX-512F path: numpy's own kernel,
+/// [`crate::math::expf_numpy`]; on older x86-64 CPUs numpy calls the C library's `expf`,
+/// [`crate::math::expf_glibc`]).
+#[inline]
+#[must_use]
+pub fn exp_f32(x: f32) -> f32 {
+    crate::math::expf_numpy(x)
+}
+
+/// `numpy.clip(a, a_min, a_max)` with scalar bounds of the array's type (`_npy_clip`'s loop for
+/// constant bounds): when neither bound is a NaN, `x < a_min` gives `a_min`, then `x > a_max`
+/// gives `a_max` (so `a_max` wins where `a_min > a_max`), and a NaN `x` is kept; when a bound is
+/// a NaN, every element becomes that bound (`a_min`'s NaN first).
+pub fn clip<T: super::NpFloat>(a: &mut [T], a_min: T, a_max: T) {
+    if a_min.is_nan() || a_max.is_nan() {
+        let fill = if a_min.is_nan() { a_min } else { a_max };
+        a.iter_mut().for_each(|x| *x = fill);
+        return;
+    }
+    for x in a.iter_mut() {
+        let mut v = *x;
+        if v < a_min {
+            v = a_min;
+        }
+        if v > a_max {
+            v = a_max;
+        }
+        *x = v;
+    }
 }
 
 /// numpy's `float64` `exp` (x86-64 Linux without AVX-512: glibc 2.35's `exp@GLIBC_2.2.5`).
@@ -55,5 +89,20 @@ mod tests {
         assert_eq!(super::log_f64(-0.0), f64::NEG_INFINITY);
         assert_eq!(super::log_f64(1.0), 0.0);
         assert_eq!(super::exp_f64(0.0), 1.0);
+        assert_eq!(super::exp_f32(0.0), 1.0);
+    }
+
+    #[test]
+    fn clip_follows_numpys_constant_bounds_loop() {
+        let mut a = [-1.0f32, 0.5, 2.0, f32::NAN];
+        super::clip(&mut a, 0.0, 1.0);
+        assert_eq!(&a[..3], &[0.0, 0.5, 1.0]);
+        assert!(a[3].is_nan());
+        let mut b = [-1.0f32, 0.5, 2.0];
+        super::clip(&mut b, 1.0, 0.0); // a_min > a_max: a_max everywhere
+        assert_eq!(b, [0.0, 0.0, 0.0]);
+        let mut c = [1.0f64, 2.0];
+        super::clip(&mut c, f64::NAN, 3.0);
+        assert!(c.iter().all(|x| x.is_nan()));
     }
 }

@@ -14,6 +14,7 @@ mod defects;
 mod fsl;
 mod hdf5;
 mod mri;
+mod ndfilters;
 mod ndimage;
 mod nifti;
 mod replica;
@@ -76,6 +77,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     hdf5::register(m)?;
     mri::register(m)?;
     ndimage::register(m)?;
+    ndfilters::register(m)?;
     replica::register(m)?;
     resample::register(m)?;
     sdcflows::register(m)?;

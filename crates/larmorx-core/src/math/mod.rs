@@ -23,6 +23,7 @@ mod exp;
 mod exp_glibc;
 mod expf;
 mod expf_glibc;
+mod expf_numpy;
 mod log;
 mod log_glibc;
 mod logf;
@@ -180,6 +181,13 @@ glibc_dispatch!(
 glibc_dispatch!(
     /// `e^x` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__expf_fma`; 0.502 ulp).
     expf_glibc::expf_glibc(x: f32) -> f32
+);
+glibc_dispatch!(
+    /// numpy's `e^x` for `f32` (`numpy.exp` on a `float32` array) as numpy 2.x's x86-64 builds
+    /// compute it on CPUs with AVX2 and FMA3 or AVX-512F: numpy's own kernel (BSD-3-Clause), not
+    /// the C library's (at most 2.52 ulp, numpy's measure), for `reproduce` only ([`expf`] is the
+    /// default). scikit-image's random walker (`expf_numpy.rs`).
+    expf_numpy::expf_numpy(x: f32) -> f32
 );
 glibc_dispatch!(
     /// `x^y` for `f32` with glibc 2.35's bits (x86-64, FMA build: `__powf_fma`; 0.82 ulp).
@@ -399,6 +407,7 @@ mod fma {
     fma_glibc!(logf_glibc::logf_glibc(x: f32) -> f32);
     fma_glibc!(logf_numpy::logf_numpy(x: f32) -> f32);
     fma_glibc!(expf_glibc::expf_glibc(x: f32) -> f32);
+    fma_glibc!(expf_numpy::expf_numpy(x: f32) -> f32);
     fma_glibc!(powf_glibc::powf_glibc(x: f32, y: f32) -> f32);
     fma_glibc!(exp_glibc::exp_glibc(x: f64) -> f64);
     fma_glibc!(log_glibc::log_glibc(x: f64) -> f64);

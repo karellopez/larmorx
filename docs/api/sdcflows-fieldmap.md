@@ -37,10 +37,14 @@ from the shared releases to the newest: 4 of its 37 cases changed in sdcflows' o
 from numpy's LAPACK 3.12.0 → 3.12.1 (the quaternions nibabel writes, an orientation tie),
 which larmorx reproduces in each release.
 
-**Speed:** the fit of fMRIPrep's field maps (weights and ridge solve) takes 0.3 to 3.8 s on 14
-threads where scikit-learn takes 1.9 to 28 s (ds002603's 128³ field map: 2,097,152 voxels ×
-9,072 coefficients, 126 million stored weights: 28.1 s against 3.8 s), with the same bits; the
-collocation matrix is applied without being stored (sdcflows holds it at least three times).
+**Speed** ([benchmark](../benchmarks/sdcflows-fieldmap.md), every output byte-identical):
+`BSplineApprox` on fMRIPrep's seven `bs_filter` calls takes 0.30 to 4.0 s at 14 threads where
+sdcflows takes 2.0 to 27.5 s (6.5 to 7.8 times faster; ds002603's 128³ field map: 2,097,152
+voxels × 9,072 coefficients, 4.0 s against 27.5 s), and at one thread 1.09 to 1.14 times
+faster than scikit-learn in a fresh process (the collocation matrix stored once at one thread;
+with several threads the weights are evaluated in parallel at every product, faster there and
+holding no matrix; sdcflows holds it at least three times); `ApplyCoeffsField` on 60 volumes of
+ds005454 1.7 times faster at 1 and 14 threads.
 
 ## Quick start
 

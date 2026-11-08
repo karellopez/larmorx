@@ -75,7 +75,14 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   infinities gives sdcflows' bits. The products are `fl32(fl32(w0 · w1) · w2)`.
 - **Memory.** sdcflows' fit holds `X` (8 bytes per stored entry: 11 million for a 64 × 64 × 44
   field map, 126 million for ds002603's 128³) at least three times (scikit-learn's copies, the
-  adjoint's conjugate copy). larmorx applies `X` from the per-axis weights without storing it.
+  adjoint's conjugate copy). larmorx stores `X` once for the fit by default
+  (`bspline::StoredCollocation`: 8 bytes per entry at one thread, 16 with the transpose its
+  threads read), within the memory rule (ds005454's fit: 877 MiB against sdcflows' 1,473; at one
+  thread less), and faster than scikit-learn at one thread (fMRIPrep's fits: ds005454 15.5 s
+  against 17.6 s, ds002603 24.4 s against 29.8 s; the adjoint scatters the rows in order, as
+  `csc_matvec` on `X.T` does); `low_memory=True` applies `X` from the per-axis weights without
+  storing it (O(voxels + knots), 1.5 to 1.9 times slower at one thread). The same bits both
+  ways.
 
 ### scipy's float64 stacks and numpy's NaN of nothing
 

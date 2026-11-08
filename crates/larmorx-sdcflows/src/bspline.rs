@@ -689,12 +689,14 @@ pub struct Csr<T> {
     pub data: Vec<T>,
 }
 
-/// A [`Collocation`] stored as scipy holds its matrix (`csr_matvec`'s rows) and as its
-/// transpose reads it (`csc_matvec` on `X.T`: every column's samples in ascending order), with
-/// 32-bit indices: 16 bytes per stored weight, against at least 24 in scikit-learn's fit
-/// (sdcflows' matrix, the copy `_preprocess_data` makes, and the copy every adjoint product
-/// makes with `X.conj()`), so its peak stays within the memory rule. The products give the
-/// [`Collocation`]'s bits: the same weights in the same order.
+/// A [`Collocation`] stored as scipy holds its matrix (`csr_matvec`'s rows), with 32-bit
+/// indices; for several threads also its transpose (every column's samples in ascending
+/// order), which the adjoint reads in parallel, while one thread scatters the rows in order as
+/// scipy's `csc_matvec` on `X.T` does. 8 bytes per stored weight at one thread, 16 with the
+/// transpose, against at least 24 in scikit-learn's fit (sdcflows' matrix, the copy
+/// `_preprocess_data` makes and the conjugate transpose the adjoint operator keeps), so its peak
+/// stays within the memory rule. The products give the [`Collocation`]'s bits: the same weights
+/// in the same order.
 #[derive(Clone, Debug)]
 pub struct StoredCollocation {
     shape: [usize; 2],
@@ -726,22 +728,28 @@ impl StoredCollocation {
                 v.len()
             )));
         }
+        let row = |r: usize| -> f32 {
+            let (a, b) = (self.indptr[r], self.indptr[r + 1]);
+            let mut sum = 0.0f32;
+            for (&d, &c) in self.data[a..b].iter().zip(&self.cols[a..b]) {
+                sum += d * v[c as usize];
+            }
+            sum
+        };
+        if n_threads == 1 {
+            return Ok((0..rows).map(row).collect());
+        }
         Ok(with_threads(n_threads, || {
             (0..rows)
                 .into_par_iter()
                 .with_min_len(1024)
-                .map(|r| {
-                    let mut sum = 0.0f32;
-                    for jj in self.indptr[r]..self.indptr[r + 1] {
-                        sum += self.data[jj] * v[self.cols[jj] as usize];
-                    }
-                    sum
-                })
+                .map(row)
                 .collect()
         })?)
     }
 
-    /// `X.T @ y`: each column a float32 sum from +0 in ascending sample order.
+    /// `X.T @ y`: each column a float32 sum from +0 in ascending sample order (scattered row by
+    /// row at one thread, gathered by column from the transpose with several).
     pub fn rmatvec_f32(&self, y: &[f32], n_threads: usize) -> Result<Vec<f32>, SdcError> {
         let [rows, cols] = self.shape;
         if y.len() != rows {
@@ -749,6 +757,18 @@ impl StoredCollocation {
                 "dimension mismatch: the matrix has {rows} rows, the vector {} values",
                 y.len()
             )));
+        }
+        if self.col_ptr.is_empty() || n_threads == 1 {
+            // scipy's csc_matvec on X.T: the rows in order, each scattered into the columns
+            // (every column's products added in ascending sample order from +0, as below).
+            let mut out = vec![0.0f32; cols];
+            for (r, &yr) in y.iter().enumerate() {
+                let (a, b) = (self.indptr[r], self.indptr[r + 1]);
+                for (&d, &c) in self.data[a..b].iter().zip(&self.cols[a..b]) {
+                    out[c as usize] += d * yr;
+                }
+            }
+            return Ok(out);
         }
         Ok(with_threads(n_threads, || {
             (0..cols)
@@ -838,6 +858,23 @@ impl Collocation {
                 }
             }
         }
+    }
+
+    /// The number of stored entries of row `s` (separable levels from their patterns' row
+    /// lengths, without evaluating a weight).
+    fn row_nnz(&self, s: usize) -> usize {
+        let [i0, i1, i2] = self.unravel(s);
+        let mut n = 0;
+        for level in &self.levels {
+            if let Some(e) = &level.exact {
+                let (w, _) = e.axes(s, level.dtype);
+                n += w[0].len * w[1].len * w[2].len;
+                continue;
+            }
+            let Some(p) = &level.patterns else { continue };
+            n += p[0].row(i0).0.len() * p[1].row(i1).0.len() * p[2].row(i2).0.len();
+        }
+        n
     }
 
     /// Calls `f(sample, weight)` for the stored entries of column `c`, in ascending sample order.
@@ -943,11 +980,7 @@ impl Collocation {
             (0..n_rows)
                 .into_par_iter()
                 .with_min_len(1024)
-                .map(|r| {
-                    let mut k = 0usize;
-                    self.for_row(r, |_, _| k += 1);
-                    k
-                })
+                .map(|r| self.row_nnz(r))
                 .collect()
         })?;
         let mut indptr = Vec::with_capacity(n_rows + 1);
@@ -985,6 +1018,19 @@ impl Collocation {
                 }
             });
         })?;
+        if n_threads == 1 {
+            // One thread: the adjoint scatters the rows in order (csc_matvec on X.T), which
+            // needs no transpose.
+            return Ok(Some(StoredCollocation {
+                shape: [n_rows, n_cols],
+                indptr,
+                cols,
+                data,
+                col_ptr: Vec::new(),
+                row_idx: Vec::new(),
+                cdata: Vec::new(),
+            }));
+        }
         // The transpose: a stable counting sort by column (every column's samples ascending).
         let mut col_ptr = vec![0usize; n_cols + 1];
         for &c in &cols {

@@ -399,6 +399,12 @@ pub fn bspline_approx_logged(
         Some(m) => ridge::ridge_sparse_cg(m, &y, params.ridge_alpha, 1e-4, None, n_threads)?,
         None => ridge::ridge_sparse_cg(&colmat, &y, params.ridge_alpha, 1e-4, None, n_threads)?,
     };
+    // The stored matrix also evaluates the fit when it was made on the original grid (every row
+    // in one product; a row's value does not depend on the rows beside it).
+    let evaluated = match (&stored, &fitting) {
+        (Some(m), Fitting::Original) => Some(m.matvec_f32(&fit.coef, n_threads)?),
+        _ => None,
+    };
     drop(stored);
     let extreme = fit.coef.iter().fold(0.0f32, |acc, c| {
         let a = c.abs();
@@ -450,11 +456,21 @@ pub fn bspline_approx_logged(
     };
     let inside = rows_where(mask, n_orig, true);
     let mut field = vec![0.0f32; n_orig];
-    for (&r, v) in inside
-        .iter()
-        .zip(colmat.matvec_f32(&fit.coef, Some(&inside), n_threads)?)
-    {
-        field[r] = v;
+    match &evaluated {
+        Some(all) => {
+            for &r in &inside {
+                field[r] = all[r];
+            }
+        }
+        None => {
+            for (&r, v) in
+                inside
+                    .iter()
+                    .zip(colmat.matvec_f32(&fit.coef, Some(&inside), n_threads)?)
+            {
+                field[r] = v;
+            }
+        }
     }
     let error: Vec<f32> = (0..n_orig)
         .map(|i| {
@@ -469,12 +485,21 @@ pub fn bspline_approx_logged(
     } else {
         let outside = rows_where(mask, n_orig, false);
         let mut extra = field.clone();
-        for (&r, v) in
-            outside
-                .iter()
-                .zip(colmat.matvec_f32(&fit.coef, Some(&outside), n_threads)?)
-        {
-            extra[r] = v;
+        match &evaluated {
+            Some(all) => {
+                for &r in &outside {
+                    extra[r] = all[r];
+                }
+            }
+            None => {
+                for (&r, v) in
+                    outside
+                        .iter()
+                        .zip(colmat.matvec_f32(&fit.coef, Some(&outside), n_threads)?)
+                {
+                    extra[r] = v;
+                }
+            }
         }
         Some(extra)
     };

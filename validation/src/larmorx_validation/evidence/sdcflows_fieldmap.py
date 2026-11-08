@@ -740,7 +740,9 @@ def _example_estimator(ctx: core.Context, key: str, links: dict) -> dict:
         "plane": "axial",
         "voxel": at,
         "panels": ["phase", "unwrapped", "sdcflows", "larmorx"],
-        "diffs": ["lx-sdc", "lx-fmriprep", "wf-fmriprep"],
+        # only comparisons drawn as images (both sides panels): fMRIPrep's own files and the
+        # workflow are compared over their files, in the metrics table
+        "diffs": ["lx-sdc", "lx14-lx1", "fix-lx"],
         "compare": {"a": "sdcflows", "b": "larmorx"},
     }
     out = common.finish(
@@ -1780,6 +1782,18 @@ def entries(ctx: core.Context) -> list[fcache.Entry]:
     ]
 
 
+def _check_default(ex: dict) -> None:
+    """The viewer draws the default's panels and comparisons: every panel must exist and every
+    comparison must have images (``display``: both sides panels), or the viewer cannot draw."""
+    panels = {p["id"] for p in ex["panels"]}
+    drawn = {x["id"] for x in ex["diffs"] if x.get("display")}
+    d = ex["default"]
+    bad = [p for p in d["panels"] if p not in panels] + [x for x in d["diffs"] if x not in drawn]
+    bad += [v for v in (d["compare"]["a"], d["compare"]["b"]) if v not in panels]
+    if bad:
+        raise ValueError(f"{ex['id']}: the default view names what the viewer cannot draw: {bad}")
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
     bench = records.load_bench(ctx.repo, RECORD)
@@ -1790,6 +1804,8 @@ def export(ctx: core.Context) -> dict:
     examples.append(_example_coefficients(ctx))
     examples.append(_example_apply(ctx, links))
     examples.append(_example_sdc10(ctx, links))
+    for ex in examples:
+        _check_default(ex)
     trial_tables, tprov = trial(ctx)
     tables = [
         _estimators_table(ctx),

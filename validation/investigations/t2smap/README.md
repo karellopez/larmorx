@@ -106,3 +106,47 @@ tedana's two calls per run (the voxels fitted with two echoes, then with three: 
 ds003592, 3,169 and 28,356 on ds000210 cuedSGT, 9,718 and 47,486 on rest), made at one BLAS thread.
 Speed on ds003592's 600 × 52,231 call: numpy 0.35 s; larmorx about 0.4 s at one thread, 0.2 s at
 14 (each fused multiply-add is a correctly rounded `mul_add`; no SIMD in this replica).
+
+### SciPy's `curve_fit` (relay 4)
+
+tedana's `--fittype curvefit` (fMRIPrep's default) calls `scipy.optimize.curve_fit(monoexponential,
+te, y, p0=loglin start, bounds=((min(y), 0), (inf, inf)))` per voxel: with bounds that is
+`least_squares`' trust-region reflective method with 2-point differences, the SVD of the augmented
+Jacobian at every iteration and the covariance from the SVD of the final Jacobian. larmorx's port
+is `larmorx_optim::curve_fit2` (with `larmorx_transform::numpy_linalg::{gesdd, blas}`).
+
+| Script | What it shows |
+|---|---|
+| `check_curve_fit.py --checker <curve_fit_check> --work <empty dir> [--real <dir> ...]` | SciPy's and numpy's own results against larmorx's, bit for bit: `dot` and `matvec` (numpy's `dot` of vectors and of C- and F-contiguous matrices on `least_squares`' shapes), `svd` (`scipy.linalg.svd` and `numpy.linalg.svd` of `m × 2` matrices, `full_matrices=False`: 2 to 4099 rows, scalings below `SMLNUM` and above `BIGNUM`, rank one, zero columns, signed zeros, not finite), `fit` (tedana-like voxels: 2 to 5 echoes, 1 to 600 volumes, three noise levels, the log-linear start), `edge` (every exit: starts outside, on or far from the bounds, infinite and NaN starts and data, residuals not finite at the start, flat, rising, tiny, huge, negative and zero signals, T2* from 0.05 ms to 10^7 ms, two and three residuals, perfect fits, the evaluation budget) and `real` (tedana's own calls); it prints the exits SciPy reached |
+| `dump_curve_fit_calls.py --out <dir> --workdir <scratch> -- <t2smap arguments>` | runs tedana's `t2smap` command line in-process and records every `scipy.optimize.curve_fit` call (echo times, float32 signal, start, bounds, SciPy's result as tedana got it) and the Python warnings they raised |
+| `run_curve_fit_check.sh <curve_fit_check> <scratch> ["shared newest"]` | both of the above in both environments, on fMRIPrep's four multi-echo `t2smap` calls (ds003592 sub-280; ds000210 sub-02's cuedSGT and rest runs; ds000258 sub-21262's rest run, four echoes) |
+| `compare_curve_fit_envs.py <scratch>` | the library step on those calls: SciPy 1.15.3/numpy 2.3.5 against SciPy 1.18.1/numpy 2.5.4 |
+| `search_rare_exits.py --fits N --seed S` | random voxels and starts, looking for `curve_fit`'s rare exits (`intersect_trust_region`'s errors, an SVD of a Jacobian that is not finite) |
+
+```
+cargo build --release -p larmorx-optim --example curve_fit_check
+scripts/orchestration/boxed.sh 16 validation/investigations/t2smap/numerics/run_curve_fit_check.sh \
+    <target>/release/examples/curve_fit_check <empty scratch dir>
+```
+
+(about 6 minutes per environment, 4 GB.) Results (2026-11-08, from 7bb40be4's code; numpy's
+AVX-512 kernels off, OpenBLAS's Haswell kernels, one BLAS thread):
+
+- every record identical in both environments, 169,785 each: `dot` 13/13, `matvec` 41/41, `svd`
+  69/69 (SciPy) and 67/67 (numpy: LAPACK 3.12.0 with 2.3.5, 3.12.1 with 2.5.4), `fit` 144/144,
+  `edge` 98/98, and **tedana's own calls 169,344/169,344**: ds003592 52,826, ds000210 cuedSGT
+  31,525 and rest 57,204, ds000258 27,789 (every voxel's fit with two to four echoes);
+- the exits SciPy reached (SciPy 1.18.1): status 2 on 150,148 fits, 4 on 13,114, 3 on 3,046, 1 on
+  1,326 (7 of them with the covariance warning: two residuals), a start outside the bounds on
+  1,925 (1,919 of them tedana's: the log-linear start below the voxel's smallest signal or a
+  T2* that is not positive), the evaluation budget on 13 (11 of them tedana's), an SVD of a
+  Jacobian that is not finite on 5, residuals not finite at the start on 1; no voxel reached
+  `intersect_trust_region`'s two errors (none of 30,000 random fits either);
+- the Python warnings tedana's calls raised: none, on all four calls;
+- the library step (`compare_curve_fit_envs.py`): the two environments give different last bits
+  in most fits (parameters differ in 39,211 of ds003592's 52,826 fits, median relative 9e-10,
+  largest 0.70; 31,007, 55,377 and 23,038 on the other three, largest 3.5 on ds000258), never a
+  different outcome: SciPy 1.18.1 returns C-ordered SVD factors and 1.15.3 Fortran-ordered ones,
+  so numpy's products with them run `dgemv_n` or `dgemv_t` (`larmorx_optim::Scipy`);
+- speed: larmorx fits the 169,785 records in 33.8 s at one thread (0.2 ms a fit; SciPy about 1
+  ms), 4.6 s at 12, with the same bits.

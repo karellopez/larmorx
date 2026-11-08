@@ -1234,12 +1234,12 @@ def _case_verdict(r: dict) -> tuple[str, str]:
         )
     shares = _shares(r)
     return "within-variability", common.clip(
-        "within specs/3dvolreg.md §14.3's limits, which allow for either side of the shear "
-        "decomposition's exact ties"
-        + (f" (the largest shares of a limit: {', '.join(shares)})" if shares else "")
+        "within specs/3dvolreg.md §14.3's limits (either side of the shear decomposition's exact "
+        "ties)"
+        + (f": the largest shares of a limit, {', '.join(shares)}" if shares else "")
         + (f"; {', '.join(lines)} -1Dfile lines identical" if lines else "")
-        + "; the exit status, the files, the headers and the messages (their numbers within the "
-        "derived bounds) AFNI's; the default against the replica's default by the same limits",
+        + "; exit status, files, headers and messages AFNI's; the default within the same limits "
+        "of the replica's",
         400,
     )
 
@@ -1356,7 +1356,7 @@ def _limits_table(rec) -> dict:
         note="1 = at the limit (specs/3dvolreg.md §14.3, the spec writer's step 3 of 2026-11-08). "
         "The record's -1Dfile lines: 417 of 1,096 identical with AFNI's (bit-identity reported, "
         "not required). The registered volumes' largest share is ds000256's high-motion child "
-        "run (its example above).",
+        "run (its worked example below, 'A child's high-motion run').",
     )  # fmt: skip
 
 

@@ -713,8 +713,56 @@ fn afni_volreg_cli(
     ))
 }
 
+/// 3dvolreg's `-SAVEDISP` arithmetic (`specs/3dvolreg.md` §10.3) on three raw displacement
+/// series, each `(volumes, voxels)` float32 as `-savedisp` writes them: the three normalised,
+/// then their sixteen products, as `(suffix, series)` in the order the program writes them
+/// (`DX`, `DY`, `DZ`, `DXX`, ...). The validation applies it to AFNI's own raw `-savedisp`
+/// values (§14.3, "`-SAVEDISP`" step 1); the command line runs the same functions.
+#[pyfunction]
+fn afni_volreg_savedisp<'py>(
+    py: Python<'py>,
+    dx: numpy::PyReadonlyArray2<'py, f32>,
+    dy: numpy::PyReadonlyArray2<'py, f32>,
+    dz: numpy::PyReadonlyArray2<'py, f32>,
+) -> PyResult<Vec<(String, Bound<'py, numpy::PyArray2<f32>>)>> {
+    use larmorx_afni::volreg::report;
+    use numpy::PyUntypedArrayMethods;
+    let shape = dx.shape().to_vec();
+    if dy.shape() != shape.as_slice() || dz.shape() != shape.as_slice() {
+        return Err(PyValueError::new_err(
+            "the three displacement series must have the same shape",
+        ));
+    }
+    let (nt, total) = (shape[0], shape[1]);
+    let take = |a: &numpy::PyReadonlyArray2<'py, f32>| -> Vec<f32> {
+        a.as_array().iter().copied().collect()
+    };
+    let mut d = [take(&dx), take(&dy), take(&dz)];
+    let sets = py.detach(move || {
+        for s in d.iter_mut() {
+            report::normalise_displacements(s, total);
+        }
+        let mut sets: Vec<(String, Vec<f32>)> = ["DX", "DY", "DZ"]
+            .iter()
+            .zip(d.iter())
+            .map(|(n, s)| ((*n).to_owned(), s.clone()))
+            .collect();
+        for &(name, counts) in report::SAVEDISP_PRODUCTS.iter() {
+            sets.push((name.to_owned(), report::savedisp_product(&d, counts, total)));
+        }
+        sets
+    });
+    sets.into_iter()
+        .map(|(name, v)| {
+            let a = numpy::ndarray::Array2::from_shape_vec((nt, total), v).map_err(value_err)?;
+            Ok((name, PyArray::from_owned_array(py, a)))
+        })
+        .collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(afni_volreg_cli, m)?)?;
+    m.add_function(wrap_pyfunction!(afni_volreg_savedisp, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_file, m)?)?;
     m.add_function(wrap_pyfunction!(afni_tshift_array, m)?)?;
     m.add_function(wrap_pyfunction!(afni_automask_file, m)?)?;

@@ -303,6 +303,13 @@ def afni_volreg_cli(
     """3dvolreg's clean-room original with its original arguments and AFNI's variables
     ``afni_settings`` (the process environment is not read): ``(exit status, stdout, stderr)``."""
 
+def afni_volreg_savedisp(
+    dx: np.ndarray, dy: np.ndarray, dz: np.ndarray
+) -> list[tuple[str, np.ndarray]]:
+    """3dvolreg's ``-SAVEDISP`` arithmetic on three raw displacement series (each
+    ``(volumes, voxels)`` float32, as ``-savedisp`` writes them): the three normalised and their
+    sixteen products, ``(suffix, series)`` in the order the program writes them."""
+
 # --- SciPy-compatible interpolation (larmorx/ndimage.py) --------------------------------------
 
 def ndimage_map_coordinates(

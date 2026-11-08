@@ -160,8 +160,16 @@ fn edge(w: &mut [f32], n: [usize; 3], e: [usize; 3]) {
     }
 }
 
+/// The trimming of a weight (§7.1, trimming): the box used, the box found when it is not used
+/// because it saves too little, with its line (printed after `-verbose -verbose`'s ` + wtrim:`
+/// line of the box found, as AFNI does), and AFNI's message of an empty trim.
+struct Trim {
+    used: Bounds,
+    unused: Option<(Bounds, String)>,
+}
+
 /// The trimming box of a weight (§7.1, trimming), with AFNI's messages.
-fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Bounds {
+fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Trim {
     let mut mask: Vec<u8> = w.iter().map(|&x| u8::from(x != 0.0)).collect();
     cluster::keep_largest(&mut mask, n);
     let stencil = morph::Stencil::new(n, morph::Neighbourhood::Edges.offsets());
@@ -190,15 +198,23 @@ fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Bounds {
             " + skipping empty trim, {{xyz}}{{a,b}} = {},{}, {},{}, {},{}\n",
             lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]
         ));
-        return Bounds::full(n);
+        return Trim {
+            used: Bounds::full(n),
+            unused: None,
+        };
     }
     let b = Bounds { lo, hi };
     let t = 100.0f32 * b.count() as f32 / (nx * ny * nz) as f32;
     if t < 90.0 {
-        b
+        Trim {
+            used: b,
+            unused: None,
+        }
     } else {
-        log.push(" + skipping use of trim - too little savings\n".into());
-        Bounds::full(n)
+        Trim {
+            used: Bounds::full(n),
+            unused: Some((b, " + skipping use of trim - too little savings\n".into())),
+        }
     }
 }
 
@@ -246,6 +262,9 @@ impl Basis {
                 }
                 blur_at = Some(lines.len());
                 log.blur_line = Some(default_weight(&mut w, n, sizes, &settings.blur));
+                if chatty {
+                    lines.push(":".to_owned());
+                }
                 w
             }
             Weight::Given { mut w, edged } => {
@@ -257,24 +276,33 @@ impl Basis {
         };
         let total = n[0] * n[1] * n[2];
         let all_zero = w.iter().all(|&x| x == 0.0);
-        let bounds = trim_box(&w, n, &mut lines);
+        let trim = trim_box(&w, n, &mut lines);
+        let bounds = trim.used;
         if all_zero {
             lines.push("** error: weights are all zero\n".to_owned());
         }
         let wb = bounds.cut(&w, n);
         drop(std::mem::take(&mut w));
         if chatty {
-            let kept = bounds.count();
+            // the box found, also when it saves too little and is not used
+            let found = trim.unused.as_ref().map_or(&bounds, |(b, _)| b);
+            let kept = found.count();
             lines.push(format!(
                 " + wtrim: [{}..{}]x[{}..{}]x[{}..{}] = {kept} voxels kept, out of {total} ({}%)\n",
-                bounds.lo[0],
-                bounds.hi[0],
-                bounds.lo[1],
-                bounds.hi[1],
-                bounds.lo[2],
-                bounds.hi[2],
+                found.lo[0],
+                found.hi[0],
+                found.lo[1],
+                found.hi[1],
+                found.lo[2],
+                found.hi[2],
                 cfmt::f1(f64::from(100.0f32 * kept as f32 / total as f32)),
             ));
+        }
+        if let Some((_, line)) = &trim.unused {
+            lines.push(line.clone());
+        }
+        if chatty {
+            let kept = bounds.count();
             let (lo, hi) = range(&wb);
             lines.push(format!(
                 "  weight range: min={}  max={}\n",

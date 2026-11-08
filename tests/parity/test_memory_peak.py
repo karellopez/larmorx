@@ -1354,3 +1354,69 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
         )
         if mode == "reproduce":
             assert _stored(a_dir) == _stored(r_dir), f"{program} {args}"
+
+
+#: 3dvolreg's clean-room original (``crates/larmorx-afni``, 2026-11-08; ``specs/3dvolreg.md``
+#: §14.4) at one thread, in both modes, against AFNI's peak: RobustAverage's call on the 20
+#: volumes above (``bold20``), and on fMRIPrep's largest input of the validation, ds005454's
+#: sliced series (160 x 160 x 96 x 20; ``validation/src/larmorx_validation/parity/
+#: afni_volreg_original.py`` makes it from the oracle run: skipped until it exists). The outputs are
+#: not AFNI's bits (the record holds them to the spec's thresholds), so each run is only checked to
+#: write them.
+ORIGINAL_VOLREG_CASES = [
+    ("bold20", AFNI_CASES[4][1]),
+    (
+        "ds005454",
+        "-Fourier -twopass -zpad 4 -1Dfile {out}/o.1D -1Dmatrix_save {out}/o.aff12.1D "
+        "-prefix {out}/o.nii.gz {ds005454}",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), ORIGINAL_VOLREG_CASES)
+def test_volreg_original_needs_no_more_memory_than_afni(tmp_path, name, args):
+    ar = pytest.importorskip("larmorx_validation.parity.afni_replica")
+    vo = pytest.importorskip("larmorx_validation.parity.afni_volreg_original")
+    afni = ar.afni_binary("3dvolreg", "26.3.05")
+    if afni is None or not Path("/usr/bin/time").is_file():
+        pytest.skip("the AFNI 26.3.05 3dvolreg oracle or /usr/bin/time was not found")
+    inputs = tmp_path / "in"
+    inputs.mkdir()
+    paths = _afni_inputs(inputs) if name == "bold20" else {}
+    if name == "ds005454":
+        src = vo.fmriprep_dir() / "ds005454_sliced.nii.gz"
+        if not src.is_file():
+            pytest.skip("ds005454's sliced input was not made yet (the afni-volreg-original suite)")
+        paths["ds005454"] = str(src)
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))},
+        "OMP_NUM_THREADS": "1",
+        "HOME": str(home),
+        "AFNI_DONT_LOGFILE": "YES",
+        "AFNI_NIFTI_NOEXT": "YES",
+    }
+
+    def argv(out: Path) -> list[str]:
+        return [w.format(**paths, out=out) for w in args.split()]
+
+    a_dir = tmp_path / "afni"
+    a_dir.mkdir()
+    code, afni_mib = _original_peak([str(afni), *argv(a_dir)], env, "afni", _emptier(a_dir), a_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "original"}
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak(
+            [sys.executable, "-m", "larmorx", "afni", "3dvolreg", *argv(r_dir)], l_env, r_dir
+        )
+        assert code == 0
+        print(f"3dvolreg original {name} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f}, entry {entry:.1f}")  # fmt: skip
+        assert mib <= allowance(afni_mib, entry), (
+            f"3dvolreg original {name} ({mode}): larmorx {mib:.0f} MiB, AFNI {afni_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        assert sorted(p.name for p in r_dir.iterdir()) == sorted(p.name for p in a_dir.iterdir())

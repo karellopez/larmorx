@@ -326,9 +326,14 @@ fn coarse_line(k: usize, found: &Found, rotations: bool) -> String {
     let s = found.shift;
     if rotations {
         let a = found.angles;
+        let marks = if found.non_3d {
+            interleaved_non_3d(&found.marks)
+        } else {
+            found.marks.clone()
+        };
         format!(
             "Getting best coarse rot+shift [{k}]:{} {} {} {} : {} {} {}",
-            found.marks,
+            marks,
             cfmt::g32(a[0]),
             cfmt::g32(a[1]),
             cfmt::g32(a[2]),
@@ -341,6 +346,37 @@ fn coarse_line(k: usize, found: &Found, rotations: bool) -> String {
             "Getting best coarse shift [{k}]: {} {} {}",
             s[0], s[1], s[2]
         )
+    }
+}
+
+/// `-verbose`'s marks of a search on a volume that is not 3D: each rotation's mark after its
+/// failure message (§7.3), the identity's (the 23rd) without one.
+fn interleaved_non_3d(marks: &str) -> String {
+    let (head, tail) = match marks.find(']') {
+        Some(i) => marks.split_at(i + 1),
+        None => ("", marks),
+    };
+    let mut out = head.to_owned();
+    for (q, c) in tail.chars().enumerate() {
+        if q != IDENTITY_ROTATION {
+            out.push_str(coarse::NON_3D);
+            out.push('\n');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The identity's place among the coarse search's 45 rotations (§8.6's order).
+const IDENTITY_ROTATION: usize = 22;
+
+/// The 44 failure messages of a coarse rotation search on a volume that is not 3D (§7.3),
+/// without `-verbose`.
+fn push_non_3d(found: &Found, verbose: bool, messages: &mut Vec<Message>) {
+    if found.non_3d && !verbose {
+        for _ in 0..44 {
+            messages.push(Message::Raw(coarse::NON_3D.into()));
+        }
     }
 }
 
@@ -404,10 +440,12 @@ fn run_in_pool(
     let k = nonzero(&base);
     if k < 100 {
         let s = if k == 1 { "" } else { "s" };
-        return Err(fail(
+        return Err(VolregError {
             messages,
-            format!("3dvolreg fails: base image has {k} nonzero voxel{s} (< 100)"),
-        ));
+            notices: Vec::new(),
+            fatal: format!("3dvolreg fails: base image has {k} nonzero voxel{s} (< 100)"),
+            fatal_error: true,
+        });
     }
     // §8.3: edging.
     let edging = p.edging.widths(n);
@@ -515,6 +553,7 @@ fn run_in_pool(
                 let mut v0 = volume_f32(&bricks, 0);
                 twopass_blur(&mut v0, n, p.twoblur, &blur);
                 let f = search(&v0);
+                push_non_3d(&f, verbose && coarse_on, &mut messages);
                 if verbose && coarse_on {
                     messages.push(Message::Info(coarse_line(0, &f, coarse_settings.rotations)));
                 }
@@ -610,10 +649,15 @@ fn run_in_pool(
                 messages.push(Message::Raw(
                     "\n*** mri_3dalign_setup: cannot use nD images!\x07".into(),
                 ));
-                return Err(fail(
+                // volume 0's coarse search came first: its empty region (AFNI-93) is named
+                let mut e = fail(
                     messages,
                     "Can't initialize first pass alignment algorithm".into(),
-                ));
+                );
+                if empty_region {
+                    e.notices.push(notices::afni_93(mode));
+                }
+                return Err(e);
             }
             Err(BasisError::LeastSquares) => None,
         };

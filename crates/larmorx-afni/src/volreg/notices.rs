@@ -49,6 +49,30 @@ pub fn afni_88(option: &str, mode: UpstreamDefects) -> Notice {
     )
 }
 
+/// AFNI-26 (by default only): an output whose name the system cannot hold (AFNI-90's names
+/// kept whole).
+pub fn afni_26_unwritable(mode: UpstreamDefects) -> Notice {
+    let d = pick(
+        mode,
+        "the output cannot be written: an error (exit status 1); AFNI writes nothing and exits \
+         with status 0",
+        "the output cannot be written: nothing is written and the exit status is 0, as AFNI does",
+    );
+    Notice::new(&defects::AFNI_26, mode, d)
+}
+
+/// AFNI-98: with `-input`, two messages name `(null)` (the argument after the options).
+pub fn afni_98(mode: UpstreamDefects) -> Notice {
+    let d = pick(
+        mode,
+        "the message names the dataset given by -input; AFNI prints '(null)' (the argument after \
+         the options) instead",
+        "the message names '(null)', the argument after the options, as AFNI does, not the \
+         dataset given by -input",
+    );
+    Notice::new(&defects::AFNI_98, mode, d)
+}
+
 /// AFNI-92: `-nomaxdisp` changes the coarse rotation search's automask.
 pub fn afni_92(mode: UpstreamDefects) -> Notice {
     let d = pick(

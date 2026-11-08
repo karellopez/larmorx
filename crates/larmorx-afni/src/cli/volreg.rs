@@ -144,7 +144,6 @@ struct Options {
     zpad: Option<usize>,
     method: Method,
     prefix: String,
-    prefix_refused: bool,
     dfile: Option<String>,
     oned: Option<String>,
     base: Option<BaseOpt>,
@@ -196,6 +195,16 @@ thread_local! {
     /// Whether this run already printed the obliquity report's long warning (§9.3: for the run's
     /// first oblique dataset only); reset at the start of every run.
     static OBLIQUE_SEEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The NIfTI type conversion notice was printed (the run's first converted dataset only,
+    /// unless `AFNI_NIFTI_TYPE_WARN` is yes: §9.3).
+    static TYPE_NOTICE_SEEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The notice that a NIfTI type is converted to float32, muted after its first time (the
+/// muting text is in it unless `AFNI_NIFTI_TYPE_WARN` is yes, when every one is printed).
+fn muted_type_notice(m: &Message) -> bool {
+    matches!(m, Message::Raw(t) if t.starts_with("** AFNI converts NIFTI_datatype=") && t.contains("will be muted"))
+        && TYPE_NOTICE_SEEN.with(|s| s.replace(true))
 }
 
 /// The obliquity report's long warning (the paragraph before the one-line report).
@@ -236,6 +245,9 @@ fn open(
         .map_err(|e| e.to_string())?;
     for m in std::mem::take(&mut image.messages) {
         if long_oblique_warning(&m) && OBLIQUE_SEEN.with(|s| s.replace(true)) {
+            continue;
+        }
+        if muted_type_notice(&m) {
             continue;
         }
         log.message(&m);
@@ -299,7 +311,6 @@ fn parse(
         zpad: None,
         method: Method::Heptic,
         prefix: "volreg".into(),
-        prefix_refused: false,
         dfile: None,
         oned: None,
         base: None,
@@ -537,7 +548,6 @@ fn parse(
             let v = need!(1);
             long_name("-prefix name", v, mode, log, &mut o)?;
             o.prefix = v.to_owned();
-            o.prefix_refused = refused(v, settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES"));
             i += 2;
             continue;
         }
@@ -691,13 +701,20 @@ fn parse(
         }
         if starts(arg, "-rotparent", 7) {
             let Some(v) = value(1) else {
-                return Err(Stop::Raw("** Can't open -rotparent dataset!\n".into()));
+                return Err(Stop::Raw("** Can't open -rotparent dataset!\n\n".into()));
             };
             if o.rotparent.is_some() {
                 return Err(Stop::Raw("** Can't use -2 -rotparent options!".into()));
             }
-            let Ok((image, _)) = open(v, settings, mode, n_threads, log) else {
-                return Err(Stop::Raw("** Can't open -rotparent dataset!\n".into()));
+            let (image, _) = match open(v, settings, mode, n_threads, log) {
+                Ok(found) => found,
+                // AFNI's line and a blank line; by default the reason too (as the replica).
+                Err(_) if mode.reproduce() => {
+                    return Err(Stop::Raw("** Can't open -rotparent dataset!\n\n".into()));
+                }
+                Err(why) => {
+                    return Err(Stop::Raw(format!("** Can't open -rotparent dataset {v}: {why}")));
+                }
             };
             let attrs = rot_attrs(&image);
             if attrs.matvec.len() < 12 {
@@ -721,13 +738,20 @@ fn parse(
         }
         if starts(arg, "-gridparent", 7) {
             let Some(v) = value(1) else {
-                return Err(Stop::Raw("** Can't open -gridparent dataset!\n".into()));
+                return Err(Stop::Raw("** Can't open -gridparent dataset!\n\n".into()));
             };
             if o.gridparent.is_some() {
                 return Err(Stop::Raw("** Can't use -2 -gridparent options!".into()));
             }
-            let Ok((image, _)) = open(v, settings, mode, n_threads, log) else {
-                return Err(Stop::Raw("** Can't open -gridparent dataset!\n".into()));
+            let (image, _) = match open(v, settings, mode, n_threads, log) {
+                Ok(found) => found,
+                // AFNI's line and a blank line; by default the reason too (as the replica).
+                Err(_) if mode.reproduce() => {
+                    return Err(Stop::Raw("** Can't open -gridparent dataset!\n\n".into()));
+                }
+                Err(why) => {
+                    return Err(Stop::Raw(format!("** Can't open -gridparent dataset {v}: {why}")));
+                }
             };
             o.gridparent = Some((v.to_owned(), Box::new(image)));
             i += 2;
@@ -927,6 +951,7 @@ pub fn main_with_settings(
         return 0;
     }
     OBLIQUE_SEEN.with(|s| s.set(false));
+    TYPE_NOTICE_SEEN.with(|s| s.set(false));
     let globals = take_global_options_of(args, &mut settings, mode, &PROGRAM);
     let mut log = Log::new(out, err, &settings, mode);
     if !settings.yes("AFNI_QUIET_STARTUP") {
@@ -1105,11 +1130,7 @@ fn execute(
     if let Base::Index(n) = &base
         && *n >= nt
     {
-        let shown_arg = if o.by_input && mode.reproduce() {
-            o.rest.first().cloned().unwrap_or_else(|| "(null)".into())
-        } else {
-            arg_name.clone()
-        };
+        let shown_arg = afni_98_name(&o, &arg_name, mode, log);
         return Err(Stop::Raw(format!(
             "** Dataset {shown_arg} doesn't have base brick index = {n}"
         )));
@@ -1152,8 +1173,9 @@ fn execute(
             for b in bad {
                 log.raw(&b);
             }
-            return Err(Stop::Fatal(
-                "perhaps you could make your datasets match?".into(),
+            // AFNI's label is not coloured here
+            return Err(Stop::Raw(
+                "** FATAL ERROR: perhaps you could make your datasets match?".into(),
             ));
         }
     }
@@ -1162,11 +1184,7 @@ fn execute(
         Some((_, index, w)) => {
             let ws = w.bricks.shape;
             if ws[..3] != [nx, ny, nz] {
-                let shown_arg = if o.by_input && mode.reproduce() {
-                    o.rest.first().cloned().unwrap_or_else(|| "(null)".into())
-                } else {
-                    arg_name.clone()
-                };
+                let shown_arg = afni_98_name(&o, &arg_name, mode, log);
                 return Err(Stop::Raw(format!(
                     "** Dataset {shown_arg} doesn't conform to dimensions of weight brick\n    Weight  has nx = {}  ny = {}  nz = {}\n    Dataset has nx = {nx}  ny = {ny}  nz = {nz}",
                     ws[0], ws[1], ws[2]
@@ -1307,9 +1325,9 @@ fn execute(
             .is_some_and(|v| v.starts_with('N'))
             && crate::output::exists(&o.prefix)
         {
-            return Err(Stop::Raw(format!(
-                "** FATAL ERROR: Output file {} already exists -- cannot continue!\n",
-                o.prefix
+            return Err(Stop::Fatal(format!(
+                "Output file {} already exists -- cannot continue!",
+                crate::output::afni_name(&o.prefix)
             )));
         }
         common::refuse_existing(&o.prefix, mode, settings, log)?;
@@ -1529,8 +1547,22 @@ fn execute(
         let target = Target {
             option: "-prefix",
             prefix: &o.prefix,
-            refused_at_scan: o.prefix_refused,
+            // 3dvolreg does not check -prefix at the scan (§10.1): refused names are named
+            // (AFNI-12) when the output is written
+            refused_at_scan: false,
         };
+        // AFNI-90: by default a -prefix of 256 bytes or more is kept whole; a file name the
+        // system cannot hold fails as the replica's does: AFNI-26 and the notices, then the error.
+        if let Some(e) = unwritable_name(&o.prefix) {
+            log.notice(&notices::afni_26_unwritable(mode));
+            for n in late.iter().chain(&notices) {
+                log.notice(n);
+            }
+            return Err(Stop::Fatal(format!(
+                "can't write output dataset: cannot replace '{}': {e}; nothing was written",
+                o.prefix
+            )));
+        }
         let mut wnotices = Vec::new();
         let written = common::write_dataset(
             &target,
@@ -1630,6 +1662,8 @@ fn execute(
             ));
             text.push('\n');
         }
+        // then a blank line (§10.2)
+        text.push('\n');
         log.stdout(&text);
     }
     if scaled && output && !o.float {
@@ -1639,6 +1673,42 @@ fn execute(
         log.notice(n);
     }
     Ok(0)
+}
+
+/// The dataset's name in AFNI-98's two messages: with `-input` AFNI names the argument after the
+/// options (`(null)` when there is none); by default the dataset; AFNI-98 named where they differ.
+fn afni_98_name(o: &Options, arg_name: &str, mode: UpstreamDefects, log: &mut Log<'_>) -> String {
+    if !o.by_input {
+        return arg_name.to_owned();
+    }
+    let afni = o.rest.first().cloned().unwrap_or_else(|| "(null)".into());
+    if afni != arg_name {
+        log.notice(&notices::afni_98(mode));
+    }
+    if mode.reproduce() { afni } else { arg_name.to_owned() }
+}
+
+/// The system's refusal of an output whose file name is longer than 255 bytes (AFNI-90's names
+/// kept whole by default), or `None`.
+fn unwritable_name(prefix: &str) -> Option<std::io::Error> {
+    let long = Path::new(prefix)
+        .file_name()
+        .is_some_and(|n| n.as_encoded_bytes().len() > 255);
+    if !long {
+        return None;
+    }
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(prefix)
+    {
+        Ok(_) => {
+            let _ = std::fs::remove_file(prefix);
+            None
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => None,
+        Err(e) => Some(e),
+    }
 }
 
 /// The last argument of the command line (AFNI's "Too few arguments" message).

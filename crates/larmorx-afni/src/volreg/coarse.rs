@@ -48,7 +48,13 @@ pub struct Found {
     pub marks: String,
     /// The search met a region without voxels (AFNI-93).
     pub empty_region: bool,
+    /// The rotations were tried on a volume that is not 3D (one slice, §7.3): each of the 44
+    /// prints `*** THD_rota3D_matvec: non-3D image input!` and its sums cover no voxel.
+    pub non_3d: bool,
 }
+
+/// The message of a rotation tried on a volume that is not 3D (§7.3).
+pub const NON_3D: &str = "\n*** THD_rota3D_matvec: non-3D image input!";
 
 /// The candidates of the shift search, in AFNI's order (dz outer, dx inner).
 fn candidates(del: i32, num: i32) -> Vec<[i32; 3]> {
@@ -296,6 +302,8 @@ struct Rotations {
     angles: Vec<[i32; 3]>,
     /// The rotations' plans (§5.1 "from a matrix"; `None` for no rotation).
     plans: Vec<Option<rotate::Plan>>,
+    /// The grid is not 3D (an axis of one voxel): every rotation but the identity fails.
+    non_3d: bool,
 }
 
 impl Searcher {
@@ -359,6 +367,7 @@ impl Searcher {
                 pct,
                 angles,
                 plans,
+                non_3d: small,
             }),
         }
     }
@@ -388,6 +397,7 @@ impl Searcher {
                 shift,
                 marks: String::new(),
                 empty_region: self.reg.empty,
+                non_3d: false,
             };
         };
         let mut marks = String::new();
@@ -408,6 +418,7 @@ impl Searcher {
                 shift: [0; 3],
                 marks,
                 empty_region: true,
+                non_3d: r.non_3d,
             };
         }
         let mut best = 1.0e38f32;
@@ -443,6 +454,7 @@ impl Searcher {
             shift,
             marks,
             empty_region: self.reg.empty,
+            non_3d: r.non_3d,
         }
     }
 }

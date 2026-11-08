@@ -29,6 +29,24 @@ whose medians are fMRIPrep's own `gen_avg` and `ref_average` outputs byte for by
 fixed; the final build's checks ran 22,539 cases without a difference, whose notices without a
 visible change made AFNI-99's notice exact, then 20,824, every one agreeing).
 
+**The clean-room original: status `experimental`** (2026-11-08; the user decides `validated` at
+the merge): held to `specs/3dvolreg.md` §14.3's thresholds, not to AFNI's bits (the shear
+decomposition's exact ties, below), in its record
+([afni-volreg-original](../validation/afni-volreg-original.md), the standard tier from a clean
+commit: 251 cases, 181 pass, 63 refused alike with the same messages (every error, AFNI-88, -89,
+-90, -94, -96 included), 6 expected divergences, 1 open: every option, data type, orientation,
+message and failure case; fMRIPrep's RobustAverage call on 8 BOLD references of 6 oracle runs
+and sdcflows' 2 PEPOLAR averages, whose inputs re-made in fMRIPrep's image give fMRIPrep's own
+medians from AFNI's volumes byte for byte: the original's medians within 1.7e-5 of the largest
+value on 7 (one stored int16 step), ds005454's and ds004958's within the thresholds with the other
+tie side, and ds000256's high-motion child run at 3.1e-4 against 1e-4 even with each volume's tie
+side (an open question for the spec writer); 417 of 1,096 `-1Dfile` lines
+identical with AFNI's; the default held to the replica's default by the same thresholds, with the
+defects named the same; every byte the same at 1, 2, 5 and 14 threads), and a random-testing trial
+(21,710 cases, 11,385 agreeing; the differences triaged in `validation/difftest/triage.toml`:
+the ties, runaway fits, fits that do not converge;
+[findings](../findings/afni-volreg-original.md)).
+
 ## Quick start
 
 ```python
@@ -121,7 +139,47 @@ NIfTI only (AFNI's `.HEAD/.BRIK` is refused, and so is a `-prefix` or `-savedisp
 version banner; results do not depend on the number of threads (AFNI's 3dvolreg is single
 threaded on this path).
 
+## The clean-room original
+
+Written from [`specs/3dvolreg.md`](../../specs/3dvolreg.md) alone (with AFNI's help, the paper and
+black-box runs of AFNI's and the replica's programs), the same command line, messages, exit
+statuses, files and defects (AFNI-86 to AFNI-99 as §12 states them, both modes), designed for
+speed: the four shears by sweeps over planes (in-plane shears on per-thread plane buffers, the
+z-shear per output plane, y and z vectorised across x), the Fourier shears four row pairs at a
+time (a batched FFT whose lanes give the single transform's bits), the coarse search on its
+support box with its 45 rotations prepared once, the blurs by whole lines, every volume
+registered in place one after another with the work inside each in parallel (deterministic: the
+same bits at any thread count).
+
+**What differs from AFNI, and why.** Where two axes have the same voxel size (every EPI with square
+in-plane voxels), pairs of the decomposition's axis orders have equal norms in exact arithmetic;
+AFNI's evaluation decides between them by its last bits, at every resampling, and is not
+specified (§5.3 "Numerics", §16), so the original cannot follow it. Its parameters then differ
+from AFNI's within the convergence thresholds (fMRIPrep's calls: at most 0.002 of a degree or mm),
+its registered volumes at single edge voxels (Fourier's wrap-around along the axes a shear
+shifts). `LARMORX_VOLREG_TIES` (`first`, `last`, or an index 0 to 5; a validation switch, not a
+setting) makes the original take a given side of every tie: the record re-examines each failure
+with the four sides. On small phantoms with sharp edges, whose fits are weakly determined, the
+ties move converged results beyond the thresholds (random testing; an open question for the spec
+writer).
+
+| | AFNI 26.3.05 | replica | original |
+|---|---|---|---|
+| results | the reference | bit for bit AFNI's | §14.3's thresholds |
+| threads | 1 | 1 | any, the same bits |
+| licence | AFNI's | Apache-2.0 with CC BY 4.0's attribution | Apache-2.0 |
+
 ## Speed
+
+The clean-room original against AFNI and the replica on fMRIPrep's call
+([benchmark](../benchmarks/afni-volreg.md); 2026-11-08, the machine shared with another agent's
+work, so the times are long; the median of three runs): ds000005 run 1 (64 × 64 × 34 × 20) AFNI
+9.0 s, the replica 3.4 s, the original 1.75 s on one thread and 0.61 s on 14; ds005454 (160 × 160
+× 96 × 20) AFNI 118 s, the replica 73 s, the original 42 s on one thread and 10.5 s on 14. Its
+peak memory at one thread is within 1.1 times AFNI's plus 8 MiB on every call (ds005454: 332 MiB
+against AFNI's 311).
+
+The replica's own measurement:
 
 The replica against AFNI 26.3.05's 3dvolreg on fMRIPrep's call (RobustAverage: `-Fourier
 -twopass -zpad 4 -1Dfile -1Dmatrix_save -maxdisp1D`) on the parity suite's inputs, one thread
@@ -138,4 +196,4 @@ another agent's work: informal timings):
 | ds005040 PEPOLAR average | 64 × 64 × 40 × 2 | 0.83 s | 0.34 s (2.4×) | 0.35 s |
 
 The replica follows AFNI's arithmetic step by step (single-threaded on this path); the
-clean-room original, to come, is to be built for speed.
+clean-room original is built for speed (above).

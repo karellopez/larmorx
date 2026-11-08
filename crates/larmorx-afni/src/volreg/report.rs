@@ -228,3 +228,73 @@ mod tests {
         );
     }
 }
+
+/// `-SAVEDISP`'s sixteen products (§10.3): each dataset's suffix and the counts of X, Y and Z.
+pub const SAVEDISP_PRODUCTS: [(&str, [usize; 3]); 16] = [
+    ("DXX", [2, 0, 0]),
+    ("DYY", [0, 2, 0]),
+    ("DZZ", [0, 0, 2]),
+    ("DXY", [1, 1, 0]),
+    ("DXZ", [1, 0, 1]),
+    ("DYZ", [0, 1, 1]),
+    ("DXXX", [3, 0, 0]),
+    ("DYYY", [0, 3, 0]),
+    ("DZZZ", [0, 0, 3]),
+    ("DXXY", [2, 1, 0]),
+    ("DXXZ", [2, 0, 1]),
+    ("DXYY", [1, 2, 0]),
+    ("DXZZ", [1, 0, 2]),
+    ("DYYZ", [0, 2, 1]),
+    ("DYZZ", [0, 1, 2]),
+    ("DXYZ", [1, 1, 1]),
+];
+
+/// The Legendre polynomial `P_a(x)` of §10.3 in float32, left to right.
+fn legendre(x: f32, a: usize) -> f32 {
+    match a {
+        0 => 1.0,
+        1 => x,
+        2 => 1.5 * x * x - 0.5,
+        _ => (2.5 * x * x - 1.5) * x,
+    }
+}
+
+/// `-SAVEDISP`'s normalisation (§10.3) of a series of volumes of `total` voxels, in place:
+/// voxel by voxel over the volumes, the linear trend removed (3dTshift's fit; skipped with fewer
+/// than 3 volumes), then every value multiplied by `1/max |value|` (left alone when it is 0).
+pub fn normalise_displacements(series: &mut [f32], total: usize) {
+    let nt = if total == 0 { 0 } else { series.len() / total };
+    let mut v = vec![0f32; nt];
+    for p in 0..total {
+        for (t, x) in v.iter_mut().enumerate() {
+            *x = series[t * total + p];
+        }
+        if nt >= 3 {
+            crate::tshift::series::detrend(&mut v, crate::tshift::series::Removal::Trend);
+        }
+        let max = v.iter().fold(0f32, |m, &x| m.max(x.abs()));
+        if max != 0.0 {
+            let r = 1.0f32 / max;
+            for x in v.iter_mut() {
+                *x *= r;
+            }
+        }
+        for (t, &x) in v.iter().enumerate() {
+            series[t * total + p] = x;
+        }
+    }
+}
+
+/// One of `-SAVEDISP`'s products of the normalised displacements `d` (X, Y, Z): each voxel
+/// `P_a(X)·P_b(Y)·P_c(Z)`, normalised as the three are.
+pub fn savedisp_product(d: &[Vec<f32>; 3], counts: [usize; 3], total: usize) -> Vec<f32> {
+    let mut out: Vec<f32> = (0..d[0].len())
+        .map(|q| {
+            legendre(d[0][q], counts[0])
+                * legendre(d[1][q], counts[1])
+                * legendre(d[2][q], counts[2])
+        })
+        .collect();
+    normalise_displacements(&mut out, total);
+    out
+}

@@ -39,6 +39,9 @@ AFNI = WORKSPACE / "oracles/afni-26.3.05/bin/3dvolreg"
 LX = os.environ.get("LX_BIN", str(REPO / "target/release/larmorx"))
 INPUTS = WORKSPACE / "oracles/inputs/afni-volreg-original"
 FMRIPREP_INPUTS = WORKSPACE / "oracles/inputs/afni-volreg/fmriprep"
+#: the replica part's derived inputs (data files: `-rotparent` datasets made by AFNI's own
+#: 3dvolreg, gridparents, bases), named with a leading `%`
+SUITE_INPUTS = WORKSPACE / "oracles/inputs/afni-volreg"
 
 sys.path.insert(0, str(REPO / "validation/src"))
 
@@ -131,6 +134,22 @@ def make_inputs() -> None:
     print("inputs in", INPUTS)
 
 
+def make_more_inputs() -> None:
+    """The inputs of relay 2's cases: an all-zero weight and a constant series (AFNI-89's
+    candidates), on the grid of the suite's ``s1``."""
+    import nibabel as nib
+
+    ref = nib.load(SUITE_INPUTS / "s1.nii.gz")
+    shape = ref.shape[:3]
+    nib.save(nib.Nifti1Image(np.zeros(shape, np.float32), ref.affine), INPUTS / "zeros_w.nii.gz")
+    const = np.full((*shape, 4), 100.0, np.float32)
+    nib.save(nib.Nifti1Image(const, ref.affine), INPUTS / "const_big.nii.gz")
+    half = np.zeros((*shape, 4), np.float32)
+    half[..., : shape[2] // 2, :] = 100.0
+    nib.save(nib.Nifti1Image(half, ref.affine), INPUTS / "halfconst.nii.gz")
+    print("inputs in", INPUTS)
+
+
 FMRIPREP = ["-Fourier", "-twopass", "-zpad", "4"]
 OUTPUTS = ["-prefix", "out.nii", "-1Dfile", "p.1D", "-1Dmatrix_save", "m.aff12.1D", "-maxdisp1D", "md.1D"]
 
@@ -166,6 +185,36 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "nomaxdisp-twopass": ("lps_f32.nii.gz", ["-nomaxdisp", "-twopass"]),
     "ras-savedisp": ("ras_i16.nii.gz", ["-savedisp", "sd.nii"]),
     "ds000005": ("@ds000005-run-01_sliced.nii.gz", []),
+    # relay 2: -twodup, -SAVEDISP, AFNI-89's candidates, -rotparent / -gridparent, -verbose x2
+    "twodup": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup"]),
+    "twodup-base3d": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base3d.nii.gz"), "-twodup"]),
+    "twodup-onepass": ("%s1.nii.gz", ["-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup"]),
+    "savedisp-s1": ("%s1.nii.gz", ["-savedisp", "sd.nii"]),
+    "SAVEDISP": ("%s1.nii.gz", ["-SAVEDISP", "sd.nii"]),
+    "SAVEDISP-ras": ("ras_i16.nii.gz", ["-SAVEDISP", "sd.nii"]),
+    "zero-weight": ("%s1.nii.gz", ["-weight", str(INPUTS / "zeros_w.nii.gz") + "[0]"]),
+    "zero-weight-twopass": ("%s1.nii.gz", ["-twopass", "-weight", str(INPUTS / "zeros_w.nii.gz") + "[0]"]),
+    "const-big-twopass": ("const_big.nii.gz", ["-twopass"]),
+    "const-big": ("const_big.nii.gz", []),
+    "halfconst-twopass": ("halfconst.nii.gz", ["-twopass"]),
+    "vv-twopass": ("lps_f32.nii.gz", ["-verbose", "-verbose", "-twopass"]),
+    "rp": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-verbose": ("%s1.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-fourier": ("%s1.nii.gz", ["-Fourier", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-linear-noclip": ("%s1.nii.gz", ["-linear", "-noclip", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-twopass": ("%s1.nii.gz", ["-twopass", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz")]),
+    "rp-gp24": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp24.nii.gz")]),
+    "rp-gp27": ("%s1.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
+    "rp-gp27m": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27m.nii.gz")]),
+    "rp-gp22": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp22.nii.gz")]),
+    "rp-gpsp": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gpsp.nii.gz")]),
+    "rp-gpx": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gpx.nii.gz")]),
+    "gp-alone": ("%s1.nii.gz", ["-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
+    "rp-noattr": ("%s1.nii.gz", ["-rotparent", str(SUITE_INPUTS / "s1.nii.gz")]),
+    "rp-st": ("%s6_st.nii.gz", ["-verbose", "-rotparent", str(SUITE_INPUTS / "rp_st.nii.gz")]),
+    "rp-st-gp27": ("%s6_st.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp_st.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
+    "rp-obl": ("%s3_oblique.nii.gz", ["-rotparent", str(SUITE_INPUTS / "rp_obl.nii.gz")]),
+    "rp-twodup": ("%s1.nii.gz", ["-twopass", "-base", str(SUITE_INPUTS / "base_shift.nii.gz"), "-twodup", "-rotparent", str(SUITE_INPUTS / "rp.nii.gz"), "-gridparent", str(SUITE_INPUTS / "gp27.nii.gz")]),
     "ds000005-fmriprep": ("@ds000005-run-01_sliced.nii.gz", FMRIPREP),
 }
 
@@ -173,6 +222,8 @@ CASES: dict[str, tuple[str, list[str]]] = {
 def input_path(name: str) -> Path:
     if name.startswith("@"):
         return FMRIPREP_INPUTS / name[1:]
+    if name.startswith("%"):
+        return SUITE_INPUTS / name[1:]
     return INPUTS / name
 
 
@@ -282,7 +333,8 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
     if (a / "md.1D").exists() and (b / "md.1D").exists():
         res["maxdisp_max"] = float(np.abs(_table(a / "md.1D") - _table(b / "md.1D")).max())
         res["maxdelta_max"] = float(np.abs(_table(a / "md_delt.1D") - _table(b / "md_delt.1D")).max())
-    for axis in ("DX", "DY", "DZ"):
+    names = sorted({f.name[3:-4] for f in [*a.glob("sd_*.nii"), *b.glob("sd_*.nii")]})
+    for axis in names:
         fa, fb = a / f"sd_{axis}.nii", b / f"sd_{axis}.nii"
         if fa.exists() or fb.exists():
             if not (fa.exists() and fb.exists()):
@@ -315,6 +367,9 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
 def main(argv: list[str]) -> int:
     if not argv or argv[0] == "inputs":
         make_inputs()
+        return 0
+    if argv[0] == "inputs2":
+        make_more_inputs()
         return 0
     if argv[0] == "run":
         prog, case, d = argv[1], argv[2], Path(argv[3])

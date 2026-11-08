@@ -921,10 +921,12 @@ fn execute(
     }
     let grid = Grid::from_geometry(&image.geometry, [nx, ny, nz], mode);
     // The base.
+    let mut base_geometry = None;
     let (base, base_grid_name) = match o.base.take() {
         None => (Base::Index(0), None),
         Some(BaseOpt::Index(n)) => (Base::Index(n), None),
         Some(BaseOpt::Dataset(b, shown)) => {
+            base_geometry = Some(b.geometry.clone());
             let g = Grid::from_geometry(
                 &b.geometry,
                 [b.bricks.shape[0], b.bricks.shape[1], b.bricks.shape[2]],
@@ -1188,7 +1190,7 @@ fn execute(
         late.push(notices::afni_92(mode));
     }
     let header = image.header.clone();
-    let geometry = image.geometry.clone();
+    let mut geometry = image.geometry.clone();
     // After -tshift the output has no slice offsets and a time origin of 0.
     let (tr, toffset, slice_timing) = if shifted {
         (image.tr, 0.0, None)
@@ -1243,6 +1245,19 @@ fn execute(
         }
         write_text(&delta_name(mm), &b, Some("*+"), true, log);
     }
+    // §8.10: -twodup moves the written outputs' origin to the base dataset's.
+    if o.twodup
+        && let Some(bg) = &base_geometry
+    {
+        for i in 0..3 {
+            geometry.m[i][3] = bg.m[i][3];
+        }
+        if let (Some(q), Some(bq)) = (geometry.qform_mm.as_mut(), bg.qform_mm.as_ref()) {
+            for i in 0..3 {
+                q[i][3] = bq[i][3];
+            }
+        }
+    }
     let mut notices = r.notices.clone();
     let mut r = r;
     if let Some(mut bricks) = r.registered.take() {
@@ -1291,12 +1306,29 @@ fn execute(
             log.info(&format!("Wrote dataset to disk in {name}"));
         }
     }
-    if let (Some((s, _)), Some(disp)) = (&o.savedisp, &r.displacements) {
-        for (axis, data) in ["DX", "DY", "DZ"].iter().zip(disp) {
+    if let (Some((s, all)), Some(disp)) = (&o.savedisp, r.displacements.as_mut()) {
+        let total = nx * ny * nz;
+        if *all {
+            // -SAVEDISP: the three normalised, then their sixteen products.
+            for d in disp.iter_mut() {
+                report::normalise_displacements(d, total);
+            }
+        }
+        // Each dataset made just before it is written (one series at a time beyond the three).
+        let mut sets: Vec<(&str, Option<[usize; 3]>)> =
+            vec![("DX", None), ("DY", None), ("DZ", None)];
+        if *all {
+            sets.extend(report::SAVEDISP_PRODUCTS.iter().map(|&(n, c)| (n, Some(c))));
+        }
+        for (q, (axis, counts)) in sets.into_iter().enumerate() {
             let name = savedisp_name(s, axis);
+            let data = match counts {
+                None => disp[q].clone(),
+                Some(c) => report::savedisp_product(disp, c, total),
+            };
             let bricks = crate::dataset::Bricks {
                 shape: [nx, ny, nz, nt],
-                data: BrickData::Float(data.clone()),
+                data: BrickData::Float(data),
                 factors: vec![0.0; nt],
             };
             let timing = OutputTiming {

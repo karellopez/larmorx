@@ -10,7 +10,8 @@
 //!
 //! Where Python prints a path of its installation (warnings, tracebacks), the replica prints
 //! the module's path inside tedana (`tedana/decay.py`) or its own name; timings in progress bars
-//! are the replica's own (a documented difference).
+//! are the replica's own (a documented difference). The bars are left out, as `tqdm` leaves
+//! them out, when the environment disables them (`TQDM_DISABLE`, [`tqdm_disabled`]).
 
 use std::collections::HashSet;
 use std::io::Write;
@@ -89,17 +90,46 @@ pub struct Log<'a> {
     capture: Option<Vec<String>>,
     /// The level and the warning registry when the capture started.
     at_capture: (Option<Level>, HashSet<(String, u32, String)>),
+    /// Whether `tqdm`'s progress bars are printed (not when the environment disables them).
+    bars: bool,
+}
+
+/// Whether `tqdm` 4.70.1 disables its bars for this environment: `tqdm.std.tqdm.__init__` takes
+/// its defaults from the variables named `TQDM_<parameter>` (the rest of the name in any case,
+/// `tqdm.utils.envwrap`, the last such variable winning), and converts the text for `disable`,
+/// whose default is `False`, with `bool(text)`: any non-empty value disables the bars
+/// (`TQDM_DISABLE=1`, also `TQDM_DISABLE=0`), an empty one does not.
+pub fn tqdm_disabled(vars: impl IntoIterator<Item = (String, String)>) -> bool {
+    let mut disabled = false;
+    for (k, v) in vars {
+        if k.len() > 5 && k.starts_with("TQDM_") && k[5..].to_lowercase() == "disable" {
+            disabled = !v.is_empty();
+        }
+    }
+    disabled
 }
 
 impl<'a> Log<'a> {
     /// Before `setup_loggers`: nothing is printed but warnings.
     pub fn new(err: &'a mut dyn Write) -> Log<'a> {
+        // Python's os.environ on Windows holds the names in upper case.
+        let bars = !tqdm_disabled(std::env::vars_os().filter_map(|(k, v)| {
+            let k = k.into_string().ok()?;
+            let k = if cfg!(windows) { k.to_uppercase() } else { k };
+            Some((k, v.to_string_lossy().into_owned()))
+        }));
+        Log::with_bars(err, bars)
+    }
+
+    /// A logger that prints `tqdm`'s bars or not, whatever the environment says.
+    pub fn with_bars(err: &'a mut dyn Write, bars: bool) -> Log<'a> {
         Log {
             err,
             level: None,
             warned: HashSet::new(),
             capture: None,
             at_capture: (None, HashSet::new()),
+            bars,
         }
     }
 
@@ -123,6 +153,7 @@ impl<'a> Log<'a> {
             warned: self.at_capture.1.clone(),
             capture: Some(Vec::new()),
             at_capture: self.at_capture.clone(),
+            bars: self.bars,
         }
     }
 
@@ -190,20 +221,27 @@ impl<'a> Log<'a> {
     }
 
     /// The bar `tqdm(iterable, desc=desc)` prints for `total` items (`total` known), started.
+    /// Nothing when the bars are disabled.
     pub fn progress(&mut self, desc: &str, total: usize) -> Progress {
-        let _ = write!(
-            self.err,
-            "\r{desc}:   0%|          | 0/{total} [00:00<?, ?it/s]"
-        );
+        if self.bars {
+            let _ = write!(
+                self.err,
+                "\r{desc}:   0%|          | 0/{total} [00:00<?, ?it/s]"
+            );
+        }
         Progress {
             desc: desc.to_owned(),
             total,
             start: Instant::now(),
+            shown: self.bars,
         }
     }
 
     /// The bar's last state and its newline (`tqdm`'s close with `leave=True`).
     pub fn progress_done(&mut self, p: Progress) {
+        if !p.shown {
+            return;
+        }
         let secs = p.start.elapsed().as_secs_f64();
         let elapsed = format!("{:02}:{:02}", (secs as u64) / 60, (secs as u64) % 60);
         let rate = if secs > 0.0 {
@@ -235,4 +273,51 @@ pub struct Progress {
     desc: String,
     total: usize,
     start: Instant,
+    shown: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn vars(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn tqdm_disable_is_any_non_empty_value() {
+        assert!(!tqdm_disabled(vars(&[])));
+        assert!(tqdm_disabled(vars(&[("TQDM_DISABLE", "1")])));
+        assert!(tqdm_disabled(vars(&[("TQDM_DISABLE", "0")])));
+        assert!(tqdm_disabled(vars(&[("TQDM_disable", "yes")])));
+        assert!(!tqdm_disabled(vars(&[("TQDM_DISABLE", "")])));
+        assert!(!tqdm_disabled(vars(&[
+            ("TQDM_DISABLE", "1"),
+            ("TQDM_Disable", "")
+        ])));
+        assert!(!tqdm_disabled(vars(&[
+            ("TQDM_DISABLED", "1"),
+            ("tqdm_disable", "1")
+        ])));
+    }
+
+    #[test]
+    fn disabled_bars_print_nothing() {
+        let mut shown = Vec::new();
+        let mut log = Log::with_bars(&mut shown, true);
+        let p = log.progress("2-echo monoexponential", 3);
+        log.progress_done(p);
+        drop(log);
+        let text = String::from_utf8(shown).unwrap();
+        assert!(text.contains("2-echo monoexponential: 100%|"), "{text}");
+        let mut hidden = Vec::new();
+        let mut log = Log::with_bars(&mut hidden, false);
+        let p = log.progress("2-echo monoexponential", 3);
+        log.progress_done(p);
+        drop(log);
+        assert!(hidden.is_empty());
+    }
 }

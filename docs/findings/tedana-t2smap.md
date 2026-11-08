@@ -208,6 +208,12 @@ over every volume (excluded ones included); the full T2* (seconds) and the combi
   encountered" at 1593 / 1617, "invalid value encountered in divide"; each printed once per place
   (`decay::Libraries`).
 - tqdm's bars print the run's own timings (not compared; the oracle runs with `TQDM_DISABLE=1`).
+  tqdm 4.70.1 takes its `disable` default from `TQDM_DISABLE` (`tqdm.utils.envwrap`: names
+  `TQDM_` + the parameter in any case, the last winning; the text converted with `bool()`, so
+  any non-empty value disables the bars, `0` included): observed on tedana with `1`, `0`, an
+  empty value and `TQDM_disable`. The replica printed its bars whatever the variable said until
+  2026-11-08 (relay 8b: `log::tqdm_disabled`, the same rule; the parity suite had normalised the
+  bars away, so its record did not see it).
 
 ## Defects (D13; the register's TED-01 to TED-18)
 

@@ -441,6 +441,27 @@ MISSING: tuple[Missing, ...] = (
         ),
     ),
     Missing(
+        "SyN field-map-less estimation",
+        (),
+        "sdcflows' `--use-syn-sdc` workflows: the anatomical reference denoised, both "
+        "references' Laplacians, the anatomical image, masks and prior mapped onto the EPI, the "
+        "EPI reference's N4 and merge, the field and its mask on the field's zooms",
+        "field maps part B (sdcflows' SyN workflows)",
+        names=(
+            "ref_anat",
+            "lap_anat",
+            "lap_epi",
+            "_n4_avgs0",
+            "amask2epi",
+            "anat2epi",
+            "mask2epi",
+            "prior2epi",
+            "zooms_bmask",
+            "zooms_field",
+            "epi_merge",
+        ),
+    ),
+    Missing(
         "confounds",
         (),
         "DVARS, CompCor (a/t/crown), global signals, expansion, spikes "

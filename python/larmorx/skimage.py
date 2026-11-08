@@ -277,5 +277,5 @@ def random_walker(
             stacklevel=2,
         )
     if kind == "full":
-        return res["prob"].reshape((res["nlabels"],) + labels_shape)
+        return res["prob"].reshape((res["nlabels"], *labels_shape))
     return res["labels"].reshape(labels_shape).astype(labels_dtype)

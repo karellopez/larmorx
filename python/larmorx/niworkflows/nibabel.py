@@ -38,10 +38,7 @@ def _squeezed(in_file: Any) -> tuple[Image, np.ndarray]:
     """``nb.squeeze_image(nb.load(in_file))`` and its ``get_fdata(dtype='float32')``: trailing
     axes of length 1 after the third dropped (then the data is the scaled array, cast to
     ``float32``); otherwise the file's data read as ``float32``."""
-    if isinstance(in_file, (str, os.PathLike)):
-        img = load_nibabel(in_file)
-    else:
-        img = as_image(in_file)
+    img = load_nibabel(in_file) if isinstance(in_file, (str, os.PathLike)) else as_image(in_file)
     shape = img.data.shape
     slen = len(shape)
     if slen >= 4:
@@ -99,6 +96,7 @@ def intensity_clip(
     out = Image(data, img.affine, img.header)
     path = None
     if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
         path = str((Path(out_dir) / "clipped.nii.gz").absolute())
         hdr = img.header
         if hdr is not None:

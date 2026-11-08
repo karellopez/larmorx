@@ -20,8 +20,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
-from larmorx import _defects
+from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 from larmorx.io.nibabel_header import load_nibabel
@@ -68,8 +67,9 @@ def _load(obj: Any, dtype: Any = None) -> Image:
 def _with_dtype(img: Image, data: np.ndarray, dtype: Any) -> Image:
     """``hdr = img.header.copy(); hdr.set_data_dtype(dtype)``; the image of ``data`` (the type
     is given to :func:`larmorx.io.save_nibabel` when written)."""
-    return Image(np.asarray(data, dtype=dtype) if data.dtype != dtype else data, img.affine,
-                 img.header)
+    return Image(
+        np.asarray(data, dtype=dtype) if data.dtype != dtype else data, img.affine, img.header
+    )
 
 
 def brain_masker(
@@ -147,6 +147,8 @@ def brain_extraction(
     """sdcflows' ``BrainExtraction``: :func:`brain_masker` with the mask named
     ``<in_file>_mask`` in ``out_dir`` (the working directory by default), so the outputs are
     ``<name>_mask``, ``<name>_probseg`` and ``<name>_brainmasked``."""
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
     out = _fname_presuffix(os.fspath(in_file), "_mask", out_dir or os.getcwd())
     return brain_masker(
         in_file,
@@ -177,6 +179,8 @@ def binary_dilation(
     out = _with_dtype(img, dil.astype(np.uint8), np.uint8)
     path = None
     if isinstance(in_file, (str, os.PathLike)):
+        if out_dir is not None:
+            os.makedirs(out_dir, exist_ok=True)
         path = _fname_presuffix(os.fspath(in_file), "_dil", out_dir or os.getcwd())
         save_nibabel(out, path, dtype=np.uint8, n_threads=n_threads)
     return out, path
@@ -198,6 +202,8 @@ def union(
     out = _with_dtype(a, data.astype(np.uint8), np.uint8)
     path = None
     if isinstance(in1, (str, os.PathLike)):
+        if out_dir is not None:
+            os.makedirs(out_dir, exist_ok=True)
         path = _fname_presuffix(os.fspath(in1), "_union", out_dir or os.getcwd())
         save_nibabel(out, path, dtype=np.uint8, n_threads=n_threads)
     return out, path

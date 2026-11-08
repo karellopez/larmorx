@@ -1038,6 +1038,8 @@ NAMESPACES = (
     "lx.ndimage",
     "lx.io",
     "lx.sdcflows",
+    "lx.skimage",
+    "lx.niworkflows",
     "lx",
 )
 
@@ -6557,3 +6559,117 @@ def _(ctx: Context) -> dict[str, Any]:
         "fieldmap": Nifti(os.fspath(r.fieldmap.out_file)),
         "metadata": repr(sorted(r.fieldmap.metadata.items())),
     }
+
+
+# --- sdcflows' masks, scikit-image and niworkflows (field maps part B) -------------------------
+
+#: The synthetic head of the masks' cases: a bright ellipsoid in dim noise (within 32³).
+SHAPE_HEAD = (30, 28, 26)
+
+
+def _head_file(ctx: Context) -> str:
+    """The head as an int16 NIfTI file (2 x 2 x 2.5 mm, axis-aligned)."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    data = np.where(brain, 120 + ints(70, SHAPE_HEAD, 0, 60), ints(71, SHAPE_HEAD, 0, 6))
+    path = ctx.out("head.nii.gz")
+    lx.save((data.astype(np.int16), affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=False)), path)
+    return path
+
+
+@case(
+    "py.skimage",
+    covers=("lx.skimage.ball", "lx.skimage.threshold_otsu", "lx.skimage.random_walker"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """scikit-image's ball, Otsu threshold (float, integer, histogram) and random walker (a 3-D
+    float32 system with float32 zooms in both SciPy orders, a 2-D float64 one with labels out,
+    a masked one with SKI-01 corrected and reproduced)."""
+    shape = (14, 12, 10)
+    data = (ints(80, shape, 0, 1000) / 4000).astype(np.float32)
+    data[3:10, 3:9, 2:8] += 1
+    labels = np.zeros(shape, np.int8)
+    labels[0] = 2
+    labels[-1] = 2
+    labels[6, 6, 5] = 1
+    zooms = np.array([2.0, 2.0, 2.5], np.float32)
+    prob = {
+        sp: lx.skimage.random_walker(
+            data, labels, spacing=zooms, return_full_prob=True, scipy_version=sp
+        )
+        for sp in ("1.15.3", "1.18.1")
+    }
+    d2 = (ints(81, (16, 15), 0, 1000) / 1000).astype(np.float64)
+    l2 = np.zeros((16, 15), np.int32)
+    l2[1, 1] = 1
+    l2[12, 11] = 3
+    masked = labels.astype(np.int32)
+    masked[:, :2, :] = -1
+    masked[4, 0, 4] = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fix = lx.skimage.random_walker(data, masked, spacing=zooms, return_full_prob=True)
+        rep = lx.skimage.random_walker(
+            data, masked, spacing=zooms, return_full_prob=True, upstream_defects=REPRODUCE
+        )
+    img = ints(82, (20, 20), 0, 200)
+    return {
+        "ball3": lx.skimage.ball(3),
+        "ball2.5": lx.skimage.ball(2.5, strict_radius=False),
+        "otsu.f32": np.asarray(lx.skimage.threshold_otsu(data)),
+        "otsu.int": np.asarray(lx.skimage.threshold_otsu(img)),
+        "otsu.hist": np.asarray(lx.skimage.threshold_otsu(hist=np.bincount(img.ravel()))),
+        "rw.115": prob["1.15.3"],
+        "rw.118": prob["1.18.1"],
+        "rw.2d": lx.skimage.random_walker(d2, l2, mode="cg_j"),
+        "rw.mask.fix": fix,
+        "rw.mask.reproduce": rep,
+    }
+
+
+@case(
+    "py.sdcflows.masks",
+    covers=(
+        "lx.sdcflows.brain_masker",
+        "lx.sdcflows.brain_extraction",
+        "lx.sdcflows.binary_dilation",
+        "lx.sdcflows.union",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' brain_masker (numpy 2.2's and 2.5's arithmetic, SciPy 1.15's and 1.18's) on
+    the synthetic head, BrainExtraction's files, BinaryDilation and Union of its mask."""
+    head = _head_file(ctx)
+    old = lx.sdcflows.brain_masker(
+        head, ctx.out("old_mask.nii.gz"), numpy_version="2.2.6", scipy_version="1.15.2"
+    )
+    new = lx.sdcflows.brain_extraction(head, out_dir=ctx.out("be"))
+    _, dil_path = lx.sdcflows.binary_dilation(new.out_mask, 3, out_dir=ctx.out("dil"))
+    _, uni_path = lx.sdcflows.union(new.out_mask, dil_path, out_dir=ctx.out("uni"))
+    return {
+        "old.probseg": Nifti(old.out_probseg),
+        "old.mask": Nifti(old.out_mask),
+        "brain": Nifti(new.out_brain),
+        "probseg": Nifti(new.out_probseg),
+        "mask": Nifti(new.out_mask),
+        "dilated": Nifti(dil_path),
+        "union": Nifti(uni_path),
+    }
+
+
+@case("py.niworkflows.intensity_clip", covers=("lx.niworkflows.intensity_clip",))
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' IntensityClip: the defaults (int16), uint8 inverted, float32 without the
+    positive-only percentiles, with numpy 2.2's and 2.5's percentile arithmetic."""
+    head = _head_file(ctx)
+    out = {}
+    for name, kw in (
+        ("int16", {}),
+        ("uint8", {"dtype": "uint8", "invert": True, "p_min": 10.0, "p_max": 99.9}),
+        ("float32", {"dtype": "float32", "nonnegative": False}),
+    ):
+        for npv in ("2.2.6", "2.5.4"):
+            r = lx.niworkflows.intensity_clip(
+                head, out_dir=ctx.out(f"{name}-{npv}"), numpy_version=npv, **kw
+            )
+            out[f"{name}.{npv}"] = Nifti(r.out_file)
+    return out

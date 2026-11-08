@@ -91,11 +91,6 @@ from larmorx.sdcflows.transform import (
 )
 
 __all__ = [
-    "BrainMaskerResult",
-    "binary_dilation",
-    "brain_extraction",
-    "brain_masker",
-    "union",
     "DEFAULT_HF_ZOOMS_MM",
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",
@@ -103,6 +98,7 @@ __all__ = [
     "ApplyCoeffsFieldResult",
     "B0FieldTransform",
     "BSplineApproxResult",
+    "BrainMaskerResult",
     "CheckRegisterResult",
     "CoefficientsResult",
     "CsrMatrix",
@@ -112,6 +108,9 @@ __all__ = [
     "RidgeResult",
     "apply_coeffs_field",
     "au2rads",
+    "binary_dilation",
+    "brain_extraction",
+    "brain_masker",
     "bspline_approx",
     "bspline_grid",
     "check_b0_units",
@@ -132,4 +131,5 @@ __all__ = [
     "subtract_phases",
     "topup_coeff_reorient",
     "transform_coefficients",
+    "union",
 ]

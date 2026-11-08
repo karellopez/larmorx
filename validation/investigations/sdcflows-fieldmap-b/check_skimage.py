@@ -6,7 +6,7 @@ environment, byte for byte.
 Run in each kept environment with ``PYTHONPATH=<repo>/python`` and ``LARMORX_WORKSPACE``:
 
     OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 python -P check_skimage.py [--threads N]
-        [--sections ball,dot,hist,otsu,rw,masker]
+        [--sections ball,dot,hist,otsu,rw,masker,clip]
 
 - ``dot``: ``np.dot`` of float32 and float64 vectors of 0 to 300 elements and a few long ones;
 - ``hist``: ``np.histogram`` with equal bins of float32/float64 arrays (constant, two-valued,
@@ -21,7 +21,10 @@ Run in each kept environment with ``PYTHONPATH=<repo>/python`` and ``LARMORX_WOR
 - ``masker``: ``brain_masker`` on the nine ``brainextraction_wf`` inputs of fMRIPrep's oracle runs
   (``clipper_post/clipped.nii.gz``) against sdcflows' own ``brain_masker`` in this environment
   (the three files' data and header), and, with numpy 2.3's percentile and SciPy 1.15's order,
-  against fMRIPrep's own ``masker`` files (fMRIPrep's image: numpy 2.2.6, SciPy 1.15.2).
+  against fMRIPrep's own ``masker`` files (fMRIPrep's image: numpy 2.2.6, SciPy 1.15.2);
+- ``clip``: niworkflows' ``IntensityClip`` (``lx.niworkflows.intensity_clip``) on the same nodes'
+  ``clipper_pre`` and ``clipper_post`` inputs, the written file against niworkflows' own and, with
+  numpy 2.2's percentile, against fMRIPrep's own ``clipped.nii.gz``.
 
 Prints one line per section (cases, identical), the times, and ``ALL OK`` or ``FAIL <n>``.
 """
@@ -94,7 +97,7 @@ def sec_ball(t: Tally) -> None:
 
 def sec_dot(t: Tally) -> None:
     rng = np.random.default_rng(1)
-    lengths = list(range(0, 300)) + [1000, 4095, 10_001, 100_003, 1_000_000]
+    lengths = [*list(range(0, 300)), 1000, 4095, 10001, 100003, 1000000]
     for dt in (np.float32, np.float64):
         for n in lengths:
             x = (rng.standard_normal(n) * rng.uniform(0.1, 100)).astype(dt)
@@ -103,7 +106,11 @@ def sec_dot(t: Tally) -> None:
             got = dt(_core.numpy_dot(x, y))
             t.add(f"np.dot {np.dtype(dt).name}", same(want, got), f"n={n}")
             if n > 0:
-                t.add(f"np.linalg.norm {np.dtype(dt).name}", same(np.linalg.norm(x), dt(np.sqrt(dt(_core.numpy_dot(x, x))))), f"n={n}")
+                t.add(
+                    f"np.linalg.norm {np.dtype(dt).name}",
+                    same(np.linalg.norm(x), dt(np.sqrt(dt(_core.numpy_dot(x, x))))),
+                    f"n={n}",
+                )
 
 
 def sec_hist(t: Tally) -> None:
@@ -132,7 +139,11 @@ def sec_hist(t: Tally) -> None:
                     t.add("np.histogram", True)
                 continue
             c, e = _core.numpy_histogram(a, nb)
-            t.add("np.histogram", same(want[0], c) and same(want[1], e), f"{a.dtype} n={a.size} bins={nb}")
+            t.add(
+                "np.histogram",
+                same(want[0], c) and same(want[1], e),
+                f"{a.dtype} n={a.size} bins={nb}",
+            )
 
 
 def sec_otsu(t: Tally) -> None:
@@ -155,7 +166,11 @@ def sec_otsu(t: Tally) -> None:
         for nb in (256, 64, 2):
             want = threshold_otsu(img, nbins=nb)
             got = lsk.threshold_otsu(img, nbins=nb)
-            t.add("threshold_otsu", same(want, got) and type(want) is type(got), f"{img.dtype} {img.shape} nbins={nb}")
+            t.add(
+                "threshold_otsu",
+                same(want, got) and type(want) is type(got),
+                f"{img.dtype} {img.shape} nbins={nb}",
+            )
     for counts, centers in [
         (np.array([0, 3, 5, 0, 2, 9, 0]), None),
         (np.array([4, 1, 1, 7]), np.array([0.5, 1.5, 2.5, 3.5], np.float32)),
@@ -199,27 +214,63 @@ def rw_cases(rng):
     zooms = np.array([2.5, 2.5, 3.0], np.float32)
     cases.append(("3d f32 zooms", a3, l3, {"spacing": zooms, "return_full_prob": True}))
     cases.append(("3d f32 zooms labels", a3, l3, {"spacing": zooms}))
-    cases.append(("3d f32 zooms tol 1e-6", a3, l3, {"spacing": zooms, "tol": 1e-6, "return_full_prob": True}))
-    cases.append(("3d f32 beta 2000", a3, l3, {"spacing": zooms, "beta": 2000, "return_full_prob": True}))
+    cases.append(
+        ("3d f32 zooms tol 1e-6", a3, l3, {"spacing": zooms, "tol": 1e-6, "return_full_prob": True})
+    )
+    cases.append(
+        ("3d f32 beta 2000", a3, l3, {"spacing": zooms, "beta": 2000, "return_full_prob": True})
+    )
     cases.append(("3d f32 tuple spacing", a3, l3, {"spacing": (2.5, 2.5, 3.0)}))
-    cases.append(("3d f64 data", a3.astype(np.float64), l3, {"spacing": zooms, "return_full_prob": True}))
-    cases.append(("3d f32 three labels", a3, seeds2(a3.shape, 3), {"spacing": zooms, "return_full_prob": True}))
+    cases.append(
+        ("3d f64 data", a3.astype(np.float64), l3, {"spacing": zooms, "return_full_prob": True})
+    )
+    cases.append(
+        (
+            "3d f32 three labels",
+            a3,
+            seeds2(a3.shape, 3),
+            {"spacing": zooms, "return_full_prob": True},
+        )
+    )
     l3n = l3.astype(np.int16) * 3
     l3n[l3n == 6] = 7
     cases.append(("3d non-consecutive labels", a3, l3n, {"spacing": zooms}))
     l3m = l3.astype(np.int32).copy()
     l3m[:, :3, :] = -1
     l3m[4, 1, 5] = 1  # a seed inside the pruned region: isolated
-    cases.append(("3d negative labels (mask)", a3, l3m, {"spacing": zooms, "return_full_prob": True}))
-    cases.append(("3d negative labels (mask) reproduce", a3, l3m, {"spacing": zooms, "return_full_prob": True, "_reproduce": True}))
+    cases.append(
+        ("3d negative labels (mask)", a3, l3m, {"spacing": zooms, "return_full_prob": True})
+    )
+    cases.append(
+        (
+            "3d negative labels (mask) reproduce",
+            a3,
+            l3m,
+            {"spacing": zooms, "return_full_prob": True, "_reproduce": True},
+        )
+    )
     l3p = l3.astype(np.int32).copy()
     l3p[:, :2, :] = -1
-    cases.append(("3d negative labels, no isolated seed", a3, l3p, {"spacing": zooms, "return_full_prob": True}))
+    cases.append(
+        (
+            "3d negative labels, no isolated seed",
+            a3,
+            l3p,
+            {"spacing": zooms, "return_full_prob": True},
+        )
+    )
     l3i = l3.astype(np.int32).copy()
     l3i[:, 0:2, :] = -1
     l3i[3, 0, 3] = 1  # an isolated seed whose neighbours are all pruned
     cases.append(("3d isolated seed", a3, l3i, {"spacing": zooms, "return_full_prob": True}))
-    cases.append(("3d isolated seed reproduce", a3, l3i, {"spacing": zooms, "return_full_prob": True, "_reproduce": True}))
+    cases.append(
+        (
+            "3d isolated seed reproduce",
+            a3,
+            l3i,
+            {"spacing": zooms, "return_full_prob": True, "_reproduce": True},
+        )
+    )
     u8 = (rng.random((25, 26)) * 255).astype(np.uint8)
     cases.append(("2d uint8 data", u8, l2[:25, :26], {}))
     i16 = (rng.standard_normal((25, 26)) * 3000).astype(np.int16)
@@ -227,9 +278,13 @@ def rw_cases(rng):
     mc = (rng.random((30, 32, 3)) * 0.5).astype(np.float32)
     cases.append(("2d multichannel", mc, l2, {"channel_axis": -1, "return_full_prob": True}))
     mc3 = (rng.random((3, 12, 14, 10)) * 0.5).astype(np.float32)
-    cases.append(("3d multichannel axis 0", mc3, seeds2((12, 14, 10)), {"channel_axis": 0, "spacing": zooms}))
+    cases.append(
+        ("3d multichannel axis 0", mc3, seeds2((12, 14, 10)), {"channel_axis": 0, "spacing": zooms})
+    )
     cases.append(("no zero labels", a2, np.ones((30, 32), np.int32), {}))
-    cases.append(("no zero labels full", a2, np.ones((30, 32), np.int32) * 2, {"return_full_prob": True}))
+    cases.append(
+        ("no zero labels full", a2, np.ones((30, 32), np.int32) * 2, {"return_full_prob": True})
+    )
     allis = np.full((30, 32), -1, np.int32)
     allis[0, 0] = 1
     allis[5, 5] = 0
@@ -257,7 +312,7 @@ def sec_rw(t: Tally, nt: int) -> None:
             warnings.simplefilter("always")
             try:
                 want = random_walker(data, labels.copy(), **kw)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 want = e
         with warnings.catch_warnings(record=True) as w2:
             warnings.simplefilter("always")
@@ -270,15 +325,28 @@ def sec_rw(t: Tally, nt: int) -> None:
                     n_threads=nt,
                     **kw,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 got = e
         msgs1 = [str(x.message) for x in w1 if "random_walker" not in str(x.filename) or True]
-        msgs1 = [m for m in msgs1 if "pyamg" in m or "UMFPACK" in m or "Conjugate" in m or "probability" in m or "Random walker" in m or "isolated" in m]
+        msgs1 = [
+            m
+            for m in msgs1
+            if "pyamg" in m
+            or "UMFPACK" in m
+            or "Conjugate" in m
+            or "probability" in m
+            or "Random walker" in m
+            or "isolated" in m
+        ]
         msgs2 = [str(x.message) for x in w2 if "SKI-01" not in str(x.message)]
         ski01 = any("SKI-01" in str(x.message) for x in w2)
         if ski01 and not reproduce:
             # the defect changes the result: the default must differ, reproduce must agree
-            t.add("random_walker SKI-01 corrected (differs from scikit-image)", not same(want, got), name)
+            t.add(
+                "random_walker SKI-01 corrected (differs from scikit-image)",
+                not same(want, got),
+                name,
+            )
             continue
         if f64 and not libm:
             skipped += 1
@@ -289,15 +357,21 @@ def sec_rw(t: Tally, nt: int) -> None:
             ok = same(want, got)
         t.add("random_walker", ok, name)
         t.add("random_walker warnings", msgs1 == msgs2, f"{name}: {msgs1} vs {msgs2}")
-    print(f"random_walker: {skipped} float64 cases not compared (numpy's float64 exp is not the C library's here)")
+    print(
+        f"random_walker: {skipped} float64 cases not compared (numpy's float64 exp is not the C library's here)"
+    )
 
 
 def masker_nodes() -> list[Path]:
     out = []
     for run in sorted(RUNS.iterdir()):
-        out += sorted(run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/brainextraction_wf"))
         out += sorted(
-            run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/magnitude_wf/brainextraction_wf")
+            run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/brainextraction_wf")
+        )
+        out += sorted(
+            run.glob(
+                "work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/magnitude_wf/brainextraction_wf"
+            )
         )
     return out
 
@@ -330,7 +404,12 @@ def sec_masker(t: Tally, nt: int) -> None:
             ref = sdc_masker(str(src), o1)
             t1 = time.perf_counter()
             mine = brain_masker(
-                src, o2, numpy_version=NP, scipy_version=SP, upstream_defects="reproduce", n_threads=nt
+                src,
+                o2,
+                numpy_version=NP,
+                scipy_version=SP,
+                upstream_defects="reproduce",
+                n_threads=nt,
             )
             t2 = time.perf_counter()
             times[0] += t1 - t0
@@ -346,19 +425,70 @@ def sec_masker(t: Tally, nt: int) -> None:
                 # fMRIPrep's own files (numpy 2.2.6 = 2.3's arithmetic, SciPy 1.15.2)
                 o3 = os.path.join(tmp, "c", "clipped_mask.nii.gz")
                 os.makedirs(os.path.dirname(o3))
-                m3 = brain_masker(src, o3, numpy_version="2.2.6", scipy_version="1.15.2", n_threads=nt)
+                m3 = brain_masker(
+                    src, o3, numpy_version="2.2.6", scipy_version="1.15.2", n_threads=nt
+                )
                 masker = node / "masker"
-                for kind, b in (("brain", m3.out_brain), ("probseg", m3.out_probseg), ("mask", m3.out_mask)):
+                for kind, b in (
+                    ("brain", m3.out_brain),
+                    ("probseg", m3.out_probseg),
+                    ("mask", m3.out_mask),
+                ):
                     name = os.path.basename(b)
                     want = masker / name
-                    t.add(f"brain_masker {kind} = fMRIPrep's file", want.exists() and nii_same(str(want), b), label)
+                    t.add(
+                        f"brain_masker {kind} = fMRIPrep's file",
+                        want.exists() and nii_same(str(want), b),
+                        label,
+                    )
     print(f"brain_masker: sdcflows {times[0]:.1f} s, larmorx {times[1]:.1f} s ({nt} threads)")
+
+
+def sec_clip(t: Tally, nt: int) -> None:
+    """niworkflows' IntensityClip through lx.niworkflows.intensity_clip on the nine nodes'
+    clipper_pre and clipper_post inputs: the written file against niworkflows' own in this
+    environment and (numpy 2.2's percentile) against fMRIPrep's own clipped.nii.gz."""
+    import re
+
+    from niworkflows.interfaces.nibabel import _advanced_clip
+
+    from larmorx.niworkflows import intensity_clip
+
+    for node in masker_nodes():
+        label = "/".join(node.parts[-6:-1])
+        for clip in ("clipper_pre", "clipper_post"):
+            text = (node / clip / "_report" / "report.rst").read_text(encoding="utf-8")
+            inputs = dict(
+                re.findall(r"^\* (\w+) : (.*)$", text.split("Original Inputs")[-1], flags=re.M)
+            )
+            work = node.parents[[p.name for p in node.parents].index("work")]
+            src = work.parent / inputs["in_file"].lstrip("/")
+            kw = {"p_min": float(inputs["p_min"]), "p_max": float(inputs["p_max"])}
+            with tempfile.TemporaryDirectory() as tmp:
+                os.makedirs(os.path.join(tmp, "a"))
+                ref = _advanced_clip(str(src), newpath=os.path.join(tmp, "a"), **kw)
+                mine = intensity_clip(
+                    src, out_dir=os.path.join(tmp, "b"), numpy_version=NP, n_threads=nt, **kw
+                )
+                t.add(
+                    f"IntensityClip ({clip}) = niworkflows' in this environment",
+                    nii_same(ref, mine.out_file),
+                    label,
+                )
+                old = intensity_clip(
+                    src, out_dir=os.path.join(tmp, "c"), numpy_version="2.2.6", n_threads=nt, **kw
+                )
+                t.add(
+                    f"IntensityClip ({clip}) = fMRIPrep's file",
+                    nii_same(str(node / clip / "clipped.nii.gz"), old.out_file),
+                    label,
+                )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--threads", type=int, default=4)
-    ap.add_argument("--sections", default="ball,dot,hist,otsu,rw,masker")
+    ap.add_argument("--sections", default="ball,dot,hist,otsu,rw,masker,clip")
     args = ap.parse_args()
     print(f"numpy {NP}, SciPy {SP}")
     t = Tally()
@@ -376,6 +506,8 @@ def main() -> int:
         sec_rw(t, args.threads)
     if "masker" in secs:
         sec_masker(t, args.threads)
+    if "clip" in secs:
+        sec_clip(t, args.threads)
     bad = t.report()
     print(f"time {time.perf_counter() - t0:.1f} s")
     print("ALL OK" if bad == 0 else f"FAIL {bad}")

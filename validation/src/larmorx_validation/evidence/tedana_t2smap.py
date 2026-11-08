@@ -82,7 +82,30 @@ MAPS = [
     ("s0-limited", "desc-limited_S0map.nii.gz", "S0 map, limited", ""),
     ("mask", "desc-adaptiveGoodSignal_mask.nii.gz", "Adaptive mask (echoes of good signal)", ""),
     ("failures", "desc-decayFitFailures_mask.nii.gz", "Curve-fit failures", ""),
-    ("rmse", "desc-rmse_statmap.nii.gz", "RMSE of the fit", ""),
+]
+#: Every file the table of files compares (images and the confounds table), in tedana's order.
+#: The RMSE map holds NaN outside the voxels of two good echoes or more: the viewer shows no
+#: NaN, so that map is compared in the table only.
+FILES = (
+    "desc-adaptiveGoodSignal_mask.nii.gz",
+    "desc-decayFitFailures_mask.nii.gz",
+    "S0map.nii.gz",
+    "desc-rmse_statmap.nii.gz",
+    "desc-confounds_timeseries.tsv",
+    "desc-limited_S0map.nii.gz",
+    "desc-limited_T2starmap.nii.gz",
+    "desc-optcom_bold.nii.gz",
+    "T2starmap.nii.gz",
+)
+#: The table of files' comparisons: label, run A, run B.
+FILE_PAIRS = [
+    ("replica − tedana 26.0.3", "replica", "tedana"),
+    ("14 − 1 thread", "replica-14", "replica"),
+    ("default − reproduce", "replica-fix", "replica-14"),
+    ("tedana: AVX-512 on − off", "tedana-avx512", "tedana"),
+    ("tedana: shared − newest", "tedana-shared", "tedana"),
+    ("tedana: 4 threads − 1", "tedana-threads4", "tedana"),
+    ("tedana 25.0.1 − 26.0.3", "tedana-25", "tedana"),
 ]
 OPTCOM = "desc-optcom_bold.nii.gz"
 #: fMRIPrep's own files of a t2smap node (the two it uses).
@@ -621,7 +644,7 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         ctx, ex, diffs, outputs, default=default, window_panel="tedana",
         input_windows={"bmask": "full"},
         caption="the crosshair where the default's T2* map differs most from the reproduce "
-        "mode's; choose the output (the maps, the adaptive mask, the failures, the RMSE) above "
+        "mode's; choose the output (the maps, the adaptive mask, the failures) above "
         "the images.",
     )  # fmt: skip
     data = _dataset(name)
@@ -634,7 +657,8 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         f"{_task(name)} run ({_echo_facts(p, eimg)}): tedana's adaptive mask (how many echoes "
         "have good signal in each voxel), the monoexponential fit of S0 and T2* in every voxel "
         "(log-linear first, then SciPy's bounded curve fit from it, `--fittype curvefit` as "
-        "fMRIPrep calls it), the full and the limited maps, the fit's failures and its RMSE. "
+        "fMRIPrep calls it), the full and the limited maps and the fit's failures (the RMSE map "
+        "and the confounds table are in the table of every file below). "
         "tedana 26.0.3 and the replica compute every map; fMRIPrep's own T2* map (tedana 25.0.1, "
         "the only map fMRIPrep keeps) and further runs of tedana are compared with them value by "
         "value.",
@@ -680,7 +704,8 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         ],
         "metrics_note": f"Δ is A − B over all {n_vox:,} voxels of each output file, not only "
         "those shown; fMRIPrep keeps the full T2* map only, so its comparisons cover that map; "
-        "tedana at four threads and tedana 25.0.1 are compared over their files.",
+        "tedana at four threads and tedana 25.0.1 are compared over their files; the RMSE map "
+        "and the confounds table in the table of every file.",
         "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
     }
 
@@ -890,12 +915,19 @@ def _spread_table(rec) -> dict:
     )
 
 
-def _corrections_table(ctx: core.Context, links: dict, cases: list[dict]) -> dict:
+def _defect_rows(ctx: core.Context) -> list[tuple[str, str, str, str]]:
+    """The findings' table of TED-xx: (id, what tedana does, rule, larmorx's default)."""
     text = (ctx.repo / FINDINGS).read_text(encoding="utf-8")
-    rows = []
+    out = []
     for m in re.finditer(r"^\| (TED-\d+) \| (.*?) \| ([^|]*?) \| (.*?) \|\s*$", text, re.M):
-        tid, what, rule, default = (g.strip() for g in m.groups())
-        what = what.replace(" (below)", "")
+        tid, what, rule, default = (g.strip().replace("`", "") for g in m.groups())
+        out.append((tid, what.replace(" (below)", ""), rule, default))
+    return out
+
+
+def _corrections_table(ctx: core.Context, links: dict, cases: list[dict]) -> dict:
+    rows = []
+    for tid, what, rule, default in _defect_rows(ctx):
         key = tid.lower()
         case = next((c["id"] for c in cases if c["id"].endswith(key)
                      or c["id"].startswith(f"difftest/{tid.lower().replace('-', '')}")), None)  # fmt: skip
@@ -933,6 +965,47 @@ def _corrections_table(ctx: core.Context, links: dict, cases: list[dict]) -> dic
         "included; the findings: docs/findings/tedana-t2smap.md. fMRIPrep's calls meet TED-05 "
         "(every call), TED-08 (three of the four curve fits) and the maths entries; the others "
         "need options or inputs fMRIPrep does not give.",
+    )
+
+
+def _files_table(ctx: core.Context) -> dict:
+    """Every file of the shown calls (images and the confounds table): the values that differ
+    in each comparison, NaN alike (the parity suite's ``value_differences``)."""
+    tt = _suite()
+    rows = []
+    for name in SHOWN:
+        e = call_entry(ctx, name)
+        diffs = {lab: tt.value_differences(_out(e, b), _out(e, a)) for lab, a, b in FILE_PAIRS}
+        ds = name.split("-")[0]
+        for f in FILES:
+            cells = []
+            total = None
+            for lab, _a, _b in FILE_PAIRS:
+                v = diffs[lab].get(f)
+                if v is None:
+                    cells.append(common.cell("–"))
+                    continue
+                total = v[1]
+                cells.append(common.cell(int(v[0]), "count"))
+            if total is None:
+                continue
+            same = diffs[FILE_PAIRS[0][0]].get(f)
+            rows.append({
+                "head": f"`{f}`",
+                "sub": f"{ds}: {total:,} values",
+                "cells": cells,
+                "verdict": "bit-identical" if same and same[0] == 0 else "open",
+            })  # fmt: skip
+    return common.table(
+        "files",
+        "Every file of the shown calls: values that differ",
+        ["File", *({"label": lab, "num": True} for lab, _a, _b in FILE_PAIRS)],
+        rows,
+        note="Each image's stored values and each cell of the confounds table, NaN counted as "
+        "equal to NaN (the RMSE map holds NaN in the voxels with fewer than two good echoes); "
+        "the verdict is the replica's against tedana 26.0.3. tedana 25.0.1 writes no adaptive "
+        "mask and no failures map in this form ('–'). The record compares the JSON files too "
+        "(dataset_description.json but for the host's and Python's fields, decision D6).",
     )
 
 
@@ -1115,6 +1188,7 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
     tt = _suite()
     defs = {cid: (desc, payload) for cid, _tier, desc, payload in tt._all_cases()}
     perm = {f"difftest/{p['id']}": p for p in permanent.load(TOOL)}
+    table = {tid: (rule, default) for tid, _what, rule, default in _defect_rows(ctx)}
     out = []
     for r in rec.results:
         cid = r["case"]
@@ -1130,6 +1204,12 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
             desc = p["description"] if p else ""
             command = ""
         rep = r.get("reported") or {}
+        defect = (payload[1] if cid in defs and payload[0] == "fail" else None) or (
+            p.get("defect") if p else None
+        )
+        if v is not None and v[0] == "both-reject" and defect in table:
+            rule, default = table[defect]
+            v = (v[0], common.clip(f"{v[1]} The default ({defect}, rule {rule}): {default}.", 420))
         if v is None:
             fixed = rep.get("D13 fix pass")
             if r["category"] == "spread":
@@ -1227,6 +1307,7 @@ def export(ctx: core.Context) -> dict:
         _calls_table(rec, bench),
         _spread_table(rec),
         _corrections_table(ctx, links, cases),
+        _files_table(ctx),
         _memory_table(ctx),
         *trial_tables,
     ]

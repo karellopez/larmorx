@@ -100,12 +100,12 @@ def write_both(data: np.ndarray, out_dtype: str, version: int = 1, affine=None) 
         try:
             with np.errstate(all="ignore"):
                 img.to_filename(p_nb)
-        except Exception as e:  # noqa: BLE001 - the exception is the result
+        except Exception as e:  # the exception is the result
             err_nb = (type(e).__name__, str(e))
         try:
             with np.errstate(all="ignore"):
                 save_nibabel(lx_img, p_lx)
-        except Exception as e:  # noqa: BLE001 - the exception is the result
+        except Exception as e:  # the exception is the result
             err_lx = (type(e).__name__, str(e))
         if err_nb or err_lx:
             return None if err_nb == err_lx else f"nibabel {err_nb}, larmorx {err_lx}"

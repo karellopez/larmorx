@@ -21,6 +21,8 @@
 //!   CSR matrix.
 //! - [`tools`]: sdcflows' grid helpers (`resample_to_zooms`' grid, nibabel's `rescale_affine`)
 //!   and nitransforms' identity resampling coordinates.
+//! - [`unwarp`]: `B0FieldTransform.apply`'s unwarping of one volume (the shift along the
+//!   phase-encoding axis, SciPy's spline interpolation, the Jacobian of the shift).
 //! - [`npy`]: the numpy element rules this needs (float floor division, `allclose`, `cross`).
 //!
 //! This crate is the **port** (a replica of a permissive upstream, in the main package). The
@@ -34,6 +36,7 @@ pub mod bspline;
 pub mod npy;
 pub mod ridge;
 pub mod tools;
+pub mod unwarp;
 
 /// An sdcflows function cannot run on its inputs (the Python original raises).
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]

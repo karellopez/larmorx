@@ -12,7 +12,9 @@ use larmorx_sdcflows::blas;
 use larmorx_sdcflows::bspline::{self, Collocation, Csr, WeightType};
 use larmorx_sdcflows::ridge::{self, CsrOperator, RidgeFit, RidgeSystem};
 use larmorx_sdcflows::tools;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use larmorx_sdcflows::unwarp::{self, ReadoutTime, UnwarpOptions};
+use numpy::{PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArray3};
+use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -528,7 +530,102 @@ fn sdcflows_apply_affine<'py>(
     ))
 }
 
+fn unwarp_typed<'py, T: larmorx_interp::ndimage::Sample + numpy::Element>(
+    py: Python<'py>,
+    volume: PyReadonlyArrayDyn<'py, T>,
+    fmap: &[f32],
+    pe_axis: usize,
+    ro: ReadoutTime,
+    options: &UnwarpOptions,
+    n_threads: usize,
+) -> PyResult<(Vec<f32>, Vec<larmorx_core::defects::Notice>, [usize; 3])> {
+    let view = volume.as_array();
+    let shape: [usize; 3] = view
+        .shape()
+        .try_into()
+        .map_err(|_| PyValueError::new_err("the volume must be 3D"))?;
+    let values = crate::ndimage::fortran_values(&view);
+    let (out, notices) = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                unwarp::unwarp_volume(&values, shape, fmap, pe_axis, ro, options)
+            })
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        .map_err(sdc_err)?;
+    Ok((out, notices, shape))
+}
+
+/// `_sdc_unwarp` for one volume (`B0FieldTransform.apply`): `volume` (3D, any numeric type
+/// `map_coordinates` takes), `fmap_hz` (float32, the same grid), the phase-encoding axis and
+/// the signed readout time, `ro_float64` when it is a numpy float64 (else a Python float).
+/// Returns the unwarped volume (float32, C order) and the interpolation's notices.
+#[pyfunction]
+#[pyo3(signature = (volume, fmap_hz, pe_axis, ro_time, ro_float64, jacobian, order, mode, cval, prefilter, n_threads = 1, upstream_defects = "fix"))]
+#[allow(clippy::too_many_arguments)]
+fn sdcflows_unwarp_volume<'py>(
+    py: Python<'py>,
+    volume: &Bound<'py, PyAny>,
+    fmap_hz: PyReadonlyArray3<'py, f32>,
+    pe_axis: usize,
+    ro_time: f64,
+    ro_float64: bool,
+    jacobian: bool,
+    order: u32,
+    mode: &str,
+    cval: f64,
+    prefilter: bool,
+    n_threads: usize,
+    upstream_defects: &str,
+) -> PyResult<(
+    Bound<'py, PyArray3<f32>>,
+    Vec<crate::defects::PyNotice>,
+)> {
+    if order > 5 {
+        return Err(PyRuntimeError::new_err("spline order not supported"));
+    }
+    let options = UnwarpOptions {
+        order,
+        mode: crate::ndimage::mode_from_py(mode)?,
+        cval,
+        prefilter,
+        jacobian,
+        defects: crate::defects::mode_from_py(upstream_defects)?,
+    };
+    let ro = if ro_float64 {
+        ReadoutTime::Float64(ro_time)
+    } else {
+        ReadoutTime::Weak(ro_time)
+    };
+    let f = fmap_hz.as_array();
+    let fmap: Vec<f32> = f.iter().copied().collect();
+    macro_rules! go {
+        ($($t:ty),*) => {{
+            $(
+                if let Ok(a) = volume.extract::<PyReadonlyArrayDyn<'py, $t>>() {
+                    if a.shape() != f.shape() {
+                        return Err(PyValueError::new_err(
+                            "the volume and the field must have the same shape",
+                        ));
+                    }
+                    let (out, notices, shape) =
+                        unwarp_typed::<$t>(py, a, &fmap, pe_axis, ro, &options, n_threads)?;
+                    let arr = numpy::ndarray::Array3::from_shape_vec(shape, out)
+                        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+                    return Ok((
+                        PyArray3::from_owned_array(py, arr),
+                        crate::defects::notices_to_py(notices),
+                    ));
+                }
+            )*
+            Err(PyRuntimeError::new_err("data type not supported"))
+        }};
+    }
+    go!(f32, f64, i16, u8, i8, u16, i32, u32, i64, u64)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(sdcflows_unwarp_volume, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_bspline_grid, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_collocation_csr, m)?)?;
     m.add_function(wrap_pyfunction!(sdcflows_collocation_apply, m)?)?;

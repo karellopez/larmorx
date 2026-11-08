@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+larmorx-interp.workspace = true
 larmorx-transform.workspace = true
 rayon.workspace = true
 thiserror.workspace = true

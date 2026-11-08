@@ -195,7 +195,8 @@ pub fn median_f32(a: &[f32]) -> f32 {
 
 /// `scipy.stats.mode(a).mode` of float32 values: the smallest of the most frequent values,
 /// all NaNs counted as one value after every number (`np.nan` for no values; a NaN of the
-/// values when they are the most frequent).
+/// values when they are the most frequent); a zero mode takes the more frequent sign of the
+/// zeros (numpy's unstable sort leaves the first one undefined).
 pub fn mode_f32(a: &[f32]) -> f32 {
     if a.is_empty() {
         return f32::NAN;
@@ -217,10 +218,20 @@ pub fn mode_f32(a: &[f32]) -> f32 {
         i = j;
     }
     if n_nan > best_count {
-        a.iter().copied().find(|v| v.is_nan()).unwrap_or(f32::NAN)
-    } else {
-        best
+        return a.iter().copied().find(|v| v.is_nan()).unwrap_or(f32::NAN);
     }
+    if best == 0.0 {
+        // +0 and -0 are one value; which of them np.unique's sort (numpy's unstable SIMD
+        // quicksort) puts first is not defined: the more frequent sign (+0 on a tie), which is
+        // numpy's on the trial's cases.
+        let negative = v
+            .iter()
+            .filter(|x| **x == 0.0 && x.is_sign_negative())
+            .count();
+        let positive = v.iter().filter(|x| **x == 0.0).count() - negative;
+        return if negative > positive { -0.0 } else { 0.0 };
+    }
+    best
 }
 
 /// The NaN an x86 CPU makes for an invalid operation such as `0.0 / 0.0` (the "default NaN":
@@ -518,5 +529,11 @@ mod tests {
         assert_eq!(mode_f32(&[]).to_bits(), f32::NAN.to_bits());
         let neg = f32::from_bits(0xffc0_0001);
         assert_eq!(mode_f32(&[neg, neg, 1.0]).to_bits(), neg.to_bits());
+        // a zero mode: the more frequent sign
+        assert_eq!(mode_f32(&[-0.0, 0.0, 0.0, 1.0]).to_bits(), 0.0f32.to_bits());
+        assert_eq!(
+            mode_f32(&[-0.0, -0.0, 0.0, 1.0]).to_bits(),
+            (-0.0f32).to_bits()
+        );
     }
 }

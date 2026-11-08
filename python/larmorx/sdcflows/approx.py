@@ -388,7 +388,11 @@ def bspline_approx(
     # out_error: (data - field) * mask (float32) with the input's header as is: nibabel writes
     # it in the input's stored type, scaled into an integer type (save_nibabel);
     # cal_min = 0, cal_max = max(error)
-    error = np.asarray(out["error"], dtype=np.float32).reshape(shape3).reshape(data_shape)
+    # Fortran order, as nibabel's arrays are: numpy's max reduces in memory order, and which NaN
+    # (the input's or a new one) or which zero sign it returns depends on that order
+    error = np.asfortranarray(
+        np.asarray(out["error"], dtype=np.float32).reshape(shape3).reshape(data_shape)
+    )
     stored = hdr.data_dtype
     err_dtype = "float32" if stored is None else np.dtype(stored).name
     error_img = Image(

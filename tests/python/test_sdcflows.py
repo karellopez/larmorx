@@ -397,3 +397,12 @@ def test_resize_onto_a_single_voxel_sdc11():
     )
     r = lx.sdcflows.bspline_approx(img, zooms_min=4.0)
     assert r.field.shape == (4, 4, 4) and np.isfinite(np.asarray(r.field.data)).all()
+
+
+def test_error_map_in_fortran_order_for_numpys_max():
+    """sdcflows' error map is a Fortran-ordered array (nibabel's), and numpy's max of it, which
+    becomes cal_max, depends on that order (which NaN, which zero sign)."""
+    rng = np.random.default_rng(9)
+    fmap = lx.Image(rng.normal(0, 10, (9, 8, 7)).astype(np.float32), np.diag([2.0, 2.0, 2.0, 1]))
+    r = lx.sdcflows.bspline_approx(fmap)
+    assert np.asarray(r.error.data).flags.f_contiguous

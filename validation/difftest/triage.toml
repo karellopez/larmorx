@@ -3942,8 +3942,24 @@ implementation = "port"
 signature = ["bspline_approx: every output bit-identical"]
 status = "register"
 defect = "SDC-11"
-explanation = "14 cases (smallest sdc-trial 59267: a 4 x 4 x 4 field map at 1 mm, zooms_min 4): BSplineApprox's resize gives a grid of one voxel, and nitransforms' Affine.apply fails there with a bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point); larmorx raised an AssertionError with its own message. Registered as SDC-11 (rule A): the voxel resampled and the fit made by default, named; reproduce raises the bare AssertionError"
+explanation = "10 of the 14 cases (smallest sdc-trial 59267: a 4 x 4 x 4 field map at 1 mm, zooms_min 4): BSplineApprox's resize gives a grid of one voxel, and nitransforms' Affine.apply fails there with a bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point); larmorx raised an AssertionError with its own message. Registered as SDC-11 (rule A): the voxel resampled and the fit made by default, named; reproduce raises the bare AssertionError"
 link = "validation/difftest/cases/sdcflows-fieldmap/sdc11-resize-onto-a-single-voxel.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "fixed"
+explanation = "2 of the 14 cases (sdc-trial 236468, 325222): the error map's cal_max is numpy's max of sdcflows' error array, which is Fortran-ordered (nibabel's arrays); numpy's SIMD max returns a new NaN or a zero's sign by memory order, and larmorx's array was C-ordered: larmorx keeps the error in Fortran order"
+link = "validation/difftest/cases/sdcflows-fieldmap/error-cal-max-memory-order.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "fixed"
+explanation = "2 of the 14 cases (sdc-trial 200937, 320850): recentring by the mode where the mode is 0 and the zeros have both signs (one -0 among 1,609 and 2,934 +0): scipy's mode is the first zero of np.unique's sort (+0 here; numpy's unstable SIMD quicksort leaves which zero is first undefined), larmorx took -0 (the total order's first); larmorx now takes the zeros' more frequent sign (+0 on a tie); only zero signs of the error map depend on it"
+link = "validation/difftest/cases/sdcflows-fieldmap/mode-zero-sign.json"
 
 [[difference]]
 tool = "sdcflows-fieldmap"

@@ -91,6 +91,17 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   NaN on x86 has its sign bit set (0xffc00000 in float32); a NaN among the values is returned as
   it is (`_median_nancheck`); SciPy's `mode` of nothing is `np.nan` (positive). After a resize
   sdcflows' error map is that NaN everywhere; larmorx gives the same bits.
+- **numpy's max of the error map follows its memory order.** sdcflows' error map
+  `(data - interp_data) * mask` is Fortran-ordered (nibabel's arrays), and its `cal_max` is
+  `np.max` of it: numpy's SIMD reduction returns a new (positive) NaN where a NaN falls in a
+  vector, the input's NaN in the scalar tail, and the first or last zero's sign by position.
+  larmorx keeps the error map in Fortran order, so `np.max` meets the values in sdcflows' order
+  (the trial's cases 236468 and 325222).
+- **A zero mode's sign.** `scipy.stats.mode` returns the first value of `np.unique`'s sorted
+  group; +0 and -0 are one group, and which of them numpy's unstable (SIMD) quicksort puts first
+  is not defined. larmorx takes the zeros' more frequent sign (+0 on a tie), numpy's on the
+  trial's cases (one -0 among 1,609 and 2,934 +0, with and without AVX-512); only the zero signs
+  of the error map depend on it.
 - **scikit-learn's dtype in its message.** "Input y contains infinity or a value too large for
   dtype('<f4')." when nibabel returned the file's raw array (an unscaled little-endian float32
   file: the header's dtype keeps its explicit byte order), "dtype('float32')" otherwise.

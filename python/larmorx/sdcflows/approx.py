@@ -265,9 +265,11 @@ def bspline_approx(
         larger than them reaches it).
     low_memory
         Fit with the B-spline weights evaluated at every product of the solver (memory of the
-        order of the voxels and knots) instead of the stored collocation matrix (the default:
-        8 bytes per weight at one thread, 16 with several, below the 24 or more scikit-learn
-        holds for sdcflows' fit, and faster); the result is the same, bit for bit.
+        order of the voxels and knots) also at one thread. By default the fit reads the stored
+        collocation matrix at one thread (8 bytes per weight, below the 24 or more scikit-learn
+        holds for sdcflows' fit, and faster than scikit-learn) and evaluates the weights at
+        every product with several threads (faster there: parallel, no matrix held); the
+        result is the same, bit for bit.
 
     The log records sdcflows writes (``nipype.interface``) go to the ``larmorx.sdcflows``
     logger, with sdcflows' texts. A fit whose largest coefficient reaches 1e4 raises

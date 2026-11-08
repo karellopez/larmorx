@@ -82,9 +82,11 @@ pub struct ApproxParams {
     /// SDC-01 (weights beyond the control grid) corrected or reproduced; the control grids
     /// cover the field map, so only a resampled grid larger than them can reach it.
     pub defects: UpstreamDefects,
-    /// Fit with the weights evaluated at every product instead of stored
-    /// ([`bspline::StoredCollocation`], the default): O(voxels + knots) memory, slower at one
-    /// thread; the same bits.
+    /// Fit with the weights evaluated at every product also at one thread. By default the fit
+    /// reads the stored matrix at one thread ([`bspline::StoredCollocation`]: faster there than
+    /// evaluating the weights, and than scikit-learn) and evaluates the weights at every product
+    /// with several threads (faster there: the products run in parallel and read no matrix;
+    /// O(voxels + knots) memory). The same bits either way.
     pub low_memory: bool,
 }
 
@@ -390,7 +392,10 @@ pub fn bspline_approx_logged(
         };
         return Err(SdcError::Invalid(format!("Input y contains {what}.")));
     }
-    let stored = if params.low_memory {
+    // The stored matrix at one thread only: with several threads the weights evaluated in
+    // parallel at every product are faster than the stored matrix's products (fMRIPrep's fit of
+    // ds005454 at 14 threads: 2.3 s against 7.6 s; docs/benchmarks/sdcflows-fieldmap.md).
+    let stored = if params.low_memory || n_threads != 1 {
         None
     } else {
         colmat.store(n_threads)?

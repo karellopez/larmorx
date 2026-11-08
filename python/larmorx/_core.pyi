@@ -887,8 +887,8 @@ def sdcflows_bspline_approx(
     """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
     grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
     system, log, beyond (whether SDC-01 changed, or would have changed, the weights). The fit
-    reads the stored collocation matrix, or, with ``low_memory``, evaluates the weights at
-    every product (the same bits)."""
+    reads the stored collocation matrix at one thread and evaluates the weights at every
+    product with several threads or with ``low_memory`` (the same bits)."""
 
 def sdcflows_rescale_affine(
     affine: np.ndarray,

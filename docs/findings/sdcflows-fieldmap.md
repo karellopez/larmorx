@@ -75,14 +75,17 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   infinities gives sdcflows' bits. The products are `fl32(fl32(w0 · w1) · w2)`.
 - **Memory.** sdcflows' fit holds `X` (8 bytes per stored entry: 11 million for a 64 × 64 × 44
   field map, 126 million for ds002603's 128³) at least three times (scikit-learn's copies, the
-  adjoint's conjugate copy). larmorx stores `X` once for the fit by default
-  (`bspline::StoredCollocation`: 8 bytes per entry at one thread, 16 with the transpose its
-  threads read), within the memory rule (ds005454's fit: 877 MiB against sdcflows' 1,473; at one
-  thread less), and faster than scikit-learn at one thread (fMRIPrep's fits: ds005454 15.5 s
-  against 17.6 s, ds002603 24.4 s against 29.8 s; the adjoint scatters the rows in order, as
-  `csc_matvec` on `X.T` does); `low_memory=True` applies `X` from the per-axis weights without
-  storing it (O(voxels + knots), 1.5 to 1.9 times slower at one thread). The same bits both
-  ways.
+  adjoint's conjugate copy). At one thread larmorx stores `X` once for the fit
+  (`bspline::StoredCollocation`: 8 bytes per entry), within the memory rule (ds005454's fit:
+  468 MiB against sdcflows' 1,473), and is faster than scikit-learn there (fMRIPrep's fits:
+  ds005454 15.2 s against 16.9 s, ds002603 24.6 s against 27.6 s; the adjoint scatters the rows
+  in order, as `csc_matvec` on `X.T` does). With several threads it applies `X` from the
+  per-axis weights at every product, without storing it: the products then run in parallel on
+  weights computed in cache, and are faster than the stored matrix's, whose products are bound
+  by memory bandwidth and whose transpose (16 bytes per entry in all) is built serially
+  (ds005454 at 14 threads: 2.3 s against 7.6 s with the matrix stored; ds002422 0.30 s against
+  0.62 s; relay 8's probe). `low_memory=True` applies `X` that way also at one thread
+  (O(voxels + knots), 1.5 to 1.9 times slower there). The same bits every way.
 
 ### scipy's float64 stacks and numpy's NaN of nothing
 

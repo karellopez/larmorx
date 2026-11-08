@@ -54,6 +54,7 @@ from sdcflows.transform import fmap_to_disp as sdc_fmap_to_disp
 from larmorx import sdcflows as lxs
 from larmorx.io import save_nibabel
 
+sys.path.insert(0, str(Path(__file__).parent))  # measure_sdc01_02 (python -P)
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 BIDS = Path.home() / ".cache" / "larmorx-testdata" / "data" / "openneuro"
@@ -61,6 +62,7 @@ FAILS: list[str] = []
 OLD_SCIPY = tuple(int(x) for x in scipy.__version__.split(".")[:2]) < (1, 18)
 SCI03_MODES = ("reflect", "grid-mirror", "nearest")
 REPRODUCE = {"upstream_defects": "reproduce"}
+FIX = {"upstream_defects": "fix"}
 
 
 def report(name: str, ok: bool, detail: str = "", expected: bool = False) -> None:
@@ -116,15 +118,26 @@ def in_memory(path):
     return img.__class__(np.asanyarray(img.dataobj), img.affine, img.header)
 
 
-def run_both(coeffs, moving, args, kw, mine_kw=None, refit=False, ref_in_memory=False):
-    """Results of sdcflows and larmorx: (image or None, warnings, exception)."""
+def run_both(
+    coeffs, moving, args, kw, mine_kw=None, refit=False, ref_in_memory=False, ref_fixed=False
+):
+    """Results of sdcflows and larmorx: (image or None, warnings, exception). larmorx runs with
+    ``upstream_defects="reproduce"`` unless ``mine_kw`` says otherwise; ``ref_fixed`` gives
+    sdcflows the corrected weights of SDC-01 and SDC-02 (``measure_sdc01_02.fixed_weights``),
+    the reference of larmorx's corrected field."""
+    import sdcflows.transform as sdct
+    from measure_sdc01_02 import fixed_weights
+
     out = []
     for impl in ("sdcflows", "larmorx"):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             err = res = None
+            original = sdct.grid_bspline_weights
             try:
                 if impl == "sdcflows":
+                    if ref_fixed:
+                        sdct.grid_bspline_weights = fixed_weights
                     t = SdcB0(coeffs=[nb.load(c) for c in coeffs])
                     src = in_memory(moving) if ref_in_memory else str(moving)
                     if refit:
@@ -132,20 +145,26 @@ def run_both(coeffs, moving, args, kw, mine_kw=None, refit=False, ref_in_memory=
                     res = t.apply(src, *args, **kw)
                 else:
                     t = lxs.B0FieldTransform(coeffs=[str(c) for c in coeffs])
-                    k = dict(kw, n_threads=8, **(mine_kw or {}))
+                    k = dict(kw, n_threads=8, **(REPRODUCE if mine_kw is None else mine_kw))
                     if refit:
                         t.apply(str(moving), *args, **k)
                     res = t.apply(str(moving), *args, **k)
             except Exception as e:  # the exception is the result
                 err = e
+            finally:
+                sdct.grid_bspline_weights = original
             msgs = [
                 f"{x.category.__name__}: {x.message}"
                 for x in w
-                if "aligned" in str(x.message)
-                or "already fit" in str(x.message)
-                or "Head-motion" in str(x.message)
-                or "SDC-05" in str(x.message)
-                or "SDC-08" in str(x.message)
+                if getattr(x.message, "entry", None) in ("SDC-05", "SDC-08")
+                or (
+                    not hasattr(x.message, "entry")
+                    and (
+                        "aligned" in str(x.message)
+                        or "already fit" in str(x.message)
+                        or "Head-motion" in str(x.message)
+                    )
+                )
             ]
         out.append((res, msgs, err))
     return out
@@ -160,10 +179,11 @@ def apply_case(
     mine_kw=None,
     refit=False,
     ref_in_memory=False,
+    ref_fixed=False,
     **kw,
 ):
     (ref, w1, e1), (mine, w2, e2) = run_both(
-        coeffs, moving, args, kw, mine_kw, refit, ref_in_memory
+        coeffs, moving, args, kw, mine_kw, refit, ref_in_memory, ref_fixed
     )
     if e1 is not None or e2 is not None:
         ok = exc(e1) == exc(e2)
@@ -244,13 +264,23 @@ def check_apply(tmp: Path) -> None:
     # SDC-08: a RAS series read from a file fails in sdcflows (an ArrayProxy given to
     # rollaxis); corrected, it gives sdcflows' result for the same data in memory
     apply_case("float64 4D RAS (SDC-08 reproduced)", c1, f64, "j", 0.05, mine_kw=REPRODUCE)
-    apply_case("float64 4D RAS (SDC-08 corrected)", c1, f64, "j", 0.05, ref_in_memory=True)
+    apply_case(
+        "float64 4D RAS (SDC-08 corrected)", c1, f64, "j", 0.05, mine_kw=FIX, ref_in_memory=True
+    )
     apply_case("int16 4D (written scaled)", c1, i16, "j-", 0.05)
     apply_case("scaled int16 4D", c1, s16, "i-", 0.05)
     apply_case("scaled int16, output float32", c1, s16, "j", 0.05, output_dtype="float32")
     apply_case("float32, output uint8", c1, f4, "j", 0.05, output_dtype="uint8")
     apply_case("5D (X, Y, Z, 1, T) RAS (SDC-08 reproduced)", c1, five, "j", 0.05, mine_kw=REPRODUCE)
-    apply_case("5D (X, Y, Z, 1, T) RAS (SDC-08 corrected)", c1, five, "j", 0.05, ref_in_memory=True)
+    apply_case(
+        "5D (X, Y, Z, 1, T) RAS (SDC-08 corrected)",
+        c1,
+        five,
+        "j",
+        0.05,
+        mine_kw=FIX,
+        ref_in_memory=True,
+    )
     five_las = image(tmp / "five_las.nii.gz", series[:, :, :, None, :], las)
     apply_case("5D (X, Y, Z, 1, T) LAS", c1, five_las, "j", 0.05)
     two_vec = image(tmp / "five2.nii.gz", np.stack([series, series], 3), las)
@@ -275,6 +305,21 @@ def check_apply(tmp: Path) -> None:
     apply_case("numpy float64 readout times", c1, f4, "i-", [np.float64(0.05)] * 3)
     apply_case("rigid xfm, approx", c1, f4, "j", 0.05, xfm_data2fmap=x)
     apply_case("rigid xfm, no approx", c1, f4, "j", 0.05, xfm_data2fmap=x, approx=False)
+    # corrected (SDC-01: the LAS series lies partly beyond the control grid; SDC-02: the rigid
+    # transform rotates the projected grid) against sdcflows with the corrected weights
+    apply_case(
+        "LAS 4D beyond the grid (SDC-01 corrected)", c1, f4, "j", 0.05, mine_kw=FIX, ref_fixed=True
+    )
+    apply_case(
+        "rigid xfm, approx (SDC-01, SDC-02 corrected)",
+        c1,
+        f4,
+        "j",
+        0.05,
+        mine_kw=FIX,
+        ref_fixed=True,
+        xfm_data2fmap=x,
+    )
     apply_case("head-motion transforms ignored", c1, f4, "j", 0.05, xfms=[np.eye(4)] * 3)
     apply_case("already fit (applied twice)", c1, f4, "j", 0.05, refit=True)
     apply_case("num_threads 2", c1, f4, "j", 0.05, num_threads=2)
@@ -297,10 +342,11 @@ def check_apply(tmp: Path) -> None:
         mine_kw={"upstream_defects": "reproduce"},
     )
     # SDC-05 corrected: an integer or float32 readout time gives sdcflows' result for the float
-    ref = run_both(c1, f4, ("j", 1.0), {})[0][0]
+    # (a RAS series inside the control grid: no other correction applies)
+    ref = run_both(c1, f3, ("j", 1.0), {})[0][0]
     for ro in (1, np.float32(0.05)):
-        (_, _, _), (mine, w, e) = run_both(c1, f4, ("j", ro), {})
-        want = ref if ro == 1 else run_both(c1, f4, ("j", float(ro)), {})[0][0]
+        (_, _, _), (mine, w, e) = run_both(c1, f3, ("j", ro), {}, FIX)
+        want = ref if ro == 1 else run_both(c1, f3, ("j", float(ro)), {})[0][0]
         ok = (
             e is None
             and np.ascontiguousarray(np.asanyarray(want.dataobj)).tobytes()
@@ -387,6 +433,7 @@ def coeff_case(name, coeffs, data, pe, ro, **xfm):
             pe,
             out_dir=t2,
             n_threads=8,
+            upstream_defects="reproduce",
             **{k: ([str(p) for p in v] if isinstance(v, list) else str(v)) for k, v in xfm.items()},
         )
         checks = {
@@ -479,7 +526,7 @@ def check_displacements(tmp: Path) -> None:
     t1 = SdcB0(coeffs=[nb.load(c) for c in synthetic(tmp)[3][1:]])
     t1.fit(nb.load(fm))
     t2 = lxs.B0FieldTransform(coeffs=[str(c) for c in synthetic(tmp)[3][1:]])
-    t2.fit(str(fm))
+    t2.fit(str(fm), upstream_defects="reproduce")
     a, b = t1.to_displacements(0.05, "j-"), t2.to_displacements(0.05, "j-")
     report(
         "to_displacements",

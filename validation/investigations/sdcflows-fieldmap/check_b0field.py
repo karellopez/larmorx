@@ -156,8 +156,13 @@ def fit_case(name, coeffs, target, xfm=None, approx=True):
             == np.asarray(mine.mapped.data, order="C").tobytes(),
             "affine": ref.mapped.affine.tobytes() == np.asarray(mine.mapped.affine).tobytes(),
             "file": raw(a) == raw(b),
+            # sdcflows' own warnings (larmorx's notices of the defects reproduced aside)
             "warnings": [str(x.message) for x in w1 if "aligned" in str(x.message)]
-            == [str(x.message) for x in w2 if "aligned" in str(x.message)],
+            == [
+                str(x.message)
+                for x in w2
+                if "aligned" in str(x.message) and not hasattr(x.message, "entry")
+            ],
         }
     bad = [k for k, v in checks.items() if not v]
     report(f"fit {name}", not bad, f"{wd.shape}" + (f"; differ: {bad}" if bad else ""))
@@ -169,11 +174,9 @@ def _aligned(a, b) -> bool:
 
 def fixed_weights(target, ctrl, dtype="float32"):
     """The corrected weights of one level (SDC-01 and SDC-02), built with numpy and SciPy."""
-    from measure_sdc01_02 import exact_matrix, true_grid_bspline_weights
+    from measure_sdc01_02 import fixed_weights as fw
 
-    if _aligned(ctrl.affine, target.affine):
-        return true_grid_bspline_weights(target, ctrl, dtype)
-    return exact_matrix(target, ctrl, np.dtype(dtype).type)
+    return fw(target, ctrl, dtype)
 
 
 def fixed_case(name, coeffs, target, xfm=None, approx=True, notices=()):
@@ -227,7 +230,15 @@ def check_fixed(tmp: Path) -> None:
     x = rigid((0.05, -0.03, 0.08), (3.0, -2.0, 1.5))
     fixed_case("aligned, inside", coeffs, image(tmp / "own_f.nii.gz", shape, ras))
     fixed_case("aligned, larger than the grid (SDC-01)", coeffs, big, notices=("SDC-01",))
-    fixed_case("oblique, no transform (SDC-02)", coeffs, oblique, notices=("SDC-01", "SDC-02"))
+    fixed_case("oblique, no transform (SDC-02)", coeffs, oblique, notices=("SDC-02",))
+    fixed_case(
+        "aligned, a rotating transform (SDC-02 on the projected grid)",
+        coeffs,
+        image(tmp / "own_g.nii.gz", shape, ras),
+        x,
+        True,
+        notices=("SDC-02",),
+    )
     fixed_case(
         "oblique, approx=False with a transform (SDC-02)",
         coeffs,

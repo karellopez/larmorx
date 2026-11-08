@@ -333,7 +333,7 @@ defects! {
     SDC_01 = "SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,
-        "grid_bspline_weights on a sampling grid rotated relative to the control grid warns that the grids are not aligned and still multiplies per-axis weights, each taken from one index of the voxel, which is not the B-spline field at the voxel (measured on a real field rotated 0.5 degrees: 2.3 Hz RMS, 40 Hz at most; at 5 degrees: 20 Hz RMS, 345 Hz)";
+        "grid_bspline_weights on a sampling grid rotated relative to the control grid warns that the grids are not aligned and still multiplies per-axis weights, each taken from one index of the voxel, which is not the B-spline field at the voxel (measured on a real field rotated 0.5 degrees: 2.3 Hz RMS, 40 Hz at most; at 5 degrees: 20 Hz RMS, 345 Hz); B0FieldTransform.fit meets it on the projected grid of any rotating registration (fMRIPrep's registrations of the oracle runs, about 1 degree: 1.5 to 4.6 Hz RMS, up to 49 Hz, in the brain)";
     SDC_04 = "SDC-04", "sdcflows", true,
         "au2rads (PhaseMap2rads) rescales a constant phase map to NaN everywhere (0 / 0) without an error";
     SDC_05 = "SDC-05", "sdcflows", true,

@@ -172,12 +172,24 @@ columns, which carry the voxel sizes) is about 0.0014° for 16 mm control spacin
 voxels, so any visible rotation warns. sdcflows' own approximation (`approx=True`: the field on
 a grid aligned with the coefficients, 4 times finer, then cubic resampling) stays within 0.13 Hz
 of the exact evaluation, which also confirms the exact evaluation; the separable product is
-wrong by up to the field's size. The input makes sense (a target rotated relative to the field
-map, `B0FieldTransform.fit` without a transform or with `approx=False`): **rule A**, the exact
+wrong by up to the field's size.
+
+**sdcflows' own unwarping meets it with real registrations** (`measure_sdc01_02.py`, part 2b;
+log `oracles/logs/fmap-a-5-sdc02b.log`): `B0FieldTransform.fit(target, xfm_data2fmap)` takes the
+direct path when the *target* is aligned with the coefficients, and evaluates the weights on the
+*projected* grid, which any rotation of the registration turns. With fMRIPrep's own
+registrations of the BOLD references to their field maps (rotations of 0.89 to 1.50°), the
+separable field differs from the field at every voxel's position, inside the BOLD brain mask,
+by 2.3 Hz RMS (30 Hz at most) and 1.5 and 1.7 Hz RMS (25 and 27 Hz) on ds002422's three runs,
+4.6 Hz RMS (49 Hz) on ds005040 and 3.5 Hz RMS (31 Hz) on ds005454 (ds002603's oblique references
+take the approximation's path: SDC-10). The input makes sense (a target rotated relative to the
+field map, `B0FieldTransform.fit` without a transform, with `approx=False`, or a rotating
+registration of an aligned target): **rule A**, the exact
 weights by default (`ExactLevel`: the location by nibabel's `apply_affine`, every axis' weights
 rounded to the matrix type, the products `(w0 · w1) · w2`, ascending columns). fMRIPrep never
 reaches it (its reconstruction refuses non-aligned grids: "Reference passed is not aligned with
-spline grids"); sdcflows reaches it in `ApplyCoeffsField` without a transform.
+spline grids"); sdcflows' `ApplyCoeffsField` and unwarping workflow reach it whenever the
+registration rotates.
 
 ### SDC-03: `CheckRegister`'s signed translation test (rule A, not switched yet)
 

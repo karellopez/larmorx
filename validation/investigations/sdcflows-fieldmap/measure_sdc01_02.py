@@ -115,6 +115,21 @@ def true_grid_bspline_weights(target_nii, ctrl_nii, dtype="float32"):
     return kron(kron(wd[0], wd[1]), wd[2])
 
 
+def fixed_weights(target, ctrl, dtype="float32"):
+    """larmorx's corrected weights of one level (SDC-01 and SDC-02), built with numpy and
+    SciPy: sdcflows' construction with the B-spline beyond the grid on an aligned target, the
+    exact weights at every voxel on a rotated one (a drop-in for sdcflows'
+    ``grid_bspline_weights``)."""
+    aligned = np.allclose(
+        np.linalg.norm(np.cross(ctrl.affine[:-1, :-1].T, target.affine[:-1, :-1].T), axis=1),
+        0,
+        atol=1e-3,
+    )
+    if aligned:
+        return true_grid_bspline_weights(target, ctrl, dtype)
+    return exact_matrix(target, ctrl, np.dtype(dtype).type)
+
+
 def beyond_voxels(target, ctrl) -> np.ndarray:
     """Voxels whose row is not empty and holds a weight whose location lies beyond the grid."""
     flags = []
@@ -459,6 +474,69 @@ def part0() -> None:
         )
 
 
+def part2b() -> None:
+    """SDC-02 on sdcflows' own unwarping of the oracle runs' BOLD references: a target aligned
+    with the coefficients takes the direct path on the projected grid, which the registration's
+    rotation makes not aligned (sdcflows warns and multiplies per-axis weights)."""
+    print("== SDC-02 on sdcflows' B0FieldTransform.fit with fMRIPrep's registrations (direct path)")
+    from fmriprep.utils.transforms import load_transforms
+
+    seen = set()
+    for run, node, inputs in reconstructions():
+        if node.split("/")[-1] != "boldref_fmap" or "bold_fit_wf" not in node:
+            continue
+        coeff_p = re.findall(r"'([^']+)'", inputs["in_coeffs"])[-1]
+        target_p = inputs["target_ref_file"].strip()
+        xfms = re.findall(r"'([^']+)'", inputs["transforms"])
+        if (coeff_p, target_p) in seen:
+            continue
+        seen.add((coeff_p, target_p))
+        ctrl = nb.load(host_path(run, coeff_p))
+        target = nb.load(host_path(run, target_p))
+        xfm = load_transforms([host_path(run, x) for x in xfms], [True]).matrix
+        al = np.allclose(
+            np.linalg.norm(np.cross(ctrl.affine[:-1, :-1].T, target.affine[:-1, :-1].T), axis=1),
+            0,
+            atol=1e-3,
+        )
+        if not al:
+            print(f"   {run} | {Path(target_p).name} | the approximation's path (SDC-10, part 3)")
+            continue
+        proj, _ = ensure_positive_cosines(
+            nb.Nifti1Image(np.zeros(target.shape[:3], np.float32), xfm @ target.affine)
+        )
+        rot = not np.allclose(
+            np.linalg.norm(np.cross(ctrl.affine[:-1, :-1].T, proj.affine[:-1, :-1].T), axis=1),
+            0,
+            atol=1e-3,
+        )
+        angle = np.degrees(np.arccos(np.clip((np.trace(xfm[:3, :3]) - 1) / 2, -1, 1)))
+        fields = []
+        for weights in (ORIGINAL_WEIGHTS, fixed_weights):
+            sdcflows.transform.grid_bspline_weights = weights
+            try:
+                xf = B0FieldTransform(coeffs=ctrl)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    xf.fit(target, xfm_data2fmap=xfm, approx=True)
+                fields.append(np.asanyarray(xf.mapped.dataobj, dtype=np.float64))
+            finally:
+                sdcflows.transform.grid_bspline_weights = ORIGINAL_WEIGHTS
+        mp = mask_for(run, host_path(run, target_p), xfms)
+        m_img = nb.load(mp)
+        m_ref, _ = ensure_positive_cosines(
+            nb.Nifti1Image(np.asanyarray(m_img.dataobj).astype(np.uint8), xfm @ target.affine)
+        )
+        mask = np.asanyarray(m_ref.dataobj) > 0
+        d = np.abs(fields[0] - fields[1])
+        print(
+            f"   {run} | {Path(target_p).name} | registration rotates {angle:.2f} deg; projected "
+            f"grid not aligned: {rot} | in the BOLD mask ({int(mask.sum())} voxels): RMS "
+            f"{np.sqrt(np.mean(d[mask] ** 2)):.3f} Hz, max {d[mask].max():.2f} Hz "
+            f"(max |field| {np.abs(fields[1][mask]).max():.1f} Hz)"
+        )
+
+
 def part3() -> None:
     """SDC-10: ``B0FieldTransform.fit(target, xfm_data2fmap, approx=True)`` on grids that are
     not aligned builds its intermediate grid around the target as given
@@ -532,6 +610,6 @@ def part3() -> None:
 if __name__ == "__main__":
     import sys
 
-    parts = sys.argv[1:] or ["0", "1", "1b", "2", "3"]
+    parts = sys.argv[1:] or ["0", "1", "1b", "2", "2b", "3"]
     for name in parts:
         globals()[f"part{name}"]()

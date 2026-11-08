@@ -214,7 +214,7 @@ def run_sdcflows(tmp, in_data, in_mask, params):
     return captured("nipype.interface", go)
 
 
-def run_larmorx(out_dir, in_data, in_mask, params):
+def run_larmorx(out_dir, in_data, in_mask, params, mine_kw=None):
     return captured(
         "larmorx.sdcflows",
         lambda: lxs.bspline_approx(
@@ -223,6 +223,7 @@ def run_larmorx(out_dir, in_data, in_mask, params):
             **params,
             out_dir=out_dir,
             n_threads=14,
+            **(mine_kw or {}),
         ),
     )
 
@@ -234,7 +235,7 @@ def exc_text(e):
     return f"{type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''}"
 
 
-def case(name, in_data, in_mask=None, oracle_dir=None, **kw):
+def case(name, in_data, in_mask=None, oracle_dir=None, mine_kw=None, **kw):
     params = {
         "bs_spacing": [(16.0, 16.0, 10.0)],
         "ridge_alpha": 1e-4,
@@ -245,7 +246,7 @@ def case(name, in_data, in_mask=None, oracle_dir=None, **kw):
     params.update(kw)
     with tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
         outs, err_ref, log_ref = run_sdcflows(t1, in_data, in_mask, params)
-        mine, err, log = run_larmorx(t2, in_data, in_mask, params)
+        mine, err, log = run_larmorx(t2, in_data, in_mask, params, mine_kw)
         if err_ref is not None or err is not None:
             ok = exc_text(err_ref) == exc_text(err) and log_ref == log
             detail = f"{exc_text(err_ref)!r} vs {exc_text(err)!r}"
@@ -429,7 +430,31 @@ def check_approx(tmp: Path) -> None:
     four = write(
         tmp / "four_fmap.nii.gz", field((20, 18, 10), 8).astype(np.float32)[..., None], aff
     )
-    case("approx 4D header", four, None)
+    case(
+        "approx 4D header (SDC-06 reproduced)",
+        four,
+        None,
+        mine_kw={"upstream_defects": "reproduce"},
+    )
+    # SDC-06 corrected: the 4D map of one volume gives sdcflows' result of the 3D map
+    three = write(tmp / "three_fmap.nii.gz", field((20, 18, 10), 8).astype(np.float32), aff)
+    with tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
+        outs, err_ref, _ = run_sdcflows(t1, three, None, {"bs_spacing": [(16.0, 16.0, 10.0)]})
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            mine, err, _ = run_larmorx(t2, four, None, {"bs_spacing": [(16.0, 16.0, 10.0)]})
+        named = any(getattr(x.message, "entry", "") == "SDC-06" for x in w)
+        same = err_ref is None and err is None
+        if same:
+            for a, b in [
+                (outs.out_field, mine.out_field),
+                (outs.out_error, mine.out_error),
+                (outs.out_coeff, mine.out_coeff[0]),
+            ]:
+                da = np.asanyarray(nb.load(a).dataobj)
+                db = np.asanyarray(nb.load(b).dataobj)
+                same &= da.tobytes() == np.squeeze(db, axis=-1 if db.ndim == 4 else None).tobytes()
+        report("approx 4D header (SDC-06 corrected: the 3D map's result)", same and named)
     other = write(tmp / "other_mask.nii.gz", np.ones((20, 18, 9), np.uint8), aff)
     case("approx mask on another grid", big, other)
 

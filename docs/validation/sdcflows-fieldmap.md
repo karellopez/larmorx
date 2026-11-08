@@ -30,7 +30,7 @@ The step's comparisons: 381 reported lines whose originals' outputs were compare
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (d0bd51dac009) |
+| larmorx | 0.0.1 (3c9c10af42cb) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "d0bd51dac009",
+  "larmorx_commit": "3c9c10af42cb",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -60,7 +60,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: two-levels": "identical"
    },
    "reason": "",
-   "seconds": 13.233,
+   "seconds": 10.463,
    "status": "pass"
   },
   {
@@ -123,7 +123,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: transform_coefficients two transforms": "identical"
    },
    "reason": "",
-   "seconds": 2.409,
+   "seconds": 2.814,
    "status": "pass"
   },
   {
@@ -176,7 +176,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: delta_te {}": "identical"
    },
    "reason": "",
-   "seconds": 2.577,
+   "seconds": 2.648,
    "status": "pass"
   },
   {
@@ -194,7 +194,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: special values and shapes (144 cases)": "identical"
    },
    "reason": "",
-   "seconds": 3.209,
+   "seconds": 3.086,
    "status": "pass"
   },
   {
@@ -240,7 +240,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: fit translation xfm": "identical"
    },
    "reason": "",
-   "seconds": 15.968,
+   "seconds": 13.29,
    "status": "pass"
   },
   {
@@ -328,7 +328,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: to_displacements": "identical"
    },
    "reason": "",
-   "seconds": 24.649,
+   "seconds": 21.772,
    "status": "pass"
   },
   {
@@ -363,7 +363,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: synthetic-two-levels": "identical"
    },
    "reason": "",
-   "seconds": 158.02,
+   "seconds": 103.218,
    "status": "pass"
   },
   {
@@ -430,7 +430,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: rescale_affine": "identical"
    },
    "reason": "",
-   "seconds": 169.85,
+   "seconds": 111.409,
    "status": "pass"
   },
   {
@@ -486,7 +486,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: ridge y-float64": "identical"
    },
    "reason": "",
-   "seconds": 231.042,
+   "seconds": 182.161,
    "status": "pass"
   },
   {
@@ -503,7 +503,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.008,
+   "seconds": 0.817,
    "status": "pass"
   },
   {
@@ -520,7 +520,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.046,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -537,7 +537,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.02,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -554,7 +554,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.019,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -571,7 +571,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.021,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -588,7 +588,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.262,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -605,7 +605,7 @@
    "reported": {
     "D13 fix pass": 26
    },
-   "seconds": 0.037,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -639,7 +639,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.113,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -656,7 +656,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -673,7 +673,7 @@
    "reported": {
     "D13 fix pass": 6839
    },
-   "seconds": 0.035,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -690,7 +690,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.039,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -707,7 +707,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -721,7 +721,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: displacements displacements": "changed"
    },
    "reason": "",
-   "seconds": 0.041,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -738,7 +738,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.019,
    "status": "pass"
   },
   {
@@ -755,7 +755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.037,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
    "reported": {
     "D13 fix pass": 9160
    },
-   "seconds": 0.069,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -789,7 +789,7 @@
    "reported": {
     "D13 fix pass": 1583
    },
-   "seconds": 0.036,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -806,7 +806,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.033,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -823,7 +823,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.027,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -840,7 +840,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.032,
+   "seconds": 0.028,
    "status": "pass"
   },
   {
@@ -857,7 +857,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.033,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -874,7 +874,7 @@
    "reported": {
     "D13 fix pass": 818
    },
-   "seconds": 0.054,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -891,7 +891,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.038,
+   "seconds": 0.027,
    "status": "pass"
   },
   {
@@ -908,7 +908,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.049,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -927,7 +927,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.031,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -944,7 +944,7 @@
    "reported": {
     "D13 fix pass": 1288
    },
-   "seconds": 0.044,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -961,7 +961,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.019,
    "status": "pass"
   }
  ],

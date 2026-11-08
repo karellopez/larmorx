@@ -286,11 +286,13 @@ file:
   `clipper_pre` are fMRIPrep's files, the brain mask identical in every voxel, but the B-spline
   fit's field differs everywhere by at most 0.067 Hz (scikit-learn's CG on the image's AVX-512
   `sdot`), where the seven phase-difference fits of the old laptop's runs are bit-identical.
-  **Confirmed on ds006736** (relay 8): the orchestrator re-made the seven runs with
+  **Confirmed on ds006736 and ds004958** (relay 8): the orchestrator re-made the seven runs with
   `OPENBLAS_CORETYPE=Haswell` (`oracles/logs/fmap-queue-haswell.log`); on the re-made
-  `ds006736-sub-004-noreconall` the image's topup gives FSL 6.0.7.23's files (7/7 images,
-  `descrip` apart, 2/2 matrices, the field identical in every voxel) and its regrid is
-  fMRIPrep's file again (`check_pepolar.py` `image`). The other re-made runs: relay 8's notes.
+  `ds006736-sub-004-noreconall` and `ds004958-sub-fsm64ps-noreconall-pepolar` the image's topup
+  gives FSL 6.0.7.23's files (7/7 images each, `descrip` apart, 2/2 matrices, the field identical
+  in every voxel), ds006736's regrid is fMRIPrep's file again, and every other check of the part
+  on them is identical in both environments (`relay8/recheck.sh`). The other re-made runs: the
+  part's notes, as they finish.
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 
@@ -356,7 +358,7 @@ wire them: `bold_fit_fieldmap` (`init_bold_fit_wf`'s stage 3 and stage 4's field
 (`bold_native_wf`'s and every `init_bold_volumetric_resample_wf`'s `fmap_select`,
 `distortion_params`, `fmap2target`, `inverses`, `fmap_recon`). Checked by `check_bold_stage.py`
 on fMRIPrep's inputs of the four earlier runs (7 BOLD fits, 21 resampling workflows; and the
-re-made ds006736): **every node file identical to fMRIPrep's in both environments**, with
+re-made ds006736 and ds004958): **every node file identical to fMRIPrep's in both environments**, with
 fMRIPrep's own `DerivativesDataSink` as the sink (so the later nodes read the derivative files,
 as in fMRIPrep, named as fMRIPrep names them): 14 fits (registering, and with fMRIPrep's
 transform given) × 14 node outputs, 70 `skullstrip_bold_wf` files, the three derivatives; the
@@ -377,8 +379,8 @@ and field maps. A call of `bold_fit_fieldmap` takes about 1 s (21 calls in 20.5 
   original type twice. Only the message; the file is right.
 - **The registration's threads do not reach the later nodes.** fMRIPrep's ANTs ran the
   registration with 8 threads (`NSLOTS`); larmorx gives ANTs' one-thread result: the parameters
-  differ by 1.3e-13 to 6.7e-13 on the earlier runs (4.3e-12 on ds006736), and nitransforms'
-  `"%g"` (PIPE-22) writes the same `out_fwd.tfm` text on all 8: every node after it is
+  differ by 1.3e-13 to 6.7e-13 on the earlier runs (4.3e-12 and 1.2e-12 on ds006736 and ds004958), and nitransforms'
+  `"%g"` (PIPE-22) writes the same `out_fwd.tfm` text on all 9: every node after it is
   fMRIPrep's file even with fMRIPrep's own registration.
 - **PIPE-20 at the pipeline level: rule B.** A BOLD run with a field map whose metadata give no
   readout time (or no phase-encoding direction) cannot be corrected as asked: fMRIPrep

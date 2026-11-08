@@ -21,7 +21,8 @@ registered volumes are held to 3 times it (9 times for 1 − NCC). Verdicts:
 - ``runaway``: a runaway whose structure meets point 4;
 - ``finding``: beyond both (its failing checks listed), to be examined case by case.
 
-    python -P triage.py <night directory> [--jobs N] [--limit N] [--sample N] [--out FILE]
+    python -P triage.py <night directory> [--jobs N] [--limit N] [--sample N] [--only FILE]
+                        [--seeds K] [--out FILE]
 
 Run inside ``scripts/orchestration/boxed.sh``, with ``LARMORX_WORKSPACE`` and ``PYTHONPATH`` set as
 the suite's are. Prints the counts and the findings; ``--out`` writes a JSON summary with one row
@@ -32,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
@@ -44,6 +46,9 @@ def _case(finding: str) -> dict:
     from larmorx_validation.parity import afni_volreg_original as vo
     from larmorx_validation.parity.harness import Case, run_one
 
+    if os.environ.get("VOLREG_TRIAGE_SEEDS"):
+        # --seeds K: the ties' spread from K seeded runs instead of the spec's 12 (a measurement)
+        vo.SPREAD_SEEDS = tuple(range(1, int(os.environ["VOLREG_TRIAGE_SEEDS"]) + 1))
     f = json.loads(Path(finding).read_text(encoding="utf-8"))
     recipe = f["recipe"]
     prefix = inputs.register(recipe["inputs"])
@@ -84,8 +89,15 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--sample", type=int, default=0, help="a seeded random sample of findings")
     ap.add_argument("--sample-seed", type=int, default=20261108)
     ap.add_argument("--out", default="")
+    ap.add_argument("--only", default="", help="a file of case numbers: only those findings")
+    ap.add_argument("--seeds", type=int, default=0, help="K seeded runs (a measurement; 12)")
     a = ap.parse_args(argv)
+    if a.seeds:
+        os.environ["VOLREG_TRIAGE_SEEDS"] = str(a.seeds)
     found = sorted((Path(a.night) / "findings" / "afni-volreg-original").glob("*.json"))
+    if a.only:
+        wanted = {int(x) for x in Path(a.only).read_text(encoding="utf-8").split()}
+        found = [f for f in found if int(f.stem.split("-")[-2]) in wanted]
     if a.sample:
         import random
 

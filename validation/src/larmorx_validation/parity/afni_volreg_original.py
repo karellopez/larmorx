@@ -2848,8 +2848,12 @@ class Compare:
         g: Geometry,
         gb: Geometry | None,
         coarse_required: bool = True,
+        relax: Relax | None = None,
     ):
         self.checks, self.p, self.s, self.g, self.gb = checks, pair, s, g, gb
+        #: §14.3 "The ties' spread": the requirements that follow the ties relaxed to 3 times
+        #: the original's own spread (random testing only)
+        self.relax = relax or Relax()
         #: §14.3: the coarse search's results required on the suite's cases and fMRIPrep's
         #: calls, reported elsewhere (random testing)
         self.coarse_required = coarse_required
@@ -2916,14 +2920,14 @@ class Compare:
         self.bounds = b
         d = np.abs(ref - test)
         ratio = float((d / b.param_bound).max()) if d.size else 0.0
-        m = 0.005 if self.s.method == "linear" else 0.001
+        m = max(0.005 if self.s.method == "linear" else 0.001, self.relax.median)
         med = float(np.median(d)) if d.size else 0.0
         self.add(
             "-1Dfile parameters",
-            ratio <= 1.0,
+            ratio <= self.relax.param,
             metric="max |diff| / threshold",
             value=round(ratio, 4),
-            threshold=1.0,
+            threshold=round(self.relax.param, 4),
             detail=f"largest |diff| {float(d.max()) if d.size else 0:.4f}",
         )
         self.add("-1Dfile median", med <= m, metric="median |diff|", value=med, threshold=m)
@@ -2987,12 +2991,14 @@ class Compare:
             mean = float(dv.mean()) / big
             ncc = _ncc(x, y)
             lv = limits[v]
+            lim_mean = max(lv, self.relax.mean)
+            lim_ncc = max(50.0 * lv * lv, self.relax.ncc)
             worst_ncc, worst_mean = min(worst_ncc, ncc), max(worst_mean, mean)
-            worst_mean_ratio = max(worst_mean_ratio, mean / lv)
-            worst_ncc_margin = max(worst_ncc_margin, (1.0 - ncc) / (50.0 * lv * lv))
+            worst_mean_ratio = max(worst_mean_ratio, mean / lim_mean)
+            worst_ncc_margin = max(worst_ncc_margin, (1.0 - ncc) / lim_ncc)
             worst_max = max(worst_max, float(dv.max()) / big)
             beyond1 += int(np.count_nonzero(dv > 1)) if integer else 0
-            ok &= ncc >= 1.0 - 50.0 * lv * lv and mean <= lv
+            ok &= 1.0 - ncc <= lim_ncc and mean <= lim_mean
         self.add(
             "registered volumes",
             ok,
@@ -3025,9 +3031,19 @@ class Compare:
         for v in range(a4.shape[3]):
             totals += nn_rule(inp[..., v], a4[..., v], b4[..., v])
         differing, failing, unknown, two = (int(t) for t in totals)
+        within = failing == 0
+        if not within and (self.relax.mean > 0 or self.relax.ncc > 0):
+            # random testing's ties' spread: the volumes within 3 (9) times the original's own
+            within = all(
+                float(np.abs(a4[..., v] - b4[..., v]).mean())
+                / (float(np.abs(a4[..., v]).max()) or 1.0)
+                <= self.relax.mean
+                and 1.0 - _ncc(a4[..., v], b4[..., v]) <= self.relax.ncc
+                for v in range(a4.shape[3])
+            )
         self.add(
             "registered volumes (-final NN): the nearest-neighbour rule",
-            failing == 0,
+            within,
             metric="differing voxels against the rule",
             value=failing,
             threshold=0,
@@ -3261,8 +3277,9 @@ class Compare:
         if (m1 := _RANGE.match(x)) and (m2 := _RANGE.match(y)):
             if m1.group(1) != m2.group(1):
                 return "text"
+            tol = self.relax.range
             for u, v in ((m1.group(2), m2.group(2)), (m1.group(3), m2.group(3))):
-                if abs(float(u) - float(v)) > 0.10 * max(abs(float(u)), abs(float(v))):
+                if abs(float(u) - float(v)) > tol * max(abs(float(u)), abs(float(v))):
                     return "a derivative image's range beyond 10 %"
             return ""
         if _MINMAX.match(x) and _MINMAX.match(y) and b is not None:
@@ -3270,7 +3287,7 @@ class Compare:
                 return "text"
             na = [float(t) for t in _NUM.findall(x.split(":", 1)[1])]
             nb = [float(t) for t in _NUM.findall(y.split(":", 1)[1])]
-            lim = b.param_bound.max(axis=0) + 0.0005
+            lim = b.param_bound.max(axis=0) * self.relax.param + 0.0005
             return (
                 ""
                 if all(abs(u - v) <= lim[q] for q, (u, v) in enumerate(zip(na, nb, strict=True)))
@@ -3299,7 +3316,8 @@ class Compare:
             delta = m1.group(1).startswith("delta")
             lim = self._disp_bound(delta)
             ka, kb = int(m1.group(3)), int(m2.group(3))
-            if abs(float(m1.group(2)) - float(m2.group(2))) > lim[ka] + 0.01:
+            # the largest of values each within its bound moves by at most the larger bound
+            if abs(float(m1.group(2)) - float(m2.group(2))) > max(lim[ka], lim[kb]) + 0.01:
                 return "the maximum displacement"
             if ka != kb:
                 # §14.3: a near tie when, in the reference's run, the value at the test's printed
@@ -3377,7 +3395,7 @@ class Compare:
             nb = [float(t) for t in re.findall(r"(-?\d+\.\d+)[IRASLP]", y)]
             if len(na) != 6 or len(nb) != 6 or v >= self.bounds.param_bound.shape[0]:
                 return False
-            lim = self.bounds.param_bound[v] + 0.0001
+            lim = self.bounds.param_bound[v] * self.relax.param + 0.0001
             if any(abs(u - w) > lim[q] for q, (u, w) in enumerate(zip(na, nb, strict=True))):
                 return False
             v += 1
@@ -3869,15 +3887,6 @@ SPREAD_SEEDS = tuple(range(1, 13))
 RUNAWAY_DEGREES, RUNAWAY_MM = 15.0, 20.0
 #: The text of the original's AFNI-97 stop (``reproduce``).
 _AFNI_97_STOP = "AFNI crashes here (AFNI-97;"
-#: The checks the ties' spread judges (the parameters and the registered volumes); every other
-#: requirement (the derived quantities' bounds follow each volume's own parameter differences)
-#: stays as it is.
-_SPREAD_CHECKS = (
-    "-1Dfile parameters",
-    "-1Dfile median",
-    "registered volumes",
-    "registered volumes (-final NN): the nearest-neighbour rule",
-)
 #: What a runaway still requires (§14.3 point 4), when both runs end with exit status 0.
 _RUNAWAY_REQUIRED = (
     "files written",
@@ -3948,125 +3957,147 @@ def _masked(lines: list[str]) -> list[str]:
     return out
 
 
-def _seeded_runs(ctx: TieContext) -> list[tuple[Ran, dict]]:
-    """The original with ``reproduce`` and each seeded tie draw (``random:<k>``, §14.3)."""
+def _seeded_runs(ctx: TieContext, mode: str) -> list[tuple[Ran, dict]]:
+    """The original in ``mode`` with each seeded tie draw (``random:<k>``, §14.3), one thread
+    (the same bits at any count)."""
     out = []
     for k in SPREAD_SEEDS:
-        sd = ctx.d / f"original-seed{k}"
+        sd = ctx.d / f"original-seed{k}-{mode}"
         placed = _prepare(sd, ctx.run, ctx.ins)
         env = {**ctx.extra, "LARMORX_VOLREG_TIES": f"random:{k}"}
-        r = run_lx("original", defects.REPRODUCE, ctx.argv, sd, env, 1, ctx.run.stdin)
+        r = run_lx("original", mode, ctx.argv, sd, env, 1, ctx.run.stdin)
         out.append((r, _written(sd, placed)))
     return out
 
 
-def _spread(centre_p, centre_v, seeded, s: Settings, ref_p, ref_v, g: Geometry) -> dict:
-    """§14.3 point 2: the largest difference between the original's default run (``centre``)
-    and its seeded runs, in each requirement's units (thresholds from the reference's values)."""
-    pb = parameter_bounds(ref_p, centre_p, s, g).param_bound
-    out = {"param": 0.0, "median": 0.0, "mean": 0.0, "ncc": 0.0, "runs": 0}
-    for _r, files in seeded:
-        pk = _params_in(files, s)
-        if pk is not None and pk.shape == centre_p.shape:
-            dk = np.abs(centre_p - pk)
-            out["param"] = max(out["param"], float((dk / pb).max()) if dk.size else 0.0)
-            out["median"] = max(out["median"], float(np.median(dk)) if dk.size else 0.0)
-            out["runs"] += 1
-        vk = _volumes(files, s)
-        same = centre_v is not None and ref_v is not None and vk is not None
-        if same and vk.shape == centre_v.shape == ref_v.shape:
-            for v in range(vk.shape[3]):
-                big = float(np.abs(ref_v[..., v]).max()) or 1.0
-                dv = np.abs(centre_v[..., v] - vk[..., v])
-                out["mean"] = max(out["mean"], float(dv.mean()) / big)
-                out["ncc"] = max(out["ncc"], 1.0 - _ncc(centre_v[..., v], vk[..., v]))
+def _ranges(stderr: str) -> list[tuple[float, float]]:
+    """``-verbose -verbose``'s derivative image ranges, in order."""
+    out = []
+    for x in stderr.splitlines():
+        if m := _RANGE.match(_ANSI.sub("", x).strip()):
+            out.append((float(m.group(2)), float(m.group(3))))
     return out
 
 
-def _within_spread(test_p, test_v, ref_p, ref_v, sp: dict, s: Settings, g: Geometry) -> list[str]:
-    """§14.3 point 3: the requirements the test does not meet within the larger of the fixed
-    requirement and 3 times the spread (9 times for 1 − NCC); [] when it meets every one."""
-    bad = []
-    if test_p is not None and ref_p is not None and test_p.shape == ref_p.shape and ref_p.size:
-        pb = parameter_bounds(ref_p, test_p, s, g).param_bound
-        dp = np.abs(ref_p - test_p)
-        r = float((dp / pb).max())
-        if r > max(1.0, 3.0 * sp["param"]):
-            bad.append(f"parameters {r:.3g} thresholds (spread {sp['param']:.3g})")
-        m = 0.005 if s.method == "linear" else 0.001
-        med = float(np.median(dp))
-        if med > max(m, 3.0 * sp["median"]):
-            bad.append(f"median {med:.3g} (spread {sp['median']:.3g})")
-    if test_v is not None and ref_v is not None and test_v.shape == ref_v.shape:
-        limits, _ = volume_limits(ref_p, ref_v.shape[3])
-        nn = s.final == "NN"
-        for v in range(ref_v.shape[3]):
-            big = float(np.abs(ref_v[..., v]).max()) or 1.0
-            mean = float(np.abs(ref_v[..., v] - test_v[..., v]).mean()) / big
-            one = 1.0 - _ncc(ref_v[..., v], test_v[..., v])
-            lv = 0.0 if nn else limits[v]
-            if mean > max(lv, 3.0 * sp["mean"]) or one > max(50 * lv * lv, 9.0 * sp["ncc"]):
-                bad.append(f"volume {v}: mean {mean:.3g}, 1 - NCC {one:.3g}")
-                break
-    return bad
+@dataclasses.dataclass
+class Relax:
+    """§14.3 point 3: the larger of each fixed requirement and 3 times the ties' spread (9 times
+    for 1 − NCC), in the requirement's own units."""
+
+    param: float = 1.0  # the parameters' thresholds multiplied by this
+    median: float = 0.0  # the median's limit at least this
+    mean: float = 0.0  # each volume's mean |diff| / max at least this
+    ncc: float = 0.0  # each volume's 1 − NCC at least this
+    range: float = 0.10  # -verbose -verbose's derivative ranges (relative)
+
+    def text(self) -> str:
+        return (
+            f"parameters x{self.param:.3g}, median {self.median:.3g}, volumes mean "
+            f"{self.mean:.3g}, 1 - NCC {self.ncc:.3g}, derivative ranges {self.range:.3g}"
+        )
+
+
+def _spread(centre: tuple[Ran, dict], seeded, s: Settings, ref_p, ref_v, g: Geometry) -> Relax:
+    """§14.3 point 2: the largest difference between the original's default run (``centre``)
+    and its seeded runs, in each requirement's units (the thresholds and largest values from the
+    reference's run); returned as the relaxed limits of point 3."""
+    cp, cv = _params_in(centre[1], s), _volumes(centre[1], s)
+    cr = _ranges(centre[0].stderr)
+    sp = {"param": 0.0, "median": 0.0, "mean": 0.0, "ncc": 0.0, "range": 0.0}
+    pb = parameter_bounds(ref_p, cp, s, g).param_bound if cp is not None else None
+    for r, files in seeded:
+        pk = _params_in(files, s)
+        if pb is not None and pk is not None and pk.shape == cp.shape and cp.size:
+            dk = np.abs(cp - pk)
+            sp["param"] = max(sp["param"], float((dk / pb).max()))
+            sp["median"] = max(sp["median"], float(np.median(dk)))
+        vk = _volumes(files, s)
+        same = cv is not None and ref_v is not None and vk is not None
+        if same and vk.shape == cv.shape == ref_v.shape:
+            for v in range(vk.shape[3]):
+                big = float(np.abs(ref_v[..., v]).max()) or 1.0
+                sp["mean"] = max(sp["mean"], float(np.abs(cv[..., v] - vk[..., v]).mean()) / big)
+                sp["ncc"] = max(sp["ncc"], 1.0 - _ncc(cv[..., v], vk[..., v]))
+        rk = _ranges(r.stderr)
+        if len(rk) == len(cr):
+            for (a1, a2), (b1, b2) in zip(cr, rk, strict=True):
+                for u, w in ((a1, b1), (a2, b2)):
+                    sp["range"] = max(sp["range"], abs(u - w) / max(abs(u), abs(w), 1e-30))
+    return Relax(
+        param=max(1.0, 3.0 * sp["param"]),
+        median=3.0 * sp["median"],
+        mean=3.0 * sp["mean"],
+        ncc=9.0 * sp["ncc"],
+        range=max(0.10, 3.0 * sp["range"]),
+    )
 
 
 def ties_judgement(ctx: TieContext, compared: CheckList) -> str:
     """§14.3 "The ties' spread" for a random-testing case beyond the fixed requirements: a
     runaway (point 4) is held to the output's structure; otherwise the original's 12 seeded runs
-    measure its own spread under the ties, and the parameters and registered volumes of both
-    comparisons (against AFNI, and the default against the replica's) are held to 3 times it.
-    Edits ``compared``'s checks; returns ``"runaway"``, ``"spread"`` or ``""`` (beyond both)."""
+    (``reproduce``; for the default against the replica's default, 12 seeded runs by default)
+    measure its own spread under the ties, and both comparisons are made again with every
+    requirement that follows the ties (the parameters, ``-rotcom``'s and the messages'
+    parameters, the registered volumes, ``-verbose -verbose``'s derivative ranges) at the larger
+    of its fixed value and 3 times the spread (9 for 1 − NCC); the derived quantities keep their
+    bounds. Edits ``compared``'s checks; returns ``"runaway"``, ``"spread"`` or ``""`` (beyond
+    both)."""
     s, g = ctx.s, ctx.g
     pa, po = _params_in(ctx.files["afni"], s), _params_in(ctx.files["original-reproduce"], s)
     crash = _afni_crashed(ctx.afni)
     runaway = _beyond(pa) or _beyond(po) or crash or _stopped_by_afni_97(ctx.rep)
     seeded: list = []
     if not runaway:
-        seeded = _seeded_runs(ctx)
+        seeded = _seeded_runs(ctx, defects.REPRODUCE)
         runaway = any(_beyond(_params_in(f, s)) or _stopped_by_afni_97(r) for r, f in seeded)
     if runaway:
         _judge_runaway(ctx, compared)
         return "runaway"
-    failing = [c for c in compared.checks if not c.passed]
-    if any(c.name.split(": ", 1)[-1] not in _SPREAD_CHECKS for c in failing):
+    if pa is None or po is None:
         return ""
-    va, vo = _volumes(ctx.files["afni"], s), _volumes(ctx.files["original-reproduce"], s)
-    pr, pf = _params_in(ctx.files["replica-fix"], s), _params_in(ctx.files["original-fix"], s)
-    vr, vf = _volumes(ctx.files["replica-fix"], s), _volumes(ctx.files["original-fix"], s)
-    if po is None or pa is None:
-        return ""
-    sp_a = _spread(po, vo, seeded, s, pa, va, g)
-    bad_a = _within_spread(po, vo, pa, va, sp_a, s, g)
-    bad_r: list[str] = []
-    if pr is not None and pf is not None:
-        sp_r = _spread(po, vo, seeded, s, pr, vr, g)
-        bad_r = _within_spread(pf, vf, pr, vr, sp_r, s, g)
-    detail = (
-        f"{sp_a['runs']} seeded runs: parameters {sp_a['param']:.3g} thresholds, median "
-        f"{sp_a['median']:.3g}, volumes mean {sp_a['mean']:.3g}, 1 - NCC {sp_a['ncc']:.3g}"
+    pairs = (
+        ("AFNI", ctx.afni, ctx.rep, "afni", "original-reproduce"),
+        ("the replica (default)", ctx.rfix, ctx.fix, "replica-fix", "original-fix"),
     )
-    compared.add(
+    labels = [p[0] for p in pairs]
+    if any(not c.passed and c.name.split(": ", 1)[0] not in labels for c in compared.checks):
+        return ""
+    kept = [c for c in compared.checks if c.name.split(": ", 1)[0] not in labels]
+    spreads = []
+    ok = True
+    for label, ref, test, rd, td in pairs:
+        own = [c for c in compared.checks if c.name.split(": ", 1)[0] == label]
+        if all(c.passed for c in own):
+            kept += own
+            continue
+        if label == "AFNI":
+            centre, runs = (ctx.rep, ctx.files["original-reproduce"]), seeded
+        else:
+            centre, runs = (ctx.fix, ctx.files["original-fix"]), _seeded_runs(ctx, defects.FIX)
+        relax = _spread(
+            centre, runs, s, _params_in(ctx.files[rd], s), _volumes(ctx.files[rd], s), g
+        )
+        spreads.append(f"{label}: {relax.text()}")
+        cl = CheckList()
+        pair = Pair(label, ref, test, ctx.dirs[rd], ctx.dirs[td], ctx.files[rd], ctx.files[td])
+        Compare(cl, pair, s, g, None, coarse_required=False, relax=relax).run()
+        relaxed = [
+            c if not c.passed or c.threshold == "reported" else dataclasses.replace(c, threshold=f"{c.threshold} (or 3 times the ties' spread, §14.3)")
+            for c in cl.checks
+        ]  # fmt: skip
+        ok &= all(c.passed for c in relaxed)
+        kept += relaxed
+    kept.append(
         Check(
             "the ties' spread (§14.3: 12 seeded runs of the original)",
-            not bad_a and not bad_r,
-            metric="within 3 times the spread (9 for 1 - NCC)",
-            value="; ".join(bad_a + bad_r) or "within",
-            threshold="reported" if not (bad_a or bad_r) else "3 x spread",
-            detail=detail,
+            True,
+            metric="the relaxed limits",
+            value="; ".join(spreads),
+            threshold="reported",
         )
     )
-    if bad_a or bad_r:
-        return ""
-    compared.checks = [
-        c
-        if c.passed
-        else dataclasses.replace(
-            c, passed=True, threshold="within 3 times the ties' spread (§14.3)"
-        )
-        for c in compared.checks
-    ]
-    return "spread"
+    compared.checks = kept
+    return "spread" if ok else ""
 
 
 def _judge_runaway(ctx: TieContext, compared: CheckList) -> None:

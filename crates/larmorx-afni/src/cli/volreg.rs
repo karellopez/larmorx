@@ -1441,9 +1441,7 @@ fn execute_after_scan(
         n_threads,
         mode,
     };
-    if !o.maxdisp && o.twopass && params.coarse_rotation && coarse.0 > 0 && coarse.1 > 0 {
-        late.push(notices::afni_92(mode));
-    }
+    let nomaxdisp = !o.maxdisp;
     let header = image.header.clone();
     let mut geometry = image.geometry.clone();
     // After -tshift the output has no slice offsets and a time origin of 0.
@@ -1482,6 +1480,10 @@ fn execute_after_scan(
             .collect();
     }
     let result = volreg::run(image.bricks, &grid, &params);
+    // AFNI-92: named when the run's coarse rotation search was reached with -nomaxdisp
+    if nomaxdisp && volreg::COARSE_ROTATIONS_RAN.load(std::sync::atomic::Ordering::Relaxed) {
+        late.push(notices::afni_92(mode));
+    }
     let r = match result {
         Ok(r) => r,
         Err(e) => {
@@ -1489,7 +1491,7 @@ fn execute_after_scan(
                 log.message(m);
             }
             // the option scan's notices too (AFNI-86, -90, -95), before the error
-            print_notices(log, std::mem::take(late).iter().chain(&e.notices));
+            print_phased(log, &std::mem::take(late), &e.notices);
             return Err(if e.fatal_error {
                 Stop::Fatal(e.fatal)
             } else {
@@ -1582,7 +1584,7 @@ fn execute_after_scan(
         if let Some(e) = unwritable_name(&o.prefix) {
             let unwritable = notices::afni_26_unwritable(mode);
             let pending: Vec<Notice> = std::mem::take(late);
-            print_notices(log, pending.iter().chain(&notices).chain([&unwritable]));
+            print_phased(log, &pending, notices.iter().chain([&unwritable]));
             return Err(Stop::Fatal(format!(
                 "can't write output dataset: cannot replace '{}': {e}; nothing was written",
                 o.prefix
@@ -1697,7 +1699,7 @@ fn execute_after_scan(
     if scaled && output && !o.float {
         log.warning("Input dataset has scale factors ==> output is stored as floats!");
     }
-    print_notices(log, late.iter().chain(&notices));
+    print_phased(log, late.iter(), &notices);
     Ok(0)
 }
 
@@ -1721,14 +1723,37 @@ fn afni_98_name(o: &Options, arg_name: &str, mode: UpstreamDefects, log: &mut Lo
 /// Prints notices as the replica orders them: by the defect's ID (a stable sort: one defect's
 /// several notices in their order), each notice once.
 fn print_notices<'a>(log: &mut Log<'_>, notices: impl IntoIterator<Item = &'a Notice>) {
-    let mut all: Vec<&Notice> = Vec::new();
-    for n in notices {
-        if !all.contains(&n) {
-            all.push(n);
+    print_phased(log, notices, []);
+}
+
+/// Prints the notices in the order the run meets them, phase by phase (black-box: as the
+/// replica prints them): first those met before the run (`early`: the option scan's and the
+/// setup's, by ID), then AFNI-92 (met when the first pass reaches the coarse rotation search),
+/// then the run's and the output's (`run`, by ID); each once.
+fn print_phased<'a>(
+    log: &mut Log<'_>,
+    early: impl IntoIterator<Item = &'a Notice>,
+    run: impl IntoIterator<Item = &'a Notice>,
+) {
+    let mut all: Vec<(u8, &Notice)> = Vec::new();
+    let mut add = |n: &'a Notice, phase: u8| {
+        if !all.iter().any(|(_, m)| *m == n) {
+            let phase = if n.defect.id == defects::AFNI_92.id {
+                1
+            } else {
+                phase
+            };
+            all.push((phase, n));
         }
+    };
+    for n in early {
+        add(n, 0);
     }
-    all.sort_by_key(|n| n.defect.id);
-    for n in all {
+    for n in run {
+        add(n, 2);
+    }
+    all.sort_by_key(|(phase, n)| (*phase, n.defect.id));
+    for (_, n) in all {
         log.notice(n);
     }
 }

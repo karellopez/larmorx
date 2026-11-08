@@ -385,6 +385,11 @@ fn push_non_3d(found: &Found, verbose: bool, messages: &mut Vec<Message>) {
     }
 }
 
+/// Whether this run started a first pass with the coarse rotation search (AFNI-92 is named only
+/// then: a run that stops before it, e.g. at the base's check, never uses the clip fraction).
+pub static COARSE_ROTATIONS_RAN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// Runs 3dvolreg on `bricks` (the input series, after `-tshift`) on `grid`.
 pub fn run(
     bricks: Bricks,
@@ -425,6 +430,7 @@ fn run_in_pool(
     // AFNI-97 and a decomposition that failed: flags of this run's resamplings.
     fourier::LONE_ROW_BEYOND.store(false, std::sync::atomic::Ordering::Relaxed);
     rotate::NO_SHEARS.store(false, std::sync::atomic::Ordering::Relaxed);
+    COARSE_ROTATIONS_RAN.store(false, std::sync::atomic::Ordering::Relaxed);
     // The tie setting of this run (a validation switch), its generator started afresh.
     if let Err(fatal) = rotate::reset_ties() {
         return Err(VolregError {
@@ -514,6 +520,9 @@ fn run_in_pool(
     };
     let mut empty_region = false;
     if p.twopass {
+        if coarse_on && coarse_settings.rotations {
+            COARSE_ROTATIONS_RAN.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         if verbose {
             messages.push(Message::Info(
                 "Start of first pass alignment on all sub-bricks".into(),

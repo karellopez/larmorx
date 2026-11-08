@@ -266,6 +266,14 @@ file:
   6.0.7.23 here too (0.03 % of the field's voxels identical, at most 0.197 Hz; its matrices
   identical): the second run after ds006736 (relay 5's note), ds001600 and ds005040 the same: the
   cause stays to be measured with the records.
+- **The D8 PEPOLAR run of ds002603** (sub-01, the phase difference's `IntendedFor` removed: two
+  EPI+BOLD estimators; finished 20:32): the same checks, ALL OK in both environments (2.15: 60,
+  2.17: 70, debug: 36, sloppy: 35 node files; fMRIPrep's own nodes of both estimators identical;
+  topup's replica = FSL 6.0.7.23 on fMRIPrep's inputs, 16 images and 4 matrices), its two BOLD runs'
+  dilated masks and skull-stripping = fMRIPrep's files (`check_bold_fmap.py`). fMRIPrep's image's
+  topup differs from FSL 6.0.7.23 more here: 0.06 % and 0.8 % of the fields' voxels identical, at most
+  5.35 Hz and 17.8 Hz apart (matrices identical). Three runs of five now: to measure before the
+  records (the image's topup on the main machine through the oracle cache: build or CPU kernels).
 
 ## Candidates for the register (the part's defects relay decides them)
 

@@ -1427,6 +1427,7 @@ fn execute_after_scan(
         coarse_rotation: o.coarse_rotation,
         sinit: o.sinit,
         maxdisp: o.maxdisp,
+        maxdisp_file: o.maxdisp1d.is_some(),
         coarse_clfrac: if o.maxdisp || mode.fix() { 0.333 } else { 0.5 },
         output,
         float_output,
@@ -1636,10 +1637,13 @@ fn execute_after_scan(
                 data: BrickData::Float(data),
                 factors: vec![0.0; nt],
             };
+            // the output's header (§10.3), its slice fields included (observed)
             let timing = OutputTiming {
                 tr,
                 toffset,
-                slices: None,
+                slices: slice_timing
+                    .as_ref()
+                    .map(|h| timing::copy_slice_fields(&h.times, mode).0),
             };
             let (hdr, _, _) =
                 dataset::output_header(&geometry, &bricks, &timing, None, mode, settings)

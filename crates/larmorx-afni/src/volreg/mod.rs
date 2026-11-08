@@ -100,6 +100,8 @@ pub struct VolregParams {
     pub coarse_rotation: bool,
     pub sinit: bool,
     pub maxdisp: bool,
+    /// `-maxdisp1D`'s files are written (their three decimals decide AFNI-99's notice, §12).
+    pub maxdisp_file: bool,
     /// The clip fraction of the coarse search's automask (0.333, or 0.5 with `-nomaxdisp` in
     /// `reproduce`: AFNI-92).
     pub coarse_clfrac: f32,
@@ -140,6 +142,7 @@ impl Default for VolregParams {
             coarse_rotation: true,
             sinit: true,
             maxdisp: true,
+            maxdisp_file: false,
             coarse_clfrac: 0.333,
             output: true,
             float_output: false,
@@ -418,6 +421,16 @@ fn run_in_pool(
         notices: Vec::new(),
         fatal,
         fatal_error: false,
+    };
+    // AFNI-97 and a decomposition that failed: flags of this run's resamplings.
+    fourier::LONE_ROW_BEYOND.store(false, std::sync::atomic::Ordering::Relaxed);
+    rotate::NO_SHEARS.store(false, std::sync::atomic::Ordering::Relaxed);
+    let lone_row = || fourier::LONE_ROW_BEYOND.load(std::sync::atomic::Ordering::Relaxed);
+    let afni_97_stop = |messages: Vec<Message>| VolregError {
+        messages,
+        notices: vec![notices::afni_97(mode)],
+        fatal: notices::AFNI_97_FATAL.into(),
+        fatal_error: true,
     };
     // AFNI-89: a basis whose least squares failed; the error comes at the first fit.
     let afni_89 = |messages: Vec<Message>| VolregError {
@@ -705,6 +718,9 @@ fn run_in_pool(
             };
             let mut chat = chatty.then(String::new);
             let r = basis.register(&v, init, &it1, &mut work, chat.as_mut());
+            if mode.reproduce() && lone_row() {
+                return Err(afni_97_stop(messages));
+            }
             let deg = r.radians.map(fit::to_degrees);
             results.push((
                 Some([
@@ -987,6 +1003,12 @@ fn run_in_pool(
             }
         }
     }
+    if lone_row() {
+        if mode.reproduce() {
+            return Err(afni_97_stop(messages));
+        }
+        defects::push_once(&mut notices, notices::afni_97(mode));
+    }
     let mut fitted = Vec::with_capacity(nt);
     let mut rms = Vec::with_capacity(nt);
     let mut stretched = false;
@@ -1054,15 +1076,25 @@ fn run_in_pool(
         let signed = mode.reproduce();
         let md = report::max_displacements(grid, &positions, &reported, signed, trig);
         let other = report::max_displacements(grid, &positions, &reported, !signed, trig);
+        // AFNI-99 is named where a value the run prints or writes differs (§12): the messages'
+        // two decimals and sub-bricks, -verbose's list (two decimals), -maxdisp1D's three
+        let digits = if p.maxdisp_file {
+            3
+        } else if verbose {
+            2
+        } else {
+            0
+        };
         let shown = |m: &MaxDisp| -> (Vec<String>, String) {
             (
                 m.per_volume
                     .iter()
+                    .filter(|_| digits > 0)
                     .map(|(a, b)| {
                         format!(
                             "{}{}",
-                            cfmt::fixed(f64::from(*a), 3),
-                            cfmt::fixed(f64::from(*b), 3)
+                            cfmt::fixed(f64::from(*a), digits),
+                            cfmt::fixed(f64::from(*b), digits)
                         )
                     })
                     .collect(),

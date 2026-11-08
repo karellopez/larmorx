@@ -61,6 +61,25 @@ pub fn afni_26_unwritable(mode: UpstreamDefects) -> Notice {
     Notice::new(&defects::AFNI_26, mode, d)
 }
 
+/// AFNI-97: a Fourier rotation's lone last row with both shifts beyond the row.
+pub fn afni_97(mode: UpstreamDefects) -> Notice {
+    let d = pick(
+        mode,
+        "a Fourier rotation shifted the last of an odd count of rows, with the previous pair's \
+         second shift, beyond the row length: that row is cleared alone; AFNI clears the missing \
+         second row through a NULL pointer and crashes",
+        "a Fourier rotation shifted the last of an odd count of rows, with the previous pair's \
+         second shift, beyond the row length: AFNI clears the missing second row through a NULL \
+         pointer and crashes (segmentation fault) here",
+    );
+    Notice::new(&defects::AFNI_97, mode, d)
+}
+
+/// AFNI-97's error with `reproduce` (AFNI crashes there).
+pub const AFNI_97_FATAL: &str = "a Fourier rotation shifted the last of an odd count of rows \
+     beyond the row length together with the previous pair's second shift (a rotation far beyond \
+     a head's motion); AFNI crashes here (AFNI-97; the default goes on)";
+
 /// AFNI-98: with `-input`, two messages name `(null)` (the argument after the options).
 pub fn afni_98(mode: UpstreamDefects) -> Notice {
     let d = pick(

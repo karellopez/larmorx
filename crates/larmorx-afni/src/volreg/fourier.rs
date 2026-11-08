@@ -213,6 +213,12 @@ impl Batch {
     }
 }
 
+/// Set when a Fourier shear met the last of an odd count of rows with its shift and the
+/// previous pair's second shift both beyond the row (AFNI-97: AFNI crashes there; the row is
+/// cleared alone, as a pair is). Reset at the start of each run (`volreg::run`).
+pub static LONE_ROW_BEYOND: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// Shifts the rows of one `w` value: `pairs` from [`Stage::pairs`], rows of length `n`;
 /// sample `m` of row `u` is read at `src[isrc(u, m)]` (or `dst[...]` when `src` is `None`:
 /// in place, as every batch reads all its rows before writing them) and written at
@@ -231,6 +237,12 @@ fn shift_rows(
 ) {
     let factor = 0.5f32 / st.l as f32;
     let beyond = |a: f32| a < -(n as f32) || a > n as f32;
+    if pairs
+        .iter()
+        .any(|&(_, two, s1, s2)| !two && beyond(s1) && beyond(s2))
+    {
+        LONE_ROW_BEYOND.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
     for chunk in pairs.chunks(B) {
         batch.clear_tail(n);
         let mut a1 = [0f32; B];

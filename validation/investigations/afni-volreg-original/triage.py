@@ -27,7 +27,7 @@ final-pass ``Iteration complete at <k> steps`` lines give each volume's iteratio
   stopped at the iteration limit M in AFNI or in the original: 23, ``-maxite``, ``-params``, 66
   with ``-twopass`` for an M below 10); ``converged and beyond`` (else: examined case by case).
 
-    python -P triage.py <night directory> [--jobs N] [--limit N] [--out FILE]
+    python -P triage.py <night directory> [--jobs N] [--limit N] [--sample N] [--out FILE]
 
 Run inside ``scripts/orchestration/boxed.sh``, with ``LARMORX_WORKSPACE`` and ``PYTHONPATH`` set as
 the suite's are. Prints the counts and the ``converged and beyond`` cases; ``--out`` writes a JSON
@@ -160,9 +160,15 @@ def main(argv: list[str]) -> int:
     ap.add_argument("night")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--sample", type=int, default=0, help="a seeded random sample of findings")
+    ap.add_argument("--sample-seed", type=int, default=20261108)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     found = sorted((Path(a.night) / "findings" / "afni-volreg-original").glob("*.json"))
+    if a.sample:
+        import random
+
+        found = sorted(random.Random(a.sample_seed).sample(found, min(a.sample, len(found))))
     if a.limit:
         found = found[: a.limit]
     with ProcessPoolExecutor(a.jobs, mp_context=get_context("spawn")) as pool:

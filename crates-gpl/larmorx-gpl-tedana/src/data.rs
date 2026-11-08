@@ -521,30 +521,52 @@ fn load_zcat(
 /// as tedana holds it (the first echo's `np.asanyarray(dataobj)`, Fortran-ordered: float32, or
 /// float64 for integers and scaled data; for z-concatenated data the first slab's
 /// `get_fdata()`, float64 and C-ordered), as a mask over the reference's first three axes with
-/// the reference's affine. `reproduce` selects numpy's own float64 `exp` and `log` for the
-/// smoothing kernel (correctly rounded ones otherwise). Also returns nilearn's empty-mask
-/// warning flag.
+/// the reference's affine. `maths` selects numpy's own float64 `exp` and `log` for the
+/// smoothing kernel (or correctly rounded ones); while its witness looks, the mask is also
+/// computed with the other choice, and a different mask is noted (`Family::ExpLog`). Also
+/// returns nilearn's empty-mask warning flag.
 pub fn compute_mask(
     data: &[String],
     reference: &RefImage,
-    reproduce: bool,
+    choice: &crate::maths::Maths,
     n_threads: usize,
 ) -> Result<(UserMask, bool), PyError> {
+    use crate::maths::Family;
     use larmorx_core::math;
     use larmorx_core::numpy::umath;
-    use larmorx_interp::nilearn::{EpiData, Layout, Maths, compute_epi_mask};
+    use larmorx_interp::nilearn::{
+        EpiData, EpiMask, EpiMaskError, Layout, Maths, compute_epi_mask,
+    };
 
     let h = &reference.header;
-    let maths = if reproduce {
-        Maths {
-            exp: umath::exp_f64,
-            log: umath::log_f64,
+    let pick = |numpy: bool| {
+        if numpy {
+            Maths {
+                exp: umath::exp_f64,
+                log: umath::log_f64,
+            }
+        } else {
+            Maths {
+                exp: math::exp,
+                log: math::log,
+            }
         }
-    } else {
-        Maths {
-            exp: math::exp,
-            log: math::log,
+    };
+    let both = choice.watching(Family::ExpLog);
+    let numpy = choice.numpy_explog();
+    // The mask with the chosen functions, and with the other while the witness looks.
+    let run = |f: &dyn Fn(Maths) -> Result<EpiMask, EpiMaskError>| {
+        let m = f(pick(numpy));
+        if both {
+            let o = f(pick(!numpy));
+            let same = match (&m, &o) {
+                (Ok(a), Ok(b)) => a.mask == b.mask && a.empty == b.empty,
+                (Err(a), Err(b)) => a.python() == b.python(),
+                _ => false,
+            };
+            choice.note(Family::ExpLog, !same);
         }
+        m
     };
     let place = "nilearn/masking.py, in compute_epi_mask";
     let fail = |e: larmorx_interp::nilearn::EpiMaskError| {
@@ -569,7 +591,7 @@ pub fn compute_mask(
         }
         let shape = [nx, ny, nzs, nt];
         (
-            compute_epi_mask(EpiData::F64(&c), &shape, Layout::C, maths).map_err(fail)?,
+            run(&|m| compute_epi_mask(EpiData::F64(&c), &shape, Layout::C, m)).map_err(fail)?,
             shape.to_vec(),
         )
     } else {
@@ -578,7 +600,7 @@ pub fn compute_mask(
         let m = match a {
             DynArray::F32(a) => {
                 let v: Vec<f32> = a.t().iter().copied().collect();
-                compute_epi_mask(EpiData::F32(&v), &shape, Layout::Fortran, maths)
+                run(&|m| compute_epi_mask(EpiData::F32(&v), &shape, Layout::Fortran, m))
             }
             DynArray::C64(_) | DynArray::C128(_) => {
                 return Err(PyError::new(
@@ -605,7 +627,7 @@ pub fn compute_mask(
                     DynArray::I64(a) => f64s(a),
                     _ => unreachable!("float32 and complex handled above"),
                 };
-                compute_epi_mask(EpiData::F64(&v), &shape, Layout::Fortran, maths)
+                run(&|m| compute_epi_mask(EpiData::F64(&v), &shape, Layout::Fortran, m))
             }
         }
         .map_err(fail)?;

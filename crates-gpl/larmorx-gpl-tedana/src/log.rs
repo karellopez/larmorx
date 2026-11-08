@@ -84,6 +84,11 @@ pub struct Log<'a> {
     pub err: &'a mut dyn Write,
     level: Option<Level>,
     warned: HashSet<(String, u32, String)>,
+    /// The lines printed since [`Log::start_capture`] (progress bars left out: their timings
+    /// are the replica's own), for the maths' comparison.
+    capture: Option<Vec<String>>,
+    /// The level and the warning registry when the capture started.
+    at_capture: (Option<Level>, HashSet<(String, u32, String)>),
 }
 
 impl<'a> Log<'a> {
@@ -93,6 +98,38 @@ impl<'a> Log<'a> {
             err,
             level: None,
             warned: HashSet::new(),
+            capture: None,
+            at_capture: (None, HashSet::new()),
+        }
+    }
+
+    /// Keeps the lines printed from here on ([`Log::take_capture`]).
+    pub fn start_capture(&mut self) {
+        self.capture = Some(Vec::new());
+        self.at_capture = (self.level, self.warned.clone());
+    }
+
+    /// The lines kept since [`Log::start_capture`]; stops keeping them.
+    pub fn take_capture(&mut self) -> Vec<String> {
+        self.capture.take().unwrap_or_default()
+    }
+
+    /// A logger on `err` in the state this one had when its capture started (level and
+    /// warnings already printed), capturing: another pass of the same stages.
+    pub fn fork<'b>(&self, err: &'b mut dyn Write) -> Log<'b> {
+        Log {
+            err,
+            level: self.at_capture.0,
+            warned: self.at_capture.1.clone(),
+            capture: Some(Vec::new()),
+            at_capture: self.at_capture.clone(),
+        }
+    }
+
+    fn line(&mut self, text: String) {
+        let _ = writeln!(self.err, "{text}");
+        if let Some(c) = &mut self.capture {
+            c.push(text);
         }
     }
 
@@ -120,7 +157,7 @@ impl<'a> Log<'a> {
     fn emit(&mut self, level: Level, site: Site, msg: &str) {
         if self.enabled(level) {
             let Site(module, func, line) = site;
-            let _ = writeln!(self.err, "{:<8} {module}:{func}:{line} {msg}", level.name());
+            self.line(format!("{:<8} {module}:{func}:{line} {msg}", level.name()));
         }
     }
 
@@ -148,7 +185,7 @@ impl<'a> Log<'a> {
             .warned
             .insert((file.to_owned(), line, format!("{category}: {message}")))
         {
-            let _ = writeln!(self.err, "{file}:{line}: {category}: {message}\n  {source}");
+            self.line(format!("{file}:{line}: {category}: {message}\n  {source}"));
         }
     }
 

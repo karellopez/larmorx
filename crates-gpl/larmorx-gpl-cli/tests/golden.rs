@@ -506,7 +506,7 @@ fn describe(expected: &Fingerprint, actual: &Fingerprint) -> String {
     if expected.dtype != actual.dtype {
         return format!("type {} expected, {} found", expected.dtype, actual.dtype);
     }
-    let (e, a) = (unhex(&expected.sample), unhex(&actual.sample));
+    // Text outputs, the status and the named defects have no sampled values.
     let size = match expected.dtype.as_str() {
         "uint8" => 1,
         "int16" => 2,
@@ -514,6 +514,7 @@ fn describe(expected: &Fingerprint, actual: &Fingerprint) -> String {
         "float64" => 8,
         _ => return String::new(),
     };
+    let (e, a) = (unhex(&expected.sample), unhex(&actual.sample));
     let differ = e
         .chunks(size)
         .zip(a.chunks(size))

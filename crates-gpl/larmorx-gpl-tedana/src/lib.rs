@@ -15,6 +15,7 @@
 //! - [`decay`], `tedana.decay`'s fits: `fit_loglinear` (numpy's `lstsq`), `fit_monoexponential`
 //!   (SciPy's `curve_fit`), `fit_decay`, `fit_decay_ts`.
 //! - [`maps`], `tedana.decay.modify_t2s_s0_maps` and `rmse_of_fit_decay_ts`, `utils.unmask`.
+//! - [`maths`], the transcendental functions (numpy's or correctly rounded) and their witness.
 //! - [`combine`], `tedana.combine.make_optcom`.
 //! - [`outputs`], `tedana.io.OutputGenerator`: the files' names, images, table and JSON.
 //! - [`workflow`], `tedana.workflows.t2smap` (`t2smap_workflow`, `_main`).
@@ -43,6 +44,7 @@ pub mod data;
 pub mod decay;
 pub mod log;
 pub mod maps;
+pub mod maths;
 pub mod outputs;
 pub mod parser;
 pub mod workflow;

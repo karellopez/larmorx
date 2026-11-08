@@ -97,6 +97,64 @@ pub enum ImgData<'a> {
     U8(&'a [u8]),
 }
 
+impl ImgData<'_> {
+    /// The stored values' bits.
+    fn bits(&self) -> Vec<u32> {
+        match self {
+            ImgData::F32(v) => v.iter().map(|x| x.to_bits()).collect(),
+            ImgData::I32(v) => v.iter().map(|&x| x as u32).collect(),
+            ImgData::U8(v) => v.iter().map(|&x| u32::from(x)).collect(),
+        }
+    }
+}
+
+/// An image's values as a pass saved them: the voxels (Fortran-order indices), the volumes
+/// per voxel and each value's bits.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct KeptImg {
+    pub description: String,
+    pub voxels: Vec<usize>,
+    pub cols: usize,
+    pub bits: Vec<u32>,
+}
+
+impl KeptImg {
+    /// The values on the whole grid of `nxyz` voxels (zeros elsewhere, as written).
+    fn grid(&self, nxyz: usize, cols: usize) -> Vec<u32> {
+        let mut out = vec![0u32; nxyz * cols];
+        for (k, &vox) in self.voxels.iter().enumerate() {
+            for c in 0..self.cols.min(cols) {
+                out[vox + c * nxyz] = self.bits[k * self.cols + c];
+            }
+        }
+        out
+    }
+}
+
+/// What the first pass saved of the files that depend on the maths: the images' values and
+/// the confounds table's text (the maths' comparison, `crate::maths`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Kept {
+    pub images: Vec<KeptImg>,
+    pub tables: Vec<(String, String)>,
+}
+
+/// Where the saved values go.
+#[derive(Clone, Debug, Default)]
+pub enum Sink {
+    /// Write the files (the run).
+    #[default]
+    Files,
+    /// Write the files and keep their values ([`Outputs::kept`]).
+    Keep,
+    /// Write nothing and count, per file, the values that differ from the first pass's
+    /// ([`Outputs::diffs`]).
+    Compare(std::sync::Arc<Kept>),
+}
+
+/// One file's values that differ from the first pass's: (file name, values that differ).
+pub type Diff = (String, usize);
+
 /// `OutputGenerator` with the mask registered.
 pub struct Outputs {
     pub out_dir: String,
@@ -115,6 +173,12 @@ pub struct Outputs {
     pub n_threads: usize,
     /// `self.registry`: description and file name, in the order saved.
     pub registry: Vec<(String, String)>,
+    /// Where the values go.
+    pub sink: Sink,
+    /// The values kept ([`Sink::Keep`]).
+    pub kept: Kept,
+    /// The values that differ from the first pass's ([`Sink::Compare`]), in the order saved.
+    pub diffs: Vec<Diff>,
 }
 
 impl Outputs {
@@ -216,7 +280,12 @@ impl Outputs {
         subset: Option<&[bool]>,
     ) -> Result<(), PyError> {
         let cols = volumes.unwrap_or(1);
-        let name = self.claim(description)?;
+        let compare = matches!(self.sink, Sink::Compare(_));
+        let name = if compare {
+            self.path(description)
+        } else {
+            self.claim(description)?
+        };
         let voxels: Vec<usize> = match subset {
             None => self.voxels.clone(),
             Some(s) => self
@@ -235,6 +304,38 @@ impl Outputs {
             ));
         }
         let nxyz: usize = self.shape.iter().product();
+        if let Sink::Compare(first) = &self.sink {
+            let bits = data.bits();
+            let n = match first.images.iter().find(|k| k.description == description) {
+                None => bits.len(),
+                Some(k) if k.voxels == voxels && k.cols == cols => {
+                    k.bits.iter().zip(&bits).filter(|(a, b)| a != b).count()
+                }
+                Some(k) => {
+                    let mine = KeptImg {
+                        description: description.to_owned(),
+                        voxels,
+                        cols,
+                        bits,
+                    };
+                    let c = cols.max(k.cols);
+                    let (a, b) = (k.grid(nxyz, c), mine.grid(nxyz, c));
+                    a.iter().zip(&b).filter(|(x, y)| x != y).count()
+                }
+            };
+            let file = file_name(description, &self.convention, &self.prefix);
+            self.diffs.push((file, n));
+            self.register(description, &name);
+            return Ok(());
+        }
+        if matches!(self.sink, Sink::Keep) {
+            self.kept.images.push(KeptImg {
+                description: description.to_owned(),
+                voxels: voxels.clone(),
+                cols,
+                bits: data.bits(),
+            });
+        }
         let mut shape = self.shape.to_vec();
         if let Some(t) = volumes {
             shape.push(t);
@@ -285,6 +386,22 @@ impl Outputs {
 
     /// `save_file(rmse_df, "confounds tsv")`.
     pub fn save_tsv(&mut self, description: &str, text: &str) -> Result<(), PyError> {
+        if let Sink::Compare(first) = &self.sink {
+            let n = match first.tables.iter().find(|(d, _)| d == description) {
+                None => text.lines().map(|l| l.split('\t').count()).sum(),
+                Some((_, t)) => table_cells_differing(t, text),
+            };
+            let name = self.path(description);
+            let file = file_name(description, &self.convention, &self.prefix);
+            self.diffs.push((file, n));
+            self.register(description, &name);
+            return Ok(());
+        }
+        if matches!(self.sink, Sink::Keep) {
+            self.kept
+                .tables
+                .push((description.to_owned(), text.to_owned()));
+        }
         let name = self.claim(description)?;
         std::fs::write(&name, text.as_bytes())
             .map_err(|e| PyError::new("OSError", e.to_string(), "pandas"))?;
@@ -311,6 +428,27 @@ impl Outputs {
         );
         self.save_json("registry json", &v)
     }
+}
+
+/// The cells of two tab-separated tables that differ (a missing cell counts as differing).
+fn table_cells_differing(a: &str, b: &str) -> usize {
+    let rows = |t: &str| -> Vec<Vec<String>> {
+        t.lines()
+            .map(|l| l.split('\t').map(str::to_owned).collect())
+            .collect()
+    };
+    let (ra, rb) = (rows(a), rows(b));
+    let mut n = 0;
+    for i in 0..ra.len().max(rb.len()) {
+        let (x, y) = (ra.get(i), rb.get(i));
+        let len = x.map_or(0, Vec::len).max(y.map_or(0, Vec::len));
+        for j in 0..len {
+            if x.and_then(|r| r.get(j)) != y.and_then(|r| r.get(j)) {
+                n += 1;
+            }
+        }
+    }
+    n
 }
 
 /// The confounds table (`rmse_df`) as `to_csv` writes it: float64 columns (numpy's shortest
@@ -440,5 +578,19 @@ mod tests {
             file_name("registry json", "bidsv1.5.0", "x_"),
             "x_desc-tedana_registry.json"
         );
+    }
+
+    #[test]
+    fn differing_cells() {
+        assert_eq!(table_cells_differing("a\tb\n1\t2\n", "a\tb\n1\t2\n"), 0);
+        assert_eq!(table_cells_differing("a\tb\n1\t2\n", "a\tb\n1\t3\n"), 1);
+        assert_eq!(table_cells_differing("a\tb\n1\t2\n", "a\tb\n"), 2);
+        let k = KeptImg {
+            description: String::new(),
+            voxels: vec![3, 1],
+            cols: 2,
+            bits: vec![1, 2, 3, 4],
+        };
+        assert_eq!(k.grid(4, 2), vec![0, 3, 0, 1, 0, 4, 0, 2]);
     }
 }

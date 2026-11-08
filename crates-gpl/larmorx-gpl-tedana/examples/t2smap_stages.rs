@@ -72,7 +72,7 @@ fn main() {
     let mut err = std::io::stderr();
     let mut log = Log::new(&mut err);
     let mut notices = Notices::new(mode);
-    let st = match prepare_and_fit(settings, rest, &env, &mut log, &mut notices) {
+    let (setup, st) = match prepare_and_fit(settings, rest, &env, &mut log, &mut notices) {
         Ok(s) => s,
         Err(e) => {
             eprint!("{}", e.traceback());
@@ -83,7 +83,7 @@ fn main() {
         eprintln!("larmorx-gpl: {}", n.line());
     }
     let md = st.fit.t2s.len();
-    let shape: Vec<usize> = if st.settings.fit_ts {
+    let shape: Vec<usize> = if setup.settings.fit_ts {
         let t = md / st.denoise.iter().filter(|&&b| b).count().max(1);
         vec![md / t.max(1), t]
     } else {

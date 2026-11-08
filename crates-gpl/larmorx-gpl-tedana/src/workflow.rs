@@ -4,16 +4,19 @@
 //! `tedana.workflows.t2smap`: `_main` (the command line) and `t2smap_workflow`, step by step in
 //! tedana's order, so that messages, files and failures come in the same order.
 //!
-//! [`prepare_and_fit`] runs the workflow up to the T2*/S0 fit (the output directory, the call
-//! script, the echo times, the reference image, the figures directory, the mask, the data, the
-//! dummy scans and excluded volumes, the adaptive mask, the fit). The maps' floors and caps, the
-//! RMSE and its table, the optimal combination and the files are the next step's.
+//! [`prepare`] runs the workflow up to the mask (the output directory, the call script, the echo
+//! times, the reference image, the figures directory); [`fit_stage`] from the mask to the T2*/S0
+//! fit (the mask, the data, the dummy scans and excluded volumes, the adaptive mask, the fit);
+//! [`save_stage`] the maps' floors and caps, the RMSE and its table, the optimal combination and
+//! their files; [`end`] the JSON files and the last messages. The program ([`t2smap`]) runs the
+//! two middle stages again for the maths' comparison (`crate::maths`).
 
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use larmorx_core::defects::{
-    Notices, TED_02, TED_03, TED_04, TED_07, TED_08, TED_10, TED_12, TED_13, UpstreamDefects,
+    GLIBC_07, NP_03, Notices, TED_02, TED_03, TED_04, TED_07, TED_08, TED_10, TED_12, TED_13,
+    UpstreamDefects,
 };
 use larmorx_core::numpy::NpFloat;
 use larmorx_core::python::argparse::{formatter_width, py_repr_str};
@@ -26,7 +29,8 @@ use crate::data::{self, LoadPath, Masked, RefImage, UserMask};
 use crate::decay::{Context, Fit, Libraries, fit_decay, fit_decay_ts};
 use crate::log::{Log, PyError, Site};
 use crate::maps::{modify_t2s_s0_maps, rmse_of_fit_decay_ts, unmask};
-use crate::outputs::{ImgData, Outputs, confounds_tsv, uname};
+use crate::maths::{Family, Maths};
+use crate::outputs::{Diff, ImgData, Kept, Outputs, Sink, confounds_tsv, uname};
 use crate::parser::{self, FitType, Settings};
 
 /// What the program reads from its environment.
@@ -175,18 +179,24 @@ fn py_list_ints(v: &[i128]) -> String {
     )
 }
 
-/// The workflow's state after the fit.
-pub struct Stages {
+/// The workflow's state before the stages that depend on the maths: what `prepare` found.
+pub struct Setup {
     /// `t2smap_command` (`"t2smap " + " ".join(argv)`).
     pub command: String,
-    /// The output generator, with the adaptive mask saved.
-    pub outputs: Outputs,
     pub settings: Settings,
     pub out_dir: String,
     pub prefix: String,
     /// Echo times in milliseconds.
     pub tes: Vec<f64>,
     pub reference: RefImage,
+    /// `--exclude`'s indices as parsed.
+    pub exclude: Vec<i128>,
+}
+
+/// The workflow's state after the fit.
+pub struct Stages {
+    /// The output generator, with the adaptive mask saved.
+    pub outputs: Outputs,
     pub mask: UserMask,
     pub load_path: LoadPath,
     /// `data_cat` after the dummy scans (all volumes kept for the combination).
@@ -200,21 +210,36 @@ pub struct Stages {
     pub fit: Fit,
 }
 
-/// `t2smap_workflow(**kwargs)` up to the fit. `argv` is the command line after the program
-/// name (for `t2smap_call.sh`).
+/// `t2smap_workflow(**kwargs)` up to the fit, with the maths of `env`'s mode and the files
+/// written. `argv` is the command line after the program name (for `t2smap_call.sh`).
 pub fn prepare_and_fit(
     settings: Settings,
     argv: &[String],
     env: &Env,
     log: &mut Log<'_>,
     notices: &mut Notices,
-) -> Result<Stages, PyError> {
+) -> Result<(Setup, Stages), PyError> {
+    let setup = prepare(settings, argv, env, log, notices)?;
+    let maths = Maths::of_mode(env.mode);
+    let st = fit_stage(&setup, env, &maths, Sink::Files, log, notices)?;
+    Ok((setup, st))
+}
+
+/// `t2smap_workflow` up to the mask: the output directory, the loggers, the call script, the
+/// echo times, the reference image, the figures directory, `--overwrite`'s removal.
+pub fn prepare(
+    settings: Settings,
+    argv: &[String],
+    _env: &Env,
+    log: &mut Log<'_>,
+    notices: &mut Notices,
+) -> Result<Setup, PyError> {
     let wf = "tedana/workflows/t2smap.py, in t2smap_workflow";
     let out_dir = py_abspath(&settings.out_dir);
     if !Path::new(&out_dir).is_dir() {
         std::fs::create_dir(&out_dir).map_err(|e| os_error(&e, &out_dir, wf))?;
     }
-    let mut exclude = parse_volume_indices(settings.exclude.as_deref())?;
+    let exclude = parse_volume_indices(settings.exclude.as_deref())?;
     log.setup(settings.quiet, settings.debug);
     log.info(
         Site("t2smap", "t2smap_workflow", 365),
@@ -299,9 +324,35 @@ pub fn prepare_and_fit(
                 .map_err(|e| os_error(&e, &path, "tedana/io.py, in __init__"))?;
         }
     }
+    Ok(Setup {
+        command: call,
+        settings,
+        out_dir,
+        prefix,
+        tes,
+        reference,
+        exclude,
+    })
+}
 
+/// `t2smap_workflow` from the mask to the fit, with `maths`; the files go to `sink` (the
+/// adaptive mask is saved before the fit, as tedana does).
+pub fn fit_stage(
+    setup: &Setup,
+    env: &Env,
+    maths: &Maths,
+    sink: Sink,
+    log: &mut Log<'_>,
+    notices: &mut Notices,
+) -> Result<Stages, PyError> {
+    let wf = "tedana/workflows/t2smap.py, in t2smap_workflow";
+    let settings = &setup.settings;
+    let tes = &setup.tes;
+    let n_echos = tes.len();
+    let reference = &setup.reference;
+    let mut exclude = setup.exclude.clone();
     // load_mask
-    let threads = threads(&settings);
+    let threads = threads(settings);
     let user_mask = settings.mask.is_some();
     let mask = if let Some(mask_path) = settings.mask.clone() {
         log.info(Site("utils", "load_mask", 916), "Using user-defined mask");
@@ -315,7 +366,7 @@ pub fn prepare_and_fit(
              accurately conforms to data boundaries.",
         );
         let ted03 = "give a mask with --mask (tedana fails later with an unrelated error)";
-        match data::compute_mask(&settings.data, &reference, notices.reproduce(), threads) {
+        match data::compute_mask(&settings.data, reference, maths, threads) {
             Ok((m, empty)) => {
                 if empty {
                     log.warn(
@@ -539,8 +590,8 @@ pub fn prepare_and_fit(
         )
     });
     let mut outputs = Outputs {
-        out_dir: out_dir.clone(),
-        prefix: prefix.clone(),
+        out_dir: setup.out_dir.clone(),
+        prefix: setup.prefix.clone(),
         convention: settings.convention.clone(),
         overwrite: settings.overwrite,
         shape: masked.spatial,
@@ -550,6 +601,9 @@ pub fn prepare_and_fit(
         release: env.libraries.lapack(),
         n_threads: threads,
         registry: Vec::new(),
+        sink,
+        kept: Kept::default(),
+        diffs: Vec::new(),
     };
     let am32: Vec<i32> = adaptive.iter().map(|&a| a as i32).collect();
     outputs.save_img("adaptive mask img", ImgData::I32(&am32), None, None)?;
@@ -575,20 +629,15 @@ pub fn prepare_and_fit(
     let ctx = Context {
         libraries: env.libraries,
         n_threads: threads,
+        maths,
     };
     let fit = if settings.fit_ts {
-        fit_decay_ts(&dm, e, nf, &tes, &am, settings.fittype, &ctx, log, notices)?
+        fit_decay_ts(&dm, e, nf, tes, &am, settings.fittype, &ctx, log, notices)?
     } else {
-        fit_decay(&dm, e, nf, &tes, &am, settings.fittype, &ctx, log, notices)?
+        fit_decay(&dm, e, nf, tes, &am, settings.fittype, &ctx, log, notices)?
     };
     Ok(Stages {
-        command: call,
         outputs,
-        settings,
-        out_dir,
-        prefix,
-        tes,
-        reference,
         mask,
         load_path,
         masked,
@@ -633,27 +682,28 @@ fn ms_to_s(v: &[f64]) -> Vec<f32> {
     v.iter().map(|&x| f32::from_f64(x.div(1000.0))).collect()
 }
 
-/// `t2smap_workflow` after the fit: the failures and variance maps, the floors and caps, the
-/// maps, the RMSE and its table, the optimal combination, the JSON files, the last messages.
-pub fn finish(
+/// `t2smap_workflow` after the fit, the stages that depend on the maths: the failures and
+/// variance maps, the floors and caps, the maps, the RMSE and its table, the optimal
+/// combination; the output generator is returned for [`end`].
+pub fn save_stage(
     st: Stages,
-    env: &Env,
+    setup: &Setup,
+    maths: &Maths,
     log: &mut Log<'_>,
     notices: &mut Notices,
-) -> Result<(), PyError> {
+) -> Result<Outputs, PyError> {
     let Stages {
-        command,
         mut outputs,
-        settings,
-        tes,
         masked,
         adaptive,
         denoise,
         fit,
         ..
     } = st;
+    let settings = &setup.settings;
+    let tes = &setup.tes;
     let reproduce = notices.reproduce();
-    let threads = threads(&settings);
+    let threads = threads(settings);
     let (e, n_vols) = (masked.n_echos, masked.n_vols);
     // fit_decay_ts fits every volume (it refuses --exclude): one column per volume.
     let cols = if settings.fit_ts { n_vols } else { 1 };
@@ -722,7 +772,7 @@ pub fn finish(
         }
     }
     let Fit { t2s, s0, .. } = fit;
-    let maps = modify_t2s_s0_maps(t2s, s0, &am_fit, cols, &tes, log, notices);
+    let maps = modify_t2s_s0_maps(t2s, s0, &am_fit, cols, tes, maths, log, notices);
     let t2s_full = unmask(&maps.t2s_full, &denoise, cols);
     let s0_full = unmask(&maps.s0_full, &denoise, cols);
     let t2s_limited = unmask(&maps.t2s_limited, &denoise, cols);
@@ -738,12 +788,12 @@ pub fn finish(
         &masked.data,
         e,
         n_vols,
-        &tes,
+        tes,
         &adaptive,
         &t2s_limited,
         &s0_limited,
         cols,
-        reproduce,
+        maths,
         threads,
         log,
     );
@@ -777,11 +827,12 @@ pub fn finish(
         &masked.data,
         e,
         n_vols,
-        &tes,
+        tes,
         &adaptive,
         &t2s_full,
         cols,
         mode,
+        maths,
         threads,
         log,
         notices,
@@ -796,7 +847,18 @@ pub fn finish(
     drop(t2s_full);
     outputs.save_img("combined img", ImgData::F32(&combined), Some(n_vols), None)?;
     drop(combined);
+    Ok(outputs)
+}
 
+/// `t2smap_workflow`'s end: `dataset_description.json`, the registry, the last messages.
+pub fn end(
+    setup: &Setup,
+    outputs: &mut Outputs,
+    env: &Env,
+    log: &mut Log<'_>,
+) -> Result<(), PyError> {
+    outputs.sink = Sink::Files;
+    let command = setup.command.clone();
     let [system, node, release, version, machine, processor] = uname();
     fn s(v: impl Into<String>) -> Value {
         Value::str(v)
@@ -883,6 +945,120 @@ fn threads(s: &Settings) -> usize {
     }
 }
 
+/// The program's run: tedana's workflow (the files written), then the maths' comparison: for
+/// each family of functions whose other choice gave another value on an argument
+/// (`crate::maths`), the stages from the mask to the combination run again with that choice,
+/// writing nothing, and NP-03 or GLIBC-07 is named with the written values and printed lines
+/// that differ (nothing when none does).
+fn run(
+    settings: Settings,
+    args: &[String],
+    env: &Env,
+    log: &mut Log<'_>,
+    notices: &mut Notices,
+) -> Result<(), PyError> {
+    let setup = prepare(settings, args, env, log, notices)?;
+    let maths = Maths::of_mode(env.mode);
+    log.start_capture();
+    let st = fit_stage(&setup, env, &maths, Sink::Keep, log, notices)?;
+    let mut outputs = save_stage(st, &setup, &maths, log, notices)?;
+    let lines = log.take_capture();
+    let kept = std::sync::Arc::new(std::mem::take(&mut outputs.kept));
+    end(&setup, &mut outputs, env, log)?;
+    drop(outputs);
+    for family in [Family::Logf, Family::ExpLog] {
+        if !maths.differed(family) {
+            continue;
+        }
+        let other = maths.with_other(family);
+        let mut sink: Vec<u8> = Vec::new();
+        let mut plog = log.fork(&mut sink);
+        let mut scratch = Notices::new(env.mode);
+        let res = fit_stage(
+            &setup,
+            env,
+            &other,
+            Sink::Compare(kept.clone()),
+            &mut plog,
+            &mut scratch,
+        )
+        .and_then(|st| save_stage(st, &setup, &other, &mut plog, &mut scratch))
+        .map(|o| o.diffs);
+        let plines = plog.take_capture();
+        drop(plog);
+        let changed = lines_differing(&lines, &plines);
+        if let Some(detail) = maths_detail(family, env.mode, res.as_ref(), changed) {
+            let defect = match family {
+                Family::Logf => &NP_03,
+                Family::ExpLog => &GLIBC_07,
+            };
+            notices.add(defect, detail);
+        }
+    }
+    Ok(())
+}
+
+/// The lines of two passes' logs that differ, position by position (a missing line counts).
+fn lines_differing(a: &[String], b: &[String]) -> usize {
+    let same = a.iter().zip(b).filter(|(x, y)| x == y).count();
+    a.len().max(b.len()) - same
+}
+
+/// The notice of a family whose other choice changed what the run wrote or printed (`None`
+/// when it changed nothing).
+fn maths_detail(
+    family: Family,
+    mode: UpstreamDefects,
+    res: Result<&Vec<Diff>, &PyError>,
+    lines: usize,
+) -> Option<String> {
+    let (what, other) = match (family, mode) {
+        (Family::Logf, UpstreamDefects::Fix) => (
+            "the log-linear fit takes the correctly rounded float32 logarithm",
+            "numpy's own kernel (tedana's)",
+        ),
+        (Family::Logf, UpstreamDefects::Reproduce) => (
+            "the log-linear fit takes numpy's own float32 logarithm kernel, as tedana",
+            "the correctly rounded logarithm",
+        ),
+        (Family::ExpLog, UpstreamDefects::Fix) => (
+            "the float64 exp and log (and the curve fit's powers) are correctly rounded",
+            "numpy's, glibc 2.35's (tedana's),",
+        ),
+        (Family::ExpLog, UpstreamDefects::Reproduce) => (
+            "the float64 exp and log (and the curve fit's powers) are glibc 2.35's, as numpy \
+             computes them for tedana",
+            "the correctly rounded functions",
+        ),
+    };
+    let effect = match res {
+        Err(e) => format!("make the run fail with {}: {}", e.class, e.message),
+        Ok(diffs) => {
+            let total: usize = diffs.iter().map(|d| d.1).sum();
+            if total == 0 && lines == 0 {
+                return None;
+            }
+            let mut parts = Vec::new();
+            if total > 0 {
+                let files: Vec<String> = diffs
+                    .iter()
+                    .filter(|d| d.1 > 0)
+                    .map(|(f, n)| format!("{f} {n}"))
+                    .collect();
+                parts.push(format!(
+                    "{total} other written value(s) ({})",
+                    files.join(", ")
+                ));
+            }
+            if lines > 0 {
+                parts.push(format!("{lines} other printed line(s)"));
+            }
+            format!("give {}", parts.join(" and "))
+        }
+    };
+    Some(format!("{what}; {other} would {effect}"))
+}
+
 /// The `t2smap` program: `args` after the program name; returns the exit status.
 pub fn t2smap(args: &[String], env: &Env, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let width = formatter_width(env.columns.as_deref(), env.terminal_columns);
@@ -896,8 +1072,7 @@ pub fn t2smap(args: &[String], env: &Env, out: &mut dyn Write, err: &mut dyn Wri
     };
     let mut notices = Notices::new(env.mode);
     let mut log = Log::new(err);
-    let result = prepare_and_fit(settings, args, env, &mut log, &mut notices)
-        .and_then(|st| finish(st, env, &mut log, &mut notices));
+    let result = run(settings, args, env, &mut log, &mut notices);
     let status = match result {
         Ok(()) => 0,
         Err(e) => {
@@ -931,6 +1106,31 @@ mod tests {
         assert!(e.message.ends_with("Negative indices are not supported."));
         let e = parse_volume_indices(Some("1,,2")).unwrap_err();
         assert_eq!(e.message, "invalid literal for int() with base 10: ''");
+    }
+
+    #[test]
+    fn maths_notices_only_for_changed_outputs() {
+        let none: Vec<Diff> = vec![("T2starmap.nii.gz".into(), 0)];
+        let fix = UpstreamDefects::Fix;
+        assert_eq!(maths_detail(Family::Logf, fix, Ok(&none), 0), None);
+        let d = maths_detail(Family::ExpLog, fix, Ok(&none), 2).unwrap();
+        assert!(d.ends_with("would give 2 other printed line(s)"), "{d}");
+        let some: Vec<Diff> = vec![("S0map.nii.gz".into(), 3), ("T2starmap.nii.gz".into(), 0)];
+        let d = maths_detail(Family::Logf, UpstreamDefects::Reproduce, Ok(&some), 0).unwrap();
+        assert!(
+            d.starts_with("the log-linear fit takes numpy's own")
+                && d.ends_with("would give 3 other written value(s) (S0map.nii.gz 3)"),
+            "{d}"
+        );
+        let e = PyError::value_error("x", "here");
+        let d = maths_detail(Family::ExpLog, fix, Err(&e), 0).unwrap();
+        assert!(
+            d.ends_with("would make the run fail with ValueError: x"),
+            "{d}"
+        );
+        let (a, b) = (vec!["x".to_owned(), "y".to_owned()], vec!["x".to_owned()]);
+        assert_eq!(lines_differing(&a, &b), 1);
+        assert_eq!(lines_differing(&a, &a), 0);
     }
 
     #[test]

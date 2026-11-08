@@ -21,14 +21,13 @@
 //! least-squares problem for all of them); by default that voxel alone is NaN.
 
 use larmorx_core::defects::{Notices, TED_09};
-use larmorx_core::math::{self, Libm};
-use larmorx_core::numpy::umath;
 use larmorx_core::parallel;
 use larmorx_optim::{Scipy, curve_fit2};
 use larmorx_transform::numpy_linalg::{LapackRelease, lstsq};
 use rayon::prelude::*;
 
 use crate::log::{Log, PyError, Site};
+use crate::maths::Maths;
 use crate::parser::FitType;
 
 /// The numpy and SciPy whose arithmetic the fits follow.
@@ -58,27 +57,12 @@ impl Libraries {
 
 /// What a fit runs with.
 #[derive(Clone, Copy, Debug)]
-pub struct Context {
+pub struct Context<'a> {
     pub libraries: Libraries,
     /// Threads for the per-voxel fits (0: all logical CPUs); the results do not depend on it.
     pub n_threads: usize,
-}
-
-/// The maths of a mode: numpy's own (`reproduce`) or correctly rounded (the default).
-fn log32(reproduce: bool, x: f32) -> f32 {
-    if reproduce {
-        umath::log_f32(x)
-    } else {
-        math::logf(x)
-    }
-}
-
-fn exp(reproduce: bool, x: f64) -> f64 {
-    if reproduce {
-        umath::exp_f64(x)
-    } else {
-        math::exp(x)
-    }
+    /// The transcendental functions (numpy's or correctly rounded, `crate::maths`).
+    pub maths: &'a Maths,
 }
 
 /// The fit's maps, over the fitted voxels (`(voxels,)`, or `(voxels, volumes)` C-ordered for
@@ -133,7 +117,7 @@ pub fn fit_loglinear(
     n_vols: usize,
     tes: &[f64],
     am: &[i64],
-    ctx: &Context,
+    ctx: &Context<'_>,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<(Vec<f64>, Vec<f64>), PyError> {
@@ -141,6 +125,7 @@ pub fn fit_loglinear(
     let mut t2s = vec![0.0f64; md];
     let mut s0 = vec![0.0f64; md];
     let reproduce = notices.reproduce();
+    let maths = ctx.maths;
     for echo_num in echos_to_run(am) {
         let n = echo_num as usize;
         let idx = group(am, echo_num, true);
@@ -165,7 +150,7 @@ pub fn fit_loglinear(
             for e in 0..n {
                 let src = &data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols];
                 for (t, &x) in src.iter().enumerate() {
-                    col[e * n_vols + t] = f64::from(log32(reproduce, x.abs() + 1.0));
+                    col[e * n_vols + t] = f64::from(maths.log32(x.abs() + 1.0));
                 }
             }
         };
@@ -246,7 +231,7 @@ pub fn fit_loglinear(
                 div0 = true;
             }
             t2s[v] = 1.0 / b1;
-            let e = exp(reproduce, b0);
+            let e = ctx.maths.exp(b0);
             if e.is_infinite() && b0.is_finite() {
                 overflow = true;
             }
@@ -301,7 +286,7 @@ pub fn fit_monoexponential(
     n_vols: usize,
     tes: &[f64],
     am: &[i64],
-    ctx: &Context,
+    ctx: &Context<'_>,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Fit, PyError> {
@@ -309,7 +294,8 @@ pub fn fit_monoexponential(
     let (mut t2s_init, mut s0_init) =
         fit_loglinear(data, n_echos, n_vols, tes, am, ctx, log, notices)?;
     let reproduce = notices.reproduce();
-    let libm = Libm::quiet(notices.mode());
+    let maths = ctx.maths;
+    let libm = maths.libm();
     let scipy = ctx.libraries.scipy();
     let mut t2s = vec![0.0f64; md];
     let mut s0 = vec![0.0f64; md];
@@ -339,7 +325,7 @@ pub fn fit_monoexponential(
             // The model's exp once per echo time (the same arguments give the same bits).
             let mut model = |_x: &[f64], p: &[f64; 2], out: &mut [f64]| {
                 for e in 0..n {
-                    let val = p[0] * exp(reproduce, -tes[e] / p[1]);
+                    let val = p[0] * maths.exp(-tes[e] / p[1]);
                     out[e * n_vols..(e + 1) * n_vols].fill(val);
                 }
             };
@@ -361,6 +347,7 @@ pub fn fit_monoexponential(
         })
         .map_err(|e| PyError::new("RuntimeError", e.to_string(), "joblib Parallel"))?;
         log.progress_done(bar);
+        maths.note_libm(&libm);
         let mut fail_count = 0usize;
         for (&v, r) in idx.iter().zip(&results) {
             match r {
@@ -426,7 +413,7 @@ pub fn fit_decay(
     tes: &[f64],
     am: &[i64],
     fittype: FitType,
-    ctx: &Context,
+    ctx: &Context<'_>,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Fit, PyError> {
@@ -453,7 +440,7 @@ pub fn fit_decay_ts(
     tes: &[f64],
     am: &[i64],
     fittype: FitType,
-    ctx: &Context,
+    ctx: &Context<'_>,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Fit, PyError> {

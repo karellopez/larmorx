@@ -24,34 +24,16 @@
 //! times voxels as voxels (`E · V`): by default it counts the voxels.
 
 use larmorx_core::defects::{Notices, TED_05, TED_14};
-use larmorx_core::math;
 use larmorx_core::numpy::NpFloat;
 use larmorx_core::numpy::quantile::{
     Percentiles, nanpercentile_linear_axis0, scoreatpercentile_lower,
 };
 use larmorx_core::numpy::reduce::{mean_axis, nanstd_axis, nansum_axis};
-use larmorx_core::numpy::umath;
 use larmorx_core::python::number::format_fixed;
 use rayon::prelude::*;
 
 use crate::log::{Log, Site};
-
-/// numpy's float64 `exp` (`reproduce`) or the correctly rounded one (the default).
-pub fn exp64(reproduce: bool, x: f64) -> f64 {
-    if reproduce {
-        umath::exp_f64(x)
-    } else {
-        math::exp(x)
-    }
-}
-
-fn log64(reproduce: bool, x: f64) -> f64 {
-    if reproduce {
-        umath::log_f64(x)
-    } else {
-        math::log(x)
-    }
-}
+use crate::maths::Maths;
 
 /// The four maps over the fitted voxels, C-ordered `(voxels[, volumes])`.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -66,14 +48,15 @@ pub struct Maps {
 fn apply_floor(
     t2s: &mut [f64],
     tes: &[f64],
-    reproduce: bool,
+    maths: &Maths,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) {
+    let reproduce = notices.reproduce();
     let e = tes.len();
     let bad: Vec<bool> = t2s
         .iter()
-        .map(|&t| t != 0.0 && tes.iter().any(|&te| exp64(reproduce, (-te).div(t)) == 0.0))
+        .map(|&t| t != 0.0 && tes.iter().any(|&te| maths.exp((-te).div(t)) == 0.0))
         .collect();
     let n_bad = bad.iter().filter(|&&b| b).count();
     if n_bad > 0 && log.enabled(crate::log::Level::Debug) {
@@ -98,7 +81,7 @@ fn apply_floor(
         });
     }
     let te_max = tes.iter().fold(f64::NEG_INFINITY, |m, &t| m.max(t));
-    let floor = (-te_max).div(log64(reproduce, f64::EPSILON));
+    let floor = (-te_max).div(maths.log(f64::EPSILON));
     for (t, &b) in t2s.iter_mut().zip(&bad) {
         if b {
             *t = floor;
@@ -108,16 +91,17 @@ fn apply_floor(
 
 /// `modify_t2s_s0_maps(t2s, s0, adaptive_mask, tes)`: `t2s`, `s0` C-ordered `(voxels, cols)`
 /// (`cols` 1 for `fitmode all`, the volumes for `ts`), `am` per voxel.
+#[allow(clippy::too_many_arguments)]
 pub fn modify_t2s_s0_maps(
     mut t2s: Vec<f64>,
     mut s0: Vec<f64>,
     am: &[i64],
     cols: usize,
     tes: &[f64],
+    maths: &Maths,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Maps {
-    let reproduce = notices.reproduce();
     for t in t2s.iter_mut() {
         if t.is_infinite() {
             *t = 500.0;
@@ -127,12 +111,12 @@ pub fn modify_t2s_s0_maps(
         }
     }
     if cols == 1 {
-        apply_floor(&mut t2s, tes, reproduce, log, notices);
+        apply_floor(&mut t2s, tes, maths, log, notices);
     } else {
         let n = am.len();
         for c in 0..cols {
             let mut col: Vec<f64> = (0..n).map(|v| t2s[v * cols + c]).collect();
-            apply_floor(&mut col, tes, reproduce, log, notices);
+            apply_floor(&mut col, tes, maths, log, notices);
             for (v, x) in col.into_iter().enumerate() {
                 t2s[v * cols + c] = x;
             }
@@ -229,7 +213,7 @@ pub fn rmse_of_fit_decay_ts(
     t2s: &[f64],
     s0: &[f64],
     cols: usize,
-    reproduce: bool,
+    maths: &Maths,
     n_threads: usize,
     log: &mut Log<'_>,
 ) -> Rmse {
@@ -256,7 +240,7 @@ pub fn rmse_of_fit_decay_ts(
                             Some(p) => p,
                             None => {
                                 let (s, tt) = (s0[v * cols + c], t2s[v * cols + c]);
-                                let p = f32::from_f64(s.mul(exp64(reproduce, neg_te.div(tt))));
+                                let p = f32::from_f64(s.mul(maths.exp(neg_te.div(tt))));
                                 if cols == 1 {
                                     constant = Some(p);
                                 }

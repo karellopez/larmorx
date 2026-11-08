@@ -27,7 +27,7 @@ use larmorx_core::numpy::reduce::{mean_axis, pairwise_sum, std_axis};
 use rayon::prelude::*;
 
 use crate::log::{Log, PyError, Site};
-use crate::maps::exp64;
+use crate::maths::Maths;
 
 /// How the echoes are combined (`--combmode`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,6 +91,7 @@ pub fn make_optcom(
     t2s: &[f64],
     cols: usize,
     mode: CombMode,
+    maths: &Maths,
     n_threads: usize,
     log: &mut Log<'_>,
     notices: &mut Notices,
@@ -130,7 +131,6 @@ pub fn make_optcom(
             },
         ),
     }
-    let reproduce = notices.reproduce();
     let mut combined = vec![0.0f32; n_samples * n_vols];
     for (n, idx) in groups(am) {
         debug_assert!(n <= n_echos, "adaptive-mask counts never exceed the echoes");
@@ -154,7 +154,7 @@ pub fn make_optcom(
                         for c in 0..wcols {
                             let t = t2s[v * cols + c.min(cols - 1)];
                             for e in 0..n {
-                                w[e * wcols + c] = tes[e].mul(exp64(reproduce, (-tes[e]).div(t)));
+                                w[e * wcols + c] = tes[e].mul(maths.exp((-tes[e]).div(t)));
                             }
                             if wcols > 1 && (0..n).all(|e| w[e * wcols + c] == 0.0) {
                                 for e in 0..n {

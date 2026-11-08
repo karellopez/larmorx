@@ -12,7 +12,11 @@ workspace, `VOLREG_WORK` a scratch folder for the runs.
 | `blackbox.py` | `inputs` / `inputs2` make the synthetic inputs (`oracles/inputs/afni-volreg-original/`); `check [case ...]` compares the original with AFNI (`reproduce`) or, with `REF=replica`, with the replica: exit statuses, messages, `-1Dfile` (§14.3's thresholds), `-1Dmatrix_save`, `-maxdisp1D`, `-savedisp`/`-SAVEDISP`, the registered volumes and their headers; `notices case ...` the replica's and the original's own lines in both modes; `run prog case dir` one run. Cases with `@` read fMRIPrep's inputs, with `%` the replica part's derived inputs (`oracles/inputs/afni-volreg/`: `-rotparent` datasets made by AFNI's own 3dvolreg, gridparents) |
 | `messages.py` | the command line's messages, failures and exit statuses (39 command lines) against AFNI and the replica |
 | `longnames.py` | output names of 200 to 255 bytes for every AFNI clean-room program (AFNI writes them) |
-| `perf.py` | speed and peak memory on fMRIPrep's call: AFNI (its peak through the cache, `peak=True`), the replica and the original at one thread and many |
+| `perf.py` | speed and peak memory on fMRIPrep's call: AFNI (its peak through the cache, `peak=True`; `--afni-fresh` times it afresh), the replica and the original at one thread and many (`--repeat n`: the median of n runs); the inputs are the suite's `oracles/inputs/afni-volreg-original/fmriprep/` (the benchmark `docs/benchmarks/afni-volreg.md`) |
+| `triage.py` | (relay 3) a random-testing night's differences: each drawn command line run again by AFNI and the original with `-verbose -verbose` (each volume's iteration count) and by the original with each side of the decomposition's exact ties (`LARMORX_VOLREG_TIES=first`, `last`: a validation switch of `crates/larmorx-afni/src/volreg/rotate.rs`); verdicts: runaway, the parameters within their bounds, within the ties' spread, not converged, converged and beyond (`docs/findings/afni-volreg-original.md`) |
+
+The suite `afni-volreg-original` (`validation/src/larmorx_validation/parity/afni_volreg_original.py`,
+relay 3) holds the cases these tools found; its record is `docs/validation/afni-volreg-original.md`.
 
 Findings they produced (relay 2, 2026-11-08):
 - `-verbose -verbose`: AFNI reports each derivative image's range over the fit's (trimmed)

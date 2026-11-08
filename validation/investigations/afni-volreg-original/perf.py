@@ -7,9 +7,12 @@ oracle-output cache with ``peak=True`` (its peak resident memory measured by ``/
 and kept in the entry; served afterwards: the peak is the entry's, the seconds are not kept, so
 a served AFNI line shows 0 s and AFNI's time is its first run's); larmorx runs from the
 command line under ``/usr/bin/time -v``. The inputs are fMRIPrep's own ``_sliced`` files
-(``oracles/inputs/afni-volreg/fmriprep/``, made by the replica part's suite).
+(``oracles/inputs/afni-volreg-original/fmriprep/``, made by the suite ``afni-volreg-original``
+in fMRIPrep's image). ``--afni-fresh`` times AFNI afresh (the cache off for its runs; their peak
+is then the run's own), ``--repeat n`` runs everything n times and prints the median time.
 
-    python -P perf.py [--threads 1,14] [--impl original,replica] [--no-afni] label ...
+    python -P perf.py [--threads 1,14] [--impl original,replica] [--no-afni] [--afni-fresh]
+                      [--repeat n] label ...
 
 Prints one line per run: label, program, threads, seconds, peak MiB, and the allowance of the
 memory rule (AFNI's peak times 1.1 plus 8 MiB).
@@ -29,7 +32,7 @@ REPO = Path(__file__).resolve().parents[3]
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE", REPO.parent))
 AFNI = WORKSPACE / "oracles/afni-26.3.05/bin/3dvolreg"
 LX = os.environ.get("LX_BIN", str(REPO / "target/release/larmorx"))
-FMRIPREP_INPUTS = WORKSPACE / "oracles/inputs/afni-volreg/fmriprep"
+FMRIPREP_INPUTS = WORKSPACE / "oracles/inputs/afni-volreg-original/fmriprep"
 sys.path.insert(0, str(REPO / "validation/src"))
 
 CALL = [
@@ -59,10 +62,12 @@ def env_for(work: Path, threads: int) -> dict[str, str]:
     }
 
 
-def afni(label: str, work: Path) -> tuple[float, float, bool]:
+def afni(label: str, work: Path, fresh: bool = False) -> tuple[float, float, bool]:
     from larmorx_validation import oracle_cache
 
     work.mkdir(parents=True, exist_ok=True)
+    if fresh:
+        os.environ[oracle_cache.ENV_MODE] = "off"
     r = oracle_cache.run(
         [str(AFNI), *CALL, str(FMRIPREP_INPUTS / f"{label}_sliced.nii.gz")],
         env=env_for(work, 1),
@@ -113,7 +118,11 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--threads", default="1,14")
     ap.add_argument("--impl", default="original,replica")
     ap.add_argument("--no-afni", action="store_true")
+    ap.add_argument("--afni-fresh", action="store_true")
+    ap.add_argument("--repeat", type=int, default=1)
     a = ap.parse_args(argv)
+    import statistics
+
     threads = [int(t) for t in a.threads.split(",")]
     with tempfile.TemporaryDirectory(
         prefix="volreg-perf-", dir=os.environ.get("VOLREG_WORK")
@@ -122,7 +131,11 @@ def main(argv: list[str]) -> int:
         for label in a.labels:
             allowance = None
             if not a.no_afni:
-                s, mib, cached = afni(label, root / f"{label}-afni")
+                runs = [
+                    afni(label, root / f"{label}-afni-{k}", a.afni_fresh) for k in range(a.repeat)
+                ]
+                s = statistics.median(r[0] for r in runs)
+                mib, cached = max(r[1] for r in runs), runs[0][2]
                 allowance = 1.1 * mib + 8
                 print(
                     f"{label:18} afni      t=1   {s:8.2f} s {mib:8.1f} MiB"
@@ -131,7 +144,11 @@ def main(argv: list[str]) -> int:
                 )
             for impl in [i for i in a.impl.split(",") if i]:
                 for t in threads:
-                    s, mib = larmorx(label, impl, t, root / f"{label}-{impl}-{t}")
+                    runs = [
+                        larmorx(label, impl, t, root / f"{label}-{impl}-{t}-{k}")
+                        for k in range(a.repeat)
+                    ]
+                    s, mib = statistics.median(r[0] for r in runs), max(r[1] for r in runs)
                     note = f"  allowance {allowance:.1f}" if allowance and t == 1 else ""
                     print(
                         f"{label:18} {impl:9} t={t:<3} {s:8.2f} s {mib:8.1f} MiB{note}", flush=True

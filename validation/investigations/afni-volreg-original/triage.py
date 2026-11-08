@@ -17,6 +17,9 @@ final-pass ``Iteration complete at <k> steps`` lines give each volume's iteratio
 - ``r_original``: the original (its default tie rule) against AFNI;
 - ``r_ties``: the largest of the three tie sides against each other (the original's own spread
   from the ties alone);
+- first the suite's own judgement with this build (``run_case``, its tie sides included):
+  ``agrees (this build)`` (a mistake fixed since the night) or ``within the ties' spread
+  (suite)``; for the others, as below;
 - verdicts: ``runaway`` (AFNI's run failed, or a parameter beyond 15 degrees or 20 mm: far outside
   the small motions 3dvolreg is made for); ``beyond the parameters`` (the parameters within their
   bounds, another check failed); ``within the ties' spread`` (``r_ties >= r_original / 2``, or a
@@ -73,6 +76,21 @@ def _case(finding: str) -> dict:
     f = json.loads(Path(finding).read_text(encoding="utf-8"))
     recipe = f["recipe"]
     prefix = inputs.register(recipe["inputs"])
+    # first the suite's own judgement with this build (its tie sides included)
+    from larmorx_validation.parity.harness import Case, run_one
+
+    suite = vo.suite()
+    case = Case(f"{f['seed']}-{f['n']}", "difftest", "", {"recipe": recipe, "prefix": prefix})
+    suite.run_case = tool._run
+    judged = run_one(suite, case)
+    ties = any(c.name.startswith("the decomposition's ties") for c in judged.checks)
+    if judged.status in ("pass", "both-error", "expected-divergence"):
+        return {
+            "case": f"{f['tool']}:{f['seed']}:{f['n']}",
+            "failed": sorted({c.split(": ", 1)[-1] for c in f.get("signature", [])}),
+            "verdict": "within the ties' spread (suite)" if ties else "agrees (this build)",
+        }
+    still = sorted({c.name.split(": ", 1)[-1] for c in judged.failed_checks})
     argv = ["-verbose", "-verbose", *tool._argv(recipe, prefix)]
     src = Path(argv[-1])
     work = Path(tempfile.mkdtemp(prefix="volreg-triage_", dir=vo._scratch()))
@@ -96,6 +114,7 @@ def _case(finding: str) -> dict:
         row = {
             "case": f"{f['tool']}:{f['seed']}:{f['n']}",
             "failed": sorted({c.split(": ", 1)[-1] for c in f.get("signature", [])}),
+            "still": still,
             "exits": [ca, co],
             "method": s.method,
             "limit": _limit(argv),

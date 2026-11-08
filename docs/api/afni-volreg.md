@@ -6,14 +6,16 @@ fMRIPrep runs it for its BOLD reference (niworkflows' `RobustAverage`: up to 20 
 before their median, `-Fourier -twopass -zpad 4`, once per run and per 4D sbref) and sdcflows'
 PEPOLAR estimator for its reference averages.
 
-**One implementation so far, in `pip install larmorx`.** The bit-exact **replica**, translated
+**Two implementations, both in `pip install larmorx`.** The bit-exact **replica**, translated
 from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for
 the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0
 ([NOTICE](../../NOTICE), [licensing](../licensing.md)), and the NIH's public-domain files,
-[PROVENANCE](../../crates/larmorx-afni-replica/PROVENANCE.md)). Its clean-room original, built
-for speed, is to be written from [`specs/3dvolreg.md`](../../specs/3dvolreg.md) by another agent
-(the user, 2026-11-06). `implementation="auto"` (the default, and `larmorx afni 3dvolreg`) and
-`"replica"` run the replica, in the same process; `"original"` raises `NotImplementedError`.
+[PROVENANCE](../../crates/larmorx-afni-replica/PROVENANCE.md)), and the clean-room **original**
+(`crates/larmorx-afni/src/volreg/`, Apache-2.0), written from
+[`specs/3dvolreg.md`](../../specs/3dvolreg.md) by an agent that never read AFNI's source or the
+replica, built for speed (below). `implementation="auto"` (the default, and `larmorx afni
+3dvolreg`) and `"replica"` run the replica, in the same process; `"original"` (and
+`LARMORX_IMPLEMENTATION=original` on the command line) runs the original, also in the same process.
 
 **Status: `validated`** (2026-11-06): the replica is bit-identical with AFNI 26.3.05 in every
 compared case of its record ([afni-volreg-replica](../validation/afni-volreg-replica.md), the

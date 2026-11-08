@@ -575,7 +575,10 @@ fn parse(
                         return Err(Stop::Raw("** Can't have two -base arguments".into()));
                     }
                 }
-                Some(_) => return Err(Stop::Raw("** Can't have two -base arguments".into())),
+                Some(_) => {
+                    print_notices(log, &scan_notices(&o, mode));
+                    return Err(Stop::Raw("** Can't have two -base arguments".into()));
+                }
                 None => {}
             }
             let t = v.trim_start();
@@ -835,7 +838,9 @@ fn long_name(
         return Ok(());
     }
     if mode.reproduce() {
-        log.notice(&notices::afni_90(what, v.len(), mode));
+        let mut pending = scan_notices(o, mode);
+        pending.push(notices::afni_90(what, v.len(), mode));
+        print_notices(log, &pending);
         return Err(Stop::Fatal(notices::afni_90_fatal(what, v.len())));
     }
     o.late.push(notices::afni_90(what, v.len(), mode));
@@ -1014,6 +1019,23 @@ fn execute(
     if o.base_twice && mode.reproduce() {
         late.push(afni_95(mode));
     }
+    // The scan's notices come at the end of a run; a run that stops with an error after the scan
+    // prints them before its error (as the replica does), unless it printed them itself.
+    let result = execute_after_scan(o, mode, settings, n_threads, log, &mut late);
+    if result.is_err() {
+        print_notices(log, &late);
+    }
+    result
+}
+
+fn execute_after_scan(
+    mut o: Options,
+    mode: UpstreamDefects,
+    settings: &AfniSettings,
+    n_threads: usize,
+    log: &mut Log<'_>,
+    late: &mut Vec<Notice>,
+) -> Result<u8, Stop> {
     // §9.2.
     let external = matches!(o.base, Some(BaseOpt::Dataset(..)));
     if !(o.twopass && external) {
@@ -1465,9 +1487,11 @@ fn execute(
             for m in &e.messages {
                 log.message(m);
             }
-            for n in &e.notices {
-                log.notice(n);
-            }
+            // the option scan's notices too (AFNI-86, -90, -95), before the error
+            print_notices(
+                log,
+                late.drain(..).collect::<Vec<_>>().iter().chain(&e.notices),
+            );
             return Err(if e.fatal_error {
                 Stop::Fatal(e.fatal)
             } else {
@@ -1558,10 +1582,9 @@ fn execute(
         // AFNI-90: by default a -prefix of 256 bytes or more is kept whole; a file name the
         // system cannot hold fails as the replica's does: AFNI-26 and the notices, then the error.
         if let Some(e) = unwritable_name(&o.prefix) {
-            log.notice(&notices::afni_26_unwritable(mode));
-            for n in late.iter().chain(&notices) {
-                log.notice(n);
-            }
+            let unwritable = notices::afni_26_unwritable(mode);
+            let pending: Vec<Notice> = late.drain(..).collect();
+            print_notices(log, pending.iter().chain(&notices).chain([&unwritable]));
             return Err(Stop::Fatal(format!(
                 "can't write output dataset: cannot replace '{}': {e}; nothing was written",
                 o.prefix
@@ -1673,9 +1696,7 @@ fn execute(
     if scaled && output && !o.float {
         log.warning("Input dataset has scale factors ==> output is stored as floats!");
     }
-    for n in late.iter().chain(&notices) {
-        log.notice(n);
-    }
+    print_notices(log, late.iter().chain(&notices));
     Ok(0)
 }
 
@@ -1694,6 +1715,33 @@ fn afni_98_name(o: &Options, arg_name: &str, mode: UpstreamDefects, log: &mut Lo
     } else {
         arg_name.to_owned()
     }
+}
+
+/// Prints notices as the replica orders them: by the defect's ID (a stable sort: one defect's
+/// several notices in their order), each notice once.
+fn print_notices<'a>(log: &mut Log<'_>, notices: impl IntoIterator<Item = &'a Notice>) {
+    let mut all: Vec<&Notice> = Vec::new();
+    for n in notices {
+        if !all.contains(&n) {
+            all.push(n);
+        }
+    }
+    all.sort_by_key(|n| n.defect.id);
+    for n in all {
+        log.notice(n);
+    }
+}
+
+/// The notices the option scan has met so far, printed before a scan's error.
+fn scan_notices(o: &Options, mode: UpstreamDefects) -> Vec<Notice> {
+    let mut out = o.late.clone();
+    if o.nocoarserot {
+        out.push(afni_86(mode));
+    }
+    if o.base_twice && mode.reproduce() {
+        out.push(afni_95(mode));
+    }
+    out
 }
 
 /// The system's refusal of an output whose file name is longer than 255 bytes (AFNI-90's names

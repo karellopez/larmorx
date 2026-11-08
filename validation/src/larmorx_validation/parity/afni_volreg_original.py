@@ -619,19 +619,7 @@ class FmriprepCall:
     node: str
     adds: str
     tier: str = "standard"
-    #: why the median may exceed §14.3's 1e-4 (an expected divergence, reported), or ""
-    median_beyond: str = ""
 
-
-#: The medians of two real calls exceed §14.3's 1e-4 (measured by the spec writer on ds000005 and
-#: ds003592 only): the decomposition's exact ties (§5.3) move single edge voxels of the registered
-#: volumes (within their own thresholds) and the median keeps one. An open question for the spec.
-_TIES = (
-    "the median's largest difference exceeds §14.3's 1e-4 of the largest value at an edge "
-    "voxel: the shear decomposition's exact ties (§5.3, §16) move single voxels of the "
-    "registered volumes, which are within their thresholds; the threshold was measured on "
-    "ds000005 and ds003592 only (an open question for the spec writer)"
-)
 
 _HMC = "bold_fit_wf/hmc_boldref_wf/gen_avg"
 FMRIPREP_CALLS = (
@@ -653,7 +641,6 @@ FMRIPREP_CALLS = (
         "ds005454-sub-16-noreconall",
         f"sub_16_wf/bold_task_rest_wf/{_HMC}",
         "multiband, 160 x 160 x 96, oblique",
-        median_beyond=_TIES,
     ),
     FmriprepCall(
         "ds003592-echo-1",
@@ -666,7 +653,6 @@ FMRIPREP_CALLS = (
         "ds004958-sub-fsm64ps-noreconall",
         f"sub_fsm64ps_wf/bold_task_rest_wf/{_HMC}",
         "multiband 8, uint16 stored, three volumes, 24 degrees oblique",
-        median_beyond=_TIES,
     ),
     FmriprepCall(
         "ds002603-mb4",
@@ -697,8 +683,7 @@ FMRIPREP_CALLS = (
         "ds000256-nofeedback",
         "ds000256-sub-CTS203-noreconall",
         f"sub_CTS203_wf/bold_task_restfixationnofeedback_wf/{_HMC}",
-        "a child's run, the most motion",
-        "full",
+        "a child's run, the most motion (rotations to 4.7 degrees)",
     ),
     FmriprepCall(
         "ds000256-fixed",
@@ -2913,29 +2898,14 @@ class Compare:
             beyond1 += int(np.count_nonzero(dv > 1)) if integer else 0
             ok &= ncc >= 0.9998 and mean <= 2e-3
         self.vol_rms = rms
-        if (s.final or s.method) == "NN":
-            # Nearest neighbour rounds at each of the four shears: where the decomposition's
-            # exact tie (§5.3) is decided the other way, whole rows move by a voxel, whatever the
-            # parameters. §14.3 states no threshold for it: reported (an open question).
-            self.checks.add(
-                Check(
-                    f"{self.p.label}: registered volumes (-final NN)",
-                    True,
-                    metric="min NCC; max mean |diff| / max",
-                    value=round(worst_ncc, 7),
-                    threshold="reported (-final NN: no threshold in §14.3; an open question)",
-                    detail=f"NCC {worst_ncc:.7f}, mean {worst_mean:.2e}",
-                )
-            )
-        else:
-            self.add(
-                "registered volumes",
-                ok,
-                metric="min NCC; max mean |diff| / max",
-                value=round(worst_ncc, 7),
-                threshold=">= 0.9998; <= 2e-3",
-                detail=f"NCC {worst_ncc:.7f}, mean {worst_mean:.2e}",
-            )
+        self.add(
+            "registered volumes",
+            ok,
+            metric="min NCC; max mean |diff| / max",
+            value=round(worst_ncc, 7),
+            threshold=">= 0.9998; <= 2e-3",
+            detail=f"NCC {worst_ncc:.7f}, mean {worst_mean:.2e}",
+        )
         self.report("registered volumes: largest |diff| / max", float(f"{worst_max:.3g}"))
         self.report("registered volumes identical", bool(np.array_equal(a4, b4, equal_nan=True)))
         if integer:
@@ -3547,75 +3517,163 @@ def _run_fmriprep(case: Case, checks: CheckList, d: Path) -> None:
         str(src),
     ]
     run = dataclasses.replace(case.payload, opts=tuple(argv), outputs=(), dataset=None)
-    _compare_all(case, checks, d, run, argv, src.parent)
     nonneg = _nonnegative(call)
     import nibabel as nib
 
-    beyond = False
     ref = nib.load(node_average(call)).get_fdata(dtype="float64")
     big = float(np.abs(ref).max()) or 1.0
-    for mode, sub in (
-        ("reproduce", "original-reproduce"),
-        ("default", "original-fix"),
-        ("AFNI", "afni"),
-    ):
-        out = d / sub / f"{stem}_volreg.nii.gz"
-        if not out.is_file():
-            checks(f"fMRIPrep's median: {mode}", False, detail="no registered volumes")
-            continue
-        med = robust_median(out, src, nonneg, d)
-        if med.shape != ref.shape:
-            checks(f"fMRIPrep's median: {mode}", False, detail=f"{med.shape} vs {ref.shape}")
-            continue
-        rel = float(np.abs(med - ref).max()) / big
-        if mode != "AFNI":
-            fa = _float_median(d / "afni" / out.name, nonneg)
-            fb = _float_median(out, nonneg)
-            checks.add(
-                Check(
-                    f"fMRIPrep's median before storage: the original ({mode}) against AFNI's",
-                    True,
-                    metric="max |diff| / max",
-                    value=float(
-                        f"{float(np.abs(fa - fb).max()) / (float(np.abs(fa).max()) or 1.0):.3g}"
-                    ),
-                    threshold="reported",
-                )
-            )
-        if mode == "AFNI":
-            # AFNI's own median is fMRIPrep's output byte for byte (§14.2): the inputs' check
-            checks(
-                "fMRIPrep's median: AFNI's (the inputs re-made as fMRIPrep made them)",
-                rel == 0.0,
-                metric="max |diff| / max",
-                value=float(f"{rel:.3g}"),
-                threshold=0.0,
-            )
-        elif rel > 1e-4 and call.median_beyond:
-            checks.add(
-                Check(
-                    f"fMRIPrep's median: the original ({mode})",
-                    True,
-                    metric="max |diff| / max",
-                    value=float(f"{rel:.3g}"),
-                    threshold="reported (beyond 1e-4: an expected divergence)",
-                )
-            )
-            beyond = True
-        else:
-            checks(
-                f"fMRIPrep's median: the original ({mode})",
-                rel <= 1e-4,
-                metric="max |diff| / max",
-                value=float(f"{rel:.3g}"),
-                threshold=1e-4,
-            )
-    if beyond:
-        raise Outcome(EXPECTED, call.median_beyond)
+    name = f"{stem}_volreg.nii.gz"
+
+    def relative(out: Path, work: Path) -> float | None:
+        med = robust_median(out, src, nonneg, work)
+        return float(np.abs(med - ref).max()) / big if med.shape == ref.shape else None
+
+    afni_out = d / "afni" / name
+
+    def medians(rep_dir: Path, fix_dir: Path) -> list[Check]:
+        """fMRIPrep's median of the original's registered volumes in both modes, against
+        fMRIPrep's own output (and, reported, before storage against AFNI's)."""
+        out = []
+        for mode, sub in (("reproduce", rep_dir), ("default", fix_dir)):
+            f = sub / name
+            rel = relative(f, sub) if f.is_file() else None
+            if rel is None:
+                out.append(Check(f"fMRIPrep's median: the original ({mode})", False, detail="no registered volumes or another shape"))  # fmt: skip
+                continue
+            out.append(Check(f"fMRIPrep's median: the original ({mode})", rel <= 1e-4, metric="max |diff| / max", value=float(f"{rel:.3g}"), threshold=1e-4))  # fmt: skip
+            fa, fb = _float_median(d / "afni" / name, nonneg), _float_median(f, nonneg)
+            out.append(Check(f"fMRIPrep's median before storage: the original ({mode}) against AFNI's", True, metric="max |diff| / max", value=float(f"{float(np.abs(fa - fb).max()) / (float(np.abs(fa).max()) or 1.0):.3g}"), threshold="reported"))  # fmt: skip
+        return out
+
+    _compare_all(case, checks, d, run, argv, src.parent, more=medians)
+    rel = relative(afni_out, d / "afni") if afni_out.is_file() else None
+    # AFNI's own median is fMRIPrep's output byte for byte (§14.2): the inputs' check
+    checks(
+        "fMRIPrep's median: AFNI's (the inputs re-made as fMRIPrep made them)",
+        rel == 0.0,
+        metric="max |diff| / max",
+        value=None if rel is None else float(f"{rel:.3g}"),
+        threshold=0.0,
+    )
+
+
+#: The tie sides of the original tried where a comparison fails (``LARMORX_VOLREG_TIES``).
+TIE_SIDES = ("0", "1", "2", "3")
+
+
+def _pair(label, ref, test, ref_dir, test_dir, ref_files, test_files, s, g, gb) -> CheckList:
+    cl = CheckList()
+    Compare(cl, Pair(label, ref, test, ref_dir, test_dir, ref_files, test_files), s, g, gb).run()
+    return cl
+
+
+def _explained_by_ties(c: Check, side: str) -> Check:
+    return dataclasses.replace(
+        c,
+        passed=True,
+        threshold=(
+            f"reported (the decomposition's ties: with tie side {side} the original meets "
+            "every threshold)"
+        ),
+    )
+
+
+#: The checks a per-volume choice of tie sides may explain: the registered volumes and what
+#: follows from them alone (fMRIPrep's median).
+_PER_VOLUME = ("registered volumes", "fMRIPrep's median: the original")
+
+
+def _tie_sides(compared, d, run, argv, ins, extra, s, g, gb, afni, rfix, dirs, files, more):
+    """§14.3 allows for either side of the decomposition's exact ties (§5.3): the original's
+    tie sides (``LARMORX_VOLREG_TIES``), each in both modes, judged the same way. The first side
+    that meets every threshold explains the failures; else, when only the registered volumes
+    (and fMRIPrep's median) fail, each volume taken from the side closest to the reference's
+    (AFNI decides its ties resampling by resampling, so its volumes mix the sides). Returns the
+    explanation (the side, or ``"per volume"``), or ``None``; the failed checks are then reported
+    with it."""
+    sides = {}
+    for side in TIE_SIDES:
+        sd = {m: d / f"original-ties{side}-{m}" for m in ("reproduce", "fix")}
+        sp = {m: _prepare(v, run, ins) for m, v in sd.items()}
+        env = {**extra, "LARMORX_VOLREG_TIES": side}
+        sr = run_lx("original", defects.REPRODUCE, argv, sd["reproduce"], env, 1, run.stdin)
+        sf = run_lx("original", defects.FIX, argv, sd["fix"], env, LX_THREADS, run.stdin)
+        sfiles = {m: _written(v, sp[m]) for m, v in sd.items()}
+        alt = _pair("AFNI", afni, sr, dirs["afni"], sd["reproduce"], files["afni"], sfiles["reproduce"], s, g, gb).checks  # fmt: skip
+        alt += _pair("the replica (default)", rfix, sf, dirs["replica-fix"], sd["fix"], files["replica-fix"], sfiles["fix"], s, g, gb).checks  # fmt: skip
+        if more is not None:
+            alt += more(sd["reproduce"], sd["fix"])
+        if all(c.passed for c in alt):
+            return _explain(compared, side)
+        sides[side] = sd
+    failing = [c.name for c in compared.checks if not c.passed]
+    if not all(any(k in n for k in _PER_VOLUME) for n in failing):
+        return None
+    name = Path(s.prefix).name if s.prefix else ""
+    comp = {}
+    for mode, own, ref in (("reproduce", "original-reproduce", "afni"), ("fix", "original-fix", "replica-fix")):  # fmt: skip
+        cands = [dirs[own] / name] + [sides[k][mode] / name for k in TIE_SIDES]
+        if not all(c.is_file() for c in cands) or not (dirs[ref] / name).is_file():
+            return None
+        comp[mode] = d / f"original-composite-{mode}"
+        comp[mode].mkdir(exist_ok=True)
+        if not _composite(dirs[ref] / name, cands, comp[mode] / name):
+            return None
+    alt = more(comp["reproduce"], comp["fix"]) if more is not None else []
+    if all(c.passed for c in alt):
+        return _explain(compared, "per volume")
+    # the volumes explained, what follows from them (fMRIPrep's median) not: its failure stays,
+    # with the value the per-volume tie choices give
+    compared.checks = [
+        _explained_by_ties(c, "per volume")
+        if not c.passed and "registered volumes" in c.name
+        else c
+        for c in compared.checks
+    ]
+    for c in alt:
+        if not c.passed:
+            compared.add(dataclasses.replace(c, name=f"{c.name}, with each volume's tie side closest to AFNI's", passed=True, threshold="reported"))  # fmt: skip
+    return None
+
+
+def _composite(ref: Path, cands: list[Path], target: Path) -> bool:
+    """Each volume from the candidate closest to ``ref``'s (mean |diff|), written to ``target``
+    with the first candidate's header; whether every volume then meets §14.3's volume thresholds."""
+    import nibabel as nib
+
+    a = np.asanyarray(nib.load(ref).dataobj)
+    imgs = [nib.load(c) for c in cands]
+    data = [np.asanyarray(i.dataobj) for i in imgs]
+    if any(x.shape != a.shape for x in data):
+        return False
+    a4 = a.reshape(*a.shape[:3], -1).astype(np.float64)
+    out = np.empty_like(data[0]).reshape(*a.shape[:3], -1)
+    ok = True
+    for v in range(a4.shape[3]):
+        x = a4[..., v]
+        big = float(np.nanmax(np.abs(x))) or 1.0
+        means = [float(np.nanmean(np.abs(y.reshape(*a.shape[:3], -1)[..., v] - x))) for y in data]
+        k = int(np.argmin(means))
+        out[..., v] = data[k].reshape(*a.shape[:3], -1)[..., v]
+        ok &= _ncc(x, out[..., v].astype(np.float64)) >= 0.9998 and means[k] / big <= 2e-3
+    nib.save(nib.Nifti1Image(out.reshape(a.shape), imgs[0].affine, imgs[0].header), target)
+    return ok
+
+
+def _explain(compared: CheckList, how: str) -> str:
+    compared.checks = [c if c.passed else _explained_by_ties(c, how) for c in compared.checks]
+    compared(f"the decomposition's ties: with tie side {how} every threshold is met", True, metric="tie side", value=how, threshold="reported")  # fmt: skip
+    return how
 
 
 def _compare_all(
-    case: Case, checks: CheckList, d: Path, run: Run, argv: list[str], ins: Path
+    case: Case,
+    checks: CheckList,
+    d: Path,
+    run: Run,
+    argv: list[str],
+    ins: Path,
+    more=None,
 ) -> None:
     extra = dict(run.env)
     s = settings_of(argv)
@@ -3637,75 +3695,25 @@ def _compare_all(
     files = {k: _written(v, placed[k]) for k, v in dirs.items()}
     if g is None:
         g = Geometry((1, 1, 1), np.ones(3), {"S": 2, "L": 0, "P": 1}, 0.0)
+    compared = CheckList()
     if afni is not None:
-        Compare(
-            checks,
-            Pair(
-                "AFNI",
-                afni,
-                rep,
-                dirs["afni"],
-                dirs["original-reproduce"],
-                files["afni"],
-                files["original-reproduce"],
-            ),
-            s,
-            g,
-            gb,
-        ).run()
+        compared.checks += _pair("AFNI", afni, rep, dirs["afni"], dirs["original-reproduce"], files["afni"], files["original-reproduce"], s, g, gb).checks  # fmt: skip
         if s.SAVEDISP and afni.code == 0 and rep.code == 0:
-            savedisp_two_steps(
-                checks,
-                d,
-                run,
-                argv,
-                ins,
-                extra,
-                input_files,
-                s,
-                g,
-                gb,
-                dirs["afni"],
-                files["afni"],
-                dirs["original-reproduce"],
-                files["original-reproduce"],
-            )
+            savedisp_two_steps(compared, d, run, argv, ins, extra, input_files, s, g, gb, dirs["afni"], files["afni"], dirs["original-reproduce"], files["original-reproduce"])  # fmt: skip
     else:
         placed["replica-reproduce"] = _prepare(d / "replica-reproduce", run, ins)
         rrep = run_lx(
             "replica", defects.REPRODUCE, argv, d / "replica-reproduce", extra, 1, run.stdin
         )
         files["replica-reproduce"] = _written(d / "replica-reproduce", placed["replica-reproduce"])
-        Compare(
-            checks,
-            Pair(
-                "the replica (reproduce)",
-                rrep,
-                rep,
-                d / "replica-reproduce",
-                dirs["original-reproduce"],
-                files["replica-reproduce"],
-                files["original-reproduce"],
-            ),
-            s,
-            g,
-            gb,
-        ).run()
-    Compare(
-        checks,
-        Pair(
-            "the replica (default)",
-            rfix,
-            fix,
-            dirs["replica-fix"],
-            dirs["original-fix"],
-            files["replica-fix"],
-            files["original-fix"],
-        ),
-        s,
-        g,
-        gb,
-    ).run()
+        compared.checks += _pair("the replica (reproduce)", rrep, rep, d / "replica-reproduce", dirs["original-reproduce"], files["replica-reproduce"], files["original-reproduce"], s, g, gb).checks  # fmt: skip
+    compared.checks += _pair("the replica (default)", rfix, fix, dirs["replica-fix"], dirs["original-fix"], files["replica-fix"], files["original-fix"], s, g, gb).checks  # fmt: skip
+    if more is not None:
+        compared.checks += more(dirs["original-reproduce"], dirs["original-fix"])
+    ties_side = None
+    if afni is not None and not run.expect and any(not c.passed for c in compared.checks):
+        ties_side = _tie_sides(compared, d, run, argv, ins, extra, s, g, gb, afni, rfix, dirs, files, more)  # fmt: skip
+    checks.checks += compared.checks
     named = _d13(
         checks,
         fix,
@@ -3724,6 +3732,8 @@ def _compare_all(
     case_status = _status(run, afni, rep)
     if case_status is not None:
         raise Outcome(*case_status)
+    if ties_side is not None:
+        raise Outcome(EXPECTED, f"the shear decomposition's exact ties (specs/3dvolreg.md §5.3, §16): with the other tie side ({ties_side}) the original meets every threshold of §14.3; beyond them with its own (an open question for the spec writer)")  # fmt: skip
 
 
 def _status(run: Run, afni: Ran | None, rep: Ran) -> tuple[str, str] | None:

@@ -257,6 +257,15 @@ file:
   3dAutomask's mask, the product, the masked reference: 70 files), and niworkflows' own graph's on
   three runs (18 files; 6 of them identical but for AFNI's history extension).
 - The two dilated masks of `init_coeff2epi_wf` are fMRIPrep's on all 14 runs (28 files).
+- **The D8 PEPOLAR run of ds004958** (sub-fsm64ps, its spin-echo AP/PA pair linked, 104x104x72,
+  2 mm; finished 2026-11-08 19:40): `check_pepolar.py` `wf` in both kept environments, every node
+  file of sdcflows' graphs identical (2.15: 30, 2.17: 35, debug: 36, sloppy: 35; FSL's `b02b0_4.cnf`
+  chosen alike), and `image`: fMRIPrep's own run averages, merge, set average, `fix_coeff`,
+  `from_las`, `from_las_fmap`, `ref_average` and its `topup` line identical; topup's replica = FSL
+  6.0.7.23 on fMRIPrep's input (8 images, 2 matrices). fMRIPrep's image's topup differs from FSL
+  6.0.7.23 here too (0.03 % of the field's voxels identical, at most 0.197 Hz; its matrices
+  identical): the second run after ds006736 (relay 5's note), ds001600 and ds005040 the same: the
+  cause stays to be measured with the records.
 
 ## Candidates for the register (the part's defects relay decides them)
 

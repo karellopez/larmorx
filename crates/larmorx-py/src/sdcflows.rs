@@ -5,6 +5,7 @@
 //! `sparse_cg` ridge solver. Matrices are float64 4×4 arrays; the GIL is released while
 //! computing.
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::linalg::Mat4;
 use larmorx_sdcflows::SdcError;
 use larmorx_sdcflows::approx::{self, ApproxParams, Fitting, Grid, LogRecord, Recenter};
@@ -18,6 +19,8 @@ use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+
+use crate::defects::mode_from_py;
 
 fn sdc_err(e: SdcError) -> PyErr {
     match e {
@@ -61,12 +64,48 @@ fn sdcflows_bspline_grid<'py>(
     Ok((g.shape, PyArray2::from_vec2(py, &a)?))
 }
 
+/// The notices of SDC-01 and SDC-02 for one set of levels: `(entry, tool, mode, detail)`.
+type Notice = (String, String, String, String);
+
+fn level_notices(weights: &[bspline::LevelWeights], defects: UpstreamDefects) -> Vec<Notice> {
+    let mut out = Vec::new();
+    let mode = defects.name().to_string();
+    let notice =
+        |id: &str, detail: String| (id.to_string(), "sdcflows".to_string(), mode.clone(), detail);
+    for (i, w) in weights.iter().enumerate() {
+        if w.beyond > 0 {
+            out.push(notice(
+                "SDC-01",
+                format!(
+                    "control grid {i}: {} sampling positions lie beyond the first or the last \
+                     control point, where sdcflows continues the end polynomial of SciPy's \
+                     extrapolation instead of the cubic B-spline",
+                    w.beyond
+                ),
+            ));
+        }
+        if !w.aligned {
+            out.push(notice(
+                "SDC-02",
+                format!(
+                    "control grid {i}: the sampling grid is rotated relative to it; sdcflows \
+                     multiplies per-axis weights each taken from one index of the voxel \
+                     (\"Image's and B-Spline's grids are not aligned.\") instead of the \
+                     B-spline at the voxel's position"
+                ),
+            ));
+        }
+    }
+    out
+}
+
 fn collocation(
     target_shape: [usize; 3],
     target_affine: &Mat4,
     levels: &[([usize; 3], Mat4)],
     dtype: WeightType,
-) -> Result<(Collocation, Vec<bool>), SdcError> {
+    defects: UpstreamDefects,
+) -> Result<(Collocation, Vec<bool>, Vec<Notice>), SdcError> {
     let mut weights = Vec::with_capacity(levels.len());
     for (shape, affine) in levels {
         weights.push(bspline::grid_bspline_weights(
@@ -75,10 +114,12 @@ fn collocation(
             *shape,
             affine,
             dtype,
+            defects,
         )?);
     }
     let aligned = weights.iter().map(|w| w.aligned).collect();
-    Ok((Collocation::new(weights)?, aligned))
+    let notices = level_notices(&weights, defects);
+    Ok((Collocation::new(weights)?, aligned, notices))
 }
 
 fn levels_from_py(
@@ -89,10 +130,12 @@ fn levels_from_py(
 
 /// The stored collocation matrix of `levels` (`[(shape, affine)]`) on the sampling grid, as
 /// sdcflows builds it (`sparse_hstack([grid_bspline_weights(target, l) for l in levels])
-/// .tocsr()`): `(data, indices, indptr, (rows, cols), aligned)`, data float64 holding the values
-/// of the matrix type, indices and indptr int64, `aligned` one flag per level.
+/// .tocsr()`): `(data, indices, indptr, (rows, cols), aligned, notices)`, data float64 holding
+/// the values of the matrix type, indices and indptr int64, `aligned` one flag per level,
+/// `notices` SDC-01's and SDC-02's (`upstream_defects`: "fix" corrects them, "reproduce" gives
+/// sdcflows' matrix bit for bit).
 #[pyfunction]
-#[pyo3(signature = (target_shape, target_affine, levels, dtype = "float32", n_threads = 1))]
+#[pyo3(signature = (target_shape, target_affine, levels, dtype = "float32", n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::type_complexity)]
 fn sdcflows_collocation_csr<'py>(
     py: Python<'py>,
@@ -101,20 +144,23 @@ fn sdcflows_collocation_csr<'py>(
     levels: Vec<([usize; 3], PyReadonlyArray2<'_, f64>)>,
     dtype: &str,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<(
     Bound<'py, PyArray1<f64>>,
     Bound<'py, PyArray1<i64>>,
     Bound<'py, PyArray1<i64>>,
     (usize, usize),
     Vec<bool>,
+    Vec<Notice>,
 )> {
     let t = mat4(&target_affine)?;
     let levels = levels_from_py(levels)?;
     let dtype = dtype_from_py(dtype)?;
-    let (csr, aligned) = py
+    let defects = mode_from_py(upstream_defects)?;
+    let (csr, aligned, notices) = py
         .detach(|| -> Result<_, SdcError> {
-            let (col, aligned) = collocation(target_shape, &t, &levels, dtype)?;
-            Ok((col.to_csr(n_threads)?, aligned))
+            let (col, aligned, notices) = collocation(target_shape, &t, &levels, dtype, defects)?;
+            Ok((col.to_csr(n_threads)?, aligned, notices))
         })
         .map_err(sdc_err)?;
     let to_i64 = |v: Vec<usize>| v.into_iter().map(|x| x as i64).collect::<Vec<i64>>();
@@ -124,15 +170,17 @@ fn sdcflows_collocation_csr<'py>(
         PyArray1::from_vec(py, to_i64(csr.indptr)),
         (csr.shape[0], csr.shape[1]),
         aligned,
+        notices,
     ))
 }
 
 /// `X @ v` (`transpose = False`, `v` of the columns' length) or `X.T @ v` (`transpose = True`)
 /// for sdcflows' float32 collocation matrix of `levels` on the sampling grid, in scipy's
 /// summation order, without storing the matrix. `rows` (int64) restricts `X @ v` to those rows.
+/// Returns `(values, notices)` (SDC-01's and SDC-02's, as `sdcflows_collocation_csr`).
 #[pyfunction]
-#[pyo3(signature = (target_shape, target_affine, levels, v, transpose = false, rows = None, n_threads = 1))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (target_shape, target_affine, levels, v, transpose = false, rows = None, n_threads = 1, upstream_defects = "fix"))]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn sdcflows_collocation_apply<'py>(
     py: Python<'py>,
     target_shape: [usize; 3],
@@ -142,9 +190,11 @@ fn sdcflows_collocation_apply<'py>(
     transpose: bool,
     rows: Option<PyReadonlyArray1<'_, i64>>,
     n_threads: usize,
-) -> PyResult<Bound<'py, PyArray1<f32>>> {
+    upstream_defects: &str,
+) -> PyResult<(Bound<'py, PyArray1<f32>>, Vec<Notice>)> {
     let t = mat4(&target_affine)?;
     let levels = levels_from_py(levels)?;
+    let defects = mode_from_py(upstream_defects)?;
     let v = v.as_array().to_vec();
     let rows: Option<Vec<usize>> = match rows {
         None => None,
@@ -155,22 +205,24 @@ fn sdcflows_collocation_apply<'py>(
                 .collect::<PyResult<_>>()?,
         ),
     };
-    let out = py
-        .detach(|| -> Result<Vec<f32>, SdcError> {
-            let (col, _) = collocation(target_shape, &t, &levels, WeightType::Float32)?;
+    let (out, notices) = py
+        .detach(|| -> Result<(Vec<f32>, Vec<Notice>), SdcError> {
+            let (col, _, notices) =
+                collocation(target_shape, &t, &levels, WeightType::Float32, defects)?;
             if let Some(r) = &rows
                 && r.iter().any(|&i| i >= col.shape()[0])
             {
                 return Err(SdcError::Invalid("row index out of range".into()));
             }
-            if transpose {
-                col.rmatvec_f32(&v, n_threads)
+            let out = if transpose {
+                col.rmatvec_f32(&v, n_threads)?
             } else {
-                col.matvec_f32(&v, rows.as_deref(), n_threads)
-            }
+                col.matvec_f32(&v, rows.as_deref(), n_threads)?
+            };
+            Ok((out, notices))
         })
         .map_err(sdc_err)?;
-    Ok(PyArray1::from_vec(py, out))
+    Ok((PyArray1::from_vec(py, out), notices))
 }
 
 /// `np.dot(x, y)` of two float32 vectors (numpy's `FLOAT_dot` over OpenBLAS's Haswell `sdot`).
@@ -286,7 +338,8 @@ fn sdcflows_ridge_csr<'py>(
 }
 
 /// The same fit on sdcflows' float32 collocation matrix of `levels` on the sampling grid
-/// (`Ridge(alpha, fit_intercept=False).fit(colmat, y)`), applied without storing the matrix.
+/// (`Ridge(alpha, fit_intercept=False).fit(colmat, y)`), applied without storing the matrix:
+/// sdcflows' own matrix (SDC-01 and SDC-02 reproduced), the parity primitive of the ridge port.
 #[pyfunction]
 #[pyo3(signature = (target_shape, target_affine, levels, y, alpha = 1e-4, tol = 1e-4, max_iter = None, n_threads = 1))]
 #[allow(clippy::too_many_arguments)]
@@ -306,7 +359,13 @@ fn sdcflows_ridge_collocation<'py>(
     let y = y.as_array().to_vec();
     let fit = py
         .detach(|| -> Result<_, SdcError> {
-            let (col, _) = collocation(target_shape, &t, &levels, WeightType::Float32)?;
+            let (col, _, _) = collocation(
+                target_shape,
+                &t,
+                &levels,
+                WeightType::Float32,
+                UpstreamDefects::Reproduce,
+            )?;
             ridge::ridge_sparse_cg(&col, &y, alpha, tol, max_iter, n_threads)
         })
         .map_err(sdc_err)?;
@@ -331,7 +390,7 @@ type GridIn<'a> = (
 /// `extrapolated` (None without `extrapolate`), `extreme`, `info`, `n_iter`, `system`, `log`
 /// ([(level, message)]).
 #[pyfunction]
-#[pyo3(signature = (data, shape, affine, zooms, spacings, mask = None, ridge_alpha = 1e-4, recenter = "median", extrapolate = true, name = "", resampled = None, n_threads = 1))]
+#[pyo3(signature = (data, shape, affine, zooms, spacings, mask = None, ridge_alpha = 1e-4, recenter = "median", extrapolate = true, name = "", resampled = None, n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments)]
 fn sdcflows_bspline_approx<'py>(
     py: Python<'py>,
@@ -347,7 +406,9 @@ fn sdcflows_bspline_approx<'py>(
     name: &str,
     resampled: Option<GridIn<'_>>,
     n_threads: usize,
+    upstream_defects: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let defects = mode_from_py(upstream_defects)?;
     let recenter = match recenter {
         "median" => Recenter::Median,
         "mode" => Recenter::Mode,
@@ -378,6 +439,7 @@ fn sdcflows_bspline_approx<'py>(
         recenter,
         extrapolate,
         name: name.to_string(),
+        defects,
     };
     let out = py.detach(|| {
         let original = Grid {
@@ -445,6 +507,7 @@ fn sdcflows_bspline_approx<'py>(
     d.set_item("n_iter", out.fit.iterations)?;
     d.set_item("system", system_name(out.fit.system))?;
     d.set_item("log", log)?;
+    d.set_item("beyond", out.beyond)?;
     Ok(d)
 }
 

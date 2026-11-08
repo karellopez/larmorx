@@ -17,6 +17,21 @@
 //! order. [`Collocation`] applies it (and its transpose) in exactly that order, from the
 //! per-axis weights, without storing it; [`Collocation::to_csr`] stores it when a caller asks.
 //!
+//! Two defects of sdcflows' weights are corrected by default ([`UpstreamDefects::Fix`]; D13,
+//! `docs/findings/sdcflows-fieldmap.md`), and reproduced bit for bit with
+//! [`UpstreamDefects::Reproduce`]:
+//! - **SDC-01**: a sample beyond the first or the last control point (a location outside
+//!   `[0, K - 1]` within distance 2 of a kept knot) gets, through SciPy's extrapolation, the
+//!   end interval's polynomial continued; corrected, the cubic B-spline's value (the same
+//!   recursion on the uniform knots continued beyond the grid; inside `[0, K - 1]` the
+//!   original's own intervals, so the same bits).
+//! - **SDC-02**: on a sampling grid rotated relative to the control grid (sdcflows' alignment
+//!   test fails: it warns and goes on), the tensor product of per-axis weights, each from one
+//!   index of the voxel only, is not the field at the voxel; corrected, every sample's weights
+//!   are the products of its three axes' weights at its own position ([`ExactLevel`]), in the
+//!   same arithmetic (the location by nibabel's `apply_affine`, the values rounded to the matrix
+//!   type, the products `(w0 * w1) * w2`).
+//!
 //! SciPy: Copyright (c) 2001-2002 Enthought, Inc. 2003, SciPy Developers. All rights reserved.
 //! Redistribution and use in source and binary forms, with or without modification, are
 //! permitted provided that the following conditions are met: redistributions of source code
@@ -35,6 +50,7 @@
 //! CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //! OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::linalg::Mat4;
 use larmorx_core::parallel::with_threads;
 use larmorx_transform::openblas::{inv4, matmul4};
@@ -173,10 +189,18 @@ fn find_interval(n_knots: usize, x: f64) -> Option<usize> {
     Some(l as usize)
 }
 
+/// The interval of `x` on sdcflows' uniform knots continued beyond the grid (`t[l] = l - 3` for
+/// every integer `l`), for a location outside `[0, K - 1]`: `floor(x) + 3` (SDC-01's
+/// correction: the cubic B-spline's own interval instead of the end one).
+fn extended_interval(x: f64) -> i64 {
+    x.floor() as i64 + 3
+}
+
 /// SciPy's `_deBoor_D(t, x, 3, ell, 0, result)` for sdcflows' uniform knots: the four cubic
 /// B-splines `B[ell-3] .. B[ell]` at `x`, in float64, each operation as the C code does it.
-fn deboor3(x: f64, ell: usize) -> [f64; 4] {
-    let t = |i: usize| i as f64 - 3.0;
+/// `ell` may lie beyond SciPy's base intervals (the knots continued: SDC-01's correction).
+fn deboor3(x: f64, ell: i64) -> [f64; 4] {
+    let t = |i: i64| i as f64 - 3.0;
     let mut h = [0.0f64; 4];
     let mut hh = [0.0f64; 4];
     h[0] = 1.0;
@@ -184,9 +208,9 @@ fn deboor3(x: f64, ell: usize) -> [f64; 4] {
         hh[..j].copy_from_slice(&h[..j]);
         h[0] = 0.0;
         for n in 1..=j {
-            let ind = ell + n;
+            let ind = ell + n as i64;
             let xb = t(ind);
-            let xa = t(ind - j);
+            let xa = t(ind - j as i64);
             if xb == xa {
                 h[n] = 0.0;
                 continue;
@@ -201,11 +225,71 @@ fn deboor3(x: f64, ell: usize) -> [f64; 4] {
 
 /// The value of B-spline column `jp` (`BSpline(...)(x)[:, jp]`) at `x` in interval `ell`: the
 /// recursion's value for the four splines non-zero there, `0.0 + 1 * w`, and +0 otherwise.
-fn basis_value(work: &[f64; 4], ell: usize, jp: usize) -> f64 {
+fn basis_value(work: &[f64; 4], ell: i64, jp: i64) -> f64 {
     if jp + 3 >= ell && jp <= ell {
-        0.0 + work[jp + 3 - ell]
+        0.0 + work[(jp + 3 - ell) as usize]
     } else {
         0.0
+    }
+}
+
+/// One sample's kept weights on one axis: the knots within distance 2 whose weight, rounded to
+/// the matrix type, is not zero, ascending; and whether SDC-01 changes them (a location beyond
+/// `[0, K - 1]` whose kept weights differ between the end polynomial and the B-spline).
+#[derive(Clone, Copy, Debug, Default)]
+struct SampleWeights {
+    len: usize,
+    knots: [usize; 4],
+    values: [f64; 4],
+    beyond: bool,
+}
+
+impl SampleWeights {
+    fn of(x: f64, n_knots: usize, dtype: WeightType, defects: UpstreamDefects) -> SampleWeights {
+        let mut out = SampleWeights::default();
+        let Some(ell) = find_interval(n_knots, x) else {
+            return out;
+        };
+        let ell = ell as i64;
+        let inside = (0.0..=(n_knots as f64 - 1.0)).contains(&x);
+        let work = deboor3(x, ell);
+        let (ext_ell, ext) = if inside {
+            (ell, None)
+        } else {
+            let e = extended_interval(x);
+            (e, Some(deboor3(x, e)))
+        };
+        // distance = |locs - knots[3:-3]| (float32 knots, exact), within_support < 2: the
+        // knots floor(x) - 1 ..= floor(x) + 2, those of the grid
+        let f = x.floor();
+        let lo = (f - 1.0).max(0.0);
+        let hi = (f + 2.0).min(n_knots as f64 - 1.0);
+        if !(lo <= hi) {
+            return out;
+        }
+        for kk in (lo as usize)..=(hi as usize) {
+            if (x - kk as f64).abs() >= 2.0 {
+                continue;
+            }
+            let jp = kk as i64 + 1;
+            let original = dtype.round(basis_value(&work, ell, jp));
+            let v = match &ext {
+                None => original,
+                Some(w) => {
+                    let corrected = dtype.round(basis_value(w, ext_ell, jp));
+                    if corrected.to_bits() != original.to_bits() {
+                        out.beyond = true;
+                    }
+                    if defects.fix() { corrected } else { original }
+                }
+            };
+            if v != 0.0 {
+                out.knots[out.len] = kk;
+                out.values[out.len] = v;
+                out.len += 1;
+            }
+        }
+        out
     }
 }
 
@@ -220,29 +304,29 @@ pub struct AxisWeights {
     pub knots: Vec<usize>,
     /// The weights, rounded to the matrix type (held as float64).
     pub values: Vec<f64>,
+    /// How many samples lie beyond the control grid with weights SDC-01 changes.
+    pub beyond: usize,
 }
 
 impl AxisWeights {
-    /// The weights of samples at knot coordinates `locs` (sdcflows' `locs` for this axis).
-    pub fn from_locations(locs: &[f64], n_knots: usize, dtype: WeightType) -> AxisWeights {
+    /// The weights of samples at knot coordinates `locs` (sdcflows' `locs` for this axis), with
+    /// SDC-01 corrected or reproduced (`defects`).
+    pub fn from_locations(
+        locs: &[f64],
+        n_knots: usize,
+        dtype: WeightType,
+        defects: UpstreamDefects,
+    ) -> AxisWeights {
         let mut indptr = Vec::with_capacity(locs.len() + 1);
         let mut knots = Vec::new();
         let mut values = Vec::new();
+        let mut beyond = 0;
         indptr.push(0);
         for &x in locs {
-            if let Some(ell) = find_interval(n_knots, x) {
-                let work = deboor3(x, ell);
-                for kk in 0..n_knots {
-                    // distance = |locs - knots[3:-3]| (float32 knots, exact), within_support < 2
-                    if (x - kk as f64).abs() < 2.0 {
-                        let v = dtype.round(basis_value(&work, ell, kk + 1));
-                        if v != 0.0 {
-                            knots.push(kk);
-                            values.push(v);
-                        }
-                    }
-                }
-            }
+            let w = SampleWeights::of(x, n_knots, dtype, defects);
+            beyond += usize::from(w.beyond);
+            knots.extend_from_slice(&w.knots[..w.len]);
+            values.extend_from_slice(&w.values[..w.len]);
             indptr.push(knots.len());
         }
         AxisWeights {
@@ -251,6 +335,7 @@ impl AxisWeights {
             indptr,
             knots,
             values,
+            beyond,
         }
     }
 
@@ -350,10 +435,89 @@ pub struct LevelWeights {
     pub axes: [AxisWeights; 3],
     /// Whether scipy's `kron` stored axes 1 and 2 densely (axis 0 is never).
     pub dense: [bool; 3],
-    /// Whether sdcflows' alignment test passed (else it warns [`NOT_ALIGNED`] and goes on).
+    /// Whether sdcflows' alignment test passed (else it warns [`NOT_ALIGNED`] and goes on: SDC-02).
     pub aligned: bool,
     pub dtype: WeightType,
+    /// How many samples get weights SDC-01 changes (beyond the control grid): per axis for a
+    /// separable level, samples for an [`ExactLevel`].
+    pub beyond: usize,
+    /// SDC-02 corrected: the weights at every sample's own position (a rotated sampling grid).
+    pub exact: Option<ExactLevel>,
     patterns: Option<[AxisPattern; 3]>,
+}
+
+/// The weights of a sampling grid rotated relative to the control grid, at every sample's own
+/// position (SDC-02's correction): the sample's three coordinates in the control grid
+/// (`apply_affine(inv(ctrl) @ target, ijk)`, nibabel's arithmetic), each axis' kept weights at
+/// its coordinate (as [`AxisWeights`], SDC-01 corrected), and every product `(w0 * w1) * w2` in
+/// the matrix type, in ascending column order. Computed for each row when it is used.
+#[derive(Clone, Debug)]
+pub struct ExactLevel {
+    to_grid: Mat4,
+    sample_shape: [usize; 3],
+    knot_shape: [usize; 3],
+    single: bool,
+    nnz: usize,
+}
+
+impl ExactLevel {
+    fn new(
+        to_grid: Mat4,
+        sample_shape: [usize; 3],
+        knot_shape: [usize; 3],
+        dtype: WeightType,
+    ) -> (ExactLevel, usize) {
+        let n: usize = sample_shape.iter().product();
+        let mut level = ExactLevel {
+            to_grid,
+            sample_shape,
+            knot_shape,
+            single: n == 1,
+            nnz: 0,
+        };
+        let (mut nnz, mut beyond) = (0, 0);
+        for s in 0..n {
+            let (w, b) = level.axes(s, dtype);
+            nnz += w.iter().map(|a| a.len).product::<usize>();
+            beyond += usize::from(b);
+        }
+        level.nnz = nnz;
+        (level, beyond)
+    }
+
+    /// Sample `s`'s weights on the three axes (SDC-01 corrected) and whether SDC-01 changes them.
+    fn axes(&self, s: usize, dtype: WeightType) -> ([SampleWeights; 3], bool) {
+        let [_, n1, n2] = self.sample_shape;
+        let idx = [s / (n1 * n2), (s / n2) % n1, s % n2];
+        let p: [f64; 3] = std::array::from_fn(|a| match dtype {
+            WeightType::Float32 => f64::from(idx[a] as f32),
+            WeightType::Float64 => idx[a] as f64,
+        });
+        let q = if self.single {
+            apply_affine_single(&self.to_grid, p)
+        } else {
+            apply_affine(&self.to_grid, p)
+        };
+        let w: [SampleWeights; 3] = std::array::from_fn(|a| {
+            SampleWeights::of(q[a], self.knot_shape[a], dtype, UpstreamDefects::Fix)
+        });
+        let beyond = w.iter().any(|a| a.beyond) && w.iter().all(|a| a.len > 0);
+        (w, beyond)
+    }
+
+    fn for_row(&self, s: usize, dtype: WeightType, off: usize, mut f: impl FnMut(usize, f64)) {
+        let (w, _) = self.axes(s, dtype);
+        let [_, k1n, k2n] = self.knot_shape;
+        for i0 in 0..w[0].len {
+            for i1 in 0..w[1].len {
+                let w01 = dtype.mul(w[0].values[i0], w[1].values[i1]);
+                let base = off + (w[0].knots[i0] * k1n + w[1].knots[i1]) * k2n;
+                for i2 in 0..w[2].len {
+                    f(base + w[2].knots[i2], dtype.mul(w01, w[2].values[i2]));
+                }
+            }
+        }
+    }
 }
 
 impl LevelWeights {
@@ -369,6 +533,9 @@ impl LevelWeights {
 
     /// The number of entries the matrix stores (explicit zeros included).
     pub fn nnz(&self) -> usize {
+        if let Some(e) = &self.exact {
+            return e.nnz;
+        }
         match &self.patterns {
             None => 0,
             Some(p) => p.iter().map(|a| a.row_knot.len()).product(),
@@ -378,13 +545,17 @@ impl LevelWeights {
 
 /// sdcflows' `grid_bspline_weights(target_nii, ctrl_nii, dtype)`: the cubic B-spline weights of
 /// every voxel of the sampling grid (`target_shape`, `target_affine`) for every control point of
-/// the grid (`ctrl_shape`, `ctrl_affine`).
+/// the grid (`ctrl_shape`, `ctrl_affine`). `defects`: SDC-01 and SDC-02 corrected
+/// ([`UpstreamDefects::Fix`]: the B-spline beyond the grid, the exact weights of a rotated
+/// grid) or sdcflows' weights bit for bit ([`UpstreamDefects::Reproduce`]); the returned
+/// [`LevelWeights::beyond`] and [`LevelWeights::aligned`] say whether they changed the result.
 pub fn grid_bspline_weights(
     target_shape: [usize; 3],
     target_affine: &Mat4,
     ctrl_shape: [usize; 3],
     ctrl_affine: &Mat4,
     dtype: WeightType,
+    defects: UpstreamDefects,
 ) -> Result<LevelWeights, SdcError> {
     let aligned = npy::grids_aligned(ctrl_affine, target_affine);
     let to_grid = matmul4(&inv4(ctrl_affine).ok_or(SdcError::Singular)?, target_affine);
@@ -407,13 +578,30 @@ pub fn grid_bspline_weights(
                 q[axis]
             })
             .collect();
-        AxisWeights::from_locations(&locs, ctrl_shape[axis], dtype)
+        AxisWeights::from_locations(&locs, ctrl_shape[axis], dtype, defects)
     });
     // kron(w0, w1), then kron(that, w2): an operand B with 2 * nnz >= rows * cols is stored
     // densely (BSR); a kron with an empty operand is the zero matrix.
     let dense_of = |a: &AxisWeights| 2 * a.nnz() >= a.n_samples * a.n_knots;
     let dense = [false, dense_of(&axes[1]), dense_of(&axes[2])];
+    if !aligned && defects.fix() {
+        let (exact, beyond) = ExactLevel::new(to_grid, target_shape, ctrl_shape, dtype);
+        return Ok(LevelWeights {
+            axes,
+            dense: [false; 3],
+            aligned,
+            dtype,
+            beyond,
+            exact: Some(exact),
+            patterns: None,
+        });
+    }
     let empty = axes.iter().any(|a| a.nnz() == 0);
+    let beyond = if empty {
+        0
+    } else {
+        axes.iter().map(|a| a.beyond).sum()
+    };
     let patterns = if empty {
         None
     } else {
@@ -426,6 +614,8 @@ pub fn grid_bspline_weights(
         dense,
         aligned,
         dtype,
+        beyond,
+        exact: None,
         patterns,
     })
 }
@@ -503,6 +693,10 @@ impl Collocation {
     fn for_row(&self, s: usize, mut f: impl FnMut(usize, f64)) {
         let [i0, i1, i2] = self.unravel(s);
         for (level, off) in self.levels.iter().zip(&self.offsets) {
+            if let Some(e) = &level.exact {
+                e.for_row(s, level.dtype, *off, &mut f);
+                continue;
+            }
             let Some(p) = &level.patterns else { continue };
             let (k1n, k2n) = (p[1].n_knots, p[2].n_knots);
             let (r0k, r0v) = p[0].row(i0);
@@ -583,6 +777,15 @@ impl Collocation {
                 self.shape()[0],
                 y.len()
             )));
+        }
+        if self.levels.iter().any(|l| l.exact.is_some()) {
+            // An exact level has no column view: scatter the rows in sample order, which adds
+            // every column's products in ascending sample order from +0, as `for_col` does.
+            let mut out = vec![0.0f32; self.n_cols];
+            for (s, &ys) in y.iter().enumerate() {
+                self.for_row(s, |c, w| out[c] += (w as f32) * ys);
+            }
+            return Ok(out);
         }
         let col = |c: usize| -> f32 {
             let mut sum = 0.0f32;
@@ -674,10 +877,10 @@ mod tests {
         let n_knots = 7;
         for i in 0..=600 {
             let x = i as f64 / 100.0; // 0 .. 6 = K - 1
-            let ell = find_interval(n_knots, x).unwrap();
+            let ell = find_interval(n_knots, x).unwrap() as i64;
             let w = deboor3(x, ell);
             for kk in 0..n_knots {
-                let v = basis_value(&w, ell, kk + 1);
+                let v = basis_value(&w, ell, kk as i64 + 1);
                 assert!((v - beta3(x - kk as f64)).abs() < 1e-14, "x {x} knot {kk}");
             }
             let sum: f64 = w.iter().sum();
@@ -689,10 +892,127 @@ mod tests {
     fn extrapolation_continues_the_end_pieces() {
         // sdcflows' weights outside the knots come from the end polynomial pieces (BSpline's
         // extrapolate=True): at -1.5 the knot-0 weight is 2/3 - u² + u³/2 at u = -1.5.
-        let ell = find_interval(5, -1.5).unwrap();
+        let ell = find_interval(5, -1.5).unwrap() as i64;
         assert_eq!(ell, 3);
         let v = basis_value(&deboor3(-1.5, ell), ell, 1);
         assert!((v - (2.0 / 3.0 - 2.25 - 1.6875)).abs() < 1e-12, "{v}");
+        // SDC-01: reproduced, that value; corrected, the cubic B-spline's (2 - 1.5)^3 / 6.
+        let r = SampleWeights::of(-1.5, 5, WeightType::Float64, UpstreamDefects::Reproduce);
+        let c = SampleWeights::of(-1.5, 5, WeightType::Float64, UpstreamDefects::Fix);
+        assert!(r.beyond && c.beyond);
+        assert_eq!((r.len, c.len), (1, 1));
+        assert_eq!(r.values[0], v);
+        assert!((c.values[0] - beta3(1.5)).abs() < 1e-15, "{}", c.values[0]);
+    }
+
+    #[test]
+    fn the_corrected_basis_is_the_bspline_beyond_the_grid_and_the_same_bits_inside() {
+        let n = 6;
+        for i in -250..=750 {
+            let x = i as f64 / 100.0; // -2.5 .. 7.5 = K + 1.5
+            let r = SampleWeights::of(x, n, WeightType::Float64, UpstreamDefects::Reproduce);
+            let c = SampleWeights::of(x, n, WeightType::Float64, UpstreamDefects::Fix);
+            if (0.0..=5.0).contains(&x) {
+                assert!(!r.beyond && !c.beyond);
+                assert_eq!(r.len, c.len);
+                for j in 0..r.len {
+                    assert_eq!(r.values[j].to_bits(), c.values[j].to_bits(), "x {x}");
+                }
+            }
+            for j in 0..c.len {
+                let want = beta3(x - c.knots[j] as f64);
+                assert!(
+                    (c.values[j] - want).abs() < 1e-14,
+                    "x {x} knot {}",
+                    c.knots[j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_rotated_grid_is_evaluated_at_every_sample_position() {
+        // SDC-02: a target rotated 30 degrees about z; corrected, each row's weights are the
+        // products of the B-splines at the sample's own coordinates in the control grid.
+        let ctrl = diag([16.0, 16.0, 10.0], [-40.0, -40.0, -20.0]);
+        let (c, sn) = (30f64.to_radians().cos(), 30f64.to_radians().sin());
+        let target: Mat4 = [
+            [2.0 * c, -2.5 * sn, 0.0, -12.0],
+            [2.0 * sn, 2.5 * c, 0.0, -10.0],
+            [0.0, 0.0, 3.0, -9.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let (ts, ks) = ([9, 8, 5], [6, 6, 5]);
+        let r = grid_bspline_weights(
+            ts,
+            &target,
+            ks,
+            &ctrl,
+            WeightType::Float64,
+            UpstreamDefects::Reproduce,
+        )
+        .unwrap();
+        let f = grid_bspline_weights(
+            ts,
+            &target,
+            ks,
+            &ctrl,
+            WeightType::Float64,
+            UpstreamDefects::Fix,
+        )
+        .unwrap();
+        assert!(!r.aligned && r.exact.is_none());
+        assert!(f.exact.is_some());
+        let col = Collocation::new(vec![f]).unwrap();
+        let csr = col.to_csr(2).unwrap();
+        assert_eq!(csr.indptr.len(), 9 * 8 * 5 + 1);
+        assert_eq!(col.nnz(), csr.data.len());
+        let to_grid = matmul4(&inv4(&ctrl).unwrap(), &target);
+        for s in [0usize, 17, 133, 359] {
+            let idx = [s / 40, (s / 5) % 8, s % 5];
+            let q = apply_affine(&to_grid, std::array::from_fn(|a| idx[a] as f64));
+            for e in csr.indptr[s]..csr.indptr[s + 1] {
+                let k = csr.indices[e];
+                let kk = [k / 30, (k / 5) % 6, k % 5];
+                let want: f64 = (0..3).map(|a| beta3(q[a] - kk[a] as f64)).product();
+                assert!((csr.data[e] - want).abs() < 1e-14, "sample {s} knot {k}");
+            }
+            // ascending columns
+            assert!(
+                csr.indices[csr.indptr[s]..csr.indptr[s + 1]]
+                    .windows(2)
+                    .all(|w| w[0] < w[1])
+            );
+        }
+        // the transposed product scatters in sample order: the same bits as the stored matrix
+        let y: Vec<f32> = (0..csr.shape[0])
+            .map(|i| (i % 5) as f32 * 0.25 - 0.5)
+            .collect();
+        let f32col = Collocation::new(vec![
+            grid_bspline_weights(
+                ts,
+                &target,
+                ks,
+                &ctrl,
+                WeightType::Float32,
+                UpstreamDefects::Fix,
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let c32 = f32col.to_csr(1).unwrap();
+        let mut want = vec![0.0f32; c32.shape[1]];
+        for s in 0..c32.shape[0] {
+            for e in c32.indptr[s]..c32.indptr[s + 1] {
+                want[c32.indices[e]] += (c32.data[e] as f32) * y[s];
+            }
+        }
+        let got = f32col.rmatvec_f32(&y, 3).unwrap();
+        assert!(
+            want.iter()
+                .zip(&got)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
     }
 
     #[test]
@@ -729,6 +1049,7 @@ mod tests {
             g.shape,
             &g.affine,
             WeightType::Float32,
+            UpstreamDefects::Reproduce,
         )
         .unwrap();
         assert!(w.aligned);

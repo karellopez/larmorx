@@ -177,6 +177,7 @@ class B0FieldTransform:
         approx: bool = True,
         *,
         n_threads: int = 1,
+        upstream_defects: UpstreamDefectsName = "fix",
     ) -> bool:
         """Evaluate the field on ``target_reference``'s grid (``mapped``).
 
@@ -191,7 +192,18 @@ class B0FieldTransform:
         ``mapped`` gets the target's header: the intent "estimate" named "fieldmap Hz",
         float32, ``cal_max``/``cal_min`` (not after the approximation's resampling, which
         gives the target's header as nitransforms makes it). Returns ``True``, as sdcflows.
+
+        ``upstream_defects="fix"`` (the default) corrects three defects of sdcflows' field,
+        with an :class:`~larmorx.UpstreamDefectWarning` when they change it: positions beyond
+        the control grid get the cubic B-spline's weights (SDC-01); a target rotated relative to
+        the control grids without the approximation (no transform, or ``approx=False``) is
+        evaluated at every voxel's own position (SDC-02; sdcflows warns that the grids are not
+        aligned and multiplies per-axis weights); and the approximation's grid covers, and is
+        resampled at, the target where ``xfm_data2fmap`` puts it (SDC-10; sdcflows builds and
+        samples it at the target's coordinates as given, so the transform is ignored).
+        ``"reproduce"`` gives sdcflows' field bit for bit.
         """
+        _defects.check(upstream_defects)
         target = _as_loaded(target_reference)
         thdr = _header(target)
         approx = bool(approx) and xfm_data2fmap is not None
@@ -201,13 +213,39 @@ class B0FieldTransform:
         proj_shape = tuple(int(n) for n in target.shape[:3])
         levels = self._levels()
         approx = approx and not _aligned(levels[-1].affine, target.affine)
+        sample_affine = np.asarray(target.affine, dtype=np.float64)
+        notices: list[Any] = []
         if approx:
-            grid = deoblique_and_zooms(levels[-1], target)
+            covered = target
+            moved = not np.array_equal(xfm, np.eye(4))
+            if moved:
+                # SDC-10: sdcflows covers (and samples) the target as given; the field is
+                # wanted where the transform puts it
+                notices.append(
+                    (
+                        "SDC-10",
+                        "sdcflows",
+                        upstream_defects,
+                        "the approximation's grid is built around, and resampled at, the "
+                        "target where xfm_data2fmap puts it (sdcflows uses the target's own "
+                        "coordinates, ignoring the transform)",
+                    )
+                )
+                if upstream_defects == "fix":
+                    sample_affine = matmul(xfm, np.asarray(target.affine))
+                    covered = Image(
+                        np.lib.stride_tricks.as_strided(
+                            np.zeros(1, np.float32), tuple(target.shape[:3]), (0, 0, 0)
+                        ),
+                        sample_affine,
+                    )
+            grid = deoblique_and_zooms(levels[-1], covered)
             proj_affine = np.asarray(grid.affine)
             proj_shape = tuple(int(n) for n in grid.shape[:3])
-        for lv in levels:
-            if not _aligned(lv.affine, proj_affine):
-                warnings.warn(NOT_ALIGNED, UserWarning, stacklevel=2)
+        if upstream_defects == "reproduce":
+            for lv in levels:
+                if not _aligned(lv.affine, proj_affine):
+                    warnings.warn(NOT_ALIGNED, UserWarning, stacklevel=2)
         coefficients = np.hstack(
             [np.asarray(lv.data, dtype=np.float32).reshape(-1) for lv in levels]
         )
@@ -222,7 +260,10 @@ class B0FieldTransform:
             False,
             None,
             int(n_threads),
+            upstream_defects,
         )
+        values, level_notices = values
+        _defects.warn([*level_notices, *notices], stacklevel=2)
         fmap = np.reshape(np.asarray(values), proj_shape)
         cal = max((abs(fmap.min()), fmap.max()))
         fields = thdr.to_dict()
@@ -240,7 +281,7 @@ class B0FieldTransform:
         )
         mapped = Image(fmap, proj_affine, NiftiHeader.from_dict(mhdr))
         if approx:
-            mapped = _resample_onto(mapped, target, thdr, n_threads)
+            mapped = _resample_onto(mapped, target, thdr, n_threads, sample_affine)
         self.mapped = mapped
         return True
 
@@ -312,6 +353,7 @@ class B0FieldTransform:
                 xfm_data2fmap=xfm_data2fmap,
                 approx=approx,
                 n_threads=n_threads,
+                upstream_defects=upstream_defects,
             )
         newshape = pc_data.shape[:3] + tuple(d for d in pc_data.shape[3:] if d > 1)
         vols = pc_data.reshape(newshape)
@@ -480,10 +522,13 @@ def _interpolable(volume: np.ndarray) -> np.ndarray:
     return volume
 
 
-def _resample_onto(mapped: Image, target: Image, thdr: NiftiHeader, n_threads: int) -> Image:
+def _resample_onto(
+    mapped: Image, target: Image, thdr: NiftiHeader, n_threads: int, sample_affine: Any = None
+) -> Image:
     """nitransforms' ``Affine(reference=zeros on target's grid).apply(mapped)``: the field
     resampled onto the target's grid (cubic, ``constant`` 0, prefiltered), with the target's
-    header (3D, float32)."""
+    header (3D, float32). ``sample_affine``: where the target's voxels are sampled (SDC-10
+    corrected: the transform applied); by default the target's own affine."""
     from larmorx.ndimage import map_coordinates
 
     shape3 = tuple(int(n) for n in target.shape[:3])
@@ -494,7 +539,7 @@ def _resample_onto(mapped: Image, target: Image, thdr: NiftiHeader, n_threads: i
     )
     coords = _core.sdcflows_affine_coordinates(
         shape3,
-        np.ascontiguousarray(target.affine),
+        np.ascontiguousarray(target.affine if sample_affine is None else sample_affine),
         np.ascontiguousarray(mapped.affine),
         None,
         int(n_threads),

@@ -67,20 +67,30 @@ def same(a, b):
     return a.shape == b.shape and a.dtype == b.dtype and a.tobytes() == b.tobytes()
 
 
-def check(name, img, spacings, target=None, dtype="float32"):
+def check(name, img, spacings, target=None, dtype="float32", mode="reproduce", reference=None):
+    """sdcflows' matrix against larmorx's with ``upstream_defects=mode``; ``reference``
+    replaces sdcflows' weights (``reference(target, grid, dtype)``: the corrected SDC-01 and
+    SDC-02, built by measure_sdc01_02.py) for the corrected cases."""
     target = img if target is None else target
     grids = [bspline_grid(img, control_zooms_mm=s) for s in spacings]
     mine = [lx.sdcflows.bspline_grid(img, s) for s in spacings]
+    weights = grid_bspline_weights if reference is None else reference
     ok_grid = all(
         g.shape == m.shape and same(g.affine, m.affine) for g, m in zip(grids, mine, strict=True)
     )
     with warnings.catch_warnings(record=True) as w1:
         warnings.simplefilter("always")
-        ref = sp.hstack([grid_bspline_weights(target, g, dtype=dtype) for g in grids]).tocsr()
+        ref = sp.hstack([weights(target, g, dtype=dtype) for g in grids]).tocsr()
+    if reference is not None:
+        w1 = []
     levels = [(g.shape, np.ascontiguousarray(g.affine)) for g in grids]
     with warnings.catch_warnings(record=True) as w2:
         warnings.simplefilter("always")
-        got = lx.sdcflows.collocation_matrix(target, [(g.shape, g.affine) for g in grids], dtype)
+        got = lx.sdcflows.collocation_matrix(
+            target, [(g.shape, g.affine) for g in grids], dtype, upstream_defects=mode
+        )
+    notices = [x.message.entry for x in w2 if isinstance(x.message, lx.UpstreamDefectWarning)]
+    w2 = [x for x in w2 if not isinstance(x.message, lx.UpstreamDefectWarning)]
     warn_ok = [str(x.message) for x in w1] == [str(x.message) for x in w2]
     ok_csr = (
         ref.shape == got.shape
@@ -94,15 +104,19 @@ def check(name, img, spacings, target=None, dtype="float32"):
         v = rng.standard_normal(ref.shape[1]).astype("float32")
         y = rng.standard_normal(ref.shape[0]).astype("float32")
         aff = np.ascontiguousarray(target.affine)
-        lv = lx._core.sdcflows_collocation_apply(target.shape[:3], aff, levels, v, False, None, 4)
-        ly = lx._core.sdcflows_collocation_apply(target.shape[:3], aff, levels, y, True, None, 4)
+        lv, _ = lx._core.sdcflows_collocation_apply(
+            target.shape[:3], aff, levels, v, False, None, 4, mode
+        )
+        ly, _ = lx._core.sdcflows_collocation_apply(
+            target.shape[:3], aff, levels, y, True, None, 4, mode
+        )
         x1 = sp.linalg.aslinearoperator(ref)
         ok_prod = str(same(x1.matvec(v), lv) and same(x1.rmatvec(y), ly))
     good = ok_grid and ok_csr and warn_ok and ok_prod in ("-", "True")
     print(
         f"{'OK' if good else 'FAIL'} {name}: grid {ok_grid} csr {ok_csr} (nnz {ref.nnz}, zeros "
         f"{int((ref.data == 0).sum())}) warnings {warn_ok} "
-        f"{[str(x.message)[:20] for x in w1]} products {ok_prod}"
+        f"{[str(x.message)[:20] for x in w1]} products {ok_prod} notices {notices}"
     )
     return good
 
@@ -128,8 +142,73 @@ def main() -> int:
     base = make((24, 20, 10), (3.0, 3.0, 3.0))
     rotated = make((24, 20, 10), (3.0, 3.0, 3.0), r=rot(2, 12))
     larger = make((40, 34, 18), (3.0, 3.0, 3.0), shift=(5.0, -3.0, 2.0))
-    ok &= check("rotated-target", base, HF, target=rotated)
-    ok &= check("larger-target", base, HF, target=larger)
+    ok &= check("rotated-target (SDC-02 reproduced)", base, HF, target=rotated)
+    ok &= check("larger-target (SDC-01 reproduced)", base, HF, target=larger)
+    # corrected: against the corrected weights built with numpy and SciPy
+    sys.path.insert(0, str(Path(__file__).parent))
+    from measure_sdc01_02 import exact_matrix, true_grid_bspline_weights
+
+    ok &= check(
+        "larger-target (SDC-01 corrected: the B-spline beyond the grid)",
+        base,
+        HF,
+        target=larger,
+        mode="fix",
+        reference=true_grid_bspline_weights,
+    )
+    ok &= check(
+        "rotated-target (SDC-02 corrected: weights at every voxel's position)",
+        base,
+        HF,
+        target=rotated,
+        mode="fix",
+        reference=lambda t, g, dtype: exact_matrix(t, g, np.dtype(dtype).type),
+    )
+    rotated_larger = make((30, 26, 12), (3.0, 3.0, 3.0), r=rot(0, 25) @ rot(2, 40))
+    ok &= check(
+        "rotated and larger target (SDC-01 and SDC-02 corrected)",
+        base,
+        HF,
+        target=rotated_larger,
+        mode="fix",
+        reference=lambda t, g, dtype: exact_matrix(t, g, np.dtype(dtype).type),
+    )
+    ok &= check(
+        "rotated target, float64 (SDC-02 corrected)",
+        base,
+        HF,
+        target=rotated,
+        dtype="float64",
+        mode="fix",
+        reference=lambda t, g, dtype: exact_matrix(t, g, np.dtype(dtype).type),
+    )
+    ok &= check("aligned inside: fix = sdcflows", base, HF, mode="fix")
+    # SDC-06: a 4D header of one volume
+    four = nb.Nifti1Image(np.zeros((24, 20, 10, 1), np.float32), base.affine)
+    try:
+        bspline_grid(four, control_zooms_mm=HF[0])
+        ref_err = None
+    except ValueError as e:
+        ref_err = str(e)
+    try:
+        lx.sdcflows.bspline_grid(four, HF[0], upstream_defects="reproduce")
+        mine_err = None
+    except ValueError as e:
+        mine_err = str(e)
+    good = ref_err is not None and ref_err == mine_err
+    print(f"{'OK' if good else 'FAIL'} 4D one-volume header (SDC-06 reproduced): {mine_err!r}")
+    ok &= good
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        g4 = lx.sdcflows.bspline_grid(four, HF[0])
+    g3 = bspline_grid(base, control_zooms_mm=HF[0])
+    good = (
+        g4.shape == g3.shape
+        and same(g4.affine, g3.affine)
+        and any(getattr(x.message, "entry", "") == "SDC-06" for x in w)
+    )
+    print(f"{'OK' if good else 'FAIL'} 4D one-volume header (SDC-06 corrected: the 3D grid)")
+    ok &= good
     for f in FILES:
         if f.exists():
             ok &= check(f"{f.parts[-9]}/{f.name[:30]}", nb.load(f), HF)

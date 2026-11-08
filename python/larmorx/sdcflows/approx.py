@@ -20,7 +20,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
@@ -151,6 +152,35 @@ def _written_header(
     return NiftiHeader.from_dict(out)
 
 
+def _spatial_zooms(
+    zooms: tuple[Any, ...], shape: tuple[int, ...], upstream_defects: str, what: str
+) -> tuple[Any, ...]:
+    """SDC-06: the header zooms sdcflows divides the affine by, all of them (``"reproduce"``:
+    a 4D header fails as in sdcflows), or the first three (``"fix"``, for an image of one
+    volume; several volumes: a clear error)."""
+    if len(zooms) <= 3 or upstream_defects == "reproduce":
+        return zooms
+    extra = tuple(int(n) for n in shape[3:])
+    if any(n != 1 for n in extra):
+        raise ValueError(
+            f"{what}: the field map has {int(np.prod(extra))} volumes (shape {tuple(shape)}); "
+            "a field map is one volume"
+        )
+    _defects.warn(
+        [
+            (
+                "SDC-06",
+                "sdcflows",
+                "fix",
+                f"a {len(shape)}D header with one volume: its first three zooms are used "
+                "(sdcflows fails with numpy's broadcasting ValueError)",
+            )
+        ],
+        stacklevel=3,
+    )
+    return zooms[:3]
+
+
 def bspline_approx(
     in_data: Any,
     in_mask: Any = None,
@@ -164,6 +194,7 @@ def bspline_approx(
     out_dir: str | os.PathLike[str] | None = None,
     name: str | None = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> BSplineApproxResult:
     """sdcflows' ``BSplineApprox``: approximate a field map with tensor-product cubic
     B-splines, which smooths it and extrapolates it beyond the brain mask.
@@ -201,6 +232,13 @@ def bspline_approx(
         The file name the outputs are named after when ``in_data`` is not a path.
     n_threads
         Worker threads (0 = all logical CPUs); the result does not depend on it.
+    upstream_defects
+        ``"fix"`` (the default): a field map stored as a 4D image of one volume (fMRIPrep's
+        ``desc-preproc_fieldmap``) is fitted with its first three zooms (sdcflows fails with
+        numpy's broadcasting ``ValueError``: SDC-06, ``"reproduce"``), a field map of several
+        volumes is refused with a clear error, and weights beyond the control grids are the
+        B-spline's (SDC-01; the control grids cover the field map, so only a resampled grid
+        larger than them reaches it).
 
     The log records sdcflows writes (``nipype.interface``) go to the ``larmorx.sdcflows``
     logger, with sdcflows' texts. A fit whose largest coefficient reaches 1e4 raises
@@ -211,10 +249,12 @@ def bspline_approx(
     in_name = os.fspath(in_data) if is_path else (name or "fieldmap.nii.gz")
     fmap = _as_loaded(in_data)
     mask_img = None if in_mask is None else _as_loaded(in_mask)
+    _defects.check(upstream_defects)
     hdr = _header(fmap)
     zooms = tuple(np.float32(z) for z in hdr.zooms)
     if fmap.ndim < 3:
         raise ValueError("the field map must have at least 3 dimensions")
+    zooms = _spatial_zooms(zooms, fmap.shape, upstream_defects, "bspline_approx")
     shape3 = tuple(int(n) for n in fmap.shape[:3])
     affine = np.ascontiguousarray(fmap.affine, dtype=np.float64)
     spacings = _spacings(bs_spacing)
@@ -263,6 +303,7 @@ def bspline_approx(
             in_name,
             resampled,
             int(n_threads),
+            upstream_defects,
         )
     except (RuntimeError, ValueError) as err:
         # the records sdcflows writes before it raises
@@ -271,6 +312,18 @@ def bspline_approx(
         raise
     for level, message in out["log"]:
         LOGGER.log(_LEVELS[level], message)
+    if out["beyond"]:
+        _defects.warn(
+            [
+                (
+                    "SDC-01",
+                    "sdcflows",
+                    upstream_defects,
+                    "the fitting grid reaches beyond a control grid's first or last point, "
+                    "where sdcflows continues the end polynomial instead of the cubic B-spline",
+                )
+            ]
+        )
 
     shape = tuple(int(n) for n in fmap.shape)
     data_shape = data.shape

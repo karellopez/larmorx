@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """lx.sdcflows without sdcflows: the control grid, the weights' structure, the warning."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -47,12 +49,126 @@ def test_rotated_target_warns_and_two_levels_stack():
     c, s = np.cos(0.2), np.sin(0.2)
     rot = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     with pytest.warns(UserWarning, match="grids are not aligned"):
-        lx.sdcflows.grid_bspline_weights(lx.Image(img.data, rot @ img.affine), grid)
+        lx.sdcflows.grid_bspline_weights(
+            lx.Image(img.data, rot @ img.affine), grid, upstream_defects="reproduce"
+        )
     coarse = lx.sdcflows.bspline_grid(img, lx.sdcflows.DEFAULT_ZOOMS_MM)
     both = lx.sdcflows.collocation_matrix(img, [coarse, grid])
     assert both.shape[1] == coarse.data.size + grid.data.size
     with pytest.raises(ValueError, match="float32 and float64"):
         lx.sdcflows.grid_bspline_weights(img, grid, dtype="float16")
+
+
+def _beta3(u):
+    a = np.abs(u)
+    return np.where(a < 1, 2 / 3 - a**2 + a**3 / 2, np.where(a < 2, (2 - a) ** 3 / 6, 0.0))
+
+
+def test_sdc01_weights_beyond_the_grid_are_the_bsplines():
+    img = _image((12, 10, 6), (3.0, 3.0, 3.0))
+    grid = lx.sdcflows.bspline_grid(img, (16.0, 16.0, 10.0))
+    larger = _image((24, 22, 12), (3.0, 3.0, 3.0))  # reaches beyond the control points
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-01"):
+        fixed = lx.sdcflows.grid_bspline_weights(larger, grid, dtype="float64")
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-01"):
+        sdc = lx.sdcflows.grid_bspline_weights(
+            larger, grid, dtype="float64", upstream_defects="reproduce"
+        )
+    to_grid = np.linalg.inv(grid.affine) @ larger.affine
+    ijk = np.indices(larger.shape).reshape(3, -1).T
+    q = ijk @ to_grid[:3, :3].T + to_grid[:3, 3]
+    dense = fixed.toarray()
+    kk = np.indices(grid.shape).reshape(3, -1).T
+    for r in (0, 517, 1300, dense.shape[0] - 1):
+        want = np.prod(_beta3(q[r][None, :] - kk), axis=1)
+        np.testing.assert_allclose(dense[r], want, atol=1e-14)
+    # the rows inside the grid are the same bits in both modes; the others differ
+    inside = np.all((q >= 0) & (q <= np.array(grid.shape) - 1), axis=1)
+    sd = sdc.toarray()
+    assert np.array_equal(dense[inside], sd[inside])
+    assert not np.allclose(dense[~inside], sd[~inside])
+    # aligned and inside: no notice, the same matrix
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        a = lx.sdcflows.grid_bspline_weights(img, grid)
+    b = lx.sdcflows.grid_bspline_weights(img, grid, upstream_defects="reproduce")
+    assert a.data.tobytes() == b.data.tobytes() and a.indices.tobytes() == b.indices.tobytes()
+
+
+def test_sdc02_a_rotated_grid_gets_the_weights_at_every_voxel():
+    img = _image((12, 10, 6), (3.0, 3.0, 3.0))
+    grid = lx.sdcflows.bspline_grid(img, (16.0, 16.0, 10.0))
+    c, s = np.cos(0.3), np.sin(0.3)
+    rot = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    target = lx.Image(img.data, rot @ img.affine)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-02") as rec:
+        w = lx.sdcflows.grid_bspline_weights(target, grid, dtype="float64")
+    assert not any(str(x.message) == "grids are not aligned." for x in rec)
+    to_grid = np.linalg.inv(grid.affine) @ target.affine
+    q = np.indices(img.shape).reshape(3, -1).T @ to_grid[:3, :3].T + to_grid[:3, 3]
+    kk = np.indices(grid.shape).reshape(3, -1).T
+    dense = w.toarray()
+    for r in (0, 100, 359, dense.shape[0] - 1):
+        np.testing.assert_allclose(
+            dense[r], np.prod(_beta3(q[r][None, :] - kk), axis=1), atol=1e-14
+        )
+    # the field of smooth coefficients: sdcflows' separable product is far from it
+    coef = np.linspace(-50, 80, w.shape[1])
+    with pytest.warns(UserWarning):
+        sep = lx.sdcflows.grid_bspline_weights(
+            target, grid, dtype="float64", upstream_defects="reproduce"
+        ).toarray()
+    assert np.abs(sep @ coef - dense @ coef).max() > 1.0
+
+
+def test_sdc06_a_4d_header_of_one_volume():
+    img = _image((12, 10, 6), (3.0, 3.0, 3.0))
+    four = lx.Image(np.zeros((12, 10, 6, 1), np.float32), img.affine)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-06"):
+        g4 = lx.sdcflows.bspline_grid(four, (16.0, 16.0, 10.0))
+    g3 = lx.sdcflows.bspline_grid(img, (16.0, 16.0, 10.0))
+    assert g4.shape == g3.shape and np.array_equal(g4.affine, g3.affine)
+    with pytest.raises(ValueError, match="could not be broadcast"):
+        lx.sdcflows.bspline_grid(four, (16.0, 16.0, 10.0), upstream_defects="reproduce")
+    rng = np.random.default_rng(3)
+    field = (rng.random((12, 10, 6)) * 40 - 20).astype(np.float32)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-06"):
+        r4 = lx.sdcflows.bspline_approx(lx.Image(field[..., None], img.affine))
+    r3 = lx.sdcflows.bspline_approx(lx.Image(field, img.affine))
+    assert r4.field.shape == (12, 10, 6, 1)
+    assert np.asarray(r4.field.data).tobytes() == np.asarray(r3.field.data).tobytes()
+    with pytest.raises(ValueError, match="2 volumes"):
+        lx.sdcflows.bspline_approx(lx.Image(np.stack([field, field], -1), img.affine))
+    with pytest.raises(ValueError, match="could not be broadcast"):
+        lx.sdcflows.bspline_approx(
+            lx.Image(field[..., None], img.affine), upstream_defects="reproduce"
+        )
+
+
+def test_sdc10_the_approximation_follows_the_transform():
+    img = _image((24, 20, 12), (3.0, 3.0, 3.0))
+    grid = lx.sdcflows.bspline_grid(img, (16.0, 16.0, 10.0))
+    coef = np.linspace(-60, 90, grid.data.size, dtype=np.float32).reshape(grid.shape)
+    coeffs = lx.Image(coef, grid.affine)
+    c, s = np.cos(0.1), np.sin(0.1)
+    rot = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    target = lx.Image(np.zeros(img.shape, np.float32), rot @ img.affine)
+    xfm = np.eye(4)
+    xfm[:3, 3] = (4.0, -2.0, 1.0)
+    projected = lx.Image(target.data, xfm @ target.affine)
+    exact = lx.sdcflows.B0FieldTransform(coeffs=coeffs)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-02"):
+        exact.fit(projected)  # no transform: evaluated at every voxel (SDC-02 corrected)
+    approx = lx.sdcflows.B0FieldTransform(coeffs=coeffs)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-10"):
+        approx.fit(target, xfm_data2fmap=xfm)
+    sdc = lx.sdcflows.B0FieldTransform(coeffs=coeffs)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-10"):
+        sdc.fit(target, xfm_data2fmap=xfm, upstream_defects="reproduce")
+    inner = (slice(4, -4), slice(4, -4), slice(3, -3))
+    e = np.asarray(exact.mapped.data)[inner]
+    assert np.abs(np.asarray(approx.mapped.data)[inner] - e).max() < 0.5
+    assert np.abs(np.asarray(sdc.mapped.data)[inner] - e).max() > 2.0
 
 
 def _csr(dense):

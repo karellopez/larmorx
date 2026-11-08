@@ -28,6 +28,7 @@
 //! The header work and the files (`_field`, `_coeff000`, `_error`, `_extra`) are the Python
 //! wrapper's.
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::linalg::Mat4;
 
 use crate::bspline::{self, Collocation, ControlGrid, WeightType};
@@ -78,6 +79,9 @@ pub struct ApproxParams {
     pub extrapolate: bool,
     /// The input's name in sdcflows' error message (`in_data`).
     pub name: String,
+    /// SDC-01 (weights beyond the control grid) corrected or reproduced; the control grids
+    /// cover the field map, so only a resampled grid larger than them can reach it.
+    pub defects: UpstreamDefects,
 }
 
 /// A log record sdcflows writes (`nipype.interface`), in order.
@@ -109,6 +113,8 @@ pub struct Approx {
     pub extreme: f32,
     pub fit: RidgeFit,
     pub log: Vec<LogRecord>,
+    /// Whether SDC-01 changed (or, reproduced, would have changed) the weights.
+    pub beyond: bool,
 }
 
 /// numpy's pairwise float32 sum (`FLOAT_pairwise_sum`): blocks of up to 128 values summed in
@@ -240,16 +246,21 @@ fn collocation(
     shape: [usize; 3],
     affine: &Mat4,
     grids: &[ControlGrid],
+    defects: UpstreamDefects,
+    beyond: &mut bool,
 ) -> Result<Collocation, SdcError> {
     let mut levels = Vec::with_capacity(grids.len());
     for g in grids {
-        levels.push(bspline::grid_bspline_weights(
+        let w = bspline::grid_bspline_weights(
             shape,
             affine,
             g.shape,
             &g.affine,
             WeightType::Float32,
-        )?);
+            defects,
+        )?;
+        *beyond |= w.beyond > 0;
+        levels.push(w);
     }
     Collocation::new(levels)
 }
@@ -320,7 +331,14 @@ pub fn bspline_approx_logged(
     let n_inside = fit_grid
         .mask
         .map_or(n_fit, |m| m.iter().filter(|k| **k).count());
-    let colmat = collocation(fit_grid.shape, fit_grid.affine, &grids)?;
+    let mut beyond = false;
+    let colmat = collocation(
+        fit_grid.shape,
+        fit_grid.affine,
+        &grids,
+        params.defects,
+        &mut beyond,
+    )?;
     let mut knots: Vec<String> = grids
         .iter()
         .map(|g| format!("{}x{}x{}", g.shape[0], g.shape[1], g.shape[2]))
@@ -381,7 +399,13 @@ pub fn bspline_approx_logged(
         Fitting::Original => (y, original.mask, colmat),
         Fitting::Resampled(_) => {
             let d: Vec<f32> = original.data.iter().map(|v| v - center).collect();
-            let c = collocation(original.shape, original.affine, &grids)?;
+            let c = collocation(
+                original.shape,
+                original.affine,
+                &grids,
+                params.defects,
+                &mut beyond,
+            )?;
             (d, original.mask, c)
         }
     };
@@ -426,6 +450,7 @@ pub fn bspline_approx_logged(
         extreme,
         fit,
         log: Vec::new(),
+        beyond,
     })
 }
 

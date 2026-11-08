@@ -18,7 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 
 #: sdcflows' default control-point spacings, in mm.
@@ -124,17 +125,38 @@ def _header_zooms(obj: Any) -> tuple[tuple[int, int, int], np.ndarray, tuple[flo
     return shape, np.asarray(img.affine, dtype=np.float64), zooms  # type: ignore[return-value]
 
 
-def bspline_grid(img: Any, control_zooms_mm: Sequence[float] = DEFAULT_ZOOMS_MM) -> Image:
+def bspline_grid(
+    img: Any,
+    control_zooms_mm: Sequence[float] = DEFAULT_ZOOMS_MM,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Image:
     """sdcflows' ``bspline_grid``: the B-spline control grid of an image, as a zero-filled
     float32 :class:`~larmorx.Image` with the grid's affine.
 
     The grid has the image's orientation, ``control_zooms_mm`` between control points (mm,
     along the image's axes), covers the image's extent plus a margin (``extent // spacing + 3``
     points per axis) and is centred on it. ``img`` is a NIfTI path, an image (nibabel or
-    larmorx) or an ``(array, affine)`` pair; its header's zooms are used, as sdcflows does (a
-    4D header makes sdcflows fail, and this function with it).
+    larmorx) or an ``(array, affine)`` pair; its header's zooms are used, as sdcflows does.
+    ``upstream_defects``: a header of more than three dimensions (a 4D field map of one volume)
+    gives the grid of its first three zooms (``"fix"``, SDC-06) or numpy's broadcasting
+    ``ValueError``, as sdcflows (``"reproduce"``).
     """
+    _defects.check(upstream_defects)
     shape, affine, zooms = _header_zooms(img)
+    if len(zooms) > 3 and upstream_defects == "fix":
+        _defects.warn(
+            [
+                (
+                    "SDC-06",
+                    "sdcflows",
+                    "fix",
+                    f"a header of {len(zooms)} zooms: the first three are used (sdcflows "
+                    "fails with numpy's broadcasting ValueError)",
+                )
+            ]
+        )
+        zooms = zooms[:3]
     spacing = tuple(float(z) for z in control_zooms_mm)
     if len(spacing) != 3:
         raise ValueError("control_zooms_mm must hold three spacings")
@@ -173,7 +195,12 @@ def _csr(
 
 
 def grid_bspline_weights(
-    target: Any, ctrl: Any, dtype: str = "float32", *, n_threads: int = 1
+    target: Any,
+    ctrl: Any,
+    dtype: str = "float32",
+    *,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> CsrMatrix:
     """sdcflows' ``grid_bspline_weights(target_nii, ctrl_nii, dtype)``: the cubic B-spline
     weights of every voxel of ``target`` (rows, C order) for every control point of ``ctrl``
@@ -184,10 +211,26 @@ def grid_bspline_weights(
     its weights fill at least half of that axis' matrix). sdcflows returns the ``kron`` result
     (COO or BSR); this is the same matrix in CSR form. Warns ``UserWarning`` "Image's and
     B-Spline's grids are not aligned." when the grids are rotated relative to each other, and
-    goes on, as sdcflows does. ``target`` and ``ctrl``: NIfTI paths, images or ``(shape,
-    affine)`` pairs.
+    goes on, as sdcflows does (``upstream_defects="reproduce"``). ``target`` and ``ctrl``: NIfTI
+    paths, images or ``(shape, affine)`` pairs.
+
+    ``upstream_defects="fix"`` (the default) corrects two defects of these weights, with an
+    :class:`~larmorx.UpstreamDefectWarning` when they change the matrix: a position beyond the
+    first or the last control point gets the cubic B-spline's weight, where sdcflows continues
+    the end polynomial of SciPy's extrapolation (SDC-01); and on a rotated grid every voxel's
+    weights are those at its own position, the products of the three axes' B-splines at its
+    coordinates (up to 64 control points per voxel), where sdcflows multiplies per-axis weights
+    each taken from one index of the voxel (SDC-02). Inside the control grid of an aligned
+    sampling grid both modes give the same bits.
     """
-    return collocation_matrix(target, [ctrl], dtype, n_threads=n_threads, _stacklevel=3)
+    return collocation_matrix(
+        target,
+        [ctrl],
+        dtype,
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
+        _stacklevel=3,
+    )
 
 
 def collocation_matrix(
@@ -196,22 +239,37 @@ def collocation_matrix(
     dtype: str = "float32",
     *,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
     _stacklevel: int = 2,
 ) -> CsrMatrix:
     """The collocation matrix sdcflows fits and evaluates with:
     ``sparse_hstack([grid_bspline_weights(target, level) for level in levels]).tocsr()``
-    (``BSplineApprox``, ``B0FieldTransform.fit``; fMRIPrep's ``ReconstructFieldmap``)."""
+    (``BSplineApprox``, ``B0FieldTransform.fit``; fMRIPrep's ``ReconstructFieldmap``), with
+    SDC-01 and SDC-02 corrected or reproduced as :func:`grid_bspline_weights` says."""
+    _defects.check(upstream_defects)
     if dtype not in ("float32", "float64"):
         raise ValueError(f"the weights are ported for float32 and float64, not {dtype!r}")
     shape, affine = _grid(target)
-    data, indices, indptr, mshape, aligned = _core.sdcflows_collocation_csr(
+    data, indices, indptr, mshape, aligned, notices = _core.sdcflows_collocation_csr(
         shape,
         np.ascontiguousarray(affine, dtype=np.float64),
         _levels(levels),
         dtype,
         n_threads,
+        upstream_defects,
     )
-    for ok in aligned:
-        if not ok:
-            warnings.warn(NOT_ALIGNED, UserWarning, stacklevel=_stacklevel)
+    warn_levels(aligned, notices, upstream_defects, _stacklevel + 1)
     return _csr(data, indices, indptr, mshape, dtype)
+
+
+def warn_levels(
+    aligned: Sequence[bool], notices: Sequence[Any], upstream_defects: str, stacklevel: int
+) -> None:
+    """sdcflows' "not aligned" warning per rotated level (reproduced: sdcflows warns and goes
+    on; corrected, the weights are exact and only the defect's notice says so), then the
+    notices of SDC-01 and SDC-02."""
+    if upstream_defects == "reproduce":
+        for ok in aligned:
+            if not ok:
+                warnings.warn(NOT_ALIGNED, UserWarning, stacklevel=stacklevel)
+    _defects.warn(notices, stacklevel=stacklevel)

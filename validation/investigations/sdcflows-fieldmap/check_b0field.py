@@ -16,7 +16,14 @@ shared ``.venv``):
    warnings; on the target's own grid, a LAS and a 4D target, one and two control grids, a
    rigid transform with and without ``approx``, an identity transform; with synthetic
    coefficients and with the fMRIPrep oracle runs' coefficients (ds005454's B-spline fit,
-   ds005040's TOPUP coefficients placed by ``TOPUPCoeffReorient``) on their BOLD references.
+   ds005040's TOPUP coefficients placed by ``TOPUPCoeffReorient``) on their BOLD references,
+   with ``upstream_defects="reproduce"``.
+3. The corrected fit (``upstream_defects="fix"``: SDC-01, SDC-02, SDC-10) against sdcflows'
+   own fit with the three corrections made in its pieces (the weights of
+   ``measure_sdc01_02.py``: the B-spline beyond the grid, the exact weights of a rotated grid;
+   the approximation's grid built and sampled at the projected target): the field's values,
+   on oblique targets with and without a transform, synthetic and ds002603's oblique BOLD
+   references with fMRIPrep's own registration to the field map.
 
 One line per case; exit status 1 if any differs.
 """
@@ -32,6 +39,8 @@ import nibabel as nb
 import numpy as np
 from sdcflows.transform import B0FieldTransform as SdcB0
 from sdcflows.utils.tools import deoblique_and_zooms as sdc_deoblique
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 from larmorx import sdcflows as lxs
 from larmorx.sdcflows.transform import B0FieldTransform, deoblique_and_zooms
@@ -129,7 +138,13 @@ def fit_case(name, coeffs, target, xfm=None, approx=True):
     with warnings.catch_warnings(record=True) as w2:
         warnings.simplefilter("always")
         mine = B0FieldTransform(coeffs=[str(c) for c in coeffs])
-        mine.fit(str(target), xfm_data2fmap=xfm, approx=approx, n_threads=8)
+        mine.fit(
+            str(target),
+            xfm_data2fmap=xfm,
+            approx=approx,
+            n_threads=8,
+            upstream_defects="reproduce",
+        )
     with tempfile.TemporaryDirectory() as t:
         a, b = Path(t) / "a.nii.gz", Path(t) / "b.nii.gz"
         ref.mapped.to_filename(a)
@@ -146,6 +161,112 @@ def fit_case(name, coeffs, target, xfm=None, approx=True):
         }
     bad = [k for k, v in checks.items() if not v]
     report(f"fit {name}", not bad, f"{wd.shape}" + (f"; differ: {bad}" if bad else ""))
+
+
+def _aligned(a, b) -> bool:
+    return np.allclose(np.linalg.norm(np.cross(a[:-1, :-1].T, b[:-1, :-1].T), axis=1), 0, atol=1e-3)
+
+
+def fixed_weights(target, ctrl, dtype="float32"):
+    """The corrected weights of one level (SDC-01 and SDC-02), built with numpy and SciPy."""
+    from measure_sdc01_02 import exact_matrix, true_grid_bspline_weights
+
+    if _aligned(ctrl.affine, target.affine):
+        return true_grid_bspline_weights(target, ctrl, dtype)
+    return exact_matrix(target, ctrl, np.dtype(dtype).type)
+
+
+def fixed_case(name, coeffs, target, xfm=None, approx=True, notices=()):
+    """larmorx's corrected fit against sdcflows' fit with the corrections made in its pieces."""
+    import sdcflows.transform as sdct
+
+    t = nb.load(target)
+    original = sdct.grid_bspline_weights
+    sdct.grid_bspline_weights = fixed_weights
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ref = SdcB0(coeffs=[nb.load(c) for c in coeffs])
+            moved = xfm is not None and not np.array_equal(xfm, np.eye(4))
+            if approx and moved and not _aligned(nb.load(coeffs[-1]).affine, t.affine):
+                # SDC-10 corrected: the target where the transform puts it, grid and samples
+                proj = nb.Nifti1Image(np.zeros(t.shape[:3], np.float32), xfm @ t.affine)
+                ref.fit(proj, xfm_data2fmap=np.eye(4), approx=True)
+            else:
+                ref.fit(t, xfm_data2fmap=xfm, approx=approx)
+    finally:
+        sdct.grid_bspline_weights = original
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mine = B0FieldTransform(coeffs=[str(c) for c in coeffs])
+        mine.fit(str(target), xfm_data2fmap=xfm, approx=approx, n_threads=8)
+    named = sorted({getattr(x.message, "entry", "") for x in w} - {""})
+    wd = np.asarray(np.asanyarray(ref.mapped.dataobj), dtype=np.float32, order="C")
+    md = np.asarray(mine.mapped.data, dtype=np.float32, order="C")
+    ok = wd.shape == md.shape and wd.tobytes() == md.tobytes() and named == sorted(notices)
+    detail = f"{wd.shape}; notices {named}"
+    if not ok and wd.shape == md.shape:
+        detail += f"; max |diff| {np.abs(wd.astype(np.float64) - md).max():.3g}"
+    report(f"fit corrected: {name}", ok, detail)
+
+
+def check_fixed(tmp: Path) -> None:
+    rng = np.random.default_rng(11)
+    ras = np.diag([3.0, 3.0, 3.5, 1.0])
+    ras[:3, 3] = (-60, -66, -40)
+    shape = (40, 44, 24)
+    g = lxs.bspline_grid((np.zeros(shape, np.float32), ras), (16.0, 16.0, 10.0))
+    coeffs = [
+        image(tmp / "f_coeff000.nii.gz", g.shape, np.asarray(g.affine), rng.normal(0, 40, g.shape))
+    ]
+    obl = matmul(rigid((0.0, 0.0, 0.12), (0.0, 0.0, 0.0)), ras)
+    oblique = image(tmp / "oblique.nii.gz", shape, obl)
+    larger = np.diag([3.0, 3.0, 3.5, 1.0])
+    larger[:3, 3] = (-75, -80, -50)
+    big = image(tmp / "big.nii.gz", (50, 54, 30), larger)
+    x = rigid((0.05, -0.03, 0.08), (3.0, -2.0, 1.5))
+    fixed_case("aligned, inside", coeffs, image(tmp / "own_f.nii.gz", shape, ras))
+    fixed_case("aligned, larger than the grid (SDC-01)", coeffs, big, notices=("SDC-01",))
+    fixed_case("oblique, no transform (SDC-02)", coeffs, oblique, notices=("SDC-01", "SDC-02"))
+    fixed_case(
+        "oblique, approx=False with a transform (SDC-02)",
+        coeffs,
+        oblique,
+        x,
+        False,
+        notices=("SDC-01", "SDC-02"),
+    )
+    fixed_case(
+        "oblique, a transform, approx (SDC-10)",
+        coeffs,
+        oblique,
+        x,
+        True,
+        notices=("SDC-01", "SDC-10"),
+    )
+    # ds002603: fMRIPrep's coefficients, its oblique BOLD references and its registration
+    import nitransforms as nt
+
+    base = R / "ds002603-sub-01-noreconall" / "out" / "sub-01"
+    cs = sorted((base / "fmap").glob("*desc-coeff_fieldmap.nii.gz"))
+    for bref in sorted((base / "func").glob("*desc-hmc_boldref.nii.gz"))[:2]:
+        prefix = bref.name.split("_desc-")[0]
+        xp = sorted((base / "func").glob(f"{prefix}_from-boldref_to-*_desc-fmap_xfm.txt"))
+        if not cs or not xp:
+            print("skipped (no oracle run here): ds002603")
+            return
+        m = np.linalg.inv(nt.linear.Affine.from_filename(str(xp[0]), fmt="itk").matrix)
+        fit_case(
+            f"ds002603 {prefix} oblique, its registration (SDC-10 reproduced)", cs, bref, m, True
+        )
+        fixed_case(
+            f"ds002603 {prefix} oblique, its registration (SDC-10 corrected)",
+            cs,
+            bref,
+            m,
+            True,
+            ("SDC-01", "SDC-10"),
+        )
 
 
 def check_fit(tmp: Path) -> None:
@@ -206,6 +327,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_deoblique(Path(tmp))
         check_fit(Path(tmp))
+        check_fixed(Path(tmp))
     print("ALL OK" if not FAILS else f"FAILED: {len(FAILS)}: {', '.join(FAILS)}")
     return 0 if not FAILS else 1
 

@@ -782,10 +782,14 @@ def sdcflows_collocation_csr(
     levels: list[tuple[tuple[int, int, int], np.ndarray]],
     dtype: str = "float32",
     n_threads: int = 1,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[bool]]:
+    upstream_defects: str = "fix",
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[bool], list[tuple[str, str, str, str]]
+]:
     """``sparse_hstack([grid_bspline_weights(target, level) ...]).tocsr()``: data (float64,
     holding the matrix type's values), indices, indptr (int64), shape, one alignment flag per
-    level."""
+    level, and the notices of SDC-01 and SDC-02 (corrected with ``"fix"``, sdcflows' matrix bit
+    for bit with ``"reproduce"``)."""
 
 def sdcflows_collocation_apply(
     target_shape: tuple[int, int, int],
@@ -795,9 +799,11 @@ def sdcflows_collocation_apply(
     transpose: bool = False,
     rows: np.ndarray | None = None,
     n_threads: int = 1,
-) -> np.ndarray:
-    """``X @ v`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32 collocation
-    matrix, in scipy's summation order, without storing the matrix."""
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """``(X @ v, notices)`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32
+    collocation matrix, in scipy's summation order, without storing the matrix; the notices of
+    SDC-01 and SDC-02."""
 
 def sdcflows_dot_f32(x: np.ndarray, y: np.ndarray) -> float:
     """``np.dot(x, y)`` of two float32 vectors (numpy over OpenBLAS's Haswell ``sdot``)."""
@@ -853,10 +859,11 @@ def sdcflows_bspline_approx(
     name: str = "",
     resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None] | None = None,
     n_threads: int = 1,
+    upstream_defects: str = "fix",
 ) -> dict[str, Any]:
     """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
     grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
-    system, log."""
+    system, log, beyond (whether SDC-01 changed, or would have changed, the weights)."""
 
 def sdcflows_rescale_affine(
     affine: np.ndarray,

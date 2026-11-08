@@ -6768,6 +6768,149 @@ def _(ctx: Context) -> dict[str, Any]:
     return out
 
 
+def _epi_pair(ctx: Context, volumes: int = 2) -> list[str]:
+    """Two int16 EPI series of the synthetic head (1 mm voxels), the brain shifted one voxel
+    each way along the first axis (the phase encoding: ``i`` and ``i-``), with a little noise
+    and a dimmer second volume."""
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    out = []
+    for name, shift, seed in (("dir-RL", 1, 110), ("dir-LR", -1, 120)):
+        brain = ellipsoid(SHAPE_HEAD, 4, 5, shift=shift)
+        vols = [
+            np.where(
+                brain,
+                140 - 10 * v + ints(seed + v, SHAPE_HEAD, 0, 30),
+                ints(seed + 9, SHAPE_HEAD, 0, 5),
+            )
+            for v in range(volumes)
+        ]
+        path = ctx.out(f"sub-01_{name}_epi.nii.gz")
+        lx.save((np.stack(vols, axis=-1).astype(np.int16), aff), path)
+        out.append(path)
+    return out
+
+
+@case(
+    "py.niworkflows.robust_average",
+    covers=(
+        "lx.niworkflows.robust_average",
+        "lx.niworkflows.merge_series",
+        "lx.niworkflows.reorient_file",
+        "lx.niworkflows.reorient_image",
+        "lx.niworkflows.as_reoriented",
+        "lx.niworkflows.axcodes2ornt",
+        "lx.niworkflows.aff2axcodes",
+        "lx.niworkflows.ornt_transform",
+        "lx.niworkflows.squeeze_image",
+        "lx.niworkflows.four_to_three",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' RobustAverage (3dvolreg's replica; numpy 2.2's and 2.5's arithmetic; without
+    registration, selected volumes, without the positive clip), MergeSeries (with a tolerance)
+    and ReorientImage; nibabel's orientation helpers."""
+    epis = _epi_pair(ctx, volumes=3)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, kw in (
+            ("afni", {}),
+            ("afni.np22", {"numpy_version": "2.2.6"}),
+            ("none", {"mc_method": None, "nonnegative": False}),
+            ("mask", {"t_mask": [True, False, True], "two_pass": False}),
+        ):
+            r = lx.niworkflows.robust_average(epis[0], out_dir=ctx.out(f"ravg-{name}"), **kw)
+            out[f"ravg.{name}.average"] = Nifti(r.out_file)
+            out[f"ravg.{name}.sliced"] = Nifti(r.out_volumes)
+            out[f"ravg.{name}.drift"] = np.asarray(r.out_drift)
+    merged = lx.niworkflows.merge_series(epis, affine_tolerance=1e-4, out_dir=ctx.out("merge"))
+    out["merged"] = Nifti(merged)
+    out["reoriented"] = Nifti(
+        lx.niworkflows.reorient_file(merged, target_ornt="PIL", newpath=ctx.out("reor"))
+    )
+    img = lx.io.load_nibabel(epis[1])
+    vols = lx.niworkflows.four_to_three(lx.niworkflows.squeeze_image(img))
+    out["volume1"] = np.asarray(vols[1].data)
+    ras = lx.niworkflows.reorient_image(vols[0], "LPS")
+    out["lps.data"] = np.asarray(ras.data)
+    out["lps.affine"] = np.asarray(ras.affine)
+    xfm = lx.niworkflows.ornt_transform(
+        lx.niworkflows.axcodes2ornt(lx.niworkflows.aff2axcodes(img.affine)),
+        lx.niworkflows.axcodes2ornt(("A", "I", "L")),
+    )
+    out["air"] = np.asarray(lx.niworkflows.as_reoriented(vols[0], xfm).data)
+    return out
+
+
+@case(
+    "py.sdcflows.pepolar",
+    covers=(
+        "lx.sdcflows.get_trt",
+        "lx.sdcflows.get_readout_time",
+        "lx.sdcflows.select_pe_volumes",
+        "lx.sdcflows.sort_pe_blips",
+        "lx.sdcflows.uniform_grid",
+        "lx.sdcflows.pad_slices",
+        "lx.sdcflows.reorient_image_and_metadata",
+        "lx.sdcflows.select_topup_config",
+        "lx.sdcflows.topup_config_file",
+        "lx.sdcflows.topup_node",
+        "lx.sdcflows.topup_mats_to_world",
+        "lx.sdcflows.topup_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' PEPOLAR estimation on a synthetic pair: init_topup_wf in 2.15's wiring (sdcflows'
+    quick configuration) and 2.17.1's (a given configuration; debug: ApplyCoeffsField with
+    TOPUP's matrices), topup's clean-room original; the steps on their own (a resampled grid, an
+    odd slice count, LAS, the readout times)."""
+    epis = _epi_pair(ctx)
+    metas = [
+        {"PhaseEncodingDirection": "i", "TotalReadoutTime": 0.05},
+        {"PhaseEncodingDirection": "i-", "EffectiveEchoSpacing": 0.0005},
+    ]
+    out: dict[str, Any] = {}
+    cfg = lx.sdcflows.topup_config_file("b02b0_2_quick.cnf")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        w15 = lx.sdcflows.topup_workflow(
+            epis, metas, wiring="2.15", sloppy=True, out_dir=ctx.out("w15"),
+            topup_implementation="original",
+        )  # fmt: skip
+        w17 = lx.sdcflows.topup_workflow(
+            epis, metas, wiring="2.17", topup_config=cfg, debug=True, max_vols_per_pe=1,
+            out_dir=ctx.out("w17"), topup_implementation="original",
+        )  # fmt: skip
+    for name, w in (("w15", w15), ("w17", w17)):
+        out[f"{name}.fmap"] = Nifti(w.fmap)
+        out[f"{name}.coeff"] = Nifti(w.fmap_coeff[0])
+        out[f"{name}.ref"] = Nifti(w.fmap_ref)
+        out[f"{name}.mask"] = Nifti(w.fmap_mask)
+    out["w17.xfms"] = np.asarray(w17.nodes["convert_xfms"])
+    out["trt"] = np.asarray([lx.sdcflows.get_readout_time(m, epis[0]).readout_time for m in metas])
+    sel = lx.sdcflows.select_pe_volumes(epis, ["x", "x-"], [0.05, 0.05], 1, out_dir=ctx.out("sel"))
+    srt = lx.sdcflows.sort_pe_blips(sel.out_data, ["x-", "x"], [0.04, 0.05])
+    out["sorted"] = np.asarray(
+        [os.path.basename(p) == os.path.basename(sel.out_data[1]) for p in srt.out_data]
+    )
+    small = ctx.out("small.nii.gz")
+    aff = affine((16, 15, 13), (1.6, 1.7, 1.9), oblique=True)
+    lx.save((ints(130, (16, 15, 13), 0, 900).astype(np.int16), aff), small)
+    grid = lx.sdcflows.uniform_grid([sel.out_data[0], small], out_dir=ctx.out("grid"))
+    out["regrid"] = Nifti(grid.out_data[1])
+    padded, _ = lx.sdcflows.pad_slices(small, out_dir=ctx.out("pad"))
+    out["padded"] = Nifti(padded)
+    las, pe = lx.sdcflows.reorient_image_and_metadata(small, "las", ["j-"], out_dir=ctx.out("las"))
+    out["las"] = Nifti(las)
+    out["las.pe"] = np.asarray(["ijk".index(pe[0][0])])
+    out["mats"] = np.asarray(lx.sdcflows.topup_mats_to_world(w15.xfms, w15.nodes["to_las"][0]))
+    out["tier"] = np.asarray(
+        [int(os.path.basename(lx.sdcflows.select_topup_config(small, True))[6])]
+    )
+    out["topup.cmd"] = np.asarray([len(w15.nodes["topup"].cmdline)])
+    return out
+
+
 @case("py.niworkflows.intensity_clip", covers=("lx.niworkflows.intensity_clip",))
 def _(ctx: Context) -> dict[str, Any]:
     """niworkflows' IntensityClip: the defaults (int16), uint8 inverted, float32 without the

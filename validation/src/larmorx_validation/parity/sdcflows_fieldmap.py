@@ -113,9 +113,11 @@ _LINE = re.compile(r"^(OK|FAIL|EXPECTED)\s+(.*?)(?::\s(.*))?$")
 #: The originals' changes from the shared releases to the newest on this suite's paths (none in
 #: sdcflows 2.15.1 -> 2.17.1 on part A's paths; the libraries' code read side by side): LAPACK
 #: 3.12.0 -> 3.12.1 in numpy's OpenBLAS, which moves the quaternions nibabel writes for some
-#: oblique headers. A line whose outputs changed only in those fields (the digest with them
-#: zeroed is identical: ``stepdigest.last_masked``) has this reason; any other change has no
-#: known reason and fails its check.
+#: oblique headers and the axis ``io_orientation`` picks for a rotation with two equal
+#: candidates. A line whose outputs changed only in those fields (the digest with them zeroed
+#: is identical: ``stepdigest.last_masked``), or whose inputs hold such an orientation
+#: (:func:`_orientation_step`), has this reason; any other change has no known reason and
+#: fails its check.
 CHANGES: dict[str, str] = {"LAPACK-3.12.1": pv.CHANGES["LAPACK-3.12.1"]}
 #: The step's second record per line: its digest with the NIfTI quaternion fields zeroed.
 _MASKED = "(NIfTI quaternions zeroed)"
@@ -228,6 +230,11 @@ def _random_case(spec: dict, checks: CheckList) -> None:
             fix_inputs = _compare(call, e, files, tmp)
         finally:
             sys.stdout = old
+        why = []
+        if os.environ.get(pv.STEP_FROM) and _orientation_step(
+            [*files.values(), *tmp.glob("*.nii*")]
+        ):
+            why = ["LAPACK-3.12.1"]
         for kind, name, detail, digest, masked in out.reported:
             ok = kind == "OK"
             checks(
@@ -237,11 +244,41 @@ def _random_case(spec: dict, checks: CheckList) -> None:
                 detail=detail[:400],
             )
             if digest is not None:
-                _step(checks, name, digest, masked)
+                _step(checks, name, digest, masked, why)
         if not out.reported:
             raise Outcome(SKIPPED, f"the comparator of {call} reported nothing")
         if fix_inputs is not None:
             _fix_pass(call, e, fix_inputs, checks)
+
+
+def _orientation_step(paths) -> bool:
+    """Whether nibabel's ``io_orientation`` of an input's affine differs between LAPACK 3.12.0
+    and 3.12.1: numpy's SVD decides which axis a rotation with two equal candidates takes
+    (larmorx's replica of numpy's ``svd`` in both releases, ``lx.io.nibabel_header``), and with
+    it whether sdcflows reorients the image (``ensure_positive_cosines``) and which error it
+    raises."""
+    import contextvars
+
+    import nibabel as nb
+
+    from larmorx.io import nibabel_header as nh
+
+    def ornt(affine, release):
+        def run():
+            nh.use_lapack(release)
+            return nh.io_orientation(affine)
+
+        return contextvars.copy_context().run(run)
+
+    for p in paths:
+        try:
+            affine = np.asarray(nb.load(str(p)).affine, dtype=np.float64)
+            a, b = ornt(affine, "3.12.0"), ornt(affine, "3.12.1")
+        except Exception:  # not an image, or an SVD that does not converge
+            continue
+        if not np.array_equal(a, b, equal_nan=True):
+            return True
+    return False
 
 
 def _rigid(x: dict | None):
@@ -427,11 +464,18 @@ class _Lines(io.StringIO):
         return n
 
 
-def _step(checks: CheckList, name: str, digest: str, masked: str | None = None) -> None:
+def _step(
+    checks: CheckList,
+    name: str,
+    digest: str,
+    masked: str | None = None,
+    reasons: list[str] | None = None,
+) -> None:
     """The originals' own step for line ``name`` (``python_versions``): recorded in a
     ``shared`` step run, compared with that record in a ``newest`` run. A change of the NIfTI
     quaternions alone (``masked``, the digest with them zeroed, identical in every run) has
-    the known reason ``LAPACK-3.12.1`` (:data:`CHANGES`)."""
+    the known reason ``LAPACK-3.12.1`` (:data:`CHANGES`), as has any change of a line whose
+    inputs ``reasons`` names (an orientation numpy's SVD decides: :func:`_orientation_step`)."""
     value = np.frombuffer(bytes.fromhex(digest), dtype=np.uint8)
     pv.record(name, value)
     mvalue = None if masked is None else np.frombuffer(bytes.fromhex(masked), dtype=np.uint8)
@@ -454,8 +498,8 @@ def _step(checks: CheckList, name: str, digest: str, masked: str | None = None) 
         )
         return
     changed = olds[0] != pv.digest(value)
-    why: list[str] = []
-    if changed and mvalue is not None:
+    why: list[str] = list(reasons or []) if changed else []
+    if changed and not why and mvalue is not None:
         molds = pv.previous(f"{name} {_MASKED}")
         if molds and len(set(molds)) == 1 and molds[0] == pv.digest(mvalue):
             why = ["LAPACK-3.12.1"]

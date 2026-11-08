@@ -25,11 +25,33 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import math
 import os
 import re
 from pathlib import Path
 
 import numpy as np
+
+
+def orthogonal(rng: np.random.Generator) -> np.ndarray:
+    """A random 3 x 3 orthogonal matrix from plain arithmetic, for the scripts' inputs: the
+    rotation of a unit quaternion of four normal draws, its first column negated half of the
+    time. ``numpy.linalg.qr``'s bits follow numpy's LAPACK release (102 of 150 matrices differ
+    between numpy 2.3.5 and 2.5.4), so inputs made with it would differ between the kept
+    environments and the step would compare the originals on other inputs."""
+    w, x, y, z = (float(v) for v in rng.normal(size=4))
+    n = math.sqrt(w * w + x * x + y * y + z * z)
+    w, x, y, z = w / n, x / n, y / n, z / n
+    r = np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+    if rng.random() < 0.5:
+        r[:, 0] = -r[:, 0]
+    return r
 
 
 def numpy_lapack() -> str:

@@ -41,7 +41,7 @@ from larmorx import sdcflows as lxs
 from larmorx.sdcflows.coeffs import reorient_pedir
 
 sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
-from stepdigest import oracle
+from stepdigest import oracle, orthogonal
 
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
@@ -180,7 +180,7 @@ def check_topup(tmp: Path) -> None:
         for pe in ("i", "i-", "j", "j-", "k", "x", "y-", "z"):
             topup_case(f"topup {axc} pe {pe}", [coeff], ref, pe)
     rng = np.random.default_rng(5)
-    q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+    q = orthogonal(rng)  # never numpy.linalg (its bits follow LAPACK's release)
     obl = np.eye(4)
     obl[:3, :3] = q * (2.0, 2.2, 3.1)
     obl[:3, 3] = (-40, 30, 12)

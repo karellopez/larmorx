@@ -47,7 +47,7 @@ import larmorx as lx
 from larmorx import sdcflows as lxs
 
 sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
-from stepdigest import oracle
+from stepdigest import oracle, orthogonal
 
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
@@ -99,7 +99,7 @@ def captured(logger_name, fn):
 def random_affine(rng, oblique=True):
     zooms = rng.uniform(0.5, 4.0, 3)
     if oblique:
-        q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+        q = orthogonal(rng)  # never numpy.linalg (its bits follow LAPACK's release)
     else:
         q = np.eye(3)[rng.permutation(3)] * rng.choice([-1, 1], 3)[:, None]
     a = np.eye(4)

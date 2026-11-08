@@ -174,7 +174,18 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
   itself writes other quaternions with numpy 2.3.5 (and fMRIPrep 25.2.6's conda-forge OpenBLAS
   0.3.30) than with numpy 2.5.4. larmorx follows 3.12.1 (the newest), and selects 3.12.0 for the
   checks in the older environment (`lx.io.nibabel_header.use_lapack`); the originals' step of
-  the records shows it as a change of the headers, with this reason.
+  the records shows it as a change of the headers, with this reason (`LAPACK-3.12.1`: a line
+  whose originals' outputs are identical once the quaternion fields are zeroed). The same
+  release also moves `io_orientation`'s choice for a rotation with two equal axis candidates
+  (numpy's SVD's last bits): random testing's permanent case `sdc02-single-voxel-no-notice`
+  (a one-voxel series rotated by the quaternion (3, 3, 0, 5)) has positive axes for sdcflows
+  under 3.12.1, so it is not reoriented and fails with SDC-08's `AttributeError: 'ArrayProxy'
+  object has no attribute 'transpose'`, and is reoriented and unwarped under 3.12.0; larmorx
+  reproduces each release (and unwarps it by default, SDC-08 corrected). The step names that
+  reason where an input's orientation differs between the two releases in larmorx's replica of
+  numpy's SVD. Inputs made with `numpy.linalg` would differ between the environments too (102 of
+  150 random `numpy.linalg.qr` matrices of relay 3's `rescale_affine` check did): the check
+  scripts' oblique inputs come from plain arithmetic (`stepdigest.orthogonal`).
 - **The qform nibabel reads** (`get_qform`) is computed in `np.longdouble`
   (`quaternions.MAX_FLOAT`): x87's extended format on x86-64 Linux. `fillpositive`'s
   `w = √(1 - (b² + c² + d²))` (numpy's longdouble `matmul` loop: from 0, each product and sum

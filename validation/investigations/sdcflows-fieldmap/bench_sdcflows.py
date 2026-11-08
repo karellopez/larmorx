@@ -2,7 +2,7 @@
 """Speed of ``lx.sdcflows`` against sdcflows' Python on fMRIPrep's calls (field maps part A).
 
     OPENBLAS_CORETYPE=Haswell PYTHONPATH=<repo>/python python -P bench_sdcflows.py \\
-        [--repeats 3] [--volumes 60] [--threads 1,14] [--out results.json]
+        [--repeats 3] [--volumes 60] [--threads 1,14] [--low-memory] [--out results.json]
 
 Run in the newest Python environment (``oracles/python-newest``: sdcflows 2.17.1, scikit-learn
 1.9.1, SciPy 1.18.1, numpy 2.5.4), inside a memory box. Two kinds of calls:
@@ -10,8 +10,9 @@ Run in the newest Python environment (``oracles/python-newest``: sdcflows 2.17.1
 - ``BSplineApprox`` as fMRIPrep's seven ``bs_filter`` nodes of the oracle runs call it (their
   field maps and masks), sdcflows' interface (nipype, a temporary directory) against
   ``lx.sdcflows.bspline_approx`` with the same files written, larmorx at each thread count
-  (BSplineApprox has no thread option: numpy's and SciPy's BLAS at one thread,
-  ``OPENBLAS_NUM_THREADS=1``, the way fMRIPrep's nodes ran);
+  with its stored collocation matrix (the default; ``--low-memory`` also times
+  ``low_memory=True`` at one thread; BSplineApprox has no thread option: numpy's and SciPy's
+  BLAS at one thread, ``OPENBLAS_NUM_THREADS=1``, the way fMRIPrep's nodes ran);
 - ``ApplyCoeffsField`` on ds005454's coefficients, registration and the first ``--volumes``
   BOLD volumes (160 x 160 x 96, int16; the whole 280-volume series would need about 50 GiB in
   sdcflows: 3.7 GiB for 20 volumes, ``tests/parity/test_memory_peak.py``), sdcflows'
@@ -76,7 +77,9 @@ def _quiet() -> None:
         logging.getLogger(name).setLevel(logging.ERROR)
 
 
-def bench_fit(run: str, node: str, threads: list[int], repeats: int) -> dict | None:
+def bench_fit(
+    run: str, node: str, threads: list[int], repeats: int, low_memory: bool = False
+) -> dict | None:
     from sdcflows.interfaces.bspline import BSplineApprox
 
     import larmorx as lx
@@ -110,6 +113,24 @@ def bench_fit(run: str, node: str, threads: list[int], repeats: int) -> dict | N
             out[f"larmorx_{n}_s"], out[f"larmorx_{n}_runs"], my_dir = timed(mine, repeats)
             names = sorted(p.name for p in Path(ref_dir).glob("*.nii.gz"))
             out[f"identical_{n}"] = names == sorted(
+                p.name for p in Path(my_dir).glob("*.nii.gz")
+            ) and all(raw(Path(ref_dir) / k) == raw(Path(my_dir) / k) for k in names)
+        if low_memory and 1 in threads:  # the option that evaluates the weights at every product
+
+            def low():
+                d = tempfile.mkdtemp(dir=t)
+                lx.sdcflows.bspline_approx(
+                    str(fmaps[0]), str(mask), out_dir=d, n_threads=1, low_memory=True,
+                    upstream_defects="reproduce",
+                )  # fmt: skip
+                return d
+
+            low()  # warm-up
+            out["larmorx_low_memory_1_s"], out["larmorx_low_memory_1_runs"], my_dir = timed(
+                low, repeats
+            )
+            names = sorted(p.name for p in Path(ref_dir).glob("*.nii.gz"))
+            out["identical_low_memory_1"] = names == sorted(
                 p.name for p in Path(my_dir).glob("*.nii.gz")
             ) and all(raw(Path(ref_dir) / k) == raw(Path(my_dir) / k) for k in names)
     return out
@@ -176,6 +197,11 @@ def main() -> int:
     p.add_argument("--threads", default="1,14")
     p.add_argument("--out", default=None)
     p.add_argument("--skip-apply", action="store_true")
+    p.add_argument(
+        "--low-memory",
+        action="store_true",
+        help="also time the fit with low_memory=True (the weights at every product) at 1 thread",
+    )
     args = p.parse_args()
     threads = [int(x) for x in args.threads.split(",")]
     import importlib.metadata as md
@@ -197,7 +223,7 @@ def main() -> int:
     }
     results = []
     for run, node in FITS:
-        r = bench_fit(run, node, threads, args.repeats)
+        r = bench_fit(run, node, threads, args.repeats, args.low_memory)
         if r is None:
             print(f"skipped (no oracle run here): {run} {node}")
             continue

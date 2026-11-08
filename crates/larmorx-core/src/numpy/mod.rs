@@ -12,6 +12,7 @@
 //!   `"linear"` method) along the first axis, SciPy's `scoreatpercentile(...,
 //!   interpolation_method="lower")`.
 //!
+//! - [`format`]: numpy's `str()` of a float array (the messages' numbers).
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
 //!   (for `reproduce`).
 //!
@@ -37,6 +38,7 @@
 //! OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //! POSSIBILITY OF SUCH DAMAGE.
 
+pub mod format;
 pub mod quantile;
 pub mod reduce;
 pub mod umath;

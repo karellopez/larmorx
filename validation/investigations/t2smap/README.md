@@ -150,3 +150,33 @@ AVX-512 kernels off, OpenBLAS's Haswell kernels, one BLAS thread):
   so numpy's products with them run `dgemv_n` or `dgemv_t` (`larmorx_optim::Scipy`);
 - speed: larmorx fits the 169,785 records in 33.8 s at one thread (0.2 ms a fit; SciPy about 1
   ms), 4.6 s at 12, with the same bits.
+
+## `replica/` (the replica program, relay 5a)
+
+The replica (`crates-gpl/larmorx-gpl-tedana`, the `larmorx-gpl tedana t2smap` program) against
+tedana 26.0.3 itself:
+
+```
+cd crates-gpl && cargo build --release -p larmorx-gpl-tedana --example t2smap_stages \
+    --example t2smap_parse && cd ..
+OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P \
+    validation/investigations/t2smap/replica/check_stages.py --stages \
+    <target>/release/examples/t2smap_stages --work <empty dir> --libraries newest --jobs 8
+<env>/bin/python -P validation/investigations/t2smap/replica/check_parser.py \
+    --parse <target>/release/examples/t2smap_parse --work <empty dir>
+```
+
+- `check_stages.py` runs tedana's `t2smap` in-process through `tedana_stages.py` (which wraps
+  `utils.make_adaptive_mask`, `decay.fit_decay` and `decay.fit_decay_ts` and saves what they
+  return) and the replica's `t2smap_stages` (`LARMORX_UPSTREAM_DEFECTS=reproduce`, numpy's AVX-512
+  kernels off: `NPY_DISABLE_CPU_FEATURES`, one BLAS thread), and compares the adaptive mask, the
+  T2* and S0 maps, the curve fit's failures, variances and covariance bit for bit (tedana's
+  variance maps swapped back, TED-07) and the messages up to "Computing T2* map" line by line.
+  Cases: fMRIPrep's four multi-echo calls of the oracle runs (their `t2smap_node/command.txt`;
+  curvefit, and loglin for ds003592) and 13 synthetic series (seeded; float32 and scaled int16,
+  options and data types). `--libraries shared` runs the shared environment's tedana (numpy
+  2.3.5, SciPy 1.15.3) against `LARMORX_TEDANA_LIBRARIES=shared`. Results (2026-11-08): 18 of 18
+  identical in the newest environment (logs `oracles/logs/t2smap-1-relay5a-stages-*.log`).
+- `check_parser.py`: tedana's parser in-process (`COLUMNS` per case) against `t2smap_parse`: 109
+  cases (help at 19 widths, every argparse and `is_valid_file` error, abbreviations, `=` forms,
+  short-option clusters, negative numbers, `--`): all identical.

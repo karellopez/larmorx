@@ -1,0 +1,17 @@
+[package]
+name = "larmorx-gpl-tedana"
+description = "tedana's t2smap translated exactly to Rust (T2* and S0 fits of multi-echo fMRI, the adaptive mask, the optimal combination), bit for bit with tedana 26.0.3 and its numpy and SciPy; GPL-3.0-only, converted from tedana's LGPL-2.1 under its section 3"
+version.workspace = true
+edition.workspace = true
+license = "GPL-3.0-only"
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+larmorx-transform.workspace = true
+larmorx-optim.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

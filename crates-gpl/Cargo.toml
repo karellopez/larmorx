@@ -3,13 +3,17 @@
 # on it. Its crates may depend on the Apache crates (Apache-2.0 code may be included in a GPL-3
 # work); the reverse is forbidden.
 #
-# Since 2026-10-29 it holds no package: the AFNI replicas moved into the main package
-# (crates/larmorx-afni-replica), and the `larmorx-gpl` package is reserved for Connectome
-# Workbench's replicas (GPL-2.0-or-later, still to come). What stays are the verification tools
-# that need the replicas' earlier translations of glibc's LGPL code (tools/glibc-reference).
+# The `larmorx-gpl` package (a program, as `larmorx-nc` is: docs/licensing.md): tedana's t2smap
+# replica (larmorx-gpl-tedana, GPL-3.0-only: tedana is LGPL-2.1-only, converted to the GPL under
+# its section 3) and the `larmorx-gpl` command line (larmorx-gpl-cli); later Connectome
+# Workbench's replicas (GPL-2.0-or-later). Since 2026-10-29 the AFNI replicas live in the main
+# package (crates/larmorx-afni-replica); the verification tools that need their earlier
+# translations of glibc's LGPL code stay here (tools/glibc-reference) and are not packaged.
 [workspace]
 resolver = "3"
 members = [
+    "larmorx-gpl-tedana",
+    "larmorx-gpl-cli",
     "tools/cbrtf-measure",
     "tools/floatmath-verify",
     "tools/glibc-dbl-model",
@@ -26,6 +30,12 @@ repository = "https://github.com/karellopez/larmorx"
 # Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
 [workspace.dependencies]
 larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
+larmorx-io = { path = "../crates/larmorx-io", version = "0.0.1" }
+larmorx-transform = { path = "../crates/larmorx-transform", version = "0.0.1" }
+larmorx-optim = { path = "../crates/larmorx-optim", version = "0.0.1" }
+larmorx-gpl-tedana = { path = "larmorx-gpl-tedana", version = "0.0.1" }
 larmorx-afni-replica = { path = "../crates/larmorx-afni-replica", version = "0.0.1" }
 glibc-reference = { path = "tools/glibc-reference" }
 rayon = "1.12.0"
+thiserror = "2.0.21"
+tempfile = "3.27.0"

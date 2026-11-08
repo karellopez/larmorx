@@ -350,6 +350,26 @@ defects! {
         "B0FieldTransform.fit with approx (the default of ApplyCoeffsField and of sdcflows' unwarping workflow), on a target not aligned with the coefficients, builds its intermediate grid around the target as given and resamples it at the target's own coordinates, so the data-to-field-map transform is ignored: the field is taken where the target lies before the registration (measured on ds002603's BOLD references, registrations of 2.5 to 3.7 mm: 7.7 to 8.5 Hz RMS, up to 87 Hz in the brain)";
     SDC_11 = "SDC-11", "sdcflows", true,
         "resample_to_zooms (BSplineApprox's resize to zooms_min) onto a grid of a single voxel fails with nitransforms' bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point), so a field map whose whole extent is below zooms_min cannot be fitted";
+    TED_01 = "TED-01", "tedana", true,
+        "t2smap's adaptive mask (dropout) takes the 33rd percentile of the first echo's non-zero temporal means, which is NaN when one of them is NaN (a NaN sample, or no volume left), so no voxel equals it and t2smap fails with ValueError: attempt to get argmax of an empty sequence";
+    TED_02 = "TED-02", "tedana", true,
+        "t2smap --exclude accepts an index equal to the number of volumes (its check is greater than, not greater than or equal), then fails with numpy's IndexError";
+    TED_04 = "TED-04", "tedana", true,
+        "t2smap applies a user mask by voxel index without comparing its affine with the data's (tedana's own TODO), so a mask of the same shape in another space is used silently";
+    TED_07 = "TED-07", "tedana", true,
+        "t2smap --fittype curvefit --verbose writes the variance of S0 as the T2* variance map and the variance of T2* as the S0 variance map (curve_fit's covariance diagonal unpacked in the wrong order)";
+    TED_08 = "TED-08", "tedana", true,
+        "t2smap --fittype curvefit fits a voxel with one good echo with two echoes and keeps its estimate in the full maps, but a failure of that fit is not marked in the failures map, nor are its variances in the --verbose maps";
+    TED_09 = "TED-09", "tedana", true,
+        "t2smap's log-linear fit (also the start of curvefit) solves every voxel with the same number of good echoes as one least-squares problem, so one infinite sample (an infinite value, or an integer scaled beyond float32) makes the T2* and S0 of all those voxels NaN";
+    TED_10 = "TED-10", "tedana", true,
+        "t2smap accepts an infinite echo time (-e inf ...: all values at least 1, so taken as milliseconds) and fails in numpy's least squares with LinAlgError: SVD did not converge in Linear Least Squares";
+    TED_11 = "TED-11", "tedana", true,
+        "t2smap --n-independent-echos 0 fails with Python's ZeroDivisionError";
+    TED_12 = "TED-12", "tedana", true,
+        "t2smap accepts a single echo (one echo time) and fails later with an unrelated numpy error: IndexError: invalid index to scalar variable (dropout) or a ValueError of numpy's column_stack (log-linear fit)";
+    TED_13 = "TED-13", "tedana", true,
+        "t2smap --dummy-scans accepts a count that removes every volume (then fails with ValueError: attempt to get argmax of an empty sequence after numpy's 'Mean of empty slice' warnings) and a negative count (which shifts --exclude's indices up instead of removing volumes)";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

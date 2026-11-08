@@ -17,6 +17,8 @@
 //!   closed-form determinants and inverses of small matrices.
 //! - [`numpy`]: numpy's sums, means, variances, percentiles and weighted averages over one axis
 //!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
+//! - [`python`]: CPython's `argparse` (parsing, usage, help, errors), `textwrap` and number
+//!   parsing and printing, for replicas of Python programs' command lines and messages.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
 
@@ -33,6 +35,7 @@ pub mod linalg;
 pub mod math;
 pub mod numpy;
 pub mod parallel;
+pub mod python;
 pub mod rotation;
 pub mod vnl_eigen;
 pub mod vnl_fixed;

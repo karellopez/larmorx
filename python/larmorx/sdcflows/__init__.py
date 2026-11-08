@@ -42,6 +42,8 @@ Rust (``larmorx-sdcflows``):
 - :func:`brainextraction_workflow`, :func:`magnitude_workflow`, :func:`fmap_workflow`:
   ``init_brainextraction_wf``, ``init_magnitude_wf`` and ``init_fmap_wf`` (phase difference
   and direct field maps) as plain functions, each node through larmorx's ports.
+- :func:`coeff2epi_workflow`, :func:`registration_settings`: ``init_coeff2epi_wf`` (the field
+  map's reference registered to the target EPI with ANTs) and sdcflows' ANTs settings files.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -109,6 +111,11 @@ from larmorx.sdcflows.phase import (
     phdiff_workflow,
     subtract_phases,
 )
+from larmorx.sdcflows.registration import (
+    Coeff2EpiResult,
+    coeff2epi_workflow,
+    registration_settings,
+)
 from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
 from larmorx.sdcflows.tools import resample_to_zooms, rescale_affine
 from larmorx.sdcflows.transform import (
@@ -137,6 +144,7 @@ __all__ = [
     "BrainExtractionWorkflowResult",
     "BrainMaskerResult",
     "CheckRegisterResult",
+    "Coeff2EpiResult",
     "CoefficientsResult",
     "CsrMatrix",
     "DisplacementsResult",
@@ -161,6 +169,7 @@ __all__ = [
     "bspline_grid",
     "check_b0_units",
     "check_register",
+    "coeff2epi_workflow",
     "collocation_matrix",
     "delta_te",
     "deoblique_and_zooms",
@@ -175,6 +184,7 @@ __all__ = [
     "pad_slices",
     "phdiff2fmap",
     "phdiff_workflow",
+    "registration_settings",
     "reorient_image_and_metadata",
     "reorient_pedir",
     "resample_to_zooms",

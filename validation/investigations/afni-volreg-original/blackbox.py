@@ -117,6 +117,17 @@ def make_inputs() -> None:
     img = nib.Nifti1Image(np.full((20, 22, 12, 3), 100.0, np.float32), lps)
     img.set_qform(lps, 1)
     nib.save(img, INPUTS / "const_f32.nii.gz")
+    # slice timing in the header (alt+z, -tshift)
+    img = nib.Nifti1Image(data, lps)
+    img.set_qform(lps, 1)
+    img.header.set_xyzt_units("mm", "sec")
+    img.header["pixdim"][4] = 2.0
+    img.header.set_dim_info(slice=2)
+    img.header["slice_code"] = 3
+    img.header["slice_start"] = 0
+    img.header["slice_end"] = data.shape[2] - 1
+    img.header["slice_duration"] = 2.0 / data.shape[2]
+    nib.save(img, INPUTS / "lps_f32_st.nii.gz")
     print("inputs in", INPUTS)
 
 
@@ -146,6 +157,10 @@ CASES: dict[str, tuple[str, list[str]]] = {
     "syn-linear": ("model_syn.nii.gz", ["-linear"]),
     "syn-default": ("model_syn.nii.gz", []),
     "u8": ("lps_u8.nii.gz", []),
+    "tshift": ("lps_f32_st.nii.gz", ["-tshift", "0"]),
+    "tshift-verbose-ignore": ("lps_f32_st.nii.gz", ["-verbose", "-tshift", "1"]),
+    "tshift-none": ("lps_f32.nii.gz", ["-tshift", "0"]),
+    "tshift-fmriprep": ("lps_f32_st.nii.gz", ["-tshift", "0", *FMRIPREP]),
     "thin-twopass": ("thin_f32.nii.gz", ["-twopass"]),
     "const-twopass": ("const_f32.nii.gz", ["-twopass"]),
     "nomaxdisp-twopass": ("lps_f32.nii.gz", ["-nomaxdisp", "-twopass"]),

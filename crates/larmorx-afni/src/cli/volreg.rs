@@ -952,10 +952,23 @@ fn execute(
             ));
         }
     }
-    if o.tshift.is_some() {
-        return Err(Stop::Fatal(
-            "larmorx: -tshift is not supported by the clean-room original yet".into(),
-        ));
+    // §9.2 item 8: -tshift's checks.
+    if let Some(ii) = o.tshift {
+        let offsets = image.slice_timing.as_ref().map_or(0, |h| h.times.len());
+        if nt == 1 {
+            log.info("WARNING: -tshift used on a 1 brick dataset!");
+            o.tshift = None;
+        } else if offsets < nz {
+            log.info("WARNING: -tshift used on a dataset with no time-offsets!");
+            o.tshift = None;
+        } else if ii as i64 > nt as i64 - 5 {
+            log.info("WARNING: -tshift ignore is too large for this dataset!");
+            o.tshift = None;
+        } else if let Base::Index(b) = &base
+            && *b < ii
+        {
+            log.info("WARNING: base brick is prior to -tshift ignore point.");
+        }
     }
     if let Base::Index(n) = &base
         && *n >= nt
@@ -1078,7 +1091,52 @@ fn execute(
         common::refuse_existing(&o.prefix, mode, settings, log)?;
     }
     if o.verbose > 0 {
-        log.info(&format!("Reading input dataset {shown}"));
+        if o.tshift.is_some() {
+            log.info(&format!("Time shifting input dataset {shown}"));
+        } else {
+            log.info(&format!("Reading input dataset {shown}"));
+        }
+    }
+    // §8.2: -tshift, in place, before anything reads the series.
+    let mut image = image;
+    let mut shifted = false;
+    if let Some(ii) = o.tshift {
+        let times = image
+            .slice_timing
+            .as_ref()
+            .map(|h| h.times.clone())
+            .unwrap_or_default();
+        let tr = image.tr;
+        let usable = tr > 0.0
+            && times.iter().all(|&t| (0.0..=tr).contains(&t))
+            && times.iter().any(|&t| t != times[0]);
+        let done = usable && {
+            let params = crate::tshift::TshiftParams {
+                tr,
+                slice_times: times.clone(),
+                tzero: timing::mean_time(&times),
+                ignore: ii,
+                method: crate::tshift::Method::Fourier,
+                restore: crate::tshift::Restore::Trend,
+                detrend: true,
+                n_threads,
+                upstream_defects: mode,
+            };
+            match crate::tshift::tshift(&mut image.bricks, &params) {
+                Ok(ns) => {
+                    for n in ns {
+                        log.notice(&n);
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        };
+        if done {
+            shifted = true;
+        } else {
+            log.info("WARNING: some error during -tshift operation!");
+        }
     }
     if o.twopass && coarse.0 == 1 && [nx, ny, nz].iter().all(|&d| d >= 120) && coarse.1 > 0 {
         log.notice(&Notice::new(
@@ -1131,7 +1189,12 @@ fn execute(
     }
     let header = image.header.clone();
     let geometry = image.geometry.clone();
-    let (tr, toffset, slice_timing) = (image.tr, image.toffset, image.slice_timing.clone());
+    // After -tshift the output has no slice offsets and a time origin of 0.
+    let (tr, toffset, slice_timing) = if shifted {
+        (image.tr, 0.0, None)
+    } else {
+        (image.tr, image.toffset, image.slice_timing.clone())
+    };
     let result = volreg::run(image.bricks, &grid, &params);
     let r = match result {
         Ok(r) => r,

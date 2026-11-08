@@ -139,7 +139,7 @@ def _quaternion_rounding(a, b) -> bool:
     for h in (hx, hy):
         h["descrip"] = b""
         h["vox_offset"] = 0
-    keys = [k for k in hx.keys() if np.asarray(hx[k]).tobytes() != np.asarray(hy[k]).tobytes()]
+    keys = [k for k in hx.keys() if np.asarray(hx[k]).tobytes() != np.asarray(hy[k]).tobytes()]  # noqa: SIM118 (a nibabel header)
     return bool(keys) and all(
         k in ("quatern_b", "quatern_c", "quatern_d") and abs(float(hx[k]) - float(hy[k])) < 1e-12
         for k in keys

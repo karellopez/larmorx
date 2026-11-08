@@ -590,7 +590,6 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
     if base is None:
         return out
     stages = _investigation("check_stages")
-    outputs = _investigation("check_outputs")
     failures = _investigation("check_failures")
     for name, args in stages.real_cases():
         out.append(
@@ -602,14 +601,10 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
                 ("fmriprep", name, args),
             )
         )
-    base.mkdir(parents=True, exist_ok=True)
-    extra = outputs.make_extra(base)
-    for name, args in stages.make_synthetic(base) + extra + _with_masks(base, extra):
+    for name, args in _synthetic_cases(base):
         tier = "smoke" if name in SMOKE else "standard"
         out.append((f"syn/{name}", tier, _describe(args), ("syn", name, args)))
     fdir = base / "failures"
-    fdir.mkdir(parents=True, exist_ok=True)
-    failures.make(fdir)
     for k, (defect, args) in enumerate(failures.CASES):
         out.append(
             (
@@ -644,6 +639,57 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
             )
         )
     return out
+
+
+def _generate(base: Path) -> list[tuple[str, list[str]]]:
+    """Writes the synthetic and failure cases' inputs under ``base``; their (name, arguments)."""
+    stages = _investigation("check_stages")
+    outputs = _investigation("check_outputs")
+    failures = _investigation("check_failures")
+    base.mkdir(parents=True, exist_ok=True)
+    extra = outputs.make_extra(base)
+    cases = stages.make_synthetic(base) + extra + _with_masks(base, extra)
+    fdir = base / "failures"
+    fdir.mkdir(parents=True, exist_ok=True)
+    failures.make(fdir)
+    return cases
+
+
+def _generator_digest() -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    for path in (
+        Path(__file__),
+        INVESTIGATION / "check_stages.py",
+        INVESTIGATION / "check_outputs.py",
+        INVESTIGATION / "check_failures.py",
+    ):
+        h.update(path.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def _synthetic_cases(base: Path) -> list[tuple[str, list[str]]]:
+    """The synthetic cases, their inputs written once: the first process (of pytest-xdist's
+    workers, which all collect the suite) writes them under a lock and leaves a marker of the
+    generators' code; the others draw the same cases in a temporary folder and name the files
+    under ``base``, so no input is rewritten while another process reads it."""
+    import fcntl
+
+    base.mkdir(parents=True, exist_ok=True)
+    marker = base / f".generated-{_generator_digest()}"
+    with open(base / ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not marker.exists():
+            cases = _generate(base)
+            marker.touch()
+            return cases
+    tmp = Path(tempfile.mkdtemp(prefix="lx-tedana-gen_"))
+    try:
+        cases = _generate(tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return [(n, [a.replace(str(tmp), str(base)) for a in args]) for n, args in cases]
 
 
 def _with_masks(base: Path, extra: list[tuple[str, list[str]]]) -> list[tuple[str, list[str]]]:

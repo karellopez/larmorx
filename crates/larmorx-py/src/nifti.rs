@@ -11,6 +11,7 @@ use larmorx_io::nifti::{
     self, ByteOrder, Extension, NiftiHeader, NiftiVersion, ReadOptions, Scaling, WriteOptions,
     header::AnalyzeFields, header::Nifti2Fields,
 };
+use larmorx_transform::numpy_linalg::{self, LapackRelease};
 use numpy::{PyArray, PyArrayDyn, PyArrayMethods, PyReadonlyArray2};
 use pyo3::exceptions::{PyFileNotFoundError, PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -360,9 +361,24 @@ pub fn nifti_write(
     )))
 }
 
-/// The header nibabel would write for an image (see `larmorx_io::nifti::header_for_image`).
+/// The LAPACK release numpy's linear algebra follows in nibabel's arithmetic ("3.12.1":
+/// OpenBLAS 0.3.34, numpy 2.5.4; "3.12.0": OpenBLAS 0.3.30, numpy 2.3.5).
+fn lapack_release(name: &str) -> PyResult<LapackRelease> {
+    match name {
+        "3.12.1" => Ok(LapackRelease::V3_12_1),
+        "3.12.0" => Ok(LapackRelease::V3_12_0),
+        other => Err(PyValueError::new_err(format!(
+            "lapack must be '3.12.1' or '3.12.0', not {other:?}"
+        ))),
+    }
+}
+
+/// The header nibabel would write for an image (see `larmorx_io::nifti::header_for_image`);
+/// with `nibabel=True` the qform is stored with nibabel's own arithmetic
+/// (`header_for_image_nibabel`: numpy's SVD and eigh, the given LAPACK release).
 #[pyfunction]
-#[pyo3(signature = (shape, dtype, affine, template = None, version = None))]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (shape, dtype, affine, template = None, version = None, nibabel = false, lapack = "3.12.1"))]
 pub fn nifti_header_for_image<'py>(
     py: Python<'py>,
     shape: Vec<usize>,
@@ -370,7 +386,10 @@ pub fn nifti_header_for_image<'py>(
     affine: PyReadonlyArray2<'_, f64>,
     template: Option<&Bound<'_, PyDict>>,
     version: Option<u8>,
+    nibabel: bool,
+    lapack: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
     let template = template.map(header_from_dict).transpose()?;
     let version = match version {
         None => None,
@@ -382,15 +401,143 @@ pub fn nifti_header_for_image<'py>(
             )));
         }
     };
-    let header = nifti::header_for_image(
-        template.as_ref(),
-        version,
-        &shape,
-        data_type_from_name(dtype)?,
-        &affine_from_py(&affine)?,
-    )
+    let data_type = data_type_from_name(dtype)?;
+    let a = affine_from_py(&affine)?;
+    let header = if nibabel {
+        nifti::header_for_image_nibabel(template.as_ref(), version, &shape, data_type, &a, release)
+    } else {
+        nifti::header_for_image(template.as_ref(), version, &shape, data_type, &a)
+    }
     .map_err(header_err)?;
     header_to_dict(py, &header)
+}
+
+/// nibabel's `header.set_sform(affine, code)` or `header.set_qform(affine, code)` on header
+/// fields (`which` is "sform" or "qform"): the affine stored in that form with that code (the
+/// qform also sets the voxel sizes and `qfac`, without shears); `nibabel=True` stores the
+/// qform with nibabel's own arithmetic (`set_qform_nibabel`).
+#[pyfunction]
+#[pyo3(signature = (header, which, affine, code, nibabel = false, lapack = "3.12.1"))]
+pub fn nifti_set_xform<'py>(
+    py: Python<'py>,
+    header: &Bound<'_, PyDict>,
+    which: &str,
+    affine: PyReadonlyArray2<'_, f64>,
+    code: i32,
+    nibabel: bool,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
+    let mut h = header_from_dict(header)?;
+    let a = affine_from_py(&affine)?;
+    match which {
+        "sform" => h.set_sform(&a, code),
+        "qform" if nibabel => h.set_qform_nibabel(&a, code, release).map_err(header_err)?,
+        "qform" => h.set_qform(&a, code).map_err(header_err)?,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "which must be 'sform' or 'qform', not {other:?}"
+            )));
+        }
+    }
+    header_to_dict(py, &h)
+}
+
+/// nibabel 5.4.2's qform arithmetic for an affine (`larmorx_io::nifti::nibabel_qform`):
+/// `qfac`, the voxel sizes, the quaternion `(w, x, y, z)` and the translation, in float64.
+#[pyfunction]
+#[pyo3(signature = (affine, lapack = "3.12.1"))]
+pub fn nibabel_qform<'py>(
+    py: Python<'py>,
+    affine: PyReadonlyArray2<'_, f64>,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
+    let q = nifti::nibabel_qform(&affine_from_py(&affine)?, release).map_err(header_err)?;
+    let out = PyDict::new(py);
+    out.set_item("qfac", q.qfac)?;
+    out.set_item("zooms", PyTuple::new(py, q.zooms)?)?;
+    out.set_item("quaternion", PyTuple::new(py, q.quaternion)?)?;
+    out.set_item("translation", PyTuple::new(py, q.translation)?)?;
+    Ok(out)
+}
+
+/// numpy.linalg's `svd` of a float64 3 × 3 matrix and `eigh` (lower triangle) of a 4 × 4
+/// one as numpy computes them with OpenBLAS's Haswell kernels and the given LAPACK release
+/// (`larmorx_transform::numpy_linalg`; the arithmetic of `nibabel_qform`): `kind` "svd"
+/// returns `(u, s, vt)`, "eigh" `(w, v)`, "det_positive" `det(a) > 0`; `None` where numpy
+/// raises `LinAlgError`.
+#[pyfunction]
+#[pyo3(signature = (kind, a, lapack = "3.12.1"))]
+pub fn numpy_linalg_small<'py>(
+    py: Python<'py>,
+    kind: &str,
+    a: PyReadonlyArray2<'_, f64>,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    let release = lapack_release(lapack)?;
+    let v = a.as_array();
+    let mat = |r: usize, c: usize| -> Vec<Vec<f64>> {
+        (0..r)
+            .map(|i| (0..c).map(|j| v[[i, j]]).collect())
+            .collect()
+    };
+    let to_py = |m: Vec<Vec<f64>>| -> Bound<'py, PyAny> {
+        let n = m.len();
+        let k = m.first().map_or(0, Vec::len);
+        let arr = numpy::ndarray::Array2::from_shape_fn((n, k), |(i, j)| m[i][j]);
+        PyArray::from_owned_array(py, arr).into_any()
+    };
+    match kind {
+        "svd" | "det_positive" | "io_polar" => {
+            if v.shape() != [3, 3] {
+                return Err(PyValueError::new_err(
+                    "svd, det_positive and io_polar take a 3x3 matrix",
+                ));
+            }
+            let m = mat(3, 3);
+            let a3: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| m[i][j]));
+            if kind == "io_polar" {
+                return match numpy_linalg::io_orientation_polar(&a3, release) {
+                    None => Ok(py.None().into_bound(py)),
+                    Some(r) => Ok(to_py(r.iter().map(|x| x.to_vec()).collect())),
+                };
+            }
+            if kind == "det_positive" {
+                return Ok(numpy_linalg::det3_is_positive(&a3)
+                    .into_pyobject(py)?
+                    .to_owned()
+                    .into_any());
+            }
+            match numpy_linalg::svd3(&a3, release) {
+                None => Ok(py.None().into_bound(py)),
+                Some((u, s, vt)) => {
+                    let u = to_py(u.iter().map(|r| r.to_vec()).collect());
+                    let s = to_py(vec![s.to_vec()]);
+                    let vt = to_py(vt.iter().map(|r| r.to_vec()).collect());
+                    Ok(PyTuple::new(py, [u, s, vt])?.into_any())
+                }
+            }
+        }
+        "eigh" => {
+            if v.shape() != [4, 4] {
+                return Err(PyValueError::new_err("eigh takes a 4x4 matrix"));
+            }
+            let m = mat(4, 4);
+            let a4: [[f64; 4]; 4] = std::array::from_fn(|i| std::array::from_fn(|j| m[i][j]));
+            match numpy_linalg::eigh4(&a4, release) {
+                None => Ok(py.None().into_bound(py)),
+                Some((w, vecs)) => {
+                    let w = to_py(vec![w.to_vec()]);
+                    let vecs = to_py(vecs.iter().map(|r| r.to_vec()).collect());
+                    Ok(PyTuple::new(py, [w, vecs])?.into_any())
+                }
+            }
+        }
+        other => Err(PyValueError::new_err(format!(
+            "kind must be 'svd', 'eigh', 'det_positive' or 'io_polar', not {other:?}"
+        ))),
+    }
 }
 
 /// Quantities derived from a header dict: shape, data type, zooms, the affines and scaling.
@@ -458,6 +605,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(nifti_parse_header, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_write, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_for_image, m)?)?;
+    m.add_function(wrap_pyfunction!(nifti_set_xform, m)?)?;
+    m.add_function(wrap_pyfunction!(nibabel_qform, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_linalg_small, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_header_info, m)?)?;
     m.add_function(wrap_pyfunction!(nifti_itk_geometry, m)?)?;
     Ok(())

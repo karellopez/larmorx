@@ -30,10 +30,14 @@ use larmorx_core::image::DynImage;
 use larmorx_core::ndarray::{ArrayD, ArrayViewD, IxDyn, ShapeBuilder};
 use larmorx_core::parallel::{self, ThreadPoolError};
 use larmorx_core::{Complex, dispatch_dyn_array};
+use larmorx_transform::numpy_linalg::LapackRelease;
 use rayon::prelude::*;
 
 pub use extension::{Extension, ExtensionError};
-pub use header::{ByteOrder, HeaderError, HeaderFix, NiftiHeader, NiftiVersion, text_field, xform};
+pub use header::{
+    ByteOrder, HeaderError, HeaderFix, NibabelQform, NiftiHeader, NiftiVersion, nibabel_qform,
+    text_field, xform,
+};
 pub use paths::NiftiPaths;
 
 use crate::gzip::ParallelGzEncoder;
@@ -507,6 +511,31 @@ pub fn header_for_image(
     data_type: DataType,
     affine: &Affine,
 ) -> Result<NiftiHeader, HeaderError> {
+    header_for_image_with(template, version, shape, data_type, affine, None)
+}
+
+/// [`header_for_image`] with nibabel's own qform arithmetic
+/// ([`NiftiHeader::set_qform_nibabel`]) where the affine is stored: the header nibabel 5.4.2
+/// writes, field for field, for ports of Python programs that write through nibabel.
+pub fn header_for_image_nibabel(
+    template: Option<&NiftiHeader>,
+    version: Option<NiftiVersion>,
+    shape: &[usize],
+    data_type: DataType,
+    affine: &Affine,
+    release: LapackRelease,
+) -> Result<NiftiHeader, HeaderError> {
+    header_for_image_with(template, version, shape, data_type, affine, Some(release))
+}
+
+fn header_for_image_with(
+    template: Option<&NiftiHeader>,
+    version: Option<NiftiVersion>,
+    shape: &[usize],
+    data_type: DataType,
+    affine: &Affine,
+    nibabel: Option<LapackRelease>,
+) -> Result<NiftiHeader, HeaderError> {
     let fits_v1 = NiftiHeader::new(NiftiVersion::V1, shape, data_type).is_ok();
     let version = version.unwrap_or(match template {
         Some(t) if t.version == NiftiVersion::V2 || fits_v1 => t.version,
@@ -527,7 +556,10 @@ pub fn header_for_image(
             .best_affine()
             .is_ok_and(|a| affine.allclose(&a, 1e-5, 1e-8));
     if !keep {
-        hdr.set_affine(affine)?;
+        match nibabel {
+            None => hdr.set_affine(affine)?,
+            Some(release) => hdr.set_affine_nibabel(affine, release)?,
+        }
     }
     hdr.scl_slope = 1.0;
     hdr.scl_inter = 0.0;

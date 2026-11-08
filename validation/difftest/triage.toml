@@ -4007,3 +4007,44 @@ implementation = "original"
 signature = ["the replica (default): exit status", "the replica (default): files written"]
 status = "harness"
 explanation = "The part's Python extension was replaced in place while the night ran: a run that had it mapped ended with SIGBUS. The extension is now replaced by an atomic rename."
+
+# ---------------------------------------------------------------- sdcflows-fieldmap (2026-11-08)
+# The field maps' part A (the sdcflows 2.17.1 port). Relay 6's 2-minute probe (seed sdc-try,
+# 12,661 cases, 2,296 differences) and relay 7's (sdc-try2, 13,785 cases, 332 differences) were
+# fixed in larmorx (nibabel's header arithmetic, scipy's float64 stack, numpy's NaN, the
+# notices; permanent cases in validation/difftest/cases/sdcflows-fieldmap/). The trial:
+# oracles/difftest/2026-11-08-sdcflows-fieldmap, seed sdc-trial, 30 minutes, 12 jobs at one
+# thread, 3 GiB per case, box 28 GiB, larmorx d47952d1: 335,471 cases, 335,456 agree, 1 notice,
+# 14 differences; every finding replayed with the final build agrees.
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "register"
+defect = "SDC-11"
+explanation = "10 of the 14 cases (smallest sdc-trial 59267: a 4 x 4 x 4 field map at 1 mm, zooms_min 4): BSplineApprox's resize gives a grid of one voxel, and nitransforms' Affine.apply fails there with a bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point); larmorx raised an AssertionError with its own message. Registered as SDC-11 (rule A): the voxel resampled and the fit made by default, named; reproduce raises the bare AssertionError"
+link = "validation/difftest/cases/sdcflows-fieldmap/sdc11-resize-onto-a-single-voxel.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "fixed"
+explanation = "2 of the 14 cases (sdc-trial 236468, 325222): the error map's cal_max is numpy's max of sdcflows' error array, which is Fortran-ordered (nibabel's arrays); numpy's SIMD max returns a new NaN or a zero's sign by memory order, and larmorx's array was C-ordered: larmorx keeps the error in Fortran order"
+link = "validation/difftest/cases/sdcflows-fieldmap/error-cal-max-memory-order.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "fixed"
+explanation = "2 of the 14 cases (sdc-trial 200937, 320850): recentring by the mode where the mode is 0 and the zeros have both signs (one -0 among 1,609 and 2,934 +0): scipy's mode is the first zero of np.unique's sort (+0 here; numpy's unstable SIMD quicksort leaves which zero is first undefined), larmorx took -0 (the total order's first); larmorx now takes the zeros' more frequent sign (+0 on a tie); only zero signs of the error map depend on it"
+link = "validation/difftest/cases/sdcflows-fieldmap/mode-zero-sign.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["notice: SCI-02"]
+status = "harness"
+explanation = "1 case (sdc-trial 294008: apply of a uint8 series, order 2, grid-constant, cval -5): lx.ndimage names SCI-02 when the spline prefilter pads an integer input with a cval its type cannot hold, whether or not a sample point reaches the padding (a condition whose effect the comparison may not see); the suite's fix pass of apply accepts SCI-02 without a change (silent_ok), as it does no other defect"
+link = "validation/difftest/cases/sdcflows-fieldmap/sci02-padding-condition-notice.json"

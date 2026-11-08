@@ -1,0 +1,267 @@
+{
+ "defect": "SDC-08",
+ "description": "B0FieldTransform.apply of a 4D series read from a file with positive axes: larmorx unwarps (sdcflows hands nibabel's ArrayProxy to rollaxis: AttributeError; reproduce gives it), SDC-08 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 1,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc08-positive-axes-series-from-a-file",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": true,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 20.0,
+    "seed": 1462687277,
+    "spacings": [
+     [
+      100.0,
+      100.0,
+      40.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": true,
+    "cval": 0.0,
+    "jacobian": true,
+    "mode": "reflect",
+    "order": 3,
+    "output_dtype": null,
+    "prefilter": true
+   },
+   "pe_dir": "k-",
+   "ro_time": 0.031,
+   "xfm": {
+    "centre": [
+     0,
+     0,
+     0
+    ],
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "translation": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "features": {
+   "allow_negative": true,
+   "approx": true,
+   "axis0": 1.2,
+   "axis1": 0.85,
+   "axis2": 0.8,
+   "bias0": -0.005,
+   "bias1": -0.01,
+   "bias2": -0.005,
+   "bias3": -0.01,
+   "call": "apply",
+   "centre0": -5.5,
+   "centre1": -5.0,
+   "centre2": 5.0,
+   "coefficient Hz": 20.0,
+   "content": "head",
+   "cval": 0.0,
+   "dtype": "uint8",
+   "extreme": false,
+   "jacobian": true,
+   "mode": "reflect",
+   "moving ndim": 4,
+   "noise": 6.0,
+   "order": 3,
+   "orientation": "plumb",
+   "origin0": -54.5,
+   "origin1": -23.5,
+   "origin2": -42.5,
+   "output_dtype": 0,
+   "pe per volume": false,
+   "pe_dir": "k-",
+   "prefilter": true,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "ro_time": 0.031,
+   "sform": "other",
+   "sform_code": 0,
+   "shape": "12x10x5x3",
+   "shear0": 0.075,
+   "shear1": 0.075,
+   "shear2": -0.025,
+   "size": 22.5,
+   "slice_code": 3,
+   "spacing0": 1.0,
+   "spacing1": 1.2,
+   "spacing2": 1.0,
+   "spacings": 2,
+   "target": "aligned",
+   "target shift0": 18.5,
+   "target shift1": 20.0,
+   "target shift2": -15.25,
+   "target spacing0": 1.2,
+   "target spacing1": 0.5,
+   "target spacing2": 1.2,
+   "tissues": "t1",
+   "tr": 2.0,
+   "transform": "identity",
+   "tunits": "msec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 156371196,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -54.5,
+      -23.5,
+      -42.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 0,
+     "shear": [
+      0.075,
+      0.075,
+      -0.025
+     ],
+     "spacing": [
+      1.0,
+      1.2,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     20,
+     20,
+     18
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      1.2,
+      0.85,
+      0.8
+     ],
+     "bias": [
+      -0.005,
+      -0.01,
+      -0.005,
+      -0.01
+     ],
+     "centre": [
+      -5.5,
+      -5.0,
+      5.0
+     ],
+     "noise": 6.0,
+     "seed": 933137743,
+     "size": 22.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -36.0,
+      -3.5,
+      -57.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.2,
+      0.5,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     10,
+     5,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 3,
+     "slice_duration": 400.0,
+     "slice_end": 4,
+     "slice_start": 0,
+     "tr": 2000.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1,
+  "options": [
+   "apply",
+   "order 3",
+   "pe k-",
+   "target aligned",
+   "transform identity"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

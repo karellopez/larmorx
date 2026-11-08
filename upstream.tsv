@@ -56,3 +56,8 @@ scipy-1.18.1	https://github.com/scipy/scipy/releases/download/v1.18.1/scipy-1.18
 numpy-2.5.4	https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.5.4.tar.gz	sha256:9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a	BSD-3-Clause	tags
 OpenBLAS-0.3.33	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33.tar.gz	sha256:6761af1d9f5d353ab4f0b7497be2643313b36c8f31caec0144bfef198e71e6ab	BSD-3-Clause	tags
 OpenBLAS-0.3.34	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz	sha256:cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed	BSD-3-Clause	tags
+sdcflows-2.17.1	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflows-2.17.1.tar.gz	sha256:0365de256edd71481ab49497ee6c8c6688f4a99f4eb11819d4770e95630e5614	Apache-2.0	tags
+sdcflows-2.15.1	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflows-2.15.1.tar.gz	sha256:a7776211cdcfbab018f4e16ccd96fd9bd504e205a616051815efbf6ebfaafe05	Apache-2.0	tags
+scikit-learn-1.9.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.9.1.tar.gz	sha256:629cada3e33e2b9bf376cdc7614a47a4140b8aedc1d836579e359736fbd82977	BSD-3-Clause	tags
+scikit-learn-1.6.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.6.1.tar.gz	sha256:b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e	BSD-3-Clause	tags
+scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags

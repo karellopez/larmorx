@@ -1,0 +1,225 @@
+{
+ "defect": null,
+ "description": "B0FieldTransform.apply on a rotated series: the corrected series' header carries nibabel's quaternion (numpy's linear algebra), not larmorx's own (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "apply apply: every output bit-identical: (1, 1, 1, 1) int16; differ: ['header', 'file'] header ['quatern_d']",
+  "n": 21,
+  "seed": "sdc-try",
+  "shrink_moves": [
+   "fmap: axis 0 19 -> 9 voxels",
+   "fmap: axis 2 13 -> 6 voxels",
+   "fmap: axis 0 9 -> 4 voxels",
+   "fmap: axis 2 6 -> 3 voxels",
+   "fmap: axis 0 4 -> 2 voxels",
+   "fmap: axis 1 4 -> 2 voxels",
+   "fmap: axis 2 3 -> 1 voxels",
+   "fmap: axis 0 2 -> 1 voxels",
+   "fmap: axis 1 2 -> 1 voxels",
+   "fmap (and its grid): origin at 0",
+   "fmap (and its grid): qform and sform codes 1",
+   "moving: float32 storage",
+   "moving: content ramp -> constant"
+  ],
+  "signature": [
+   "apply apply: every output bit-identical"
+  ]
+ },
+ "id": "nibabel-quaternion-apply",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": false,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 20.0,
+    "seed": 598490228,
+    "spacings": [
+     [
+      16.0,
+      16.0,
+      10.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": 0.0,
+    "jacobian": false,
+    "mode": "constant",
+    "order": 0,
+    "output_dtype": "int16",
+    "prefilter": true
+   },
+   "pe_dir": "i-",
+   "ro_time": 0.05,
+   "xfm": {
+    "centre": [
+     0,
+     0,
+     0
+    ],
+    "quaternion": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "translation": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": false,
+   "call": "apply",
+   "coefficient Hz": 20.0,
+   "content": "ramp",
+   "cval": 0.0,
+   "dtype": "int16",
+   "extreme": false,
+   "jacobian": false,
+   "mode": "constant",
+   "moving ndim": 3,
+   "order": 0,
+   "orientation": "axes+oblique",
+   "origin0": 48.0,
+   "origin1": -15.25,
+   "origin2": -46.0,
+   "output_dtype": "int16",
+   "pe_dir": "i-",
+   "prefilter": true,
+   "qfac": 1,
+   "qform_code": 1,
+   "ramp0": 0,
+   "ramp1": 0,
+   "ramp2": -2,
+   "range": "plain",
+   "ro_time": 0.05,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "19x4x13",
+   "spacing0": 1.0,
+   "spacing1": 3.0,
+   "spacing2": 3.0,
+   "spacings": 0,
+   "target": "own grid",
+   "transform": "identity",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1849122334,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      33,
+      29,
+      -2,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "seed": 1173312820,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      33,
+      29,
+      -2,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 21,
+  "options": [
+   "apply",
+   "order 0",
+   "pe i-",
+   "target own grid",
+   "transform identity"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

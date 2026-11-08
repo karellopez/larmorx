@@ -1,0 +1,151 @@
+{
+ "defect": "SDC-07",
+ "description": "TOPUPCoeffReorient with a BIDS 'i' phase encoding: larmorx keeps TOPUP's sign (sdcflows negates the field; reproduce gives it), SDC-07 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 115,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc07-bids-i-direction-kept",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "topup",
+   "factors": [
+    3.0,
+    3.0,
+    2.0
+   ],
+   "pe_dir": "i",
+   "seed": 1669645142,
+   "wrong_shape": false
+  },
+  "features": {
+   "axis0": 0.75,
+   "axis1": 1.1,
+   "axis2": 0.75,
+   "bias0": 0.005,
+   "bias1": -0.005,
+   "bias2": 0.0075,
+   "bias3": 0.005,
+   "call": "topup",
+   "centre0": -5.5,
+   "centre1": 3.0,
+   "centre2": -1.0,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "factors": 3,
+   "noise": 6.0,
+   "orientation": "axes",
+   "origin0": -19.0,
+   "origin1": 24.25,
+   "origin2": 32.25,
+   "pe_dir": "i",
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "18x21x12",
+   "size": 10.5,
+   "spacing0": 0.5,
+   "spacing1": 2.5,
+   "spacing2": 1.5,
+   "tissues": "t1",
+   "units": "mm",
+   "wrong shape": false
+  },
+  "groups": [
+   {
+    "args": [
+     "topup"
+    ],
+    "name": "topup",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ref": {
+    "content": {
+     "axes": [
+      0.75,
+      1.1,
+      0.75
+     ],
+     "bias": [
+      0.005,
+      -0.005,
+      0.0075,
+      0.005
+     ],
+     "centre": [
+      -5.5,
+      3.0,
+      -1.0
+     ],
+     "noise": 6.0,
+     "seed": 1990449244,
+     "size": 10.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -19.0,
+      24.25,
+      32.25
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      0,
+      0,
+      1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.5,
+      2.5,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     18,
+     21,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 115,
+  "options": [
+   "pe i",
+   "topup"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

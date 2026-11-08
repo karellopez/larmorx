@@ -96,8 +96,35 @@ def nifti_header_for_image(
     affine: np.ndarray,
     template: dict[str, Any] | None = None,
     version: int | None = None,
+    nibabel: bool = False,
+    lapack: str = "3.12.1",
 ) -> dict[str, Any]:
-    """The header fields nibabel would write for an image."""
+    """The header fields nibabel would write for an image; ``nibabel=True`` stores the qform
+    with nibabel's own arithmetic (numpy's SVD, det and eigh as LAPACK ``lapack`` computes
+    them)."""
+
+def nifti_set_xform(
+    header: dict[str, Any],
+    which: str,
+    affine: np.ndarray,
+    code: int,
+    nibabel: bool = False,
+    lapack: str = "3.12.1",
+) -> dict[str, Any]:
+    """nibabel's ``header.set_sform(affine, code)`` (``which="sform"``) or
+    ``header.set_qform(affine, code)`` (``"qform"``) on header fields; ``nibabel=True``
+    stores the qform with nibabel's own arithmetic."""
+
+def nibabel_qform(affine: np.ndarray, lapack: str = "3.12.1") -> dict[str, Any]:
+    """nibabel 5.4.2's ``set_qform`` arithmetic: ``qfac``, ``zooms``, ``quaternion`` (w, x,
+    y, z) and ``translation`` in float64."""
+
+def numpy_linalg_small(kind: str, a: np.ndarray, lapack: str = "3.12.1") -> Any:
+    """numpy.linalg's ``svd`` (3 x 3: ``(u, s[None], vt)``), ``eigh`` (4 x 4, lower: ``(w[None],
+    v)``) or ``det(a) > 0`` (``kind="det_positive"``) as numpy computes them with OpenBLAS's
+    Haswell kernels and LAPACK ``lapack``, or nibabel's ``io_orientation`` polar factor
+    (``kind="io_polar"``: ``P[:, keep] @ Qs[keep]``); ``None`` where numpy raises
+    ``LinAlgError``."""
 
 def nifti_header_info(header: dict[str, Any]) -> dict[str, Any]:
     """Shape, dtype, zooms, affines, scaling and serialised bytes of header fields."""
@@ -774,3 +801,157 @@ def mri_hmc_world(
     """``ras``, ``itk`` (``(N, 4, 4)``) and ``fd`` (``(N,)``) of mcflirt-convention matrices and
     motion parameters computed by the ``larmorx-nc`` replica, for the series at ``series``
     registered to the reference at ``reference`` (``None``: the series' grid)."""
+
+# --- sdcflows' field-map estimation, ported (larmorx/sdcflows) ---------------------------------
+
+def sdcflows_bspline_grid(
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    zooms: list[float],
+    control_zooms_mm: tuple[float, float, float],
+) -> tuple[tuple[int, int, int], np.ndarray]:
+    """sdcflows' ``bspline_grid``: the control grid's shape and affine for an image of
+    ``shape`` and ``affine`` whose header zooms are ``zooms``."""
+
+def sdcflows_collocation_csr(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    dtype: str = "float32",
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[bool], list[tuple[str, str, str, str]]
+]:
+    """``sparse_hstack([grid_bspline_weights(target, level) ...]).tocsr()``: data (float64,
+    holding the matrix type's values), indices, indptr (int64), shape, one alignment flag per
+    level, and the notices of SDC-01 and SDC-02 (corrected with ``"fix"``, sdcflows' matrix bit
+    for bit with ``"reproduce"``)."""
+
+def sdcflows_collocation_apply(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    v: np.ndarray,
+    transpose: bool = False,
+    rows: np.ndarray | None = None,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """``(X @ v, notices)`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32
+    collocation matrix, in scipy's summation order, without storing the matrix; the notices of
+    SDC-01 and SDC-02. ``X @ v`` is float64 where scipy's stacked matrix is (a level with an
+    axis of no weights: scipy's ``kron`` returns an empty float64 matrix)."""
+
+def sdcflows_dot_f32(x: np.ndarray, y: np.ndarray) -> float:
+    """``np.dot(x, y)`` of two float32 vectors (numpy over OpenBLAS's Haswell ``sdot``)."""
+
+def sdcflows_cg_csr(
+    data: np.ndarray,
+    indices: np.ndarray,
+    indptr: np.ndarray,
+    shape: tuple[int, int],
+    b: np.ndarray,
+    rtol: float = 1e-5,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> tuple[np.ndarray, int, int]:
+    """SciPy's ``cg`` for a float32 CSR matrix: ``(x, info, iterations)``."""
+
+def sdcflows_ridge_csr(
+    data: np.ndarray,
+    indices: np.ndarray,
+    indptr: np.ndarray,
+    shape: tuple[int, int],
+    y: np.ndarray,
+    alpha: float = 1.0,
+    tol: float = 1e-4,
+    max_iter: int | None = None,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, int, int, str]:
+    """scikit-learn's ``Ridge(fit_intercept=False)`` ``sparse_cg`` fit of a float32 CSR
+    matrix: ``(coef, info, iterations, system)``."""
+
+def sdcflows_ridge_collocation(
+    target_shape: tuple[int, int, int],
+    target_affine: np.ndarray,
+    levels: list[tuple[tuple[int, int, int], np.ndarray]],
+    y: np.ndarray,
+    alpha: float = 1e-4,
+    tol: float = 1e-4,
+    max_iter: int | None = None,
+    n_threads: int = 1,
+) -> tuple[np.ndarray, int, int, str]:
+    """The same fit on sdcflows' float32 collocation matrix, without storing it."""
+
+def sdcflows_bspline_approx(
+    data: np.ndarray,
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    zooms: list[float],
+    spacings: list[tuple[float, float, float]],
+    mask: np.ndarray | None = None,
+    ridge_alpha: float = 1e-4,
+    recenter: str = "median",
+    extrapolate: bool = True,
+    name: str = "",
+    resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None] | None = None,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    low_memory: bool = False,
+) -> dict[str, Any]:
+    """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
+    grids, coefficients, center, n_inside, field, error, extrapolated, extreme, info, n_iter,
+    system, log, beyond (whether SDC-01 changed, or would have changed, the weights). The fit
+    reads the stored collocation matrix at one thread and evaluates the weights at every
+    product with several threads or with ``low_memory`` (the same bits)."""
+
+def sdcflows_rescale_affine(
+    affine: np.ndarray,
+    shape: tuple[int, int, int],
+    zooms: tuple[float, float, float],
+    new_shape: tuple[float, float, float],
+) -> np.ndarray:
+    """nibabel's ``rescale_affine(affine, shape, zooms, new_shape)`` (numpy's BLAS order)."""
+
+def sdcflows_resample_to_zooms_grid(
+    shape: tuple[int, int, int],
+    affine: np.ndarray,
+    pre_zooms: tuple[float, float, float],
+    zooms: tuple[float, float, float],
+) -> tuple[tuple[float, float, float], np.ndarray]:
+    """The grid of sdcflows' ``resample_to_zooms``: ``np.rint(shape * pre_zooms / zooms)``
+    (float64 values) and its affine."""
+
+def sdcflows_affine_coordinates(
+    ref_shape: tuple[int, int, int],
+    ref_affine: np.ndarray,
+    moving_affine: np.ndarray,
+    matrix: np.ndarray | None = None,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``(3, n)`` voxel coordinates in the moving image of every reference voxel (Fortran
+    order), as nitransforms' ``Affine(matrix, reference=ref).apply(moving)`` computes them (the
+    identity without ``matrix``)."""
+
+def sdcflows_apply_affine(affine: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """nibabel's ``apply_affine(affine, points)`` for ``(n, 3)`` points (numpy's BLAS order)."""
+
+def sdcflows_unwarp_volume(
+    volume: np.ndarray,
+    fmap_hz: np.ndarray,
+    pe_axis: int,
+    ro_time: float,
+    ro_float64: bool,
+    jacobian: bool,
+    order: int,
+    mode: str,
+    cval: float,
+    prefilter: bool,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """sdcflows' ``_sdc_unwarp`` for one 3D volume: the volume sampled at its voxels moved
+    along ``pe_axis`` by ``fmap_hz * ro_time`` (float32 arithmetic, or float64 with
+    ``ro_float64``), with SciPy's ``map_coordinates``, times the Jacobian of the shift with
+    ``jacobian``. Returns the float32 volume (C order) and the interpolation's notices."""

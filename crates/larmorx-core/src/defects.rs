@@ -330,6 +330,26 @@ defects! {
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
+    SDC_01 = "SDC-01", "sdcflows", true,
+        "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
+    SDC_02 = "SDC-02", "sdcflows", true,
+        "grid_bspline_weights on a sampling grid rotated relative to the control grid warns that the grids are not aligned and still multiplies per-axis weights, each taken from one index of the voxel, which is not the B-spline field at the voxel (measured on a real field rotated 0.5 degrees: 2.3 Hz RMS, 40 Hz at most; at 5 degrees: 20 Hz RMS, 345 Hz); B0FieldTransform.fit meets it on the projected grid of any rotating registration (fMRIPrep's registrations of the oracle runs, about 1 degree: 1.5 to 4.6 Hz RMS, up to 49 Hz, in the brain)";
+    SDC_04 = "SDC-04", "sdcflows", true,
+        "au2rads (PhaseMap2rads) rescales a constant phase map to NaN everywhere (0 / 0) without an error";
+    SDC_05 = "SDC-05", "sdcflows", true,
+        "B0FieldTransform.apply accepts a readout time only as a Python float or a list: an integer or a numpy float32 readout time fails with a TypeError";
+    SDC_06 = "SDC-06", "sdcflows", true,
+        "bspline_grid (and BSplineApprox) divide the affine by every header zoom, so a field map stored as a 4D image with one volume (as fMRIPrep writes its desc-preproc_fieldmap) fails with numpy's broadcasting ValueError";
+    SDC_07 = "SDC-07", "sdcflows", true,
+        "TOPUPCoeffReorient negates TOPUP's field coefficients (a field in Hz) when the phase-encoding direction, reoriented to RAS, is written with BIDS' letter i, which inverts the field (measured r = -0.999 with the true field; FSL's letter x, which fMRIPrep passes, is not negated)";
+    SDC_08 = "SDC-08", "sdcflows", true,
+        "B0FieldTransform.apply (and ApplyCoeffsField) fails with an AttributeError on a series read from a file whose axes already run to R, A and S (no reorientation): numpy's rollaxis is given nibabel's ArrayProxy, which has no transpose";
+    SDC_09 = "SDC-09", "sdcflows", true,
+        "SubtractPhases fails with Python's TypeError of a comparison with None when a phase map's metadata have no EchoTime";
+    SDC_10 = "SDC-10", "sdcflows", true,
+        "B0FieldTransform.fit with approx (the default of ApplyCoeffsField and of sdcflows' unwarping workflow), on a target not aligned with the coefficients, builds its intermediate grid around the target as given and resamples it at the target's own coordinates, so the data-to-field-map transform is ignored: the field is taken where the target lies before the registration (measured on ds002603's BOLD references, registrations of 2.5 to 3.7 mm: 7.7 to 8.5 Hz RMS, up to 87 Hz in the brain)";
+    SDC_11 = "SDC-11", "sdcflows", true,
+        "resample_to_zooms (BSplineApprox's resize to zooms_min) onto a grid of a single voxel fails with nitransforms' bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point), so a field map whose whole extent is below zooms_min cannot be fitted";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

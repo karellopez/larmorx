@@ -1,0 +1,177 @@
+{
+ "defect": null,
+ "description": "BSplineApprox of an int16 field map: the error map's cal_max is -0.0 where numpy's max over sdcflows' Fortran-ordered array meets a -0 first (the trial of 2026-11-08)",
+ "expect": "pass",
+ "found": {
+  "detail": "bspline_approx: every output bit-identical: 1 inside, 0 iterations; differ: ['error-bytes']",
+  "n": 236468,
+  "seed": "sdc-trial",
+  "shrink_moves": [],
+  "signature": [
+   "bspline_approx: every output bit-identical"
+  ]
+ },
+ "id": "error-cal-max-zero-sign",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      16.0,
+      16.0,
+      10.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": "median",
+    "ridge_alpha": 0.0,
+    "zooms_min": 1.0
+   }
+  },
+  "features": {
+   "4D of one volume": false,
+   "bs_spacing": 0,
+   "call": "bspline_approx",
+   "content": "sparse",
+   "dtype": "float32",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 0.25,
+   "mask": true,
+   "orientation": "plumb",
+   "origin0": 14.25,
+   "origin1": -57.0,
+   "origin2": 28.25,
+   "qfac": -1,
+   "qform_code": 3,
+   "range": "plain",
+   "recenter": "median",
+   "ridge_alpha": 0.0,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "19x5x15",
+   "spacing0": 1.2,
+   "spacing1": 0.5,
+   "spacing2": 4.0,
+   "sparse": 0.001,
+   "units": "unknown",
+   "zooms_min": 1.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 584357143,
+     "type": "noise"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      14.25,
+      -57.0,
+      28.25
+     ],
+     "qfac": -1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.2,
+      0.5,
+      4.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     19,
+     5,
+     15
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 0.25
+    }
+   },
+   "mask": {
+    "content": {
+     "fraction": 0.001,
+     "seed": 1358692525,
+     "type": "sparse"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      14.25,
+      -57.0,
+      28.25
+     ],
+     "qfac": -1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.2,
+      0.5,
+      4.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     19,
+     5,
+     15
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 236468,
+  "options": [
+   "1 level(s)",
+   "alpha 0.0",
+   "bspline_approx",
+   "extrapolate",
+   "mask",
+   "recenter median",
+   "zooms_min 1.0"
+  ],
+  "seed": "sdc-trial",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

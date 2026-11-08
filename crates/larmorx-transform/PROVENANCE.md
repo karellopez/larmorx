@@ -75,3 +75,21 @@ ITK readers (`io/itk.py`: `ITKLinearTransform`, `ITKLinearTransformArray`,
 `ensure_positive_cosines` (Apache-2.0) and nibabel's orientation helpers
 (`orientations.py`: `io_orientation`, `ornt_transform`, `ornt2axcodes`, `inv_ornt_aff`,
 `apply_orientation`; `affines.from_matvec`).
+
+## numpy's small linear algebra (`numpy_linalg`)
+
+**Ported** from the OpenBLAS 0.3.34 and 0.3.30 release tarballs (BSD-3-Clause; the LAPACK they
+bundle, `lapack-netlib`, BSD-3-Clause) and numpy 2.5.4 (`numpy/linalg/umath_linalg.cpp`,
+BSD-3-Clause): `numpy.linalg.svd` of a 3 × 3 matrix (`svd3`: `dgesdd` path 5a, `dgebrd` →
+`dgebd2`, `dbdsdc` → `dlasdq` → `dbdsqr`, `dormbr` → `dorm2r`/`dorml2`), `eigh` of a 4 × 4 one
+(`eigh4`: `dsyevd`, `dsytrd` → `dsytd2`, `dstedc` → `dsteqr`, `dormtr` → `dorm2r`), `det(a) > 0`
+(`det3_is_positive`: OpenBLAS's `getf2_k`, numpy's `det_from_slogdet`), `matmul3`
+(`openblas::gemm`) and nibabel's `io_orientation` polar factor (`io_orientation_polar`), with
+`dlarfg`, `dlapy2`, `dlartg.f90`, `dlas2`, `dlasv2`, `dlaev2`, `dlasr`, `dlanst`, `dlansy`,
+`dlange`, `dlascl`, `iladlc`, `iladlr`, `ilaenv`'s block sizes and `dlamch`; LAPACK 3.12.1's
+`dlarf1f.f` (OpenBLAS 0.3.34) and 3.12.0's `dlarf.f` (0.3.30) as `LapackRelease`. The BLAS on
+these lengths: `interface/{nrm2,scal,axpy,dot,rot,gemv,ger,symv,syr2}.c`, `kernel/x86_64/{nrm2.S,
+dscal.c,daxpy.c,ddot.c,drot.c,drot_microk_haswell-2.c,dsymv_L.c,dgemv_n_4.c,dgemv_t_4.c}`,
+`kernel/generic/ger.c`, `driver/level2/syr2_k.c` (the Haswell selection, `KERNEL.HASWELL`),
+with the fused operations of the build numpy ships (checked in the disassembly of its
+`libscipy_openblas64_`). The logic is re-expressed in Rust; no code was copied.

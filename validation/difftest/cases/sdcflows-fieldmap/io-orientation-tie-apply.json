@@ -1,0 +1,236 @@
+{
+ "defect": null,
+ "description": "B0FieldTransform.apply of a series whose rotation has equal axis candidates: the axis nibabel picks decides whether the series is reoriented, and so which error sdcflows raises (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "apply apply: every output bit-identical: ('ValueError', 'Shape of array too small to calculate a numerical gradient, at least (edge_order + 1) elements are required.') vs ('AttributeError', \"'ArrayProxy' object has no attribute 'transpose'\")",
+  "n": 33,
+  "seed": "sdc-try2",
+  "shrink_moves": [
+   "fmap: axis 1 16 -> 8 voxels",
+   "fmap: axis 0 11 -> 5 voxels",
+   "fmap: axis 1 8 -> 4 voxels",
+   "fmap: axis 2 6 -> 3 voxels",
+   "fmap: axis 0 5 -> 2 voxels",
+   "fmap: axis 1 4 -> 2 voxels",
+   "fmap: axis 2 3 -> 1 voxels",
+   "fmap: axis 0 2 -> 1 voxels",
+   "fmap: axis 1 2 -> 1 voxels",
+   "moving: axis 1 18 -> 9 voxels",
+   "moving: axis 0 14 -> 7 voxels",
+   "moving: axis 2 11 -> 5 voxels",
+   "moving: axis 1 9 -> 4 voxels",
+   "moving: axis 0 7 -> 3 voxels",
+   "moving: axis 2 5 -> 2 voxels",
+   "moving: axis 1 4 -> 2 voxels",
+   "moving: axis 0 3 -> 1 voxels",
+   "moving: axis 1 2 -> 1 voxels",
+   "moving: axis 2 2 -> 1 voxels",
+   "moving: 3 -> 2 volumes",
+   "fmap (and its grid): plumb orientation",
+   "fmap (and its grid): unit spacing",
+   "fmap (and its grid): origin at 0",
+   "fmap (and its grid): qform and sform codes 1",
+   "moving (and its grid): unit spacing",
+   "moving (and its grid): origin at 0",
+   "moving: content blobs -> constant"
+  ],
+  "signature": [
+   "apply apply: every output bit-identical"
+  ]
+ },
+ "id": "io-orientation-tie-apply",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": false,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 60.0,
+    "seed": 1742562587,
+    "spacings": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": 0.0,
+    "jacobian": true,
+    "mode": "wrap",
+    "order": 3,
+    "output_dtype": "float32",
+    "prefilter": true
+   },
+   "pe_dir": "i",
+   "ro_time": 0.05,
+   "xfm": null
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": false,
+   "axis0": 0.85,
+   "axis1": 0.85,
+   "axis2": 1.1,
+   "blobs": 1,
+   "call": "apply",
+   "centre0": -6.0,
+   "centre1": 3.5,
+   "centre2": -1.0,
+   "coefficient Hz": 60.0,
+   "content": "blobs",
+   "cval": 0.0,
+   "dtype": "float32",
+   "extreme": false,
+   "jacobian": true,
+   "mode": "wrap",
+   "moving ndim": 4,
+   "order": 3,
+   "orientation": "oblique",
+   "origin0": -21.0,
+   "origin1": 50.0,
+   "origin2": -22.5,
+   "output_dtype": "float32",
+   "pe per volume": false,
+   "pe_dir": "i",
+   "prefilter": true,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "ro_time": 0.05,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "14x18x11x3",
+   "size": 14.0,
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 4.0,
+   "spacings": 1,
+   "target": "rotated",
+   "tr": 2.0,
+   "transform": "none",
+   "tunits": "sec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 606379535,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "seed": 874869974,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      4,
+      0,
+      2,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 33,
+  "options": [
+   "apply",
+   "order 3",
+   "pe i",
+   "target rotated",
+   "transform none"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

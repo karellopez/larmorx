@@ -116,6 +116,15 @@ how = "port (fMRIPrep, nitransforms, SciPy)"
 validation = "[{resample-series.cases} cases](record:resample-series): {resample-series.pass} of {resample-series.pass} compared bit-identical"
 
 [[tool]]
+id = "sdcflows-fieldmap"
+title = "sdcflows' field-map estimation (the B-spline field fit, the field evaluated and applied, the phase-difference preparation)"
+eco = "larmorx"
+page = "/tools/sdcflows-fieldmap/"
+use = ["lx.sdcflows.bspline_approx", "lx.sdcflows.B0FieldTransform", "lx.sdcflows.apply_coeffs_field", "lx.sdcflows.phdiff_workflow", "lx.io.save_nibabel"]
+how = "port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic)"
+validation = "[{sdcflows-fieldmap.cases} cases](record:sdcflows-fieldmap): {sdcflows-fieldmap.pass} of {sdcflows-fieldmap.pass} bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](repo:docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one"
+
+[[tool]]
 id = "afni-tshift"
 title = "3dTshift (slice timing)"
 eco = "afni"
@@ -324,6 +333,12 @@ status = "`validated`"
 id = "resample-series"
 larmorx = "`lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage`"
 reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1 and numpy 2.5.4 (in-process, `oracles/python-newest`; the step from SciPy 1.15.3 and numpy 2.3.5 in every case)"
+status = "`validated`"
+
+[[record]]
+id = "sdcflows-fieldmap"
+larmorx = "`lx.sdcflows` (`crates/larmorx-sdcflows`), `lx.io.save_nibabel`, `lx.io.load_nibabel`"
+reference = "sdcflows 2.17.1 with scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4 and nibabel 5.4.2 (in-process, `oracles/python-newest`, numpy's OpenBLAS on its Haswell kernels; the step from SciPy 1.15.3 and numpy 2.3.5 in every case), and fMRIPrep 25.2.6's own files of five oracle runs"
 status = "`validated`"
 
 [[record]]

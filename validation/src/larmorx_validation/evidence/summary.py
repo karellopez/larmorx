@@ -236,6 +236,12 @@ PAGES = [
         [("port", "resample-series", "validated", None, None)],
     ),
     (
+        "/tools/sdcflows-fieldmap/",
+        "sdcflows' field-map estimation",
+        "larmorx",
+        [("port", "sdcflows-fieldmap", "validated", None, None)],
+    ),
+    (
         "/tools/nifti-io/",
         "NIfTI I/O",
         "larmorx",

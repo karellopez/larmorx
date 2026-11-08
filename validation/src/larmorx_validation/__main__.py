@@ -39,6 +39,7 @@ PARITY_MODULES = {
     "afni-volreg-original": "afni_volreg_original",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
+    "sdcflows-fieldmap": "sdcflows_fieldmap",
     "mri-hmc": "mri_hmc",
     "fsl-mcflirt-replica": "fsl_mcflirt_replica",
     "fsl-flirt-replica": "fsl_flirt_replica",

@@ -2,7 +2,8 @@
 
 Every defect or questionable behaviour found so far in the tools and pipelines larmorx
 reproduces: ANTs and ITK, AFNI, FSL, fMRIPrep and its libraries (nipype, niworkflows,
-sMRIPrep, sdcflows, nitransforms), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
+sMRIPrep, sdcflows, nitransforms; sdcflows' field-map estimation, ported bit for bit in the
+field maps' part A, has its own family, SDC-), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
 each: the evidence, what it does to fMRIPrep users, what larmorx does today, and what decision
 D13 ("correct by default, faithful on request", CLAUDE.md) requires. Collected 2026-10-11 from
 the other files in `docs/findings/`, the specs, the validation records and `docs/analysis/`.
@@ -228,7 +229,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-11 | sMRIPrep | a registration fallback leaves the composite undefined | a | after a failed attempt | – | – |
 | PIPE-12 | sMRIPrep | a default that is not an allowed choice | e | none | – | – |
 | PIPE-13 | sMRIPrep | the report text prints a module | f | every report | – | – |
-| PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |
+| PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | ignored with sdcflows' own warning (`lx.sdcflows`, 2026-11-08: a feature sdcflows says it has not enabled; rule C) | – |
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
 | PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect; decided 2026-10-21: larmorprepx keeps N4's float32 result, `reproduce` fMRIPrep's int16 | – (larmorprepx) |
 | PIPE-17 | nitransforms | the first group of an `.h5` file skipped as if it were the composite: one transform fails, a list without a composite loses its first, an empty composite fails | c | none (fMRIPrep's composites) | corrected by default (`upstream_defects`, 2026-10-16) | – |
@@ -238,11 +239,11 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | SCI-05 | SciPy `map_coordinates` | a NaN coordinate with orders 2 to 5 and mode `nearest` (the suite's 3D float32 inputs, `prefilter=False` mostly): the output there is NaN in every run, but its sign and payload vary between runs on the same inputs (SciPy 1.15.3 and 1.18.1 alike) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit; NaN values compared alike); not reproduced; the resample-series step counts NaN values alike and runs the shared releases twice (2026-10-30) | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
-| NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
+| NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD (`lx.transforms`); numpy's own SVD, as x86-64 Linux computes it, in `lx.sdcflows`' orientation decisions (2026-11-08) | – |
 | NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-02 | nibabel | `vox_offset` 0: header read as data | c | none | refuses | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-03 | nibabel | complex data: imaginary part dropped | c | none | raises | – (decided 2026-10-23: larmorx's behaviour kept) |
-| NIB-04 | nibabel | qform precision depends on the platform | d | none | f64 everywhere | – |
+| NIB-04 | nibabel | qform precision depends on the platform | d | none | f64 everywhere (`lx.load`); x86-64 Linux's extended precision, emulated exactly on every platform, in `lx.io.load_nibabel` (2026-11-08) | – |
 | GLIBC-01 | glibc 2.35 | `exp`, `log`, `sin`, `cos` not correctly rounded | d | every ANTs run | correctly rounded | – |
 | GLIBC-02 | glibc 2.35 | `expf`, `logf`, `powf` not correctly rounded | d | N4, DenoiseImage | correctly rounded | – |
 | GLIBC-03 | glibc 2.35 | `sinf`, `cosf` not correctly rounded; two builds differ | d | none | see entry | – |
@@ -253,6 +254,17 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
+| SDC-01 | sdcflows `grid_bspline_weights` | a sampling position beyond the first or the last control point gets SciPy's extrapolated end polynomial, not the cubic B-spline (−3.27 instead of 0.0208 at 1.5 spacings beyond) | c | none (fMRIPrep's reconstructions are evaluated on the field map's grid, inside the knots: 28 of 28 in the oracle runs); sdcflows' own unwarping: up to 70 Hz outside the BOLD mask (ds005040) | rule D measured, then A: the B-spline's value by default (the same bits inside the grid), `reproduce` sdcflows' (field maps part A, 2026-11-08) | – |
+| SDC-02 | sdcflows `grid_bspline_weights` | on a sampling grid rotated relative to the control grid: per-axis weights, each from one index of the voxel (a warning, then a wrong field: 2.3 Hz RMS at 0.5°, 20 Hz at 5°, up to 1,132 Hz) | c | none (fMRIPrep's reconstruction refuses non-aligned grids); sdcflows' own unwarping with fMRIPrep's registrations (rotations of 0.9 to 1.5°): 1.5 to 4.6 Hz RMS, up to 49 Hz, in the brain | rule D measured, then A: the weights at every voxel's own position by default, `reproduce` sdcflows' separable product with its warning (field maps part A, 2026-11-08) | – |
+| SDC-03 | sdcflows `CheckRegister` | the translation test is signed (a large negative shift passes); its critical message prints "{mag_files}" | c, f | none (no oracle run registers two magnitudes) | rule A; the branch (FreeSurfer's `mri_robust_register`) is not ported yet: `NotImplementedError` | switch (with the FreeSurfer part) |
+| SDC-04 | sdcflows `PhaseMap2rads` (`au2rads`) | a constant phase map becomes NaN everywhere (0 / 0), no error | c | none | rule B: a `ValueError` by default, `reproduce` the NaN map (field maps part A, 2026-11-08) | – |
+| SDC-05 | sdcflows `B0FieldTransform.apply` | an integer or numpy float32 readout time fails (`TypeError` in `zip`) | c | none (fMRIPrep passes floats) | rule A: accepted as the float, named; `reproduce` sdcflows' `TypeError` (field maps part A, 2026-11-08) | – |
+| SDC-06 | sdcflows `bspline_grid`, `BSplineApprox` | a field map stored as a 4D image of one volume (as fMRIPrep writes `desc-preproc_fieldmap`) fails with numpy's broadcasting `ValueError` | c | none (fMRIPrep fits 3D maps) | rule A: the first three zooms (several volumes: a clear error), named; `reproduce` sdcflows' error (field maps part A, 2026-11-08) | – |
+| SDC-07 | sdcflows `TOPUPCoeffReorient` | TOPUP's coefficients (a field in Hz) negated for a BIDS `i` direction: the field inverted (r = −0.999 with the true field) | c | none (fMRIPrep passes FSL's letters, never negated) | rule D measured, then A: never negated, named; `reproduce` negates (field maps part A, 2026-11-08) | – |
+| SDC-08 | sdcflows `B0FieldTransform.apply`, `ApplyCoeffsField` | a series read from a file whose axes already run to R, A, S fails (`AttributeError`: numpy's `rollaxis` on nibabel's `ArrayProxy`) | c | none (fMRIPrep uses its own resampler) | rule A: unwarped, named; `reproduce` sdcflows' error (field maps part A, 2026-11-08) | – |
+| SDC-09 | sdcflows `SubtractPhases` | no `EchoTime`: Python's `TypeError` of a comparison with None | c | none | rule B: a `ValueError` naming the metadata; `reproduce` the `TypeError` (field maps part A, 2026-11-08) | – |
+| SDC-10 | sdcflows `B0FieldTransform.fit(approx=True)` (`ApplyCoeffsField`, sdcflows' unwarping workflow) | on a target not aligned with the coefficients the intermediate grid is built around, and resampled at, the target as given: `xfm_data2fmap` is ignored (ds002603's BOLD references: 7.7 to 8.5 Hz RMS, up to 87 Hz, in the brain) | c | none (fMRIPrep uses its own reconstruction) | rule A: built and sampled where the transform puts the target, named; `reproduce` sdcflows' field (field maps part A, 2026-11-08) | – |
+| SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`'s resize to `zooms_min`) | onto a grid of a single voxel it fails with nitransforms' bare `AssertionError` (`assert targets.ndim == 2` after numpy's squeeze of the one target point): a field map whose whole extent is below `zooms_min` cannot be fitted | c | none (fMRIPrep's field maps are larger than `zooms_min`) | rule A: the one voxel resampled and the fit made, named; `reproduce` the `AssertionError` (field maps part A, 2026-11-08: its random-testing trial) | – |
 | AFNI-01 † | 3dTshift, 3dAutomask, 3dUnifize | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-02 † | 3dTshift, 3dAutomask, 3dUnifize | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-03 † | 3dTshift (3dAutomask, 3dUnifize: no slice timing written) | header slice code 2 (sequential decreasing): no shift (AFNI 25.2.09; **fixed in AFNI 26.3.05**) | c | none | corrected by default in both implementations (replica 2026-10-12); fixed upstream in AFNI 26.3.05 exactly as larmorx corrected it: both implementations follow 26.3.05 in both modes and name it no more (the GPL replicas and the clean-room originals, 2026-10-29) | – |
@@ -475,7 +487,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (421 entries, recounted from the table on 2026-11-08, after 3dvolreg's clean-room original part (no new entry; AFNI-100 to AFNI-110 unused)
+**Counts** (432 entries, recounted from the table on 2026-11-08, after the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
@@ -483,16 +495,17 @@ entries, decided, count as (c)):
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 99 | |
 | (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 205 | 10 |
+| (c) deterministic bug that changes results | 216 | 10 |
 | (d) imprecision | 25 | |
 | (e) command-line or parsing quirk | 62 | |
 | (f) documentation or message only | 15 | |
 | explained, not a defect | 2 | |
 
 The gap column today (2026-11-08): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
-kept, rule C); one rule 8; no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
+kept, rule C); one rule 8; **switch** for SDC-03 (with the FreeSurfer part: `CheckRegister`'s
+registration branch is not ported yet); no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
 
-Fifteen entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
+Sixteen entries have a second class: ANTS-12, FSL-03 and SDC-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
 FSL-135, FSL-159, FSL-268 and FSL-269 (a), FSL-08 and AFNI-90 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
 column (2026-10-12, after completing 3dTshift, part 2b, and AFNI-26's switch): no **yes**, no
 **replica** and no **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18,
@@ -849,6 +862,16 @@ replica does (the same defaults, `reproduce` and refusals), and the shared entri
 original; its random-testing
 trial met AFNI-97 on AFNI's runaway Fourier first passes (small uint8 or int16 series with `-Fourier
 -twopass`). No new defect was found (AFNI-100 to AFNI-110 unused).
+**The sdcflows port** (`crates/larmorx-sdcflows`, `lx.sdcflows`, 2026-11-08; sdcflows 2.17.1,
+[sdcflows-fieldmap.md](sdcflows-fieldmap.md)): SDC-01 to SDC-11 (SDC-12 to SDC-30 unused), each
+with `reproduce` (sdcflows' result bit for bit): corrected by default SDC-01, -02 and -07 (rule D
+measured, then A), SDC-05, -06, -08, -10 and -11 (rule A); a clear error by default SDC-04 and
+SDC-09 (rule B); SDC-03 (rule A) with the FreeSurfer part, whose `mri_robust_register` its branch
+runs (gap **switch**). Kept and documented, without an ID (rule C): `CheckB0Units`' rad/s map
+re-quantised into the input's stored type by nibabel's writer, the header's zooms against the
+affine's (equal on every oracle field map); PIPE-14 (`apply`'s head-motion transforms ignored with
+sdcflows' own warning) kept too. No numpy, SciPy, scikit-learn or OpenBLAS defect was found on
+these paths.
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -3476,11 +3499,17 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **D13 / gap:** not D13.
 
 ### PIPE-14 sdcflows ignores head motion when applying a field — (c)
-- **What:** `B0FieldTransform.apply` accepts head-motion transforms and silently ignores them.
-- **Evidence:** read: `sdcflows/transform.py:509-524` (`docs/analysis/03`).
+- **What:** `B0FieldTransform.apply` accepts head-motion transforms and ignores them, with a
+  warning that says so (sdcflows 2.15.1 and 2.17.1: "Head-motion compensating (realignment)
+  transforms are ignored when applying the unwarp with SDCFlows. This feature will be enabled as
+  soon as unit tests are implemented for its quality assurance.").
+- **Evidence:** read: `sdcflows/transform.py:509-524` (`docs/analysis/03`); validated (the
+  port's `check_apply.py`: the warning and the unwarped series sdcflows').
 - **fMRIPrep:** none (fMRIPrep applies the field in `ResampleSeries`).
-- **larmorx:** –.
-- **D13 / gap:** no larmorx code. No gap.
+- **larmorx:** `lx.sdcflows.B0FieldTransform.apply` and `apply_coeffs_field` (field maps part A,
+  2026-11-08) ignore them with sdcflows' warning: a feature sdcflows has not enabled yet and says
+  so, kept (rule C); fMRIPrep's head motion is `lx.transforms.resample_series`' job.
+- **D13 / gap:** rule C (kept and documented). No gap.
 
 ### PIPE-15 nipype's `MCFLIRT` interface — (e)
 - **What:** `use_contour` emits `-edge`, which mcflirt rejects; with FSL 6 or later the
@@ -3620,7 +3649,12 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** validated (`orientation/45-degrees`).
 - **fMRIPrep:** none.
 - **larmorx:** vnl's LINPACK SVD; nibabel's choice on 4,300 of 4,800 such grids (expected
-  divergence).
+  divergence). Since 2026-11-08 `lx.sdcflows` decides orientations with
+  `larmorx.io.nibabel_header.io_orientation`, numpy's own SVD replicated (`larmorx_transform::numpy_linalg`:
+  LAPACK 3.12.1 or 3.12.0 on OpenBLAS's Haswell kernels), so it makes nibabel's choice at a tie as
+  numpy makes it on x86-64 Linux, on every platform ([sdcflows-fieldmap.md](sdcflows-fieldmap.md));
+  the resampler's `lx.transforms.ensure_positive_cosines` keeps vnl's (a follow-up in
+  [next-steps](../next-steps.md)).
 - **D13 / gap:** not D13.
 
 ### NIB-01 Compression decided by the file name — (e)
@@ -3651,7 +3685,11 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   elsewhere.
 - **Evidence:** validated (within 1e-9 mm).
 - **fMRIPrep:** none.
-- **larmorx:** f64 everywhere.
+- **larmorx:** f64 everywhere (`lx.load`). `lx.io.load_nibabel` and `lx.io.nibabel_affine`
+  (2026-11-08, for the ports of nibabel-based Python programs, `lx.sdcflows` first) compute it as
+  nibabel does on x86-64 Linux, x87's extended precision emulated in exact rational arithmetic, so
+  every platform gets Linux's bits; and `lx.io.save_nibabel` writes the slope and intercept nibabel
+  computes there ([sdcflows-fieldmap.md](sdcflows-fieldmap.md)).
 - **D13 / gap:** not D13.
 
 ### GLIBC-01 `exp`, `log`, `sin`, `cos` are not correctly rounded — (d)
@@ -3816,6 +3854,171 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** none.
 - **larmorx:** not used as a geometry oracle.
 - **D13 / gap:** no larmorx code. No gap.
+
+## sdcflows: field-map estimation (SDC-)
+
+sdcflows 2.17.1 (the newest release; fMRIPrep 25.2.6's 2.15.1 is byte-identical on these
+paths), ported bit for bit in `lx.sdcflows` (`crates/larmorx-sdcflows`; the field maps' part A,
+2026-11-08). Apache-2.0: open to everyone. The evidence and the arithmetic behind every entry:
+[sdcflows-fieldmap.md](sdcflows-fieldmap.md). No defect of numpy, SciPy, scikit-learn or
+OpenBLAS was found on these paths (NP-, SCI- and SKL- IDs unused); the LAPACK 3.12.0 → 3.12.1 step
+between numpy 2.3.5 and 2.5.4 changes nibabel's quaternions, a change of release recorded in the
+findings, not a defect. PIPE-14 (head motion ignored by `apply`, with sdcflows' warning) stays
+under fMRIPrep's libraries above.
+
+### SDC-01 Weights beyond the control grid continue the end polynomial — (c)
+- **What:** `grid_bspline_weights` evaluates `BSpline(arange(-3, K + 3), eye(K + 2), 3)` with
+  SciPy's extrapolation, whose base interval is `[0, K - 1]`: a sampling position beyond the
+  first or the last control point (within distance 2 of a kept knot) gets the end interval's
+  polynomial continued: knot 0's weight at -0.5 is 0.354 instead of 0.479, at -1.5 -3.27
+  instead of 0.0208, at -1.75 -5.08 instead of 0.0026.
+- **Evidence:** read (`sdcflows/transform.py`, `grid_bspline_weights`); validated
+  (`check_weights.py`: sdcflows' matrix reproduced bit for bit, the corrected one equal to
+  sdcflows' construction with the knots continued); measured (`measure_sdc01_02.py`).
+- **fMRIPrep:** none: its `ReconstructFieldmap` evaluates the weights on the target only when
+  the projected target is aligned with the coefficients, which none of the 28 reconstructions of
+  the oracle runs is; the field map's own grid lies inside the knots. sdcflows' own unwarping
+  (`ApplyCoeffsField`) reaches it: ds005040's BOLD reference has 9,049 voxels (5.5 %) beyond
+  TOPUP's grid, all outside the brain mask, where the field differs by up to 70 Hz; ds002603's
+  intermediate grids have 19 % of their positions beyond (by up to 380 Hz), none under a BOLD
+  voxel.
+- **larmorx:** rule D, measured: A. The cubic B-spline's value by default (the same recursion
+  on the knots continued beyond the grid; inside `[0, K - 1]` the original's own intervals, so
+  the same bits), named where a weight changes; `reproduce` gives sdcflows' weights
+  (`lx.sdcflows.grid_bspline_weights`, `collocation_matrix`, `B0FieldTransform`,
+  `apply_coeffs_field`, `bspline_approx`; 2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-02 A rotated sampling grid gets separable weights — (c)
+- **What:** on a sampling grid rotated relative to the control grid, `grid_bspline_weights`
+  warns "Image's and B-Spline's grids are not aligned." and still multiplies per-axis weights,
+  each computed from one index of the voxel with the others at 0, which is not the field at the
+  voxel. On ds005454's field (427 Hz at most) on its own grid rotated about its centre, against
+  the field at every voxel's position: 0.23 Hz RMS (4 Hz at most) at 0.05°, 2.3 (40) at 0.5°,
+  9.1 (158) at 2°, 20 (345) at 5°, 39 (1,132) at 45°. sdcflows' own approximation
+  (`approx=True`) stays within 0.13 Hz of the exact field.
+- **Evidence:** read; measured (`measure_sdc01_02.py`, part 2); validated (`check_weights.py`:
+  the reproduced matrix and warning are sdcflows', the corrected matrix equals an independent
+  numpy construction bit for bit).
+- **fMRIPrep:** none: its reconstruction refuses a grid not aligned with the coefficients
+  ("Reference passed is not aligned with spline grids"). sdcflows' own unwarping reaches it
+  (`ApplyCoeffsField`, `B0FieldTransform.fit`): without a transform, with `approx=False`, and
+  on the projected grid of an aligned target whenever the registration rotates: with
+  fMRIPrep's registrations of the oracle runs' BOLD references (0.89 to 1.50°), 1.5 to 4.6 Hz
+  RMS, up to 49 Hz, inside the brain mask (ds002422 x3, ds005040, ds005454;
+  `measure_sdc01_02.py`, part 2b); on ds005454's real `ApplyCoeffsField` call with fMRIPrep's
+  registration the field differs by 3.65 Hz RMS (31 Hz at most) in the brain (the site's page).
+- **larmorx:** rule D, measured: A. The weights at every voxel's own position by default (its
+  coordinates by nibabel's `apply_affine`, each axis' weights rounded to the matrix type, the
+  products `(w0 * w1) * w2`, up to 64 per voxel), named; `reproduce` gives sdcflows' matrix and
+  warning (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-03 `CheckRegister`'s signed translation test — (c), (f)
+- **What:** two magnitude images whose affines differ are registered with FreeSurfer's
+  `mri_robust_register --auto_sens`; the registration is refused when a rotation exceeds
+  `rot_thresh` or a translation component exceeds `trans_thresh`, but the test is
+  `vec > trans_thresh` on the signed components, so a large negative shift is never too big.
+  The critical message's first part lacks its f-prefix and prints "{mag_files}".
+- **Evidence:** read (`sdcflows/interfaces/fmap.py`, `CheckRegister._run_interface`).
+- **fMRIPrep:** none in the oracle runs (no estimator with two magnitudes of different affines).
+- **larmorx:** the branch needs FreeSurfer's registration and is not ported:
+  `lx.sdcflows.check_register` raises `NotImplementedError` there.
+- **D13 / gap:** switch: rule A (|components| and the message's names) with the FreeSurfer part.
+
+### SDC-04 A constant phase map becomes NaN — (c)
+- **What:** `au2rads` (`PhaseMap2rads`) rescales `(d - min) * 2π / (max - min)`: a constant map
+  gives 0 / 0, NaN everywhere, with only numpy's `RuntimeWarning`.
+- **Evidence:** validated (`check_phase.py`).
+- **fMRIPrep:** none (a real phase map is not constant).
+- **larmorx:** rule B: a `ValueError` by default; `reproduce` gives the NaN map with sdcflows'
+  warning (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-05 An integer or float32 readout time fails — (c)
+- **What:** `B0FieldTransform.apply` wraps `ro_time` in a list only when it is a Python `float`;
+  an `int` or a numpy `float32` reaches `zip` and fails with a `TypeError`.
+- **Evidence:** validated (`check_apply.py`: sdcflows' `TypeError` texts reproduced).
+- **fMRIPrep:** none (it passes floats; it uses its own resampler).
+- **larmorx:** rule A: accepted as the float, named; `reproduce` gives sdcflows' `TypeError`
+  (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-06 A 4D field map of one volume fails — (c)
+- **What:** `bspline_grid` divides the affine's columns by `img.header.get_zooms()`, every
+  zoom: a field map stored as `(X, Y, Z, 1)`, as fMRIPrep writes its `desc-preproc_fieldmap`
+  (9 of 9 in the oracle runs), fails with numpy's broadcasting `ValueError`, and `BSplineApprox`
+  with it. (Header zooms against the affine's voxel sizes: equal on all 34 field-map images of
+  the oracle runs, kept, rule C.)
+- **Evidence:** read; validated (`check_weights.py`: the error text; `probe_header_zooms.py`).
+- **fMRIPrep:** none (it fits 3D field maps).
+- **larmorx:** rule A: the first three zooms (a field map of several volumes: a clear error),
+  named; `reproduce` gives sdcflows' error (`bspline_grid`, `bspline_approx`; 2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-07 `TOPUPCoeffReorient` inverts the field for a BIDS `i` direction — (c)
+- **What:** `_fix_topup_fieldcoeff` negates TOPUP's coefficients when the phase-encoding
+  direction, reoriented to RAS, is written `i`, never for FSL's `x`. TOPUP's coefficients are a
+  field in Hz, which a left-right flip does not negate: on synthetic left-right blips with a
+  known field the negated field correlates r = -0.999 with the truth (RMS 55 Hz), the kept one
+  r = +0.999 (0.9 Hz), in LAS and RAS.
+- **Evidence:** measured (`measure_sdc_g.py`; TOPUP through `lx.fsl.topup`, whose coefficients
+  equal FSL's: `probe_sdc07_topup.py`); validated (`check_coeffs.py`).
+- **fMRIPrep:** none (it passes FSL's letters).
+- **larmorx:** rule D, measured: A. Never negated, named; `reproduce` negates (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-08 A positive-axes series from a file fails — (c)
+- **What:** `B0FieldTransform.apply` (and `ApplyCoeffsField`) on a series whose axes already run
+  to R, A and S, read from a file: no reorientation happens, numpy's `rollaxis` receives
+  nibabel's `ArrayProxy`, which has no `transpose`: `AttributeError` (also with fMRIPrep's
+  sdcflows 2.15.1 and numpy 2.2.6).
+- **Evidence:** validated (`check_apply.py`).
+- **fMRIPrep:** none (it uses its own resampler).
+- **larmorx:** rule A: unwarped, named; `reproduce` gives the `AttributeError` (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-09 `SubtractPhases` without `EchoTime` — (c)
+- **What:** `subtract_phases` pops `EchoTime` from each map's metadata and orders the maps by
+  it: a missing one is `None`, and the comparison fails with Python's `TypeError`.
+- **Evidence:** validated (`check_phase.py`).
+- **fMRIPrep:** none (BIDS phase1/phase2 maps carry `EchoTime`).
+- **larmorx:** rule B: a `ValueError` that names the missing metadata; `reproduce` gives the
+  `TypeError` (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-10 The approximation ignores the data-to-field-map transform — (c)
+- **What:** `B0FieldTransform.fit(target, xfm_data2fmap, approx=True)` (the default of
+  `ApplyCoeffsField` and of sdcflows' unwarping workflow) on a target not aligned with the
+  coefficients builds its intermediate grid with `deoblique_and_zooms(coeffs[-1],
+  target_reference)` (the target as given, not the projected reference) and resamples it at the
+  target's own coordinates: the field is taken where the target lies before the registration.
+  On ds002603's two oblique BOLD references (registrations to the field map of 2.5 and 3.7 mm):
+  7.7 and 8.5 Hz RMS, up to 87 Hz, inside the brain mask, against the field where the transform
+  puts them; ds005454's reference rotated 5° with a 4 mm transform: 11 Hz RMS, up to 232 Hz.
+- **Evidence:** read (`sdcflows/transform.py`, `B0FieldTransform.fit`); measured
+  (`measure_sdc01_02.py`, part 3); validated (the reproduced field is sdcflows' bit for bit,
+  `check_b0field.py`).
+- **fMRIPrep:** none (it reconstructs fields with its own `ReconstructFieldmap`).
+- **larmorx:** rule A: the grid built around, and sampled at, the target where the transform
+  puts it, named whenever the transform is not the identity; `reproduce` gives sdcflows' field
+  (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-11 A resize onto a single voxel fails — (c)
+- **What:** `resample_to_zooms(in_file, zooms)` (sdcflows' `utils/tools.py`, used by
+  `BSplineApprox` when a voxel size is below `zooms_min`) builds the new grid with
+  `np.rint(shape * zooms / new_zooms)` voxels and resamples with nitransforms' `Affine.apply`,
+  which squeezes the target points and asserts they are 2-D: a grid of a single voxel (a field
+  map whose whole extent is below `zooms_min`) raises a bare `AssertionError`, so the fit cannot
+  be made.
+- **Evidence:** found by the random-testing trial of 2026-11-08 (10 of its 14 differences,
+  smallest a 4 x 4 x 4 field map at 1 mm with `zooms_min` 4; the triage's permanent case
+  `sdc11-resize-onto-a-single-voxel`); read (`nitransforms/resampling.py`, `apply`).
+- **fMRIPrep:** none (its field maps are much larger than `zooms_min`).
+- **larmorx:** rule A: the one voxel resampled and the fit made, named; `reproduce` gives the
+  `AssertionError` (2026-11-08).
+- **D13 / gap:** done.
 
 ## FSL: black-box findings (open to everyone)
 

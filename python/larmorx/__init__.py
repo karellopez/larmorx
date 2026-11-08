@@ -23,13 +23,13 @@ from typing import TYPE_CHECKING
 from larmorx._core import __version__
 
 if TYPE_CHECKING:
-    from larmorx import afni, ants, fsl, io, mri, ndimage, transforms
+    from larmorx import afni, ants, fsl, io, mri, ndimage, sdcflows, transforms
     from larmorx._defects import UpstreamDefectWarning
     from larmorx._replica import Implementation, ReplicaError, ReplicaNotFoundError
     from larmorx.image import Image, as_image
     from larmorx.io import load, save
 
-_SUBMODULES = frozenset({"afni", "ants", "fsl", "io", "mri", "ndimage", "transforms"})
+_SUBMODULES = frozenset({"afni", "ants", "fsl", "io", "mri", "ndimage", "sdcflows", "transforms"})
 _NAMES = {
     "UpstreamDefectWarning": "larmorx._defects",
     "Implementation": "larmorx._replica",
@@ -57,6 +57,7 @@ __all__ = [
     "mri",
     "ndimage",
     "save",
+    "sdcflows",
     "transforms",
 ]
 

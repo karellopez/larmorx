@@ -81,6 +81,16 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | PIPE-17 | nitransforms | `lx.transforms.load_itk_composite`, `load_transforms` | the first group of an `.h5` file is skipped as if it were the composite: a file of one transform fails, one of several without a composite loses its first, an empty composite fails | the first group read when it is not a composite; an empty composite is the identity |
 | HDF-01 | HDF5 1.12 | `lx.transforms.read`, `-t x.h5` (non-native floating-point parameters) | conversion state carried from one element to the next (denormals) | each element converted on its own ([transforms-hdf5.md](transforms-hdf5.md)) |
 | SCI-03 | SciPy `ndimage` | `lx.ndimage.*`, `resample_series(mode=...)` | SciPy up to 1.17: the spline prefilter's reflect boundary (modes `reflect`, `grid-mirror`, `nearest`) read a coefficient it had already updated, so its splines missed the samples on short axes | SciPy 1.18's exact half-sample-symmetric initialisation, in both modes (no notice since 2026-10-29) |
+| SDC-01 | sdcflows `grid_bspline_weights` | `lx.sdcflows.grid_bspline_weights`, `collocation_matrix`, `B0FieldTransform`, `apply_coeffs_field`, `bspline_approx` | a sampling position beyond the first or the last control point gets SciPy's extrapolated end polynomial (−3.27 instead of 0.0208 at 1.5 spacings beyond) | the cubic B-spline's weight (the same bits inside the grid), named where a weight changes |
+| SDC-02 | sdcflows `grid_bspline_weights` | the same | a sampling grid rotated relative to the control grid gets per-axis weights, each from one index of the voxel (with a warning): up to the field's own size wrong | the weights at every voxel's own position (up to 64 control points), named |
+| SDC-04 | sdcflows `PhaseMap2rads` | `lx.sdcflows.au2rads`, `phdiff_workflow` | a constant phase map becomes NaN everywhere | a `ValueError` |
+| SDC-05 | sdcflows `B0FieldTransform.apply` | `lx.sdcflows.B0FieldTransform.apply`, `apply_coeffs_field` | an integer or numpy float32 readout time fails (`TypeError`) | accepted as the float, named |
+| SDC-06 | sdcflows `bspline_grid`, `BSplineApprox` | `lx.sdcflows.bspline_grid`, `bspline_approx` | a 4D field map of one volume fails (numpy's broadcasting `ValueError`) | the first three zooms, named (several volumes: a clear error) |
+| SDC-07 | sdcflows `TOPUPCoeffReorient` | `lx.sdcflows.topup_coeff_reorient` | TOPUP's coefficients are negated for a BIDS `i` direction, which inverts the field | never negated, named |
+| SDC-08 | sdcflows `B0FieldTransform.apply`, `ApplyCoeffsField` | `lx.sdcflows.B0FieldTransform.apply`, `apply_coeffs_field` | a series read from a file whose axes already run to R, A, S fails (`AttributeError`) | unwarped, named |
+| SDC-09 | sdcflows `SubtractPhases` | `lx.sdcflows.subtract_phases`, `phdiff_workflow` | no `EchoTime`: Python's `TypeError` of a comparison with None | a `ValueError` naming the metadata |
+| SDC-10 | sdcflows `B0FieldTransform.fit` | `lx.sdcflows.B0FieldTransform.fit`/`apply`, `apply_coeffs_field` | with `approx` on a target not aligned with the coefficients, the data-to-field-map transform is ignored (the field taken where the target lies before the registration) | the approximation built and sampled where the transform puts the target, named |
+| SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`) | `lx.sdcflows.resample_to_zooms`, `bspline_approx` | a resize onto a grid of a single voxel fails with nitransforms' bare `AssertionError` | the voxel resampled and the fit made, named |
 | AFNI-01 | 3dTshift | `lx.afni.tshift`, `larmorx afni 3dTshift` (both implementations) | a negative `scl_slope` is applied on output only: shifted slices come out sign-flipped and scaled | the factor is applied on input too |
 | AFNI-02 | 3dTshift, 3dAutomask, 3dUnifize | same | float32 data with a slope and an intercept are scaled, and the slope is kept as a scale factor: scaled twice | scaled once, no factor |
 | AFNI-03 | 3dTshift | `larmorx afni 3dTshift` (header slice timing); 3dAutomask's `-apply_prefix` and 3dUnifize `-EPI` keep the slice fields (both implementations) | AFNI 25.2.09: header slice code 2 (sequential decreasing) gives every slice time 0: nothing is shifted. **Fixed in AFNI 26.3.05** (both implementations follow it in both modes and name it no more) | slices `slice_end` down to `slice_start`, as NIfTI defines the code |
@@ -421,6 +431,11 @@ pointer) are refused in both modes. Its clean-room original (2026-11-08, `crates
 has the same switch and the same defaults, with AFNI-97's stop in `reproduce` where AFNI crashes;
 its record's fix pass shows each correction where it applies
 ([afni-volreg-original.md](../validation/afni-volreg-original.md)).
+`lx.sdcflows` (the port of sdcflows 2.17.1, 2026-11-08) has the switch for SDC-01, -02 and -04 to
+-11: by default the corrections above, with `upstream_defects="reproduce"` sdcflows' result bit for
+bit (its warnings and errors included; [sdcflows-fieldmap.md](sdcflows-fieldmap.md#upstream-defects-d13)).
+SDC-03 (`CheckRegister`'s signed translation test) has no switch yet: its branch runs FreeSurfer's
+`mri_robust_register`, which `lx.sdcflows.check_register` refuses until the FreeSurfer part.
 - **ITK-06** (nifti_clib reads NaN and ±inf as 0) is kept in both modes, by measurement
   (2026-10-23, rule C): no fMRIPrep input has such a value, and keeping them would spread one NaN
   through every smoothing step ([investigation](../../validation/investigations/itk-06-nonfinite/README.md)).

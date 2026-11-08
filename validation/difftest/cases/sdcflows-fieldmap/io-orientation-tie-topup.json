@@ -1,0 +1,147 @@
+{
+ "defect": null,
+ "description": "TOPUPCoeffReorient on a reference whose rotation has two equal axis candidates: nibabel's io_orientation through numpy's SVD picks the axis (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "topup: every output bit-identical: differ: ['bytes0']",
+  "n": 635,
+  "seed": "sdc-try2",
+  "shrink_moves": [
+   "ref: axis 1 23 -> 11 voxels",
+   "ref: axis 2 21 -> 10 voxels",
+   "ref: axis 0 20 -> 10 voxels",
+   "ref: axis 1 11 -> 5 voxels",
+   "ref: axis 0 10 -> 5 voxels",
+   "ref: axis 2 10 -> 5 voxels",
+   "ref: axis 0 5 -> 2 voxels",
+   "ref: axis 1 5 -> 2 voxels",
+   "ref: axis 2 5 -> 2 voxels",
+   "ref: axis 0 2 -> 1 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "ref: axis 2 2 -> 1 voxels",
+   "ref (and its grid): origin at 0",
+   "ref: content head -> constant"
+  ],
+  "signature": [
+   "topup: every output bit-identical"
+  ]
+ },
+ "id": "io-orientation-tie-topup",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "topup",
+   "factors": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "pe_dir": "k",
+   "seed": 1106548550,
+   "wrong_shape": false
+  },
+  "features": {
+   "axis0": 1.15,
+   "axis1": 0.95,
+   "axis2": 0.85,
+   "bias0": -0.01,
+   "bias1": 0.005,
+   "bias2": 0.0,
+   "bias3": -0.0025,
+   "call": "topup",
+   "centre0": 2.0,
+   "centre1": -2.0,
+   "centre2": -5.5,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "factors": 1,
+   "noise": 3.0,
+   "orientation": "oblique",
+   "origin0": -53.5,
+   "origin1": 27.75,
+   "origin2": -17.25,
+   "pe_dir": "k",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "20x23x21",
+   "size": 29.0,
+   "spacing0": 1.0,
+   "spacing1": 4.0,
+   "spacing2": 4.0,
+   "tissues": "t1",
+   "units": "mm",
+   "wrong shape": false
+  },
+  "groups": [
+   {
+    "args": [
+     "topup"
+    ],
+    "name": "topup",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ref": {
+    "content": {
+     "seed": 713036070,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      5,
+      3,
+      3,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 635,
+  "options": [
+   "pe k",
+   "topup"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

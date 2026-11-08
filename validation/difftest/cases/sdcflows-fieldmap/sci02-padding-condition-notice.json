@@ -1,0 +1,199 @@
+{
+ "defect": null,
+ "description": "B0FieldTransform.apply of a uint8 series with a negative cval, order 2 and grid-constant: lx.ndimage names SCI-02 when the prefilter pads with a cval the type cannot hold, whether or not a sample reaches the padding; the suite's fix pass of apply accepts that notice without a change (the trial of 2026-11-08)",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 294008,
+  "seed": "sdc-trial",
+  "shrink_moves": [],
+  "signature": [
+   "notice: SCI-02"
+  ]
+ },
+ "id": "sci02-padding-condition-notice",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": true,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 150.0,
+    "seed": 1828170676,
+    "spacings": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": -5.0,
+    "jacobian": false,
+    "mode": "grid-constant",
+    "order": 2,
+    "output_dtype": "float32",
+    "prefilter": true
+   },
+   "pe_dir": "k",
+   "ro_time": 0.031,
+   "xfm": null
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": true,
+   "call": "apply",
+   "coefficient Hz": 150.0,
+   "content": "ramp",
+   "cval": -5.0,
+   "dtype": "uint8",
+   "extreme": false,
+   "jacobian": false,
+   "mode": "grid-constant",
+   "moving ndim": 3,
+   "order": 2,
+   "orientation": "plumb",
+   "origin0": 16.5,
+   "origin1": 14.5,
+   "origin2": -24.5,
+   "output_dtype": "float32",
+   "pe_dir": "k",
+   "prefilter": true,
+   "qfac": -1,
+   "qform_code": 4,
+   "ramp0": 0,
+   "ramp1": 2,
+   "ramp2": -2,
+   "range": "plain",
+   "ro_time": 0.031,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x14x4",
+   "spacing0": 1.0,
+   "spacing1": 0.5,
+   "spacing2": 1.5,
+   "spacings": 1,
+   "target": "rotated",
+   "transform": "none",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1911715952,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      46.0,
+      -38.25,
+      7.75
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      7,
+      9,
+      -5,
+      15
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     22,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "direction": [
+      0,
+      2,
+      -2
+     ],
+     "seed": 343899291,
+     "type": "ramp"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      16.5,
+      14.5,
+      -24.5
+     ],
+     "qfac": -1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     14,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 294008,
+  "options": [
+   "apply",
+   "order 2",
+   "pe k",
+   "target rotated",
+   "transform none"
+  ],
+  "seed": "sdc-trial",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

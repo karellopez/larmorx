@@ -319,3 +319,145 @@ def test_mmap_falls_back_for_compressed_and_scaled_files(tmp_path):
     assert scaled.dtype == np.float64  # scaled: read normally
     raw = lx.load(path, mmap=True, scaled=False)
     np.testing.assert_array_equal(raw.data, stored)
+
+
+def test_save_nibabel_scales_floats_into_the_header_type(tmp_path):
+    from larmorx.io.nifti import NiftiHeader
+
+    data = np.linspace(-3.5, 120.25, 60, dtype=np.float32).reshape(5, 4, 3)
+    hdr = NiftiHeader.from_dict(
+        lx._core.nifti_header_for_image([5, 4, 3], "int16", np.eye(4), None, None)
+    )
+    img = lx.Image(data, np.eye(4), hdr)
+    lx.io.save_nibabel(img, tmp_path / "x.nii.gz")
+    back = lx.load(tmp_path / "x.nii.gz", dtype=np.float32)
+    stored = lx.load(tmp_path / "x.nii.gz", scaled=False)
+    assert stored.data.dtype == np.int16
+    slope = (120.25 + 3.5) / 65535
+    np.testing.assert_allclose(back.data, data, atol=slope)
+    stored_values, s, _ = lx.io.nibabel_stored(data, np.int16)
+    assert stored_values.min() == -32768 and stored_values.max() == 32767
+    assert s == float(np.float32(slope))
+
+
+def test_save_nibabel_errors_and_types(tmp_path):
+    from larmorx.io.nifti import NiftiHeader
+
+    hdr = NiftiHeader.from_dict(
+        lx._core.nifti_header_for_image([2, 2, 2], "uint8", np.eye(4), None, None)
+    )
+    # A constant float image: nibabel stores zeros with the value as the intercept (probed).
+    img = lx.Image(np.full((2, 2, 2), 7.0, dtype=np.float32), np.eye(4), hdr)
+    lx.io.save_nibabel(img, tmp_path / "c.nii")
+    raw = lx.load(tmp_path / "c.nii", scaled=False)
+    assert raw.data.dtype == np.uint8 and np.all(raw.data == 0)
+    assert (raw.header.scl_slope, raw.header.scl_inter) == (1.0, 7.0)
+    assert np.all(lx.load(tmp_path / "c.nii").data == 7.0)
+    # Without a header, the array's own type; dtype= overrides the header's.
+    lx.io.save_nibabel(lx.Image(np.arange(8.0).reshape(2, 2, 2), np.eye(4)), tmp_path / "f.nii")
+    assert lx.load(tmp_path / "f.nii", scaled=False).data.dtype == np.float64
+    lx.io.save_nibabel(img, tmp_path / "d.nii", dtype=np.float32)
+    assert lx.load(tmp_path / "d.nii", scaled=False).data.dtype == np.float32
+    # An infinite value is clipped to the type's range, as nibabel 5.4.2 stores it (values,
+    # slope and intercept probed with nibabel itself).
+    inf = np.array([np.inf, 0, 1, 2, 3, 4, 5, 6], np.float32).reshape(2, 2, 2)
+    lx.io.save_nibabel(lx.Image(inf, np.eye(4), hdr), tmp_path / "inf.nii")
+    stored = lx.load(tmp_path / "inf.nii", scaled=False)
+    assert stored.data.ravel().tolist() == [255, 0, 42, 85, 128, 170, 212, 255]
+    assert stored.header.scl_slope == np.float32(0.0235294122248888)
+    assert stored.header.scl_inter == 0.0
+
+
+# --- nibabel's own header arithmetic (lx.io.nibabel_header) -----------------------------------
+# The expected values were computed with nibabel 5.4.2 on x86-64 Linux with numpy 2.5.4
+# (OpenBLAS 0.3.34, LAPACK 3.12.1) and numpy 2.3.5 (OpenBLAS 0.3.30, LAPACK 3.12.0), Haswell
+# kernels; larmorx gives them on every platform.
+
+
+def _rot(q):
+    q = np.asarray(q, float)
+    q = q / np.sqrt(q @ q)
+    w, x, y, z = q
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+
+
+_PERM = np.array([[0, -2.0, 0, 10.0], [0, 0, 3.0, -20.0], [-1.5, 0, 0, 5.0], [0, 0, 0, 1]])
+_OBLIQUE = np.r_[np.c_[_rot([2, 1, -1, 3]) * [2.5, 2.0, 3.0], [-90.0, 12.5, 33.0]], [[0, 0, 0, 1]]]
+_TIE = np.r_[np.c_[_rot([5, 3, 3, 0]), [0.0, 0.0, 0.0]], [[0, 0, 0, 1]]]
+
+
+def _f32(bits):
+    return np.array(bits, dtype=np.uint32).view(np.float32)
+
+
+@pytest.mark.parametrize(
+    ("affine", "bits", "lapack"),
+    [
+        (_PERM, [0xBF000000, 0x3F000000, 0x3F000000], "3.12.1"),
+        (_OBLIQUE, [0x3E8432A5, 0xBE8432A5, 0x3F464BF8], "3.12.1"),
+        # numpy's SVD of an exact rotation leaves a last bit: LAPACK 3.12.1's DLARF1F and
+        # 3.12.0's DLARF leave different ones
+        (_TIE, [0x3EEA3CE1, 0x3EEA3CE1, 0x255B344D], "3.12.1"),
+        (_TIE, [0x3EEA3CE1, 0x3EEA3CE1, 0x248BE45C], "3.12.0"),
+    ],
+)
+def test_nibabel_qform_quaternions(affine, bits, lapack):
+    from larmorx import _core
+
+    q = _core.nibabel_qform(np.ascontiguousarray(affine), lapack)
+    assert q["qfac"] == 1.0
+    got = np.asarray(q["quaternion"][1:], dtype=np.float32)
+    assert got.tobytes() == _f32(bits).tobytes()
+
+
+def test_save_nibabel_writes_nibabels_quaternions(tmp_path):
+    p = tmp_path / "perm.nii"
+    lx.io.save_nibabel(lx.Image(np.zeros((2, 3, 4), np.float32), _PERM), p)
+    h = lx.io.read_header(p)
+    got = np.array([h.quatern_b, h.quatern_c, h.quatern_d], dtype=np.float32)
+    assert got.tobytes() == _f32([0xBF000000, 0x3F000000, 0x3F000000]).tobytes()
+    assert int(h.qform_code) == 0 and int(h.sform_code) == 2
+
+
+def test_nibabel_io_orientation_breaks_ties_as_numpy(tmp_path):
+    from larmorx.io.nibabel_header import io_orientation
+
+    np.testing.assert_array_equal(io_orientation(_TIE), [[1, 1], [2, 1], [0, 1]])
+    np.testing.assert_array_equal(io_orientation(_PERM), [[2, -1], [0, -1], [1, 1]])
+    np.testing.assert_array_equal(io_orientation(_OBLIQUE), [[1, 1], [0, -1], [2, 1]])
+
+
+def test_load_nibabel_reads_a_qform_in_extended_precision(tmp_path):
+    from larmorx import _core
+    from larmorx.io.nibabel_header import header_for_image
+
+    fields = header_for_image((2, 3, 4), "float32", _OBLIQUE)
+    fields.update(qform_code=1, sform_code=0)
+    p = tmp_path / "qform-only.nii"
+    _core.nifti_write(str(p), np.zeros((2, 3, 4), np.float32), fields, 1, 1)
+    want = [
+        "-0x1.aaaab020ae5e8p-1", "-0x1.dddddcf6d0672p+0", "0x1.99999ebdb8961p-2",
+        "-0x1.6800000000000p+6", "0x1.aaaaa9c458a27p+0", "-0x1.555559b3beb20p-1",
+        "-0x1.ffffff70faea8p+0", "0x1.9000000000000p+3", "0x1.aaaaaa337bc37p+0",
+        "-0x1.1111147e7b0ebp-2", "0x1.199999bcb27a8p+1", "0x1.0800000000000p+5",
+        "0x0.0p+0", "0x0.0p+0", "0x0.0p+0", "0x1.0000000000000p+0",
+    ]  # fmt: skip
+    img = lx.io.load_nibabel(p)
+    assert [float(v).hex() for v in np.asarray(img.affine).ravel()] == want
+    assert np.array_equal(lx.io.nibabel_affine(img.header), img.affine)
+
+
+def test_nibabel_base_affine_keeps_negative_zero_translations():
+    from larmorx import _core
+
+    fields = _core.nifti_header_for_image([1, 4, 1], "float32", np.eye(4), None, None)
+    fields.update(qform_code=0, sform_code=0, pixdim=[1.0, 2.0, 3.0, 1.5, 1.0, 1.0, 1.0, 1.0])
+    a = lx.io.nibabel_affine(lx.io.NiftiHeader.from_dict(fields))
+    want = [-2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, -4.5, 0.0, 0.0, 1.5, -0.0, 0, 0, 0, 1]
+    assert a.ravel().tobytes() == np.array(want, dtype=np.float64).tobytes()

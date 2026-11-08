@@ -76,12 +76,12 @@ RUNS = [
 ]
 #: The maps an example shows: output id, file (tedana's BIDS names), label, unit.
 MAPS = [
-    ("t2s", "T2starmap.nii.gz", "T2* map (s; fMRIPrep's output)", "s"),
-    ("s0", "S0map.nii.gz", "S0 map", ""),
-    ("t2s-limited", "desc-limited_T2starmap.nii.gz", "T2* map, limited (s)", "s"),
-    ("s0-limited", "desc-limited_S0map.nii.gz", "S0 map, limited", ""),
-    ("mask", "desc-adaptiveGoodSignal_mask.nii.gz", "Adaptive mask (echoes of good signal)", ""),
-    ("failures", "desc-decayFitFailures_mask.nii.gz", "Curve-fit failures", ""),
+    ("t2s", "T2starmap.nii.gz", "T2* (s)", "s"),
+    ("s0", "S0map.nii.gz", "S0", ""),
+    ("t2s-limited", "desc-limited_T2starmap.nii.gz", "T2*, limited (s)", "s"),
+    ("s0-limited", "desc-limited_S0map.nii.gz", "S0, limited", ""),
+    ("mask", "desc-adaptiveGoodSignal_mask.nii.gz", "Adaptive mask", ""),
+    ("failures", "desc-decayFitFailures_mask.nii.gz", "Fit failures", ""),
 ]
 #: Every file the table of files compares (images and the confounds table), in tedana's order.
 #: The RMSE map holds NaN outside the voxels of two good echoes or more: the viewer shows no
@@ -604,6 +604,40 @@ def _peak(ex, a: str, b: str, out: str, t: int | None = None) -> list[int]:
     return at
 
 
+#: The T2* maps' long tail (floors, caps, a T2* of 500 ms where the decay is flat) puts their
+#: 99.5th percentile far above tissue: their first window ends at the 95th.
+TISSUE = ("t2s", "t2s-limited")
+
+
+def _tissue_window(ctx: core.Context, ex, out: dict) -> None:
+    """A first window for the T2* maps, 0 to tedana's 95th percentile over the shown region, and
+    the default view's posters again in it (``common.finish`` drew them in the 0.5-99.5 %
+    window, where tissue is near black)."""
+    from larmorx_validation.evidence import example as exm
+
+    win = {}
+    for o in out["outputs"]:
+        if o["id"] not in TISSUE:
+            continue
+        v = ex.values(ex.key("tedana", o["id"]))[ex.m]
+        w = {"id": "tissue", "label": "brain, 0 to its 95th percentile (T2*'s long tail out)",
+             "lo": 0.0, "hi": float(np.percentile(v, 95))}  # fmt: skip
+        o["windows"].insert(0, w)
+        win[o["id"]] = w
+    d, post = out["default"], out["poster"]
+    w = win.get(d["output"])
+    if w is None:
+        return
+    plane, k = post["plane"], post["slice"]
+    m2 = exm.plane_slice(ex.m, plane, k)
+    for pid in post["panels"]:
+        p = ex.panel(pid)
+        if p.role == "input" or (p.overlay or {}).get(d["output"]):
+            continue
+        a = exm.plane_slice(ex.values(ex.key(pid, d["output"])), plane, k)
+        post["panels"][pid] = exm.poster_gray(ctx, a, m2, w["lo"], w["hi"])
+
+
 def _echo_facts(p: dict, img) -> str:
     tes = ", ".join(f"{t:g}" for t in p["tes"])
     z = img.header.get_zooms()
@@ -674,9 +708,10 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         ctx, ex, diffs, outputs, default=default, window_panel="tedana",
         input_windows={"bmask": "full"},
         caption="the crosshair where the default's T2* map differs most from the reproduce "
-        "mode's; choose the output (the maps, the adaptive mask, the failures) above "
-        "the images.",
+        "mode's; choose the output above the images: the full T2* map (fMRIPrep's output) and S0, "
+        "the limited maps, the adaptive mask (good echoes per voxel), the curve fit's failures.",
     )  # fmt: skip
+    _tissue_window(ctx, ex, out)
     data = _dataset(name)
     n_vox = int(np.prod(mimg.shape[:3]))
     t2 = runs["tedana"]["t2s"].astype(np.float64)

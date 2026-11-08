@@ -64,3 +64,21 @@ memory-limit night at `-n 12`). The site's own viewer check should check that ev
 first). The one-thread fit slows in a process that already ran sdcflows (ds001600: 2.5 s fresh, 3.3 to 5.7 s after):
 find the cause before larmorprepx runs fits in one long-lived process. The stored matrix's transpose is used only by
 tests. When sdcflows' clean-room original starts, the audit's restriction table needs an sdcflows family.
+
+### Merge notes (the orchestrator, 2026-11-08)
+- Merged into main 931fdc58 (on ec557ff5, after 3dvolreg's clean-room original). Three conflicts, both sides kept:
+  `tests/golden/golden.json` (`merge_golden.py`, re-recorded from the merge), `tests/parity/test_memory_peak.py`
+  (main's file with the branch's appended test after it; git had interleaved the two appended tests),
+  `validation/difftest/triage.toml` (both appended blocks; 494 entries). The site's `fmap-a-pages` (7130949f) into the
+  site's main 69662a86 (a8e1b3a4); `evidence-blobs` a4fa3b63 → 96bca689 (the manifest's SHA-256 8565bf68d65fe9ca
+  matches; 39 added, none replaced).
+- HANDOFF.toml's 48 operations applied (17 files); `register_counts.py` 432 entries; `tables --site`, `tables --check`,
+  the summary re-exported; the site build 0 problems. The decision log gained the order of 2026-11-08 (tedana's
+  `t2smap` replica before part B) and the wait loops' time limit.
+- The clean-room audit's merge step: 11 agents archived; 0 blocking, 0 to judge (a port of a permissive upstream; no
+  clean-room original touched).
+- Verified (`verify-merge.sh` on 4ead4671, 11:53-12:35, 8 threads): the three Rust workspaces' gates, the GPL and nc
+  builds, the Python gates, the smoke tier and golden (every checksum unchanged, only the header); re-runs against the
+  committed records, no status or detail differs: `sdcflows-fieldmap` 37/37 (newest environment, with the step),
+  `resample-series` 139/139, `numpy-linalg` 28/28, `nifti-io` 254/254; the page re-exported with only the exporter's
+  fingerprint changed (data unchanged; taken into the site, 01f901ed).

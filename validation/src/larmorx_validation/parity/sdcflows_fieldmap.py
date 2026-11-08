@@ -385,7 +385,11 @@ def _fix_pass(call: str, e: dict, f: dict, checks: CheckList) -> None:
     else:
         for a, b in zip(fixed, reproduced, strict=True):
             change = change + defects.Change.of(a, b)
-    defects.add_fix_check(checks, entries, change, other_changes=other)
+    # SCI-02 (lx.ndimage) is named when the spline prefilter pads an integer series with a cval
+    # its type cannot hold, whether or not a sample point then reaches the padding: a condition
+    # whose effect the comparison may not see.
+    silent = ("SCI-02",) if call == "apply" else ()
+    defects.add_fix_check(checks, entries, change, other_changes=other, silent_ok=silent)
 
 
 class _Lines(io.StringIO):

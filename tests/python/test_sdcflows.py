@@ -379,3 +379,21 @@ def test_a_3d_mask_fits_a_4d_field_map_of_one_volume():
     r4 = lx.sdcflows.bspline_approx(lx.Image(data[..., None], aff), mask)
     assert r4.field.shape == (10, 9, 8, 1)
     assert np.asarray(r3.field.data).tobytes() == np.asarray(r4.field.data).tobytes()
+
+
+def test_resize_onto_a_single_voxel_sdc11():
+    from larmorx._defects import UpstreamDefectWarning
+
+    rng = np.random.default_rng(2)
+    img = lx.Image(rng.uniform(-5, 5, (4, 4, 4)).astype(np.float32), np.eye(4))
+    with pytest.raises(AssertionError):
+        lx.sdcflows.resample_to_zooms(img, (4.0, 4.0, 4.0), upstream_defects="reproduce")
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        out = lx.sdcflows.resample_to_zooms(img, (4.0, 4.0, 4.0))
+    assert out.shape == (1, 1, 1)
+    assert any(
+        issubclass(x.category, UpstreamDefectWarning) and "SDC-11" in str(x.message) for x in w
+    )
+    r = lx.sdcflows.bspline_approx(img, zooms_min=4.0)
+    assert r.field.shape == (4, 4, 4) and np.isfinite(np.asarray(r.field.data)).all()

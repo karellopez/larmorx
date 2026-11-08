@@ -62,7 +62,8 @@ time in `apply`), SDC-06 (a 4D field map of one volume: its first three zooms), 
 (`TOPUPCoeffReorient`'s negation for a BIDS `i` direction, measured: `measure_sdc_g.py`),
 SDC-08 (`apply` on a positive-axes series read from a file), SDC-09 (`SubtractPhases` without
 `EchoTime`), SDC-10 (`B0FieldTransform.fit`'s approximation built and sampled where the
-transform puts the target; measured). SDC-03 (`CheckRegister`'s signed translation test) waits
+transform puts the target; measured), SDC-11 (`resample_to_zooms` onto a grid of one voxel:
+nitransforms' bare assertion; found by relay 7's random-testing trial). SDC-03 (`CheckRegister`'s signed translation test) waits
 for its FreeSurfer branch.
 
 Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`; `init_fmap_wf`

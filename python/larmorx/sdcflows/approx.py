@@ -302,11 +302,15 @@ def bspline_approx(
             f"({'x'.join(str(s) for s in zooms)} → "
             f"{'x'.join(str(s) for s in target_zooms)})."
         )
-        rf = resample_to_zooms(fmap, target_zooms, n_threads=n_threads)
+        rf = resample_to_zooms(
+            fmap, target_zooms, n_threads=n_threads, upstream_defects=upstream_defects
+        )
         rm = (
             None
             if mask_img is None
-            else resample_to_zooms(mask_img, target_zooms, n_threads=n_threads)
+            else resample_to_zooms(
+                mask_img, target_zooms, n_threads=n_threads, upstream_defects=upstream_defects
+            )
         )
         rdata = np.asarray(rf.data, dtype=np.float32)
         rmask = None if rm is None else _mask_of(rm, rdata.shape)

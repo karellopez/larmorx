@@ -3927,3 +3927,28 @@ implementation = "original"
 signature = ["notice: GLIBC-07"]
 status = "explained"
 explanation = "14 cases: GLIBC-07 named where the correctly rounded arctangent and glibc's atan2f differ on a voxel of a complex image, whether or not an output changes (the voxel outside the mask, or the phase's last bit absorbed), as specs/prelude.md §6.4 says; the suite reports it in the replica suite's D13 check (the replica never names GLIBC-07)"
+
+# ---------------------------------------------------------------- sdcflows-fieldmap (2026-11-08)
+# The field maps' part A (the sdcflows 2.17.1 port). Relay 6's 2-minute probe (seed sdc-try,
+# 12,661 cases, 2,296 differences) and relay 7's (sdc-try2, 13,785 cases, 332 differences) were
+# fixed in larmorx (nibabel's header arithmetic, scipy's float64 stack, numpy's NaN, the
+# notices; permanent cases in validation/difftest/cases/sdcflows-fieldmap/). The trial:
+# oracles/difftest/2026-11-08-sdcflows-fieldmap, seed sdc-trial, 30 minutes, 12 jobs at one
+# thread, 3 GiB per case, box 28 GiB, larmorx d47952d1: 335,471 cases, 335,456 agree, 1 notice,
+# 14 differences; every finding replayed with the final build agrees.
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["bspline_approx: every output bit-identical"]
+status = "register"
+defect = "SDC-11"
+explanation = "14 cases (smallest sdc-trial 59267: a 4 x 4 x 4 field map at 1 mm, zooms_min 4): BSplineApprox's resize gives a grid of one voxel, and nitransforms' Affine.apply fails there with a bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point); larmorx raised an AssertionError with its own message. Registered as SDC-11 (rule A): the voxel resampled and the fit made by default, named; reproduce raises the bare AssertionError"
+link = "validation/difftest/cases/sdcflows-fieldmap/sdc11-resize-onto-a-single-voxel.json"
+
+[[difference]]
+tool = "sdcflows-fieldmap"
+implementation = "port"
+signature = ["notice: SCI-02"]
+status = "harness"
+explanation = "1 case (sdc-trial 294008: apply of a uint8 series, order 2, grid-constant, cval -5): lx.ndimage names SCI-02 when the spline prefilter pads an integer input with a cval its type cannot hold, whether or not a sample point reaches the padding (a condition whose effect the comparison may not see); the suite's fix pass of apply accepts SCI-02 without a change (silent_ok), as it does no other defect"
+link = "validation/difftest/cases/sdcflows-fieldmap/sci02-padding-condition-notice.json"

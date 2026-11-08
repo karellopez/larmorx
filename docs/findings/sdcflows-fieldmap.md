@@ -2,7 +2,7 @@
 
 What porting sdcflows' field-map model (field maps, part A: `lx.sdcflows`, `crates/larmorx-sdcflows`)
 showed about sdcflows 2.17.1 and the libraries under it: the arithmetic a bit-exact port has to
-follow, the defects found (SDC-01 to SDC-10) and how each was decided (rules A to D). sdcflows
+follow, the defects found (SDC-01 to SDC-11) and how each was decided (rules A to D). sdcflows
 is Apache-2.0, so this file is not restricted. The scripts behind every number are in
 [validation/investigations/sdcflows-fieldmap](../../validation/investigations/sdcflows-fieldmap/README.md);
 the API in [docs/api/sdcflows-fieldmap.md](../api/sdcflows-fieldmap.md).
@@ -170,7 +170,7 @@ Haswell kernel on every platform, as for numpy's other BLAS paths ([numpy-blas.m
 - **The base affine** of a header with neither code (`shape_zoom_affine`) has `-0.0`
   translations along singleton axes (`-0.0 · zoom`).
 
-## The defects (SDC-01 to SDC-10)
+## The defects (SDC-01 to SDC-11)
 
 Decided by the rules (CLAUDE.md, D13): **A** the input makes sense and the result is wrong:
 correct it; **B** the input makes no sense: a clear error; **C** keep and document; **D**
@@ -321,6 +321,16 @@ on ds002603's two oblique BOLD references (registrations to the field map of 2.5
 rotated 5° with a 4 mm transform, 11.4 Hz RMS, up to 232 Hz. **Rule A**: the grid built around,
 and sampled at, the target where the transform puts it (the notice whenever the transform is
 not the identity). fMRIPrep does not use this path.
+
+### SDC-11: a resize onto a single voxel (rule A)
+
+`resample_to_zooms` (`BSplineApprox`'s resize when a voxel size is below `zooms_min`) resamples
+with nitransforms' `Affine.apply`, which squeezes the target points and asserts that they are
+2-D: a new grid of one voxel (a field map whose whole extent is below `zooms_min`) raises a bare
+`AssertionError`, and the fit is not made. Found by the random-testing trial of 2026-11-08 (14
+cases; the smallest a 4 × 4 × 4 field map at 1 mm with `zooms_min` 4). **Rule A**: the voxel is
+resampled and the fit made (the coefficients' grids are the original image's), named;
+`reproduce` raises the bare `AssertionError`. fMRIPrep's field maps never meet it.
 
 ### Not defects
 

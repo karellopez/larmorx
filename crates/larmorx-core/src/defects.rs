@@ -348,6 +348,8 @@ defects! {
         "SubtractPhases fails with Python's TypeError of a comparison with None when a phase map's metadata have no EchoTime";
     SDC_10 = "SDC-10", "sdcflows", true,
         "B0FieldTransform.fit with approx (the default of ApplyCoeffsField and of sdcflows' unwarping workflow), on a target not aligned with the coefficients, builds its intermediate grid around the target as given and resamples it at the target's own coordinates, so the data-to-field-map transform is ignored: the field is taken where the target lies before the registration (measured on ds002603's BOLD references, registrations of 2.5 to 3.7 mm: 7.7 to 8.5 Hz RMS, up to 87 Hz in the brain)";
+    SDC_11 = "SDC-11", "sdcflows", true,
+        "resample_to_zooms (BSplineApprox's resize to zooms_min) onto a grid of a single voxel fails with nitransforms' bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point), so a field map whose whole extent is below zooms_min cannot be fitted";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

@@ -180,7 +180,7 @@ out_corrected, out_field)`.
 | `transform_coefficients(in_coeff, fmap_ref, transform, fmap_target=None, *, out_dir=None, n_threads=1)` → `CoefficientsResult` | `interfaces/bspline.py: TransformCoefficients` (`transform.py: _move_coeff`) | the coefficients' affine moved by an ITK rigid transform; `fmap_target` writes sdcflows' debug image `debug_fmapref.nii.gz` (into `out_dir`, or the working directory as sdcflows); `<coeff>_space-target` |
 | `reorient_pedir(pe_dir, source_ornt, target_ornt=None)` | `utils/tools.py: reorient_pedir` | the phase-encoding direction in another orientation (BIDS letters and FSL's `x`/`y`/`z`) |
 | `deoblique_and_zooms(in_reference, oblique, factor=4, padding=1, factor_tol=1e-4)` | `utils/tools.py: deoblique_and_zooms` | a grid with the reference's orientation covering every corner of `oblique` plus `padding` voxels, `factor` times finer |
-| `resample_to_zooms(in_file, zooms, order=3, prefilter=True, *, n_threads=1)` | `utils/tools.py: resample_to_zooms` | nibabel's `rescale_affine` and nitransforms' `Affine(reference=...).apply` (3D and 4D images of one volume) |
+| `resample_to_zooms(in_file, zooms, order=3, prefilter=True, *, n_threads=1, upstream_defects="fix")` | `utils/tools.py: resample_to_zooms` | nibabel's `rescale_affine` and nitransforms' `Affine(reference=...).apply` (3D and 4D images of one volume); a grid of one voxel: SDC-11 |
 | `rescale_affine(affine, shape, zooms, new_shape=None)` | nibabel `affines.rescale_affine` | |
 
 ## The phase-difference preparation
@@ -218,6 +218,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-08 | a positive-axes series read from a file fails (`AttributeError`) | unwarped | `B0FieldTransform.apply`, `apply_coeffs_field` |
 | SDC-09 | no `EchoTime`: Python's `TypeError` of a comparison with None | a `ValueError` naming the metadata | `subtract_phases`, `phdiff_workflow` |
 | SDC-10 | `fit(approx=True)` on a rotated target ignores `xfm_data2fmap` | the approximation built and sampled where the transform puts the target | `B0FieldTransform.fit`/`apply`, `apply_coeffs_field` |
+| SDC-11 | a resize (`zooms_min`) onto a grid of a single voxel fails (nitransforms' bare `AssertionError`) | the voxel resampled and the fit made | `resample_to_zooms`, `bspline_approx` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

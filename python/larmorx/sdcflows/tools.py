@@ -18,7 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 from larmorx.io.nibabel_header import header_for_image as _nb_header_for_image
 from larmorx.io.nibabel_header import set_xform as _nb_set_xform
@@ -76,6 +77,7 @@ def resample_to_zooms(
     prefilter: bool = True,
     *,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
     """sdcflows' ``resample_to_zooms(in_file, zooms, order=3, prefilter=True)``: the image on a
     grid with voxel sizes ``zooms``, ``np.rint(shape * zooms_before / zooms)`` voxels, centred
@@ -89,7 +91,11 @@ def resample_to_zooms(
     (nitransforms' default: integers are rounded as SciPy rounds them) and has the header
     sdcflows gives it: the input's, with the new grid in the sform and qform (their codes
     kept) and the input's stored type.
+
+    ``upstream_defects``: a grid of a single voxel is resampled (``"fix"``, with a notice);
+    sdcflows fails there with nitransforms' bare ``AssertionError`` (SDC-11, ``"reproduce"``).
     """
+    _defects.check(upstream_defects)
     img = _as_loaded(in_file)
     data = np.asarray(img.data)
     hdr = _header(img)
@@ -126,9 +132,19 @@ def resample_to_zooms(
     if n == 0:
         np.empty(0).reshape((-1, *new3))  # nitransforms' reshape: numpy's ValueError
     if n == 1:
-        raise AssertionError(
-            "nitransforms 25.1.0 cannot resample onto a single-voxel grid (its "
-            "`assert targets.ndim == 2`)"
+        # nitransforms squeezes the one target point to 1-D and asserts it is 2-D
+        if upstream_defects == "reproduce":
+            raise AssertionError
+        _defects.warn(
+            [
+                (
+                    "SDC-11",
+                    "sdcflows",
+                    "fix",
+                    "the image is resampled onto a grid of a single voxel (sdcflows fails with "
+                    "nitransforms' bare AssertionError)",
+                )
+            ]
         )
     try:
         coords = _core.sdcflows_affine_coordinates(

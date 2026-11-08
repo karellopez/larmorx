@@ -157,17 +157,23 @@ fn pairwise_sum(a: &[f32]) -> f32 {
 /// float32 (`ret.dtype.type(ret / rcount)`).
 pub fn mean_f32(a: &[f32]) -> f32 {
     if a.is_empty() {
-        return f32::NAN;
+        // 0.0 / 0 in float64: x86's default NaN (the sign bit set), rounded to float32.
+        return X86_DEFAULT_NAN_F32;
     }
     (f64::from(pairwise_sum(a)) / a.len() as f64) as f32
 }
 
-/// `np.median(a)` of float32 values: NaN when a value is NaN (or there is none), else the mean
-/// of the middle one or two values of the sorted order (`mean` of one or two float32 values:
+/// `np.median(a)` of float32 values: the mean of an empty slice (x86's default NaN) when there
+/// is none; a NaN of the values when one is NaN (`_median_nancheck` returns the partition's
+/// last element; the first NaN here, the same bits when the NaNs are alike); else the mean of
+/// the middle one or two values of the sorted order (`mean` of one or two float32 values:
 /// `(0 + a [+ b]) / count`).
 pub fn median_f32(a: &[f32]) -> f32 {
-    if a.is_empty() || a.iter().any(|v| v.is_nan()) {
-        return f32::NAN;
+    if a.is_empty() {
+        return X86_DEFAULT_NAN_F32;
+    }
+    if let Some(&nan) = a.iter().find(|v| v.is_nan()) {
+        return nan;
     }
     let mut v = a.to_vec();
     let n = v.len();
@@ -184,7 +190,8 @@ pub fn median_f32(a: &[f32]) -> f32 {
 }
 
 /// `scipy.stats.mode(a).mode` of float32 values: the smallest of the most frequent values,
-/// all NaNs counted as one value after every number (NaN for no values).
+/// all NaNs counted as one value after every number (`np.nan` for no values; a NaN of the
+/// values when they are the most frequent).
 pub fn mode_f32(a: &[f32]) -> f32 {
     if a.is_empty() {
         return f32::NAN;
@@ -205,8 +212,16 @@ pub fn mode_f32(a: &[f32]) -> f32 {
         }
         i = j;
     }
-    if n_nan > best_count { f32::NAN } else { best }
+    if n_nan > best_count {
+        a.iter().copied().find(|v| v.is_nan()).unwrap_or(f32::NAN)
+    } else {
+        best
+    }
 }
+
+/// The NaN an x86 CPU makes for an invalid operation such as `0.0 / 0.0` (the "default NaN":
+/// quiet, the sign bit set), as numpy's `mean` of an empty slice returns it on x86-64.
+pub const X86_DEFAULT_NAN_F32: f32 = f32::from_bits(0xffc0_0000);
 
 fn center_of(data: &[f32], mask: Option<&[bool]>, recenter: Recenter) -> f32 {
     if recenter == Recenter::None {

@@ -190,15 +190,8 @@ def topup_coeff_reorient(
         ras_shape = np.array([ref.shape[int(a)] for a in order])
     coeff_pe_dir = reorient_pedir(pe_dir, ref_ornt)
     reverse_pe = 1.0
-    if coeff_pe_dir[0] == "i":
-        if upstream_defects == "reproduce":
-            reverse_pe = -1.0
-        verb = "negated as sdcflows negates them" if reverse_pe < 0 else "kept"
-        detail = (
-            f"the coefficients of a phase encoding along {coeff_pe_dir!r} are {verb} "
-            "(sdcflows negates TOPUP's field for a BIDS 'i' direction)"
-        )
-        _defects.warn([("SDC-07", "sdcflows", upstream_defects, detail)])
+    if coeff_pe_dir[0] == "i" and upstream_defects == "reproduce":
+        reverse_pe = -1.0
     out = []
     for c in coeffs:
         img = _as_loaded(c)
@@ -218,6 +211,15 @@ def topup_coeff_reorient(
         c_coeff = _apply_affine(newaff, 0.5 * (coeff_shape - 1))
         newaff[:3, 3] = c_ref - c_coeff
         out.append(Image(data, newaff, _coefficient_header(hdr, data, newaff, intent=True)))
+    if coeff_pe_dir[0] == "i" and out:
+        # Named once the coefficients are made: a shape that is not TOPUP's raises first in
+        # both modes, with nothing negated.
+        verb = "negated as sdcflows negates them" if reverse_pe < 0 else "kept"
+        detail = (
+            f"the coefficients of a phase encoding along {coeff_pe_dir!r} are {verb} "
+            "(sdcflows negates TOPUP's field for a BIDS 'i' direction)"
+        )
+        _defects.warn([("SDC-07", "sdcflows", upstream_defects, detail)])
     files = _write(out, _names(coeffs, "coefficients"), "_fixed", out_dir)
     return CoefficientsResult(tuple(out), files)
 

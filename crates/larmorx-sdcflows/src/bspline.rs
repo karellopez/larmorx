@@ -445,6 +445,43 @@ pub struct LevelWeights {
     /// SDC-02 corrected: the weights at every sample's own position (a rotated sampling grid).
     pub exact: Option<ExactLevel>,
     patterns: Option<[AxisPattern; 3]>,
+    /// `inv(ctrl.affine) @ target.affine` (the exact weights' map, for SDC-02's test).
+    to_grid: Mat4,
+}
+
+impl LevelWeights {
+    /// Whether the level stores no weight at all: a separable level some axis of which has
+    /// none (scipy's `kron` is then an empty float64 matrix), an exact level no sample of which
+    /// lies near the grid.
+    pub fn is_empty(&self) -> bool {
+        match &self.exact {
+            Some(e) => e.nnz == 0,
+            None => self.axes.iter().any(|a| a.nnz() == 0),
+        }
+    }
+
+    /// Whether SDC-02 changes this level's weights: the sampling grid is rotated relative to
+    /// the control grid and sdcflows' separable product or the exact weights store a weight
+    /// (both empty give the same zero rows).
+    pub fn sdc02_changes(&self) -> bool {
+        if self.aligned {
+            return false;
+        }
+        if !self.axes.iter().any(|a| a.nnz() == 0) {
+            return true;
+        }
+        match &self.exact {
+            Some(e) => e.nnz > 0,
+            None => {
+                let shape = [0, 1, 2].map(|a| self.axes[a].n_samples);
+                let knots = [0, 1, 2].map(|a| self.axes[a].n_knots);
+                ExactLevel::new(self.to_grid, shape, knots, self.dtype)
+                    .0
+                    .nnz
+                    > 0
+            }
+        }
+    }
 }
 
 /// The weights of a sampling grid rotated relative to the control grid, at every sample's own
@@ -595,6 +632,7 @@ pub fn grid_bspline_weights(
             beyond,
             exact: Some(exact),
             patterns: None,
+            to_grid,
         });
     }
     let empty = axes.iter().any(|a| a.nnz() == 0);
@@ -618,6 +656,7 @@ pub fn grid_bspline_weights(
         beyond,
         exact: None,
         patterns,
+        to_grid,
     })
 }
 
@@ -760,6 +799,43 @@ impl Collocation {
             let s = rows.map_or(r, |rs| rs[r]);
             let mut sum = 0.0f32;
             self.for_row(s, |c, w| sum += (w as f32) * v[c]);
+            sum
+        };
+        Ok(with_threads(n_threads, || {
+            (0..n).into_par_iter().with_min_len(1024).map(row).collect()
+        })?)
+    }
+
+    /// Whether scipy's `sparse_hstack` of the levels is float64 although the weights are
+    /// float32: a level some axis of which has no stored weight (no sample within 2 knots of
+    /// the grid), whose `kron` scipy returns early as an empty float64 matrix
+    /// (`scipy.sparse.kron`: `if A.nnz == 0 or B.nnz == 0`), upcasts the whole stack.
+    pub fn scipy_upcasts(&self) -> bool {
+        self.levels.iter().any(LevelWeights::is_empty)
+    }
+
+    /// `X @ v` for an `X` scipy holds as float64 ([`scipy_upcasts`](Self::scipy_upcasts)) and
+    /// a float32 `v`: `csr_matvec` in float64 (the float32 weights and values converted
+    /// exactly), each row a sum from +0 in ascending column order.
+    pub fn matvec_f64_upcast(
+        &self,
+        v: &[f32],
+        rows: Option<&[usize]>,
+        n_threads: usize,
+    ) -> Result<Vec<f64>, SdcError> {
+        self.check_f32()?;
+        if v.len() != self.n_cols {
+            return Err(SdcError::Invalid(format!(
+                "dimension mismatch: the matrix has {} columns, the vector {} values",
+                self.n_cols,
+                v.len()
+            )));
+        }
+        let n = rows.map_or(self.shape()[0], <[usize]>::len);
+        let row = |r: usize| -> f64 {
+            let s = rows.map_or(r, |rs| rs[r]);
+            let mut sum = 0.0f64;
+            self.for_row(s, |c, w| sum += f64::from(w as f32) * f64::from(v[c]));
             sum
         };
         Ok(with_threads(n_threads, || {

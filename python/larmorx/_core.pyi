@@ -822,7 +822,8 @@ def sdcflows_collocation_apply(
 ) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
     """``(X @ v, notices)`` (or ``X.T @ v``; ``X[rows] @ v`` with ``rows``) for the float32
     collocation matrix, in scipy's summation order, without storing the matrix; the notices of
-    SDC-01 and SDC-02."""
+    SDC-01 and SDC-02. ``X @ v`` is float64 where scipy's stacked matrix is (a level with an
+    axis of no weights: scipy's ``kron`` returns an empty float64 matrix)."""
 
 def sdcflows_dot_f32(x: np.ndarray, y: np.ndarray) -> float:
     """``np.dot(x, y)`` of two float32 vectors (numpy over OpenBLAS's Haswell ``sdot``)."""

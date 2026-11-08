@@ -84,7 +84,7 @@ fn level_notices(weights: &[bspline::LevelWeights], defects: UpstreamDefects) ->
                 ),
             ));
         }
-        if !w.aligned {
+        if w.sdc02_changes() {
             out.push(notice(
                 "SDC-02",
                 format!(
@@ -177,7 +177,9 @@ fn sdcflows_collocation_csr<'py>(
 /// `X @ v` (`transpose = False`, `v` of the columns' length) or `X.T @ v` (`transpose = True`)
 /// for sdcflows' float32 collocation matrix of `levels` on the sampling grid, in scipy's
 /// summation order, without storing the matrix. `rows` (int64) restricts `X @ v` to those rows.
-/// Returns `(values, notices)` (SDC-01's and SDC-02's, as `sdcflows_collocation_csr`).
+/// Returns `(values, notices)` (SDC-01's and SDC-02's, as `sdcflows_collocation_csr`). `X @ v`
+/// is float64 where scipy's stacked matrix is (a level with an axis of no weights:
+/// `Collocation::scipy_upcasts`), float32 otherwise.
 #[pyfunction]
 #[pyo3(signature = (target_shape, target_affine, levels, v, transpose = false, rows = None, n_threads = 1, upstream_defects = "fix"))]
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -191,7 +193,7 @@ fn sdcflows_collocation_apply<'py>(
     rows: Option<PyReadonlyArray1<'_, i64>>,
     n_threads: usize,
     upstream_defects: &str,
-) -> PyResult<(Bound<'py, PyArray1<f32>>, Vec<Notice>)> {
+) -> PyResult<(Bound<'py, PyAny>, Vec<Notice>)> {
     let t = mat4(&target_affine)?;
     let levels = levels_from_py(levels)?;
     let defects = mode_from_py(upstream_defects)?;
@@ -205,8 +207,12 @@ fn sdcflows_collocation_apply<'py>(
                 .collect::<PyResult<_>>()?,
         ),
     };
+    enum Values {
+        F32(Vec<f32>),
+        F64(Vec<f64>),
+    }
     let (out, notices) = py
-        .detach(|| -> Result<(Vec<f32>, Vec<Notice>), SdcError> {
+        .detach(|| -> Result<(Values, Vec<Notice>), SdcError> {
             let (col, _, notices) =
                 collocation(target_shape, &t, &levels, WeightType::Float32, defects)?;
             if let Some(r) = &rows
@@ -215,14 +221,20 @@ fn sdcflows_collocation_apply<'py>(
                 return Err(SdcError::Invalid("row index out of range".into()));
             }
             let out = if transpose {
-                col.rmatvec_f32(&v, n_threads)?
+                Values::F32(col.rmatvec_f32(&v, n_threads)?)
+            } else if col.scipy_upcasts() {
+                Values::F64(col.matvec_f64_upcast(&v, rows.as_deref(), n_threads)?)
             } else {
-                col.matvec_f32(&v, rows.as_deref(), n_threads)?
+                Values::F32(col.matvec_f32(&v, rows.as_deref(), n_threads)?)
             };
             Ok((out, notices))
         })
         .map_err(sdc_err)?;
-    Ok((PyArray1::from_vec(py, out), notices))
+    let arr = match out {
+        Values::F32(o) => PyArray1::from_vec(py, o).into_any(),
+        Values::F64(o) => PyArray1::from_vec(py, o).into_any(),
+    };
+    Ok((arr, notices))
 }
 
 /// `np.dot(x, y)` of two float32 vectors (numpy's `FLOAT_dot` over OpenBLAS's Haswell `sdot`).

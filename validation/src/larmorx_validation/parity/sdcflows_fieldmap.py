@@ -344,9 +344,13 @@ def _larmorx_outputs(call: str, f: dict, mode: str) -> tuple[list[np.ndarray] | 
                 t.fit(f["target"], f["xfm"], f["approx"], upstream_defects=mode)
                 arrays = [t.mapped.data]
             elif call == "apply":
+                # The unwarped series and the field it used (``mapped``, which
+                # ``ApplyCoeffsField`` writes as ``<in>_field``).
                 t = lx.sdcflows.B0FieldTransform(coeffs=f["coeffs"])
                 arrays = [t.apply(f["moving"], f["pe"], f["ro"], **f["kw"],
                                   upstream_defects=mode).data]  # fmt: skip
+                assert t.mapped is not None
+                arrays.append(t.mapped.data)
             elif call == "topup":
                 r = lx.sdcflows.topup_coeff_reorient(f["coeffs"], f["ref"], f["pe"],
                                                      upstream_defects=mode)  # fmt: skip

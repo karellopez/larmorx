@@ -3931,15 +3931,18 @@ explanation = "14 cases: GLIBC-07 named where the correctly rounded arctangent a
 # --- 3dvolreg's clean-room original (afni-volreg-original), its trial of 2026-11-08 ---------------
 # oracles/difftest/2026-11-08-volreg-original-trial (seed volreg-original-trial, 0.5 h, 4 jobs at one
 # thread, AFNI 26.3.05 through the oracle cache): 21,710 cases, 11,385 agree, 10,325 differ. A seeded
-# sample of 1,200 differences judged again with the part's final build and classified by
-# validation/investigations/afni-volreg-original/triage.py (docs/findings/afni-volreg-original.md).
+# sample of 1,200 differences judged again with the part's final build (relay 4) by
+# validation/investigations/afni-volreg-original/triage.py, which runs the descriptor's own judgement:
+# specs/3dvolreg.md §14.3's fixed requirements, then its "The ties' spread" (the spec writer's step 3
+# of 2026-11-08): 67 agree, 860 within the ties' spread, 268 runaways, 5 findings (the last two
+# entries) (docs/findings/afni-volreg-original.md).
 
 [[difference]]
 tool = "afni-volreg-original"
 implementation = "original"
 signature = ["AFNI: -NDfile parameters", "the replica (default): -NDfile parameters", "AFNI: -NDfile median", "the replica (default): -NDfile median", "AFNI: registered volumes", "the replica (default): registered volumes"]
 status = "explained"
-explanation = "The shear decomposition's exact ties (specs/3dvolreg.md §5.3, §16): the original cannot follow AFNI's choice between orders of equal norm. Of the 1,200 sampled differences: 676 within the original's own tie spread (one of its tie sides, LARMORX_VOLREG_TIES, meets every threshold, or the sides move it as far), 245 runaway fits (rotations beyond 15 degrees or 20 mm on 12- to 32-voxel phantoms, far outside the small motions 3dvolreg is made for; AFNI-97 met by AFNI in some), 80 fits stopped at the iteration limit (oscillating, not converged), 23 with the parameters within their bounds, 43 agreeing with the final build (fixed since the night), and 133 converged beyond what the original's four global tie sides span (AFNI mixes the sides resampling by resampling, which cannot be measured from outside; reported to the spec writer with the question whether §14.3 should bound ill-conditioned fits)."
+explanation = "The shear decomposition's exact ties (specs/3dvolreg.md §5.3, §16): AFNI decides each resampling's tie its own way, and on random testing's small phantoms with sharp edges the fits are ill-conditioned with respect to them (the spec writer: AFNI's own parameters move by a median of 25 thresholds over its tie variants). Judged by §14.3's 'The ties' spread': of the 1,200 sampled differences 860 lie within 3 times the original's own spread over 12 seeded tie draws (LARMORX_VOLREG_TIES=random:1 to 12; 9 times for 1 - NCC), 268 are runaways (beyond 15 degrees or 20 mm, or AFNI-97) whose files, headers, types, dimensions and masked messages agree, 67 agree with the fixed requirements; two lie at the edge of 3 times the 12-draw spread (case 13852: 27.0 thresholds against 22.3; case 18762: a median of 0.0516 against 0.0504) and within it when the spread is measured from 36 draws (triage.py --seeds 36): the spread is a sampled estimate."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]
@@ -3947,7 +3950,7 @@ tool = "afni-volreg-original"
 implementation = "original"
 signature = ["AFNI: messages", "the replica (default): messages"]
 status = "explained"
-explanation = "Numbers that follow from the parameters (the maximum displacements, the parameters' summary) beyond their derived bounds where the parameters are (the entry above); and the coarse search's weight percentage (-verbose's w[...%]), which counted the weight's non-zero voxels instead of its automask's: fixed after the night (AFNI's percentage on every case checked)."
+explanation = "The parameters' summary (++ Min/Mean/Max) and the derivative images' ranges with -verbose -verbose follow the parameters and the ties (the entry above): within 3 times the ties' spread in every sampled case; the largest displacement is held to the larger of its two sub-bricks' bounds (a check corrected in relay 4); and the coarse search's weight percentage (-verbose's w[...%]), which counted the weight's non-zero voxels instead of its automask's: fixed after the night (AFNI's percentage on every case checked)."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]
@@ -3955,7 +3958,7 @@ tool = "afni-volreg-original"
 implementation = "original"
 signature = ["AFNI: standard output (-rotcom)", "the replica (default): standard output (-rotcom)"]
 status = "explained"
-explanation = "-rotcom's 3drotate commands print the parameters: beyond their bounds where the parameters are (the first entry)."
+explanation = "-rotcom's 3drotate commands print the parameters: within 3 times the ties' spread where the parameters are (the first entry)."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]
@@ -3970,16 +3973,16 @@ link = "docs/findings/afni-volreg-original.md"
 tool = "afni-volreg-original"
 implementation = "original"
 signature = ["-SAVEDISP step N: the normalisation, and the products of one or two factors, on AFNI's raw displacements"]
-status = "open"
-explanation = "§10.3's arithmetic applied to AFNI's own raw -savedisp values gives AFNI's three normalised datasets bit for bit, but its sixteen products differ at a few voxels (second- and third-order alike, 2 to 26 values of 20,000 to 250,000): the products' order of operations is a question for the spec writer; the check now requires the normalisation and reports the products."
+status = "fixed"
+explanation = "§10.3's arithmetic applied to AFNI's own raw -savedisp values gave AFNI's three normalised datasets bit for bit but its sixteen products differed at a few voxels: the line's coefficients in the spec writer's double order (§10.3 step 1, step 3 of 2026-11-08) give AFNI's nineteen datasets bit for bit (savedisp.py --original: 0 values differ on s1 and ds000005); the suite's step 1 requires the products too since relay 4."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]
 tool = "afni-volreg-original"
 implementation = "original"
 signature = ["defects named as the replica's default"]
-status = "fixed"
-explanation = "The option scan's notices (AFNI-86, -90, -95) were not printed when a run stopped with a later error, AFNI-97 was never named, and AFNI-99 was named from -maxdisp1D's three decimals when no file was written: fixed after the night (the notices before any error, in the order of their IDs, as the replica prints them)."
+status = "explained"
+explanation = "Fixed after the night: the option scan's notices (AFNI-86, -90, -95) were not printed when a run stopped with a later error, AFNI-97 was never named, AFNI-99 was named from -maxdisp1D's three decimals when no file was written, and (relay 4) AFNI-92 was named for a run that stopped before its first pass and the notices were printed by ID alone (now phase by phase, as the replica). Explained: 3 of the 1,200 sampled cases name AFNI-99 in one program only because the maximum displacement lies on a rounding boundary of its two-decimal message (case 5378: the original 2.02 mm by default and 2.01 with reproduce, the replica 2.02 in both): whether the printed value changes with AFNI-99's correction follows the parameters' last digits, which the ties decide."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]
@@ -3987,7 +3990,7 @@ tool = "afni-volreg-original"
 implementation = "original"
 signature = ["AFNI: exit status", "AFNI: files written", "AFNI: standard output"]
 status = "explained"
-explanation = "AFNI-97: AFNI's runaway Fourier first passes (rotations of hundreds of degrees) met a lone row shifted beyond the row and AFNI crashed; the original's runaway path differs (the decomposition's ties) and ends with other meaningless parameters. The original now names AFNI-97 by default and stops as AFNI does with reproduce wherever it meets the condition itself (found by this night: no trigger was known before)."
+explanation = "AFNI-97: AFNI's runaway Fourier first passes (rotations of hundreds of degrees) met a lone row shifted beyond the row and AFNI crashed; whether a run meets the condition is the ties' choice (the spec writer: in 2 to 12 of AFNI's 16 tie variants). The original names AFNI-97 by default and stops as AFNI does with reproduce wherever it meets the condition itself; random testing accepts an exit status that differs only by AFNI-97 (§14.3 point 4)."
 link = "docs/findings/afni-volreg-original.md"
 
 [[difference]]

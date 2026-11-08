@@ -33,19 +33,21 @@ visible change made AFNI-99's notice exact, then 20,824, every one agreeing).
 the merge): held to `specs/3dvolreg.md` §14.3's thresholds, not to AFNI's bits (the shear
 decomposition's exact ties, below), in its record
 ([afni-volreg-original](../validation/afni-volreg-original.md), the standard tier from a clean
-commit: 251 cases, 181 pass, 63 refused alike with the same messages (every error, AFNI-88, -89,
--90, -94, -96 included), 6 expected divergences, 1 open: every option, data type, orientation,
-message and failure case; fMRIPrep's RobustAverage call on 8 BOLD references of 6 oracle runs
-and sdcflows' 2 PEPOLAR averages, whose inputs re-made in fMRIPrep's image give fMRIPrep's own
-medians from AFNI's volumes byte for byte: the original's medians within 1.7e-5 of the largest
-value on 7 (one stored int16 step), ds005454's and ds004958's within the thresholds with the other
-tie side, and ds000256's high-motion child run at 3.1e-4 against 1e-4 even with each volume's tie
-side (an open question for the spec writer); 417 of 1,096 `-1Dfile` lines
-identical with AFNI's; the default held to the replica's default by the same thresholds, with the
-defects named the same; every byte the same at 1, 2, 5 and 14 threads), and a random-testing trial
-(21,710 cases, 11,385 agreeing; the differences triaged in `validation/difftest/triage.toml`:
-the ties, runaway fits, fits that do not converge;
-[findings](../findings/afni-volreg-original.md)).
+commit: 251 cases, 185 pass, 63 refused alike with the same messages (every error, AFNI-88, -89,
+-90, -94, -96 included), 3 expected divergences (larmorx refuses AFNI's .HEAD/.BRIK format, twice,
+and AFNI-96's short attribute, rule B), none failing: every option, data type, orientation, message and
+failure case; fMRIPrep's RobustAverage call on 8 BOLD references of 6 oracle runs and sdcflows' 2
+PEPOLAR averages, whose inputs re-made in fMRIPrep's image give fMRIPrep's own medians from AFNI's
+volumes byte for byte: the original's medians within 0.115 of the limit their volumes imply
+(ds000256's high-motion child run; 0.0016 or less on the others), its registered volumes within
+0.68 of each volume's limit (the same run, as AFNI's own tie variants), `-final NN` within the
+nearest-neighbour rule, `-SAVEDISP`'s nineteen datasets bit for bit on AFNI's raw displacements;
+417 of 1,096 `-1Dfile` lines identical with AFNI's; the default held to the replica's default by
+the same thresholds, with the defects named the same; every byte the same at 1, 2, 5 and 14
+threads), and a random-testing trial (21,710 cases, 11,385 agreeing; a seeded sample of 1,200 of
+the differences judged again with the final build: 67 agree, 860 within 3 times the original's
+own spread under the ties, 268 runaways whose structure agrees, 5 explained; triaged in
+`validation/difftest/triage.toml`; [findings](../findings/afni-volreg-original.md)).
 
 ## Quick start
 
@@ -158,11 +160,15 @@ AFNI's evaluation decides between them by its last bits, at every resampling, an
 specified (§5.3 "Numerics", §16), so the original cannot follow it. Its parameters then differ
 from AFNI's within the convergence thresholds (fMRIPrep's calls: at most 0.002 of a degree or mm),
 its registered volumes at single edge voxels (Fourier's wrap-around along the axes a shear
-shifts). `LARMORX_VOLREG_TIES` (`first`, `last`, or an index 0 to 5; a validation switch, not a
-setting) makes the original take a given side of every tie: the record re-examines each failure
-with the four sides. On small phantoms with sharp edges, whose fits are weakly determined, the
-ties move converged results beyond the thresholds (random testing; an open question for the spec
-writer).
+shifts). §14.3's limits allow for AFNI's own spread under the ties as the spec writer measured
+it: each registered volume within a limit that grows with its rotation, fMRIPrep's median within
+the limit its volumes imply, `-final NN` by a nearest-neighbour rule (a tie decided the other way
+moves whole rows by a voxel). `LARMORX_VOLREG_TIES` (a validation switch, not a setting) makes
+the original take a given side of every tie (`first`, `last`, or an index 0 to 5) or draw each tie
+at random at every resampling (`random:<seed>`, the same bits at any thread count). On random
+testing's small phantoms with sharp edges, whose fits are ill-conditioned with respect to the ties,
+a case beyond the fixed limits is judged by the original's own spread over 12 seeded draws (§14.3
+"The ties' spread"), and a runaway (beyond 15° or 20 mm, or AFNI-97) by its output's structure.
 
 | | AFNI 26.3.05 | replica | original |
 |---|---|---|---|

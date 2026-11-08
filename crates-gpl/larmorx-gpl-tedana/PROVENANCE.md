@@ -29,7 +29,11 @@ none of this crate's code.
 | `src/data.rs` | `tedana/io.py` (`load_ref_img`, `load_data_nilearn` and its `_mask_4d`, `_convert_to_nifti1`), `tedana/utils.py` (`load_mask`, the user-mask branch) |
 | `src/adaptive.rs` | `tedana/utils.py` (`make_adaptive_mask`) |
 | `src/decay.rs` | `tedana/decay.py` (`monoexponential`, `_fit_single_voxel`, `fit_monoexponential`, `fit_loglinear`, `fit_decay`, `fit_decay_ts`) |
-| `src/workflow.rs` | `tedana/workflows/t2smap.py` (`t2smap_workflow` up to the fit, `_main`), `tedana/utils.py` (`check_te_values`, `parse_volume_indices`), `tedana/io.py` (`OutputGenerator.__init__`, `_infer_prefix`), `tedana/resources/config/outputs.json` (the confounds table's names) |
+| `src/maps.rs` | `tedana/decay.py` (`_apply_t2s_floor`, `modify_t2s_s0_maps`, `rmse_of_fit_decay_ts`, `monoexponential`), `tedana/utils.py` (`unmask`) |
+| `src/combine.rs` | `tedana/combine.py` (`make_optcom`, `_combine_t2s`, `_combine_paid`) |
+| `src/outputs.rs` | `tedana/io.py` (`OutputGenerator`: `_determine_extension`, `get_name`, `save_file`, `save_img`, `save_json`, `save_tsv`, `save_self`, `register_mask`; `CustomEncoder`, `prep_data_for_json`), `tedana/resources/config/outputs.json` (the names of t2smap's files), `tedana/utils.py` (`get_system_version_info`'s fields) |
+| `src/data.rs`'s `compute_mask` | `tedana/utils.py` (`load_mask`, the branch without a mask), `tedana/io.py` (`load_ref_img`: the reference nilearn masks) |
+| `src/workflow.rs` | `tedana/workflows/t2smap.py` (`t2smap_workflow`, `_main`), `tedana/utils.py` (`check_te_values`, `parse_volume_indices`), `tedana/io.py` (`OutputGenerator.__init__`, `_infer_prefix`), `tedana/resources/config/outputs.json` (the confounds table's names) |
 | `examples/t2smap_stages.rs`, `examples/t2smap_parse.rs` | (larmorx's own: the validation's programs) |
 
 The line numbers the log prints (`%(module)s:%(funcName)s:%(lineno)d`) are those of tedana
@@ -46,7 +50,13 @@ crate uses: numpy 2.5.4 and 2.3.5's reductions, percentiles, float32 `log` and a
 beside tedana's code: nilearn 0.14.1's `masking.apply_mask` path that tedana's loader falls back
 on (`check_niimg_3d`'s squeeze of a one-volume 4D mask, `load_mask_img`'s empty-mask error,
 `apply_mask_fmri`'s affine and shape checks and their messages, `smooth_array`'s zeroing of
-non-finite values; BSD-3-Clause, "Copyright (c) The nilearn developers"), numpy's layout of a
+non-finite values; and, for the files, `masking.unmask` and `image.new_img_like(...,
+copy_header=False)`: a fresh header from the mask's affine, `load_mask_img`'s empty-mask error;
+BSD-3-Clause, "Copyright (c) The nilearn developers"), nibabel 5.4.2's fresh `Nifti1Image` header
+(`SpatialImage.update_header`'s affine test, `_affine2header`, `set_zooms` and its errors; MIT),
+pandas 3.0.6's `to_csv` of a float frame (numpy's `astype(str)`, `na_rep`; BSD-3-Clause), numpy's
+`average` with its two summation orders (the weights of `fitmode ts` are echo-innermost in
+memory: pairwise), numpy's layout of a
 boolean index on the last axis (the excluded-volume copy, whose temporal mean numpy sums in
 order), and nibabel's choice of image class by extension and magic.
 
@@ -69,3 +79,18 @@ order), and nibabel's choice of image class by extension and magic.
   negative numbers, `--`), all identical (exit status, standard output and error, values).
 - `check_failures.py`: 11 failure cases (the TED defects' and tedana's own clear errors): with
   `reproduce` tedana's exit status and last line, by default the defect named.
+
+## Verification (relay 5b, 2026-11-08)
+
+`validation/investigations/t2smap/replica/check_outputs.py`: tedana 26.0.3's `t2smap` program
+against `larmorx-gpl tedana t2smap` (`LARMORX_UPSTREAM_DEFECTS=reproduce`), every output file
+(images' decompressed bytes: every header field and every value bit for bit; the confounds
+table's text; the registry; `dataset_description.json` but for the host and Python fields, D6;
+`t2smap_call.sh`), the logger's lines, the exit status and the last error line: 33 cases, all
+identical, in the newest environment (numpy 2.5.4, SciPy 1.18.1) and in the shared one (numpy
+2.3.5, SciPy 1.15.3): fMRIPrep's four multi-echo calls (curvefit; ds003592 also loglin), the 13
+synthetic cases of `check_stages.py`, and 15 more (no mask: nilearn's `compute_epi_mask` on
+float32, scaled int16 and z-concatenated data; PAID in both fit modes; `--verbose` with the
+`orig` convention and a prefix, and per volume; nine echoes per volume and over all volumes;
+one volume; constant voxels with PAID (TED-15); an image nilearn finds no mask in (TED-03); an
+existing output without and with `--overwrite`). Logs: `oracles/logs/t2smap-1-relay5b-outputs-*.log`.

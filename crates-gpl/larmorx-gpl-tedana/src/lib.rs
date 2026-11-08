@@ -14,6 +14,9 @@
 //! - [`adaptive`], `tedana.utils.make_adaptive_mask`.
 //! - [`decay`], `tedana.decay`'s fits: `fit_loglinear` (numpy's `lstsq`), `fit_monoexponential`
 //!   (SciPy's `curve_fit`), `fit_decay`, `fit_decay_ts`.
+//! - [`maps`], `tedana.decay.modify_t2s_s0_maps` and `rmse_of_fit_decay_ts`, `utils.unmask`.
+//! - [`combine`], `tedana.combine.make_optcom`.
+//! - [`outputs`], `tedana.io.OutputGenerator`: the files' names, images, table and JSON.
 //! - [`workflow`], `tedana.workflows.t2smap` (`t2smap_workflow`, `_main`).
 //!
 //! The numerics tedana calls are numpy's and SciPy's, translated in the main package's
@@ -35,9 +38,12 @@
 #![forbid(unsafe_code)]
 
 pub mod adaptive;
+pub mod combine;
 pub mod data;
 pub mod decay;
 pub mod log;
+pub mod maps;
+pub mod outputs;
 pub mod parser;
 pub mod workflow;
 

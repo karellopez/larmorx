@@ -11,8 +11,9 @@
 //!   error messages and exit statuses.
 //! - [`textwrap`]: `textwrap.wrap` with its default options (argparse wraps help text with it).
 //! - [`number`]: `float(str)` and `int(str)` as Python parses them, and `repr(float)`.
+//! - [`json`]: `json.dump` with an indent (`Lib/json/encoder.py`).
 //!
-//! Upstream: CPython 3.12.16 `Lib/argparse.py`, `Lib/textwrap.py`, `Lib/shutil.py`
+//! Upstream: CPython 3.12.16 `Lib/argparse.py`, `Lib/json/encoder.py`, `Lib/textwrap.py`, `Lib/shutil.py`
 //! (`get_terminal_size`), `Objects/floatobject.c`, `Objects/longobject.c`, `Python/pystrtod.c`
 //! (PSF License Version 2; "Copyright (c) 2001-2024 Python Software Foundation; All Rights
 //! Reserved"; the licence text in NOTICE). The behaviour is re-expressed in Rust; no code was
@@ -20,5 +21,6 @@
 //! are not ported (no program ported so far uses them).
 
 pub mod argparse;
+pub mod json;
 pub mod number;
 pub mod textwrap;

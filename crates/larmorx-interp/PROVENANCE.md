@@ -54,3 +54,25 @@ reproduces SciPy's notice.
   would then read outside its buffer (index arithmetic that overflows), larmorx returns NaN.
 - `Spline::sample_batch` evaluates interior points four at a time; each point keeps SciPy's
   own order of operations, so the values are the same.
+
+## SciPy's 1D Gaussian filter and binary morphology, nilearn's EPI mask (`src/ndimage/filters.rs`, `src/ndimage/morphology.rs`, `src/nilearn.rs`)
+
+**Ported** (2026-11-08, for tedana's `t2smap` without a mask) from SciPy 1.18.1 (the workspace's
+`tags/scipy-1.18.1/`, BSD-3-Clause; SciPy 1.15.3 has the same code on these paths) and nilearn
+0.14.1 (BSD-3-Clause, "Copyright (c) The nilearn developers"; as installed in both Python
+environments). Results are bit-identical to them (`validation/investigations/t2smap/replica/
+check_outputs.py`: tedana's masks without `--mask` on float32, scaled int16 and z-concatenated
+data, in both environments).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `ndimage::filters::gaussian_weights`, `gaussian_filter1d` (order 0) | SciPy 1.18.1 `scipy/ndimage/_filters.py` (`_gaussian_kernel1d`, `gaussian_filter1d`) | BSD-3-Clause |
+| `ndimage::filters::correlate1d_reflect` (the symmetric, antisymmetric and general loops; the line buffer's reflection) | SciPy 1.18.1 `scipy/ndimage/src/ni_filters.c` (`NI_Correlate1D`), `src/ni_support.c` (`NI_ExtendLine`, `NI_EXTEND_REFLECT`); `_filters.py` (`correlate1d`) | BSD-3-Clause |
+| `ndimage::morphology::{binary_erosion, binary_dilation}` (the default cross structure, `border_value=0`, iterations) | SciPy 1.18.1 `scipy/ndimage/_morphology.py` (`_binary_erosion`, `binary_erosion`, `binary_dilation`), `src/ni_morphology.c` (`NI_BinaryErosion`, `CASE_NI_ERODE_POINT`: the border value inverted for dilation) | BSD-3-Clause |
+| `ndimage::morphology::label` (face connectivity; regions numbered by their first voxel in C order) | SciPy 1.18.1 `scipy/ndimage/_measurements.py` (`label`), `src/_ni_label.pyx` (the line scan and merge table) | BSD-3-Clause |
+| `nilearn::compute_epi_mask` (`compute_mean` with `smooth=1`, `smooth_array`, `ensure_finite_data`, the cut-offs and gap threshold, `_post_process_mask`, `largest_connected_component`) | nilearn 0.14.1 `nilearn/masking.py` (`compute_epi_mask`, `_post_process_mask`), `nilearn/image/image.py` (`compute_mean`, `smooth_array`), `nilearn/_utils/ndimage.py` (`largest_connected_component`), `nilearn/_utils/niimg.py` (`ensure_finite_data`) | BSD-3-Clause |
+
+The memory layout that sets the temporal mean's order (`nilearn::Layout`) was measured: nibabel's
+arrays from files are Fortran-ordered, the `get_fdata()` of a sliced image (tedana's reference of
+z-concatenated data) C-ordered. SciPy's `_nd_image` modules of both environments contain no fused
+multiply-add instructions (`objdump`), so every product and sum of the correlation is rounded.

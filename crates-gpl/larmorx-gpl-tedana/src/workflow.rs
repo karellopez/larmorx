@@ -12,15 +12,22 @@
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use larmorx_core::defects::{Notices, TED_02, TED_04, TED_10, TED_12, TED_13, UpstreamDefects};
+use larmorx_core::defects::{
+    Notices, TED_02, TED_03, TED_04, TED_07, TED_08, TED_10, TED_12, TED_13, UpstreamDefects,
+};
+use larmorx_core::numpy::NpFloat;
 use larmorx_core::python::argparse::{formatter_width, py_repr_str};
+use larmorx_core::python::json::Value;
 use larmorx_core::python::number::parse_int;
 
 use crate::adaptive::make_adaptive_mask;
+use crate::combine::{CombMode, make_optcom};
 use crate::data::{self, LoadPath, Masked, RefImage, UserMask};
 use crate::decay::{Context, Fit, Libraries, fit_decay, fit_decay_ts};
 use crate::log::{Log, PyError, Site};
-use crate::parser::{self, Settings};
+use crate::maps::{modify_t2s_s0_maps, rmse_of_fit_decay_ts, unmask};
+use crate::outputs::{ImgData, Outputs, confounds_tsv, uname};
+use crate::parser::{self, FitType, Settings};
 
 /// What the program reads from its environment.
 #[derive(Clone, Debug, Default)]
@@ -163,6 +170,10 @@ fn py_list_ints(v: &[i128]) -> String {
 
 /// The workflow's state after the fit.
 pub struct Stages {
+    /// `t2smap_command` (`"t2smap " + " ".join(argv)`).
+    pub command: String,
+    /// The output generator, with the adaptive mask saved.
+    pub outputs: Outputs,
     pub settings: Settings,
     pub out_dir: String,
     pub prefix: String,
@@ -283,7 +294,12 @@ pub fn prepare_and_fit(
     }
 
     // load_mask
-    let Some(mask_path) = settings.mask.clone() else {
+    let threads = threads(&settings);
+    let user_mask = settings.mask.is_some();
+    let mask = if let Some(mask_path) = settings.mask.clone() {
+        log.info(Site("utils", "load_mask", 916), "Using user-defined mask");
+        data::load_user_mask(&mask_path, threads)?
+    } else {
         log.warning(
             Site("utils", "load_mask", 943),
             "Computing EPI mask from first echo using nilearn's compute_epi_mask function. Most \
@@ -291,15 +307,51 @@ pub fn prepare_and_fit(
              recommended to provide an external mask, and to visually confirm that mask \
              accurately conforms to data boundaries.",
         );
-        return Err(PyError::new(
-            "NotImplementedError",
-            "nilearn's compute_epi_mask is the next relay's (5b) work in larmorx-gpl",
-            "tedana/utils.py, in load_mask",
-        ));
+        let ted03 = "give a mask with --mask (tedana fails later with an unrelated error)";
+        match data::compute_mask(&settings.data, &reference, notices.reproduce(), threads) {
+            Ok((m, empty)) => {
+                if empty {
+                    log.warn(
+                        "tedana/utils.py",
+                        949,
+                        "MaskWarning",
+                        "Computed an empty mask. Are you sure that input data are EPI images not \
+                         detrended. ",
+                        "mask_img = compute_epi_mask(ref_img)",
+                    );
+                    notices.add(&TED_03, "nilearn's compute_epi_mask found an empty mask");
+                    if notices.fix() {
+                        return Err(PyError::value_error(
+                            format!(
+                                "nilearn's compute_epi_mask found no voxels in the first echo; \
+                                 {ted03}"
+                            ),
+                            "tedana/utils.py, in load_mask",
+                        ));
+                    }
+                }
+                m
+            }
+            Err(e) => {
+                if e.class == "ValueError" && e.message.starts_with("attempt to get argmax") {
+                    notices.add(
+                        &TED_03,
+                        "nilearn's compute_epi_mask has too few voxels to find a threshold",
+                    );
+                    if notices.fix() {
+                        return Err(PyError::value_error(
+                            format!(
+                                "the first echo has too few voxels for nilearn's \
+                                 compute_epi_mask to find a threshold; {ted03}"
+                            ),
+                            "tedana/utils.py, in load_mask",
+                        ));
+                    }
+                }
+                return Err(e);
+            }
+        }
     };
-    log.info(Site("utils", "load_mask", 916), "Using user-defined mask");
-    let threads = threads(&settings);
-    let mask = data::load_user_mask(&mask_path, threads)?;
 
     log.info(
         Site("t2smap", "t2smap_workflow", 414),
@@ -323,7 +375,7 @@ pub fn prepare_and_fit(
     }
     // TED-04: the mask's affine against the data's (tedana does not compare them).
     let first = data::load_header(&settings.data[0])?;
-    if !affines_close(&mask.header.affine, &first.affine) {
+    if user_mask && !affines_close(&mask.header.affine, &first.affine) {
         notices.add(&TED_04, "the mask's affine differs from the data's");
         if notices.fix() {
             return Err(PyError::value_error(
@@ -479,6 +531,22 @@ pub fn prepare_and_fit(
             denoise.iter().filter(|&&b| b).count()
         )
     });
+    let mut outputs = Outputs {
+        out_dir: out_dir.clone(),
+        prefix: prefix.clone(),
+        convention: settings.convention.clone(),
+        overwrite: settings.overwrite,
+        shape: masked.spatial,
+        affine: mask.header.affine,
+        voxels: masked.voxels.clone(),
+        ref_zooms: reference.zooms.clone(),
+        release: env.libraries.lapack(),
+        n_threads: threads,
+        registry: Vec::new(),
+    };
+    let am32: Vec<i32> = adaptive.iter().map(|&a| a as i32).collect();
+    outputs.save_img("adaptive mask img", ImgData::I32(&am32), None, None)?;
+    drop(am32);
     log.info(Site("t2smap", "t2smap_workflow", 458), "Computing T2* map");
     let kept: Vec<usize> = (0..n_samp).filter(|&v| denoise[v]).collect();
     let mut dm = Vec::with_capacity(kept.len() * e * nf);
@@ -507,6 +575,8 @@ pub fn prepare_and_fit(
         fit_decay(&dm, e, nf, &tes, &am, settings.fittype, &ctx, log, notices)?
     };
     Ok(Stages {
+        command: call,
+        outputs,
         settings,
         out_dir,
         prefix,
@@ -520,6 +590,267 @@ pub fn prepare_and_fit(
         denoise,
         fit,
     })
+}
+
+/// The libraries' versions of the environment whose results are reproduced, as tedana lists
+/// them in `dataset_description.json` (`get_system_version_info`).
+fn library_versions(libraries: Libraries) -> Vec<(String, Value)> {
+    let (numpy, scipy) = match libraries {
+        Libraries::Newest => ("2.5.4", "1.18.1"),
+        Libraries::Shared => ("2.3.5", "1.15.3"),
+    };
+    [
+        ("bokeh", "3.10.0"),
+        ("matplotlib", "3.11.2"),
+        ("mapca", "0.0.8"),
+        ("nibabel", "5.4.2"),
+        ("nilearn", "0.14.1"),
+        ("numpy", numpy),
+        ("pandas", "3.0.6"),
+        ("robustica", "0.1.4"),
+        ("scikit-learn", "1.9.1"),
+        ("scipy", scipy),
+        ("threadpoolctl", "3.7.0"),
+        ("tqdm", "4.70.1"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), Value::str(v)))
+    .collect()
+}
+
+fn to_f32(v: &[f64]) -> Vec<f32> {
+    v.iter().map(|&x| f32::from_f64(x)).collect()
+}
+
+fn ms_to_s(v: &[f64]) -> Vec<f32> {
+    v.iter().map(|&x| f32::from_f64(x.div(1000.0))).collect()
+}
+
+/// `t2smap_workflow` after the fit: the failures and variance maps, the floors and caps, the
+/// maps, the RMSE and its table, the optimal combination, the JSON files, the last messages.
+pub fn finish(
+    st: Stages,
+    env: &Env,
+    log: &mut Log<'_>,
+    notices: &mut Notices,
+) -> Result<(), PyError> {
+    let Stages {
+        command,
+        mut outputs,
+        settings,
+        tes,
+        masked,
+        adaptive,
+        denoise,
+        fit,
+        ..
+    } = st;
+    let reproduce = notices.reproduce();
+    let threads = threads(&settings);
+    let (e, n_vols) = (masked.n_echos, masked.n_vols);
+    // fit_decay_ts fits every volume (it refuses --exclude): one column per volume.
+    let cols = if settings.fit_ts { n_vols } else { 1 };
+    let volumes = settings.fit_ts.then_some(n_vols);
+    let am_fit: Vec<i64> = adaptive
+        .iter()
+        .zip(&denoise)
+        .filter(|&(_, &d)| d)
+        .map(|(&a, _)| a)
+        .collect();
+    if settings.fittype == FitType::Curvefit {
+        let failures = fit.failures.as_ref().expect("curvefit's failures");
+        if fit.count1_failed > 0 {
+            notices.add(
+                &TED_08,
+                format!(
+                    "{} failed fit(s) of voxels with one good echo marked in the failures map",
+                    fit.count1_failed
+                ),
+            );
+        }
+        let f8: Vec<u8> = failures.iter().map(|&b| u8::from(b)).collect();
+        outputs.save_img(
+            "fit failures img",
+            ImgData::U8(&f8),
+            volumes,
+            Some(&denoise),
+        )?;
+        if settings.verbose {
+            notices.add(
+                &TED_07,
+                "the T2* and S0 variance maps hold their own variances",
+            );
+            if fit.count1_fitted > 0 {
+                notices.add(
+                    &TED_08,
+                    format!(
+                        "the variances of {} voxel(s) with one good echo kept in the variance \
+                         maps",
+                        fit.count1_fitted
+                    ),
+                );
+            }
+            let t2v = fit.t2s_var.as_ref().expect("curvefit");
+            let s0v = fit.s0_var.as_ref().expect("curvefit");
+            let (first, second) = if reproduce { (s0v, t2v) } else { (t2v, s0v) };
+            let cov = fit.covar.as_ref().expect("curvefit");
+            outputs.save_img(
+                "t2star variance img",
+                ImgData::F32(&to_f32(first)),
+                volumes,
+                Some(&denoise),
+            )?;
+            outputs.save_img(
+                "s0 variance img",
+                ImgData::F32(&to_f32(second)),
+                volumes,
+                Some(&denoise),
+            )?;
+            outputs.save_img(
+                "t2star-s0 covariance img",
+                ImgData::F32(&to_f32(cov)),
+                volumes,
+                Some(&denoise),
+            )?;
+        }
+    }
+    let Fit { t2s, s0, .. } = fit;
+    let maps = modify_t2s_s0_maps(t2s, s0, &am_fit, cols, &tes, log, notices);
+    let t2s_full = unmask(&maps.t2s_full, &denoise, cols);
+    let s0_full = unmask(&maps.s0_full, &denoise, cols);
+    let t2s_limited = unmask(&maps.t2s_limited, &denoise, cols);
+    let s0_limited = unmask(&maps.s0_limited, &denoise, cols);
+    drop(maps);
+    outputs.save_img("s0 img", ImgData::F32(&to_f32(&s0_full)), volumes, None)?;
+    drop(s0_full);
+    log.info(
+        Site("t2smap", "t2smap_workflow", 505),
+        "Calculating model fit quality metrics",
+    );
+    let rmse = rmse_of_fit_decay_ts(
+        &masked.data,
+        e,
+        n_vols,
+        &tes,
+        &adaptive,
+        &t2s_limited,
+        &s0_limited,
+        cols,
+        reproduce,
+        threads,
+        log,
+    );
+    outputs.save_img("rmse img", ImgData::F32(&rmse.map), None, None)?;
+    outputs.save_tsv("confounds tsv", &confounds_tsv(&rmse))?;
+    drop(rmse);
+    outputs.save_img(
+        "limited s0 img",
+        ImgData::F32(&to_f32(&s0_limited)),
+        volumes,
+        None,
+    )?;
+    drop(s0_limited);
+    outputs.save_img(
+        "limited t2star img",
+        ImgData::F32(&ms_to_s(&t2s_limited)),
+        volumes,
+        None,
+    )?;
+    drop(t2s_limited);
+    log.info(
+        Site("t2smap", "t2smap_workflow", 521),
+        "Computing optimal combination",
+    );
+    let mode = if settings.paid {
+        CombMode::Paid
+    } else {
+        CombMode::T2s
+    };
+    let combined = make_optcom(
+        &masked.data,
+        e,
+        n_vols,
+        &tes,
+        &adaptive,
+        &t2s_full,
+        cols,
+        mode,
+        threads,
+        log,
+        notices,
+    )?;
+    drop(masked);
+    outputs.save_img(
+        "t2star img",
+        ImgData::F32(&ms_to_s(&t2s_full)),
+        volumes,
+        None,
+    )?;
+    drop(t2s_full);
+    outputs.save_img("combined img", ImgData::F32(&combined), Some(n_vols), None)?;
+    drop(combined);
+
+    let [system, node, release, version, machine, processor] = uname();
+    fn s(v: impl Into<String>) -> Value {
+        Value::str(v)
+    }
+    let generated = Value::Dict(vec![
+        ("Name".into(), s("t2smap")),
+        ("Version".into(), s(crate::TEDANA_VERSION)),
+        (
+            "Description".into(),
+            s(
+                "A pipeline estimating T2* from multi-echo fMRI data and combining data across \
+               echoes.",
+            ),
+        ),
+        ("CodeURL".into(), s("https://github.com/ME-ICA/tedana")),
+        (
+            "Node".into(),
+            Value::Dict(vec![
+                ("Name".into(), s(node)),
+                ("System".into(), s(system)),
+                ("Machine".into(), s(machine)),
+                ("Processor".into(), s(processor)),
+                ("Release".into(), s(release)),
+                ("Version".into(), s(version)),
+            ]),
+        ),
+        (
+            "Python".into(),
+            s(format!(
+                "larmorx-gpl {} (tedana {}'s t2smap translated to Rust, with the results of \
+                 Python 3.12.16 and the libraries listed)",
+                env!("CARGO_PKG_VERSION"),
+                crate::TEDANA_VERSION
+            )),
+        ),
+        (
+            "Python_Libraries".into(),
+            Value::Dict(library_versions(env.libraries)),
+        ),
+        ("Command".into(), s(command)),
+    ]);
+    let description = Value::Dict(vec![
+        ("Name".into(), s("t2smap Outputs")),
+        ("BIDSVersion".into(), s("1.5.0")),
+        ("DatasetType".into(), s("derivative")),
+        ("GeneratedBy".into(), Value::List(vec![generated])),
+    ]);
+    outputs.save_json("data description json", &description)?;
+    outputs.save_self()?;
+    log.info(Site("t2smap", "t2smap_workflow", 566), "Workflow completed");
+    log.info(
+        Site("utils", "log_newsletter_info", 812),
+        "Don't forget to subscribe to the tedana newsletter for updates! This is a very low \
+         volume email list.",
+    );
+    log.info(
+        Site("utils", "log_newsletter_info", 816),
+        "https://groups.google.com/g/tedana-newsletter",
+    );
+    log.teardown();
+    Ok(())
 }
 
 fn affines_close(a: &larmorx_core::Affine, b: &larmorx_core::Affine) -> bool {
@@ -558,16 +889,10 @@ pub fn t2smap(args: &[String], env: &Env, out: &mut dyn Write, err: &mut dyn Wri
     };
     let mut notices = Notices::new(env.mode);
     let mut log = Log::new(err);
-    let result = prepare_and_fit(settings, args, env, &mut log, &mut notices);
+    let result = prepare_and_fit(settings, args, env, &mut log, &mut notices)
+        .and_then(|st| finish(st, env, &mut log, &mut notices));
     let status = match result {
-        Ok(_) => {
-            let _ = writeln!(
-                log.err,
-                "larmorx-gpl: tedana t2smap: the fit is done; the maps, the combination and the \
-                 output files are not written yet (relay 5b of the port)"
-            );
-            3
-        }
+        Ok(()) => 0,
         Err(e) => {
             let _ = log.err.write_all(e.traceback().as_bytes());
             1

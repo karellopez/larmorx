@@ -286,5 +286,10 @@ its default options: `wordsep_re`, `_wrap_chunks`, `_handle_long_word`), `Lib/sh
 4,300-digit limit). Positional arguments, subparsers, mutually exclusive groups and `fromfile`
 prefixes are not ported (no ported program uses them). Unicode digits and Unicode's
 non-printable categories beyond the control characters are approximations (documented in the
-module). Verified against tedana 26.0.3's parser in-process: 109 cases, all identical
+module). `json` (2026-11-08): `Lib/json/encoder.py` (`json.dump` with an indent: `_make_iterencode`,
+`py_encode_basestring_ascii`, `float.__repr__` and the special values), for tedana's JSON files.
+`repr(float)` and numpy's float printing choose, between two shortest forms equally close to the
+value, the one with an even last digit, as `_Py_dg_dtoa` mode 0 and numpy's Dragon4 do
+(`numpy::format::shortest_ties_even`; Rust's own shortest form can pick the other: 920.45343017578125
+prints as `920.4534301757812`, found in tedana's confounds table). Verified against tedana 26.0.3's parser in-process: 109 cases, all identical
 (`validation/investigations/t2smap/replica/check_parser.py`), and the unit tests here.

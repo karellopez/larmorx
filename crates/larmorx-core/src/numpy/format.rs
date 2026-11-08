@@ -26,7 +26,11 @@ impl PrintFloat for f32 {
         f64::from(self)
     }
     fn sci(self) -> String {
-        format!("{self:e}")
+        shortest_ties_even(
+            format!("{self:e}"),
+            |p| format!("{self:.p$e}"),
+            |s| s.parse::<f32>().is_ok_and(|v| v == self),
+        )
     }
     fn fixed(self, p: usize) -> String {
         format!("{self:.p$}")
@@ -36,12 +40,38 @@ impl PrintFloat for f32 {
     }
 }
 
+/// The shortest digits that read back as the value, and among them the closest to it, ties to
+/// an even last digit (as numpy's Dragon4 and Python's `repr` choose them): Rust's shortest
+/// form `shortest` gives the length; the value correctly rounded to that many digits (`fixed`,
+/// exact, ties to even) is taken when it reads back (`reads_back`), which it does unless the
+/// value is a power of two whose lower neighbour is closer.
+pub fn shortest_ties_even(
+    shortest: String,
+    fixed: impl Fn(usize) -> String,
+    reads_back: impl Fn(&str) -> bool,
+) -> String {
+    let mant = shortest
+        .split_once('e')
+        .map_or(shortest.as_str(), |(m, _)| m);
+    let n = mant.chars().filter(char::is_ascii_digit).count();
+    let r = fixed(n.saturating_sub(1));
+    if r != shortest && reads_back(&r) {
+        r
+    } else {
+        shortest
+    }
+}
+
 impl PrintFloat for f64 {
     fn to_f64(self) -> f64 {
         self
     }
     fn sci(self) -> String {
-        format!("{self:e}")
+        shortest_ties_even(
+            format!("{self:e}"),
+            |p| format!("{self:.p$e}"),
+            |s| s.parse::<f64>().is_ok_and(|v| v == self),
+        )
     }
     fn fixed(self, p: usize) -> String {
         format!("{self:.p$}")

@@ -32,11 +32,13 @@
 //! float index.
 //!
 //! [`ndimage`] is the other family: SciPy's `map_coordinates` and spline prefilter (orders 0-5,
-//! every boundary mode), as fMRIPrep and nitransforms use them.
+//! every boundary mode), as fMRIPrep and nitransforms use them; [`nilearn`] is nilearn's
+//! `compute_epi_mask` on SciPy's filters and morphology.
 #![forbid(unsafe_code)]
 
 pub mod nd;
 pub mod ndimage;
+pub mod nilearn;
 pub mod vnl;
 
 use std::collections::BTreeMap;

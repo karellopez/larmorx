@@ -354,8 +354,12 @@ defects! {
         "t2smap's adaptive mask (dropout) takes the 33rd percentile of the first echo's non-zero temporal means, which is NaN when one of them is NaN (a NaN sample, or no volume left), so no voxel equals it and t2smap fails with ValueError: attempt to get argmax of an empty sequence";
     TED_02 = "TED-02", "tedana", true,
         "t2smap --exclude accepts an index equal to the number of volumes (its check is greater than, not greater than or equal), then fails with numpy's IndexError";
+    TED_03 = "TED-03", "tedana", true,
+        "t2smap without --mask computes one with nilearn's compute_epi_mask; when that finds no voxel (nilearn's MaskWarning: Computed an empty mask) t2smap goes on and fails in the adaptive mask with IndexError: index -1 is out of bounds for axis 0 with size 0, and an image with too few voxels for its threshold fails with ValueError: attempt to get argmax of an empty sequence";
     TED_04 = "TED-04", "tedana", true,
         "t2smap applies a user mask by voxel index without comparing its affine with the data's (tedana's own TODO), so a mask of the same shape in another space is used silently";
+    TED_05 = "TED-05", "tedana", true,
+        "t2smap caps only the limited T2* map (values above ten times its 99.5th percentile set to it); the full map, from which the optimal combination is weighted and which fMRIPrep keeps as its T2* map, holds the fit's largest values (up to 239,794 s on fMRIPrep's ds003592 call, in 2 to 34 voxels of its four multi-echo calls), where tedana 25.0.1's t2smap capped the full map too";
     TED_07 = "TED-07", "tedana", true,
         "t2smap --fittype curvefit --verbose writes the variance of S0 as the T2* variance map and the variance of T2* as the S0 variance map (curve_fit's covariance diagonal unpacked in the wrong order)";
     TED_08 = "TED-08", "tedana", true,
@@ -370,6 +374,10 @@ defects! {
         "t2smap accepts a single echo (one echo time) and fails later with an unrelated numpy error: IndexError: invalid index to scalar variable (dropout) or a ValueError of numpy's column_stack (log-linear fit)";
     TED_13 = "TED-13", "tedana", true,
         "t2smap --dummy-scans accepts a count that removes every volume (then fails with ValueError: attempt to get argmax of an empty sequence after numpy's 'Mean of empty slice' warnings) and a negative count (which shifts --exclude's indices up instead of removing volumes)";
+    TED_14 = "TED-14", "tedana", true,
+        "t2smap --debug's message on the T2* floor counts echoes times voxels as voxels (T2* values for N/E·V voxels), so its count and percentage are wrong for more than one echo";
+    TED_15 = "TED-15", "tedana", true,
+        "t2smap --combmode paid weights each echo by its temporal signal-to-noise ratio, 0 where the echo's standard deviation over time is 0, so a voxel whose good echoes are constant (and every voxel of a one-volume series) has weights summing to zero and t2smap fails with numpy's ZeroDivisionError: Weights sum to zero, can't be normalized";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

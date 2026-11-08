@@ -151,7 +151,7 @@ AVX-512 kernels off, OpenBLAS's Haswell kernels, one BLAS thread):
 - speed: larmorx fits the 169,785 records in 33.8 s at one thread (0.2 ms a fit; SciPy about 1
   ms), 4.6 s at 12, with the same bits.
 
-## `replica/` (the replica program, relay 5a)
+## `replica/` (the replica program, relays 5a and 5b)
 
 The replica (`crates-gpl/larmorx-gpl-tedana`, the `larmorx-gpl tedana t2smap` program) against
 tedana 26.0.3 itself:
@@ -184,3 +184,38 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   <dir>`: tedana's failure cases on tiny seeded echoes (TED-01, 02, 04, 10, 11, 12, 13 and three
   clear errors of tedana's own): with `reproduce` the replica ends as tedana does (status, last
   line of standard error), by default it names the defect. 11 cases, all as expected.
+- `check_outputs.py --replica <target>/release/larmorx-gpl --work <empty dir> --libraries
+  newest|shared` (relay 5b; build with `cargo build --release --manifest-path crates-gpl/Cargo.toml
+  -p larmorx-gpl-cli`): tedana's whole `t2smap` program (`t2smap._main(args)` in the environment's
+  Python) against `larmorx-gpl tedana t2smap` with `reproduce`, every output file: each image's
+  decompressed bytes (every header field and value bit for bit; gzip's own bytes are not
+  compared), the confounds table's text, the registry, `dataset_description.json` except the
+  fields that describe the host and Python (decision D6), `t2smap_call.sh`; the logger's lines,
+  the exit status and the last error line. Cases: those of `check_stages.py` and 15 more for the
+  paths after the fit (no `--mask`: nilearn's `compute_epi_mask` on float32, scaled int16 and
+  z-concatenated data; `--combmode paid` in both fit modes; `--verbose` with `--convention orig`
+  and `--prefix`, and with `--fitmode ts`; nine echoes per volume and over all volumes; one
+  volume; constant voxels with PAID, TED-15; an image nilearn finds no mask in, TED-03; an
+  existing output without and with `--overwrite`). Results (2026-11-08): 33 of 33 identical in
+  the shared environment, the 28 synthetic and the 5 real in the newest (logs
+  `oracles/logs/t2smap-1-relay5b-outputs-*.log`).
+
+## `defects/` (relay 5b: measurements behind rules D)
+
+- `ted05_full_map_cap.py`: with tedana's own functions on fMRIPrep's four multi-echo calls
+  (curvefit), the full T2* map's values above ten times the cap tedana 26.0.3 applies to the
+  limited map only, and what capping them changes in the combined series. Result (2026-11-08,
+  log `oracles/logs/t2smap-1-relay5b-ted05.log`): 2 to 34 voxels per call (full-map maxima 1,574
+  to 239,794,244 ms), the combined series changes in those voxels only (median relative change
+  0.01 to 0.9 %, at most 2.5 % to 110 %); tedana 25.0.1's t2smap capped the full map too (by its
+  own percentile: the same voxels). Decision: rule A (TED-05): by default the full map gets the
+  cap.
+- `ted06_feasible_start.py`: where tedana's curve fit rejects its start (SciPy's "x0 is
+  infeasible" for a log-linear start outside the bounds `((min(data), 0), (inf, inf))`), why, and
+  what `curve_fit` from a start clipped into the bounds gives. Result (log
+  `oracles/logs/t2smap-1-relay5b-ted06.log`): 1,919 of the 1,930 failures of the four calls are
+  infeasible starts, every one with T2* <= 0 (the signal rising with the echo time; 5 also with
+  S0 below the smallest sample); refits
+  converge in all, but their residuals are below the log-linear estimate's in only 15 to 29 %
+  (the data do not decay). Decision: rule C (TED-06: tedana's design, kept and documented: the
+  voxels stay failures with the log-linear estimate).

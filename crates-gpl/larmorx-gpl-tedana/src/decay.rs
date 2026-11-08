@@ -42,7 +42,7 @@ pub enum Libraries {
 }
 
 impl Libraries {
-    fn lapack(self) -> LapackRelease {
+    pub fn lapack(self) -> LapackRelease {
         match self {
             Libraries::Newest => LapackRelease::V3_12_1,
             Libraries::Shared => LapackRelease::V3_12_0,

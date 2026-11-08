@@ -516,3 +516,110 @@ fn load_zcat(
         data: stack(per_echo, n_voxels, nt),
     })
 }
+
+/// `load_mask(ref_img)` without a mask: nilearn's `compute_epi_mask(ref_img)` on the reference
+/// as tedana holds it (the first echo's `np.asanyarray(dataobj)`, Fortran-ordered: float32, or
+/// float64 for integers and scaled data; for z-concatenated data the first slab's
+/// `get_fdata()`, float64 and C-ordered), as a mask over the reference's first three axes with
+/// the reference's affine. `reproduce` selects numpy's own float64 `exp` and `log` for the
+/// smoothing kernel (correctly rounded ones otherwise). Also returns nilearn's empty-mask
+/// warning flag.
+pub fn compute_mask(
+    data: &[String],
+    reference: &RefImage,
+    reproduce: bool,
+    n_threads: usize,
+) -> Result<(UserMask, bool), PyError> {
+    use larmorx_core::math;
+    use larmorx_core::numpy::umath;
+    use larmorx_interp::nilearn::{EpiData, Layout, Maths, compute_epi_mask};
+
+    let h = &reference.header;
+    let maths = if reproduce {
+        Maths {
+            exp: umath::exp_f64,
+            log: umath::log_f64,
+        }
+    } else {
+        Maths {
+            exp: math::exp,
+            log: math::log,
+        }
+    };
+    let place = "nilearn/masking.py, in compute_epi_mask";
+    let fail = |e: larmorx_interp::nilearn::EpiMaskError| {
+        let (class, msg) = e.python();
+        PyError::new(class, msg, place)
+    };
+    let (mask, shape) = if data.len() == 1 {
+        // z-concatenated: get_fdata() of the first slab is C-ordered.
+        let arr = as_f64(read_data(h, Scaling::F64, n_threads)?);
+        let s = &h.shape;
+        let (nx, ny, nz, nt) = (s[0], s[1], s[2], s[3]);
+        let nzs = reference.shape[2];
+        let mut c = Vec::with_capacity(nx * ny * nzs * nt);
+        for x in 0..nx {
+            for y in 0..ny {
+                for z in 0..nzs {
+                    for t in 0..nt {
+                        c.push(arr[x + nx * (y + ny * (z + nz * t))]);
+                    }
+                }
+            }
+        }
+        let shape = [nx, ny, nzs, nt];
+        (
+            compute_epi_mask(EpiData::F64(&c), &shape, Layout::C, maths).map_err(fail)?,
+            shape.to_vec(),
+        )
+    } else {
+        let a = read_data(h, Scaling::Auto, n_threads)?;
+        let shape = a.shape().to_vec();
+        let m = match a {
+            DynArray::F32(a) => {
+                let v: Vec<f32> = a.t().iter().copied().collect();
+                compute_epi_mask(EpiData::F32(&v), &shape, Layout::Fortran, maths)
+            }
+            DynArray::C64(_) | DynArray::C128(_) => {
+                return Err(PyError::new(
+                    "TypeError",
+                    "complex data are not supported by compute_epi_mask",
+                    place,
+                ));
+            }
+            other => {
+                fn f64s<T: larmorx_core::RealElement>(
+                    a: &larmorx_core::ndarray::ArrayD<T>,
+                ) -> Vec<f64> {
+                    a.t().iter().map(|&x| x.to_f64()).collect()
+                }
+                let v = match &other {
+                    DynArray::F64(a) => f64s(a),
+                    DynArray::U8(a) => f64s(a),
+                    DynArray::I8(a) => f64s(a),
+                    DynArray::U16(a) => f64s(a),
+                    DynArray::I16(a) => f64s(a),
+                    DynArray::U32(a) => f64s(a),
+                    DynArray::I32(a) => f64s(a),
+                    DynArray::U64(a) => f64s(a),
+                    DynArray::I64(a) => f64s(a),
+                    _ => unreachable!("float32 and complex handled above"),
+                };
+                compute_epi_mask(EpiData::F64(&v), &shape, Layout::Fortran, maths)
+            }
+        }
+        .map_err(fail)?;
+        (m, shape)
+    };
+    let empty = mask.empty;
+    let mut header = h.clone();
+    header.shape = shape[..3].to_vec();
+    Ok((
+        UserMask {
+            header,
+            shape: shape[..3].to_vec(),
+            inside: mask.mask,
+        },
+        empty,
+    ))
+}

@@ -59,6 +59,8 @@ pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {
     fn sub(self, b: Self) -> Self;
     /// `a * b` as SSE computes it.
     fn mul(self, b: Self) -> Self;
+    /// `a / b` as SSE computes it.
+    fn div(self, b: Self) -> Self;
     /// The square root (IEEE: exact rounding; a NaN passes on).
     fn sqrt(self) -> Self;
     /// The value as `f64` (exact).
@@ -85,6 +87,10 @@ impl NpFloat for f32 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f32(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f32(self, b)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {
@@ -143,6 +149,10 @@ impl NpFloat for f64 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f64(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f64(self, b)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {

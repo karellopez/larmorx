@@ -74,7 +74,12 @@ pub fn parse_int(s: &str) -> Option<i128> {
 /// The shortest digits of `x` (finite, not zero is not required) and its decimal point
 /// position `decpt` (`x = 0.d1d2... × 10^decpt`), as `_Py_dg_dtoa` mode 0 gives them.
 fn shortest_digits(x: f64) -> (String, i32) {
-    let e = format!("{:e}", x.abs());
+    let a = x.abs();
+    let e = crate::numpy::format::shortest_ties_even(
+        format!("{a:e}"),
+        |p| format!("{a:.p$e}"),
+        |s| s.parse::<f64>().is_ok_and(|v| v == a),
+    );
     let (mant, exp) = e.split_once('e').expect("exponent form");
     let digits: String = mant.chars().filter(char::is_ascii_digit).collect();
     let exp: i32 = exp.parse().expect("exponent");
@@ -178,6 +183,8 @@ mod tests {
             (5e-324, "5e-324"),
             (14.0, "14.0"),
             (66.0, "66.0"),
+            // a tie between two shortest forms: the even last digit (dtoa mode 0)
+            (920.0 + 7429.0 / 16384.0, "920.4534301757812"),
         ] {
             assert_eq!(float_repr(x), r);
         }

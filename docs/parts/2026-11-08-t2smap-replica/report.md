@@ -49,3 +49,23 @@ replaced).
 The replica prints its maths notices at the cost of extra passes (above). fMRIPrep's ds000210 and ds000258 runs were
 made with OpenBLAS's AVX-512 kernels (the orchestrator's finding, next-steps: made again before the clean-room part).
 The gates of relays 8b to 10 covered the crates they changed; verify-merge runs the full gates.
+
+### Merge notes (the orchestrator, 2026-11-08)
+- Merged into main 1225f38d (on 6840f4d8). Four conflicts (`crates/larmorx-core/{PROVENANCE.md, src/lib.rs,
+  src/numpy/mod.rs}`, `validation/investigations/t2smap/README.md`): main's copies are relay 2's commit 0ed9cee2's
+  (the shared numpy module brought into main early), so the branch's versions were taken. Two permanent random-testing
+  cases held a machine path in a traceback (this part's `qform-signed-zero` and main's
+  `ants-registration/four-dimensional-field-parameters`): written as `<workspace>`. The site's `t2smap-pages`
+  (c40ae49c) into the site's main (8e97a4ca); `evidence-blobs` 96bca689 → ae1a3b62 (the manifest's SHA-256
+  f29298798b957e77 matches; 68 added, none replaced or removed).
+- HANDOFF.toml's 104 operations applied (26 files; `NOTICE` and its two copies identical); `register_counts.py` 452
+  entries; `tables --site`, `tables --check`, the summary re-exported; the site build 0 problems. Added by the
+  orchestrator: the audit's brief rules name the replica's record, permanent cases, evidence module and site checks
+  (they hold a few words of tedana's source; decision log), next-steps' two follow-ups (fMRIPrep's ds000210 and ds000258
+  runs again with Haswell's kernels before the clean-room part; tests that refuse a TMPDIR holding `-h`).
+- The clean-room audit's merge step (6608931e): 13 agents archived; 0 blocking, 0 to judge.
+- Verified (`verify-merge.sh` on 6608931e, 22:59-23:48, 8 threads): VERDICT PASSED: the three Rust workspaces' gates,
+  the GPL and nc builds, the Python gates, the smoke tier and golden (every checksum unchanged, only the header);
+  re-runs against the committed records, no status or detail differs: `tedana-t2smap-replica` 69/69, `numpy-linalg`
+  28/28, `sdcflows-fieldmap` 37/37, `nifti-io` 254/254 and 3 new cases (ds000258's echoes, which the test-data catalog
+  gained for this part: pass), taken as its new record (257); the page re-exported with no change.

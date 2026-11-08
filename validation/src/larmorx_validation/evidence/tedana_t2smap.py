@@ -638,13 +638,18 @@ def _tissue_window(ctx: core.Context, ex, out: dict) -> None:
         post["panels"][pid] = exm.poster_gray(ctx, a, m2, w["lo"], w["hi"])
 
 
+def _dtype(img) -> str:
+    dt = img.get_data_dtype()
+    return dt.name + (", big-endian" if dt.byteorder == ">" else "")
+
+
 def _echo_facts(p: dict, img) -> str:
     tes = ", ".join(f"{t:g}" for t in p["tes"])
     z = img.header.get_zooms()
     return (
         f"{len(p['echoes'])} echoes (TE {tes} ms) of {' × '.join(map(str, img.shape[:3]))} "
         f"voxels of {' × '.join(f'{v:.3g}' for v in z[:3])} mm, {img.shape[3]} volumes (TR "
-        f"{float(z[3]):g} s), {img.get_data_dtype()}"
+        f"{float(z[3]):g} s), {_dtype(img)}"
     )
 
 
@@ -1175,6 +1180,9 @@ def trial(ctx: core.Context) -> tuple[list[dict], dict]:
         "the final build, and the 10-minute check of the final build found one notice (TED-15 "
         "in a run made twice), fixed with its permanent case.",
     )
+    from larmorx_validation.difftest import permanent
+
+    n_perm = len(permanent.load(TOOL))
     tri = tomllib.loads(
         (ctx.repo / "validation" / "difftest" / "triage.toml").read_text(encoding="utf-8")
     )
@@ -1194,7 +1202,8 @@ def trial(ctx: core.Context) -> tuple[list[dict], dict]:
         ["Status", "What it was", "Register"],
         trows,
         note="validation/difftest/triage.toml (block tedana-t2smap, 2026-11-08); each difference "
-        "has a permanent case (validation/difftest/cases/tedana-t2smap/, 17), run by the record.",
+        f"has a permanent case (validation/difftest/cases/tedana-t2smap/, {n_perm} in all), run "
+        "by the record.",
     )
     return [table, triage], prov
 

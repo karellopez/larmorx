@@ -117,7 +117,7 @@ original with random valid inputs and options, a night at a time
 <!-- BEGIN GENERATED: tools table (python -m larmorx_validation tables; edit validation/tools.toml) -->
 | Tool | Command / Python | How | Validation (standard tier) |
 |---|---|---|---|
-| NIfTI-1/2 I/O | `lx.load`, `lx.save`, `lx.Image` | own implementation | [254 files](docs/validation/nifti-io.md), data bit-identical to nibabel; [4–8× faster](docs/benchmarks/nifti-io.md) on compressed writes with threads |
+| NIfTI-1/2 I/O | `lx.load`, `lx.save`, `lx.Image` | own implementation | [257 files](docs/validation/nifti-io.md), data bit-identical to nibabel; [4–8× faster](docs/benchmarks/nifti-io.md) on compressed writes with threads |
 | antsApplyTransforms | `larmorx ants antsApplyTransforms`, `lx.ants.apply_transforms` | port (ANTs/ITK) | [258 cases](docs/validation/ants-apply-transforms.md): 185 of 200 compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included; data panel: [329 of 425](docs/validation/ants-apply-transforms-panel.md) as built, all with correctly rounded maths (fMRIPrep's 421 calls on the fourteen oracle runs) |
 | ITK transform files (`.mat`, `.txt`, `.h5`) | `lx.transforms` | port (ITK, HDF5) | [149 cases](docs/validation/itk-hdf5.md), 0 failures; HDF5 read and written in pure Rust |
 | N4BiasFieldCorrection | `larmorx ants N4BiasFieldCorrection`, `lx.ants.n4_bias_field_correction` | port | [29 of 46](docs/validation/ants-n4.md) bit-identical to ANTs, 46 of 46 with correctly rounded maths; ANTS-40 corrected by default; data panel: [20 of 69](docs/validation/ants-n4-panel.md) as built, 69 of 69 with correctly rounded maths |

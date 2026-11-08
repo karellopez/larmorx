@@ -1,11 +1,12 @@
 # Parity: NIfTI reading and writing
 
-**All cases agree.** 254 cases on the `standard` tier: 232 pass, 17 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 257 cases on the `standard` tier: 235 pass, 17 rejected by both, 5 expected divergences, 0 failures.
 
 - **Validated:** larmorx.io.load / larmorx.io.save (crate larmorx-io)
 - **Reference:** nibabel 5.4.2
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-21 on Linux x86_64, with `python -m larmorx_validation parity nifti-io --tier standard`
+- **Test data:** larmorx-testdata `52e371aab0ac`, tier `standard`
+- **Generated:** 2026-11-08 on Linux x86_64, with `python -m larmorx_validation parity nifti-io --tier standard`
+- **Original programs:** 0 runs: 0 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -37,7 +38,7 @@
 | openneuro-ds000240 | 1 | 1 | 0 | 0 | 0 |
 | openneuro-ds000241 | 1 | 1 | 0 | 0 | 0 |
 | openneuro-ds000248 | 1 | 1 | 0 | 0 | 0 |
-| openneuro-ds000258 | 2 | 2 | 0 | 0 | 0 |
+| openneuro-ds000258 | 5 | 5 | 0 | 0 | 0 |
 | openneuro-ds001547 | 1 | 1 | 0 | 0 | 0 |
 | openneuro-ds001600 | 18 | 18 | 0 | 0 | 0 |
 | openneuro-ds001972 | 1 | 1 | 0 | 0 | 0 |
@@ -113,12 +114,12 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1dfe56c0dc60) |
-| larmorx-testdata | 00b862132e9c |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (6608931ecce5) |
+| larmorx-testdata | 52e371aab0ac |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
-| numpy | 2.3.5 |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
+| numpy | 2.5.4 |
 | nibabel | 5.4.2 |
 
 ## Notes
@@ -198,6 +199,9 @@
 | `openneuro/ds000241/sub-08/anat/sub-08_T1w.nii.gz` | pass | 21/21 | Extreme scaling on int16: scl_slope 31.44 and scl_inter 1.03e6 (scaled values around 1e6, beyond float32 integer precis… |
 | `openneuro/ds000248/sub-01/anat/sub-01_T1w.nii.gz` | pass | 21/21 | MNE 'sample' subject T1w: qform_code 0 with sform_code 2 (sform-only geometry), FreeSurfer-conformed 256^3 LIA, uint8 w… |
 | `openneuro/ds000258/sub-21262/anat/sub-21262_T1w.nii.gz` | pass | 21/21 | BIG-endian header and data (>i2), PIL storage, scaled (scl_slope 0.011, scl_inter 360.5), slightly oblique (~0.07 rad). |
+| `openneuro/ds000258/sub-21262/func/sub-21262_task-rest_echo-1_bold.nii.gz` | pass | 22/22 | BIG-endian 4D BOLD (>i2, 64x64x30x239, echo 1 of the four-echo run, TE 12 ms), LPS, oblique; with echoes 2-4 the input … |
+| `openneuro/ds000258/sub-21262/func/sub-21262_task-rest_echo-2_bold.nii.gz` | pass | 22/22 | BIG-endian 4D BOLD (>i2, 64x64x30x239, echo 2 of the four-echo run, TE 28 ms), LPS, oblique; with echoes 2-4 the input … |
+| `openneuro/ds000258/sub-21262/func/sub-21262_task-rest_echo-3_bold.nii.gz` | pass | 22/22 | BIG-endian 4D BOLD (>i2, 64x64x30x239, echo 3 of the four-echo run, TE 44 ms), LPS, oblique; with echoes 2-4 the input … |
 | `openneuro/ds000258/sub-21262/func/sub-21262_task-rest_echo-4_bold.nii.gz` | pass | 22/22 | BIG-endian 4D BOLD (>i2, 64x64x30x239, echo 4 of a multi-echo run), LPS, oblique; dim[6] = dim[7] = 0 where unused dime… |
 | `openneuro/ds001547/sub-181004LEEV1LGN/stat/BOLDzstat2.nii` | pass | 22/22 | Uncompressed z-statistic map with intent_code 5 (NIFTI_INTENT_ZSCORE), float32 162x216x26; stored outside the BIDS layo… |
 | `openneuro/ds001600/sub-1/anat/sub-1_T1w.nii.gz` | pass | 21/21 | Siemens Prisma T1w (176x256x256, 1 mm, sagittal slices stored RAS) with scaled int16 data (scl_slope 0.0121, scl_inter … |

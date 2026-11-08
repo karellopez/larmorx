@@ -141,13 +141,26 @@ CASES: list[tuple[str, list[str], int]] = [
     ("curvefit", [*E3, *TES, *MASK, "--fittype", "curvefit"], 1),
     (
         "curvefit-verbose-orig-prefix",
-        [*E3, *TES, *MASK, "--fittype", "curvefit", "--verbose", "--convention", "orig",
-         "--prefix", "sub-01"],
+        [
+            *E3,
+            *TES,
+            *MASK,
+            "--fittype",
+            "curvefit",
+            "--verbose",
+            "--convention",
+            "orig",
+            "--prefix",
+            "sub-01",
+        ],
         1,
     ),
     ("ts-loglin", [*E3, *TES, *MASK, "--fitmode", "ts"], 1),
-    ("ts-curvefit-verbose", [*E3, *TES, *MASK, "--fitmode", "ts", "--fittype", "curvefit",
-                             "--verbose"], 1),
+    (
+        "ts-curvefit-verbose",
+        [*E3, *TES, *MASK, "--fitmode", "ts", "--fittype", "curvefit", "--verbose"],
+        1,
+    ),
     ("paid", [*E3, *TES, *MASK, "--combmode", "paid"], 1),
     ("paid-ts", [*E3, *TES, *MASK, "--combmode", "paid", "--fitmode", "ts"], 1),
     ("no-mask", [*E3, *TES], 1),
@@ -169,8 +182,11 @@ CASES: list[tuple[str, list[str], int]] = [
     ("exclude-all", [*E3, *TES, *MASK, "--exclude", "0:6"], 1),
     ("exclude-ts", [*E3, *TES, *MASK, "--exclude", "1", "--fitmode", "ts"], 1),
     ("zcat", ["-d", "<I>/zcat.nii.gz", *TES, *MASK], 1),
-    ("int16", ["-d", "<I>/i16-e1.nii.gz", "<I>/i16-e2.nii.gz", "<I>/i16-e3.nii.gz", *TES, *MASK],
-     1),
+    (
+        "int16",
+        ["-d", "<I>/i16-e1.nii.gz", "<I>/i16-e2.nii.gz", "<I>/i16-e3.nii.gz", *TES, *MASK],
+        1,
+    ),
     ("n-independent-3", [*E3, *TES, *MASK, "--n-independent-echos", "3"], 1),
     ("n-independent-4", [*E3, *TES, *MASK, "--n-independent-echos", "4"], 1),
     ("n-independent-0", [*E3, *TES, *MASK, "--n-independent-echos", "0"], 1),
@@ -179,16 +195,30 @@ CASES: list[tuple[str, list[str], int]] = [
     ("exists", [*E3, *TES, *MASK], 2),
     ("overwrite", [*E3, *TES, *MASK, "-f"], 2),
     ("nan-sample", ["-d", "<I>/nan-e1.nii.gz", "<I>/e2.nii.gz", "<I>/e3.nii.gz", *TES, *MASK], 1),
-    ("nan-sample-decay", ["-d", "<I>/nan-e1.nii.gz", "<I>/e2.nii.gz", "<I>/e3.nii.gz", *TES,
-                          *MASK, "--masktype", "decay"], 1),
+    (
+        "nan-sample-decay",
+        [
+            "-d",
+            "<I>/nan-e1.nii.gz",
+            "<I>/e2.nii.gz",
+            "<I>/e3.nii.gz",
+            *TES,
+            *MASK,
+            "--masktype",
+            "decay",
+        ],
+        1,
+    ),
     ("inf-sample", ["-d", "<I>/e1.nii.gz", "<I>/inf-e2.nii.gz", "<I>/e3.nii.gz", *TES, *MASK], 1),
     ("one-echo", ["-d", "<I>/e1.nii.gz", "-e", "0.012", *MASK], 1),
     ("two-echoes", ["-d", "<I>/e1.nii.gz", "<I>/e2.nii.gz", "-e", "0.012", "0.028", *MASK], 1),
-    ("three-d", ["-d", "<I>/e1-3d.nii.gz", "<I>/e1-3d.nii.gz", "<I>/e1-3d.nii.gz", *TES, *MASK],
-     1),
+    ("three-d", ["-d", "<I>/e1-3d.nii.gz", "<I>/e1-3d.nii.gz", "<I>/e1-3d.nii.gz", *TES, *MASK], 1),
     ("mask-shifted", [*E3, *TES, "--mask", "<I>/mask-shifted.nii.gz"], 1),
-    ("abbreviations", [*E3, *TES, "--mask=<I>/mask.nii.gz", "--fitt", "curvefit", "--comb=paid"],
-     1),
+    (
+        "abbreviations",
+        [*E3, *TES, "--mask=<I>/mask.nii.gz", "--fitt", "curvefit", "--comb=paid"],
+        1,
+    ),
     ("threads", [*E3, *TES, *MASK, "--fittype", "curvefit", "--n-threads", "2"], 1),
 ]
 
@@ -259,8 +289,9 @@ def describe_image(path: Path) -> list[str]:
         with gzip.open(path) as g:
             g.read(1)
         raw = path.read_bytes()
-        lines.append(f"    gzip: flags {raw[3]}, mtime {int.from_bytes(raw[4:8], 'little')}, "
-                     f"xfl {raw[8]}")
+        lines.append(
+            f"    gzip: flags {raw[3]}, mtime {int.from_bytes(raw[4:8], 'little')}, xfl {raw[8]}"
+        )
     return lines
 
 
@@ -286,8 +317,10 @@ def describe_dir(out: Path, work: Path) -> list[str]:
             if "GeneratedBy" in obj:
                 gb = obj["GeneratedBy"][0]
                 lines.append(f"    keys {sorted(obj)}; GeneratedBy keys {sorted(gb)}")
-                lines.append(f"    Node keys {sorted(gb.get('Node', {}))}; Python libraries "
-                             f"{sorted(gb.get('Python_Libraries', {}))}")
+                lines.append(
+                    f"    Node keys {sorted(gb.get('Node', {}))}; Python libraries "
+                    f"{sorted(gb.get('Python_Libraries', {}))}"
+                )
                 lines.append(f"    Command {gb.get('Command', '').replace(str(work), '<W>')!r}")
                 lines.append(f"    first line {p.read_text(encoding='utf-8').splitlines()[0]!r}")
             else:
@@ -317,8 +350,13 @@ def main(argv: list[str]) -> int:
         print(f"== {name}: {' '.join(args)}")
         for run in range(runs):
             proc = subprocess.run(
-                [*program, *full], cwd=case, env=env, capture_output=True, text=True,
-                check=False, timeout=900,
+                [*program, *full],
+                cwd=case,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=900,
             )
             print(f"-- run {run + 1}: exit {proc.returncode}")
             for line in normalise(proc.stdout, work):

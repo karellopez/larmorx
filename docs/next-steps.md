@@ -810,7 +810,7 @@ The items below keep their history.
     4.6 Hz RMS in the brain with fMRIPrep's registrations).
   - *A temporary folder holding `-h`* (tedana's `t2smap` replica, 2026-11-08): BET's temporary-folder tests
     (`test_bet_temporary_folders_hold_no_option_text` and the oracle cache's key test) fail when TMPDIR's path
-    holds an option's text (the agents' scratch folders start `/tmp/claude-1000/-home-...`); the gates ran with
+    holds an option's text (the agents' scratch folders hold `-home-...` in their path); the gates ran with
     TMPDIR unset. Make the tests independent of TMPDIR's name (CLAUDE.md, "Portable tests").
   - *The harness:* three tests of `validation/tests` fail only under pytest-xdist (serially, as the gates
     run them, all pass): the oracle cache's `test_above_one_thread_a_run_is_served_after_three_identical_runs`

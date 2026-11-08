@@ -2071,3 +2071,12 @@ together at the end.
 - **Every wait has a time limit** (CLAUDE.md, "Wait loops must not match themselves"): eleven loops of finished agents
   were found waiting on 2026-11-08 (three for a pattern their own command lines held, eight for the end line of a run
   restarted under another log) and stopped at the user's request.
+
+## 2026-11-08: tedana's `t2smap` replica in `larmorx-gpl` (the user)
+- **The package** (the user: "Follow your recommendation. We will have a clean room as well, that can go in the main
+  package"): tedana is LGPL-2.1 (only: no "any later version" in its licence or files); its replica lives in
+  `larmorx-gpl` (`crates-gpl/`), its tedana-derived crate converted to GPL-3.0 under LGPL-2.1's section 3 (which keeps it
+  compatible with the Apache crates it builds on), shipped as a program and a binary-only wheel as `larmorx-nc` is;
+  `larmorx-gpl` is therefore published from this part on, not only for Workbench. The permissive numerics it needs
+  (numpy's, SciPy's) are in the main package's Apache crates. The clean-room original follows in the main package
+  (Apache-2.0), as for AFNI and FSL. `pip install larmorx` stays Apache-only; `larmorx[all]` adds the GPL program.

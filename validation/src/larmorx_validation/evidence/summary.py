@@ -242,6 +242,12 @@ PAGES = [
         [("port", "sdcflows-fieldmap", "validated", None, None)],
     ),
     (
+        "/tools/tedana-t2smap/",
+        "t2smap",
+        "larmorx",
+        [("larmorx-gpl replica", "tedana-t2smap-replica", "experimental", None, None)],
+    ),
+    (
         "/tools/nifti-io/",
         "NIfTI I/O",
         "larmorx",

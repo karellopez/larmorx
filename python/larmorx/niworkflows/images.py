@@ -459,34 +459,38 @@ def _volreg_nipype(
     upstream_defects: str,
 ) -> tuple[str, str]:
     """nipype's ``Volreg(in_file, interp='Fourier', args='-twopass', zpad=4,
-    outputtype='NIFTI_GZ')`` run in ``cwd``: ``3dvolreg -twopass -Fourier -1Dfile <stem>.1D
-    -1Dmatrix_save <stem>.aff12.1D -prefix <stem>_volreg.nii.gz -zpad 4 -maxdisp1D
-    <stem>_md.1D <in>`` (``-twopass`` only with ``two_pass``), through larmorx's 3dvolreg (the
-    bit-exact replica by default). The registered series and the matrices file."""
+    outputtype='NIFTI_GZ')`` run in ``cwd`` (:func:`larmorx._nipype.volreg`): ``3dvolreg
+    -twopass -Fourier -1Dfile <stem>.1D -1Dmatrix_save <stem>.aff12.1D -prefix
+    <stem>_volreg.nii.gz -zpad 4 -maxdisp1D <stem>_md.1D <in>`` (``-twopass`` only with
+    ``two_pass``), through larmorx's 3dvolreg (the bit-exact replica by default). The
+    registered series and the matrices file."""
+    from larmorx import _nipype
     from larmorx.afni import _common
     from larmorx.afni.volreg import _run_original
-    from larmorx.sdcflows.approx import _split_filename
 
-    stem = _split_filename(in_file)[1]
-    names = {
-        "oned": f"{stem}.1D",
-        "mat": f"{stem}.aff12.1D",
-        "out": f"{stem}_volreg.nii.gz",
-        "md": f"{stem}_md.1D",
-    }
+    cmd = _nipype.volreg(
+        cwd=cwd,
+        in_file=in_file,
+        args="-twopass" if two_pass else None,
+        interp="Fourier",
+        zpad=4,
+        outputtype="NIFTI_GZ",
+    )
     selected = _replica.select("afni", "3dvolreg", implementation)
-    at = (lambda n: n) if selected is not None else (lambda n: os.path.join(cwd, n))
-    argv = ["-twopass"] if two_pass else []
-    argv += ["-Fourier", "-1Dfile", at(names["oned"]), "-1Dmatrix_save", at(names["mat"])]
-    argv += ["-prefix", at(names["out"]), "-zpad", "4", "-maxdisp1D", at(names["md"]), in_file]
     threads = 1 if num_threads is None else max(int(num_threads), 1)
     if selected is None:
-        _run_original(argv, threads, upstream_defects, {})
+        # in this process: the output names in the node's folder
+        _run_original(cmd.run_argv(), threads, upstream_defects, {})
     else:
         _common.run_replica(
-            selected, argv, cwd, n_threads=threads, upstream_defects=upstream_defects, settings={}
+            selected,
+            cmd.argv(),
+            cwd,
+            n_threads=threads,
+            upstream_defects=upstream_defects,
+            settings={},
         )
-    return os.path.join(cwd, names["out"]), os.path.join(cwd, names["mat"])
+    return cmd.outputs["out_file"], cmd.outputs["oned_matrix_save"]
 
 
 def _mcflirt_sinc(in_file: str, cwd: str, implementation: str) -> str:

@@ -586,27 +586,25 @@ def topup_node(
     --fout=<in>_field.nii.gz --jacout=jac --logout=<in>_topup.log --rbmout=xfm
     --dfout=warpfield`` with ``FSLOUTPUTTYPE=NIFTI_GZ``, through larmorx's ``topup`` (the
     replica when ``larmorx-nc`` is installed, ``implementation``)."""
+    from larmorx import _nipype
     from larmorx.fsl.topup import _run_original
-    from larmorx.sdcflows.approx import _split_filename
 
     in_file = os.path.abspath(os.fspath(in_file))
     cwd = os.path.abspath(os.fspath(out_dir))
     os.makedirs(cwd, exist_ok=True)
-    base = _split_filename(in_file)[1]
-    enc = os.path.join(cwd, f"{base}_encfile.txt")
-    _encfile(enc, list(encoding_direction), list(readout_times))
-    args = [
-        f"--config={os.fspath(config)}",
-        f"--datain={enc}",
-        f"--imain={in_file}",
-        f"--out={base}_base",
-        f"--iout={base}_corrected.nii.gz",
-        f"--fout={base}_field.nii.gz",
-        "--jacout=jac",
-        f"--logout={base}_topup.log",
-        "--rbmout=xfm",
-        "--dfout=warpfield",
-    ]
+    base = _nipype.split_filename(in_file)[1]
+    cmd = _nipype.topup(
+        cwd=cwd,
+        in_file=in_file,
+        encoding_direction=list(encoding_direction),
+        readout_times=list(readout_times),
+        config=os.fspath(config),
+    )
+    for path, text in cmd.files.items():
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    enc = cmd.outputs["out_enc_file"]
+    args = cmd.argv()
     selected = _replica.select("fsl", "topup", implementation)
     env = {
         "FSLOUTPUTTYPE": "NIFTI_GZ",

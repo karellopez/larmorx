@@ -12,9 +12,9 @@
 //! The arithmetic is the hardware's; NaNs are looked at only when the result is one.
 
 /// SSE's default NaN in single precision.
-pub(super) const DEFAULT_NAN_F32: f32 = f32::from_bits(0xffc0_0000);
+pub(crate) const DEFAULT_NAN_F32: f32 = f32::from_bits(0xffc0_0000);
 /// SSE's default NaN in double precision.
-pub(super) const DEFAULT_NAN_F64: f64 = f64::from_bits(0xfff8_0000_0000_0000);
+pub(crate) const DEFAULT_NAN_F64: f64 = f64::from_bits(0xfff8_0000_0000_0000);
 
 /// The NaN SSE gives for `a op b` when the result is NaN: `a`'s quieted, else `b`'s, else the
 /// default NaN.
@@ -47,7 +47,7 @@ macro_rules! sse_op {
     ($name:ident, $t:ty, $op:tt, $nan:ident, $doc:literal) => {
         #[doc = $doc]
         #[inline(always)]
-        pub(super) fn $name(a: $t, b: $t) -> $t {
+        pub(crate) fn $name(a: $t, b: $t) -> $t {
             let r = a $op b;
             if r.is_nan() { $nan(a, b) } else { r }
         }
@@ -66,14 +66,14 @@ sse_op!(div_f64, f64, /, nan_f64, "`a / b` with SSE's NaN (`divsd`).");
 /// `__math_invalidf(x)`: `(x - x) / (x - x)` as SSE computes it: a NaN `x` quieted, the default
 /// NaN for an infinity (or a finite `x`, where the quotient is `0 / 0`).
 #[inline(always)]
-pub(super) fn invalid_f32(x: f32) -> f32 {
+pub(crate) fn invalid_f32(x: f32) -> f32 {
     let d = sub_f32(x, x);
     div_f32(d, d)
 }
 
 /// `__math_invalid(x)` in double precision.
 #[inline(always)]
-pub(super) fn invalid_f64(x: f64) -> f64 {
+pub(crate) fn invalid_f64(x: f64) -> f64 {
     let d = sub_f64(x, x);
     div_f64(d, d)
 }

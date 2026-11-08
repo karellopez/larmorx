@@ -1,0 +1,107 @@
+=== shared
+average average_axis f32: 7/7 identical
+avx512off-exp-full exp_glibc f64: 1/1 identical
+avx512off-exp-neg800 exp_glibc f64: 1/1 identical
+avx512off-exp-pm20 exp_glibc f64: 1/1 identical
+avx512off-exp-special exp_glibc f64: 1/1 identical
+avx512off-log-0to10 log_numpy f64: 1/1 identical
+avx512off-log-special log_numpy f64: 1/1 identical
+avx512off-log-wide log_numpy f64: 1/1 identical
+default-exp-full exp_cr f64: 0/1 identical
+default-exp-full exp_glibc f64: 0/1 identical
+default-exp-neg800 exp_cr f64: 0/1 identical
+default-exp-neg800 exp_glibc f64: 0/1 identical
+default-exp-pm20 exp_cr f64: 0/1 identical
+default-exp-pm20 exp_glibc f64: 0/1 identical
+default-exp-special exp_cr f64: 1/1 identical
+default-exp-special exp_glibc f64: 1/1 identical
+default-log-0to10 log_cr f64: 0/1 identical
+default-log-0to10 log_glibc f64: 0/1 identical
+default-log-special log_cr f64: 0/1 identical
+default-log-special log_glibc f64: 1/1 identical
+default-log-wide log_cr f64: 0/1 identical
+default-log-wide log_glibc f64: 0/1 identical
+pct nanpct_linear f32: 6/6 identical
+pct pct_higher f32: 51/51 identical
+pct score_lower f64: 26/26 identical
+reduce mean_axis f32: 109/109 identical
+reduce mean_axis f64: 109/109 identical
+reduce nanstd_axis f32: 109/109 identical
+reduce nansum_axis f32: 109/109 identical
+reduce std_axis f32: 109/109 identical
+reduce std_axis f64: 109/109 identical
+reduce sum_axis f32: 109/109 identical
+reduce sum_axis f64: 109/109 identical
+reduce var_axis f32: 109/109 identical
+  DIFF default-exp-neg800/exp_glibc/200001 exp_glibc f64 shape [2000000, 1, 1] param 0: 81649 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-neg800/exp_cr/200002 exp_cr f64 shape [2000000, 1, 1] param 0: 81706 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-pm20/exp_glibc/200003 exp_glibc f64 shape [2000000, 1, 1] param 0: 92295 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-pm20/exp_cr/200004 exp_cr f64 shape [2000000, 1, 1] param 0: 92370 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-full/exp_glibc/200005 exp_glibc f64 shape [2000000, 1, 1] param 0: 90088 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-full/exp_cr/200006 exp_cr f64 shape [2000000, 1, 1] param 0: 90199 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-0to10/log_glibc/200009 log_glibc f64 shape [2000000, 1, 1] param 0: 2083 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-0to10/log_cr/200010 log_cr f64 shape [2000000, 1, 1] param 0: 1742 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-wide/log_glibc/200011 log_glibc f64 shape [2000000, 1, 1] param 0: 12 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-wide/log_cr/200012 log_cr f64 shape [2000000, 1, 1] param 0: 10 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-special/log_cr/200014 log_cr f64 shape [9, 1, 1] param 0: 2 values differ (lengths 72 vs 72)
+numpy 2.3.5, SciPy 1.15.3, <workspace>/.venv/bin/python
+[logf-default]
+logf_numpy: 64/64 chunks identical (4294967296 inputs); correctly rounded logf: 30 chunks identical
+[logf-avx512off]
+logf_numpy: 64/64 chunks identical (4294967296 inputs); correctly rounded logf: 30 chunks identical
+logf over positive finite (2139095039 inputs): numpy vs correctly rounded 78427614 differ (max 4 ulp), numpy vs glibc 78438378, glibc vs correctly rounded 416908
+logf over [1, 2^24] (201326593 inputs): numpy vs correctly rounded 10947841 differ (max 3 ulp), numpy vs glibc 10955142, glibc vs correctly rounded 167180
+=== newest
+average average_axis f32: 7/7 identical
+avx512off-exp-full exp_glibc f64: 1/1 identical
+avx512off-exp-neg800 exp_glibc f64: 1/1 identical
+avx512off-exp-pm20 exp_glibc f64: 1/1 identical
+avx512off-exp-special exp_glibc f64: 1/1 identical
+avx512off-log-0to10 log_numpy f64: 1/1 identical
+avx512off-log-special log_numpy f64: 1/1 identical
+avx512off-log-wide log_numpy f64: 1/1 identical
+default-exp-full exp_cr f64: 0/1 identical
+default-exp-full exp_glibc f64: 0/1 identical
+default-exp-neg800 exp_cr f64: 0/1 identical
+default-exp-neg800 exp_glibc f64: 0/1 identical
+default-exp-pm20 exp_cr f64: 0/1 identical
+default-exp-pm20 exp_glibc f64: 0/1 identical
+default-exp-special exp_cr f64: 1/1 identical
+default-exp-special exp_glibc f64: 1/1 identical
+default-log-0to10 log_cr f64: 0/1 identical
+default-log-0to10 log_glibc f64: 0/1 identical
+default-log-special log_cr f64: 0/1 identical
+default-log-special log_glibc f64: 1/1 identical
+default-log-wide log_cr f64: 0/1 identical
+default-log-wide log_glibc f64: 0/1 identical
+pct nanpct_linear f32: 6/6 identical
+pct pct_higher f32: 51/51 identical
+pct score_lower f64: 26/26 identical
+reduce mean_axis f32: 109/109 identical
+reduce mean_axis f64: 109/109 identical
+reduce nanstd_axis f32: 109/109 identical
+reduce nansum_axis f32: 109/109 identical
+reduce std_axis f32: 109/109 identical
+reduce std_axis f64: 109/109 identical
+reduce sum_axis f32: 109/109 identical
+reduce sum_axis f64: 109/109 identical
+reduce var_axis f32: 109/109 identical
+  DIFF default-exp-neg800/exp_glibc/200001 exp_glibc f64 shape [2000000, 1, 1] param 0: 81649 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-neg800/exp_cr/200002 exp_cr f64 shape [2000000, 1, 1] param 0: 81706 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-pm20/exp_glibc/200003 exp_glibc f64 shape [2000000, 1, 1] param 0: 92295 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-pm20/exp_cr/200004 exp_cr f64 shape [2000000, 1, 1] param 0: 92370 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-full/exp_glibc/200005 exp_glibc f64 shape [2000000, 1, 1] param 0: 90088 values differ (lengths 16000000 vs 16000000)
+  DIFF default-exp-full/exp_cr/200006 exp_cr f64 shape [2000000, 1, 1] param 0: 90199 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-0to10/log_glibc/200009 log_glibc f64 shape [2000000, 1, 1] param 0: 2083 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-0to10/log_cr/200010 log_cr f64 shape [2000000, 1, 1] param 0: 1742 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-wide/log_glibc/200011 log_glibc f64 shape [2000000, 1, 1] param 0: 12 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-wide/log_cr/200012 log_cr f64 shape [2000000, 1, 1] param 0: 10 values differ (lengths 16000000 vs 16000000)
+  DIFF default-log-special/log_cr/200014 log_cr f64 shape [9, 1, 1] param 0: 2 values differ (lengths 72 vs 72)
+numpy 2.5.4, SciPy 1.18.1, <workspace>/oracles/python-newest/bin/python
+[logf-default]
+logf_numpy: 64/64 chunks identical (4294967296 inputs); correctly rounded logf: 30 chunks identical
+[logf-avx512off]
+logf_numpy: 64/64 chunks identical (4294967296 inputs); correctly rounded logf: 30 chunks identical
+logf over positive finite (2139095039 inputs): numpy vs correctly rounded 78427614 differ (max 4 ulp), numpy vs glibc 78438378, glibc vs correctly rounded 416908
+logf over [1, 2^24] (201326593 inputs): numpy vs correctly rounded 10947841 differ (max 3 ulp), numpy vs glibc 10955142, glibc vs correctly rounded 167180
+RUN-BOTH-DONE

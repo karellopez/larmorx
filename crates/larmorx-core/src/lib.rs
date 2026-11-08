@@ -15,6 +15,8 @@
 //!   [`vnl_svd_f32`]: vnl's SVD in double and single precision, bit-exact with ITK;
 //!   [`vnl_eigen`]: vnl's symmetric and real eigensystems (EISPACK); [`vnl_fixed`]: vnl's
 //!   closed-form determinants and inverses of small matrices.
+//! - [`numpy`]: numpy's sums, means, variances, percentiles and weighted averages over one axis
+//!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
 // No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
 
@@ -29,6 +31,7 @@ pub mod image;
 pub mod itk_real;
 pub mod linalg;
 pub mod math;
+pub mod numpy;
 pub mod parallel;
 pub mod rotation;
 pub mod vnl_eigen;

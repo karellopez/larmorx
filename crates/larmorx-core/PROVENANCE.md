@@ -218,3 +218,41 @@ SSE4.2: for a 4 × 4 matrix every vectorised kernel keeps the scalar order of op
 650,003 matrices: random of every scale, Horn matrices of random landmark sets, repeated
 eigenvalues, tiny subdiagonals, singular ones; a scratch harness.
 
+
+## numpy's float32 logarithm (`src/math/logf_numpy.rs`)
+
+**Ported** from numpy 2.5.4 (BSD-3-Clause, `tags/numpy-2.5.4`, identical in 2.3.5):
+`numpy/_core/src/umath/loops_exponent_log.dispatch.c.src` (`simd_log_FLOAT`, one lane of it, and
+its helpers `fma_get_exponent`, `fma_get_mantissa`, `avx512_get_exponent`, `avx512_get_mantissa`),
+the constants `NPY_COEFF_{P,Q}{0..5}_LOGf` of `numpy/_core/src/umath/npy_simd_data.h` and
+`NPY_LOGE2f`, `NPY_SQRT1_2f` of `numpy/_core/include/numpy/npy_math.h`. The file carries
+numpy's notice. Each `fmadd` is `mul_add`; an FMA-compiled copy is chosen at run time on x86-64
+(the same bits). Equal to `numpy.log` on `float32` arrays (numpy 2.3.5 and 2.5.4, Linux x86-64,
+the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
+(`validation/investigations/t2smap/numerics/`); unit tests check recorded values.
+
+## numpy's reductions and percentiles (`src/numpy/`)
+
+**Ported** from numpy 2.5.4 (BSD-3-Clause; the same code paths in 2.3.5) and SciPy 1.18.1
+(BSD-3-Clause; the same in 1.15.3), for the replicas of Python programs (tedana's `t2smap`):
+- `numpy/reduce.rs`: the pairwise sum `@TYPE@_pairwise_sum` (`numpy/_core/src/umath/loops_utils.h.src`)
+  and its use by the float `add` loop's reduce branch (`loops_arithm_fp.dispatch.c.src`); the
+  identity as initial value (`umath/reduction.c`, `legacy_array_method.c`'s
+  `get_initial_from_ufunc`); `_mean`, `_var`, `_std` (`numpy/_core/_methods.py`); `nansum`,
+  `nanvar`, `nanstd`, `_replace_nan`, `_divide_by_count` (`numpy/lib/_nanfunctions_impl.py`);
+  `average` (`numpy/lib/_function_base_impl.py`). The order of a sum over an outer axis
+  (accumulation in index order) is numpy's iterator's, established by measurement.
+- `numpy/quantile.rs`: `percentile`, `_quantile`, `_get_indexes`, `_get_gamma`, `_lerp`,
+  `_QuantileMethods`' `linear` and `higher` (`numpy/lib/_function_base_impl.py`),
+  `nanpercentile`, `_nanquantile_ureduce_func`, `_nanquantile_1d`, `_remove_nan_1d`
+  (`_nanfunctions_impl.py`), `apply_along_axis`'s output type (`numpy/lib/_shape_base_impl.py`);
+  SciPy's `scoreatpercentile` and `_compute_qth_percentile` (`scipy/stats/_stats_py.py`).
+- `numpy/umath.rs`: which C library function numpy's x86-64 Linux wheels call for `float64`
+  `exp` and `log` without AVX-512 (`loops_exponent_log.dispatch.c.src`'s `DOUBLE_exp`,
+  `DOUBLE_log`; the symbols `exp@GLIBC_2.2.5`, `log@GLIBC_2.2.5` they bind, whose negative
+  logarithm is C's positive `NAN`: measured, glibc's source not read).
+
+Each file carries numpy's (and SciPy's) notice. Bit-identical to numpy 2.3.5 / SciPy 1.15.3 and
+numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
+`validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana
+reaches, lengths around the pairwise blocks, axes of length 1, NaN, signed zeros, infinities).

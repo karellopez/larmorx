@@ -209,7 +209,10 @@ def main(argv: list[str]) -> int:
         }
         for f, (name, run) in checks.items():
             report[name][run].update(f.result())
-    (work / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+    full = report
+    if a.check_only:  # the cases not checked again keep their entries
+        full = {**json.loads((work / "report.json").read_text(encoding="utf-8")), **report}
+    (work / "report.json").write_text(json.dumps(full, indent=1), encoding="utf-8")
     bad = 0
     for name, runs in report.items():
         ref = runs["ref"]

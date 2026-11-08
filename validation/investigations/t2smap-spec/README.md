@@ -36,7 +36,7 @@ folder, the log `oracles/logs/t2smap-1-relay8b-*.log`):
 - tedana's own spread (the shared environment, `--n-threads 4`, numpy's AVX-512 kernels on) and
   the model's fast variant pass every row of the spec's §17.3; the largest uses are the numbers
   in its brackets (e.g. the curve fit's (b)/(c) share 0.28 % / 0.31 % of the fit voxels, against
-  3 %; the variance maps 9.9e-5 relative, against 1e-3).
+  3 %; the variance maps 8.1e-6 relative where the parameters agree, against 1e-4).
 - Two statements of the spec were made precise (the exemplars' tie-break sums the thirds; the
   RMSE map's sums are `nansum`), and the replica now honours `TQDM_DISABLE` as tqdm does.
 

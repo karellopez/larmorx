@@ -38,7 +38,7 @@ TOL_CURVE_REL = 1e-6
 TOL_OBJECTIVE = 1e-6
 TOL_OBJECTIVE_ABS = 1e-12
 TOL_SHARE_BC = 0.03  # at most this share of the fit voxels pass by (b) or (c) (measured 0.31 %)
-TOL_VAR_REL = 1e-3  # measured 9.9e-5 (ds003592 with --verbose, AVX-512 on)
+TOL_VAR_REL = 1e-4  # measured 8.1e-6 where (a) holds (ds003592 with --verbose)
 TOL_PRED_REL = 2.0**-21  # the predictions' float32 rounding from each run's own maps
 SUM_UNIT = 2.0**-24  # a float32 sum of n terms in another order: SUM_UNIT * (n + SUM_SLACK) of it
 SUM_SLACK = 32
@@ -109,9 +109,12 @@ def rate(t2s_s: np.ndarray) -> np.ndarray:
         return 1.0 / t2s_s.astype(F64)
 
 
-def compare_maps(res: Result, a, b, tol_rel, rate_domain: bool, ok_extra=None) -> np.ndarray:
+def compare_maps(
+    res: Result, a, b, tol_rel, rate_domain: bool, ok_extra=None, use_where=None
+) -> np.ndarray:
     """Per value: identical, or within tol_rel (the rate domain for T2*: also 1e-9 s^-1);
-    returns the mask of values that pass by the tolerance or are identical."""
+    returns the mask of values that pass by the tolerance or are identical. The use is taken
+    over ``use_where`` (all values by default)."""
     same = same_bits(a, b)
     res.n += a.size
     res.identical += int(same.sum())
@@ -126,6 +129,8 @@ def compare_maps(res: Result, a, b, tol_rel, rate_domain: bool, ok_extra=None) -
         within = ~same & (diff <= allow)
         with np.errstate(invalid="ignore", divide="ignore"):
             use = np.where(~same & np.isfinite(diff), diff / allow, 0.0)
+    if use_where is not None:
+        use = np.where(use_where, use, 0.0)
     if use.size:
         res.use = max(res.use, float(np.nanmax(np.where(within, use, 0.0))))
     passed = same | within
@@ -387,7 +392,9 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
                 res = Result(desc)
                 va = on(load(ref / fname(desc))[1])
                 vb = on(load(other / fname(desc))[1])
-                passed = compare_maps(res, va, vb, TOL_VAR_REL, False, ok_extra=~exact_ok)
+                passed = compare_maps(
+                    res, va, vb, TOL_VAR_REL, False, ok_extra=~exact_ok, use_where=exact_ok
+                )
                 del passed
                 results.append(res)
 

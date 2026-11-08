@@ -1295,6 +1295,14 @@ def _text(n: int) -> dict:
     return common.cell("identical" if n == 0 else ("shapes differ" if n < 0 else f"{n:,} differ"))
 
 
+def _checks(threads: int, modes: int, step: int) -> dict:
+    """One cell for larmorx at 14 against 1 thread, its default against its reproduce mode and
+    sdcflows' step: "identical", or what differs in each that differs."""
+    parts = [f"{name}: " + ("shapes differ" if n < 0 else f"{n:,} differ") for name, n in
+             (("threads", threads), ("modes", modes), ("step", step)) if n]  # fmt: skip
+    return common.cell("; ".join(parts) if parts else "identical")
+
+
 def _estimators_table(ctx: core.Context) -> dict:
     """Every phase-difference estimator of the oracle runs, output by output."""
     rows = []
@@ -1314,8 +1322,7 @@ def _estimators_table(ctx: core.Context) -> dict:
         cells = [
             _text(sdc["rads"]), _text(sdc["fmap"]), _text(c_sdc),
             _text(sdc["extrapolated"]), _text(sdc["error"]),
-            _text(sum(own.values())), _text(sum(wf.values())), _text(thr), _text(fix),
-            _text(step),
+            _text(sum(own.values())), _text(sum(wf.values())), _checks(thr, fix, step),
         ]  # fmt: skip
         ok = all(v == 0 for v in (*sdc.values(), *own.values(), *wf.values(), thr, fix, c_sdc))
         cells.append({"verdict": "bit-identical" if ok else "open"})
@@ -1325,7 +1332,7 @@ def _estimators_table(ctx: core.Context) -> dict:
         shape = nib.load(img).shape
         rows.append({
             "head": f"{run.split('-noreconall')[0]} `{est.rsplit('/', 1)[-1]}`",
-            "sub": f"{what}; {' × '.join(map(str, shape[:3]))} voxels",
+            "sub": what if "voxels" in what else f"{what}; {' × '.join(map(str, shape[:3]))} voxels",
             "cells": cells,
             "verdict": "bit-identical" if ok else "open",
         })  # fmt: skip
@@ -1341,9 +1348,7 @@ def _estimators_table(ctx: core.Context) -> dict:
             "Error",
             "fMRIPrep's files",
             "Workflow",
-            "1 vs 14 threads",
-            "Default vs reproduce",
-            "sdcflows' step",
+            "Threads, modes, step",
             "Verdict",
         ],
         rows,
@@ -1353,9 +1358,10 @@ def _estimators_table(ctx: core.Context) -> dict:
         "reproduce mode) against sdcflows 2.17.1 (newest releases) output by output; against "
         "fMRIPrep 25.2.6's own files (the phase difference, the field map, the extrapolated "
         "field and the coefficients); larmorx's whole workflow with lx.fsl.prelude's clean-room "
-        "original against fMRIPrep's phase difference and field map; larmorx at 14 threads and "
-        "in its default mode against itself; sdcflows with the shared environment's releases "
-        "against the newest (the originals' own step). Values counted as stored (NaN alike).",
+        "original against fMRIPrep's phase difference and field map; in one column, larmorx at 14 "
+        "threads and in its default mode against itself and sdcflows with the shared "
+        "environment's releases against the newest (the originals' own step). Values counted "
+        "as stored (NaN alike).",
     )
 
 

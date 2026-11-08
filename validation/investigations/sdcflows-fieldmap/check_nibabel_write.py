@@ -31,6 +31,9 @@ import numpy as np
 from larmorx.image import Image
 from larmorx.io.nibabel_writer import _Extended, save_nibabel
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 FAILS: list[str] = []
 INT_TYPES = ("int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64")
 
@@ -78,7 +81,7 @@ def check_extended(rng: np.random.Generator) -> None:
                 x, r = xa / xb, na / nb_
             n += 1
             with np.errstate(over="ignore", under="ignore"):
-                want = np.float32(r)
+                want = oracle(np.float32(r))
             got = x.to_float32()
             if want.tobytes() != got.tobytes():
                 bad += 1
@@ -102,6 +105,7 @@ def write_both(data: np.ndarray, out_dtype: str, version: int = 1, affine=None) 
                 img.to_filename(p_nb)
         except Exception as e:  # the exception is the result
             err_nb = (type(e).__name__, str(e))
+        oracle(err_nb if err_nb else raw(p_nb))
         try:
             with np.errstate(all="ignore"):
                 save_nibabel(lx_img, p_lx)

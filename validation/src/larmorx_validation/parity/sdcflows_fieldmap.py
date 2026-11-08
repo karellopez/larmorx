@@ -31,14 +31,18 @@ line it reports (``OK <name>: ...`` or ``FAIL <name>: ...``).
   ``phdiff_workflow`` with ``lx.fsl.prelude``;
 - ``nibabel-writer``: ``lx.io.save_nibabel`` against nibabel 5.4.2's writer.
 
-The suite runs in the interpreter's environment (``python_versions``: ``newest`` by default;
-the shared one for the step) with numpy's OpenBLAS on the Haswell kernels (skipped otherwise:
-``OPENBLAS_CORETYPE=Haswell``, as ``scripts/orchestration/env.sh`` sets it).
+The suite runs in the interpreter's environment (``python_versions``: ``newest`` by default)
+with numpy's OpenBLAS on the Haswell kernels (skipped otherwise: ``OPENBLAS_CORETYPE=Haswell``,
+as ``scripts/orchestration/env.sh`` sets it). **The originals' own step** (``python_versions``'
+``STEP_SUITES``, as ``resample-series``): a run in ``newest`` first runs the same cases in the
+shared environment, twice; every script passes what sdcflows, scikit-learn, SciPy, numpy or
+nibabel gave on its side of a comparison through ``stepdigest.oracle``, and each reported line
+carries one more check: whether those outputs are the same under both releases (the digests of
+the content gathered since the previous line: arrays, decompressed files, headers, messages).
 """
 
 from __future__ import annotations
 
-import contextlib
 import importlib.util
 import io
 import os
@@ -46,7 +50,18 @@ import re
 import sys
 from pathlib import Path
 
-from larmorx_validation.parity.harness import SKIPPED, Case, CheckList, Outcome, Suite
+import numpy as np
+
+from larmorx_validation.parity import python_versions as pv
+from larmorx_validation.parity.harness import (
+    SKIPPED,
+    Case,
+    CaseResult,
+    Check,
+    CheckList,
+    Outcome,
+    Suite,
+)
 
 #: Where the scripts are (the repository's ``validation/investigations/sdcflows-fieldmap``).
 SCRIPTS = Path(__file__).resolve().parents[3] / "investigations" / "sdcflows-fieldmap"
@@ -94,7 +109,11 @@ CASES = {
         "numpy's dot, SciPy's cg, scikit-learn's Ridge; fMRIPrep's seven fits and coefficients",
     ),
 }
-_LINE = re.compile(r"^(OK|FAIL)\s+(.*?)(?::\s(.*))?$")
+_LINE = re.compile(r"^(OK|FAIL|EXPECTED)\s+(.*?)(?::\s(.*))?$")
+#: The originals' changes from the shared releases to the newest on this suite's paths
+#: (``NOTES``: none in sdcflows 2.15.1 -> 2.17.1 on part A's paths; the libraries' code read
+#: side by side): a change the step finds has no known reason and fails its check.
+CHANGES: dict[str, str] = {}
 
 
 def _workspace() -> Path | None:
@@ -142,16 +161,25 @@ def run_case(case: Case, checks: CheckList) -> None:
     if ws is not None:
         os.environ.setdefault("LARMORX_WORKSPACE", str(ws))
     module = _load(case.payload)
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out):
+    import stepdigest  # the scripts' own folder, on sys.path once a script is loaded
+
+    stepdigest.reset()
+    out = _Lines(stepdigest)
+    old = sys.stdout
+    sys.stdout = out
+    try:
         status = module.main()
+    finally:
+        sys.stdout = old
     lines = out.getvalue().splitlines()
     n = 0
-    for line in lines:
-        m = _LINE.match(line.strip())
-        if m:
-            checks(m.group(2).strip(), m.group(1) == "OK", detail=(m.group(3) or "")[:400])
-            n += 1
+    with pv.case(case.id):
+        for kind, name, detail, digest in out.reported:
+            if kind != "EXPECTED":
+                checks(name, kind == "OK", detail=detail[:400])
+                n += 1
+            if digest is not None:
+                _step(checks, name, digest)
     skipped = [line for line in lines if line.startswith("skipped")]
     checks(
         "the script's exit status",
@@ -160,6 +188,82 @@ def run_case(case: Case, checks: CheckList) -> None:
     )
     if n == 0:
         raise Outcome(SKIPPED, "no comparison ran (the oracle runs or packages are missing)")
+
+
+class _Lines(io.StringIO):
+    """The script's output; at each reported line the digests of the originals' outputs
+    gathered since the previous one (``stepdigest``) are taken for that line."""
+
+    def __init__(self, stepdigest) -> None:
+        super().__init__()
+        self._digests = stepdigest
+        self._partial = ""
+        self._names: dict[str, int] = {}
+        #: (kind, name, detail, digest or None) per reported line, in order.
+        self.reported: list[tuple[str, str, str, str | None]] = []
+
+    def write(self, s: str) -> int:
+        n = super().write(s)
+        self._partial += s
+        while "\n" in self._partial:
+            line, self._partial = self._partial.split("\n", 1)
+            m = _LINE.match(line.strip())
+            if m:
+                name = m.group(2).strip()
+                k = self._names.get(name, 0)
+                self._names[name] = k + 1
+                if k:  # a name reported twice: numbered, so each line keeps its own step
+                    name = f"{name} #{k + 1}"
+                self.reported.append((m.group(1), name, m.group(3) or "", self._digests.take()))
+        return n
+
+
+def _step(checks: CheckList, name: str, digest: str) -> None:
+    """The originals' own step for line ``name`` (``python_versions``): recorded in a
+    ``shared`` step run, compared with that record in a ``newest`` run."""
+    value = np.frombuffer(bytes.fromhex(digest), dtype=np.uint8)
+    pv.record(name, value)
+    olds = pv.previous(name)
+    if not olds:
+        return
+    if len(set(olds)) > 1:
+        checks.add(
+            Check(
+                f"{pv.STEP_CHECK}: {name}",
+                True,
+                metric="the originals' outputs",
+                value=pv.VARIES,
+                threshold="a change has a known reason",
+                detail=f"{len(set(olds))} different outputs in {len(olds)} runs of the shared "
+                "releases on the same inputs, so the step is not measured",
+            )
+        )
+        return
+    changed = olds[0] != pv.digest(value)
+    checks.add(
+        Check(
+            f"{pv.STEP_CHECK}: {name}",
+            not changed,
+            metric="the originals' outputs",
+            value="changed" if changed else "identical",
+            threshold="a change has a known reason",
+            detail="identical" if not changed else "changed: no known reason",
+        )
+    )
+
+
+def _highlights(results: list[CaseResult]) -> list[str]:
+    from larmorx_validation.parity.resample_series import step_summary
+
+    lines = step_summary(results)
+    stepped = sum(1 for r in results for c in r.checks if c.name.startswith(pv.STEP_CHECK))
+    if stepped:
+        lines.append(
+            f"The step's comparisons: {stepped} reported lines whose originals' outputs were "
+            f"compared under both releases ({pv.RELEASES[pv.SHARED]}; {pv.RELEASES[pv.NEWEST]}; "
+            "sdcflows 2.17.1, scikit-learn 1.9.1 and nibabel 5.4.2 in both)."
+        )
+    return lines
 
 
 def suite() -> Suite:
@@ -195,4 +299,12 @@ def suite() -> Suite:
         cases=cases,
         run_case=run_case,
         packages=("numpy", "scipy", "scikit-learn", "nibabel", "nitransforms", "sdcflows"),
+        highlights=_highlights,
+        notes=(
+            "Each case is one of the investigation's check scripts, run in this process; one "
+            "check per line it reports. The originals' own step (python_versions): every line "
+            "whose script passed the originals' outputs to stepdigest.oracle carries one more "
+            "check, whether those outputs are identical in the shared releases (two runs) and "
+            "the newest."
+        ),
     )

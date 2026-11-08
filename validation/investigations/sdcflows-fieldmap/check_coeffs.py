@@ -40,6 +40,9 @@ from sdcflows.utils.tools import reorient_pedir as sdc_reorient_pedir
 from larmorx import sdcflows as lxs
 from larmorx.sdcflows.coeffs import reorient_pedir
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 FAILS: list[str] = []
@@ -78,7 +81,7 @@ def check_reorient_pedir() -> None:
             o = axcodes2ornt(c)
             for src, dst in ((o, None), (None, o), (o, axcodes2ornt(codes[n % 48]))):
                 n += 1
-                want = sdc_reorient_pedir(pe, src, dst)
+                want = oracle(sdc_reorient_pedir(pe, src, dst))
                 got = reorient_pedir(pe, src, dst)
                 bad += want != got
     report(
@@ -130,7 +133,7 @@ def topup_case(name, coeffs, ref, pe_dir, oracle_files=()):
             )
             return node.run(cwd=t1).outputs.out_coeff
 
-        want, err_ref = outcome(ref_run)
+        want, err_ref = oracle(*outcome(ref_run))
         # sdcflows' bytes with upstream_defects="reproduce" (SDC-07 negates an i direction)
         got, err = outcome(
             lambda: lxs.topup_coeff_reorient(
@@ -252,7 +255,7 @@ def check_transform(tmp: Path) -> None:
                     node.inputs.fmap_target = str(tgt)
                 return node.run(cwd=t1).outputs.out_coeff
 
-            want, err_ref = outcome(ref_run)
+            want, err_ref = oracle(*outcome(ref_run))
             got, err = outcome(
                 lambda xfm=xfm, tgt=tgt, t2=t2: lxs.transform_coefficients(
                     [str(c) for c in coeffs],
@@ -277,7 +280,7 @@ def check_transform(tmp: Path) -> None:
                 checks[f"name{i}"] = Path(a).name == b.name
                 checks[f"bytes{i}"] = raw(a) == raw(b)
             if tgt is not None:
-                checks["debug"] = raw(Path(t1) / "debug_fmapref.nii.gz") == raw(
+                checks["debug"] = oracle(raw(Path(t1) / "debug_fmapref.nii.gz")) == raw(
                     Path(t2) / "debug_fmapref.nii.gz"
                 )
             bad = [k for k, v in checks.items() if not v]

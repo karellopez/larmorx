@@ -54,7 +54,9 @@ from sdcflows.transform import fmap_to_disp as sdc_fmap_to_disp
 from larmorx import sdcflows as lxs
 from larmorx.io import save_nibabel
 
-sys.path.insert(0, str(Path(__file__).parent))  # measure_sdc01_02 (python -P)
+sys.path.insert(0, str(Path(__file__).parent))  # measure_sdc01_02, stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 BIDS = Path.home() / ".cache" / "larmorx-testdata" / "data" / "openneuro"
@@ -167,6 +169,7 @@ def run_both(
                 )
             ]
         out.append((res, msgs, err))
+    oracle(out[0][0], out[0][1], exc(out[0][2]))
     return out
 
 
@@ -426,6 +429,7 @@ def coeff_case(name, coeffs, data, pe, ro, **xfm):
                 outs = node.run().outputs
         finally:
             os.chdir(cwd)
+        oracle(outs)
         mine = lxs.apply_coeffs_field(
             str(data),
             [str(c) for c in coeffs],
@@ -483,6 +487,7 @@ def disp_case(name, fmap, epi, ro, pe, itk=True):
         except Exception as e:  # the exception is the result
             res.append(None)
             errs.append(exc(e))
+    oracle(res[0], errs[0])
     if errs[0] or errs[1]:
         report(f"displacements {name}", errs[0] == errs[1], f"{errs[0]} vs {errs[1]}")
         return
@@ -527,7 +532,7 @@ def check_displacements(tmp: Path) -> None:
     t1.fit(nb.load(fm))
     t2 = lxs.B0FieldTransform(coeffs=[str(c) for c in synthetic(tmp)[3][1:]])
     t2.fit(str(fm), upstream_defects="reproduce")
-    a, b = t1.to_displacements(0.05, "j-"), t2.to_displacements(0.05, "j-")
+    a, b = oracle(t1.to_displacements(0.05, "j-")), t2.to_displacements(0.05, "j-")
     report(
         "to_displacements",
         np.asanyarray(a.dataobj).tobytes() == np.ascontiguousarray(b.data).tobytes()
@@ -553,6 +558,7 @@ def check_displacements(tmp: Path) -> None:
                     outs = node.run().outputs
                 finally:
                     os.chdir(cwd)
+                oracle(outs)
                 mine = lxs.displacements_field_to_fieldmap(
                     str(dpath), str(fm), 0.05, "j", demean=demean, itk_transform=itk, out_dir=t2d
                 )

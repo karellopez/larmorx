@@ -34,6 +34,9 @@ from sdcflows.utils.tools import resample_to_zooms
 
 from larmorx import _core
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 QUICK = "--quick" in sys.argv
@@ -70,9 +73,9 @@ def run_sdcflows(tmp, in_data, in_mask, **kw):
         if in_mask is not None:
             node.inputs.in_mask = str(in_mask)
         res = node.run(cwd=tmp)
-        return res.outputs, cap.records, None
+        return oracle(res.outputs, cap.records, None)
     except RuntimeError as e:
-        return None, cap.records, str(e)
+        return oracle(None, cap.records, str(e))
     finally:
         log.removeHandler(cap)
         log.setLevel(old)
@@ -160,7 +163,7 @@ def case(name, in_data, in_mask=None, **kw):
         fmap = nb.load(in_data)
         checks["grids"] = all(
             tuple(nb.load(f).shape) == tuple(g[0])
-            and same(bspline_grid(fmap, control_zooms_mm=sp).affine, g[1])
+            and same(oracle(bspline_grid(fmap, control_zooms_mm=sp).affine), g[1])
             for f, g, sp in zip(coeffs, mine["grids"], params["bs_spacing"], strict=False)
         )
         checks["field"] = same(stored(outs.out_field), mine["field"].reshape(shape))

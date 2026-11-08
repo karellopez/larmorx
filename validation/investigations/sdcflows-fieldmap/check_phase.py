@@ -47,6 +47,9 @@ from sdcflows.utils.phasemanip import delta_te as sdc_delta_te
 
 from larmorx import sdcflows as lxs
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 BIDS = Path.home() / ".cache" / "larmorx-testdata" / "data" / "openneuro"
@@ -87,14 +90,14 @@ def run_node(node):
         try:
             outs = node.run(cwd=t).outputs
         except Exception as e:  # the exception is the result
-            return None, exc(e), {}
+            return oracle(None, exc(e), {})
         files = {}
         for k, v in outs.get().items():
             if isinstance(v, str) and v.endswith((".nii", ".nii.gz")) and Path(v).exists():
                 files[k] = (Path(v).name, raw(v))
             elif isinstance(v, list):
                 files[k] = [(Path(x).name, raw(x)) for x in v]
-        return outs.get(), None, files
+        return oracle(outs.get(), None, files)
 
 
 def run_mine(fn):
@@ -215,6 +218,7 @@ def check_synthetic(tmp: Path) -> None:
                 out.append(("ok", repr(fn(dict(meta)))))
             except Exception as e:  # the exception is the result
                 out.append(exc(e))
+        oracle(out[0])
         report(f"delta_te {meta}", out[0] == out[1], f"{out[0]} vs {out[1]}")
     # phase difference to Hz
     meta = {"EchoTime1": 0.00492, "EchoTime2": 0.00738}
@@ -284,6 +288,7 @@ def register_case(mags, fmaps):
                 )
         except Exception as e:  # the exception is the result
             err_ref = exc(e)
+        oracle(None if err_ref else ref, err_ref)
         try:
             mine = lxs.check_register([str(m) for m in mags], [str(f) for f in fmaps], out_dir=t2)
         except Exception as e:  # the exception is the result

@@ -46,6 +46,9 @@ from sdcflows.utils.tools import resample_to_zooms as sdc_resample
 import larmorx as lx
 from larmorx import sdcflows as lxs
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 QUICK = "--quick" in sys.argv
@@ -117,7 +120,7 @@ def check_rescale() -> None:
         if i % 3 == 0:
             zooms = zooms.astype(np.float32)
         new_shape = np.rint(np.array(shape) * rng.uniform(0.2, 3, 3))
-        want = nb_rescale(a, shape, zooms, new_shape)
+        want = oracle(nb_rescale(a, shape, zooms, new_shape))
         got = lxs.rescale_affine(a, shape, zooms, new_shape)
         if want.tobytes() != got.tobytes():
             bad += 1
@@ -173,7 +176,7 @@ def check_resample(tmp: Path) -> None:
         p = tmp / f"rz_{len(name)}_{abs(hash(name)) % 10**6}.nii.gz"
         img.to_filename(p)
         loaded = nb.load(p)
-        want = sdc_resample(loaded, zooms, **kw)
+        want = oracle(sdc_resample(loaded, zooms, **kw))
         got = lxs.resample_to_zooms(p, zooms, n_threads=4, **kw)
         wdata = np.asanyarray(want.dataobj)
         mine_hdr = nb.Nifti2Header if got.header.version == 2 else nb.Nifti1Header
@@ -211,7 +214,7 @@ def run_sdcflows(tmp, in_data, in_mask, params):
             node.inputs.in_mask = str(in_mask)
         return node.run(cwd=tmp).outputs
 
-    return captured("nipype.interface", go)
+    return oracle(*captured("nipype.interface", go))
 
 
 def run_larmorx(out_dir, in_data, in_mask, params, mine_kw=None):

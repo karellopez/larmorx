@@ -48,6 +48,9 @@ from sklearn.linear_model import Ridge
 import larmorx as lx
 from larmorx import _core
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 HF = [(16.0, 16.0, 10.0)]
@@ -61,7 +64,7 @@ def same(a, b) -> bool:
 
 
 def report(name: str, ok: bool, detail: str = "") -> None:
-    print(f"{'OK  ' if ok else 'FAIL'} {name} {detail}".rstrip())
+    print(f"{'OK  ' if ok else 'FAIL'} {name}{': ' + detail if detail else ''}")
     if not ok:
         FAILS.append(name)
 
@@ -113,6 +116,7 @@ def check_dot() -> None:
             with np.errstate(all="ignore"):
                 ref = np.float32(np.dot(x, y))
                 nref = np.linalg.norm(x)
+            oracle(ref, nref)
             got = np.float32(_core.sdcflows_dot_f32(x, y))
             ngot = np.sqrt(np.float32(_core.sdcflows_dot_f32(x, x)))
             n_cases += 1
@@ -152,7 +156,7 @@ def check_cg() -> None:
         rtol = kw.get("rtol", 1e-5)
         atol = kw.get("atol", 0.0)
         maxiter = kw.get("maxiter")
-        x_ref, info_ref = spla.cg(a, b, rtol=rtol, atol=atol, maxiter=maxiter)
+        x_ref, info_ref = oracle(*spla.cg(a, b, rtol=rtol, atol=atol, maxiter=maxiter))
         x, info, it = _core.sdcflows_cg_csr(
             a.data, a.indices.astype(np.int64), a.indptr.astype(np.int64), a.shape, b,
             rtol, atol, maxiter,
@@ -166,7 +170,7 @@ def check_cg() -> None:
 
 def ridge_ref(x, y, **kw):
     m = Ridge(fit_intercept=False, **kw).fit(x, y)
-    return m.coef_, m.intercept_
+    return oracle(m.coef_, m.intercept_)
 
 
 def check_ridge_csr() -> None:
@@ -243,6 +247,7 @@ def check_ridge_csr() -> None:
             want = "no error"
         except ValueError as e:
             want = str(e)
+        oracle(want)
         try:
             lx.sdcflows.ridge_sparse_cg(x, y, **kw)
             got = "no error"
@@ -264,6 +269,7 @@ def fit_both(name, fmap, data, mask, spacings, ref_coef=None) -> None:
     colmat = sp.hstack([grid_bspline_weights(fmap, g) for g in grids]).tocsr()
     model = Ridge(alpha=1e-4, fit_intercept=False).fit(colmat, data.reshape(-1))
     t_ref = time.perf_counter() - t0
+    oracle(model.coef_)
     levels = [(tuple(g.shape), np.ascontiguousarray(g.affine, dtype=np.float64)) for g in grids]
     aff = np.ascontiguousarray(fmap.affine, dtype=np.float64)
     y = np.ascontiguousarray(data.reshape(-1))

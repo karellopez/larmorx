@@ -26,6 +26,9 @@ from sdcflows.transform import grid_bspline_weights
 
 import larmorx as lx
 
+sys.path.insert(0, str(Path(__file__).parent))  # stepdigest, measure_sdc01_02 (python -P)
+from stepdigest import oracle
+
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE") or Path(__file__).resolve().parents[4])
 R = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 WORK = "work/fmriprep_25_2_wf"
@@ -83,6 +86,7 @@ def check(name, img, spacings, target=None, dtype="float32", mode="reproduce", r
         ref = sp.hstack([weights(target, g, dtype=dtype) for g in grids]).tocsr()
     if reference is not None:
         w1 = []
+    oracle([(g.shape, g.affine) for g in grids], ref, [str(x.message) for x in w1])
     levels = [(g.shape, np.ascontiguousarray(g.affine)) for g in grids]
     with warnings.catch_warnings(record=True) as w2:
         warnings.simplefilter("always")
@@ -111,7 +115,7 @@ def check(name, img, spacings, target=None, dtype="float32", mode="reproduce", r
             target.shape[:3], aff, levels, y, True, None, 4, mode
         )
         x1 = sp.linalg.aslinearoperator(ref)
-        ok_prod = str(same(x1.matvec(v), lv) and same(x1.rmatvec(y), ly))
+        ok_prod = str(same(oracle(x1.matvec(v)), lv) and same(oracle(x1.rmatvec(y)), ly))
     good = ok_grid and ok_csr and warn_ok and ok_prod in ("-", "True")
     print(
         f"{'OK' if good else 'FAIL'} {name}: grid {ok_grid} csr {ok_csr} (nnz {ref.nnz}, zeros "
@@ -145,7 +149,6 @@ def main() -> int:
     ok &= check("rotated-target (SDC-02 reproduced)", base, HF, target=rotated)
     ok &= check("larger-target (SDC-01 reproduced)", base, HF, target=larger)
     # corrected: against the corrected weights built with numpy and SciPy
-    sys.path.insert(0, str(Path(__file__).parent))
     from measure_sdc01_02 import exact_matrix, true_grid_bspline_weights
 
     ok &= check(
@@ -190,6 +193,7 @@ def main() -> int:
         ref_err = None
     except ValueError as e:
         ref_err = str(e)
+    oracle(ref_err)
     try:
         lx.sdcflows.bspline_grid(four, HF[0], upstream_defects="reproduce")
         mine_err = None
@@ -202,6 +206,7 @@ def main() -> int:
         warnings.simplefilter("always")
         g4 = lx.sdcflows.bspline_grid(four, HF[0])
     g3 = bspline_grid(base, control_zooms_mm=HF[0])
+    oracle(g3.shape, g3.affine)
     good = (
         g4.shape == g3.shape
         and same(g4.affine, g3.affine)

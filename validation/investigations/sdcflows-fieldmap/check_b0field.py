@@ -42,6 +42,8 @@ from sdcflows.utils.tools import deoblique_and_zooms as sdc_deoblique
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from stepdigest import oracle
+
 from larmorx import sdcflows as lxs
 from larmorx.sdcflows.transform import B0FieldTransform, deoblique_and_zooms
 
@@ -108,7 +110,9 @@ def check_deoblique(tmp: Path) -> None:
     ):
         tpath = image(tmp / f"target{i}.nii.gz", shape, aff)
         for factor, padding in ((4, 1), (1, 1), (2, 3), (4, 0)):
-            want = sdc_deoblique(nb.load(cpath), nb.load(tpath), factor=factor, padding=padding)
+            want = oracle(
+                sdc_deoblique(nb.load(cpath), nb.load(tpath), factor=factor, padding=padding)
+            )
             got = deoblique_and_zooms(str(cpath), str(tpath), factor=factor, padding=padding)
             checks = {
                 "shape": tuple(want.shape) == tuple(got.shape),
@@ -135,6 +139,7 @@ def fit_case(name, coeffs, target, xfm=None, approx=True):
         warnings.simplefilter("always")
         ref = SdcB0(coeffs=[nb.load(c) for c in coeffs])
         ref.fit(nb.load(target), xfm_data2fmap=xfm, approx=approx)
+    oracle(ref.mapped, [str(x.message) for x in w1])
     with warnings.catch_warnings(record=True) as w2:
         warnings.simplefilter("always")
         mine = B0FieldTransform(coeffs=[str(c) for c in coeffs])
@@ -199,6 +204,7 @@ def fixed_case(name, coeffs, target, xfm=None, approx=True, notices=()):
                 ref.fit(t, xfm_data2fmap=xfm, approx=approx)
     finally:
         sdct.grid_bspline_weights = original
+    oracle(ref.mapped)
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         mine = B0FieldTransform(coeffs=[str(c) for c in coeffs])

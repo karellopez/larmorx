@@ -126,3 +126,26 @@ niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2) `utils/images.py` (`_copyxfo
 (`python/larmorx/sdcflows/data/fmap-any_registration.json`, `fmap-any_registration_testing.json`,
 `affine.json`, `sd_syn.json`, `sd_syn_sloppy.json`, `translation_rigid.json`) are copied
 unchanged from sdcflows 2.17.1's `sdcflows/data/` (Apache-2.0; identical in 2.15.1).
+
+## Part B: the fieldmap-less (SyN) preprocessing (`python/larmorx/sdcflows/syn.py`, relay 9)
+
+sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1) `workflows/fit/syn.py` (`init_syn_preprocessing_wf`,
+`_set_dtype`, `_merge_meta`) and `interfaces/utils.py` (`Deoblique`, `Reoblique`: `_deoblique`,
+`_reoblique`, `OBLIQUE_THRESHOLD_DEG`); sdcflows' `data/fmap_atlas_2_MNI152NLin2009cAsym_affine.mat`
+(Apache-2.0, shipped as `python/larmorx/sdcflows/data/`; SHA-256
+`588820bdaefab4f98c42b3a394c7c975ad9764bc5d8b095718f47419a9ea6ffc`); `data/fmap_atlas.nii.gz` is
+fetched, not shipped (SHA-256 `72b8d2cc7ff3324f3bfaf52712bc191256e795bcff5ee168563b89e584aa40bb`, from
+`https://raw.githubusercontent.com/nipreps/sdcflows/2.17.1/sdcflows/data/fmap_atlas.nii.gz`); sdcflows'
+`DenoiseImage` (`interfaces/utils.py`) with nipype 1.12.0's `CopyHeaderInterface` and
+`utils/imagemanip.copy_header` (Apache-2.0); nibabel 5.4.2's `affines.obliquity` (MIT). Into
+`python/larmorx/niworkflows/`: niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2)
+`interfaces/header.py` (`ValidateImage`), `interfaces/bold.py` (`NonsteadyStatesDetector`),
+`interfaces/nibabel.py` (`Binarize`, `GenerateSamplingReference`, `_gen_reference`),
+`interfaces/freesurfer.py` (`StructuralReference`'s one-file shortcut), `workflows/epi/refmap.py`
+(`init_epi_reference_wf`, `_post_merge`); nipype 1.12.0 `algorithms/confounds.py` (`is_outlier`);
+nilearn 0.14.1 and 0.11.1 (BSD-3-Clause; tags `nilearn-0.14.1`, `nilearn-0.11.1`) `image/resampling.py`
+(`resample_img`, `get_bounds`, `to_matrix_vector`, `_resampling_not_needed`,
+`_check_resample_img_inputs`, `_resample_one_img`) and `image/image.py` (`new_img_like`, `crop_img`,
+`_downcast_from_int64_if_possible`); transforms3d 0.4.2 (BSD-2-Clause) `affines.decompose44` and
+`axangles.mat2axangle` (`ValidateImage`'s report). nibabel 5.4.2's `ArrayWriter(check_scaling=False)`
+path into `python/larmorx/io/nibabel_writer.py` (`save_nibabel(scale=False)`).

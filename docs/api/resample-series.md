@@ -123,6 +123,7 @@ nitransforms on such a machine, and on every platform
 | `map_coordinates(input, coordinates, output, order, mode, cval, prefilter)` | the same, plus `n_threads`, `upstream_defects` | `output` is a dtype, not an array; 1- to 4-D inputs; float, integer outputs |
 | `spline_filter(input, order, output, mode)` | `spline_filter(input, order, mode, n_threads=, upstream_defects=)` | float64 result |
 | `spline_filter1d(input, order, axis, output, mode)` | `spline_filter1d(input, order, axis, mode, n_threads=, upstream_defects=)` | float64 result |
+| `affine_transform(input, matrix, offset, output_shape, output, order, mode, cval, prefilter)` | the same, plus `scipy_version`, `n_threads`, `upstream_defects` | 3-D inputs (`NotImplementedError` otherwise); a 3 x 3, 3 x 4 or homogeneous 4 x 4 matrix (SciPy's `geometric_transform` path: its sums in SciPy 1.16's order, the offset first; `scipy_version="1.15.3"` gives 1.15's, the offset last) or a vector (a diagonal: SciPy's `zoom_shift` path, `(o + offset / m) * m`); SciPy's checks and messages. Checked bit for bit on 600 seeded cases per environment (`validation/investigations/sdcflows-fieldmap-b/relay9/check_affine_transform.py`; in SciPy 1.15 the reflect boundaries' SCI-03 shows as in `map_coordinates`) |
 
 ## Upstream defects (D13)
 

@@ -20,8 +20,11 @@ Run in each kept environment (``PYTHONPATH=<repo>/python:<repo>/validation/src``
   ``mask_dtype``, ``prior2epi``, ``prior_msk`` (their command lines too). fMRIPrep 25.2.6's
   image's libraries: numpy 2.2.6, SciPy 1.15.2, nilearn 0.11.1, niworkflows 1.15.2;
   ``upstream_defects="reproduce"``.
-- ``workflow``: the whole function on the workflow's inputs, every NIfTI file of fMRIPrep's
-  folder against larmorx's at the same place (the registration as above).
+- ``workflow``: the whole function on each workflow's inputs against sdcflows' own graph (this
+  environment's sdcflows and niworkflows, run by nipype; ANTs' programs at one thread with
+  correctly rounded maths and AFNI's 3dvolreg as stand-ins through the oracle cache): every
+  NIfTI file of the graph's folders. (fMRIPrep's own N4, DenoiseImage and registration ran on
+  4 threads, on which they depend, so its later files are not the one-thread results.)
 - ``library``: this environment's sdcflows 2.17.1, niworkflows and nilearn on synthetic inputs
   (seeded): ``GenerateSamplingReference`` (oblique, plumb, LPS, 4D, NaN values, ``fov_mask``,
   ``target_resolution``, ``xform_code``), ``ValidateImage`` (every row of its truth table),
@@ -414,6 +417,32 @@ def sec_nodes(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> None
             )
             ref = n / "transform0GenericAffine.mat"
             mine = Path(reg.outputs["forward_transforms"][0])
+            seed = cbf.ants_seed(n)
+            ora_dir = tmpd / "epi2anat_oracle"
+            ora_reg = _nipype.registration(
+                cwd=ora_dir,
+                from_file=sd.registration_settings("affine.json"),
+                output_warped_image=False,
+                output_inverse_warped_image=False,
+                fixed_image=hosts(n, "fixed_image"),
+                moving_image=hosts(n, "moving_image"),
+                fixed_image_masks=hosts(n, "fixed_image_masks"),
+                moving_image_masks=hosts(n, "moving_image_masks"),
+                num_threads=1,
+            )
+            ora_dir.mkdir()
+            from larmorx_validation.parity.ants_programs import _run_ants
+
+            code, _o, err = _run_ants(
+                "antsRegistration", [*ora_reg.run_argv(), "--random-seed", str(seed)], threads=1,
+                correctly_rounded=True,
+            )  # fmt: skip
+            ora = Path(ora_reg.outputs["forward_transforms"][0])
+            t.add(
+                "epi2anat transform = ANTs 2.6.5 (one thread, correctly rounded maths, the run's seed)",
+                code == 0 and ora.read_bytes() == mine.read_bytes(),
+                f"{label}: {err[-200:]}",
+            )
             same = ref.read_bytes() == mine.read_bytes()
             t.add("epi2anat transform (fMRIPrep's ANTs threads): reported", True)
             if not same:
@@ -495,48 +524,105 @@ def workflow_inputs(wf: Path) -> dict:
     }
 
 
+DENOISE_BODY = """from larmorx_validation.parity.ants_programs import _run_ants
+code, out, err = _run_ants("DenoiseImage", sys.argv[1:], threads=1, correctly_rounded=True)
+sys.stdout.write(out)
+sys.stderr.write(err)
+sys.exit(code)
+"""
+APPLY_BODY = """from larmorx_validation.parity.ants_programs import _run_ants
+code, out, err = _run_ants("antsApplyTransforms", sys.argv[1:], threads=1, correctly_rounded=True)
+sys.stdout.write(out)
+sys.stderr.write(err)
+sys.exit(code)
+"""
+LTA_BODY = """args = sys.argv[1:]
+# FreeSurfer's lta_convert for StructuralReference's one-file identity transform: a placeholder
+# file (nothing on these paths reads it; larmorx does not produce it)
+out = args[args.index("--outlta") + 1]
+open(out, "w").write("identity placeholder (check_syn_preprocessing.py)\\n")
+sys.exit(0)
+"""
+
+
+def install_shims(folder: Path) -> None:
+    import stat
+
+    cbf.install_shims(folder)
+    paths = [p for p in sys.path if p and ("validation/src" in p or p.endswith("/python"))]
+    for name, body in (
+        ("DenoiseImage", DENOISE_BODY),
+        ("antsApplyTransforms", APPLY_BODY),
+        ("lta_convert", LTA_BODY),
+    ):
+        p = folder / name
+        p.write_text(cw.SHIM.format(python=sys.executable, name=name, paths=paths, body=body))
+        p.chmod(p.stat().st_mode | stat.S_IXUSR)
+
+
 def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> None:
+    """sdcflows' own ``init_syn_preprocessing_wf`` (this environment's sdcflows 2.17.1 and
+    niworkflows) run by nipype on the workflow's inputs, ANTs' and AFNI's programs as stand-ins
+    (one thread, correctly rounded maths, through the oracle cache), against larmorx's function
+    with this environment's libraries: every NIfTI file of the graph's folders."""
+    import nilearn
+    import niworkflows
+    import scipy
+    from sdcflows.workflows.fit.syn import init_syn_preprocessing_wf
+
     from larmorx import sdcflows as sd
 
     os.environ["LARMORX_SDCFLOWS_ATLAS"] = str(ATLAS)
-    for wf in wfs:
-        label = f"{cw.run_root(wf).name}/{wf.name}"
-        with tempfile.TemporaryDirectory() as tmp:
-            t0 = time.perf_counter()
-            res = sd.syn_preprocessing_workflow(
-                **workflow_inputs(wf),
-                out_dir=tmp,
-                auto_bold_nss=True,
-                omp_nthreads=nt,
-                ants_random_seed=cbf.ants_seed(wf / "epi2anat"),
-                niworkflows_version=NIWF_IMAGE,
-                nilearn_version=NILEARN_IMAGE,
-                upstream_defects="reproduce",
-                n_threads=nt,
-                **IMAGE,
-            )
-            times.append(time.perf_counter() - t0)
-            mine_root = Path(tmp) / "syn_preprocessing_wf"
-            same_reg = (wf / "epi2anat" / "transform0GenericAffine.mat").read_bytes() == Path(
-                res.epi2anat_xfm[0]
-            ).read_bytes()
-            print(
-                f"INFO {label}: workflow's epi2anat {'identical to' if same_reg else 'differs from'} fMRIPrep's"
-            )
-            after_reg = ("anat2epi", "mask2epi", "prior2epi", "prior_msk")
-            for f in sorted(wf.rglob("*.nii*")):
-                rel = f.relative_to(wf)
-                if any(p.startswith("_report") for p in rel.parts):
-                    continue
-                what = "workflow: node files"
-                if rel.parts[0] in after_reg and not same_reg:
-                    what = "workflow: node files after the registration (its threads)"
-                tally(t, what, f"{label}: {rel}", f, mine_root / rel)
-            t.add(
-                "workflow: epi_ref metadata",
-                res.epi_ref[1] == value(wf / "merge_output", "meta_list")[0],
-                label,
-            )
+    with tempfile.TemporaryDirectory() as shims:
+        install_shims(Path(shims))
+        for wf in wfs:
+            label = f"{cw.run_root(wf).name}/{wf.name}"
+            inp = workflow_inputs(wf)
+            seed = cbf.ants_seed(wf / "epi2anat")
+            os.environ["ANTS_RANDOM_SEED"] = str(seed)
+            with tempfile.TemporaryDirectory() as tmp:
+                g = init_syn_preprocessing_wf(
+                    omp_nthreads=1, debug=False, auto_bold_nss=True, t1w_inversion=False
+                )
+                for k, v in inp.items():
+                    setattr(g.inputs.inputnode, k, v)
+                t0 = time.perf_counter()
+                ref_root = cw.run_nipype(g, Path(tmp) / "nipype")
+                t1 = time.perf_counter()
+                res = sd.syn_preprocessing_workflow(
+                    **inp,
+                    out_dir=Path(tmp) / "lx",
+                    auto_bold_nss=True,
+                    omp_nthreads=nt,
+                    ants_random_seed=seed,
+                    niworkflows_version=niworkflows.__version__,
+                    nilearn_version=nilearn.__version__,
+                    numpy_version=np.__version__,
+                    scipy_version=scipy.__version__,
+                    upstream_defects="reproduce",
+                    n_threads=nt,
+                )
+                times.append(time.perf_counter() - t1)
+                print(
+                    f"INFO {label}: sdcflows' graph {t1 - t0:.1f} s (one thread), larmorx {times[-1]:.1f} s ({nt} threads)"
+                )
+                mine_root = Path(tmp) / "lx" / "syn_preprocessing_wf"
+                for f in sorted(ref_root.rglob("*.nii*")):
+                    rel = f.relative_to(ref_root)
+                    if any(p.startswith("_report") or p == "crash" for p in rel.parts):
+                        continue
+                    tally(
+                        t,
+                        "workflow: node files = sdcflows' graph's",
+                        f"{label}: {rel}",
+                        f,
+                        mine_root / rel,
+                    )
+                t.add(
+                    "workflow: epi_ref metadata",
+                    res.epi_ref[1] == value(wf / "merge_output", "meta_list")[0],
+                    label,
+                )
 
 
 def sec_library(t: cw.Tally, nt: int) -> None:

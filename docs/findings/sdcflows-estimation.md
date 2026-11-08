@@ -291,8 +291,12 @@ file:
   `ds006736-sub-004-noreconall` and `ds004958-sub-fsm64ps-noreconall-pepolar` the image's topup
   gives FSL 6.0.7.23's files (7/7 images each, `descrip` apart, 2/2 matrices, the field identical
   in every voxel), ds006736's regrid is fMRIPrep's file again, and every other check of the part
-  on them is identical in both environments (`relay8/recheck.sh`). The other re-made runs: the
-  part's notes, as they finish.
+  on them is identical in both environments (`relay8/recheck.sh`). **And on ds002603's EPI
+  view** (relay 9): its two estimators' topup = FSL 6.0.7.23 (7/7 images, 2/2 matrices, the
+  fields identical in every voxel; 17.8 Hz apart before), `runwise_avg`, `setwise_avg`,
+  `concat_blips`, `fix_coeff`, `from_las(_fmap)`, `ref_average` fMRIPrep's files, the BOLD
+  steps (8 reconstructed fields, all through the resampled path) and fits identical in both
+  environments. The other re-made runs: the part's notes, as they finish.
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 
@@ -395,6 +399,74 @@ and field maps. A call of `bold_fit_fieldmap` takes about 1 s (21 calls in 20.5 
   documented undefined outputs (rule C, relay 7). `reproduce` resamples without the field map,
   as fMRIPrep, with an `UpstreamDefectWarning` (checked: `reproduce` = fMRIPrep's
   `ResampleSeries` without `ro_time` on the same files).
+
+## The fieldmap-less (SyN) preprocessing (relay 9)
+
+`lx.sdcflows.syn_preprocessing_workflow` (`init_syn_preprocessing_wf`) with niworkflows' EPI
+reference (`init_epi_reference_wf`: `ValidateImage`, `NonsteadyStatesDetector`, `RobustAverage`,
+two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateSamplingReference`
+(nilearn's nearest `resample_img`), `Binarize`, sdcflows' `Deoblique`, `DenoiseImage`,
+`BrainExtraction`, `BinaryDilation`, `antsRegistration` (`affine.json`), `antsApplyTransforms`
+(now runnable from nipype's line: `_core.ants_file_program`) and the prior
+(`check_syn_preprocessing.py`):
+
+- **fMRIPrep's own nodes, each fed fMRIPrep's inputs** (the three `--use-syn-sdc` runs of
+  2026-11-08, five SyN estimators; header bytes as written, `scl_slope`/`scl_inter` included):
+  `validate_nii` (its report too), `select_volumes`, `per_run_avgs` (and the drift), `clip_avgs`,
+  `clip_bg_noise`, `deob_epi`, `anat_dilmsk`, `mask_anat`, `clip_anat`, `epi_brain`'s mask,
+  `epi_dilmsk`, `sampling_ref` (nilearn 0.11.1's path), `anat2epi`, `mask2epi`, `mask_dtype`,
+  `prior2epi`, `prior_msk` and the command lines of `ref_anat`, `epi2anat`, `anat2epi`,
+  `mask2epi` and `prior2epi` are fMRIPrep's files, with fMRIPrep 25.2.6's image's libraries as
+  switches (numpy 2.2.6, SciPy 1.15.2, nilearn 0.11.1, niworkflows 1.15.2). Those runs were made
+  with the AVX-512 kernels; the brain mask's random walker (OpenBLAS's `sdot`) still gave the
+  same mask on all five (the probabilities are not kept by nipype).
+- **What depends on fMRIPrep's threads**: `n4_avgs` (N4's B-spline fit), `ref_anat`
+  (DenoiseImage) and `epi2anat` (antsRegistration) ran on `omp_nthreads` = 4, and N4 and
+  DenoiseImage with glibc's `expf`/`exp` ([ants-n4.md](ants-n4.md), [ants-denoise.md](ants-denoise.md)):
+  larmorx gives ANTs 2.6.5's one-thread results with correctly rounded maths, checked bit for bit
+  against that build on fMRIPrep's inputs (through the oracle cache). fMRIPrep's own N4 output
+  shares 40 to 45 % of its voxels with the one-thread result, its DenoiseImage output 97.8 to
+  99.0 %; its registrations differ from the one-thread result by 4.5e-13 to 2.6e-11 in their
+  parameters on four estimators and by **0.081 on ds005003's second** (`affine.json`'s second
+  stage samples 40 % of the voxels at random: which points a thread draws depends on the number
+  of threads, so the optimiser can end elsewhere). So fMRIPrep's later files of a SyN estimator
+  are a 4-thread result; the whole workflow is checked against sdcflows' own graph instead
+  (below).
+- **The whole workflow against sdcflows' own graph** (this environment's sdcflows 2.17.1 and
+  niworkflows run by nipype, ANTs' programs at one thread with correctly rounded maths and AFNI's
+  3dvolreg as stand-ins through the oracle cache): see the part's notes for the counts.
+- **nilearn changed `resample_img` between fMRIPrep's image (0.11.1) and the newest (0.14.1)**:
+  0.13 copies the image's header by default (`copy_header=True`: the fixed EPI's header with
+  `scl_slope = scl_inter = 0`, which nibabel then writes unscaled, and `cal_max`/`cal_min` set to
+  the data's range) and always resamples (`force_resample=True`); 0.11 makes a new header and
+  copies by whole voxels (after nilearn's `crop_img`) when the grids differ by whole voxels. So
+  `GenerateSamplingReference`'s file differs between the two in its header (`xyzt_units`,
+  `pixdim[4]`, `cal_max`, `scl_slope`): `nilearn_version` gives either. Checked against nilearn
+  0.14.1 in both environments (oblique, plumb, LPS, 4D, NaN and infinite values, `fov_mask`,
+  `target_resolution`, `xform_code`) and against fMRIPrep's 0.11.1 files.
+- **SciPy changed `affine_transform`'s sums in 1.16**: `NI_GeometricTransform` adds a matrix
+  row's products to the offset (SciPy 1.16 onwards) instead of adding the offset after them
+  (1.15): `lx.ndimage.affine_transform(scipy_version=...)` gives both; bit for bit on 600 seeded
+  cases in each environment (`relay9/check_affine_transform.py`).
+- **nilearn's bounds**: `np.dot(transform, box)` of a 4 x 4 and a 4 x 8 matrix is one fused
+  multiply-add per term from zero in OpenBLAS's Haswell `dgemm` (3,000 seeded affines in both
+  environments, `relay9/probe_bounds.py`; a plain sum differs in a third of them). nilearn inverts
+  the image's affine with `scipy.linalg.inv`, whose last bits differ from numpy's `inv` in tiny
+  entries (1,995 of 3,000 oblique affines: SciPy's `getrf`/`getri` in its own OpenBLAS, and in
+  1.18 a structure detection that inverts a triangular affine with `trtri`); larmorx uses numpy's.
+  The inverse only places the sampling points: a nearest value would change only for a point
+  within about 1e-12 voxel of a half-voxel boundary, and every sampling grid checked is
+  nilearn's file. A port of SciPy's 4 x 4 `inv` is a follow-up.
+- **SDC-13 (Deoblique's threshold, rule D)**: the SyN EPIs of the runs are oblique by up to
+  20.7 degrees (pixar008: 12.2, 20.7, 18.8 degrees per axis; ds004884: 2.5, 6.3, 5.8; ds005003:
+  plumb), below the 28.6 degrees sdcflows' radians make of its threshold, so `Deoblique` and
+  `Reoblique` pass them through; with the threshold in degrees pixar008's and ds004884's would be
+  made plumb. The measurement needs the SyN registration itself (relay 10).
+- **ValidateImage's report**: the angle of a qform that only changes at a qform's precision is
+  rounding noise (1e-17 radians); niworkflows' text needs the qform as the header stores it
+  (`float32`) and transforms3d's `decompose44` as it computes it, then the same numpy `eig`.
+- **PIPE-23** (nipype's `is_outlier`, rule A) and **PIPE-24** (`ValidateImage`'s report with an
+  unknown unit code, rule A): `docs/api/niworkflows-helpers.md`.
 
 ## Candidates for the register (the part's defects relay decides them)
 

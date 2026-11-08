@@ -277,6 +277,52 @@ node file against sdcflows' own graph (ANTs 2.6.5 at one thread with CORE-MATH t
 cache) and against fMRIPrep's own nodes on the oracle runs:
 `validation/investigations/sdcflows-fieldmap-b/check_bold_fmap.py`.
 
+## The fieldmap-less (SyN) preprocessing (part B)
+
+`syn_preprocessing_workflow` is sdcflows' `init_syn_preprocessing_wf`
+(`python/larmorx/sdcflows/syn.py`; the same in 2.15.1 and 2.17.1): the EPI reference
+(`lx.niworkflows.epi_reference_workflow`), made plumb (`deoblique`) and brain-extracted; the
+anatomical image masked (`ApplyMask`), clipped (`IntensityClip(0, 99.8)`) and denoised (ANTs'
+`DenoiseImage -n Gaussian -s 1` with nipype's `copy_header`); the registration of the EPI reference
+to it (`antsRegistration` with sdcflows' `affine.json`, `--masks [ anat_dil, NULL ]` then
+`[ anat_dil, epi_dil ]`, both masks dilated by 3); the sampling grid
+(`lx.niworkflows.generate_sampling_reference`); the anatomical reference (`Linear`) and mask
+(`MultiLabel`, then `uint8`) resampled onto it through the inverted registration
+(`antsApplyTransforms`, `FixHeaderApplyTransforms`); and the prior of strong distortions through
+`[epi2anat (inverted), std2anat_xfm, fmap_atlas_2_MNI152NLin2009cAsym_affine.mat]`, thresholded
+above `atlas_threshold` (`Binarize`).
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `in_epis`, `in_meta`, `in_anat`, `mask_anat`, `std2anat_xfm=None`, `t_masks=None` | `inputnode` | `std2anat_xfm` is needed with `sd_prior` |
+| `atlas_threshold=3`, `auto_bold_nss=False`, `sd_prior=True`, `omp_nthreads=1` | the same | fMRIPrep 25.2.6: `auto_bold_nss=True`, the BOLD and SBRef files of the estimator and their metadata, its T1w, mask and MNI-to-T1w transform |
+| `debug=False` | `debug` | sdcflows' fast settings regrid the T1w with niworkflows' `RegridToZooms`: `NotImplementedError` until that port (fMRIPrep sets it only with `--sloppy`) |
+| `t1w_inversion=False` | `t1w_inversion` | accepted and unused, as in sdcflows |
+| `prior_file=None` | (`data/fmap_atlas.nii.gz`) | a larmorx addition: another prior image (tests); by default sdcflows' atlas (`fmap_atlas()`) |
+| `ants_random_seed=None` | the environment's `ANTS_RANDOM_SEED` | as `coeff2epi_workflow` |
+| `niworkflows_version="1.15.4"`, `numpy_version="2.5.4"`, `scipy_version="1.18.1"`, `nilearn_version="0.14.1"`, `volreg_implementation="auto"`, `upstream_defects="fix"`, `n_threads=1`, `out_dir` | | the libraries' arithmetic where their releases differ (fMRIPrep 25.2.6's image: `"1.15.2"`, `"2.2.6"`, `"1.15.2"`, `"0.11.1"`); the nodes' folders under `out_dir/syn_preprocessing_wf` |
+| → `SynPreprocessingResult(epi_ref, epi_mask, anat_ref, anat_mask, sd_prior, epi_reference, deob_epi, sampling_ref, epi2anat_xfm, files, commands)` | `outputnode` | `epi_ref` is `(file, the first input's metadata)` (`_merge_meta`); `commands`: nipype's lines |
+
+| Helper | sdcflows | Notes |
+|---|---|---|
+| `fmap_atlas()` → path | `data/fmap_atlas.nii.gz` (5.8 MB, Apache-2.0) | not shipped: `LARMORX_SDCFLOWS_ATLAS` (a local copy), else larmorx's data cache (`LARMORX_DATA_DIR`, or the user's cache folder), fetched there once from sdcflows 2.17.1's release; every copy checked against its SHA-256 (`ValueError`) |
+| `fmap_atlas_affine()` → path | `data/fmap_atlas_2_MNI152NLin2009cAsym_affine.mat` | shipped (193 bytes) |
+| `obliquity(affine)` | nibabel's `affines.obliquity` | radians, numpy's `arccos` |
+| `deoblique(in_file, in_affine=None, *, out_dir=".", n_threads=1)` → path | `interfaces/utils.Deoblique` (`_deoblique`) | the input when every axis's obliquity is below `OBLIQUE_THRESHOLD_DEG` (SDC-13); else `<in>_plumb` with the plumb affine (or `in_affine`'s) as qform and sform, code 1 |
+| `reoblique(in_epi, in_plumb, in_field, in_mask=None, *, out_dir=".", n_threads=1)` → `(epi, field, mask)` | `interfaces/utils.Reoblique` (`_reoblique`) | unchanged for a plumb EPI; else `<name>_oriented` with the EPI's affine (the plumb EPI with the EPI's whole header; the field and mask with the EPI's qform and sform) |
+| `set_dtype(in_file, dtype="int16", *, n_threads=1)` → path | `fit/syn._set_dtype` | the input when stored as `dtype`; else `<in>_<dtype>` beside it |
+| `merge_meta(epi_ref, meta_list)` | `fit/syn._merge_meta` | `(epi_ref, meta_list[0])` |
+
+Checked on the three `--use-syn-sdc` fMRIPrep runs node by node (each node fed fMRIPrep's own
+inputs; header bytes as written) and as a whole: `validate_nii`, `select_volumes`,
+`per_run_avgs`, `clip_avgs`, `clip_bg_noise`, `deob_epi`, `anat_dilmsk`, `mask_anat`, `clip_anat`,
+`epi_brain`, `epi_dilmsk`, `sampling_ref`, `anat2epi`, `mask2epi`, `mask_dtype`, `prior2epi`,
+`prior_msk` and the command lines are fMRIPrep's files; `n4_avgs` and `ref_anat` are ANTs 2.6.5's
+one-thread results with correctly rounded maths (fMRIPrep's own ran on 4 threads, on which N4's
+fit and DenoiseImage depend, with glibc's maths: `docs/findings/ants-n4.md`,
+`ants-denoise.md`); the registration is ANTs' one-thread result
+(`validation/investigations/sdcflows-fieldmap-b/check_syn_preprocessing.py`).
+
 ## Upstream defects (D13)
 
 Corrected by default; `upstream_defects="reproduce"` gives sdcflows' result bit for bit, and
@@ -298,6 +344,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-10 | `fit(approx=True)` on a rotated target ignores `xfm_data2fmap` | the approximation built and sampled where the transform puts the target | `B0FieldTransform.fit`/`apply`, `apply_coeffs_field` |
 | SDC-11 | a resize (`zooms_min`) onto a grid of a single voxel fails (nitransforms' bare `AssertionError`) | the voxel resampled and the fit made | `resample_to_zooms`, `bspline_approx` |
 | SDC-12 | `ReorientImageAndMetadata` checks the upper-cased orientation code but reorients to the code as given (a lower-case one fails in nibabel) | the upper-cased code it checked | `reorient_image_and_metadata` |
+| SDC-13 | `Deoblique`/`Reoblique` compare nibabel's obliquity (radians) with `OBLIQUE_THRESHOLD_DEG = 0.5` (degrees): they act only beyond 28.6 degrees; `_deoblique`'s plumb grid centres the image in voxels, not millimetres, and compares the axis codes with `RAS` by position | **under measurement** (rule D, with `init_syn_sdc_wf`'s port): sdcflows' behaviour in both modes until then | `deoblique`, `reoblique`, `syn_preprocessing_workflow` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

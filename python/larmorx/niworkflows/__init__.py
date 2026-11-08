@@ -12,6 +12,8 @@ and scikit-image arithmetic under them.
 - :func:`copy_xform`, :func:`copy_header`, :func:`apply_mask`, :func:`key_select`:
   ``_copyxform`` (``FixHeaderApplyTransforms``' and ``FixHeaderRegistration``'s header fix),
   ``CopyHeader``, ``ApplyMask``, ``KeySelect``.
+- :func:`concatenate_xfms`: ``ConcatenateXFMs``, linear transform files combined into one and
+  written as nitransforms writes ITK text files.
 - :func:`skullstrip_bold_workflow`: ``init_skullstrip_bold_wf`` (FSL's ``bet``, AFNI's
   ``3dAutomask`` and ``fslmaths`` with nipype's command lines).
 """
@@ -45,8 +47,10 @@ from larmorx.niworkflows.nibabel import (
     reorient_file,
     reorient_image,
 )
+from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
 
 __all__ = [
+    "ConcatenateXfmsResult",
     "IntensityClipResult",
     "IntraModalMergeResult",
     "RobustAverageResult",
@@ -56,6 +60,7 @@ __all__ = [
     "as_closest_canonical",
     "as_reoriented",
     "axcodes2ornt",
+    "concatenate_xfms",
     "copy_header",
     "copy_xform",
     "four_to_three",

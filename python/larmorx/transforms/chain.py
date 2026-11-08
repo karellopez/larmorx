@@ -332,6 +332,24 @@ def load_itk_linear(path: PathLike) -> Affine | AffineSeries:
     return series[0] if len(series) == 1 else series
 
 
+def _itk_linear_text(ras: np.ndarray, index: int = 0) -> str:
+    """nitransforms' ``ITKLinearTransform.from_ras(ras, index).to_string()``: the parameters
+    ``LPS @ ras @ LPS`` (numpy's products) written with ``"%g"`` (six significant digits), as
+    ``AffineTransform_float_3_3`` with the centre ``0 0 0``; the banner line for index 0."""
+    lps = LPS.astype(np.float64)
+    params = matmul(lps, matmul(np.asarray(ras, dtype=np.float64), lps))
+    values = params[:3, :3].reshape(-1).tolist() + params[:3, 3].tolist()
+    lines = [
+        f"#Transform {index:d}",
+        "Transform: AffineTransform_float_3_3",
+        "Parameters: {}".format(" ".join([f"{p:g}" for p in values])),  # nitransforms: "%g" % p
+        "FixedParameters: {:g} {:g} {:g}".format(*np.zeros(3, dtype="f4")),
+        "",
+    ]
+    text = "\n".join(lines)
+    return f"#Insight Transform File V1.0\n{text}" if index == 0 else text
+
+
 def _first_type(member: dict) -> bytes:
     """A group's ``TransformType`` (its first string), or ``b""``."""
     try:

@@ -1204,7 +1204,14 @@ fn execute(
             for m in &e.messages {
                 log.message(m);
             }
-            return Err(Stop::Raw(format!("** {}", e.fatal)));
+            for n in &e.notices {
+                log.notice(n);
+            }
+            return Err(if e.fatal_error {
+                Stop::Fatal(e.fatal)
+            } else {
+                Stop::Raw(format!("** {}", e.fatal))
+            });
         }
     };
     for m in &r.messages {

@@ -110,3 +110,18 @@ pub fn afni_99_savedisp(mode: UpstreamDefects) -> Notice {
     );
     Notice::new(&defects::AFNI_99, mode, d)
 }
+
+/// AFNI-89: a basis whose least squares could not be set up (AFNI crashes at the first fit).
+pub fn afni_89(mode: UpstreamDefects) -> Notice {
+    Notice::new(
+        &defects::AFNI_89,
+        mode,
+        "the registration's least squares could not be set up (see the messages above): AFNI \
+         crashes (segmentation fault) at the first sub-brick it registers",
+    )
+}
+
+/// AFNI-89's error, in both modes (rule B).
+pub const AFNI_89_FATAL: &str = "the base's least squares could not be set up (the messages \
+    above say why: all-zero weights, or a base whose rotated and shifted copies do not change \
+    under the weight); AFNI crashes here (AFNI-89)";

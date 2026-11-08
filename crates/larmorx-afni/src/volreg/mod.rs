@@ -167,11 +167,14 @@ pub struct VolregOutput {
     pub notices: Vec<Notice>,
 }
 
-/// A run that failed: the messages printed before, and the fatal error.
+/// A run that failed: the messages printed before, the notices, and the error (AFNI's plain
+/// `** ` line, or a `** FATAL ERROR: ` line when `fatal_error`).
 #[derive(Clone, Debug)]
 pub struct VolregError {
     pub messages: Vec<Message>,
+    pub notices: Vec<Notice>,
     pub fatal: String,
+    pub fatal_error: bool,
 }
 
 /// The values of volume `t` of `bricks` as float32: `factor·x` when its factor is neither 0
@@ -286,16 +289,23 @@ impl BlurOnce {
     }
 }
 
-/// Pushes a basis' setup lines, with the run's `edt_blur` line where it falls.
+/// Pushes a basis' setup lines, with the run's `edt_blur` line where it falls. AFNI's
+/// `** ERROR: ` lines are errors (labelled, coloured with `reproduce` as AFNI colours them).
 fn setup_lines(log: SetupLog, once: &mut BlurOnce, messages: &mut Vec<Message>) {
     let at = log.blur_at.min(log.lines.len());
     let (before, after) = log.lines.split_at(at);
+    let push = |messages: &mut Vec<Message>, l: &String| {
+        messages.push(match l.strip_prefix("** ERROR: ") {
+            Some(rest) => Message::Error(rest.to_owned()),
+            None => Message::Text(l.clone()),
+        });
+    };
     for l in before {
-        messages.push(Message::Text(l.clone()));
+        push(messages, l);
     }
     once.emit(log.blur_line, messages);
     for l in after {
-        messages.push(Message::Text(l.clone()));
+        push(messages, l);
     }
 }
 
@@ -332,7 +342,9 @@ pub fn run(
         .unwrap_or_else(|e| {
             Err(VolregError {
                 messages: Vec::new(),
+                notices: Vec::new(),
                 fatal: format!("larmorx: can't start {} threads: {e}", params.n_threads),
+                fatal_error: true,
             })
         })
 }
@@ -351,7 +363,19 @@ fn run_in_pool(
     let (axes, signs) = grid.angle_axes();
     let mut messages: Vec<Message> = Vec::new();
     let mut notices: Vec<Notice> = Vec::new();
-    let fail = |messages: Vec<Message>, fatal: String| VolregError { messages, fatal };
+    let fail = |messages: Vec<Message>, fatal: String| VolregError {
+        messages,
+        notices: Vec::new(),
+        fatal,
+        fatal_error: false,
+    };
+    // AFNI-89: a basis whose least squares failed; the error comes at the first fit.
+    let afni_89 = |messages: Vec<Message>| VolregError {
+        messages,
+        notices: vec![notices::afni_89(mode)],
+        fatal: notices::AFNI_89_FATAL.into(),
+        fatal_error: true,
+    };
     let blur = BlurSettings {
         firfac: p.firfac,
         old: p.firold,
@@ -556,7 +580,7 @@ fn run_in_pool(
         let basis = Basis::new(&b1, n, sizes, weight, settings, &mut log);
         setup_lines(log, &mut once, &mut messages);
         let basis = match basis {
-            Ok(b) => b,
+            Ok(b) => Some(b),
             Err(BasisError::NotThreeD) => {
                 messages.push(Message::Raw(
                     "\n*** mri_3dalign_setup: cannot use nD images!\x07".into(),
@@ -566,12 +590,7 @@ fn run_in_pool(
                     "Can't initialize first pass alignment algorithm".into(),
                 ));
             }
-            Err(BasisError::LeastSquares) => {
-                return Err(fail(
-                    messages,
-                    "Can't initialize first pass alignment algorithm".into(),
-                ));
-            }
+            Err(BasisError::LeastSquares) => None,
         };
         let it1 = Iteration {
             x_thresh: p.twoblur * p.x_thresh,
@@ -603,6 +622,9 @@ fn run_in_pool(
                 }
             };
             let init = initial(&f);
+            let Some(basis) = &basis else {
+                return Err(afni_89(messages));
+            };
             let r = basis.register(&v, init, &it1, &mut work, None);
             let deg = r.radians.map(fit::to_degrees);
             results.push((
@@ -662,19 +684,25 @@ fn run_in_pool(
     let basis = Basis::new(&base, n, sizes, weight, settings, &mut log);
     setup_lines(log, &mut once, &mut messages);
     let basis = match basis {
-        Ok(b) => b,
-        Err(e) => {
-            if e == BasisError::NotThreeD {
-                messages.push(Message::Raw(
-                    "\n*** mri_3dalign_setup: cannot use nD images!\x07".into(),
-                ));
-            }
+        Ok(b) => Some(b),
+        Err(BasisError::NotThreeD) => {
+            messages.push(Message::Raw(
+                "\n*** mri_3dalign_setup: cannot use nD images!\x07".into(),
+            ));
             return Err(fail(
                 messages,
                 "Can't initialize base image for alignment".into(),
             ));
         }
+        Err(BasisError::LeastSquares) => None,
     };
+    // AFNI-89: the first volume to be fitted (not the base, not empty-ish).
+    if basis.is_none() {
+        let fitted_one = (0..nt).any(|t| !skipped(t) && !empty_ish(&volume_f32(&bricks, t)));
+        if fitted_one {
+            return Err(afni_89(messages));
+        }
+    }
     let out_resampler = Resampler {
         method: p.final_method,
         zpad: p.zpad,
@@ -731,6 +759,7 @@ fn run_in_pool(
             };
         }
         let init = if p.twopass { first[t] } else { None };
+        let basis = basis.as_ref().expect("checked above (AFNI-89)");
         let fitted = basis.register(y, init, &iteration, work, chat.as_mut());
         if p.output {
             let tf = basis.transform(&fitted.params);

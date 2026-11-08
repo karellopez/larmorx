@@ -256,10 +256,11 @@ impl Basis {
             }
         };
         let total = n[0] * n[1] * n[2];
-        if w.iter().all(|&x| x == 0.0) {
+        let all_zero = w.iter().all(|&x| x == 0.0);
+        let bounds = trim_box(&w, n, &mut lines);
+        if all_zero {
             lines.push("** error: weights are all zero\n".to_owned());
         }
-        let bounds = trim_box(&w, n, &mut lines);
         let wb = bounds.cut(&w, n);
         drop(std::mem::take(&mut w));
         if chatty {

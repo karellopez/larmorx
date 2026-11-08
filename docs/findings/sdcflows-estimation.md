@@ -148,6 +148,13 @@ that is a NaN is recomputed with the exact rules):
 - the conjugate gradients of all labels run in lockstep (one pass over the matrix for two
   labels), with fast paths for the products and the vector updates.
 
+*Measured* (newest environment, one thread, the machine shared with another agent): ds002603's
+`brain_masker` 6.2 to 6.7 s against sdcflows' 7.6 to 8.0 s (three runs each, alternating); the
+nine `brainextraction_wf` inputs 12.1 s against 15.6 s; peak memory 422 MiB at one thread and
+432 MiB at fourteen against sdcflows' 1,439 MiB. The outputs stay sdcflows' own (27 of 27 files
+in each environment, fMRIPrep's 27 of 27; `check_skimage.py`), and `lx.ndimage` stays SciPy's
+in all 39,436 cases of `check_ndimage.py` in both environments.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background

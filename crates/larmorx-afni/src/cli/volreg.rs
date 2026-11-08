@@ -108,8 +108,6 @@ enum Stop {
     Fatal(String),
     /// A line printed as it is (AFNI's `** ...` messages without a label).
     Raw(String),
-    /// `** ERROR: ...`
-    Error(String),
 }
 
 impl From<Failure> for Stop {
@@ -198,9 +196,10 @@ fn open(
     n_threads: usize,
     log: &mut Log<'_>,
 ) -> Result<(AfniImage, String), String> {
-    if name.contains('[') || name.ends_with(".HEAD") || name.ends_with(".BRIK") {
+    let lower = name.to_ascii_lowercase();
+    if !(lower.ends_with(".nii") || lower.ends_with(".nii.gz")) || name.contains('[') {
         return Err(format!(
-            "larmorx: '{name}': sub-brick selectors and AFNI's .HEAD/.BRIK format are not supported"
+            "{name}: larmorx reads NIfTI files (.nii, .nii.gz) only: not supported by larmorx"
         ));
     }
     let (mut messages, mut notices) = (Vec::new(), Vec::new());
@@ -211,7 +210,10 @@ fn open(
     for n in &notices {
         log.notice(n);
     }
-    let found = found.map_err(|e| e.0)?;
+    let found = found.map_err(|e| match std::fs::metadata(name) {
+        Err(io) => format!("{name}: {io}"),
+        Ok(_) => e.0,
+    })?;
     let mut image = dataset::read(&found.path, &found.shown, n_threads, mode, settings)
         .map_err(|e| e.to_string())?;
     for m in std::mem::take(&mut image.messages) {
@@ -221,6 +223,16 @@ fn open(
         log.notice(&n);
     }
     Ok((image, found.shown))
+}
+
+/// AFNI's message for a dataset that cannot be opened, with larmorx's reason by default, and
+/// in both modes where the reason is larmorx's own limit (a format it does not read).
+fn reason(afni: String, why: &str, mode: UpstreamDefects) -> String {
+    if mode.fix() || why.ends_with("not supported by larmorx") {
+        format!("{afni}: {why}")
+    } else {
+        afni
+    }
 }
 
 /// The AFNI-88 notice and error for an option given last without its value.
@@ -303,8 +315,9 @@ fn parse(
             if o.by_input {
                 return Err(Stop::Fatal(format!("Can't have 2 '{arg}' options!")));
             }
-            let image = open(v, settings, mode, n_threads, log)
-                .map_err(|_| Stop::Fatal(format!("Can't open input dataset '{v}'")))?;
+            let image = open(v, settings, mode, n_threads, log).map_err(|e| {
+                Stop::Fatal(reason(format!("Can't open input dataset '{v}'"), &e, mode))
+            })?;
             o.input_image = Some(image);
             o.by_input = true;
             o.input_option = arg.to_owned();
@@ -438,7 +451,7 @@ fn parse(
         if arg == "-twoblur" {
             let b = strtod(need!(1)) as f32;
             if b < 2.0 {
-                return Err(Stop::Error("value after -twoblur is < 2.0".into()));
+                return Err(Stop::Raw("** ERROR: value after -twoblur is < 2.0".into()));
             }
             o.twoblur = b;
             i += 2;
@@ -478,7 +491,7 @@ fn parse(
                 log.info("WARNING: second -zpad option!");
             }
             if z < 0.0 {
-                return Err(Stop::Error(format!("Can't use -zpad {}", z as i64)));
+                return Err(Stop::Raw(format!("** ERROR: Can't use -zpad {}", z as i64)));
             }
             o.zpad = Some(z as usize);
             i += 2;
@@ -541,8 +554,9 @@ fn parse(
                 if o.verbose > 0 {
                     log.info(&format!("Reading in base dataset {v}"));
                 }
-                let (image, shown) = open(v, settings, mode, n_threads, log)
-                    .map_err(|_| Stop::Fatal(format!("Couldn't open -base dataset {v}")))?;
+                let (image, shown) = open(v, settings, mode, n_threads, log).map_err(|e| {
+                    Stop::Fatal(reason(format!("Couldn't open -base dataset {v}"), &e, mode))
+                })?;
                 if image.bricks.shape[3] > 1 {
                     log.warning(&format!("-base dataset {v} has more than 1 sub-brick"));
                 }
@@ -605,8 +619,13 @@ fn parse(
                     "** Illegal sub-brick selector after -weight".into(),
                 ));
             }
-            let (image, _) = open(name, settings, mode, n_threads, log)
-                .map_err(|_| Stop::Raw(format!("** Can't open weight dataset {name}")))?;
+            let (image, _) = open(name, settings, mode, n_threads, log).map_err(|e| {
+                Stop::Raw(reason(
+                    format!("** Can't open weight dataset {name}"),
+                    &e,
+                    mode,
+                ))
+            })?;
             if index as usize >= image.bricks.shape[3] {
                 return Err(Stop::Raw(format!(
                     "** Illegal sub-brick selector for dataset {name}"
@@ -816,10 +835,6 @@ pub fn main_with_settings(
             log.raw(&m);
             1
         }
-        Err(Stop::Error(m)) => {
-            log.error(&m);
-            1
-        }
     }
 }
 
@@ -891,8 +906,8 @@ fn execute(
         }
         let name = o.rest[0].clone();
         let (image, shown) = open(&name, settings, mode, n_threads, log).map_err(|e| {
-            if e.starts_with("larmorx:") {
-                Stop::Fatal(e)
+            if mode.fix() {
+                Stop::Fatal(format!("Can't open input dataset '{name}': {e}"))
             } else {
                 Stop::Raw(format!("** Can't open dataset {name}"))
             }

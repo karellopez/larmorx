@@ -183,6 +183,8 @@ def run(prog: str, case: str, d: Path, mode: str = "reproduce", threads: str = "
     args = [*opts, *outputs, str(input_path(src))]
     env = clean_env(d)
     if prog == "afni":
+        if mode != "reproduce":
+            raise SystemExit("AFNI is compared in reproduce mode only")
         return oracle_cache.run(
             [str(AFNI), *args],
             env=env,
@@ -265,6 +267,15 @@ def compare(case: str, a: Path, b: Path, ra, rb) -> dict:
     if (a / "md.1D").exists() and (b / "md.1D").exists():
         res["maxdisp_max"] = float(np.abs(_table(a / "md.1D") - _table(b / "md.1D")).max())
         res["maxdelta_max"] = float(np.abs(_table(a / "md_delt.1D") - _table(b / "md_delt.1D")).max())
+    for axis in ("DX", "DY", "DZ"):
+        fa, fb = a / f"sd_{axis}.nii", b / f"sd_{axis}.nii"
+        if fa.exists() or fb.exists():
+            if not (fa.exists() and fb.exists()):
+                res[f"savedisp_{axis}"] = "missing"
+                continue
+            da = np.asarray(nib.load(fa).dataobj, dtype=np.float64)
+            db = np.asarray(nib.load(fb).dataobj, dtype=np.float64)
+            res[f"savedisp_{axis}_max"] = float(np.abs(da - db).max())
     va = np.asarray(nib.load(a / "out.nii").dataobj, dtype=np.float64)
     vb = np.asarray(nib.load(b / "out.nii").dataobj, dtype=np.float64)
     res["dtype"] = (str(nib.load(a / "out.nii").get_data_dtype()), str(nib.load(b / "out.nii").get_data_dtype()))
@@ -316,15 +327,18 @@ def main(argv: list[str]) -> int:
                             print("    " + ln)
         return 0
     if argv[0] == "check":
+        # REF=replica compares with the replica (a black box) in LARMORX_UPSTREAM_DEFECTS's mode
         cases = argv[1:] or list(CASES)
         work = Path(tempfile.mkdtemp(prefix="volreg-bb_", dir=os.environ.get("VOLREG_WORK")))
         rows = []
         for case in cases:
             a, b = work / case / "afni", work / case / "original"
             t0 = time.perf_counter()
-            ra = run("afni", case, a)
+            ref = os.environ.get("REF", "afni")
+            mode = os.environ.get("LARMORX_UPSTREAM_DEFECTS", "reproduce")
+            ra = run(ref, case, a, mode)
             t1 = time.perf_counter()
-            rb = run("original", case, b, os.environ.get("LARMORX_UPSTREAM_DEFECTS", "reproduce"))
+            rb = run("original", case, b, mode)
             t2 = time.perf_counter()
             res = compare(case, a, b, ra, rb)
             res["seconds"] = {"afni": round(t1 - t0, 2), "afni_cached": bool(getattr(ra, "cached", False)),

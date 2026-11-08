@@ -221,6 +221,43 @@ file:
   sdcflows' PEPOLAR paths give it 3D averages (2.15) or single volumes (2.17.1); larmorx raises
   `NotImplementedError` for 4D inputs on that path.
 
+## nipype's command lines and the BOLD runs' registration and skull-stripping (relay 6)
+
+- **nipype's lines, ported once** (`larmorx._nipype`): nipype 1.12.0 orders an interface's
+  arguments by position, then by input name, negative positions last, quotes file names for the
+  shell (`shlex.quote`; a list of files is not quoted: nipype computes the quoted list and does
+  not use it), derives output names from `name_source`/`name_template` with the output type's
+  extension, and some interfaces format their own pieces (`Registration` builds every stage under
+  `transforms`; its two winsorize inputs give one argument and an empty one, so `command.txt`
+  holds two spaces before `--write-composite-transform`; BET writes its input and output relative
+  to the node's folder). Settings files (`from_file`) are converted by nipype's traits: sdcflows'
+  `affine.json` gives `"smoothing_sigmas": [[6, 0], [2, 1]]`, written `6.0x0.0mm`, and
+  `sd_syn.json`'s `[0.8, 6.0, 10.0]` stays three floats because nipype's `transform_parameters`
+  tries its tuple forms in order (`F`, `FFF`, `FIII`, `FIFFFF`, `FFFI`, `FIIII`). Every
+  `command.txt` of the fMRIPrep 25.2.6 oracle runs for the ported interfaces is formatted again
+  character for character: 77 `antsRegistration` (`FixHeaderRegistration`), 663
+  `antsApplyTransforms`, 95 `N4BiasFieldCorrection` (63 nipype's, 32 niworkflows'
+  `FixN4BiasFieldCorrection`: none of their inputs had negative values, which it would rescale
+  first), 577 `ImageMath`, 29 `DenoiseImage`, 46 `bet`, 46 `fslmaths` (`BinaryMaths`), 46
+  `3dAutomask`, 4 `topup` (and its encoding file against nipype's own, the runs kept none): 1,583
+  of 1,583 in both kept environments; nipype's own `cmdline` and outputs agree on 14 option sets
+  the runs do not use (`check_nipype.py`). niworkflows' `RobustMNINormalization` (`norm`, 21
+  nodes) builds its line itself and is not one of them.
+- **fMRIPrep seeds ANTs.** fMRIPrep sets `ANTS_RANDOM_SEED` (50495 for `--random-seed 0`: each
+  node's report lists it); without it, ANTs seeds its sampling from the clock, so an unseeded
+  `antsRegistration` with `Random` sampling (sdcflows' `fmap-any_registration.json`) differs from
+  run to run. `coeff2epi_workflow(ants_random_seed=...)` passes the seed as `--random-seed`, which
+  ANTs prefers to the variable; with the run's seed larmorx's transform is ANTs 2.6.5's one-thread
+  result bit for bit (sdcflows' own graph, ANTs through the oracle cache: 3 of 3, and 1 of 1 with
+  `debug`, whose warped images are identical too), and fMRIPrep's own `coregister` transforms (six
+  threads, its image's ANTs) within 1e-11 in every parameter on all 14 BOLD runs with a field map
+  (the thread band of `docs/validation/ants-registration-panel.md`).
+- **`skullstrip_bold_wf`**: BET's and fslmaths' replicas (FSL 6.0.7.23) and 3dAutomask's
+  (AFNI 26.3.05) give fMRIPrep's own node files bit for bit on all 14 runs (BET's brain and mask,
+  3dAutomask's mask, the product, the masked reference: 70 files), and niworkflows' own graph's on
+  three runs (18 files; 6 of them identical but for AFNI's history extension).
+- The two dilated masks of `init_coeff2epi_wf` are fMRIPrep's on all 14 runs (28 files).
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background

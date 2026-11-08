@@ -103,6 +103,7 @@ def copy_header(
     assert hdr.header is not None and src.header is not None
     fields = hdr.header.to_dict()
     header = NiftiHeader.from_dict(fields)
+    os.makedirs(out_dir, exist_ok=True)
     out = _nipype.fname_presuffix(in_file, suffix="_fixhdr", newpath=out_dir)
     save_nibabel(
         Image(src.data, hdr.affine, header), out, dtype=src.header.data_dtype, n_threads=n_threads
@@ -125,6 +126,7 @@ def apply_mask(
     img = load_nibabel(in_file, n_threads=n_threads)
     msknii = load_nibabel(in_mask, dtype=np.float64, n_threads=n_threads)
     msk = np.asarray(msknii.data) > float(threshold)
+    os.makedirs(out_dir, exist_ok=True)
     out = _nipype.fname_presuffix(in_file, suffix="_masked", newpath=out_dir)
     data = np.asanyarray(img.data)
     if tuple(data.shape[:3]) != tuple(msk.shape):

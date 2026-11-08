@@ -6928,3 +6928,101 @@ def _(ctx: Context) -> dict[str, Any]:
             )
             out[f"{name}.{npv}"] = Nifti(r.out_file)
     return out
+
+
+@case(
+    "py.niworkflows.skullstrip",
+    covers=(
+        "lx.niworkflows.skullstrip_bold_workflow",
+        "lx.niworkflows.apply_mask",
+        "lx.niworkflows.copy_xform",
+        "lx.niworkflows.copy_header",
+        "lx.niworkflows.key_select",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' init_skullstrip_bold_wf on the synthetic head (BET's and fslmaths' clean-room
+    originals: the replicas are not installed everywhere; 3dAutomask's replica), ApplyMask with a
+    4D image, _copyxform onto an oblique image, CopyHeader, KeySelect."""
+    head = _head_file(ctx)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ss = lx.niworkflows.skullstrip_bold_workflow(
+            head,
+            out_dir=ctx.out("ss"),
+            bet_implementation="original",
+            maths_implementation="original",
+        )
+    for name in ("bet_brain", "bet_mask", "automask_mask", "automask_brain", "mask_file"):
+        out[f"ss.{name}"] = Nifti(getattr(ss, name))
+    out["ss.masked"] = Nifti(ss.skull_stripped_file)
+    epi = _epi_pair(ctx)[0]
+    mask4 = ctx.out("mask4.nii.gz")
+    lx.save(
+        (
+            ellipsoid(SHAPE_HEAD, 3, 5).astype(np.uint8),
+            affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+        ),
+        mask4,
+    )
+    out["masked4d"] = Nifti(lx.niworkflows.apply_mask(epi, mask4, out_dir=ctx.out("am4")))
+    obl = ctx.out("oblique.nii.gz")
+    lx.save(
+        (
+            ints(91, (12, 11, 10), 0, 50).astype(np.float32),
+            affine((12, 11, 10), (1.5, 1.6, 2.0), oblique=True),
+        ),
+        obl,
+    )
+    fixed = ctx.out("fixed.nii.gz")
+    lx.save(
+        (ints(92, (12, 11, 10), 0, 50).astype(np.int16), affine((12, 11, 10), (1.0, 1.0, 1.0))),
+        fixed,
+    )
+    out["copyxform"] = Nifti(lx.niworkflows.copy_xform(obl, fixed, message="golden"))
+    out["copyheader"] = Nifti(lx.niworkflows.copy_header(obl, mask4, out_dir=ctx.out("ch")))
+    sel = lx.niworkflows.key_select(["a", "b", "c"], "b", fmap=[1, 2, 3], ref=["x", "y", "z"])
+    out["keyselect"] = np.asarray([sel["fmap"], ord(sel["ref"]), ord(sel["key"])])
+    return out
+
+
+@case(
+    "py.sdcflows.coeff2epi",
+    covers=("lx.sdcflows.coeff2epi_workflow", "lx.sdcflows.registration_settings"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_coeff2epi_wf on the synthetic EPI pair (the field map's reference the
+    first, the target the second, their brains as masks), sdcflows' sloppy settings, with debug's
+    warped images (their x-forms copied) and an ANTs seed."""
+    epis = _epi_pair(ctx, volumes=1)
+    masks = []
+    for i, shift in enumerate((1, -1)):
+        m = ctx.out(f"mask{i}.nii.gz")
+        lx.save(
+            (
+                ellipsoid(SHAPE_HEAD, 4, 5, shift=shift).astype(np.uint8),
+                affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+            ),
+            m,
+        )
+        masks.append(m)
+    refs = []
+    for i, e in enumerate(epis):
+        img = lx.io.load_nibabel(e)
+        r = ctx.out(f"ref{i}.nii.gz")
+        lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, None), r)
+        refs.append(r)
+    res = lx.sdcflows.coeff2epi_workflow(
+        refs[1], masks[1], refs[0], masks[0], sloppy=True, debug=True,
+        ants_random_seed=42, out_dir=ctx.out("c2e"),
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "xfm": lx.transforms.read(res.target2fmap_xfm[0])[0].parameters,
+        "warped": Nifti(res.target_ref),
+        "dil": Nifti(res.dilate_fmap_mask),
+        "settings": np.asarray(
+            [len(lx.sdcflows.registration_settings("sd_syn.json").read_bytes())]
+        ),
+    }
+    return out

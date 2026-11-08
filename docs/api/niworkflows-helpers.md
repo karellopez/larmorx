@@ -76,3 +76,44 @@ is clipped once more and its median over the volumes written as `<in>_average`. 
 Checked file for file against niworkflows and sdcflows on the oracle runs' PEPOLAR estimators
 (every option of `RobustAverage`, its one-volume, 3D and error paths) and against fMRIPrep's own
 node files: `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`.
+
+## `copy_xform`, `copy_header`, `apply_mask`, `key_select`: the header fixes, `ApplyMask`, `KeySelect`
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `copy_xform(ref_image, out_image, message=None, *, n_threads=1)` → the path | `utils/images._copyxform` | the reference's qform and sform (their codes too; a code 0 changes only the code, as nibabel's `set_qform(None, 0)`) into `out_image`'s header, `descrip` = `xform matrices modified by <message>.`, the image rewritten in place with the reference's affine (nibabel's writer). `FixHeaderApplyTransforms` and `FixHeaderRegistration` call it on their outputs |
+| `copy_header(hdr_file, in_file, *, out_dir=".", n_threads=1)` → the path | `header.CopyHeader` | `in_file`'s data with `hdr_file`'s affine and header, in `in_file`'s stored type, `<in>_fixhdr` |
+| `apply_mask(in_file, in_mask, *, threshold=0.5, out_dir=".", n_threads=1)` → the path | `nibabel.ApplyMask` | the data as nibabel's `dataobj` reads it times `mask > threshold` (a 4D image: every volume), the header kept, `<in>_masked`; other sizes: `ValueError('Image and mask sizes do not match.')`; other affines (`np.allclose`): `ValueError('Image and mask affines are not similar enough.')` |
+| `key_select(keys, key, **fields)` → `{field: value, ..., "key": key}` | `utility.KeySelect` | the item at `key`'s index of each field; niworkflows' `ValueError`s: no fields, duplicated keys, a key not in `keys`, a field that is a string, empty or of another length |
+
+## `skullstrip_bold_workflow`: `init_skullstrip_bold_wf`
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `in_file` | `inputnode.in_file` | linked into the first node's folder, as nipype links it (a copy where links cannot be made) |
+| `out_dir=None` | the workflow's directory | the nodes' folders `skullstrip_first_pass`, `skullstrip_second_pass`, `combine_masks`, `apply_mask`; a temporary folder otherwise (the paths are then `None`) |
+| `bet_implementation="auto"`, `maths_implementation="auto"` | | FSL's `bet` and `fslmaths`: the replica when `larmorx-nc` is installed, else the clean-room original; AFNI's `3dAutomask`: its replica (built in) |
+| `upstream_defects="fix"`, `n_threads=1` | | |
+| → `SkullstripBoldResult(mask_file, skull_stripped_file, bet_brain, bet_mask, automask_mask, automask_brain, commands)` | `outputnode.mask_file`, `skull_stripped_file` | `commands`: nipype's lines, `bet <in> <in>_brain -f 0.20 -m`, `3dAutomask -apply_prefix <in>_brain_masked.nii.gz -dilate 1 -prefix <in>_brain_mask.nii.gz <in>_brain.nii.gz`, `fslmaths <bet mask> -mul <automask> <bet mask>_maths.nii.gz`; the mask report (`SimpleShowMaskRPT`) belongs with the reports and is not made |
+
+## nipype's command lines (`larmorx._nipype`)
+
+The programs under sdcflows', niworkflows' and fMRIPrep's nodes run with the command line nipype
+1.12.0 builds (every environment's nipype, fMRIPrep 25.2.6's included): `larmorx._nipype` formats
+the inputs of `ants.Registration` (niworkflows' `FixHeaderRegistration`, from sdcflows' settings
+files: `lx.sdcflows.registration_settings`), `ants.ApplyTransforms` (`FixHeaderApplyTransforms`),
+`ants.N4BiasFieldCorrection`, `ants.ImageMath`, `ants.DenoiseImage`, `fsl.BET`,
+`fsl.BinaryMaths`, `fsl.MultiImageMaths`, `fsl.TOPUP` (its encoding file), `afni.Automask` and
+`afni.Volreg` in nipype's order (positions first, then by name, negative positions last), with
+nipype's file names (`name_source`, `genfile`, the output types' extensions), its shell quoting
+and its `_list_outputs`, and runs them in the node's folder through larmorx's ports (ANTs in this
+process, FSL's replicas or clean-room originals, AFNI's replicas). Settings files are read as
+nipype's `from_file` reads them, their values converted as nipype's input traits convert them
+(a JSON `6` for a float stage setting is written `6.0`). `antsRegistration` takes fMRIPrep's
+`ANTS_RANDOM_SEED` as `ants_random_seed` (ANTs seeds from the clock without one). Checked against
+every `command.txt` of the oracle runs for these interfaces (1,583 nodes, the encoding files of
+TOPUP against nipype's own) and against nipype's own `cmdline` and outputs on 14 option sets the
+runs do not use: `validation/investigations/sdcflows-fieldmap-b/check_nipype.py`. Not ported:
+nipype's version checks (the singular `fixed_image_mask`/`moving_image_mask` of ANTs <= 2.1.0
+raise), the `xor`/`requires` checks that do not change the line; `antsApplyTransforms`' line is
+formatted and runs with the SyN steps.

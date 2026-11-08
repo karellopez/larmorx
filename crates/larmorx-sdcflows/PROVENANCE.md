@@ -103,3 +103,26 @@ are copied unchanged from sdcflows 2.17.1's `sdcflows/data/flirtsch/` (Apache-2.
 `ornt_transform`, `as_reoriented`, `squeeze_image`, `four_to_three`, `concat_images`; MIT) are in
 `python/larmorx/niworkflows/` (niworkflows 1.15.4, Apache-2.0; the same in 1.15.2). Switch:
 SDC-12 (`ReorientImageAndMetadata` reorients to the upper-cased code it checked).
+
+## Part B: nipype's command lines, the field map's registration and the BOLD skull-stripping (relay 6)
+
+**Ported** in Python (no new Rust): nipype 1.12.0 (Apache-2.0) `interfaces/base/core.py`
+(`CommandLine._parse_inputs`, `_format_arg`, `_filename_from_source`, `_list_outputs`),
+`utils/filemanip.py` (`split_filename`, `fname_presuffix`, `ensure_list`),
+`interfaces/ants/registration.py` (`Registration`), `interfaces/ants/resampling.py`
+(`ApplyTransforms`), `interfaces/ants/segmentation.py` (`N4BiasFieldCorrection`, `DenoiseImage`),
+`interfaces/ants/utils.py` (`ImageMath`), `interfaces/ants/base.py` (`ANTSCommand`'s `NSLOTS`,
+`_format_xarray`), `interfaces/fsl/preprocess.py` (`BET`), `interfaces/fsl/maths.py`
+(`MultiImageMaths`, `BinaryMaths`), `interfaces/fsl/epi.py` (`TOPUP`), `interfaces/fsl/base.py`
+(`_gen_fname`), `interfaces/afni/preprocess.py` (`Automask`, `Volreg`), `interfaces/afni/base.py`
+(`_overload_extension`, `_list_outputs`), and niworkflows 1.15.4's `interfaces/fixes.py`
+(`FixHeaderRegistration`, `FixHeaderApplyTransforms`), into `python/larmorx/_nipype.py`;
+niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2) `utils/images.py` (`_copyxform`),
+`interfaces/header.py` (`CopyHeader`), `interfaces/nibabel.py` (`ApplyMask`),
+`interfaces/utility.py` (`KeySelect`) and `func/util.py` (`init_skullstrip_bold_wf`) into
+`python/larmorx/niworkflows/header.py`; sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1)
+`workflows/apply/registration.py` (`init_coeff2epi_wf`) into
+`python/larmorx/sdcflows/registration.py`. sdcflows' ANTs settings files
+(`python/larmorx/sdcflows/data/fmap-any_registration.json`, `fmap-any_registration_testing.json`,
+`affine.json`, `sd_syn.json`, `sd_syn_sloppy.json`, `translation_rigid.json`) are copied
+unchanged from sdcflows 2.17.1's `sdcflows/data/` (Apache-2.0; identical in 2.15.1).

@@ -252,6 +252,31 @@ cache) and against fMRIPrep 25.2.6's own node files of its two PEPOLAR estimator
 `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`
 ([findings](../findings/sdcflows-estimation.md)).
 
+## The field map's registration to the EPI (part B)
+
+`coeff2epi_workflow` is sdcflows' `init_coeff2epi_wf` (`python/larmorx/sdcflows/registration.py`;
+the same in 2.15.1 and 2.17.1): both masks dilated by a ball of radius 5 (`BinaryDilation`), then
+ANTs' `antsRegistration` with sdcflows' `fmap-any_registration.json` (two rigid stages, Mattes,
+`LanczosWindowedSinc`) through niworkflows' `FixHeaderRegistration` command line, the field map's
+reference fixed and the target moving, the dilated masks per stage.
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `target_ref`, `target_mask`, `fmap_ref`, `fmap_mask`, `fmap_coeff=None` | `inputnode` | `fmap_coeff` is passed through |
+| `sloppy=False` | `sloppy` | `fmap-any_registration_testing.json` |
+| `debug=False` | `debug` | the warped and inverse-warped images too (`transform_Warped.nii.gz`, `transform_InverseWarped.nii.gz`), their x-forms copied from the fixed and the moving image (`copy_xform`, `descrip` naming `niworkflows_version`) |
+| `write_coeff=False` | `write_coeff` | a warning only (deprecated), as sdcflows |
+| `ants_random_seed=None` | the environment's `ANTS_RANDOM_SEED` | fMRIPrep sets it; `None`: larmorx's fixed seed (ANTs seeds from the clock: never reproduced) |
+| `out_dir=None`, `upstream_defects="fix"`, `n_threads=1` | `omp_nthreads` | the nodes' folders `dilate_target_mask`, `dilate_fmap_mask`, `coregister`; `n_threads` never changes a result |
+| → `Coeff2EpiResult(target2fmap_xfm, target_ref, fmap_coeff, dilate_target_mask, dilate_fmap_mask, coregister_cmdline)` | `outputnode` | `target2fmap_xfm`: ANTs' `transform0GenericAffine.mat` |
+
+`registration_settings(name)` is the path of one of sdcflows 2.17.1's ANTs settings files shipped
+with larmorx (Apache-2.0): `fmap-any_registration.json`, `fmap-any_registration_testing.json`,
+`affine.json`, `sd_syn.json`, `sd_syn_sloppy.json`, `translation_rigid.json`. Checked node file by
+node file against sdcflows' own graph (ANTs 2.6.5 at one thread with CORE-MATH through the oracle
+cache) and against fMRIPrep's own nodes on the oracle runs:
+`validation/investigations/sdcflows-fieldmap-b/check_bold_fmap.py`.
+
 ## Upstream defects (D13)
 
 Corrected by default; `upstream_defects="reproduce"` gives sdcflows' result bit for bit, and

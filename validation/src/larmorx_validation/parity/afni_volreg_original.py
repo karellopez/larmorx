@@ -4272,6 +4272,8 @@ def _highlights(results) -> list[str]:
     worst = {}
     for r in results:
         for c in r.checks:
+            if c.name.startswith("fMRIPrep's median"):
+                continue  # its own line below
             if c.passed and isinstance(c.value, float) and c.threshold == 1.0:
                 key = c.name.split(": ", 1)[-1]
                 if c.value > worst.get(key, (0.0, ""))[0]:

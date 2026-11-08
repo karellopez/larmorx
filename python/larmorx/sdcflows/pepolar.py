@@ -863,7 +863,7 @@ def topup_workflow(
             upstream_defects=upstream_defects,
         )  # fmt: skip
         nodes["fix_coeff"] = fix
-        fmap_coeff = tuple(os.fspath(p) for p in (fix.paths or ()))
+        fmap_coeff = tuple(os.fspath(p) for p in fix.out_coeff)
         if not debug:
             from_las = reorient_file(
                 tu.out_corrected,

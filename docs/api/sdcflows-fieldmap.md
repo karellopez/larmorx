@@ -223,6 +223,35 @@ Checked node file by node file against sdcflows' own nipype graphs (`upstream_de
 ANTs' N4 at one thread with correctly rounded maths and FSL's PRELUDE through the oracle cache):
 `validation/investigations/sdcflows-fieldmap-b/check_workflows.py`.
 
+## The PEPOLAR estimation (part B)
+
+sdcflows' `init_topup_wf` and its steps (`python/larmorx/sdcflows/pepolar.py`), in **both
+wirings**: `wiring="2.17"` (sdcflows 2.17.1, the default) and `wiring="2.15"` (sdcflows 2.15,
+fMRIPrep 25.2.x's; 2.15.1 and 2.15.2 are identical on this file). Nodes run and write as in
+`fmap_workflow` (above); the programs underneath are larmorx's: AFNI's `3dvolreg` (the replica
+by default, `volreg_implementation`), FSL's `topup` (the replica when `larmorx-nc` is
+installed, else the clean-room original: `topup_implementation`).
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `get_trt(in_meta, in_file=None, *, use_estimate=False, fallback=None)` | `utils/epimanip.get_trt` | `TotalReadoutTime` (or `EstimatedTotalReadoutTime` with `use_estimate`) as given (falsy: `ValueError("'<value>'")`); with `PhaseEncodingDirection` and one of the echo-spacing keys, the voxels along the phase encoding of `in_file`: `EES (N - 1)`, `EchoSpacing (N // ParallelReductionFactorInPlane - 1)`, Philips' `WaterFatShift / (wfs_hz (EPIFactor + 1)) (N - 1)`; then a truthy `fallback`; else `ValueError('Unknown total-readout time specification')` |
+| `get_readout_time(metadata, in_file=None, use_estimate=False, fallback=None)` → `GetReadoutTimeResult(readout_time, pe_direction, pe_dir_fsl)` | `interfaces/epi.GetReadoutTime` | `fallback` 0 is none; no `PhaseEncodingDirection`: `KeyError` |
+| `select_pe_volumes(in_data, pe_dirs_fsl, readout_times, max_vols_per_pe=3, *, out_dir)` → `SelectPEVolumesResult` | `interfaces/epi.SelectPEVolumes` (2.17.1) | the runs in order, squeezed and split; at most `max_vols_per_pe` volumes per direction, `<in>_vol<i>`; lists of different lengths: `zip(strict=True)`'s `ValueError` |
+| `sort_pe_blips(in_data, pe_dirs_fsl, readout_times)` → `SortPEBlipsResult(out_data, pe_dirs, pe_dirs_fsl, readout_times)` | `interfaces/epi.SortPEBlips` | sorted by the blip (`+` before `-`), the readout time, the path |
+| `uniform_grid(in_data, reference=0, *, out_dir)` → `UniformGridResult(out_data, reference, resampled)` | `interfaces/utils.UniformGrid` | an equal grid kept, a close affine (`np.allclose`) replaced by the reference's, any other grid resampled (nitransforms' cubic `Affine.apply`, `constant` 0, the input's type), `<in>_regrid<i>`; the warning of 2.17.1 for a rotation that differs; 3D inputs only on the resampling path (`NotImplementedError` for 4D: the paths sdcflows runs give 3D) |
+| `pad_slices(in_file, axis=2, *, out_dir)` → `(file, padded)` | `interfaces/utils.PadSlices` (2.15's wiring) | an odd count along `axis`: one empty slice appended, `<in>_padded` |
+| `reorient_image_and_metadata(in_file, target_orientation, pe_dir, *, out_dir, upstream_defects="fix")` → `(file, pe_dirs)` | `interfaces/utils.ReorientImageAndMetadata` | `<in><TARGET>`, or the input when nothing moves; letters other than RASLPI: `ValueError('Invalid orientation code …')`; SDC-12 |
+| `select_topup_config(in_file, sloppy=False, *, fsldir=None)`, `topup_config_file(name, fsldir=None)` | `workflows/fit/pepolar._select_topup_config` | `b02b0_4.cnf` (every dimension divisible by 4), `_2` (all even), `_1`; `_quick` with `sloppy`. sdcflows' own files (`b02b0.cnf`, `b02b0_quick.cnf`, `b02b0_{1,2,4}_quick.cnf`, Apache-2.0) ship with larmorx; FSL's `b02b0_{1,2,4}.cnf` (FSL Licence) do not: they are read from `fsldir`'s `etc/flirtsch`, else from `larmorx-nc`'s FSL files, else `FileNotFoundError` naming both (the user's D9, for now) |
+| `topup_node(in_file, encoding_direction, readout_times, config, *, out_dir, fsldir=None, implementation="auto", upstream_defects="fix", n_threads=1)` → `TopupNodeResult` | nipype 1.12.0's `TOPUP` | `topup --config --datain=<in>_encfile.txt --imain --out=<in>_base --iout --fout --jacout=jac --logout --rbmout=xfm --dfout=warpfield` in `out_dir`, `FSLOUTPUTTYPE=NIFTI_GZ`; the encoding file as nipype's (`"%d %d %d %.8f"`; one readout time for all rows, else one per row: nipype's `ValueError`) |
+| `topup_mats_to_world(in_mats, in_reference)` | `workflows/fit/pepolar._topup_mats_to_world` (2.17.1) | nitransforms' FSL matrices as RAS affines (`.tolist()`) |
+| `topup_workflow(in_data, metadata, *, wiring="2.17", grid_reference=0, use_metadata_estimates=False, fallback_total_readout_time=None, omp_nthreads=1, sloppy=False, debug=False, topup_config=None, max_vols_per_pe=3, out_dir=None, fsldir=None, numpy_version=None, scipy_version=None, topup_implementation="auto", volreg_implementation="auto", upstream_defects="fix", n_threads=1)` → `TopupWorkflowResult` | `workflows/fit/pepolar.init_topup_wf` | 2.17: `readout_time`, `select_volumes`, `regrid`, `sort_pe_blips`, `concat_blips` (`MergeSeries(affine_tolerance=1e-4)`), `to_las`, `select_config` (unless `topup_config`), `topup`, `fix_coeff` (on the regridded reference), `from_las`, `from_las_fmap`, `ref_average` (`RobustAverage`), `brainextraction_wf`; 2.15: `runwise_avg` (`RobustAverage` per run), `regrid`, `readout_time` (on the regridded averages), `sort_pe_blips`, `concat_blips`, `pad_blip_slices`, `setwise_avg` (`RobustAverage` of the set), `to_las`, `topup` (sdcflows' `b02b0.cnf`), `fix_coeff` (on the set's average), `from_las`, `from_las_fmap`, `ref_average`, `brainextraction_wf`; `debug`: `unwarp` (`ApplyCoeffsField(jacobian=True)`, with 2.17.1's `convert_xfms` matrices) and `concat_corrected` instead of TOPUP's corrected volumes and field. Outputs `fmap`, `fmap_ref`, `fmap_mask`, `fmap_coeff`, `jacobians`, `xfms`, `out_warps`, `method`, `topup_config`, and every node's result (`nodes`) |
+
+Checked node file by node file against sdcflows' own graphs of both releases (2.15.1's
+`pepolar.py` from its release, 2.17.1 installed; 3dvolreg, topup and N4 through the oracle
+cache) and against fMRIPrep 25.2.6's own node files of its two PEPOLAR estimators:
+`validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`
+([findings](../findings/sdcflows-estimation.md)).
+
 ## Upstream defects (D13)
 
 Corrected by default; `upstream_defects="reproduce"` gives sdcflows' result bit for bit, and
@@ -243,6 +272,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-09 | no `EchoTime`: Python's `TypeError` of a comparison with None | a `ValueError` naming the metadata | `subtract_phases`, `phdiff_workflow` |
 | SDC-10 | `fit(approx=True)` on a rotated target ignores `xfm_data2fmap` | the approximation built and sampled where the transform puts the target | `B0FieldTransform.fit`/`apply`, `apply_coeffs_field` |
 | SDC-11 | a resize (`zooms_min`) onto a grid of a single voxel fails (nitransforms' bare `AssertionError`) | the voxel resampled and the fit made | `resample_to_zooms`, `bspline_approx` |
+| SDC-12 | `ReorientImageAndMetadata` checks the upper-cased orientation code but reorients to the code as given (a lower-case one fails in nibabel) | the upper-cased code it checked | `reorient_image_and_metadata` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

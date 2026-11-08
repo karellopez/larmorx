@@ -46,3 +46,33 @@ Corrected by default (`upstream_defects="reproduce"` gives niworkflows' behaviou
 | PIPE-19 | a 6- or 7-dimensional image is averaged over its fourth axis | niworkflows' error for an image of more than four dimensions |
 
 `as_closest_canonical(image)` and `reorient(in_file, newpath=None)` are available on their own.
+
+## `robust_average`: `RobustAverage`
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `in_file` | `in_file` | a 3D image is the result itself; one volume after squeezing: `<in>_squeezed` |
+| `t_mask=None` | `t_mask` | the volumes kept (all); its length must be the series' (`ValueError('Image length (…) unmatched by mask (…)')`) and it must keep one (`ValueError('At least one volume should be selected for slicing')`) |
+| `mc_method="AFNI"` | `mc_method` | `"AFNI"`: nipype's `Volreg(interp='Fourier', args='-twopass', zpad=4)`, i.e. `3dvolreg -twopass -Fourier -1Dfile <s>.1D -1Dmatrix_save <s>.aff12.1D -prefix <s>_volreg.nii.gz -zpad 4 -maxdisp1D <s>_md.1D <s>.nii.gz` on the sliced volumes (`volreg_implementation`: the replica by default); `"FSL"`: `mcflirt -refvol 0 -sinc_final` (`mcflirt_implementation`); `None`: no registration |
+| `nonnegative=True` | `nonnegative` | the lower clip at 0 (else the 0.2th percentile, then the minimum) |
+| `two_pass=True` | `two_pass` | `-twopass` |
+| `num_threads=None` | `num_threads` | 3dvolreg's `OMP_NUM_THREADS` (no effect on its result) |
+| `out_dir=None`, `numpy_version="2.5.4"`, `upstream_defects="fix"`, `n_threads=1` | | `numpy_version`: the percentiles' arithmetic and the order of the drift's sums (numpy 2.2: chunks of 8192; fMRIPrep 25.2.6's `"2.2.6"`) |
+
+The volumes are read as `float32`, clipped to the 99.8th percentile, divided by the global
+signal's drift (each volume's mean over the brightest's), clipped again and written as
+`<in>_sliced` with the input's header (extensions cleared); after the registration the series
+is clipped once more and its median over the volumes written as `<in>_average`. The result:
+`RobustAverageResult(out_file, out_volumes, out_drift, out_hmc, out_hmc_volumes)`.
+
+## `merge_series`, `reorient_file`, `reorient_image`: `MergeSeries`, `ReorientImage`
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `merge_series(in_files, allow_4D=True, affine_tolerance=None, *, out_dir=None)` → the path | `nibabel.MergeSeries` | each file squeezed; 3D images and (with `allow_4D`) 4D ones' volumes merged (nibabel's `concat_images`), `<first>_merged`; another dimension: `ValueError('Input image has an incorrect number of dimensions (…).')`; with `affine_tolerance`, `np.allclose(atol=…)` against the first (`ValueError('Difference in affines greater than allowed tolerance …')`) and the first's affine kept; without, affines must be identical |
+| `reorient_file(in_file, *, target_file=None, target_ornt=None, newpath=None)` → the path | `nibabel.ReorientImage` (`reorient_file`) | to `target_file`'s axis codes or `target_ornt`'s (`TypeError('No target orientation or file is specified.')`), `reoriented.nii.gz` |
+| `reorient_image(img, target_ornt)`, `as_reoriented(img, ornt)`, `axcodes2ornt`, `aff2axcodes`, `ornt_transform`, `squeeze_image`, `four_to_three` | `nibabel.reorient_image`; nibabel 5.4.2's functions (MIT) | in memory; nibabel's errors (`Not all axis codes … in label set …`) |
+
+Checked file for file against niworkflows and sdcflows on the oracle runs' PEPOLAR estimators
+(every option of `RobustAverage`, its one-volume, 3D and error paths) and against fMRIPrep's own
+node files: `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`.

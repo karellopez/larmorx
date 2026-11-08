@@ -72,9 +72,9 @@ home = Path(os.environ["LX_SHIM_HOME"])
 env = {"HOME": str(home), "AFNI_DONT_LOGFILE": "YES", "OMP_NUM_THREADS": "1",
        "PATH": "/usr/bin:/bin"}
 r = run_afni("3dvolreg", sys.argv[1:], env, Path.cwd())
-sys.stdout.write(r.stdout)
-sys.stderr.write(r.stderr)
-sys.exit(r.returncode)
+sys.stdout.write(r.out)
+sys.stderr.write(r.err)
+sys.exit(r.code)
 """
 TOPUP_BODY = """from pathlib import Path
 from larmorx_validation import oracle_cache
@@ -467,6 +467,7 @@ def sec_ravg(t: cw.Tally, nt: int, ests) -> None:
         except Exception as e:
             mine = ("err", type(e).__name__, str(e))
         t.add("RobustAverage outputs = niworkflows'", ref == mine, f"{label}: {ref} vs {mine}")
+        t.add(f"RobustAverage {ref[0]} cases", True)
         for f in sorted(rd.glob("*.nii*")):
             tally_file(t, "RobustAverage files = niworkflows'", f"{label} {kw}", f, md / f.name)
 
@@ -521,17 +522,24 @@ def sec_wf(t: cw.Tally, nt: int, ests, times) -> None:
                 ref = cw.run_nipype(wf, Path(tmp) / "ref")
                 t1 = time.perf_counter()
                 mine = Path(tmp) / "mine"
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    res = topup_workflow(
+                what = f"topup_workflow {wiring}{''.join(f' {k}' for k in kw)}"
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        res = topup_workflow(
                         files, metas, wiring=wiring, out_dir=mine, fsldir=fsldir(),
                         numpy_version=NP, scipy_version=SP, topup_implementation="replica",
                         volreg_implementation="replica", upstream_defects="reproduce",
                         n_threads=nt, **kw,
                     )  # fmt: skip
+                except Exception as e:  # noqa: BLE001
+                    import traceback
+
+                    traceback.print_exc()
+                    t.add(f"{what}: ran", False, f"{label}: {type(e).__name__}: {e}")
+                    continue
                 times[0] += t1 - t0
                 times[1] += time.perf_counter() - t1
-                what = f"topup_workflow {wiring}{''.join(f' {k}' for k in kw)}"
                 compare_tree(t, label, ref, mine, what)
                 outn = wf.get_node("outputnode")
                 t.add(f"{what}: method", res.method == outn.inputs.method, label)
@@ -586,7 +594,7 @@ def sec_image(t: cw.Tally, nt: int, ests) -> None:
                 pe = fx["pe_dir"].strip("'\"")
                 res = lxs.topup_coeff_reorient(ref, fmap_ref, pe, out_dir=tmp / "fix_coeff", upstream_defects="reproduce")
                 if fix_ref:
-                    tally_file(t, "image: fix_coeff (fMRIPrep's topup) = fMRIPrep's", label, fix_ref[0], res.paths[0])
+                    tally_file(t, "image: fix_coeff (fMRIPrep's topup) = fMRIPrep's", label, fix_ref[0], res.out_coeff[0])
             for node in ("from_las", "from_las_fmap"):
                 n = wf / node
                 ni = cw.node_inputs(n)
@@ -604,11 +612,18 @@ def sec_image(t: cw.Tally, nt: int, ests) -> None:
             dirs = ast.literal_eval(ti["encoding_direction"])
             cfg = lxs.topup_config_file("b02b0.cnf")
             mine_tu = lxs.topup_node(las, dirs, ros, cfg, out_dir=tmp / "topup", implementation="replica", upstream_defects="reproduce", n_threads=nt)
-            for ref in sorted(tu.glob("*_field.nii.gz")):
-                print(f"INFO {label} topup field (FSL 6.0.7.23 vs fMRIPrep's FSL): {cw.info_diff(str(ref), mine_tu.out_field)}")
-            enc_ok = True
-            print(f"INFO {label} topup command line: {' '.join(mine_tu.cmdline)[:160]}...")
-            t.add("image: topup encoding rows = fMRIPrep's inputs", enc_ok, label)
+            # FSL 6.0.7.23's topup (the replica) on fMRIPrep's own topup input: fMRIPrep ran an
+            # older FSL; each of its files compared (FSL's descrip apart), the matrices as text
+            for ref in sorted(tu.glob("*.nii.gz")):
+                tally_file(t, "image: topup (FSL 6.0.7.23's replica) = fMRIPrep's older FSL", label, ref, tmp / "topup" / ref.name)
+            for ref in sorted(tu.glob("xfm_*.mat")):
+                t.add("image: topup matrices = fMRIPrep's", ref.read_text() == (tmp / "topup" / ref.name).read_text(), f"{label} {ref.name}")
+            cmd = (tu / "command.txt").read_text().split()
+            def flags(argv):
+                return [(a.partition("=")[0], Path(a.partition("=")[2]).name) for a in argv]
+
+            t.add("image: topup command line = fMRIPrep's (directories apart)",
+                  flags(cmd) == flags(mine_tu.cmdline), f"{label}: {cmd} vs {mine_tu.cmdline}")  # fmt: skip
 
 
 def _patch_nipype_cwd() -> None:

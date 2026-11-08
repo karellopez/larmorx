@@ -155,6 +155,52 @@ nine `brainextraction_wf` inputs 12.1 s against 15.6 s; peak memory 422 MiB at o
 in each environment, fMRIPrep's 27 of 27; `check_skimage.py`), and `lx.ndimage` stays SciPy's
 in all 39,436 cases of `check_ndimage.py` in both environments.
 
+## The PEPOLAR estimation (relay 5)
+
+`lx.sdcflows.topup_workflow` runs sdcflows' `init_topup_wf` in both wirings (sdcflows 2.17.1's,
+the default, and 2.15's, fMRIPrep 25.2.x's), node by node, and `check_pepolar.py` compares every
+file:
+
+- **The steps alone** (`units`): `get_trt` (192 cases: sdcflows' doctest metadata and every
+  branch, the errors and messages), `GetReadoutTime`, `SelectPEVolumes`, `SortPEBlips`,
+  `UniformGrid` (fMRIPrep's two estimators with each run as the reference: ds001600's runs are
+  on different grids, 80x80x60 at 3 mm and 64x64x44 at 3.75x3.75x4 mm, so one is resampled;
+  synthetic grids equal, close, shifted and rotated, `float32` and `int16`), `MergeSeries`,
+  `PadSlices` (odd counts on each axis, scaled `int16`, `uint8`, `float32`),
+  `ReorientImageAndMetadata` (LAS, RAS, LPI, PIR, lower case), `ReorientImage`,
+  `_select_topup_config`, `_topup_mats_to_world`, nipype's `TOPUP` command line and encoding
+  file: all identical in the shared environment.
+- **niworkflows' `RobustAverage`** (`ravg`): every option (`t_mask`, `nonnegative`, `two_pass`,
+  `mc_method=None`, `num_threads`), its 3D, one-volume and error paths, on the estimators' EPIs:
+  every output and file identical. The drift's mean over each volume is numpy's
+  `mean(axis=(0, 1, 2))` of a series whose volumes are C-ordered blocks: from numpy 2.3 the
+  pairwise sum of each block, before (numpy 2.2.6, fMRIPrep's image) chunks of 8192 elements
+  (the buffered order of the whole-array sums above); `numpy_add_reduce` gives either.
+- **fMRIPrep's own node files** (`image`, numpy 2.2.6's arithmetic): for ds001600 and ds005040
+  every node of the 2.15 wiring is fMRIPrep's file bit for bit: the four run averages, the
+  regridded run, the merge, the set's average and registered volumes (3dvolreg's replica), and,
+  fed fMRIPrep's own topup outputs, `fix_coeff`, `from_las`, `from_las_fmap` and `ref_average`.
+  **topup**: FSL 6.0.7.23's replica run on fMRIPrep's own `topup` input gives every file of
+  fMRIPrep's older FSL bit for bit (14 images: data and header but `descrip`, where FSL writes its
+  version; the four matrices as text), and nipype's command line is fMRIPrep's (directories
+  apart). Only `brainextraction_wf`'s N4 differs (eight threads there; above).
+- **AFNI's history.** 3dvolreg writes the command line and the date into an AFNI extension of
+  its NIfTI output, and nibabel carries it into files made from it (`to_las` in 2.15): those
+  files differ from run to run in that extension (and `vox_offset`) only; their data and the rest
+  of the header are compared exactly (counted apart as `descrip/extension only`).
+- **FSL's configurations** (D9 for now): sdcflows 2.17.1 picks FSL's `b02b0_4/_2/_1.cnf`
+  (byte-identical to FSL's own files, FSL Licence) by the grid's divisibility. larmorx ships
+  only sdcflows' own (`b02b0.cnf`, fMRIPrep's; the `_quick` variants) and reads FSL's from an
+  FSL installation (`fsldir`) or from larmorx-nc's FSL files (`topup_config_file`, one function);
+  larmorx-nc carries them once the handoff adds them.
+- **SDC-12** (rule A): `ReorientImageAndMetadata` validates `target_orientation.upper()` but hands
+  the original string to nibabel's `axcodes2ornt`, which refuses lower-case codes; larmorx
+  reorients to the code it checked (sdcflows calls it with `"LAS"` only).
+- **UniformGrid resamples 3D images only here**: nitransforms' `apply` of one affine to a 4D image
+  of fewer than eight volumes passes three coordinates for four axes (SciPy's error), and
+  sdcflows' PEPOLAR paths give it 3D averages (2.15) or single volumes (2.17.1); larmorx raises
+  `NotImplementedError` for 4D inputs on that path.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background

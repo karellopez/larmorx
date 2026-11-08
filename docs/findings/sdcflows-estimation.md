@@ -176,14 +176,33 @@ file:
   `mean(axis=(0, 1, 2))` of a series whose volumes are C-ordered blocks: from numpy 2.3 the
   pairwise sum of each block, before (numpy 2.2.6, fMRIPrep's image) chunks of 8192 elements
   (the buffered order of the whole-array sums above); `numpy_add_reduce` gives either.
-- **fMRIPrep's own node files** (`image`, numpy 2.2.6's arithmetic): for ds001600 and ds005040
-  every node of the 2.15 wiring is fMRIPrep's file bit for bit: the four run averages, the
+- **The workflows** (`wf`): sdcflows 2.15.1's and 2.17.1's `init_topup_wf` on ds001600,
+  ds005040 and ds006736 (3D AP/PA EPIs on different grids, a D8 run of 2026-11-08), 2.17.1 also
+  with `debug` (`ApplyCoeffsField` with `_topup_mats_to_world`'s matrices) and `sloppy` (the
+  `_quick` configuration): every node file identical in both kept environments (shared: 61, 73,
+  39 and 38 files of ds001600 and ds005040; newest: 55, 59, 36 and 35 of ds005040 and ds006736),
+  the configurations chosen alike (`b02b0_4.cnf` for 80x80x60 and 64x64x40, `b02b0_2.cnf` for
+  74x64x58).
+- **fMRIPrep's own node files** (`image`, numpy 2.2.6's arithmetic): for ds001600, ds005040 and
+  ds006736 every node of the 2.15 wiring is fMRIPrep's file bit for bit: the run averages, the
   regridded run, the merge, the set's average and registered volumes (3dvolreg's replica), and,
-  fed fMRIPrep's own topup outputs, `fix_coeff`, `from_las`, `from_las_fmap` and `ref_average`.
-  **topup**: FSL 6.0.7.23's replica run on fMRIPrep's own `topup` input gives every file of
-  fMRIPrep's older FSL bit for bit (14 images: data and header but `descrip`, where FSL writes its
-  version; the four matrices as text), and nipype's command line is fMRIPrep's (directories
-  apart). Only `brainextraction_wf`'s N4 differs (eight threads there; above).
+  fed fMRIPrep's own topup outputs, `fix_coeff`, `from_las`, `from_las_fmap` and `ref_average`;
+  nipype's `topup` command line is fMRIPrep's (directories apart). Two notes:
+  - ds006736's regridded run: the data identical, `quatern_b` -1.4631e-16 where fMRIPrep's file
+    has -1.5087e-16 (a quaternion component that is zero up to rounding). fMRIPrep's image gives
+    its own value on the main machine without `OPENBLAS_CORETYPE` and larmorx's with
+    `OPENBLAS_CORETYPE=Haswell` (`r5` probe: nibabel 5.3.2's `set_qform` through its numpy
+    2.2.6's BLAS): a kernel dependence of numpy's linear algebra in fMRIPrep's image, counted
+    apart (`quaternion rounding only`), to settle with the records (which kernel the old laptop
+    ran).
+  - **topup**: the replica gives FSL 6.0.7.23's own files on fMRIPrep's three `topup` inputs
+    (24 images, `descrip` apart, and 6 matrices, FSL run through the oracle cache). fMRIPrep's
+    image has the same topup release (fsl-topup 2203.5, another build and its own libraries, run
+    on the old laptop): its files are FSL 6.0.7.23's bit for bit on ds001600 and ds005040, but
+    not on ds006736 (0.15 % of the field's voxels identical, at most 0.58 Hz apart; the matrices
+    identical). Whether the build, its libraries or the CPU's BLAS kernels make that difference
+    is to be measured (the image's topup on the main machine through the oracle cache).
+  Only `brainextraction_wf`'s N4 differs otherwise (eight threads there; above).
 - **AFNI's history.** 3dvolreg writes the command line and the date into an AFNI extension of
   its NIfTI output, and nibabel carries it into files made from it (`to_las` in 2.15): those
   files differ from run to run in that extension (and `vox_offset`) only; their data and the rest

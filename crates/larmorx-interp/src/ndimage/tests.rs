@@ -292,3 +292,87 @@ fn floor_matches_the_c_library() {
         }
     }
 }
+
+#[test]
+fn affine_points_follow_scipy_sum_orders() {
+    // SciPy 1.16 onwards adds a row's products to the offset; 1.15 adds the offset after them.
+    let m = [[0.1, 0.2, 0.3], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let off = [1e16, 0.0, 0.0];
+    let new = AffineMap::Matrix {
+        matrix: m,
+        offset: off,
+        offset_last: false,
+    };
+    let old = AffineMap::Matrix {
+        matrix: m,
+        offset: off,
+        offset_last: true,
+    };
+    let io = [3, 1, 1];
+    let a = ((1e16 + 3.0 * 0.1) + 1.0 * 0.2) + 1.0 * 0.3;
+    let b = (((0.0 + 3.0 * 0.1) + 1.0 * 0.2) + 1.0 * 0.3) + 1e16;
+    assert_eq!(new.point(io)[0].to_bits(), f64::to_bits(a));
+    assert_eq!(old.point(io)[0].to_bits(), f64::to_bits(b));
+    let zoom = AffineMap::Zoom {
+        zoom: [1.0 / 3.0, 2.0, 1.0],
+        shift: [0.5 / (1.0 / 3.0), 0.0, -1.0],
+    };
+    let third: f64 = 1.0 / 3.0;
+    assert_eq!(
+        zoom.point([2, 3, 4]),
+        [(2.0 + 0.5 / third) * third, 6.0, 3.0]
+    );
+}
+
+#[test]
+fn affine_identity_reproduces_the_samples() {
+    let shape = [6, 5, 4];
+    let v = volume(shape);
+    let map = AffineMap::Matrix {
+        matrix: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        offset: [0.0; 3],
+        offset_last: false,
+    };
+    for order in [0, 1, 3] {
+        let mut out = vec![0.0f32; v.len()];
+        affine_transform3(
+            &v,
+            shape,
+            &map,
+            shape,
+            &mut out,
+            order,
+            Mode::Mirror,
+            0.0,
+            true,
+            UpstreamDefects::Fix,
+        )
+        .unwrap();
+        if order <= 1 {
+            assert_eq!(out, v, "order {order}");
+        } else {
+            let worst = out
+                .iter()
+                .zip(&v)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0, f32::max);
+            assert!(worst < 1e-3, "order {order}: {worst}");
+        }
+    }
+    let mut short = vec![0.0f32; 3];
+    assert!(
+        affine_transform3(
+            &v,
+            shape,
+            &map,
+            shape,
+            &mut short,
+            0,
+            Mode::Constant,
+            0.0,
+            true,
+            UpstreamDefects::Fix
+        )
+        .is_err()
+    );
+}

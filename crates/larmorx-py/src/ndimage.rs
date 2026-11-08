@@ -298,8 +298,7 @@ fn affine3<T: Sample + Element, O: Output + Element>(
         .detach(|| {
             larmorx_core::parallel::with_threads(n_threads, || {
                 ndimage::affine_transform3(
-                    &values, shape, map, out_shape, &mut out, order, mode, cval, prefilter,
-                    defects,
+                    &values, shape, map, out_shape, &mut out, order, mode, cval, prefilter, defects,
                 )
             })
         })
@@ -386,7 +385,8 @@ fn ndimage_affine_transform3<'py>(
         },
         _ => return Err(PyRuntimeError::new_err("no proper affine matrix provided")),
     };
-    let (m, sh, ord, md, cv, pf, nt) = (&map, output_shape, order, mode, cval, prefilter, n_threads);
+    let (m, sh, ord, md, cv, pf, nt) =
+        (&map, output_shape, order, mode, cval, prefilter, n_threads);
     match output {
         "float64" => dispatch_affine!(py, input, f64, m, sh, ord, md, cv, pf, nt, defects),
         "float32" => dispatch_affine!(py, input, f32, m, sh, ord, md, cv, pf, nt, defects),

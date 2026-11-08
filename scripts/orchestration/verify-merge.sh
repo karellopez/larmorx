@@ -58,4 +58,9 @@ if [ $GOLDEN = 1 ]; then
   (export PYTHONPATH=$R/python:$R/validation/src; cd "$R" && python -P scripts/record_golden.py --parity-workers "$WORKERS" ${SMOKE:+--serial-parity}) > "$OUT/golden.log" 2>&1; log "STEP4+golden exit $?"
   log "golden diff: $(git -C "$R" diff --stat | tail -1)"
 fi
+# Every step's status in one verdict (2026-11-08: a failed step 1 sat in the log's second line while the
+# script ended 0 and only the log's tail was read): any "exit N" with N > 0 fails the verification.
+FAILED=$(grep -E ' exit [1-9][0-9]*$' "$L" | tr '\n' ';')
+if [ -n "$FAILED" ]; then log "VERDICT FAILED: $FAILED"; else log "VERDICT PASSED"; fi
 log "ALLDONE $(date -Is)"
+[ -z "$FAILED" ]

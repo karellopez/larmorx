@@ -82,3 +82,8 @@ tests. When sdcflows' clean-room original starts, the audit's restriction table 
   committed records, no status or detail differs: `sdcflows-fieldmap` 37/37 (newest environment, with the step),
   `resample-series` 139/139, `numpy-linalg` 28/28, `nifti-io` 254/254; the page re-exported with only the exporter's
   fingerprint changed (data unchanged; taken into the site, 01f901ed).
+- After the push (2026-11-08 13:05): CI failed in the six `gpl` jobs: `crates-nc/LICENSES/NOTICE-larmorx.txt` was not
+  copied again after the part added sdcflows', scikit-learn's, SciPy's and OpenBLAS's notices to `NOTICE`. The
+  verification had found it (`STEP1 rust gates exit 1`, the second line of its `main.log`), but the orchestrator read
+  only the log's end and the script ended 0. The copy made again (crates-nc's tests pass), and `verify-merge.sh` now
+  ends with `VERDICT PASSED` or `VERDICT FAILED: <steps>` and exit status 1 when any step failed.

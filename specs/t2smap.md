@@ -36,7 +36,8 @@ This spec describes behaviour: what goes in, what comes out, the maths and the c
 decide the results. It holds no code. Statements marked **(observed)** were confirmed by running
 tedana's program (`validation/investigations/t2smap-spec/blackbox.py`, and the replica's suite,
 which compares 69 cases with tedana bit for bit); the rest come from the analysis of the
-program's behaviour. Message texts are tedana's output, quoted as it prints them: their prefixes
+program's behaviour, and §§3–11's arithmetic was confirmed by a model written from this text,
+whose files equal tedana's bit for bit on the probe's cases and fMRIPrep's calls (§18). Message texts are tedana's output, quoted as it prints them: their prefixes
 name tedana's module, function and line because tedana's log format prints them (§12.1).
 
 **The method and its sources.** Posse et al., "Enhancement of BOLD-contrast sensitivity by
@@ -458,10 +459,12 @@ the first bad echo.
    so that no voxel equals it (step 3, TED-01). An empty set (no voxel, or every first-echo mean
    0) is numpy's `IndexError: index -1 is out of bounds for axis 0 with size 0` (TED-03's empty
    mask).
-3. The exemplar voxels are those whose first-echo mean **equals** that value. With one exemplar,
-   the thresholds are its E means divided by 3 (float32); with several, the exemplar whose
-   E means have the largest float32 sum (summed in echo order; the first such voxel in voxel order),
-   its means divided by 3. No exemplar (a NaN percentile: TED-01) is `ValueError: attempt to get
+3. The exemplar voxels are those whose first-echo mean **equals** that value. Each exemplar's
+   candidate thresholds are its E means divided by 3 (float32). With one exemplar they are the
+   thresholds; with several, the candidates of the exemplar whose **candidates** (the thirds, not
+   the means: the two can rank differently by rounding) have the largest float32 sum (numpy's sum
+   along the echoes, the innermost axis, §13.2: left to right for fewer than eight echoes; the
+   first such exemplar in voxel order). No exemplar (a NaN percentile: TED-01) is `ValueError: attempt to get
    argmax of an empty sequence` (observed). With one echo the thresholds are a single float32
    value, printed (step 4), and step 5 fails: `IndexError: invalid index to scalar variable.`
    (observed; TED-12).
@@ -634,10 +637,12 @@ with the **limited** maps (ms):
    order, then divided by n in float64 and rounded to float32: §13.2); its square root (float32).
    This is rmse[v, t]; it is NaN for the voxels of count 0 or 1. (A limited T2* of 0 in a count ≥ 2
    voxel, after TED-18's cap, divides by zero: numpy's warning, §12.3.)
-2. The RMSE map: per voxel, the sum over volumes of the non-NaN rmse[v, ·] (float32, §13.2)
-   divided by their number (float64 division, rounded to float32); NaN when there is none.
-3. Per volume t over the S voxels: `rmse_mean` = the sum of the non-NaN rmse[·, t] (float32, in voxel
-   order) divided by their number (float64, rounded to float32), NaN when none; `rmse_std` = numpy's
+2. The RMSE map: per voxel, numpy's `nansum` over the volumes (the NaN values replaced by +0 in
+   place, then the float32 sum along the volumes, the innermost axis: pairwise, §13.2) divided by
+   the number of non-NaN values (float64 division, rounded to float32); NaN when there is none.
+3. Per volume t over the S voxels: `rmse_mean` = numpy's `nansum` over the voxels (NaN as +0; a
+   plain float32 sum in voxel order, the voxels an outer axis) divided by the number of non-NaN
+   values (float64, rounded to float32), NaN when none; `rmse_std` = numpy's
    `nanstd` (degrees of freedom 0; float32) of the non-NaN values; the percentiles 0, 2, 25, 50,
    75, 98, 100 of the non-NaN values by numpy's `nanpercentile` (linear method, §13.6; float64
    results), named `rmse_min`, `rmse_percentile02`, `rmse_percentile25`, `rmse_median`,
@@ -737,8 +742,8 @@ step leaves the files written before it.
 
 ### 11.4 The confounds table
 
-Tab-separated, `\n` line ends, a header line with the nine column names of §9, one line per
-volume, no index column, NaN written `n/a`; each value is the float64 number in Python's shortest
+Tab-separated, every line (the last one too) ended by `\n`, a header line with the nine column
+names of §9, one line per volume, no index column, NaN written `n/a`; each value is the float64 number in Python's shortest
 round-trip form (`repr`: `11.061917304992676`, `1e-05`, `0.0`), the float32 columns (`rmse_mean`,
 `rmse_std`, and the percentile columns in §9's float32 case) widened to float64 first (observed:
 `11.061917304992676\t5.293344020843506\t1.1068437099456787\t3.1794732332229616\t...`). Ties
@@ -854,7 +859,11 @@ marked):
 
 tqdm's progress bars (`<n>-echo monoexponential`, one per group and volume) print their own
 timings and are not part of the contract; the reference runs set `TQDM_DISABLE=1` (§17.1), with
-which tedana prints none.
+which tedana prints none. tqdm 4.70.1 takes the default of its `disable` parameter from the
+environment variable `TQDM_DISABLE` (a name `TQDM_` followed by `disable` in any case; the last
+such variable wins) as Python's truth of the text: **any non-empty value disables the bars**
+(`1`, also `0`), an empty one does not (observed). An original prints no bar when the
+environment disables them; otherwise its progress display is its own.
 
 ### 12.4 Errors (exit status 1)
 
@@ -929,8 +938,9 @@ last bits; a shift of the batch by 1 to 3 columns changes 2 of 5,003), the BLAS 
 relative in one noise voxel) (black-box, measured by the replica author). The reference is one BLAS
 thread. `larmorx_transform::numpy_linalg::lstsq` reproduces numpy 2.5.4's (and 2.3.5's) result
 bit for bit at any thread count (§13.9); a direct per-voxel solution of the 2 × 2 problem (for
-instance by an orthogonal factorisation of the centred design) gives the same β within a few units
-in the last place, which §17.3 allows.
+instance the closed form of the centred design) gives the same β within a few units in the last
+place, which §17.3 allows (measured: the model's per-voxel closed form wrote the same float32
+T2* and S0 as tedana on every voxel of §18's cases).
 
 ### 13.5 The curve fit (§7.3)
 
@@ -1051,13 +1061,40 @@ with `larmorx:` for the replica's `larmorx-gpl:`. Error texts are the last line 
 By default every elementary function is correctly rounded (§13.3); `reproduce` uses tedana's:
 numpy's float32 log kernel (NP-03) and glibc 2.35's float64 `exp`, `log` and `pow` (GLIBC-07).
 NP-04 (numpy's AVX-512 SVML kernels) is a register row only: the reference setup turns them off,
-and larmorx never reproduces them. The replica names NP-03 and GLIBC-07 exactly where the other
-choice changes a written value or a printed line, in both modes (it re-runs the stages from the
-mask to the combination with the other functions, writing nothing; up to four passes: §16).
-Observed (the probe's `loglin`): `upstream defect NP-03 (numpy) corrected: the log-linear fit
-takes the correctly rounded float32 logarithm; numpy's own kernel (tedana's) would give 1164 other
-written value(s) (S0map.nii.gz 175, desc-rmse_statmap.nii.gz 224, ...)`. The original's notices for
-these entries: §19, open point 1.
+and larmorx never reproduces them.
+
+The two implementations name NP-03 and GLIBC-07 by different rules (decided 2026-11-08, by the
+precedent of the user's decision of 2026-11-04 on GLIBC-07 in the FSL clean-room originals and on
+GLIBC-06, where an exact notice that made BET 1.9 times slower was declined):
+
+- **The replica** names them exactly where the other choice changes a written value or a printed
+  line, in both modes: it re-runs the stages from the mask to the combination with the other
+  functions, writing nothing (up to four passes: §16). Observed (the probe's `loglin`):
+  `larmorx-gpl: upstream defect NP-03 (numpy) corrected: the log-linear fit takes the correctly
+  rounded float32 logarithm; numpy's own kernel (tedana's) would give 1164 other written value(s)
+  (S0map.nii.gz 175, desc-rmse_statmap.nii.gz 224, ...) [LARMORX_UPSTREAM_DEFECTS=reproduce gives
+  numpy's result]`.
+- **The original** makes no extra pass. In its one pass it names a function only where that
+  function's **own value is written** as an output value, and exactly there: where the other
+  function's value of the same argument, rounded to the output's type, differs from the value
+  written. Where a function's value only feeds later arithmetic (the log-linear observations, the
+  floors' test, the RMSE's predictions, the combination's weights, sums) or the iterative curve
+  fit, the original names nothing, as FSL's iterative programs and filters do. On t2smap's path
+  this leaves:
+  - **NP-03: never named** by the original (the float32 logarithm's values are only the log-linear
+    fit's observations, §7.2);
+  - **GLIBC-07: the log-linear S0 values exp(β0)** (§7.2) where they are written: the full and
+    limited S0 maps of a `loglin` run, and of a `curvefit` run's voxels whose curve fit failed
+    (they keep the log-linear S0, §7.3), per volume in `--fitmode ts` (count-1 voxels' limited
+    S0 is 0, §8). Named when at least one such written value would differ, with the count per
+    file in the order of writing: by default `larmorx: upstream defect GLIBC-07 (glibc 2.35)
+    corrected: the log-linear S0 = exp(b0) is written with the correctly rounded exp; glibc
+    2.35's (tedana's) would write <k> other value(s) (S0map.nii.gz <k1>, desc-limited_S0map.nii.gz
+    <k2>) [LARMORX_UPSTREAM_DEFECTS=reproduce gives glibc 2.35's result]`; in `reproduce`
+    `... reproduced: the log-linear S0 = exp(b0) is written with glibc 2.35's exp, as numpy
+    computes it for tedana; the correctly rounded exp would write <k> other value(s) (...)`.
+  The cost is one more exponential per written log-linear S0 value, compared after rounding to
+  float32.
 
 ### 15.3 Kept as tedana's, not defects
 
@@ -1099,8 +1136,9 @@ thread count, within §17.3:
   peak plus 10 % and 8 MiB (CLAUDE.md, memory) and should do better: echoes read one at a time
   into the masked float32 array (S · E · T · 4 bytes: 127 MB there), the combination written from
   float64 per voxel without a full float64 copy of the series.
-- **Passes**: one pass of the work; the replica's extra passes for exact maths notices (31.9 s
-  against 11 s on ds003592) are the replica's role (§19, open point 1).
+- **Passes**: one pass of the work, the maths notices included (§15.2's one-pass rule); the
+  replica's extra passes for exact maths notices (31.9 s against 11 s on ds003592) are the
+  replica's role.
 - **Speed today** (`docs/benchmarks/tedana-t2smap.md`, a shared machine): tedana 26.0.3 at one
   thread 29.2 / 46.2 / 32.2 / 44.3 s on fMRIPrep's four curvefit calls, 6.1 s on ds003592's loglin;
   the replica 31.0 / 44.7 / 42.2 / 42.1 s at one thread, 8.9 / 13.3 / 10.8 / 10.6 s at 14. The
@@ -1132,7 +1170,8 @@ against the replica's default (`larmorx-gpl tedana t2smap`), newest environment.
   .../bold_t2smap_wf/t2smap_node`, the echoes `_echoidx_*/.../*_xformresampled.nii.gz` and
   `dilate_mask/dilated_mask.nii.gz`), with fMRIPrep's own `T2starmap` and `desc-optcom_bold`
   (tedana 25.0.1) reported against tedana 26.0.3's and the original's (TED-05 and the version
-  step).
+  step); ds003592's also with `--verbose` (the variance maps on real data: fMRIPrep never asks
+  for them).
 - The edge cases of every defect of §15 (both modes), two and many echoes (nine), one volume,
   `--fitmode ts` with both fits and combinations, every input data type (float32, float64, int16
   scaled, uint8, uint16), both byte orders, pairs and NIfTI-2, no mask (NIfTI-1 and -2), a 4D mask
@@ -1142,38 +1181,47 @@ against the replica's default (`larmorx-gpl tedana t2smap`), newest environment.
 
 ### 17.3 Thresholds
 
-(provisional, spec writer relay 8a: the numbers below are the plan; relay 8b measures them with the
-model of §18 against tedana's own spread and a per-voxel variant, and revises this table.)
+(spec writer, 2026-11-08, relay 8b: measured with the model of §18; `check.py` implements this
+table.) Each allowance's **use** is the largest |difference| / allowance of a run; the numbers in
+brackets are the largest uses measured on fMRIPrep's five calls (four `curvefit`, ds003592's
+`loglin`, ds003592's with `--verbose`) and `blackbox.py`'s 30 completed cases, first for tedana's
+own spread (tedana 26.0.3 in the shared environment, with `--n-threads 4` and the BLAS threads
+free, with numpy's AVX-512 kernels on, each against the reference setup), then for the model's
+`fast` variant (§18: the kind of change §16 allows). T is the volumes, E the echoes, S0 and T2* the
+written values (T2* in seconds; ×1000 for the predictions and weights, in ms).
 
-| Quantity | Requirement |
+| Quantity | Requirement [measured use: tedana's spread / fast variant] |
 |---|---|
 | exit status, the last error line | identical |
 | log lines (§12.2) | identical text, except: paths (the run's own), the cap's DEBUG value and the curve fit's DEBUG failure counts where §7's values differ within this table (reported) |
 | Python warnings (§12.3) | the same categories and messages at the same points of the log; their location lines may differ |
-| progress bars | not compared |
-| `t2smap_call.sh`, file names, the registry, the table's header and row count, JSON keys and every JSON value except `Node` and D6's `Python`/`Python_Libraries` | identical |
-| image headers, types, dimensions, affines | identical |
-| the adaptive mask | identical (its means follow §13.2 exactly) |
-| `loglin` full and limited T2* and S0 (float32 as written) | per voxel identical, or: in the rate r = 1/T2* (s⁻¹), \|r − r'\| ≤ 2⁻²²·\|r\| + 1e-9 s⁻¹, and \|S0 − S0'\| ≤ 2⁻²²·\|S0\| (two float32 units in the last place); a value floored (§8: 1 ms or 500 ms, or the underflow floor) on one side is accepted when the other side's rate is within 1e-9 s⁻¹ of 0 (β1's sign) or of the floor's rate; capped values: c within the same tolerance as T2* |
-| `curvefit` T2* and S0 | per voxel: (a) as for `loglin` with 1e-6 relative instead of 2⁻²² and 1e-9 s⁻¹, or (b) the original's (S0, T2*) fit the voxel's used samples at least as well as tedana's: F' ≤ F·(1 + 1e-6) + 1e-12·Σy², F = Σ (S0·exp(−TE/T2*) − y)² in float64 from the written values, both unfloored and uncapped, or (c) the two log-linear starts differ in feasibility (a start's T2* rate within 1e-9 s⁻¹ of 0, or its S0 within 1e-6 relative of the voxel's smallest sample): reported. Voxels passing by (b) or (c): at most 0.5 % of the fit voxels (to be measured against tedana's own step 1.15.3 → 1.18.1, whose fits differ in their last bits in most voxels and by up to 0.70 relative in a few) |
-| the failures map | identical, except voxels passing by (b) or (c) above (reported) |
-| variance and covariance maps | where (a) holds: relative 1e-4 (a finite-difference Jacobian at nearly equal points); +∞ identical; elsewhere reported |
-| the RMSE map and rmse[v, t] | per voxel and volume \|Δ\| ≤ rms_e(p_e − p'_e) + 2⁻²¹·(RMSE + max_e\|p_e\|), p and p' the predictions of §9 from the two runs' written limited maps (the triangle inequality of the root mean square); NaN where tedana has NaN |
-| the confounds table | per volume and column \|Δ\| ≤ max_v \|Δrmse[v, t]\| + 1e-6·\|value\| (order statistics and means are 1-Lipschitz in the largest difference; the float32 sums' order); `n/a` identical; the float32/float64 form of §9 identical |
-| the combined series | per voxel and volume \|Δ\| ≤ Σ_e \|x_e\|·\|ŵ_e − ŵ'_e\| + 2⁻²³·\|combined\| + 2⁻¹⁴⁹, ŵ the normalised weights of §10 from each run's written full T2* (PAID: identical weights expected, so 1 float32 ulp) |
-| the notices (B) | the same TED IDs named in the same runs, their texts identical except numbers that count values of this table (reported); NP-03 and GLIBC-07: §19, open point 1 |
+| progress bars | none when `TQDM_DISABLE` disables them (§12.3); otherwise not compared |
+| `t2smap_call.sh`, file names, the registry, the table's header and row count, JSON keys and every JSON value except `Node` and D6's `Python`/`Python_Libraries` | identical [0 / 0] |
+| image headers, types, dimensions, affines | identical [0 / 0] |
+| the adaptive mask | identical (its means follow §13.2 exactly) [0 / 0] |
+| `loglin` full and limited T2* and S0 | per voxel identical, or: in the rate r = 1/T2* (s⁻¹), \|r − r'\| ≤ 2⁻²²·\|r\| + 1e-9 s⁻¹, and \|S0 − S0'\| ≤ 2⁻²²·\|S0\| (two float32 units in the last place); a value floored (§8: 1 ms, 500 ms or the underflow floor) in one run only is accepted when one run's rate is within 1e-9 s⁻¹ of 0 (β1's sign) or of the floor's rate [identical on every voxel: tedana's spread, and the fast variant's per-voxel closed-form solution, whose float64 differences vanish in the float32 values written] |
+| `curvefit` T2* and S0 | per voxel (and volume in `ts`): (a) \|r − r'\| ≤ 1e-6·\|r\| + 1e-9 s⁻¹ and \|S0 − S0'\| ≤ 1e-6·\|S0\|; or (b) the other run's fit is at least as good: F' ≤ F·(1 + 1e-6) + 1e-12·Σy², F = Σ (S0·exp(−TE/T2*) − y)² in float64 from the written full maps over the voxel's samples of the fit (echoes 1..n of its group, the used volumes); or (c) its log-linear start lies near the feasibility boundary (a start's rate within 1e-9 s⁻¹ of 0, or its S0 within 1e-6 relative of the voxel's smallest sample). Voxels passing by (b) or (c): at most **3 %** of the fit voxels [(a)'s use 0.997 / 0.995: the rest pass by (b); (b) or (c) for 0.28 % / 0.31 % of the fit voxels at most, all by (b), with F'/F − 1 between −1.9e-8 and 3.2e-8] |
+| the cap (limited T2*) | the cap is an order statistic: \|c − c'\| ≤ max \|ℓ − ℓ'\| over the voxels capped in neither run (count ≥ 2) + tol·c (tol the T2* row's relative tolerance); a voxel capped in one run only is accepted when the other run's value is within 10·\|c − c'\| + 10·tol·c of ten caps, or passes by (b)/(c) [0.005 / 0.005] |
+| the failures map | identical, except voxels passing by (b) or (c) (reported) [identical / identical] |
+| variance and covariance maps | where (a) holds: relative 1e-3; +∞ identical; elsewhere reported [0.99 / 0.86 of the former 1e-4: up to 9.9e-5 relative on ds003592 with `--verbose`] |
+| the RMSE map | per voxel \|Δ\| ≤ max_t rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(T + E + 64)·RMSE, p and p' the predictions of §9 (float32) from the two runs' written limited maps; the last term is the error of a float32 sum of the volumes and the echoes in another order (the standard bound n·2⁻²⁴ of the terms' sum, with a slack for numpy's pairwise blocks); NaN where tedana has NaN [0.43 / 0.14] |
+| the confounds table | per volume t: `rmse_mean` and `rmse_std` \|Δ\| ≤ A_t + 2⁻²⁴·(N_t + 32)·max(\|value\|, \|rmse_mean\|); the percentile columns \|Δ\| ≤ A_t + 1e-6·\|value\| (order statistics move by at most the largest change of the values); A_t the largest over the voxels of rmse[v, t]'s allowance rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(E + 32)·rmse[v, t], N_t the non-NaN values; `n/a` identical; the float32/float64 form of §9 identical [0.07 / 0.02] |
+| the combined series | per voxel and volume \|Δ\| ≤ Σ_e \|x_e\|·\|ŵ_e − ŵ'_e\| + 2⁻²⁰·(\|∂c/∂ln T2*\| + \|c\|) + 2⁻¹⁴⁹, ŵ the normalised weights of §10 from each run's written full T2* (ms), ∂c/∂ln T2* = Σ_e ŵ_e x_e (TE_e − Σ_k ŵ_k TE_k) / T2*: each run's own T2* lies within half a float32 unit of its written value, and eight units are allowed; PAID: identical weights expected, so the 2⁻²⁰ term [0.85 / 0.44: the first term is a first-order bound, sharp by design] |
+| the notices (B) | the same TED IDs named in the same runs, their texts identical except numbers that count values of this table (reported); NP-03 never named by the original; GLIBC-07 by §15.2's one-pass rule; the replica's NP-03 and GLIBC-07 notices (the exact rule) are not compared |
 | memory | peak RSS ≤ tedana's · 1.1 + 8 MiB on fMRIPrep's ds003592 call (`tests/parity/test_memory_peak.py`) |
 
-Bit-identity per output is reported, not required. **tedana's own spread** (the record
-`tedana-t2smap-replica`, values that differ from the reference setup on fMRIPrep's ds003592 call,
-of 35.6 million written values; a synthetic curve fit; a synthetic log-linear fit): numpy's AVX-512
-kernels on: 22,899 / 8 / 0; `--n-threads 4`: 1 / 0 / 0; the shared environment: 28,808 / 5 / 0;
-tedana 25.0.1 in fMRIPrep's image: 176,938 / 447 / 1,646. fMRIPrep's own files against tedana
-26.0.3: 12,295 (ds000210 cuedSGT), 12,565 (rest), 35,226 (ds000258), 41,897 (ds003592) values;
-against larmorx's default 12,117 / 12,602 / 34,918 / 42,180 (the default caps the full map, as
-25.0.1 did). The thresholds above must hold for tedana's own spread (the shared environment and
-`--n-threads 4` against the reference): relay 8b checks that, so that they are never stricter than
-tedana is with itself.
+Bit-identity per output is reported, not required. **tedana's own spread** in values written
+(the record `tedana-t2smap-replica`, of 35.6 million written values of fMRIPrep's ds003592 call; a
+synthetic curve fit; a synthetic log-linear fit): numpy's AVX-512 kernels on: 22,899 / 8 / 0;
+`--n-threads 4`: 1 / 0 / 0; the shared environment: 28,808 / 5 / 0; tedana 25.0.1 in fMRIPrep's
+image: 176,938 / 447 / 1,646. fMRIPrep's own files against tedana 26.0.3: 12,295 (ds000210
+cuedSGT), 12,565 (rest), 35,226 (ds000258), 41,897 (ds003592) values; against larmorx's default
+12,117 / 12,602 / 34,918 / 42,180 (the default caps the full map, as 25.0.1 did). Every row above
+holds for that spread (relay 8b, `measure.py`: every run of tedana's spread and of the fast
+variant passes), and every number is at least the measured largest: about ten times it where the
+allowance is a tolerance (the curve fit's objective, 30 times; the (b)/(c) share, 10 times; the
+variances, 10 times), and the derived bounds (the cap, the RMSE, the table, the combination) are
+error bounds of the computation itself, whose uses stay below 1 by construction.
 
 ### 17.4 Random testing, golden cases, memory, speed
 
@@ -1190,38 +1238,68 @@ tedana is with itself.
 
 ## 18. The model (`validation/investigations/t2smap-spec/`)
 
-Written from this spec and black-box runs only (a clean-room implementer may read and run it):
+Written from this spec and black-box runs only (a clean-room implementer may read and run them;
+the folder's README says how):
 
-- `blackbox.py` (relay 8a, done): 54 cases of a `t2smap` program on inputs it generates (seeded
-  numpy; the decay as a product of per-millisecond factors), the report of every case's exit
-  status, standard output and error (paths and the stack normalised) and every file's header fields
-  and value summary; the source of this spec's **(observed)** facts. Run against tedana 26.0.3
-  (the newest launcher) and against `larmorx-gpl tedana t2smap` in both modes (2026-11-08): the
+- `blackbox.py` (relay 8a): 54 cases of a `t2smap` program on inputs it generates (seeded numpy;
+  the decay as a product of per-millisecond factors), the report of every case's exit status,
+  standard output and error (paths and the stack normalised) and every file's header fields and
+  value summary; the source of this spec's **(observed)** facts. Run against tedana 26.0.3 (the
+  newest launcher) and against `larmorx-gpl tedana t2smap` in both modes (2026-11-08): the
   replica's `reproduce` report equals tedana's except the warnings' location lines (D6), larmorx's
-  notices, the progress bars (the replica prints them whatever `TQDM_DISABLE` says) and gzip's
+  notices, the progress bars (the replica printed them whatever `TQDM_DISABLE` said; corrected in
+  relay 8b: it now honours §12.3's rule, observed with `1`, `0` and an empty value) and gzip's
   header byte for the compression level.
-- `model.py` (relay 8b, to do): §§4–11 in numpy and SciPy as this spec states them (numpy's
-  means, `percentile`, `lstsq` per group, SciPy's `curve_fit` per voxel with §7.3's options, the
-  floors, the cap, the RMSE, the table, the combination, the files), compared bit for bit with
-  tedana's files on `blackbox.py`'s cases and fMRIPrep's calls in the reference setup; a variant
-  with a per-voxel log-linear solution and other sum orders to measure §17.3's margins.
-- `check.py` (relay 8b, to do): §17.3's thresholds as a function of two output directories, run on
-  tedana's own spread (the shared environment, `--n-threads 4`, AVX-512 on) and on the model's
-  variant.
+- `model.py` (relay 8b): §§3–11 in numpy and SciPy as this spec states them, with the orders of
+  §13.2's sums and §13.6's percentile rules written out rather than left to numpy: nibabel's
+  float32 reading, the user mask or nilearn's `compute_epi_mask`, the dummy scans and
+  `--exclude`, the adaptive mask, the groups, numpy's `lstsq` per group, SciPy's `curve_fit` per
+  voxel with §7.3's options passed explicitly, the floors, the limited maps, the cap, the RMSE,
+  the table (written with Python's `repr`), the combination, the images (nibabel's new image from
+  the mask's affine), the JSON files. Its scope: NIfTI-1 single files, a mask of the data's grid
+  or none; tedana's behaviour (`reproduce`); the files (the messages are `blackbox.py`'s). Its
+  `fast` variant makes the changes §16 allows: the log-linear fit per voxel in closed form (a
+  centred 2 × 2 least squares), the curve fit with an analytic Jacobian (another path of the same
+  trust-region method), the RMSE's sums in float64 with the echoes reversed and a plain sum over
+  the volumes, the table's mean pairwise, the combination from normalised weights summed in
+  reverse.
+  **Result** (2026-11-08, the reference setup, `oracles/python-newest`): the model's files are
+  **bit-identical** to tedana 26.0.3's (every image's header and data, the table's text, the
+  registry, the call file, the JSON files but for D6's fields) on all 30 of `blackbox.py`'s cases
+  that tedana completes (both fits and modes, both combinations and conventions, the variance
+  maps, no mask, every mask method, dummy scans, `--exclude` with and without dummy scans, int16
+  with a scale factor, a z-concatenated file, a NaN and an infinite sample, two echoes, a shifted
+  mask, abbreviated options) and on fMRIPrep's four curve-fit calls, ds003592's log-linear call and
+  ds003592's with `--verbose` (52,826 curve fits and their variances on ds003592 alone). Two
+  statements were made precise while it was written, from tedana's behaviour as the spec writer
+  analysed it: §6.2's choice between several exemplars sums their thirds, not their means, and
+  §9's per-voxel sums are numpy's `nansum` (NaN as +0 in place, then the pairwise sum); neither
+  changes a case above (no tie between exemplars ranks differently there, and no voxel mixes NaN
+  and numbers over eight or more volumes).
+- `check.py` (relay 8b): §17.3 between two output directories (the command read again from
+  `t2smap_call.sh`, the inputs read again with the model's readers): per output the values
+  compared, the identical ones, those passing by each rule, the failures, the largest use, and
+  with `--details` the first failures.
+- `measure.py` (relay 8b): the runs behind §17.3: per case tedana in the reference setup, in the
+  shared environment, with `--n-threads 4`, with numpy's AVX-512 kernels on, the model and its
+  `fast` variant, each checked against the reference by `check.py`, and the table of the largest
+  uses (§17.3's brackets). 2026-11-08: every run passes; the model bit-identical everywhere.
 
 ## 19. How this text was checked, and open points
 
-(spec writer, 2026-11-08, relay 8a) Written from tedana 26.0.3's source and the replica's
+(spec writer, 2026-11-08, relays 8a and 8b) Written from tedana 26.0.3's source and the replica's
 findings, then checked against `blackbox.py`'s 54 runs of tedana's program (every **(observed)**
-statement) and of the replica in both modes (§18). Not yet checked by a model: §§6–10's
-arithmetic (relay 8b) and the thresholds of §17.3 (provisional).
+statement) and of the replica in both modes, and against the model of §18: §§3–11 as written give
+tedana's files bit for bit on every case of §18, and §17.3's thresholds hold, measured, for
+tedana's own spread and for the kind of implementation §16 allows.
 
 Open points:
-1. **The original's maths notices.** The replica names NP-03 and GLIBC-07 exactly (extra passes,
-   up to four). For the fast original, the orchestrator decides between the same exact rule (the
-   passes cost about three times one pass) and a one-pass rule (named when the other function's
-   value differs on an argument that reaches an output, without establishing that a written value
-   changes).
-2. The thresholds of §17.3, measured in relay 8b.
+1. (Decided 2026-11-08, §15.2.) The original's maths notices: the one-pass rule (NP-03 never
+   named; GLIBC-07 where a written log-linear S0 would differ).
+2. (Done, relay 8b.) The thresholds of §17.3, measured.
 3. fMRIPrep's image (tedana 25.0.1, numpy 2.2.6's blocked sums) is a reference of the final
    comparisons only; no "25" mode.
+4. What the model does not cover, for the original's own suite (§17.2): inputs other than NIfTI-1
+   single files and nilearn's masking path (§4.4); the defects' corrections (larmorx's default,
+   §15); the messages (`blackbox.py`'s report covers them); eight or more echoes (numpy's pairwise
+   sums along the echoes, §13.2); a 4D mask of one volume.

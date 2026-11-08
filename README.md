@@ -105,8 +105,8 @@ lx.save(t1w_n4, "t1w_n4.nii.gz")
 
 ## Supported tools
 
-Implemented and validated against the original programs (ANTs 2.6.5, AFNI 25.2.09, FSL 6.0.7,
-nibabel). Each line links to its validation record; API pages are in [docs/api](docs/api/),
+Implemented and validated against the original programs (ANTs 2.6.5, AFNI 26.3.05, FSL 6.0.7.23,
+nibabel, fMRIPrep's resampler, sdcflows 2.17.1). Each line links to its validation record; API pages are in [docs/api](docs/api/),
 benchmark reports in [docs/benchmarks](docs/benchmarks/).
 The table is generated from [validation/tools.toml](validation/tools.toml) and the records
 (`python -m larmorx_validation tables`). Beside the records, every tool is tested against its
@@ -127,6 +127,7 @@ original with random valid inputs and options, a night at a time
 | antsAI, antsAffineInitializer | `larmorx ants antsAI`, `larmorx ants antsAffineInitializer` | port | [antsAI](docs/validation/ants-ai.md): 76 of 76 compared identical (75 as built, 1 with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](docs/validation/ants-affine-initializer.md): 26 of 26; data panel: [antsAI](docs/validation/ants-ai-panel.md) 40 of 40, [antsAffineInitializer](docs/validation/ants-affine-initializer-panel.md) 14 of 14 |
 | Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [97 cases](docs/validation/ants-atropos.md): 27 of 58 compared bit-identical to ANTs, 58 of 58 with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [3 of 17](docs/validation/ants-atropos-panel.md) as built, 17 of 17 with correctly rounded maths, the classes identical in all |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
+| sdcflows' field-map estimation (the B-spline field fit, the field evaluated and applied, the phase-difference preparation) | `lx.sdcflows.bspline_approx`, `lx.sdcflows.B0FieldTransform`, `lx.sdcflows.apply_coeffs_field`, `lx.sdcflows.phdiff_workflow`, `lx.io.save_nibabel` | port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic) | [37 cases](docs/validation/sdcflows-fieldmap.md): 37 of 37 bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one |
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [282 of 282](docs/validation/afni-tshift.md) compared agree, 180 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [282 of 282](docs/validation/afni-tshift-replica.md) bit-identical |
 | 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [130 cases](docs/validation/afni-automask.md), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [101 of 101](docs/validation/afni-automask-replica.md) compared cases that write outputs bit-identical |
 | 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [129 cases](docs/validation/afni-unifize.md), none failing: 44 of 99 compared cases that write outputs bit-identical to AFNI, the other 55 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [97 of 97](docs/validation/afni-unifize-replica.md) compared cases that write outputs bit-identical at 1, 2 and 6 threads |
@@ -154,7 +155,9 @@ The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
    unwrapping), a replica and a clean-room original (the mcflirt, BET with every option, FLIRT,
    FAST, topup, `fslmaths`, `fslstats`, `standard_space_roi` and `fslroi` replicas and the
    clean-room originals of BET, FLIRT, FAST, topup, `fslmaths` and `fslstats` are done).
-3. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
+3. **sdcflows' field-map estimation, part B** (PEPOLAR's and SyN's steps, sdcflows' masks and
+   command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the
+   phase-difference preparation, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome
    Workbench- and MSM-compatible surface tools, the confounds.
 4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
    fMRIPrep-compatible derivatives and reports out), written in plain Python on the library,

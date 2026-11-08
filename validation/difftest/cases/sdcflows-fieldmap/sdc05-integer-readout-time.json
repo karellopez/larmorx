@@ -1,0 +1,213 @@
+{
+ "defect": "SDC-05",
+ "description": "B0FieldTransform.apply with an integer readout time: larmorx unwarps (sdcflows raises a TypeError from zip over an int; reproduce gives it), SDC-05 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 164,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc05-integer-readout-time",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": true,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 20.0,
+    "seed": 740490011,
+    "spacings": [
+     [
+      100.0,
+      100.0,
+      40.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": -5.0,
+    "jacobian": false,
+    "mode": "reflect",
+    "order": 3,
+    "output_dtype": null,
+    "prefilter": true
+   },
+   "pe_dir": "k",
+   "ro_time": "int 1",
+   "xfm": null
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": true,
+   "call": "apply",
+   "coefficient Hz": 20.0,
+   "content": "ramp",
+   "cval": -5.0,
+   "dtype": "float64",
+   "extreme": false,
+   "jacobian": false,
+   "mode": "reflect",
+   "moving ndim": 3,
+   "order": 3,
+   "orientation": "axes+oblique",
+   "origin0": -50.5,
+   "origin1": 2.5,
+   "origin2": -47.25,
+   "output_dtype": 0,
+   "pe_dir": "k",
+   "prefilter": true,
+   "qfac": -1,
+   "qform_code": 0,
+   "ramp0": 1,
+   "ramp1": -1,
+   "ramp2": 0,
+   "range": "plain",
+   "ro_time": "int 1",
+   "sform": "other",
+   "sform_code": 0,
+   "shape": "15x19x4",
+   "shear0": -0.05,
+   "shear1": 0.05,
+   "shear2": -0.025,
+   "spacing0": 3.0,
+   "spacing1": 1.2,
+   "spacing2": 2.0,
+   "spacings": 2,
+   "target": "aligned",
+   "target shift0": -18.25,
+   "target shift1": -18.75,
+   "target shift2": 11.25,
+   "target spacing0": 1.5,
+   "target spacing1": 1.5,
+   "target spacing2": 2.5,
+   "transform": "none",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1444676645,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -50.5,
+      2.5,
+      -47.25
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      18,
+      -20,
+      24,
+      -22
+     ],
+     "sform": "other",
+     "sform_code": 0,
+     "shear": [
+      -0.05,
+      0.05,
+      -0.025
+     ],
+     "spacing": [
+      3.0,
+      1.2,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     8,
+     18,
+     17
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "direction": [
+      1,
+      -1,
+      0
+     ],
+     "seed": 1904845260,
+     "type": "ramp"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -68.75,
+      -16.25,
+      -36.0
+     ],
+     "qfac": -1,
+     "qform_code": 0,
+     "quaternion": [
+      18,
+      -20,
+      24,
+      -22
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      1.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     15,
+     19,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 164,
+  "options": [
+   "apply",
+   "order 3",
+   "pe k",
+   "target aligned",
+   "transform none"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

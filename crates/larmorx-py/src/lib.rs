@@ -18,6 +18,7 @@ mod ndimage;
 mod nifti;
 mod replica;
 mod resample;
+mod sdcflows;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
@@ -77,5 +78,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ndimage::register(m)?;
     replica::register(m)?;
     resample::register(m)?;
+    sdcflows::register(m)?;
     Ok(())
 }

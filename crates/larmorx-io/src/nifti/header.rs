@@ -10,6 +10,7 @@ use larmorx_core::affine::Affine;
 use larmorx_core::element::DataType;
 use larmorx_core::linalg::{self, Mat3};
 use larmorx_core::rotation;
+use larmorx_transform::numpy_linalg::{self, LapackRelease};
 
 use super::bytes::{FieldReader, FieldWriter};
 use super::datatype;
@@ -201,6 +202,87 @@ pub enum HeaderError {
     ShapeTooLarge(Vec<usize>),
     #[error("the affine cannot be stored in a qform: {0}")]
     BadAffine(&'static str),
+}
+
+/// The qform parameters nibabel 5.4.2's `Nifti1Header.set_qform(affine)` computes, operation
+/// for operation (`nibabel/nifti1.py`, `quaternions.mat2quat`; MIT): the voxel sizes
+/// `√((a0j² + a1j²) + a2j²)`, `R = RZS / zooms`, `qfac = 1` if `numpy.linalg.det(R) > 0` else
+/// -1 (and `R`'s last column negated), the closest rotation `PR = P @ Qs` from
+/// `numpy.linalg.svd(R)`, and the quaternion as `mat2quat` takes it: the eigenvector of the
+/// largest eigenvalue of Bar-Itzhack's `K / 3` (`numpy.linalg.eigh`, lower triangle), reordered
+/// to `(w, x, y, z)` and negated when `w < 0`. numpy's linear algebra is
+/// [`larmorx_transform::numpy_linalg`] (OpenBLAS's Haswell kernels and the given LAPACK
+/// release), so every platform writes the fields nibabel writes on x86-64 Linux.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NibabelQform {
+    pub qfac: f64,
+    pub zooms: [f64; 3],
+    /// `(w, x, y, z)`; the header stores `x, y, z`.
+    pub quaternion: [f64; 4],
+    pub translation: [f64; 3],
+}
+
+/// See [`NibabelQform`]. An affine whose rotation part numpy cannot decompose (a zero or
+/// non-finite voxel axis: nibabel's `HeaderDataError('Could not decompose affine')`) is an
+/// error.
+pub fn nibabel_qform(affine: &Affine, release: LapackRelease) -> Result<NibabelQform, HeaderError> {
+    let m = affine.rows();
+    let zooms: [f64; 3] = std::array::from_fn(|j| {
+        let s = m[0][j] * m[0][j] + m[1][j] * m[1][j];
+        (s + m[2][j] * m[2][j]).sqrt()
+    });
+    let mut r: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| m[i][j] / zooms[j]));
+    let qfac = if numpy_linalg::det3_is_positive(&r) {
+        1.0
+    } else {
+        for row in &mut r {
+            row[2] *= -1.0;
+        }
+        -1.0
+    };
+    let (p, _s, qs) = numpy_linalg::svd3(&r, release).ok_or(HeaderError::BadAffine(
+        "numpy cannot decompose its rotation part",
+    ))?;
+    let pr = numpy_linalg::matmul3(&p, &qs);
+    let quaternion = mat2quat(&pr, release).ok_or(HeaderError::BadAffine(
+        "numpy's eigh does not converge on its rotation",
+    ))?;
+    Ok(NibabelQform {
+        qfac,
+        zooms,
+        quaternion,
+        translation: [m[0][3], m[1][3], m[2][3]],
+    })
+}
+
+/// nibabel's `quaternions.mat2quat(M)` (nibabel 5.4.2, MIT).
+fn mat2quat(mm: &[[f64; 3]; 3], release: LapackRelease) -> Option<[f64; 4]> {
+    let [[qxx, qyx, qzx], [qxy, qyy, qzy], [qxz, qyz, qzz]] = *mm;
+    // The lower half of the symmetric matrix, then `/ 3.0` elementwise (the zeros too).
+    let k = [
+        [qxx - qyy - qzz, 0.0, 0.0, 0.0],
+        [qyx + qxy, qyy - qxx - qzz, 0.0, 0.0],
+        [qzx + qxz, qzy + qyz, qzz - qxx - qyy, 0.0],
+        [qyz - qzy, qzx - qxz, qxy - qyx, qxx + qyy + qzz],
+    ]
+    .map(|row| row.map(|v| v / 3.0));
+    let (vals, vecs) = numpy_linalg::eigh4(&k, release)?;
+    // np.argmax: the first maximum (a NaN wins).
+    let mut best = 0;
+    for i in 1..4 {
+        if vals[best].is_nan() {
+            break;
+        }
+        if vals[i] > vals[best] || vals[i].is_nan() {
+            best = i;
+        }
+    }
+    let mut q = [vecs[3][best], vecs[0][best], vecs[1][best], vecs[2][best]];
+    if q[0] < 0.0 {
+        // `q *= -1`: the same bits as a negation, zeros included.
+        q = q.map(|v| -v);
+    }
+    Some(q)
 }
 
 /// A field that was fixed when the header was read (as nibabel's header checks do).
@@ -834,6 +916,38 @@ impl NiftiHeader {
         self.set_qform(affine, xform::UNKNOWN)
     }
 
+    /// [`set_qform`](Self::set_qform) with nibabel's own arithmetic ([`nibabel_qform`]): the
+    /// quaternion fields, voxel sizes and `qfac` nibabel 5.4.2 writes, for ports of Python
+    /// programs that write headers through nibabel.
+    pub fn set_qform_nibabel(
+        &mut self,
+        affine: &Affine,
+        code: i32,
+        release: LapackRelease,
+    ) -> Result<(), HeaderError> {
+        let q = nibabel_qform(affine, release)?;
+        self.qoffset_x = q.translation[0];
+        self.qoffset_y = q.translation[1];
+        self.qoffset_z = q.translation[2];
+        self.pixdim[0] = q.qfac;
+        self.pixdim[1..4].copy_from_slice(&q.zooms);
+        self.quatern_b = q.quaternion[1];
+        self.quatern_c = q.quaternion[2];
+        self.quatern_d = q.quaternion[3];
+        self.qform_code = code;
+        Ok(())
+    }
+
+    /// [`set_affine`](Self::set_affine) with nibabel's qform arithmetic.
+    pub fn set_affine_nibabel(
+        &mut self,
+        affine: &Affine,
+        release: LapackRelease,
+    ) -> Result<(), HeaderError> {
+        self.set_sform(affine, xform::ALIGNED_ANAT);
+        self.set_qform_nibabel(affine, xform::UNKNOWN, release)
+    }
+
     /// Converts the header to another version, keeping every field the target can store.
     pub fn with_version(&self, version: NiftiVersion) -> Self {
         let mut out = self.clone();
@@ -1012,5 +1126,51 @@ mod tests {
             ByteOrder::Big
         );
         assert_eq!(NiftiHeader::sniff(b"\0\0\0\0"), Err(HeaderError::NotNifti));
+    }
+
+    #[test]
+    fn nibabels_quaternions_with_numpys_lapack() {
+        // nibabel 5.4.2's set_qform on x86-64 with numpy 2.5.4 (LAPACK 3.12.1) and 2.3.5
+        // (3.12.0): a rotation whose exact quaternion has d = 0 keeps a last bit of numpy's SVD.
+        let q = [5.0f64, 3.0, 3.0, 0.0];
+        let n = (q.iter().map(|v| v * v).sum::<f64>()).sqrt();
+        let [w, x, y, z] = q.map(|v| v / n);
+        let r = [
+            [
+                1.0 - 2.0 * (y * y + z * z),
+                2.0 * (x * y - z * w),
+                2.0 * (x * z + y * w),
+            ],
+            [
+                2.0 * (x * y + z * w),
+                1.0 - 2.0 * (x * x + z * z),
+                2.0 * (y * z - x * w),
+            ],
+            [
+                2.0 * (x * z - y * w),
+                2.0 * (y * z + x * w),
+                1.0 - 2.0 * (x * x + y * y),
+            ],
+        ];
+        let a = Affine::from_linear(r, [0.0, 0.0, 0.0]);
+        for (release, d) in [
+            (LapackRelease::V3_12_1, 0x255b_344du32),
+            (LapackRelease::V3_12_0, 0x248b_e45c),
+        ] {
+            let p = nibabel_qform(&a, release).unwrap();
+            let bits = p.quaternion.map(|v| (v as f32).to_bits());
+            assert_eq!(&bits[1..], &[0x3eea_3ce1, 0x3eea_3ce1, d]);
+            assert_eq!(p.qfac, 1.0);
+        }
+        // a signed permutation: exact halves
+        let perm = Affine::from_rows([
+            [0.0, -2.0, 0.0, 10.0],
+            [0.0, 0.0, 3.0, -20.0],
+            [-1.5, 0.0, 0.0, 5.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let p = nibabel_qform(&perm, LapackRelease::V3_12_1).unwrap();
+        assert_eq!(p.quaternion.map(|v| v as f32), [0.5, -0.5, 0.5, 0.5]);
+        assert_eq!(p.zooms, [1.5, 2.0, 3.0]);
     }
 }

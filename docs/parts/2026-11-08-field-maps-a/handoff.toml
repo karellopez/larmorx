@@ -1,0 +1,855 @@
+# HANDOFF.toml of the field maps' part A (sdcflows' port; relay 11, 2026-11-08): the exact changes to the
+# shared documents, applied in order by scripts/orchestration/apply_handoff.py (run from the merged larmorx
+# checkout, with --site <the merged site checkout>); written against a trial merge of the branch with main
+# ec557ff5 and of fmap-a-pages with the site's 69662a86. The reasons are in HANDOFF.md beside this file.
+# Afterwards: `python -m larmorx_validation tables --site <site>`, `register_counts.py`, the evidence summary.
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = "validation = \"[{resample-series.cases} cases](record:resample-series)"
+text = "\n[[tool]]\nid = \"sdcflows-fieldmap\"\ntitle = \"sdcflows' field-map estimation (the B-spline field fit, the field evaluated and applied, the phase-difference preparation)\"\neco = \"larmorx\"\npage = \"/tools/sdcflows-fieldmap/\"\nuse = [\"lx.sdcflows.bspline_approx\", \"lx.sdcflows.B0FieldTransform\", \"lx.sdcflows.apply_coeffs_field\", \"lx.sdcflows.phdiff_workflow\", \"lx.io.save_nibabel\"]\nhow = \"port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic)\"\nvalidation = \"[{sdcflows-fieldmap.cases} cases](record:sdcflows-fieldmap): {sdcflows-fieldmap.pass} of {sdcflows-fieldmap.pass} bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](repo:docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one\""
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = '''
+[[record]]
+id = "resample-series"
+larmorx = "`lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage`"
+reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1 and numpy 2.5.4 (in-process, `oracles/python-newest`; the step from SciPy 1.15.3 and numpy 2.3.5 in every case)"
+status = "`validated`"
+'''
+new = '''
+[[record]]
+id = "resample-series"
+larmorx = "`lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage`"
+reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1 and numpy 2.5.4 (in-process, `oracles/python-newest`; the step from SciPy 1.15.3 and numpy 2.3.5 in every case)"
+status = "`validated`"
+
+[[record]]
+id = "sdcflows-fieldmap"
+larmorx = "`lx.sdcflows` (`crates/larmorx-sdcflows`), `lx.io.save_nibabel`, `lx.io.load_nibabel`"
+reference = "sdcflows 2.17.1 with scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4 and nibabel 5.4.2 (in-process, `oracles/python-newest`, numpy's OpenBLAS on its Haswell kernels; the step from SciPy 1.15.3 and numpy 2.3.5 in every case), and fMRIPrep 25.2.6's own files of five oracle runs"
+status = "`validated`"
+'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "sMRIPrep, sdcflows, nitransforms), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy."
+new = '''
+sMRIPrep, sdcflows, nitransforms; sdcflows' field-map estimation, ported bit for bit in the
+field maps' part A, has its own family, SDC-), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy.'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| ANTSPY-03 | ANTsPy 0.6.3 |"
+text = '''
+| SDC-01 | sdcflows `grid_bspline_weights` | a sampling position beyond the first or the last control point gets SciPy's extrapolated end polynomial, not the cubic B-spline (−3.27 instead of 0.0208 at 1.5 spacings beyond) | c | none (fMRIPrep's reconstructions are evaluated on the field map's grid, inside the knots: 28 of 28 in the oracle runs); sdcflows' own unwarping: up to 70 Hz outside the BOLD mask (ds005040) | rule D measured, then A: the B-spline's value by default (the same bits inside the grid), `reproduce` sdcflows' (field maps part A, 2026-11-08) | – |
+| SDC-02 | sdcflows `grid_bspline_weights` | on a sampling grid rotated relative to the control grid: per-axis weights, each from one index of the voxel (a warning, then a wrong field: 2.3 Hz RMS at 0.5°, 20 Hz at 5°, up to 1,132 Hz) | c | none (fMRIPrep's reconstruction refuses non-aligned grids); sdcflows' own unwarping with fMRIPrep's registrations (rotations of 0.9 to 1.5°): 1.5 to 4.6 Hz RMS, up to 49 Hz, in the brain | rule D measured, then A: the weights at every voxel's own position by default, `reproduce` sdcflows' separable product with its warning (field maps part A, 2026-11-08) | – |
+| SDC-03 | sdcflows `CheckRegister` | the translation test is signed (a large negative shift passes); its critical message prints "{mag_files}" | c, f | none (no oracle run registers two magnitudes) | rule A; the branch (FreeSurfer's `mri_robust_register`) is not ported yet: `NotImplementedError` | switch (with the FreeSurfer part) |
+| SDC-04 | sdcflows `PhaseMap2rads` (`au2rads`) | a constant phase map becomes NaN everywhere (0 / 0), no error | c | none | rule B: a `ValueError` by default, `reproduce` the NaN map (field maps part A, 2026-11-08) | – |
+| SDC-05 | sdcflows `B0FieldTransform.apply` | an integer or numpy float32 readout time fails (`TypeError` in `zip`) | c | none (fMRIPrep passes floats) | rule A: accepted as the float, named; `reproduce` sdcflows' `TypeError` (field maps part A, 2026-11-08) | – |
+| SDC-06 | sdcflows `bspline_grid`, `BSplineApprox` | a field map stored as a 4D image of one volume (as fMRIPrep writes `desc-preproc_fieldmap`) fails with numpy's broadcasting `ValueError` | c | none (fMRIPrep fits 3D maps) | rule A: the first three zooms (several volumes: a clear error), named; `reproduce` sdcflows' error (field maps part A, 2026-11-08) | – |
+| SDC-07 | sdcflows `TOPUPCoeffReorient` | TOPUP's coefficients (a field in Hz) negated for a BIDS `i` direction: the field inverted (r = −0.999 with the true field) | c | none (fMRIPrep passes FSL's letters, never negated) | rule D measured, then A: never negated, named; `reproduce` negates (field maps part A, 2026-11-08) | – |
+| SDC-08 | sdcflows `B0FieldTransform.apply`, `ApplyCoeffsField` | a series read from a file whose axes already run to R, A, S fails (`AttributeError`: numpy's `rollaxis` on nibabel's `ArrayProxy`) | c | none (fMRIPrep uses its own resampler) | rule A: unwarped, named; `reproduce` sdcflows' error (field maps part A, 2026-11-08) | – |
+| SDC-09 | sdcflows `SubtractPhases` | no `EchoTime`: Python's `TypeError` of a comparison with None | c | none | rule B: a `ValueError` naming the metadata; `reproduce` the `TypeError` (field maps part A, 2026-11-08) | – |
+| SDC-10 | sdcflows `B0FieldTransform.fit(approx=True)` (`ApplyCoeffsField`, sdcflows' unwarping workflow) | on a target not aligned with the coefficients the intermediate grid is built around, and resampled at, the target as given: `xfm_data2fmap` is ignored (ds002603's BOLD references: 7.7 to 8.5 Hz RMS, up to 87 Hz, in the brain) | c | none (fMRIPrep uses its own reconstruction) | rule A: built and sampled where the transform puts the target, named; `reproduce` sdcflows' field (field maps part A, 2026-11-08) | – |
+| SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`'s resize to `zooms_min`) | onto a grid of a single voxel it fails with nitransforms' bare `AssertionError` (`assert targets.ndim == 2` after numpy's squeeze of the one target point): a field map whose whole extent is below `zooms_min` cannot be fitted | c | none (fMRIPrep's field maps are larger than `zooms_min`) | rule A: the one voxel resampled and the fit made, named; `reproduce` the `AssertionError` (field maps part A, 2026-11-08: its random-testing trial) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | – | – |"
+new = "| PIPE-14 | sdcflows | `B0FieldTransform.apply` ignores head motion | c | none | ignored with sdcflows' own warning (`lx.sdcflows`, 2026-11-08: a feature sdcflows says it has not enabled; rule C) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+- **What:** `B0FieldTransform.apply` accepts head-motion transforms and silently ignores them.
+- **Evidence:** read: `sdcflows/transform.py:509-524` (`docs/analysis/03`).
+- **fMRIPrep:** none (fMRIPrep applies the field in `ResampleSeries`).
+- **larmorx:** –.
+- **D13 / gap:** no larmorx code. No gap.'''
+new = '''
+- **What:** `B0FieldTransform.apply` accepts head-motion transforms and ignores them, with a
+  warning that says so (sdcflows 2.15.1 and 2.17.1: "Head-motion compensating (realignment)
+  transforms are ignored when applying the unwarp with SDCFlows. This feature will be enabled as
+  soon as unit tests are implemented for its quality assurance.").
+- **Evidence:** read: `sdcflows/transform.py:509-524` (`docs/analysis/03`); validated (the
+  port's `check_apply.py`: the warning and the unwarped series sdcflows').
+- **fMRIPrep:** none (fMRIPrep applies the field in `ResampleSeries`).
+- **larmorx:** `lx.sdcflows.B0FieldTransform.apply` and `apply_coeffs_field` (field maps part A,
+  2026-11-08) ignore them with sdcflows' warning: a feature sdcflows has not enabled yet and says
+  so, kept (rule C); fMRIPrep's head motion is `lx.transforms.resample_series`' job.
+- **D13 / gap:** rule C (kept and documented). No gap.'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |"
+new = "| NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD (`lx.transforms`); numpy's own SVD, as x86-64 Linux computes it, in `lx.sdcflows`' orientation decisions (2026-11-08) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+- **larmorx:** vnl's LINPACK SVD; nibabel's choice on 4,300 of 4,800 such grids (expected
+  divergence).'''
+new = '''
+- **larmorx:** vnl's LINPACK SVD; nibabel's choice on 4,300 of 4,800 such grids (expected
+  divergence). Since 2026-11-08 `lx.sdcflows` decides orientations with
+  `larmorx.io.nibabel_header.io_orientation`, numpy's own SVD replicated (`larmorx_transform::numpy_linalg`:
+  LAPACK 3.12.1 or 3.12.0 on OpenBLAS's Haswell kernels), so it makes nibabel's choice at a tie as
+  numpy makes it on x86-64 Linux, on every platform ([sdcflows-fieldmap.md](sdcflows-fieldmap.md));
+  the resampler's `lx.transforms.ensure_positive_cosines` keeps vnl's (a follow-up in
+  [next-steps](../next-steps.md)).'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| NIB-04 | nibabel | qform precision depends on the platform | d | none | f64 everywhere | – |"
+new = "| NIB-04 | nibabel | qform precision depends on the platform | d | none | f64 everywhere (`lx.load`); x86-64 Linux's extended precision, emulated exactly on every platform, in `lx.io.load_nibabel` (2026-11-08) | – |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+- **larmorx:** f64 everywhere.
+- **D13 / gap:** not D13.'''
+new = '''
+- **larmorx:** f64 everywhere (`lx.load`). `lx.io.load_nibabel` and `lx.io.nibabel_affine`
+  (2026-11-08, for the ports of nibabel-based Python programs, `lx.sdcflows` first) compute it as
+  nibabel does on x86-64 Linux, x87's extended precision emulated in exact rational arithmetic, so
+  every platform gets Linux's bits; and `lx.io.save_nibabel` writes the slope and intercept nibabel
+  computes there ([sdcflows-fieldmap.md](sdcflows-fieldmap.md)).
+- **D13 / gap:** not D13.'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "## FSL: black-box findings (open to everyone)"
+new = '''
+## sdcflows: field-map estimation (SDC-)
+
+sdcflows 2.17.1 (the newest release; fMRIPrep 25.2.6's 2.15.1 is byte-identical on these
+paths), ported bit for bit in `lx.sdcflows` (`crates/larmorx-sdcflows`; the field maps' part A,
+2026-11-08). Apache-2.0: open to everyone. The evidence and the arithmetic behind every entry:
+[sdcflows-fieldmap.md](sdcflows-fieldmap.md). No defect of numpy, SciPy, scikit-learn or
+OpenBLAS was found on these paths (NP-, SCI- and SKL- IDs unused); the LAPACK 3.12.0 → 3.12.1 step
+between numpy 2.3.5 and 2.5.4 changes nibabel's quaternions, a change of release recorded in the
+findings, not a defect. PIPE-14 (head motion ignored by `apply`, with sdcflows' warning) stays
+under fMRIPrep's libraries above.
+
+### SDC-01 Weights beyond the control grid continue the end polynomial — (c)
+- **What:** `grid_bspline_weights` evaluates `BSpline(arange(-3, K + 3), eye(K + 2), 3)` with
+  SciPy's extrapolation, whose base interval is `[0, K - 1]`: a sampling position beyond the
+  first or the last control point (within distance 2 of a kept knot) gets the end interval's
+  polynomial continued: knot 0's weight at -0.5 is 0.354 instead of 0.479, at -1.5 -3.27
+  instead of 0.0208, at -1.75 -5.08 instead of 0.0026.
+- **Evidence:** read (`sdcflows/transform.py`, `grid_bspline_weights`); validated
+  (`check_weights.py`: sdcflows' matrix reproduced bit for bit, the corrected one equal to
+  sdcflows' construction with the knots continued); measured (`measure_sdc01_02.py`).
+- **fMRIPrep:** none: its `ReconstructFieldmap` evaluates the weights on the target only when
+  the projected target is aligned with the coefficients, which none of the 28 reconstructions of
+  the oracle runs is; the field map's own grid lies inside the knots. sdcflows' own unwarping
+  (`ApplyCoeffsField`) reaches it: ds005040's BOLD reference has 9,049 voxels (5.5 %) beyond
+  TOPUP's grid, all outside the brain mask, where the field differs by up to 70 Hz; ds002603's
+  intermediate grids have 19 % of their positions beyond (by up to 380 Hz), none under a BOLD
+  voxel.
+- **larmorx:** rule D, measured: A. The cubic B-spline's value by default (the same recursion
+  on the knots continued beyond the grid; inside `[0, K - 1]` the original's own intervals, so
+  the same bits), named where a weight changes; `reproduce` gives sdcflows' weights
+  (`lx.sdcflows.grid_bspline_weights`, `collocation_matrix`, `B0FieldTransform`,
+  `apply_coeffs_field`, `bspline_approx`; 2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-02 A rotated sampling grid gets separable weights — (c)
+- **What:** on a sampling grid rotated relative to the control grid, `grid_bspline_weights`
+  warns "Image's and B-Spline's grids are not aligned." and still multiplies per-axis weights,
+  each computed from one index of the voxel with the others at 0, which is not the field at the
+  voxel. On ds005454's field (427 Hz at most) on its own grid rotated about its centre, against
+  the field at every voxel's position: 0.23 Hz RMS (4 Hz at most) at 0.05°, 2.3 (40) at 0.5°,
+  9.1 (158) at 2°, 20 (345) at 5°, 39 (1,132) at 45°. sdcflows' own approximation
+  (`approx=True`) stays within 0.13 Hz of the exact field.
+- **Evidence:** read; measured (`measure_sdc01_02.py`, part 2); validated (`check_weights.py`:
+  the reproduced matrix and warning are sdcflows', the corrected matrix equals an independent
+  numpy construction bit for bit).
+- **fMRIPrep:** none: its reconstruction refuses a grid not aligned with the coefficients
+  ("Reference passed is not aligned with spline grids"). sdcflows' own unwarping reaches it
+  (`ApplyCoeffsField`, `B0FieldTransform.fit`): without a transform, with `approx=False`, and
+  on the projected grid of an aligned target whenever the registration rotates: with
+  fMRIPrep's registrations of the oracle runs' BOLD references (0.89 to 1.50°), 1.5 to 4.6 Hz
+  RMS, up to 49 Hz, inside the brain mask (ds002422 x3, ds005040, ds005454;
+  `measure_sdc01_02.py`, part 2b); on ds005454's real `ApplyCoeffsField` call with fMRIPrep's
+  registration the field differs by 3.65 Hz RMS (31 Hz at most) in the brain (the site's page).
+- **larmorx:** rule D, measured: A. The weights at every voxel's own position by default (its
+  coordinates by nibabel's `apply_affine`, each axis' weights rounded to the matrix type, the
+  products `(w0 * w1) * w2`, up to 64 per voxel), named; `reproduce` gives sdcflows' matrix and
+  warning (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-03 `CheckRegister`'s signed translation test — (c), (f)
+- **What:** two magnitude images whose affines differ are registered with FreeSurfer's
+  `mri_robust_register --auto_sens`; the registration is refused when a rotation exceeds
+  `rot_thresh` or a translation component exceeds `trans_thresh`, but the test is
+  `vec > trans_thresh` on the signed components, so a large negative shift is never too big.
+  The critical message's first part lacks its f-prefix and prints "{mag_files}".
+- **Evidence:** read (`sdcflows/interfaces/fmap.py`, `CheckRegister._run_interface`).
+- **fMRIPrep:** none in the oracle runs (no estimator with two magnitudes of different affines).
+- **larmorx:** the branch needs FreeSurfer's registration and is not ported:
+  `lx.sdcflows.check_register` raises `NotImplementedError` there.
+- **D13 / gap:** switch: rule A (|components| and the message's names) with the FreeSurfer part.
+
+### SDC-04 A constant phase map becomes NaN — (c)
+- **What:** `au2rads` (`PhaseMap2rads`) rescales `(d - min) * 2π / (max - min)`: a constant map
+  gives 0 / 0, NaN everywhere, with only numpy's `RuntimeWarning`.
+- **Evidence:** validated (`check_phase.py`).
+- **fMRIPrep:** none (a real phase map is not constant).
+- **larmorx:** rule B: a `ValueError` by default; `reproduce` gives the NaN map with sdcflows'
+  warning (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-05 An integer or float32 readout time fails — (c)
+- **What:** `B0FieldTransform.apply` wraps `ro_time` in a list only when it is a Python `float`;
+  an `int` or a numpy `float32` reaches `zip` and fails with a `TypeError`.
+- **Evidence:** validated (`check_apply.py`: sdcflows' `TypeError` texts reproduced).
+- **fMRIPrep:** none (it passes floats; it uses its own resampler).
+- **larmorx:** rule A: accepted as the float, named; `reproduce` gives sdcflows' `TypeError`
+  (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-06 A 4D field map of one volume fails — (c)
+- **What:** `bspline_grid` divides the affine's columns by `img.header.get_zooms()`, every
+  zoom: a field map stored as `(X, Y, Z, 1)`, as fMRIPrep writes its `desc-preproc_fieldmap`
+  (9 of 9 in the oracle runs), fails with numpy's broadcasting `ValueError`, and `BSplineApprox`
+  with it. (Header zooms against the affine's voxel sizes: equal on all 34 field-map images of
+  the oracle runs, kept, rule C.)
+- **Evidence:** read; validated (`check_weights.py`: the error text; `probe_header_zooms.py`).
+- **fMRIPrep:** none (it fits 3D field maps).
+- **larmorx:** rule A: the first three zooms (a field map of several volumes: a clear error),
+  named; `reproduce` gives sdcflows' error (`bspline_grid`, `bspline_approx`; 2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-07 `TOPUPCoeffReorient` inverts the field for a BIDS `i` direction — (c)
+- **What:** `_fix_topup_fieldcoeff` negates TOPUP's coefficients when the phase-encoding
+  direction, reoriented to RAS, is written `i`, never for FSL's `x`. TOPUP's coefficients are a
+  field in Hz, which a left-right flip does not negate: on synthetic left-right blips with a
+  known field the negated field correlates r = -0.999 with the truth (RMS 55 Hz), the kept one
+  r = +0.999 (0.9 Hz), in LAS and RAS.
+- **Evidence:** measured (`measure_sdc_g.py`; TOPUP through `lx.fsl.topup`, whose coefficients
+  equal FSL's: `probe_sdc07_topup.py`); validated (`check_coeffs.py`).
+- **fMRIPrep:** none (it passes FSL's letters).
+- **larmorx:** rule D, measured: A. Never negated, named; `reproduce` negates (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-08 A positive-axes series from a file fails — (c)
+- **What:** `B0FieldTransform.apply` (and `ApplyCoeffsField`) on a series whose axes already run
+  to R, A and S, read from a file: no reorientation happens, numpy's `rollaxis` receives
+  nibabel's `ArrayProxy`, which has no `transpose`: `AttributeError` (also with fMRIPrep's
+  sdcflows 2.15.1 and numpy 2.2.6).
+- **Evidence:** validated (`check_apply.py`).
+- **fMRIPrep:** none (it uses its own resampler).
+- **larmorx:** rule A: unwarped, named; `reproduce` gives the `AttributeError` (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-09 `SubtractPhases` without `EchoTime` — (c)
+- **What:** `subtract_phases` pops `EchoTime` from each map's metadata and orders the maps by
+  it: a missing one is `None`, and the comparison fails with Python's `TypeError`.
+- **Evidence:** validated (`check_phase.py`).
+- **fMRIPrep:** none (BIDS phase1/phase2 maps carry `EchoTime`).
+- **larmorx:** rule B: a `ValueError` that names the missing metadata; `reproduce` gives the
+  `TypeError` (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-10 The approximation ignores the data-to-field-map transform — (c)
+- **What:** `B0FieldTransform.fit(target, xfm_data2fmap, approx=True)` (the default of
+  `ApplyCoeffsField` and of sdcflows' unwarping workflow) on a target not aligned with the
+  coefficients builds its intermediate grid with `deoblique_and_zooms(coeffs[-1],
+  target_reference)` (the target as given, not the projected reference) and resamples it at the
+  target's own coordinates: the field is taken where the target lies before the registration.
+  On ds002603's two oblique BOLD references (registrations to the field map of 2.5 and 3.7 mm):
+  7.7 and 8.5 Hz RMS, up to 87 Hz, inside the brain mask, against the field where the transform
+  puts them; ds005454's reference rotated 5° with a 4 mm transform: 11 Hz RMS, up to 232 Hz.
+- **Evidence:** read (`sdcflows/transform.py`, `B0FieldTransform.fit`); measured
+  (`measure_sdc01_02.py`, part 3); validated (the reproduced field is sdcflows' bit for bit,
+  `check_b0field.py`).
+- **fMRIPrep:** none (it reconstructs fields with its own `ReconstructFieldmap`).
+- **larmorx:** rule A: the grid built around, and sampled at, the target where the transform
+  puts it, named whenever the transform is not the identity; `reproduce` gives sdcflows' field
+  (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-11 A resize onto a single voxel fails — (c)
+- **What:** `resample_to_zooms(in_file, zooms)` (sdcflows' `utils/tools.py`, used by
+  `BSplineApprox` when a voxel size is below `zooms_min`) builds the new grid with
+  `np.rint(shape * zooms / new_zooms)` voxels and resamples with nitransforms' `Affine.apply`,
+  which squeezes the target points and asserts they are 2-D: a grid of a single voxel (a field
+  map whose whole extent is below `zooms_min`) raises a bare `AssertionError`, so the fit cannot
+  be made.
+- **Evidence:** found by the random-testing trial of 2026-11-08 (10 of its 14 differences,
+  smallest a 4 x 4 x 4 field map at 1 mm with `zooms_min` 4; the triage's permanent case
+  `sdc11-resize-onto-a-single-voxel`); read (`nitransforms/resampling.py`, `apply`).
+- **fMRIPrep:** none (its field maps are much larger than `zooms_min`).
+- **larmorx:** rule A: the one voxel resampled and the fit made, named; `reproduce` gives the
+  `AssertionError` (2026-11-08).
+- **D13 / gap:** done.
+
+## FSL: black-box findings (open to everyone)'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "**Counts** (421 entries, recounted from the table on 2026-11-08, after 3dvolreg's clean-room original part (no new entry; AFNI-100 to AFNI-110 unused)"
+new = "**Counts** (432 entries, recounted from the table on 2026-11-08, after the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| (c) deterministic bug that changes results | 205 | 10 |"
+new = "| (c) deterministic bug that changes results | 216 | 10 |"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "kept, rule C); one rule 8; no **original**"
+new = '''
+kept, rule C); one rule 8; **switch** for SDC-03 (with the FreeSurfer part: `CheckRegister`'s
+registration branch is not ported yet); no **original**'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "Fifteen entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f),"
+new = "Sixteen entries have a second class: ANTS-12, FSL-03 and SDC-03 (f), ANTS-24 (f),"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+-twopass`). No new defect was found (AFNI-100 to AFNI-110 unused).
+'''
+new = '''
+-twopass`). No new defect was found (AFNI-100 to AFNI-110 unused).
+**The sdcflows port** (`crates/larmorx-sdcflows`, `lx.sdcflows`, 2026-11-08; sdcflows 2.17.1,
+[sdcflows-fieldmap.md](sdcflows-fieldmap.md)): SDC-01 to SDC-11 (SDC-12 to SDC-30 unused), each
+with `reproduce` (sdcflows' result bit for bit): corrected by default SDC-01, -02 and -07 (rule D
+measured, then A), SDC-05, -06, -08, -10 and -11 (rule A); a clear error by default SDC-04 and
+SDC-09 (rule B); SDC-03 (rule A) with the FreeSurfer part, whose `mri_robust_register` its branch
+runs (gap **switch**). Kept and documented, without an ID (rule C): `CheckB0Units`' rad/s map
+re-quantised into the input's stored type by nibabel's writer, the header's zooms against the
+affine's (equal on every oracle field map); PIPE-14 (`apply`'s head-motion transforms ignored with
+sdcflows' own warning) kept too. No numpy, SciPy, scikit-learn or OpenBLAS defect was found on
+these paths.
+'''
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| SCI-03 | SciPy `ndimage` |"
+text = '''
+| SDC-01 | sdcflows `grid_bspline_weights` | `lx.sdcflows.grid_bspline_weights`, `collocation_matrix`, `B0FieldTransform`, `apply_coeffs_field`, `bspline_approx` | a sampling position beyond the first or the last control point gets SciPy's extrapolated end polynomial (−3.27 instead of 0.0208 at 1.5 spacings beyond) | the cubic B-spline's weight (the same bits inside the grid), named where a weight changes |
+| SDC-02 | sdcflows `grid_bspline_weights` | the same | a sampling grid rotated relative to the control grid gets per-axis weights, each from one index of the voxel (with a warning): up to the field's own size wrong | the weights at every voxel's own position (up to 64 control points), named |
+| SDC-04 | sdcflows `PhaseMap2rads` | `lx.sdcflows.au2rads`, `phdiff_workflow` | a constant phase map becomes NaN everywhere | a `ValueError` |
+| SDC-05 | sdcflows `B0FieldTransform.apply` | `lx.sdcflows.B0FieldTransform.apply`, `apply_coeffs_field` | an integer or numpy float32 readout time fails (`TypeError`) | accepted as the float, named |
+| SDC-06 | sdcflows `bspline_grid`, `BSplineApprox` | `lx.sdcflows.bspline_grid`, `bspline_approx` | a 4D field map of one volume fails (numpy's broadcasting `ValueError`) | the first three zooms, named (several volumes: a clear error) |
+| SDC-07 | sdcflows `TOPUPCoeffReorient` | `lx.sdcflows.topup_coeff_reorient` | TOPUP's coefficients are negated for a BIDS `i` direction, which inverts the field | never negated, named |
+| SDC-08 | sdcflows `B0FieldTransform.apply`, `ApplyCoeffsField` | `lx.sdcflows.B0FieldTransform.apply`, `apply_coeffs_field` | a series read from a file whose axes already run to R, A, S fails (`AttributeError`) | unwarped, named |
+| SDC-09 | sdcflows `SubtractPhases` | `lx.sdcflows.subtract_phases`, `phdiff_workflow` | no `EchoTime`: Python's `TypeError` of a comparison with None | a `ValueError` naming the metadata |
+| SDC-10 | sdcflows `B0FieldTransform.fit` | `lx.sdcflows.B0FieldTransform.fit`/`apply`, `apply_coeffs_field` | with `approx` on a target not aligned with the coefficients, the data-to-field-map transform is ignored (the field taken where the target lies before the registration) | the approximation built and sampled where the transform puts the target, named |
+| SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`) | `lx.sdcflows.resample_to_zooms`, `bspline_approx` | a resize onto a grid of a single voxel fails with nitransforms' bare `AssertionError` | the voxel resampled and the fit made, named |'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+([afni-volreg-original.md](../validation/afni-volreg-original.md)).
+'''
+new = '''
+([afni-volreg-original.md](../validation/afni-volreg-original.md)).
+`lx.sdcflows` (the port of sdcflows 2.17.1, 2026-11-08) has the switch for SDC-01, -02 and -04 to
+-11: by default the corrections above, with `upstream_defects="reproduce"` sdcflows' result bit for
+bit (its warnings and errors included; [sdcflows-fieldmap.md](sdcflows-fieldmap.md#upstream-defects-d13)).
+SDC-03 (`CheckRegister`'s signed translation test) has no switch yet: its branch runs FreeSurfer's
+`mri_robust_register`, which `lx.sdcflows.check_register` refuses until the FreeSurfer part.
+'''
+
+[[op]]
+do = "insert"
+file = "upstream.tsv"
+after = "OpenBLAS-0.3.34\t"
+text = '''
+sdcflows-2.17.1	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflows-2.17.1.tar.gz	sha256:0365de256edd71481ab49497ee6c8c6688f4a99f4eb11819d4770e95630e5614	Apache-2.0	tags
+sdcflows-2.15.1	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflows-2.15.1.tar.gz	sha256:a7776211cdcfbab018f4e16ccd96fd9bd504e205a616051815efbf6ebfaafe05	Apache-2.0	tags
+scikit-learn-1.9.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.9.1.tar.gz	sha256:629cada3e33e2b9bf376cdc7614a47a4140b8aedc1d836579e359736fbd82977	BSD-3-Clause	tags
+scikit-learn-1.6.1	https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit_learn-1.6.1.tar.gz	sha256:b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e	BSD-3-Clause	tags
+scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags'''
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = '''
+| fMRIPrep | Apache-2.0 | `master` → `21a490fb89ac` (the workspace clone; the venv runs it as 26.0.0.dev1+g21a490fb8) | – | the one-shot BOLD resampler (`fmriprep/interfaces/resampling.py`, `utils/transforms.py`) in `larmorx_transform::resample_series` and `larmorx.transforms.resample_series` |
+'''
+new = '''
+| fMRIPrep | Apache-2.0 | `master` → `21a490fb89ac` (the workspace clone; the venv runs it as 26.0.0.dev1+g21a490fb8) | – | the one-shot BOLD resampler (`fmriprep/interfaces/resampling.py`, `utils/transforms.py`) in `larmorx_transform::resample_series` and `larmorx.transforms.resample_series` |
+| sdcflows | Apache-2.0 | `2.17.1`, the newest release (PyPI sdist, SHA-256 `0365de256edd…`, `<workspace>/tags/sdcflows-2.17.1`) | 2.15.1 (fMRIPrep 25.2.6's image; sdist SHA-256 `a7776211cdcf…`, `tags/sdcflows-2.15.1`): byte-identical on these paths | the field-map estimation of the field maps' part A (`transform.py`, `interfaces/bspline.py`, `interfaces/fmap.py`, `utils/phasemanip.py`, `utils/tools.py`, `workflows/fit/fieldmap.py`) in `larmorx_sdcflows` and `larmorx.sdcflows` (2026-11-08) |
+| scikit-learn | BSD-3-Clause | `1.9.1` (PyPI sdist, SHA-256 `629cada3e33e…`, `tags/scikit-learn-1.9.1`) | 1.6.1 (fMRIPrep 25.2.6's image; sdist SHA-256 `b4fc2525eca2…`, `tags/scikit-learn-1.6.1`): `_solve_sparse_cg` and the solver's choice identical | `Ridge(fit_intercept=False)` on a sparse float32 matrix (`sparse_cg`), the fit sdcflows' `BSplineApprox` runs, in `larmorx_sdcflows::ridge` (2026-11-08) |
+'''
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = "| SciPy | BSD-3-Clause | `v1.15.2` → `0f1fd4a7268b`, **and 1.18.1** (sdist SHA-256 `52c4b7422442…`, `<workspace>/tags/scipy-1.18.1`; followed since 2026-10-29: the reflect initialisation, `docs/findings/scipy-ndimage.md`) | 1.15.2 (fMRIPrep's lockfile, `pixi.lock`) | `scipy.ndimage` spline interpolation (`map_coordinates`, `spline_filter`) in `larmorx_interp::ndimage`; the development venv runs 1.15.3, whose `ndimage` interpolation code is identical (checked 2026-10-10) |"
+new = "| SciPy | BSD-3-Clause | `v1.15.2` → `0f1fd4a7268b`, **and 1.18.1** (sdist SHA-256 `52c4b7422442…`, `<workspace>/tags/scipy-1.18.1`; followed since 2026-10-29: the reflect initialisation, `docs/findings/scipy-ndimage.md`) | 1.15.2 (fMRIPrep's lockfile, `pixi.lock`) | `scipy.ndimage` spline interpolation (`map_coordinates`, `spline_filter`) in `larmorx_interp::ndimage`; the development venv runs 1.15.3, whose `ndimage` interpolation code is identical (checked 2026-10-10); since 2026-11-08 also `scipy.sparse` (`kron`, `hstack`, the CSR and CSC products), `sparse.linalg.cg`, `interpolate.BSpline`'s de Boor evaluation and `stats.mode` as sdcflows reaches them (`larmorx_sdcflows`; 1.18.1, identical on these paths in 1.15.3, whose sdist is `tags/scipy-1.15.3`, SHA-256 `eae3cf522bc7…`) |"
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = "| OpenBLAS | BSD-3-Clause | `v0.3.30` release tarball, SHA-256 `27342cff5186` (tag `v0.3.30` → `993fad6aebbc`); 0.3.34 (numpy 2.5.4's scipy-openblas64 0.3.34.106.0; tarball SHA-256 `cd7e12986832…`): the same kernels, checked 2026-10-29 | – (fMRIPrep's numpy calls the OpenBLAS its wheel bundles; numpy 2.3.5's is scipy-openblas64 0.3.30) | the operation order of the Haswell kernels behind numpy's 4×4 `@`/`dot` (`dgemm`, `dgemv`) and `np.linalg.inv` (`dgesv`: `getf2_k`, `getrs`, the triangular solves, `idamax`), reproduced in `larmorx_transform::openblas` so that `lx.transforms` gives the same bits on every platform (docs/findings/numpy-blas.md) |"
+new = "| OpenBLAS | BSD-3-Clause | `v0.3.30` release tarball, SHA-256 `27342cff5186` (tag `v0.3.30` → `993fad6aebbc`); 0.3.34 (numpy 2.5.4's scipy-openblas64 0.3.34.106.0; tarball SHA-256 `cd7e12986832…`): the same kernels, checked 2026-10-29 | – (fMRIPrep's numpy calls the OpenBLAS its wheel bundles; numpy 2.3.5's is scipy-openblas64 0.3.30) | the operation order of the Haswell kernels behind numpy's 4×4 `@`/`dot` (`dgemm`, `dgemv`) and `np.linalg.inv` (`dgesv`: `getf2_k`, `getrs`, the triangular solves, `idamax`), reproduced in `larmorx_transform::openblas` so that `lx.transforms` gives the same bits on every platform (docs/findings/numpy-blas.md); since 2026-11-08 also `sdot`'s Haswell kernel (numpy's float32 `dot`: `larmorx_sdcflows::blas`) and the reference LAPACK routines 0.3.34 (LAPACK 3.12.1) and 0.3.30 (LAPACK 3.12.0) bundle that numpy's `svd`, `eigh` and `det` of 3 × 3 and 4 × 4 matrices reach, with their BLAS kernels (`larmorx_transform::numpy_linalg`: nibabel's quaternions and orientations) |"
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = "| numpy | BSD-3-Clause | 2.3.5 (development venv; sdist SHA-256 `784db1dcdab5`), and 2.5.4 (sdist SHA-256 `9a94cf751c9a…`; checked 2026-10-29: no change on the paths larmorx follows) | which BLAS and LAPACK routine each 4×4 operation calls and with which memory layout (`numpy/_core/src/umath/matmul.c.src`, `_core/src/common/cblasfuncs.c`, `linalg/umath_linalg.cpp`); read, not translated |"
+new = "| numpy | BSD-3-Clause | 2.3.5 (development venv; sdist SHA-256 `784db1dcdab5`), and 2.5.4 (sdist SHA-256 `9a94cf751c9a…`; checked 2026-10-29: no change on the paths larmorx follows) | which BLAS and LAPACK routine each 4×4 operation calls and with which memory layout (`numpy/_core/src/umath/matmul.c.src`, `_core/src/common/cblasfuncs.c`, `linalg/umath_linalg.cpp`); read, not translated; since 2026-11-08 the float32 `dot`, `median`, `mean` (its pairwise sum) and `linalg.svd`, `eigh`, `det` paths sdcflows and nibabel reach are followed operation by operation (`larmorx_sdcflows`, `larmorx_transform::numpy_linalg`) |"
+
+[[op]]
+do = "edit"
+file = "UPSTREAM.md"
+old = "| nibabel | MIT | 5.4.2 (development venv); fMRIPrep's image has 5.3.2 | NIfTI reading/writing semantics (`larmorx-io`), parity oracle |"
+new = "| nibabel | MIT | 5.4.2 (development venv); fMRIPrep's image has 5.3.2 | NIfTI reading/writing semantics (`larmorx-io`), parity oracle; its scaled array writer (`arraywriters.py`, `volumeutils.py`) and header arithmetic (`nifti1.py`'s `set_qform`/`get_qform`, `quaternions.py`, `orientations.io_orientation`) ported in `lx.io.save_nibabel`, `load_nibabel` and `larmorx.io.nibabel_header` (2026-11-08) |"
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) - BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.'''
+new = '''
+SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
+(scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
+scipy/sparse/linalg: cg; scipy/interpolate: BSpline's de Boor evaluation; scipy/stats: mode, in
+crates/larmorx-sdcflows) - BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+OpenBLAS 0.3.30 (the operation order of its Haswell dgemm, dgemv and dgesv paths for 4x4
+matrices: products and inverses as numpy computes them) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+new = '''
+OpenBLAS 0.3.30 (the operation order of its Haswell dgemm, dgemv and dgesv paths for 4x4
+matrices: products and inverses as numpy computes them) and OpenBLAS 0.3.34 (since 2026-11-08:
+the Haswell sdot kernel, in crates/larmorx-sdcflows/src/blas.rs; the BLAS kernels and getrf
+path of numpy's svd, eigh and det of 3x3 and 4x4 matrices, in
+crates/larmorx-transform/src/numpy_linalg.rs) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+nitransforms 25.1.0 (coordinate mapping, transform chains, ITK transform loading) - MIT License
+'''
+new = '''
+sdcflows 2.17.1 (sdcflows/transform.py, interfaces/bspline.py, interfaces/fmap.py,
+utils/phasemanip.py, utils/tools.py, workflows/fit/fieldmap.py: the field-map estimation, translated
+into Rust in crates/larmorx-sdcflows and into Python in python/larmorx/sdcflows/, since 2026-11-08)
+- Apache License, Version 2.0
+  sdcflows
+  Copyright 2021 The NiPreps Developers <nipreps@gmail.com>
+
+  We support and encourage derived works from this project, please read about our expectations at
+  https://www.nipreps.org/community/licensing/
+
+scikit-learn 1.9.1 (sklearn/linear_model/_ridge.py and _base.py: Ridge with the sparse_cg solver,
+its validation messages; crates/larmorx-sdcflows/src/ridge.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2007-2026 The scikit-learn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * Neither the name of the copyright holder nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+numpy 2.5.4 (the float32 dot product, median, mean and its pairwise sum, and the paths of
+numpy.linalg's svd, eigh and det; crates/larmorx-sdcflows and
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+      * Redistributions of source code must retain the above copyright
+         notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above
+         copyright notice, this list of conditions and the following
+         disclaimer in the documentation and/or other materials provided
+         with the distribution.
+
+      * Neither the name of the NumPy Developers nor the names of any
+         contributors may be used to endorse or promote products derived
+         from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+LAPACK 3.12.1 and 3.12.0, as OpenBLAS 0.3.34 and 0.3.30 bundle them (lapack-netlib/SRC: dgesdd,
+dgebrd, dgebd2, dbdsdc, dlasdq, dbdsqr, dormbr, dormqr, dormlq, dorm2r, dorml2, dsyevd, dsytrd,
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08) - modified BSD licence
+  Copyright (c) 1992-2023 The University of Tennessee and The University
+                          of Tennessee Research Foundation.  All rights
+                          reserved.
+  Copyright (c) 2000-2023 The University of California Berkeley. All
+                          rights reserved.
+  Copyright (c) 2006-2023 The University of Colorado Denver.  All rights
+                          reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  - Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  - Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer listed
+    in this license in the documentation and/or other materials
+    provided with the distribution.
+
+  - Neither the name of the copyright holders nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+  The copyright holders provide no reassurances that the source code
+  provided does not infringe any patent, copyright, or any other
+  intellectual property rights of third parties.  The copyright holders
+  disclaim any liability to any recipient for claims brought against
+  recipient by any third party for infringement of that parties
+  intellectual property rights.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+nitransforms 25.1.0 (coordinate mapping, transform chains, ITK transform loading) - MIT License
+'''
+
+[[op]]
+do = "edit"
+file = "NOTICE"
+old = '''
+nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine) - MIT License
+'''
+new = '''
+nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine; since 2026-11-08 also the scaled
+array writer of arraywriters.py and volumeutils.py, nifti1.py's set_qform and get_qform,
+quaternions.py and orientations.io_orientation, in python/larmorx/io/nibabel_writer.py,
+nibabel_header.py and crates/larmorx-io) - MIT License
+'''
+
+[[op]]
+do = "insert"
+file = "docs/licensing.md"
+after = "| CORE-MATH, nibabel | MIT |"
+text = '''
+| sdcflows (the NiPreps developers; its field-map estimation) | Apache-2.0 | ✓ main package since 2026-11-08 (`crates/larmorx-sdcflows`, `lx.sdcflows`: an exact port of sdcflows 2.17.1, the field maps' part A; the notice in `NOTICE`) | not needed for the licence; a later clean-room original of every program (the user, 2026-11-06), in another crate |
+| scikit-learn, SciPy, numpy, OpenBLAS and the reference LAPACK OpenBLAS bundles (their arithmetic on the paths the ports reach: `Ridge`'s `sparse_cg`, `cg`, `BSpline`, sparse products, `ndimage`, numpy's reductions, `sdot`, `svd`, `eigh`, `det`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`; the notices in `NOTICE`) | not needed |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "[`tests/golden/registry.py`](../../tests/golden/registry.py): 246 cases, 1,863 outputs"
+new = "[`tests/golden/registry.py`](../../tests/golden/registry.py): 262 cases, 2,053 outputs"
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+'''
+new = '''
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+The main package's checksums were recorded on 2026-11-08 from 14ff7709 (the field maps' part A,
+relay 8; the parity smoke tier passing: 2,880 tests): 16 cases added, `io.save_nibabel`,
+`io.load_nibabel` and fourteen `py.sdcflows.*` (below; 190 outputs, about 1.9 s together,
+`py.sdcflows.bspline_approx` the longest, 0.94 s), every other checksum unchanged; its later
+commits (the stored collocation matrix at one thread only, 3c9c10af) change no checksum. No
+output of these cases is a NaN (SDC-04's NaN map hashed as where its NaNs are: NaN bits differ
+between processors), and paths in messages are replaced by names.
+'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "| I/O (`lx`, `lx.io`) | 4 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel` |"
+new = '''
+| I/O (`lx`, `lx.io`) | 6 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel`; nibabel's scaled writer (`lx.io.save_nibabel`: a float image with a NaN and an infinity written in its int16 header's type, slope and intercept from the x87-precision path; `nibabel_stored`'s uint8 scaling) and header arithmetic (`lx.io.load_nibabel`: an oblique qform stored as nibabel's `set_qform` stores it and read back as its `get_qform` reads it; `nibabel_affine`'s base affine of a header without codes) |
+| `lx.sdcflows` | 14 | the control grid and B-spline weights (fMRIPrep's spacing and the default, a 4D header of one volume (SDC-06), float32 and float64, a LAS target, two levels, the corrected weights beyond the grid (SDC-01) and on a rotated target (SDC-02), with `reproduce` sdcflows' weights and warning); the weights as a SciPy CSR array; scikit-learn's ridge solver (the normal equations, an iteration limit, alpha 0, the kernel system, two messages); `bspline_approx` (fMRIPrep's call with its files, the mean and two grids, the mode without a mask, a resize, an int16 field map, a failed fit); the tools (`resample_to_zooms`, `rescale_affine`, `deoblique_and_zooms`, `reorient_pedir`); `B0FieldTransform` (the field on its own grid and a LAS series, unwarping along `j` with the Jacobian and an int16 series along `i-`, a rotating transform with and without the approximation, SDC-10 and SDC-02 corrected; with `reproduce` sdcflows' fields and SDC-05's error) and its displacements; the coefficients (TOPUP's on a LAS reference with FSL's `y` and BIDS' `i` (SDC-07), a wrong shape, `TransformCoefficients`, `ApplyCoeffsField` both ways; `reproduce`'s negation); the displacement fields (ITK and RAS+, `DisplacementsField2Fieldmap` demeaned); the phase-difference preparation (radians, one and two phases with their metadata, echo-time messages, Hz, rad/s, `CheckRegister`'s copied affine and shape mismatch, SDC-04 and SDC-09 corrected; with `reproduce` sdcflows' NaN map and `TypeError`); `phdiff_workflow` with PRELUDE's clean-room original |'''
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "`lx.mri`, `lx.transforms`, `lx.ndimage`, `lx.io` and `lx`,"
+new = "`lx.mri`, `lx.transforms`, `lx.ndimage`, `lx.io`, `lx.sdcflows` (since 2026-11-08) and `lx`,"
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "| `resample-series` | `parity.resample_series` |"
+text = "| `sdcflows-fieldmap` | `parity.sdcflows_fieldmap` (one call per case through the investigation's comparators, larmorx in `reproduce`; the originals' step; the D13 fix pass, SCI-02's padding notice accepted without a change in `apply`'s; the permanent cases in `validation/difftest/cases/sdcflows-fieldmap/` (28)) | port vs sdcflows 2.17.1 (in-process) | `BSplineApprox` (field maps 3D or 4D of one volume, float32, float64 and scaled int16, masks, spacings, ridge alpha, recentring, extrapolation, `zooms_min`), `B0FieldTransform.fit` and `apply` (own, aligned and rotated targets; no, identity and rigid transforms; the approximation; every stored type, phase-encoding direction, readout time, the Jacobian, spline order, mode, `cval`, prefilter, negative values, output type), `TOPUPCoeffReorient`, the displacement fields, the phase preparation |"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+(6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
+   then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);'''
+new = '''
+(6) the field maps' part A (sdcflows: the B-spline fit and evaluation with the phase-difference
+   preparation; **done** 2026-11-08: an exact port of sdcflows 2.17.1 in `lx.sdcflows`, every compared case of its
+   record bit-identical to sdcflows (37 of 37), fMRIPrep's seven phase-difference estimators and their B-spline
+   fits included, also against fMRIPrep's own files; SDC-01 to SDC-11; the fit 6.5 to 7.8 times scikit-learn's
+   speed at 14 threads with 22 to 32 % of sdcflows' peak memory; with it nibabel's scaled writer and header
+   arithmetic in `lx.io`; follow-ups below); (7) part B (PEPOLAR's and SyN's Python steps, sdcflows' masks,
+   niworkflows' helpers, `init_fmap_wf` complete, fMRIPrep's own field-map steps; last, sdcflows' command line);'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
+   the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;'''
+new = '''
+8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
+   the B-spline fit, PEPOLAR and phase-difference preparation; part A done 2026-11-08, `lx.sdcflows`) and
+   fMRIPrep's own Python steps; with FreeSurfer's `mri_robust_register`, `lx.sdcflows.check_register`'s
+   two-magnitude branch (a `NotImplementedError` until then) and SDC-03's switch (rule A);'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''
+- **From the field maps' part A (sdcflows' port, 2026-11-08; eleven relays;
+  [findings](findings/sdcflows-fieldmap.md), record [sdcflows-fieldmap](validation/sdcflows-fieldmap.md),
+  [benchmarks](benchmarks/sdcflows-fieldmap.md), [API](api/sdcflows-fieldmap.md)).** Done in the part besides
+  the port: nibabel's scaled writer and header arithmetic in `larmorx.io` (`lx.io.save_nibabel`,
+  `load_nibabel`, `nibabel_affine`, `larmorx.io.nibabel_header`, with numpy's `svd`, `eigh` and `det` of
+  small matrices replicated for LAPACK 3.12.0 and 3.12.1 in `larmorx_transform::numpy_linalg`), for
+  fMRIPrep's other Python steps to write through. Left:
+  - *Part B* (next): PEPOLAR's and SyN's Python steps, sdcflows' masks (`brain_masker`), niworkflows'
+    helpers, `init_fmap_wf` complete (the magnitude preparation: `IntraModalMerge`,
+    `init_brainextraction_wf`; part A takes the magnitude reference and mask as inputs), fMRIPrep's own
+    field-map steps (`ReconstructFieldmap`), and last sdcflows' command line (its BIDS app; the
+    orchestrator, 2026-11-08). `check_b0_units` (direct field maps) is ported; its workflow comes with
+    part B.
+  - *With FreeSurfer:* `lx.sdcflows.check_register`'s two-magnitude branch (FreeSurfer's
+    `mri_robust_register --auto_sens`) and SDC-03's switch (item 8).
+  - *The resampler's orientation:* `lx.transforms.ensure_positive_cosines` (fMRIPrep's resampler) decides
+    axes with vnl's SVD, `lx.sdcflows` with numpy's own (`larmorx.io.nibabel_header.io_orientation`): a
+    rotation with two equal axis candidates may pick another axis in the resampler (NP-02). Measure on the
+    resampler's records first; follow numpy's SVD there if they stay identical.
+  - *Speed:* the stored collocation matrix's one-thread fit slows after sdcflows, nipype, scikit-learn and
+    numpy have run in the same process (ds001600's fits 2.5 s in a fresh process, 3.3 to 5.7 s after
+    them; not glibc's mmap threshold; the benchmark's footnote 1): find the cause before larmorprepx runs
+    these fits in a long-lived process. The stored matrix's transpose (`Collocation::store` with several
+    threads) is used by no fit since 3c9c10af (several threads evaluate the weights at every product),
+    only by tests: drop it, or keep it for the clean-room original's measurements.
+  - *The clean-room original* (the user, 2026-11-06), in another crate (never `larmorx-sdcflows`), from a
+    spec of sdcflows' behaviour; its implementer reads neither sdcflows' source nor this port. Room for
+    speed: the aligned grids' Kronecker structure (per-axis products instead of 64-entry rows), SIMD with
+    runtime dispatch.
+  - *The final validation phase:* the data panel's other field maps (ds005752's direct field map is not
+    linked to its BOLD runs; the PEPOLAR runs with part B), random testing at length (the trial: 335,471
+    cases in half an hour), sdcflows' own unwarping on the panel's series (SDC-02 measured at 1.5 to
+    4.6 Hz RMS in the brain with fMRIPrep's registrations).
+  - *The harness:* three tests of `validation/tests` fail only under pytest-xdist (serially, as the gates
+    run them, all pass): the oracle cache's `test_above_one_thread_a_run_is_served_after_three_identical_runs`
+    and `test_exit_status_and_failures_are_cached` (`-n 8`), and random testing's
+    `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on` (`-n 12`, a night in a box of its
+    own beside eleven workers); this part did not touch their code. The first memory run's two oracle-cache disputes (nipype's INFO lines carried time stamps; keys
+    `fac9bd9a…` and `ba61bf75…`, under the memory script's old key and never served again) stay in the
+    cache's `findings.jsonl`, as the cache's rule says.
+  - *The site's checks:* its viewer check passes a viewer that draws nothing: the page's three estimator
+    examples drew no image (their default view named comparisons without images, so the viewer's `render`
+    threw inside its animation frame), fixed in the exporter, which now refuses such a default. The site's
+    own `checkViewers` should check that every viewer drew, on every page
+    (`validation/investigations/sdcflows-fieldmap/site_checks.sh`'s `drawn`: every viewer loaded and no
+    canvas left at the browser's default 300 × 150).'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''
+| I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`, following SciPy 1.18.1 and numpy 2.5.4 since 2026-10-29: records in `oracles/python-newest`, `--python newest`) | `nifti-io`, `itk-hdf5`, `resample-series` |
+'''
+new = '''
+| I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`, following SciPy 1.18.1 and numpy 2.5.4 since 2026-10-29: records in `oracles/python-newest`, `--python newest`) | `nifti-io`, `itk-hdf5`, `resample-series` |
+| Field maps (ports) | sdcflows' field-map estimation, part A (2026-11-08): the B-spline field fit (`BSplineApprox` with scikit-learn's ridge regression), the field evaluated and applied (`B0FieldTransform`, `ApplyCoeffsField`), the coefficients' interfaces and the phase-difference preparation (`init_phdiff_wf` with `lx.fsl.prelude`): an exact port of sdcflows 2.17.1 (`lx.sdcflows`, `crates/larmorx-sdcflows`), `validated` in the newest Python environment with the step from the shared one; nibabel's scaled writer and header arithmetic (`lx.io.save_nibabel`, `load_nibabel`) | `sdcflows-fieldmap` |
+'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''
+output names of 228 to 255 bytes in every AFNI original). Next: the
+field maps, FreeSurfer,'''
+new = '''
+output names of 228 to 255 bytes in every AFNI original). The field maps' part A (2026-11-08: sdcflows 2.17.1's B-spline field fit, the field evaluated and applied and the phase-difference preparation, an exact port in `lx.sdcflows`; every compared case bit-identical to sdcflows, fMRIPrep's seven phase-difference estimators included, also against fMRIPrep's own files; the fit 6.5 to 7.8 times scikit-learn's speed at 14 threads). Next: the
+field maps' part B, FreeSurfer,'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+Implemented and validated against the original programs (ANTs 2.6.5, AFNI 25.2.09, FSL 6.0.7,
+nibabel).'''
+new = '''
+Implemented and validated against the original programs (ANTs 2.6.5, AFNI 26.3.05, FSL 6.0.7.23,
+nibabel, fMRIPrep's resampler, sdcflows 2.17.1).'''
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''
+3. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
+   Workbench- and MSM-compatible surface tools, the confounds.'''
+new = '''
+3. **sdcflows' field-map estimation, part B** (PEPOLAR's and SyN's steps, sdcflows' masks and
+   command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the
+   phase-difference preparation, is done), **FreeSurfer** (`larmorx-freesurfer`), Connectome
+   Workbench- and MSM-compatible surface tools, the confounds.'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = "and 3dvolreg's replica (2026-11-07) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): 3dvolreg's clean-room original, the field maps (two parts),"
+new = "and 3dvolreg's replica (2026-11-07), its clean-room original and the field maps' part A (sdcflows' port, 2026-11-08) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the field maps' part B,"
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+   - AFNI 26.3.05 (since 2026-10-29, both implementations; 25.2.09 kept for the step between the two)
+'''
+new = '''
+   - AFNI 26.3.05 (since 2026-10-29, both implementations; 25.2.09 kept for the step between the two)
+   - sdcflows 2.17.1 (since 2026-11-08, `lx.sdcflows`; 2.15.1, fMRIPrep 25.2.6's, kept for the final comparisons) with scikit-learn 1.9.1 (1.6.1, fMRIPrep's); SciPy 1.15.3's sdist for the shared environment's step
+'''
+
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = '''
+## 2026-11-08: The field maps' part A, sdcflows' port (the orchestrator's decisions and the rules)
+- **sdcflows' command line** (its BIDS app, `sdcflows bids_dir output_dir participant`): ported at the end
+  of part B, once the workflows it runs exist (full completeness: every tool's original command line); part
+  A's interfaces have none, as the resampler's (nipype interfaces have no program or original arguments).
+- **nibabel's writer in `larmorx.io`:** `lx.io.save_nibabel` (nibabel 5.4.2's scaled array writer, its
+  extended-precision slope and intercept emulated exactly, so every platform writes Linux's bits), not in
+  `lx.sdcflows`; fMRIPrep's other Python steps (part B, larmorprepx) write through it too. **nibabel's header
+  arithmetic stays nibabel-specific:** the quaternions nibabel writes (`mat2quat`, numpy's `svd` and `eigh`)
+  and the affine of a qform-only image as nibabel reads it (`lx.io.load_nibabel`, `nibabel_affine`); `lx.load`,
+  `lx.save` and the ITK path unchanged, so no other tool's record or golden checksum moved.
+- **The two Python environments' record** as the resampler's: the record made in the newest environment, the
+  originals' step from the shared one per case (`python_versions.STEP_SUITES`); numpy 2.3.5 to 2.5.4's LAPACK
+  3.12.0 to 3.12.1 named as the reason where nibabel's quaternions or an orientation tie change (4 of the 37
+  cases).
+- **The stored collocation matrix** (the port must not be slower than sdcflows at one thread): stored at one
+  thread, where it is 1.09 to 1.14 times faster than scikit-learn in a fresh process, within the memory rule;
+  with several threads the weights evaluated at every product (faster there: the stored matrix's products are
+  bound by memory bandwidth); `low_memory=True` for the on-the-fly path at one thread; the same bits every way.
+- **`check_register`'s two-magnitude branch** (FreeSurfer's `mri_robust_register`) waits for FreeSurfer: a
+  clear `NotImplementedError` until then, SDC-03's switch with it.
+- **By the rules (A to D), without asking:** SDC-01, -02 and -07 measured (D), then corrected by default (A);
+  SDC-05, -06, -08, -10 and -11 corrected (A); SDC-04 and SDC-09 a clear error (B); SDC-03 (A) with
+  FreeSurfer; kept and documented (C): `CheckB0Units`' re-quantisation into the input's type, the header's
+  zooms against the affine's, and PIPE-14 (`apply`'s head-motion transforms ignored with sdcflows' own
+  warning: a feature sdcflows has not enabled).
+- **Left unchanged in this part:** `lx.transforms.ensure_positive_cosines` (the resampler's vnl SVD; a
+  follow-up, measured on the resampler's records first); the first memory run's two oracle-cache disputes
+  stay in the cache's findings.'''
+
+[[op]]
+do = "insert"
+file = "site:site.yml"
+after = "      summary: \"fMRIPrep's ResampleSeries, with nitransforms' chains and SciPy's interpolation. Port.\" }"
+text = '''
+  - { title: "sdcflows' field-map estimation", url: "/tools/sdcflows-fieldmap/", eco: larmorx,
+      summary: "sdcflows' B-spline field fit, the field evaluated and applied, and the phase-difference preparation: a port of sdcflows 2.17.1, fMRIPrep's seven phase-difference estimators bit for bit, the fit 6.5 to 7.8 times faster at 14 threads. Port." }'''
+
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = "    text: sdcflows' field-map estimation, FreeSurfer (`larmorx-freesurfer`), Connectome Workbench- and MSM-compatible surface tools, the confounds."
+new = "    text: sdcflows' field-map estimation, part B (PEPOLAR's and SyN's steps, sdcflows' masks and command line, fMRIPrep's own field-map steps; part A, the B-spline fit, the field and the phase-difference preparation, is done), FreeSurfer (`larmorx-freesurfer`), Connectome Workbench- and MSM-compatible surface tools, the confounds."
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 1 | **Field maps** | sdcflows' field-map estimation: the B-spline fit, reversed phase encoding (PEPOLAR) and phase difference | Planned |"
+new = "| 1 | **Field maps** | sdcflows' field-map estimation: part A, the B-spline fit, the field evaluated and applied and the phase-difference preparation, is done ([its page](/tools/sdcflows-fieldmap/)); part B: reversed phase encoding (PEPOLAR), the SyN-based estimate, sdcflows' masks and command line, fMRIPrep's own field-map steps | Part A done; part B next |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+| Completed | Step |
+|---|---|
+'''
+new = '''
+| Completed | Step |
+|---|---|
+| 2026-11-08 | **Field maps, part A: sdcflows' field-map estimation.** The steps fMRIPrep runs, through sdcflows, to turn a gradient-echo field map into the smooth field that corrects susceptibility distortion, ported bit for bit from sdcflows 2.17.1 (the newest release; fMRIPrep 25.2.6 runs 2.15.1, the same code on these paths) with the arithmetic of the libraries under it (scikit-learn's ridge regression, SciPy's conjugate gradients, B-splines and sparse matrices, numpy's reductions over OpenBLAS's kernels, nibabel's scaled writer and header arithmetic): the phase difference to radians and, after PRELUDE, to Hz, the field map's cubic B-spline fit, the field evaluated on other grids and a series unwarped with it, every option, message and failure case; every output, file, header, warning and message bit-identical to sdcflows' in every case of its record (37 of 37), fMRIPrep's seven phase-difference estimators on four oracle runs included, whose own files it matches, at any thread count; eleven defects of sdcflows found (SDC-01 to SDC-11), each corrected by default or refused with a clear error and reproduced on request; the fit 6.5 to 7.8 times faster than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory. [The page](/tools/sdcflows-fieldmap/) |
+'''

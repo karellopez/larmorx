@@ -1,0 +1,200 @@
+{
+ "defect": null,
+ "description": "BSplineApprox with an empty mask after a resize: numpy's median of no values is x86's default NaN (sign bit set), so the error map is that NaN (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "bspline_approx: every output bit-identical: 0 inside, 0 iterations; differ: ['error-bytes']",
+  "n": 48,
+  "seed": "sdc-try",
+  "shrink_moves": [],
+  "signature": [
+   "bspline_approx: every output bit-identical"
+  ]
+ },
+ "id": "nan-sign-of-an-empty-mask",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ],
+     [
+      16.0,
+      16.0,
+      10.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": "median",
+    "ridge_alpha": 0.0001,
+    "zooms_min": 1.0
+   }
+  },
+  "features": {
+   "4D of one volume": false,
+   "axis0": 0.8,
+   "axis1": 1.05,
+   "axis2": 1.0,
+   "bs_spacing": 3,
+   "call": "bspline_approx",
+   "centre0": 1.0,
+   "centre1": 1.0,
+   "centre2": 1.0,
+   "content": "labels",
+   "dtype": "float32",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 1.0,
+   "labels": 5,
+   "mask": true,
+   "orientation": "axes+oblique",
+   "origin0": 24.25,
+   "origin1": 3.75,
+   "origin2": 18.5,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "recenter": "median",
+   "ridge_alpha": 0.0001,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "4x11x13",
+   "size": 24.5,
+   "spacing0": 1.5,
+   "spacing1": 0.5,
+   "spacing2": 0.5,
+   "units": "mm",
+   "zooms_min": 1.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 608051878,
+     "type": "noise"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      24.25,
+      3.75,
+      18.5
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      11,
+      3,
+      5,
+      -9
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     11,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mask": {
+    "content": {
+     "axes": [
+      0.8,
+      1.05,
+      1.0
+     ],
+     "centre": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "n": 5,
+     "seed": 1426201215,
+     "size": 24.5,
+     "type": "labels"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      24.25,
+      3.75,
+      18.5
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      11,
+      3,
+      5,
+      -9
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     11,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 48,
+  "options": [
+   "2 level(s)",
+   "alpha 0.0001",
+   "bspline_approx",
+   "extrapolate",
+   "mask",
+   "recenter median",
+   "zooms_min 1.0"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

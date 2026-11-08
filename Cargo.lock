@@ -359,6 +359,7 @@ dependencies = [
  "larmorx-interp",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-sdcflows",
  "larmorx-transform",
  "numpy",
  "pyo3",
@@ -372,6 +373,17 @@ dependencies = [
  "larmorx-image",
  "larmorx-interp",
  "larmorx-io",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
+name = "larmorx-sdcflows"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-interp",
+ "larmorx-transform",
  "rayon",
  "thiserror",
 ]

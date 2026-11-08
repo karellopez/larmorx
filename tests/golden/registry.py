@@ -1037,6 +1037,7 @@ NAMESPACES = (
     "lx.transforms",
     "lx.ndimage",
     "lx.io",
+    "lx.sdcflows",
     "lx",
 )
 
@@ -1205,6 +1206,66 @@ def _(ctx: Context) -> dict[str, Any]:
         "float32": lx.load(path, dtype=np.float32).data,
         "unscaled": lx.load(path, scaled=False).data,
         "resaved.gz": File(resaved),
+    }
+
+
+@case("io.save_nibabel", covers=("lx.io.save_nibabel", "lx.io.nibabel_stored"))
+def _(ctx: Context) -> dict[str, Any]:
+    """nibabel's scaled writer: a float image (NaN and an infinity included) written in its
+    int16 header's type (slope and intercept from the x87-precision path), and the stored
+    values of a uint8 scaling without writing."""
+    data = (anat().data.astype(np.float32) * np.float32(0.37)) - np.float32(41.5)
+    data[0, 0, 0] = np.nan
+    data[1, 0, 0] = np.inf
+    header = NiftiHeader.from_dict(
+        _core.nifti_header_for_image(list(data.shape), "int16", anat().affine, None, None)
+    )
+    path = ctx.out("scaled.nii.gz")
+    lx.io.save_nibabel(lx.Image(data, anat().affine, header), path, n_threads=2)
+    stored, slope, inter = lx.io.nibabel_stored(bold().data[..., 0], np.uint8)
+    return {
+        "file": Nifti(path),
+        "file.gz": File(path),
+        "stored": stored,
+        "scale": np.array([slope, inter]),
+    }
+
+
+@case("io.load_nibabel", covers=("lx.io.load_nibabel", "lx.io.nibabel_affine"))
+def _(ctx: Context) -> dict[str, Any]:
+    """nibabel's header arithmetic: an oblique qform (the rotation of the rational quaternion
+    (2, 1, -1, 3), exact rationals) stored as nibabel's set_qform stores it (numpy's SVD and
+    eigh replicated), read back as nibabel's get_qform reads it (x87 extended precision); the
+    base affine of a header without codes (its -0.0 translations)."""
+    from larmorx.io.nibabel_header import header_for_image
+
+    w, x, y, z = 2.0, 1.0, -1.0, 3.0
+    n2 = w * w + x * x + y * y + z * z
+    rot = (
+        np.array(
+            [
+                [n2 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                [2 * (x * y + z * w), n2 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                [2 * (x * z - y * w), 2 * (y * z + x * w), n2 - 2 * (x * x + y * y)],
+            ]
+        )
+        / n2
+    )
+    aff = np.eye(4)
+    aff[:3, :3] = rot * np.array([2.5, 2.0, 3.0])
+    aff[:3, 3] = [-90.0, 12.5, 33.0]
+    data = anat().data.astype(np.float32)
+    fields = header_for_image(data.shape, "float32", aff)
+    fields.update(qform_code=1, sform_code=0)
+    path = ctx.out("qform-only.nii")
+    _core.nifti_write(str(path), data, fields, 1, 1)
+    img = lx.io.load_nibabel(path)
+    base = dict(fields, qform_code=0, sform_code=0)
+    return {
+        "file": File(path),
+        "affine": np.asarray(img.affine),
+        "data": img.data,
+        "base_affine": lx.io.nibabel_affine(NiftiHeader.from_dict(base)),
     }
 
 
@@ -5818,4 +5879,580 @@ def _(ctx: Context) -> dict[str, Any]:
         "stdout": r.stdout,
         "complex_unwrapped": c.unwrapped.data,
         "complex_labels": c.labels.data,
+    }
+
+
+# --- sdcflows' field-map estimation (lx.sdcflows, crates/larmorx-sdcflows) -------------------
+
+#: The field-map grid of the ``lx.sdcflows`` cases (axis-aligned, 3 × 3 × 3.5 mm).
+SHAPE_FMAP = (20, 18, 12)
+#: fMRIPrep's control-point spacing (sdcflows' ``DEFAULT_HF_ZOOMS_MM``).
+SDC_HF = (16.0, 16.0, 10.0)
+
+
+def _sdc_affine(
+    shape: tuple[int, ...] = SHAPE_FMAP,
+    las: bool = False,
+    centre: tuple[float, float, float] = (0.5, -1.0, 2.0),
+) -> np.ndarray:
+    a = affine(shape, (3.0, 3.0, 3.5), centre, oblique=False)
+    if las:
+        a[0, :] = -a[0, :]
+    return a
+
+
+def _sdc_values(shape: tuple[int, ...], seed: int) -> np.ndarray:
+    """A smooth field in Hz (a product, a square and a ramp of the centred indices) with seeded
+    noise in quarter steps (float32, exact)."""
+    c = _centred(shape)
+    v = c[0] * c[1] * 0.25 - c[2] * c[2] * 0.5 + c[0] * 3.0 + ints(seed, shape, 0, 17) * 0.25
+    return np.asfortranarray(v.astype(np.float32))
+
+
+@functools.cache
+def sdc_field() -> lx.Image:
+    """The field map (float32, Hz) on ``SHAPE_FMAP``."""
+    return _frozen(lx.Image(_sdc_values(SHAPE_FMAP, 31), _sdc_affine()))
+
+
+@functools.cache
+def sdc_coeffs() -> lx.Image:
+    """B-spline coefficients on the field map's control grid (fMRIPrep's spacing)."""
+    g = lx.sdcflows.bspline_grid(sdc_field(), SDC_HF)
+    data = ((ints(32, tuple(g.shape), 0, 81) - 40) * 1.5).astype(np.float32)
+    return _frozen(lx.Image(np.asfortranarray(data), np.asarray(g.affine)))
+
+
+def _sdc_files(ctx: Context) -> dict[str, str]:
+    """The cases' inputs as files: the field map, its mask (uint8), the coefficients, a 4D
+    series (float32) and a 3D int16 image with scaling on the field map's grid, and a LAS
+    float32 series."""
+    head = ellipsoid(SHAPE_FMAP, 9, 10)
+    brain = phantom(SHAPE_FMAP, 33).astype(np.float32)
+    series = np.stack([brain, brain * np.float32(1.25), brain + np.float32(7)], -1)
+    files = {
+        "fmap.nii.gz": (sdc_field().data, sdc_field().affine),
+        "mask.nii.gz": (head.astype(np.uint8), _sdc_affine()),
+        "coeff.nii.gz": (sdc_coeffs().data, sdc_coeffs().affine),
+        "bold.nii.gz": (np.asfortranarray(series), _sdc_affine()),
+        "bold_las.nii.gz": (np.asfortranarray(series), _sdc_affine(las=True)),
+    }
+    out = {}
+    for name, (data, aff) in files.items():
+        path = ctx.out(name)
+        lx.save((data, aff), path)
+        out[name.split(".")[0]] = path
+    i16 = np.asfortranarray((phantom(SHAPE_FMAP, 34) * 3).astype(np.int16))
+    fields = header_for(i16, _sdc_affine()).replace(scl_slope=0.5, scl_inter=-2.0).to_dict()
+    out["i16"] = ctx.out("i16.nii")
+    _core.nifti_write(out["i16"], i16, fields, 2, 1)
+    return out
+
+
+def _sdc_xfm(path: str) -> str:
+    """An ITK affine text file (a rotation with rational cosines and a shift), as ANTs writes
+    one, for ``transform_coefficients`` and ``apply_coeffs_field``."""
+    r = _mat3(
+        [[12 / 13, -5 / 13, 0.0], [5 / 13, 12 / 13, 0.0], [0.0, 0.0, 1.0]], np.eye(3).tolist()
+    )
+    params = " ".join(repr(float(v)) for v in [*(x for row in r for x in row), 1.5, -2.0, 0.75])
+    Path(path).write_text(
+        "#Insight Transform File V1.0\n#Transform 0\nTransform: AffineTransform_float_3_3\n"
+        f"Parameters: {params}\nFixedParameters: 0 0 0\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _sdc_warned(fn: Callable[[], Any]) -> tuple[Any, str]:
+    """``fn()`` and the warnings it gave (larmorx's notices by their entry), one per line."""
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        out = fn()
+    return out, "\n".join(
+        getattr(x.message, "entry", None) or f"{x.category.__name__}: {x.message}" for x in w
+    )
+
+
+def _sdc_error(fn: Callable[[], Any]) -> str:
+    try:
+        fn()
+    except Exception as e:  # the message is the output
+        return f"{type(e).__name__}: {e}"
+    return "no error"
+
+
+def _csr_outputs(name: str, m: Any) -> dict[str, Any]:
+    return {
+        f"{name}.data": m.data,
+        f"{name}.indices": m.indices,
+        f"{name}.indptr": m.indptr,
+        f"{name}.shape": np.array(m.shape),
+    }
+
+
+@case(
+    "py.sdcflows.weights",
+    covers=(
+        "lx.sdcflows.bspline_grid",
+        "lx.sdcflows.grid_bspline_weights",
+        "lx.sdcflows.collocation_matrix",
+        "lx.sdcflows.CsrMatrix.toarray",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' control grid and B-spline weights: the grid of fMRIPrep's spacing and the
+    default one (a 4D header of one volume: its first three zooms, SDC-06), the weights in
+    float32 and float64, a LAS target, two levels side by side, and the corrected weights of a
+    target beyond the control grid (SDC-01) and of a rotated one (SDC-02); a small matrix
+    dense."""
+    fmap = sdc_field()
+    g = lx.sdcflows.bspline_grid(fmap, SDC_HF)
+    g2 = lx.sdcflows.bspline_grid(fmap)
+    four, notices4 = _sdc_warned(
+        lambda: lx.sdcflows.bspline_grid((fmap.data[..., None], fmap.affine), SDC_HF)
+    )
+    levels = [(g.shape, g.affine), (g2.shape, g2.affine)]
+    las = (np.zeros(SHAPE_FMAP, np.float32), _sdc_affine(las=True))
+    larger = (np.zeros((26, 22, 16), np.float32), _sdc_affine((26, 22, 16)))
+    rotated = (np.zeros((14, 12, 8), np.float32), affine((14, 12, 8), (3.0, 3.0, 3.5)))
+    beyond, n1 = _sdc_warned(lambda: lx.sdcflows.grid_bspline_weights(larger, g, n_threads=2))
+    exact, n2 = _sdc_warned(lambda: lx.sdcflows.grid_bspline_weights(rotated, g, n_threads=2))
+    small = lx.sdcflows.collocation_matrix((np.zeros((5, 4, 3), np.float32), _sdc_affine((5, 4, 3))),
+                                           [(g.shape, g.affine)])  # fmt: skip
+    return {
+        **image_outputs("grid", g, geometry=True),
+        **image_outputs("grid_default", g2, geometry=True),
+        "grid_4d.affine": np.asarray(four.affine),
+        "grid_4d.shape": np.array(four.shape),
+        "notices": f"{notices4}\n{n1}\n{n2}",
+        **_csr_outputs("weights", lx.sdcflows.grid_bspline_weights(fmap, g, n_threads=2)),
+        **_csr_outputs("weights64", lx.sdcflows.grid_bspline_weights(fmap, g, "float64")),
+        **_csr_outputs("las", lx.sdcflows.grid_bspline_weights(las, g)),
+        **_csr_outputs("levels", lx.sdcflows.collocation_matrix(fmap, levels, n_threads=3)),
+        **_csr_outputs("beyond", beyond),
+        **_csr_outputs("rotated", exact),
+        "dense": small.toarray(),
+    }
+
+
+@case("py.sdcflows.weights.reproduce", covers=())
+def _(ctx: Context) -> dict[str, Any]:
+    """The weights with ``reproduce`` (D13): beyond the control grid, sdcflows' extrapolated
+    polynomial pieces (SDC-01); a rotated target, sdcflows' separable product with its
+    warning (SDC-02)."""
+    g = lx.sdcflows.bspline_grid(sdc_field(), SDC_HF)
+    larger = (np.zeros((26, 22, 16), np.float32), _sdc_affine((26, 22, 16)))
+    rotated = (np.zeros((14, 12, 8), np.float32), affine((14, 12, 8), (3.0, 3.0, 3.5)))
+    beyond, n1 = _sdc_warned(
+        lambda: lx.sdcflows.grid_bspline_weights(larger, g, upstream_defects=REPRODUCE)
+    )
+    product, n2 = _sdc_warned(
+        lambda: lx.sdcflows.grid_bspline_weights(rotated, g, upstream_defects=REPRODUCE)
+    )
+    return {**_csr_outputs("beyond", beyond), **_csr_outputs("rotated", product),
+            "notices": f"{n1}\n{n2}"}  # fmt: skip
+
+
+@case("py.sdcflows.csr_scipy", covers=("lx.sdcflows.CsrMatrix.to_scipy",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The weights as a SciPy CSR array (needs SciPy): only the arrays larmorx gives it."""
+    import pytest
+
+    pytest.importorskip("scipy")
+    g = lx.sdcflows.bspline_grid(sdc_field(), SDC_HF)
+    return _csr_outputs("scipy", lx.sdcflows.grid_bspline_weights(sdc_field(), g).to_scipy())
+
+
+@case("py.sdcflows.ridge", covers=("lx.sdcflows.ridge_sparse_cg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """scikit-learn's ``Ridge(fit_intercept=False)`` with its sparse_cg solver: the normal
+    equations of the field map's collocation matrix, a limit on the iterations, alpha 0, and
+    the kernel system of a matrix wider than tall; the messages of a negative alpha and of a
+    length mismatch."""
+    g = lx.sdcflows.bspline_grid(sdc_field(), SDC_HF)
+    x = lx.sdcflows.collocation_matrix(sdc_field(), [(g.shape, g.affine)])
+    y = np.ascontiguousarray(sdc_field().data).reshape(-1)
+    wide = lx.sdcflows.collocation_matrix((np.zeros((3, 3, 2), np.float32), _sdc_affine((3, 3, 2))),
+                                          [(g.shape, g.affine)])  # fmt: skip
+    out: dict[str, Any] = {}
+    for name, m, yy, kw in [
+        ("normal", x, y, {"alpha": 1e-4}),
+        ("max_iter", x, y, {"alpha": 1e-4, "max_iter": 3}),
+        ("alpha0", x, y, {"alpha": 0.0}),
+        ("kernel", wide, np.arange(18, dtype=np.float32) - 8.5, {"alpha": 1e-2}),
+    ]:
+        r = lx.sdcflows.ridge_sparse_cg(m, yy, **kw, n_threads=2)
+        out[f"{name}.coef"] = r.coef
+        out[f"{name}.state"] = f"{r.intercept} {r.info} {r.n_iter} {r.system}"
+    out["errors"] = "\n".join(
+        [
+            _sdc_error(lambda: lx.sdcflows.ridge_sparse_cg(x, y, alpha=-1.0)),
+            _sdc_error(lambda: lx.sdcflows.ridge_sparse_cg(x, y[:-1])),
+        ]
+    )
+    return out
+
+
+def _approx_outputs(name: str, r: Any, files: bool) -> dict[str, Any]:
+    out: dict[str, Any] = {f"{name}.state": f"{r.center!r} {r.n_inside} {r.n_iter} {r.intercept}"}
+    if files:
+        out[f"{name}.field"] = Nifti(os.fspath(r.out_field))
+        out[f"{name}.error"] = Nifti(os.fspath(r.out_error))
+        for i, c in enumerate(r.out_coeff):
+            out[f"{name}.coeff{i}"] = Nifti(os.fspath(c))
+        if r.out_extrapolated is not None:
+            out[f"{name}.extra"] = Nifti(os.fspath(r.out_extrapolated))
+    else:
+        out[f"{name}.field"] = r.field.data
+        out[f"{name}.error"] = r.error.data
+        for i, c in enumerate(r.coefficients):
+            out[f"{name}.coeff{i}"] = c.data
+        out[f"{name}.extra"] = "none" if r.extrapolated is None else r.extrapolated.data
+    return out
+
+
+@case("py.sdcflows.bspline_approx", covers=("lx.sdcflows.bspline_approx",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' ``BSplineApprox``: fMRIPrep's call (median, a mask, extrapolation) with its
+    files; the mean and two control grids without extrapolation in memory; the mode of a
+    quantised field without a mask; no recentring with a resize (``zooms_min``); an int16 field
+    map (its error map scaled into int16, as nibabel writes it); a failed fit's message."""
+    f = _sdc_files(ctx)
+    a = lx.sdcflows.bspline_approx(f["fmap"], f["mask"], out_dir=ctx.out("a"), n_threads=2)
+    b = lx.sdcflows.bspline_approx(f["fmap"], f["mask"], [(40.0, 40.0, 20.0), (30.0, 30.0, 20.0)],
+                                   recenter="mean", extrapolate=False)  # fmt: skip
+    q = (np.round(sdc_field().data * np.float32(0.25)) * np.float32(4)).astype(np.float32)
+    c = lx.sdcflows.bspline_approx((np.asfortranarray(q), sdc_field().affine), recenter="mode")
+    d = lx.sdcflows.bspline_approx(f["fmap"], f["mask"], recenter=False, zooms_min=4.0)
+    e = lx.sdcflows.bspline_approx(f["i16"], f["mask"], out_dir=ctx.out("e"))
+    huge = (np.asfortranarray(sdc_field().data * np.float32(1e5)), sdc_field().affine)
+    return {
+        **_approx_outputs("default", a, True),
+        **_approx_outputs("mean_two_levels", b, False),
+        **_approx_outputs("mode_no_mask", c, False),
+        **_approx_outputs("resized", d, False),
+        **_approx_outputs("int16", e, True),
+        "failed": _sdc_error(lambda: lx.sdcflows.bspline_approx(huge, name="huge.nii.gz")),
+    }
+
+
+@case(
+    "py.sdcflows.tools",
+    covers=(
+        "lx.sdcflows.resample_to_zooms",
+        "lx.sdcflows.rescale_affine",
+        "lx.sdcflows.deoblique_and_zooms",
+        "lx.sdcflows.reorient_pedir",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' tools: ``resample_to_zooms`` (cubic, a LAS series' first volume, an int16
+    image with scaling, linear without prefilter), nibabel's ``rescale_affine`` of an oblique
+    affine, ``deoblique_and_zooms`` of the control grid around an oblique target, and
+    ``reorient_pedir`` between orientations."""
+    f = _sdc_files(ctx)
+    r1 = lx.sdcflows.resample_to_zooms(f["fmap"], 2.0, n_threads=2)
+    r2 = lx.sdcflows.resample_to_zooms(f["i16"], (4.0, 2.5, 3.0))
+    r3 = lx.sdcflows.resample_to_zooms(f["fmap"], 5.0, order=1, prefilter=False)
+    oblique = affine((14, 12, 8), (3.0, 3.0, 3.5))
+    ra = lx.sdcflows.rescale_affine(oblique, (14, 12, 8), (2.0, 2.0, 2.0), (21, 18, 14))
+    target = (np.zeros((14, 12, 8), np.float32), oblique)
+    dz = lx.sdcflows.deoblique_and_zooms(sdc_coeffs(), target)
+    dz2 = lx.sdcflows.deoblique_and_zooms(sdc_coeffs(), target, factor=2, padding=3)
+    ras = np.array([[0, 1], [1, 1], [2, 1]], dtype=np.float64)
+    psl = np.array([[1, -1], [2, -1], [0, -1]], dtype=np.float64)
+    pes = [lx.sdcflows.reorient_pedir(p, psl) for p in ("i", "j-", "k", "x", "y-")]
+    pes += [lx.sdcflows.reorient_pedir(p, ras, psl) for p in ("i-", "j", "z-")]
+    return {
+        **image_outputs("cubic", r1, geometry=True, header=True),
+        **image_outputs("int16", r2, geometry=True, header=True),
+        **image_outputs("linear", r3, geometry=True),
+        "rescaled": ra,
+        **image_outputs("deoblique", dz, geometry=True),
+        "deoblique2.affine": np.asarray(dz2.affine),
+        "deoblique2.shape": np.array(dz2.shape),
+        "pe_dirs": " ".join(pes),
+    }
+
+
+@case(
+    "py.sdcflows.b0field",
+    covers=(
+        "lx.sdcflows.B0FieldTransform.fit",
+        "lx.sdcflows.B0FieldTransform.apply",
+        "lx.sdcflows.B0FieldTransform.to_displacements",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' ``B0FieldTransform``: the field on its own grid and on a LAS series (two
+    control grids), the series unwarped along ``j`` with the Jacobian, an int16 image along
+    ``i-`` without it (linear, nearest, its stored type), a rotating transform with the
+    approximation (SDC-10 corrected) and without (SDC-02 corrected), and the displacement
+    field of the field."""
+    f = _sdc_files(ctx)
+    coarse = lx.sdcflows.bspline_grid(sdc_field())
+    c2 = lx.Image(np.asfortranarray(((ints(35, tuple(coarse.shape), 0, 41) - 20) * 2.0)
+                                    .astype(np.float32)), np.asarray(coarse.affine))  # fmt: skip
+    t = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    t.fit(f["fmap"], n_threads=2)
+    own = t.mapped
+    t2 = lx.sdcflows.B0FieldTransform(coeffs=[c2, sdc_coeffs()])
+    unwarped, w1 = _sdc_warned(lambda: t2.apply(f["bold_las"], "j", 0.05, n_threads=2))
+    t3 = lx.sdcflows.B0FieldTransform(coeffs=sdc_coeffs())
+    i16 = t3.apply(f["i16"], "i-", 0.04, jacobian=False, order=1, mode="nearest")
+    rot = np.eye(4)
+    rot[:3, :3] = np.array([[12 / 13, -5 / 13, 0.0], [5 / 13, 12 / 13, 0.0], [0.0, 0.0, 1.0]])
+    rot[:3, 3] = (1.5, -2.0, 0.75)
+    oblique = (np.zeros((14, 12, 8), np.float32), affine((14, 12, 8), (3.0, 3.0, 3.5)))
+    t4 = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    _, w4 = _sdc_warned(lambda: t4.fit(oblique, xfm_data2fmap=rot, n_threads=2))
+    t5 = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    _, w5 = _sdc_warned(lambda: t5.fit(f["bold"], xfm_data2fmap=rot, approx=False))
+    return {
+        **image_outputs("own", own, geometry=True, header=True),
+        **image_outputs("unwarped", unwarped, geometry=True, header=True),
+        "unwarped.field": t2.mapped.data,
+        **image_outputs("int16", i16, header=True),
+        "approx": t4.mapped.data,
+        "direct": t5.mapped.data,
+        "notices": f"{w1}\n{w4}\n{w5}",
+        **image_outputs(
+            "displacements", t.to_displacements(0.05, "j-"), geometry=True, header=True
+        ),
+        "displacements_ras": t.to_displacements(0.03, "i", itk_format=False).data,
+    }
+
+
+@case("py.sdcflows.b0field.reproduce", covers=())
+def _(ctx: Context) -> dict[str, Any]:
+    """``B0FieldTransform`` with ``reproduce`` (D13): the rotating transform's approximation
+    built and sampled where sdcflows does (SDC-10), the direct evaluation's separable product
+    (SDC-02), and an integer readout time's TypeError (SDC-05)."""
+    f = _sdc_files(ctx)
+    rot = np.eye(4)
+    rot[:3, :3] = np.array([[12 / 13, -5 / 13, 0.0], [5 / 13, 12 / 13, 0.0], [0.0, 0.0, 1.0]])
+    rot[:3, 3] = (1.5, -2.0, 0.75)
+    oblique = (np.zeros((14, 12, 8), np.float32), affine((14, 12, 8), (3.0, 3.0, 3.5)))
+    t1 = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    _, w1 = _sdc_warned(lambda: t1.fit(oblique, rot, upstream_defects=REPRODUCE))
+    t2 = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    _, w2 = _sdc_warned(lambda: t2.fit(f["bold"], rot, approx=False, upstream_defects=REPRODUCE))
+    t3 = lx.sdcflows.B0FieldTransform(coeffs=[sdc_coeffs()])
+    return {
+        "approx": t1.mapped.data,
+        "direct": t2.mapped.data,
+        "notices": f"{w1}\n{w2}",
+        "int_readout": _sdc_error(lambda: t3.apply(f["bold"], "j", 1, upstream_defects=REPRODUCE)),
+    }
+
+
+@case(
+    "py.sdcflows.coeffs",
+    covers=(
+        "lx.sdcflows.topup_coeff_reorient",
+        "lx.sdcflows.transform_coefficients",
+        "lx.sdcflows.apply_coeffs_field",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """TOPUP's coefficients placed on a LAS reference (FSL's ``y`` and BIDS' ``i``: SDC-07
+    corrected, the sign kept) with their files, a shape that is not TOPUP's; the coefficients
+    moved by an ITK transform (``TransformCoefficients``); ``ApplyCoeffsField`` with the
+    transform in both directions and its files."""
+    f = _sdc_files(ctx)
+    topup = np.asfortranarray(((ints(36, (8, 7, 6), 0, 61) - 30) * 0.5).astype(np.float32))
+    tpath = ctx.out("topup_fieldcoef.nii.gz")
+    lx.save((topup, np.diag([4.0, 4.0, 4.0, 1.0])), tpath)
+    wrong = ctx.out("wrong_fieldcoef.nii.gz")
+    lx.save((topup[:-1], np.diag([4.0, 4.0, 4.0, 1.0])), wrong)
+    r1 = lx.sdcflows.topup_coeff_reorient(tpath, f["bold_las"], "y", out_dir=ctx.out("t1"))
+    r2, w2 = _sdc_warned(lambda: lx.sdcflows.topup_coeff_reorient(tpath, f["bold_las"], "i"))
+    xfm = _sdc_xfm(ctx.out("xfm.txt"))
+    moved = lx.sdcflows.transform_coefficients(f["coeff"], f["fmap"], xfm, out_dir=ctx.out("m"))
+    a1 = lx.sdcflows.apply_coeffs_field(f["bold"], [f["coeff"]], [0.05], ["j"],
+                                        fmap2data_xfm=xfm, out_dir=ctx.out("a1"))  # fmt: skip
+    a2 = lx.sdcflows.apply_coeffs_field(f["i16"], f["coeff"], 0.04, "k-", data2fmap_xfm=[xfm],
+                                        jacobian=True, n_threads=2)  # fmt: skip
+    return {
+        "topup_y": Nifti(os.fspath(r1.out_coeff[0])),
+        **image_outputs("topup_i", r2.coefficients[0], geometry=True),
+        "notices": w2,
+        "wrong": _sdc_error(lambda: lx.sdcflows.topup_coeff_reorient(wrong, f["bold"], "j")),
+        "moved": Nifti(os.fspath(moved.out_coeff[0])),
+        "applied": Nifti(os.fspath(a1.out_corrected)),
+        "applied.field": Nifti(os.fspath(a1.out_field)),
+        **image_outputs("applied2", a2.corrected, header=True),
+    }
+
+
+@case("py.sdcflows.coeffs.reproduce", covers=())
+def _(ctx: Context) -> dict[str, Any]:
+    """``topup_coeff_reorient`` with ``reproduce`` (D13): BIDS' ``i`` negates TOPUP's field as
+    sdcflows does (SDC-07)."""
+    f = _sdc_files(ctx)
+    topup = np.asfortranarray(((ints(36, (8, 7, 6), 0, 61) - 30) * 0.5).astype(np.float32))
+    tpath = ctx.out("topup_fieldcoef.nii.gz")
+    lx.save((topup, np.diag([4.0, 4.0, 4.0, 1.0])), tpath)
+    r, w = _sdc_warned(lambda: lx.sdcflows.topup_coeff_reorient(
+        tpath, f["bold_las"], "i-", upstream_defects=REPRODUCE))  # fmt: skip
+    return {**image_outputs("topup_i", r.coefficients[0], geometry=True), "notices": w}
+
+
+@case(
+    "py.sdcflows.displacements",
+    covers=(
+        "lx.sdcflows.fmap_to_disp",
+        "lx.sdcflows.disp_to_fmap",
+        "lx.sdcflows.displacements_field_to_fieldmap",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """A field map to an ITK displacement field and back (LAS, ``j-``), RAS+ displacements
+    (``i``), and ``DisplacementsField2Fieldmap`` from the file, its median subtracted."""
+    f = _sdc_files(ctx)
+    las = (sdc_field().data, _sdc_affine(las=True))
+    d = lx.sdcflows.fmap_to_disp(las, 0.05, "j-")
+    back = lx.sdcflows.disp_to_fmap(d, las, 0.05, "j-")
+    ras = lx.sdcflows.fmap_to_disp(f["fmap"], 0.03, "i", itk_format=False)
+    path = ctx.out("sub-01_xfm.nii.gz")
+    lx.save(d, path)
+    r = lx.sdcflows.displacements_field_to_fieldmap(path, f["bold_las"], 0.05, "j-", demean=True,
+                                                    out_dir=ctx.out("d"))  # fmt: skip
+    return {
+        **image_outputs("disp", d, geometry=True, header=True),
+        **image_outputs("back", back, header=True),
+        "ras": ras.data,
+        "fieldmap": Nifti(os.fspath(r.out_file)),
+    }
+
+
+def _sdc_phase_files(ctx: Context) -> dict[str, str]:
+    """Phase maps in scanner units (int16, 0 to 4095: the phase difference and the two phases
+    of a phase1/phase2 acquisition), a magnitude, a mask and a field map in rad/s."""
+    aff = _sdc_affine()
+    c = _centred(SHAPE_FMAP)
+    base = (c[0] * c[0] * 4 + c[1] * 3 + c[2] * 40 + 2048) % 4096
+    files = {
+        "phasediff": base,
+        "phase1": (base * 3 + ints(37, SHAPE_FMAP, 0, 9)) % 4096,
+        "phase2": (base * 5 + ints(38, SHAPE_FMAP, 0, 9)) % 4096,
+    }
+    out = {}
+    for name, data in files.items():
+        out[name] = ctx.out(f"sub-01_{name}.nii.gz")
+        lx.save((np.asfortranarray(data.astype(np.int16)), aff), out[name])
+    out["mag"] = ctx.out("sub-01_magnitude1.nii.gz")
+    lx.save((np.asfortranarray((phantom(SHAPE_FMAP, 39) * 2 + 10).astype(np.float32)), aff),
+            out["mag"])  # fmt: skip
+    out["mask"] = ctx.out("mask.nii.gz")
+    lx.save((ellipsoid(SHAPE_FMAP, 8, 10).astype(np.uint8), aff), out["mask"])
+    out["rads"] = ctx.out("sub-01_fieldmap.nii.gz")
+    lx.save((np.asfortranarray(sdc_field().data * np.float32(6)), aff), out["rads"])
+    out["shifted"] = ctx.out("sub-01_fieldmap2.nii.gz")
+    lx.save((sdc_field().data, _sdc_affine(centre=(0.5, -1.0, 2.5))), out["shifted"])
+    return out
+
+
+@case(
+    "py.sdcflows.phase",
+    covers=(
+        "lx.sdcflows.au2rads",
+        "lx.sdcflows.subtract_phases",
+        "lx.sdcflows.delta_te",
+        "lx.sdcflows.phdiff2fmap",
+        "lx.sdcflows.check_b0_units",
+        "lx.sdcflows.check_register",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The phase-difference preparation: phase maps to radians, a phase difference passed
+    through and two phases subtracted (the metadata merged), echo-time differences and their
+    messages, radians to Hz, a field map in rad/s and one in Hz, ``CheckRegister``'s copied
+    affine and its shape mismatch, a constant phase map (SDC-04 corrected) and missing echo
+    times (SDC-09 corrected)."""
+    p = _sdc_phase_files(ctx)
+    rads = [lx.sdcflows.au2rads(p[k], out_dir=ctx.out("r")) for k in ("phasediff", "phase1",
+                                                                      "phase2")]  # fmt: skip
+    one = lx.sdcflows.subtract_phases([rads[0].out_file], [{"EchoTime1": 0.00492,
+                                                            "EchoTime2": 0.00738}])  # fmt: skip
+    meta = [{"EchoTime": 0.00738, "Units": "rad"}, {"EchoTime": 0.00492, "Other": 1}]
+    two = lx.sdcflows.subtract_phases([rads[1].out_file, rads[2].out_file], meta,
+                                      out_dir=ctx.out("s"))  # fmt: skip
+    tes = [
+        lx.sdcflows.delta_te(m)
+        for m in (
+            {"EchoTime1": 0.00492, "EchoTime2": 0.00738},
+            {"EchoTime1": "0.004", "EchoTime2": 0.0065},
+            {"EchoTimeDifference": -0.00246},
+        )
+    ]
+    msgs = [_sdc_error(lambda m=m: lx.sdcflows.delta_te(m))
+            for m in ({}, {"EchoTimeDifference": "abc"}, {"EchoTime1": 0, "EchoTime2": 0.007})]  # fmt: skip
+    hz = lx.sdcflows.phdiff2fmap(two.out_file, metadata=two.metadata, out_dir=ctx.out("h"))
+    hz2 = lx.sdcflows.phdiff2fmap(rads[0].image, 0.00246)
+    b0 = lx.sdcflows.check_b0_units(p["rads"], "rad/s", out_dir=ctx.out("b"))
+    same = lx.sdcflows.check_b0_units(p["rads"], "Hz")
+    reg = lx.sdcflows.check_register([p["mag"]], [p["shifted"]], out_dir=ctx.out("c"))
+    const = ctx.out("const.nii.gz")
+    lx.save((np.full(SHAPE_FMAP, 7, np.int16), _sdc_affine()), const)
+    small = ctx.out("small.nii.gz")
+    lx.save((np.zeros((4, 4, 4), np.float32), _sdc_affine((4, 4, 4))), small)
+    return {
+        **{f"rads{i}": Nifti(os.fspath(r.out_file)) for i, r in enumerate(rads)},
+        "one": f"{Path(one.out_file).name} {sorted(one.metadata.items())}",
+        "two": Nifti(os.fspath(two.out_file)),
+        "two.metadata": repr(sorted(two.metadata.items())),
+        "delta_te": np.array(tes),
+        "messages": "\n".join(msgs),
+        "hz": Nifti(os.fspath(hz.out_file)),
+        "hz2": hz2.image.data,
+        "b0": Nifti(os.fspath(b0.out_file)),
+        "b0_hz": Path(same.out_file).name,
+        "register": "\n".join(Path(x).name for x in (*reg.mag_files, *reg.fmap_files)),
+        "register.fmap": Nifti(os.fspath(reg.fmap_files[0])),
+        "mismatch": _sdc_error(lambda: lx.sdcflows.check_register([p["mag"]], [small]))
+        .replace(p["mag"], "<mag>")
+        .replace(small, "<small>"),
+        "constant": _sdc_error(lambda: lx.sdcflows.au2rads(const)),
+        "no_echo_time": _sdc_error(
+            lambda: lx.sdcflows.subtract_phases([rads[1].out_file, rads[2].out_file], [{}, {}])
+        ),
+    }
+
+
+@case("py.sdcflows.phase.reproduce", covers=())
+def _(ctx: Context) -> dict[str, Any]:
+    """The phase preparation with ``reproduce`` (D13): a constant phase map gives sdcflows'
+    NaN map (SDC-04: only where the NaNs are is hashed, their bits differ between processors)
+    and missing echo times sdcflows' TypeError (SDC-09)."""
+    p = _sdc_phase_files(ctx)
+    const = ctx.out("const.nii.gz")
+    lx.save((np.full(SHAPE_FMAP, 7, np.int16), _sdc_affine()), const)
+    r, w = _sdc_warned(lambda: lx.sdcflows.au2rads(const, upstream_defects=REPRODUCE))
+    rads = [lx.sdcflows.au2rads(p[k]) for k in ("phase1", "phase2")]
+    return {
+        "constant_nan": np.isnan(r.image.data),
+        "notices": w,
+        "no_echo_time": _sdc_error(
+            lambda: lx.sdcflows.subtract_phases(
+                [x.image for x in rads], [{}, {}], upstream_defects=REPRODUCE
+            )
+        ),
+    }
+
+
+@case("py.sdcflows.phdiff_workflow", covers=("lx.sdcflows.phdiff_workflow",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' ``init_phdiff_wf`` with PRELUDE's clean-room original: two phases of a
+    phase1/phase2 acquisition to a field map in Hz, every step's file."""
+    p = _sdc_phase_files(ctx)
+    meta = [{"EchoTime": 0.00492}, {"EchoTime": 0.00738}]
+    r = lx.sdcflows.phdiff_workflow(p["mag"], [p["phase1"], p["phase2"]], meta, p["mask"],
+                                    out_dir=ctx.out("w"), prelude_implementation="original")  # fmt: skip
+    return {
+        "phase_diff": Nifti(os.fspath(r.phase_diff.out_file)),
+        "unwrapped": r.unwrapped.data,
+        "fieldmap": Nifti(os.fspath(r.fieldmap.out_file)),
+        "metadata": repr(sorted(r.fieldmap.metadata.items())),
     }

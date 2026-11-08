@@ -1,0 +1,188 @@
+{
+ "defect": "SDC-04",
+ "description": "PhaseMap2rads of a constant phase map: larmorx raises a clear ValueError (sdcflows rescales 0/0 to NaN everywhere; reproduce gives it), SDC-04 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 47,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc04-constant-phase-map",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "phase",
+   "echo_times": [
+    0.00738,
+    0.00492
+   ],
+   "subtract": true
+  },
+  "features": {
+   "axis0": 1.0,
+   "axis1": 0.8,
+   "axis2": 0.85,
+   "blobs": 5,
+   "call": "phase",
+   "centre0": -3.5,
+   "centre1": -4.0,
+   "centre2": -2.0,
+   "content": "blobs",
+   "dtype": "int16",
+   "echo times": 1,
+   "extreme": false,
+   "orientation": "axes",
+   "origin0": -40.5,
+   "origin1": -47.75,
+   "origin2": 23.5,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "5x22x7",
+   "size": 12.5,
+   "spacing0": 0.8,
+   "spacing1": 1.0,
+   "spacing2": 3.0,
+   "two phases": true,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "phase"
+    ],
+    "name": "phase",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "phase1": {
+    "content": {
+     "axes": [
+      1.2,
+      0.9,
+      1.2
+     ],
+     "centre": [
+      3.0,
+      -4.5,
+      -5.5
+     ],
+     "n": 5,
+     "seed": 926838444,
+     "size": 8.0,
+     "type": "blobs"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -40.5,
+      -47.75,
+      23.5
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      1,
+      -1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      1.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     5,
+     22,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "phase2": {
+    "content": {
+     "axes": [
+      1.0,
+      0.8,
+      0.85
+     ],
+     "centre": [
+      -3.5,
+      -4.0,
+      -2.0
+     ],
+     "n": 5,
+     "seed": 1389025521,
+     "size": 12.5,
+     "type": "blobs"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -40.5,
+      -47.75,
+      23.5
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      1,
+      -1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      1.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     5,
+     22,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 47,
+  "options": [
+   "echo times [0.00738, 0.00492]",
+   "phase"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "B",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

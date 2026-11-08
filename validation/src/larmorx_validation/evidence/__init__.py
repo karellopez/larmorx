@@ -38,6 +38,7 @@ TOOLS: dict[str, str] = {
     "fsl-prelude": "fsl_prelude_original",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
+    "sdcflows-fieldmap": "sdcflows_fieldmap",
     "nifti-io": "nifti_io",
 }
 

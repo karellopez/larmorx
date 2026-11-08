@@ -21,6 +21,7 @@ pub mod field;
 pub mod itk_object;
 pub mod linear;
 pub mod nitransforms;
+pub mod numpy_linalg;
 pub mod openblas;
 pub mod resample_series;
 

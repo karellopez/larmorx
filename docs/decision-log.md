@@ -2034,3 +2034,40 @@ together at the end.
   re-examination with one global tie side for a whole run not accepted (a single point of the spread).
 - **No spec-writer step for relay 4's three questions** (2026-11-08): the record has no failure and the
   trial's sampled differences are explained; they stay open in next-steps.
+
+## 2026-11-08: The field maps' part A, sdcflows' port (the orchestrator's decisions and the rules)
+- **sdcflows' command line** (its BIDS app, `sdcflows bids_dir output_dir participant`): ported at the end
+  of part B, once the workflows it runs exist (full completeness: every tool's original command line); part
+  A's interfaces have none, as the resampler's (nipype interfaces have no program or original arguments).
+- **nibabel's writer in `larmorx.io`:** `lx.io.save_nibabel` (nibabel 5.4.2's scaled array writer, its
+  extended-precision slope and intercept emulated exactly, so every platform writes Linux's bits), not in
+  `lx.sdcflows`; fMRIPrep's other Python steps (part B, larmorprepx) write through it too. **nibabel's header
+  arithmetic stays nibabel-specific:** the quaternions nibabel writes (`mat2quat`, numpy's `svd` and `eigh`)
+  and the affine of a qform-only image as nibabel reads it (`lx.io.load_nibabel`, `nibabel_affine`); `lx.load`,
+  `lx.save` and the ITK path unchanged, so no other tool's record or golden checksum moved.
+- **The two Python environments' record** as the resampler's: the record made in the newest environment, the
+  originals' step from the shared one per case (`python_versions.STEP_SUITES`); numpy 2.3.5 to 2.5.4's LAPACK
+  3.12.0 to 3.12.1 named as the reason where nibabel's quaternions or an orientation tie change (4 of the 37
+  cases).
+- **The stored collocation matrix** (the port must not be slower than sdcflows at one thread): stored at one
+  thread, where it is 1.09 to 1.14 times faster than scikit-learn in a fresh process, within the memory rule;
+  with several threads the weights evaluated at every product (faster there: the stored matrix's products are
+  bound by memory bandwidth); `low_memory=True` for the on-the-fly path at one thread; the same bits every way.
+- **`check_register`'s two-magnitude branch** (FreeSurfer's `mri_robust_register`) waits for FreeSurfer: a
+  clear `NotImplementedError` until then, SDC-03's switch with it.
+- **By the rules (A to D), without asking:** SDC-01, -02 and -07 measured (D), then corrected by default (A);
+  SDC-05, -06, -08, -10 and -11 corrected (A); SDC-04 and SDC-09 a clear error (B); SDC-03 (A) with
+  FreeSurfer; kept and documented (C): `CheckB0Units`' re-quantisation into the input's type, the header's
+  zooms against the affine's, and PIPE-14 (`apply`'s head-motion transforms ignored with sdcflows' own
+  warning: a feature sdcflows has not enabled).
+- **Left unchanged in this part:** `lx.transforms.ensure_positive_cosines` (the resampler's vnl SVD; a
+  follow-up, measured on the resampler's records first); the first memory run's two oracle-cache disputes
+  stay in the cache's findings.
+
+## 2026-11-08: tedana's `t2smap` replica before the field maps' part B (the user)
+- **The order** (the user: "yes do it t2map"): with the field maps' part A at its last relay and part B building on
+  part A's code (so it waits for that merge), the second agent's place went to tedana's `t2smap` replica (item 4
+  (8)); part B then runs beside `t2smap`'s clean-room original. The rest of the plan before FreeSurfer is unchanged.
+- **Every wait has a time limit** (CLAUDE.md, "Wait loops must not match themselves"): eleven loops of finished agents
+  were found waiting on 2026-11-08 (three for a pattern their own command lines held, eight for the end line of a run
+  restarted under another log) and stopped at the user's request.

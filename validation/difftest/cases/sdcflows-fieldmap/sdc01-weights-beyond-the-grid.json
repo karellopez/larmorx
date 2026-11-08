@@ -1,0 +1,243 @@
+{
+ "defect": "SDC-01",
+ "description": "B0FieldTransform.apply on a target reaching beyond the control grid: larmorx gives the cubic B-spline's weights there (sdcflows continues the end polynomial of SciPy's extrapolation; reproduce gives it), SDC-01 named",
+ "expect": "pass",
+ "found": {
+  "detail": "",
+  "n": 97,
+  "seed": "sdc-try2",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "sdc01-weights-beyond-the-grid",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": false,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 60.0,
+    "seed": 643724468,
+    "spacings": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": -5.0,
+    "jacobian": true,
+    "mode": "nearest",
+    "order": 1,
+    "output_dtype": null,
+    "prefilter": true
+   },
+   "pe_dir": "j-",
+   "ro_time": 0.0429303,
+   "xfm": null
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": false,
+   "axis0": 0.8,
+   "axis1": 1.0,
+   "axis2": 1.0,
+   "bias0": -0.01,
+   "bias1": -0.01,
+   "bias2": 0.01,
+   "bias3": -0.0075,
+   "call": "apply",
+   "centre0": 1.0,
+   "centre1": 6.0,
+   "centre2": -2.0,
+   "coefficient Hz": 60.0,
+   "content": "head",
+   "cval": -5.0,
+   "dtype": "uint8",
+   "extreme": false,
+   "inter": 10.0,
+   "jacobian": true,
+   "mode": "nearest",
+   "moving ndim": 4,
+   "noise": 0.0,
+   "order": 1,
+   "orientation": "axes+oblique",
+   "origin0": 41.25,
+   "origin1": -54.5,
+   "origin2": -43.5,
+   "output_dtype": 0,
+   "pe per volume": false,
+   "pe_dir": "j-",
+   "prefilter": true,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "ro_time": 0.0429303,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "23x20x17x4",
+   "size": 8.5,
+   "slope": 0.5,
+   "spacing0": 1.0,
+   "spacing1": 1.5,
+   "spacing2": 2.5,
+   "spacings": 1,
+   "target": "aligned",
+   "target shift0": 16.0,
+   "target shift1": -3.75,
+   "target shift2": 12.75,
+   "target spacing0": 0.8,
+   "target spacing1": 3.0,
+   "target spacing2": 3.0,
+   "tissues": "t1",
+   "tr": 2.5,
+   "transform": "none",
+   "tunits": "sec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 200888653,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      41.25,
+      -54.5,
+      -43.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      -3,
+      35,
+      -29,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.0,
+      1.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     23,
+     11,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      0.8,
+      1.0,
+      1.0
+     ],
+     "bias": [
+      -0.01,
+      -0.01,
+      0.01,
+      -0.0075
+     ],
+     "centre": [
+      1.0,
+      6.0,
+      -2.0
+     ],
+     "noise": 0.0,
+     "seed": 775900445,
+     "size": 8.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      57.25,
+      -58.25,
+      -30.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      -3,
+      35,
+      -29,
+      3
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      0.8,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 10.0,
+     "slope": 0.5
+    },
+    "shape": [
+     23,
+     20,
+     17,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 97,
+  "options": [
+   "apply",
+   "order 1",
+   "pe j-",
+   "target aligned",
+   "transform none"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

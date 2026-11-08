@@ -1,0 +1,147 @@
+{
+ "defect": "SDC-11",
+ "description": "BSplineApprox of a field map whose whole extent is below zooms_min: the resize gives a grid of one voxel, which larmorx resamples and fits (sdcflows fails with nitransforms' bare AssertionError; reproduce gives it), SDC-11 named (the trial of 2026-11-08)",
+ "expect": "pass",
+ "found": {
+  "detail": "bspline_approx: every output bit-identical: 'AssertionError: ' vs 'AssertionError: nitransforms 25.1.0 cannot resample onto a single-voxel grid (its `assert targets.ndim == 2`)'",
+  "n": 59267,
+  "seed": "sdc-trial",
+  "shrink_moves": [
+   "fmap (and its grid): plumb orientation",
+   "fmap (and its grid): origin at 0",
+   "fmap (and its grid): qform and sform codes 1",
+   "fmap: plain value range",
+   "fmap: content blobs -> constant"
+  ],
+  "signature": [
+   "bspline_approx: every output bit-identical"
+  ]
+ },
+ "id": "sdc11-resize-onto-a-single-voxel",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": false,
+    "ridge_alpha": 0.0001,
+    "zooms_min": 2.0
+   }
+  },
+  "features": {
+   "4D of one volume": false,
+   "axis0": 0.85,
+   "axis1": 0.9,
+   "axis2": 0.8,
+   "blobs": 3,
+   "bs_spacing": 1,
+   "call": "bspline_approx",
+   "centre0": -4.0,
+   "centre1": -3.5,
+   "centre2": -2.5,
+   "content": "blobs",
+   "dtype": "float32",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 0.25,
+   "mask": false,
+   "orientation": "oblique",
+   "origin0": -40.5,
+   "origin1": -36.0,
+   "origin2": 49.0,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "recenter": false,
+   "ridge_alpha": 0.0001,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "4x4x4",
+   "size": 27.0,
+   "spacing0": 0.5,
+   "spacing1": 0.5,
+   "spacing2": 0.5,
+   "units": "mm",
+   "zooms_min": 2.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1233389849,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 59267,
+  "options": [
+   "1 level(s)",
+   "alpha 0.0001",
+   "bspline_approx",
+   "extrapolate",
+   "recenter False",
+   "zooms_min 2.0"
+  ],
+  "seed": "sdc-trial",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

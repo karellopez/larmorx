@@ -54,11 +54,11 @@ NEWEST = "newest"
 SHARED = "shared"
 ENV = "LARMORX_PYTHON"
 #: The parity suites whose originals are Python libraries (they default to ``newest``).
-SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg")
+SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg", "sdcflows-fieldmap")
 #: The suites that report the originals' own step (their comparisons record digests).
-STEP_SUITES = ("resample-series",)
+STEP_SUITES = ("resample-series", "sdcflows-fieldmap")
 #: Random testing's tools of the same originals.
-TOOLS = ("resample-series", "nifti-io")
+TOOLS = ("resample-series", "nifti-io", "sdcflows-fieldmap")
 STEP_RECORD = "LARMORX_PYTHON_STEP_RECORD"
 STEP_FROM = "LARMORX_PYTHON_STEP_FROM"
 #: How many times the step runs the shared releases' cases (their originals' own variation).
@@ -80,6 +80,13 @@ CHANGES = {
     "its own (scipy/ndimage/src/ni_splines.c), so its last term reads the original first "
     "coefficient: SCI-03 fixed upstream, with the scaling's rounding of its own "
     "(modes nearest, reflect and grid-mirror, orders 2 to 5)",
+    "LAPACK-3.12.1": "numpy's OpenBLAS 0.3.31 and later bundle LAPACK 3.12.1, whose DLARF1F "
+    "(dorm2r, dorml2, dgebd2) moves the last bits of numpy.linalg.svd and eigh, so nibabel "
+    "5.4.2 writes other NIfTI quaternions (quatern_b, c, d) for some oblique affines (every "
+    "other byte identical: the digest with those fields zeroed) and its io_orientation picks "
+    "another axis for a rotation with two equal candidates (an input's orientation differs "
+    "between the two releases in larmorx's replica of numpy's SVD), which decides whether "
+    "sdcflows reorients the image and which error it raises (docs/findings/sdcflows-fieldmap.md)",
 }
 
 #: Spline modes whose prefilter uses the reflect initialisation.

@@ -1,0 +1,248 @@
+{
+ "defect": null,
+ "description": "B0FieldTransform.apply of a single-voxel series on rotated coefficients: the separable product is the exact one there, so SDC-02 is not named (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "apply apply: every output bit-identical: ('AttributeError', \"'ArrayProxy' object has no attribute 'transpose'\") vs None; D13 fix pass: SDC-02: no values changed",
+  "n": 1447,
+  "seed": "sdc-try2",
+  "shrink_moves": [
+   "fmap: axis 1 18 -> 9 voxels",
+   "fmap: axis 1 9 -> 4 voxels",
+   "fmap: axis 0 8 -> 4 voxels",
+   "fmap: axis 2 7 -> 3 voxels",
+   "fmap: axis 0 4 -> 2 voxels",
+   "fmap: axis 1 4 -> 2 voxels",
+   "fmap: axis 2 3 -> 1 voxels",
+   "fmap: axis 0 2 -> 1 voxels",
+   "fmap: axis 1 2 -> 1 voxels",
+   "moving: axis 1 22 -> 11 voxels",
+   "moving: axis 0 20 -> 10 voxels",
+   "moving: axis 1 11 -> 5 voxels",
+   "moving: axis 0 10 -> 5 voxels",
+   "moving: axis 2 10 -> 5 voxels",
+   "moving: axis 0 5 -> 2 voxels",
+   "moving: axis 1 5 -> 2 voxels",
+   "moving: axis 2 5 -> 2 voxels",
+   "moving: axis 0 2 -> 1 voxels",
+   "moving: axis 1 2 -> 1 voxels",
+   "moving: axis 2 2 -> 1 voxels",
+   "fmap (and its grid): plumb orientation",
+   "fmap (and its grid): unit spacing",
+   "fmap (and its grid): origin at 0",
+   "fmap (and its grid): qform and sform codes 1",
+   "moving (and its grid): origin at 0",
+   "moving (and its grid): qform and sform codes 1",
+   "moving: float32 storage",
+   "moving: content blobs -> constant"
+  ],
+  "signature": [
+   "apply apply: every output bit-identical"
+  ]
+ },
+ "id": "sdc02-single-voxel-no-notice",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "approx": true,
+   "call": "apply",
+   "coefficients": {
+    "amplitude": 60.0,
+    "seed": 1059143716,
+    "spacings": [
+     [
+      40.0,
+      40.0,
+      20.0
+     ],
+     [
+      16.0,
+      16.0,
+      10.0
+     ]
+    ]
+   },
+   "kw": {
+    "allow_negative": false,
+    "cval": 0.0,
+    "jacobian": false,
+    "mode": "grid-constant",
+    "order": 2,
+    "output_dtype": "int16",
+    "prefilter": true
+   },
+   "pe_dir": "j-",
+   "ro_time": 0.05,
+   "xfm": null
+  },
+  "features": {
+   "allow_negative": false,
+   "approx": true,
+   "axis0": 1.0,
+   "axis1": 1.05,
+   "axis2": 0.95,
+   "blobs": 5,
+   "call": "apply",
+   "centre0": -4.0,
+   "centre1": 1.0,
+   "centre2": -3.5,
+   "coefficient Hz": 60.0,
+   "content": "blobs",
+   "cval": 0.0,
+   "dtype": "int16",
+   "extreme": false,
+   "jacobian": false,
+   "mode": "grid-constant",
+   "moving ndim": 4,
+   "order": 2,
+   "orientation": "axes+oblique",
+   "origin0": -47.5,
+   "origin1": -35.5,
+   "origin2": -59.5,
+   "output_dtype": "int16",
+   "pe per volume": false,
+   "pe_dir": "j-",
+   "prefilter": true,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "ro_time": 0.05,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "20x22x10x2",
+   "size": 14.5,
+   "spacing0": 0.8,
+   "spacing1": 3.0,
+   "spacing2": 2.0,
+   "spacings": 3,
+   "target": "aligned",
+   "target shift0": -3.75,
+   "target shift1": 16.0,
+   "target shift2": -4.5,
+   "target spacing0": 2.5,
+   "target spacing1": 0.8,
+   "target spacing2": 0.8,
+   "tr": 3.0,
+   "transform": "none",
+   "tunits": "msec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "apply"
+    ],
+    "name": "apply",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1458704126,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "seed": 904440642,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      3,
+      3,
+      0,
+      5
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 3000.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1447,
+  "options": [
+   "apply",
+   "order 2",
+   "pe j-",
+   "target aligned",
+   "transform none"
+  ],
+  "seed": "sdc-try2",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

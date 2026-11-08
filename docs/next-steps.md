@@ -127,8 +127,13 @@ at a time:
    6.0.7.23's bytes in every compared case of its record, fMRIPrep's seven calls included; `specs/prelude.md`;
    FSL-261 to FSL-273; the questions answered and those still open below, "The questions for a spec writer,
    gathered"); (3) PRELUDE's clean-room original (**done** 2026-11-07: from `specs/prelude.md` and black-box runs alone; with `reproduce` every file FSL 6.0.7.23's bytes, by default the replica's default bit for bit but GLIBC-07's last bits of complex images' phases, in every compared case of its record (166: 138 pass, 28 refused by both alike), fMRIPrep's seven calls included (also against fMRIPrep's own outputs); fMRIPrep's two large calls 97 and 211 times FSL's speed and 2.5 to 2.8 times the replica's on one thread, the same bits at any thread count; with it the spec answers' clean-room follow-ups and every FSL original's pair headers and time step; follow-ups below); (4) 3dvolreg's replica (AFNI 26.3.05; **done** 2026-11-07: every compared case of its record bit-identical, fMRIPrep's RobustAverage and PEPOLAR calls included; `specs/3dvolreg.md`; AFNI-86 to AFNI-99; follow-ups below) and (5) its clean-room
-   original (**done** 2026-11-08: from `specs/3dvolreg.md` and black-box runs alone, built for speed; every compared case of its record within §14.3's limits against AFNI 26.3.05, its default within them of the replica's (251 cases: 185 pass, 63 refused by both alike, 3 expected divergences, none failing), fMRIPrep's ten RobustAverage and PEPOLAR calls included (their medians at most 0.115 of their limits from fMRIPrep's own outputs); fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count; with it, output names of 228 to 255 bytes written by all four AFNI originals; follow-ups below); (6, 7) the field maps (sdcflows: the B-spline fit and evaluation with the phase-difference preparation;
-   then PEPOLAR's and SyN's Python steps, sdcflows' masks, niworkflows' helpers, fMRIPrep's own field-map steps);
+   original (**done** 2026-11-08: from `specs/3dvolreg.md` and black-box runs alone, built for speed; every compared case of its record within §14.3's limits against AFNI 26.3.05, its default within them of the replica's (251 cases: 185 pass, 63 refused by both alike, 3 expected divergences, none failing), fMRIPrep's ten RobustAverage and PEPOLAR calls included (their medians at most 0.115 of their limits from fMRIPrep's own outputs); fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count; with it, output names of 228 to 255 bytes written by all four AFNI originals; follow-ups below); (6) the field maps' part A (sdcflows: the B-spline fit and evaluation with the phase-difference
+   preparation; **done** 2026-11-08: an exact port of sdcflows 2.17.1 in `lx.sdcflows`, every compared case of its
+   record bit-identical to sdcflows (37 of 37), fMRIPrep's seven phase-difference estimators and their B-spline
+   fits included, also against fMRIPrep's own files; SDC-01 to SDC-11; the fit 6.5 to 7.8 times scikit-learn's
+   speed at 14 threads with 22 to 32 % of sdcflows' peak memory; with it nibabel's scaled writer and header
+   arithmetic in `lx.io`; follow-ups below); (7) part B (PEPOLAR's and SyN's Python steps, sdcflows' masks,
+   niworkflows' helpers, `init_fmap_wf` complete, fMRIPrep's own field-map steps; last, sdcflows' command line);
    (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original);
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
    confound steps: nothing from FreeSurfer); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
@@ -710,7 +715,9 @@ The items below keep their history.
    examples of the options and standard_space_roi on the data panel's heads and sections on the
    variations, standard_space_roi and fslroi and the data; fslmaths' page exported again.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
-   the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
+   the B-spline fit, PEPOLAR and phase-difference preparation; part A done 2026-11-08, `lx.sdcflows`) and
+   fMRIPrep's own Python steps; with FreeSurfer's `mri_robust_register`, `lx.sdcflows.check_register`'s
+   two-magnitude branch (a `NotImplementedError` until then) and SDC-03's switch (rule A);
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
    original (main package, built for speed) each (decision log 2026-10-26): the oracle runs first
    (8.2.0 on the panel with every intermediate and command kept; fMRIPrep with recon-all, 7.3.2, as
@@ -724,6 +731,52 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From the field maps' part A (sdcflows' port, 2026-11-08; eleven relays;
+  [findings](findings/sdcflows-fieldmap.md), record [sdcflows-fieldmap](validation/sdcflows-fieldmap.md),
+  [benchmarks](benchmarks/sdcflows-fieldmap.md), [API](api/sdcflows-fieldmap.md)).** Done in the part besides
+  the port: nibabel's scaled writer and header arithmetic in `larmorx.io` (`lx.io.save_nibabel`,
+  `load_nibabel`, `nibabel_affine`, `larmorx.io.nibabel_header`, with numpy's `svd`, `eigh` and `det` of
+  small matrices replicated for LAPACK 3.12.0 and 3.12.1 in `larmorx_transform::numpy_linalg`), for
+  fMRIPrep's other Python steps to write through. Left:
+  - *Part B* (next): PEPOLAR's and SyN's Python steps, sdcflows' masks (`brain_masker`), niworkflows'
+    helpers, `init_fmap_wf` complete (the magnitude preparation: `IntraModalMerge`,
+    `init_brainextraction_wf`; part A takes the magnitude reference and mask as inputs), fMRIPrep's own
+    field-map steps (`ReconstructFieldmap`), and last sdcflows' command line (its BIDS app; the
+    orchestrator, 2026-11-08). `check_b0_units` (direct field maps) is ported; its workflow comes with
+    part B.
+  - *With FreeSurfer:* `lx.sdcflows.check_register`'s two-magnitude branch (FreeSurfer's
+    `mri_robust_register --auto_sens`) and SDC-03's switch (item 8).
+  - *The resampler's orientation:* `lx.transforms.ensure_positive_cosines` (fMRIPrep's resampler) decides
+    axes with vnl's SVD, `lx.sdcflows` with numpy's own (`larmorx.io.nibabel_header.io_orientation`): a
+    rotation with two equal axis candidates may pick another axis in the resampler (NP-02). Measure on the
+    resampler's records first; follow numpy's SVD there if they stay identical.
+  - *Speed:* the stored collocation matrix's one-thread fit slows after sdcflows, nipype, scikit-learn and
+    numpy have run in the same process (ds001600's fits 2.5 s in a fresh process, 3.3 to 5.7 s after
+    them; not glibc's mmap threshold; the benchmark's footnote 1): find the cause before larmorprepx runs
+    these fits in a long-lived process. The stored matrix's transpose (`Collocation::store` with several
+    threads) is used by no fit since 3c9c10af (several threads evaluate the weights at every product),
+    only by tests: drop it, or keep it for the clean-room original's measurements.
+  - *The clean-room original* (the user, 2026-11-06), in another crate (never `larmorx-sdcflows`), from a
+    spec of sdcflows' behaviour; its implementer reads neither sdcflows' source nor this port. Room for
+    speed: the aligned grids' Kronecker structure (per-axis products instead of 64-entry rows), SIMD with
+    runtime dispatch.
+  - *The final validation phase:* the data panel's other field maps (ds005752's direct field map is not
+    linked to its BOLD runs; the PEPOLAR runs with part B), random testing at length (the trial: 335,471
+    cases in half an hour), sdcflows' own unwarping on the panel's series (SDC-02 measured at 1.5 to
+    4.6 Hz RMS in the brain with fMRIPrep's registrations).
+  - *The harness:* three tests of `validation/tests` fail only under pytest-xdist (serially, as the gates
+    run them, all pass): the oracle cache's `test_above_one_thread_a_run_is_served_after_three_identical_runs`
+    and `test_exit_status_and_failures_are_cached` (`-n 8`), and random testing's
+    `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on` (`-n 12`, a night in a box of its
+    own beside eleven workers); this part did not touch their code. The first memory run's two oracle-cache disputes (nipype's INFO lines carried time stamps; keys
+    `fac9bd9a…` and `ba61bf75…`, under the memory script's old key and never served again) stay in the
+    cache's `findings.jsonl`, as the cache's rule says.
+  - *The site's checks:* its viewer check passes a viewer that draws nothing: the page's three estimator
+    examples drew no image (their default view named comparisons without images, so the viewer's `render`
+    threw inside its animation frame), fixed in the exporter, which now refuses such a default. The site's
+    own `checkViewers` should check that every viewer drew, on every page
+    (`validation/investigations/sdcflows-fieldmap/site_checks.sh`'s `drawn`: every viewer loaded and no
+    canvas left at the browser's default 300 × 150).
 - **From 3dvolreg's clean-room original part (2026-11-08; six relays and two spec-writer steps;
   [findings](findings/afni-volreg-original.md), record [afni-volreg-original](validation/afni-volreg-original.md),
   [benchmarks](benchmarks/afni-volreg.md)).** Done in the part besides the original: output names of

@@ -1,0 +1,147 @@
+{
+ "defect": null,
+ "description": "TOPUPCoeffReorient's coefficients on a rotated reference: the qform quaternion nibabel writes (numpy's SVD and eigh through LAPACK and OpenBLAS's Haswell kernels; larmorx's Shepperd formula gave other last bits and zero signs before relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "topup: every output bit-identical: differ: ['bytes0']",
+  "n": 18,
+  "seed": "sdc-try",
+  "shrink_moves": [
+   "ref: axis 0 18 -> 9 voxels",
+   "ref: axis 2 16 -> 8 voxels",
+   "ref: axis 0 9 -> 4 voxels",
+   "ref: axis 2 8 -> 4 voxels",
+   "ref: axis 1 5 -> 2 voxels",
+   "ref: axis 0 4 -> 2 voxels",
+   "ref: axis 2 4 -> 2 voxels",
+   "ref: axis 0 2 -> 1 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "ref: axis 2 2 -> 1 voxels",
+   "ref (and its grid): unit spacing",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref: content head -> constant"
+  ],
+  "signature": [
+   "topup: every output bit-identical"
+  ]
+ },
+ "id": "nibabel-quaternion-topup",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "topup",
+   "factors": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "pe_dir": "x-",
+   "seed": 984196471,
+   "wrong_shape": false
+  },
+  "features": {
+   "axis0": 0.95,
+   "axis1": 1.2,
+   "axis2": 1.15,
+   "bias0": -0.0025,
+   "bias1": 0.0075,
+   "bias2": -0.005,
+   "bias3": 0.005,
+   "call": "topup",
+   "centre0": -4.0,
+   "centre1": -0.5,
+   "centre2": -5.5,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "factors": 2,
+   "noise": 0.0,
+   "orientation": "oblique",
+   "origin0": 42.75,
+   "origin1": 3.25,
+   "origin2": -23.75,
+   "pe_dir": "x-",
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "18x5x16",
+   "size": 22.0,
+   "spacing0": 0.5,
+   "spacing1": 1.5,
+   "spacing2": 4.0,
+   "tissues": "epi",
+   "units": "mm",
+   "wrong shape": false
+  },
+  "groups": [
+   {
+    "args": [
+     "topup"
+    ],
+    "name": "topup",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ref": {
+    "content": {
+     "seed": 267288221,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      8,
+      1,
+      -2,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 18,
+  "options": [
+   "pe x-",
+   "topup"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

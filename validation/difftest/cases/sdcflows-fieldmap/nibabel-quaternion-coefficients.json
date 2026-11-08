@@ -1,0 +1,151 @@
+{
+ "defect": null,
+ "description": "BSplineApprox's coefficient grid of a rotated field map: nibabel's quaternion and zero signs in the coefficients' file (relay 7)",
+ "expect": "pass",
+ "found": {
+  "detail": "bspline_approx: every output bit-identical: 1 inside, 0 iterations; differ: ['coeff0-bytes']",
+  "n": 22,
+  "seed": "sdc-try",
+  "shrink_moves": [
+   "fmap: axis 2 21 -> 10 voxels",
+   "fmap: axis 0 15 -> 7 voxels",
+   "fmap: axis 2 10 -> 5 voxels",
+   "fmap: axis 0 7 -> 3 voxels",
+   "fmap: axis 1 6 -> 3 voxels",
+   "fmap: axis 2 5 -> 2 voxels",
+   "fmap: axis 0 3 -> 1 voxels",
+   "fmap: axis 1 3 -> 1 voxels",
+   "fmap: axis 2 2 -> 1 voxels",
+   "fmap (and its grid): unit spacing",
+   "fmap (and its grid): origin at 0",
+   "fmap: float32 storage",
+   "fmap: plain value range",
+   "fmap: content ramp -> constant"
+  ],
+  "signature": [
+   "bspline_approx: every output bit-identical"
+  ]
+ },
+ "id": "nibabel-quaternion-coefficients",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "bspline_approx",
+   "params": {
+    "bs_spacing": [
+     [
+      100.0,
+      100.0,
+      40.0
+     ]
+    ],
+    "extrapolate": true,
+    "recenter": "median",
+    "ridge_alpha": 0.01,
+    "zooms_min": 1.0
+   }
+  },
+  "features": {
+   "4D of one volume": false,
+   "bs_spacing": 2,
+   "call": "bspline_approx",
+   "content": "ramp",
+   "dtype": "float64",
+   "extrapolate": true,
+   "extreme": false,
+   "field Hz scale": 0.25,
+   "mask": false,
+   "orientation": "axes",
+   "origin0": 8.5,
+   "origin1": -59.75,
+   "origin2": -8.25,
+   "qfac": -1,
+   "qform_code": 1,
+   "ramp0": 2,
+   "ramp1": 2,
+   "ramp2": -1,
+   "range": "plain",
+   "recenter": "median",
+   "ridge_alpha": 0.01,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "15x6x21",
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "units": "mm",
+   "zooms_min": 1.0
+  },
+  "groups": [
+   {
+    "args": [
+     "bspline_approx"
+    ],
+    "name": "bspline_approx",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fmap": {
+    "content": {
+     "seed": 1114810923,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 22,
+  "options": [
+   "1 level(s)",
+   "alpha 0.01",
+   "bspline_approx",
+   "extrapolate",
+   "recenter median",
+   "zooms_min 1.0"
+  ],
+  "seed": "sdc-try",
+  "tool": "sdcflows-fieldmap"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-fieldmap",
+ "tier": "smoke",
+ "tool": "sdcflows-fieldmap"
+}

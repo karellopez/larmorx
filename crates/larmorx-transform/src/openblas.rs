@@ -230,14 +230,30 @@ pub fn inv4(m: &Mat4) -> Option<Mat4> {
     Some(std::array::from_fn(|r| std::array::from_fn(|c| b[c][r])))
 }
 
+/// The sign and the diagonal of the LU factors of a 3×3 matrix as numpy's `det` takes them
+/// (OpenBLAS's `dgetrf`, `getf2_k` for this size): `(±1 from the row interchanges, U's
+/// diagonal)`, or `None` when LAPACK reports an exactly zero pivot (numpy's determinant is then
+/// 0).
+pub fn lu_sign_and_diagonal3(m: &[[f64; 3]; 3]) -> Option<(f64, [f64; 3])> {
+    // numpy's linearize_matrix: column-major, a[c][r] = m[r][c].
+    let mut a: [[f64; 3]; 3] = std::array::from_fn(|c| std::array::from_fn(|r| m[r][c]));
+    let mut ipiv = [0usize; 3];
+    if getf2(&mut a, &mut ipiv) != 0 {
+        return None;
+    }
+    let swaps = ipiv.iter().enumerate().filter(|(i, p)| *i != **p).count();
+    let sign = if swaps % 2 == 1 { -1.0 } else { 1.0 };
+    Some((sign, [a[0][0], a[1][1], a[2][2]]))
+}
+
 /// `getf2_k` (OpenBLAS's left-looking LU with partial pivoting) on a column-major 4×4 matrix,
 /// in place: `a[c][r]`. Fills `ipiv` (0-based) and returns LAPACK's `info` (0, or one more than
-/// the first column with an exactly zero pivot). Only for 4×4: then every `dgemv_n` call has at
-/// most 3 rows and runs the kernel's scalar tail, and `idamax` sees at most 4 elements.
+/// the first column with an exactly zero pivot). Only for 3×3 and 4×4: then every `dgemv_n`
+/// call has at most 3 rows and runs the kernel's scalar tail, and `idamax` sees at most 4
+/// elements.
 // The loops keep getf2_k's indices, so the port can be checked line by line.
 #[allow(clippy::needless_range_loop)]
-fn getf2(a: &mut [[f64; 4]; 4], ipiv: &mut [usize; 4]) -> usize {
-    const N: usize = 4;
+fn getf2<const N: usize>(a: &mut [[f64; N]; N], ipiv: &mut [usize; N]) -> usize {
     let mut info = 0;
     for j in 0..N {
         // Apply the earlier interchanges to column j.

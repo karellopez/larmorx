@@ -250,6 +250,14 @@ def _decompose(q, e):
 
 ORDERS = [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]
 
+#: §5.3's exact ties (spec writer, 2026-11-08): orders whose norms are equal in exact arithmetic
+#: (two axes with the same voxel size) differ only in their last bits, which decide the choice.
+#: ``"smallest"``: the smallest computed norm, the first of equal ones (the spec's rule applied to
+#: this model's own evaluation); ``"first"`` / ``"last"``: the first / last order whose computed
+#: norm is within a relative 1e-12 of the smallest -- the two sides of every such tie, which
+#: ``thresholds.py`` uses to measure how much the choice moves the results.
+TIES = "smallest"
+
 
 def shear_best(Q, d):
     tr = Q[0, 0] + Q[1, 1] + Q[2, 2]
@@ -261,23 +269,28 @@ def shear_best(Q, d):
             Shear(2, (0, 0, 0), d[2]),
             Shear(0, (0, 0, 0), d[0]),
         ]
-    best, bestn = None, 1e38
+    cands = []
     for o in ORDERS:
         q = np.array([[Q[o[m], o[n]] for n in range(3)] for m in range(3)])
         e = np.array([d[o[m]] for m in range(3)])
         r = _decompose(q, e)
-        if r is None:
-            continue
-        norm, sh = r
-        if norm < bestn:
-            out = []
-            for ax, coef, s in sh:
-                c = [0.0, 0.0, 0.0]
-                for n in range(3):
-                    c[o[n]] = coef[n]
-                out.append(Shear(o[ax], tuple(c), s))
-            best, bestn = out, norm
-    return best
+        if r is not None:
+            cands.append((r[0], o, r[1]))
+    if not cands:
+        return None
+    smallest = min(c[0] for c in cands)
+    if TIES == "smallest":
+        _, o, sh = next(c for c in cands if c[0] == smallest)
+    else:
+        near = [c for c in cands if c[0] <= smallest * (1 + 1e-12)]
+        _, o, sh = near[0] if TIES == "first" else near[-1]
+    out = []
+    for ax, coef, s in sh:
+        c = [0.0, 0.0, 0.0]
+        for n in range(3):
+            c[o[n]] = coef[n]
+        out.append(Shear(o[ax], tuple(c), s))
+    return out
 
 
 def shears_for(Q, d, delta):

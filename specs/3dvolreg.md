@@ -322,17 +322,45 @@ If they fail again, AFNI prints `*** THD_rota_vol: can't compute shear transform
 volume is left as it was. A rotation about **one** axis only (two angles exactly 0, as for every
 rotation derivative image of §7.1) fails in all six orders (its exact zeros make `q10` or the determinant term 0) and always takes the retry.
 
-**Numerics (spec writer's measurement, 2026-11-07).** After the retry the problem is nearly
-singular: several orders tie in norm to the last double bits, and the decomposition's tiny
-coefficients (about 1e-6 to 1e-8, e.g. `c1` and `c2` nearly cancelling) depend on how the
-solution is evaluated. AFNI's closed form and the stable formulas above both reconstruct `Q'` to
-about 1e-8, but give different tiny coefficients and, for some angles, choose another of the tied
-orders: on a 40 × 44 × 24 series with 3 × 3 × 3.5 mm voxels the roll derivative image's extremes
-differ by 0.4 % (−24.80 against −24.69), the parameters by up to 0.001° and 0.001 mm, the first
-fit's coefficients by about 1e-3 relative. So an implementation that does not evaluate the
-decomposition as AFNI does cannot be bit-identical, and §14.3's thresholds allow for it. Every
-other statement of this spec was checked bit for bit by the model of §15 with the decomposition's
-double values made AFNI's: then it reproduces AFNI's outputs exactly (§15).
+**Numerics (spec writer's measurements, 2026-11-07 and 2026-11-08).** Two things depend on how
+the decomposition is evaluated.
+1. *The tiny coefficients* of the retry (about 1e-6 to 1e-8, e.g. `c1` and `c2` nearly
+   cancelling) differ between AFNI's closed form and the stable formulas above; both reconstruct
+   `Q'` to about 1e-8, and the difference changes only last bits.
+2. *Exact ties choose the order*, and this is what decides the results. When two axes have the
+   same voxel size (as in every EPI with square in-plane voxels), orders come in pairs whose
+   norms are **equal in exact arithmetic**: an entry of a rotation equals its own cofactor
+   where its row's and its column's voxel sizes are equal, and in each pair the largest
+   coefficient of one order is an entry of `Q'` (its `ay = q10`) while the other's is the matching
+   cofactor (its `az`). For a rotation mainly in the plane of axes 0 and 1 (equal sizes) the
+   orders (0, 1, 2) and (1, 2, 0) tie, and so do (0, 2, 1) and (1, 0, 2); for a rotation about
+   one axis only (the rotation derivative images, after the retry) the four orders that shear in
+   its plane tie. The computed norms then differ only by rounding (about 1e-16 relative,
+   measured), so the evaluation's last bits choose the order, at **every** resampling of such a
+   grid: the derivative images, each iteration of the fit, the output. Both choices are exact
+   decompositions of the same transformation, but they shift the rows along different axes
+   (x–y–x against y–x–y shears for a rotation about z) and so interpolate differently.
+
+Measured with the model of §15 taking either side of every tie, against AFNI: on a 40 × 44 × 24
+series with 3 × 3 × 3.5 mm voxels the roll derivative image's extremes move by 0.4 % to 1.4 %
+with heptic (−24.80 against −24.69 for one choice) and 5.5 % with linear, the first fit's
+coefficients by up to 4e-3 (heptic) and 4e-2 (linear) relative; through the iterations the
+parameters move by at most 0.0005° with Fourier (fMRIPrep's call: 0.0004°), 0.0044° heptic,
+0.0068° quintic, 0.013° cubic and **0.051° with `-linear`** (a roll of 2.4° in the series'
+3 × 3 mm plane; 0.0098° on another phantom, 0.0035° and 0.0012° on fMRIPrep's inputs of ds003592
+and ds000005), and single voxels of the registered volumes at their edges by up to 0.6 % of the
+largest value even where the parameters agree. Linear interpolation's smoothing depends on the
+fraction of each row's shift, so the axes it shifts along matter far more for it than for the
+higher orders. **With AFNI's choice of order and the stable formulas' coefficients** (a scratch
+check of the spec writer, with AFNI's evaluation of the norms: not kept), the model gives AFNI's
+`-1Dfile` lines exactly on that `-linear` case: the order is what decides, not the coefficients.
+AFNI's choice comes from its own rounding: in exact arithmetic on the same double `Q'` the tied
+norms differ by less than that rounding and agree with AFNI's choice in only 75 % of the
+derivative images measured, so no rule of this spec reproduces it. An implementation that does
+not evaluate the norms as AFNI does cannot be bit-identical, and §14.3's thresholds allow for
+either side of every tie. Every other statement of this spec was checked bit for bit by the model
+of §15 with the decomposition's double values made AFNI's: then it reproduces AFNI's outputs
+exactly (§15).
 
 ### 5.4 Zero padding (`-zpad n`)
 
@@ -590,11 +618,43 @@ The scale `c0` is never used (only printed with `-verbose -verbose`).
   for alignment` (final pass) or `** Can't initialize first pass alignment algorithm` (first
   pass), exit status 1. With `-twopass` and the coarse rotation search, each of its 44 rotations
   first prints `\n*** THD_rota3D_matvec: non-3D image input!` (and its sums cover no voxel).
-- **A basis whose least squares failed** (§7.1 steps 1 or 3: a constant base with `-twopass`,
-  all-zero weights, ...): the setup's messages are printed, and AFNI dies at the first volume it
-  fits ("Fatal Signal 11 (SIGSEGV)", its crash banner, exit status 1): AFNI-89 (§12).
-- **(observed)** A constant series without `-twopass` registers (every parameter 0; the
-  derivative images are non-zero at the padded edges); with `-twopass` it is AFNI-89.
+- **A basis whose least squares failed** (§7.1 step 1: a reference vector that is 0 at every
+  voxel of the fit's box; or step 3: a pivot `s ≤ 0`): the setup's messages are printed, and
+  AFNI dies at the first volume it fits ("Fatal Signal 11 (SIGSEGV)", its crash banner, exit
+  status 1): AFNI-89 (§12).
+- **Which inputs reach it** (spec writer, 2026-11-08; **(observed)**,
+  `validation/investigations/3dvolreg-spec/afni89.py`). Whether the least squares fail is decided
+  by the arithmetic of §5–§7 alone (exact zeros, a non-positive pivot), so an implementation that
+  follows it meets the failure on the same inputs; there is no simpler criterion, because an
+  exact zero depends on the float32 rounding of the interpolation (below).
+  - **Every weight in the box 0** (an all-zero `-weight`, with or without `-twopass`):
+    ` + skipping empty trim, {xyz}{a,b} = 0,0, 0,0, 0,0`, `** error: weights are all zero`,
+    `** ERROR: Choleski factorization failure in startup_lsqfit [row=0 sum=0]`, the "bad call"
+    line, the crash.
+  - **With `-twopass`, a base that does not vary along an axis** (each row along it one value),
+    for the first pass's basis: the two images of its shift derivative along that axis (the
+    blurred base shifted by `±twoblur·dfac` voxels, 1.4 by default, by linear interpolation,
+    §7.1) differ from the blurred base only in the `twoblur·dfac` voxels (rounded up: 2) nearest
+    each face of the axis, where the padding's zeros come in, so the derivative image (their
+    scaled difference) is 0 elsewhere if the interpolation gives the blurred base's value back
+    exactly (float32, §5.6). When the edging along that axis (§8.3) is at least that wide (with
+    the default 5 %, `trunc(0.05·N + 0.5) ≥ 2`: N ≥ 30 voxels) and the value comes back exactly
+    at every other voxel of the box, the image is 0 over the box: `** ERROR: lsqfit :: <k> vector<s> are
+    all 0 for data fitting`, one per such axis, then the "bad call" line and the crash. A
+    constant 40 × 44 × 24 series (value 100) gives `2 vectors` (x and y; its 24 slices have an
+    edging of 1), 30 × 30 × 30 gives 3, 30 × 29 × 29 and 29 × 29 × 30 give 1; so do the
+    values 37.3 and 7·10⁵ (2) and 1 (5: its rotation images are 0 over the box as well), the
+    40 × 44 × 24 series whose lower half of slices is 100 and upper half 0 (2), `-cubic` (the
+    first pass is always linear) and `-delta 0.3` (shifts of 0.6 voxel reach one plane: 3).
+  - **Not reached**, AFNI ends with exit status 0 and parameters that fit only the few voxels
+    near the faces (meaningless): when every axis's edging is narrower than the shifts' reach
+    (a constant 29 × 29 × 29 series: largest parameter 0.0016; 20 × 22 × 12: 569 mm;
+    40 × 44 × 24 with `-edging 1`: 117; with `-twoblur 3`, shifts of 2.1 voxels: 8·10⁶), and
+    when the interpolation does not give the value back exactly everywhere (the constants 1000
+    and 123.456 over 40 × 44 × 24: 4·10⁵ and 7·10⁵; a base constant along x but varying along y
+    and z: 4·10⁵).
+  - **Without `-twopass`** a constant series registers (the default heptic's shifts of 0.7 voxel
+    reach 4 planes, more than the 5 % edging; every parameter 0).
 
 ### 7.4 Volumes that are not registered
 
@@ -815,15 +875,25 @@ once:
 1. `R`, `t` from the 12 numbers of `VOLREG_MATVEC_000000` (§4.5's order, float32 to double). If
    `Σ |RᵀR − I|` (the nine entries, double; the sum rounded to float32) exceeds 0.01: `** -rotparent
    matrix not orthogonal!`, exit 1.
-2. The centres (DICOM, double from float32): `E2` = the output grid's centre (§4.1, after
-   `-gridparent`'s padding), `E1` = the gridparent's centre (or `E2`), `S2` = `VOLREG_CENTER_OLD`,
-   `S1` = `VOLREG_CENTER_BASE` (their first three numbers). `t ← t + (R·(E2 − S2) − (E1 − S1))`.
+2. The centres (DICOM, double from float32): `E2` = the centre (§4.1) of the **input's** grid
+   padded as `-gridparent` requires (below), before step 4 moves its origin: the input's origin
+   with, along the slice axis, `o − npad_neg·Δ` (a float32 product and difference) and
+   `npad_neg + nz + npad_pos` slices; without padding (no `-gridparent`, or one with as many
+   slices) the input's own centre. The gridparent's origin is **not** used for `E2` (spec writer,
+   2026-11-08, confirmed from the analysis; the reading the clean-room implementer's black-box
+   runs against AFNI found). `E1` = the gridparent's centre (or `E2`), `S2` =
+   `VOLREG_CENTER_OLD`, `S1` = `VOLREG_CENTER_BASE` (their first three numbers).
+   `t ← t + (R·(E2 − S2) − (E1 − S1))`.
 3. To dataset order: `R ← Pᵀ·R·P`, `t ← Pᵀ·t` (the output's P).
 4. With `-gridparent`, the output's origin becomes the gridparent's (and the slice timing's
    origin with it).
-5. The slice offsets (if any) move by `ndz = rint(t_z/|Δz|)` slices (double, ties to even;
-   `t_z` the dataset-order z component): offset `k` becomes the input's offset `k − ndz` (0 outside);
-   with `-verbose`: `++ adjusting time-offsets by <ndz> slices`.
+5. Only for a dataset **with slice offsets** (a NIfTI header that gives slice timing,
+   3dTshift §3.2; after `-gridparent`'s padding, the padded offsets): they move by
+   `ndz = rint(t_z/|Δz|)` slices (double, ties to even; `t_z` the dataset-order z component):
+   offset `k` becomes the input's offset `k − ndz` (0 outside); when `ndz ≠ 0` and with
+   `-verbose`: `++ adjusting time-offsets by <ndz> slices`. A dataset without slice offsets
+   prints nothing here, whatever `ndz` (spec writer, 2026-11-08, confirmed from the analysis; as
+   the clean-room implementer's black-box runs found).
 6. Each volume is registered as usual (§7.2) but not resampled; its reported parameters are
    printed with `%.4f` and read back (each value rounded to 4 decimals, as float32), turned into
    the transformation `T1` = rotation of §4.4 in dataset axes with the shift **after** the
@@ -1020,6 +1090,12 @@ which larmorx does not print). AFNI colours the labels of warnings and errors (A
   blanks (the initial values with scale 1 when given), per iteration `Delta fit: ` (the increment's
   seven) and `Total fit: ` (the increment's scale and the six totals), and `Iteration complete at
   <k> steps`.
+  **Over the box** (spec writer, 2026-11-08, confirmed from the analysis; **(observed)** by the
+  clean-room implementer): every number of these setup lines after ` + wtrim:` is taken over the
+  fit's box (§7.1 "Trimming"), the whole volume when nothing is trimmed: `weight range` is the
+  trimmed weight's minimum and maximum, ` # zero weights=<k> out of <n>` counts the box's voxels
+  (n is the box's size), the workspace's `voxels` are the box's, and each `<name> range` is the
+  range of that derivative image **after** it was cut to the box, not of the whole volume.
 - **(observed)** A whole quiet run of fMRIPrep's call on a 40 × 44 × 24 × 6 series:
 
       ++ Authored by: RW Cox
@@ -1128,7 +1204,11 @@ _DXXZ, _DXYY, _DXZZ, _DYYZ, _DYZZ, _DXYZ`, each voxel `P_a(X)·P_b(Y)·P_c(Z)` o
 three (a, b, c the letters' counts; `P_0 = 1`, `P_1(x) = x`, `P_2(x) = 1.5·x·x − 0.5`,
 `P_3(x) = (2.5·x·x − 1.5)·x`, all float32 left to right, the three factors multiplied left to
 right), normalised the same way. (The help lists only the three datasets; `-SAVEDISP` is
-undocumented.)
+undocumented.) The values normalised are exactly the float32 values `-savedisp` writes for the
+same arguments (they are normalised in place, after they were computed as above), and the 16
+products are made from the three normalised datasets; how both are validated: §14.3,
+"`-SAVEDISP`" (spec writer, 2026-11-08: the normalisation magnifies small differences of the raw
+values).
 
 ## 11. A faster implementation: what must stay, what may change
 
@@ -1182,7 +1262,7 @@ changed something; `reproduce` gives AFNI's behaviour. Rules A–D of the decisi
 | AFNI-86 | A | `-nocoarserot` is read as `-noclip` (its first 4 letters, §9.1 #18): the clipping turns off, the coarse rotation search stays on | `-nocoarserot` turns the coarse rotation search off, as the help says | whenever `-nocoarserot` is given |
 | AFNI-87 | A | a uint8 dataset's registered volumes are stretched, each by its own range: `trunc(s·(x − min))`, `s = 255.9/(max − min)` (double; `max = min + 1` when `max ≤ min`; `x − min` in float32), stored as uint8 | rounded (ties to even) and clamped to 0..255 | when the two differ |
 | AFNI-88 | B | an option that needs a value, given last, reads past the arguments: a crash (`Fatal Signal 11`), except `-input`/`-source` (`** FATAL ERROR: Can't open input dataset '(null)'`), `-rotparent`/`-gridparent` (`** Can't open -rotparent dataset!` and a blank line) and `-1Dmatrix_save` (`** FATAL ERROR: no argument after '-1Dmatrix_save'!`) | an error naming the option, exit 1, in both modes (AFNI's own message where it has one) | in both modes |
-| AFNI-89 | B | a basis whose least squares failed (§7.1: an all-zero reference vector, a failed Cholesky; a constant base with `-twopass`) prints its errors and crashes at the first volume fitted | AFNI's messages, then an error, exit 1, in both modes | in both modes |
+| AFNI-89 | B | a basis whose least squares failed (§7.1: a reference vector 0 over the whole box, a failed Cholesky; §7.3 lists the inputs measured: an all-zero weight, and with `-twopass` a base that does not vary along an axis of 30 voxels or more, for some of its values) prints its errors and crashes at the first volume fitted | AFNI's messages, then an error, exit 1, in both modes | in both modes |
 | AFNI-90 | A | a `-prefix`, `-dfile` or `-1Dfile` value, or `-weight`'s dataset name, of 256 bytes or more aborts the program at that option (`*** buffer overflow detected ***: terminated` and the crash banner, exit 1); `-maxdisp1D`'s name is cut to 997 bytes | kept whole | when a name is that long |
 | AFNI-92 | A | the coarse rotation search's automask uses the clip fraction left by `-maxdisp` (0.333), so `-nomaxdisp` changes it to 0.5 | 0.333 always | with `-nomaxdisp`, `-twopass` and the coarse rotation search |
 | AFNI-93 | A | a shift search whose region has no voxel (a grid of at most `2·del·(num+1)` voxels along an axis) scores every candidate 0: the first shift (`dz = −del·num`) wins, and in the rotation search the first rotation (−9°, −18°, −9°) | such candidates are not taken: no shift, no rotation | when such a region is met |
@@ -1285,21 +1365,85 @@ ds005003, ds005040's BOLD, ds005752's reverse run).
 
 ### 14.3 Thresholds (the original against AFNI, `reproduce`; and its default against the replica's default)
 
+(spec writer, 2026-11-08: revised from the measurements of §5.3, "Numerics". A clean-room
+original differs from AFNI because the decomposition's exact ties may be decided the other way,
+at every resampling; the thresholds allow for either side of every tie and nothing more.
+`validation/investigations/3dvolreg-spec/thresholds.py` holds every requirement below against
+AFNI for the model of §15 taking the smallest computed norm, the first and the last side of
+every tie, on 15 cases: the 40 × 44 × 24 × 6 series `s1` of §14.1 with each estimation method,
+`-twopass`, `-linear -twopass` and fMRIPrep's call, the model's own phantom with heptic and
+`-linear`, and fMRIPrep's inputs re-made from ds000005 and ds003592 with heptic, `-linear` and
+fMRIPrep's call: **0 failures** in 45 runs. The earlier fixed thresholds for the matrices, 1e-5,
+and the maximum displacements, 0.01 mm, were stricter than the parameters they follow from: they
+failed respectively every volume whose angles differ by more than about 0.0006° and the cubic
+and linear runs, with every parameter within its threshold.)
+
 | Quantity | Requirement |
 |---|---|
 | exit status | the same |
-| messages | byte for byte, except the CPU times and `-verbose -verbose`'s fit numbers (compared as numbers: relative 1e-4, or 1e-6 absolute) |
+| messages | byte for byte, except: the CPU times; the numbers that follow from the parameters (the two `Max displacement` messages and `-verbose`'s ` %.2f(%.2f)` list: within the derived bounds below plus 0.01, the printed sub-brick the same unless another volume's value is within that bound of the largest, a near tie, reported); `-verbose -verbose` (next row) |
+| `-verbose -verbose` | the lines that come before any resampling exactly (` + wtrim: ...`, `weight range`, ` # zero weights`, the workspace: §9.3); each derivative image's range within 10 % of the larger magnitude (the tie choices move them by up to 1.4 % with heptic, 5.5 % with linear); the fit lines (`First fit`, `Delta fit`, `Total fit`, `Iteration complete at <k> steps`) the same text with their numbers masked where both runs iterate as often; their numbers, and a different count, reported, not required (the first fit's coefficients move by up to 4e-3 relative with heptic, 4e-2 with linear) |
 | coarse search results (`-verbose`'s coarse lines) | the same rotation and shift for every volume; a difference is reported with its scores and must come from a near tie |
-| parameters (`-1Dfile`, `-dfile`, `-rotcom`) | per volume `|Δ angle| ≤ φ_t + 0.005·|angle|` and `|Δ shift| ≤ x_t·δ_n + 0.005·|shift|` (the convergence thresholds, plus the decomposition's sensitivity of §5.3: the model of §15 with its own decomposition differs by up to 0.4 % of the roll angle with `-linear`, 0.04 % otherwise), and the median of all `|Δ|` ≤ 0.001 (degrees or mm) |
-| matrices (`-1Dmatrix_save`) | rotation entries within 1e-5, translations within `x_t·max δ` mm (they follow from the parameters) |
-| maximum displacements (`-maxdisp1D`, the messages) | within 0.01 mm |
-| registered volumes, float32 | where every parameter of the volume agrees within 1e-4: max `|diff|` ≤ 1e-5·max `|AFNI|` (polynomial methods) or 1e-4·max (Fourier: another FFT); elsewhere NCC ≥ 0.9999 and mean `|diff|` ≤ 1e-3·max (the model of §15: at most 0.6 % at one voxel, 2.4e-5 typically) |
-| registered volumes, int16 / uint8 | ±1, the fraction of differing voxels reported |
-| fMRIPrep's medians | max `|diff|` ≤ 1e-4·max of fMRIPrep's own `gen_avg` / `ref_average` output |
+| parameters (`-1Dfile`, `-dfile`, `-rotcom`) | per volume `|Δ angle| ≤ φ_t + k·|angle|` and `|Δ shift| ≤ x_t·δ_n + k·|shift|` (δ_n the voxel size along the shift's axis; `angle` and `shift` AFNI's), and the median of all `|Δ|` ≤ m (degrees or mm): **k = 0.005 and m = 0.001** for the estimation methods heptic, quintic, cubic and Fourier (measured: within `φ_t` and `x_t·δ_n` alone, at most 0.013° and 0.0035 mm, cubic on `s1`); **k = 0.03 and m = 0.005 for `-linear`** (measured: up to 0.051° at a roll of 2.4°, which needs k = 0.015, and a median of 0.0031); the estimation method decides, not `-final`, and `-twopass`'s linear first pass does not count (its result only starts the final pass) |
+| `-dfile`'s rmsold, rmsnew | rmsold identical (it compares the input with the base); rmsnew within `rms(y_AFNI − y)` (the two registered volumes' difference: the triangle inequality) `+ 1e-3·rmsnew` (the float32 sums and the `%11.4g` printing), for float32 outputs, `+ 1` for int16, taken from a run that writes the registered dataset; otherwise reported (measured: rmsnew moves by up to 11 % with `-linear`, 4.5 % cubic, 1.7 % heptic, 0.2 % Fourier on `s1`) |
+| matrices (`-1Dmatrix_save`) | derived (below): rotation entries within `α_v + 1e-6`; translations within `τ_v + α_v·(|t| + |c_b|) + 1e-6·(|t| + |c_b| + |c_i|) + 1e-5·|u|` |
+| maximum displacements (`-maxdisp1D`, the messages) | derived: each volume's within `α_v·r + τ_v + 0.001`, each delta within the sum of its volume's and the previous volume's bounds |
+| `-savedisp` | derived: each voxel's three values within `α_v·|x − c| + τ_v + 1e-6·(1 + |u|)` |
+| `-SAVEDISP` | in two steps, below: its normalisation and its 16 products exactly, on AFNI's own raw displacements; a whole run's 19 datasets by names, order, count, headers and types exactly, and by value only where the normalisation is well conditioned |
+| registered volumes, float32 | every volume NCC ≥ 0.9998 and mean `|diff|` ≤ 2e-3·max `|AFNI|`, whether or not its parameters agree (the output's own resampling meets the ties); the largest single difference reported, not required (measured: NCC ≥ 0.99994 and mean ≤ 1.1e-3, both `-linear` on `s1`; at most 7.3e-4 with the other methods, 3.2e-4 on fMRIPrep's inputs; single voxels at the volume's edges up to 2.9e-2 of the largest value with `-linear`, 1.7e-2 cubic, 5.9e-3 heptic on ds000005, also where every parameter agrees within 1e-4) |
+| registered volumes, int16 / uint8 | the same measures on the stored values; the fraction of voxels that differ by more than 1 reported |
+| fMRIPrep's medians | on §14.2's calls, max `|diff|` ≤ 1e-4·max of fMRIPrep's own `gen_avg` / `ref_average` output (measured: at most 3.2e-5 on ds000005 and ds003592; the synthetic `s1` with fMRIPrep's call, a motion of 3° and 5 mm that no fMRIPrep input of §14.2 has, 1.3e-3: reported) |
 | headers, types, dimensions, geometry, time fields | identical |
 
 Bit-identity is reported per category, not required. PLAN.md §11.3's motion-parameter criterion
 (median ≤ 0.05 mm and 0.05°) is met by construction.
+
+**Derived quantities** (spec writer, 2026-11-08). The matrices, the maximum displacements and
+`-savedisp`'s displacements are functions of a volume's six reported parameters (§4.5, §8.8,
+§10.3), so their thresholds follow from that volume's own parameter differences, which already
+carry every tolerance. For volume v, with `Δθ_k` (roll, pitch, yaw; degrees) and `Δs_k` (dS, dL,
+dP; mm) the differences of the two runs' `-1Dfile` lines (printed with four decimals, so the
+float32 values differ by at most `|Δ| + 0.0001` each):
+- `α_v = (π/180)·Σ_k (|Δθ_k| + 0.0001)` (radians) bounds the angle of the rotation between the
+  two volumes' rotations (the angle of a product of rotations is at most the sum of their
+  angles), and so every entry of the difference of the two rotation matrices and of their
+  inverses (an entry is at most the difference's 2-norm, `2·sin(angle/2)`);
+- `τ_v = √(Σ_k (|Δs_k| + 0.0001)²)` (mm) bounds the length of the difference of the shifts;
+- so a point at distance ρ from the centre of rotation moves by at most `α_v·ρ + τ_v` between the
+  two runs. `-savedisp`'s ρ is the voxel's distance `|x − c|` from the axis centre (§10.3); the
+  maximum displacement's `r` is half the grid's diagonal, `0.5·√(Σ_n ((N_n − 1)·δ_n)²)`, which no
+  edge voxel of the mask exceeds;
+- `-1Dmatrix_save`'s translation is `−R⁻¹·(t + c_b) + c_i` (§4.5), so it moves by at most
+  `τ_v + α_v·|t + c_b|`, with `|t|` the length of AFNI's `(dL, dP, dS)` and `c_b`, `c_i` the base's
+  and the input's centres (§4.1);
+- the small terms cover the roundings: `1e-6` the rotation entries' `%13.6g`, `1e-6·(|t| + |c_b| +
+  |c_i|)` §4.5's float32 steps and `1e-5·|u|` the translations' `%13.6g` (|u| the larger printed
+  value), 0.001 the two `%.3f` of `-maxdisp1D`, `1e-6·(1 + |u|)` `-savedisp`'s float32 storage.
+
+With every parameter within its threshold, `α_v ≤ (π/180)·Σ_k (φ_t + k·|θ_k| + 0.0001)`: for the
+default `φ_t = 0.02°` and small angles the rotation entries are within about 1.05e-3. This is the
+threshold that follows from the parameter thresholds; the per-volume form above is tighter and
+is the one checked (measured differences of the rotation entries: 5e-8 to 9e-4).
+
+**`-SAVEDISP`.** Its normalisation (§10.3) divides each voxel's detrended series by its largest
+absolute value m, so a difference e of the raw displacements becomes about e/m. For a motion close
+to linear in time m is the size of the parameters' own small differences from that line, and the
+normalised values turn differences far below the thresholds into any value between −1 and 1
+(measured: on `s1`, whose volumes move by equal steps, the normalised displacements differ by up
+to 2.0 and no voxel is well conditioned; on ds000005's 20 volumes 49 % of the voxels are with
+heptic, 24 % with `-linear`). They are therefore validated in two steps:
+1. **The arithmetic, exactly.** AFNI's `-savedisp` run with the same arguments gives the raw
+   displacements that `-SAVEDISP` normalises (the same float32 values: AFNI is deterministic and
+   normalises them in place before writing). The original's normalisation and its 16 products,
+   applied to those raw datasets, must give AFNI's 19 `-SAVEDISP` datasets bit for bit.
+2. **A whole run.** Names, order, count, headers and types exactly; the raw displacements
+   (`-savedisp`) at the derived threshold above; the three normalised displacements `_DX`, `_DY`,
+   `_DZ` by value only at the voxels where the normalisation is well conditioned: with `τ` the
+   voxel's largest `-savedisp` bound over the volumes and `m` the largest absolute value of AFNI's
+   detrended raw series, voxels with `m > 30·τ`, whose normalised values must agree within
+   `6·τ/(m − 3·τ)` (the detrending is a projection that at most triples a difference, the
+   division at most doubles it). The other voxels and the 16 products are reported (largest
+   difference, correlation), not required.
 
 **AFNI's own variability.** AFNI is deterministic and single-threaded: repeated runs, AFNI 25.2.09
 and fMRIPrep's own AFNI give the same bits **(observed)**, so there is no natural spread. A band
@@ -1351,12 +1495,34 @@ reading) and `-twopass -coarse 2 1` (the shift-only search); the same series sto
   Fourier cases identical in every `-1Dfile` line and maximum displacement, their volumes within
   1.2e-6 (numpy's FFT, not AFNI's) and their int16 volumes within ±1 in 22 of 211,200 voxels.
 
+**Added 2026-11-08** (spec writer; the implementer's questions on §14.3, §7.3, §8.9, §9.3 and
+§10.3):
+- `model.py`'s `TIES` takes either side of §5.3's exact ties (`"smallest"`, the spec's rule on
+  the model's own evaluation, as before; `"first"`, `"last"`: the first or the last order within
+  a relative 1e-12 of the smallest norm).
+- `thresholds.py` runs AFNI through the oracle cache (`afni_run.py`) and the model with each of
+  the three on 15 cases (§14.3's list) and holds every requirement of §14.3 against them,
+  `-savedisp` and `-SAVEDISP` included (the model's displacements computed by §10.3's formula
+  from its parameters): 0 failures in 45 runs. It also prints what the earlier fixed thresholds
+  would have failed (the matrices' 1e-5 in every case but fMRIPrep's calls, the maximum
+  displacements' 0.01 mm with `-cubic` and `-linear`).
+- `afni89.py` runs AFNI on the inputs of §7.3 (constant series of several sizes and values, a
+  half-constant one, a base constant along one axis, an all-zero weight, with and without
+  `-twopass`, `-edging`, `-twoblur`, `-delta`) and prints its errors or the parameters it ends
+  with.
+
 ## 16. Open points
 
-- **Bit-identity needs AFNI's evaluation of the shear decomposition** (§5.3, "Numerics"): AFNI's
-  closed form is generated code, not a mathematical definition, and this spec does not give it;
-  the original is validated by the thresholds of §14.3. (For the orchestrator: if the user wants
-  the original bit-identical on the polynomial methods, the spec could describe that evaluation's
-  order of operations; the spec writer's recommendation is not to: the replica gives AFNI's bits,
-  and the difference is a fraction of the convergence threshold.)
+- **Bit-identity needs AFNI's evaluation of the shear decomposition's norms** (§5.3,
+  "Numerics"): the order AFNI chooses where two orders tie exactly decides every resampling of a
+  grid with two equal voxel sizes, and AFNI's closed form is generated code, not a mathematical
+  definition; this spec does not give it, and no rule found reproduces its choice (measured: in
+  the derivative images AFNI's choice follows a fixed pattern, but taking that pattern there alone
+  brings the results no closer; in the fit's iterations the choice follows the last bits of each
+  matrix). The original is
+  validated by the thresholds of §14.3. (For the orchestrator: if the user wants the original
+  bit-identical on the polynomial methods, the spec could describe that evaluation's order of
+  operations; the spec writer's recommendation is not to: the replica gives AFNI's bits, and the
+  difference is within the thresholds that follow from the convergence thresholds, `-linear`'s
+  wider ones included.)
 - For Fourier the FFT's last bits are AFNI's own (§5.6) and not specified.

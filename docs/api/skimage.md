@@ -1,0 +1,76 @@
+# scikit-image's ball, Otsu threshold and random walker
+
+`lx.skimage` holds a replica of the three scikit-image functions under sdcflows' `brain_masker`:
+`skimage.morphology.ball`, `skimage.filters.threshold_otsu` and
+`skimage.segmentation.random_walker`. They are ported from **scikit-image 0.26.0**
+(`morphology/footprints.py`, `filters/thresholding.py`, `exposure/exposure.py`,
+`segmentation/random_walker_segmentation.py`, `util/dtype.py`); their arithmetic is the same in
+scikit-image 0.25.2, fMRIPrep 25.2.6's. Under them run SciPy's sparse matrices and conjugate
+gradients (`scipy/sparse/_compressed.py`, `_coo.py`, `sparsetools/csr.h`,
+`sparse/linalg/_isolve/iterative.py`, SciPy 1.18.1 and 1.15.3) and numpy's `histogram`,
+`linspace`, `dot`, `std` and float32/float64 `exp` (numpy 2.5.4 and 2.3.5, OpenBLAS's Haswell
+`sdot`/`ddot`: `larmorx_core::numpy`). The Rust code is `larmorx_ndimage::skimage`.
+
+**Status: experimental** (field maps part B, relay 3, 2026-11-08). Results are scikit-image's
+bit for bit on seeded cases in the shared (numpy 2.3.5, SciPy 1.15.3) and newest (numpy 2.5.4,
+SciPy 1.18.1) environments (`validation/investigations/sdcflows-fieldmap-b/check_skimage.py`):
+`ball` 24 of 24, `threshold_otsu` 52 of 52 (float, integer images, histograms), numpy's
+`histogram` 128 of 128 and `dot`/`norm` 1,218 of 1,218, `random_walker` 24 of 24 cases (2-D, 3-D,
+float32 and float64 data and spacings, multichannel, integer data, negative labels, isolated
+seeds, three labels, both outputs, every ported mode, the early returns; warnings identical), the
+float64 systems with numpy's float64 `exp` from the C library (numpy's AVX-512 dispatch off;
+on AVX-512 CPUs numpy 2.5.4 uses Intel's SVML `exp`, whose last bits differ).
+
+```python
+import numpy as np
+import larmorx as lx
+
+ball3 = lx.skimage.ball(3)
+th = lx.skimage.threshold_otsu(image)
+prob = lx.skimage.random_walker(
+    data, markers, spacing=zooms, return_full_prob=True, scipy_version="1.18.1", n_threads=8
+)
+```
+
+## Option mapping
+
+| scikit-image | larmorx | notes |
+|---|---|---|
+| `ball(radius, dtype, strict_radius=, decomposition=None)` | `lx.skimage.ball(...)` | `decomposition='sequence'`: `NotImplementedError` |
+| `threshold_otsu(image, nbins=256)` | `lx.skimage.threshold_otsu(image, nbins)` | float images: numpy's `histogram` with `nbins` bins; integer images: one bin per value (`nbins` ignored), as scikit-image |
+| `threshold_otsu(hist=counts)` / `hist=(counts, centres)` | the same | zero counts at both ends trimmed |
+| `random_walker(data, labels, beta=130, mode='cg_j', tol=1e-3, copy=True, return_full_prob=False, spacing=None, prob_tol=1e-3, channel_axis=None)` | `lx.skimage.random_walker(...)` | every argument; plus `scipy_version`, `upstream_defects`, `n_threads` |
+| `mode='cg_j'` / `None` | the same | Jacobi-preconditioned conjugate gradients |
+| `mode='cg'` | the same | no preconditioner; scikit-image's UMFPACK warning |
+| `mode='cg_mg'` | falls back to `'cg_j'` with scikit-image's warning | scikit-image does the same without pyamg; pyamg's multigrid is not ported |
+| `mode='bf'` | `NotImplementedError` | SciPy's `spsolve` (SuperLU) is not ported yet |
+
+## What decides the bits
+
+- **The types.** The gradients run in the type numpy promotes the data and the spacing to: a
+  `float32` image with a `float32` spacing (nibabel's zooms) stays in `float32` end to end; the
+  default spacing (`np.ones(3)`), a tuple of Python floats or any `float64` spacing makes the
+  gradients, the weights, the Laplacian and the conjugate gradients `float64`; multichannel data
+  make the scale `float64` too. `data.std()` is numpy's of the caller's array (its memory order
+  decides numpy's summation order).
+- **SciPy's row order** (`scipy_version`). SciPy 1.15 stores the Laplacian's diagonal after each
+  row's other entries (`setdiag` through COO); SciPy 1.16 onwards sorts every row. The conjugate
+  gradients' products are added in that order, so the probabilities' last bits differ between the
+  releases (on sdcflows' `brain_masker`, 74-90 % of the voxels' probabilities; the masks differ in
+  0 or 1 voxel).
+- **numpy's dot products**: OpenBLAS's Haswell kernels (`OPENBLAS_CORETYPE=Haswell` on the
+  validation machine; the kernel numpy runs on every AVX2 CPU), one thread.
+
+## Upstream defects
+
+- **SKI-01** (scikit-image's random walker with a mask): when labels are negative or seeds are
+  isolated, scikit-image numbers the Laplacian's nodes by the ends of the remaining edges but the
+  labels by the mask; a pixel of the mask with no neighbour left in it (a seed surrounded by pruned
+  pixels) shifts every later node, so the system pairs labels with the wrong pixels (probabilities
+  off by up to 0.59 on the check's cases). larmorx numbers both by the mask by default and warns
+  (`UpstreamDefectWarning`); `upstream_defects='reproduce'` gives scikit-image's result bit for
+  bit. Rule A (the input makes sense; the result is wrong).
+- Candidates for the register (decided in the part's defects relay): the labels returned by
+  `random_walker` are the renumbered ones (consecutive from 1), not the input's values, when these
+  are not consecutive; `return_full_prob=True` without unlabeled pixels returns a boolean
+  concatenation along the last axis instead of `(nlabels, ...)` probabilities.

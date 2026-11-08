@@ -23,6 +23,7 @@
 //! outputs are; the steps before it are elementwise or order-free.
 
 use larmorx_core::numpy::histograms::min_max;
+use larmorx_core::numpy::reduce::{SumOrder, std_ordered};
 use larmorx_core::numpy::{NpFloat, NumpyRelease, quantile};
 use larmorx_ndimage::skimage::{self, Mode, Numbering, Preprocessed, RandomWalker, SparseOrder};
 use larmorx_ndimage::{
@@ -39,6 +40,9 @@ pub struct MaskerOptions {
     pub padding: usize,
     /// numpy's release for the percentile of a Python-number `q`.
     pub numpy: NumpyRelease,
+    /// numpy's order of a whole-array sum (the random walker's `data.std()`: numpy 2.2 sums in
+    /// buffered chunks).
+    pub sum_order: SumOrder,
     /// SciPy's order of the random walker's Laplacian rows.
     pub scipy: SparseOrder,
     /// Keep sdcflows' results where its inputs make no sense (`reproduce`): with no component in
@@ -52,6 +56,7 @@ impl Default for MaskerOptions {
         MaskerOptions {
             padding: 5,
             numpy: NumpyRelease::V2_5,
+            sum_order: SumOrder::Pairwise,
             scipy: SparseOrder::Scipy118,
             reproduce: false,
         }
@@ -324,7 +329,7 @@ pub fn brain_masker(
         data: &seg,
         shape: ps,
         channels: 1,
-        std: None,
+        std: Some(std_ordered(&seg, 0, opts.sum_order)),
         multichannel: false,
         spacing: skimage::random_walker::Spacing::F32(zooms),
         beta: 130.0,

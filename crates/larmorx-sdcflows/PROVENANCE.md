@@ -68,3 +68,18 @@ for its FreeSurfer branch.
 
 Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`; `init_fmap_wf`
 needs part B's magnitude preparation and masks.
+
+## Part B: `brain_masker` (`src/masker.rs`)
+
+**Ported** from sdcflows 2.17.1 `sdcflows/utils/tools.py` (`brain_masker`; identical in 2.15.1),
+on `larmorx-ndimage` (SciPy's `grey_closing`, `median_filter`, `binary_*`, `label`, `sum`) and
+its `skimage` module (`ball`, `threshold_otsu`, `random_walker`), and numpy's `percentile` and
+`std` (`larmorx_core::numpy`). The Python wrapper `python/larmorx/sdcflows/masks.py` ports
+`brain_masker`'s file names and writes, `interfaces/brainmask.py`'s `BrainExtraction`,
+`BinaryDilation` (`_dilate`) and `Union` (`_union`). Bit-identical to sdcflows' own
+`brain_masker` in both kept environments and to fMRIPrep 25.2.6's own `masker` files (numpy
+2.2's sums, SciPy 1.15's order) on the nine `brainextraction_wf` nodes of the oracle runs
+(`validation/investigations/sdcflows-fieldmap-b/check_skimage.py`). Its switches: the rough mask
+without a component (SDC-h) and no brain seed after the erosion: errors by default,
+`upstream_defects='reproduce'` gives sdcflows' results (IDs in the part's defects relay).
+

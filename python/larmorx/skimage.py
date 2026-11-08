@@ -116,6 +116,7 @@ def random_walker(
     prob_tol: float = 1e-3,
     channel_axis: int | None = None,
     scipy_version: str = SCIPY_NEWEST,
+    numpy_version: str | None = None,
     upstream_defects: str = "fix",
     n_threads: int = 1,
 ) -> np.ndarray:
@@ -129,7 +130,10 @@ def random_walker(
 
     ``scipy_version``: SciPy 1.15 (and older) stores the Laplacian's diagonal after each row's
     other entries, SciPy 1.16 onwards sorts them; the conjugate gradients add the products in that
-    order. ``upstream_defects='reproduce'`` numbers a masked Laplacian as scikit-image does (by
+    order. ``numpy_version``: ``None`` takes ``data.std()`` from the running numpy (on the caller's
+    array, in its memory order); a release computes it on the C-ordered data in that release's
+    order of sums (numpy 2.2 and older add whole arrays in buffered chunks of 8192 elements, numpy
+    2.3 onwards pairwise). ``upstream_defects='reproduce'`` numbers a masked Laplacian as scikit-image does (by
     the edges' ends: wrong when a seed has no neighbour left in the mask); the default numbers it by
     the mask. ``n_threads``: the threads of the system's construction and products (the result
     does not depend on them)."""
@@ -197,7 +201,7 @@ def random_walker(
     sp = np.ascontiguousarray(spacing, dtype=np.float32 if gtype == np.float32 else np.float64)
     if data.dtype not in (np.float32, np.float64):
         data = data.astype(np.float64)
-    std = float(data.std())
+    std = float(data.std()) if numpy_version is None else None
     if labels.dtype.kind not in "biu":
         # labels of another number type: numpy's ranks minus the rank of 0 keep every test of
         # _preprocess (zero, positive, negative); without a 0 scikit-image returns early
@@ -228,6 +232,7 @@ def random_walker(
         "edges" if upstream_defects == "reproduce" else "mask",
         bool(return_full_prob),
         int(n_threads),
+        numpy_version,
     )
     kind = res["kind"]
     if kind == "nozero":

@@ -456,6 +456,58 @@ def numpy_exp_f32(a: np.ndarray) -> np.ndarray:
 def numpy_clip_f32(a: np.ndarray, a_min: float, a_max: float) -> np.ndarray:
     """``numpy.clip`` of a float32 array with float32 bounds."""
 
+def numpy_histogram(a: np.ndarray, nbins: int) -> tuple[np.ndarray, np.ndarray]:
+    """``numpy.histogram(a, bins=nbins)`` of a float32 or float64 array: ``(int64 counts,
+    edges)``."""
+
+def numpy_dot(x: np.ndarray, y: np.ndarray) -> float:
+    """``np.dot`` of two float32 or float64 vectors (OpenBLAS's Haswell kernels)."""
+
+# --- scikit-image (larmorx/skimage) and sdcflows' brain_masker -------------------------------
+
+def skimage_ball(radius: float, strict_radius: bool) -> np.ndarray:
+    """``skimage.morphology.ball`` as a bool array."""
+
+def skimage_threshold_otsu(image: np.ndarray, nbins: int) -> float:
+    """``threshold_otsu`` of a float32 or float64 image (the value in its type)."""
+
+def skimage_threshold_otsu_int(image: np.ndarray) -> int:
+    """``threshold_otsu`` of an integer image (int64 values)."""
+
+def skimage_threshold_otsu_hist(counts: np.ndarray, centers: np.ndarray) -> int:
+    """``threshold_otsu(hist=(counts, centers))``: float32 counts, float32 or float64 centres;
+    the index of the chosen centre."""
+
+def skimage_random_walker(
+    data: np.ndarray,
+    labels: np.ndarray,
+    multichannel: bool,
+    spacing: np.ndarray,
+    std: float | None,
+    beta: float,
+    mode: str,
+    tol: float,
+    prob_tol: float,
+    scipy_version: str,
+    numbering: str,
+    return_full_prob: bool,
+    n_threads: int,
+    numpy_version: str | None = None,
+) -> dict[str, Any]:
+    """``random_walker`` after scikit-image's checks (``larmorx.skimage.random_walker``)."""
+
+def sdcflows_brain_masker(
+    data: np.ndarray,
+    zooms: list[float],
+    padding: int,
+    numpy_version: str,
+    scipy_version: str,
+    reproduce: bool,
+    n_threads: int,
+) -> tuple[np.ndarray, np.ndarray, float, list[int], list[str]]:
+    """sdcflows' ``brain_masker`` of a float32 3-D array: ``(probseg, mask, threshold,
+    iterations, warnings)``."""
+
 # --- nitransforms chains and fMRIPrep's one-shot resampler (larmorx/transforms) ---------------
 
 Step = tuple[Any, ...]  # ("affine", 4x4) or ("field", deltas (x, y, z, 3), affine, inverse)

@@ -27,3 +27,24 @@ SciPy reads or writes outside its arrays (binary morphology with an origin befor
 the `reflect` boundary two periods before a short axis, the 1-D rank filter's window running past
 a short input) or loops for ever (a binary erosion until nothing changes that alternates),
 larmorx gives the mode's own value or a clear error.
+
+## scikit-image's `ball`, `threshold_otsu` and `random_walker` (`src/skimage/`)
+
+**Ported** from scikit-image 0.26.0 (BSD-3-Clause, `tags/scikit-image-0.26.0`, sdist SHA-256
+`f5f970ab...99fa`; the same arithmetic in 0.25.2, fMRIPrep 25.2.6's), with SciPy 1.18.1's and
+1.15.3's sparse arithmetic under the random walker. Each file carries scikit-image's notice.
+
+| Rust | Upstream | Licence |
+|---|---|---|
+| `skimage::ball` | `src/skimage/morphology/footprints.py` (`ball`, no decomposition) and numpy's `mgrid` with a complex step (`numpy/lib/_index_tricks_impl.py`, `nd_grid`) | BSD-3-Clause |
+| `skimage::otsu` (`threshold_otsu`, `threshold_otsu_int`, `threshold_otsu_hist`) | `src/skimage/filters/thresholding.py` (`threshold_otsu`, `_validate_image_histogram`), `src/skimage/exposure/exposure.py` (`histogram`, `_histogram`, `_bincount_histogram`, `_bincount_histogram_centers`, `_offset_array`) | BSD-3-Clause |
+| `skimage::random_walker` (`preprocess`, `random_walker`, `RwOutput::full_prob`, `labels`) | `src/skimage/segmentation/random_walker_segmentation.py` (`_make_graph_edges_3d`, `_compute_weights_3d`, `_build_laplacian`, `_build_linear_system`, `_solve_linear_system`'s `cg` and `cg_j`, `_preprocess`, `random_walker`); SciPy's `_compressed.py` (`_setdiag`, `_minor_index_fancy`, `diagonal`), `_coo.py` (`_setdiag`, `_coo_to_compressed`), `_base.py` (`sum`), `sparsetools/csr.h` (`csr_matvecs`, `csc_matvecs`, `csr_matmat`, `csr_diagonal`, `coo_tocsr`), `_dia.py` (`dia_matvec`), `sparse/linalg/_isolve/iterative.py` (`cg`, `_get_atol_rtol`) and `utils.py` (`make_system`), SciPy 1.18.1 and 1.15.3 (the rows' order: measured, `check_skimage.py`) | BSD-3-Clause |
+
+The Python wrapper (`python/larmorx/skimage.py`) ports `random_walker`'s argument checks,
+`channel_as_last_axis`, `img_as_float` (`src/skimage/util/dtype.py`, `_convert`'s integer and
+boolean branches), the early returns and scikit-image's warnings. Not ported: `mode='bf'`
+(SciPy's `spsolve`), pyamg's `cg_mg` (scikit-image's own fallback to `cg_j` without pyamg is),
+`ball(decomposition='sequence')`.
+
+**The D13 switch** (`upstream_defects`): SKI-01, a masked Laplacian numbered by the edges' ends
+(`docs/api/skimage.md`).

@@ -252,6 +252,21 @@ the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
   `DOUBLE_log`; the symbols `exp@GLIBC_2.2.5`, `log@GLIBC_2.2.5` they bind, whose negative
   logarithm is C's positive `NAN`: measured, glibc's source not read).
 
+- `numpy/reduce.rs`'s `SumOrder`, `add_reduce_ordered`, `std_ordered` (field maps part B): numpy
+  2.2 and older add a whole contiguous array in chunks of `NPY_BUFSIZE` (8192) elements (the
+  buffered reduction's inner loop), numpy 2.3 onwards pairwise over the whole array (the
+  iterator's buffering rewrite); established by measurement against numpy 2.2.6 (fMRIPrep
+  25.2.6's image) and 2.3.5 (`validation/investigations/sdcflows-fieldmap-b/`).
+- `numpy/dot.rs` (field maps part B; moved from `larmorx-sdcflows`' `blas.rs`): numpy's
+  `FLOAT_dot`/`DOUBLE_dot` and `cblas_matrixproduct`'s one-element case
+  (`numpy/_core/src/multiarray/arraytypes.c.src`, `common/cblasfuncs.c`) over OpenBLAS 0.3.34's
+  Haswell `sdot`/`ddot` (`kernel/x86_64/sdot.c`, `sdot_microk_haswell-2.c`, `ddot.c`,
+  `ddot_microk_haswell-2.c`; BSD-3-Clause, the OpenBLAS notice in the file): the kernels' lane
+  order, the tails (the `ddot` tail measured unfused).
+- `numpy/histograms.rs` (field maps part B): `linspace` (`numpy/_core/function_base.py`) and
+  `histogram`'s equal-bin path with `_get_outer_edges`, `_get_bin_edges`, `_unsigned_subtract`
+  (`numpy/lib/_histograms_impl.py`), numpy 2.5.4 (the same values in 2.3.5).
+
 Each file carries numpy's (and SciPy's) notice. Bit-identical to numpy 2.3.5 / SciPy 1.15.3 and
 numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
 `validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana

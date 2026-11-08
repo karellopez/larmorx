@@ -3,6 +3,7 @@
 //! `random_walker`), sdcflows' `brain_masker` (`larmorx_sdcflows::masker`), and two numpy
 //! helpers the checks use (`histogram`, `dot`), for `larmorx.skimage` and `larmorx.sdcflows`.
 
+use larmorx_core::numpy::reduce::{SumOrder, std_ordered};
 use larmorx_core::numpy::{self as np, NpFloat, NumpyRelease};
 use larmorx_ndimage::skimage::{
     self as sk, Mode, Numbering, Preprocessed, RandomWalker, RwWarning, Spacing, SparseOrder,
@@ -31,6 +32,11 @@ fn values<T: Copy + Element>(a: &PyReadonlyArrayDyn<'_, T>) -> Vec<T> {
 fn release(name: &str) -> PyResult<NumpyRelease> {
     NumpyRelease::from_version(name)
         .ok_or_else(|| PyValueError::new_err(format!("not a numpy 2 version: {name:?}")))
+}
+
+fn sum_order(name: &str) -> PyResult<SumOrder> {
+    SumOrder::from_version(name)
+        .ok_or_else(|| PyValueError::new_err(format!("not a numpy version: {name:?}")))
 }
 
 /// SciPy's release name to the order of the random walker's Laplacian rows: 1.15 (and older)
@@ -126,6 +132,7 @@ fn random_walker_t<'py, D: NpFloat + Element>(
     multichannel: bool,
     spacing: Spacing,
     std: Option<f64>,
+    order_of_sums: Option<SumOrder>,
     beta: f64,
     mode: Mode,
     tol: f64,
@@ -147,7 +154,11 @@ fn random_walker_t<'py, D: NpFloat + Element>(
                 data: &v,
                 shape,
                 channels,
-                std: std.map(D::from_f64),
+                std: match (std, order_of_sums) {
+                    (Some(s), _) => Some(D::from_f64(s)),
+                    (None, Some(o)) => Some(std_ordered(&v, 0, o)),
+                    (None, None) => None,
+                },
                 multichannel,
                 spacing,
                 beta,
@@ -201,7 +212,7 @@ fn random_walker_t<'py, D: NpFloat + Element>(
 /// `labels` with `labels`), `warnings`, `iterations`, `float32`, `nlabels`.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (data, labels, multichannel, spacing, std, beta, mode, tol, prob_tol, scipy_version, numbering, return_full_prob, n_threads))]
+#[pyo3(signature = (data, labels, multichannel, spacing, std, beta, mode, tol, prob_tol, scipy_version, numbering, return_full_prob, n_threads, numpy_version=None))]
 fn skimage_random_walker<'py>(
     py: Python<'py>,
     data: &Bound<'py, PyAny>,
@@ -217,7 +228,9 @@ fn skimage_random_walker<'py>(
     numbering: &str,
     return_full_prob: bool,
     n_threads: usize,
+    numpy_version: Option<&str>,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let order_of_sums = numpy_version.map(sum_order).transpose()?;
     let lshape = labels.shape().to_vec();
     if lshape.len() != 3 {
         return Err(PyValueError::new_err("labels must be 3-D here"));
@@ -258,6 +271,7 @@ fn skimage_random_walker<'py>(
             multichannel,
             spacing,
             std,
+            order_of_sums,
             beta,
             mode,
             tol,
@@ -279,6 +293,7 @@ fn skimage_random_walker<'py>(
         multichannel,
         spacing,
         std,
+        order_of_sums,
         beta,
         mode,
         tol,
@@ -320,6 +335,7 @@ fn sdcflows_brain_masker<'py>(
     let opts = MaskerOptions {
         padding,
         numpy: release(numpy_version)?,
+        sum_order: sum_order(numpy_version)?,
         scipy: scipy_order(scipy_version)?,
         reproduce,
     };

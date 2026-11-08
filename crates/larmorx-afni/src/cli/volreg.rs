@@ -1489,10 +1489,7 @@ fn execute_after_scan(
                 log.message(m);
             }
             // the option scan's notices too (AFNI-86, -90, -95), before the error
-            print_notices(
-                log,
-                late.drain(..).collect::<Vec<_>>().iter().chain(&e.notices),
-            );
+            print_notices(log, std::mem::take(late).iter().chain(&e.notices));
             return Err(if e.fatal_error {
                 Stop::Fatal(e.fatal)
             } else {
@@ -1584,7 +1581,7 @@ fn execute_after_scan(
         // system cannot hold fails as the replica's does: AFNI-26 and the notices, then the error.
         if let Some(e) = unwritable_name(&o.prefix) {
             let unwritable = notices::afni_26_unwritable(mode);
-            let pending: Vec<Notice> = late.drain(..).collect();
+            let pending: Vec<Notice> = std::mem::take(late);
             print_notices(log, pending.iter().chain(&notices).chain([&unwritable]));
             return Err(Stop::Fatal(format!(
                 "can't write output dataset: cannot replace '{}': {e}; nothing was written",

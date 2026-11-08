@@ -52,9 +52,46 @@ fMRIPrep's median, each volume from the side closest to AFNI's) meets every thre
 thresholds are exceeded by the ties alone on real data with more motion than the 15 cases had
 (ds000256, ds000228, ds005454, ds004958); `-final NN` has no threshold that the ties can meet.
 
-## Random testing: fits that do not converge, ill-conditioned fits
+## Random testing: the ties on small, sharp phantoms; runaways; fits that do not converge
 
-<!-- filled from the trial -->
+The descriptor (`validation/src/larmorx_validation/difftest/tools/afni_volreg_original.py`) draws
+moving head phantoms (nested ellipsoids with noise, sharp edges) and blobs on grids of 12 to 32
+voxels in-plane and 3 to 24 slices, every option. A check night (1,813 cases) and the trial
+(`oracles/difftest/2026-11-08-volreg-original-trial`: 0.5 h, 4 jobs, 21,710 cases) agree on 11,385
+and differ on 10,325 (48 %; 72 % of the head phantoms, 19 % of the blobs in the check night). A
+seeded sample of 1,200 differences was judged again with the final build by `triage.py`:
+
+| Verdict | Cases | What it is |
+|---|---|---|
+| within the ties' spread | 676 | one of the original's tie sides meets every threshold, or the sides move its result as far as AFNI's is from it |
+| runaway | 245 | AFNI's or the fit's rotations beyond 15° or shifts beyond 20 mm (both programs end with meaningless parameters; AFNI-97 met by AFNI in some) |
+| not converged | 80 | every volume beyond its bounds stopped at the iteration limit (23): the fit oscillates (observed: between two points for all 23 iterations, increments of ±0.2° that do not shrink) |
+| the parameters within their bounds | 23 | another check failed (the `-SAVEDISP` products, numbers derived from the parameters) |
+| agrees with the final build | 43 | fixed after the night (the notices, `-savedisp`'s slice fields, AFNI-97, AFNI-99's precision) |
+| converged and beyond | 133 | converged in both programs beyond what the four global tie sides span |
+
+**The mechanism** (case 977 of the check night: blobs on 12 × 20 × 13 voxels of 3 × 3 × 3.3 mm,
+the default heptic, converged in 2 to 3 iterations, the roll 0.085° from AFNI's): the first fit's
+roll is 0.164 in AFNI and 0.102 to 0.106 in the original with every tie side, while the derivative
+images' ranges agree within 0.4 %. The roll is weakly determined by such a phantom (nearly
+collinear with the shifts on a small grid), so the derivative images' tie-dependent last
+percent moves it by more than the thresholds; AFNI's own result moves by only 0.002° when `-delta`
+changes by 3 %, a smooth change of the same images. AFNI decides each resampling's ties its own
+way (the spec writer measured a fixed pattern in the derivative images, not reproducible by a
+rule), so the original's four global sides do not span AFNI's mixture.
+
+**Open question for the spec writer:** §14.3's thresholds were derived from 15 well-conditioned
+cases; on small phantoms with sharp edges the ties move converged fits beyond them. A bound that
+scales with the fit's conditioning (or a restriction of the thresholds to well-conditioned
+problems) would let random testing judge such cases.
+
+**AFNI-97's first trigger**: the trial found the condition AFNI-97 describes (a Fourier rotation
+shifting the last of an odd count of rows beyond the row with the previous pair's second shift):
+AFNI's runaway first passes on small uint8 or int16 series with `-Fourier -twopass` (rotations of
+hundreds of degrees), where AFNI crashes and the replica reproduces the crash as an error. The
+original now names AFNI-97 by default and stops with AFNI's error with `reproduce` wherever it meets
+the condition itself; on the trial's cases its own runaway path differs (the ties) and ends with
+other meaningless parameters.
 
 ## Behaviours found and corrected in the original (black-box, against AFNI and the replica)
 
@@ -83,10 +120,17 @@ The suite's first runs found these; each is fixed, and the case that found it is
   label also with `reproduce`; **a base of fewer than 100 non-zero voxels** is a labelled fatal
   error (`** FATAL ERROR: 3dvolreg fails: ...`); **an existing output with `AFNI_DECONFLICT=NO`**
   names it as AFNI does (`./out.nii`) under a fatal label.
+- **The coarse search's weight percentage** (`-verbose`'s `w[...%]`) counts the automask's voxels,
+  also those whose weight fell below 0.05 inside it (found by random testing: 96.3 % against 91.7 %
+  on a head phantom; the weight itself was right).
+- **`-savedisp`'s datasets** carry the input's slice fields as the registered output does.
+- **AFNI-97** named by default and AFNI's stop with `reproduce` (above).
 - **Defects named as the replica names them**: AFNI-98 (both messages; in both modes), AFNI-12
   when a `-prefix` AFNI refuses is written (3dvolreg checks the name only when writing, §10.1),
   AFNI-26 and AFNI-90 for a kept name of 256 bytes the system cannot hold, the option scan's
-  notices (AFNI-86, -90, -95) before any later error, every notice in the order of its ID.
+  notices (AFNI-86, -90, -95) before any later error, every notice in the order of its ID, AFNI-99
+  only where a value the run prints or writes differs (`-maxdisp1D`'s three decimals only when the
+  file is written, `-verbose`'s two only with `-verbose`).
 
 ## Other observations
 
@@ -95,10 +139,12 @@ The suite's first runs found these; each is fixed, and the case that found it is
   fits no intensity scale without `-twopass`'s initialisation, and is meant for small motions).
 - **`-SAVEDISP`'s third-order products**: §10.3's arithmetic (the three normalised displacements,
   `P_a(X)·P_b(Y)·P_c(Z)` in float32 left to right, normalised the same way), applied to AFNI's own
-  raw `-savedisp` values (`_core.afni_volreg_savedisp`), gives AFNI's 3 normalised datasets and the
-  6 products of one or two factors bit for bit, but 7 of the 10 products of three factors differ at
-  1 to 26 of 253,440 values (by up to 140 units in the last place after the normalisation) on the
-  suite's `s1`. **Open question for the spec writer:** the order of those products' arithmetic.
+  raw `-savedisp` values (`_core.afni_volreg_savedisp`), gives AFNI's 3 normalised datasets bit for
+  bit, but its products differ at a few voxels: on the suite's `s1` 7 of the 10 third-order ones
+  at 1 to 26 of 253,440 values (by up to 140 units in the last place after the normalisation), in
+  random testing second-order ones too (2 to 20 of 20,000 values). **Open question for the spec
+  writer:** the products' order of operations. The suite requires the normalisation exactly and
+  reports the products.
 - **Inputs re-made for fMRIPrep's calls**: niworkflows' own lines in fMRIPrep 25.2.6's image give
   `_sliced` files byte-identical with the replica part's, and the median of AFNI's registered
   volumes, written as niworkflows writes it (the sliced input's header: int16 with nibabel's scale

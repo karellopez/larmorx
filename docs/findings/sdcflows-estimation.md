@@ -180,7 +180,8 @@ file:
   ds005040 and ds006736 (3D AP/PA EPIs on different grids, a D8 run of 2026-11-08), 2.17.1 also
   with `debug` (`ApplyCoeffsField` with `_topup_mats_to_world`'s matrices) and `sloppy` (the
   `_quick` configuration): every node file identical in both kept environments (shared: 61, 73,
-  39 and 38 files of ds001600 and ds005040; newest: 55, 59, 36 and 35 of ds005040 and ds006736),
+  39 and 38 files of ds001600 and ds005040, and 25, 24, 25 and 24 of ds006736; newest: 55, 59, 36
+  and 35 of ds005040 and ds006736),
   the configurations chosen alike (`b02b0_4.cnf` for 80x80x60 and 64x64x40, `b02b0_2.cnf` for
   74x64x58).
 - **fMRIPrep's own node files** (`image`, numpy 2.2.6's arithmetic): for ds001600, ds005040 and

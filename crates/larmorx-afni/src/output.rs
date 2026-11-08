@@ -149,7 +149,7 @@ pub fn cannot_open(path: &Path) -> Option<std::io::Error> {
         .unwrap_or_default();
     let pid = std::process::id();
     for k in 0..1000u32 {
-        let probe = dir.join(format!(".{name}.larmorx-probe-{pid}-{k}"));
+        let probe = dir.join(hidden_name(&name, &format!("larmorx-probe-{pid}-{k}"), ""));
         match std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -196,9 +196,29 @@ fn temporary_name(target: &Path) -> PathBuf {
     let suffix = if suffix.is_empty() { ".nii" } else { suffix };
     let pid = std::process::id();
     (0u64..)
-        .map(|k| dir.join(format!(".{name}.larmorx-{pid}-{k}{suffix}")))
+        .map(|k| dir.join(hidden_name(&name, &format!("larmorx-{pid}-{k}"), suffix)))
         .find(|p| !p.exists())
         .expect("a free name")
+}
+
+/// The longest file name the systems larmorx runs on accept (Linux and macOS: 255 bytes;
+/// Windows: 255 UTF-16 units, which a name of at most 255 bytes never exceeds).
+const NAME_MAX: usize = 255;
+
+/// A hidden working name in the output's directory: `.<name>.<tag><suffix>`, or, when that would
+/// be longer than [`NAME_MAX`] (an output name of 228 bytes or more, which AFNI writes),
+/// `.<tag><suffix>` with as much of `name` before the tag as fits.
+fn hidden_name(name: &str, tag: &str, suffix: &str) -> String {
+    let full = format!(".{name}.{tag}{suffix}");
+    if full.len() <= NAME_MAX {
+        return full;
+    }
+    let room = NAME_MAX.saturating_sub(tag.len() + suffix.len() + 2);
+    let mut cut = room.min(name.len());
+    while !name.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    format!(".{}.{tag}{suffix}", &name[..cut])
 }
 
 /// The pauses between attempts to rename on Windows: growing, about 2 s in all.
@@ -271,6 +291,31 @@ mod tests {
         assert!(!refused_when_written(&afni_name("3dcalc/x y.nii"), false));
         assert!(refused_when_written("-d/out.nii", true));
         assert_eq!(file_name("sub/out.nii"), "out.nii");
+    }
+
+    /// Output names of 228 to 255 bytes (AFNI writes them): the hidden working names stay
+    /// within 255 bytes, and the write succeeds.
+    #[test]
+    fn long_output_names() {
+        let dir = tempfile::tempdir().unwrap();
+        for len in [200usize, 227, 228, 240, 250, 255] {
+            let name = format!("{}.nii", "x".repeat(len - 4));
+            assert_eq!(name.len(), len);
+            let target = dir.path().join(&name);
+            let tmp = temporary_name(&target);
+            let tmp_name = tmp.file_name().unwrap().to_string_lossy().into_owned();
+            assert!(tmp_name.len() <= NAME_MAX, "{len}: {}", tmp_name.len());
+            assert!(tmp_name.ends_with(".nii") && tmp_name.starts_with('.'));
+            assert!(cannot_open(&target).is_none(), "{len}");
+            write_replacing(&target, |p| {
+                std::fs::write(p, b"x").map_err(|e| e.to_string())
+            })
+            .unwrap();
+            assert_eq!(std::fs::read(&target).unwrap(), b"x");
+        }
+        assert_eq!(hidden_name("a.nii", "t", ".nii"), ".a.nii.t.nii");
+        let long = "é".repeat(127);
+        assert!(hidden_name(&long, "tag", ".nii").len() <= NAME_MAX);
     }
 
     #[test]

@@ -99,3 +99,55 @@ def test_ridge_messages_are_scikit_learns():
             ),
             np.ones(3),
         )
+
+
+def test_save_nibabel_scales_floats_into_the_header_type(tmp_path):
+    from larmorx.io.nifti import NiftiHeader
+
+    data = np.linspace(-3.5, 120.25, 60, dtype=np.float32).reshape(5, 4, 3)
+    hdr = NiftiHeader.from_dict(
+        lx._core.nifti_header_for_image([5, 4, 3], "int16", np.eye(4), None, None)
+    )
+    img = lx.Image(data, np.eye(4), hdr)
+    lx.sdcflows.save_nibabel(img, tmp_path / "x.nii.gz")
+    back = lx.load(tmp_path / "x.nii.gz", dtype=np.float32)
+    stored = lx.load(tmp_path / "x.nii.gz", scaled=False)
+    assert stored.data.dtype == np.int16
+    slope = (120.25 + 3.5) / 65535
+    np.testing.assert_allclose(back.data, data, atol=slope)
+    stored_values, s, _ = lx.sdcflows._nibabel_write.nibabel_stored(data, np.int16)
+    assert stored_values.min() == -32768 and stored_values.max() == 32767
+    assert s == float(np.float32(slope))
+
+
+def test_unwarp_with_a_zero_field_is_the_identity_and_conversions_invert():
+    shape = (12, 10, 6)
+    img = _image(shape, (3.0, 3.0, 4.0))
+    rng = np.random.default_rng(1)
+    data = rng.uniform(10, 100, shape).astype(np.float32)
+    grid = lx.sdcflows.bspline_grid(img, lx.sdcflows.DEFAULT_HF_ZOOMS_MM)
+    t = lx.sdcflows.B0FieldTransform(coeffs=[grid])
+    out = t.apply(lx.Image(data, img.affine), "j", 0.05, order=1)
+    assert out.shape == (*shape, 1)
+    np.testing.assert_array_equal(out.data[..., 0], data)
+    field = lx.Image(rng.normal(0, 30, shape).astype(np.float32), img.affine)
+    disp = lx.sdcflows.fmap_to_disp(field, 0.04, "i-")
+    assert disp.shape == (*shape, 1, 3)
+    back = lx.sdcflows.disp_to_fmap(disp, field, 0.04, "i-")
+    np.testing.assert_allclose(back.data, field.data, rtol=1e-5, atol=1e-4)
+
+
+def test_phase_maps_to_radians_and_hz():
+    shape = (6, 5, 4)
+    aff = np.diag([3.0, 3.0, 3.0, 1.0])
+    ph = lx.Image(np.arange(120, dtype=np.int16).reshape(shape) - 60, aff)
+    rads = lx.sdcflows.au2rads(ph).image
+    assert rads.data.dtype == np.float32
+    assert float(rads.data.min()) == 0.0 and float(rads.data.max()) <= np.float32(2 * np.pi)
+    with pytest.raises(ValueError, match="SDC-04"):
+        lx.sdcflows.au2rads(lx.Image(np.zeros(shape, np.int16), aff))
+    assert lx.sdcflows.delta_te({"EchoTime1": 0.005, "EchoTime2": 0.0075}) == pytest.approx(0.0025)
+    with pytest.raises(ValueError, match="no echo-times information"):
+        lx.sdcflows.delta_te({})
+    fmap = lx.sdcflows.phdiff2fmap(rads, 0.0025).image
+    np.testing.assert_allclose(fmap.data, rads.data / (2 * np.pi * 0.0025), rtol=1e-6)

@@ -26,6 +26,7 @@ upstream.
 | `approx::bspline_approx_logged` | the same; the records sdcflows writes before it raises | Apache-2.0 |
 | `tools::rescale_affine`, `voxel_sizes`, `resample_to_zooms_grid`, `apply_affine` | sdcflows `sdcflows/utils/tools.py` (`resample_to_zooms`); nibabel 5.4.2 `nibabel/affines.py` (`rescale_affine`, `voxel_sizes`, `apply_affine`) | Apache-2.0, MIT |
 | `tools::affine_coordinates`, `identity_coordinates` | nitransforms 25.1.0 `nitransforms/resampling.py` (`apply`), `base.py` (`ImageGrid.ndcoords`, `index`, `_as_homogeneous`, `_apply_affine`), `linear.py` (`Affine.map`) | MIT |
+| `unwarp::unwarp_volume`, `ReadoutTime`, `UnwarpOptions` | sdcflows `sdcflows/transform.py` (`_sdc_unwarp`, `unwarp_parallel`, `B0FieldTransform.apply`'s per-volume work); numpy `numpy/lib/_function_base_impl.py` (`gradient`: unit spacing, `edge_order=1`), NEP 50's scalar rules (a Python float readout time keeps float32, a numpy float64 one gives float64); SciPy's `map_coordinates` through `larmorx-interp` (its provenance there) | Apache-2.0, BSD-3-Clause |
 | `npy::py_repr`, `py_format_2e` | CPython's float `repr` ("short" style) and `format(x, ".2e")`, as the original messages print numbers (behaviour only) | (no code) |
 | `npy::floor_divide`, `allclose_zero`, `cross`, `norm3`, `grids_aligned` | numpy `numpy/_core/src/npymath/npy_math_internal.h.src` (`npy_divmod`, `npy_floor_divide`), `numpy/_core/numeric.py` (`cross`, `isclose`, `allclose`), `numpy/linalg/_linalg.py` (`norm`) | BSD-3-Clause |
 
@@ -39,5 +40,26 @@ resize, files, headers and log records; nipype's `split_filename` and `fname_pre
 `tools.py` (`resample_to_zooms`), `coeffs.py` (`TOPUPCoeffReorient` / `_fix_topup_fieldcoeff`,
 `TransformCoefficients` / `_move_coeff`, `reorient_pedir`; nibabel's `as_reoriented`,
 `set_intent`), `transform.py` (`B0FieldTransform.fit`, `deoblique_and_zooms`,
-`ensure_positive_cosines`; nibabel's `strided_scalar`), from sdcflows 2.17.1 (Apache-2.0),
-nibabel 5.4.2 and nitransforms 25.1.0 (MIT) and nipype 1.12.0's `utils/filemanip.py` (Apache-2.0).
+`ensure_positive_cosines`; nibabel's `strided_scalar`; `B0FieldTransform.apply` and
+`to_displacements`, `ApplyCoeffsField`; niworkflows 1.15.3's `reorient_image` (Apache-2.0),
+nibabel's `axcodes2ornt`; nitransforms' `Affine.from_filename(fmt='itk')` and `~Affine`),
+`fmap.py` (`fmap_to_disp`, `disp_to_fmap`, `DisplacementsField2Fieldmap`; nibabel's
+`apply_affine`, `set_intent`), `phase.py` (`utils/phasemanip.py`: `au2rads`,
+`subtract_phases`, `phdiff2fmap`, `delta_te`; `interfaces/fmap.py`: `PhaseMap2rads`,
+`SubtractPhases`, `Phasediff2Fieldmap`, `CheckB0Units`, `CheckRegister` with
+`_check_gross_geometry` and `_conform_img`; `workflows/fit/fieldmap.py`: `init_phdiff_wf`, with
+nipype's `PRELUDE` call through `lx.fsl.prelude`) and `_nibabel_write.py` (nibabel 5.4.2's
+writer with its scaling: `arraywriters.py` `make_array_writer`, `ArrayWriter`,
+`SlopeArrayWriter`, `SlopeInterArrayWriter`; `volumeutils.py` `array_to_file`, `_write_data`,
+`finite_range`, `best_write_scale_ftype`, `_ftype4scaled_finite`, `working_type`,
+`_dt_min_max`, `better_float_of`, `_matching_float`; `casting.py` `shared_range`,
+`floor_exact`, `ceil_exact`, `floor_log2`, `int_abs`; `analyze.py` `to_file_map`;
+`nifti1.py` `set_slope_inter`'s checks; x87's extended precision of `best_float()` in exact
+rational arithmetic), from sdcflows 2.17.1 (Apache-2.0), nibabel 5.4.2 and nitransforms 25.1.0
+(MIT) and nipype 1.12.0's `utils/filemanip.py` and `interfaces/fsl/epi.py` (Apache-2.0).
+
+The D13 switches of this port (`upstream_defects`): SDC-04 (`au2rads` of a constant phase map),
+SDC-05 (an integer or float32 readout time in `apply`), SDC-07 (`TOPUPCoeffReorient`'s negation
+for a BIDS `i` direction, measured: `validation/investigations/sdcflows-fieldmap/
+measure_sdc_g.py`), SDC-08 (`apply` on a positive-axes series read from a file), SDC-09
+(`SubtractPhases` without `EchoTime`).

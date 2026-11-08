@@ -26,6 +26,10 @@ Rust (``larmorx-sdcflows``):
   files and an ITK transform.
 - :func:`fmap_to_disp`, :func:`disp_to_fmap`, :func:`displacements_field_to_fieldmap`: a field
   map as a displacement field and back (``DisplacementsField2Fieldmap``).
+- :func:`au2rads`, :func:`subtract_phases`, :func:`delta_te`, :func:`phdiff2fmap`,
+  :func:`check_b0_units`, :func:`check_register`, :func:`phdiff_workflow`: the
+  phase-difference preparation (``PhaseMap2rads``, ``SubtractPhases``, ``Phasediff2Fieldmap``,
+  ``CheckB0Units``, ``CheckRegister``, ``init_phdiff_wf`` with PRELUDE through ``lx.fsl``).
 - :func:`save_nibabel`: an image written as nibabel writes it (its header's data type, scaled
   into an integer type), as sdcflows' outputs are written.
 """
@@ -54,6 +58,18 @@ from larmorx.sdcflows.fmap import (
     displacements_field_to_fieldmap,
     fmap_to_disp,
 )
+from larmorx.sdcflows.phase import (
+    CheckRegisterResult,
+    PhaseResult,
+    PhdiffWorkflowResult,
+    au2rads,
+    check_b0_units,
+    check_register,
+    delta_te,
+    phdiff2fmap,
+    phdiff_workflow,
+    subtract_phases,
+)
 from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
 from larmorx.sdcflows.tools import resample_to_zooms, rescale_affine
 from larmorx.sdcflows.transform import (
@@ -71,24 +87,34 @@ __all__ = [
     "ApplyCoeffsFieldResult",
     "B0FieldTransform",
     "BSplineApproxResult",
+    "CheckRegisterResult",
     "CoefficientsResult",
     "CsrMatrix",
     "DisplacementsResult",
+    "PhaseResult",
+    "PhdiffWorkflowResult",
     "RidgeResult",
     "apply_coeffs_field",
+    "au2rads",
     "bspline_approx",
     "bspline_grid",
+    "check_b0_units",
+    "check_register",
     "collocation_matrix",
+    "delta_te",
     "deoblique_and_zooms",
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
     "fmap_to_disp",
     "grid_bspline_weights",
+    "phdiff2fmap",
+    "phdiff_workflow",
     "reorient_pedir",
     "resample_to_zooms",
     "rescale_affine",
     "ridge_sparse_cg",
     "save_nibabel",
+    "subtract_phases",
     "topup_coeff_reorient",
     "transform_coefficients",
 ]

@@ -534,6 +534,14 @@ pub fn fit_stage(
                     wf,
                 )
             } else {
+                // tedana logs the count, then `use_volumes[exclude_idx] = False` raises.
+                log.info(
+                    Site("t2smap", "t2smap_workflow", 441),
+                    &format!(
+                        "Excluding {} volumes from adaptive mask and T2*/S0 estimation",
+                        exclude.len()
+                    ),
+                );
                 PyError::new(
                     "IndexError",
                     format!("index {max} is out of bounds for axis 0 with size {n_vols}"),
@@ -580,6 +588,7 @@ pub fn fit_stage(
         settings.n_independent_echos,
         &settings.masktype,
         nf < n_vols,
+        env.libraries,
         log,
         notices,
     )?;
@@ -688,10 +697,12 @@ fn ms_to_s(v: &[f64]) -> Vec<f32> {
 pub fn save_stage(
     st: Stages,
     setup: &Setup,
+    env: &Env,
     maths: &Maths,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Outputs, PyError> {
+    let libraries = env.libraries;
     let Stages {
         mut outputs,
         masked,
@@ -794,6 +805,7 @@ pub fn save_stage(
         &s0_limited,
         cols,
         maths,
+        libraries,
         threads,
         log,
     );
@@ -961,7 +973,7 @@ fn run(
     let maths = Maths::of_mode(env.mode);
     log.start_capture();
     let st = fit_stage(&setup, env, &maths, Sink::Keep, log, notices)?;
-    let mut outputs = save_stage(st, &setup, &maths, log, notices)?;
+    let mut outputs = save_stage(st, &setup, env, &maths, log, notices)?;
     let lines = log.take_capture();
     let kept = std::sync::Arc::new(std::mem::take(&mut outputs.kept));
     end(&setup, &mut outputs, env, log)?;
@@ -982,7 +994,7 @@ fn run(
             &mut plog,
             &mut scratch,
         )
-        .and_then(|st| save_stage(st, &setup, &other, &mut plog, &mut scratch))
+        .and_then(|st| save_stage(st, &setup, env, &other, &mut plog, &mut scratch))
         .map(|o| o.diffs);
         let plines = plog.take_capture();
         drop(plog);

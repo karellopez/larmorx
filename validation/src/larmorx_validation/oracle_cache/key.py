@@ -69,6 +69,9 @@ ENV_FAMILIES = {
     "itk": ("ITK_", "ANTS_", "NSLOTS"),
     "afni": ("AFNI_", "NIML_", "OMP_", "GOMP_", "HOME"),
     "fsl": ("FSL*", "OMP_", "GOMP_"),
+    # A Python program (tedana's t2smap): its variables are all in FAMILY_ONLY_ENV, so a run
+    # that names no family keeps its key.
+    "python": (),
 }
 #: Variables in the key of a program of one family only, not of a run that names no family:
 #: OpenBLAS's variables choose the kernels of FSL 6.0.7.23's matrix arithmetic
@@ -76,7 +79,14 @@ ENV_FAMILIES = {
 #: ``parity.fsl_versions.OPENBLAS_CORE``, since 2026-10-29), while the harness's own environment
 #: sets ``OPENBLAS_CORETYPE`` for numpy (``scripts/orchestration/env.sh``), which no program of
 #: the other families reads.
-FAMILY_ONLY_ENV = {"fsl": ("OPENBLAS_",)}
+FAMILY_ONLY_ENV = {
+    "fsl": ("OPENBLAS_",),
+    # numpy's CPU dispatch (``NPY_DISABLE_CPU_FEATURES``: its float64 exp and log), OpenBLAS's
+    # kernels and threads, the interpreter's own settings, argparse's width (``COLUMNS``: the
+    # usage text of a refused command line) and tqdm's defaults (``TQDM_DISABLE``: no progress
+    # bars) choose a Python program's results and messages (since 2026-11-08).
+    "python": ("NPY_", "OPENBLAS_", "OMP_", "MKL_", "PYTHON*", "COLUMNS", "TQDM_"),
+}
 
 
 #: Files programs write into ``HOME`` and never read (left out of its digest): AFNI's crash log

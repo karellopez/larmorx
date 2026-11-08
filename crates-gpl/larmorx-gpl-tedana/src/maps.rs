@@ -32,6 +32,7 @@ use larmorx_core::numpy::reduce::{mean_axis, nanstd_axis, nansum_axis};
 use larmorx_core::python::number::format_fixed;
 use rayon::prelude::*;
 
+use crate::decay::Libraries;
 use crate::log::{Log, Site};
 use crate::maths::Maths;
 
@@ -214,6 +215,7 @@ pub fn rmse_of_fit_decay_ts(
     s0: &[f64],
     cols: usize,
     maths: &Maths,
+    libraries: Libraries,
     n_threads: usize,
     log: &mut Log<'_>,
 ) -> Rmse {
@@ -289,7 +291,7 @@ pub fn rmse_of_fit_decay_ts(
     if sd.bad_dof {
         log.warn(
             "numpy/lib/_nanfunctions_impl.py",
-            1997,
+            libraries.nanstd_line(),
             "RuntimeWarning",
             "Degrees of freedom <= 0 for slice.",
             "var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,",
@@ -305,7 +307,7 @@ pub fn rmse_of_fit_decay_ts(
     if percentiles.all_nan_column {
         log.warn(
             "numpy/lib/_nanfunctions_impl.py",
-            1593,
+            libraries.nanquantile_line(),
             "RuntimeWarning",
             "All-NaN slice encountered",
             "return fnb._ureduce(a,",

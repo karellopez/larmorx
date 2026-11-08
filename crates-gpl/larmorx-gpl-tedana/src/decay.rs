@@ -53,6 +53,41 @@ impl Libraries {
             Libraries::Shared => Scipy::V1_15_3,
         }
     }
+
+    /// numpy's `RuntimeWarning` of a mean over no values (2.3.5 ends it with a full stop).
+    pub fn mean_of_empty_slice(self) -> &'static str {
+        match self {
+            Libraries::Newest => "Mean of empty slice",
+            Libraries::Shared => "Mean of empty slice.",
+        }
+    }
+
+    /// The line of `numpy/_core/_methods.py`'s `_mean` that divides (its "invalid value"
+    /// warning).
+    pub fn methods_divide_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 134,
+            Libraries::Shared => 136,
+        }
+    }
+
+    /// The line of `numpy/lib/_nanfunctions_impl.py`'s `nanstd` that calls `nanvar` (its
+    /// degrees-of-freedom warning).
+    pub fn nanstd_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 1997,
+            Libraries::Shared => 2015,
+        }
+    }
+
+    /// The line of `numpy/lib/_nanfunctions_impl.py`'s `_nanquantile_unchecked` that reduces
+    /// (its all-NaN warning).
+    pub fn nanquantile_line(self) -> u32 {
+        match self {
+            Libraries::Newest => 1593,
+            Libraries::Shared => 1617,
+        }
+    }
 }
 
 /// What a fit runs with.

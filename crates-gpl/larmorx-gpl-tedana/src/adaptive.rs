@@ -26,6 +26,7 @@ use larmorx_core::numpy::quantile::percentile_higher;
 use larmorx_core::numpy::reduce::{add_reduce_axis, mean_axis};
 use larmorx_core::python::number::float_repr;
 
+use crate::decay::Libraries;
 use crate::log::{Log, PyError, Site};
 
 /// numpy's `np.round(x, decimals=1)` of a float64: `rint(x * 10) / 10`.
@@ -79,6 +80,7 @@ pub fn make_adaptive_mask(
     n_independent_echos: Option<i128>,
     methods: &[String],
     time_outer: bool,
+    libraries: Libraries,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<(Vec<bool>, Vec<i64>), PyError> {
@@ -114,12 +116,12 @@ pub fn make_adaptive_mask(
                 "tedana/utils.py",
                 145,
                 "RuntimeWarning",
-                "Mean of empty slice",
+                libraries.mean_of_empty_slice(),
                 "echo_means = data.mean(axis=-1)  # temporal mean of echos",
             );
             log.warn(
                 "numpy/_core/_methods.py",
-                134,
+                libraries.methods_divide_line(),
                 "RuntimeWarning",
                 "invalid value encountered in divide",
                 "ret = um.true_divide(",

@@ -68,6 +68,7 @@ PARITY_MODULES = {
     "ants-affine-initializer": "ants_affine_initializer",
     "ants-atropos": "ants_atropos",
     "fsl-bet": "fsl_bet",
+    "tedana-t2smap-replica": "tedana_t2smap_replica",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).

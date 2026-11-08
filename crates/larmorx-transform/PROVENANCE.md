@@ -112,3 +112,21 @@ microkernel and the SSE2 4×2 and 4×1 kernels, the contracted tails), `daxpy.c`
 (`validation/investigations/t2smap/numerics/check_lstsq.py`), tedana's own calls on fMRIPrep's
 three multi-echo `t2smap` calls included. The logic is re-expressed in Rust; no code was
 copied.
+
+`numpy_linalg::gesdd` and `numpy_linalg::blas` (2026-11-08, the t2smap replica part; SciPy's
+`curve_fit` for tedana's monoexponential fit, `larmorx-optim`): the thin SVD of an `m × 2`
+matrix, `scipy.linalg.svd(a, full_matrices=False)` and `numpy.linalg.svd(a,
+full_matrices=False)` (`dgesdd` with `JOBZ='S'`), from the same tarballs' `lapack-netlib/SRC/`
+(`dgesdd.f` paths 3 and 5s, `dgeqrf.f`, `dgeqr2.f`, `dorgqr.f`, `dorg2r.f`, `dgebrd.f`,
+`dgebd2.f`, `dbdsdc.f`, `dlasdq.f`, `dbdsqr.f`, `dormbr.f`, `dormqr.f`, `dorm2r.f`,
+`dormlq.f`, `dorml2.f`, `dlacpy.f`, `dlaset.f`, `dlange.f`, `dlascl.f`) and SciPy 1.18.1 and
+1.15.3 `scipy/linalg/_decomp_svd.py` (BSD-3-Clause; SciPy's `scipy-openblas32` 0.3.31.dev and
+0.3.28 builds, GCC 10.2, bundle LAPACK 3.12.0's routines: no `dlarf1f`); and `numpy.dot` of
+vectors and matrices on the shapes `least_squares` gives it, from `interface/{gemv,dot}.c`,
+`kernel/x86_64/{ddot.c, ddot_microk_haswell-2.c, dgemv_n_4.c, dgemv_t_4.c}` and numpy 2.5.4 and
+2.3.5 `numpy/_core/src/common/cblasfuncs.c` (`cblas_matrixproduct`: row-major `dgemv` for a
+C-contiguous matrix, column-major for another) and `numpy/_core/src/multiarray/arraytypes.c.src`
+(`DOUBLE_dot`). Verified bit for bit against SciPy 1.18.1/numpy 2.5.4 and SciPy 1.15.3/numpy
+2.3.5 (`validation/investigations/t2smap/numerics/check_curve_fit.py`: 54 products, 69 SciPy
+and 67 numpy SVDs, and `curve_fit` on synthetic, edge and real voxels). The logic is re-expressed
+in Rust; no code was copied.

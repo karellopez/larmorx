@@ -297,7 +297,7 @@ fn numpy_outputs(b: &[f64], m: usize, nrhs: usize, rank: usize, s: Vec<f64>) -> 
 }
 
 /// `DLANGE('M', ...)`: the largest magnitude, a NaN wins (`VALUE.LT.TEMP .OR. DISNAN(TEMP)`).
-fn dlange_max(a: &[f64]) -> f64 {
+pub(super) fn dlange_max(a: &[f64]) -> f64 {
     let mut value = 0.0f64;
     for &v in a {
         let temp = v.abs();
@@ -311,7 +311,7 @@ fn dlange_max(a: &[f64]) -> f64 {
 /// The multipliers `DLASCL(TYPE, 0, 0, CFROM, CTO, ...)` applies to every element, in order
 /// (more than one when `cto / cfrom` would overflow or underflow); none when its argument
 /// check rejects `cfrom` (0 or NaN) or `cto` (NaN), where LAPACK calls XERBLA and returns.
-fn dlascl_factors(cfrom: f64, cto: f64) -> Vec<f64> {
+pub(super) fn dlascl_factors(cfrom: f64, cto: f64) -> Vec<f64> {
     let mut out = Vec::new();
     if cfrom == 0.0 || cfrom.is_nan() || cto.is_nan() {
         return out;
@@ -357,7 +357,7 @@ fn dlascl_factors(cfrom: f64, cto: f64) -> Vec<f64> {
     }
 }
 
-fn scale_all(a: &mut [f64], factors: &[f64]) {
+pub(super) fn scale_all(a: &mut [f64], factors: &[f64]) {
     for &mul in factors {
         a.iter_mut().for_each(|v| *v *= mul);
     }
@@ -484,7 +484,7 @@ fn dlalsd2(
 
 /// Which of `dgemv_t_4.c`'s kernels computes column `j` of `lastc`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum GemvClass {
+pub(super) enum GemvClass {
     /// The first `4·⌊lastc/4⌋` columns: `dgemv_kernel_4x4` (Haswell microkernel).
     Fma4,
     /// The next two when `lastc mod 4 >= 2`: `dgemv_kernel_4x2`.
@@ -493,7 +493,7 @@ enum GemvClass {
     Single,
 }
 
-fn gemv_class(j: usize, lastc: usize) -> GemvClass {
+pub(super) fn gemv_class(j: usize, lastc: usize) -> GemvClass {
     let n4 = lastc & !3;
     if j < n4 {
         GemvClass::Fma4
@@ -544,7 +544,7 @@ fn dot_single(a: &[f64], x: &[f64]) -> f64 {
 
 /// `DGEMV('T', len, lastc, 1, A, LDA, x, 1, 0, y, 1)`'s value for one column `a` (`len`
 /// rows) of class `class` (`interface/gemv.c`: `y` cleared to +0; `dgemv_t_4.c`).
-fn gemv_t_column(class: GemvClass, a: &[f64], x: &[f64]) -> f64 {
+pub(super) fn gemv_t_column(class: GemvClass, a: &[f64], x: &[f64]) -> f64 {
     let m = a.len();
     let m3 = m & 3;
     let body = m - m3;
@@ -576,7 +576,7 @@ fn gemv_t_column(class: GemvClass, a: &[f64], x: &[f64]) -> f64 {
 
 /// `AXPYU_K(len, s, x, 1, y, 1)` (`daxpy.c`): the first `16·⌊len/16⌋` elements
 /// `fma(s, x, y)` (the Haswell microkernel), the rest `y + round(s·x)`.
-fn axpy_column(s: f64, x: &[f64], y: &mut [f64]) {
+pub(super) fn axpy_column(s: f64, x: &[f64], y: &mut [f64]) {
     let n1 = y.len() & !15;
     let (head, tail) = y.split_at_mut(n1);
     for (yi, &xi) in head.iter_mut().zip(x) {
@@ -592,7 +592,7 @@ fn axpy_column(s: f64, x: &[f64], y: &mut [f64]) {
 /// of `c` (column-major, `ldc`): `DLARF('L', mi, ncols, v, 1, tau, C(r0+1, 1), LDC)` (3.12.0,
 /// `v[0] = 1` stored) or `DLARF1F` (3.12.1, `v[0] = 1` implicit). `v` holds `mi` values.
 #[allow(clippy::too_many_arguments)]
-fn reflect_left(
+pub(super) fn reflect_left(
     release: LapackRelease,
     mi: usize,
     v: &[f64],

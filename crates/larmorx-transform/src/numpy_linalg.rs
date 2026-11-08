@@ -36,7 +36,10 @@
 //!   `det = sign · exp(Σ log|u_ii|)`.
 //!
 //! [`lstsq`] (its own module) adds `numpy.linalg.lstsq` of an `m × 2` design with any number of
-//! right-hand sides (LAPACK's `dgelsd`, and these kernels' main loops on long vectors).
+//! right-hand sides (LAPACK's `dgelsd`, and these kernels' main loops on long vectors);
+//! [`gesdd`] the thin SVD of an `m × 2` matrix (`scipy.linalg.svd(a, full_matrices=False)`:
+//! `dgesdd` with `JOBZ='S'`), and [`blas`] numpy's `dot` of vectors and matrices on the shapes
+//! SciPy's `least_squares` gives it (for SciPy's `curve_fit`, `larmorx-optim`).
 //!
 //! Upstream files (BSD-3-Clause; notices below and in NOTICE): OpenBLAS 0.3.34 and 0.3.30
 //! release tarballs, `lapack-netlib/SRC/` (`dgesdd.f`, `dgebrd.f`, `dgebd2.f`, `dbdsdc.f`,
@@ -90,7 +93,10 @@
 
 use crate::openblas;
 
+pub mod blas;
+pub mod gesdd;
 pub mod lstsq;
+pub use gesdd::{GesddError, Svd2, gesdd_s2};
 pub use lstsq::{Lstsq, LstsqError, lstsq};
 
 /// The LAPACK release whose arithmetic a call follows.

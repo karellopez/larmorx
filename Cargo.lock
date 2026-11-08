@@ -347,6 +347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-optim"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-transform",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-py"
 version = "0.0.1"
 dependencies = [

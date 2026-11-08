@@ -81,8 +81,22 @@ class Cases:
             fr = self._save(f"c{k}_r.bin", np.asarray(res, dtype=np.float64))
             fs = self._save(f"c{k}_s.bin", np.asarray(s, dtype=np.float64))
         self.lines.append(
-            "\t".join([f"{group}/{k}", group, str(m), str(nrhs), rc, release(), rank_s,
-                       fa, fb, fx, fr, fs])
+            "\t".join(
+                [
+                    f"{group}/{k}",
+                    group,
+                    str(m),
+                    str(nrhs),
+                    rc,
+                    release(),
+                    rank_s,
+                    fa,
+                    fb,
+                    fx,
+                    fr,
+                    fs,
+                ]
+            )
         )
 
     def write(self) -> None:
@@ -112,20 +126,59 @@ TES = {
 
 
 def tedana_cases(c: Cases, rng) -> None:
-    for ne, tes in TES.items():
+    for tes in TES.values():
         for vols in (1, 2, 3, 7, 50, 200):
             for nrhs in (1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 1000):
                 c.add("tedana", design(tes, vols), tedana_rhs(rng, tes, vols, nrhs))
     for ne, vols, nrhs in [
-        (5, 600, 1), (5, 600, 3), (5, 600, 6), (5, 600, 2001),
-        (3, 683, 5), (3, 683, 7), (3, 1366, 9), (2, 1024, 6), (4, 1024, 3), (2, 1025, 4),
+        (5, 600, 1),
+        (5, 600, 3),
+        (5, 600, 6),
+        (5, 600, 2001),
+        (3, 683, 5),
+        (3, 683, 7),
+        (3, 1366, 9),
+        (2, 1024, 6),
+        (4, 1024, 3),
+        (2, 1025, 4),
     ]:
         c.add("tedana", design(TES[ne], vols), tedana_rhs(rng, TES[ne], vols, nrhs))
 
 
 def random_cases(c: Cases, rng) -> None:
-    ms = [2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 18, 19, 20, 31, 32, 33, 34, 35, 63, 64, 65,
-          2047, 2048, 2049, 2050, 2051, 2052, 4095, 4096, 4099]
+    ms = [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        31,
+        32,
+        33,
+        34,
+        35,
+        63,
+        64,
+        65,
+        2047,
+        2048,
+        2049,
+        2050,
+        2051,
+        2052,
+        4095,
+        4096,
+        4099,
+    ]
     for m in ms:
         for nrhs in (1, 2, 3, 5, 6, 7, 9):
             a = rng.standard_normal((m, 2)) * rng.uniform(0.1, 30, 2)
@@ -161,8 +214,12 @@ def edge_cases(c: Cases, rng) -> None:
         am[-z:, 0] = 0
         c.add("edge", am, rng.standard_normal((m, 5)))
     # Collinear and nearly collinear designs.
-    for t, vols in (([30.0, 30.0], 4), ([30.0, 30.0, 30.0], 10), ([30.0, 30.0 + 1e-12], 6),
-                    ([30.0, 30.0 + 1e-9, 30.0], 50)):
+    for t, vols in (
+        ([30.0, 30.0], 4),
+        ([30.0, 30.0, 30.0], 10),
+        ([30.0, 30.0 + 1e-12], 6),
+        ([30.0, 30.0 + 1e-9, 30.0], 50),
+    ):
         c.add("edge", design(t, vols), tedana_rhs(rng, t, vols, 7))
     c.add("edge", np.zeros((6, 2)), rng.standard_normal((6, 3)))  # all-zero design
     for scale in (1e-300, 1e-295, 1e300, 1e295):  # DLASCL of A

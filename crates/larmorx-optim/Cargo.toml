@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-optim"
+description = "SciPy's optimizers for larmorx: curve_fit with bounds (least_squares' trust-region reflective method, the exact solver, 2-point differences), bit for bit with SciPy 1.18.1 and 1.15.3"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-transform.workspace = true
+thiserror.workspace = true

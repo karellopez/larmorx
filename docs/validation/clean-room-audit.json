@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-08-field-maps-a",
+ "dossier": "2026-11-08-t2smap-replica",
  "edits": [
   {
    "added": null,
@@ -106,11 +106,11 @@
   }
  ],
  "evidence": {
-  "accesses": 261117,
-  "agents": 218,
+  "accesses": 274004,
+  "agents": 239,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 302,
-  "archived_files": 302,
+  "archive_checksums_matched": 325,
+  "archived_files": 325,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -143,32 +143,36 @@
    "2026-11-08-session-transcripts-field-maps-a": {
     "files": 16,
     "sha256": "e0aa0da6a320302ae22a85e3d56f19fdee079e3f73ae0e82bfd4191037a28c41"
+   },
+   "2026-11-08-session-transcripts-t2smap-replica": {
+    "files": 60,
+    "sha256": "ef14a8406eba16d6d61b2bd1c51a770b0fd41ad292c4e3fee2781a66eb94ff92"
    }
   },
-  "commits_printed": 2532,
-  "distinct_transcripts": 222,
+  "commits_printed": 2712,
+  "distinct_transcripts": 243,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 128,
+   "agents_without_worktree": 149,
    "bad_lines": 0,
    "calls_without_result": 15,
    "compaction_parent_missing": 2,
-   "compactions": 65,
-   "refused_calls": 1468,
-   "refused_calls_restricted_accesses": 657,
+   "compactions": 66,
+   "refused_calls": 1497,
+   "refused_calls_restricted_accesses": 676,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 6712
+   "unresolved_paths": 7037
   },
-  "last_record": "2026-11-08 10:53 UTC",
-  "live_files": 222,
-  "live_files_also_archived": 220,
+  "last_record": "2026-11-08 21:58 UTC",
+  "live_files": 243,
+  "live_files_also_archived": 241,
   "sessions": 4,
-  "tool_calls": 76468,
+  "tool_calls": 80193,
   "tool_calls_by_tool": [
    [
     "Agent",
-    220
+    241
    ],
    [
     "Artifact",
@@ -180,7 +184,7 @@
    ],
    [
     "Bash",
-    63954
+    67341
    ],
    [
     "CronCreate",
@@ -192,15 +196,19 @@
    ],
    [
     "Edit",
-    3989
+    4009
+   ],
+   [
+    "EnterWorktree",
+    1
    ],
    [
     "Monitor",
-    151
+    155
    ],
    [
     "Read",
-    2045
+    2092
    ],
    [
     "ReadNotifications",
@@ -208,7 +216,7 @@
    ],
    [
     "SendMessage",
-    86
+    88
    ],
    [
     "Skill",
@@ -216,7 +224,7 @@
    ],
    [
     "SubagentHandback",
-    230
+    250
    ],
    [
     "TaskOutput",
@@ -224,15 +232,15 @@
    ],
    [
     "TaskStop",
-    168
+    176
    ],
    [
     "ToolSearch",
-    148
+    155
    ],
    [
     "WebFetch",
-    20
+    34
    ],
    [
     "WebSearch",
@@ -240,12 +248,12 @@
    ],
    [
     "Write",
-    5405
+    5599
    ]
   ],
-  "transcript_bytes": 6400735703,
-  "transcript_files": 524,
-  "unique_paths": 55479
+  "transcript_bytes": 6659673773,
+  "transcript_files": 568,
+  "unique_paths": 58324
  },
  "levels": [
   [
@@ -326,7 +334,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "95ea64a8",
-  "verdicts_repository": "931fdc58"
+  "verdicts_repository": "1225f38d"
  },
  "overview": {
   "agents_by_role": [
@@ -348,11 +356,11 @@
    ],
    [
     "other",
-    53
+    62
    ],
    [
     "replica author",
-    68
+    80
    ],
    [
     "spec writer",
@@ -385,7 +393,7 @@
    ]
   ],
   "implementers": 73,
-  "register_restricted_lines": 1453,
+  "register_restricted_lines": 1476,
   "single_file_scopes": {
    "checked": 59,
    "shown": 0
@@ -458,12 +466,12 @@
    "title": "glibc's and libstdc++'s source (LGPL / GPL)"
   },
   {
-   "basis": "docs/licensing.md (an original from the published equations); decision log 2026-11-06 (t2smap: a replica and a clean-room original)",
+   "basis": "docs/licensing.md (an original from the published equations); decision log 2026-11-06 (t2smap: a replica and a clean-room original); the tags and installed copies named at the t2smap replica's merge (D9, 2026-11-08)",
    "family": "tedana",
    "id": "R07",
    "named": "2026-11-06",
    "since": "2026-10-09",
-   "title": "tedana's source (LGPL-2.1)"
+   "title": "tedana's source (LGPL-2.1: the clone, tags/tedana-*, every installed copy's site-packages/tedana)"
   },
   {
    "basis": "CLAUDE.md rule 1 (8d332534); crates/larmorx-afni-replica named 2026-10-30 (05893577)",
@@ -3349,7 +3357,7 @@
    },
    "rules": [
     [
-     "R10 content (AFNI)",
+     "R10 content (AFNI/tedana)",
      4
     ],
     [

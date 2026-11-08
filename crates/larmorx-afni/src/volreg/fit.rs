@@ -336,8 +336,10 @@ impl Basis {
                     *pv = kappa * (qv - *pv);
                 }
                 drop(minus);
-                let (lo, hi) = if chatty { range(&plus) } else { (0.0, 0.0) };
-                (bounds.cut(&plus, n), lo, hi)
+                // The range over the fit's box (observed: AFNI reports the trimmed image's).
+                let cut = bounds.cut(&plus, n);
+                let (lo, hi) = if chatty { range(&cut) } else { (0.0, 0.0) };
+                (cut, lo, hi)
             })
             .collect();
         let mut refs: Vec<Vec<f32>> = Vec::with_capacity(7);

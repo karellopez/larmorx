@@ -600,15 +600,16 @@ fn run_in_pool(
         // One volume at a time, each one's resamplings and searches parallel inside: the
         // memory is one volume's work whatever the thread count.
         let mut work = Work::default();
-        let mut results: Vec<(Option<[f32; 6]>, Option<String>, bool)> = Vec::with_capacity(nt);
+        type FirstPass = (Option<[f32; 6]>, Option<String>, bool, Option<String>);
+        let mut results: Vec<FirstPass> = Vec::with_capacity(nt);
         for t in 0..nt {
             if skipped(t) {
-                results.push((Some([0.0; 6]), None, false));
+                results.push((Some([0.0; 6]), None, false, None));
                 continue;
             }
             let mut v = volume_f32(&bricks, t);
             if empty_ish(&v) {
-                results.push((Some([0.0; 6]), None, false));
+                results.push((Some([0.0; 6]), None, false, None));
                 continue;
             }
             twopass_blur(&mut v, n, p.twoblur, &blur);
@@ -625,7 +626,8 @@ fn run_in_pool(
             let Some(basis) = &basis else {
                 return Err(afni_89(messages));
             };
-            let r = basis.register(&v, init, &it1, &mut work, None);
+            let mut chat = chatty.then(String::new);
+            let r = basis.register(&v, init, &it1, &mut work, chat.as_mut());
             let deg = r.radians.map(fit::to_degrees);
             results.push((
                 Some([
@@ -638,12 +640,16 @@ fn run_in_pool(
                 ]),
                 line,
                 f.empty_region,
+                chat,
             ));
         }
-        for (t, (r, line, empty)) in results.into_iter().enumerate() {
+        for (t, (r, line, empty, chat)) in results.into_iter().enumerate() {
             first[t] = r;
             if let Some(l) = line {
                 messages.push(Message::Info(l));
+            }
+            if let Some(c) = chat {
+                messages.push(Message::Text(c));
             }
             empty_region |= empty;
         }

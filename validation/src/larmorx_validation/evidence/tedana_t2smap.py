@@ -108,6 +108,22 @@ FILE_PAIRS = [
     ("tedana 25.0.1 − 26.0.3", "tedana-25", "tedana"),
 ]
 OPTCOM = "desc-optcom_bold.nii.gz"
+#: Why tedana 26.0.3's outputs differ from tedana 25.0.1's (fMRIPrep 25.2.6's) on its calls.
+VERSION_STEP = (
+    "tedana 26.0.x caps only the limited T2* map (TED-05; 25.0.1 capped the full map, as "
+    "larmorx's default does), loads the data as float32 (25.0.1: float64), applies the T2* floors "
+    "to the full map and no longer clamps negative values; and fMRIPrep's image has other "
+    "libraries (numpy 2.2.6, which sums more than 8,192 elements in chunks, SciPy 1.15.2, "
+    "conda-forge's OpenBLAS)"
+)
+#: Why tedana's outputs change from the shared environment's releases to the newest.
+RELEASE_STEP = {
+    "curvefit": "SciPy 1.15.3 → 1.18.1 changed least_squares' trust-region reflective method "
+    "and its finite differences (the order of their steps, the SVD factors' memory order): the "
+    "curve fit's last bits, which the full T2* map magnifies where T2* is large",
+    "loglin": "numpy 2.3.5 → 2.5.4 brought LAPACK 3.12.0 → 3.12.1 (dgelsd's QR applies its "
+    "reflectors another way): the last bits of a voxel's log-linear slope now and then",
+}
 #: fMRIPrep's own files of a t2smap node (the two it uses).
 FMRIPREP_FILES = {"t2s": "T2starmap.nii.gz", "optcom": OPTCOM}
 #: The panels of runs: id (= run label), role, label, sub.
@@ -174,6 +190,19 @@ def _dataset(name: str) -> dict:
     c = td.catalog().collections[f"openneuro-{ds}"]
     title = re.sub(r"\s*\(OpenNeuro[^)]*\)\s*$", "", c.title)
     return {"dataset": f"OpenNeuro {ds} ({title})", "subject": sub, "licence": c.licence}
+
+
+def _fmriprep_host(name: str) -> str:
+    """Where fMRIPrep's own run of a call was made (its RUN_INFO.txt's host line)."""
+    import os
+
+    run = node_dir(name).relative_to(common.oracles() / "fmriprep-25.2.6").parts[0]
+    text = (common.fmriprep_run(run) / "RUN_INFO.txt").read_text(encoding="utf-8")
+    m = re.search(r"^host: .*?(\d+) CPUs", text, re.M)
+    cpus = int(m.group(1)) if m else None
+    if cpus == os.cpu_count():
+        return "made on this machine, where numpy uses its AVX-512 kernels by default (NP-04)"
+    return f"made on another machine ({cpus} CPUs)"
 
 
 def _task(name: str) -> str:
@@ -442,11 +471,11 @@ def _ncomp(x: dict) -> int:
 
 
 def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | None,
-              what: str) -> None:  # fmt: skip
+              what: str, host: str, series: bool = False) -> None:  # fmt: skip
     """Each comparison's verdict and reason, decided from its metrics."""
-    tt = _suite()
     by = {x["id"]: x for x in diffs}
     same = common.identical(diffs)
+    what_shown = "the optimally combined series" if series else "the maps shown"
     for x in diffs:
         i = x["id"]
         x["links"] = []
@@ -457,14 +486,14 @@ def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | No
             body = {
                 "avx-ted": "numpy's float64 exp and log are Intel's SVML kernels on CPUs with "
                 "AVX-512 (NP-04), glibc 2.35's otherwise; larmorx's reference is the path "
-                "without them (decision D2), the path of fMRIPrep's own run here",
-                "shared-ted": tt.STEP_REASON if what != "loglin" else tt.LOGLIN_STEP_REASON,
+                "without them (decision D2)",
+                "shared-ted": RELEASE_STEP.get(what, RELEASE_STEP["curvefit"]),
                 "thr4-ted": "tedana's --n-threads 4 runs the curve fits in four joblib processes "
                 "and lets OpenBLAS use four threads",
                 "t25-ted": "tedana's own step from 25.0.1 (fMRIPrep 25.2.6's) to 26.0.3: "
-                + tt.FMRIPREP_REASON,
-                "t25-fmriprep": "the same tedana 25.0.1 in the same image, on this machine with "
-                "numpy's AVX-512 kernels off and on the machine of fMRIPrep's run",
+                + VERSION_STEP,
+                "t25-fmriprep": "tedana 25.0.1 in fMRIPrep's image, here with numpy's AVX-512 "
+                "kernels off, against fMRIPrep's own run of it, " + host,
             }[i]
             x["reason"] = lead + (
                 f"{body}: every one of the {total:,} values is the same."
@@ -478,11 +507,12 @@ def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | No
             if same[i]:
                 x["verdict"] = "bit-identical"
                 x["reason"] = (
-                    f"Every value of every output is tedana 26.0.3's ({total:,} values): the "
+                    f"Every value of {what_shown} is tedana 26.0.3's ({total:,} values): the "
                     "adaptive mask, the log-linear fit (numpy's lstsq: LAPACK's dgelsd over each "
                     "group of voxels at once, with OpenBLAS's Haswell kernels), SciPy's bounded "
-                    "trust-region curve fit voxel by voxel, the floors and the cap, the RMSE and "
-                    "the optimal combination, written as nibabel and nilearn write them."
+                    "trust-region curve fit voxel by voxel, the floors and the cap"
+                    + (", the optimal combination" if series else "")
+                    + ", written as nibabel and nilearn write them."
                 )
             else:
                 x["verdict"], x["reason"] = "open", "Not accounted for (see the record)."
@@ -525,7 +555,7 @@ def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | No
                 x["reason"] = (
                     "The replica is tedana 26.0.3 bit for bit, so this is tedana's own step from "
                     f"25.0.1 (fMRIPrep's) to 26.0.3 ({n:,} of {total:,} values): "
-                    + tt.FMRIPREP_REASON
+                    + VERSION_STEP
                     + (
                         f". On this machine tedana 25.0.1 in fMRIPrep's image differs from "
                         f"tedana 26.0.3 in {_count(step):,} values."
@@ -630,7 +660,7 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
     common.compare_all(ex, diffs, outputs, full=full)
     named = _named(e)
     capped = _capped(runs["replica-14"]["t2s"], runs["replica-fix"]["t2s"])
-    _verdicts(diffs, named, links, capped, parse(args)["fittype"])
+    _verdicts(diffs, named, links, capped, p["fittype"], _fmriprep_host(name))
     at = _peak(ex, "replica-fix", "replica-14", "t2s")
     default = {
         "output": "t2s",
@@ -754,7 +784,7 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
         if x["a"] in panels and x["b"] in panels:
             x["display"] = {"optcom": ex.compare(x["a"], x["b"], "optcom")["display"]}
     named = _named(e)
-    _verdicts(diffs, named, links, None, p["fittype"])
+    _verdicts(diffs, named, links, None, p["fittype"], _fmriprep_host(name), series=True)
     for x in diffs:
         if x["id"] == "fix-fmriprep":
             x["reason"] = x["reason"].replace(
@@ -873,7 +903,9 @@ def _calls_table(rec, bench) -> dict:
         "mode (the defects it names: the benchmark's runs), fMRIPrep's own T2* map and combined "
         "series (tedana 25.0.1 in fMRIPrep 25.2.6's image; fMRIPrep keeps no other output, and "
         "its log-linear call was not run by fMRIPrep) against tedana 26.0.3 and against the "
-        f"default. Why fMRIPrep's files differ: {tt.FMRIPREP_REASON}.",
+        f"default. Why fMRIPrep's files differ: {VERSION_STEP}; ds000210's and ds000258's runs "
+        "were also made with numpy's AVX-512 kernels on (NP-04), ds003592's on a machine without "
+        "them.",
     )
 
 

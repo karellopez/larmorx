@@ -176,11 +176,13 @@ def _mask(d: gen.Draw) -> dict:
 
 
 def _exclude(d: gen.Draw, nt: int) -> str:
+    """Indices and ranges within the series, and now and then up to its end (TED-02)."""
     form = d.choice("exclude form", ("one", "two", "range", "both"), (2, 1, 1, 1))
-    a = d.integer("exclude a", 0, nt)
+    top = nt if d.chance("exclude up to the end", 0.1) else max(0, nt - 2)
+    a = d.integer("exclude a", 0, top)
     if form == "one":
         return str(a)
-    b = d.integer("exclude b", 0, nt)
+    b = d.integer("exclude b", 0, top)
     if form == "two":
         return f"{min(a, b)},{max(a, b) + 1}" if a == b else f"{min(a, b)},{max(a, b)}"
     lo, hi = min(a, b), max(a, b) + 1
@@ -271,7 +273,7 @@ def draw(d: gen.Draw) -> dict:
         n = d.choice("dummy count", (1, 2, nt), (4, 2, 0.4))
         groups.append(group("dummy scans", *_spell(d, "--dummy-scans", str(n))))
         options.append("dummy scans" + (" (all)" if n >= nt else ""))
-    if d.chance("exclude", 0.18):
+    if d.chance("exclude", 0.18 if fitmode == "all" else 0.03):
         groups.append(group("exclude", *_spell(d, "--exclude", _exclude(d, nt))))
         options.append("exclude")
     if d.chance("n-independent-echos", 0.1):

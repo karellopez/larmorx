@@ -17,6 +17,10 @@
 //!
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
 //!   (for `reproduce`), and `clip` with scalar bounds.
+//! - [`dot`]: `np.dot` and `np.linalg.norm` of float32 and float64 vectors (OpenBLAS's Haswell
+//!   `sdot` and `ddot`), under SciPy's conjugate gradients.
+//! - [`histograms`]: `numpy.linspace` and `numpy.histogram` with equal bins (scikit-image's Otsu
+//!   threshold).
 //!
 //! The arithmetic is x86-64's (SSE) in every respect, NaNs included (`math::x86_nan`), so the
 //! results are the same on every platform.
@@ -40,6 +44,8 @@
 //! OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //! POSSIBILITY OF SUCH DAMAGE.
 
+pub mod dot;
+pub mod histograms;
 pub mod quantile;
 pub mod reduce;
 pub mod umath;
@@ -95,6 +101,13 @@ pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {
     fn sub(self, b: Self) -> Self;
     /// `a * b` as SSE computes it.
     fn mul(self, b: Self) -> Self;
+    /// `a / b` as SSE computes it.
+    fn div(self, b: Self) -> Self;
+    /// numpy's elementwise `exp` in this type ([`umath::exp_f32`], [`umath::exp_f64`]).
+    fn np_exp(self) -> Self;
+    /// `np.dot(x, y)` of two contiguous vectors of this type ([`dot::dot_f32`],
+    /// [`dot::dot_f64`]).
+    fn np_dot(x: &[Self], y: &[Self]) -> Self;
     /// The square root (IEEE: exact rounding; a NaN passes on).
     fn sqrt(self) -> Self;
     /// The value as `f64` (exact).
@@ -121,6 +134,18 @@ impl NpFloat for f32 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f32(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f32(self, b)
+    }
+    #[inline(always)]
+    fn np_exp(self) -> Self {
+        umath::exp_f32(self)
+    }
+    #[inline]
+    fn np_dot(x: &[Self], y: &[Self]) -> Self {
+        dot::dot_f32(x, y)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {
@@ -179,6 +204,18 @@ impl NpFloat for f64 {
     #[inline(always)]
     fn mul(self, b: Self) -> Self {
         x86_nan::mul_f64(self, b)
+    }
+    #[inline(always)]
+    fn div(self, b: Self) -> Self {
+        x86_nan::div_f64(self, b)
+    }
+    #[inline(always)]
+    fn np_exp(self) -> Self {
+        umath::exp_f64(self)
+    }
+    #[inline]
+    fn np_dot(x: &[Self], y: &[Self]) -> Self {
+        dot::dot_f64(x, y)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {

@@ -31,6 +31,10 @@ Rust (``larmorx-sdcflows``):
   phase-difference preparation (``PhaseMap2rads``, ``SubtractPhases``, ``Phasediff2Fieldmap``,
   ``CheckB0Units``, ``CheckRegister``, ``init_phdiff_wf`` with PRELUDE through ``lx.fsl``).
 
+- :func:`brain_masker`, :func:`brain_extraction`, :func:`binary_dilation`, :func:`union`:
+  sdcflows' masks (``brain_masker``, ``BrainExtraction``, ``BinaryDilation``, ``Union``), with
+  scikit-image's random walker (:mod:`larmorx.skimage`).
+
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
 """
@@ -58,6 +62,13 @@ from larmorx.sdcflows.fmap import (
     displacements_field_to_fieldmap,
     fmap_to_disp,
 )
+from larmorx.sdcflows.masks import (
+    BrainMaskerResult,
+    binary_dilation,
+    brain_extraction,
+    brain_masker,
+    union,
+)
 from larmorx.sdcflows.phase import (
     CheckRegisterResult,
     PhaseResult,
@@ -80,6 +91,11 @@ from larmorx.sdcflows.transform import (
 )
 
 __all__ = [
+    "BrainMaskerResult",
+    "binary_dilation",
+    "brain_extraction",
+    "brain_masker",
+    "union",
     "DEFAULT_HF_ZOOMS_MM",
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",

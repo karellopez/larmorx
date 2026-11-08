@@ -71,6 +71,7 @@ pub mod filters;
 pub mod measurements;
 pub mod morphology;
 mod neighbourhood;
+pub mod skimage;
 #[cfg(test)]
 mod tests;
 

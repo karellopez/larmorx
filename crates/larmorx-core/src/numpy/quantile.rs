@@ -88,8 +88,10 @@ pub fn nanpercentile_linear_axis0(
             let (prev, next, prev_idx) = if vi >= (n - 1) as f64 {
                 (n - 1, n - 1, -1.0)
             } else {
-                let f = vi.floor();
-                (f as usize, f as usize + 1, f)
+                // gamma subtracts the integer index (`astype(np.intp)`): q = -0.0 keeps a -0
+                // weight, so a -0 lower neighbour stays -0 (`-0 + d * -0`)
+                let f = vi.floor() as usize;
+                (f, f + 1, f as f64)
             };
             let gamma = vi - prev_idx;
             let lo = kth(&mut col, prev);
@@ -453,5 +455,11 @@ mod tests {
             p.values[1],
             f64::from(f32::from_f64(f64::from(0.2f32) - d * 0.5))
         );
+        // q = -0.0: numpy's weight is -0 (vi = -0 minus the integer 0), so a -0 lower
+        // neighbour gives -0 (numpy 2.3.5 and 2.5.4: `nanpercentile([[-0.], [1.]], [-0.],
+        // axis=0)` is `[[-0.]]`)
+        let c = [-0.0f32, 1.0];
+        let p = nanpercentile_linear_axis0(&c, 2, 1, &[-0.0]).unwrap();
+        assert_eq!(p.values[0].to_bits(), (-0.0f64).to_bits());
     }
 }

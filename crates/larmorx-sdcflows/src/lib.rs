@@ -33,6 +33,7 @@
 pub mod approx;
 pub mod blas;
 pub mod bspline;
+pub mod masker;
 pub mod npy;
 pub mod ridge;
 pub mod tools;

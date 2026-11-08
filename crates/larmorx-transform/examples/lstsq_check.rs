@@ -7,7 +7,8 @@
 //! m, nrhs, rcond bits or `none`, LAPACK release, numpy's rank or `err`, then the files of a,
 //! b (column-major), x, residuals and s, raw little-endian float64), computes each case at one
 //! thread and at `<threads>` threads, and compares bit for bit; prints one line per group
-//! (cases, identical) and every differing case (how many columns of x differ).
+//! (cases, identical) and every differing case (how many columns of x differ); with
+//! `LSTSQ_CHECK_TIMES` set, each case's time at one and at `<threads>` threads.
 
 use larmorx_transform::numpy_linalg::{LapackRelease, LstsqError, lstsq};
 use std::collections::BTreeMap;
@@ -16,8 +17,10 @@ use std::path::Path;
 fn read_f64(p: &Path) -> Vec<f64> {
     std::fs::read(p)
         .unwrap_or_else(|e| panic!("{}: {e}", p.display()))
-        .chunks_exact(8)
-        .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|c| f64::from_le_bytes(*c))
         .collect()
 }
 
@@ -49,8 +52,17 @@ fn main() {
             let mut bb = b.clone();
             lstsq(&a, m, 2, &mut bb, nrhs, rcond, release, t)
         };
+        let t0 = std::time::Instant::now();
         let one = run(1);
+        let t1 = t0.elapsed();
         let many = run(threads);
+        if std::env::var_os("LSTSQ_CHECK_TIMES").is_some() {
+            println!(
+                "  time {id}: 1 thread {:.3} s, {threads} threads {:.3} s (b copied each time)",
+                t1.as_secs_f64(),
+                (t0.elapsed() - t1).as_secs_f64()
+            );
+        }
         let entry = groups.entry(group.to_string()).or_default();
         entry.0 += 1;
         let verdict: Result<(), String> = match (f[6], &one) {

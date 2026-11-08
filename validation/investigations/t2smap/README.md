@@ -73,3 +73,36 @@ identical, m = 600 rows), a shift of the columns by 1 to 3 places changes 2 of 5
 14 BLAS threads change 4 to 14 of 5,003 (tedana's `--n-threads`); with one volume (m = echoes) every
 column is the same in every arrangement. So the replica follows `dgelsd` on the whole batch with
 OpenBLAS's kernels at one thread (fMRIPrep's call), column blocking included.
+
+### numpy's `lstsq` (relay 3)
+
+`larmorx_transform::numpy_linalg::lstsq` follows `numpy.linalg.lstsq` for tedana's two-column
+design: LAPACK's `dgelsd` (the QR path for `m >= 3` rows, the direct bidiagonalization for two
+rows, `dlalsd`'s small path with `dbdsqr` on the right-hand sides) and OpenBLAS's Haswell kernels
+on long vectors (`dgemv_t` in row blocks of 2048 with its 4×4, 4×2 and 4×1 column kernels,
+`dger`/`daxpy` with the fused first `16·⌊m/16⌋` rows, `drot`, `dgemm`, the x87 `dnrm2`). A
+column's result depends only on its own values and on its kernel class (the last `nrhs mod 4`
+columns), which is why tedana's results change with the batch and with BLAS threads; larmorx gives
+numpy's one-thread result at any thread count.
+
+| Script | What it shows |
+|---|---|
+| `check_lstsq.py --checker <lstsq_check> --work <empty dir> [--real <dir> ...]` | numpy's `lstsq` at one BLAS thread against larmorx's at one and four threads, bit for bit: `tedana` (2 to 5 echoes, 1 to 1366 volumes, 1 to 2001 voxels), `random` (2 to 4099 rows around the kernels' blocks), `edge` (zero columns and rows, collinear and all-zero designs, scalings below `SMLNUM` and above `BIGNUM`, NaN, infinities, signed zeros, `rcond` values, a non-finite design, no column) and `real` (tedana's own calls) |
+| `dump_lstsq_calls.py --out <dir> --workdir <scratch> -- <t2smap arguments>` | runs tedana's `t2smap` command line in-process and records every `numpy.linalg.lstsq` call it makes (inputs, numpy's results, BLAS threads) |
+| `run_lstsq_check.sh <lstsq_check> <scratch>` | both of the above in both environments, on fMRIPrep's three multi-echo `t2smap` calls (ds003592 sub-280; ds000210 sub-02's cuedSGT and rest runs) |
+
+```
+cargo build --release -p larmorx-transform --example lstsq_check
+scripts/orchestration/boxed.sh 24 validation/investigations/t2smap/numerics/run_lstsq_check.sh \
+    <target>/release/examples/lstsq_check <empty scratch dir>
+```
+
+(about 6 minutes, 3 GB.) Results (2026-11-08, from 7c3fa5f0's code; the same in both
+environments, numpy 2.3.5 with LAPACK 3.12.0 and numpy 2.5.4 with LAPACK 3.12.1): every case
+identical, 550 per environment: `tedana` 274/274, `random` 217/217, `edge` 53/53 (numpy 2.3.5
+raises `LinAlgError` for a non-finite design too, through `DLASCL`'s argument check on a NaN norm,
+printing OpenBLAS's `** On entry to DLASCL parameter number 4 had an illegal value`), `real` 6/6:
+tedana's two calls per run (the voxels fitted with two echoes, then with three: 595 and 52,231 on
+ds003592, 3,169 and 28,356 on ds000210 cuedSGT, 9,718 and 47,486 on rest), made at one BLAS thread.
+Speed on ds003592's 600 × 52,231 call: numpy 0.35 s; larmorx about 0.4 s at one thread, 0.2 s at
+14 (each fused multiply-add is a correctly rounded `mul_add`; no SIMD in this replica).

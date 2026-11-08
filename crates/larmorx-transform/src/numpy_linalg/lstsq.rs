@@ -165,7 +165,6 @@ fn dgelsd2(
     let smlnum = sfmin / eps;
     let bignum = 1.0 / smlnum;
     let mut s = vec![0.0f64; N];
-    let rank;
 
     // Scale A if max entry outside range [SMLNUM, BIGNUM].
     let anrm = dlange_max(&a);
@@ -231,10 +230,9 @@ fn dgelsd2(
         reflect_left(release, N - i + 1, &v, tauq[i - 1], b, i - 1, ldb, nrhs);
     }
     // Solve the bidiagonal least squares problem.
-    match dlalsd2(&mut d, &mut e, b, ldb, nrhs, rcond, release) {
-        Some(r) => rank = r,
-        None => return Err(LstsqError::DidNotConverge),
-    }
+    let Some(rank) = dlalsd2(&mut d, &mut e, b, ldb, nrhs, rcond, release) else {
+        return Err(LstsqError::DidNotConverge);
+    };
     // B := P_b·B (DORMBR('P', 'L', 'N') → DORMLQ → DORML2 with the one reflector G(1), which
     // DLARFG(1, ...) made the identity: TAUP(1) = 0).
     debug_assert_eq!(taup[0], 0.0);
@@ -510,7 +508,7 @@ fn gemv_class(j: usize, lastc: usize) -> GemvClass {
 /// +0, combined as `(l0 + l2) + (l1 + l3)`.
 fn dot_fma4(a: &[f64], x: &[f64]) -> f64 {
     let mut l = [0.0f64; 4];
-    for (ra, rx) in a.chunks_exact(4).zip(x.chunks_exact(4)) {
+    for (ra, rx) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
         for t in 0..4 {
             l[t] = ra[t].mul_add(rx[t], l[t]);
         }
@@ -522,7 +520,7 @@ fn dot_fma4(a: &[f64], x: &[f64]) -> f64 {
 /// then `haddpd`.
 fn dot_pair(a: &[f64], x: &[f64]) -> f64 {
     let (mut l0, mut l1) = (0.0f64, 0.0f64);
-    for (ra, rx) in a.chunks_exact(2).zip(x.chunks_exact(2)) {
+    for (ra, rx) in a.as_chunks::<2>().0.iter().zip(x.as_chunks::<2>().0) {
         let p0 = rx[0] * ra[0];
         let p1 = rx[1] * ra[1];
         l0 += p0;
@@ -535,7 +533,7 @@ fn dot_pair(a: &[f64], x: &[f64]) -> f64 {
 /// rounded, then `addpd` and `haddpd`: `(s0 + s2) + (s1 + s3)`.
 fn dot_single(a: &[f64], x: &[f64]) -> f64 {
     let mut s = [0.0f64; 4];
-    for (ra, rx) in a.chunks_exact(4).zip(x.chunks_exact(4)) {
+    for (ra, rx) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
         for t in 0..4 {
             let p = ra[t] * rx[t];
             s[t] += p;
@@ -740,10 +738,9 @@ mod tests {
                     let mut bb = b.clone();
                     let out = lstsq(&a, m, 2, &mut bb, nrhs, None, release, threads).unwrap();
                     assert_eq!(out.rank, 2);
-                    for j in 0..nrhs {
-                        for i in 0..2 {
+                    for (j, want_j) in reference.iter().enumerate() {
+                        for (i, &want) in want_j.iter().enumerate() {
                             let got = out.x[i * nrhs + j];
-                            let want = reference[j][i];
                             assert!(
                                 (got - want).abs() < 1e-9 * want.abs().max(1.0),
                                 "{got} {want}"

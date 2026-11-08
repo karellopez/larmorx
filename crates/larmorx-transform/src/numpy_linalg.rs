@@ -35,6 +35,9 @@
 //! - OpenBLAS's `dgetrf` (`getf2_k`) for the determinant's sign, and numpy's
 //!   `det = sign · exp(Σ log|u_ii|)`.
 //!
+//! [`lstsq`] (its own module) adds `numpy.linalg.lstsq` of an `m × 2` design with any number of
+//! right-hand sides (LAPACK's `dgelsd`, and these kernels' main loops on long vectors).
+//!
 //! Upstream files (BSD-3-Clause; notices below and in NOTICE): OpenBLAS 0.3.34 and 0.3.30
 //! release tarballs, `lapack-netlib/SRC/` (`dgesdd.f`, `dgebrd.f`, `dgebd2.f`, `dbdsdc.f`,
 //! `dlasdq.f`, `dbdsqr.f`, `dormbr.f`, `dormqr.f`, `dormlq.f`, `dorm2r.f`, `dorml2.f`,

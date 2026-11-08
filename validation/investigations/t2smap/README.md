@@ -17,6 +17,11 @@ part's notes; the numbers below are this machine's (Linux x86-64, AMD, AVX-512).
 | `edge_probe.py` | failure cases on tiny synthetic echoes (a NaN in the first echo: `argmax of an empty sequence`; an `--exclude` index equal to the number of volumes: `IndexError`; no mask found) |
 | `log32_all.py`, `simd_probe.py` | first look at numpy's `float32` `log` and `float64` `exp` per dispatch path (superseded by `numerics/`) |
 
+- `probes/numpy_average_orders.py` (relay 5b): numpy's orders behind the optimal combination
+  (PAID's `divide(f32, f32, out=f64)` runs in float32; `average`'s weights' sum is pairwise for
+  `fitmode ts`'s echo-innermost weights, the products in index order). `probes/epi_mask_failures.py`
+  (relay 5b): how t2smap ends without `--mask` when nilearn finds no mask (TED-03).
+
 ## `numerics/` (relay 2)
 
 `check_numerics.py` writes seeded cases (inputs and numpy's or SciPy's results) and runs the Rust

@@ -274,6 +274,20 @@ file:
   topup differs from FSL 6.0.7.23 more here: 0.06 % and 0.8 % of the fields' voxels identical, at most
   5.35 Hz and 17.8 Hz apart (matrices identical). Three runs of five now: to measure before the
   records (the image's topup on the main machine through the oracle cache: build or CPU kernels).
+- **The likely cause: where the runs ran.** The five fMRIPrep runs whose topup files are FSL
+  6.0.7.23's (ds001600, ds005040) ran on the old laptop (AVX2: OpenBLAS's Haswell kernels); the
+  three that differ (ds006736, ds004958's and ds002603's PEPOLAR views) are the D8 runs of
+  2026-11-08, made on the main machine (AVX-512; their reports' `hostname`) without
+  `OPENBLAS_CORETYPE=Haswell`, so the image's OpenBLAS picked its AVX-512 kernels, which round
+  differently ([sdcflows-fieldmap.md](sdcflows-fieldmap.md): `sdot`; `numpy-blas.md`). The same
+  explains relay 5's quaternion note (ds006736's regrid: the image gives its own value without
+  `OPENBLAS_CORETYPE` on the main machine) and the **direct D8 run** (ds005752, its field map
+  linked; `check_workflows.py` `direct`): the magnitude's and the field map's merges and
+  `clipper_pre` are fMRIPrep's files, the brain mask identical in every voxel, but the B-spline
+  fit's field differs everywhere by at most 0.067 Hz (scikit-learn's CG on the image's AVX-512
+  `sdot`), where the seven phase-difference fits of the old laptop's runs are bit-identical. To
+  confirm with the records (the image's topup and `BSplineApprox` with and without
+  `OPENBLAS_CORETYPE=Haswell` on one of them).
 
 ## Candidates for the register (the part's defects relay decides them)
 

@@ -32,7 +32,10 @@ Run in each kept environment with ``PYTHONPATH=<repo>/python:<repo>/validation/s
   (``magmrg``, ``clipper_pre``); N4 ran there at eight threads with glibc's maths, so its file
   and the nodes after it are reported (INFO: identical voxels, largest difference), not
   compared for identity (fMRIPrep's own later nodes from its N4 output: ``check_skimage.py``'s
-  ``clip`` and ``masker``).
+  ``clip`` and ``masker``);
+- ``direct``: the same on fMRIPrep's direct field-map estimators (the D8 run
+  ``ds005752-sub-ON01016-noreconall-direct``): the magnitude's and the field map's merges, the
+  units and ``clipper_pre`` compared for identity, N4 and what follows reported.
 
 Prints one line per check (cases, identical), INFO lines, the times, and ``ALL OK`` or
 ``FAIL <n>``.
@@ -415,9 +418,77 @@ def sec_image(t: Tally, nt: int) -> None:
                 print(f"INFO {label} fmap: {info_diff(str(want[0]), str(res.fmap))}")
 
 
+def direct_estimators() -> list[tuple[str, Path, list[str], list[str], list[dict]]]:
+    """fMRIPrep's finished direct field-map estimators (``fmapmrg`` and ``units``, no
+    ``phdiff_wf``): (label, folder, magnitudes, field maps, metadata)."""
+    out = []
+    for run in sorted(RUNS.iterdir()):
+        for units in sorted(run.glob("work/fmriprep_25_2_wf/sub_*_wf/fmap_preproc_wf/*/units")):
+            est = units.parent
+            if (est / "phdiff_wf").exists() or not (
+                est / "bs_filter" / "result_bs_filter.pklz"
+            ).exists():
+                continue
+            mags = ast.literal_eval(node_inputs(est / "magnitude_wf" / "magmrg")["in_files"])
+            fmaps = ast.literal_eval(node_inputs(est / "fmapmrg")["in_files"])
+            meta = {"Units": node_inputs(units)["units"]}
+            out.append(
+                (
+                    "/".join(est.parts[-4:]),
+                    est,
+                    [host_path(est, p) for p in mags],
+                    [host_path(est, p) for p in fmaps],
+                    [meta] * len(fmaps),
+                )
+            )
+    return out
+
+
+def sec_direct(t: Tally, nt: int) -> None:
+    """larmorx's direct mode with fMRIPrep 25.2.6's libraries (numpy 2.2.6, SciPy 1.15.2) on
+    fMRIPrep's direct estimators against fMRIPrep's own node files: identical up to N4 (its N4 ran
+    at eight threads with glibc's maths: N4 and the nodes after it reported, as ``image``), and
+    the field map's merge and units, which do not depend on N4."""
+    from larmorx.sdcflows import fmap_workflow
+
+    for label, est, mags, fmaps, metas in direct_estimators():
+        with tempfile.TemporaryDirectory() as tmp:
+            res = fmap_workflow(
+                mags,
+                list(zip(fmaps, metas, strict=True)),
+                "mapped",
+                out_dir=tmp,
+                numpy_version="2.2.6",
+                scipy_version="1.15.2",
+                upstream_defects="reproduce",
+                n_threads=nt,
+            )
+            mine = Path(tmp)
+            for rel in ("magnitude_wf/magmrg", "fmapmrg", "units"):
+                for f in sorted((est / rel).glob("*.nii*")):
+                    t.add(f"direct: {rel} = fMRIPrep's", nii_same(f, mine / rel / f.name), label)
+            bx = est / "magnitude_wf" / "brainextraction_wf"
+            mine_bx = mine / "magnitude_wf" / "brainextraction_wf"
+            t.add(
+                "direct: clipper_pre = fMRIPrep's",
+                nii_same(bx / "clipper_pre/clipped.nii.gz", mine_bx / "clipper_pre/clipped.nii.gz"),
+                label,
+            )
+            for rel in (
+                "n4/clipped_corrected.nii.gz",
+                "clipper_post/clipped.nii.gz",
+                "masker/clipped_mask.nii.gz",
+                "masker/clipped_probseg.nii.gz",
+            ):
+                print(f"INFO {label} {rel}: {info_diff(str(bx / rel), str(mine_bx / rel))}")
+            want = sorted((est / "bs_filter").glob("*_extra.nii.gz"))
+            if want and res.fmap is not None:
+                print(f"INFO {label} fmap: {info_diff(str(want[0]), str(res.fmap))}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sections", default="bx,fmap,mapped,image")
+    ap.add_argument("--sections", default="bx,fmap,mapped,image,direct")
     ap.add_argument("--threads", type=int, default=4)
     args = ap.parse_args()
     from larmorx.io.nibabel_header import use_lapack
@@ -441,6 +512,8 @@ def main() -> int:
         sec_mapped(t, args.threads, times)
     if "image" in secs:
         sec_image(t, args.threads)
+    if "direct" in secs:
+        sec_direct(t, args.threads)
     bad = t.report()
     print(
         f"sdcflows' graphs {times[0]:.1f} s (programs through the oracle cache), larmorx "

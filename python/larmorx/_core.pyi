@@ -851,8 +851,7 @@ def sdcflows_bspline_approx(
     recenter: str = "median",
     extrapolate: bool = True,
     name: str = "",
-    resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None]
-    | None = None,
+    resampled: tuple[np.ndarray, tuple[int, int, int], np.ndarray, np.ndarray | None] | None = None,
     n_threads: int = 1,
 ) -> dict[str, Any]:
     """sdcflows' ``BSplineApprox`` on a loaded field map (flat float32 data, flat bool mask):
@@ -889,3 +888,22 @@ def sdcflows_affine_coordinates(
 
 def sdcflows_apply_affine(affine: np.ndarray, points: np.ndarray) -> np.ndarray:
     """nibabel's ``apply_affine(affine, points)`` for ``(n, 3)`` points (numpy's BLAS order)."""
+
+def sdcflows_unwarp_volume(
+    volume: np.ndarray,
+    fmap_hz: np.ndarray,
+    pe_axis: int,
+    ro_time: float,
+    ro_float64: bool,
+    jacobian: bool,
+    order: int,
+    mode: str,
+    cval: float,
+    prefilter: bool,
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """sdcflows' ``_sdc_unwarp`` for one 3D volume: the volume sampled at its voxels moved
+    along ``pe_axis`` by ``fmap_hz * ro_time`` (float32 arithmetic, or float64 with
+    ``ro_float64``), with SciPy's ``map_coordinates``, times the Jacobian of the shift with
+    ``jacobian``. Returns the float32 volume (C order) and the interpolation's notices."""

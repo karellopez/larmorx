@@ -330,6 +330,10 @@ defects! {
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
+    SDC_05 = "SDC-05", "sdcflows", true,
+        "B0FieldTransform.apply accepts a readout time only as a Python float or a list: an integer or a numpy float32 readout time fails with a TypeError";
+    SDC_08 = "SDC-08", "sdcflows", true,
+        "B0FieldTransform.apply (and ApplyCoeffsField) fails with an AttributeError on a series read from a file whose axes already run to R, A and S (no reorientation): numpy's rollaxis is given nibabel's ArrayProxy, which has no transpose";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

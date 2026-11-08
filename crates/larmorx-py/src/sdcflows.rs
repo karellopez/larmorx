@@ -577,10 +577,7 @@ fn sdcflows_unwarp_volume<'py>(
     prefilter: bool,
     n_threads: usize,
     upstream_defects: &str,
-) -> PyResult<(
-    Bound<'py, PyArray3<f32>>,
-    Vec<crate::defects::PyNotice>,
-)> {
+) -> PyResult<(Bound<'py, PyArray3<f32>>, Vec<crate::defects::PyNotice>)> {
     if order > 5 {
         return Err(PyRuntimeError::new_err("spline order not supported"));
     }

@@ -20,9 +20,17 @@ Rust (``larmorx-sdcflows``):
   image.
 - :class:`B0FieldTransform`, :func:`deoblique_and_zooms`: a field map given by B-spline
   coefficients evaluated on a target grid (``fit``), and the fine aligned grid it uses for a
-  rotated target.
+  rotated target; an EPI image or series unwarped with it (``apply``); its displacement field
+  (``to_displacements``).
+- :func:`apply_coeffs_field`: ``ApplyCoeffsField``, the unwarping of a file with coefficient
+  files and an ITK transform.
+- :func:`fmap_to_disp`, :func:`disp_to_fmap`, :func:`displacements_field_to_fieldmap`: a field
+  map as a displacement field and back (``DisplacementsField2Fieldmap``).
+- :func:`save_nibabel`: an image written as nibabel writes it (its header's data type, scaled
+  into an integer type), as sdcflows' outputs are written.
 """
 
+from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.approx import BSplineApproxResult, bspline_approx
 from larmorx.sdcflows.bspline import (
     DEFAULT_HF_ZOOMS_MM,
@@ -40,29 +48,47 @@ from larmorx.sdcflows.coeffs import (
     topup_coeff_reorient,
     transform_coefficients,
 )
+from larmorx.sdcflows.fmap import (
+    DisplacementsResult,
+    disp_to_fmap,
+    displacements_field_to_fieldmap,
+    fmap_to_disp,
+)
 from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
 from larmorx.sdcflows.tools import resample_to_zooms, rescale_affine
-from larmorx.sdcflows.transform import B0FieldTransform, deoblique_and_zooms
+from larmorx.sdcflows.transform import (
+    ApplyCoeffsFieldResult,
+    B0FieldTransform,
+    apply_coeffs_field,
+    deoblique_and_zooms,
+)
 
 __all__ = [
     "DEFAULT_HF_ZOOMS_MM",
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",
     "NOT_ALIGNED",
+    "ApplyCoeffsFieldResult",
     "B0FieldTransform",
     "BSplineApproxResult",
     "CoefficientsResult",
     "CsrMatrix",
+    "DisplacementsResult",
     "RidgeResult",
+    "apply_coeffs_field",
     "bspline_approx",
     "bspline_grid",
     "collocation_matrix",
     "deoblique_and_zooms",
+    "disp_to_fmap",
+    "displacements_field_to_fieldmap",
+    "fmap_to_disp",
     "grid_bspline_weights",
     "reorient_pedir",
     "resample_to_zooms",
     "rescale_affine",
     "ridge_sparse_cg",
+    "save_nibabel",
     "topup_coeff_reorient",
     "transform_coefficients",
 ]

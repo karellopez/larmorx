@@ -382,6 +382,7 @@ name = "larmorx-sdcflows"
 version = "0.0.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-interp",
  "larmorx-transform",
  "rayon",
  "thiserror",

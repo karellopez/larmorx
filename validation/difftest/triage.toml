@@ -3927,3 +3927,80 @@ implementation = "original"
 signature = ["notice: GLIBC-07"]
 status = "explained"
 explanation = "14 cases: GLIBC-07 named where the correctly rounded arctangent and glibc's atan2f differ on a voxel of a complex image, whether or not an output changes (the voxel outside the mask, or the phase's last bit absorbed), as specs/prelude.md §6.4 says; the suite reports it in the replica suite's D13 check (the replica never names GLIBC-07)"
+
+# --- 3dvolreg's clean-room original (afni-volreg-original), its trial of 2026-11-08 ---------------
+# oracles/difftest/2026-11-08-volreg-original-trial (seed volreg-original-trial, 0.5 h, 4 jobs at one
+# thread, AFNI 26.3.05 through the oracle cache): 21,710 cases, 11,385 agree, 10,325 differ. A seeded
+# sample of 1,200 differences judged again with the part's final build and classified by
+# validation/investigations/afni-volreg-original/triage.py (docs/findings/afni-volreg-original.md).
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["AFNI: -NDfile parameters", "the replica (default): -NDfile parameters", "AFNI: -NDfile median", "the replica (default): -NDfile median", "AFNI: registered volumes", "the replica (default): registered volumes"]
+status = "explained"
+explanation = "The shear decomposition's exact ties (specs/3dvolreg.md §5.3, §16): the original cannot follow AFNI's choice between orders of equal norm. Of the 1,200 sampled differences: 676 within the original's own tie spread (one of its tie sides, LARMORX_VOLREG_TIES, meets every threshold, or the sides move it as far), 245 runaway fits (rotations beyond 15 degrees or 20 mm on 12- to 32-voxel phantoms, far outside the small motions 3dvolreg is made for; AFNI-97 met by AFNI in some), 80 fits stopped at the iteration limit (oscillating, not converged), 23 with the parameters within their bounds, 43 agreeing with the final build (fixed since the night), and 133 converged beyond what the original's four global tie sides span (AFNI mixes the sides resampling by resampling, which cannot be measured from outside; reported to the spec writer with the question whether §14.3 should bound ill-conditioned fits)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["AFNI: messages", "the replica (default): messages"]
+status = "explained"
+explanation = "Numbers that follow from the parameters (the maximum displacements, the parameters' summary) beyond their derived bounds where the parameters are (the entry above); and the coarse search's weight percentage (-verbose's w[...%]), which counted the weight's non-zero voxels instead of its automask's: fixed after the night (AFNI's percentage on every case checked)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["AFNI: standard output (-rotcom)", "the replica (default): standard output (-rotcom)"]
+status = "explained"
+explanation = "-rotcom's 3drotate commands print the parameters: beyond their bounds where the parameters are (the first entry)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["AFNI: -savedisp DX header", "AFNI: -savedisp DY header", "AFNI: -savedisp DZ header", "the replica (default): -savedisp DX header", "the replica (default): -savedisp DY header", "the replica (default): -savedisp DZ header"]
+status = "fixed"
+explanation = "-savedisp's and -SAVEDISP's datasets did not carry the input's slice fields (slice_code, slice_duration) as the registered output does: fixed after the night (the suite's tshift and outputs cases cover it)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["-SAVEDISP step N: the normalisation, and the products of one or two factors, on AFNI's raw displacements"]
+status = "open"
+explanation = "§10.3's arithmetic applied to AFNI's own raw -savedisp values gives AFNI's three normalised datasets bit for bit, but its sixteen products differ at a few voxels (second- and third-order alike, 2 to 26 values of 20,000 to 250,000): the products' order of operations is a question for the spec writer; the check now requires the normalisation and reports the products."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["defects named as the replica's default"]
+status = "fixed"
+explanation = "The option scan's notices (AFNI-86, -90, -95) were not printed when a run stopped with a later error, AFNI-97 was never named, and AFNI-99 was named from -maxdisp1D's three decimals when no file was written: fixed after the night (the notices before any error, in the order of their IDs, as the replica prints them)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["AFNI: exit status", "AFNI: files written", "AFNI: standard output"]
+status = "explained"
+explanation = "AFNI-97: AFNI's runaway Fourier first passes (rotations of hundreds of degrees) met a lone row shifted beyond the row and AFNI crashed; the original's runaway path differs (the decomposition's ties) and ends with other meaningless parameters. The original now names AFNI-97 by default and stops as AFNI does with reproduce wherever it meets the condition itself (found by this night: no trigger was known before)."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "AFNI-99 named where no printed or written value changed (the comparison used -maxdisp1D's three decimals also when no -maxdisp1D file was written): fixed after the night."
+link = "docs/findings/afni-volreg-original.md"
+
+[[difference]]
+tool = "afni-volreg-original"
+implementation = "original"
+signature = ["the replica (default): exit status", "the replica (default): files written"]
+status = "harness"
+explanation = "The part's Python extension was replaced in place while the night ran: a run that had it mapped ended with SIGBUS. The extension is now replaced by an atomic rename."

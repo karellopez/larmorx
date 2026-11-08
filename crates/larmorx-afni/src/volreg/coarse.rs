@@ -267,17 +267,22 @@ fn rotation_weight(b: &[f32], n: [usize; 3], s: &CoarseSettings) -> (Vec<f32>, f
         ..MaskSettings::default()
     };
     let mut log = Vec::new();
-    match automask::form_mask(&w, n, &settings, &mut log) {
+    // `-verbose`'s percentage counts the automask's voxels (observed: also those whose weight
+    // fell below 0.05 inside it)
+    let kept = match automask::form_mask(&w, n, &settings, &mut log) {
         Ok(mask) => {
             for (x, &m) in w.iter_mut().zip(&mask) {
                 if m == 0 {
                     *x = 0.0;
                 }
             }
+            mask.iter().filter(|&&m| m != 0).count()
         }
-        Err(_) => w.iter_mut().for_each(|x| *x = 0.0),
-    }
-    let kept = w.iter().filter(|&&x| x > 0.0).count();
+        Err(_) => {
+            w.iter_mut().for_each(|x| *x = 0.0);
+            0
+        }
+    };
     let pct = 100.0f32 * kept as f32 / w.len() as f32;
     (w, pct)
 }

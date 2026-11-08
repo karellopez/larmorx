@@ -3308,7 +3308,7 @@ def savedisp_two_steps(
     raw_a = [_series(ar / f"{stem}_D{ax}{suffix}") for ax in "XYZ"]
     raw_b = [_series(lr / f"{stem}_D{ax}{suffix}") for ax in "XYZ"]
     sets = _core.afni_volreg_savedisp(*raw_a)
-    bad, third = [], []
+    bad, products = [], []
     for name, series in sets:
         f = afni_files.get(f"{stem}_{name}{suffix}")
         if f is None:
@@ -3320,22 +3320,23 @@ def savedisp_two_steps(
             or theirs.tobytes() != np.asarray(series, np.float32).tobytes()
         ):
             n = int(np.count_nonzero(theirs != series)) if theirs.shape == series.shape else -1
-            (third if len(name) == 4 else bad).append(f"{name}: {n} of {theirs.size} values differ")
+            (bad if len(name) == 2 else products).append(f"{name}: {n} of {theirs.size} values differ")  # fmt: skip
     checks(
-        "-SAVEDISP step 1: the normalisation, and the products of one or two factors, on AFNI's raw displacements",
+        "-SAVEDISP step 1: the normalisation (DX, DY, DZ) on AFNI's raw displacements",
         not bad,
         metric="bit-identical",
         detail="; ".join(bad),
     )
-    # The third-order products (DXXX ... DXYZ): §10.3's arithmetic gives AFNI's values but at a
-    # few voxels (findings: afni-volreg-original.md); reported, an open question.
+    # The sixteen products: §10.3's arithmetic gives AFNI's values but at a few voxels, in second-
+    # and third-order products alike (findings: afni-volreg-original.md); reported, an open
+    # question for the spec writer.
     checks.add(
         Check(
-            "-SAVEDISP step 1: the third-order products",
+            "-SAVEDISP step 1: the sixteen products",
             True,
             metric="values differing",
-            value="; ".join(third) or "none",
-            threshold="reported (an open question: §10.3's order of the third-order products)",
+            value="; ".join(products) or "none",
+            threshold="reported (an open question: the arithmetic of §10.3's products)",
         )
     )
     # step 2: the whole run

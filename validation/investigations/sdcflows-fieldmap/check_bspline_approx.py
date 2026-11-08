@@ -280,7 +280,11 @@ def case(name, in_data, in_mask=None, oracle_dir=None, **kw):
             np.array_equal(np.asanyarray(nb.load(p).dataobj), img.data, equal_nan=True)
             for p, img in [
                 (mine.out_field, mine.field),
-                (mine.out_error, mine.error),
+                *(
+                    [(mine.out_error, mine.error)]
+                    if np.dtype(mine.error.header.data_dtype).kind == "f"
+                    else []  # an integer input type: the file holds nibabel's scaled values
+                ),
                 *list(zip(mine.out_coeff, mine.coefficients, strict=False)),
             ]
         )
@@ -401,6 +405,18 @@ def check_approx(tmp: Path) -> None:
     case("approx NIfTI-2 uncompressed", n2, n2m)
     d64, d64m, _ = synthetic(tmp, "f64", (20, 22, 12), (3.0, 3.0, 3.0), 11, dtype=np.float64)
     case("approx float64 input", d64, d64m)
+    i16, i16m, i16a = synthetic(tmp, "i16", (20, 22, 12), (3.0, 3.0, 3.0), 13, dtype=np.int16)
+    case("approx int16 input (error map scaled into int16)", i16, i16m)
+    si16 = write(
+        tmp / "si16_fmap.nii.gz",
+        np.round(field((20, 22, 12), 14) * 50).astype(np.int16),
+        i16a,
+        slope=0.02,
+        inter=0.5,
+    )
+    case("approx scaled int16 input", si16, i16m)
+    u8, u8m, _ = synthetic(tmp, "u8", (18, 16, 10), (3.0, 3.0, 3.0), 15, dtype=np.uint8)
+    case("approx uint8 input (error map scaled into uint8)", u8, u8m)
     nm = tmp / "sub-01_field.v2_fmap.nii.gz"
     nm.write_bytes(Path(f).read_bytes())
     case("approx name with _field.", nm, m)

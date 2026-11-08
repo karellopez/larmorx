@@ -23,6 +23,7 @@ import numpy as np
 from larmorx import _core
 from larmorx.image import Image
 from larmorx.io.nifti import NiftiHeader
+from larmorx.sdcflows._nibabel_write import save_nibabel
 from larmorx.sdcflows.bspline import DEFAULT_HF_ZOOMS_MM
 from larmorx.sdcflows.tools import _as_loaded, _header, resample_to_zooms
 
@@ -41,7 +42,9 @@ class BSplineApproxResult:
     - ``field``: the smooth field on the field map's grid, 0 outside the mask (``out_field``).
     - ``coefficients``: the B-spline coefficients of every control grid (``out_coeff``), each
       an image on its control grid.
-    - ``error``: ``(data - field) * mask`` with the input's header (``out_error``).
+    - ``error``: ``(data - field) * mask`` (float32) with the input's header (``out_error``,
+      written in the input's stored type as nibabel writes it: scaled into an integer type;
+      :func:`larmorx.sdcflows.save_nibabel`).
     - ``extrapolated``: the field with its extrapolation outside the mask
       (``out_extrapolated``); the ``field`` itself when the mask holds every voxel; ``None``
       without ``extrapolate``.
@@ -288,14 +291,12 @@ def bspline_approx(
             list(c.shape), "float32", np.ascontiguousarray(gaffine), None, version
         )
         coefficients.append(Image(c, np.asarray(gaffine), NiftiHeader.from_dict(fields)))
-    # out_error: (data - field) * mask with the input's header as is (its stored type),
+    # out_error: (data - field) * mask (float32) with the input's header as is: nibabel writes
+    # it in the input's stored type, scaled into an integer type (save_nibabel);
     # cal_min = 0, cal_max = max(error)
-    error = np.asarray(out["error"]).reshape(shape3).reshape(data_shape)
+    error = np.asarray(out["error"], dtype=np.float32).reshape(shape3).reshape(data_shape)
     stored = hdr.data_dtype
-    err_dtype = "float32"
-    if stored is not None and stored.kind == "f":
-        err_dtype = stored.name
-    error = error.astype(err_dtype, copy=False)
+    err_dtype = "float32" if stored is None else np.dtype(stored).name
     error_img = Image(
         error,
         affine,
@@ -320,7 +321,7 @@ def bspline_approx(
             c.save(p)
             coeff_paths.append(Path(p))
         err_path = _renamed(out_name, "_field.", "_error.")
-        error_img.save(err_path)
+        save_nibabel(error_img, err_path)
         files = {
             "out_field": Path(out_name),
             "out_coeff": tuple(coeff_paths),

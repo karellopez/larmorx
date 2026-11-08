@@ -167,6 +167,9 @@ fn blur_x(v: &mut [f32], dims: [usize; 3], w: &[f32]) {
     );
 }
 
+/// The two input lines `q` steps before and after an output line (`None`: zeros).
+type Pair<'a> = (Option<&'a [f32]>, Option<&'a [f32]>);
+
 /// Blurs along y (`axis` 1) or z (`axis` 2): each output x line from whole input x lines.
 fn blur_yz(v: &mut [f32], dims: [usize; 3], w: &[f32], axis: usize, ends: Ends) {
     let [nx, ny, nz] = dims;
@@ -183,7 +186,7 @@ fn blur_yz(v: &mut [f32], dims: [usize; 3], w: &[f32], axis: usize, ends: Ends) 
         let at = |p: i64| -> Option<&[f32]> {
             source(p, n, ends).map(|s| if axis == 1 { line(s, k) } else { line(j, s) })
         };
-        let neighbours: Vec<(Option<&[f32]>, Option<&[f32]>)> = (0..=m)
+        let neighbours: Vec<Pair<'_>> = (0..=m)
             .map(|q| (at(t as i64 - q as i64), at(t as i64 + q as i64)))
             .collect();
         let centre = neighbours[0].0.expect("the row itself");

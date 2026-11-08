@@ -116,7 +116,7 @@ fn weights(method: Method, x: f32) -> ([f32; 8], [i64; 8], usize) {
 /// `None` when the row becomes all zeros.
 pub(crate) fn split(alpha: f32, n: usize) -> Option<(i64, f32)> {
     let beta = -alpha;
-    if !(beta.abs() < 1.0e9) {
+    if beta.is_nan() || beta.abs() >= 1.0e9 {
         return None;
     }
     let mut ia = beta.trunc() as i64;

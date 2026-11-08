@@ -203,10 +203,13 @@ fn best_order(q: &M3, e: [f64; 3]) -> Option<[Shear; 4]> {
     best.map(|(_, s)| s)
 }
 
+/// A decomposition's norm and its four shears' coefficients (permuted axes) and shifts.
+type Solution = (f64, [([f64; 3], f64); 4]);
+
 /// The solution of §5.3 step 2 for one axis order (`q` and `e` already permuted): its norm and
 /// each shear's coefficients on the permuted axes and shift (X1, Y, Z, X2); `None` when this
 /// order fails.
-fn solve_full(q: &M3, e: [f64; 3]) -> Option<(f64, [([f64; 3], f64); 4])> {
+fn solve_full(q: &M3, e: [f64; 3]) -> Option<Solution> {
     let d = super::grid::det(q);
     let (q10, q11, q12) = (q[1][0], q[1][1], q[1][2]);
     let (q20, q21, q22) = (q[2][0], q[2][1], q[2][2]);
@@ -468,7 +471,7 @@ fn shift_rows(
 
 /// Applies one shear to `v` (a padded volume of `dims`) in place.
 fn shear(
-    v: &mut Vec<f32>,
+    v: &mut [f32],
     scratch: &mut Vec<f32>,
     dims: [usize; 3],
     sh: &Shear,

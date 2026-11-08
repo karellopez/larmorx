@@ -167,7 +167,7 @@ struct Options {
 
 enum BaseOpt {
     Index(usize),
-    Dataset(AfniImage, String),
+    Dataset(Box<AfniImage>, String),
 }
 
 /// `-edging`'s value (or `AFNI_VOLREG_EDGING`'s): `e` voxels or `e%`.
@@ -560,7 +560,7 @@ fn parse(
                 if image.bricks.shape[3] > 1 {
                     log.warning(&format!("-base dataset {v} has more than 1 sub-brick"));
                 }
-                o.base = Some(BaseOpt::Dataset(image, shown));
+                o.base = Some(BaseOpt::Dataset(Box::new(image), shown));
             }
             i += 2;
             continue;

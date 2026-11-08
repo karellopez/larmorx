@@ -211,6 +211,7 @@ fn range(v: &[f32]) -> (f32, f32) {
 
 impl Basis {
     /// The basis of `base` (a volume of `n` voxels of sizes `sizes`) with `weight` (§7.1).
+    #[allow(clippy::needless_range_loop)]
     pub fn new(
         base: &[f32],
         n: [usize; 3],
@@ -394,7 +395,7 @@ impl Basis {
             c[i][j] = s;
             c[j][i] = s;
         }
-        // Step 3: Cholesky.
+        // Step 3: Cholesky (the spec's index form).
         let mut l = [[0f64; 7]; 7];
         for i in 0..7 {
             for j in 0..i {

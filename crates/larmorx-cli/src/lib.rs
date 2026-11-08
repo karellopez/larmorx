@@ -71,7 +71,7 @@ const FSL_TOOLS: &[&str] = &[
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
 /// built-in replica (`larmorx_afni_replica::cli::TOOLS`; a test checks the lists), then those
-/// with a replica only (`3dvolreg`, whose clean-room original is still to be written).
+/// with a replica only (none since 3dvolreg's original, 2026-11-08).
 const AFNI_TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize", "3dvolreg"];
 
 /// How a command line runs, besides its arguments.
@@ -478,11 +478,8 @@ mod tests {
             .chain(replica::replica_only("afni"))
             .collect();
         assert_eq!(listed, AFNI_TOOLS);
-        // Every AFNI tool has its built-in replica; 3dvolreg has no clean-room original yet.
-        assert_eq!(
-            replica::replica_only("afni").collect::<Vec<_>>(),
-            ["3dvolreg"]
-        );
+        // Every AFNI tool has its built-in replica and its clean-room original.
+        assert_eq!(replica::replica_only("afni").count(), 0);
         assert_eq!(larmorx_afni_replica::cli::TOOLS, AFNI_TOOLS);
         let replica = Options {
             implementation: Some(Implementation::Replica),

@@ -34,12 +34,11 @@ pub fn dicom_rotation(p: &[f32; 6], trig: Trig) -> M3 {
 
 /// The inverse of `A` by cofactors (§4.5).
 fn inverse(a: &M3) -> M3 {
-    let det = a[0][0] * a[1][1] * a[2][2]
-        - a[0][0] * a[1][2] * a[2][1]
-        - a[1][0] * a[0][1] * a[2][2]
-        + a[1][0] * a[0][2] * a[2][1]
-        + a[2][0] * a[0][1] * a[1][2]
-        - a[2][0] * a[0][2] * a[1][1];
+    let det =
+        a[0][0] * a[1][1] * a[2][2] - a[0][0] * a[1][2] * a[2][1] - a[1][0] * a[0][1] * a[2][2]
+            + a[1][0] * a[0][2] * a[2][1]
+            + a[2][0] * a[0][1] * a[1][2]
+            - a[2][0] * a[0][2] * a[1][1];
     let r = 1.0 / det;
     [
         [
@@ -70,8 +69,8 @@ pub fn matrix_line(p: &[f32; 6], cb: [f32; 3], ci: [f32; 3], trig: Trig) -> [f64
     let ri = inverse(&r);
     let u = mul_vec(&ri, v.map(f64::from)).map(|x| -x);
     [
-        ri[0][0], ri[0][1], ri[0][2], u[0], ri[1][0], ri[1][1], ri[1][2], u[1], ri[2][0],
-        ri[2][1], ri[2][2], u[2],
+        ri[0][0], ri[0][1], ri[0][2], u[0], ri[1][0], ri[1][1], ri[1][2], u[1], ri[2][0], ri[2][1],
+        ri[2][2], u[2],
     ]
 }
 
@@ -97,7 +96,11 @@ pub fn dataset_transform(grid: &Grid, p: &[f32; 6], signed: bool, trig: Trig) ->
 pub fn displacement(rd: &M3, td: &[f64; 3], c: &[f64; 3], x: [f64; 3]) -> [f64; 3] {
     let d = [x[0] - c[0], x[1] - c[1], x[2] - c[2]];
     let q = mul_vec(rd, d);
-    let q = [q[0] + td[0] + c[0], q[1] + td[1] + c[1], q[2] + td[2] + c[2]];
+    let q = [
+        q[0] + td[0] + c[0],
+        q[1] + td[1] + c[1],
+        q[2] + td[2] + c[2],
+    ];
     [x[0] - q[0], x[1] - q[1], x[2] - q[2]]
 }
 
@@ -209,11 +212,19 @@ mod tests {
             origin: [-58.5, -64.5, -40.25],
         };
         let p = reported(&g, [0.0; 3], [0.0; 3]);
-        assert_eq!(oned_line(&p), "  0.0000   0.0000   0.0000   0.0000   0.0000   0.0000");
+        assert_eq!(
+            oned_line(&p),
+            "  0.0000   0.0000   0.0000   0.0000   0.0000   0.0000"
+        );
         let c = g.centre();
         let m = matrix_line(&p, c, c, Trig::Correct);
         let text = matrix_text(&m);
         let words: Vec<&str> = text.split_whitespace().collect();
-        assert_eq!(words, ["1", "0", "0", "-0", "0", "1", "0", "-0", "0", "0", "1", "-0"]);
+        assert_eq!(
+            words,
+            [
+                "1", "0", "0", "-0", "0", "1", "0", "-0", "0", "0", "1", "-0"
+            ]
+        );
     }
 }

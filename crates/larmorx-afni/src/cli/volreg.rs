@@ -1,0 +1,1366 @@
+// SPDX-License-Identifier: Apache-2.0
+//! `3dvolreg` with its original arguments, the clean-room original (`specs/3dvolreg.md` §9,
+//! §10), AFNI's global options and environment variables included.
+//!
+//! Differences from AFNI, all deliberate (the larmorx AFNI tools' rules): the outputs must be
+//! NIfTI files (AFNI's default prefix `volreg`, in AFNI's own format, is refused); no history
+//! extension or `VOLREG_*` attributes are written; AFNI's version banner and compile date are
+//! not printed; the CPU times are printed as 0. AFNI's defects are corrected unless
+//! `LARMORX_UPSTREAM_DEFECTS` is `reproduce` (D13).
+
+use std::io::Write;
+use std::path::Path;
+
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
+
+use crate::dataset::{self, AfniImage, BrickData, OutputTiming};
+use crate::msg::{Log, Message};
+use crate::output::refused;
+use crate::settings::{self, AfniSettings, Program, take_global_options_of};
+use crate::timing;
+use crate::volreg::grid::Grid;
+use crate::volreg::{self, Base, Edging, Method, VolregParams, report};
+
+use super::common::{self, Failure, Target, check_nifti, strtod, strtol_int};
+use super::threads;
+
+/// The program, for the warnings about `-D` options.
+pub const PROGRAM: Program = Program {
+    name: "3dvolreg",
+    consults: consulted,
+};
+
+/// The variables 3dvolreg reads: the masks' (the dataset reading and writing) and its own.
+fn consulted(name: &str) -> bool {
+    settings::is_consulted_by_masks(name)
+        || matches!(
+            name,
+            "AFNI_VOLREG_EDGING"
+                | "AFNI_BLUR_FIRFAC"
+                | "AFNI_BLUR_FIROLD"
+                | "AFNI_BLUR_INTS_AS_OLD"
+                | "AFNI_ROTA_ZPAD"
+                | "AFNI_QUIET_STARTUP"
+        )
+}
+
+const USAGE: &str = "\
+Usage: 3dvolreg [options] dataset   (larmorx: clean-room original of AFNI 26.3.05's 3dvolreg)
+
+Registers each 3D sub-brick of the input dataset to the base brick (rigid body, 6
+parameters), by iterated linearised weighted least squares, as AFNI's 3dvolreg does. The
+dataset and the outputs are NIfTI files.
+
+Options (before the dataset):
+  -verbose             print progress reports (twice: lots of output)
+  -Fourier -heptic -quintic -cubic -linear
+                       interpolation for the estimation (default -heptic)
+  -final mode          final interpolation: NN cubic quintic heptic Fourier linear
+  -clipit / -noclip    clip each output to its input's range (default on)
+  -zpad n              zero padding around the edges during rotations (default 4)
+  -prefix fname        output (.nii or .nii.gz); NULL writes no dataset
+  -float               write the output as float
+  -base n | -base dset the n'th sub-brick of the input, or sub-brick 0 of another dataset
+  -dfile f             save n, roll, pitch, yaw, dS, dL, dP, rmsold, rmsnew
+  -1Dfile f            save roll, pitch, yaw, dS, dL, dP
+  -1Dmatrix_save ff    save the base-to-input matrices (ff, or ff.aff12.1D)
+  -rotcom              print the 3drotate fragments
+  -maxdisp / -nomaxdisp  report the maximum displacement in the automask (default on)
+  -maxdisp1D mm        also write it per sub-brick to mm (and its change to mm_delt)
+  -savedisp sss        save the displacements of every voxel (sss_DX, sss_DY, sss_DZ)
+  -maxite m  -x_thresh x  -rot_thresh r  -delta d  -params m x r d
+  -weight 'wset[n]'    the weight brick
+  -wtinp               sub-brick 0 of the input as the weight
+  -edging ee | ee%     the weight's zeroed edge (default 5%, or AFNI_VOLREG_EDGING)
+  -twopass  -twoblur bb  -sinit  -coarse del num  -coarserot  -nocoarserot
+                       two passes: a coarse search on blurred bricks first
+  -tshift ii           slice-time correct the input first (ignoring ii time points)
+  -rotparent rset  -gridparent gset  -twodup
+  -input dset / -source dset   the dataset, given as an option
+
+AFNI's global options (anywhere on the command line):
+  -overwrite      replace an existing output (AFNI_DECONFLICT=OVERWRITE)
+  -Dname=value    set AFNI's environment variable 'name' for this run
+  -skip_afnirc    accepted (no .afnirc file is read)
+";
+
+/// The first `-verbose` line.
+const IMPLEMENTATION: &str = concat!(
+    "implementation: original (larmorx ",
+    env!("CARGO_PKG_VERSION"),
+    ", Apache-2.0), clean-room 3dvolreg"
+);
+
+/// Runs `3dvolreg` with `args`; returns the exit code.
+pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    match UpstreamDefects::from_env() {
+        Ok(mode) => main_with_settings(args, mode, AfniSettings::from_env(), threads(), out, err),
+        Err(e) => {
+            let _ = writeln!(err, "** FATAL ERROR: {e}");
+            EXIT_BAD_MODE
+        }
+    }
+}
+
+/// A failure printed as it is.
+enum Stop {
+    /// `** FATAL ERROR: ...`
+    Fatal(String),
+    /// A line printed as it is (AFNI's `** ...` messages without a label).
+    Raw(String),
+    /// `** ERROR: ...`
+    Error(String),
+}
+
+impl From<Failure> for Stop {
+    fn from(f: Failure) -> Stop {
+        match f {
+            Failure::Fatal(m) => Stop::Fatal(m),
+        }
+    }
+}
+
+/// The parsed command line.
+struct Options {
+    dataset: Option<String>,
+    input_image: Option<(AfniImage, String)>,
+    by_input: bool,
+    input_option: String,
+    maxdisp: bool,
+    maxdisp1d: Option<String>,
+    savedisp: Option<(String, bool)>,
+    matrix_save: Option<String>,
+    sinit: bool,
+    max_iter: i32,
+    x_thresh: f32,
+    rot_thresh: f32,
+    delta: f32,
+    final_method: Option<Method>,
+    rotcom: bool,
+    twopass: bool,
+    twoblur: f32,
+    verbose: u8,
+    clip: bool,
+    zpad: Option<usize>,
+    method: Method,
+    prefix: String,
+    prefix_refused: bool,
+    dfile: Option<String>,
+    oned: Option<String>,
+    base: Option<BaseOpt>,
+    /// AFNI-95: a second `-base` after `-base 0`.
+    base_twice: bool,
+    coarse: (i32, i32),
+    coarse_rotation: bool,
+    /// AFNI-86: `-nocoarserot` given.
+    nocoarserot: bool,
+    wtinp: bool,
+    edging: Option<Edging>,
+    weight: Option<(String, usize, AfniImage)>,
+    twodup: bool,
+    tshift: Option<usize>,
+    rotparent: Option<String>,
+    gridparent: Option<String>,
+    float: bool,
+    rest: Vec<String>,
+    /// The arguments after the global options (for `-maxdisp1D`'s first line).
+    command: Vec<String>,
+}
+
+enum BaseOpt {
+    Index(usize),
+    Dataset(AfniImage, String),
+}
+
+/// `-edging`'s value (or `AFNI_VOLREG_EDGING`'s): `e` voxels or `e%`.
+fn edging_value(v: &str) -> Result<Edging, &'static str> {
+    let Some((e, rest)) = super::leading_number(v) else {
+        return Ok(Edging::Voxels(0.0));
+    };
+    if e < 0.0 {
+        return Err("value");
+    }
+    if rest.starts_with('%') {
+        if e > 25.0 {
+            return Err("percentage");
+        }
+        Ok(Edging::Percent(e))
+    } else {
+        Ok(Edging::Voxels(e))
+    }
+}
+
+/// Opens a dataset as 3dvolreg reads it (its messages and notices to `log`).
+fn open(
+    name: &str,
+    settings: &AfniSettings,
+    mode: UpstreamDefects,
+    n_threads: usize,
+    log: &mut Log<'_>,
+) -> Result<(AfniImage, String), String> {
+    if name.contains('[') || name.ends_with(".HEAD") || name.ends_with(".BRIK") {
+        return Err(format!(
+            "larmorx: '{name}': sub-brick selectors and AFNI's .HEAD/.BRIK format are not supported"
+        ));
+    }
+    let (mut messages, mut notices) = (Vec::new(), Vec::new());
+    let found = crate::input::resolve(name, settings, mode, &mut messages, &mut notices);
+    for m in &messages {
+        log.message(m);
+    }
+    for n in &notices {
+        log.notice(n);
+    }
+    let found = found.map_err(|e| e.0)?;
+    let mut image = dataset::read(&found.path, &found.shown, n_threads, mode, settings)
+        .map_err(|e| e.to_string())?;
+    for m in std::mem::take(&mut image.messages) {
+        log.message(&m);
+    }
+    for n in std::mem::take(&mut image.notices) {
+        log.notice(&n);
+    }
+    Ok((image, found.shown))
+}
+
+/// The AFNI-88 notice and error for an option given last without its value.
+fn needs_value(opt: &str, mode: UpstreamDefects, log: &mut Log<'_>) -> Stop {
+    let verb = match mode {
+        UpstreamDefects::Fix => "corrected",
+        UpstreamDefects::Reproduce => "reproduced",
+    };
+    let _ = verb;
+    log.notice(&Notice::new(
+        &defects::AFNI_88,
+        mode,
+        format!(
+            "{opt} is the last argument and needs a value: AFNI reads past the end of its \
+             arguments (a crash)"
+        ),
+    ));
+    Stop::Fatal(format!(
+        "need argument after {opt} (AFNI-88: AFNI crashes here)"
+    ))
+}
+
+fn starts(arg: &str, name: &str, n: usize) -> bool {
+    arg.len() >= n && arg.as_bytes()[..n] == name.as_bytes()[..n]
+}
+
+fn parse(
+    args: &[String],
+    log: &mut Log<'_>,
+    settings: &AfniSettings,
+    mode: UpstreamDefects,
+    n_threads: usize,
+) -> Result<Options, Stop> {
+    let mut o = Options {
+        dataset: None,
+        input_image: None,
+        by_input: false,
+        input_option: String::new(),
+        maxdisp: true,
+        maxdisp1d: None,
+        savedisp: None,
+        matrix_save: None,
+        sinit: true,
+        max_iter: 23,
+        x_thresh: 0.01,
+        rot_thresh: 0.02,
+        delta: 0.7,
+        final_method: None,
+        rotcom: false,
+        twopass: false,
+        twoblur: 2.0,
+        verbose: 0,
+        clip: true,
+        zpad: None,
+        method: Method::Heptic,
+        prefix: "volreg".into(),
+        prefix_refused: false,
+        dfile: None,
+        oned: None,
+        base: None,
+        base_twice: false,
+        coarse: (10, 2),
+        coarse_rotation: true,
+        nocoarserot: false,
+        wtinp: false,
+        edging: None,
+        weight: None,
+        twodup: false,
+        tshift: None,
+        rotparent: None,
+        gridparent: None,
+        float: false,
+        rest: Vec::new(),
+        command: args.to_vec(),
+    };
+    let mut i = 0;
+    while i < args.len() && args[i].starts_with('-') {
+        let arg = args[i].as_str();
+        let value = |k: usize| -> Option<&str> { args.get(i + k).map(String::as_str) };
+        macro_rules! need {
+            ($k:expr) => {
+                match value($k) {
+                    Some(v) => v,
+                    None => return Err(needs_value(arg, mode, log)),
+                }
+            };
+        }
+        if arg == "-input" || arg == "-source" {
+            let Some(v) = value(1) else {
+                return Err(Stop::Fatal("Can't open input dataset '(null)'".into()));
+            };
+            if o.by_input {
+                return Err(Stop::Fatal(format!("Can't have 2 '{arg}' options!")));
+            }
+            let image = open(v, settings, mode, n_threads, log)
+                .map_err(|_| Stop::Fatal(format!("Can't open input dataset '{v}'")))?;
+            o.input_image = Some(image);
+            o.by_input = true;
+            o.input_option = arg.to_owned();
+            o.dataset = Some(v.to_owned());
+            i += 2;
+            continue;
+        }
+        if arg == "-maxdisp" {
+            o.maxdisp = true;
+            i += 1;
+            continue;
+        }
+        if arg == "-nomaxdisp" {
+            o.maxdisp = false;
+            i += 1;
+            continue;
+        }
+        if arg == "-maxdisp1D" {
+            let v = need!(1);
+            o.maxdisp = true;
+            o.maxdisp1d = Some(v.to_owned());
+            i += 2;
+            continue;
+        }
+        if arg == "-savedisp" || arg == "-SAVEDISP" {
+            let v = need!(1);
+            let lower = v.to_ascii_lowercase();
+            let ok = !refused(v, settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES"))
+                && !((lower.ends_with(".nii.gz") && v.len() < 8)
+                    || (lower.ends_with(".nii") && v.len() < 5));
+            if !ok {
+                return Err(Stop::Fatal(format!(
+                    "{arg} '{v}' is invalid output dataset name"
+                )));
+            }
+            o.savedisp = Some((v.to_owned(), arg == "-SAVEDISP"));
+            i += 2;
+            continue;
+        }
+        if arg == "-1Dmatrix_save" {
+            let Some(v) = value(1) else {
+                return Err(Stop::Fatal("no argument after '-1Dmatrix_save'!".into()));
+            };
+            if o.matrix_save.is_some() {
+                return Err(Stop::Fatal(
+                    "Can't have multiple -1Dmatrix_save options!".into(),
+                ));
+            }
+            if refused(v, settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES")) {
+                return Err(Stop::Fatal(format!(
+                    "badly formed filename: -1Dmatrix_save '{v}'"
+                )));
+            }
+            o.matrix_save = Some(v.to_owned());
+            i += 2;
+            continue;
+        }
+        if arg == "-sinit" {
+            o.sinit = false;
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-params", 4) {
+            let (m, x, r, d) = (need!(1), need!(2), need!(3), need!(4));
+            o.max_iter = strtol_int(m);
+            o.x_thresh = strtod(x) as f32;
+            o.rot_thresh = strtod(r) as f32;
+            o.delta = strtod(d) as f32;
+            i += 5;
+            continue;
+        }
+        if starts(arg, "-maxite", 4) {
+            let m = strtol_int(need!(1));
+            if m > 0 {
+                o.max_iter = m;
+            }
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-x_thresh", 4) {
+            let x = strtod(need!(1)) as f32;
+            if x > 0.0 {
+                o.x_thresh = x;
+            }
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-rot_thresh", 6) {
+            let x = strtod(need!(1)) as f32;
+            if x > 0.0 {
+                o.rot_thresh = x;
+            }
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-delta", 4) {
+            let x = strtod(need!(1)) as f32;
+            if x > 0.0 {
+                o.delta = x;
+            }
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-final", 4) {
+            let v = need!(1);
+            o.final_method = Some(match v {
+                "cubic" => Method::Cubic,
+                "quintic" => Method::Quintic,
+                "heptic" => Method::Heptic,
+                "Fourier" => Method::Fourier,
+                "NN" => Method::NN,
+                "linear" => Method::Linear,
+                _ => return Err(Stop::Raw("** Illegal mode after -final".into())),
+            });
+            i += 2;
+            continue;
+        }
+        if arg == "-rotcom" {
+            o.rotcom = true;
+            i += 1;
+            continue;
+        }
+        if arg == "-twopass" {
+            o.twopass = true;
+            if o.max_iter < 10 {
+                o.max_iter = 66;
+            }
+            i += 1;
+            continue;
+        }
+        if arg == "-twoblur" {
+            let b = strtod(need!(1)) as f32;
+            if b < 2.0 {
+                return Err(Stop::Error("value after -twoblur is < 2.0".into()));
+            }
+            o.twoblur = b;
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-verbose", 5) {
+            o.verbose = o.verbose.saturating_add(1);
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-clipit", 4) {
+            log.info("Notice: -clipit is now the default");
+            o.clip = true;
+            i += 1;
+            continue;
+        }
+        // AFNI-86: AFNI tests -noclip's four letters first, so -nocoarserot is -noclip.
+        if arg == "-nocoarserot" && mode.fix() {
+            o.coarse_rotation = false;
+            o.nocoarserot = true;
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-noclip", 4) {
+            if arg == "-nocoarserot" {
+                o.nocoarserot = true;
+            }
+            o.clip = false;
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-zpad", 5) {
+            let z = strtod(need!(1)).trunc();
+            if let Some(prev) = o.zpad
+                && prev != 4
+            {
+                log.info("WARNING: second -zpad option!");
+            }
+            if z < 0.0 {
+                return Err(Stop::Error(format!("Can't use -zpad {}", z as i64)));
+            }
+            o.zpad = Some(z as usize);
+            i += 2;
+            continue;
+        }
+        let method = [
+            ("-Fourier", "-fourier", Method::Fourier),
+            ("-linear", "-Linear", Method::Linear),
+            ("-cubic", "-Cubic", Method::Cubic),
+            ("-quintic", "-Quintic", Method::Quintic),
+            ("-heptic", "-Heptic", Method::Heptic),
+        ]
+        .into_iter()
+        .find(|(a, b, _)| starts(arg, a, 4) || starts(arg, b, 4));
+        if let Some((_, _, m)) = method {
+            o.method = m;
+            i += 1;
+            continue;
+        }
+        if starts(arg, "-prefix", 4) {
+            let v = need!(1);
+            o.prefix = v.to_owned();
+            o.prefix_refused = refused(v, settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES"));
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-dfile", 4) {
+            o.dfile = Some(need!(1).to_owned());
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-1Dfile", 4) {
+            o.oned = Some(need!(1).to_owned());
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-base", 4) {
+            let v = need!(1);
+            match &o.base {
+                Some(BaseOpt::Index(0)) => {
+                    o.base_twice = true;
+                    if mode.fix() {
+                        log.notice(&afni_95(mode));
+                        return Err(Stop::Raw("** Can't have two -base arguments".into()));
+                    }
+                }
+                Some(_) => return Err(Stop::Raw("** Can't have two -base arguments".into())),
+                None => {}
+            }
+            let t = v.trim_start();
+            let digits = t.strip_prefix(['+', '-']).unwrap_or(t);
+            let integer = !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit());
+            if integer {
+                let n = strtol_int(v);
+                if n < 0 {
+                    return Err(Stop::Fatal("Illegal negative number after -base".into()));
+                }
+                o.base = Some(BaseOpt::Index(n as usize));
+            } else {
+                if o.verbose > 0 {
+                    log.info(&format!("Reading in base dataset {v}"));
+                }
+                let (image, shown) = open(v, settings, mode, n_threads, log)
+                    .map_err(|_| Stop::Fatal(format!("Couldn't open -base dataset {v}")))?;
+                if image.bricks.shape[3] > 1 {
+                    log.warning(&format!("-base dataset {v} has more than 1 sub-brick"));
+                }
+                o.base = Some(BaseOpt::Dataset(image, shown));
+            }
+            i += 2;
+            continue;
+        }
+        if arg == "-coarse" {
+            let (a, b) = (need!(1), need!(2));
+            o.coarse = (strtol_int(a), strtol_int(b));
+            i += 3;
+            continue;
+        }
+        if arg == "-coarserot" {
+            log.info("-coarserot is now the default");
+            o.coarse_rotation = true;
+            i += 1;
+            continue;
+        }
+        if arg == "-wtrim" {
+            log.info("Notice: -wtrim is now always enabled");
+            i += 1;
+            continue;
+        }
+        if arg == "-wtinp" {
+            o.wtinp = true;
+            i += 1;
+            continue;
+        }
+        if arg == "-edging" {
+            let v = need!(1);
+            o.edging = Some(
+                edging_value(v)
+                    .map_err(|what| Stop::Raw(format!("** Illegal {what} after -edging")))?,
+            );
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-weight", 4) {
+            let v = need!(1);
+            if o.weight.is_some() {
+                return Err(Stop::Raw("** Can't have two -weight options".into()));
+            }
+            let Some(at) = v.find('[').filter(|&a| a > 0) else {
+                return Err(Stop::Raw("** Illegal weight dataset after -weight".into()));
+            };
+            let name = &v[..at];
+            let index = crate::cli::atoi(&v[at + 1..]);
+            let index = if v[at + 1..]
+                .trim_start()
+                .starts_with(|c: char| c.is_ascii_digit() || c == '-' || c == '+')
+            {
+                index
+            } else {
+                -1
+            };
+            if index < 0 {
+                return Err(Stop::Raw(
+                    "** Illegal sub-brick selector after -weight".into(),
+                ));
+            }
+            let (image, _) = open(name, settings, mode, n_threads, log)
+                .map_err(|_| Stop::Raw(format!("** Can't open weight dataset {name}")))?;
+            if index as usize >= image.bricks.shape[3] {
+                return Err(Stop::Raw(format!(
+                    "** Illegal sub-brick selector for dataset {name}"
+                )));
+            }
+            if o.verbose > 0 {
+                log.info(&format!("Reading in weight dataset {name}"));
+            }
+            o.weight = Some((name.to_owned(), index as usize, image));
+            i += 2;
+            continue;
+        }
+        if arg == "-twodup" {
+            o.twodup = true;
+            i += 1;
+            continue;
+        }
+        if arg == "-tshift" {
+            let v = strtod(need!(1)).trunc();
+            if v < 0.0 {
+                return Err(Stop::Raw("** -tshift parameter is negative!".into()));
+            }
+            o.tshift = Some(v as usize);
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-rotparent", 7) {
+            let Some(v) = value(1) else {
+                return Err(Stop::Raw("** Can't open -rotparent dataset!\n".into()));
+            };
+            if o.rotparent.is_some() {
+                return Err(Stop::Raw("** Can't use -2 -rotparent options!".into()));
+            }
+            o.rotparent = Some(v.to_owned());
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-gridparent", 7) {
+            let Some(v) = value(1) else {
+                return Err(Stop::Raw("** Can't open -gridparent dataset!\n".into()));
+            };
+            if o.gridparent.is_some() {
+                return Err(Stop::Raw("** Can't use -2 -gridparent options!".into()));
+            }
+            o.gridparent = Some(v.to_owned());
+            i += 2;
+            continue;
+        }
+        if starts(arg, "-float", 6) {
+            o.float = true;
+            i += 1;
+            continue;
+        }
+        return Err(Stop::Raw(format!("** Unknown option: {arg}\x07")));
+    }
+    o.rest = args[i..].to_vec();
+    Ok(o)
+}
+
+/// The AFNI-95 notice.
+fn afni_95(mode: UpstreamDefects) -> Notice {
+    let detail = match mode {
+        UpstreamDefects::Fix => {
+            "a second -base after -base 0: refused; AFNI accepts it (the last \
+                                 -base wins)"
+        }
+        UpstreamDefects::Reproduce => "a second -base after -base 0 replaces it, as AFNI does",
+    };
+    Notice::new(&defects::AFNI_95, mode, detail)
+}
+
+/// The AFNI-86 notice.
+fn afni_86(mode: UpstreamDefects) -> Notice {
+    let detail = match mode {
+        UpstreamDefects::Fix => {
+            "-nocoarserot turns the coarse rotation search off, as its help says; AFNI reads it \
+             as -noclip (its first four letters), which turns the clipping off instead"
+        }
+        UpstreamDefects::Reproduce => {
+            "-nocoarserot is read as -noclip (its first four letters): the clipping is turned off \
+             and the coarse rotation search stays on, as AFNI does"
+        }
+    };
+    Notice::new(&defects::AFNI_86, mode, detail)
+}
+
+/// `-maxdisp1D`'s delta file: `_delt` before a known extension, else appended.
+fn delta_name(name: &str) -> String {
+    const EXT: [&str; 29] = [
+        ".HEAD",
+        ".BRIK",
+        ".BRIK.gz",
+        ".mnc",
+        ".mri",
+        ".svl",
+        ".1D",
+        ".1D.dset",
+        ".1D.do",
+        ".txt",
+        ".3D",
+        ".nii",
+        ".nii.gz",
+        ".nia",
+        ".hdr",
+        ".img",
+        ".mpg",
+        ".mpeg",
+        ".MPG",
+        ".MPEG",
+        ".niml",
+        ".niml.dset",
+        ".niml.do",
+        ".gii",
+        ".gii.dset",
+        ".niml.tract",
+        ".jpg",
+        ".jpeg",
+        ".png",
+    ];
+    let mut best: Option<&str> = None;
+    for e in EXT.iter().chain(std::iter::once(&".heic")) {
+        if name.ends_with(e) && best.is_none_or(|b| e.len() > b.len()) {
+            best = Some(e);
+        }
+    }
+    match best {
+        Some(e) => format!("{}_delt{e}", &name[..name.len() - e.len()]),
+        None => format!("{name}_delt"),
+    }
+}
+
+/// `-maxdisp1D`'s first line: the command line, refused names quoted.
+fn command_line(args: &[String], settings: &AfniSettings) -> String {
+    let arbitrary = settings.yes("AFNI_ALLOW_ARBITRARY_FILENAMES");
+    let mut line = String::from("3dvolreg");
+    for a in args.iter().filter(|a| !a.is_empty()) {
+        line.push(' ');
+        if refused(a, arbitrary) {
+            let cleaned: String = a
+                .bytes()
+                .map(|b| {
+                    if b <= 32 || b >= 127 {
+                        ' '
+                    } else {
+                        char::from(b)
+                    }
+                })
+                .collect();
+            line.push('\'');
+            line.push_str(&cleaned);
+            line.push('\'');
+        } else {
+            line.push_str(a);
+        }
+    }
+    line
+}
+
+/// Writes a text output; AFNI's messages for an existing file and for one it cannot open.
+fn write_text(path: &str, text: &str, warn: Option<&str>, sad: bool, log: &mut Log<'_>) {
+    if Path::new(path).exists()
+        && let Some(w) = warn
+    {
+        log.message(&if w.starts_with("*+") {
+            Message::Warning(format!("Overwriting file {path}"))
+        } else {
+            Message::Raw(format!("** Warning: overwriting file {path}"))
+        });
+    }
+    if std::fs::write(path, text).is_err() {
+        log.error(&format!(
+            "Cannot open '{path}' for output{}",
+            if sad { " :(" } else { "" }
+        ));
+    }
+}
+
+/// Runs `3dvolreg` with the D13 mode and AFNI's settings given.
+pub fn main_with_settings(
+    args: &[String],
+    mode: UpstreamDefects,
+    mut settings: AfniSettings,
+    n_threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    if args.is_empty() || args[0].starts_with("-help") {
+        let _ = out.write_all(USAGE.as_bytes());
+        return 0;
+    }
+    let globals = take_global_options_of(args, &mut settings, mode, &PROGRAM);
+    let mut log = Log::new(out, err, &settings, mode);
+    if !settings.yes("AFNI_QUIET_STARTUP") {
+        log.info("Authored by: RW Cox");
+    }
+    for w in &globals.warnings {
+        log.warning(w);
+    }
+    for n in &globals.notices {
+        log.notice(n);
+    }
+    let mut rest = globals.rest;
+    // `-@` as the last argument: the words of standard input.
+    if rest.last().is_some_and(|a| a == "-@") {
+        let mut text = String::new();
+        let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut text);
+        let words: Vec<String> = text
+            .split([' ', '\t', '\n', '\r', '\x0c', '\x0b'])
+            .filter(|w| !w.is_empty())
+            .map(str::to_owned)
+            .collect();
+        if !words.is_empty() {
+            rest.pop();
+            rest.extend(words);
+        }
+    }
+    let result = parse(&rest, &mut log, &settings, mode, n_threads)
+        .and_then(|o| execute(o, mode, &settings, n_threads, &mut log));
+    match result {
+        Ok(code) => code,
+        Err(Stop::Fatal(m)) => {
+            log.fatal(&m);
+            1
+        }
+        Err(Stop::Raw(m)) => {
+            log.raw(&m);
+            1
+        }
+        Err(Stop::Error(m)) => {
+            log.error(&m);
+            1
+        }
+    }
+}
+
+fn execute(
+    mut o: Options,
+    mode: UpstreamDefects,
+    settings: &AfniSettings,
+    n_threads: usize,
+    log: &mut Log<'_>,
+) -> Result<u8, Stop> {
+    log.verbose = o.verbose > 0;
+    log.larmorx_info(IMPLEMENTATION);
+    log.larmorx_info(&format!("upstream defects: {mode} ({})", defects::ENV));
+    let mut late: Vec<Notice> = Vec::new();
+    if o.nocoarserot {
+        late.push(afni_86(mode));
+    }
+    if o.base_twice && mode.reproduce() {
+        late.push(afni_95(mode));
+    }
+    // §9.2.
+    let external = matches!(o.base, Some(BaseOpt::Dataset(..)));
+    if !(o.twopass && external) {
+        o.twodup = false;
+    }
+    if o.gridparent.is_some() && o.rotparent.is_none() {
+        log.info("WARNING: -gridparent means nothing without -rotparent!");
+        o.gridparent = None;
+    }
+    if o.rotparent.is_some() && o.twopass {
+        log.info("WARNING: Combining -rotparent and -twopass isn't recommended!");
+    }
+    if o.gridparent.is_some() && o.twodup {
+        log.info("WARNING: -gridparent overrides -twodup!");
+        o.twodup = false;
+    }
+    let edging = match o.edging {
+        Some(e) => e,
+        None => match settings.get("AFNI_VOLREG_EDGING") {
+            Some(v) => edging_value(v)
+                .map_err(|what| Stop::Raw(format!("** Illegal {what} in AFNI_VOLREG_EDGING")))?,
+            None => Edging::Percent(5.0),
+        },
+    };
+    let (image, shown, arg_name) = if o.by_input {
+        if let Some(first) = o.rest.first() {
+            log.warning(&format!(
+                "Skipping argument(s) after last option? '{first}'"
+            ));
+        }
+        let (image, shown) = o.input_image.take().expect("opened by -input");
+        let name = o.dataset.clone().unwrap_or_default();
+        (image, shown, name)
+    } else {
+        match o.rest.len() {
+            0 => {
+                return Err(Stop::Fatal(format!(
+                    "Too few arguments!?  Last={}",
+                    rest_last(&o)
+                )));
+            }
+            1 => {}
+            _ => {
+                return Err(Stop::Fatal(format!(
+                    "Too many arguments?!  Dataset={}?",
+                    o.rest[0]
+                )));
+            }
+        }
+        let name = o.rest[0].clone();
+        let (image, shown) = open(&name, settings, mode, n_threads, log).map_err(|e| {
+            if e.starts_with("larmorx:") {
+                Stop::Fatal(e)
+            } else {
+                Stop::Raw(format!("** Can't open dataset {name}"))
+            }
+        })?;
+        (image, shown, name)
+    };
+    let [nx, ny, nz, nt] = image.bricks.shape;
+    let scaled = image.bricks.factors.iter().any(|&f| f != 0.0 && f != 1.0);
+    if scaled && !o.float {
+        log.warning("Input dataset has scale factors ==> output will be stored as floats!");
+    }
+    let grid = Grid::from_geometry(&image.geometry, [nx, ny, nz], mode);
+    // The base.
+    let (base, base_grid_name) = match o.base.take() {
+        None => (Base::Index(0), None),
+        Some(BaseOpt::Index(n)) => (Base::Index(n), None),
+        Some(BaseOpt::Dataset(b, shown)) => {
+            let g = Grid::from_geometry(
+                &b.geometry,
+                [b.bricks.shape[0], b.bricks.shape[1], b.bricks.shape[2]],
+                mode,
+            );
+            let v = volreg::volume_f32(&b.bricks, 0);
+            (
+                Base::External { volume: v, grid: g },
+                Some((shown, b.bricks.shape)),
+            )
+        }
+    };
+    if let Base::External { grid: bg, .. } = &base
+        && o.verbose > 0
+    {
+        let (a, b) = (grid.centre(), bg.centre());
+        let d = ((a[0] - b[0]) * (a[0] - b[0])
+            + (a[1] - b[1]) * (a[1] - b[1])
+            + (a[2] - b[2]) * (a[2] - b[2]))
+            .sqrt();
+        if d > 0.01 {
+            log.info(&format!(
+                "centers of base and input datasets are {} mm apart",
+                crate::cfmt::fixed(f64::from(d), 2)
+            ));
+        }
+    }
+    if o.tshift.is_some() {
+        return Err(Stop::Fatal(
+            "larmorx: -tshift is not supported by the clean-room original yet".into(),
+        ));
+    }
+    if let Base::Index(n) = &base
+        && *n >= nt
+    {
+        let shown_arg = if o.by_input && mode.reproduce() {
+            o.rest.first().cloned().unwrap_or_else(|| "(null)".into())
+        } else {
+            arg_name.clone()
+        };
+        return Err(Stop::Raw(format!(
+            "** Dataset {shown_arg} doesn't have base brick index = {n}"
+        )));
+    }
+    if let (Base::External { grid: bg, .. }, Some((bshown, bshape))) = (&base, &base_grid_name) {
+        let mut bad = Vec::new();
+        let dot = |s: &str| {
+            if s.contains('/') {
+                s.to_owned()
+            } else {
+                format!("./{s}")
+            }
+        };
+        let (ina, bna) = (dot(&shown), dot(bshown));
+        if bshape[..3] != [nx, ny, nz] {
+            bad.push(format!(
+                "** Input {ina} and base {bna} don't have same dimensions!\n   Input: nx={nx}  ny={ny}  nz={nz}\n   Base:  nx={}  ny={}  nz={}",
+                bshape[0], bshape[1], bshape[2]
+            ));
+        }
+        let step_differs =
+            (0..3).any(|a| (grid.delta[a] - bg.delta[a]).abs() > 0.01 * grid.delta[a].abs());
+        if step_differs {
+            let f = |d: [f32; 3]| d.map(|x| crate::cfmt::fixed_width(f64::from(x), 6, 3));
+            let (a, b) = (f(grid.delta), f(bg.delta));
+            bad.push(format!(
+                "** Input {ina} and base {bna} don't have same grid spacing!\n   Input: dx={}  dy={}  dz={}\n   Base:  dx={}  dy={}  dz={}",
+                a[0], a[1], a[2], b[0], b[1], b[2]
+            ));
+        }
+        if grid.orient != bg.orient {
+            let f = |g: &Grid| g.orient.map(|o| o.name()).join(" ");
+            bad.push(format!(
+                "** Input {ina} and base {bna} don't have same orientation!\n   Input: {}\n   Base:  {} ",
+                f(&grid),
+                f(bg)
+            ));
+        }
+        if !bad.is_empty() {
+            for b in bad {
+                log.raw(&b);
+            }
+            return Err(Stop::Fatal(
+                "perhaps you could make your datasets match?".into(),
+            ));
+        }
+    }
+    let weight = match o.weight.take() {
+        None => None,
+        Some((_, index, w)) => {
+            let ws = w.bricks.shape;
+            if ws[..3] != [nx, ny, nz] {
+                let shown_arg = if o.by_input && mode.reproduce() {
+                    o.rest.first().cloned().unwrap_or_else(|| "(null)".into())
+                } else {
+                    arg_name.clone()
+                };
+                return Err(Stop::Raw(format!(
+                    "** Dataset {shown_arg} doesn't conform to dimensions of weight brick\n    Weight  has nx = {}  ny = {}  nz = {}\n    Dataset has nx = {nx}  ny = {ny}  nz = {nz}",
+                    ws[0], ws[1], ws[2]
+                )));
+            }
+            Some(volreg::volume_f32(&w.bricks, index))
+        }
+    };
+    if matches!(base, Base::Index(_)) && nt == 1 {
+        return Err(Stop::Fatal(
+            "You can't register a 1 brick dataset to itself!".into(),
+        ));
+    }
+    let mut coarse = o.coarse;
+    if o.twopass && coarse.0 > 0 && coarse.1 > 0 {
+        let m = ((0.1 * nx.min(ny).min(nz) as f64 + 0.499).trunc() as i32).max(1);
+        if coarse.0 > m {
+            log.info(&format!("Coarse del was {}, replaced with {m}", coarse.0));
+            coarse.0 = m;
+        }
+    }
+    if weight.is_some() && o.wtinp {
+        log.info("Input weight file overrides -wtinp option!");
+        o.wtinp = false;
+    }
+    if o.rotparent.is_some() {
+        return Err(Stop::Fatal(
+            "larmorx: -rotparent is not supported by the clean-room original yet".into(),
+        ));
+    }
+    // §8.1: the output.
+    let output = o.prefix != "NULL";
+    if output {
+        check_nifti("-prefix", &o.prefix)?;
+    }
+    if let Some((s, _)) = &o.savedisp {
+        for axis in ["DX", "DY", "DZ"] {
+            check_nifti("-prefix", &savedisp_name(s, axis))?;
+        }
+    }
+    if !output {
+        log.warning("No output dataset will be calculated");
+    } else {
+        if settings
+            .get("AFNI_DECONFLICT")
+            .is_some_and(|v| v.starts_with('N'))
+            && crate::output::exists(&o.prefix)
+        {
+            return Err(Stop::Raw(format!(
+                "** FATAL ERROR: Output file {} already exists -- cannot continue!\n",
+                o.prefix
+            )));
+        }
+        common::refuse_existing(&o.prefix, mode, settings, log)?;
+    }
+    if o.verbose > 0 {
+        log.info(&format!("Reading input dataset {shown}"));
+    }
+    if o.twopass && coarse.0 == 1 && [nx, ny, nz].iter().all(|&d| d >= 120) && coarse.1 > 0 {
+        log.notice(&Notice::new(
+            &defects::AFNI_94,
+            mode,
+            "-twopass with a coarse step of 1 on a grid of 120 or more voxels along every axis: \
+             the subsampled search's step is 0 and AFNI never ends",
+        ));
+        return Err(Stop::Fatal(
+            "the coarse step 1 halves to 0 on this grid (AFNI-94: AFNI never ends here); use \
+             -coarse 2 or more"
+                .into(),
+        ));
+    }
+    let float_output = o.float || scaled;
+    let final_method = o.final_method.unwrap_or(o.method);
+    let params = VolregParams {
+        base,
+        method: o.method,
+        final_method,
+        clip: o.clip,
+        zpad: o.zpad.unwrap_or(4),
+        max_iter: o.max_iter,
+        x_thresh: o.x_thresh,
+        rot_thresh: o.rot_thresh,
+        delta: o.delta,
+        weight,
+        wtinp: o.wtinp,
+        edging,
+        twopass: o.twopass,
+        twoblur: o.twoblur,
+        coarse,
+        coarse_rotation: o.coarse_rotation,
+        sinit: o.sinit,
+        maxdisp: o.maxdisp,
+        coarse_clfrac: if o.maxdisp || mode.fix() { 0.333 } else { 0.5 },
+        output,
+        float_output,
+        savedisp: o.savedisp.is_some(),
+        verbose: o.verbose,
+        firfac: settings
+            .get("AFNI_BLUR_FIRFAC")
+            .and_then(|v| super::leading_number(v).map(|(x, _)| x)),
+        firold: settings.yes("AFNI_BLUR_FIROLD"),
+        n_threads,
+        mode,
+    };
+    if !o.maxdisp && mode.fix() && o.twopass && params.coarse_rotation {
+        late.push(Notice::new(
+            &defects::AFNI_92,
+            mode,
+            "-nomaxdisp leaves the coarse rotation search's automask at the clip fraction \
+             0.333; AFNI changes it to 0.5",
+        ));
+    }
+    let header = image.header.clone();
+    let geometry = image.geometry.clone();
+    let (tr, toffset, slice_timing) = (image.tr, image.toffset, image.slice_timing.clone());
+    let result = volreg::run(image.bricks, &grid, &params);
+    let r = match result {
+        Ok(r) => r,
+        Err(e) => {
+            for m in &e.messages {
+                log.message(m);
+            }
+            return Err(Stop::Raw(format!("** {}", e.fatal)));
+        }
+    };
+    for m in &r.messages {
+        log.message(m);
+    }
+    if volreg::rotate::NO_SHEARS.load(std::sync::atomic::Ordering::Relaxed) {
+        log.raw("*** THD_rota_vol: can't compute shear transformation!");
+    }
+    // §10.2: the outputs, in AFNI's order.
+    if let Some(ff) = &o.matrix_save {
+        let name = if ff.ends_with(".1D") {
+            ff.clone()
+        } else {
+            format!("{ff}.aff12.1D")
+        };
+        let mut text = String::from("# 3dvolreg matrices (DICOM-to-DICOM, row-by-row):\n");
+        for m in &r.matrices {
+            text.push_str(&report::matrix_text(m));
+            text.push('\n');
+        }
+        write_text(&name, &text, None, true, log);
+    }
+    for m in &r.maxdisp_messages {
+        log.message(m);
+    }
+    if let (Some(mm), Some(md)) = (&o.maxdisp1d, &r.maxdisp) {
+        let cmd = command_line(&o.command, settings);
+        let mut a = format!("# {cmd}\n# max displacement (mm) for each volume\n");
+        let mut b = format!("# {cmd}\n# max delta displ (mm) for each volume\n");
+        for (d, e) in &md.per_volume {
+            a.push_str(&format!(" {}\n", crate::cfmt::fixed(f64::from(*d), 3)));
+            b.push_str(&format!(" {}\n", crate::cfmt::fixed(f64::from(*e), 3)));
+        }
+        if mm == "-" {
+            log.stdout(a.trim_end_matches('\n'));
+        } else {
+            write_text(mm, &a, Some("*+"), true, log);
+        }
+        write_text(&delta_name(mm), &b, Some("*+"), true, log);
+    }
+    let mut notices = r.notices.clone();
+    if let Some(reg) = &r.registered {
+        let mut bricks = reg.clone();
+        if let BrickData::Float(_) = bricks.data {
+        } else if float_output {
+            unreachable!("float output is float");
+        }
+        bricks.factors = vec![0.0; nt];
+        let slices = slice_timing
+            .as_ref()
+            .map(|h| timing::copy_slice_fields(&h.times, mode).0);
+        let timing = OutputTiming {
+            tr,
+            toffset,
+            slices,
+        };
+        let (hdr, hnotices, hmessages) =
+            dataset::output_header(&geometry, &bricks, &timing, None, mode, settings)
+                .map_err(Stop::Fatal)?;
+        for m in &hmessages {
+            log.message(m);
+        }
+        for n in hnotices {
+            defects::push_once(&mut notices, n);
+        }
+        let _ = header;
+        let target = Target {
+            option: "-prefix",
+            prefix: &o.prefix,
+            refused_at_scan: o.prefix_refused,
+        };
+        let mut wnotices = Vec::new();
+        let written = common::write_dataset(
+            &target,
+            &hdr,
+            &bricks,
+            n_threads,
+            mode,
+            settings,
+            log,
+            &mut wnotices,
+        )?;
+        for n in wnotices {
+            defects::push_once(&mut notices, n);
+        }
+        if o.verbose > 0
+            && let Some((name, path)) = &written
+            && Path::new(path).is_file()
+        {
+            log.info(&format!("Wrote dataset to disk in {name}"));
+        }
+    }
+    if let (Some((s, _)), Some(disp)) = (&o.savedisp, &r.displacements) {
+        for (axis, data) in ["DX", "DY", "DZ"].iter().zip(disp) {
+            let name = savedisp_name(s, axis);
+            let bricks = crate::dataset::Bricks {
+                shape: [nx, ny, nz, nt],
+                data: BrickData::Float(data.clone()),
+                factors: vec![0.0; nt],
+            };
+            let timing = OutputTiming {
+                tr,
+                toffset,
+                slices: None,
+            };
+            let (hdr, _, _) =
+                dataset::output_header(&geometry, &bricks, &timing, None, mode, settings)
+                    .map_err(Stop::Fatal)?;
+            let target = Target {
+                option: "-savedisp",
+                prefix: &name,
+                refused_at_scan: false,
+            };
+            let mut wn = Vec::new();
+            let written = common::write_dataset(
+                &target, &hdr, &bricks, n_threads, mode, settings, log, &mut wn,
+            )?;
+            if o.verbose > 0
+                && let Some((nm, path)) = &written
+                && Path::new(path).is_file()
+            {
+                log.info(&format!("Wrote dataset to disk in {nm}"));
+            }
+        }
+    }
+    if let Some(f) = &o.dfile {
+        let mut text = String::new();
+        for (k, (p, rms)) in r.reported.iter().zip(&r.rms).enumerate() {
+            text.push_str(&report::dfile_line(k, p, *rms));
+            text.push('\n');
+        }
+        write_text(f, &text, Some("**"), false, log);
+    }
+    if let Some(f) = &o.oned {
+        let mut text = String::new();
+        for p in &r.reported {
+            text.push_str(&report::oned_line(p));
+            text.push('\n');
+        }
+        write_text(f, &text, Some("**"), false, log);
+    }
+    if o.rotcom {
+        let s = if nt > 1 { "s" } else { "" };
+        let mut text = format!("\n3drotate fragment{s}:\n\n");
+        for p in &r.reported {
+            text.push_str(&report::rotcom_line(
+                final_method.rotate_option(),
+                o.clip,
+                params.zpad,
+                p,
+            ));
+            text.push('\n');
+        }
+        log.stdout(&text);
+    }
+    if scaled && output && !o.float {
+        log.warning("Input dataset has scale factors ==> output is stored as floats!");
+    }
+    for n in late.iter().chain(&notices) {
+        log.notice(n);
+    }
+    Ok(0)
+}
+
+/// The last argument of the command line (AFNI's "Too few arguments" message).
+fn rest_last(o: &Options) -> String {
+    o.command.last().cloned().unwrap_or_default()
+}
+
+/// `-savedisp`'s output for one axis: `<stem>_<axis><suffix>`.
+fn savedisp_name(s: &str, axis: &str) -> String {
+    let lower = s.to_ascii_lowercase();
+    for suffix in [".nii.gz", ".nii"] {
+        if lower.ends_with(suffix) {
+            let (stem, suf) = s.split_at(s.len() - suffix.len());
+            return format!("{stem}_{axis}{suf}");
+        }
+    }
+    format!("{s}_{axis}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delta_names() {
+        assert_eq!(delta_name("md.1D"), "md_delt.1D");
+        assert_eq!(delta_name("md"), "md_delt");
+        assert_eq!(delta_name("a.nii.gz"), "a_delt.nii.gz");
+        assert_eq!(delta_name("-"), "-_delt");
+        assert_eq!(savedisp_name("sd.nii", "DX"), "sd_DX.nii");
+        assert_eq!(savedisp_name("sd", "DY"), "sd_DY");
+    }
+
+    #[test]
+    fn edging_values() {
+        assert_eq!(edging_value("5%"), Ok(Edging::Percent(5.0)));
+        assert_eq!(edging_value("3"), Ok(Edging::Voxels(3.0)));
+        assert_eq!(edging_value("26%"), Err("percentage"));
+        assert_eq!(edging_value("-1"), Err("value"));
+    }
+}

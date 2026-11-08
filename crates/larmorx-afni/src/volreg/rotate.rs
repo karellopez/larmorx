@@ -389,15 +389,17 @@ fn flip(v: &mut [f32], dims: [usize; 3], a: usize, b: usize) {
             i
         }
     };
-    v.par_chunks_mut(nx * ny).enumerate().for_each(|(k, plane)| {
-        let sk = rev(2, k);
-        for j in 0..ny {
-            let sj = rev(1, j);
-            for i in 0..nx {
-                plane[i + nx * j] = src[rev(0, i) + nx * (sj + ny * sk)];
+    v.par_chunks_mut(nx * ny)
+        .enumerate()
+        .for_each(|(k, plane)| {
+            let sk = rev(2, k);
+            for j in 0..ny {
+                let sj = rev(1, j);
+                for i in 0..nx {
+                    plane[i + nx * j] = src[rev(0, i) + nx * (sj + ny * sk)];
+                }
             }
-        }
-    });
+        });
     let _ = nz;
 }
 

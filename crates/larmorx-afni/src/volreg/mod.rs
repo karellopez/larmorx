@@ -159,6 +159,8 @@ pub struct VolregOutput {
     pub displacements: Option<[Vec<f32>; 3]>,
     /// AFNI's messages of the run, in its order.
     pub messages: Vec<Message>,
+    /// The messages of the maximum displacements (printed after `-1Dmatrix_save` is opened).
+    pub maxdisp_messages: Vec<Message>,
     /// The upstream defects that changed (or would have changed) the result.
     pub notices: Vec<Notice>,
 }
@@ -287,11 +289,11 @@ fn setup_lines(log: SetupLog, once: &mut BlurOnce, messages: &mut Vec<Message>) 
     let at = log.blur_at.min(log.lines.len());
     let (before, after) = log.lines.split_at(at);
     for l in before {
-        messages.push(Message::Raw(l.clone()));
+        messages.push(Message::Text(l.clone()));
     }
     once.emit(log.blur_line, messages);
     for l in after {
-        messages.push(Message::Raw(l.clone()));
+        messages.push(Message::Text(l.clone()));
     }
 }
 
@@ -311,7 +313,10 @@ fn coarse_line(k: usize, found: &Found, rotations: bool) -> String {
             s[2]
         )
     } else {
-        format!("Getting best coarse shift [{k}]: {} {} {}", s[0], s[1], s[2])
+        format!(
+            "Getting best coarse shift [{k}]: {} {} {}",
+            s[0], s[1], s[2]
+        )
     }
 }
 
@@ -463,11 +468,7 @@ fn run_in_pool(
                 twopass_blur(&mut v0, n, p.twoblur, &blur);
                 let f = search(&v0);
                 if verbose && coarse_on {
-                    messages.push(Message::Info(coarse_line(
-                        0,
-                        &f,
-                        coarse_settings.rotations,
-                    )));
+                    messages.push(Message::Info(coarse_line(0, &f, coarse_settings.rotations)));
                 }
                 empty_region |= f.empty_region;
                 let s = f.shift;
@@ -603,7 +604,14 @@ fn run_in_pool(
                 let r = basis.register(&v, init, &it1, work, None);
                 let deg = r.radians.map(fit::to_degrees);
                 (
-                    Some([deg[0], deg[1], deg[2], r.params[3], r.params[4], r.params[5]]),
+                    Some([
+                        deg[0],
+                        deg[1],
+                        deg[2],
+                        r.params[3],
+                        r.params[4],
+                        r.params[5],
+                    ]),
                     line,
                     f.empty_region,
                 )
@@ -622,17 +630,18 @@ fn run_in_pool(
     }
     if empty_region {
         let detail = match mode {
-            UpstreamDefects::Fix => "the coarse search's region has no voxel (an axis of at most \
+            UpstreamDefects::Fix => {
+                "the coarse search's region has no voxel (an axis of at most \
                  2*del*(num+1) voxels): no coarse shift or rotation is taken; AFNI scores every \
                  candidate 0 and takes the first (a shift of -del*num along z, a rotation of -9, \
-                 -18, -9 degrees)",
-            UpstreamDefects::Reproduce => "the coarse search's region has no voxel: every \
-                 candidate scores 0 and the first is taken, as AFNI does",
+                 -18, -9 degrees)"
+            }
+            UpstreamDefects::Reproduce => {
+                "the coarse search's region has no voxel: every \
+                 candidate scores 0 and the first is taken, as AFNI does"
+            }
         };
-        defects::push_once(
-            &mut notices,
-            Notice::new(&defects::AFNI_93, mode, detail),
-        );
+        defects::push_once(&mut notices, Notice::new(&defects::AFNI_93, mode, detail));
     }
 
     // §8.7: the final pass.
@@ -688,9 +697,9 @@ fn run_in_pool(
         )));
     }
     let float_out = p.float_output || matches!(bricks.data, BrickData::Float(_));
-    let mut out_float: Option<Vec<f32>> = (p.output && float_out
-        && !matches!(bricks.data, BrickData::Float(_)))
-    .then(|| vec![0f32; total * nt]);
+    let mut out_float: Option<Vec<f32>> =
+        (p.output && float_out && !matches!(bricks.data, BrickData::Float(_)))
+            .then(|| vec![0f32; total * nt]);
     struct One {
         fitted: Fitted,
         rms: [f32; 2],
@@ -746,9 +755,11 @@ fn run_in_pool(
             };
             out_resampler.apply(y, n, sizes, &tf, out, work);
             if p.clip && p.final_method.clips() {
-                let (lo, hi) = y.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
-                    (a.min(x), b.max(x))
-                });
+                let (lo, hi) = y
+                    .iter()
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+                        (a.min(x), b.max(x))
+                    });
                 for v in out.iter_mut() {
                     if *v < lo {
                         *v = lo;
@@ -816,7 +827,13 @@ fn run_in_pool(
                     let scale = f != 0.0 && f != 1.0;
                     let y: Vec<f32> = slot
                         .iter()
-                        .map(|&x| if scale { f * f32::from(x) } else { f32::from(x) })
+                        .map(|&x| {
+                            if scale {
+                                f * f32::from(x)
+                            } else {
+                                f32::from(x)
+                            }
+                        })
                         .collect();
                     let r = register_one(t, &y, work, buf);
                     if p.output {
@@ -838,13 +855,21 @@ fn run_in_pool(
                     let scale = f != 0.0 && f != 1.0;
                     let y: Vec<f32> = slot
                         .iter()
-                        .map(|&x| if scale { f * f32::from(x) } else { f32::from(x) })
+                        .map(|&x| {
+                            if scale {
+                                f * f32::from(x)
+                            } else {
+                                f32::from(x)
+                            }
+                        })
                         .collect();
                     let mut r = register_one(t, &y, work, buf);
                     if p.output {
-                        let (lo, hi) = buf.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
-                            (a.min(x), b.max(x))
-                        });
+                        let (lo, hi) = buf
+                            .iter()
+                            .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+                                (a.min(x), b.max(x))
+                            });
                         let rounded: Vec<u8> = buf
                             .iter()
                             .map(|&x| f64::from(x).clamp(0.0, 255.0).round_ties_even() as u8)
@@ -877,6 +902,9 @@ fn run_in_pool(
     let mut rms = Vec::with_capacity(nt);
     let mut stretched = false;
     for (t, r) in results.into_iter().enumerate() {
+        if verbose {
+            messages.push(Message::Text(format!("{t}")));
+        }
         if let Some(w) = r.warning {
             messages.push(Message::Warning(w));
         }
@@ -884,7 +912,7 @@ fn run_in_pool(
             messages.push(Message::Text(c));
         }
         if verbose {
-            messages.push(Message::Text(format!("{t}..")));
+            messages.push(Message::Text("..".into()));
         }
         stretched |= r.stretched;
         fitted.push(r.fitted);
@@ -892,10 +920,14 @@ fn run_in_pool(
     }
     if stretched {
         let detail = match mode {
-            UpstreamDefects::Fix => "the registered byte volumes are rounded and clamped to \
-                 0..255; AFNI stretches each over 0..255.9 from its own range",
-            UpstreamDefects::Reproduce => "each registered byte volume is stretched over \
-                 0..255.9 from its own range, as AFNI does",
+            UpstreamDefects::Fix => {
+                "the registered byte volumes are rounded and clamped to \
+                 0..255; AFNI stretches each over 0..255.9 from its own range"
+            }
+            UpstreamDefects::Reproduce => {
+                "each registered byte volume is stretched over \
+                 0..255.9 from its own range, as AFNI does"
+            }
         };
         defects::push_once(&mut notices, Notice::new(&defects::AFNI_87, mode, detail));
     }
@@ -938,6 +970,7 @@ fn run_in_pool(
         .map(|r| report::matrix_line(r, cb, ci, trig))
         .collect();
     let mut maxdisp = None;
+    let mut maxdisp_messages = Vec::new();
     if !positions.is_empty() {
         let signed = mode.reproduce();
         let md = report::max_displacements(grid, &positions, &reported, signed, trig);
@@ -946,7 +979,13 @@ fn run_in_pool(
             (
                 m.per_volume
                     .iter()
-                    .map(|(a, b)| format!("{}{}", cfmt::fixed(f64::from(*a), 3), cfmt::fixed(f64::from(*b), 3)))
+                    .map(|(a, b)| {
+                        format!(
+                            "{}{}",
+                            cfmt::fixed(f64::from(*a), 3),
+                            cfmt::fixed(f64::from(*b), 3)
+                        )
+                    })
                     .collect(),
                 format!(
                     "{} {} {} {}",
@@ -959,13 +998,17 @@ fn run_in_pool(
         };
         if shown(&md) != shown(&other) {
             let detail = match mode {
-                UpstreamDefects::Fix => "the maximum displacements are those of the voxels \
+                UpstreamDefects::Fix => {
+                    "the maximum displacements are those of the voxels \
                      themselves; AFNI converts the motion to the dataset's axes with their \
                      signs but not the voxels' positions, so for an axis stored L2R, P2A or S2I \
-                     it reports the displacements of the mirrored positions",
-                UpstreamDefects::Reproduce => "the maximum displacements are those of the \
+                     it reports the displacements of the mirrored positions"
+                }
+                UpstreamDefects::Reproduce => {
+                    "the maximum displacements are those of the \
                      positions mirrored along the axes stored L2R, P2A or S2I, as AFNI computes \
-                     them",
+                     them"
+                }
             };
             defects::push_once(&mut notices, Notice::new(&defects::AFNI_99, mode, detail));
         }
@@ -978,21 +1021,23 @@ fn run_in_pool(
                     cfmt::fixed(f64::from(*b), 2)
                 ));
             }
-            messages.push(Message::Raw(line));
+            maxdisp_messages.push(Message::Raw(line));
         }
-        messages.push(Message::Info(format!(
+        maxdisp_messages.push(Message::Info(format!(
             "Max displacement in automask = {} (mm) at sub-brick {}",
             cfmt::fixed(f64::from(md.max.0), 2),
             md.max.1
         )));
-        messages.push(Message::Info(format!(
+        maxdisp_messages.push(Message::Info(format!(
             "Max delta displ  in automask = {} (mm) at sub-brick {}",
             cfmt::fixed(f64::from(md.max_delta.0), 2),
             md.max_delta.1
         )));
         maxdisp = Some(md);
     }
-    let displacements = p.savedisp.then(|| displacement_series(grid, &reported, mode, trig));
+    let displacements = p
+        .savedisp
+        .then(|| displacement_series(grid, &reported, mode, trig));
     let registered = p.output.then(|| match out_float {
         Some(v) => Bricks {
             shape: bricks.shape,
@@ -1014,6 +1059,7 @@ fn run_in_pool(
         maxdisp,
         displacements,
         messages,
+        maxdisp_messages,
         notices,
     })
 }

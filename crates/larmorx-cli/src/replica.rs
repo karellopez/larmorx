@@ -126,14 +126,13 @@ pub const REPLICAS: &[Replica] = &[
         },
         original: true,
     },
-    // The clean-room original is to be written from specs/3dvolreg.md.
     Replica {
         family: "afni",
         tool: "3dvolreg",
         location: Location::Builtin {
             licence: AFNI_REPLICA_LICENCE,
         },
-        original: false,
+        original: true,
     },
     // The clean-room original is `larmorx mri hmc` (`lx.mri.hmc`), which takes mcflirt's
     // arguments.
@@ -747,22 +746,25 @@ mod tests {
         );
         let e = choose_with(Implementation::Original, &BUILTIN_ONLY, never).unwrap_err();
         assert!(e.to_string().contains("built in"), "{e}");
-        // The AFNI tools have their replicas built in, and their originals but 3dvolreg's
-        // (its clean-room original is to be written from specs/3dvolreg.md). FSL's bet, bet2
-        // and betsurf have their clean-room originals (since 2026-10-31 betsurf's too).
+        // The AFNI tools have their replicas built in, and their clean-room originals
+        // (3dvolreg's since 2026-11-08). FSL's bet, bet2 and betsurf have their clean-room
+        // originals (since 2026-10-31 betsurf's too).
         assert!(
             REPLICAS
                 .iter()
                 .filter(|r| r.family == "afni")
-                .all(|r| (r.original || r.tool == "3dvolreg") && r.package().is_none())
+                .all(|r| r.original && r.package().is_none())
         );
-        assert_eq!(replica_only("afni").collect::<Vec<_>>(), ["3dvolreg"]);
+        assert_eq!(replica_only("afni").count(), 0);
         let volreg = lookup("afni", "3dvolreg").unwrap();
         assert_eq!(
             choose_with(Implementation::Auto, volreg, never),
             Ok(Choice::Builtin)
         );
-        assert!(choose_with(Implementation::Original, volreg, never).is_err());
+        assert_eq!(
+            choose_with(Implementation::Original, volreg, never),
+            Ok(Choice::Original)
+        );
         assert_eq!(replica_only("ants").count(), 0);
         // every FSL tool has its clean-room original (prelude's since 2026-11-06)
         assert_eq!(replica_only("fsl").count(), 0);

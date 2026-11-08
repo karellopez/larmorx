@@ -143,7 +143,11 @@ pub fn shift_poly(method: Method, f: &[f32], alpha: f32, out: &mut [f32]) {
     if method == Method::NN {
         for (i, o) in out.iter_mut().enumerate() {
             let j = i as i64 + ia;
-            *o = if (0..ni).contains(&j) { f[j as usize] } else { 0.0 };
+            *o = if (0..ni).contains(&j) {
+                f[j as usize]
+            } else {
+                0.0
+            };
         }
         return;
     }
@@ -384,7 +388,12 @@ mod tests {
     fn integer_shifts_move_samples() {
         let f: Vec<f32> = (0..10).map(|i| (i * i) as f32).collect();
         let mut out = vec![0f32; 10];
-        for m in [Method::Linear, Method::Cubic, Method::Quintic, Method::Heptic] {
+        for m in [
+            Method::Linear,
+            Method::Cubic,
+            Method::Quintic,
+            Method::Heptic,
+        ] {
             shift_poly(m, &f, 2.0, &mut out);
             assert_eq!(&out[2..], &f[..8], "{m:?}");
             assert_eq!(&out[..2], &[0.0, 0.0], "{m:?}");

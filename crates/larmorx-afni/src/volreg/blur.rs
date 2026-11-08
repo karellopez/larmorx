@@ -310,10 +310,7 @@ pub fn fft_blur(v: &mut [f32], dims: [usize; 3], sigma: f32, delta: f32, trig: T
                 for k in 0..l {
                     let g = gains[k.min(l - k)];
                     let c = data[k];
-                    data[k] = Complex::new(
-                        f64::from(c.re as f32 * g),
-                        f64::from(c.im as f32 * g),
-                    );
+                    data[k] = Complex::new(f64::from(c.re as f32 * g), f64::from(c.im as f32 * g));
                 }
                 fft.inverse(&mut data, &mut scratch);
                 let mut out = Vec::new();

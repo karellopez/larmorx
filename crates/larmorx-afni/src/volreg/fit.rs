@@ -187,7 +187,7 @@ fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Bounds {
     if !any || hi == [0, 0, 0] {
         let lo = if any { lo } else { [0; 3] };
         log.push(format!(
-            " + skipping empty trim, {{xyz}}{{a,b}} = {},{}, {},{}, {},{}",
+            " + skipping empty trim, {{xyz}}{{a,b}} = {},{}, {},{}, {},{}\n",
             lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]
         ));
         return Bounds::full(n);
@@ -197,15 +197,16 @@ fn trim_box(w: &[f32], n: [usize; 3], log: &mut Vec<String>) -> Bounds {
     if t < 90.0 {
         b
     } else {
-        log.push(" + skipping use of trim - too little savings".into());
+        log.push(" + skipping use of trim - too little savings\n".into());
         Bounds::full(n)
     }
 }
 
 fn range(v: &[f32]) -> (f32, f32) {
-    v.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
-        (a.min(x), b.max(x))
-    })
+    v.iter()
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), &x| {
+            (a.min(x), b.max(x))
+        })
 }
 
 impl Basis {
@@ -255,13 +256,15 @@ impl Basis {
         };
         let total = n[0] * n[1] * n[2];
         if w.iter().all(|&x| x == 0.0) {
-            lines.push("** error: weights are all zero".to_owned());
+            lines.push("** error: weights are all zero\n".to_owned());
         }
         let bounds = trim_box(&w, n, &mut lines);
+        let wb = bounds.cut(&w, n);
+        drop(std::mem::take(&mut w));
         if chatty {
             let kept = bounds.count();
             lines.push(format!(
-                " + wtrim: [{}..{}]x[{}..{}]x[{}..{}] = {kept} voxels kept, out of {total} ({}%)",
+                " + wtrim: [{}..{}]x[{}..{}]x[{}..{}] = {kept} voxels kept, out of {total} ({}%)\n",
                 bounds.lo[0],
                 bounds.hi[0],
                 bounds.lo[1],
@@ -270,20 +273,20 @@ impl Basis {
                 bounds.hi[2],
                 cfmt::f1(f64::from(100.0f32 * kept as f32 / total as f32)),
             ));
-            let (lo, hi) = range(&w);
+            let (lo, hi) = range(&wb);
             lines.push(format!(
-                "  weight range: min={}  max={}",
+                "  weight range: min={}  max={}\n",
                 cfmt::g32(lo),
                 cfmt::g32(hi)
             ));
-            let zeros = w.iter().filter(|&&x| x == 0.0).count();
+            let zeros = wb.iter().filter(|&&x| x == 0.0).count();
             lines.push(format!(
-                " # zero weights={zeros} out of {total} ({}%)",
-                cfmt::f1(100.0 * zeros as f64 / total as f64)
+                " # zero weights={zeros} out of {kept} ({}%)\n",
+                cfmt::f1(f64::from(100.0f32 * zeros as f32 / kept as f32))
             ));
             lines.push(format!(
-                "  mri_3dalign: using {} Mbytes of workspace",
-                (10 * total * 4) / (1 << 20)
+                "  mri_3dalign: using {} Mbytes of workspace\n",
+                (10 * kept * 4) / (1 << 20)
             ));
         }
         // The derivative images, in the order θ1, θ2, θ3, δx, δy, δz.
@@ -346,7 +349,7 @@ impl Basis {
                 lines.push(":".to_owned());
                 let (lo, hi) = range(&d);
                 lines.push(format!(
-                    "  {} range: min={}  max={}",
+                    "  {} range: min={}  max={}\n",
                     names[p],
                     cfmt::g32(lo),
                     cfmt::g32(hi)
@@ -355,23 +358,19 @@ impl Basis {
             refs.push(bounds.cut(&d, n));
         }
         if chatty {
-            lines.push("  initializing least squares".to_owned());
+            lines.push("  initializing least squares\n".to_owned());
         }
-        let wb = bounds.cut(&w, n);
-        drop(std::mem::take(&mut w));
         // §7.1 step 1: all-zero reference vectors.
-        let zero = refs
-            .iter()
-            .filter(|r| r.iter().all(|&x| x == 0.0))
-            .count();
+        let zero = refs.iter().filter(|r| r.iter().all(|&x| x == 0.0)).count();
         let fail = |lines: &mut Vec<String>| {
-            lines.push("** ERROR: mri_startup_lsqfit: bad call to startup_lsqfit!\x07".to_owned());
+            lines
+                .push("** ERROR: mri_startup_lsqfit: bad call to startup_lsqfit!\x07\n".to_owned());
         };
         log.blur_at = blur_at.unwrap_or(0);
         if zero > 0 {
             let s = if zero == 1 { "" } else { "s" };
             lines.push(format!(
-                "** ERROR: lsqfit :: {zero} vector{s} are all 0 for data fitting"
+                "** ERROR: lsqfit :: {zero} vector{s} are all 0 for data fitting\n"
             ));
             fail(&mut lines);
             log.lines = lines;
@@ -379,9 +378,7 @@ impl Basis {
         }
         // Step 2: the normal matrix, its sums in double in storage order.
         let mut c = [[0f64; 7]; 7];
-        let pairs: Vec<(usize, usize)> = (0..7)
-            .flat_map(|i| (i..7).map(move |j| (i, j)))
-            .collect();
+        let pairs: Vec<(usize, usize)> = (0..7).flat_map(|i| (i..7).map(move |j| (i, j))).collect();
         let sums: Vec<f64> = pairs
             .par_iter()
             .map(|&(i, j)| {
@@ -413,7 +410,7 @@ impl Basis {
             }
             if s <= 0.0 {
                 lines.push(format!(
-                    "** ERROR: Choleski factorization failure in startup_lsqfit [row={i} sum={}]",
+                    "** ERROR: Choleski factorization failure in startup_lsqfit [row={i} sum={}]\n",
                     cfmt::g(s)
                 ));
                 fail(&mut lines);
@@ -542,7 +539,13 @@ impl Basis {
     ) -> Fitted {
         let mut chat = chat;
         let thr: [f32; 6] = {
-            let t = |d: f32| if d == 0.0 { it.x_thresh } else { d * it.x_thresh };
+            let t = |d: f32| {
+                if d == 0.0 {
+                    it.x_thresh
+                } else {
+                    d * it.x_thresh
+                }
+            };
             [
                 it.rot_thresh,
                 it.rot_thresh,
@@ -600,7 +603,7 @@ impl Basis {
             }
         }
         if let Some(s) = chat {
-            s.push_str(&format!("\nIteration complete at {iterations} steps"));
+            s.push_str(&format!("\nIteration complete at {iterations} steps\n"));
         }
         Fitted {
             params: p,

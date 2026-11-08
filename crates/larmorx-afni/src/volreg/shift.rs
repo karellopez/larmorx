@@ -250,7 +250,7 @@ pub fn fourier_length(n: usize, st: f32) -> usize {
 }
 
 /// FFT plans by length, shared by every thread (built once per length).
-fn plan(l: usize) -> Arc<Fft> {
+pub(crate) fn plan(l: usize) -> Arc<Fft> {
     static PLANS: OnceLock<Mutex<HashMap<usize, Arc<Fft>>>> = OnceLock::new();
     let mut plans = PLANS
         .get_or_init(|| Mutex::new(HashMap::new()))

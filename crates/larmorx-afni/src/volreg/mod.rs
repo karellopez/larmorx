@@ -18,6 +18,7 @@
 pub mod blur;
 pub mod coarse;
 pub mod fit;
+pub mod fourier;
 pub mod grid;
 pub mod notices;
 pub mod report;

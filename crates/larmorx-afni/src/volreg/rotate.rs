@@ -315,6 +315,11 @@ pub struct Work {
     vols: super::sweep::Volumes,
 }
 
+thread_local! {
+    /// Tests only: the Fourier method row by row, the reference of the batched shears.
+    static ROW_BY_ROW: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Sets when a resampling found no decomposition (AFNI's "can't compute shear
 /// transformation"): the volume was left as it was.
 pub static NO_SHEARS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -358,6 +363,10 @@ impl Resampler {
         }
         if self.method != Method::Fourier {
             super::sweep::apply(self.method, p, vol, n, self.zpad, win, out, &mut work.vols);
+            return;
+        }
+        if !cfg!(test) || !ROW_BY_ROW.with(std::cell::Cell::get) {
+            super::fourier::apply(p, vol, n, self.zpad, win, out, self.trig, &mut work.vols);
             return;
         }
         if *win == super::sweep::Window::full(n) {

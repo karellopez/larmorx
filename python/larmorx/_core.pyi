@@ -485,9 +485,13 @@ def ndimage_label(input: np.ndarray, structure: np.ndarray) -> tuple[np.ndarray,
     """``_ni_label._label`` with SciPy's default output: ``(int32 or int64 labels, number)``."""
 
 def ndimage_sum_labels(input: np.ndarray, labels: np.ndarray, index: list[int]) -> list[float]:
-    """``sum_labels``' ``bincount`` path for a sequence ``index``: the float64 sum per label, in
-    C order (``lx.ndimage.sum_labels`` runs SciPy's ``_stats`` with numpy itself since relay 22
-    of the field maps' part B; this binding stays the Rust function's own)."""
+    """The Rust kernel of ``sum_labels`` for a sequence ``index``
+    (``larmorx_ndimage::sum_labels_bincount``): the float64 sum per label, the elements added
+    in C order, an absent label 0 (SciPy's ``bincount`` and ``unique`` paths give the same
+    sums). The Python wrapper ``lx.ndimage.sum_labels`` does not call it: it follows SciPy's
+    ``_stats`` with numpy's ``bincount`` itself (SciPy's argument handling, relay 22 of the
+    field maps' part B); this binding exposes the crate's own kernel, kept equal to that path
+    by ``tests/python/test_ndimage_sum_labels_binding.py``."""
 
 def ndimage_watershed_ift(
     input: np.ndarray,

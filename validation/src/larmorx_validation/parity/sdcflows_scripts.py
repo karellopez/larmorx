@@ -28,8 +28,9 @@ arguments, put stand-in programs on ``PATH``, set environment variables and logg
 and this validation package on ``PYTHONPATH``, ``LARMORX_WORKSPACE``, numpy's OpenBLAS on its
 Haswell kernels at one thread (``OPENBLAS_CORETYPE=Haswell``, ``OPENBLAS_NUM_THREADS=1``, as the
 scripts were validated), the FSL replicas' program (``LARMORX_NC_BIN``) where a script runs
-one, and a scratch folder of its own. A heavy case runs in its own memory box
-(``scripts/orchestration/boxed.sh``, the size its README row names). Every summary line the
+one, and a scratch folder of its own. A heavy case runs in a memory box: the one the
+parity run itself runs in (every heavy job runs in one: ``scripts/orchestration/boxed.sh``),
+else a box of its own of the size its README row names. Every summary line the
 script prints is one check: ``<name>: <N> cases, identical <K>`` (``K == N``), SciPy's ``inv``
 families (``<N> cases, <K> identical, rcond <a>/<b> identical, ..., <D> differ``: ``D == 0``,
 ``a == b``), the estimators' sections (``== <name>: <K> identical, <M> differ``: ``M == 0``),
@@ -544,9 +545,27 @@ def _command(spec: Script, ws: Path, folder: Path) -> list[str]:
         images = _oracle_images(ws)
         if images:
             cmd += ["--images", *images]
-    if spec.gib and BOXED.is_file() and shutil.which("systemd-run"):
+    if spec.gib and _box() is None and BOXED.is_file() and shutil.which("systemd-run"):
         cmd = ["bash", str(BOXED), str(spec.gib), *cmd]
     return cmd
+
+
+def _box() -> int | None:
+    """The memory limit (bytes) of the box this process runs in, if any: a control group of
+    its own or an enclosing one with a finite ``memory.max``. Inside a box the cases run in it
+    (a new scope would leave it: systemd puts a user scope beside the box, not in it)."""
+    from larmorx_validation.difftest import limits
+
+    group = limits.own_cgroup()
+    while group is not None and group != limits.CGROUP_ROOT and group != group.parent:
+        try:
+            value = (group / "memory.max").read_text(encoding="utf-8").strip()
+        except OSError:
+            value = "max"
+        if value != "max":
+            return int(value)
+        group = group.parent
+    return None
 
 
 def _reported(text: str) -> str:

@@ -431,10 +431,17 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   stage samples 40 % of the voxels at random: which points a thread draws depends on the number
   of threads, so the optimiser can end elsewhere). So fMRIPrep's later files of a SyN estimator
   are a 4-thread result; the whole workflow is checked against sdcflows' own graph instead
-  (below).
-- **The whole workflow against sdcflows' own graph** (this environment's sdcflows 2.17.1 and
-  niworkflows run by nipype, ANTs' programs at one thread with correctly rounded maths and AFNI's
-  3dvolreg as stand-ins through the oracle cache): see the part's notes for the counts.
+  (below). Every node of the five estimators, fed fMRIPrep's inputs, is identical: 29 checks x 5
+  (fMRIPrep's files, or ANTs' one-thread result for N4, DenoiseImage and the registration, with
+  the run's `ANTS_RANDOM_SEED`).
+- **The whole workflow against sdcflows' own graph** (the shared environment's sdcflows 2.17.1 and
+  niworkflows 1.15.3 run by nipype, ANTs' programs at one thread with correctly rounded maths and
+  AFNI's 3dvolreg as stand-ins through the oracle cache): every NIfTI file of the graph's
+  folders identical on the five estimators (105 files), the five registered series of
+  `RobustAverage`'s 3dvolreg apart in `vox_offset` only (AFNI writes its history as a NIfTI
+  extension, larmorx's replica does not: [fmriprep-oracle.md](fmriprep-oracle.md)). sdcflows'
+  graph takes 118 to 155 s at one thread, larmorx 30 to 39 s on 6 threads (the same one-thread
+  results).
 - **nilearn changed `resample_img` between fMRIPrep's image (0.11.1) and the newest (0.14.1)**:
   0.13 copies the image's header by default (`copy_header=True`: the fixed EPI's header with
   `scl_slope = scl_inter = 0`, which nibabel then writes unscaled, and `cal_max`/`cal_min` set to

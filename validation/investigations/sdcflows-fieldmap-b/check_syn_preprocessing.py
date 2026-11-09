@@ -98,12 +98,18 @@ def same_file(ref, mine, descrip: bool = True) -> str:
     diff = [k for k in a_h if np.asarray(a_h[k]).tobytes() != np.asarray(b_h[k]).tobytes()]
     if not descrip and diff == ["descrip"]:
         return "same but descrip"
+    if diff == ["vox_offset"] and str(ref).endswith("_volreg.nii.gz"):
+        # AFNI's 3dvolreg writes its history as a NIfTI extension; larmorx's replica does not
+        # (docs/findings/fmriprep-oracle.md): the data and every other header field identical
+        return "same but vox_offset (AFNI's history extension)"
     return f"header {diff}"
 
 
 def tally(t: cw.Tally, what: str, label: str, ref, mine, descrip: bool = True) -> None:
     r = same_file(ref, mine, descrip)
     t.add(what, r.startswith("same"), f"{label}: {r}")
+    if r.startswith("same but"):
+        t.add(f"{what} (of which {r[len('same but ') :]})", True)
 
 
 def syn_workflows(root: Path, runs: list[str] | None) -> list[Path]:

@@ -29,11 +29,12 @@ def _registry():
     return mod
 
 
-def _outcome(fn):
+def _outcome(fn, **kw):
+    """``fn(**kw)``'s outcome: the number of specs it found, or its exception."""
     try:
-        out = fn()
+        out = fn(**kw)
         return f"ok: {len(out)} specs" if hasattr(out, "__len__") else f"ok: {out!r}"[:200]
-    except Exception as err:  # noqa: BLE001 - the outcome is the point
+    except Exception as err:
         return f"{type(err).__name__}: {err}"[:300]
 
 
@@ -57,16 +58,12 @@ def main() -> int:
         t1 = lay.get(suffix="T1w", extension=".nii.gz")[0]
         ents = sorted(t1.get_entities())
         print(f"{parent}: pybids T1w entities {ents}")
-        print(f"{parent}: sdcflows: {_outcome(lambda: sdc_find(anat_file=t1, layout=lay, **kw))}")
+        print(f"{parent}: sdcflows: {_outcome(sdc_find, anat_file=t1, layout=lay, **kw)}")
         mine = lx.bids.BIDSLayout(root, validate=False)
         t1m = mine.get(suffix="T1w", extension=".nii.gz")[0]
         print(f"{parent}: lx.bids T1w entities {sorted(t1m.get_entities())}")
-        print(
-            f"{parent}: larmorx: "
-            + _outcome(
-                lambda: lx.sdcflows.find_anatomical_estimators(anat_file=t1m, layout=mine, **kw)
-            )
-        )
+        find = lx.sdcflows.find_anatomical_estimators
+        print(f"{parent}: larmorx: {_outcome(find, anat_file=t1m, layout=mine, **kw)}")
     return 0
 
 

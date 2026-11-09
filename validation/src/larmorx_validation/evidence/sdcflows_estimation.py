@@ -174,16 +174,18 @@ def _compute_app(key: str):
         log = (e.dir / "check-app.log").read_text(encoding="utf-8")
         if "ALL OK" not in log:
             raise RuntimeError(f"check_app.py on {run} did not end with ALL OK")
-        e.run("larmorx-14", [_python(), "-P", "-m", RUN_MODULE, "app", run,
-                             str(e.dir / "larmorx-14"), "--threads", "14", "--defects", "fix"],
-              env=env, unset=UNSET, cwd=e.dir, timeout=7200)  # fmt: skip
+        for label, mode in (("larmorx-14", "reproduce"), ("larmorx-fix", "fix")):
+            e.run(label, [_python(), "-P", "-m", RUN_MODULE, "app", run, str(e.dir / label),
+                          "--threads", "14", "--defects", mode],
+                  env=env, unset=UNSET, cwd=e.dir, timeout=7200)  # fmt: skip
         e.finish(
             versions=_versions(),
             settings="sdcflows 2.17.1's BIDS app (`sdcflows <bids> <out> participant "
             "--participant-label <sub> --nprocs 1 --omp-nthreads 1 --no-fmapless --notrack "
             "--pdb`) and LARMORX's port of it (`lx.sdcflows.run_app`, reproduce) as "
             "check_app.py --sections run runs them (every derivative compared there byte for "
-            "byte: ALL OK); LARMORX's again at 14 threads in its default mode",
+            "byte: ALL OK); LARMORX's again at 14 threads, in its reproduce and its default "
+            "mode",
         )
 
     return compute
@@ -194,7 +196,7 @@ def app_entry(ctx: core.Context, key: str) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(), TOOL, f"app-{key}",
         f"sdcflows' BIDS app on {run} ({kind}): sdcflows 2.17.1 and LARMORX at one thread, "
-        "LARMORX at 14 threads (default)",
+        "LARMORX at 14 threads in both modes",
         _compute_app(key),
     )  # fmt: skip
 
@@ -390,8 +392,6 @@ def entries(ctx: core.Context) -> list[fcache.Entry]:
     ]
 
 
-
-
 # ------------------------------------------------------------------------- shared pieces
 
 
@@ -495,6 +495,14 @@ def _check_default(ex: dict) -> None:
         raise ValueError(f"{ex['id']}: the default view names what the viewer cannot draw: {bad}")
 
 
+def _named_text(named: list[str]) -> str:
+    """The register entries a run's notices named, each with what it is (larmorx_core::defects)."""
+    from larmorx._defects import defects
+
+    what = {d.id: f"{d.tool}: {d.what}" for d in defects()}
+    return "; ".join(f"{i} ({common.clip(what.get(i, ''), 170)})" for i in named)
+
+
 def _verdicts(diffs: list[dict], outputs: list[dict], same: dict, named: list[str],
               links: dict, reasons: dict[str, str],
               explained: dict[str, tuple[str, str]] | None = None) -> None:  # fmt: skip
@@ -506,27 +514,29 @@ def _verdicts(diffs: list[dict], outputs: list[dict], same: dict, named: list[st
         x["links"] = []
         if x["kind"] == "variability":
             x["verdict"] = None
-            x["reason"] = reasons[i] if same[i] else reasons[i + ":differ"] + " " + _differs(
-                x, outputs
-            ) + "."
+            x["reason"] = (
+                reasons[i] if same[i] else reasons[i + ":differ"] + " " + _differs(x, outputs) + "."
+            )
             continue
         if same[i]:
             x["verdict"] = "bit-identical"
             x["reason"] = reasons[i]
-        elif i.startswith("lx14") and named:
+        elif i.startswith("fix-") and named:
             x["verdict"] = "d13"
-            x["reason"] = f"The default mode corrects {', '.join(named)} and names it: " + _differs(
-                x, outputs
-            ) + "."
+            x["reason"] = (
+                f"The default mode corrects {_named_text(named)} and names them: "
+                + _differs(x, outputs)
+                + "."
+            )
             x["links"] += _link(links, named)
         elif explained and i in explained:
             x["verdict"], why = explained[i]
             x["reason"] = why + " " + _differs(x, outputs) + "."
         else:
             x["verdict"] = "open"
-            x["reason"] = "Not accounted for by the other runs of this example: " + _differs(
-                x, outputs
-            ) + "."
+            x["reason"] = (
+                "Not accounted for by the other runs of this example: " + _differs(x, outputs) + "."
+            )
 
 
 # ------------------------------------------------------------------- the brain mask (masker)
@@ -646,18 +656,27 @@ def _example_masker(ctx: core.Context, links: dict) -> dict:
         "compute every output; fMRIPrep's own files are compared with LARMORX run on its "
         "image's libraries.",
         "facts": [
-            {"label": "Data", "text": f"{_data('ds002603', 'sub-01')['dataset']}, sub-01 (CC0-1.0): "
-             "the `acq-Mm2` magnitude as fMRIPrep's node was given it; shown inside fMRIPrep's "
-             "brain mask, dilated by 2 voxels, so no face shows"},
+            {
+                "label": "Data",
+                "text": f"{_data('ds002603', 'sub-01')['dataset']}, sub-01 (CC0-1.0): "
+                "the `acq-Mm2` magnitude as fMRIPrep's node was given it; shown inside fMRIPrep's "
+                "brain mask, dilated by 2 voxels, so no face shows",
+            },
             {"label": "Node", "text": f"fMRIPrep 25.2.6, `{info.get('node', '')}`"},
-            {"label": "Programs", "text": "sdcflows 2.17.1 in process (the newest environment); "
-             f"LARMORX's `lx.sdcflows.brain_masker` at commit `{info['larmorx_commit'][:12]}`; "
-             "numpy's OpenBLAS on its Haswell kernels, one thread"},
-            {"label": "Time", "text": f"sdcflows {t['sdcflows']:.1f} s; LARMORX {t['larmorx']:.1f} s "
-             f"at one thread, {t['larmorx-14']:.1f} s at 14 (informal: the benchmark below has "
-             "the medians)"},
+            {
+                "label": "Programs",
+                "text": "sdcflows 2.17.1 in process (the newest environment); "
+                f"LARMORX's `lx.sdcflows.brain_masker` at commit `{info['larmorx_commit'][:12]}`; "
+                "numpy's OpenBLAS on its Haswell kernels, one thread",
+            },
+            {
+                "label": "Time",
+                "text": f"sdcflows {t['sdcflows']:.1f} s; LARMORX {t['larmorx']:.1f} s "
+                f"at one thread, {t['larmorx-14']:.1f} s at 14 (informal: the benchmark below has "
+                "the medians)",
+            },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
-        ],  # fmt: skip
+        ],
         **out,
         "chain": None,
         "groups": [
@@ -670,3 +689,1070 @@ def _example_masker(ctx: core.Context, links: dict) -> dict:
         "those shown.",
         "provenance": common.provenance(info, f"{TOOL}/{e.case}", [_data("ds002603", "sub-01")]),
     }
+
+
+# ---------------------------------------------------------- epi_mask and SciPy's watershed
+
+EPI_OUTPUTS = [{"id": "mask", "label": "Brain mask (epi_mask)", "unit": ""}]
+EPI_PANELS = [
+    ("sdcflows", "original", "sdcflows 2.17.1", "SciPy 1.18.1's watershed_ift: LARMORX's reference"),
+    ("larmorx", "larmorx", "LARMORX (port)", "reproduce mode: SciPy's watershed"),
+    ("larmorx-fix", "larmorx", "LARMORX (port)", "default mode: the corrected watershed (SCI-13, SCI-14)"),
+]  # fmt: skip
+
+
+def _epi_masks(e: fcache.Entry, run: str) -> dict[str, np.ndarray]:
+    ds = run.split("-")[0]
+    return {lab: _stored(e.dir / ds / lab / "mask.nii.gz") for lab, *_ in EPI_MASK_RUNS}
+
+
+def _dice(a: np.ndarray, b: np.ndarray) -> float:
+    a, b = a > 0, b > 0
+    n = int(a.sum()) + int(b.sum())
+    return 2.0 * int((a & b).sum()) / n if n else 0.0
+
+
+def _example_epi(ctx: core.Context, links: dict) -> dict:
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+    from larmorx_validation.evidence.fsl_bet import window_of
+
+    e = epi_entry(ctx)
+    info = e.info()
+    run = EPI_RUNS[0]
+    ds = run.split("-")[0]
+    sub = run.split("-")[1] + "-" + run.split("-")[2]
+    ref, brain_path = _epi_ref(run)
+    img = nib.load(str(ref))
+    masks = _epi_masks(e, run)
+    brain = _stored(brain_path)
+    show = _show(np.logical_or.reduce([m > 0 for m in [*masks.values(), brain]]), 2)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    raw, rs, ri = common.stored(ref)
+    ex.add(exm.Panel("ref", "input", f"{ds}: BOLD reference", "fMRIPrep's `desc-hmc_boldref`, "
+                     "epi_mask's input", {"all": raw}, scale=rs, inter=ri))  # fmt: skip
+    over = {"mask": {"on": "ref", "window": window_of(ex, "ref")}}
+    ex.add(exm.Panel("brain", "input", f"{ds}: fMRIPrep's brain mask",
+                     "`desc-brain_mask` (niworkflows' skull stripping), the independent "
+                     "reference", {"all": brain}, overlay=over))  # fmt: skip
+    for pid, role, label, sub_ in EPI_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub_, {"mask": masks[pid]}, overlay=over))
+    d = common.d
+    diffs = [
+        d("lx-sdc", "larmorx", "sdcflows", "main", "LARMORX (reproduce) − sdcflows 2.17.1",
+          common.ROLE_LX),
+        d("fix-lx", "larmorx-fix", "larmorx", "check", "LARMORX: default − reproduce mode",
+          common.ROLE_SELF),
+    ]  # fmt: skip
+    outputs = copy.deepcopy(EPI_OUTPUTS)
+    common.compare_all(ex, diffs, outputs)
+    same = common.identical(diffs)
+    named = _outputs_json(e.dir / ds / "larmorx-fix").get("named", [])
+    d_sdc, d_fix = _dice(masks["sdcflows"], brain), _dice(masks["larmorx-fix"], brain)
+    n = {k: int((v > 0).sum()) for k, v in masks.items()}
+    reasons = {
+        "lx-sdc": "LARMORX's reproduce mode gives sdcflows' mask, every voxel: the non-flat "
+        "`ball(3)` opening and `ball(2)` closing, numpy's percentiles, SciPy's watershed from "
+        "the two markers with its defects, the `ball(2)` dilation.",
+        "fix-lx": "No correction changes this reference's mask.",
+    }
+    _verdicts(diffs, outputs, same, named, links, reasons)
+    for x in diffs:
+        if x["id"] == "fix-lx" and x["verdict"] == "d13":
+            x["reason"] = (
+                f"The default corrects SciPy's watershed (SCI-13: neighbours across the image's "
+                f"edges; SCI-14: an element left alone in its queue) and names it: the object's "
+                f"region no longer stops early. sdcflows' mask holds {n['sdcflows']:,} voxels "
+                f"(Dice {d_sdc:.3f} with fMRIPrep's brain mask), the corrected one "
+                f"{n['larmorx-fix']:,} (Dice {d_fix:.3f}): rule A, measured on four references "
+                "(the table below)."
+            )
+    at = _diff_view(ex, "larmorx-fix", "larmorx", "mask") or _peak_view(ex, "brain", "mask")
+    default = {
+        "output": "mask",
+        "plane": "axial",
+        "voxel": at,
+        "panels": ["ref", "brain", "sdcflows", "larmorx-fix"],
+        "diffs": ["lx-sdc", "fix-lx"],
+        "compare": {"a": "larmorx-fix", "b": "larmorx"},
+    }
+    out = common.finish(
+        ctx, ex, diffs, outputs, default=default, window_panel="sdcflows",
+        caption="each mask over the BOLD reference; the crosshair where the corrected watershed "
+        "changes the mask.",
+    )  # fmt: skip
+    data = _data(ds, sub)
+    return {
+        "id": f"epi-mask-{ds}",
+        "title": f"SciPy's watershed corrected by default: sdcflows' epi_mask on {ds}'s BOLD "
+        "reference",
+        "summary": "sdcflows' `epi_mask` (`utils/epimanip.py`; no workflow of sdcflows or "
+        "fMRIPrep calls it) masks an EPI by grey-level morphology and SciPy's `watershed_ift` "
+        "from two markers, the object at the window's centre of mass and the background at one "
+        "corner voxel. SciPy's watershed lets a region's front reach across the image's edges "
+        "(SCI-13) and can leave an element alone in its queue (SCI-14): on this multi-echo "
+        "BOLD reference the object's region stops early. LARMORX corrects both by default "
+        "(rule A, measured against fMRIPrep's own brain masks) and gives SciPy's result in its "
+        "reproduce mode.",
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{data['dataset']}, {sub} ({data['licence']}): fMRIPrep "
+                "25.2.6's BOLD reference of the run (`desc-hmc_boldref`) and its brain mask; "
+                "shown inside the masks, dilated by 2 voxels",
+            },
+            {
+                "label": "Masks",
+                "text": f"sdcflows {n['sdcflows']:,} voxels (Dice {d_sdc:.3f} with "
+                f"fMRIPrep's), LARMORX reproduce {n['larmorx']:,}, default {n['larmorx-fix']:,} "
+                f"(Dice {d_fix:.3f}); fMRIPrep's mask {int((brain > 0).sum()):,}",
+            },
+            {
+                "label": "Programs",
+                "text": "sdcflows 2.17.1 in process (the newest environment); "
+                f"LARMORX's `lx.sdcflows.epi_mask` at commit `{info['larmorx_commit'][:12]}`",
+            },
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "chain": None,
+        "groups": [
+            ["main", "LARMORX against sdcflows"],
+            ["check", "LARMORX against itself: its default mode (D13)"],
+        ],
+        "metrics_note": f"Δ is A − B over all {int(np.prod(img.shape[:3])):,} voxels of each "
+        "mask, not only those shown.",
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+    }
+
+
+def _epi_table(ctx: core.Context) -> dict:
+    e = epi_entry(ctx)
+    rows = []
+    for run in EPI_RUNS:
+        ds = run.split("-")[0]
+        masks = _epi_masks(e, run)
+        brain = _stored(_epi_ref(run)[1])
+        named = _outputs_json(e.dir / ds / "larmorx-fix").get("named", [])
+        same = masks["larmorx"].tobytes() == masks["sdcflows"].tobytes()
+        cells = [common.cell(int((brain > 0).sum()), "count")]
+        for lab in ("sdcflows", "larmorx-fix"):
+            m = masks[lab] > 0
+            cells += [common.cell(int(m.sum()), "count"), common.cell(_dice(m, brain), "sig"),
+                      common.cell(int((m & ~(brain > 0)).sum()), "count")]  # fmt: skip
+        cells.append(common.cell("identical" if same else "differs"))
+        cells.append(common.cell(", ".join(named) if named and
+                                 masks["larmorx-fix"].tobytes() != masks["larmorx"].tobytes()
+                                 else "–"))  # fmt: skip
+        rows.append({"head": f"{ds} ({brain.shape[0]} × {brain.shape[1]} × "
+                             f"{brain.shape[2]})", "cells": cells})  # fmt: skip
+    return common.table(
+        "epi-mask",
+        "epi_mask on four BOLD references: SciPy's watershed and the corrected one, against "
+        "fMRIPrep's brain masks",
+        [
+            "Reference",
+            {"label": "fMRIPrep's mask", "num": True},
+            {"label": "sdcflows: voxels", "num": True},
+            {"label": "Dice", "num": True},
+            {"label": "outside fMRIPrep's", "num": True},
+            {"label": "default: voxels", "num": True},
+            {"label": "Dice", "num": True},
+            {"label": "outside fMRIPrep's", "num": True},
+            "reproduce = sdcflows",
+            "named by default",
+        ],
+        rows,
+        note="The cache entry's runs (sdcflows 2.17.1 and LARMORX in both modes, the newest "
+        "environment) on fMRIPrep 25.2.6's `desc-hmc_boldref` of four oracle runs; fMRIPrep's "
+        "`desc-brain_mask` of each run is the independent reference (niworkflows' skull "
+        "stripping; for ds005040's PEPOLAR run it is the corrected reference's). The corrected "
+        "masks are better on three references and the same on the fourth, worse on none: rule "
+        'A (docs/findings/sdcflows-estimation.md, "epi_mask and SciPy\'s watershed"). The '
+        "default masks larger than fMRIPrep's by thousands of voxels are epi_mask's own "
+        "`ball(2)` dilation around the brain; no sdcflows or fMRIPrep workflow calls epi_mask.",
+    )
+
+
+# ------------------------------------------------------------------------- the BIDS app
+
+#: The app examples' panels of runs: id, role, label, sub.
+APP_PANELS = [
+    ("sdcflows", "original", "sdcflows 2.17.1, 1 thread",
+     "its BIDS app; numpy 2.5.4, SciPy 1.18.1; FSL 6.0.7.23's topup, ANTs 2.6.5's N4 (one "
+     "thread, correctly rounded maths), AFNI 26.3.05's 3dvolreg: LARMORX's reference"),
+    ("larmorx", "larmorx", "LARMORX (port), 1 thread",
+     "its BIDS app, reproduce mode; LARMORX's replicas and ports underneath"),
+    ("larmorx-14", "larmorx", "LARMORX (port), 14 threads", "reproduce mode"),
+    ("larmorx-fix", "larmorx", "LARMORX (port), 14 threads", "default mode (D13 corrections)"),
+    ("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own files",
+     "sdcflows 2.15.1 in its image (numpy 2.2.6, SciPy 1.15.2); N4 at 8 threads, glibc's maths"),
+    ("larmorx-fmriprep", "larmorx", "LARMORX (port), as fMRIPrep ran the stage",
+     "sdcflows 2.15's wiring, fMRIPrep's image's numpy and SciPy, the replicas; reproduce mode"),
+    ("sdcflows-4", "original", "sdcflows 2.17.1, 4 threads",
+     "its own oracle run (--nprocs 4 --omp-nthreads 4, RUN_INFO.txt)"),
+]  # fmt: skip
+#: The derivatives' ``desc`` -> the example's output.
+DESC = {
+    "preproc_fieldmap": "fmap",
+    "epi_fieldmap": "ref",
+    "magnitude_fieldmap": "ref",
+    "brain_mask": "mask",
+    "coeff_fieldmap": "coeff",
+}
+
+
+def _app_outputs(kind: str) -> list[dict]:
+    ref = "EPI reference (`desc-epi`)" if kind == "pepolar" else "Magnitude (`desc-magnitude`)"
+    return [
+        {"id": "fmap", "label": "Field map (Hz, `desc-preproc`)", "unit": "Hz"},
+        {"id": "ref", "label": ref, "unit": ""},
+        {"id": "probseg", "label": "Brain probability (the masker node)", "unit": ""},
+        {"id": "mask", "label": "Brain mask (`desc-brain`)", "unit": ""},
+    ]
+
+
+def _app_dirs(ctx: core.Context, key: str) -> dict[str, tuple[Path, Path]]:
+    """Each run's derivatives folder and working folder."""
+    _k, run, frun, _kind, _w = _app(key)
+    e, st = app_entry(ctx, key), stage_entry(ctx)
+    sdc = _workspace() / "oracles" / "sdcflows-2.17.1" / run
+    fm = common.fmriprep_run(frun)
+    stage = st.dir / "stage" / "fmriprep" / frun
+    return {
+        "sdcflows": (e.dir / "app" / "run" / f"{run}-sdcflows" / "out",
+                     e.dir / "app" / "run" / f"{run}-sdcflows" / "work"),
+        "larmorx": (e.dir / "app" / "run" / f"{run}-larmorx" / "out",
+                    e.dir / "app" / "run" / f"{run}-larmorx" / "work"),
+        "larmorx-14": (e.dir / "larmorx-14" / "out", e.dir / "larmorx-14" / "work"),
+        "larmorx-fix": (e.dir / "larmorx-fix" / "out", e.dir / "larmorx-fix" / "work"),
+        "sdcflows-4": (sdc / "out", sdc / "work"),
+        "fmriprep": (fm / "out", fm / "work"),
+        "larmorx-fmriprep": (stage / "out", stage / "work"),
+    }  # fmt: skip
+
+
+def _derivs(out: Path) -> dict[str, Path]:
+    found: dict[str, Path] = {}
+    for p in sorted(out.rglob("*_desc-*.nii.gz")):
+        if "figures" in p.parts or "fmap" not in p.parts:
+            continue
+        desc = p.name.split("_desc-", 1)[1].removesuffix(".nii.gz")
+        if desc in DESC:
+            found[DESC[desc]] = p
+    return found
+
+
+def _probseg(work: Path) -> Path:
+    found = sorted(work.rglob("wf_auto_00000/**/brainextraction_wf/masker/clipped_probseg.nii.gz"))
+    if len(found) != 1:
+        raise FileNotFoundError(f"{work}: {len(found)} masker probabilities of wf_auto_00000")
+    return found[0]
+
+
+def _app_arrays(ctx: core.Context, key: str) -> tuple[dict, dict]:
+    arrays, coeffs = {}, {}
+    for pid, (out, work) in _app_dirs(ctx, key).items():
+        f = _derivs(out)
+        arrays[pid] = {k: _stored(f[k]) for k in ("fmap", "ref", "mask")}
+        arrays[pid]["probseg"] = _stored(_probseg(work))
+        coeffs[pid] = _stored(f["coeff"])
+    return arrays, coeffs
+
+
+def _app_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("lx-sdc", "larmorx", "sdcflows", "main", "LARMORX − sdcflows 2.17.1 (both one thread)",
+          common.ROLE_LX),
+        d("lxf-fmriprep", "larmorx-fmriprep", "fmriprep", "fmriprep",
+          "LARMORX as fMRIPrep ran the stage − fMRIPrep 25.2.6's own files", common.ROLE_FMRIPREP),
+        d("lx14-lx1", "larmorx-14", "larmorx", "check",
+          "LARMORX (reproduce): 14 threads − 1 thread", common.ROLE_SELF),
+        d("fix-lx14", "larmorx-fix", "larmorx-14", "check",
+          "LARMORX at 14 threads: default − reproduce mode", common.ROLE_SELF),
+        d("sdc4-sdc1", "sdcflows-4", "sdcflows", "variability",
+          "sdcflows: its own run at 4 threads − 1 thread", common.ROLE_ORIG),
+        d("fmriprep-sdc", "fmriprep", "sdcflows", "variability",
+          "fMRIPrep 25.2.6's own files − sdcflows 2.17.1 with the newest releases",
+          common.ROLE_ORIG),
+    ]  # fmt: skip
+
+
+def _stage_lines(ctx: core.Context, frun: str) -> list[str]:
+    log = (stage_entry(ctx).dir / "stage.log").read_text(encoding="utf-8")
+    return [ln for ln in log.splitlines() if ln.startswith(f"INFO {frun} ")]
+
+
+def _example_app(ctx: core.Context, key: str, links: dict) -> dict:
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+    from larmorx_validation.evidence.fsl_bet import window_of
+
+    _k, run, frun, kind, what = _app(key)
+    e = app_entry(ctx, key)
+    info = e.info()
+    dirs = _app_dirs(ctx, key)
+    arrays, coeffs = _app_arrays(ctx, key)
+    fpath = _derivs(dirs["sdcflows"][0])["fmap"]
+    img = nib.load(str(fpath))
+    show = _show(np.logical_or(arrays["sdcflows"]["mask"] > 0, arrays["fmriprep"]["mask"] > 0), 2)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    wf = dirs["sdcflows"][1] / "sdcflows_wf" / "wf_auto_00000"
+    ds = key
+    if kind == "pepolar":
+        vols = sorted((wf / "select_volumes").glob("*_vol0.nii.gz"))
+        first = None
+        for v in vols:
+            pe = re.search(r"_dir-([A-Z]+)_", v.name).group(1)  # type: ignore[union-attr]
+            a, s_, i_ = common.stored(v)
+            ex.add(exm.Panel(f"epi-{pe}", "input", f"{ds}: EPI, phase encoding {pe}",
+                             "the first volume (SelectPEVolumes' output)", {"all": a}, scale=s_,
+                             inter=i_))  # fmt: skip
+            first = first or f"epi-{pe}"
+    else:
+        a, s_, i_ = common.stored(next((wf / "fmapmrg").glob("*.nii.gz")))
+        ex.add(exm.Panel("fieldmap", "input", f"{ds}: the scanner's field map (Hz)",
+                         "the BIDS `fieldmap` image as merged (fmapmrg)", {"all": a}, scale=s_,
+                         inter=i_))  # fmt: skip
+        a, s_, i_ = common.stored(next((wf / "magnitude_wf" / "magmrg").glob("*.nii.gz")))
+        ex.add(exm.Panel("magnitude", "input", f"{ds}: magnitude", "the BIDS `magnitude` image "
+                         "as merged (magmrg)", {"all": a}, scale=s_, inter=i_))  # fmt: skip
+        first = "magnitude"
+    over = {"mask": {"on": first, "window": window_of(ex, first)}}
+    for pid, role, label, sub in APP_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    diffs = _app_diffs()
+    outputs = copy.deepcopy(_app_outputs(kind))
+    common.compare_all(ex, diffs, outputs)
+    same = common.identical(diffs)
+    named = _outputs_json(e.dir / "larmorx-fix").get("named", [])
+    lines = _stage_lines(ctx, frun)
+    n4 = [ln for ln in lines if "data different" in ln]
+    reasons = {
+        "lx-sdc": "Every value of the four outputs is sdcflows' (and every derivative file, "
+        "byte for byte: the cache entry's check_app.py run), with LARMORX's replicas and ports "
+        "underneath: "
+        + (
+            "FSL's topup, AFNI's 3dvolreg (niworkflows' RobustAverage), ANTs' N4, sdcflows' "
+            "masks and the TOPUP coefficients' reorientation."
+            if kind == "pepolar"
+            else "ANTs' N4, sdcflows' masks and the B-spline fit of the field map in Hz."
+        ),
+        "lxf-fmriprep": "fMRIPrep's own derivatives hold the same values: LARMORX's field-map "
+        "stage run as fMRIPrep ran it gives them.",
+        "lx14-lx1": "The same bytes at 1 and 14 threads (every sum in sdcflows' order, whatever "
+        "the thread count).",
+        "fix-lx14": "No correction of the register changes this run's values: both modes give "
+        "the same bytes.",
+        "sdc4-sdc1": "The original against itself, a reference row: sdcflows' own run at four "
+        "threads gives the same values.",
+        "sdc4-sdc1:differ": "The original against itself, a reference row: sdcflows' own run "
+        "of 2026-11-08 at four threads (`--nprocs 4 --omp-nthreads 4`; ANTs' N4 then sums in "
+        "another order) gives other values than at one thread:",
+        "fmriprep-sdc": "The version step, a reference row: fMRIPrep 25.2.6's files hold "
+        "sdcflows 2.17.1's values.",
+        "fmriprep-sdc:differ": "The version step, a reference row (the originals against each "
+        "other): fMRIPrep 25.2.6 runs sdcflows 2.15.1"
+        + ("'s PEPOLAR wiring" if kind == "pepolar" else "")
+        + " with its image's numpy 2.2.6 and SciPy 1.15.2 and N4 at 8 threads with glibc's "
+        "maths, sdcflows 2.17.1 here its own with the newest releases; LARMORX follows both "
+        "(the first two rows):",
+    }
+    explained = {
+        "lxf-fmriprep": (
+            "within-variability",
+            "Within the original's own variability: fMRIPrep's N4 node ran at 8 threads with "
+            "glibc's exp and log, LARMORX's at one thread with correctly rounded maths (as "
+            "ANTs' at one thread); ANTs 2.6.5 at the node's 8 threads with glibc gives "
+            "fMRIPrep's N4 output, at one thread with correctly rounded maths LARMORX's (the "
+            "cache entry's check_fmap_stage.py --sections fmriprep: every derivative identical, "
+            "its data identical with only FSL's build string in `descrip`, or after such an N4 "
+            f"node: {len(n4)} files of this run); the reference, its brain probability and "
+            "mask follow from N4's output:",
+        )
+    }
+    _verdicts(diffs, outputs, same, named, links, reasons, explained)
+    at = _peak_view(ex, "sdcflows", "fmap")
+    default = {
+        "output": "fmap",
+        "plane": "axial",
+        "voxel": at,
+        "panels": [first, "sdcflows", "larmorx", "fmriprep"],
+        "diffs": ["lx-sdc", "lxf-fmriprep", "fix-lx14", "fmriprep-sdc"],
+        "compare": {"a": "sdcflows", "b": "larmorx"},
+    }
+    out = common.finish(
+        ctx, ex, diffs, outputs, default=default, window_panel="sdcflows",
+        caption="the crosshair where the field is strongest in the slice; choose the output (the "
+        "field map, the reference, its brain probability, the mask over the input) above the "
+        "images.",
+    )  # fmt: skip
+    nc = {k: v.tobytes() == coeffs["larmorx"].tobytes() for k, v in coeffs.items()}
+    ncf = coeffs["larmorx-fmriprep"].tobytes() == coeffs["fmriprep"].tobytes()
+    cshape = " × ".join(str(x) for x in coeffs["sdcflows"].shape[:3])
+    coeff_text = (
+        f"the {cshape} coefficients (`desc-coeff`): LARMORX's "
+        + ("equal sdcflows' at one thread" if nc["sdcflows"] else "differ from sdcflows'")
+        + (", at 14 threads too" if nc["larmorx-14"] else "")
+        + ("; the default mode's too" if nc["larmorx-fix"] else
+           "; the default mode's differ (its corrections, below)")
+        + "; as fMRIPrep ran the stage, "
+        + ("fMRIPrep's own file, every value" if ncf else "not fMRIPrep's own file")
+        + (" (TOPUP's own coefficients on the field map's grid, reoriented by "
+           "TOPUPCoeffReorient)" if kind == "pepolar" else
+           " (the B-spline fit's, 16 × 16 × 10 mm apart)")
+    )  # fmt: skip
+    sub = "sub-" + run.split("-sub-")[1].split("-")[0]
+    data = _data(ds, sub)
+    secs = {lab: r["seconds"] for lab in ("check-app", "larmorx-14", "larmorx-fix")
+            for r in info["runs"] if r["label"] == lab}  # fmt: skip
+    title = (
+        f"PEPOLAR: sdcflows' BIDS app on {ds}'s AP/PA pair (TOPUP)"
+        if kind == "pepolar"
+        else f"A direct field map: sdcflows' BIDS app on {ds}'s field map in Hz"
+    )
+    return {
+        "id": f"app-{key}",
+        "title": title,
+        "summary": f"sdcflows' BIDS app on {ds} ({what}): "
+        + (
+            "the two EPIs' first volumes regridded to one grid, merged and given to FSL's topup "
+            "(its `b02b0` settings), the field and its coefficients reoriented back, the "
+            "corrected reference averaged by niworkflows' RobustAverage (AFNI's 3dvolreg) and "
+            "skull-stripped (IntensityClip, ANTs' N4, sdcflows' brain_masker)"
+            if kind == "pepolar"
+            else "the field map in Hz merged, the magnitude skull-stripped (IntensityClip, ANTs' "
+            "N4, sdcflows' brain_masker), the field map's cubic B-spline fit inside the mask"
+        )
+        + ". sdcflows 2.17.1 and LARMORX run the whole app; fMRIPrep 25.2.6's own derivatives "
+        "of the same data are compared with LARMORX's field-map stage run as fMRIPrep ran it, "
+        "and sdcflows' own run at four threads is the original's own spread.",
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{data['dataset']}, {sub} ({data['licence']}): the "
+                "field-map files of the dataset (with the derived sidecars of its view, RUN_INFO."
+                "txt); shown inside the brain masks of sdcflows and fMRIPrep, dilated by 2 voxels, "
+                "so no face shows",
+            },
+            {
+                "label": "Command",
+                "text": f"`sdcflows <bids> <out> participant --participant-label "
+                f"{sub.removeprefix('sub-')} --nprocs 1 --omp-nthreads 1 --no-fmapless`; LARMORX: "
+                "`larmorx sdcflows sdcflows` with the same arguments (`lx.sdcflows.run_app`)",
+            },
+            {"label": "Coefficients", "text": coeff_text},
+            {
+                "label": "Programs",
+                "text": "sdcflows 2.17.1 in its BIDS app (the newest "
+                "environment), its programs through the oracle cache; LARMORX at commit "
+                f"`{info['larmorx_commit'][:12]}`; numpy's OpenBLAS on its Haswell kernels, one "
+                "thread",
+            },
+            {
+                "label": "Time",
+                "text": f"both apps at one thread {secs.get('check-app', 0):.0f} s "
+                f"(check_app.py, sdcflows' programs from the oracle cache); LARMORX at 14 threads "
+                f"{secs.get('larmorx-14', 0):.0f} s (informal: the benchmark below has the medians)",
+            },
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "chain": None,
+        "groups": [
+            ["main", "LARMORX against sdcflows"],
+            ["fmriprep", "LARMORX against fMRIPrep's own files"],
+            ["check", "LARMORX against itself: threads and modes"],
+            ["variability", "The originals against themselves: threads, versions"],
+        ],
+        "metrics_note": f"Δ is A − B over all {int(np.prod(img.shape[:3])):,} voxels of each "
+        "output file, not only those shown (the field map's one volume as its 3-D image).",
+        "provenance": common.provenance(
+            info,
+            f"{TOOL}/{e.case}",
+            [data],
+            [f"{TOOL}/stage-fmriprep (LARMORX's stage as fMRIPrep ran it)"],
+        ),
+    }
+
+
+# ------------------------------------------------------------------------------ the tables
+
+
+def _records(ctx: core.Context) -> list[tuple[records.Record, str, str, str]]:
+    return [(records.load(ctx.repo, n), suite, tier, env) for n, suite, tier, env in RECORDS]
+
+
+STEP_PREFIX = "the originals' own step"
+
+
+def _step_lines(r: dict) -> dict[str, str]:
+    """A case's step comparisons: name (without the releases) -> identical/changed/varying."""
+    out = {}
+    for k, v in r.get("measured", {}).items():
+        if k.startswith(STEP_PREFIX):
+            out[k.split(": ", 2)[-1]] = v
+    return out
+
+
+def _records_table(ctx: core.Context, recs) -> dict:
+    rows = []
+    for rec, suite, tier, env in recs:
+        s = rec.summary
+        lines = sum(r["checks_total"] for r in rec.results)
+        step = [v for r in rec.results for v in _step_lines(r).values()]
+        rows.append(
+            {
+                "head": f"[{rec.name}](record:{rec.name})",
+                "cells": [
+                    common.cell(suite),
+                    common.cell(tier),
+                    common.cell(env),
+                    common.cell(len(rec.results), "count"),
+                    common.cell(s.get("pass", 0), "count"),
+                    common.cell(lines, "count"),
+                    common.cell(f"{len(step):,} / {step.count('changed'):,}" if step else "–"),
+                ],
+                "verdict": "bit-identical" if s.get("pass", 0) == len(rec.results) else "open",
+            }
+        )
+    return common.table(
+        "records",
+        "The records of the part: every case passes",
+        [
+            "Record",
+            "Suite",
+            "Tier",
+            "Environment",
+            {"label": "Cases", "num": True},
+            {"label": "Pass", "num": True},
+            {"label": "Checks", "num": True},
+            "The originals' step: compared / changed",
+        ],
+        rows,
+        note="Each record runs the investigation's check scripts (some of their sections) as "
+        "separate processes of the environment's interpreter, from a clean commit: one check per "
+        "summary line a script prints (its cases, all identical), its final line and its exit "
+        "status. newest: numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1 (oracles/python-newest, "
+        "LARMORX's reference); shared: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 (the shared "
+        ".venv). The full tier holds the whole workflows and the BIDS app's whole runs "
+        "(minutes to an hour each). The originals' step: each comparison of the library scripts "
+        "with the originals' outputs digested in both environments; every change has a known "
+        "reason (the table below).",
+    )
+
+
+def _step_table(ctx: core.Context, recs) -> dict:
+    from larmorx_validation.parity import sdcflows_scripts as ss
+
+    rows = []
+    total = changed = 0
+    for rec, suite, _tier, _env in recs:
+        for r in rec.results:
+            lines = _step_lines(r)
+            if not lines:
+                continue
+            total += len(lines)
+            ch = [k for k, v in lines.items() if v == "changed"]
+            changed += len(ch)
+            if not ch:
+                continue
+            pats = ss.REASONS.get(f"{suite}/{r['case']}", {})
+            keys = sorted({next((v for p, v in pats.items() if re.search(p, k)), "?") for k in ch})
+            rows.append(
+                {
+                    "head": f"`{suite}/{r['case']}`",
+                    "cells": [
+                        common.cell(len(lines), "count"),
+                        common.cell(len(ch), "count"),
+                        common.cell(", ".join(keys)),
+                    ],
+                }
+            )
+    rows.insert(
+        0,
+        {
+            "head": "every case",
+            "cells": [common.cell(total, "count"), common.cell(changed, "count"), common.cell("–")],
+        },
+    )
+    reasons = "; ".join(f"{k}: {v.split(';')[0].split(':')[0]}" for k, v in ss.CHANGES.items()
+                        if k not in ("SCI-03",))  # fmt: skip
+    return common.table(
+        "step",
+        "The originals' own step: numpy 2.3.5 / SciPy 1.15.3 → numpy 2.5.4 / SciPy 1.18.1",
+        [
+            "Case",
+            {"label": "Comparisons", "num": True},
+            {"label": "Changed", "num": True},
+            "Reasons",
+        ],
+        rows,
+        note="The records' step (python_versions): each comparison of a library script whose "
+        "originals' outputs are digested, in the shared releases (two runs: none varies) and in "
+        "the newest. Every change has a known reason, LARMORX following each release: "
+        + reasons
+        + " (sdcflows_scripts.CHANGES, with their sources). The workflow scripts carry no step: "
+        "their originals (sdcflows 2.17.1, niworkflows, nipype) are the same in both "
+        "environments, and the libraries' step under them is the library scripts'.",
+    )
+
+
+def _app_table(ctx: core.Context, recs) -> dict:
+    from larmorx_validation.parity.sdcflows_scripts import APP_RUNS
+
+    by = {(rec.name, r["case"]): r for rec, *_ in recs for r in rec.results}
+    bench = _bench(ctx)
+    times = {r["dataset"]: r for a in bench["app"] for r in a["rows"]}
+    rows = []
+    for short, run, what in APP_RUNS:
+        cells = [common.cell(what)]
+        for name in ("sdcflows-estimation-full", "sdcflows-estimation-app-shared"):
+            r = by.get((name, f"app-run-{short}"))
+            cells.append(common.cell(f"{r['checks_passed']}/{r['checks_total']}" if r else "–"))
+        t = times.get(run)
+        cells += [common.cell(t["sdcflows"], "sig") if t else common.cell("–"),
+                  common.cell(t["larmorx_1"], "sig") if t else common.cell("–")]  # fmt: skip
+        ok = all(by.get((n, f"app-run-{short}"), {}).get("status") == "pass"
+                 for n in ("sdcflows-estimation-full", "sdcflows-estimation-app-shared"))  # fmt: skip
+        rows.append({"head": f"`{run}`", "cells": cells,
+                     "verdict": "bit-identical" if ok else "open"})  # fmt: skip
+    return common.table(
+        "app-runs",
+        "sdcflows' BIDS app run whole on its eight oracle datasets",
+        [
+            "sdcflows' run",
+            "Estimators",
+            "Checks, newest",
+            "Checks, shared",
+            {"label": "sdcflows (s)", "num": True},
+            {"label": "LARMORX (s)", "num": True},
+        ],
+        rows,
+        note="The records' cases `app-run-*` (check_app.py --sections run): sdcflows 2.17.1's own "
+        "BIDS app and LARMORX's (`larmorx sdcflows sdcflows`, reproduce) at one thread on the "
+        "datasets of sdcflows' own oracle runs, with `--no-fmapless`: the exit statuses, the "
+        "command-line logger's lines, the list of derivative files and every file byte for byte "
+        "(NIfTI decompressed, the JSON sidecars), the logs folder and the settings file, in "
+        "both environments. The times: the benchmark (docs/benchmarks/sdcflows-estimation.md; "
+        "the originals' programs run fresh, LARMORX at one thread), where measured.",
+    )
+
+
+def _stage_table(ctx: core.Context) -> dict:
+    """fMRIPrep's own derivatives against LARMORX's stage as fMRIPrep ran it: per run, the
+    files identical, those whose data are and only ``descrip`` differs, those after N4."""
+    rows = []
+    tot = [0, 0, 0, 0]
+    for frun in STAGE_RUNS:
+        lines = _stage_lines(ctx, frun)
+        files = [ln for ln in lines if ".nii.gz:" in ln]
+        same = sum(ln.endswith(": identical") for ln in files)
+        descrip = sum("data identical; descrip" in ln for ln in files)
+        n4 = sum("data different" in ln for ln in files)
+        secs = next((re.search(r"\) (\d+) s$", ln).group(1) for ln in lines  # type: ignore[union-attr]
+                     if "estimate_fieldmaps" in ln), "?")  # fmt: skip
+        for i, v in enumerate((len(files), same, descrip, n4)):
+            tot[i] += v
+        rows.append(
+            {
+                "head": f"`{frun}`",
+                "cells": [
+                    common.cell(len(files), "count"),
+                    common.cell(same, "count"),
+                    common.cell(descrip, "count"),
+                    common.cell(n4, "count"),
+                    common.cell(f"{secs} s"),
+                ],
+                "verdict": "bit-identical" if n4 == 0 else "within-variability",
+            }
+        )
+    rows.insert(0, {"head": "every run", "cells": [common.cell(v, "count") for v in tot]
+                    + [common.cell("–")]})  # fmt: skip
+    return common.table(
+        "stage",
+        "fMRIPrep's own field-map derivatives, against LARMORX's stage run as fMRIPrep ran it",
+        [
+            "fMRIPrep's run",
+            {"label": "NIfTI files", "num": True},
+            {"label": "identical", "num": True},
+            {"label": "data identical, FSL's build string in descrip", "num": True},
+            {"label": "after an N4 node", "num": True},
+            "LARMORX's stage",
+        ],
+        rows,
+        note="The cache entry `stage-fmriprep` (check_fmap_stage.py --sections fmriprep, ALL OK): "
+        "larmorprepx's estimate_fieldmaps with fMRIPrep 25.2.6's options, sdcflows 2.15's "
+        "PEPOLAR wiring, its image's numpy 2.2.6 and SciPy 1.15.2, LAPACK 3.12.0 in the data "
+        "sinks and the replicas, against the run's own derivatives in `out/`. A file is "
+        "identical (data and header, decompressed), or its data are and its header differs "
+        "only by FSL's build string in `descrip` (fMRIPrep's image's FSL 2501.4, the replicas' "
+        "FSL 6.0.7.23 2601.0: PRELUDE's and TOPUP's outputs and what copies their headers), or "
+        "it follows an N4 node that ANTs 2.6.5 reproduces at the node's 8 threads with glibc's "
+        "maths (fMRIPrep's file) and at one thread with correctly rounded maths (LARMORX's): at "
+        "most one stored value apart in a few hundred voxels (the magnitude and EPI references, "
+        "and once a brain mask by 3 voxels). Every difference is explained; the field maps and "
+        "the coefficients are fMRIPrep's in every run.",
+    )
+
+
+def _memory_table(ctx: core.Context) -> dict:
+    e = memory_entry(ctx)
+    peaks = e.info()["peaks_mib"]
+    labels = {
+        "masker": "sdcflows' brain_masker, ds002603's magnitude (128 × 128 × 128 padded)",
+        "clip": "niworkflows' IntensityClip, ds002603's merged magnitude",
+        "ravg": "niworkflows' RobustAverage's own steps, ds004958's PEPOLAR series",
+        "recon": "fMRIPrep's ReconstructFieldmap, ds005454 onto its T1w grid",
+    }
+    rows = []
+    for name, p in peaks.items():
+        o = p["original"]
+        worst = max(p["larmorx-reproduce"], p["larmorx-fix"])
+        rows.append(
+            {
+                "head": labels.get(name, name),
+                "cells": [
+                    common.cell(round(o), "count"),
+                    common.cell(round(p["larmorx-reproduce"]), "count"),
+                    common.cell(round(p["larmorx-fix"]), "count"),
+                    common.cell(worst / o, "sig"),
+                ],
+            }
+        )
+    return common.table(
+        "memory",
+        "Peak memory (MiB): the memory rule's calls of the part, one thread",
+        [
+            "Call",
+            {"label": "The original", "num": True},
+            {"label": "LARMORX, reproduce", "num": True},
+            {"label": "LARMORX, default", "num": True},
+            {"label": "LARMORX ÷ the original", "num": True},
+        ],
+        rows,
+        note="Each call in a process of its own (validation/investigations/sdcflows-fieldmap-b/"
+        "memory_call.py, the calls of tests/parity/test_memory_peak.py), its peak resident "
+        "memory from /usr/bin/time -v, in the newest environment at one thread. The rule: at "
+        "most 10 % above the original's peak plus 8 MiB. sdcflows' brain_masker holds the "
+        "random walker's Laplacian several times (SciPy's sparse matrices, scikit-image's "
+        "copies), LARMORX once; fMRIPrep's ReconstructFieldmap holds nitransforms' sampling "
+        "grids in float64.",
+    )
+
+
+def _bench(ctx: core.Context) -> dict:
+    return json.loads((ctx.repo / BENCH).read_text(encoding="utf-8"))
+
+
+def _speed(ctx: core.Context) -> dict:
+    b = _bench(ctx)
+    series = [
+        {"id": "original|1", "label": "the original, 1 thread", "mark": "original"},
+        {"id": "larmorx|1", "label": "LARMORX, 1 thread", "mark": "larmorx"},
+        {"id": "larmorx|14", "label": "LARMORX, 14 threads", "mark": "larmorx-open"},
+    ]
+    names = {
+        "masker-ds002603": "brain_masker: ds002603's magnitude",
+        "clip-ds002603": "IntensityClip: ds002603's magnitude",
+        "ravg-ds004958": "RobustAverage's own steps: ds004958's PEPOLAR series",
+        "recon-ds005454": "ReconstructFieldmap: ds005454 onto its T1w",
+    }
+    rows = []
+    for r in b["calls"]["rows"]:
+        sec = {"original|1": r["original"], "larmorx|1": r["larmorx_1"],
+               "larmorx|14": r["larmorx_14"]}  # fmt: skip
+        rows.append({"label": names.get(r["call"], r["call"]), "input": r["call"], "seconds": sec,
+                     "speedup": r["original"] / r["larmorx_1"]})  # fmt: skip
+    for a in b["app"]:
+        for r in a["rows"]:
+            sec = {"original|1": r["sdcflows"], "larmorx|1": r["larmorx_1"]}
+            rows.append({"label": f"the BIDS app: {r['dataset']}", "input": r["dataset"],
+                         "seconds": sec, "speedup": r["sdcflows"] / r["larmorx_1"]})  # fmt: skip
+    nan = b["masker_nan"]["relay28_build"]["rows"][0]
+    rows.append({"label": "random walker that does not converge (random testing's case)",
+                 "input": nan["case"],
+                 "seconds": {"original|1": nan["original"], "larmorx|1": nan["larmorx_1"]},
+                 "speedup": nan["original"] / nan["larmorx_1"]})  # fmt: skip
+    axis, ticks = common.ticks_log([v for row in rows for v in row["seconds"].values()], " s")
+    m = b["calls"]["machine"]
+    return {
+        "title": "Seconds per call (median of 3), log scale; the factor is LARMORX's speed-up "
+        "over the original at one thread",
+        "axis": axis,
+        "ticks": ticks,
+        "series": series,
+        "rows": rows,
+        "note": f"From the benchmark report `{BENCH}` (commit {m.get('commit', '?')}, "
+        f"{m.get('cpus', '?')} logical CPUs, the newest environment, OPENBLAS_NUM_THREADS=1 as "
+        "fMRIPrep's nodes; every output byte-identical). The originals have no thread option on "
+        "these calls. The BIDS app: one run each (minutes), sdcflows' programs run fresh (FSL's "
+        "topup, ANTs' N4, AFNI's 3dvolreg), LARMORX's replicas and ports at one thread. The "
+        "random walker that does not converge: a NaN system from its first iteration (an image "
+        "whose grey closing is 0 everywhere), SciPy's conjugate gradients run to their limit; "
+        "LARMORX stops with SciPy's solution once nothing can change it (210 s before that "
+        "change).",
+    }
+
+
+def trial(ctx: core.Context) -> tuple[list[dict], dict]:
+    """Random testing's two trials of the part and its triage: two tables."""
+    import tomllib
+
+    out_rows, prov = [], []
+    head = ["", *(f"{t} ({'AVX-512 off' if 'noavx' in t else 'numpy default'})" for t in TRIALS)]
+    data = []
+    for t in TRIALS:
+        path = common.oracles() / "difftest" / t / "summary.json"
+        raw = path.read_bytes()
+        data.append(json.loads(raw))
+        prov.append({"trial": f"oracles/difftest/{t}/summary.json",
+                     "sha256": hashlib.sha256(raw).hexdigest()})  # fmt: skip
+
+    def row(label, fn):
+        out_rows.append({"head": label, "cells": [fn(s) for s in data]})
+
+    row(
+        "Random cases, each compared with the original",
+        lambda s: common.cell(int(s["cases"]), "count"),
+    )
+    for tool in TRIAL_TOOLS:
+
+        def cell(s, tool=tool):
+            t = s["tools"].get(tool, {})
+            im = t.get("implementations", {}).get("port", {})
+            text = f"{t.get('cases', 0):,} cases: {im.get('agree', 0):,} agree"
+            for k in ("differ", "skipped", "timeout", "notice"):
+                if im.get(k):
+                    text += f", {im[k]:,} {k}"
+            return common.cell(text + f"; {t.get('options_covered', 0)} options drawn")
+
+        row(tool, cell)
+    row("length (minutes)", lambda s: common.cell(round(s["elapsed_s"] / 60, 1), "sig"))
+    row("seed, LARMORX commit", lambda s: common.cell(f"{s['seed']}, {s['larmorx_commit']}"))
+    table = common.table(
+        "trial",
+        "Random testing: the part's two trials",
+        head,
+        out_rows,
+        note="Differential random testing (docs/validation/difftest.md): random inputs and "
+        "options for SciPy's ndimage and scikit-image (filters, morphology, labels, the random "
+        "walker, Otsu), numpy's statistics, niworkflows' helpers with nipype's command lines, "
+        "and sdcflows' estimation steps, masks, readout times and derivatives; the originals "
+        "in-process, LARMORX in its reproduce mode compared output by output, its default mode "
+        "checked by D13's rule. `skipped`: calls the descriptor does not compare (an input the "
+        "original refuses in a way it cannot run twice, or a program not drawn); `timeout`: "
+        "sdcflows' brain_masker cases whose random walker does not converge, slower than the "
+        "case's limit in the original (the benchmark's last row): replayed, every one agrees. "
+        "The second trial turns numpy's AVX-512 kernels off (NPY_DISABLE_CPU_FEATURES).",
+    )
+    tri = tomllib.loads(
+        (ctx.repo / "validation" / "difftest" / "triage.toml").read_text(encoding="utf-8")
+    )
+    trows = []
+    for d in tri.get("difference", []):
+        if d.get("tool") not in TRIAL_TOOLS:
+            continue
+        trows.append(
+            {
+                "head": d.get("status", ""),
+                "cells": [
+                    common.cell(d.get("tool", "")),
+                    common.cell(common.clip(d.get("explanation", ""), 420)),
+                    common.cell(d.get("defect", "–")),
+                ],
+                "sub": d.get("link", ""),
+            }
+        )
+    triage = common.table(
+        "triage",
+        "Random testing: every difference of the part's runs, triaged",
+        ["Status", "Tool", "What it was", "Register"],
+        trows,
+        note="validation/difftest/triage.toml (the field maps' part B, 2026-11-09): each "
+        "difference of the short runs before the trials and of the trials themselves, a "
+        "LARMORX mistake fixed with a permanent case, a defect of the original registered by "
+        "the rules A to D, or a slow original.",
+    )
+    return [table, triage], {"trials": prov}
+
+
+def _defect_rows(ctx: core.Context) -> list[tuple[str, ...]]:
+    """The findings' table of part B's register entries: (id, original, class, defect,
+    fMRIPrep's calls, LARMORX)."""
+    text = (ctx.repo / FINDINGS).read_text(encoding="utf-8")
+    pat = r"^\| ((?:SDC|PIPE|SCI|SKI)-\d+) \| (.*?) \| (\S+) \| (.*?) \| (.*?) \| (.*?) \|\s*$"
+    return [tuple(g.strip() for g in m.groups()) for m in re.finditer(pat, text, re.M)]
+
+
+def _corrections_table(ctx: core.Context, links: dict) -> dict:
+    from larmorx._defects import defects
+
+    switch = {d.id: d for d in defects()}
+    rows = []
+    for i, tool, cls, what, users, today in _defect_rows(ctx):
+        sw = switch.get(i)
+        rows.append(
+            {
+                "head": f"[{i}](repo:{links.get(i, FINDINGS)})",
+                "cells": [
+                    common.cell(tool.replace("`", "")),
+                    common.cell(cls),
+                    common.cell(what.replace("`", "")),
+                    common.cell(users.replace("`", "")),
+                    common.cell(today.replace("`", "")),
+                    common.cell("yes" if sw else "–"),
+                ],
+            }
+        )
+    return common.table(
+        "corrections",
+        "The originals' defects found by the part (SDC-12 to SDC-46, PIPE-18 to PIPE-40, "
+        "SCI-06 to SCI-32, SKI-01 to SKI-04)",
+        [
+            "Entry",
+            "Original",
+            "Class",
+            "What the original does",
+            "fMRIPrep's calls",
+            "What LARMORX does",
+            "Switch",
+        ],
+        rows,
+        note="Each decided by rules A to D (A: corrected by default; B: a clear error; C: kept "
+        "and documented; D: measured first), with `upstream_defects='reproduce'` "
+        "(LARMORX_UPSTREAM_DEFECTS=reproduce) giving the original's behaviour where LARMORX has "
+        "a switch (larmorx_core::defects, the Switch column); crashes, reads out of bounds and "
+        "nondeterminism are never reproduced. The class is the register's (a: crash or undefined "
+        "behaviour; b: nondeterminism; c: a wrong result; e: a command-line quirk; f: a message; "
+        'c?: questionable). The findings: docs/findings/sdcflows-estimation.md (its table "Part '
+        "B's register entries at a glance\") and docs/findings/scipy-ndimage-filters.md.",
+    )
+
+
+# --------------------------------------------------------------------------- the cases
+
+
+def _cases(ctx: core.Context, recs) -> list[dict]:
+    from larmorx_validation.parity.sdcflows_scripts import SUITES
+
+    out = []
+    for rec, suite, _tier, env in recs:
+        for r in rec.results:
+            spec = SUITES.get(suite, {}).get(r["case"])
+            cid = r["case"] if env == "newest" else f"{env}/{r['case']}"
+            v = common.outcome_verdict(r)
+            if v is None:
+                step = _step_lines(r)
+                ch = sum(x == "changed" for x in step.values())
+                v = (
+                    "bit-identical",
+                    f"Every one of its {r['checks_total']} checks: the outputs bit-identical to "
+                    "the originals' (or fMRIPrep's own files), their messages, warnings and exit "
+                    "statuses too"
+                    + (f"; the originals' step: {len(step)} comparisons, {ch} changed with a "
+                       "known reason" if step else "")
+                    + ".",
+                )  # fmt: skip
+            command = ""
+            if spec:
+                command = "python -P validation/investigations/sdcflows-fieldmap-b/" + " ".join(
+                    [spec.script, *spec.args]
+                )
+            out.append(
+                {
+                    "id": cid,
+                    "category": r["category"],
+                    "description": (spec.description if spec else "")
+                    + ("" if env == "newest" else f" (the {env} environment)"),
+                    "command": command,
+                    "results": {
+                        "port": {
+                            "outcome": r["status"],
+                            "verdict": v[0],
+                            "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                            "reason": v[1],
+                        }
+                    },
+                }
+            )
+    return out
+
+
+# -------------------------------------------------------------------------------- export
+
+
+def export(ctx: core.Context) -> dict:
+    recs = _records(ctx)
+    links = _findings_links(ctx.repo)
+    ents = entries(ctx)
+    cases = _cases(ctx, recs)
+    examples = [
+        _example_app(ctx, "ds006736", links),
+        _example_app(ctx, "ds005752", links),
+        _example_masker(ctx, links),
+        _example_epi(ctx, links),
+    ]
+    for ex in examples:
+        _check_default(ex)
+    trial_tables, tprov = trial(ctx)
+    tables = [
+        _records_table(ctx, recs),
+        _app_table(ctx, recs),
+        _stage_table(ctx),
+        _epi_table(ctx),
+        _corrections_table(ctx, links),
+        _step_table(ctx, recs),
+        _memory_table(ctx),
+        *trial_tables,
+    ]
+    bench = ctx.repo / BENCH
+    return {
+        "schema": 1,
+        "tool": TOOL,
+        "title": "sdcflows' field-map estimation: PEPOLAR, direct and fieldmap-less, the masks "
+        "and the BIDS app",
+        "provenance": {
+            "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
+            "records": [x for rec, *_ in recs for x in rec.source()],
+            "benchmarks": [
+                {
+                    "path": BENCH,
+                    "sha256": hashlib.sha256(bench.read_bytes()).hexdigest(),
+                    "larmorx_commit": _bench(ctx)["calls"]["machine"].get("commit"),
+                }
+            ],
+            "cache": [fcache.provenance(x) for x in ents],
+            "difftest": tprov,
+            "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
+        },
+        "implementations": [
+            common.implementation(
+                cases,
+                "port",
+                "LARMORX (port), against sdcflows 2.17.1, niworkflows, nipype, SciPy, "
+                "scikit-image, numpy and fMRIPrep 25.2.6's own files",
+                "port",
+                "docs/validation/sdcflows-estimation.md",
+                "validated",
+            )
+        ],
+        "cases": cases,
+        "cases_total": len(cases),
+        "speed": _speed(ctx),
+        "tables": tables,
+        "examples": examples,
+    }
+
+
+if __name__ == "__main__":  # compute the cache entries only
+    from larmorx_validation.figures.core import REPO, default_cache
+
+    c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    for x in entries(c):
+        print("done", x.dir, flush=True)

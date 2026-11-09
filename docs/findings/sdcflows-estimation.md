@@ -431,7 +431,7 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   stage samples 40 % of the voxels at random: which points a thread draws depends on the number
   of threads, so the optimiser can end elsewhere). So fMRIPrep's later files of a SyN estimator
   are a 4-thread result; the whole workflow is checked against sdcflows' own graph instead
-  (below). Every node of the five estimators, fed fMRIPrep's inputs, is identical: 29 checks x 5
+  (below). Every node of the five estimators, fed fMRIPrep's inputs, is identical: 27 checks x 5
   (fMRIPrep's files, or ANTs' one-thread result for N4, DenoiseImage and the registration, with
   the run's `ANTS_RANDOM_SEED`).
 - **The whole workflow against sdcflows' own graph** (the shared environment's sdcflows 2.17.1 and

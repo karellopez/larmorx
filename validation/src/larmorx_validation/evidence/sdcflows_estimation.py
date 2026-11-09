@@ -983,7 +983,7 @@ def _app_diffs() -> list[dict]:
 
 def _stage_lines(ctx: core.Context, frun: str) -> list[str]:
     log = (stage_entry(ctx).dir / "stage.log").read_text(encoding="utf-8")
-    return [ln for ln in log.splitlines() if ln.startswith(f"INFO {frun} ")]
+    return [ln for ln in log.splitlines() if re.match(rf"INFO {re.escape(frun)}[ :]", ln)]
 
 
 def _example_app(ctx: core.Context, key: str, links: dict) -> dict:
@@ -1687,6 +1687,15 @@ def _cases(ctx: core.Context, recs) -> list[dict]:
 # -------------------------------------------------------------------------------- export
 
 
+def _provenance(e: fcache.Entry) -> dict:
+    """An entry's provenance without its runs' temporary folder (``TMPDIR``, made for the
+    computation and gone)."""
+    out = fcache.provenance(e)
+    for c in out["commands"]:
+        c["env"].pop("TMPDIR", None)
+    return out
+
+
 def export(ctx: core.Context) -> dict:
     recs = _records(ctx)
     links = _findings_links(ctx.repo)
@@ -1727,7 +1736,7 @@ def export(ctx: core.Context) -> dict:
                     "larmorx_commit": _bench(ctx)["calls"]["machine"].get("commit"),
                 }
             ],
-            "cache": [fcache.provenance(x) for x in ents],
+            "cache": [_provenance(x) for x in ents],
             "difftest": tprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },

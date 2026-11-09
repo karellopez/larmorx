@@ -8274,3 +8274,55 @@ def _(ctx: Context) -> dict[str, Any]:
     except NotImplementedError as err:
         out["qwarp_workflow"] = np.frombuffer(str(err).encode(), dtype=np.uint8).copy()
     return out
+
+
+@case(
+    "py.sdcflows.unwarp",
+    covers=("lx.sdcflows.unwarp_workflow", "lx.sdcflows.unwarp_num_threads"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' ``init_unwarp_wf`` on a synthetic two-volume int16 EPI (LAS) with coefficients
+    on its control grid: the series with an ITK transform (``data2fmap_xfm``) and head-motion
+    matrices (ignored), its first volume without the Jacobian and with a fallback readout time,
+    both transforms with ``reproduce`` (SDC-26: ``data2fmap_xfm`` used) and refused by default,
+    the thread settings."""
+    shape = (24, 22, 16)
+    aff = affine(shape, (3.0, 3.0, 3.5), oblique=False)
+    aff[0, :] = -aff[0, :]
+    head = ellipsoid(shape, 9, 10)
+    vol = np.where(head, 300 + ints(160, shape, 0, 50), ints(161, shape, 0, 7))
+    series = ctx.out("sub-01_task-x_bold.nii.gz")
+    lx.save((np.stack([vol, vol + 4], -1).astype(np.int16), aff), series)
+    first = ctx.out("sub-01_task-x_boldref.nii.gz")
+    lx.save((vol.astype(np.int16), aff), first)
+    grid = lx.sdcflows.bspline_grid(lx.Image(vol.astype(np.float32), aff), SDC_HF)
+    coeff = ctx.out("coeff.nii.gz")
+    lx.save((((ints(162, tuple(grid.shape), 0, 9) - 4) * 1.5).astype(np.float32), np.asarray(grid.affine)), coeff)  # fmt: skip
+    xfm = _sdc_xfm(ctx.out("xfm.txt"))
+    meta = {"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.05}
+    hmc = [np.eye(4).tolist(), np.eye(4).tolist()]
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = lx.sdcflows.unwarp_workflow(series, meta, [coeff], data2fmap_xfm=xfm, hmc_xforms=hmc,
+                                        out_dir=ctx.out("a"))  # fmt: skip
+        b = lx.sdcflows.unwarp_workflow(first, {"PhaseEncodingDirection": "i"}, coeff,
+                                        jacobian=False, fallback_total_readout_time=0.04,
+                                        out_dir=ctx.out("b"))  # fmt: skip
+        c = lx.sdcflows.unwarp_workflow(first, meta, coeff, data2fmap_xfm=xfm, fmap2data_xfm=xfm,
+                                        out_dir=ctx.out("c"), upstream_defects="reproduce")  # fmt: skip
+    for name, r in (("a", a), ("b", b), ("c", c)):
+        for k in ("fieldmap", "corrected", "corrected_ref", "corrected_mask"):
+            out[f"{name}.{k}"] = Nifti(getattr(r, k))
+    out["c.both_refused"] = np.frombuffer(
+        _sdc_error(lambda: lx.sdcflows.unwarp_workflow(first, meta, coeff, data2fmap_xfm=xfm,
+                                                       fmap2data_xfm=xfm)).encode(),
+        dtype=np.uint8,
+    ).copy()  # fmt: skip
+    out["num_threads"] = np.array(
+        [a.num_threads, b.num_threads]
+        + [lx.sdcflows.unwarp_num_threads(o, f, d) for o in (1, 8) for f in (None, 0.5, 12.5)
+           for d in (False, True)],
+        dtype=np.int64,
+    )  # fmt: skip
+    return out

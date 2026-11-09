@@ -39,6 +39,8 @@ Rust (``larmorx-sdcflows``):
   :func:`select_topup_config`, :func:`topup_config_file`, :func:`topup_node`,
   :func:`topup_mats_to_world`, :func:`topup_workflow`: the PEPOLAR estimation
   (``init_topup_wf`` in sdcflows 2.17.1's and 2.15's wirings, FSL's ``topup`` through ``lx.fsl``).
+- :func:`unwarp_workflow`, :func:`unwarp_num_threads`: ``init_unwarp_wf``, an EPI dataset
+  unwarped with a field map's coefficients, merged, averaged and brain-extracted.
 - :func:`flatten`, :func:`sorted_pe`, :func:`qwarp2ants`, :func:`qwarp_workflow`: the Python
   steps of the PEPOLAR estimation with AFNI's ``3dQwarp`` (``init_3dQwarp_wf``, which waits for
   its programs: ``NotImplementedError``).
@@ -94,6 +96,12 @@ from larmorx.sdcflows.coeffs import (
     reorient_pedir,
     topup_coeff_reorient,
     transform_coefficients,
+)
+from larmorx.sdcflows.correction import (
+    MEM_PER_THREAD,
+    UnwarpWorkflowResult,
+    unwarp_num_threads,
+    unwarp_workflow,
 )
 from larmorx.sdcflows.estimators import (
     MODALITIES,
@@ -218,6 +226,7 @@ __all__ = [
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",
     "EPI_LIKE_SUFFIXES",
+    "MEM_PER_THREAD",
     "MODALITIES",
     "NOT_ALIGNED",
     "QWARP_ARGS",
@@ -259,6 +268,7 @@ __all__ = [
     "TopupNodeResult",
     "TopupWorkflowResult",
     "UniformGridResult",
+    "UnwarpWorkflowResult",
     "adjust_zooms",
     "apply_coeffs_field",
     "au2rads",
@@ -333,6 +343,8 @@ __all__ = [
     "transform_coefficients",
     "uniform_grid",
     "union",
+    "unwarp_num_threads",
+    "unwarp_workflow",
     "warp_dir",
     "workflow_options",
 ]

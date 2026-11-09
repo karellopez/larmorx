@@ -740,13 +740,8 @@ while it builds the graph (after the "Precomputed ... found" line). larmorx rais
 and ds001600's three phase-difference estimators and its PEPOLAR one (197 s at 8 threads, mostly
 TOPUP's replica) writes the 25 derivative files byte for byte as sdcflows 2.17.1's own
 `init_fmap_preproc_wf` (run in nipype by `check_derivatives.py --sections preproc`), and the
-buffers name the runs' files. Against fMRIPrep's own derivatives (information only): every
-field-map estimator's brain mask and coefficients are identical, and ds005752's field map; the
-magnitude references are not (fMRIPrep's N4 ran at four threads with glibc's `exp`/`log`, the
-reference larmorx follows is one thread with correctly rounded functions), nor ds001600's three
-phase-difference field maps although their coefficients are identical (left for the records
-relay to explain); the PEPOLAR estimator differs as expected (this run used sdcflows 2.17.1's
-wiring, fMRIPrep's is 2.15's).
+buffers name the runs' files. Against fMRIPrep's own derivatives, with fMRIPrep's wiring and
+libraries, every difference is explained (relay 14, the next section).
 
 **3dQwarp's Python steps.** `init_3dQwarp_wf` waits for AFNI's `3dQwarp`, FreeSurfer's
 `mri_robust_template` and niworkflows' `init_enhance_and_skullstrip_bold_wf`
@@ -764,6 +759,71 @@ drops a spatial axis of length one too, so a one-slice warp `X x Y x 1 x 1 x 3` 
 only the axes after the third. **SDC-23** (rule B when the workflow is ported):
 `init_3dQwarp_wf` connects `inputnode.in_reference`, a field its `inputnode` lacks, so its
 `fmap_ref` can never be computed.
+
+## The stage against fMRIPrep's own derivatives, every difference explained (relay 14)
+
+`check_fmap_stage.py --sections fmriprep` runs `estimate_fieldmaps` the way fMRIPrep 25.2.6 ran
+the stage: sdcflows 2.15's PEPOLAR graph (`wiring="2.15"`), the image's numpy 2.2.6 and SciPy
+1.15.2 (`numpy_version`, `scipy_version`), the data sinks' `set_qform` on LAPACK 3.12.0, the
+replicas of PRELUDE, TOPUP and 3dvolreg, `upstream_defects="reproduce"`; on five oracle runs
+with nine estimators of every kind fMRIPrep ran (ds005752's direct field map, ds001600's three
+phase-difference estimators and its PEPOLAR one on two grids, ds005040's PEPOLAR, ds002422's two
+phase-difference estimators, ds006736's PEPOLAR; 1 to 74 s each at 8 threads, both kept
+environments' larmorx being the same here). Each of the 36 NIfTI derivatives (and 9 sidecars)
+is compared with fMRIPrep's own file in `out/`:
+
+- **13 identical** byte for byte (uncompressed and gzip), and the 9 sidecars (`RawSources` with
+  the dataset at `/data`).
+- **13 with every voxel identical and only `descrip` different: FSL's build string.** FSL's
+  `newimage` writes its own version and build time into `descrip`: fMRIPrep's image has
+  fsl-newimage 2501.4 (`2501.4 2025-04-22T09:56:22+01:00`), larmorx's PRELUDE and TOPUP replicas
+  follow FSL 6.0.7.23's 2601.0 (`2601.0 2025-12-08T15:20:57Z`). PRELUDE's unwrapped phase passes
+  it on through `Phasediff2Fieldmap` and `BSplineApprox` (each copies its input's header) to the
+  preprocessed field map; TOPUP's outputs to the PEPOLAR field map, coefficients and reference.
+  **This is the whole difference of ds001600's three phase-difference field maps** that relay 13
+  left open (their data identical in every voxel; also ds002422's two).
+- **10 that differ through N4 only**, by at most one stored value (int16) in 1 to 302 voxels:
+  the magnitude references of the six phase-difference and direct estimators, the PEPOLAR
+  references (ds001600 11 voxels, ds005040 191, ds006736 302) and ds005040's PEPOLAR brain mask
+  (3 voxels). fMRIPrep ran sdcflows' N4 at **eight** threads (its `n4` nodes' `num_threads`; relay
+  13 wrote four) with glibc's `exp`/`log`. Re-running each of the nine `n4` nodes with the ANTs
+  oracle (2.6.5, GCC 14.3) at the node's eight threads with glibc's maths gives fMRIPrep's own
+  file byte for byte (9 of 9), and at one thread with correctly rounded maths larmorx's file (9 of
+  9; the PEPOLAR ones with FSL's build string as above): the difference is ANTs' own thread band
+  (`docs/findings/ants-n4.md`), not the port. Every brain mask but ds005040's PEPOLAR one, every
+  coefficient file and every field map is unaffected.
+
+**The step from numpy 2.2 to 2.3 on fMRIPrep's wiring.** Run with the shared environment's numpy
+(2.3.5) instead of the image's 2.2.6, the 2.15 PEPOLAR estimates of the two runs whose EPIs are
+series (ds001600, ds005040) differ from fMRIPrep's: `runwise_avg` already (147,312 of 163,840
+voxels on ds005040's first run), then TOPUP amplifies it: the field maps up to 3.7 Hz (ds001600)
+and 19.6 Hz (ds005040) apart, the coefficients up to 11.9 and 46.0. The cause is
+`RobustAverage`'s global-signal drift, a whole-volume sum that numpy 2.3 adds pairwise (2.2 in
+buffered chunks; this file's first section): larmorx follows each release (`numpy_version`), and
+with 2.2.6 every PEPOLAR file is fMRIPrep's. ds006736's 3-D EPIs (no series to average) are
+fMRIPrep's either way. The records relay shows this step per case.
+
+## `unwarp_workflow`: sdcflows' `init_unwarp_wf` (relay 14)
+
+No fMRIPrep path runs `init_unwarp_wf` (fMRIPrep 25.2 unwarps its BOLD runs with its own steps,
+relay 8), so `check_unwarp.py` runs sdcflows 2.17.1's own graph in nipype (N4 at one thread with
+correctly rounded maths as its stand-in) against `lx.sdcflows.unwarp_workflow` on three oracle
+runs' coefficients applied to their BOLD references with the runs' `boldref -> fmap` transforms
+(ds005752's direct field map, ds006736's PEPOLAR, ds000228's SyN), a 4-D target with head-motion
+matrices, the transform inverted, a fallback readout time, the metadata's estimates and thread
+settings: 81 node files identical (data and header bytes) in both kept environments, the outputs
+at sdcflows' places, the same refusals (no `PhaseEncodingDirection`, no readout time, a list as
+the target); the `resample` node's `num_threads` and `mem_gb` for 48 settings. Two behaviours:
+
+- **SDC-25 (rule C, kept).** The workflow's `fieldwarp` output (the displacement field, says its
+  docstring) is connected to nothing, so nipype leaves it undefined; larmorx returns `None`. No
+  caller reads it; `B0FieldTransform.to_displacements` gives the displacement field of the same
+  coefficients.
+- **SDC-26 (rule B).** `ApplyCoeffsField` declares `fmap2data_xfm` and `data2fmap_xfm` exclusive
+  (nipype's `xor`), but when both reach it through the workflow's connections nipype sets both
+  without the check, and `_run_interface` uses `data2fmap_xfm`, ignoring the other without a word
+  (shown with two different transforms: sdcflows' files are those of `data2fmap_xfm` alone).
+  larmorx raises a `ValueError`; `reproduce` uses `data2fmap_xfm` with a warning.
 
 ## Candidates for the register (the part's defects relay decides them)
 
@@ -785,6 +845,6 @@ only the axes after the third. **SDC-23** (rule B when the workflow is ported):
   `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
   `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
   PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
-  `larmorx.pipelines.larmorprepx.estimators` (relay 13) and SDC-12 to SDC-24 in `lx.sdcflows`
-  (relays 5 to 13); the register's entries and `larmorx_core::defects` wait for the part's
+  `larmorx.pipelines.larmorprepx.estimators` (relay 13) and SDC-12 to SDC-26 in `lx.sdcflows`
+  (relays 5 to 14); the register's entries and `larmorx_core::defects` wait for the part's
   defects relay.

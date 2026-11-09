@@ -231,3 +231,8 @@ same in 2.15.1 and 2.15.2) `interfaces/utils.py` (`Flatten`, `_flatten`, `Conver
 nibabel 5.4.2 (MIT) `spatialimages.py` (`SpatialFirstSlicer`: the 4th-axis slice and its "Empty
 slice requested" error), `funcs.py` (`four_to_three`), `nifti1.py` (`set_intent`), through
 `lx.io`; nipype 1.12.0 `utils/filemanip.py` (`fname_presuffix`'s prefix argument).
+
+Into `python/larmorx/sdcflows/correction.py` (relay 14): sdcflows 2.17.1 (Apache-2.0; the same
+in 2.15.1 and 2.15.2) `workflows/apply/correction.py` (`init_unwarp_wf`: the nodes and their
+wiring, `mem_per_thread` and the thread setting); `interfaces/bspline.py` (`ApplyCoeffsField`'s
+`_run_interface`: `data2fmap_xfm` before `fmap2data_xfm`, SDC-26); `utils/misc.py` (`front`).

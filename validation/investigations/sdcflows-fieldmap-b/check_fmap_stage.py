@@ -33,6 +33,14 @@
   fMRIPrep's own derivatives as information (its N4 ran at four threads with glibc's
   ``exp``/``log``).
 
+- ``fmriprep``: ``estimate_fieldmaps`` on chosen runs the way fMRIPrep 25.2.6 ran the stage
+  (sdcflows 2.15's PEPOLAR graph, the image's numpy 2.2.6 and SciPy 1.15.2, LAPACK 3.12.0 in the
+  data sinks, the replicas) against fMRIPrep's own derivatives in ``out/``: each file identical,
+  or with its data identical and only FSL's build string in ``descrip``
+  (:data:`FSL_DESCRIP`), or fed by an ``n4`` node that the ANTs oracle reproduces at the node's
+  thread count with glibc's maths (fMRIPrep's file) and at one thread with correctly rounded
+  maths (larmorx's file): every difference explained, else reported.
+
 Usage: ``LARMORX_WORKSPACE=<workspace> python -P check_fmap_stage.py [--sections ...]
 --scratch <folder>``. Prints one line per check and ``ALL OK`` or ``DIFFERENCES``.
 """
@@ -817,6 +825,217 @@ def sec_run(t: cw.Tally, scratch: Path, datasets: list[str], reference: Path, nt
             )
 
 
+#: The build string FSL's ``newimage`` writes into an image's ``descrip`` (PRELUDE's output,
+#: then every file nibabel derives from it keeps it): fMRIPrep 25.2.6's image (fsl-newimage
+#: 2501.4) and FSL 6.0.7.23 (fsl-newimage 2601.0), which larmorx's PRELUDE replica follows.
+FSL_DESCRIP = (b"2501.4 2025-04-22T09:56:22+01:00", b"2601.0 2025-12-08T15:20:57Z")
+#: fMRIPrep 25.2.6's image's numpy and SciPy (numpy 2.3 sums RobustAverage's drift pairwise:
+#: the PEPOLAR averages differ from 2.2.6's).
+IMAGE_NUMPY, IMAGE_SCIPY = "2.2.6", "1.15.2"
+
+
+def _header_fields(a: Any, b: Any) -> list[str]:
+    import numpy as np
+
+    return [
+        k
+        for k in a.header
+        if np.asarray(a.header[k]).tobytes() != np.asarray(b.header[k]).tobytes()
+    ]
+
+
+def _descrip(img: Any) -> bytes:
+    return bytes(img.header["descrip"]).rstrip(b"\x00")
+
+
+def _brain_mask(name: str) -> str:
+    """The estimator's brain mask beside a derivative file of it."""
+    return re.sub(r"_desc-[a-zA-Z0-9]+_[a-z]+\.nii\.gz$", "_desc-brain_mask.nii.gz", name)
+
+
+def _n4_nodes(est_dir: Path) -> list[Path]:
+    return sorted(p.parent for p in est_dir.rglob("n4/command.txt"))
+
+
+def _n4_threads(node: Path) -> int:
+    text = (node / "_report" / "report.rst").read_text(encoding="utf-8")
+    return int(re.search(r"^\* num_threads : (\d+)$", text, re.M).group(1))  # type: ignore[union-attr]
+
+
+def _n4_check(t: cw.Tally, run: Path, fnode: Path, mine_node: Path, scratch: Path) -> bool:
+    """fMRIPrep's ``n4`` node again with ANTs (the oracle build, through the oracle cache) at
+    the node's thread count with glibc's maths, and at one thread with correctly rounded
+    maths, each followed by nipype's ``copy_header(keep_dtype=False)``: the first must give
+    fMRIPrep's file, the second larmorx's (the same node of larmorx's run). True when both
+    hold: then the files after N4 differ only by ANTs' threads and glibc."""
+    import nibabel as nb
+    from larmorx_validation.parity.ants_programs import _run_ants
+    from nipype.utils.imagemanip import copy_header
+
+    argv = (fnode / "command.txt").read_text(encoding="utf-8").split()[1:]
+    out_name = argv[argv.index("--output") + 1]
+    in_idx = argv.index("--input-image") + 1
+    src = cd.host(run, "fmriprep", argv[in_idx])
+    label = f"{run.name}/{fnode.relative_to(run / 'work').parent}"
+    ok_all = True
+    for threads, cr, want in (
+        (_n4_threads(fnode), False, fnode / out_name),
+        (1, True, mine_node / out_name),
+    ):
+        out = scratch / f"n4-{threads}-{'cr' if cr else 'glibc'}" / out_name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        args = list(argv)
+        args[in_idx] = src
+        args[args.index("--output") + 1] = str(out)
+        code, _, err = _run_ants("N4BiasFieldCorrection", args, threads, correctly_rounded=cr)
+        if code:
+            t.add("fmriprep: N4 re-run", False, f"{label}: exit {code} {err[-300:]}")
+            ok_all = False
+            continue
+        copy_header(src, str(out), keep_dtype=False)
+        a, b = nb.load(want), nb.load(out)
+        same = cd.raw(want) == cd.raw(out)
+        if not same and cr and _header_fields(a, b) == ["descrip"]:
+            # a PEPOLAR reference: larmorx's TOPUP replica writes FSL 6.0.7.23's build
+            # string, fMRIPrep's input carries its image's; N4 and copy_header keep it
+            import numpy as np
+
+            same = (_descrip(b), _descrip(a)) == FSL_DESCRIP and (
+                np.asanyarray(a.dataobj).tobytes() == np.asanyarray(b.dataobj).tobytes()
+            )
+        what = "fMRIPrep's file" if not cr else "larmorx's file"
+        t.add(
+            f"fmriprep: ANTs' N4 at {'the node threads, glibc' if not cr else 'one thread, CR'}"
+            f" = {what}",
+            same,
+            f"{label}: header {_header_fields(a, b)}",
+        )
+        ok_all &= same
+    return ok_all
+
+
+def sec_fmriprep(t: cw.Tally, scratch: Path, datasets: list[str], nt: int) -> None:
+    """``estimate_fieldmaps`` with fMRIPrep's own wiring (sdcflows 2.15's PEPOLAR graph,
+    ``wiring='2.15'``), libraries (numpy 2.2.6, SciPy 1.15.2: :data:`IMAGE_NUMPY`) and data
+    sinks (``set_qform`` on LAPACK 3.12.0, numpy 2.2.6's) against
+    fMRIPrep's own derivatives, every difference explained or reported: a NIfTI file is
+    identical, or its data are and its header differs only in ``descrip`` by FSL's build
+    string (:data:`FSL_DESCRIP`: PRELUDE's output in fMRIPrep's image against FSL 6.0.7.23's),
+    or it depends on an N4 node that :func:`_n4_check` shows to differ by ANTs' threads and
+    glibc only (the magnitude reference of a phase-difference or direct estimator, the
+    reference of a PEPOLAR one and what follows from it)."""
+    import check_pepolar as cp
+    import nibabel as nb
+
+    import larmorx.sdcflows as ls
+    from larmorx.io.nibabel_header import use_lapack
+    from larmorx.pipelines.larmorprepx import estimators as le
+
+    use_lapack("3.12.0")
+    for name in datasets:
+        run = FMRIPREP / name
+        info = cd.run_info(run)
+        sub = info["sub"]
+        opts = run_options(run)
+        ls.clear_registry()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ests = cd._fmriprep_estimators(run)
+        base = scratch / "fmriprep" / name
+        if base.exists():
+            shutil.rmtree(base)
+        subwf_name = sorted((run / "work" / "fmriprep_25_2_wf").glob(f"sub_{sub}*_wf"))[0].name
+        t0 = time.time()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            le.estimate_fieldmaps(
+                ests, {}, output_dir=base / "out", subject=sub, work_dir=base / "work" / subwf_name,
+                omp_nthreads=opts["omp_nthreads"], fallback_total_readout_time=opts["fallback"],
+                debug=opts["debug"], sloppy=opts["sloppy"], upstream_defects="reproduce", n_threads=nt,
+                numpy_version=IMAGE_NUMPY, scipy_version=IMAGE_SCIPY, fsldir=cp.fsldir(),
+                prelude_implementation="replica", topup_implementation="replica",
+                volreg_implementation="replica", wiring="2.15",
+            )  # fmt: skip
+        print(f"INFO {name}: estimate_fieldmaps (wiring 2.15) {time.time() - t0:.0f} s")
+        mine_out = base / "out"
+        fo = run / "out"
+        ids = {re.sub(r"[^a-zA-Z0-9]", "", e.bids_id): e for e in ests}
+        want = sorted(
+            p.relative_to(fo)
+            for i in ids
+            for p in fo.rglob(f"*_fmapid-{i}_*")
+            if p.is_file() and "figures" not in p.parts
+        )
+        got = sorted(p.relative_to(mine_out) for p in mine_out.rglob("*") if p.is_file())
+        t.add("fmriprep: the derivative files' names", want == got, f"{name}: {want} vs {got}")
+        n4_ok: dict[str, bool] = {}
+        for est in ests:
+            fdir = run / "work" / "fmriprep_25_2_wf" / subwf_name / "fmap_preproc_wf"
+            fdir = fdir / f"wf_{est.sanitized_id}"
+            mdir = base / "work" / subwf_name / "fmap_preproc_wf" / f"wf_{est.sanitized_id}"
+            nodes = _n4_nodes(fdir)
+            n4_ok[re.sub(r"[^a-zA-Z0-9]", "", est.bids_id)] = bool(nodes) and all(
+                _n4_check(t, run, n, mdir / n.relative_to(fdir), scratch / "n4" / name)
+                for n in nodes
+            )
+        for rel in want:
+            mine = mine_out / rel
+            if not mine.is_file():
+                continue
+            if rel.suffix == ".json":
+                # RawSources: fMRIPrep's image saw the dataset at /data
+                text = mine.read_text(encoding="utf-8").replace(
+                    info["root"].rstrip("/") + "/", "/data/"
+                )
+                t.add("fmriprep: JSON", text == (fo / rel).read_text(encoding="utf-8"), str(rel))
+                continue
+            if cd.raw(fo / rel) == cd.raw(mine):
+                t.add("fmriprep: NIfTI identical (uncompressed bytes)", True)
+                t.add(
+                    "fmriprep: NIfTI identical (gzip bytes)",
+                    (fo / rel).read_bytes() == mine.read_bytes(),
+                    str(rel),
+                )
+                print(f"INFO {name} {rel.name}: identical")
+                continue
+            a, b = nb.load(fo / rel), nb.load(mine)
+            import numpy as np
+
+            da, db = np.asanyarray(a.dataobj), np.asanyarray(b.dataobj)
+            data_same = da.dtype == db.dtype and da.tobytes() == db.tobytes()
+            fields = _header_fields(a, b)
+            fmapid = re.search(r"_fmapid-([a-zA-Z0-9]+)_", rel.name).group(1)  # type: ignore[union-attr]
+            if data_same and fields == ["descrip"]:
+                pair = (_descrip(a), _descrip(b))
+                t.add(
+                    "fmriprep: data identical, descrip = FSL's build string",
+                    pair == FSL_DESCRIP,
+                    f"{rel}: {pair}",
+                )
+                print(f"INFO {name} {rel.name}: data identical; descrip {pair[0]!r} vs {pair[1]!r}")
+                continue
+            nd = int((da != db).sum()) if da.shape == db.shape else -1
+            md = float(np.abs(a.get_fdata() - b.get_fdata()).max()) if da.shape == db.shape else -1
+            print(
+                f"INFO {name} {rel.name}: data {'identical' if data_same else 'different'}"
+                f" ({nd} of {da.size} stored values, at most {md:.4g} apart); header {fields}"
+            )
+            # the files N4 feeds: the reference and the brain mask (sdcflows' masker on N4's
+            # output); the fit of a phase-difference or direct estimator uses that mask
+            desc = re.search(r"_desc-([a-zA-Z0-9]+)_", rel.name).group(1)  # type: ignore[union-attr]
+            pepolar = "PEPOLAR" in str(ids[fmapid].method)
+            n4_fed = desc in ("magnitude", "epi", "brain") or (
+                not pepolar
+                and cd.raw(fo / rel.with_name(_brain_mask(rel.name)))
+                != cd.raw(mine_out / rel.with_name(_brain_mask(rel.name)))
+            )
+            t.add(
+                "fmriprep: a difference after an N4 node that differs by ANTs' threads and glibc only",
+                n4_fed and n4_ok.get(fmapid, False),
+                f"{name} {rel}: data {nd} values, header {fields}",
+            )  # fmt: skip
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sections", nargs="*", default=["graph", "nodes"])
@@ -834,6 +1053,8 @@ def main() -> int:
         sec_nodes(t)
     if "run" in args.sections:
         sec_run(t, scratch, args.datasets, Path(args.reference), args.threads)
+    if "fmriprep" in args.sections:
+        sec_fmriprep(t, scratch, args.datasets, args.threads)
     bad = t.report()
     print("ALL OK" if not bad else f"DIFFERENCES: {bad}")
     return 1 if bad else 0

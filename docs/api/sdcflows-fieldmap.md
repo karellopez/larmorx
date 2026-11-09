@@ -276,6 +276,39 @@ dotted names), nine phase-encoding orders and eight warps (5D and 4D, float32, f
 int16, big-endian, oblique, without sform, one slice): names, metadata and uncompressed bytes
 identical, the same errors.
 
+## Unwarping an EPI with the coefficients: `unwarp_workflow` (part B)
+
+`unwarp_workflow` is sdcflows' `init_unwarp_wf` (`workflows/apply/correction.py`, the same in
+2.15.1, 2.15.2 and 2.17.1; `python/larmorx/sdcflows/correction.py`): the target EPI's readout
+time and phase-encoding direction (`rotime`: `get_readout_time`), the target unwarped with the
+field of the coefficients (`resample`: `apply_coeffs_field`), its volumes merged into one series
+(`merge`: niworkflows' `MergeSeries`), their average without head-motion correction (`average`:
+`RobustAverage(mc_method=None)`) and the average's brain extraction (`brainextraction_wf`: N4,
+the clipping and sdcflows' `BrainExtraction`). No fMRIPrep path runs it (fMRIPrep 25.2 unwarps
+with its own steps, `lx.larmorprepx`'s BOLD field-map stage); sdcflows' users may.
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `distorted`, `metadata`, `fmap_coeff` | `inputnode` | one file (3D or 4D; a list: `TypeError`, nipype's `File` trait refuses it too); the target's BIDS metadata; one coefficient file or a list |
+| `fmap2data_xfm=None`, `data2fmap_xfm=None` | `inputnode` | an ITK transform file (or a list: the first), exclusive: a `ValueError` (SDC-26: sdcflows' graph sets both and uses `data2fmap_xfm`) |
+| `hmc_xforms=None` | `inputnode` | head-motion matrices (4 × 4 nested lists): ignored, with sdcflows' warning |
+| `jacobian=True` | `jacobian` | the Jacobian determinant's intensity correction (`init_unwarp_wf`'s default, not `ApplyCoeffsField`'s) |
+| `use_metadata_estimates=False`, `fallback_total_readout_time=None` | `use_metadata_estimates`, `fallback_total_readout_time` | `GetReadoutTime`'s `use_estimate` and `fallback` (`get_trt`'s errors: no readout time and no fallback, a `ValueError`; no `PhaseEncodingDirection`, a `KeyError`) |
+| `free_mem=None`, `omp_nthreads=1`, `debug=False` | `free_mem`, `omp_nthreads`, `debug` | `resample`'s `num_threads` (`unwarp_num_threads`: 1 with `debug`; with `free_mem`, the 5 GB threads `min(0.9 free_mem, 5 omp_nthreads)` holds, at least one; else `omp_nthreads`) and nipype's `mem_gb`: scheduling only, no change of result |
+| `out_dir=None`, `numpy_version=None`, `scipy_version=None`, `upstream_defects="fix"`, `n_threads=1` | `name` (the folder) | the nodes' folders `rotime`, `resample`, `merge`, `average`, `brainextraction_wf/{clipper_pre,n4,clipper_post,masker}` (a temporary folder without `out_dir`: the paths `None`); the libraries' releases for the percentiles, the drift's sum and the brain mask (default the newest); `upstream_defects` goes to N4 and the brain mask |
+| → `UnwarpWorkflowResult(fieldmap, fieldwarp, corrected, corrected_ref, corrected_mask, num_threads, nodes)` | `outputnode` | `fieldmap`: `<in>_field` (Hz on the target's grid); `corrected`: `<in>_sdc_merged`; `corrected_ref`, `corrected_mask`: the brain extraction's; `fieldwarp`: always `None` (SDC-25) |
+| `unwarp_num_threads(omp_nthreads=1, free_mem=None, debug=False)`, `MEM_PER_THREAD` (5) | `init_unwarp_wf`'s `num_threads`, `mem_per_thread` | |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_unwarp.py`, both kept
+environments): sdcflows 2.17.1's own `init_unwarp_wf` run by nipype (ANTs' N4 at one thread with
+correctly rounded maths as its stand-in, through the oracle cache) on three fMRIPrep oracle runs'
+coefficients applied to their BOLD references with the runs' `boldref -> fmap` transforms
+(ds005752's direct field map, ds006736's PEPOLAR, ds000228's SyN), a 4-D target with head-motion
+matrices, the transform inverted (`fmap2data_xfm`) without the Jacobian, a fallback readout time,
+the metadata's estimates, thread settings, and four errors: every node file identical (data and
+header bytes), no other file, the outputs at sdcflows' places, the same refusals; the
+`resample` node's `num_threads` and `mem_gb` for 48 settings.
+
 ## The field map's registration to the EPI (part B)
 
 `coeff2epi_workflow` is sdcflows' `init_coeff2epi_wf` (`python/larmorx/sdcflows/registration.py`;
@@ -490,6 +523,8 @@ changed) a result. Rules A to D and the evidence:
 | SDC-22 | `get_workflow` and `init_fmap_preproc_wf` pass every keyword argument on to the estimator's `init_*_wf`, which ignores the ones it does not take: a misspelt option (`slopy=True`) is ignored without a word | a `TypeError` for an argument no estimator workflow takes (rule B); the others are passed to the workflows that take them, as sdcflows does | `estimator_workflow`, `fmap_preproc_workflow` |
 | SDC-23 | `init_3dQwarp_wf` connects `inputnode.in_reference` to the reference's resampling, a field its `inputnode` does not have (`in_data`, `metadata`): its `fmap_ref` can never be computed | (the workflow waits for `3dQwarp`: `NotImplementedError`); when ported, a clear error (rule B) | `qwarp_workflow` |
 | SDC-24 | `_qwarp2ants` squeezes every axis of length one before it adds the vector axis: the warp of a one-slice (or one-row) image loses that spatial axis and becomes a 4D image ANTs does not read as a displacement field | only the axes after the third dropped (rule A) | `qwarp2ants` |
+| SDC-25 | `init_unwarp_wf`'s `fieldwarp` output (the displacement field, says its docstring) is connected to nothing: nipype leaves it undefined | kept (rule C: no caller reads it): `None`; the displacement field of the same coefficients is `B0FieldTransform.to_displacements` | `unwarp_workflow` |
+| SDC-26 | `init_unwarp_wf` given both `fmap2data_xfm` and `data2fmap_xfm`: `ApplyCoeffsField` declares them exclusive, but the graph's connections set both (nipype's `xor` is not checked there) and `_run_interface` uses `data2fmap_xfm`, ignoring the other without a word | a `ValueError` (rule B) | `unwarp_workflow` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

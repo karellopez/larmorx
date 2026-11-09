@@ -299,8 +299,11 @@ file:
   environments. **And on ds005752's direct view** (relay 9): the B-spline fit's field (the
   estimator's `fmap`) is fMRIPrep's in every voxel (0.067 Hz apart on the AVX-512 run), the
   merges, `clipper_pre` and the brain mask fMRIPrep's files, the BOLD steps (8 fields, resampled
-  path) and fits identical in both environments. The three re-made SyN runs: the part's notes,
-  as they finish.
+  path) and fits identical in both environments. **And on two of the three SyN runs** (relay 10:
+  ds000228's and ds004884's, re-made): every node of the SyN preprocessing and estimation fed
+  fMRIPrep's inputs is fMRIPrep's file, the B-spline fit of the field included (none of its 2,548
+  coefficients equal on the AVX-512 run), and the BOLD steps (4 and 8 fields, resampled path) and
+  fits identical in both environments; ds005003's: the part's notes, when it finishes.
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 

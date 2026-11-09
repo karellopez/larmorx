@@ -24,6 +24,7 @@ pub mod nitransforms;
 pub mod numpy_linalg;
 pub mod openblas;
 pub mod resample_series;
+pub mod scipy_linalg;
 
 pub use bspline::BSplineTransform;
 pub use field::{DisplacementField, FieldData};

@@ -253,7 +253,7 @@ pub fn lu_sign_and_diagonal3(m: &[[f64; 3]; 3]) -> Option<(f64, [f64; 3])> {
 /// elements.
 // The loops keep getf2_k's indices, so the port can be checked line by line.
 #[allow(clippy::needless_range_loop)]
-fn getf2<const N: usize>(a: &mut [[f64; N]; N], ipiv: &mut [usize; N]) -> usize {
+pub(crate) fn getf2<const N: usize>(a: &mut [[f64; N]; N], ipiv: &mut [usize; N]) -> usize {
     let mut info = 0;
     for j in 0..N {
         // Apply the earlier interchanges to column j.

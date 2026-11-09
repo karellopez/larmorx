@@ -31,11 +31,12 @@ nibabel's as nilearn runs it:
 - ``_gen_reference`` then sets the qform and sform of the new affine with the sform's code (2
   when it was 1) and writes ``descrip``.
 
-One step is not bit for bit: nilearn inverts the image's affine with ``scipy.linalg.inv``
-(LAPACK ``getrf`` and ``getri`` through SciPy's own OpenBLAS), whose last bits differ from
-numpy's ``inv`` used here in tiny entries. The inverse only places the sampling points (not the
-grid or the header), and a nearest-neighbour value changes only when a point lies within about
-1e-12 voxel of a half-voxel boundary; no such case was found (``check_sampling_reference.py``).
+- nilearn inverts the image's affine twice: with ``np.linalg.inv`` for the bounds
+  (:func:`larmorx.transforms._linalg.inv`, numpy's OpenBLAS ``dgesv``) and with
+  ``scipy.linalg.inv`` for the sampling points (:func:`larmorx.transforms._linalg.scipy_inv`:
+  SciPy 1.18.1's structure detection, ``trtri`` for a plumb affine and ``getrf``/``getri`` for
+  an oblique one, or 1.15's ``getrf``/``getri`` with ``scipy_version``, through SciPy's own
+  OpenBLAS; their last bits differ from numpy's in tiny entries).
 """
 
 from __future__ import annotations
@@ -244,7 +245,7 @@ def resample_img_nearest(
     if np.all(np.array(target_shape) == shape[:3]) and np.allclose(target_affine, affine):
         return img
     data = np.asanyarray(img.data)
-    from larmorx.transforms._linalg import inv, matmul
+    from larmorx.transforms._linalg import inv, matmul, scipy_inv
 
     if target_affine.shape == (3, 3):
         missing_offset = True
@@ -277,7 +278,10 @@ def resample_img_nearest(
         transform_affine = np.eye(4)
     else:
         # nilearn: np.dot(scipy.linalg.inv(affine), target_affine) (see the module)
-        transform_affine = matmul(inv(affine), target_affine)
+        transform_affine = matmul(
+            scipy_inv(affine, scipy_version=scipy_version, upstream_defects=upstream_defects),
+            target_affine,
+        )
     A = transform_affine[:3, :3]
     b = transform_affine[:3, 3]
     target_shape = tuple(int(n) for n in target_shape)

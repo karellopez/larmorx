@@ -374,6 +374,8 @@ defects! {
         "markers and labels are read as 32-bit C ints: an int64 marker 2**32 + 5 is 5, 2**31 a background marker";
     SCI_16 = "SCI-16", "SciPy watershed_ift", true,
         "the byte offsets are 32-bit C ints: above 2 GiB of input or output it reads and writes outside its arrays";
+    SCI_18 = "SCI-18", "SciPy linalg.inv", true,
+        "SciPy 1.18's inverse of a general matrix whose norm overflows (its largest row sum is infinite) returns the LU factors: the condition estimate (LAPACK gecon) stops with info -5 and the inverse (getri) is skipped without an error";
     SDC_01 = "SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,

@@ -322,6 +322,52 @@ fn linalg_inv4<'py>(py: Python<'py>, a: PyReadonlyArray3<'_, f64>) -> PyResult<I
     Ok((to_stack(py, &out), PyArray1::from_vec(py, singular)))
 }
 
+/// `scipy.linalg.inv` of a float64 4×4 matrix as SciPy `scipy_version` ("1.18.1", or a 1.15
+/// release) computes it (`larmorx_transform::scipy_linalg::inv4`; finite input, checked by the
+/// caller): `(structure, status, inverse, lu, rcond)` with `status` one of "ok",
+/// "ill_conditioned" (the diagonal path's warning, `rcond` the value SciPy prints),
+/// "estimate_needed", "singular", "norm_overflow" (SCI-18: `lu` is what SciPy returns) and
+/// "symmetric_not_ported".
+#[pyfunction]
+fn linalg_scipy_inv4<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'_, f64>,
+    scipy_version: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    use larmorx_transform::scipy_linalg::{self, Condition, Outcome, ScipyRelease};
+    let m = mat4(&a)?;
+    let release = match scipy_version.split('.').take(2).collect::<Vec<_>>().as_slice() {
+        ["1", "15"] => ScipyRelease::V1_15,
+        ["1", "18"] => ScipyRelease::V1_18,
+        _ => {
+            return Err(PyValueError::new_err(format!(
+                "scipy_version must be a 1.15 or 1.18 release, not {scipy_version:?}"
+            )));
+        }
+    };
+    let (structure, outcome) = scipy_linalg::inv4(&m, release);
+    let mat = |x: &Mat4| -> Bound<'py, PyAny> {
+        PyArray::from_owned_array(py, Array2::from_shape_fn((4, 4), |(i, j)| x[i][j])).into_any()
+    };
+    let none = || py.None().into_bound(py);
+    let (status, inverse, lu, rcond) = match outcome {
+        Outcome::Inverse(x, Condition::WellConditioned) => ("ok", mat(&x), none(), 0.0),
+        Outcome::Inverse(x, Condition::IllConditioned(r)) => ("ill_conditioned", mat(&x), none(), r),
+        Outcome::Inverse(x, Condition::EstimateNeeded) => ("estimate_needed", mat(&x), none(), 0.0),
+        Outcome::Singular => ("singular", none(), none(), 0.0),
+        Outcome::NormOverflow { lu, inverse } => ("norm_overflow", mat(&inverse), mat(&lu), 0.0),
+        Outcome::SymmetricNotPorted => ("symmetric_not_ported", none(), none(), 0.0),
+    };
+    let items: Vec<Bound<'py, PyAny>> = vec![
+        structure.name().into_pyobject(py)?.into_any(),
+        status.into_pyobject(py)?.into_any(),
+        inverse,
+        lu,
+        rcond.into_pyobject(py)?.into_any(),
+    ];
+    PyTuple::new(py, items)
+}
+
 /// nibabel's `io_orientation` polar step for a 3×3 matrix of unit columns
 /// (`larmorx_transform::nitransforms::closest_orthogonal`).
 #[pyfunction]
@@ -345,6 +391,7 @@ fn linalg_closest_orthogonal<'py>(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(linalg_matmul4, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_inv4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_scipy_inv4, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_closest_orthogonal, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_ndcoords, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_map, m)?)?;

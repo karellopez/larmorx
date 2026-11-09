@@ -2,3 +2,9 @@ file	bytes	sha256	package	version	read_by
 standard/MNI152_T1_2mm.nii.gz	1406977	0585cd056bf5ccfb8bf97a5f6a66082d4e7caad525718fc11e40d80a827fcb92	fsl-data_standard	2208.0	bet -S, -B, -A, -A2; standard_space_roi
 standard/MNI152_T1_2mm_brain_mask_dil.nii.gz	11132	342d41e1c445d87a812ca288786a116306e96a5595a198e46ba7e7515d4f221c	fsl-data_standard	2208.0	bet -S, -B; standard_space_roi -b
 standard/MNI152_T1_2mm_eye_mask.nii.gz	2788	5ce2da5f524da4562d2274192010c69e152b83166f214ac75dbcc5a778493ad5	fsl-data_standard	2208.0	bet -S
+etc/flirtsch/b02b0.cnf	997	9833bcbaa60c1550457dd7149a15b88040562afecd1e05aae908af1517a8dcb9	fsl-topup	2203.5	topup --config=b02b0
+etc/flirtsch/b02b0_1.cnf	1002	3254d0f1aca3e2c810dead5326c781d6a496fd491ecc29412f89ee07fb1eb041	fsl-topup	2203.5	topup --config=b02b0_1; sdcflows 2.17.1's PEPOLAR estimate (lx.sdcflows.select_topup_config)
+etc/flirtsch/b02b0_2.cnf	997	9833bcbaa60c1550457dd7149a15b88040562afecd1e05aae908af1517a8dcb9	fsl-topup	2203.5	topup --config=b02b0_2; sdcflows 2.17.1's PEPOLAR estimate (lx.sdcflows.select_topup_config)
+etc/flirtsch/b02b0_4.cnf	997	488a09c3d6bc60eb41d75355253a02c510c6942354f4c317075ae86e423b7c1a	fsl-topup	2203.5	topup --config=b02b0_4; sdcflows 2.17.1's PEPOLAR estimate (lx.sdcflows.select_topup_config)
+etc/flirtsch/b02b0_7T.cnf	1072	93a84f65f2d3b02cad89ac2dd6344e0afc5e91a5256a392d1859ecf5401ec932	fsl-topup	2203.5	topup --config=b02b0_7T
+etc/flirtsch/test_acqp.cnf	1101	c6f3e4ce7a955c4f9daa6c7b62cc231c774ebf5f33411b6545b0a315a3f06204	fsl-topup	2203.5	topup --config=test_acqp

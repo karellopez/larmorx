@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Part of larmorx-nc (FSL Licence terms; see LICENSE). Copyright 2026 Karel Lopez Vilaret.
-//! FSL's standard images the larmorx-nc wheel ships (the user's decision of 2026-11-04,
+//! FSL's standard images and topup's settings files the larmorx-nc wheel ships (the user's
+//! decisions of 2026-11-04 and 2026-11-09,
 //! `crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/README.md`): the committed copy holds
-//! exactly the images of its `MANIFEST.tsv`, unchanged, with FSL's Licence and MNI's notice;
-//! they are the images the replicated scripts ask for; maturin installs the directory as the
-//! wheel's data; and the program finds them beside itself, without any FSL installation.
+//! exactly the files of its `MANIFEST.tsv`, unchanged, with FSL's Licence and MNI's notice;
+//! they are the images the replicated scripts ask for and topup's six settings files; maturin
+//! installs the directory as the wheel's data; and the program finds them beside itself, without
+//! any FSL installation.
 
 use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use larmorx_nc_core::fsldata::{self, BUNDLED_IMAGES, Source};
+use larmorx_nc_core::fsldata::{self, BUNDLED_IMAGES, BUNDLED_SETTINGS, Source};
 use larmorx_nc_core::settings::Settings;
 use sha2::{Digest, Sha256};
 
@@ -57,11 +59,12 @@ fn the_copy_is_the_manifest_unchanged() {
     for line in lines {
         let f: Vec<&str> = line.split('\t').collect();
         assert_eq!(f.len(), 6, "{line}");
-        assert_eq!(
-            (f[3], f[4]),
-            ("fsl-data_standard", "2208.0"),
-            "{line}: FSL 6.0.7.23's data package"
-        );
+        let package = if f[0].starts_with("etc/flirtsch/") {
+            ("fsl-topup", "2203.5")
+        } else {
+            ("fsl-data_standard", "2208.0")
+        };
+        assert_eq!((f[3], f[4]), package, "{line}: FSL 6.0.7.23's package");
         let data = std::fs::read(dir.join(f[0])).unwrap_or_else(|e| panic!("{}: {e}", f[0]));
         assert_eq!(data.len().to_string(), f[1], "{}: size", f[0]);
         let digest: String = Sha256::digest(&data)
@@ -71,11 +74,12 @@ fn the_copy_is_the_manifest_unchanged() {
         assert_eq!(digest, f[2], "{} changed", f[0]);
         listed.insert(f[0].to_owned());
     }
-    // the images the scripts read, and no other
-    let images: BTreeSet<String> = BUNDLED_IMAGES
+    // the images the scripts read and topup's settings files, and no other
+    let mut images: BTreeSet<String> = BUNDLED_IMAGES
         .iter()
         .map(|r| format!("{r}.nii.gz"))
         .collect();
+    images.extend(BUNDLED_SETTINGS.iter().map(|r| (*r).to_owned()));
     assert_eq!(listed, images);
     let mut present = BTreeSet::new();
     files_below(&dir, "", &mut present);
@@ -95,6 +99,8 @@ fn the_copy_is_the_manifest_unchanged() {
         "Copyright (C) 1993-2009 Louis Collins, McConnell Brain Imaging Centre, Montreal",
         "fsl-data_standard 2208.0",
         "2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a",
+        "fsl-topup 2203.5",
+        "24381a8ab0d7410bc86c440a57666a9c166aef3a48fcf0fb1080a81a60d8909f",
     ] {
         assert!(notice.contains(s), "NOTICE lacks {s:?}");
     }
@@ -237,4 +243,112 @@ fn the_program_finds_the_copy_beside_itself() {
         dims(&work.join("out_tmp_standard_mask.nii.gz")),
         [91, 109, 91]
     );
+}
+
+/// A pair of 16 × 16 × 8 float32 volumes of 3 mm voxels (a blob one voxel up and one down along
+/// y), as `.nii`, and their acquisition parameters.
+fn pair(dir: &Path) {
+    let (nx, ny, nz) = (16usize, 16usize, 8usize);
+    let mut h = vec![0u8; 352];
+    h[0..4].copy_from_slice(&348i32.to_le_bytes());
+    let dims: [i16; 8] = [4, nx as i16, ny as i16, nz as i16, 2, 1, 1, 1];
+    for (k, d) in dims.iter().enumerate() {
+        h[40 + 2 * k..42 + 2 * k].copy_from_slice(&d.to_le_bytes());
+    }
+    h[70..72].copy_from_slice(&16i16.to_le_bytes());
+    h[72..74].copy_from_slice(&32i16.to_le_bytes());
+    for (k, p) in [1.0f32, 3.0, 3.0, 3.0, 1.0].iter().enumerate() {
+        h[76 + 4 * k..80 + 4 * k].copy_from_slice(&p.to_le_bytes());
+    }
+    h[108..112].copy_from_slice(&352f32.to_le_bytes());
+    h[112..116].copy_from_slice(&1f32.to_le_bytes());
+    h[344..348].copy_from_slice(b"n+1\0");
+    for shift in [1.0f32, -1.0] {
+        for k in 0..nz {
+            for j in 0..ny {
+                for i in 0..nx {
+                    let (x, y, z) = (i as f32 - 7.5, j as f32 - 7.5 + shift, k as f32 - 3.5);
+                    let v = (400.0 - 4.0 * (x * x + y * y + 2.0 * z * z)).max(0.0) + 10.0;
+                    h.extend_from_slice(&v.to_le_bytes());
+                }
+            }
+        }
+    }
+    std::fs::write(dir.join("b0.nii"), h).unwrap();
+    std::fs::write(dir.join("acq.txt"), "0 1 0 0.05\n0 -1 0 0.05\n").unwrap();
+}
+
+/// topup's `--config=test_acqp` (one of FSL's settings files, by its name) in an installation's
+/// layout without `FSLDIR`: without the copy, FSL-121's clear message (FSL's own places only);
+/// with it, the settings are read from the copy (the log lists `test_acqp.cnf`'s levels; one
+/// iteration per level from the command line, which wins over the file) and the run ends.
+#[test]
+fn topup_finds_its_settings_in_the_copy() {
+    let root = tempfile::tempdir().unwrap();
+    let prefix = root.path().join("prefix ~1");
+    let bin = prefix.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let exe = bin.join(Path::new(EXE).file_name().unwrap());
+    if std::fs::hard_link(EXE, &exe).is_err() {
+        std::fs::copy(EXE, &exe).unwrap();
+    }
+    let work = root.path().join("work");
+    std::fs::create_dir_all(&work).unwrap();
+    pair(&work);
+    let run = || {
+        let o = Command::new(&exe)
+            .args([
+                "fsl",
+                "topup",
+                "--imain=b0",
+                "--datain=acq.txt",
+                "--config=test_acqp",
+                "--miter=1",
+                "--out=tu",
+                "--logout=tu.log",
+                "--nthr=1",
+            ])
+            .current_dir(&work)
+            .env_remove("FSLDIR")
+            .env_remove(fsldata::ENV)
+            .env_remove("LARMORX_UPSTREAM_DEFECTS")
+            .env("FSLOUTPUTTYPE", "NIFTI_GZ")
+            .env("OMP_NUM_THREADS", "1")
+            .output()
+            .unwrap();
+        (
+            o.status.code(),
+            String::from_utf8_lossy(&o.stderr).into_owned(),
+        )
+    };
+    let (code, stderr) = run();
+    assert_eq!(code, Some(1), "{stderr}");
+    assert!(
+        stderr.contains("--config=test_acqp: no such file here, and FSLDIR is unset"),
+        "{stderr}"
+    );
+    assert!(!work.join("tu.log").exists());
+    let to = prefix.join("share/larmorx-nc/fsl-data");
+    let mut files = BTreeSet::new();
+    files_below(&copy_dir(), "", &mut files);
+    for f in &files {
+        let dst = to.join(f);
+        std::fs::create_dir_all(dst.parent().unwrap()).unwrap();
+        std::fs::copy(copy_dir().join(f), dst).unwrap();
+    }
+    let (code, stderr) = run();
+    assert_eq!(code, Some(0), "{stderr}");
+    let log = std::fs::read_to_string(work.join("tu.log")).unwrap();
+    for line in [
+        "--warpres=20,14\n",
+        "--subsamp=2,2\n",
+        "--fwhm=8,4\n",
+        "--miter=1\n",
+        "--lambda=0.005,0.0001\n",
+        "--fout=field_test\n",
+        "--iout=iout_test\n",
+    ] {
+        assert!(log.contains(line), "{line:?} not in the log:\n{log}");
+    }
+    assert!(work.join("field_test.nii.gz").exists());
 }

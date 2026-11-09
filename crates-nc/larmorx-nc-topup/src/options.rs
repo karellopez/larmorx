@@ -4,7 +4,8 @@
 // modified from the originals. Distributed under the FSL Licence (see LICENSE).
 //! topup's command line (`parse_topup_command_line`, `topup_clp`): the options, the
 //! configuration file (`--config`: a name, a name with `.cnf`, or either in
-//! `$FSLDIR/etc/flirtsch/`; options given on the command line take precedence), the
+//! `$FSLDIR/etc/flirtsch/`, then in larmorx-nc's copy of FSL's settings files; options given on
+//! the command line take precedence), the
 //! acquisition-parameter file, the checks of every setting, the per-level settings (a single
 //! value applies to every level) and the log file of the parsed settings.
 
@@ -327,8 +328,20 @@ fn check_exist(fname: &str) -> bool {
 }
 
 /// `existing_conf_file(cfname)`: `Err` is the exception of `std::string(getenv("FSLDIR"))`
-/// when `FSLDIR` is not set (libstdc++'s text).
+/// when `FSLDIR` is not set (libstdc++'s text). After FSL's own places, a name without a
+/// directory is looked for in larmorx-nc's copy of FSL's settings files
+/// ([`larmorx_nc_core::fsldata::bundled`]`/etc/flirtsch/`, as named, then with `.cnf`; the user's
+/// decision of 2026-11-09), so that `--config=b02b0` works without an FSL installation.
 fn existing_conf_file(cfname: &str, fsl: &Settings) -> Result<String, String> {
+    existing_conf_file_in(cfname, fsl, larmorx_nc_core::fsldata::bundled())
+}
+
+/// [`existing_conf_file`] with larmorx-nc's copy given (tests).
+fn existing_conf_file_in(
+    cfname: &str,
+    fsl: &Settings,
+    bundled: Option<std::path::PathBuf>,
+) -> Result<String, String> {
     if check_exist(cfname) {
         return Ok(cfname.to_owned());
     }
@@ -339,8 +352,20 @@ fn existing_conf_file(cfname: &str, fsl: &Settings) -> Result<String, String> {
         }
     }
     if path(cfname).is_empty() {
+        // larmorx-nc's copy: as named, then with `.cnf`
+        let in_copy = || {
+            let dir = bundled.as_ref()?.join("etc").join("flirtsch");
+            let e = dir.join(cfname);
+            if e.is_file() {
+                return Some(e.to_string_lossy().into_owned());
+            }
+            let e2 = dir.join(format!("{cfname}.cnf"));
+            (extension(cfname).is_empty() && e2.is_file())
+                .then(|| e2.to_string_lossy().into_owned())
+        };
         let Some(fsldir) = fsl.get("FSLDIR") else {
-            return Err("basic_string: construction from null is not valid".to_owned());
+            return in_copy()
+                .ok_or_else(|| "basic_string: construction from null is not valid".to_owned());
         };
         let e = format!("{fsldir}/etc/flirtsch/{cfname}");
         if check_exist(&e) {
@@ -351,6 +376,9 @@ fn existing_conf_file(cfname: &str, fsl: &Settings) -> Result<String, String> {
             if check_exist(&e2) {
                 return Ok(e2);
             }
+        }
+        if let Some(e) = in_copy() {
+            return Ok(e);
         }
     }
     Ok(String::new())
@@ -808,4 +836,47 @@ fn log_opt(p: &OptionParser, r: &Parsed, key: &str, log: &mut String) {
         .expect("a topup option");
     log.push_str(&p.opts[i].print(&r.states[i]));
     log.push('\n');
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FSL's places first (as named, `.cnf`, `$FSLDIR/etc/flirtsch/`), then larmorx-nc's copy
+    /// for a name without a directory; FSLDIR unset with nothing in the copy keeps FSL's text.
+    #[test]
+    fn the_settings_file_fsl_then_larmorx_ncs_copy() {
+        let root = tempfile::tempdir().unwrap();
+        let (fsldir, copy) = (root.path().join("fsl ~1"), root.path().join("share"));
+        for (dir, name) in [(&fsldir, "a.cnf"), (&copy, "a.cnf"), (&copy, "b.cnf")] {
+            let d = dir.join("etc").join("flirtsch");
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join(name), "--miter=1\n").unwrap();
+        }
+        let path_of = |dir: &std::path::Path, name: &str| {
+            dir.join("etc")
+                .join("flirtsch")
+                .join(name)
+                .to_string_lossy()
+                .into_owned()
+        };
+        let set = Settings::new().with("FSLDIR", &fsldir.to_string_lossy());
+        let unset = Settings::new().without("FSLDIR");
+        let fsl_a = format!("{}/etc/flirtsch/a.cnf", fsldir.to_string_lossy());
+        let got = |name: &str, s: &Settings, copy: Option<&std::path::Path>| {
+            existing_conf_file_in(name, s, copy.map(|p| p.to_path_buf()))
+        };
+        assert_eq!(got("a", &set, Some(&copy)), Ok(fsl_a.clone()));
+        assert_eq!(got("a.cnf", &set, Some(&copy)), Ok(fsl_a));
+        assert_eq!(got("b", &set, Some(&copy)), Ok(path_of(&copy, "b.cnf")));
+        assert_eq!(got("b.cnf", &set, Some(&copy)), Ok(path_of(&copy, "b.cnf")));
+        assert_eq!(got("b", &set, None), Ok(String::new()));
+        assert_eq!(got("c", &set, Some(&copy)), Ok(String::new()));
+        assert_eq!(got("a", &unset, Some(&copy)), Ok(path_of(&copy, "a.cnf")));
+        let fsl_text = Err("basic_string: construction from null is not valid".to_owned());
+        assert_eq!(got("c", &unset, Some(&copy)), fsl_text);
+        assert_eq!(got("a", &unset, None), fsl_text);
+        // a name with a directory is never looked for in the copy
+        assert_eq!(got("x/b", &set, Some(&copy)), Ok(String::new()));
+    }
 }

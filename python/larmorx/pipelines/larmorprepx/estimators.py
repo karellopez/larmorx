@@ -121,19 +121,27 @@ def fmriprep_layout(
     *,
     bids_database_dir: Any = None,
     pybids_version: str = "0.22.0",
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Any:
     """The dataset indexed as fMRIPrep's ``config.execution.init`` indexes it: ``code``,
     ``stimuli``, ``sourcedata``, ``models`` and the subjects' ``beh``, ``dwi``, ``eeg``,
     ``ieeg``, ``meg`` and ``perf`` folders ignored, and, with ``participant_label`` and no
     ``bids_database_dir`` (fMRIPrep's default), every other subject. The root must hold a valid
-    ``dataset_description.json`` (pybids' ``validate=True`` root checks)."""
+    ``dataset_description.json`` (pybids' ``validate=True`` root checks). ``upstream_defects``:
+    PIPE-37, the files' entities from their paths below the root (``"fix"``) or, as pybids,
+    from their absolute paths (``"reproduce"``)."""
     from larmorx.bids import BIDSLayout, BIDSLayoutIndexer
 
     ignore = list(FMRIPREP_IGNORE)
     if participant_label and bids_database_dir is None:
         ignore.append(re.compile(r"sub-(?!(" + "|".join(participant_label) + r")(\b|_))"))
     indexer = BIDSLayoutIndexer(validate=False, ignore=ignore)
-    return BIDSLayout(str(bids_dir), indexer=indexer, pybids_version=pybids_version)
+    return BIDSLayout(
+        str(bids_dir),
+        indexer=indexer,
+        pybids_version=pybids_version,
+        upstream_defects=upstream_defects,
+    )
 
 
 def get_estimator(layout: Any, fname: str, *, registry: Any = None) -> Any:

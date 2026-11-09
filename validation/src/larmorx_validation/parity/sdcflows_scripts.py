@@ -461,9 +461,10 @@ SUITES: dict[str, dict[str, Script]] = {
         ),
         "estimators": _s(
             "check_estimators.py",
-            ["--sections", "index,wrangler,units,fmriprep,runs,apps"],
+            ["--sections", "index,wrangler,units,fmriprep,runs,apps,roots"],
             "standard",
-            "lx.bids' index, sdcflows' wrangler and estimators, fMRIPrep's estimator "
+            "lx.bids' index, sdcflows' wrangler and estimators (datasets below folders named "
+            "like entities too: SDC-45, PIPE-37), fMRIPrep's estimator "
             "selection on every oracle run",
             gib=8,
             scratch=True,

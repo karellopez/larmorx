@@ -358,6 +358,8 @@ defects! {
         "an image constant between its percentiles is divided by its maximum, 0: a NaN image, converted to int16 or uint8 by an undefined conversion (0 on x86-64)";
     PIPE_34 = "PIPE-34", "niworkflows RobustAverage", true,
         "a gathered volume whose mean is 0 after the clipping is divided by it: NaN or infinite voxels, registered and averaged";
+    PIPE_37 = "PIPE-37", "pybids BIDSLayout", true,
+        "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
@@ -454,6 +456,8 @@ defects! {
         "brain_masker's rough mask without a connected component makes the background the largest component, so the whole image is taken as the brain (a constant image divides 0 by 0)";
     SDC_38 = "SDC-38", "sdcflows", true,
         "brain_masker with no brain seed left after the rough mask's erosion takes the background's probability as the brain's";
+    SDC_45 = "SDC-45", "sdcflows", true,
+        "FieldmapFile takes its entities from the file's absolute path, where pybids' derivatives patterns (den-, res-, desc-, label-, ...) have no separator before them: a dataset below a folder such as golden-clone or andres-lab gives every file den or res, and the fieldmap-less search queries the layout with them and stops (ValueError: 'den' is not a recognized entity)";
     SKI_01 = "SKI-01", "scikit-image random_walker", true,
         "with a mask (negative labels or isolated seeds) the Laplacian's nodes are numbered by the remaining edges' ends but the labels by the mask, so a mask pixel without a neighbour in it shifts every later node and the system pairs labels with the wrong pixels";
     SKI_02 = "SKI-02", "scikit-image match_histograms", true,

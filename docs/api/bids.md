@@ -23,7 +23,7 @@ layout.get(suffix="epi", IntendedFor=lx.bids.Query.REQUIRED)
 
 | larmorx | pybids 0.22.0 | Notes |
 |---|---|---|
-| `BIDSLayout(root, validate=True, *, derivatives=False, config=None, sources=None, regex_search=False, indexer=None, is_derivative=False, pybids_version="0.22.0")` | `BIDSLayout(root, validate, derivatives, config, sources, regex_search, database_path, reset_database, indexer, is_derivative)` | `validate`: the root's `dataset_description.json` checks (pybids' messages); `config`: `"bids"`, `"derivatives"`, a JSON file (`lx.bids.NIPREPS_CONFIG`) or a dictionary (`"bids-schema"`: `NotImplementedError`); `pybids_version="0.20.0"` (fMRIPrep 25.2.6's image): `get_entities`' order and no named-dataset warning. No `database_path`/`reset_database` (no database); after `validate`, keywords only |
+| `BIDSLayout(root, validate=True, *, derivatives=False, config=None, sources=None, regex_search=False, indexer=None, is_derivative=False, pybids_version="0.22.0", upstream_defects="fix")` | `BIDSLayout(root, validate, derivatives, config, sources, regex_search, database_path, reset_database, indexer, is_derivative)` | `validate`: the root's `dataset_description.json` checks (pybids' messages); `config`: `"bids"`, `"derivatives"`, a JSON file (`lx.bids.NIPREPS_CONFIG`) or a dictionary (`"bids-schema"`: `NotImplementedError`); `pybids_version="0.20.0"` (fMRIPrep 25.2.6's image): `get_entities`' order and no named-dataset warning; `upstream_defects`: PIPE-37 (below; the derivatives layouts it adds take the same). No `database_path`/`reset_database` (no database); after `validate`, keywords only |
 | `BIDSLayoutIndexer(validate=False, ignore=None, force_index=None, index_metadata=True, config_filename="layout_config.json", **filters)` | the same | `ignore`/`force_index`: paths relative to the root (as `^/<path>.*`) or compiled expressions searched in `/`-rooted relative paths; default `^/(code|models|sourcedata|stimuli)`; dot files always ignored; `derivatives/` never walked; per-folder `layout_config.json`; `validate=True` (the BIDS validator's file rules): `NotImplementedError` |
 | `layout.get(return_type="object", target=None, scope="all", regex_search=False, invalid_filters="error", **filters)` | the same | `"object"`, `"file"`/`"filename"`, `"id"` (with `target`), `"dir"`; filter values: a value, a list (any), `None`/`Query.NONE` (absent), `Query.REQUIRED`/`ANY` (present), `Query.OPTIONAL` (no filter), `[]` (no filter); `regex_search`: case-insensitive `re.search` of every filter (SQLite's `REGEXP` as pybids registers it); a filter is first converted to its entity's type, and an integer entity compares the stored text as SQLite's `CAST(... AS INTEGER)` (`run=1` and `run="1"` match `run-01`); metadata compare as text (`EchoTime=0.03` against `"0.03"`); `extension` gets its leading dot (with the `bids` configuration); results in pybids' natural order |
 | `layout.get_<entity>s(**filters)` (`get_subjects`, `get_sessions`, `get_B0FieldIdentifiers`, ...) | the same | `get(return_type="id", target=<entity>)`; the plural's singular by English's regular rules (pybids asks `inflect`); an unknown entity: `BIDSEntityError` |
@@ -34,8 +34,9 @@ layout.get(suffix="epi", IntendedFor=lx.bids.Query.REQUIRED)
 
 ## The details pybids' database decides, kept
 
-- Entities are searched in the **whole** path (pybids' patterns on the absolute path): a folder
-  above the dataset named `sub-x` or `ses-y` gives its value to files without one of their own.
+- Within the dataset, entities are searched in the whole path below the root (a folder named
+  `ses-y` gives its value to the files below it that have none of their own); above the root:
+  PIPE-37, below.
 - Metadata inheritance: every sidecar of the file's suffix in its folder and each folder above
   whose entities are a subset of the file's, merged from the farthest; within one folder the
   sidecars are applied in reverse natural order, so the *less* specific sidecar
@@ -46,6 +47,16 @@ layout.get(suffix="epi", IntendedFor=lx.bids.Query.REQUIRED)
   sidecar has `IntendedFor` is pybids' `KeyError`; pybids 0.22.0 warns "Skipping association for
   None" for each `bids:<name>:` URI); the associations themselves are not kept (nothing on the
   field-map paths reads them).
+
+## Upstream defects (D13)
+
+| ID | pybids does | larmorx by default |
+|---|---|---|
+| PIPE-37 | the index matches the entity patterns against each file's **absolute** path, so the folders above the dataset give its files entities: below a folder named `func`, `sub-pilot` or `run-2` every file gets `datatype` `func`, `subject` `pilot` (the participant's own label lost: queries for it find nothing) or `run` 2; with the derivatives configuration, whose `den-`, `res-`, `desc-`, `label-`, ... patterns have no separator before them, below `golden-x` or `andres-lab` every file gets `den` or `res` | the patterns matched against the path below the root (`/`-rooted, as the ignore patterns) (rule A), with an `lx.UpstreamDefectWarning` when that changed an entity; `upstream_defects="reproduce"` pybids' index. `parse_file_entities` (the function and the method) parses the path it is given, as pybids' does |
+
+Checked: `validation/investigations/sdcflows-fieldmap-b/check_estimators.py`'s `roots` section
+(datasets below `plain`, `golden-x`, `andres-lab`, `workspace-2024`, `func`, `sub-pilot`: pybids'
+index reproduced; below each, the index pybids gives below `plain`).
 
 ## Differences
 

@@ -193,3 +193,77 @@ def test_sci10_the_propagations_int8_mask():
     assert ids == ["SCI-10"] and old.sum() == 10
     _, ids = entries(lx.ndimage.binary_propagation, seed, mask=mask > 0)
     assert ids == []
+
+
+def _syn_tree(root: Path) -> Path:
+    """A participant with a T1w and a BOLD run with its phase encoding: the fieldmap-less
+    search's inputs."""
+    import nibabel as nb
+
+    for rel in ("sub-01/anat/sub-01_T1w.nii.gz", "sub-01/func/sub-01_task-rest_bold.nii.gz"):
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        nb.Nifti1Image(np.zeros((4, 4, 4), np.int16), np.eye(4)).to_filename(p)
+    meta = {"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2}
+    (root / "sub-01/func/sub-01_task-rest_bold.json").write_text(json.dumps(meta))
+    (root / "dataset_description.json").write_text('{"Name": "t", "BIDSVersion": "1.8.0"}')
+    return root
+
+
+def _search(root: Path, mode: str):
+    lay = lx.bids.BIDSLayout(root, validate=False, upstream_defects=mode)
+    found = lx.sdcflows.find_estimators(
+        layout=lay,
+        subject="01",
+        force_fmapless=True,
+        registry=lx.sdcflows.FieldmapRegistry(),
+        upstream_defects=mode,
+    )
+    return [
+        [(str(Path(f.path).relative_to(root)), f.suffix, f.entities) for f in e.sources]
+        for e in found
+    ]
+
+
+def test_sdc45_a_dataset_below_a_folder_named_like_a_derivatives_entity(tmp_path):
+    """sdcflows parses FieldmapFile's entities from the absolute path: ``golden-x`` gives every
+    file ``den`` and the fieldmap-less search stops; larmorx takes the path from the
+    participant's folder, and finds what it finds below a folder of another name."""
+    plain = _search(_syn_tree(tmp_path / "plain" / "ds"), "fix")
+    assert plain and plain[0][0][1] == "T1w"
+    root = _syn_tree(tmp_path / "golden-x" / "ds")
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError, match="'den' is not a recognized entity"):
+            _search(root, "reproduce")
+    assert {(w.message.entry, w.message.mode) for w in record} == {("SDC-45", "reproduce")}
+    found, ids = entries(_search, root, "fix")
+    assert found == plain and set(ids) == {"SDC-45"}
+    f = root / "sub-01/anat/sub-01_T1w.nii.gz"
+    assert "den" not in lx.sdcflows.FieldmapFile(f).entities
+    assert lx.sdcflows.FieldmapFile(f, upstream_defects="reproduce").entities["den"] == "x"
+
+
+def test_pipe37_a_dataset_below_a_folder_named_like_an_entity(tmp_path):
+    """pybids indexes the absolute path: below ``sub-pilot`` every file is participant
+    ``pilot`` (and ``func`` gives every file that datatype); larmorx indexes the path below the
+    root by default; ``workspace-2024`` (``space-`` needs a separator before it) changes
+    nothing."""
+
+    def index(root: Path, mode: str):
+        lay = lx.bids.BIDSLayout(root, validate=False, upstream_defects=mode)
+        return sorted((f.relpath, sorted(f.get_entities().items())) for f in lay.get())
+
+    plain = index(_syn_tree(tmp_path / "plain" / "ds"), "fix")
+    for parent, entity, value in (("sub-pilot", "subject", "pilot"), ("func", "datatype", "func")):
+        root = _syn_tree(tmp_path / parent / "ds")
+        fixed, ids = entries(index, root, "fix")
+        assert fixed == plain and ids == ["PIPE-37"]
+        old, ids = entries(index, root, "reproduce")
+        assert ids == ["PIPE-37"] and old != plain
+        assert all(dict(e)[entity] == value for _, e in old)
+    _, ids = entries(index, _syn_tree(tmp_path / "workspace-2024" / "ds"), "fix")
+    assert ids == []
+    assert _search(tmp_path / "plain" / "ds", "fix") == _search(
+        tmp_path / "sub-pilot" / "ds", "fix"
+    )

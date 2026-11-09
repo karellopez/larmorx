@@ -7980,7 +7980,7 @@ def _(ctx: Context) -> dict[str, Any]:
     js = lay.get(suffix="bold", extension=".json")[0]
     ents = lx.bids.Config.load("bids").entities
     out["misc"] = _portable([
-        lay.parse_file_entities(bold.path), lx.bids.parse_file_entities("sub-01_ses-x_desc-y_bold.nii.gz"),
+        lay.parse_file_entities("/" + bold.relpath), lx.bids.parse_file_entities("sub-01_ses-x_desc-y_bold.nii.gz"),
         js.get_dict(), js.get_json(), ents["run"].match_file(bold.path), lx.bids.listify("a"), lx.bids.listify(None),
         lx.bids.natural_sort(["a10", "a9", "B1"]), lay2.get_file("nothing"),
     ], root)  # fmt: skip
@@ -8015,13 +8015,23 @@ def _(ctx: Context) -> dict[str, Any]:
     for mode in ("fix", "reproduce"):
         results = []
         for kw in cases:
+            if (
+                mode == "reproduce"
+                and kw.get("force_fmapless")
+                and "datatype" not in kw.get("bids_filters", {})
+            ):
+                # SDC-45: sdcflows' fieldmap-less search takes entities from the folders above the
+                # dataset, so its reproduced result depends on the temporary folder's name
+                continue
             reg = lx.sdcflows.FieldmapRegistry()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 found = lx.sdcflows.find_estimators(
                     layout=lay, subject="01", registry=reg, upstream_defects=mode, **kw
                 )
-            results.append([found, [e.paths() for e in found], sorted(reg.estimators.items()), sorted((k, sorted(v)) for k, v in reg.intents.items()),
+            # reproduced, the files' entities hold the folders above the dataset (SDC-45)
+            shown = found if mode == "fix" else [(e.method.name, e.bids_id) for e in found]
+            results.append([shown, [e.paths() for e in found], sorted(reg.estimators.items()), sorted((k, sorted(v)) for k, v in reg.intents.items()),
                             lx.sdcflows.get_identifier("ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz", registry=reg)])  # fmt: skip
         out[f"wrangler_{mode}"] = _portable(results, root)
     t1 = lay.get(suffix="T1w", extension=".nii.gz")[0]
@@ -8034,6 +8044,20 @@ def _(ctx: Context) -> dict[str, Any]:
         suffixes=["bold"],
     )
     out["anat"] = _portable(specs, root)
+    # SDC-45, PIPE-37: below a folder whose name holds pybids' den- and sub- patterns, the same
+    deep = _bids_tree(Path(ctx.out("golden-x")) / "sub-pilot" / "ds")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lay2 = lx.bids.BIDSLayout(deep, validate=False)
+        again = lx.sdcflows.find_estimators(
+            layout=lay2, subject="01", registry=lx.sdcflows.FieldmapRegistry(), force_fmapless=True
+        )
+        first = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", registry=lx.sdcflows.FieldmapRegistry(), force_fmapless=True
+        )
+    out["below_entity_folders"] = _portable(again, deep)
+    if not np.array_equal(out["below_entity_folders"], _portable(first, root)):
+        raise AssertionError("SDC-45, PIPE-37: other estimators below golden-x/sub-pilot/")
     errors = []
     reg = lx.sdcflows.FieldmapRegistry()
     fmap = root / "sub-01/ses-b/fmap"

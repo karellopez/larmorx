@@ -34,6 +34,15 @@ Differences, each on purpose:
 - ``validate=True`` with the default indexer filters files with the BIDS validator, which is not
   ported: :class:`BIDSLayoutIndexer` raises ``NotImplementedError`` (fMRIPrep and sdcflows index
   with ``validate=False``; the root's checks of ``BIDSLayout(validate=True)`` are ported).
+- PIPE-37, corrected by default (``upstream_defects="reproduce"`` gives pybids' index): pybids
+  matches the entity patterns against each file's absolute path, so the folders above the
+  dataset give its files entities (below a folder ``func``, ``sub-pilot`` or ``run-2`` every file
+  gets ``datatype`` ``func``, ``subject`` ``pilot`` or ``run`` 2; with the derivatives
+  configuration, whose ``den-``, ``res-``, ``desc-``, ... patterns have no separator before them,
+  below ``golden-x`` or ``andres-lab`` every file gets ``den`` or ``res``); here they are matched
+  against the path below the root (``/``-rooted, as the ignore patterns are), with
+  :class:`~larmorx.UpstreamDefectWarning` when that changed an entity. :func:`parse_file_entities`
+  parses the path it is given, as pybids' does.
 - pybids' file associations (``get_associations``, ``get_fieldmap``, ``get_nearest``), its BIDS
   schema configuration (``config='bids-schema'``), ``write_to_file`` (``build_path`` is in
   :mod:`larmorx.bids.writing`),
@@ -53,6 +62,9 @@ from collections.abc import Iterable, Mapping
 from functools import cache, partial
 from pathlib import Path, PurePath
 from typing import Any
+
+from larmorx import _defects
+from larmorx._defects import UpstreamDefectsName
 
 __all__ = [
     "ALWAYS_IGNORE",
@@ -883,6 +895,10 @@ class BIDSLayout:
     pybids_version
         ``"0.22.0"`` (default) or ``"0.20.0"`` (fMRIPrep 25.2.6's image): the order of
         :meth:`BIDSFile.get_entities` and the warning about named-dataset URIs.
+    upstream_defects
+        ``"fix"`` (PIPE-37: the entities from the path below the root) or ``"reproduce"``
+        (pybids': from the absolute path, the folders above the dataset included); the
+        derivatives layouts it adds take the same.
     """
 
     def __init__(
@@ -897,7 +913,11 @@ class BIDSLayout:
         indexer: BIDSLayoutIndexer | None = None,
         is_derivative: bool = False,
         pybids_version: str = "0.22.0",
+        upstream_defects: UpstreamDefectsName = "fix",
     ):
+        self._upstream_defects = _defects.check(upstream_defects)
+        #: PIPE-37: (file below the root, entity, value from the absolute path, from below).
+        self._above: list[tuple[str, str, Any, Any]] = []
         if pybids_version not in PYBIDS_VERSIONS:
             raise ValueError(
                 f"pybids_version must be one of {PYBIDS_VERSIONS}, not {pybids_version!r}"
@@ -933,6 +953,7 @@ class BIDSLayout:
                 self._entities[ent.name] = ent
         _indexer = indexer or BIDSLayoutIndexer(validate=validate and not is_derivative)
         _indexer(self)
+        self._warn_above()
         if derivatives:
             if derivatives is True:
                 derivatives = root / "derivatives"
@@ -944,6 +965,7 @@ class BIDSLayout:
                 config=None,
                 regex_search=regex_search,
                 indexer=indexer,
+                upstream_defects=self._upstream_defects,
             )
 
     # -- indexing helpers --
@@ -952,14 +974,41 @@ class BIDSLayout:
 
     def _add_file(self, abs_fn: Path, entities: Mapping[str, Entity]) -> None:
         bf = _make_bidsfile(str(abs_fn), self)
+        try:  # PIPE-37: the path below the root, "/"-rooted
+            below = _relative_posix(abs_fn, self._root)
+        except ValueError:
+            below = bf.path
+        reproduce = self._upstream_defects == "reproduce"
         for e in entities.values():
-            m = e.match_file(bf.path)
+            whole = e.match_file(bf.path)  # pybids: the absolute path
+            ours = e.match_file(below) if below != bf.path else whole
+            if (whole is None) != (ours is None) or str(whole) != str(ours):
+                self._above.append((below.lstrip("/"), e.name, whole, ours))
+            m = whole if reproduce else ours
             if m is None and e.mandatory:
                 break
             if m is not None:
                 bf._tags[e.name] = _Tag(m, e._dtype)
                 self._seen(e.name, False)
         self._files[bf.path] = bf
+
+    def _warn_above(self) -> None:
+        """PIPE-37's notice: the folders above the dataset gave (or, reproduced, give) its files
+        entities."""
+        if not self._above:
+            return
+        files = sorted({a[0] for a in self._above})
+        rel, name, whole, ours = self._above[0]
+        names = sorted({a[1] for a in self._above})
+        detail = (
+            f"the folders above the dataset match the entity patterns {names} in the absolute "
+            f"paths of {len(files)} file(s) (pybids indexes {rel} with {name} {whole!r}, its "
+            f"path below the root gives {'none' if ours is None else repr(ours)})"
+        )
+        warnings.warn(
+            _defects.UpstreamDefectWarning("PIPE-37", "pybids", self._upstream_defects, detail),
+            stacklevel=3,
+        )
 
     # -- pybids' API --
     @property
@@ -1098,6 +1147,7 @@ class BIDSLayout:
             )
         kwargs["sources"] = kwargs.get("sources") or self
         kwargs.setdefault("pybids_version", self._pybids_version)
+        kwargs.setdefault("upstream_defects", self._upstream_defects)
         for name, p in deriv_paths:
             if name in self.derivatives:
                 raise BIDSDerivativesValidationError(

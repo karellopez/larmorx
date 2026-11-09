@@ -22,6 +22,8 @@ Compares, value for value (types, key order, messages):
   "Several fieldmaps" and "estimated with the following" lines.
 - ``apps``: the estimators of sdcflows 2.17.1's own BIDS-app runs (``--no-fmapless``) against
   the ``fmapid`` labels of their derivatives.
+- ``roots``: datasets below folders whose names hold pybids' entity patterns (SDC-45, PIPE-37;
+  :func:`section_roots`): both modes against pybids, sdcflows 2.17.1 and 2.15.2.
 - ``image``: pybids 0.20.0, sdcflows 2.15.1 and fMRIPrep 25.2.6 in fMRIPrep's image
   (``relay11/estimators_dump.py`` run there) against larmorx with ``pybids_version="0.20.0"``,
   ``sdcflows_version="2.15"`` and ``upstream_defects="reproduce"``.
@@ -987,9 +989,166 @@ def section_image(datasets: list[tuple[str, Path, list[str]]], scratch: Path) ->
                    [w["result"], w["log"], w["registry"]], [res, [ser.s(x) for x in cap.lines], state()])  # fmt: skip
 
 
+#: The folders the roots section puts each dataset below: none of pybids' patterns, the
+#: derivatives' unanchored ``den-`` and ``res-`` (SDC-45), ``space-`` (anchored: a control) and
+#: two of the raw configuration's anchored ones, ``func`` and ``sub-`` (PIPE-37).
+ROOT_PARENTS = ("plain", "golden-x", "andres-lab", "workspace-2024", "func", "sub-pilot")
+
+
+def _strip_parse(d: dict[str, Any]) -> dict[str, Any]:
+    """An index dump without the module's ``parse_file_entities`` of each absolute path (pybids'
+    API, which parses the path it is given in both modes)."""
+    out = dict(d)
+    out["files"] = {
+        k: {x: y for x, y in v.items() if not x.startswith("parse")} for k, v in d["files"].items()
+    }
+    return out
+
+
+def _fmriprep_get_sbrefs() -> Any:
+    """fMRIPrep 25.2.7's ``extract_entities`` and ``get_sbrefs`` from its source (PIPE-36)."""
+    from bids.utils import listify
+
+    ns: dict[str, Any] = {"listify": listify}
+    for rel, name in (
+        ("utils/bids.py", "extract_entities"),
+        ("workflows/bold/fit.py", "get_sbrefs"),
+    ):
+        src = TAGS / "fmriprep-25.2.7" / "fmriprep" / rel
+        tree = ast.parse(src.read_text(encoding="utf-8"))
+        fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
+        for arg in fn.args.args:  # the annotations name fMRIPrep's imports
+            arg.annotation = None
+        fn.returns = None
+        exec(compile(ast.Module(body=[fn], type_ignores=[]), str(src), "exec"), ns)
+    return ns["get_sbrefs"]
+
+
+def section_roots(scratch: Path) -> None:
+    """SDC-45 and PIPE-37: datasets below folders whose names hold pybids' patterns
+    (:data:`ROOT_PARENTS`): pybids' index against ``lx.bids``' reproduced, sdcflows 2.17.1's
+    search against larmorx's reproduced (the same error under ``golden-x`` and ``andres-lab``);
+    larmorx's corrected index and search below each folder against pybids' and sdcflows 2.15.2's
+    on the dataset below no such folder; and fMRIPrep's ``get_sbrefs`` (PIPE-36, not ported) on
+    each, reported."""
+    import sdcflows.utils.wrangler as w2171
+    from bids.layout import BIDSLayout as PLayout
+    from bids.layout import Query as PQ
+    from bids.layout import parse_file_entities as pparse
+    from niworkflows.utils.testing import generate_bids_skeleton
+    from sdcflows import fieldmaps as sfm
+
+    import larmorx.bids as lb
+    import larmorx.sdcflows as ls
+
+    w2152 = _load_wrangler_2152()
+    for mod in (w2171, w2152):
+        mod.reduce = dump.natural_reduce  # SDC-19
+    specs = _wrangler_specs()
+    T1w = {"suffix": "T1w"}
+    bold = {"task": "rest", "suffix": "bold",
+            "metadata": {"RepetitionTime": 0.8, "TotalReadoutTime": 0.5, "PhaseEncodingDirection": "j"}}  # fmt: skip
+    sources: list[tuple[str, Any, str]] = [
+        ("phasediff", specs["phasediff"], "01"),
+        ("pepolar", specs["pepolar"], "01"),
+        ("fmapless_sbref", {"01": {"anat": [T1w], "func": [bold, {**bold, "suffix": "sbref"}]}}, "01"),
+    ]  # fmt: skip
+    syn = [(n, r, s) for n, r, s, o in oracle_datasets() if o["use_syn"]][:1]
+    get_sbrefs = _fmriprep_get_sbrefs()
+    for parent in ROOT_PARENTS:
+        for name, spec, sub in sources + [(n, r, s) for n, r, s in syn]:
+            root = scratch / "roots" / parent / name
+            if root.exists() or root.is_symlink():
+                shutil.rmtree(root) if not root.is_symlink() else root.unlink()
+            root.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(spec, Path):
+                root.symlink_to(spec, target_is_directory=True)  # a real dataset, linked
+            else:
+                generate_bids_skeleton(str(root), spec)
+            plain = scratch / "roots" / "plain" / name
+            ser = dump.Ser({str(root): "<root>"})
+            pser = dump.Ser({str(plain): "<root>"})
+            which = "fmriprep" if isinstance(spec, Path) else "default"
+            tag = f"roots {parent}/{name}"
+            spec_kw = indexers(sub)[which]
+
+            def layouts(
+                side: str, mode: str | None = None, at: Path = root, spec_kw=spec_kw
+            ) -> Any:
+                kw: dict[str, Any] = {} if mode is None else {"upstream_defects": mode}
+                if side == "pybids":
+                    from bids.layout import BIDSLayoutIndexer as PI
+
+                    return PLayout(str(at), indexer=PI(validate=False, **spec_kw))
+                return lb.BIDSLayout(
+                    str(at), indexer=lb.BIDSLayoutIndexer(validate=False, **spec_kw), **kw
+                )
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                p, lr, lf = layouts("pybids"), layouts("larmorx", "reproduce"), layouts("larmorx")
+            pipe37 = sorted(
+                {(w.message.entry, w.message.mode) for w in caught if hasattr(w.message, "entry")}
+            )
+            pidx = dump.dump_index(p, ser, PQ, pparse)
+            report(
+                f"{tag} index reproduce",
+                pidx,
+                dump.dump_index(lr, ser, lb.Query, lb.parse_file_entities),
+            )
+            plain_idx = dump.dump_index(layouts("pybids", at=plain), pser, PQ, pparse)
+            report(f"{tag} index fix = pybids below plain/",
+                   _strip_parse(plain_idx), _strip_parse(dump.dump_index(lf, ser, lb.Query, lb.parse_file_entities)))  # fmt: skip
+            changed = _strip_parse(pidx) != _strip_parse(plain_idx)
+            want = [("PIPE-37", "fix"), ("PIPE-37", "reproduce")] if changed else []
+            report(f"{tag} PIPE-37 notices", want, pipe37)
+            if changed:
+                print(f"INFO {tag}: pybids' index differs from its index below plain/ (PIPE-37)")
+            cases = [{"subject": sub, "force_fmapless": True}, {"subject": sub}]
+            for label, find, mode, lay_o, lay_l, s_o in (
+                ("2.17.1", w2171.find_estimators, "reproduce", p, lr, ser),
+                ("2.15.2", w2152.find_estimators, "fix", layouts("pybids", at=plain), lf, pser),
+            ):
+                a = dump.dump_wrangler(
+                    find, sfm.clear_registry,
+                    lambda s_o=s_o: dump.registry_state(sfm._estimators, sfm._intents, s_o), lay_o, s_o, cases,
+                )  # fmt: skip
+                notes: list[list[str]] = []
+
+                def lfind(mode: str = mode, notes: list[list[str]] = notes, **kw: Any) -> Any:
+                    with warnings.catch_warnings(record=True) as cw:
+                        warnings.simplefilter("always")
+                        try:
+                            return ls.find_estimators(upstream_defects=mode, **kw)
+                        finally:
+                            notes.append(
+                                sorted({getattr(w.message, "entry", "") for w in cw} - {""})
+                            )
+
+                b = dump.dump_wrangler(
+                    lfind, ls.clear_registry,
+                    lambda ser=ser: dump.registry_state(ls.REGISTRY.estimators, ls.REGISTRY.intents, ser), lay_l, ser, cases,
+                )  # fmt: skip
+                for x, y, n in zip(a, b, notes, strict=True):
+                    report(f"{tag} wrangler {label} {x['case']}", x, y)
+                    if parent in ("golden-x", "andres-lab") and x["case"] == ser(cases[0]):
+                        print(f"INFO {tag} {label}: larmorx's notices {n}; sdcflows: "
+                              f"{json.dumps(x['result'])[:160]}")  # fmt: skip
+            # fMRIPrep's get_sbrefs on each BOLD run (absolute paths), pybids' layout: PIPE-36
+            runs = p.get(
+                subject=sub, suffix="bold", extension=[".nii", ".nii.gz"], return_type="file"
+            )
+            for f in runs[:1]:
+                try:
+                    out = [ser.s(x) for x in get_sbrefs([f], {}, layout=p)]
+                except Exception as err:
+                    out = ser.error(err)
+                print(f"INFO {tag} fMRIPrep get_sbrefs (PIPE-36): {json.dumps(out)[:200]}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sections", default="index,wrangler,units,fmriprep,runs,apps,image")
+    ap.add_argument("--sections", default="index,wrangler,units,fmriprep,runs,apps,roots,image")
     ap.add_argument("--scratch", default=None)
     args = ap.parse_args()
     scratch = Path(args.scratch or tempfile.mkdtemp(prefix="lx-estimators-"))
@@ -1010,6 +1169,8 @@ def main() -> int:
             section_runs()
         elif sec == "apps":
             section_apps()
+        elif sec == "roots":
+            section_roots(scratch)
         elif sec == "image":
             section_image(datasets, scratch)
         print(f"== {sec}: {COUNTS['ok'] - n0} identical, {len(FAILS) - f0} differ", flush=True)

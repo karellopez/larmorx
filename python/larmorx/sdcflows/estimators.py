@@ -19,7 +19,12 @@ Upstream behaviours kept (rule C, documented): SDC-18, :meth:`bidict.add` takes 
 ``auto_`` index in ``range(len(used) + 1)``, not the first (the names are in fMRIPrep's and
 sdcflows' derivatives). Corrected by default (``upstream_defects="reproduce"`` gives sdcflows'):
 SDC-20, :func:`get_identifier` names the unknown index table in its ``KeyError`` (sdcflows' raw
-string gives the text ``'{by}'``). Not reproduced (nondeterminism): the order of the common
+string gives the text ``'{by}'``); SDC-45, :class:`FieldmapFile` takes its entities from the
+file's path from its participant's folder (sdcflows parses the absolute path, where pybids'
+derivatives patterns ``den-``, ``res-``, ``desc-``, ... have no separator before them: below a
+folder such as ``golden-clone`` or ``andres-lab`` every file gets ``den`` or ``res``, and the
+fieldmap-less search queries the layout with them: ``ValueError: 'den' is not a recognized
+entity``). Not reproduced (nondeterminism): the order of the common
 ``B0FieldIdentifier`` values in ``FieldmapEstimation``'s "Multiple common" message (a Python
 ``set``'s order in sdcflows; sorted here).
 """
@@ -250,6 +255,17 @@ def relative_to_root(path: Any) -> Path:
     )
 
 
+def _bids_part(path: Path) -> str | None:
+    """SDC-45: a file's BIDS part, ``/``-rooted: its path from the nearest ``sub-*`` folder above
+    it (as niworkflows' :func:`relative_to_root` and ``DerivativesDataSink`` take it); ``None``
+    when no such folder is above it (where the dataset begins is not known)."""
+    parts = path.parts
+    for i in range(len(parts) - 2, -1, -1):
+        if parts[i].startswith("sub-"):
+            return "/" + "/".join(parts[i:])
+    return None
+
+
 def _get_trt(metadata: Mapping[str, Any], in_file: Any, use_estimate: bool = False) -> Any:
     """sdcflows' ``get_trt`` with nibabel's error for an unreadable header (not a
     ``ValueError``)."""
@@ -283,6 +299,10 @@ class FieldmapFile:
     sdcflows_version
         ``"2.17.1"`` (default: a broken link is accepted) or ``"2.15"`` (fMRIPrep 25.2.6's: it
         is refused).
+    upstream_defects
+        ``"fix"`` (SDC-45: the entities from the file's path from its participant's folder; a
+        file below no ``sub-*`` folder keeps sdcflows' parse) or ``"reproduce"`` (sdcflows': from
+        the path as given, the folders above the dataset included).
     """
 
     __slots__ = ("bids_root", "entities", "find_meta", "metadata", "path", "suffix")
@@ -294,17 +314,19 @@ class FieldmapFile:
         metadata: Any = None,
         find_meta: bool = True,
         sdcflows_version: str = "2.17.1",
+        upstream_defects: UpstreamDefectsName = "fix",
     ):
         if sdcflows_version not in SDCFLOWS_VERSIONS:
             raise ValueError(
                 f"sdcflows_version must be one of {SDCFLOWS_VERSIONS}, not {sdcflows_version!r}"
             )
+        mode = _defects.check(upstream_defects)
         self.path = Path(path)
         self.metadata = {} if metadata is None else metadata
         self.find_meta = find_meta
         self.bids_root: Path | None = None
         self._check_path(self.path, sdcflows_version)
-        self._post_init()
+        self._post_init(mode)
 
     @staticmethod
     def _check_path(value: Path, sdcflows_version: str) -> None:
@@ -323,10 +345,27 @@ class FieldmapFile:
                 f"File path <{value}> with suffix <{suffix}> is not a valid fieldmap sourcefile."
             )
 
-    def _post_init(self) -> None:
+    def _post_init(self, mode: str) -> None:
         from larmorx.bids import parse_file_entities
 
-        self.entities = parse_file_entities(str(self.path))
+        whole = parse_file_entities(str(self.path))  # sdcflows: the path as given
+        part = _bids_part(self.path)
+        below = whole if part is None else parse_file_entities(part)
+        self.entities = whole if mode == "reproduce" else below
+        if part is not None and whole != below:
+            extra = {k: v for k, v in whole.items() if below.get(k, None) != v}
+            _defects.warn(
+                [
+                    (
+                        "SDC-45",
+                        "sdcflows",
+                        mode,
+                        f"the folders above <{part.lstrip('/')}> give it the entities {extra} "
+                        "(sdcflows parses the absolute path)",
+                    )
+                ],
+                stacklevel=4,
+            )
         self.suffix = self.entities.pop("suffix")
         extension = self.entities.pop("extension").lstrip(".")
         if self.find_meta:
@@ -404,6 +443,8 @@ class FieldmapEstimation:
         The registry it is recorded in.
     sdcflows_version
         For the :class:`FieldmapFile` objects it makes.
+    upstream_defects
+        For the :class:`FieldmapFile` objects it makes (SDC-45).
     """
 
     __slots__ = ("_method", "_wf", "bids_id", "registry", "sanitized_id", "sources")
@@ -415,9 +456,11 @@ class FieldmapEstimation:
         bids_id: str | None = None,
         registry: FieldmapRegistry | None = None,
         sdcflows_version: str = "2.17.1",
+        upstream_defects: UpstreamDefectsName = "fix",
     ):
+        mode = _defects.check(upstream_defects)
         self.sources = [
-            FieldmapFile(f, sdcflows_version=sdcflows_version)
+            FieldmapFile(f, sdcflows_version=sdcflows_version, upstream_defects=mode)
             if not isinstance(f, FieldmapFile)
             else f
             for f in _listify(sources)  # type: ignore[union-attr]
@@ -426,7 +469,7 @@ class FieldmapEstimation:
         object.__setattr__(self, "_wf", None)
         object.__setattr__(self, "bids_id", bids_id)
         self.registry = _registry(registry)
-        self._post_init(sdcflows_version)
+        self._post_init(sdcflows_version, mode)
 
     # attrs' on_setattr hooks: the method cannot change once set, the identifier never
     @property
@@ -456,7 +499,7 @@ class FieldmapEstimation:
             raise ValueError("Cannot edit the bids_id")
         object.__setattr__(self, name, value)
 
-    def _post_init(self, sdcflows_version: str) -> None:
+    def _post_init(self, sdcflows_version: str, mode: str) -> None:
         reg = self.registry
         suffix_list = [f.suffix for f in self.sources]
         suffix_set = set(suffix_list)
@@ -476,7 +519,11 @@ class FieldmapEstimation:
                 mis_ph = "phase1" if missing_phases[0] else "phase2"
                 hit_ph = "phase2" if missing_phases[0] else "phase1"
                 new_source = sources[0].parent / sources[0].name.replace(hit_ph, mis_ph)
-                self.sources.append(FieldmapFile(new_source, sdcflows_version=sdcflows_version))
+                self.sources.append(
+                    FieldmapFile(
+                        new_source, sdcflows_version=sdcflows_version, upstream_defects=mode
+                    )
+                )
                 sources.insert(int(missing_phases[1]), new_source)
 
             self.method = MODALITIES[sorted(fmap_types)[0]]  # type: ignore[assignment]
@@ -487,7 +534,11 @@ class FieldmapEstimation:
                     new_path = sources[0].parent / sources[0].name.replace(
                         "_fieldmap", "_magnitude"
                     ).replace("_phasediff", "_phase1").replace("_phase", "_magnitude")
-                    self.sources.append(FieldmapFile(new_path, sdcflows_version=sdcflows_version))
+                    self.sources.append(
+                        FieldmapFile(
+                            new_path, sdcflows_version=sdcflows_version, upstream_defects=mode
+                        )
+                    )
                 except Exception:
                     raise ValueError(
                         "A fieldmap or phase-difference estimation type was found, "
@@ -499,7 +550,11 @@ class FieldmapEstimation:
                     new_path = sources[-1].parent / sources[-1].name.replace("diff", "2").replace(
                         "phase", "magnitude"
                     )
-                    self.sources.append(FieldmapFile(new_path, sdcflows_version=sdcflows_version))
+                    self.sources.append(
+                        FieldmapFile(
+                            new_path, sdcflows_version=sdcflows_version, upstream_defects=mode
+                        )
+                    )
                 except Exception:
                     if "phase2" in suffix_set:
                         raise ValueError(

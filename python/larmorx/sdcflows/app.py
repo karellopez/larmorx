@@ -687,7 +687,7 @@ def toml_dumps(o: Mapping[str, Any]) -> str:
 # --- parsing and its checks (sdcflows' parse_args) -------------------------------------------
 
 
-def _layout(execution: ExecutionSettings) -> Any:
+def _layout(execution: ExecutionSettings, mode: str = "fix") -> Any:
     """sdcflows' ``execution.init()``: the dataset indexed with its app's ignore patterns (only
     ``sub-<label>`` folders, without ``beh``, ``pet``, ``perf``, ``meg``, ``eeg``, ``ieeg``,
     ``micr``, ``nirs``), the BIDS validator off."""
@@ -702,7 +702,7 @@ def _layout(execution: ExecutionSettings) -> Any:
     if execution.participant_label:
         ignore_paths[0] = re.compile(r"^(?!/sub-(" + "|".join(execution.participant_label) + "))")
     indexer = BIDSLayoutIndexer(validate=False, ignore=ignore_paths)
-    return BIDSLayout(str(execution.bids_dir), indexer=indexer)
+    return BIDSLayout(str(execution.bids_dir), indexer=indexer, upstream_defects=mode)
 
 
 def parse_args(
@@ -746,7 +746,7 @@ def parse_args(
             if k in section._paths:
                 v = Path(v).absolute()
             setattr(section, k, v)
-    layout = _layout(execution)  # execution.init(), inside sdcflows' from_dict
+    layout = _layout(execution, mode)  # execution.init(), inside sdcflows' from_dict
 
     implementation = env.get(_IMPLEMENTATION_ENV, "") or "auto"
     libraries = env.get(LIBRARIES_ENV, "") or "newest"

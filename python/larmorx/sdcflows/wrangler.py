@@ -31,6 +31,13 @@ Corrected by default (``upstream_defects="reproduce"`` gives sdcflows 2.17.1's s
   and the identifier ``pe`` matches ``"PE"`` and ``"pe2"`` written in other files' lists, so
   their files join the estimator. By default the subject and the other filters match exactly
   and the identifier is a member of the list.
+- SDC-45 (rule A): the files' entities come from their absolute paths, where pybids'
+  derivatives patterns (``den-``, ``res-``, ``desc-``, ...) have no separator before them, and
+  the fieldmap-less search queries the layout with every entity of its targets: a dataset below
+  a folder such as ``golden-clone`` or ``andres-lab`` stops it (``ValueError: 'den' is not a
+  recognized entity``). By default the entities come from the files' paths from their
+  participant's folder (:class:`~larmorx.sdcflows.FieldmapFile`); the layout's own index takes
+  the path below its root by default too (PIPE-37, :class:`larmorx.bids.BIDSLayout`).
 
 Not reproduced (nondeterminism, SDC-19): sdcflows takes the identifiers of step (1) from a
 Python ``set``, so the estimators' order changes between processes; here they follow pybids'
@@ -169,6 +176,7 @@ def _pepolar_collections(
     contrasts: list[Any],
     subject: str,
     sdcflows_version: str,
+    mode: str = "fix",
 ) -> list[list[FieldmapFile]]:
     """Step 2's EPI field maps in two or more directions, grouped by ``IntendedFor``."""
     out = []
@@ -183,6 +191,7 @@ def _pepolar_collections(
                     fmap.path,
                     metadata=_filter_metadata(fmap.get_metadata(), subject),
                     sdcflows_version=sdcflows_version,
+                    upstream_defects=mode,
                 )
                 by_intent.setdefault(tuple(fmapfile.metadata.get("IntendedFor", ())), []).append(
                     fmapfile
@@ -246,8 +255,8 @@ def find_estimators(
     sdcflows_version
         ``"2.17.1"`` or ``"2.15"``, for the :class:`FieldmapFile` objects made.
     upstream_defects
-        ``"fix"`` (SDC-17: sdcflows 2.15.2's search; SDC-21) or ``"reproduce"`` (sdcflows
-        2.17.1's).
+        ``"fix"`` (SDC-17: sdcflows 2.15.2's search; SDC-21; SDC-45) or ``"reproduce"``
+        (sdcflows 2.17.1's).
 
     Returns
     -------
@@ -287,7 +296,11 @@ def find_estimators(
 
     def _estimation(sources: Any, **kwargs: Any) -> FieldmapEstimation:
         return FieldmapEstimation(
-            sources, registry=reg, sdcflows_version=sdcflows_version, **kwargs
+            sources,
+            registry=reg,
+            sdcflows_version=sdcflows_version,
+            upstream_defects=mode,
+            **kwargs,
         )
 
     # Step 1. Use B0FieldIdentifier metadata
@@ -307,6 +320,7 @@ def find_estimators(
                             fmap.path,
                             metadata=fmap.get_metadata(),
                             sdcflows_version=sdcflows_version,
+                            upstream_defects=mode,
                         )
                         for fmap in bare_ids + listed_ids
                     ],
@@ -334,6 +348,7 @@ def find_estimators(
                         fmap.path,
                         metadata=_filter_metadata(fmap.get_metadata(), subject),
                         sdcflows_version=sdcflows_version,
+                        upstream_defects=mode,
                     )
                 )
             except (ValueError, TypeError) as err:
@@ -344,14 +359,14 @@ def find_estimators(
 
         acqs, contrasts = _acq_ce(layout, base_entities, subject, version)
         collections = _pepolar_collections(
-            layout, base_entities, sessions, acqs, contrasts, subject, sdcflows_version
+            layout, base_entities, sessions, acqs, contrasts, subject, sdcflows_version, mode
         )
         if mode == "fix":
             other = _acq_ce(layout, base_entities, subject, "2.17.1")
             if other != (acqs, contrasts):
                 try:
                     alt = _pepolar_collections(
-                        layout, base_entities, sessions, *other, subject, sdcflows_version
+                        layout, base_entities, sessions, *other, subject, sdcflows_version, mode
                     )
                 except Exception:
                     alt = None
@@ -420,11 +435,13 @@ def find_estimators(
                                 epi_fmap.path,
                                 metadata=estimator_md,
                                 sdcflows_version=sdcflows_version,
+                                upstream_defects=mode,
                             ),
                             FieldmapFile(
                                 target.path,
                                 metadata=target.get_metadata(),
                                 sdcflows_version=sdcflows_version,
+                                upstream_defects=mode,
                             ),
                         ]
                     )
@@ -457,7 +474,14 @@ def find_estimators(
             )
         elif anat_file and base_entities != no_filter_entities:
             specs = _anatomical_specs(
-                anat_file[0], layout, subject, sessions, anat_entities, fmapless, sdcflows_version
+                anat_file[0],
+                layout,
+                subject,
+                sessions,
+                anat_entities,
+                fmapless,
+                sdcflows_version,
+                mode,
             )
             try:
                 old_specs: Any = _anatomical_specs(
@@ -468,6 +492,7 @@ def find_estimators(
                     base_entities,
                     fmapless,
                     sdcflows_version,
+                    mode,
                 )
             except Exception:
                 old_specs = None
@@ -487,7 +512,7 @@ def find_estimators(
 
     logger.debug("Attempting fmap-less estimation")
     estimator_specs = _anatomical_specs(
-        anat_file[0], layout, subject, sessions, anat_entities, fmapless, sdcflows_version
+        anat_file[0], layout, subject, sessions, anat_entities, fmapless, sdcflows_version, mode
     )
     for spec in estimator_specs:
         try:
@@ -508,6 +533,7 @@ def _anatomical_specs(
     base_entities: Mapping[str, Any],
     suffixes: Any,
     sdcflows_version: str,
+    mode: str,
 ) -> list[list[FieldmapFile]]:
     return find_anatomical_estimators(
         anat_file=anat_file,
@@ -517,6 +543,7 @@ def _anatomical_specs(
         base_entities=base_entities,
         suffixes=suffixes,
         sdcflows_version=sdcflows_version,
+        upstream_defects=mode,  # type: ignore[arg-type]
     )
 
 
@@ -529,6 +556,7 @@ def find_anatomical_estimators(
     base_entities: Mapping[str, Any],
     suffixes: Iterable[str],
     sdcflows_version: str = "2.17.1",
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> list[list[FieldmapFile]]:
     """sdcflows' ``find_anatomical_estimators``: for each EPI run with a phase-encoding direction
     (its single-band reference preferred, the shortest echo first), the anatomical reference and
@@ -550,7 +578,12 @@ def find_anatomical_estimators(
         EPI suffixes (``"bold"``, ``"dwi"``, ``"asl"``).
     sdcflows_version
         For the :class:`FieldmapFile` objects made.
+    upstream_defects
+        ``"fix"`` (SDC-45: the files' entities from their BIDS part) or ``"reproduce"``
+        (sdcflows': from their absolute paths, so a dataset below a folder such as
+        ``golden-clone`` stops the search with ``ValueError: 'den' is not a recognized entity``).
     """
+    mode = _defects.check(upstream_defects)
     subject_root = Path(layout.root) / f"sub-{subject}"
     hits: set[Path] = set()
     estimators = []
@@ -568,7 +601,12 @@ def find_anatomical_estimators(
             with suppress(ValueError):
                 meta.update({"TotalReadoutTime": _get_trt(meta, candidate.path)})
             epi_targets.append(
-                FieldmapFile(candidate, metadata=meta, sdcflows_version=sdcflows_version)
+                FieldmapFile(
+                    candidate,
+                    metadata=meta,
+                    sdcflows_version=sdcflows_version,
+                    upstream_defects=mode,
+                )
             )
 
         def sort_key(fmap: FieldmapFile, suffixes: list[str] = suffixes_) -> tuple[int, Any]:
@@ -583,7 +621,12 @@ def find_anatomical_estimators(
             metadata = {"IntendedFor": [_rel(epi, subject_root) for epi in intent]}
             estimators.append(
                 [
-                    FieldmapFile(anat_file, metadata=metadata, sdcflows_version=sdcflows_version),
+                    FieldmapFile(
+                        anat_file,
+                        metadata=metadata,
+                        sdcflows_version=sdcflows_version,
+                        upstream_defects=mode,
+                    ),
                     target,
                 ]
             )

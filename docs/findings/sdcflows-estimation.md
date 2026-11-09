@@ -1309,8 +1309,7 @@ of the context, so it does not outlive the run); unit test
 `test_library_sets_choose_the_writers_lapack`; the eight shared runs again: see the record
 `sdcflows-estimation-app-shared`.
 
-**A defect of sdcflows found by the records (a candidate, SDC-45, for the next relay: rule A
-proposed).** A dataset stored below a folder whose name holds one of pybids' derivatives entities
+**A defect of sdcflows found by the records (SDC-45, rule A; decided in relay 26, below).** A dataset stored below a folder whose name holds one of pybids' derivatives entities
 without a separator (`atlas-`, `roi-`, `label-`, `desc-`, `hemi-`, `seg-`, `res-`, `den-`,
 `model-`, `subset-`: pybids 0.22.0's `config/derivatives.json` gives these patterns no `_` or `/`
 before them, so `golden-clone`, `andres-lab` or `garden-2024` match) stops sdcflows'
@@ -1325,3 +1324,67 @@ larmorx give the same error under `golden-clone/`, two estimators each under `pl
 is a valid dataset, the result a crash: rule A (the entities from the path below the dataset's
 root, or from the BIDS part of the path), `reproduce` keeping sdcflows' error; fMRIPrep's
 `--use-syn-sdc` reaches the same call.
+
+## Entities from the folders above a dataset (relay 26: SDC-45, PIPE-36, PIPE-37)
+
+Every place sdcflows 2.17.1, niworkflows 1.15.4, fMRIPrep 25.2.7 and pybids 0.22.0 parse BIDS
+entities from a path was read (`parse_file_entities`, `Entity.match_file`), and each decided by
+the rules:
+
+- **pybids' index (PIPE-37, rule A, corrected in `lx.bids`).** `BIDSLayoutIndexer._index_file`
+  matches every entity's pattern against the file's absolute path (`Entity.match_file`:
+  `regex.search(f.path)`), so the folders above the dataset give its files entities. The raw
+  configuration's patterns need a separator before the key (`[_/\\]+sub-`), so only a folder
+  named like an entity matches: below `func/` every file has `datatype` `func` (an anatomical
+  image too), below `sub-pilot/` every file is participant `pilot` (the leftmost match: the
+  participant's own label is lost and a query for it finds nothing). The derivatives
+  configuration's `atlas-`, `roi-`, `label-`, `desc-`, `hemi-`, `seg-`, `res-`, `den-`, `model-`
+  and `subset-` (and niworkflows' `nipreps.json`'s `model-`, `subset-`, `res-`, `hash-`,
+  `hemi-`) have none, so any folder name holding one matches: `golden-x` gives `den`
+  `x`, `andres-lab` `res` `lab`, and a folder such as `my-desc-files` would give every
+  derivative `desc` `files` (its own `desc` lost). A dataset may be stored anywhere: rule A.
+  `lx.bids.BIDSLayout` matches the patterns against the path below the root (`/`-rooted, as
+  pybids' ignore patterns already are) by default and warns when that changed an entity;
+  `upstream_defects="reproduce"` gives pybids' index. `parse_file_entities` (the function and
+  the layout's method) parses the path it is given, as pybids' (an API: the caller chooses the
+  path).
+- **sdcflows' `FieldmapFile` (SDC-45, rule A).** It parses the file's absolute path with the
+  `bids` and `derivatives` configurations (`fieldmaps.py` line 246), and
+  `find_anatomical_estimators` queries the layout with every entity of its targets
+  (`wrangler.py` line 615). A raw layout knows no derivatives entity, so below `golden-x` or
+  `andres-lab` the fieldmap-less search stops: `ValueError: 'den' is not a recognized entity`
+  (sdcflows' BIDS app and fMRIPrep's `--use-syn-sdc` reach it; the B0FieldIdentifier and
+  heuristic searches do not query with the files' entities). Below `func/` or `sub-pilot/`
+  pybids' index and `FieldmapFile` agree in their mistake, so the search runs. larmorx's
+  `FieldmapFile` takes its entities from the path from the participant's nearest `sub-*` folder
+  (niworkflows' `relative_to_root`, which `DerivativesDataSink` already parses; a file below no
+  such folder keeps sdcflows' parse: where the dataset begins is not known), with a warning when
+  that changed them; `reproduce` gives sdcflows' entities and error.
+- **fMRIPrep's `extract_entities` (PIPE-36, rule A when ported; not ported yet).**
+  `utils/bids.py`'s `extract_entities` parses the absolute BOLD paths it is given
+  (`parse_file_entities(f)`), and `workflows/bold/fit.py`'s `get_sbrefs` queries the layout
+  with them, so below `golden-x` or `andres-lab` every BOLD run stops fMRIPrep's
+  `init_bold_fit_wf` (`ValueError: 'den' is not a recognized entity`), with or without field
+  maps; `workflows/base.py` passes the same entities to `collect_derivatives`. fMRIPrep's
+  container wrappers mount the dataset at `/data`, where nothing above it matches; Apptainer
+  with the host's paths, and a bare installation, meet it. larmorprepx's BOLD stages, when
+  they are ported, take the entities from the BIDS part (rule A), `reproduce` fMRIPrep's.
+- **Parsed relative to the dataset, safe:** niworkflows' `DerivativesDataSink`
+  (`relative_to_root(source_file)`), `BIDSInfo` with `bids_dir` (fMRIPrep passes it), sdcflows'
+  and fMRIPrep's queries of the layout. **Absolute, not ported:** niworkflows' `BIDSInfo`
+  without `bids_dir` and `ReadSidecarJSON` (`layout.parse_file_entities(in_file)`), off the
+  field-map paths: decided when they are ported.
+
+Evidence: `check_estimators.py`'s `roots` section (three of sdcflows' test skeletons and the
+SyN oracle run ds000228's BIDS input, linked, below `plain`, `golden-x`, `andres-lab`,
+`workspace-2024`, `func` and `sub-pilot`): reproduced, pybids' index and sdcflows 2.17.1's
+search on every folder (the same `ValueError` below `golden-x` and `andres-lab`); corrected, the
+index and the search below every folder are pybids' and sdcflows 2.15.2's below `plain`; 168
+comparisons identical; fMRIPrep 25.2.7's `get_sbrefs` (from its source) on pybids' layout: the
+`ValueError` below `golden-x` and `andres-lab`, the single-band reference below the others.
+Unit tests `test_sdc45_*` and `test_pipe37_*` (`tests/python/test_fmap_defects.py`). The golden
+case `py.sdcflows.estimators` runs its search below `golden-x/sub-pilot/` as well (the same
+estimators), and its reproduced cases leave out the fieldmap-less search and the files'
+entities, which depend on the temporary folder's name; all 37 of part B's golden cases give the
+same checksums below a folder named as `record_golden.py`'s (`larmorx-golden-<x>`, `den-`) and
+below another.

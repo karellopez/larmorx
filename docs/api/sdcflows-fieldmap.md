@@ -323,6 +323,56 @@ fit and DenoiseImage depend, with glibc's maths: `docs/findings/ants-n4.md`,
 `ants-denoise.md`); the registration is ANTs' one-thread result
 (`validation/investigations/sdcflows-fieldmap-b/check_syn_preprocessing.py`).
 
+## The fieldmap-less (SyN) estimation (part B)
+
+`syn_sdc_workflow` is sdcflows' `init_syn_sdc_wf` (`python/larmorx/sdcflows/syn.py`; the same
+in 2.15.1 and 2.17.1), on `syn_preprocessing_workflow`'s outputs: the readout time and phase
+encoding from the EPI's metadata (`get_readout_time`); the EPI reference clipped
+(`IntensityClip(35, 99.9)`); both references' Laplacians (ANTs' `ImageMath 3 <out> Laplacian
+<in> 1.5 1` with nipype's `copy_header`) normalised (`norm_lap`); the EPI's mask joined with the
+anatomical mask, dilated by 3 and brought onto the EPI's grid (`antsApplyTransforms -t identity`,
+`MultiLabel`, `Union`); the registration of the EPI to the anatomy (`antsRegistration` with
+sdcflows' `sd_syn.json`: two SyN stages, two Mattes metrics each (image and Laplacian), the
+deformation restricted to the phase-encoding axis (`warp_dir`), SyN's field variance in voxels
+(`mm2vox`), fixed masks `[anat_mask, sd_prior]`, moving masks `[NULL, union]`); the displacement
+field as a field map in Hz (`displacements_field_to_fieldmap`); the field onto the EPI
+reference's grid (`antsApplyTransforms -u float -t identity`, `BSpline`) and the anatomical mask
+with it (`-u uchar`, `MultiLabel`); sdcflows' B-spline fit (`bspline_approx(recenter=False)`, the
+16 x 16 x 10 mm grid, no mask); and the EPI reference unwarped with it (`apply_coeffs_field`, no
+Jacobian). The nodes write into `out_dir/<name>/<node>` as nipype's (fMRIPrep names the workflow
+`wf_<estimator id>`).
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `epi_ref` (`(file, metadata)`), `epi_mask`, `anat_ref`, `anat_mask`, `sd_prior` | `inputnode` (`INPUT_FIELDS`) | `syn_preprocessing_workflow`'s outputs, as fMRIPrep connects them |
+| `use_metadata_estimates=False`, `fallback_total_readout_time=None` | the same | `GetReadoutTime`'s `use_estimate` and `fallback` |
+| `sloppy=False` | `sloppy` | `sd_syn_sloppy.json` (20 x 10 and 2 iterations, ANTs' verbose output) and the fit at `zooms_min=4` mm |
+| `debug=False` | `debug` | the registration's warped images (`files["syn_warped_image"]`, `["syn_inverse_warped_image"]`) and `--write-interval-volumes 2`; the fit without extrapolation |
+| `laplacian_weight=None` | `laplacian_weight` | two weights, each clipped to [0, `MAX_LAPLACIAN_WEIGHT` = 0.5]: `metric_weight = [[1 - w0, w0], [1 - w1, w1]]` |
+| `omp_nthreads=1` | `omp_nthreads` | the registration's `num_threads` in nipype's line |
+| `name="syn_sdc_wf"` | `name` | the workflow's folder; fMRIPrep's estimators: `wf_auto_00000`, ... |
+| `ants_random_seed=None` | the environment's `ANTS_RANDOM_SEED` | as `coeff2epi_workflow` (fMRIPrep sets it) |
+| `niworkflows_version="1.15.4"`, `numpy_version="2.5.4"`, `upstream_defects="fix"`, `n_threads=1`, `out_dir` | | `descrip`'s version, the clip's percentile arithmetic (fMRIPrep 25.2.6's image: `"1.15.2"`, `"2.2.6"`) |
+| → `SynSdcResult(fmap, fmap_ref, fmap_coeff, fmap_mask, out_warp, method, readout_time, pe_direction, zooms, files, commands)` | `outputnode` | `out_warp` is declared and never connected by sdcflows (`None`); `method` = `FLB ("fieldmap-less", SyN-based)`; `zooms`: `find_zooms`' value |
+
+| Helper | sdcflows | Notes |
+|---|---|---|
+| `warp_dir(moving_image, fixed_image, pe_dir, nlevels=2)` | `fit/syn._warp_dir` | 0.1 on each axis of the fixed image, 1.0 on the one closest to the moving image's PE axis, per level; logs sdcflows' "Running fieldmap-less registration on an oblique dataset" (`larmorx.sdcflows`, warning) when the fixed image's obliquity exceeds 0.05 radians (sdcflows calls `Logger.warn`, a deprecated alias of `warning`); a PE letter or axis it cannot match: `ValueError` as sdcflows' `index` |
+| `mm2vox(moving_image, fixed_image, pe_dir, registration_config)` | `fit/syn._mm2vox` | each level's third transform parameter divided by the fixed image's voxel size along that axis (numpy's float64) |
+| `adjust_zooms(in_anat, in_epi, z_max=2.2, z_min=1.8)` | `fit/syn._adjust_zooms` | `min(round(max(0.5 * (anat + epi), z_min), 2), z_max)` three times, numpy 2's float32 arithmetic (a float32, or the Python bound) |
+| `norm_lap(in_file, *, out_dir=".", upstream_defects="fix", n_threads=1)` → path | `fit/syn._norm_lap` | minus the median; positives over their 99.8th percentile, negatives over minus their 0.2th; clipped to [-1, 1]; float32 `<name>_norm`; SDC-14 |
+
+Not computed: `zooms_epi` (niworkflows' `RegridToZooms` of the clipped EPI to `find_zooms`'
+size), whose output sdcflows never connects (SDC-15); its port comes with `RegridToZooms`
+(`syn_preprocessing_workflow(debug=True)` needs it too).
+
+Checked on fMRIPrep's five `--use-syn-sdc` estimators node by node (each node fed fMRIPrep's
+own inputs and, after the registration, fMRIPrep's own warp; header bytes as written): every
+file, value and command line is fMRIPrep's; the registration itself is ANTs 2.6.5's
+one-thread result with correctly rounded maths (fMRIPrep's own ran on 4 threads, on which SyN's
+sampled metric depends); and the whole function against sdcflows' own graph
+(`validation/investigations/sdcflows-fieldmap-b/check_syn_sdc.py`).
+
 ## Upstream defects (D13)
 
 Corrected by default; `upstream_defects="reproduce"` gives sdcflows' result bit for bit, and
@@ -345,6 +395,8 @@ changed) a result. Rules A to D and the evidence:
 | SDC-11 | a resize (`zooms_min`) onto a grid of a single voxel fails (nitransforms' bare `AssertionError`) | the voxel resampled and the fit made | `resample_to_zooms`, `bspline_approx` |
 | SDC-12 | `ReorientImageAndMetadata` checks the upper-cased orientation code but reorients to the code as given (a lower-case one fails in nibabel) | the upper-cased code it checked | `reorient_image_and_metadata` |
 | SDC-13 | `Deoblique`/`Reoblique` compare nibabel's obliquity (radians) with `OBLIQUE_THRESHOLD_DEG = 0.5` (degrees): they act only beyond 28.6 degrees; `_deoblique`'s plumb grid centres the image in voxels, not millimetres, and compares the axis codes with `RAS` by position | **under measurement** (rule D, with `init_syn_sdc_wf`'s port): sdcflows' behaviour in both modes until then | `deoblique`, `reoblique`, `syn_preprocessing_workflow` |
+| SDC-14 | `_norm_lap` of an image with no positive (or no negative) value after the median's subtraction fails with numpy's `IndexError` (the percentile of nothing) | a `ValueError` saying so (rule B) | `norm_lap`, `syn_sdc_workflow` |
+| SDC-15 | `init_syn_sdc_wf`'s `zooms_epi` regrids the clipped EPI and nothing reads it | kept as sdcflows (rule C: no result depends on it); larmorx does not compute it (`zooms` holds its voxel size) | `syn_sdc_workflow` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

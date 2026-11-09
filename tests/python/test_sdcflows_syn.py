@@ -91,3 +91,50 @@ def test_affine_transform_checks() -> None:
     same = lx.ndimage.affine_transform(data, np.eye(3), order=0)
     assert np.array_equal(same, data)
     assert np.array_equal(lx.ndimage.affine_transform(data, np.ones(3), order=1), data)
+
+
+def _plain(path: Path, shape: tuple[int, ...], zooms: tuple[float, ...], rot: float = 0.0) -> str:
+    """A file of ``shape`` with voxel sizes ``zooms``, rotated by ``rot`` radians about z."""
+    c, s = np.cos(rot), np.sin(rot)
+    aff = np.eye(4)
+    aff[:3, :3] = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]) @ np.diag(zooms)
+    data = (np.arange(int(np.prod(shape))).reshape(shape) % 11).astype(np.float32)
+    return _write(path, data, aff)
+
+
+def test_syn_sdc_helpers(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    anat = _plain(tmp_path / "anat.nii.gz", (8, 9, 7), (1.0, 1.25, 1.5))
+    epi = _plain(tmp_path / "epi.nii.gz", (6, 7, 5), (3.0, 3.0, 3.3))
+    # 0.5 * (1.0 + 3.0) = 2.0 (float32); the bounds as Python floats
+    z = lx.sdcflows.adjust_zooms(anat, epi)
+    assert z == (2.0, 2.0, 2.0) and isinstance(z[0], np.float32)
+    assert lx.sdcflows.adjust_zooms(anat, anat) == (1.8, 1.8, 1.8)
+    assert isinstance(lx.sdcflows.adjust_zooms(anat, anat)[0], float)
+    assert lx.sdcflows.adjust_zooms(epi, epi) == (2.2, 2.2, 2.2)
+    assert lx.sdcflows.warp_dir(epi, anat, "j-") == [[0.1, 1.0, 0.1], [0.1, 1.0, 0.1]]
+    assert lx.sdcflows.warp_dir(epi, anat, "k", nlevels=1) == [[0.1, 0.1, 1.0]]
+    with pytest.raises(ValueError):
+        lx.sdcflows.warp_dir(epi, anat, "x")
+    oblique = _plain(tmp_path / "obl.nii.gz", (8, 9, 7), (1.0, 1.25, 1.5), rot=0.1)
+    with caplog.at_level("WARNING", logger="larmorx.sdcflows"):
+        lx.sdcflows.warp_dir(epi, oblique, "i")
+    assert "oblique dataset" in caplog.text
+    cfg = {"transform_parameters": [[0.8, 6.0, 10.0], [0.8, 2.0, 0.5]]}
+    vp = lx.sdcflows.mm2vox(epi, anat, "j", cfg)
+    assert vp == [[0.8, 6.0, 8.0], [0.8, 2.0, 0.4]]
+
+
+def test_norm_lap_sdc14(tmp_path: Path) -> None:
+    data = np.zeros((6, 5, 4), dtype=np.float32)
+    data[2:4, 2:4, 1:3] = 5.0
+    data[0, 0, 0] = -3.0
+    data[5, 4, 3] = 7.0
+    p = _write(tmp_path / "lap.nii.gz", data, np.eye(4))
+    out = lx.sdcflows.norm_lap(p, out_dir=tmp_path / "n")
+    v = np.asarray(lx.io.load_nibabel(out).data)
+    assert v.dtype == np.float32 and v.min() == -1.0 and v.max() == 1.0
+    flat = _write(tmp_path / "flat.nii.gz", np.full((4, 4, 4), 2.0, np.float32), np.eye(4))
+    with pytest.raises(ValueError, match="SDC-14"):
+        lx.sdcflows.norm_lap(flat, out_dir=tmp_path / "f")
+    with pytest.raises(IndexError):
+        lx.sdcflows.norm_lap(flat, out_dir=tmp_path / "f", upstream_defects="reproduce")

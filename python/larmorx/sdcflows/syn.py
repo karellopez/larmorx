@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""sdcflows' fieldmap-less ("SyN") preprocessing as plain functions: the EPI reference, the
-anatomical reference and its masks in the EPI's space, and the prior of strong distortions.
+"""sdcflows' fieldmap-less ("SyN") estimation as plain functions: the preprocessing (the EPI
+reference, the anatomical reference and its masks in the EPI's space, the prior of strong
+distortions) and the estimation itself (the EPI registered to the anatomy with the deformation
+restricted to the phase-encoding axis, its field map smoothed by sdcflows' B-spline fit).
 
 Ported from sdcflows 2.17.1 (Apache-2.0, the NiPreps developers; the same in 2.15.1, fMRIPrep
-25.2.6's): ``workflows/fit/syn.py`` (``init_syn_preprocessing_wf``, ``_set_dtype``,
-``_merge_meta``) and ``interfaces/utils.py`` (``Deoblique``, ``Reoblique``: ``_deoblique``,
+25.2.6's): ``workflows/fit/syn.py`` (``init_syn_preprocessing_wf``, ``init_syn_sdc_wf``,
+``_set_dtype``, ``_merge_meta``, ``_warp_dir``, ``_mm2vox``, ``_adjust_zooms``, ``_norm_lap``)
+and ``interfaces/utils.py`` (``Deoblique``, ``Reoblique``: ``_deoblique``,
 ``_reoblique``, ``OBLIQUE_THRESHOLD_DEG``). The nodes run as nipype runs them, in the graph's
 order, each in its folder under ``out_dir`` (``syn_preprocessing_wf/...``), through larmorx's
 ports: niworkflows' EPI reference (:func:`larmorx.niworkflows.epi_reference_workflow`),
@@ -46,16 +49,25 @@ from larmorx.io.nifti import NiftiHeader
 
 __all__ = [
     "FMAP_ATLAS_SHA256",
+    "INPUT_FIELDS",
+    "MAX_LAPLACIAN_WEIGHT",
     "OBLIQUE_THRESHOLD_DEG",
+    "SYN_METHOD",
     "SynPreprocessingResult",
+    "SynSdcResult",
+    "adjust_zooms",
     "deoblique",
     "fmap_atlas",
     "fmap_atlas_affine",
     "merge_meta",
+    "mm2vox",
+    "norm_lap",
     "obliquity",
     "reoblique",
     "set_dtype",
     "syn_preprocessing_workflow",
+    "syn_sdc_workflow",
+    "warp_dir",
 ]
 
 _DATA = Path(__file__).resolve().parent / "data"
@@ -298,7 +310,15 @@ def _denoise_copy_header(
     cmd = _nipype.denoise_image(cwd=cwd, input_image=in_file)
     _nipype.run(cmd, n_threads=n_threads, upstream_defects=upstream_defects)
     out = cmd.outputs["output_image"]
-    hdr_img = load_nibabel(in_file, n_threads=n_threads)
+    _copy_header_keep_dtype(in_file, out, n_threads)
+    return out, cmd.cmdline
+
+
+def _copy_header_keep_dtype(header_file: str, out: str, n_threads: int) -> None:
+    """nipype's ``copy_header(header_file, out, keep_dtype=True)`` (its ``CopyHeaderInterface``
+    after ANTs' ``DenoiseImage`` and ``ImageMath``): ``out``'s values with ``header_file``'s
+    header in ``out``'s stored type, written over ``out``."""
+    hdr_img = load_nibabel(header_file, n_threads=n_threads)
     out_img = load_nibabel(out, n_threads=n_threads)
     assert hdr_img.header is not None and out_img.header is not None
     dtype = np.dtype(out_img.header.data_dtype)
@@ -306,7 +326,6 @@ def _denoise_copy_header(
     save_nibabel(
         Image(out_img.data, nibabel_affine(header), header), out, dtype=dtype, n_threads=n_threads
     )
-    return out, cmd.cmdline
 
 
 def _apply_transforms(
@@ -314,25 +333,30 @@ def _apply_transforms(
     input_image: str,
     reference_image: str,
     transforms: Sequence[str],
-    invert: Sequence[bool],
+    invert: Sequence[bool] | None,
     interpolation: str,
     message: str,
     upstream_defects: str,
     n_threads: int,
+    args: str | None = None,
 ) -> tuple[str, str]:
     """niworkflows' ``FixHeaderApplyTransforms``: nipype's ``antsApplyTransforms`` line run by
-    larmorx's port, then the reference's x-forms copied onto the output (``_copyxform``)."""
+    larmorx's port, then the reference's x-forms copied onto the output (``_copyxform``).
+    ``invert`` ``None``: no flags (nipype's line for ``transforms='identity'``)."""
     from larmorx.niworkflows.header import copy_xform
 
-    cmd = _nipype.apply_transforms(
-        cwd=cwd,
-        input_image=input_image,
-        reference_image=reference_image,
-        transforms=list(transforms),
-        invert_transform_flags=list(invert),
-        interpolation=interpolation,
-        num_threads=max(int(n_threads), 1),
-    )
+    inputs: dict[str, Any] = {
+        "input_image": input_image,
+        "reference_image": reference_image,
+        "transforms": list(transforms),
+        "interpolation": interpolation,
+        "num_threads": max(int(n_threads), 1),
+    }
+    if invert is not None:
+        inputs["invert_transform_flags"] = list(invert)
+    if args is not None:
+        inputs["args"] = args
+    cmd = _nipype.apply_transforms(cwd=cwd, **inputs)
     _nipype.run(cmd, n_threads=n_threads, upstream_defects=upstream_defects)
     out = cmd.outputs["output_image"]
     copy_xform(reference_image, out, message=message, n_threads=n_threads)
@@ -562,6 +586,473 @@ def syn_preprocessing_workflow(
         deob_epi=deob,
         sampling_ref=sampling,
         epi2anat_xfm=tuple(forward),
+        files=files,
+        commands=commands,
+    )
+
+
+#: ``init_syn_sdc_wf``'s input fields (sdcflows' ``INPUT_FIELDS``).
+INPUT_FIELDS = ("epi_ref", "epi_mask", "anat_ref", "anat_mask", "sd_prior")
+#: The largest weight of the Laplacian term sdcflows accepts (``MAX_LAPLACIAN_WEIGHT``).
+MAX_LAPLACIAN_WEIGHT = 0.5
+#: ``outputnode.method`` of the fieldmap-less estimation.
+SYN_METHOD = 'FLB ("fieldmap-less", SyN-based)'
+#: sdcflows' threshold of ``_warp_dir``'s warning (nibabel's obliquity, radians).
+_WARP_DIR_OBLIQUITY = 0.05
+
+
+def _front(x: Any) -> Any:
+    """sdcflows' ``utils.misc.front``: the first element of a list or tuple, else ``x``."""
+    return x[0] if isinstance(x, (list, tuple)) else x
+
+
+def _last(x: Any) -> Any:
+    """sdcflows' ``utils.misc.last``: the last element of a list or tuple, else ``x``."""
+    return x[-1] if isinstance(x, (list, tuple)) else x
+
+
+def _header_of(path: Any) -> NiftiHeader:
+    from larmorx.sdcflows.bspline import _read_header
+
+    return _read_header(path)
+
+
+def _unsigned_axcodes(affine: Any) -> tuple[str | None, ...]:
+    """``nb.aff2axcodes(affine, ['RR', 'AA', 'SS'])``: each voxel axis's closest world axis,
+    without its sign."""
+    from larmorx.niworkflows import aff2axcodes
+
+    unsign = {"L": "R", "R": "R", "P": "A", "A": "A", "I": "S", "S": "S"}
+    return tuple(None if c is None else unsign[c] for c in aff2axcodes(affine))
+
+
+def warp_dir(
+    moving_image: str | os.PathLike[str],
+    fixed_image: str | os.PathLike[str],
+    pe_dir: str,
+    nlevels: int = 2,
+) -> list[list[float]]:
+    """sdcflows' ``_warp_dir``: ``antsRegistration``'s ``restrict_deformation`` for each of
+    ``nlevels`` levels: 0.1 on every axis of the fixed image but the one closest to the moving
+    image's phase-encoding axis (``pe_dir``: ``i``, ``j``, ``k``, signed or not), 1.0 there.
+    Logs sdcflows' warning (``larmorx.sdcflows``) when the fixed image is oblique (nibabel's
+    obliquity above 0.05 radians on an axis). A ``pe_dir`` or an axis it cannot match raises
+    the ``ValueError`` sdcflows' ``str.index``/``tuple.index`` raise."""
+    import logging
+
+    moving = nibabel_affine(_header_of(moving_image))
+    fixed = nibabel_affine(_header_of(fixed_image))
+    if np.any(obliquity(fixed) > _WARP_DIR_OBLIQUITY):
+        logging.getLogger("larmorx.sdcflows").warning(
+            "Running fieldmap-less registration on an oblique dataset"
+        )
+    moving_pe_axis = _unsigned_axcodes(moving)["ijk".index(pe_dir[0])]
+    fixed_axcodes = _unsigned_axcodes(fixed)
+    deformation = [0.1, 0.1, 0.1]
+    deformation[fixed_axcodes.index(moving_pe_axis)] = 1.0
+    return nlevels * [deformation]
+
+
+def mm2vox(
+    moving_image: str | os.PathLike[str],
+    fixed_image: str | os.PathLike[str],
+    pe_dir: str,
+    registration_config: Mapping[str, Any],
+) -> list[list[Any]]:
+    """sdcflows' ``_mm2vox``: the settings' ``transform_parameters`` with each level's third
+    value (SyN's total-field variance, mm) divided by the fixed image's voxel size along the
+    axis closest to the moving image's phase-encoding axis (nibabel's ``voxel_sizes``)."""
+    params = registration_config["transform_parameters"]
+    moving = nibabel_affine(_header_of(moving_image))
+    moving_pe_axis = _unsigned_axcodes(moving)["ijk".index(pe_dir[0])]
+    fixed = nibabel_affine(_header_of(fixed_image))
+    fixed_axcodes = _unsigned_axcodes(fixed)
+    zooms = np.sqrt(np.sum(fixed[:-1, :-1] ** 2, axis=0))
+    pe_res = zooms[fixed_axcodes.index(moving_pe_axis)]
+    return [[*level[:2], level[2] / pe_res] for level in params]
+
+
+def adjust_zooms(
+    in_anat: str | os.PathLike[str],
+    in_epi: str | os.PathLike[str],
+    z_max: float = 2.2,
+    z_min: float = 1.8,
+) -> tuple[Any, Any, Any]:
+    """sdcflows' ``_adjust_zooms``: ``min(round(max(0.5 * (anat + epi), z_min), 2), z_max)``
+    three times, ``anat`` and ``epi`` the smallest of each header's three voxel sizes; numpy
+    2's arithmetic of the header's float32 values (a float32 result, or the Python bound)."""
+    f32 = np.float32
+    anat_res = min(f32(z) for z in _header_of(in_anat).zooms[:3])
+    epi_res = min(f32(z) for z in _header_of(in_epi).zooms[:3])
+    half = f32(f32(anat_res + epi_res) * f32(0.5))
+    # Python's max and min keep the first argument unless the second is larger (smaller); a
+    # float32 is compared with a Python float in float32 (NEP 50); numpy rounds a float32 in
+    # float32 (x * 100, rint, / 100)
+    value: Any
+    if f32(z_min) > half:
+        value = round(float(z_min), 2)
+        if z_max < value:
+            value = z_max
+    else:
+        value = f32(np.rint(f32(half * f32(100.0))) / f32(100.0))
+        if f32(z_max) < value:
+            value = z_max
+    return (value, value, value)
+
+
+def norm_lap(
+    in_file: str | os.PathLike[str],
+    *,
+    out_dir: str | os.PathLike[str] = ".",
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> str:
+    """sdcflows' ``_norm_lap`` (from nirodents): the image (float64) minus its median, its
+    positive values divided by their 99.8th percentile and its negative ones by minus their
+    0.2th (numpy's linear percentiles), clipped to [-1, 1] and written as float32 with the
+    input's header as ``<name>_norm`` in ``out_dir``.
+
+    An image with no positive or no negative value after the median's subtraction (a constant
+    image, for example) has no such percentile: sdcflows fails with numpy's ``IndexError``
+    (``"reproduce"``); larmorx raises a ``ValueError`` saying so (SDC-14, rule B)."""
+    from larmorx import _core
+
+    _defects.check(upstream_defects)
+    in_file = os.fspath(in_file)
+    img = load_nibabel(in_file, dtype=np.float64, n_threads=n_threads)
+    assert img.header is not None
+    data = np.array(img.data, dtype=np.float64)
+    data -= np.float64(_core.numpy_median(data))
+    pos = data[data > 0]
+    neg = data[data < 0]
+    if pos.size == 0 or neg.size == 0:
+        if upstream_defects == "reproduce":
+            raise IndexError("index -1 is out of bounds for axis 0 with size 0")
+        side = "positive" if pos.size == 0 else "negative"
+        raise ValueError(
+            f"{in_file}: the Laplacian has no {side} value after its median is subtracted "
+            "(a constant image?), so it cannot be normalised (sdcflows fails here with "
+            "numpy's IndexError: SDC-14)"
+        )
+    l_max = _core.numpy_percentile(pos, [99.8])[0]
+    l_min = _core.numpy_percentile(neg, [0.2])[0]
+    data[data < 0] *= -1.0 / l_min
+    data[data > 0] *= 1.0 / l_max
+    data = np.clip(data, -1.0, 1.0)
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = _nipype.fname_presuffix(
+        os.path.basename(in_file), suffix="_norm", newpath=os.path.abspath(os.fspath(out_dir))
+    )
+    save_nibabel(
+        Image(data.astype(np.float32), img.affine, img.header),
+        out_file,
+        dtype=np.dtype(np.float32),
+        n_threads=n_threads,
+    )
+    return out_file
+
+
+def _laplacian(op1: str, cwd: str, upstream_defects: str, n_threads: int) -> tuple[str, str]:
+    """sdcflows' ``ImageMath(operation='Laplacian', op2='1.5 1', copy_header=True)``: nipype's
+    line (``ImageMath 3 <op1>_maths Laplacian <op1> 1.5 1``) run by larmorx's port, then
+    nipype's ``copy_header`` (``keep_dtype``)."""
+    cmd = _nipype.image_math(cwd=cwd, op1=op1, operation="Laplacian", op2="1.5 1", copy_header=True)
+    _nipype.run(cmd, n_threads=n_threads, upstream_defects=upstream_defects)
+    out = cmd.outputs["output_image"]
+    _copy_header_keep_dtype(op1, out, n_threads)
+    return out, cmd.cmdline
+
+
+@dataclass(frozen=True)
+class SynSdcResult:
+    """``init_syn_sdc_wf``'s outputs: ``fmap`` (the field map, Hz, on the EPI reference's
+    grid: ``unwarp``'s ``out_field``), ``fmap_ref`` (the EPI reference unwarped:
+    ``out_corrected``), ``fmap_coeff`` (the B-spline coefficients, one file per control grid),
+    ``fmap_mask`` (the anatomical mask on the field's grid), ``out_warp`` (declared by sdcflows'
+    output node and never connected: ``None``), ``method``; the readout time and
+    phase-encoding direction read from the metadata; ``zooms`` (``find_zooms``' value); the
+    files of the other nodes and the command lines nipype would write."""
+
+    fmap: str
+    fmap_ref: str
+    fmap_coeff: tuple[str, ...]
+    fmap_mask: str
+    out_warp: None
+    method: str
+    readout_time: float
+    pe_direction: str
+    zooms: tuple[Any, Any, Any]
+    files: Mapping[str, Any]
+    commands: Mapping[str, str]
+
+
+def syn_sdc_workflow(
+    epi_ref: tuple[str | os.PathLike[str], Mapping[str, Any]] | Sequence[Any],
+    epi_mask: str | os.PathLike[str],
+    anat_ref: str | os.PathLike[str],
+    anat_mask: str | os.PathLike[str],
+    sd_prior: str | os.PathLike[str],
+    *,
+    out_dir: str | os.PathLike[str],
+    name: str = "syn_sdc_wf",
+    use_metadata_estimates: bool = False,
+    fallback_total_readout_time: float | None = None,
+    sloppy: bool = False,
+    debug: bool = False,
+    omp_nthreads: int = 1,
+    laplacian_weight: Sequence[float] | None = None,
+    ants_random_seed: int | None = None,
+    niworkflows_version: str = NIWORKFLOWS_VERSION,
+    numpy_version: str = "2.5.4",
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> SynSdcResult:
+    """sdcflows' ``init_syn_sdc_wf``: the fieldmap-less ("SyN") estimation of the
+    susceptibility distortion, from :func:`syn_preprocessing_workflow`'s outputs.
+
+    The EPI reference (``epi_ref``: its path and metadata) is clipped (``IntensityClip(35,
+    99.9)``) and registered to the anatomical reference in its space (``anat_ref``) with
+    ``antsRegistration`` and sdcflows' ``sd_syn.json`` (``sd_syn_sloppy.json`` with
+    ``sloppy``): two images per side (the image and its normalised Laplacian, ANTs'
+    ``ImageMath ... Laplacian 1.5 1``), the deformation restricted to the axis of the phase
+    encoding (:func:`warp_dir`, SyN's field variance in voxels: :func:`mm2vox`), the fixed
+    masks ``[anat_mask, sd_prior]``, the moving ones ``[NULL, epi_mask | anat_mask dilated]``.
+    The registration's displacement field becomes a field map (Hz:
+    :func:`displacements_field_to_fieldmap` with the metadata's readout time,
+    :func:`get_readout_time`), is brought onto the EPI reference's grid (``antsApplyTransforms
+    -t identity``, B-spline, ``-u float``), smoothed by sdcflows' B-spline fit
+    (:func:`bspline_approx`, ``recenter=False``; ``zooms_min=4`` with ``sloppy``) and applied
+    to the EPI reference (:func:`apply_coeffs_field`, no Jacobian). The nodes write into
+    ``out_dir/<name>/<node>`` as nipype's do (fMRIPrep names the workflow ``wf_<estimator>``).
+
+    ``laplacian_weight`` (two weights, each clipped to [0, 0.5]) replaces the settings' metric
+    weights by ``[[1 - w0, w0], [1 - w1, w1]]``. ``debug`` writes the registration's warped
+    images and every second iteration's volumes (``--write-interval-volumes 2``) and fits
+    without extrapolation, as sdcflows does. ``ants_random_seed`` is what ANTs reads from
+    ``ANTS_RANDOM_SEED`` (fMRIPrep sets it); ``omp_nthreads`` the registration's thread count
+    in nipype's line; ``n_threads`` larmorx's (the results do not depend on either).
+    ``numpy_version`` selects the clip's percentile arithmetic; ``niworkflows_version`` the
+    version written into ``descrip``.
+
+    One node is not computed: ``zooms_epi`` (niworkflows' ``RegridToZooms`` of the clipped EPI
+    to ``find_zooms``' voxel size), whose output sdcflows never connects (SDC-15, rule C: no
+    result depends on it); ``zooms`` holds ``find_zooms``' value."""
+    import json
+
+    from larmorx.niworkflows import intensity_clip
+    from larmorx.niworkflows.header import copy_xform
+    from larmorx.sdcflows.approx import bspline_approx
+    from larmorx.sdcflows.bspline import DEFAULT_HF_ZOOMS_MM
+    from larmorx.sdcflows.fmap import displacements_field_to_fieldmap
+    from larmorx.sdcflows.masks import binary_dilation, union
+    from larmorx.sdcflows.pepolar import get_readout_time
+    from larmorx.sdcflows.registration import registration_settings
+    from larmorx.sdcflows.transform import apply_coeffs_field
+
+    _defects.check(upstream_defects)
+    wf = os.path.join(os.path.abspath(os.fspath(out_dir)), name)
+
+    def node(n: str) -> str:
+        p = os.path.join(wf, n)
+        os.makedirs(p, exist_ok=True)
+        return p
+
+    epi_file = os.path.abspath(os.fspath(_front(epi_ref)))
+    metadata = _last(epi_ref)
+    epi_mask = os.path.abspath(os.fspath(epi_mask))
+    anat_ref = os.path.abspath(os.fspath(anat_ref))
+    anat_mask = os.path.abspath(os.fspath(anat_mask))
+    sd_prior = os.path.abspath(os.fspath(sd_prior))
+    ants_threads = max(int(omp_nthreads), 1)
+    files: dict[str, Any] = {}
+    commands: dict[str, str] = {}
+    at_message = f"FixHeaderApplyTransforms (niworkflows v{niworkflows_version})"
+
+    # readout_time
+    node("readout_time")
+    ro = get_readout_time(
+        metadata,
+        epi_file,
+        use_estimate=use_metadata_estimates,
+        fallback=fallback_total_readout_time,
+    )
+    # clip_epi, and the two Laplacians
+    clipped = intensity_clip(
+        epi_file,
+        p_min=35.0,
+        p_max=99.9,
+        out_dir=node("clip_epi"),
+        numpy_version=numpy_version,
+        n_threads=n_threads,
+    )
+    assert clipped.out_file is not None
+    clip_epi = clipped.out_file
+    lap_anat, commands["lap_anat"] = _laplacian(
+        anat_ref, node("lap_anat"), upstream_defects, ants_threads
+    )
+    lap_anat_norm = norm_lap(
+        lap_anat, out_dir=node("lap_anat_norm"), upstream_defects=upstream_defects,
+        n_threads=n_threads,
+    )  # fmt: skip
+    lap_epi, commands["lap_epi"] = _laplacian(
+        clip_epi, node("lap_epi"), upstream_defects, ants_threads
+    )
+    lap_epi_norm = norm_lap(
+        lap_epi, out_dir=node("lap_epi_norm"), upstream_defects=upstream_defects,
+        n_threads=n_threads,
+    )  # fmt: skip
+    # the masks: anat_dilmsk, amask2epi, epi_umask
+    _, anat_dil = binary_dilation(anat_mask, out_dir=node("anat_dilmsk"), n_threads=n_threads)
+    assert anat_dil is not None
+    amask2epi, commands["amask2epi"] = _apply_transforms(
+        node("amask2epi"),
+        anat_dil,
+        epi_mask,
+        ["identity"],
+        None,
+        "MultiLabel",
+        at_message,
+        upstream_defects,
+        n_threads,
+    )
+    _, umask = union(epi_mask, amask2epi, out_dir=node("epi_umask"), n_threads=n_threads)
+    assert umask is not None
+    # find_zooms (zooms_epi's RegridToZooms is not computed: SDC-15)
+    node("find_zooms")
+    zooms = adjust_zooms(anat_ref, epi_file)
+    # warp_dir, vox_params
+    node("warp_dir")
+    restrict = warp_dir(clip_epi, anat_ref, ro.pe_direction, nlevels=2)
+    settings_file = registration_settings(f"sd_syn{'_sloppy' * bool(sloppy)}.json")
+    node("vox_params")
+    config = json.loads(settings_file.read_text(encoding="utf-8"))
+    transform_parameters = mm2vox(clip_epi, anat_ref, ro.pe_direction, config)
+    # syn
+    extra: dict[str, Any] = {}
+    if laplacian_weight is not None:
+        w = (
+            max(min(laplacian_weight[0], MAX_LAPLACIAN_WEIGHT), 0.0),
+            max(min(laplacian_weight[1], MAX_LAPLACIAN_WEIGHT), 0.0),
+        )
+        extra["metric_weight"] = [[1.0 - w[0], w[0]], [1.0 - w[1], w[1]]]
+    if debug:
+        extra["args"] = "--write-interval-volumes 2"
+    reg = _nipype.registration(
+        cwd=node("syn"),
+        from_file=settings_file,
+        output_warped_image=bool(debug),
+        output_inverse_warped_image=bool(debug),
+        restrict_deformation=restrict,
+        fixed_image=[anat_ref, lap_anat_norm],
+        fixed_image_masks=[anat_mask, sd_prior],
+        moving_image=[clip_epi, lap_epi_norm],
+        moving_image_masks=["NULL", umask],
+        transform_parameters=transform_parameters,
+        num_threads=ants_threads,
+        **extra,
+    )
+    _nipype.run(
+        reg,
+        n_threads=ants_threads,
+        upstream_defects=upstream_defects,
+        ants_random_seed=ants_random_seed,
+    )
+    commands["syn"] = reg.cmdline
+    message = f"FixHeaderRegistration (niworkflows v{niworkflows_version})"
+    for key, ref_image in (("warped_image", anat_ref), ("inverse_warped_image", clip_epi)):
+        produced = reg.outputs.get(key)
+        if produced:
+            copy_xform(ref_image, produced, message=message, n_threads=n_threads)
+            files[f"syn_{key}"] = produced
+    forward = list(reg.outputs["forward_transforms"])
+    # extract_field, zooms_field, zooms_bmask
+    extracted = displacements_field_to_fieldmap(
+        _front(forward),
+        clip_epi,
+        ro.readout_time,
+        ro.pe_direction,
+        out_dir=node("extract_field"),
+    )
+    assert extracted.out_file is not None
+    zooms_field, commands["zooms_field"] = _apply_transforms(
+        node("zooms_field"),
+        os.fspath(extracted.out_file),
+        epi_file,
+        ["identity"],
+        None,
+        "BSpline",
+        at_message,
+        upstream_defects,
+        n_threads,
+        args="-u float",
+    )
+    zooms_bmask, commands["zooms_bmask"] = _apply_transforms(
+        node("zooms_bmask"),
+        anat_mask,
+        zooms_field,
+        ["identity"],
+        None,
+        "MultiLabel",
+        at_message,
+        upstream_defects,
+        n_threads,
+        args="-u uchar",
+    )
+    # bs_filter, unwarp
+    fit_kwargs: dict[str, Any] = {"zooms_min": 4.0} if sloppy else {}
+    fit = bspline_approx(
+        zooms_field,
+        None,
+        bs_spacing=[DEFAULT_HF_ZOOMS_MM],
+        recenter=False,
+        extrapolate=not debug,
+        debug=debug,
+        out_dir=node("bs_filter"),
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
+        **fit_kwargs,
+    )
+    coeffs = tuple(os.fspath(p) for p in fit.out_coeff)
+    unwarped = apply_coeffs_field(
+        epi_file,
+        list(coeffs),
+        ro.readout_time,
+        ro.pe_direction,
+        jacobian=False,
+        out_dir=node("unwarp"),
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
+    )
+    assert unwarped.out_corrected is not None and unwarped.out_field is not None
+    files.update(
+        {
+            "clip_epi": clip_epi,
+            "lap_anat": lap_anat,
+            "lap_anat_norm": lap_anat_norm,
+            "lap_epi": lap_epi,
+            "lap_epi_norm": lap_epi_norm,
+            "anat_dilmsk": anat_dil,
+            "amask2epi": amask2epi,
+            "epi_umask": umask,
+            "warp_dir": restrict,
+            "vox_params": transform_parameters,
+            "syn": forward,
+            "extract_field": os.fspath(extracted.out_file),
+            "zooms_field": zooms_field,
+            "zooms_bmask": zooms_bmask,
+            "bs_filter": coeffs,
+        }
+    )
+    return SynSdcResult(
+        fmap=os.fspath(unwarped.out_field),
+        fmap_ref=os.fspath(unwarped.out_corrected),
+        fmap_coeff=coeffs,
+        fmap_mask=zooms_bmask,
+        out_warp=None,
+        method=SYN_METHOD,
+        readout_time=ro.readout_time,
+        pe_direction=ro.pe_direction,
+        zooms=zooms,
         files=files,
         commands=commands,
     )

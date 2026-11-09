@@ -7408,6 +7408,68 @@ def _(ctx: Context) -> dict[str, Any]:
 
 
 @case(
+    "py.sdcflows.syn_sdc",
+    covers=(
+        "lx.sdcflows.syn_sdc_workflow",
+        "lx.sdcflows.warp_dir",
+        "lx.sdcflows.mm2vox",
+        "lx.sdcflows.adjust_zooms",
+        "lx.sdcflows.norm_lap",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_syn_sdc_wf on init_syn_preprocessing_wf's outputs of the synthetic head
+    (the registration seeded; the sloppy settings, the B-spline fit at 4 mm, debug's warped
+    images and interval volumes, Laplacian weights clipped to 0.5: fMRIPrep's call differs only
+    by its settings file), its helpers' values, and _norm_lap's constant image (SDC-14 fixed
+    and reproduced)."""
+    inp = _syn_inputs(ctx)
+    meta = {"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.0315}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        pre = lx.sdcflows.syn_preprocessing_workflow(
+            [inp["epi"]], [meta], inp["anat"], inp["mask"], inp["xfm"], out_dir=ctx.out("pre"),
+            auto_bold_nss=True, prior_file=inp["prior"], ants_random_seed=7,
+        )  # fmt: skip
+        res = lx.sdcflows.syn_sdc_workflow(
+            pre.epi_ref, pre.epi_mask, pre.anat_ref, pre.anat_mask, pre.sd_prior,
+            out_dir=ctx.out("syn"), name="wf_auto_00000", sloppy=True, debug=True,
+            laplacian_weight=(0.3, 0.7), ants_random_seed=7,
+        )  # fmt: skip
+    out: dict[str, Any] = {
+        name: Nifti(getattr(res, name)) for name in ("fmap", "fmap_ref", "fmap_mask")
+    }
+    out["fmap_coeff"] = Nifti(res.fmap_coeff[0])
+    out["warped"] = Nifti(res.files["syn_warped_image"])
+    for name in ("lap_anat_norm", "lap_epi_norm", "epi_umask", "extract_field", "zooms_field"):
+        out[name] = Nifti(res.files[name])
+    out["ro"] = np.asarray([res.readout_time])
+    out["warp_dir"] = np.asarray(
+        lx.sdcflows.warp_dir(res.files["clip_epi"], pre.anat_ref, "j-", nlevels=3)
+    )
+    cfg = json.loads(lx.sdcflows.registration_settings("sd_syn_sloppy.json").read_text())
+    out["mm2vox"] = np.asarray(
+        lx.sdcflows.mm2vox(res.files["clip_epi"], pre.anat_ref, "i", cfg), dtype=np.float64
+    )
+    out["zooms"] = np.asarray(
+        [*lx.sdcflows.adjust_zooms(pre.anat_ref, pre.epi_ref[0]), *res.zooms], dtype=np.float64
+    )
+    flat = ctx.out("flat.nii.gz")
+    lx.save((np.full((6, 5, 4), 3.0, dtype=np.float32), np.eye(4)), flat)
+    errors = []
+    for mode in ("fix", "reproduce"):
+        try:
+            lx.sdcflows.norm_lap(flat, out_dir=ctx.out("flat"), upstream_defects=mode)
+            errors.append(0)
+        except ValueError:
+            errors.append(1)
+        except IndexError:
+            errors.append(2)
+    out["sdc14"] = np.asarray(errors)
+    return out
+
+
+@case(
     "py.niworkflows.epi_reference",
     covers=(
         "lx.niworkflows.epi_reference_workflow",

@@ -47,6 +47,8 @@ Rust (``larmorx-sdcflows``):
 - :func:`syn_preprocessing_workflow`, :func:`deoblique`, :func:`reoblique`, :func:`set_dtype`,
   :func:`merge_meta`, :func:`obliquity`, :func:`fmap_atlas`, :func:`fmap_atlas_affine`: the
   fieldmap-less (SyN) preprocessing (``init_syn_preprocessing_wf``) and its helpers.
+- :func:`syn_sdc_workflow`, :func:`warp_dir`, :func:`mm2vox`, :func:`adjust_zooms`,
+  :func:`norm_lap`: the fieldmap-less (SyN) estimation (``init_syn_sdc_wf``) and its helpers.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -122,14 +124,20 @@ from larmorx.sdcflows.registration import (
 from larmorx.sdcflows.ridge import RidgeResult, ridge_sparse_cg
 from larmorx.sdcflows.syn import (
     SynPreprocessingResult,
+    SynSdcResult,
+    adjust_zooms,
     deoblique,
     fmap_atlas,
     fmap_atlas_affine,
     merge_meta,
+    mm2vox,
+    norm_lap,
     obliquity,
     reoblique,
     set_dtype,
     syn_preprocessing_workflow,
+    syn_sdc_workflow,
+    warp_dir,
 )
 from larmorx.sdcflows.tools import resample_to_zooms, rescale_affine
 from larmorx.sdcflows.transform import (
@@ -171,9 +179,11 @@ __all__ = [
     "SelectPEVolumesResult",
     "SortPEBlipsResult",
     "SynPreprocessingResult",
+    "SynSdcResult",
     "TopupNodeResult",
     "TopupWorkflowResult",
     "UniformGridResult",
+    "adjust_zooms",
     "apply_coeffs_field",
     "au2rads",
     "binary_dilation",
@@ -200,6 +210,8 @@ __all__ = [
     "grid_bspline_weights",
     "magnitude_workflow",
     "merge_meta",
+    "mm2vox",
+    "norm_lap",
     "obliquity",
     "pad_slices",
     "phdiff2fmap",
@@ -217,6 +229,7 @@ __all__ = [
     "sort_pe_blips",
     "subtract_phases",
     "syn_preprocessing_workflow",
+    "syn_sdc_workflow",
     "topup_coeff_reorient",
     "topup_config_file",
     "topup_mats_to_world",
@@ -225,4 +238,5 @@ __all__ = [
     "transform_coefficients",
     "uniform_grid",
     "union",
+    "warp_dir",
 ]

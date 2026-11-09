@@ -149,3 +149,14 @@ nilearn 0.14.1 and 0.11.1 (BSD-3-Clause; tags `nilearn-0.14.1`, `nilearn-0.11.1`
 `_downcast_from_int64_if_possible`); transforms3d 0.4.2 (BSD-2-Clause) `affines.decompose44` and
 `axangles.mat2axangle` (`ValidateImage`'s report). nibabel 5.4.2's `ArrayWriter(check_scaling=False)`
 path into `python/larmorx/io/nibabel_writer.py` (`save_nibabel(scale=False)`).
+
+## Part B: the fieldmap-less (SyN) estimation (`python/larmorx/sdcflows/syn.py`, relay 10)
+
+sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1) `workflows/fit/syn.py` (`init_syn_sdc_wf`,
+`INPUT_FIELDS`, `MAX_LAPLACIAN_WEIGHT`, `_warp_dir`, `_mm2vox`, `_adjust_zooms`, `_norm_lap`) and
+`utils/misc.py` (`front`, `last`); nipype 1.12.0's `interfaces/ants/utils.py` (`ImageMath`, its
+`copy_header` through `interfaces/mixins/fixheader.py`'s `CopyHeaderInterface`; Apache-2.0);
+nibabel 5.4.2's `orientations.aff2axcodes` with sdcflows' unsigned labels and `affines.voxel_sizes`
+(MIT). The nodes run through larmorx's earlier ports (`lx.niworkflows.intensity_clip`, sdcflows'
+`BinaryDilation`, `Union`, `GetReadoutTime`, `DisplacementsField2Fieldmap`, `BSplineApprox`,
+`ApplyCoeffsField`; ANTs' `ImageMath`, `antsRegistration`, `antsApplyTransforms`).

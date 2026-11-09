@@ -10,6 +10,7 @@ is re-expressed in Rust; no code was copied verbatim. Each source file reproduce
 | `neighbourhood::map_coordinate`, `Neighbourhood` (the boundary rules and the offsets of a footprint's elements) | `scipy/ndimage/src/ni_support.c` (`NI_InitFilterOffsets`, `NI_InitFilterIterator`) | BSD-3-Clause (Peter J. Verveer) |
 | `filters::min_or_max_filter` | `src/ni_filters.c` (`NI_MinOrMaxFilter`, `CASE_MIN_OR_MAX_POINT`, `CASE_FILTER_OUT`, `CASE_FILTER_OUT_SAFE`) | BSD-3-Clause |
 | `filters::min_or_max_filter1d`, `extend_line`, `harter` | `src/ni_filters.c` (`NI_MinOrMaxFilter1D`, Richard Harter's sliding minimum as SciPy adapts it), `src/ni_support.c` (`NI_ExtendLine`, `NI_InitLineBuffer`, `CASE_COPY_LINE_TO_DATA`) | BSD-3-Clause |
+| `filters::correlate1d` (relay 18 of the field maps' part B) | `src/ni_filters.c` (`NI_Correlate1D`: the symmetry test, the three sums), `src/ni_support.c` (`NI_ExtendLine`, `NI_ArrayToLineBuffer`, `CASE_COPY_LINE_TO_DATA`) | BSD-3-Clause |
 | `filters::rank_filter`, `ni_select` | `src/ni_filters.c` (`NI_RankFilter`, `CASE_RANK_POINT`, `NI_Select`) | BSD-3-Clause |
 | `filters::rank_filter_1d`, `Mediator` | `src/_rank_filter_1d.cpp` (`Mediator`, `MediatorInsert` and its heap helpers, `_rank_filter`; Copyright (c) 2011 ashelly.myopenid.com, MIT, modified in 2024 by Gideon Genadi Kogan) | MIT within BSD-3-Clause |
 | `morphology::binary_erosion`, `pass`, `propagate`, `center_is_true`, `dilation_arguments`, `generate_binary_structure`, `iterate_structure`, `MaskElement` | `src/ni_morphology.c` (`NI_BinaryErosion`, `CASE_NI_ERODE_POINT`, `NI_BinaryErosion2`, `CASE_ERODE_POINT2`), `_morphology.py` (`_binary_erosion`, `binary_dilation`, `_center_is_true`, `generate_binary_structure`, `iterate_structure`) | BSD-3-Clause |
@@ -28,7 +29,10 @@ arise.
 The Python wrappers (`python/larmorx/_ndimage_filters.py`) port `_filters.py`
 (`_min_or_max_filter`, `_rank_filter`, `minimum_filter1d`, `maximum_filter1d`, the `axes`,
 origin and mode helpers), `_morphology.py` (`grey_*`, `binary_*`) and `_ni_support.py`
-(`_normalize_sequence`, `_check_axes`, `_get_output`) with their messages.
+(`_normalize_sequence`, `_check_axes`, `_get_output`) with their messages; and (relay 18)
+`correlate1d`, `_gaussian_kernel1d` (order 0), `gaussian_filter1d` and `gaussian_filter` from
+`_filters.py` (the same in SciPy 1.15.3), the kernel's `exp` and sum through numpy's
+(`larmorx_core::numpy::umath::exp_f64`, `reduce::add_reduce_ordered`).
 
 **Deliberate differences** (`docs/api/ndimage-filters.md`, "Differences from SciPy"): where
 SciPy reads or writes outside its arrays (binary morphology with an origin before its structure,

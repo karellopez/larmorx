@@ -1,6 +1,7 @@
 # SciPy's ndimage filters, morphology, labelling and watershed
 
-`lx.ndimage` holds a replica of `scipy.ndimage`'s minimum, maximum, rank, median and
+`lx.ndimage` holds a replica of `scipy.ndimage`'s `correlate1d`, `gaussian_filter1d` and
+`gaussian_filter`, minimum, maximum, rank, median and
 percentile filters, grey and binary morphology, `label`, `sum_labels`, `center_of_mass` and
 `watershed_ift`, besides its spline
 interpolation ([resample-series.md](resample-series.md)). They are ported from **SciPy 1.18.1**
@@ -23,6 +24,11 @@ environments (`validation/investigations/sdcflows-fieldmap-b/`). `center_of_mass
 `watershed_ift` (relay 15, 2026-11-09): SciPy's on 44 and 600 seeded cases per environment and on
 sdcflows' `epi_mask` of four oracle runs' BOLD references (`check_epi_mask.py`; the watershed with
 `upstream_defects="reproduce"`, its corrected labels against an independent implementation).
+`correlate1d` and the Gaussian filters (relay 18, 2026-11-09): SciPy's on 7,178 seeded cases per
+environment (`check_regrid.py --sections filters`: 1- to 3-D, six element types, symmetric,
+anti-symmetric, asymmetric and even kernels, every origin and mode, output types, sigmas per
+axis and zero, `truncate`, `radius`, `axes`, the errors), and through niworkflows'
+`RegridToZooms` on fMRIPrep's own nodes ([niworkflows-helpers.md](niworkflows-helpers.md)).
 
 ```python
 import numpy as np
@@ -45,6 +51,8 @@ contiguous); results are C-ordered, as SciPy's.
 
 | larmorx (`lx.ndimage.`) | SciPy (`scipy.ndimage.`) | Notes |
 |---|---|---|
+| `correlate1d` | the same | `weights` (float64), `axis`, `output`, `mode`, `cval`, `origin`; `NI_Correlate1D`: an odd kernel whose mirrored weights differ by at most `DBL_EPSILON` adds the mirrored pairs first (symmetric, or anti-symmetric with differences), from the outermost pair in, after the centre term; any other kernel the last term first, then the others in order; each line read into doubles and extended by `NI_ExtendLine`; C's cast to the output type. Complex input or weights: `NotImplementedError` |
+| `gaussian_filter1d`, `gaussian_filter` | the same | order 0 (`NotImplementedError` for derivatives); `sigma`, `mode`, `radius` per axis, `truncate`, `axes`, `output`; the kernel `exp(-0.5 / sigma**2 * x**2) / sum` with numpy's float64 `exp` on its path without AVX-512 (glibc's; on an AVX-512 CPU numpy takes Intel's SVML kernels, which differ in a few per cent of arguments: `larmorx_core::numpy::umath`) and numpy's sum (`numpy_version`, keyword); axes with `sigma <= 1e-15` skipped, each pass written in the output's type; none left: numpy's copy into the output's type |
 | `minimum_filter`, `maximum_filter` | the same | `size`, `footprint`, `output`, `mode`, `cval`, `origin`, `axes`; a full footprint or `size` is separable (one 1-D pass per axis, the first into the output's type), else `NI_MinOrMaxFilter` |
 | `minimum_filter1d`, `maximum_filter1d` | the same | `NI_MinOrMaxFilter1D` (Richard Harter's running minimum on the line extended by `NI_ExtendLine`) |
 | `rank_filter`, `median_filter`, `percentile_filter` | the same | the rank from the footprint's true elements; rank 0 and the last rank are the minimum and maximum filters; 1-D inputs use `_rank_filter_1d` (Ashelly's running rank, with the footprint's size) unless the footprint is too large for the input, as SciPy 1.18 decides; otherwise `NI_RankFilter` with SciPy's quickselect `NI_Select`; `upstream_defects` (SCI-09: a 1-D footprint with holes) |

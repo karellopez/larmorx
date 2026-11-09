@@ -29,6 +29,9 @@ with numpy's AVX-512 dispatch off (``NPY_DISABLE_CPU_FEATURES``).
 Prints one line per check and ``ALL OK`` or ``FAIL <n>``.
 """
 
+# The lambdas below run at once (inside `both` and `run`), so their loop variables are bound.
+# ruff: noqa: B023
+
 from __future__ import annotations
 
 import os
@@ -57,7 +60,16 @@ import check_workflows as cw  # noqa: E402
 from larmorx import ndimage as lnd  # noqa: E402
 from larmorx import niworkflows as lnw  # noqa: E402
 
-MODES = ("reflect", "grid-mirror", "constant", "grid-constant", "nearest", "mirror", "wrap", "grid-wrap")
+MODES = (
+    "reflect",
+    "grid-mirror",
+    "constant",
+    "grid-constant",
+    "nearest",
+    "mirror",
+    "wrap",
+    "grid-wrap",
+)
 TYPES = (np.float64, np.float32, np.int16, np.uint8, np.int32, np.bool_)
 
 
@@ -71,7 +83,7 @@ def run(fn):
         warnings.simplefilter("ignore")
         try:
             return "ok", fn()
-        except Exception as e:  # noqa: BLE001 - compared by type and text
+        except Exception as e:
             return type(e).__name__, str(e)
 
 
@@ -106,13 +118,17 @@ def sec_filters(t: cw.Tally, nt: int) -> None:
                     for axis in range(len(shape)):
                         lw = len(w)
                         for origin in sorted({0, -(lw // 2), (lw - 1) // 2}):
-                            label = f"{shape} {np.dtype(dt).name} {kname} {mode} axis {axis} o {origin}"
+                            label = (
+                                f"{shape} {np.dtype(dt).name} {kname} {mode} axis {axis} o {origin}"
+                            )
                             both(
                                 t,
                                 "correlate1d",
                                 label,
                                 lambda: snd.correlate1d(a, w, axis, None, mode, 3.5, origin),
-                                lambda: lnd.correlate1d(a, w, axis, None, mode, 3.5, origin, n_threads=nt),
+                                lambda: lnd.correlate1d(
+                                    a, w, axis, None, mode, 3.5, origin, n_threads=nt
+                                ),
                             )
             for out in (np.float32, np.int16, np.uint8):
                 both(
@@ -120,7 +136,9 @@ def sec_filters(t: cw.Tally, nt: int) -> None:
                     "correlate1d output types",
                     f"{shape} {np.dtype(dt).name} -> {np.dtype(out).name}",
                     lambda: snd.correlate1d(a, kernels["symmetric"], -1, out, "reflect"),
-                    lambda: lnd.correlate1d(a, kernels["symmetric"], -1, out, "reflect", n_threads=nt),
+                    lambda: lnd.correlate1d(
+                        a, kernels["symmetric"], -1, out, "reflect", n_threads=nt
+                    ),
                 )
     a = rng.normal(size=(5, 6))
     for label, args in [
@@ -130,12 +148,33 @@ def sec_filters(t: cw.Tally, nt: int) -> None:
         ("bad mode", (a, [1.0], -1, None, "bogus")),
         ("bad axis", (a, [1.0], 4)),
     ]:
-        both(t, "correlate1d errors", label, lambda: snd.correlate1d(*args), lambda: lnd.correlate1d(*args))
-    sigmas = [0.5, 1.0, 1.7, 3.0, (0.8, 0.0, 1.3), (0.0, 0.0, 0.0), np.array([0.25, 0.25, 0.25]), 1e-16]
+        both(
+            t,
+            "correlate1d errors",
+            label,
+            lambda: snd.correlate1d(*args),
+            lambda: lnd.correlate1d(*args),
+        )
+    sigmas = [
+        0.5,
+        1.0,
+        1.7,
+        3.0,
+        (0.8, 0.0, 1.3),
+        (0.0, 0.0, 0.0),
+        np.array([0.25, 0.25, 0.25]),
+        1e-16,
+    ]
     for dt in (np.float64, np.float32, np.int16, np.uint8):
         vol = rng.normal(100, 30, (11, 9, 8)).astype(dt)
         for sg in sigmas:
-            for extra in ({}, {"truncate": 2.5}, {"mode": "nearest"}, {"mode": ("reflect", "constant", "wrap")}, {"output": np.float32}):
+            for extra in (
+                {},
+                {"truncate": 2.5},
+                {"mode": "nearest"},
+                {"mode": ("reflect", "constant", "wrap")},
+                {"output": np.float32},
+            ):
                 label = f"{np.dtype(dt).name} sigma {sg} {extra}"
                 both(
                     t,
@@ -196,7 +235,8 @@ def regrid_ref(path: str, zooms, out_dir: Path, **kw) -> str:
 def sec_regrid(t: cw.Tally, nt: int, tmp: Path) -> None:
     rng = np.random.default_rng(7)
     affines = {
-        "plumb": np.diag([1.2, 1.0, 1.5, 1.0]) + np.array([[0, 0, 0, -30.0], [0, 0, 0, 20], [0, 0, 0, 5], [0, 0, 0, 0]]),
+        "plumb": np.diag([1.2, 1.0, 1.5, 1.0])
+        + np.array([[0, 0, 0, -30.0], [0, 0, 0, 20], [0, 0, 0, 5], [0, 0, 0, 0]]),
         "oblique": oblique([0.1, -0.05, 0.2], [1.0, 1.1, 0.9], [-40.0, 30.0, 12.0]),
         "lps": np.diag([-2.0, -2.0, 2.5, 1.0]),
     }
@@ -220,19 +260,34 @@ def sec_regrid(t: cw.Tally, nt: int, tmp: Path) -> None:
                 path = tmp / f"in_{dname}_{aname}_{qc}{sc}.nii.gz"
                 img.to_filename(path)
                 for zooms in zoom_sets:
-                    for kw in ({}, {"order": 1}, {"order": 0, "clip": False}, {"smooth": True}, {"smooth": 0.8}, {"order": 5}):
+                    for kw in (
+                        {},
+                        {"order": 1},
+                        {"order": 0, "clip": False},
+                        {"smooth": True},
+                        {"smooth": 0.8},
+                        {"order": 5},
+                    ):
                         i += 1
                         if i % 3 and kw not in ({}, {"smooth": True}):
                             continue  # one in three of the rarer options, every combination of the rest
                         label = f"{dname} {aname} q{qc}s{sc} {zooms} {kw}"
-                        ok_ref, ref = run(lambda: regrid_ref(str(path), zooms, tmp / f"ref{i}", **kw))
+                        ok_ref, ref = run(
+                            lambda: regrid_ref(str(path), zooms, tmp / f"ref{i}", **kw)
+                        )
                         ok_mine, mine = run(
-                            lambda: lnw.regrid_to_zooms(
-                                path, zooms, out_dir=tmp / f"mine{i}", n_threads=nt, **kw
-                            ).out_file
+                            lambda: (
+                                lnw.regrid_to_zooms(
+                                    path, zooms, out_dir=tmp / f"mine{i}", n_threads=nt, **kw
+                                ).out_file
+                            )
                         )
                         if ok_ref != "ok" or ok_mine != "ok":
-                            t.add("RegridToZooms: errors", ok_ref == ok_mine, f"{label}: {ok_ref} {ref} | {ok_mine} {mine}")
+                            t.add(
+                                "RegridToZooms: errors",
+                                ok_ref == ok_mine,
+                                f"{label}: {ok_ref} {ref} | {ok_mine} {mine}",
+                            )
                             continue
                         csp.tally(t, "RegridToZooms synthetic", label, ref, mine)
     # edge voxel sizes
@@ -242,12 +297,20 @@ def sec_regrid(t: cw.Tally, nt: int, tmp: Path) -> None:
         path = tmp / f"edge_{name}.nii.gz"
         img.to_filename(path)
         k1, v1 = run(lambda: regrid_ref(str(path), (2.0, 2.0, 2.0), tmp / f"ref_{name}"))
-        k2, v2 = run(lambda: lnw.regrid_to_zooms(path, (2.0, 2.0, 2.0), out_dir=tmp / f"mine_{name}").out_file)
+        k2, v2 = run(
+            lambda: (
+                lnw.regrid_to_zooms(path, (2.0, 2.0, 2.0), out_dir=tmp / f"mine_{name}").out_file
+            )
+        )
         if k1 == k2 == "ok":
             csp.tally(t, "RegridToZooms edge voxel sizes", name, v1, v2)
         else:
             ok = k1 == k2 and (str(v1).split("\n")[0] == str(v2).split("\n")[0])
-            t.add("RegridToZooms edge voxel sizes", ok, f"{name}: {k1} {str(v1)[:80]!r} | {k2} {str(v2)[:80]!r}")
+            t.add(
+                "RegridToZooms edge voxel sizes",
+                ok,
+                f"{name}: {k1} {str(v1)[:80]!r} | {k2} {str(v2)[:80]!r}",
+            )
 
 
 def regrid_nodes(root: Path) -> list[Path]:

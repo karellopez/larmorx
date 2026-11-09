@@ -40,9 +40,6 @@ from larmorx._defects import UpstreamDefectsName
 
 __all__ = [
     "binary_closing",
-    "correlate1d",
-    "gaussian_filter",
-    "gaussian_filter1d",
     "binary_dilation",
     "binary_erosion",
     "binary_fill_holes",
@@ -50,6 +47,9 @@ __all__ = [
     "binary_opening",
     "binary_propagation",
     "center_of_mass",
+    "correlate1d",
+    "gaussian_filter",
+    "gaussian_filter1d",
     "generate_binary_structure",
     "grey_closing",
     "grey_dilation",

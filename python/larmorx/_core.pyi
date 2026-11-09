@@ -428,6 +428,19 @@ def ndimage_min_or_max_filter1d(
 ) -> np.ndarray:
     """``_nd_image.min_or_max_filter1d``: the minimum or maximum over ``size`` along ``axis``."""
 
+def ndimage_correlate1d(
+    input: np.ndarray,
+    weights: list[float],
+    axis: int,
+    mode: str,
+    cval: float,
+    origin: int,
+    n_threads: int = 1,
+    output: str | None = None,
+) -> np.ndarray:
+    """``_nd_image.correlate1d``: the lines along ``axis`` correlated with ``weights`` and cast
+    to ``output`` (the input's type by default)."""
+
 def ndimage_rank_filter(
     input: np.ndarray,
     rank: int,
@@ -487,6 +500,9 @@ def numpy_median(a: np.ndarray, axis: int | None = None) -> np.ndarray:
 
 def numpy_exp_f32(a: np.ndarray) -> np.ndarray:
     """numpy's float32 ``exp`` (its AVX2/AVX-512 kernel), elementwise."""
+
+def numpy_exp_f64(a: np.ndarray) -> np.ndarray:
+    """numpy's float64 ``exp`` on its path without AVX-512 (glibc's), elementwise."""
 
 def numpy_clip_f32(a: np.ndarray, a_min: float, a_max: float) -> np.ndarray:
     """``numpy.clip`` of a float32 array with float32 bounds."""
@@ -554,6 +570,18 @@ def linalg_matmul4(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def linalg_inv4(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """``np.linalg.inv`` of an ``(n, 4, 4)`` float64 stack as OpenBLAS's ``dgesv`` computes it;
     NaN for singular matrices, and which were singular (bool, ``(n,)``)."""
+
+def linalg_scipy_inv4(
+    a: np.ndarray, scipy_version: str
+) -> tuple[str, str, np.ndarray | None, np.ndarray | None, float]:
+    """``scipy.linalg.inv`` of a finite float64 4×4 matrix as SciPy ``scipy_version`` (1.15 or
+    1.18) computes it: ``(structure, status, inverse, lu, rcond)``; ``status`` is "ok",
+    "ill_conditioned", "estimate_needed", "singular", "norm_overflow" (SCI-18: ``lu`` is
+    SciPy's result) or "symmetric_not_ported"."""
+
+def linalg_affine_points(affine: np.ndarray, points: np.ndarray, n_threads: int = 1) -> np.ndarray:
+    """``affine.dot(np.vstack((points.T, ones)))[:3].T`` for ``(n, 3)`` float64 points, in the
+    operation order of numpy's OpenBLAS Haswell ``dgemm`` (``dgemv`` for one point)."""
 
 def linalg_closest_orthogonal(rs: np.ndarray) -> np.ndarray:
     """nibabel's ``io_orientation`` polar step for a 3×3 matrix (vnl's SVD)."""

@@ -98,6 +98,24 @@ and stage 4's field-map branch, `init_bold_native_wf`'s field-map nodes, `_selec
 `workflows/base.py` (the Jacobian rule, the missing-readout-time message), with niworkflows
 1.15.4's `utils/connections.listify` and nipype 1.12.0's `Merge` (Apache-2.0).
 
+## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
+
+**Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`
+`invert_slice_general`, `invert_slice_triangular`, `invert_slice_diagonal`, `_inverse`,
+`src/_common_array_utils.hh` `bandwidth`, `is_sym_or_herm`, `norm1_`, `swap_cf`,
+`zero_other_triangle`, `_calc_lwork`) and SciPy 1.15.3 (`scipy/linalg/_basic.py` `inv`), BSD-3-Clause;
+with the OpenBLAS their wheels bundle (0.3.31.dev and 0.3.28; read in the 0.3.30 release
+tarball, `tags/OpenBLAS-0.3.30`: `interface/lapack/getrf.c`, `trtri.c`, `interface/gemv.c`,
+`lapack/getrf/getrf_single.c`, `lapack/trtri/trtri_U_single.c`, `trtri_L_single.c`,
+`lapack/trti2/trti2_U.c`, `trti2_L.c`, `driver/level2/trmv_U.c`, `trmv_L.c`,
+`kernel/x86_64/daxpy.c`, `dscal.c`, `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`,
+`KERNEL.HASWELL`; the reference LAPACK in `lapack-netlib/SRC/dgetri.f`, `dgecon.f`), BSD-3-Clause.
+`getf2` is `openblas::getf2` (numpy's path). Validated against both SciPy wheels
+(`validation/investigations/sdcflows-fieldmap-b/check_scipy_inv.py`). Not ported: 1.18's
+symmetric path (Cholesky, Bunch-Kaufman) and its condition estimates (`gecon`, `trcon`).
+`openblas::affine_points` (relay 18): numpy's `dgemm`/`dgemv` of homogeneous points, as
+`point_row`/`point_row_single`.
+
 ## numpy's small linear algebra (`numpy_linalg`)
 
 **Ported** from the OpenBLAS 0.3.34 and 0.3.30 release tarballs (BSD-3-Clause; the LAPACK they

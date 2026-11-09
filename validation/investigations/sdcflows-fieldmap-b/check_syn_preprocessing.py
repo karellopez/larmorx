@@ -20,7 +20,8 @@ Run in each kept environment (``PYTHONPATH=<repo>/python:<repo>/validation/src``
   ``mask_dtype``, ``prior2epi``, ``prior_msk`` (their command lines too). fMRIPrep 25.2.6's
   image's libraries: numpy 2.2.6, SciPy 1.15.2, nilearn 0.11.1, niworkflows 1.15.2;
   ``upstream_defects="reproduce"``.
-- ``workflow``: the whole function on each workflow's inputs against sdcflows' own graph (this
+- ``workflow``: the whole function on each workflow's inputs (``--debug``: with sdcflows' fast
+  settings, the anatomy regridded by ``RegridToZooms``) against sdcflows' own graph (this
   environment's sdcflows and niworkflows, run by nipype; ANTs' programs at one thread with
   correctly rounded maths and AFNI's 3dvolreg as stand-ins through the oracle cache): every
   NIfTI file of the graph's folders. (fMRIPrep's own N4, DenoiseImage and registration ran on
@@ -566,11 +567,14 @@ def install_shims(folder: Path) -> None:
         p.chmod(p.stat().st_mode | stat.S_IXUSR)
 
 
-def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> None:
+def sec_workflow(
+    t: cw.Tally, wfs: list[Path], nt: int, times: list[float], debug: bool = False
+) -> None:
     """sdcflows' own ``init_syn_preprocessing_wf`` (this environment's sdcflows 2.17.1 and
     niworkflows) run by nipype on the workflow's inputs, ANTs' and AFNI's programs as stand-ins
     (one thread, correctly rounded maths, through the oracle cache), against larmorx's function
-    with this environment's libraries: every NIfTI file of the graph's folders."""
+    with this environment's libraries: every NIfTI file of the graph's folders (``debug``:
+    sdcflows' fast settings, the anatomy regridded to 2 mm by ``regrid_anat``)."""
     import nilearn
     import niworkflows
     import scipy
@@ -588,7 +592,7 @@ def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> N
             os.environ["ANTS_RANDOM_SEED"] = str(seed)
             with tempfile.TemporaryDirectory() as tmp:
                 g = init_syn_preprocessing_wf(
-                    omp_nthreads=1, debug=False, auto_bold_nss=True, t1w_inversion=False
+                    omp_nthreads=1, debug=debug, auto_bold_nss=True, t1w_inversion=False
                 )
                 for k, v in inp.items():
                     setattr(g.inputs.inputnode, k, v)
@@ -599,6 +603,7 @@ def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> N
                     **inp,
                     out_dir=Path(tmp) / "lx",
                     auto_bold_nss=True,
+                    debug=debug,
                     omp_nthreads=nt,
                     ants_random_seed=seed,
                     niworkflows_version=niworkflows.__version__,
@@ -619,7 +624,7 @@ def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> N
                         continue
                     tally(
                         t,
-                        "workflow: node files = sdcflows' graph's",
+                        "workflow: node files = sdcflows' graph's" + (" (debug)" * debug),
                         f"{label}: {rel}",
                         f,
                         mine_root / rel,
@@ -948,6 +953,7 @@ def main() -> int:
     ap.add_argument("--root", default=str(cw.RUNS))
     ap.add_argument("--runs", default="")
     ap.add_argument("--threads", type=int, default=6)
+    ap.add_argument("--debug", action="store_true", help="the workflow section with debug=True")
     a = ap.parse_args()
     runs = [r for r in a.runs.split(",") if r] or None
     wfs = syn_workflows(Path(a.root), runs)
@@ -962,7 +968,7 @@ def main() -> int:
         if "nodes" in sections:
             sec_nodes(t, wfs, a.threads, times["nodes"])
         if "workflow" in sections:
-            sec_workflow(t, wfs, a.threads, times["workflow"])
+            sec_workflow(t, wfs, a.threads, times["workflow"], a.debug)
     if "library" in sections:
         sec_library(t, a.threads)
     bad = t.report()

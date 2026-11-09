@@ -4187,6 +4187,61 @@ def _(ctx: Context) -> dict[str, Any]:
     return out
 
 
+@case("py.ndimage.gaussian", covers=("lx.ndimage.correlate1d", "lx.ndimage.gaussian_filter1d", "lx.ndimage.gaussian_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """correlate1d with a symmetric, an anti-symmetric and an asymmetric kernel (modes, an
+    origin, an output type), the Gaussian filters (sigmas per axis with a zero, truncate, a
+    radius, axes, an integer input and output)."""
+    data = (ints(55, (14, 11, 9), -500, 500) / 8).astype(np.float64)
+    out: dict[str, Any] = {}
+    for name, w in (
+        ("sym", [0.25, 0.5, 0.25]),
+        ("anti", [-0.5, 0.0, 0.5]),
+        ("asym", [0.75, -0.125, 0.5, 0.25]),
+    ):
+        for mode in ("reflect", "constant", "nearest", "mirror", "wrap"):
+            out[f"corr.{name}.{mode}"] = lx.ndimage.correlate1d(
+                data, w, axis=1, mode=mode, cval=2.5
+            )
+    out["corr.origin"] = lx.ndimage.correlate1d(data, [0.5, 0.25, 0.125], axis=0, origin=-1)
+    out["corr.int16"] = lx.ndimage.correlate1d(data.astype(np.int16), [1.5, -0.5], output=np.int16)
+    out["g1d"] = lx.ndimage.gaussian_filter1d(data, 1.25, axis=2)
+    out["g"] = lx.ndimage.gaussian_filter(data, (0.75, 0.0, 1.5), mode="nearest", truncate=3.0)
+    out["g.radius.axes"] = lx.ndimage.gaussian_filter(data, (1.0, 2.0), axes=(0, 2), radius=(2, 3))
+    out["g.uint8"] = lx.ndimage.gaussian_filter(ints(56, (12, 10), 0, 256).astype(np.uint8), 0.8)
+    out["g.zero"] = lx.ndimage.gaussian_filter(data, 0.0, output=np.float32)
+    return out
+
+
+@case("py.niworkflows.regrid", covers=("lx.niworkflows.regrid_to_zooms", "lx.niworkflows.resample_by_spacing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' RegridToZooms: an int16 image on an oblique grid (a 3-4-5 rotation) regridded
+    to coarser and finer voxels, with smooth=True and a sigma, order 1 without clipping, and a
+    float32 image whose header has no x-form codes."""
+    aff = np.array([[0.96 * 1.5, -0.28 * 1.25, 0.0, -20.0], [0.28 * 1.5, 0.96 * 1.25, 0.0, 12.0],
+                    [0.0, 0.0, 2.0, 7.5], [0.0, 0.0, 0.0, 1.0]])  # fmt: skip
+    src = ctx.out("regrid_in.nii.gz")
+    lx.io.save_nibabel(lx.Image(ints(57, (20, 18, 12), -300, 900).astype(np.int16), aff, None), src)
+    out: dict[str, Any] = {}
+    for tag, zooms, kw in (
+        ("coarse", (3.0, 3.0, 3.0), {}),
+        ("fine", (1.0, 1.0, 1.0), {"smooth": True}),
+        ("sigma", (2.0, 2.0, 2.0), {"smooth": 0.8}),
+        ("order1", (2.5, 1.5, 2.0), {"order": 1, "clip": False}),
+    ):
+        out[tag] = Nifti(
+            lx.niworkflows.regrid_to_zooms(src, zooms, out_dir=ctx.out(tag), **kw).out_file
+        )
+    img = lx.io.load_nibabel(src)
+    assert img.header is not None
+    hdr = img.header.replace(qform_code=0, sform_code=0)
+    flt = lx.Image(np.asarray(img.data).astype(np.float32) / 4, img.affine, hdr)
+    res = lx.niworkflows.resample_by_spacing(flt, (2.0, 2.0, 2.0))
+    out["image"] = np.asarray(res.data)
+    out["image.affine"] = np.asarray(res.affine)
+    return out
+
+
 @case("py.ndimage.grey", covers=("lx.ndimage.grey_erosion", "lx.ndimage.grey_dilation", "lx.ndimage.grey_opening", "lx.ndimage.grey_closing"))  # fmt: skip
 def _(ctx: Context) -> dict[str, Any]:
     """Grey morphology with a footprint, a size and a non-flat structure (brain_masker's

@@ -32,7 +32,7 @@ def case(name, pixdim, zooms=(2.0, 2.0, 2.0), smooth=False):
                 out = resample_by_spacing(str(p), zooms, smooth=smooth)
                 arr = np.asarray(out.dataobj)
                 msg = f"shape {arr.shape}, finite {bool(np.isfinite(arr).all())}"
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 msg = f"{type(e).__name__}: {e}"
         warns = sorted({str(x.message)[:60] for x in w})
     print(f"{name}: {msg}; warnings {warns}")

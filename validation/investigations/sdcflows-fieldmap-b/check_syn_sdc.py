@@ -19,7 +19,8 @@ Run in each kept environment (``PYTHONPATH=<repo>/python:<repo>/validation/src``
   values), ``extract_field``, ``zooms_field``, ``zooms_bmask``, ``bs_filter`` and ``unwarp``
   (each fed fMRIPrep's file before it: the registration ran on fMRIPrep's 4 threads, on which
   it depends). fMRIPrep 25.2.6's image's numpy (2.2.6) for the clip's percentiles;
-  ``upstream_defects="reproduce"``. ``zooms_epi`` is not computed (SDC-15): its value only.
+  ``upstream_defects="reproduce"``; ``zooms_epi`` (``RegridToZooms``; its output unused,
+  SDC-15) too.
 - ``syn``: the registration of the estimators named by ``--syn-runs`` (default: the first)
   on fMRIPrep's inputs, larmorx (``--threads``) against ANTs 2.6.5 (the GCC 14.3 oracle, one
   thread, correctly rounded maths, the run's seed; through the oracle cache): the forward and
@@ -27,7 +28,7 @@ Run in each kept environment (``PYTHONPATH=<repo>/python:<repo>/validation/src``
 - ``workflow``: the whole function on the ``--syn-runs`` estimators' inputs against sdcflows'
   own ``init_syn_sdc_wf`` run by nipype (this environment's sdcflows, niworkflows and numpy;
   ANTs' programs at one thread with correctly rounded maths as stand-ins through the oracle
-  cache): every NIfTI file of the graph's folders (``zooms_epi``'s: SDC-15, counted apart),
+  cache): every NIfTI file of the graph's folders (``zooms_epi``'s included),
   and the outputs' values.
 
 Prints one line per check, INFO lines and ``ALL OK`` or ``FAIL <n>``.
@@ -200,11 +201,17 @@ def sec_nodes(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> None
                 f"{lab}: {z} vs {ref_z}",
             )
             zin = csp.value(wf / "zooms_epi", "zooms")
-            t.add(
-                "zooms_epi's zooms (its file not computed: SDC-15)",
-                [float(v) for v in z] == [float(v) for v in zin],
-                lab,
-            )
+            t.add("zooms_epi's zooms", [float(v) for v in z] == [float(v) for v in zin], lab)
+            from larmorx.niworkflows import regrid_to_zooms
+
+            n = wf / "zooms_epi"
+            mine = regrid_to_zooms(
+                csp.hosts(n, "in_file"),
+                zin,
+                out_dir=tmpd / "zooms_epi",
+                numpy_version=csp.IMAGE["numpy_version"],
+            ).out_file
+            csp.tally(t, "zooms_epi (RegridToZooms)", lab, next(n.glob("*_regrid.nii*")), mine)
             n = wf / "warp_dir"
             rd = sd.warp_dir(
                 csp.hosts(n, "moving_image"), csp.hosts(n, "fixed_image"), ro.pe_direction
@@ -430,13 +437,6 @@ def sec_workflow(t: cw.Tally, wfs: list[Path], nt: int, times: list[float]) -> N
                 for f in sorted(ref_root.rglob("*.nii*")):
                     rel = f.relative_to(ref_root)
                     if any(p.startswith("_report") or p == "crash" for p in rel.parts):
-                        continue
-                    if rel.parts[0] == "zooms_epi":
-                        t.add(
-                            "workflow: zooms_epi's file (not computed: SDC-15)",
-                            not (mine_root / rel).exists(),
-                            f"{lab}: {rel}",
-                        )
                         continue
                     csp.tally(
                         t,

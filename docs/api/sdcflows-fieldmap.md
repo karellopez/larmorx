@@ -375,7 +375,7 @@ above `atlas_threshold` (`Binarize`).
 |---|---|---|
 | `in_epis`, `in_meta`, `in_anat`, `mask_anat`, `std2anat_xfm=None`, `t_masks=None` | `inputnode` | `std2anat_xfm` is needed with `sd_prior` |
 | `atlas_threshold=3`, `auto_bold_nss=False`, `sd_prior=True`, `omp_nthreads=1` | the same | fMRIPrep 25.2.6: `auto_bold_nss=True`, the BOLD and SBRef files of the estimator and their metadata, its T1w, mask and MNI-to-T1w transform |
-| `debug=False` | `debug` | sdcflows' fast settings regrid the T1w with niworkflows' `RegridToZooms`: `NotImplementedError` until that port (fMRIPrep sets it only with `--sloppy`) |
+| `debug=False` | `debug` | sdcflows' fast settings: the T1w regridded to 2 mm by niworkflows' `RegridToZooms` (`smooth=True`; `regrid_anat`, `files["regrid_anat"]`; [niworkflows-helpers.md](niworkflows-helpers.md)), the sampling grid taking its voxel sizes, and the registration's warped images (fMRIPrep sets it only with `--sloppy`) |
 | `t1w_inversion=False` | `t1w_inversion` | accepted and unused, as in sdcflows |
 | `prior_file=None` | (`data/fmap_atlas.nii.gz`) | a larmorx addition: another prior image (tests); by default sdcflows' atlas (`fmap_atlas()`) |
 | `ants_random_seed=None` | the environment's `ANTS_RANDOM_SEED` | as `coeff2epi_workflow` |
@@ -443,9 +443,10 @@ Jacobian). The nodes write into `out_dir/<name>/<node>` as nipype's (fMRIPrep na
 | `norm_lap(in_file, *, out_dir=".", upstream_defects="fix", n_threads=1)` → path | `fit/syn._norm_lap` | minus the median; positives over their 99.8th percentile, negatives over minus their 0.2th; clipped to [-1, 1]; float32 `<name>_norm`; SDC-14 |
 | `match_histogram(reference, image, ref_mask=None, img_mask=None, *, out_dir=None, upstream_defects="fix", n_threads=1)` → path | `fit/syn.match_histogram` (no workflow calls it) | the image's values in `img_mask` (`> 0`; all without it) matched onto the reference's in `ref_mask` (`lx.skimage.match_histograms`, SKI-02), assigned back into nibabel's `dataobj` values (an integer image truncates them toward zero, as numpy's assignment: kept), written with the image's header as `<image>_matched` in `out_dir` (the current folder without it); masks of another shape: numpy's `IndexError`; an empty reference mask: numpy's `ValueError`; SDC-27 |
 
-Not computed: `zooms_epi` (niworkflows' `RegridToZooms` of the clipped EPI to `find_zooms`'
-size), whose output sdcflows never connects (SDC-15); its port comes with `RegridToZooms`
-(`syn_preprocessing_workflow(debug=True)` needs it too).
+`zooms_epi` (niworkflows' `RegridToZooms` of the clipped EPI to `find_zooms`' voxel size,
+`files["zooms_epi"]`) is computed as sdcflows computes it, although its output is never
+connected (SDC-15): fMRIPrep's own five `zooms_epi` files are larmorx's (`check_syn_sdc.py`,
+`check_regrid.py`).
 
 Checked on fMRIPrep's five `--use-syn-sdc` estimators node by node (each node fed fMRIPrep's
 own inputs and, after the registration, fMRIPrep's own warp; header bytes as written): every
@@ -537,7 +538,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-13 | `Deoblique`/`Reoblique` compare nibabel's obliquity (radians) with `OBLIQUE_THRESHOLD_DEG = 0.5` (degrees): they act only beyond 28.6 degrees; `_deoblique`'s plumb grid centres the image in voxels, not millimetres, and compares the axis codes with `RAS` by position | kept (rule C after rule D's measurement): made plumb as meant (the threshold in degrees, the centre kept in millimetres, each voxel axis on its closest world axis), fMRIPrep's most oblique SyN EPI (20.7 degrees) gets a field 8.2 Hz apart at the 95th percentile (another ANTs seed: 1.7 Hz) and an unwarped reference no closer to the anatomy (normalised mutual information 0.0008 lower; another seed: 0.0001; on ds004884's 6.3-degree EPI 6.1 Hz against 2.4 Hz, and 0.0025 lower): sdcflows' behaviour in both modes | `deoblique`, `reoblique`, `syn_preprocessing_workflow` |
 | SDC-14 | `_norm_lap` of an image with no positive (or no negative) value after the median's subtraction fails with numpy's `IndexError` (the percentile of nothing) | a `ValueError` saying so (rule B) | `norm_lap`, `syn_sdc_workflow` |
 | SDC-16 | `_warp_dir` puts the weight 1.0 at the position of the phase-encoding axis among the fixed image's voxel axes, while ANTs' `--restrict-deformation` weighs the physical axes (x, y, z): a sagittal or coronal fixed grid frees another world axis and holds the phase encoding at 0.1 | the 1.0 on the phase encoding's world axis (rule A); the same restriction for a grid in R, A, S order (fMRIPrep's axial EPIs) | `warp_dir`, `syn_sdc_workflow` |
-| SDC-15 | `init_syn_sdc_wf`'s `zooms_epi` regrids the clipped EPI and nothing reads it | kept as sdcflows (rule C: no result depends on it); larmorx does not compute it (`zooms` holds its voxel size) | `syn_sdc_workflow` |
+| SDC-15 | `init_syn_sdc_wf`'s `zooms_epi` regrids the clipped EPI and nothing reads it | kept as sdcflows (rule C: no result depends on it): computed, its file in `files["zooms_epi"]`, unused | `syn_sdc_workflow` |
 | SDC-17 | sdcflows 2.17.1 lacks three corrections of its 2.15.2 (published after 2.17.1): `bids_filters` also restrict the fieldmap-less estimation's anatomical reference and targets (a `datatype: fmap` filter finds no T1w), no sessionless anatomical reference serves sessioned runs, and the `acquisition`/`ceagent` filters never reach the EPI heuristics (it reads the key `acquisitions`) | 2.15.2's search (rule A, the upstream's own correction) | `find_estimators`, `map_fieldmap_estimation` |
 | SDC-18 | `bidict.add` names a new estimator with the last free `auto_` index in `range(len(used) + 1)`, not the first | kept (rule C: the names are in fMRIPrep's and sdcflows' derivatives and logs) | `bidict.add`, `FieldmapEstimation`, `find_estimators` |
 | SDC-19 | the `B0FieldIdentifier` estimators are built in a Python `set`'s order, which changes between processes | pybids' natural order of the identifiers, in both modes (nondeterminism is never reproduced) | `find_estimators` |

@@ -262,3 +262,14 @@ Evans, 2019 Filippo Broggini) `encoder.py` (`dumps`, `_dump_str`, `_dump_float`,
 `dump_value`, `dump_sections`: `toml_dumps`). Into `python/larmorx/niworkflows/participants.py`:
 niworkflows 1.15.4 (the same in 1.15.2) `utils/bids.py` (`BIDSError`, `BIDSWarning`,
 `collect_participants`).
+
+## Part B: niworkflows' `RegridToZooms` (`python/larmorx/niworkflows/regrid.py`, relay 18)
+
+Into `python/larmorx/niworkflows/regrid.py`: niworkflows 1.15.4 (Apache-2.0, the NiPreps
+developers; the same in 1.15.2) `interfaces/images.py` and `interfaces/nibabel.py`
+(`RegridToZooms`, its input spec) and `utils/images.py` (`resample_by_spacing`), with nibabel
+5.4.2 (MIT) `affines.from_matvec` and the header's `get_zooms`/`set_zooms`. Into
+`python/larmorx/sdcflows/syn.py`: sdcflows 2.17.1's `zooms_epi` (`init_syn_sdc_wf`) and
+`regrid_anat` (`init_syn_preprocessing_wf(debug=True)`). nilearn's second inverse of
+`resample_img` (`python/larmorx/niworkflows/sampling.py`) now through SciPy's `linalg.inv`
+(`larmorx_transform::scipy_linalg`).

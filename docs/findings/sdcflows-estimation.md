@@ -1067,3 +1067,95 @@ stands (the default follows the corrected watershed, `reproduce` SciPy's). The m
 fMRIPrep's by about 8,000 voxels are `epi_mask`'s own `ball(2)` dilation around the brain; on
 ds005040 and ds004958 the method itself finds little of the brain either way. sdcflows' own
 workflows do not call `epi_mask`, so no pipeline result moves.
+
+## SciPy's `linalg.inv`, niworkflows' `RegridToZooms` and SciPy's Gaussian filter (relay 18)
+
+**SciPy's 4 x 4 inverse.** nilearn's `resample_img` inverts the image's affine twice: with
+`np.linalg.inv` for the bounding box and with `scipy.linalg.inv` for the sampling points
+(`np.dot(linalg.inv(affine), target_affine)`). Relay 9 used numpy's inverse for both (their
+last bits differ for 1,995 of 3,000 oblique affines). `larmorx_transform::scipy_linalg` now
+follows SciPy itself, read from its sources and its wheels' OpenBLAS (SciPy 1.15.3 bundles
+OpenBLAS 0.3.28, 1.18.1 OpenBLAS 0.3.31.dev, both `DYNAMIC_ARCH`, Haswell kernels pinned):
+
+- SciPy 1.15 (`_basic.py`): `getrf` (OpenBLAS's own; for 4 x 4 the unblocked `getf2_k`, the
+  path numpy's `dgesv` takes) and `getri` with `lwork = int(1.01 * 256)`, so the reference
+  LAPACK `dgetri` runs unblocked (its block size 64 is at least n): OpenBLAS's `dtrtri`
+  (`trti2_U`: the reciprocal of the diagonal, `trmv_NUN` with `daxpy`'s scalar tail, `dscal` by
+  `-1/a`), then from the last column `dgemv('N', 4, 3 - j, -1, ...)` (the Haswell 4 x 2 kernel:
+  two products summed, then one fused multiply-add by alpha; the SSE2 4 x 1 kernel: `x * alpha`
+  first), then the column swaps.
+- SciPy 1.18 (`src/_linalg_inv.hh`): the structure is detected on the column-major copy
+  (exact comparisons with 0, so -0 is zero): a diagonal matrix has its diagonal replaced by
+  `1 / a`; an upper or lower triangular one (a plumb affine with a translation is upper
+  triangular) goes to OpenBLAS's `dtrtri` (`trti2_U`, `trti2_L`), the other triangle set to +0;
+  a general one to `getrf`, `gecon` (only the warning) and `getri`, the values as 1.15's; a
+  symmetric one to Cholesky (`potrf`, `pocon`, `potri`), then Bunch-Kaufman when that fails:
+  **not ported** (`NotImplementedError`; an image affine is symmetric only with a zero
+  translation). 1.18 warns (`LinAlgWarning`, "An ill-conditioned matrix detected: slice 0 has
+  rcond = ...") below `rcond = eps`: exact for the diagonal path; for the others it needs LAPACK's
+  estimate (`gecon`/`trcon`: Hager's estimator with `dlatrs`), not ported: LAPACK's estimate of
+  `‖A⁻¹‖₁` is at most the true one, so `rcond >= 1 / (‖A‖ ‖A⁻¹‖₁)` from the inverse; at or above
+  `1000 eps` there is no warning, below larmorx refuses (`NotImplementedError`; never an image
+  affine: in the checks only the matrices scaled by `2^±300` and numerically singular integer
+  matrices).
+- Measured (`validation/investigations/sdcflows-fieldmap-b/check_scipy_inv.py`, both
+  environments): 13 families of 20,000 seeded matrices (random, oblique, `float32` oblique,
+  plumb, axis-permuted affines, diagonal, triangular, scaled by `2^±300`, condition `1e3` to
+  `1e12`, entries `±1, ±2`, near-permutations, integers) and the 513 image affines of the oracle
+  runs' preprocessed T1w, BOLD references, field maps, masks and SyN nodes: every value
+  identical (signed zeros included); the singular, non-finite and non-square errors and the
+  diagonal warning's text identical. 1.18's refusals: 20,000 scaled matrices, 79 and 47 of the
+  `±1, ±2` and integer families (their values identical where computed; 9 symmetric).
+- Defects: **SCI-18** (1.18 returns the LU factors as the inverse when the matrix's norm
+  overflows: `gecon` stops with `info = -5` and `getri` is skipped; rule A, the inverse, with
+  the notice; `reproduce`: the LU factors). Candidates for the relay that ports the condition
+  estimates: 1.18's `norm1_` sums the rows of the column-major copy, so `gecon`'s 1-norm
+  estimate of `A⁻¹` is combined with the infinity norm of `A` (SCI-x; the warning only), and the
+  diagonal path prints the condition number `max|a| · max|1/a|` as "rcond" (the threshold is
+  right; rule C proposed: a message).
+- After the change: `check_syn_preprocessing.py --sections nodes,library` ALL OK in both
+  environments (fMRIPrep's five `sampling_ref` nodes with nilearn 0.11.1 and SciPy 1.15.2;
+  `GenerateSamplingReference` 25 cases against nilearn 0.14.1 with each environment's SciPy).
+
+**niworkflows' `RegridToZooms`** (`resample_by_spacing`; `lx.niworkflows.regrid_to_zooms`).
+Besides sdcflows' `zooms_epi` and its debug `regrid_anat`, fMRIPrep runs it in every
+brain extraction (`res_tmpl`, `res_target`: 4 mm, `smooth=True`). Its arithmetic: the header's
+`pixdim` as `float32`; the `float32` cardinal matrix (its centred translation rounded to
+`float32`); the extent and `np.diag(zooms).dot(new_size)` (`dgemv` with one non-zero product per
+row: exact per entry); **`np.linalg.inv` of the `float32` matrix is numpy's `float64` inverse
+cast to `float32`** (numpy's `_commonType` computes linear algebra on single-precision input in
+double: a first port with `float32` reciprocals differed from fMRIPrep's `res_target` of
+ds000228 and ds005752 in half of the voxels or more: the inverse's translation 88.00001 against
+88.0);
+the sampling points `inv(card).dot(new_card.dot(grid))` as numpy's `dgemm` adds them (one fused
+chain per entry, `openblas::affine_points`); SciPy's `map_coordinates` (order 3,
+`mode='constant'`, prefiltered); `clip`; the header's zooms, qform and sform
+(`new_affine · inv(affine) · xform`), nibabel's constructor and scaled writer.
+Measured (`check_regrid.py`, both environments): 576 seeded files (int16, uint8, float32 and a
+scaled int16; plumb, oblique and LPS; every qform/sform code pair; finer, coarser and mixed
+zooms; orders 0, 1, 3, 5; `clip`; `smooth` False, True, 0.8) identical to niworkflows' files
+(data and the 348 header bytes); fMRIPrep's own nodes: `res_tmpl` 23 of 23, `res_target` 23 of
+23, `zooms_epi` 5 of 5; zero and negative voxel sizes (nibabel's loader sets them to 1 and their
+absolute value, as larmorx's), subnormal and NaN ones (nibabel's `HeaderDataError` "Could not
+decompose affine:", whose printed matrix larmorx does not reproduce).
+
+**PIPE-35** (`smooth=True`): the sigma `max(0, (old / new - 1) / 2)` voxels is positive only
+when the new grid is finer (3 mm to 2 mm: 0.25), so the anti-aliasing case, a coarser grid, is
+never smoothed: fMRIPrep's 1 mm T1w and template regridded to 4 mm for the brain extraction's
+initialisation are not smoothed at all (scikit-image's `rescale` takes `(new / old - 1) / 2`).
+Proposed rule D: whether smoothing helps that initialisation is measured with the anatomical
+brain extraction's port; until then both modes give niworkflows' sigma
+(`validation/investigations/sdcflows-fieldmap-b/relay18/probe_regrid_edges.py` prints both
+cases and the edge voxel sizes).
+
+**SciPy's Gaussian filter** (`lx.ndimage.correlate1d`, `gaussian_filter1d`, `gaussian_filter`;
+`larmorx_ndimage::correlate1d`, SciPy 1.18.1's `NI_Correlate1D`, the same in 1.15.3): the
+symmetric kernel's pairs added from the outermost in after the centre term, products and sums
+rounded separately (SciPy's C has no FMA); the kernel with numpy's float64 `exp` on its path
+without AVX-512 (glibc's): on this project's AVX-512 machine numpy takes Intel's SVML kernels,
+so the check runs SciPy with `NPY_DISABLE_CPU_FEATURES` (the AVX-512 features off). 7,178
+seeded cases per environment identical. On fMRIPrep's paths the filter never smooths (PIPE-35:
+sigma 0 for every real call), so only `get_fdata()`'s `float64` copy is reached there.
+
+`syn_sdc_workflow` now computes `zooms_epi` (SDC-15 stays rule C: its output is unused) and
+`syn_preprocessing_workflow(debug=True)` regrids the anatomy (`regrid_anat`).

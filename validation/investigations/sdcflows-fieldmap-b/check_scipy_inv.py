@@ -33,7 +33,7 @@ import numpy as np
 import scipy
 from scipy import linalg
 
-from larmorx.transforms._linalg import LinAlgWarning, scipy_inv
+from larmorx.transforms._linalg import scipy_inv
 
 VERSION = scipy.__version__
 
@@ -52,7 +52,7 @@ def outcome(fn, m):
             kind = "ok"
         except NotImplementedError as e:
             return "refused", str(e), []
-        except Exception as e:  # noqa: BLE001 - compared by type and text
+        except Exception as e:
             return type(e).__name__, str(e), [str(x.message) for x in w]
     msgs = [f"{x.category.__name__}: {x.message}" for x in w]
     return kind, value, msgs
@@ -127,8 +127,12 @@ def families(rng, n):
             rng, (np.eye(3)[rng.permutation(3)] * rng.choice([-1, 1], 3)) * zooms()
         ),
         "diagonal": lambda: np.diag(rng.uniform(0.1, 5, 4) * rng.choice([-1, 1], 4)),
-        "lower triangular": lambda: np.tril(rng.normal(size=(4, 4))) + np.diag(rng.choice([-3, 3], 4)),
-        "upper triangular": lambda: np.triu(rng.normal(size=(4, 4))) + np.diag(rng.choice([-3, 3], 4)),
+        "lower triangular": lambda: (
+            np.tril(rng.normal(size=(4, 4))) + np.diag(rng.choice([-3, 3], 4))
+        ),
+        "upper triangular": lambda: (
+            np.triu(rng.normal(size=(4, 4))) + np.diag(rng.choice([-3, 3], 4))
+        ),
         "scaled 2^+-300": lambda: (
             rng.normal(size=(4, 4))
             * (2.0 ** rng.integers(-300, 301, 4))[:, None]
@@ -214,9 +218,7 @@ def main() -> int:
     sym = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]])
     print(f"symmetric: {compare(sym)}")
     # SCI-18: an overflowing norm (1.18 returns the LU factors; 1.15 the inverse).
-    big = np.array(
-        [[1.7e308, 1.7e308, 0, 1], [0.5, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]]
-    )
+    big = np.array([[1.7e308, 1.7e308, 0, 1], [0.5, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         ref = linalg.inv(big)
@@ -224,8 +226,10 @@ def main() -> int:
         fix = scipy_inv(big, scipy_version=VERSION, upstream_defects="fix")
     ok = same(ref, rep)
     fails += not ok
-    print(f"norm overflow (SCI-18): reproduce = SciPy {ok}; fix = the inverse "
-          f"{np.allclose(fix @ big, np.eye(4), atol=1e-6) if np.isfinite(fix).all() else 'non-finite'}")
+    print(
+        f"norm overflow (SCI-18): reproduce = SciPy {ok}; fix = the inverse "
+        f"{np.allclose(fix @ big, np.eye(4), atol=1e-6) if np.isfinite(fix).all() else 'non-finite'}"
+    )
     if args.images:
         import nibabel as nb
 

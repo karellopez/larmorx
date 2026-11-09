@@ -34,7 +34,8 @@ Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour
 numpy's ``IndexError``), SDC-16 (``_warp_dir`` restricts the deformation along the world axis
 of the phase encoding: ANTs weighs physical axes, sdcflows indexes the fixed image's voxel
 axes), SDC-27 (``match_histogram``'s undefined integer conversions clamped, with a warning).
-SDC-15: ``init_syn_sdc_wf``'s ``zooms_epi`` node, whose output nothing reads, is not computed.
+SDC-15: ``init_syn_sdc_wf``'s ``zooms_epi`` node, whose output nothing reads, is computed as
+sdcflows computes it (rule C; niworkflows' ``RegridToZooms``, :func:`larmorx.niworkflows.regrid_to_zooms`).
 """
 
 from __future__ import annotations
@@ -419,8 +420,9 @@ def syn_preprocessing_workflow(
     sdcflows' atlas (a larmorx addition, for tests and other priors; its affine to MNI is still
     sdcflows'). ``ants_random_seed`` is what
     ANTs reads from ``ANTS_RANDOM_SEED`` (fMRIPrep sets it). ``t1w_inversion`` is accepted and
-    unused, as in sdcflows. ``debug`` (sdcflows' fast settings: the anatomical image regridded
-    to 2 mm with niworkflows' ``RegridToZooms``) waits for that port (``NotImplementedError``).
+    unused, as in sdcflows. ``debug`` (sdcflows' fast settings) regrids the anatomical image to
+    2 mm with niworkflows' ``RegridToZooms`` (``smooth=True``; ``regrid_anat``), whose voxel
+    sizes the sampling grid then takes, and writes the registration's warped images.
     ``numpy_version``, ``scipy_version`` and ``nilearn_version`` select the libraries'
     arithmetic (the newest by default; fMRIPrep 25.2.6's image: numpy 2.2.6, SciPy 1.15.2,
     nilearn 0.11.1); ``niworkflows_version`` the version written into ``descrip``."""
@@ -432,11 +434,6 @@ def syn_preprocessing_workflow(
 
     _defects.check(upstream_defects)
     del t1w_inversion
-    if debug:
-        raise NotImplementedError(
-            "init_syn_preprocessing_wf(debug=True) regrids the anatomical image with "
-            "niworkflows' RegridToZooms, which larmorx has not ported yet"
-        )
     if sd_prior and std2anat_xfm is None:
         raise ValueError("std2anat_xfm is needed for the prior (sd_prior=True)")
     wf = os.path.join(os.path.abspath(os.fspath(out_dir)), name)
@@ -520,10 +517,23 @@ def syn_preprocessing_workflow(
         if produced:
             copy_xform(ref_image, produced, message=message, n_threads=n_threads)
     forward = list(reg.outputs["forward_transforms"])
-    # sampling_ref
+    # sampling_ref (with debug, on regrid_anat's grid: RegridToZooms 2 mm, smooth=True)
+    moving = in_anat
+    if debug:
+        from larmorx.niworkflows.regrid import regrid_to_zooms
+
+        moving = regrid_to_zooms(
+            in_anat,
+            (2.0, 2.0, 2.0),
+            smooth=True,
+            out_dir=node("regrid_anat"),
+            numpy_version=numpy_version,
+            n_threads=n_threads,
+        ).out_file
+        files["regrid_anat"] = moving
     sampling = generate_sampling_reference(
         deob,
-        in_anat,
+        moving,
         out_dir=node("sampling_ref"),
         niworkflows_version=niworkflows_version,
         nilearn_version=nilearn_version,
@@ -953,9 +963,9 @@ def syn_sdc_workflow(
     ``numpy_version`` selects the clip's percentile arithmetic; ``niworkflows_version`` the
     version written into ``descrip``.
 
-    One node is not computed: ``zooms_epi`` (niworkflows' ``RegridToZooms`` of the clipped EPI
-    to ``find_zooms``' voxel size), whose output sdcflows never connects (SDC-15, rule C: no
-    result depends on it); ``zooms`` holds ``find_zooms``' value."""
+    ``zooms_epi`` (niworkflows' ``RegridToZooms`` of the clipped EPI to ``find_zooms``' voxel
+    size, ``files["zooms_epi"]``) is computed although sdcflows never connects its output
+    (SDC-15, rule C: no result depends on it); ``zooms`` holds ``find_zooms``' value."""
     import json
 
     from larmorx.niworkflows import intensity_clip
@@ -1037,9 +1047,18 @@ def syn_sdc_workflow(
     )
     _, umask = union(epi_mask, amask2epi, out_dir=node("epi_umask"), n_threads=n_threads)
     assert umask is not None
-    # find_zooms (zooms_epi's RegridToZooms is not computed: SDC-15)
+    # find_zooms, zooms_epi (whose output nothing reads: SDC-15)
+    from larmorx.niworkflows.regrid import regrid_to_zooms
+
     node("find_zooms")
     zooms = adjust_zooms(anat_ref, epi_file)
+    files["zooms_epi"] = regrid_to_zooms(
+        clip_epi,
+        zooms,
+        out_dir=node("zooms_epi"),
+        numpy_version=numpy_version,
+        n_threads=n_threads,
+    ).out_file
     # warp_dir, vox_params
     node("warp_dir")
     restrict = warp_dir(

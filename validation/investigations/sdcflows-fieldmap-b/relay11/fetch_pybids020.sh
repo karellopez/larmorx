@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # pybids 0.20.0 (fMRIPrep 25.2.6's image): the sdist from PyPI, SHA-256 checked against PyPI's JSON,
 # unpacked into <workspace>/tags/pybids-0.20.0/ (the sdist kept in pybids-0.20.0-download/).
 set -u

@@ -815,14 +815,17 @@ def registration(
 ) -> Command:
     """nipype's ``Registration(from_file=..., **inputs)`` (niworkflows'
     ``FixHeaderRegistration``): ``antsRegistration``'s command line with the settings file's
-    values (they override ``inputs`` given with them, as nipype's ``from_file`` does; inputs
-    connected later go in ``inputs`` too: ``fixed_image``, ``moving_image``, masks,
-    ``metric_weight``, ...). Outputs: ``forward_transforms``, ``reverse_transforms`` and their
-    invert flags, ``composite_transform``, ``warped_image``, ``inverse_warped_image``."""
-    values = dict(inputs)
+    values and ``inputs`` over them, as nipype sets them: the interface's own inputs again after
+    ``load_inputs_from_json`` (``BaseInterface.__init__``), and the inputs connected or set later
+    (``fixed_image``, ``moving_image``, masks, sdcflows' SyN ``transform_parameters`` and
+    ``metric_weight``, ...) over both. Outputs: ``forward_transforms``, ``reverse_transforms``
+    and their invert flags, ``composite_transform``, ``warped_image``,
+    ``inverse_warped_image``."""
+    values: dict[str, Any] = {}
     if from_file is not None:
         settings = dict(from_file) if isinstance(from_file, Mapping) else load_settings(from_file)
         values.update(settings)
+    values.update(inputs)
     return _Registration(values, cwd).command()
 
 

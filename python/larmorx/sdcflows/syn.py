@@ -20,11 +20,13 @@ The prior (``fmap_atlas.nii.gz``, sdcflows' data, Apache-2.0, 5.8 MB) is not shi
 fetched once from sdcflows' release into larmorx's data cache and checked against its SHA-256
 (:func:`fmap_atlas`); its small affine to MNI152NLin2009cAsym ships.
 
-Under measurement (SDC-13, rule D; decided with ``init_syn_sdc_wf``'s port): sdcflows compares
-nibabel's ``obliquity`` (radians) with ``OBLIQUE_THRESHOLD_DEG = 0.5`` (meant as degrees), so
-``Deoblique`` and ``Reoblique`` act only beyond 28.6 degrees; and ``_deoblique``'s plumb grid
-centres the image in voxels, not millimetres, and compares the axis codes with ``RAS`` by
-position. Both modes give sdcflows' behaviour until the measurement decides.
+Kept as sdcflows (SDC-13, rule C after rule D's measurement): sdcflows compares nibabel's
+``obliquity`` (radians) with ``OBLIQUE_THRESHOLD_DEG = 0.5`` (meant as degrees), so ``Deoblique``
+and ``Reoblique`` act only beyond 28.6 degrees; and ``_deoblique``'s plumb grid centres the image
+in voxels, not millimetres, and compares the axis codes with ``RAS`` by position. Making the EPI
+plumb as meant changes fMRIPrep's SyN field maps well beyond the estimation's own spread without
+bringing the unwarped reference closer to the anatomy (the findings,
+``docs/findings/sdcflows-estimation.md``), so both modes give sdcflows' behaviour.
 
 Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour): SDC-14
 (``_norm_lap`` of an image without positive or negative values: a ``ValueError`` instead of

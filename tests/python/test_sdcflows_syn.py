@@ -155,3 +155,20 @@ def test_warp_dir_sdc16(tmp_path: Path) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", lx.UpstreamDefectWarning)
         assert lx.sdcflows.warp_dir(epi, epi, "i", nlevels=1) == [[1.0, 0.1, 0.1]]
+
+
+def test_registration_inputs_over_the_settings_file(tmp_path: Path) -> None:
+    """nipype sets an interface's inputs again after ``from_file`` (and connections later):
+    sdcflows' SyN parameters in voxels replace the settings file's."""
+    from larmorx import _nipype
+
+    cmd = _nipype.registration(
+        cwd=tmp_path,
+        from_file=lx.sdcflows.registration_settings("sd_syn.json"),
+        fixed_image=["f.nii.gz", "fl.nii.gz"],
+        moving_image=["m.nii.gz", "ml.nii.gz"],
+        transform_parameters=[[0.8, 6.0, 8.0], [0.8, 2.0, 0.4]],
+        metric_weight=[[0.7, 0.3], [0.6, 0.4]],
+    )
+    assert "SyN[ 0.8, 6.0, 8.0 ]" in cmd.cmdline and "SyN[ 0.8, 2.0, 0.4 ]" in cmd.cmdline
+    assert "m.nii.gz, 0.7, 48" in cmd.cmdline and "ml.nii.gz, 0.4, 48" in cmd.cmdline

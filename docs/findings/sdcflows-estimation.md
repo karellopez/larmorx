@@ -1388,3 +1388,57 @@ estimators), and its reproduced cases leave out the fieldmap-less search and the
 entities, which depend on the temporary folder's name; all 37 of part B's golden cases give the
 same checksums below a folder named as `record_golden.py`'s (`larmorx-golden-<x>`, `den-`) and
 below another.
+
+## Random testing of part B (relay 27)
+
+Three difftest tools, one per parity suite (`validation/src/larmorx_validation/difftest/tools/fieldmaps_b.py`,
+run by `parity/fieldmaps_b_random.py` through `parity.sdcflows_scripts`' suites; `docs/validation/difftest.md`):
+`ndimage-skimage`, `niworkflows-helpers`, `sdcflows-estimation`. Each case is one drawn call; the
+original runs in-process, larmorx with `reproduce`, every output bit for bit (arrays by type,
+shape and bytes, floats by their bits, files by name and decompressed bytes, command lines,
+errors by type and message; the array arguments afterwards, as an original may write into them),
+then the D13 fix pass. Each side builds its own arguments from the recipe. Calls whose original
+runs numpy's float64 `exp` (the Gaussian kernels, `RegridToZooms`, `random_walker` in float64) are
+compared where numpy's `exp` is the C library's (`NPY_DISABLE_CPU_FEATURES` with numpy's AVX-512
+dispatch off, as `check_regrid.py`), and skipped elsewhere.
+
+What the first probes found (permanent cases: `relay27/make_permanent.py`, eleven in
+`validation/difftest/cases/{ndimage-skimage,niworkflows-helpers,sdcflows-estimation}/`):
+
+- **Defects of the originals, by rules A-D:** SCI-31 (rule A) and SCI-32 (memory, never
+  reproduced): `docs/findings/scipy-ndimage-filters.md`. **SDC-46** (rule A): sdcflows'
+  `brain_masker(..., padding=0)` crops with `[..., 0:-0, ...]`, an empty slice: it writes the
+  probability and the mask as 0 x 0 x 0 images and the brain unmasked (an empty boolean index
+  changes nothing); larmorx gives the whole image's probability and mask with a warning,
+  `reproduce` sdcflows' files. **PIPE-38** (rule C, kept): nipype's `DenoiseImage` lists
+  `noise_image` (`<in>_noise`) without `save_noise`, as `CommandLine._list_outputs` lists every
+  `name_source` input; larmorx's formatter now lists it too (nothing larmorx runs reads it).
+  **PIPE-39** (nondeterministic, never reproduced): nipype's `aggregate_outputs` sets the outputs
+  in the order of `set(predicted_outputs)`, which follows the process's string hashes: with
+  several invalid outputs the `TraitError` names any of them (four processes gave three orders
+  for `GetReadoutTime` of `'j+'` with a string readout time); larmorx checks them in their
+  declared order, the comparison too. **PIPE-40** (rule A): `IntraModalMerge` with `to_ras`
+  reorients the inputs but not `in_mask`, so `grand_mean_scaling` indexes the RAS series with the
+  mask on the input's grid (an `IndexError` when the shapes differ, a mirrored mask when they
+  agree; for two or more volumes PIPE-18 fails first); larmorx reorients the mask with the series.
+- **larmorx's mistakes, fixed:** `GetReadoutTime` (and fMRIPrep's `DistortionParameters`) raise
+  traits' `TraitError` with its message (`larmorx._nipype.TraitError`, `trait_error`) where larmorx
+  raised a `TypeError` of its own words, and check the directions' enumerations (an invalid
+  `PhaseEncodingDirection` was returned); `random_walker` names the mode it replaces (`cg_mg`
+  without pyamg) and UMFPACK's absence only when there is a system to solve (after
+  `_preprocess`'s early returns, as scikit-image's `_solve_linear_system`), and refuses `bf` only
+  then; `UniformGrid` of an image of other than three dimensions on another grid raises SciPy's
+  `RuntimeError('invalid shape for coordinate array')` (nitransforms' `map_coordinates`), where
+  larmorx refused with `NotImplementedError`; `brain_masker` of an image with no positive value
+  raises numpy's `IndexError` (larmorx's binding raised `ValueError`); `match_histogram` keeps
+  nibabel's data types (`'<f4'`, the header's byte order, for unscaled data), so numpy's message
+  names `dtype('<f4')`; `epi_mask` names SciPy's watershed defects (SCI-13, SCI-14) only when they
+  change its mask (its labels may differ outside the dilated brain label alone).
+- **Speed (a follow-up, not a difference):** a brain mask whose random walker does not converge
+  (difftest case `sdcflows-estimation:fmapb-try1:492`, 15 x 20 x 15 voxels of 2.5 x 0.8 x 1.0 mm):
+  SciPy's conjugate gradients run to their limit, 2 x 162,120 iterations, 23 s in sdcflows, 209 s
+  in larmorx at one thread (`relay27/slow_masker_*.py`); the tool's time limit is
+  900 s for such cases.
+- **Not ported (documented):** nipype's `requires` checks the command lines do not need
+  (`antsApplyTransforms`' `print_out_composite_warp_file` without `output_image`): random testing
+  draws the valid combinations only.

@@ -1080,8 +1080,10 @@ def _nipype_inputs(prog: str, rng: np.random.Generator, f: dict[str, str]) -> di
             kw["input_image_type"] = pick([0, 1, 2, 3])
         if maybe(0.3):
             kw["output_image"] = "warped.nii.gz"
-        if maybe(0.1):
-            kw["print_out_composite_warp_file"] = True
+            # (nipype requires output_image for it: its requires checks are not ported, as
+            # nothing larmorx runs reaches them: larmorx._nipype's documentation)
+            if maybe(0.3):
+                kw["print_out_composite_warp_file"] = True
     elif prog == "bet":
         kw["in_file"] = f["in.nii.gz"]
         if maybe():

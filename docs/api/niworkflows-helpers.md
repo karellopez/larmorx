@@ -46,6 +46,7 @@ Corrected by default (`upstream_defects="reproduce"` gives niworkflows' behaviou
 | PIPE-19 | a 6- or 7-dimensional image is averaged over its fourth axis | niworkflows' error for an image of more than four dimensions |
 | PIPE-33 | `IntensityClip` of an image constant between its percentiles divides it by its maximum, 0: a NaN image, converted to `int16` or `uint8` by an undefined conversion (0 on x86-64) | a `ValueError` (rule B); `reproduce` niworkflows' result with x86-64's NaN and casts on every platform (`intensity_clip(..., upstream_defects=)`) |
 | PIPE-34 | `RobustAverage` divides each gathered volume by its mean over the brightest's: a volume whose mean is 0 after the clipping (an empty volume) becomes NaN or infinite voxels, registered and averaged | a `ValueError` naming the volumes (rule B); `reproduce` niworkflows' arithmetic (`robust_average(..., upstream_defects=)`) |
+| PIPE-40 | `IntraModalMerge` with `to_ras` reorients the series to RAS but not `in_mask`, so `grand_mean_scaling` indexes the RAS series with the mask on the input's grid (numpy's `IndexError` when the shapes differ, a mirrored mask when they agree) | the mask reoriented with the series (`as_closest_canonical`), with a warning |
 
 `as_closest_canonical(image)` and `reorient(in_file, newpath=None)` are available on their own.
 

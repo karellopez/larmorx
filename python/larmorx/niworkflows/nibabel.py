@@ -217,8 +217,11 @@ def axcodes2ornt(axcodes: Sequence[str | None]) -> np.ndarray:
 
 
 def aff2axcodes(affine: Any) -> tuple[str | None, ...]:
-    """nibabel's ``aff2axcodes(affine)``: the axis codes of ``io_orientation(affine)``."""
-    from larmorx.transforms.resample import _io_orientation, _ornt2axcodes
+    """nibabel's ``aff2axcodes(affine)``: the axis codes of ``io_orientation(affine)`` (nibabel's,
+    whose polar step is numpy's LAPACK: a rotation with two equal candidates picks the axis
+    numpy's SVD gives it, :func:`larmorx.io.nibabel_header.io_orientation`)."""
+    from larmorx.io.nibabel_header import io_orientation as _io_orientation
+    from larmorx.transforms.resample import _ornt2axcodes
 
     return tuple(_ornt2axcodes(_io_orientation(np.asarray(affine, dtype=np.float64))))
 

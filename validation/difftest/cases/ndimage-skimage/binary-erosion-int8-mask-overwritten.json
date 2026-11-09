@@ -1,0 +1,95 @@
+{
+ "defect": "SCI-31",
+ "description": "an iterated binary_erosion with an int8 mask: SciPy writes its scratch values into the caller's mask (SCI-31), so each side gets its own arguments and they are compared afterwards (the first probe gave larmorx the mask SciPy had overwritten)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 120,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "binary: every output bit-identical"
+  ]
+ },
+ "id": "binary-erosion-int8-mask-overwritten",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "array": {
+    "dtype": "int16",
+    "layout": "strided",
+    "seed": 227872425,
+    "shape": [
+     5,
+     9,
+     9
+    ],
+    "special": false
+   },
+   "call": "binary",
+   "fn": "binary_erosion",
+   "kw": {
+    "border_value": 1,
+    "brute_force": false,
+    "iterations": 2,
+    "mask": {
+     "dtype": "int8",
+     "seed": 2032278027
+    },
+    "structure": {
+     "connectivity": 2
+    }
+   },
+   "threads": 3
+  },
+  "features": {
+   "border_value": 1,
+   "brute_force": false,
+   "call": "binary",
+   "connectivity": 2,
+   "extreme": false,
+   "function": "binary_erosion",
+   "input dtype": "int16",
+   "input layout": "strided",
+   "input n0": 5,
+   "input n1": 9,
+   "input n2": 9,
+   "input ndim": 3,
+   "input special values": false,
+   "iterations": 2,
+   "mask": true,
+   "mask dtype": "int8",
+   "origin": false,
+   "output": false,
+   "structure": "connectivity",
+   "threads": 3
+  },
+  "groups": [
+   {
+    "args": [
+     "binary"
+    ],
+    "name": "binary",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 120,
+  "options": [
+   "binary",
+   "binary_erosion",
+   "mask",
+   "structure connectivity"
+  ],
+  "seed": "try1",
+  "tool": "ndimage-skimage"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "ndimage-skimage",
+ "tier": "smoke",
+ "tool": "ndimage-skimage"
+}

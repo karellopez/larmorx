@@ -1678,32 +1678,18 @@ def binary_opening(
     num_axes = len(axes)
     if structure is None:
         structure = generate_binary_structure(num_axes, 1)
-    tmp = binary_erosion(
-        input,
-        structure,
-        iterations,
-        mask,
-        None,
-        border_value,
-        origin,
-        brute_force,
-        axes=axes,
-        n_threads=n_threads,
-        upstream_defects=upstream_defects,
-    )
-    return binary_dilation(
-        tmp,
-        structure,
-        iterations,
-        mask,
-        output,
-        border_value,
-        origin,
-        brute_force,
-        axes=axes,
-        n_threads=n_threads,
-        upstream_defects=upstream_defects,
-    )
+
+    def run(mode: str, out: Any, m: Any) -> Any:
+        tmp = binary_erosion(
+            input, structure, iterations, m, None, border_value, origin, brute_force,
+            axes=axes, n_threads=n_threads, upstream_defects=mode,
+        )  # fmt: skip
+        return binary_dilation(
+            tmp, structure, iterations, m, out, border_value, origin, brute_force,
+            axes=axes, n_threads=n_threads, upstream_defects=mode,
+        )  # fmt: skip
+
+    return _composite(run, output, mask, upstream_defects)
 
 
 def binary_closing(
@@ -1726,32 +1712,50 @@ def binary_closing(
     num_axes = len(axes)
     if structure is None:
         structure = generate_binary_structure(num_axes, 1)
-    tmp = binary_dilation(
-        input,
-        structure,
-        iterations,
-        mask,
-        None,
-        border_value,
-        origin,
-        brute_force,
-        axes=axes,
-        n_threads=n_threads,
-        upstream_defects=upstream_defects,
-    )
-    return binary_erosion(
-        tmp,
-        structure,
-        iterations,
-        mask,
-        output,
-        border_value,
-        origin,
-        brute_force,
-        axes=axes,
-        n_threads=n_threads,
-        upstream_defects=upstream_defects,
-    )
+
+    def run(mode: str, out: Any, m: Any) -> Any:
+        tmp = binary_dilation(
+            input, structure, iterations, m, None, border_value, origin, brute_force,
+            axes=axes, n_threads=n_threads, upstream_defects=mode,
+        )  # fmt: skip
+        return binary_erosion(
+            tmp, structure, iterations, m, out, border_value, origin, brute_force,
+            axes=axes, n_threads=n_threads, upstream_defects=mode,
+        )  # fmt: skip
+
+    return _composite(run, output, mask, upstream_defects)
+
+
+def _composite(run: Any, output: Any, mask: Any, upstream_defects: str) -> Any:
+    """An opening or a closing in ``upstream_defects``' mode, its steps' notices given only
+    where they change the composite's result or the caller's mask (SCI-31): a step's change
+    (SCI-10, SCI-25) can vanish in the other step."""
+    import warnings as _w
+
+    # only an int8 mask array is written into (SCI-31, reproduced): its values before
+    before = mask.copy() if isinstance(mask, np.ndarray) and mask.dtype == np.int8 else mask
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        result = run(upstream_defects, output, mask)
+    notices = [w for w in caught if isinstance(w.message, _defects.UpstreamDefectWarning)]
+    if notices:
+        m2 = before.copy() if before is not mask else mask
+        o2 = np.empty_like(output) if isinstance(output, np.ndarray) else output
+        try:
+            with _w.catch_warnings():
+                _w.simplefilter("ignore")
+                other = run("fix" if upstream_defects == "reproduce" else "reproduce", o2, m2)
+        except Exception:
+            other = None
+        if other is not None:
+            a, b = np.asarray(result), np.asarray(other)
+            same = a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
+            if same and (m2 is mask or np.array_equal(np.asarray(mask), np.asarray(m2))):
+                notices = []
+    for w in caught:
+        if w in notices or not isinstance(w.message, _defects.UpstreamDefectWarning):
+            _w.warn(w.message, stacklevel=3)
+    return result
 
 
 def binary_hit_or_miss(

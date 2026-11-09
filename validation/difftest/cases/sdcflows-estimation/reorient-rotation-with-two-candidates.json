@@ -1,0 +1,140 @@
+{
+ "defect": null,
+ "description": "ReorientImageAndMetadata of an affine whose rotation has two equal candidates: nibabel's io_orientation (numpy's SVD) decides the axis; larmorx used a platform-independent SVD (another axis, other directions and dim_info)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 725,
+  "seed": "fmapb-try2",
+  "shrink_moves": [],
+  "signature": [
+   "reorient: every output bit-identical"
+  ]
+ },
+ "id": "reorient-rotation-with-two-candidates",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "reorient",
+   "pe": [
+    "i-",
+    "k"
+   ],
+   "target": "LAS",
+   "threads": 3
+  },
+  "features": {
+   "call": "reorient",
+   "content": "ramp",
+   "dtype": "float32",
+   "extreme": false,
+   "ndim": 4,
+   "orientation": "axes+oblique",
+   "origin0": 43.5,
+   "origin1": -3.5,
+   "origin2": -1.75,
+   "pe per volume": true,
+   "pe0": "i-",
+   "pe1": "k",
+   "qfac": 1,
+   "qform_code": 1,
+   "ramp0": -2,
+   "ramp1": 2,
+   "ramp2": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "15x10x15x2",
+   "slice_code": 2,
+   "spacing0": 0.5,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "target": "LAS",
+   "threads": 3,
+   "tr": 2.0,
+   "tunits": "msec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "reorient"
+    ],
+    "name": "reorient",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "direction": [
+      -2,
+      2,
+      1
+     ],
+     "seed": 761476527,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      43.5,
+      -3.5,
+      -1.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      -6,
+      6,
+      6,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.5,
+      0.8,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     15,
+     10,
+     15,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 2,
+     "slice_duration": 133.3333,
+     "slice_end": 14,
+     "slice_start": 0,
+     "tr": 2000.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 725,
+  "options": [
+   "reorient",
+   "target LAS"
+  ],
+  "seed": "fmapb-try2",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

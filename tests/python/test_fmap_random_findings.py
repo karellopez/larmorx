@@ -164,3 +164,23 @@ def test_pipe38_denoise_image_lists_its_noise_image_as_nipype(tmp_path):
     # nipype lists every name_source output (rule C, kept): the file the program does not write
     assert cmd.outputs["noise_image"] == str(tmp_path / "in_noise.nii.gz")
     assert "[" not in cmd.cmdline
+
+
+def test_pipe40_the_mask_reoriented_with_the_series(tmp_path):
+    from larmorx.niworkflows import intra_modal_merge
+
+    rng = np.random.default_rng(40)
+    las = np.diag([-2.0, 2.0, 2.0, 1.0])
+    f = _save(tmp_path / "s.nii.gz", rng.integers(50, 150, (6, 5, 4, 3)).astype(np.float32), las)
+    m = _save(tmp_path / "m.nii.gz", (rng.random((6, 5, 4)) < 0.6).astype(np.uint8), las)
+    kw = {"hmc": False, "to_ras": True, "grand_mean_scaling": True}
+    _, ids, _ = entries(intra_modal_merge, f, m, **kw, out_dir=tmp_path / "a")
+    assert "PIPE-40" in ids and "PIPE-18" in ids
+    with pytest.raises(IndexError):  # niworkflows' own indexing (PIPE-18)
+        intra_modal_merge(f, m, **kw, out_dir=tmp_path / "b", upstream_defects="reproduce")
+    # a mask already in RAS: nothing to reorient, no PIPE-40
+    ras = np.diag([2.0, 2.0, 2.0, 1.0])
+    g = _save(tmp_path / "r.nii.gz", rng.integers(50, 150, (6, 5, 4, 3)).astype(np.float32), ras)
+    n = _save(tmp_path / "n.nii.gz", (rng.random((6, 5, 4)) < 0.6).astype(np.uint8), ras)
+    _, ids, _ = entries(intra_modal_merge, g, n, **kw, out_dir=tmp_path / "c")
+    assert "PIPE-40" not in ids

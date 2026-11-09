@@ -1,0 +1,99 @@
+{
+ "defect": null,
+ "description": "random_walker(mode='cg_mg') with no label 0: scikit-image returns the labels before it names the mode it replaces; larmorx warned about pyamg first (found as try3's case 380, a float64 one, compared only without numpy's AVX-512 exp; this float32 one everywhere)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 15279,
+  "seed": "relay27-rw",
+  "shrink_moves": [],
+  "signature": [
+   "skimage: every output bit-identical"
+  ]
+ },
+ "id": "random-walker-cg-mg-without-zeros",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "array": {
+    "dtype": "float32",
+    "layout": "C",
+    "seed": 1865900765,
+    "shape": [
+     4,
+     4,
+     4
+    ],
+    "special": false
+   },
+   "call": "skimage",
+   "fn": "random_walker",
+   "kw": {
+    "beta": 50,
+    "mode": "cg_mg",
+    "return_full_prob": false,
+    "spacing": {
+     "kind": "float32",
+     "values": [
+      2.5,
+      1.0,
+      3.0
+     ]
+    }
+   },
+   "labels": {
+    "kind": "no zeros",
+    "seed": 1131361430
+   },
+   "threads": 3
+  },
+  "features": {
+   "beta": 50,
+   "call": "skimage",
+   "data dtype": "float32",
+   "data n0": 4,
+   "data n1": 2,
+   "data n2": 1,
+   "data special values": false,
+   "extreme": false,
+   "function": "random_walker",
+   "labels": "no zeros",
+   "mode": "cg_mg",
+   "ndim": 3,
+   "return_full_prob": false,
+   "spacing": "float32",
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 3.0,
+   "threads": 3,
+   "tol": false
+  },
+  "groups": [
+   {
+    "args": [
+     "skimage"
+    ],
+    "name": "skimage",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 15279,
+  "options": [
+   "labels no zeros",
+   "mode cg_mg",
+   "random_walker",
+   "skimage"
+  ],
+  "seed": "relay27-rw",
+  "tool": "ndimage-skimage"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ndimage-skimage",
+ "tier": "smoke",
+ "tool": "ndimage-skimage"
+}

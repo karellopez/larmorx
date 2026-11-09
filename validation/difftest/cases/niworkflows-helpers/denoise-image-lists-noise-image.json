@@ -1,0 +1,55 @@
+{
+ "defect": "PIPE-38",
+ "description": "nipype's DenoiseImage lists noise_image (in_noise.nii.gz) without save_noise, as it lists every name_source output; larmorx's formatter left it out (PIPE-38: kept as nipype's)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 35,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "nipype: every output bit-identical"
+  ]
+ },
+ "id": "denoise-image-lists-noise-image",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "nipype",
+   "program": "DenoiseImage",
+   "seed": 863327454,
+   "threads": 1
+  },
+  "features": {
+   "call": "nipype",
+   "extreme": false,
+   "program": "DenoiseImage",
+   "threads": 1
+  },
+  "groups": [
+   {
+    "args": [
+     "nipype"
+    ],
+    "name": "nipype",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 35,
+  "options": [
+   "DenoiseImage",
+   "nipype"
+  ],
+  "seed": "try1",
+  "tool": "niworkflows-helpers"
+ },
+ "rule": "C",
+ "status": "register",
+ "suite": "niworkflows-helpers",
+ "tier": "smoke",
+ "tool": "niworkflows-helpers"
+}

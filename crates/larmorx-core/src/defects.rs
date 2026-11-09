@@ -360,6 +360,8 @@ defects! {
         "a gathered volume whose mean is 0 after the clipping is divided by it: NaN or infinite voxels, registered and averaged";
     PIPE_37 = "PIPE-37", "pybids BIDSLayout", true,
         "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
+    PIPE_40 = "PIPE-40", "niworkflows IntraModalMerge", true,
+        "with to_ras the series is reoriented to RAS but in_mask is not, so grand_mean_scaling indexes the RAS series with the mask on the input's grid: numpy's IndexError when the shapes differ, a mirrored or permuted mask when they agree";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

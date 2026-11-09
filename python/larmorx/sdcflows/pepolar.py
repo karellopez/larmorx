@@ -444,11 +444,11 @@ def reorient_image_and_metadata(
     (``ValueError('Invalid orientation code ...')`` for letters other than RASLPI) with its
     phase-encoding directions (``reorient_pedir``), written as ``<in><TARGET>``; the input and
     its directions when no reorientation is needed. SDC-12 (module docstring)."""
+    from larmorx.io.nibabel_header import io_orientation as _io_orientation
     from larmorx.niworkflows.images import as_reoriented
     from larmorx.niworkflows.nibabel import axcodes2ornt, ornt_transform
     from larmorx.sdcflows.approx import _fname_presuffix
     from larmorx.sdcflows.coeffs import reorient_pedir
-    from larmorx.transforms.resample import _io_orientation
 
     _defects.check(upstream_defects)
     in_file = os.fspath(in_file)

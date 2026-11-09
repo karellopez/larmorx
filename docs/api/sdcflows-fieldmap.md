@@ -582,6 +582,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-43 | `get_trt`'s `ValueError` for a zero or empty `TotalReadoutTime` is only the value in quotes (`'0'`) | the same message (class f, kept) | `get_trt` |
 | SDC-44 | `_warp_dir` logs "Running fieldmap-less registration on an oblique dataset" through `Logger.warn`, which Python deprecates (a `DeprecationWarning`) | the same message through `warning` (class f) | `warp_dir` |
 | SDC-45 | `FieldmapFile` takes its entities from the file's absolute path, where pybids' derivatives patterns (`den-`, `res-`, `desc-`, `label-`, ...) have no separator before them: below a folder such as `golden-clone` or `andres-lab` every file gets `den` or `res`, and the fieldmap-less search queries the layout with them: `ValueError: 'den' is not a recognized entity` (fMRIPrep's `--use-syn-sdc` too) | the entities of the path from the participant's `sub-*` folder (a file below none keeps sdcflows' parse) (rule A); `reproduce` sdcflows' | `FieldmapFile`, `FieldmapEstimation`, `find_estimators`, `find_anatomical_estimators`, the command line |
+| SDC-46 | `brain_masker` with `padding=0` crops its probabilities with `[..., 0:-0, ...]`, an empty slice: the probability and the mask are written as 0 x 0 x 0 images, the brain unmasked | the whole image's probability and mask, with a warning | `brain_masker`, `brain_extraction` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

@@ -326,8 +326,27 @@ def epi_mask(
     markers[cm] = 2
     markers[0, 0, -1] = -1
     # Run watershed
-    labels = ndimage.watershed_ift(wshed, markers, upstream_defects=upstream_defects)
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        labels = ndimage.watershed_ift(wshed, markers, upstream_defects=upstream_defects)
     mask = ndimage.binary_dilation(labels == 2, skimage.ball(2), n_threads=n_threads)
+    notices = [w for w in caught if isinstance(w.message, _defects.UpstreamDefectWarning)]
+    if notices:
+        # the watershed's notices (SCI-13, SCI-14) only where they change the mask: its other
+        # mode's labels can differ outside the brain's dilated label alone
+        other_mode = "fix" if upstream_defects == "reproduce" else "reproduce"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            other = ndimage.watershed_ift(wshed, markers, upstream_defects=other_mode)
+        if np.array_equal(labels == 2, other == 2) or np.array_equal(
+            mask, ndimage.binary_dilation(other == 2, skimage.ball(2), n_threads=n_threads)
+        ):
+            notices = []
+    for w in caught:
+        if w in notices or not isinstance(w.message, _defects.UpstreamDefectWarning):
+            warnings.warn(w.message, stacklevel=2)
     mask_img = _with_dtype(img, mask.astype(np.uint8), np.uint8)
     path = None
     if write:

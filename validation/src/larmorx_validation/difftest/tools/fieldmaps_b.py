@@ -317,7 +317,15 @@ def _draw_binary(d: gen.Draw, e: dict, options: list[str]) -> None:
                 "seed": d.seed(),
             }
         kw["border_value"] = d.choice("border_value", (0, 1), (3, 1))
-    if fn != "binary_hit_or_miss" and d.chance("origin", 0.3):
+    # SCI-32: SciPy's propagation strategy of a dilation (binary_dilation, the dilations of
+    # binary_opening and binary_closing, binary_propagation, binary_fill_holes) with a non-zero
+    # origin reads and writes outside its arrays (a crash, or memory's values): never drawn
+    propagates = fn in ("binary_propagation", "binary_fill_holes") or (
+        fn in ("binary_dilation", "binary_opening", "binary_closing")
+        and kw.get("iterations") != 1
+        and not kw.get("brute_force")
+    )
+    if fn != "binary_hit_or_miss" and not propagates and d.chance("origin", 0.3):
         sizes = kw.get("structure", {}).get("shape") or [3] * nd
         kw["origin"] = _origin(d, "origin", sizes)
     if fn != "binary_hit_or_miss" and d.chance("output", 0.25):
@@ -1134,5 +1142,7 @@ ESTIMATION = _tool(
     "sdcflows' estimation steps and estimators",
     draw_estimation,
     ("sdcflows", "bids", "niworkflows"),
-    240,
+    # brain_masker's random walker may not converge: SciPy's conjugate gradients run to their
+    # limit (10 n iterations), 23 s in sdcflows, 209 s in larmorx (relay 27's follow-up)
+    900,
 )

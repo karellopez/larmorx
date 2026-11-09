@@ -1,0 +1,101 @@
+{
+ "defect": null,
+ "description": "binary_opening with a uint16 mask (SCI-10's cast) whose erosion step differs between the modes but whose opening does not: no notice (larmorx named the step's defect)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 1211,
+  "seed": "fmapb-try2",
+  "shrink_moves": [],
+  "signature": [
+   "binary: every output bit-identical"
+  ]
+ },
+ "id": "binary-opening-step-notice-without-change",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "array": {
+    "dtype": "int16",
+    "layout": "strided",
+    "seed": 822240197,
+    "shape": [
+     2,
+     3,
+     7
+    ],
+    "special": false
+   },
+   "call": "binary",
+   "fn": "binary_opening",
+   "kw": {
+    "border_value": 1,
+    "brute_force": false,
+    "iterations": 0,
+    "mask": {
+     "dtype": "uint16",
+     "seed": 1446482368
+    },
+    "structure": {
+     "seed": 2030037870,
+     "shape": [
+      3,
+      3,
+      3
+     ]
+    }
+   },
+   "threads": 1
+  },
+  "features": {
+   "border_value": 1,
+   "brute_force": false,
+   "call": "binary",
+   "extreme": false,
+   "function": "binary_opening",
+   "input dtype": "int16",
+   "input layout": "strided",
+   "input n0": 2,
+   "input n1": 3,
+   "input n2": 7,
+   "input ndim": 3,
+   "input special values": false,
+   "iterations": 0,
+   "mask": true,
+   "mask dtype": "uint16",
+   "output": false,
+   "structure": "random",
+   "structure0": 3,
+   "structure1": 3,
+   "structure2": 3,
+   "threads": 1
+  },
+  "groups": [
+   {
+    "args": [
+     "binary"
+    ],
+    "name": "binary",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 1211,
+  "options": [
+   "binary",
+   "binary_opening",
+   "mask",
+   "structure random"
+  ],
+  "seed": "fmapb-try2",
+  "tool": "ndimage-skimage"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ndimage-skimage",
+ "tier": "smoke",
+ "tool": "ndimage-skimage"
+}

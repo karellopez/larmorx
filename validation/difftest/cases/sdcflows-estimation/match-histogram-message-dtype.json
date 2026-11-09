@@ -1,0 +1,184 @@
+{
+ "defect": null,
+ "description": "match_histogram of an unsigned image with a float reference (SKI-02 reproduced): numpy's message names nibabel's dtype('<f4'), which larmorx now keeps for unscaled data",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 134,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "match_histogram: every output bit-identical"
+  ]
+ },
+ "id": "match-histogram-message-dtype",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "match_histogram",
+   "threads": 1
+  },
+  "features": {
+   "axis0": 0.8,
+   "axis1": 1.2,
+   "axis2": 0.75,
+   "bias0": 0.0,
+   "bias1": -0.01,
+   "bias2": 0.005,
+   "bias3": 0.01,
+   "call": "match_histogram",
+   "centre0": -1.0,
+   "centre1": -6.0,
+   "centre2": 6.0,
+   "content": "head",
+   "dtype": "uint16",
+   "extreme": false,
+   "img mask": false,
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": -47.75,
+   "origin1": 48.5,
+   "origin2": 48.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "ref mask": false,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "9x4x9",
+   "size": 17.5,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 3.0,
+   "threads": 1,
+   "tissues": "t2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "match_histogram"
+    ],
+    "name": "match_histogram",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "img": {
+    "content": {
+     "axes": [
+      0.8,
+      1.2,
+      0.75
+     ],
+     "bias": [
+      0.0,
+      -0.01,
+      0.005,
+      0.01
+     ],
+     "centre": [
+      -1.0,
+      -6.0,
+      6.0
+     ],
+     "noise": 6.0,
+     "seed": 2117909890,
+     "size": 17.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -47.75,
+      48.5,
+      48.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     9,
+     4,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "seed": 602332468,
+     "type": "noise"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -10.0,
+      8.0,
+      35.5
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      2.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     5,
+     14,
+     18
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 134,
+  "options": [
+   "match_histogram"
+  ],
+  "seed": "try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

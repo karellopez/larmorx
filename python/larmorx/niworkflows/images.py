@@ -242,6 +242,14 @@ def _sequential_mean(series: np.ndarray) -> np.ndarray:
     return (acc.astype(np.float64) / np.float64(series.shape[3])).astype(np.float32)
 
 
+_PIPE40 = (
+    "IntraModalMerge with to_ras reorients the series to RAS but not in_mask, so "
+    "grand_mean_scaling indexes the RAS series with the mask on the input's grid (numpy's "
+    "IndexError when the shapes differ, a mirrored mask when they agree); the mask was "
+    "reoriented with the series"
+)
+
+
 def _grand_mean_scaled(
     series: np.ndarray,
     in_mask: Any,
@@ -373,7 +381,17 @@ def intra_modal_merge(
             series = np.asarray(mdata, dtype=np.float32)
             affine, header = merged.affine, merged.header
         if grand_mean_scaling:
-            series, more = _grand_mean_scaled(series, in_mask, numpy_version, upstream_defects)
+            mask_in = in_mask
+            if to_ras and in_mask is not None and upstream_defects != "reproduce":
+                # PIPE-40: niworkflows reorients the series to RAS but not the mask; the mask
+                # reoriented with it (a mask already in RAS is unchanged, no notice)
+                given = load_nibabel(in_mask, dtype=np.float32)
+                mask_in = as_closest_canonical(given)
+                if np.asarray(mask_in.data).tobytes() != np.asarray(given.data).tobytes() or (
+                    np.asarray(mask_in.data).shape != np.asarray(given.data).shape
+                ):
+                    notices.append(("PIPE-40", "niworkflows", "fix", _PIPE40))
+            series, more = _grand_mean_scaled(series, mask_in, numpy_version, upstream_defects)
             if upstream_defects != "reproduce":
                 notices += more
         # a 6/7-D series (PIPE-19 reproduced): numpy's own mean over the fourth axis

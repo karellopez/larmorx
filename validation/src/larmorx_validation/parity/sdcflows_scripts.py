@@ -814,6 +814,8 @@ def run_case(case: Case, checks: CheckList) -> None:
     if case.payload[0] == "random":  # random testing's case or a permanent one
         from larmorx_validation.parity import fieldmaps_b_random
 
+        if os.environ.get(pv.STEP_RECORD):
+            raise Outcome(SKIPPED, "the originals' own step runs the library scripts only")
         fieldmaps_b_random.run_case(case, checks)
         return
     suite, cid = case.payload

@@ -333,6 +333,34 @@ an array return `None`; `CPython`'s `"i"` conversion overflows at a C `long` wit
 large to convert to C long", the Linux and macOS text (a C `long` is 32-bit on Windows, where
 CPython says so already above 2^31 - 1: larmorx gives Linux's message on every platform).
 
+## Found by random testing (relay 27: SCI-31, SCI-32)
+
+The difftest tool `ndimage-skimage` (`validation/src/larmorx_validation/difftest/tools/fieldmaps_b.py`)
+draws one call per case and gives each side arguments of its own, compared afterwards too:
+
+1. **The iterated binary morphology overwrites the caller's `int8` mask** (SCI-31, class a). The
+   propagation strategy's second C call takes `np.asarray(mask, dtype=np.int8)`, which is the
+   caller's own array when it is `int8` (a copy for every other type), and `NI_BinaryErosion2`
+   uses it as its scratch: `-1` where the mask is true; where it is false, the output element's
+   first byte after the first pass, the output element then set false; at the end only the output
+   is restored. So the caller's mask is changed, and `binary_closing` (a dilation, then an erosion
+   with the same mask) erodes with the overwritten one: of 589 closings with an `int8` mask and
+   more than one pass, 456 differ from the closing with the mask intact (`relay27/probe_sci31.py`;
+   SciPy 1.18.1 and 1.15.3 alike). Rule A: larmorx leaves the mask as given (with a warning);
+   `reproduce` writes SciPy's values into it, and `binary_closing` then reads them as SciPy does
+   (3,000 calls of the five functions: result and mask afterwards = SciPy's).
+2. **The dilation's propagation strategy with an origin reads and writes outside its arrays**
+   (SCI-32, class a). With a valid non-zero origin, `binary_dilation` (and `binary_propagation`,
+   `binary_fill_holes`, the dilations of `binary_opening` and `binary_closing`) without
+   `brute_force` sometimes gives a result other than its own brute force, and its process sometimes
+   dies (`malloc(): unsorted double linked list corrupted`, aborts and segmentation faults, at the
+   call or at exit, so a later call of the same process can be the one that crashes: the first
+   probe's two worker deaths). One case per process (`relay27/probe_sci32.py`): of 120 dilations
+   with an origin 1 differed from the brute force; of 120 propagations 1 differed and 2 died;
+   none with a zero origin, none for the erosion or the brute force. larmorx gives the brute
+   force's result in both modes (memory is never reproduced); random testing draws no origin for
+   these calls.
+
 ## numpy.linalg's `svd3` (the field maps' part A module, fixed here)
 
 LAPACK 3.12.1's `DBDSQR` sets a zero singular value to `+0` ("avoid -ZERO"); 3.12.0's (OpenBLAS

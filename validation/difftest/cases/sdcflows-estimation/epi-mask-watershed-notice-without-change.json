@@ -1,0 +1,141 @@
+{
+ "defect": null,
+ "description": "epi_mask whose watershed labels differ between the modes (SCI-13, SCI-14) only where the brain's dilated label is the same: no notice (larmorx named the defects without a change)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 11,
+  "seed": "fmapb-try1",
+  "shrink_moves": [],
+  "signature": [
+   "epi_mask: every output bit-identical"
+  ]
+ },
+ "id": "epi-mask-watershed-notice-without-change",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "epi_mask",
+   "threads": 1
+  },
+  "features": {
+   "axis0": 1.25,
+   "axis1": 0.75,
+   "axis2": 0.9,
+   "bias0": -0.0075,
+   "bias1": -0.005,
+   "bias2": 0.01,
+   "bias3": 0.0025,
+   "call": "epi_mask",
+   "centre0": 2.0,
+   "centre1": 0.5,
+   "centre2": 1.0,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "noise": 1.0,
+   "orientation": "axes+oblique",
+   "origin0": 3.25,
+   "origin1": -35.75,
+   "origin2": -53.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "10x11x23",
+   "size": 25.0,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 1.0,
+   "threads": 1,
+   "tissues": "t1",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "epi_mask"
+    ],
+    "name": "epi_mask",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.25,
+      0.75,
+      0.9
+     ],
+     "bias": [
+      -0.0075,
+      -0.005,
+      0.01,
+      0.0025
+     ],
+     "centre": [
+      2.0,
+      0.5,
+      1.0
+     ],
+     "noise": 1.0,
+     "seed": 1598309319,
+     "size": 25.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      3.25,
+      -35.75,
+      -53.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      33,
+      27,
+      0,
+      4
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     11,
+     23
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 11,
+  "options": [
+   "epi_mask"
+  ],
+  "seed": "fmapb-try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

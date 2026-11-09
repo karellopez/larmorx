@@ -253,6 +253,18 @@ part B, 2026-11-09):
   the sums per label of its one label as a scalar, the empty input zero counts and sums of the
   index's shape, with a warning (one per `center_of_mass` call); `"reproduce"` raises SciPy's
   errors.
+- An iterated binary erosion or dilation (the propagation strategy: iterations other than 1, the
+  structure's centre true, no `brute_force`; `binary_opening`, `binary_closing` and
+  `binary_propagation` too) with an `int8` mask array: SciPy's cast to `int8` returns the
+  caller's own array, which `NI_BinaryErosion2` uses as its scratch, so the mask is left `-1`
+  where it was true and the first pass's output where it was false, and `binary_closing`'s
+  erosion reads the overwritten mask (its result differs). **SCI-31**, rule A: by default the
+  caller's mask is left as given (and `binary_closing` erodes with it), with a warning;
+  `"reproduce"` writes SciPy's values into it (random testing, relay 27).
+- A dilation's propagation strategy with a non-zero origin (`binary_dilation`,
+  `binary_propagation`, `binary_fill_holes`, the dilations of `binary_opening` and
+  `binary_closing`) reads and writes outside SciPy's arrays: a result from memory, or a crash
+  (**SCI-32**); larmorx gives the brute force's result in both modes (memory is never reproduced).
 - Complex inputs are refused by the filters, morphology and measurements (`TypeError`, SciPy's
   message for these functions); `correlate1d` and the Gaussian filters take them, as SciPy's.
 - `watershed_ift` is **corrected by default** (`upstream_defects="fix"`; `"reproduce"` gives

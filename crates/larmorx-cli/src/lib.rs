@@ -34,7 +34,16 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
     ("ants", larmorx_ants::cli::TOOLS),
     ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
+    ("sdcflows", PYTHON_TOOLS),
 ];
+
+/// The tools that are Python programs (sdcflows' BIDS app, `larmorx.sdcflows.run_app`): the
+/// `larmorx` command of the Python package runs them before this parser sees them; here they
+/// are listed, and running one says that it needs the Python package.
+const PYTHON_TOOLS: &[&str] = &["sdcflows"];
+
+/// Exit status of a tool this binary cannot run (the shell's "command not found").
+pub const EXIT_NOT_AVAILABLE: u8 = 127;
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; BET's and
@@ -244,6 +253,19 @@ fn run_tool(
             _ => larmorx_fsl::cli::run(tool, args, out, err),
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
+        "sdcflows" if PYTHON_TOOLS.contains(&tool) => {
+            let written = writeln!(
+                err,
+                "error: '{family} {tool}' (sdcflows' BIDS app) is a Python program: install the \
+                 larmorx Python package (pip install larmorx) and run it with the larmorx command \
+                 it installs (larmorx {family} {tool} <bids_dir> <output_dir> participant ...)"
+            );
+            Some(if written.is_ok() {
+                EXIT_NOT_AVAILABLE
+            } else {
+                EXIT_IO_ERROR
+            })
+        }
         _ => None,
     }
 }
@@ -446,6 +468,20 @@ mod tests {
         let (code, out, _) = run_capture(&["some/dir/lx.exe", "-h"]);
         assert_eq!(code, 0);
         assert!(out.contains("Usage: lx <family> <tool>"), "{out}");
+    }
+
+    #[test]
+    fn python_programs_say_they_need_the_python_package() {
+        let (code, out, err) = run_capture(&["larmorx", "sdcflows", "sdcflows", "--version"]);
+        assert_eq!(code, EXIT_NOT_AVAILABLE);
+        assert_eq!(out, "");
+        assert!(err.contains("is a Python program"), "{err}");
+        assert!(err.contains("pip install larmorx"), "{err}");
+        let (code, _, err) = run_capture(&["larmorx", "sdcflows", "other"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(err.contains("unknown sdcflows tool 'other'"), "{err}");
+        let (_, out, _) = run_capture(&["larmorx", "--help"]);
+        assert!(out.contains("sdcflows sdcflows"), "{out}");
     }
 
     #[test]

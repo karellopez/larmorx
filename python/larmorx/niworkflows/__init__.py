@@ -24,6 +24,8 @@ and scikit-image arithmetic under them.
 - :func:`derivatives_data_sink`, :func:`copy_any`: ``DerivativesDataSink`` (a derivative named
   by niworkflows' ``nipreps.json`` patterns, its header fixed, its JSON sidecar) and
   ``_copy_any``.
+- :func:`collect_participants`: the participants of a BIDS dataset to process (with
+  :class:`BIDSError` and :class:`BIDSWarning`).
 """
 
 from larmorx.niworkflows.bids import (
@@ -69,6 +71,7 @@ from larmorx.niworkflows.nibabel import (
     reorient_image,
 )
 from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
+from larmorx.niworkflows.participants import BIDSError, BIDSWarning, collect_participants
 from larmorx.niworkflows.refmap import EpiReferenceResult, epi_reference_workflow
 from larmorx.niworkflows.sampling import (
     BoundingBoxError,
@@ -79,6 +82,8 @@ from larmorx.niworkflows.sampling import (
 __all__ = [
     "DEFAULT_DTYPES",
     "STANDARD_SPACES",
+    "BIDSError",
+    "BIDSWarning",
     "BinarizeResult",
     "BoundingBoxError",
     "ConcatenateXfmsResult",
@@ -96,6 +101,7 @@ __all__ = [
     "as_reoriented",
     "axcodes2ornt",
     "binarize",
+    "collect_participants",
     "concatenate_xfms",
     "copy_any",
     "copy_header",

@@ -67,11 +67,15 @@ Rust (``larmorx-sdcflows``):
   each estimator's workflow, ``init_fmap_preproc_wf``'s graph built (its checks), a subject's
   estimators run with their derivatives (``init_fmap_preproc_wf``) and the derivatives
   (``init_fmap_derivatives_wf``, with niworkflows' ``DerivativesDataSink``).
+- :func:`run_app`, :func:`sdcflows_workflow` (:class:`SdcflowsWorkflow`): sdcflows' BIDS app (its
+  command line, ``larmorx sdcflows sdcflows``) and its graph (``init_sdcflows_wf``), in
+  :mod:`larmorx.sdcflows.app`.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
 """
 
+from larmorx.sdcflows.app import FieldmaplessError, SdcflowsWorkflow, run_app, sdcflows_workflow
 from larmorx.sdcflows.approx import BSplineApproxResult, bspline_approx
 from larmorx.sdcflows.base import (
     EPI_LIKE_SUFFIXES,
@@ -257,6 +261,7 @@ __all__ = [
     "FieldmapEstimation",
     "FieldmapFile",
     "FieldmapRegistry",
+    "FieldmaplessError",
     "FlattenResult",
     "FmapDerivativesResult",
     "FmapPreprocResult",
@@ -268,6 +273,7 @@ __all__ = [
     "PhaseResult",
     "PhdiffWorkflowResult",
     "RidgeResult",
+    "SdcflowsWorkflow",
     "SelectPEVolumesResult",
     "SortPEBlipsResult",
     "SynPreprocessingResult",
@@ -335,6 +341,8 @@ __all__ = [
     "resample_to_zooms",
     "rescale_affine",
     "ridge_sparse_cg",
+    "run_app",
+    "sdcflows_workflow",
     "select_pe_volumes",
     "select_topup_config",
     "selectintent",

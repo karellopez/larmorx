@@ -5,6 +5,10 @@ Arguments are parsed once, in Rust (crate ``larmorx-cli``), so the console scrip
 exactly like the standalone ``larmorx`` binary. Tools with a bit-exact replica run its program
 as a separate process when it is found (``LARMORX_IMPLEMENTATION``, ``docs/licensing.md``);
 it is also looked for in this Python environment's scripts directory.
+
+Python programs are run here, before Rust parses anything: ``larmorx sdcflows sdcflows ...`` is
+sdcflows' BIDS app (:func:`larmorx.sdcflows.run_app`); the standalone binary lists it and says it
+needs this package.
 """
 
 import sys
@@ -33,10 +37,25 @@ def run(argv: Sequence[str], *, implementation: str | None = None) -> int:
     ``implementation`` (``"auto"``, ``"replica"`` or ``"original"``) chooses how tools with a
     replica run; ``None`` reads ``LARMORX_IMPLEMENTATION`` (default ``auto``).
     """
+    argv = list(argv)
+    if argv[1:3] == ["sdcflows", "sdcflows"]:
+        return _python_program(argv[3:], implementation)
     code, out, err = _core.cli_main(list(argv), _search_dirs(), implementation)
     sys.stdout.write(out)
     sys.stderr.write(err)
     return code
+
+
+def _python_program(args: list[str], implementation: str | None) -> int:
+    """sdcflows' BIDS app, with ``implementation`` as its ``LARMORX_IMPLEMENTATION``."""
+    import os
+
+    from larmorx.sdcflows.app import run_app
+
+    env = dict(os.environ)
+    if implementation is not None:
+        env["LARMORX_IMPLEMENTATION"] = implementation
+    return run_app(args, env=env)
 
 
 def main() -> int:

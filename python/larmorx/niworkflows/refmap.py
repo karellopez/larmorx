@@ -163,6 +163,7 @@ def epi_reference_workflow(
             a.out_file,
             out_dir=node("clip_avgs", i),
             numpy_version=numpy_version,
+            upstream_defects=upstream_defects,
             n_threads=n_threads,
         )
         assert c.out_file is not None
@@ -175,6 +176,7 @@ def epi_reference_workflow(
             p_max=100.0,
             out_dir=node("clip_bg_noise", i),
             numpy_version=numpy_version,
+            upstream_defects=upstream_defects,
             n_threads=n_threads,
         )
         clips.append(c)

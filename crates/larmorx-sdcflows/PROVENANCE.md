@@ -80,8 +80,8 @@ its `skimage` module (`ball`, `threshold_otsu`, `random_walker`), and numpy's `p
 `brain_masker` in both kept environments and to fMRIPrep 25.2.6's own `masker` files (numpy
 2.2's sums, SciPy 1.15's order) on the nine `brainextraction_wf` nodes of the oracle runs
 (`validation/investigations/sdcflows-fieldmap-b/check_skimage.py`). Its switches: the rough mask
-without a component (SDC-h) and no brain seed after the erosion: errors by default,
-`upstream_defects='reproduce'` gives sdcflows' results (IDs in the part's defects relay).
+without a component (SDC-37) and no brain seed after the erosion (SDC-38): errors by default,
+`upstream_defects='reproduce'` gives sdcflows' results (rule B).
 
 
 ## Part B: the PEPOLAR estimation (`python/larmorx/sdcflows/pepolar.py`, relay 5)

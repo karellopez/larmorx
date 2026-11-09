@@ -257,7 +257,7 @@ def sec_watershed(t: cw.Tally, n: int) -> None:
         differ = not np.array_equal(np.asarray(fixed), np.asarray(want))
         t.add("watershed: a warning exactly when the labels differ", bool(warned) == differ, lab)
         if differ:
-            alone = inp.ndim == 1 and warned == ["SCI-W2"]
+            alone = inp.ndim == 1 and warned == ["SCI-14"]
             causes[" ".join(warned) + (" (1-D: the queue alone)" if alone else "")] += 1
     for cause, k in sorted(causes.items()):
         print(f"INFO watershed: corrected labels differ from SciPy's in {k} cases: {cause}")

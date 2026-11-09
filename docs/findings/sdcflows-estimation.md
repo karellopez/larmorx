@@ -947,7 +947,7 @@ sidecars), the settings files and the `cli` lines (the run's own folder apart); 
   runs (the dry runs: 52 of 52 listings identical with the correction, 2.15.2's search); the
   shared identifier's work folders go under `sdcflows_wf/sub_<label>/`. fMRIPrep, which also
   searches every participant of a run with the same registry, has the same defect
-  (`map_fieldmap_estimation`): a candidate for the defects relay (a PIPE- identifier).
+  (`map_fieldmap_estimation`): **PIPE-32** (rule A; relay 17, below).
 - The fieldmap-less estimators (`--no-fmapless` not given, a participant without field maps):
   `init_sdcflows_wf` builds `init_syn_sdc_wf` without its inputs (the SyN preprocessing needs an
   anatomical preprocessing the app does not have), and nipype stops at the first node that needs
@@ -975,41 +975,95 @@ sidecars), the settings files and the `cli` lines (the run's own folder apart); 
 - Before it checks anything else, sdcflows builds pybids' database (`execution.init()` runs inside
   `config.from_dict`): without `--participant-label` in `<output_dir>/.bids_db`, so with an
   output folder equal to the dataset (refused next) it first writes the database into the
-  dataset. larmorx writes no database at all (a documented difference of `larmorx.bids`): a
-  candidate for the defects relay, without a switch (nothing to reproduce).
+  dataset. larmorx writes no database at all (a documented difference of `larmorx.bids`): **SDC-40**
+  (class e, rule A; no switch: pybids' database has no counterpart to reproduce).
 - sdcflows' parent process logs "Workflow did not generate any jobs. Please check your inputs are
   valid." before its loggers start: Python's last-resort handler prints it on standard error,
   without the log format (reproduced); the "Running SDCFlows" lines come from its child process,
   where the loggers have started (standard output, formatted).
 - `init_sdcflows_wf` passes `fmap_type=estim.method` (the `EstimatorType`) to the reports'
   workflow, so the figures are named `desc-EstimatorType.PEPOLAR_fieldmap.svg` (the oracle runs'
-  `figures/`): for larmorprepx's reports part (D7), with `init_fmap_preproc_wf`'s
-  `str(estimator.method).rpartition('.')[-1].lower()`.
+  `figures/`): **SDC-42** (class c; for larmorprepx's reports part, D7, which names them as
+  `init_fmap_preproc_wf` does, `str(estimator.method).rpartition('.')[-1].lower()`, rule A,
+  with `reproduce` the enum's text).
 - On a machine without `HOME` (Windows), sdcflows' `config` module fails when imported
-  (`os.path.join(os.getenv('HOME'), ...)` for TemplateFlow's folder): larmorx uses the home
-  folder Python finds. A candidate for the defects relay (a crash: never reproduced).
+  (`os.path.join(os.getenv('HOME'), ...)` for TemplateFlow's folder): larmorx uses the home folder Python finds. **SDC-41** (class a: a crash, never
+  reproduced).
 
-## Candidates for the register (the part's defects relay decides them)
+## The register's entries of part B (relay 17, the defects relay)
 
-- **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
-  (label 0, of size 0) the largest, so the whole image is the brain; a constant inverted image
-  divides 0 by 0 (NaN). Now: a clear error by default (rule B), `reproduce` gives sdcflows'.
-- **brain_masker without brain seeds**: when the rough mask's erosion by `ball(5)` is empty, the
-  markers have no label 1, the random walker renumbers label 2 as 1, and `labels[0]` is the
-  background's probability, taken as the brain's. Now: a clear error by default (rule B).
-- **SDC-g** `brain_masker`'s `grey_closing(..., structure=ball(1))` is a non-flat closing with a
-  flat 3³ footprint: to measure (rule D).
-- scikit-image's `random_walker` returns the renumbered labels (consecutive from 1), not the
-  input's values, when these are not consecutive; `return_full_prob=True` with no unlabeled pixel
-  returns a boolean concatenation along the last axis.
-- niworkflows' `_advanced_clip` of a constant image: 0 / 0, then `round(255 * NaN)` cast to
-  `int16` (PIPE-a).
-- PIPE-18 and PIPE-19 (above) are already numbered and switched in `lx.niworkflows`
-  (`intra_modal_merge`), PIPE-20 to PIPE-22 (relay 7) in `lx.transforms` and
-  `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
-  `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
-  PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
-  `larmorx.pipelines.larmorprepx.estimators` (relay 13), SDC-12 to SDC-28 in `lx.sdcflows`
-  (relays 5 to 15), SDC-29 to SDC-36 in `lx.sdcflows`' command line (relay 16), SKI-02 in `lx.skimage` (relay 14) and SciPy's watershed candidates
-  (provisionally SCI-W1 to SCI-W4, relay 15) in `lx.ndimage`; the register's entries and
-  `larmorx_core::defects` wait for the part's defects relay.
+Every defect the part found is registered (`docs/findings/upstream-defects.md`, through the
+part's handoff) and, where larmorx has a switch for it, in `larmorx_core::defects` (the notices'
+table; `tests/python/test_fmap_defects.py` checks that every ID a Python notice of the package
+names is there):
+
+- **sdcflows: SDC-12 to SDC-44.** SDC-12 to SDC-36 as the relays above decided them. The
+  candidates decided here: **SDC-37** (`brain_masker`'s rough mask without a connected
+  component: the background, of size 0, is the largest, so the whole image is the brain; a
+  constant image divides 0 by 0) and **SDC-38** (no brain seed left after the erosion by
+  `ball(5)`: the random walker renumbers label 2 as 1 and `labels[0]` is the background's
+  probability, taken as the brain's): rule B, errors by default, `reproduce` sdcflows' results;
+  **SDC-39** (`brain_masker`'s `grey_closing(..., structure=ball(1))`, a non-flat closing where a
+  flat one by the ball is meant): rule D measured, then C (`relay17/probe_sdc39.py`: sdcflows'
+  own `brain_masker` both ways on the 14 `brainextraction_wf` inputs of the oracle runs: the
+  closed images differ on 25,270 to 1,135,280 voxels, the probabilities by at most 1.7e-06, the
+  masks on none: kept, no switch); **SDC-40** to **SDC-42** (relay 16's candidates, above);
+  **SDC-43** (`get_trt`'s `ValueError` for a zero or empty `TotalReadoutTime` is only the value
+  in quotes, `'0'`: class f, kept); **SDC-44** (`_warp_dir` logs through `Logger.warn`, which
+  Python deprecates with a `DeprecationWarning`: class f; larmorx logs the same message through
+  `warning`).
+- **niworkflows, nipype, fMRIPrep: PIPE-18 to PIPE-34.** PIPE-18 to PIPE-31 as decided above.
+  **PIPE-32** (fMRIPrep records every participant's estimators in sdcflows' one registry, so a
+  second participant with a `B0FieldIdentifier` an earlier one used stops the run with
+  `KeyError: "'<id>' is already  in mapping"`): rule A, measured with fMRIPrep 25.2.7's own
+  `map_fieldmap_estimation` (`relay17/probe_shared_identifier.py`: two participants whose
+  PEPOLAR pairs are both named `pepolar`, as BIDS allows: fMRIPrep stops at the second,
+  `reproduce` the same error, the default maps both with a warning); larmorprepx's
+  `map_fieldmap_estimation` searches each participant in a registry of its own (holding the
+  earlier automatic names, so `auto_NNNNN` stay fMRIPrep's) and adds its entries to the shared
+  registry where their names are free. **PIPE-33** (niworkflows' `IntensityClip` of an image
+  constant between its percentiles: 0 / 0, a NaN image, cast to `int16` or `uint8` by an
+  undefined conversion, 0 on x86-64) and **PIPE-34** (`RobustAverage`: a volume whose mean is 0
+  after the clipping is divided by 0): rule B, `ValueError`s by default, `reproduce`
+  niworkflows' results (x86-64's NaN and casts on every platform for PIPE-33).
+- **scikit-image: SKI-01 to SKI-04.** SKI-01 and SKI-02 as above. **SKI-03** (`random_walker`
+  returns its consecutive renumbering of the labels, from 1, not the labels given, when they are
+  not consecutive: labels 3 and 7 come back as 1 and 2) and **SKI-04** (`return_full_prob` with
+  no pixel to segment returns the seeds' boolean masks concatenated along the last axis, not the
+  documented `(nlabels, ...)` probabilities): rule A (its documentation: the pixels "labeled
+  according to the marker"; the probabilities' shape), corrected by default with a warning,
+  `reproduce` scikit-image's; no sdcflows path reaches them (`brain_masker`'s labels are 1 and
+  2, with pixels to segment).
+- **SciPy: SCI-06 to SCI-17** (`docs/findings/scipy-ndimage-filters.md`): the origin crash
+  (SCI-06), the `reflect` and 1-D rank filters' reads outside their arrays (SCI-07, SCI-08) and
+  the binary iterations that never end (SCI-11): never reproduced; the 1-D rank filter's
+  footprint holes (SCI-09) and the propagation's `int8` mask (SCI-10): rule A, corrected by
+  default with a switch (no sdcflows path reaches them); the non-flat structure added in the
+  element's type (SCI-12): rule C; the watershed's neighbours across the edges (SCI-13), an
+  element left alone in its queue (SCI-14), 32-bit markers (SCI-15): rule A, and its 32-bit byte
+  offsets (SCI-16): never reproduced; SciPy 1.15's short-input 1-D rank (SCI-17): fixed in SciPy
+  1.18, which larmorx follows.
+- No numpy or nibabel defect was found on part B's paths (NP-05 to NP-08 and NIB-05 to NIB-08
+  unused).
+
+**The corrected watershed against an independent mask (rule D's evidence for SCI-13 and SCI-14,
+the orchestrator's request).** `epi_mask`'s two masks on the four BOLD references, compared with
+fMRIPrep's own BOLD brain mask of each run (`desc-brain_mask`, the reference's grid; niworkflows'
+skull stripping of the coregistration reference, the corrected one for ds005040's PEPOLAR run)
+and with a head mask of the reference (its voxels above 5 % of its 98th percentile, holes
+filled, the largest component); `measure_watershed_masks.py`, newest environment,
+`oracles/logs/fmapb-r17-watershed-masks.log`:
+
+| run | fMRIPrep's mask | SciPy's watershed (`reproduce`): voxels, Dice, outside fMRIPrep's mask, outside the head | corrected (default) |
+|---|---|---|---|
+| ds000228 (a child) | 39,159 | 131,072 (the whole image), 0.460, 91,913, 79,304 | 47,081, **0.906**, 7,998, 1,662 |
+| ds003592 (multi-echo) | 42,464 | 12,843, 0.464, 10, 0 | 51,162, **0.904**, 8,828, 179 |
+| ds005040 | 51,891 | 15,882, 0.469, 0, 0 | 16,106, **0.474**, 7, 0 |
+| ds004958 (multiband 8) | 171,400 | 143, 0.002, 0, 0 | the same |
+
+The corrected masks are better on three references (twice the overlap on two of them; on
+ds000228 SciPy's mask is the whole image) and the same on the fourth, worse on none: rule A
+stands (the default follows the corrected watershed, `reproduce` SciPy's). The masks larger than
+fMRIPrep's by about 8,000 voxels are `epi_mask`'s own `ball(2)` dilation around the brain; on
+ds005040 and ds004958 the method itself finds little of the brain either way. sdcflows' own
+workflows do not call `epi_mask`, so no pipeline result moves.

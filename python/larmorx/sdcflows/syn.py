@@ -476,6 +476,7 @@ def syn_preprocessing_workflow(
         p_max=99.8,
         out_dir=node("clip_anat"),
         numpy_version=numpy_version,
+        upstream_defects=upstream_defects,
         n_threads=n_threads,
     )
     assert clipped.out_file is not None
@@ -1001,6 +1002,7 @@ def syn_sdc_workflow(
         p_max=99.9,
         out_dir=node("clip_epi"),
         numpy_version=numpy_version,
+        upstream_defects=upstream_defects,
         n_threads=n_threads,
     )
     assert clipped.out_file is not None

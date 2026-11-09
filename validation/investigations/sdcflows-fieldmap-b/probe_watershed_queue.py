@@ -32,7 +32,7 @@ for _ in range(20000):
     ent = {x.message.entry for x in w if hasattr(x.message, "entry")}
     if not np.array_equal(fixed, sp):
         differ += 1
-        assert ent == {"SCI-W2"}, ent
+        assert ent == {"SCI-14"}, ent
         if best is None or size < best[0].size:
             best = (a, m, sp, fixed)
 print(f"{n} 1-D cases, the corrected labels differ from SciPy's in {differ}")

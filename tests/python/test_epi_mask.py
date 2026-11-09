@@ -34,7 +34,7 @@ def test_watershed_across_an_edge():
     assert scipy.tolist() == [[1, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]]
     assert fixed.tolist() == [[1, 2, 2, 2], [1, 2, 2, 2], [1, 2, 2, 2]]
     assert fixed.dtype == np.int64
-    assert _entries(caught) == {"SCI-W1"}
+    assert _entries(caught) == {"SCI-13"}
 
 
 def test_watershed_queue_and_wide_markers():
@@ -46,7 +46,7 @@ def test_watershed_queue_and_wide_markers():
             -1, -1, -1, -1, -1, 0,
         ]  # fmt: skip
         assert lx.ndimage.watershed_ift(line, lm).tolist() == [-1] * 6
-        assert _entries(caught) == {"SCI-W2"}
+        assert _entries(caught) == {"SCI-14"}
         big = np.array([[2**32 + 5, 0], [0, 2**31]], np.int64)
         flat = np.zeros((2, 2), np.uint8)
         assert lx.ndimage.watershed_ift(flat, big, upstream_defects="reproduce").tolist() == [

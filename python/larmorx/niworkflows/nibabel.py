@@ -7,6 +7,10 @@ with nibabel's (5.4.2, MIT) ``axcodes2ornt``, ``aff2axcodes`` and ``ornt_transfo
 numpy's ``percentile`` of a Python-number ``q`` differs between numpy 2.2/2.3 (``float32``
 arithmetic) and 2.5 (``float64``): ``numpy_version`` picks the release (the default the newest;
 fMRIPrep 25.2.6's image has numpy 2.2.6).
+
+Corrected by default (``upstream_defects='reproduce'`` gives niworkflows' behaviour): PIPE-33,
+``IntensityClip`` of an image constant between its percentiles divides 0 by 0 (a NaN image,
+converted to ``int16``/``uint8`` by an undefined cast): a ``ValueError`` (rule B).
 """
 
 from __future__ import annotations
@@ -19,7 +23,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image, as_image
 from larmorx.io.nibabel_header import load_nibabel
 from larmorx.io.nibabel_writer import save_nibabel
@@ -82,15 +87,22 @@ def intensity_clip(
     *,
     out_dir: str | os.PathLike[str] | None = None,
     numpy_version: str = NUMPY_NEWEST,
+    upstream_defects: UpstreamDefectsName = "fix",
     n_threads: int = 1,
 ) -> IntensityClipResult:
     """niworkflows' ``IntensityClip``: the image clipped at the ``p_min`` and ``p_max``
     percentiles of its ``ball(3)`` median-filtered version (its positive values with
     ``nonnegative``), shifted to 0, divided by its maximum, inverted with ``invert``, and for
     ``dtype`` ``'int16'`` or ``'uint8'`` rounded from ``255 x``; ``cal_max`` set to the maximum.
-    Written as ``clipped.nii.gz`` in ``out_dir`` when given."""
+    Written as ``clipped.nii.gz`` in ``out_dir`` when given.
+
+    PIPE-33 (rule B; ``upstream_defects="reproduce"`` gives niworkflows' result): when the
+    clipped image is constant (both percentiles equal, or a constant image), niworkflows divides
+    0 by 0: a NaN image, which ``int16`` and ``uint8`` take by an undefined conversion (0 on
+    x86-64; here x86-64's 0 and default NaN on every platform); by default a ``ValueError``."""
     from larmorx import ndimage, skimage
 
+    _defects.check(upstream_defects)
     if dtype not in ("int16", "float32", "uint8"):
         raise ValueError(f"dtype must be 'int16', 'float32' or 'uint8', not {dtype!r}")
     img, data = _squeezed(in_file)
@@ -103,11 +115,36 @@ def intensity_clip(
     a_max = np.float32(_core.numpy_percentile_weak(sel, float(p_max), numpy_version))
     data = _core.numpy_clip_f32(np.ascontiguousarray(data), a_min, a_max)
     data -= data.min()
-    data /= data.max()
-    if invert:
-        data = 1.0 - data
-    if dtype in ("uint8", "int16"):
-        data = np.round(255 * data).astype(dtype)
+    if data.max() == 0:  # PIPE-33: 0 / 0
+        if upstream_defects == "fix":
+            raise ValueError(
+                f"IntensityClip: the image clipped at its percentiles {float(a_min)!r} and "
+                f"{float(a_max)!r} is constant, and niworkflows divides 0 by 0 (a NaN image"
+                f"{'' if dtype == 'float32' else ', converted to ' + dtype + ' as the CPU does'}"
+                "; PIPE-33, upstream_defects='reproduce' gives it)"
+            )
+        _defects.warn(
+            [
+                (
+                    "PIPE-33",
+                    "niworkflows IntensityClip",
+                    "reproduce",
+                    "a constant clipped image divided by its maximum, 0: NaN (x86-64's "
+                    f"default NaN{'' if dtype == 'float32' else ', converted to ' + dtype + ': 0'})",
+                )
+            ],
+            stacklevel=2,
+        )
+        nan = np.array([0xFFC00000], dtype=np.uint32).view(np.float32)[0]
+        data = np.full(data.shape, nan, dtype=np.float32)
+        if dtype in ("uint8", "int16"):
+            data = np.zeros(data.shape, dtype=dtype)
+    else:
+        data /= data.max()
+        if invert:
+            data = 1.0 - data
+        if dtype in ("uint8", "int16"):
+            data = np.round(255 * data).astype(dtype)
     out = Image(data, img.affine, img.header)
     path = None
     if out_dir is not None:

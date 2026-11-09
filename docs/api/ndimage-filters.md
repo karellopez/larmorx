@@ -101,49 +101,58 @@ contiguous); results are C-ordered, as SciPy's.
 
 Where SciPy's C code reads or writes outside its arrays, or never returns, larmorx gives a
 defined result or a clear error instead (CLAUDE.md, D13: crashes and out-of-bounds reads are
-never reproduced). Each is a defect candidate of the field maps' part B, to be registered with
-its ID (`docs/findings/upstream-defects.md`):
+never reproduced). Each is in the register (`docs/findings/upstream-defects.md`; the field maps'
+part B, 2026-11-09):
 
 - `binary_erosion` and `binary_dilation` with an origin that puts the structure's centre before
   it (an index numpy's `_center_is_true` wraps around: erosion origins below `-(s // 2)`,
   dilation origins above `(s - 1) // 2`): SciPy crashes (segmentation fault) or returns memory's
   values; larmorx raises `ValueError("invalid origin")`. An origin beyond the structure gives
-  numpy's `IndexError` in both (`probe_origin_crash.py`).
+  numpy's `IndexError` in both (`probe_origin_crash.py`). **SCI-06**.
 - The n-dimensional filters' `reflect` mode maps a coordinate two or more whole periods (`2 ·
   2n`) before an axis of length `n` (a footprint more than eight times the axis) to index `-1`,
-  before the array; larmorx reads index 0, the reflection's value.
+  before the array; larmorx reads index 0, the reflection's value. **SCI-07**.
 - The 1-D rank filter (`_rank_filter_1d`) starts and ends its window by indexing the input
   directly; with a window much larger than the input (or a large `wrap` origin) it reads
   before or after it. larmorx reads the mode's extension there (the check counts those cases
-  apart).
-- The 1-D rank filter takes the footprint's size, its false elements included; larmorx does the
-  same (SciPy's result), to be decided with the register (rule A or C).
+  apart). **SCI-08**.
+- The 1-D rank filter takes the footprint's size, its false elements included (the rank counted
+  from the true ones), so a 1-D footprint with holes filters another neighbourhood: **SCI-09**,
+  rule A, corrected by default (`rank_filter`, `median_filter`, `percentile_filter`:
+  `upstream_defects="fix"` filters it with the n-dimensional filter, `"reproduce"` gives SciPy's
+  running rank; an `UpstreamDefectWarning` when the two differ).
 - `binary_erosion` and `binary_dilation` iterated until nothing changes with a structure whose
   centre is false can alternate between two states for ever (SciPy never returns); larmorx
-  raises `RuntimeError` when a state repeats.
+  raises `RuntimeError` when a state repeats. **SCI-11**.
 - In the propagation of more than one iteration, SciPy reads the mask cast to `int8` (so `0.5`
-  or `256` are false there although true in the first pass); larmorx does the same (SciPy's
-  result), to be decided with the register.
+  or `256` are false there although true in the first pass): **SCI-10**, rule A, corrected by
+  default (`binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`,
+  `binary_propagation`: `upstream_defects="fix"` reads the mask's truth in every pass,
+  `"reproduce"` SciPy's int8 cast; a warning when the two differ).
+- Kept as SciPy (**SCI-12**, rule C): a non-flat structure is added in the element's type (C's
+  wrapping integer arithmetic: a `uint8` dilation wraps), SciPy's definition.
+- SciPy 1.15's 1-D rank filter of an input shorter than half the footprint returns zeros
+  (**SCI-17**, gh-23293, fixed in SciPy 1.18): larmorx follows SciPy 1.18 in both modes.
 - `output` given as a dtype or array: the result is computed as SciPy computes it (a double per
   element, cast to the output's type by SciPy's own cast); integers beyond 2^53 follow the same
   path.
 - Complex inputs are not supported (`TypeError`, as SciPy's message for these functions).
 - `watershed_ift` is **corrected by default** (`upstream_defects="fix"`; `"reproduce"` gives
-  SciPy's labels, an `UpstreamDefectWarning` names the defects whenever the two differ; IDs to be
-  given when the part registers them, provisionally SCI-W1 to SCI-W4):
-  - **neighbours across the edges** (SCI-W1): SciPy adds the structure's offsets to the C-order
+  SciPy's labels, an `UpstreamDefectWarning` names the defects whenever the two differ; SCI-13
+  to SCI-16):
+  - **neighbours across the edges** (SCI-13): SciPy adds the structure's offsets to the C-order
     index and checks only that the sum is inside the array, so the last element of a row
     neighbours the first of the next and an axis of length 1 has neighbours along it; larmorx
     takes a neighbour only when every coordinate is inside;
-  - **an element alone in its queue** (SCI-W2): SciPy takes an element whose cost drops out of
+  - **an element alone in its queue** (SCI-14): SciPy takes an element whose cost drops out of
     its queue only when one of its links is set, so an element alone there stays; a later
     element queued at that level is linked behind it, which can cut elements off every queue
     (they keep their label and are never processed: in `[1, 0, 0, 1, 1, 2]` with markers
     `[-1, 0, -1, 0, 0, 0]` the last element keeps label 0) or process them at the wrong level;
     larmorx always takes it out;
-  - **32-bit markers** (SCI-W3): SciPy reads markers and labels as C `int`s, so `2**32 + 5` is
+  - **32-bit markers** (SCI-15): SciPy reads markers and labels as C `int`s, so `2**32 + 5` is
     5 and `2**31` a background marker; larmorx keeps 64 bits;
-  - **arrays over 2 GiB** (SCI-W4): SciPy's byte offsets are `int`s and overflow (reads and
+  - **arrays over 2 GiB** (SCI-16): SciPy's byte offsets are `int`s and overflow (reads and
     writes outside its arrays, never reproduced); larmorx's are 64-bit in both modes, with a
     warning.
 

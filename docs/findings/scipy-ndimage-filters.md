@@ -4,8 +4,8 @@ Findings of the field maps' part B, relay 2 (2026-11-08), from porting SciPy 1.1
 filters, morphology and labelling (`crates/larmorx-ndimage`, `lx.ndimage`,
 [docs/api/ndimage-filters.md](../api/ndimage-filters.md)) and numpy's percentiles, medians,
 `clip` and float32 `exp` (`larmorx_core::numpy`). The tools are in
-`validation/investigations/sdcflows-fieldmap-b/`. The defect candidates below get their IDs and
-their rules A-D when the part registers them (`docs/findings/upstream-defects.md`).
+`validation/investigations/sdcflows-fieldmap-b/`. The defects below are registered (SCI-06 to SCI-17, `docs/findings/upstream-defects.md`), each
+with its rule A-D.
 
 ## numpy
 
@@ -33,51 +33,57 @@ their rules A-D when the part registers them (`docs/findings/upstream-defects.md
   column gives a NaN. `mean` over the first three axes of a Fortran-ordered 4D series is a
   pairwise sum of each volume's contiguous block (`relay2/probe_mean_axes.py` there).
 
-## SciPy ndimage (defect candidates)
+## SciPy ndimage (defects SCI-06 to SCI-17, registered by the part's defects relay, 2026-11-09)
 
-1. **Binary morphology with an origin before its structure crashes.** SciPy checks no origin of
+1. **Binary morphology with an origin before its structure crashes** (SCI-06, class a). SciPy checks no origin of
    `binary_erosion` and `binary_dilation`; `_center_is_true` indexes the structure with numpy's
    rules, so a centre one or more places before the structure wraps around, and the C code
    then reads and writes outside its arrays: a segmentation fault, or a result from memory
    (erosion origins below `-(s // 2)`, dilation origins above `(s - 1) // 2`; the outcome varies
    between runs and environments: `probe_origin_crash.py`). A centre beyond the structure is
    numpy's `IndexError`. larmorx raises `ValueError("invalid origin")` where SciPy crashes
-   (candidate: rule B).
-2. **The n-dimensional filters' `reflect` boundary reads before the array** for a coordinate two
+   (rule B; a crash is never reproduced).
+2. **The n-dimensional filters' `reflect` boundary reads before the array** (SCI-07, class a) for a coordinate two
    or more whole periods (`2 · 2n`) before an axis of length `n` (`NI_InitFilterOffsets`: the
    reduction leaves 0, then `-cc - 1` gives `-1`); only a footprint more than eight times the
-   axis reaches it. larmorx reads index 0, the reflection's value (candidate: rule A; an
-   out-of-bounds read is never reproduced).
-3. **The 1-D rank filter (`_rank_filter_1d`) reads outside a short input.** It starts and ends
+   axis reaches it. larmorx reads index 0, the reflection's value (rule A; an out-of-bounds read is never reproduced).
+3. **The 1-D rank filter (`_rank_filter_1d`) reads outside a short input** (SCI-08, class a). It starts and ends
    its running window by indexing the input directly (`reflect`, `mirror`: up to `win_len - lim`;
    `wrap`: from `arr_len - lim - offset - 2·origin`; the end loops), so a window much larger
    than the input (or a large `wrap` origin) reads memory before or after it. larmorx reads the
-   mode's extension there (candidate: rule A).
-4. **The 1-D rank filter ignores the footprint's false elements**: SciPy passes
+   mode's extension there (rule A; never reproduced).
+4. **The 1-D rank filter ignores the footprint's false elements** (SCI-09, class c): SciPy passes
    `footprint.size` as the window and the rank computed from the true elements, so a 1-D
-   footprint with holes takes the median (rank) of the whole window. larmorx gives SciPy's
-   result for now (candidate: rule A, correct by the n-dimensional filter, `reproduce` SciPy's).
-5. **The propagation of more than one binary iteration reads the mask cast to `int8`**
+   footprint with holes takes the median (rank) of the whole window. Rule A: larmorx filters such a
+   footprint with the n-dimensional filter by default (`upstream_defects="reproduce"` gives
+   SciPy's running rank), with a warning when the two differ (a 40-element series with the
+   footprint `[1, 0, 1, 1, 0, 1]`: the corrected result equals SciPy's own n-dimensional filter
+   of that footprint along a row of a 2-D array; `tests/python/test_fmap_defects.py`).
+5. **The propagation of more than one binary iteration reads the mask cast to `int8`** (SCI-10,
+   class c)
    (`np.asarray(mask, dtype=np.int8)` in `_binary_erosion`), while the first pass reads its
-   truth: a mask of `0.5` or `256` is true in the first pass and false afterwards. larmorx gives
-   SciPy's result for now (candidate: rule A or C).
-6. **A binary erosion or dilation until nothing changes can loop for ever** with a structure
+   truth: a mask of `0.5` or `256` is true in the first pass and false afterwards. Rule A (SciPy documents the mask as
+   the elements with a True value): larmorx reads its truth in every pass by default
+   (`reproduce`: SciPy's cast), with a warning when the result changes (a propagation from one
+   end of 30 elements whose mask's middle third is 0.5: SciPy reaches 10, the corrected one 30,
+   SciPy's own result with the mask as booleans).
+6. **A binary erosion or dilation until nothing changes can loop for ever** (SCI-11, class a) with a structure
    whose centre (after the origin) is false: the whole passes can alternate between two states.
-   larmorx raises a `RuntimeError` when a state repeats (candidate: rule B).
+   larmorx raises a `RuntimeError` when a state repeats (rule B; a hang is never reproduced).
 7. The non-flat structure is added in the element's type (`_tmp += (_type)_ss[ii]`, C's wrapping
    integer arithmetic and casts), while the running result is the caller's double (`_res += _ss[0]`
-   in double): uint8 dilations wrap (`probe_int_casts.py`). Kept (SciPy's definition, rule C).
+   in double): uint8 dilations wrap (`probe_int_casts.py`). Kept (SCI-12, rule C: SciPy's
+   definition).
 
-8. **`watershed_ift` links elements across the array's edges** (provisionally SCI-W1).
+8. **`watershed_ift` links elements across the array's edges** (SCI-13).
    `NI_WatershedIFT` adds each structure offset to the C-order index and checks only that the
    sum lies in the array, so the last element of a row neighbours the first of the next (and,
    through the other axes' offsets, the last row of a plane the first of the next), and an axis
    of length 1 has neighbours along it. In a 3 x 4 image with a wall in column 1, markers 1 at
    `(0, 0)` and 2 at `(2, 3)`, label 2 reaches column 0 through `(0, 3)` -> `(1, 0)`:
    `[[1, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]]` (SciPy 1.15.3 and 1.18.1). larmorx takes a
-   neighbour only when every coordinate is inside (candidate: rule A; `reproduce` gives
-   SciPy's).
-9. **`watershed_ift` leaves an element alone in its queue there** (provisionally SCI-W2): it
+   neighbour only when every coordinate is inside (rule A; `reproduce` gives SciPy's).
+9. **`watershed_ift` leaves an element alone in its queue there** (SCI-14): it
    takes an element whose cost drops out of its queue only `if (p->next || p->prev)`, so an
    element alone in its queue stays, the queue's first and last pointing at it; an element
    queued at that level later is linked behind it, joining two queues, cutting elements off
@@ -85,18 +91,22 @@ their rules A-D when the part registers them (`docs/findings/upstream-defects.md
    reach) or processing them at the wrong level. 1-D (no neighbour across an edge): image
    `[1, 0, 0, 1, 1, 2]`, markers `[-1, 0, -1, 0, 0, 0]`: SciPy `[-1, -1, -1, -1, -1, 0]` (the
    last element never reached), corrected all `-1`; in 37 of 20,000 seeded 1-D cases the labels
-   differ (`probe_watershed_queue.py`). larmorx always takes the element out (candidate: rule
-   A). With 8 they change sdcflows' `epi_mask` on three of four oracle runs' BOLD references
-   (ds000228's mask is the whole image in SciPy's run: `docs/findings/sdcflows-estimation.md`).
-10. **`watershed_ift` reads markers and labels as C `int`s** (provisionally SCI-W3): an int64
+   differ (`probe_watershed_queue.py`). larmorx always takes the element out (rule A). With 8 they change sdcflows' `epi_mask` on three of four oracle runs' BOLD references
+   (ds000228's mask is the whole image in SciPy's run: `docs/findings/sdcflows-estimation.md`);
+   measured against fMRIPrep's own BOLD brain mask of each run (rule D's evidence the
+   orchestrator asked for, `measure_watershed_masks.py`), the corrected masks are better on
+   three references and the same on the fourth, worse on none (Dice 0.460 to 0.906, 0.464 to
+   0.904, 0.469 to 0.474; the voxels outside the head 79,304 to 1,662, 0 to 179, 0 to 0):
+   rule A stands.
+10. **`watershed_ift` reads markers and labels as C `int`s** (SCI-15): an int64
     marker `2**32 + 5` is 5, `2**31` is `-2**31`, a background marker (`[[5, 5], [5, -2**31]]`
-    for a flat 2 x 2 image). larmorx keeps the 64 bits (candidate: rule A).
-11. **`watershed_ift`'s byte offsets are `int`s** (provisionally SCI-W4): above 2^31 bytes of
+    for a flat 2 x 2 image). larmorx keeps the 64 bits (rule A).
+11. **`watershed_ift`'s byte offsets are `int`s** (SCI-16): above 2^31 bytes of
     input or output (an int64 output from 2^28 elements) SciPy reads and writes outside its
     arrays; larmorx's offsets are 64-bit in both modes and it warns (an out-of-bounds access is
     never reproduced; not run: such arrays take tens of GB).
 
-    Kept as SciPy (no candidate): labels stored in the output's type (an `int8` output wraps
+    Kept as SciPy (not registered): labels stored in the output's type (an `int8` output wraps
     300 to 44, read back as such); a non-array `output` (a dtype) ignored, the markers' type
     used; a 0-d array keeps its marker (SciPy writes `strides[-1]` on its stack there and
     returns the same); the wrapper's checks and messages (`TypeError` for inputs other than
@@ -105,7 +115,7 @@ their rules A-D when the part registers them (`docs/findings/upstream-defects.md
     marker and output type, random structures, Fortran-ordered, strided and big-endian arrays)
     with `reproduce` = SciPy's labels and types, the corrected labels = an independent Python
     implementation of the corrected transform, a warning exactly when they differ (in 209 of
-    the 600; among the causes candidate 8 in 205, 9 in 169, 10 in 17), and the wrapper's 13
+    the 600; among the causes SCI-13 in 205, SCI-14 in 169, SCI-15 in 17), and the wrapper's 13
     errors, in both environments.
 
 **Speed without changing a bit (relay 15).** The minimum and maximum filters with a non-flat
@@ -120,7 +130,7 @@ element by element in the footprint's order. `check_ndimage.py`'s 39,436 cases a
 (SciPy 0.29 s), `grey_closing` with `ball(2)` 0.10 s (0.10 s), `grey_erosion` with `ball(5)` of
 a Fortran-ordered 104 x 104 x 72 image 0.78 s (0.57 s: the per-point path) at one thread.
 
-**SciPy 1.15 to 1.18.** For a 1-D input shorter than half the footprint, SciPy 1.15's running
+**SciPy 1.15 to 1.18** (SCI-17, fixed upstream). For a 1-D input shorter than half the footprint, SciPy 1.15's running
 rank returned before writing (all zeros, gh-23293: SciPy 1.15.3, the shared environment, 30 of 30
 such cases); SciPy 1.18 runs the n-dimensional filter. larmorx follows 1.18 (fixed upstream, as
 SCI-03).

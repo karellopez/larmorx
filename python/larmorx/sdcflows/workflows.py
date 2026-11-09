@@ -205,6 +205,7 @@ def _brainextraction(
         in_file,
         out_dir=wd.node(*prefix, "clipper_pre"),
         numpy_version=numpy_version,
+        upstream_defects=upstream_defects,
         n_threads=n_threads,
     )
     assert pre.out_file is not None
@@ -217,6 +218,7 @@ def _brainextraction(
         p_max=99.9,
         out_dir=wd.node(*prefix, "clipper_post"),
         numpy_version=numpy_version,
+        upstream_defects=upstream_defects,
         n_threads=n_threads,
     )
     assert post.out_file is not None

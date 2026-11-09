@@ -398,8 +398,20 @@ def maximum_filter(
 
 
 def _rank_filter(
-    input, rank, size, footprint, output, mode, cval, origin, operation, axes, n_threads
+    input,
+    rank,
+    size,
+    footprint,
+    output,
+    mode,
+    cval,
+    origin,
+    operation,
+    axes,
+    n_threads,
+    upstream_defects="fix",
 ) -> np.ndarray:
+    _defects.check(upstream_defects)
     if (size is not None) and (footprint is not None):
         warnings.warn("ignoring size because footprint is set", UserWarning, stacklevel=3)
     a, dtype = _input(input)
@@ -455,6 +467,19 @@ def _rank_filter(
     # SciPy 1.18.1 sends 1-D inputs to its running-rank code unless the footprint is too large
     # for the input (gh-23293); it passes the footprint's size, its false elements included
     lim2 = a.size - ((footprint.size - 1) // 2 - origin)
+
+    def nd():
+        return _core.ndimage_rank_filter(
+            a,
+            int(rank),
+            footprint,
+            mode,
+            float(cval),
+            [int(o) for o in origins],
+            int(n_threads),
+            target.name,
+        )
+
     if a.ndim == 1 and ((lim2 >= 0) or (a.size == 1)):
         x = a if dtype in (np.int64, np.float64, np.float32) else a.astype("int64")
         cv = x.dtype.type(cval)
@@ -466,18 +491,28 @@ def _rank_filter(
         )
         res = np.empty(a.shape, dtype=target)
         np.copyto(res, x_out, casting="unsafe")
-        return _result(res.view(np.uint8) if target == np.bool_ else res, target, output)
-    out = _core.ndimage_rank_filter(
-        a,
-        int(rank),
-        footprint,
-        mode,
-        float(cval),
-        [int(o) for o in origins],
-        int(n_threads),
-        target.name,
-    )
-    return _result(out, target, output)
+        res = res.view(np.uint8) if target == np.bool_ else res
+        # SCI-09: SciPy's running rank takes the whole window, the footprint's false elements
+        # included; corrected, a footprint with holes is filtered by the n-dimensional filter
+        if not footprint.all():
+            fixed = nd()
+            if not np.array_equal(fixed, res, equal_nan=res.dtype.kind == "f"):
+                _defects.warn(
+                    [
+                        (
+                            "SCI-09",
+                            "SciPy ndimage",
+                            upstream_defects,
+                            f"the 1-D {operation} filter's footprint has false elements, which "
+                            "SciPy's running rank counts in its window",
+                        )
+                    ],
+                    stacklevel=4,
+                )
+            if upstream_defects == "fix":
+                return _result(fixed, target, output)
+        return _result(res, target, output)
+    return _result(nd(), target, output)
 
 
 def rank_filter(
@@ -492,11 +527,29 @@ def rank_filter(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """``scipy.ndimage.rank_filter``: the ``rank``-th smallest value over a footprint."""
+    """``scipy.ndimage.rank_filter``: the ``rank``-th smallest value over a footprint.
+
+    SCI-09 (rule A; ``upstream_defects="reproduce"`` gives SciPy's result), also of
+    :func:`median_filter` and :func:`percentile_filter`: on a 1-D input SciPy's running rank
+    takes the footprint's whole window, its false elements included (the rank is counted from
+    the true ones), so a 1-D footprint with holes filters another neighbourhood; larmorx filters
+    it with the n-dimensional filter, with a warning when that changes the result."""
     rank = operator.index(rank)
     return _rank_filter(
-        input, rank, size, footprint, output, mode, cval, origin, "rank", axes, n_threads
+        input,
+        rank,
+        size,
+        footprint,
+        output,
+        mode,
+        cval,
+        origin,
+        "rank",
+        axes,
+        n_threads,
+        upstream_defects,
     )
 
 
@@ -511,10 +564,22 @@ def median_filter(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.median_filter``: the median over a footprint (rank ``size // 2``)."""
     return _rank_filter(
-        input, 0, size, footprint, output, mode, cval, origin, "median", axes, n_threads
+        input,
+        0,
+        size,
+        footprint,
+        output,
+        mode,
+        cval,
+        origin,
+        "median",
+        axes,
+        n_threads,
+        upstream_defects,
     )
 
 
@@ -530,6 +595,7 @@ def percentile_filter(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.percentile_filter``: the ``percentile``-th value over a footprint."""
     return _rank_filter(
@@ -544,6 +610,7 @@ def percentile_filter(
         "percentile",
         axes,
         n_threads,
+        upstream_defects,
     )
 
 
@@ -689,7 +756,9 @@ def _binary_erosion(
     brute_force,
     axes,
     n_threads,
+    upstream_defects="fix",
 ) -> np.ndarray:
+    _defects.check(upstream_defects)
     try:
         iterations = operator.index(iterations)
     except TypeError as e:
@@ -726,17 +795,43 @@ def _binary_erosion(
     if isinstance(output, np.ndarray) and np.iscomplexobj(output):
         raise TypeError("Complex output type not supported")
     data, _ = _input(a)
-    out = _core.ndimage_binary_erosion(
-        data,
-        structure,
-        [int(o) for o in origin],
-        int(iterations),
-        bool(border_value),
-        bool(invert),
-        bool(brute_force),
-        mask,
-        int(n_threads),
-    )
+
+    def run(m):
+        return _core.ndimage_binary_erosion(
+            data,
+            structure,
+            [int(o) for o in origin],
+            int(iterations),
+            bool(border_value),
+            bool(invert),
+            bool(brute_force),
+            m,
+            int(n_threads),
+        )
+
+    # SCI-10: SciPy's passes after the first read the mask cast to int8 (0.5 and 256 are false
+    # there, true in the first pass); corrected, every pass reads the mask's truth
+    truth = None
+    if mask is not None and iterations != 1 and mask.dtype not in (np.uint8, np.int8):
+        t = mask != 0
+        if not np.array_equal(t, mask.astype(np.int8) != 0):
+            truth = t.view(np.uint8)
+    out = run(mask if truth is None or upstream_defects == "reproduce" else truth)
+    if truth is not None:
+        other = run(truth if upstream_defects == "reproduce" else mask)
+        if not np.array_equal(out, other):
+            _defects.warn(
+                [
+                    (
+                        "SCI-10",
+                        "SciPy ndimage",
+                        upstream_defects,
+                        "the passes after the first read the mask cast to int8 (values such as "
+                        "0.5 or 256 false), the first its truth",
+                    )
+                ],
+                stacklevel=3,
+            )
     res = out.view(np.bool_)
     if output is None:
         return res
@@ -760,8 +855,9 @@ def binary_erosion(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """``scipy.ndimage.binary_erosion``."""
+    """``scipy.ndimage.binary_erosion`` (SCI-10, ``upstream_defects``: :func:`binary_propagation`)."""
     return _binary_erosion(
         input,
         structure,
@@ -774,6 +870,7 @@ def binary_erosion(
         brute_force,
         axes,
         n_threads,
+        upstream_defects,
     )
 
 
@@ -789,6 +886,7 @@ def binary_dilation(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.binary_dilation``: the erosion of the complement with the reversed
     structure."""
@@ -816,6 +914,7 @@ def binary_dilation(
         brute_force,
         axes,
         n_threads,
+        upstream_defects,
     )
 
 
@@ -831,6 +930,7 @@ def binary_opening(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.binary_opening``: an erosion, then a dilation."""
     a = np.asarray(input)
@@ -848,6 +948,7 @@ def binary_opening(
         brute_force,
         axes=axes,
         n_threads=n_threads,
+        upstream_defects=upstream_defects,
     )
     return binary_dilation(
         tmp,
@@ -860,6 +961,7 @@ def binary_opening(
         brute_force,
         axes=axes,
         n_threads=n_threads,
+        upstream_defects=upstream_defects,
     )
 
 
@@ -875,6 +977,7 @@ def binary_closing(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.binary_closing``: a dilation, then an erosion."""
     a = np.asarray(input)
@@ -892,6 +995,7 @@ def binary_closing(
         brute_force,
         axes=axes,
         n_threads=n_threads,
+        upstream_defects=upstream_defects,
     )
     return binary_erosion(
         tmp,
@@ -904,6 +1008,7 @@ def binary_closing(
         brute_force,
         axes=axes,
         n_threads=n_threads,
+        upstream_defects=upstream_defects,
     )
 
 
@@ -951,10 +1056,26 @@ def binary_propagation(
     *,
     axes: Any = None,
     n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """``scipy.ndimage.binary_propagation``: a dilation repeated until nothing changes."""
+    """``scipy.ndimage.binary_propagation``: a dilation repeated until nothing changes.
+
+    SCI-10 (rule A; ``upstream_defects="reproduce"`` gives SciPy's result): with a ``mask`` of a
+    type other than bool and 8-bit integers and more than one pass (``iterations`` other than 1,
+    as here), SciPy's first pass reads the mask's truth and the later ones the mask cast to
+    ``int8``, so a value such as 0.5 or 256 is true in the first pass and false afterwards;
+    larmorx reads its truth in every pass, with a warning when that changes the result."""
     return binary_dilation(
-        input, structure, -1, mask, output, border_value, origin, axes=axes, n_threads=n_threads
+        input,
+        structure,
+        -1,
+        mask,
+        output,
+        border_value,
+        origin,
+        axes=axes,
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
     )
 
 
@@ -1139,11 +1260,11 @@ def center_of_mass(
 #: The register's entries for ``watershed_ift``'s events (provisional IDs: the part registers
 #: them, ``docs/findings/scipy-ndimage-filters.md``, candidates 8 to 11).
 _WATERSHED_DEFECTS = (
-    ("SCI-W1", "SciPy links elements across the array's edges (it checks only the C-order index)"),
-    ("SCI-W2", "SciPy left an element alone in its queue there when its cost dropped"),
-    ("SCI-W3", "SciPy reads markers beyond 32 bits as C ints"),
+    ("SCI-13", "SciPy links elements across the array's edges (it checks only the C-order index)"),
+    ("SCI-14", "SciPy left an element alone in its queue there when its cost dropped"),
+    ("SCI-15", "SciPy reads markers beyond 32 bits as C ints"),
     (
-        "SCI-W4",
+        "SCI-16",
         "SciPy's int byte offsets overflow above 2 GiB (it reads and writes outside its "
         "arrays; never reproduced)",
     ),

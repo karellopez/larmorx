@@ -12,7 +12,7 @@
 //! `median_filter` with `footprint=ball(3)`; scikit-image's Otsu threshold of that; the rough mask
 //! `closed < threshold` (a `float32` 0/1 array), `binary_opening` with `ball(3)`; its largest
 //! connected component (6-connectivity, every tie kept; with no component the background's label
-//! is the largest: SDC-h); `binary_closing` with `ball(5)`; the markers (2 on the padded array's
+//! is the largest: SDC-37); `binary_closing` with `ball(5)`; the markers (2 on the padded array's
 //! outer shell, 0 inside and on the rough mask's `binary_dilation` with `ball(5)`, 1 on its
 //! `binary_erosion` with `ball(5)`); the random walker of `2 * closed / closed.max() - 1` (with
 //! the positive values of `closed` shifted down by their minimum first) with these markers, the
@@ -46,8 +46,9 @@ pub struct MaskerOptions {
     /// SciPy's order of the random walker's Laplacian rows.
     pub scipy: SparseOrder,
     /// Keep sdcflows' results where its inputs make no sense (`reproduce`): with no component in
-    /// the rough mask, the whole image as the rough mask (SDC-h); with no brain seed left after
-    /// the erosion, the background's probability as the brain's. By default both are errors.
+    /// the rough mask, the whole image as the rough mask (SDC-37); with no brain seed left after
+    /// the erosion, the background's probability as the brain's (SDC-38). By default both are
+    /// errors.
     pub reproduce: bool,
 }
 
@@ -161,7 +162,7 @@ pub fn brain_masker(
         }
     }
     // datainv = -data; datainv -= datainv.min(); datainv /= datainv.max() (numpy's min and max
-    // propagate a NaN; a constant image divides 0 by 0: SDC-h)
+    // propagate a NaN; a constant image divides 0 by 0: SDC-37)
     for x in &mut d {
         *x = -*x;
     }
@@ -243,7 +244,7 @@ pub fn brain_masker(
     if max == 0 && !opts.reproduce {
         return Err(SdcError::Invalid(
             "brain_masker: the rough mask has no connected component (sdcflows would take the \
-             whole image as the brain: SDC-h; upstream_defects='reproduce' gives its result)"
+             whole image as the brain: SDC-37; upstream_defects='reproduce' gives its result)"
                 .into(),
         ));
     }
@@ -320,7 +321,7 @@ pub fn brain_masker(
     if !brain_seeds && !opts.reproduce {
         return Err(SdcError::Invalid(
             "brain_masker: no brain seed is left after the rough mask's erosion by ball(5) \
-             (sdcflows would take the background's probability as the brain's; \
+             (sdcflows would take the background's probability as the brain's: SDC-38; \
              upstream_defects='reproduce' gives its result)"
                 .into(),
         ));

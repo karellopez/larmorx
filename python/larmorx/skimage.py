@@ -345,9 +345,7 @@ def random_walker(
             stacklevel=2,
         )
         if return_full_prob:
-            return np.concatenate(
-                [np.atleast_3d(labels == lab) for lab in np.unique(labels) if lab > 0], axis=-1
-            )
+            return _seeds_as_probabilities(labels, upstream_defects)
         return labels
     if kind == "isolated":
         isolated = res["labels"].reshape(labels_shape) == -1
@@ -360,9 +358,7 @@ def random_walker(
             stacklevel=2,
         )
         if return_full_prob:
-            return np.concatenate(
-                [np.atleast_3d(labels == lab) for lab in np.unique(labels) if lab > 0], axis=-1
-            )
+            return _seeds_as_probabilities(labels, upstream_defects)
         return labels
     for w in res["warnings"]:
         warnings.warn(w, stacklevel=2)
@@ -381,4 +377,51 @@ def random_walker(
         )
     if kind == "full":
         return res["prob"].reshape((res["nlabels"], *labels_shape))
-    return res["labels"].reshape(labels_shape).astype(labels_dtype)
+    out = res["labels"].reshape(labels_shape)
+    # SKI-03: scikit-image returns its consecutive renumbering of the labels' values
+    values = np.unique(labels)
+    if np.issubdtype(values.dtype, np.number) and not np.isnan(values).any():
+        renumbered = np.arange(values.size) - int(np.searchsorted(values, 0))
+        if not np.array_equal(values.astype(np.float64), renumbered.astype(np.float64)):
+            mapped = values[np.clip(out + int(np.searchsorted(values, 0)), 0, values.size - 1)]
+            if not np.array_equal(mapped, out):
+                from larmorx._defects import UpstreamDefectWarning
+
+                mode = "reproduce" if upstream_defects == "reproduce" else "fix"
+                warnings.warn(
+                    UpstreamDefectWarning(
+                        "SKI-03",
+                        "scikit-image random_walker",
+                        mode,
+                        f"the labels {values.tolist()[:8]} are not consecutive: scikit-image "
+                        "returns its renumbering of them (from 1), not the labels given",
+                    ),
+                    stacklevel=2,
+                )
+                if mode == "fix":
+                    return mapped.astype(labels_dtype)
+    return out.astype(labels_dtype)
+
+
+def _seeds_as_probabilities(labels: np.ndarray, upstream_defects: str) -> np.ndarray:
+    """``return_full_prob=True`` without a pixel to segment (SKI-04, rule A): the documented
+    ``(nlabels, *labels.shape)`` float probabilities, 1 on each label's seeds; scikit-image
+    (``reproduce``) returns its boolean seed masks concatenated along the last axis
+    (``np.atleast_3d``: ``(..., nlabels)`` for 2-D labels, the volumes side by side for 3-D)."""
+    from larmorx._defects import UpstreamDefectWarning
+
+    positive = [lab for lab in np.unique(labels) if lab > 0]
+    mode = "reproduce" if upstream_defects == "reproduce" else "fix"
+    warnings.warn(
+        UpstreamDefectWarning(
+            "SKI-04",
+            "scikit-image random_walker",
+            mode,
+            "with no pixel to segment, return_full_prob returns the seeds' boolean masks "
+            "concatenated along the last axis, not (nlabels, ...) probabilities",
+        ),
+        stacklevel=3,
+    )
+    if mode == "reproduce":
+        return np.concatenate([np.atleast_3d(labels == lab) for lab in positive], axis=-1)
+    return np.stack([labels == lab for lab in positive]).astype(np.float64)

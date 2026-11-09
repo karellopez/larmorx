@@ -27,6 +27,8 @@ Corrected by default (``upstream_defects='reproduce'`` gives niworkflows' behavi
   its median inside the mask, as the code means.
 - PIPE-19: a 6- or 7-dimensional image passes niworkflows' 5D check and is averaged over its
   fourth axis; larmorx raises niworkflows' error for it, as for a 5D image.
+- PIPE-34 (``robust_average``): a gathered volume whose mean is 0 is divided by 0; larmorx
+  raises a ``ValueError`` naming it (rule B).
 """
 
 from __future__ import annotations
@@ -549,7 +551,12 @@ def robust_average(
       its median over the volumes written as ``<in>_average`` with the gathered volumes' header.
 
     ``num_threads`` is nipype's (3dvolreg's ``OMP_NUM_THREADS``: no effect on its result).
-    Files go into ``out_dir`` (nipype's node directory), else into a temporary directory."""
+    Files go into ``out_dir`` (nipype's node directory), else into a temporary directory.
+
+    PIPE-34 (rule B; ``upstream_defects="reproduce"`` gives niworkflows' result): a gathered
+    volume whose mean is 0 after the clipping (an empty volume, or a series of zeros) is divided
+    by 0: NaN (or infinite) voxels, which niworkflows registers and averages; by default a
+    ``ValueError`` naming the volumes."""
     _defects.check(upstream_defects)
     in_file = os.fspath(in_file)
     with _workdir(out_dir) as (cwd, keep):
@@ -587,6 +594,25 @@ def robust_average(
         )
         data = np.clip(data, a_min=lo, a_max=hi)
         gs_drift = _gs_drift(data, numpy_version)
+        zero = [i for i, v in enumerate(gs_drift) if v == 0]
+        if zero and upstream_defects == "fix":
+            raise ValueError(
+                f"RobustAverage: the gathered volume(s) {zero} of {in_file} have a mean of 0 after "
+                "the clipping, and niworkflows divides by it (NaN or infinite voxels; PIPE-34, "
+                "upstream_defects='reproduce' gives its result)"
+            )
+        if zero:
+            _defects.warn(
+                [
+                    (
+                        "PIPE-34",
+                        "niworkflows RobustAverage",
+                        "reproduce",
+                        f"the gathered volume(s) {zero} have a mean of 0: divided by 0",
+                    )
+                ],
+                stacklevel=2,
+            )
         gs_drift /= gs_drift.max()
         drift = tuple(float(i) for i in gs_drift)
         data /= gs_drift

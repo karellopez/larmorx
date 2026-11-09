@@ -33,7 +33,10 @@ fMRIPrep logs through ``nipype.workflow``; these functions log the same messages
 Corrected by default (``upstream_defects="reproduce"`` gives fMRIPrep's behaviour): PIPE-31, a
 precomputed field map whose derivatives lack its field map, reference or coefficients file
 stops fMRIPrep with a bare ``KeyError`` ('fieldmap', 'magnitude' or 'coeffs'); here a
-``ValueError`` names the identifier, the missing file and the derivatives (rule B).
+``ValueError`` names the identifier, the missing file and the derivatives (rule B). PIPE-32,
+participants of one run that share a ``B0FieldIdentifier`` stop fMRIPrep with sdcflows'
+``KeyError`` (one registry for every participant); here each participant's search has a
+registry of its own (rule A, :func:`map_fieldmap_estimation`).
 """
 
 from __future__ import annotations
@@ -190,16 +193,25 @@ def map_fieldmap_estimation(
         For :func:`larmorx.sdcflows.find_estimators`.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: sdcflows' SDC-17 and SDC-21
-        (:func:`larmorx.sdcflows.find_estimators`) and PIPE-25: when the sources of an
+        (:func:`larmorx.sdcflows.find_estimators`); PIPE-25: when the sources of an
         estimator list several ``B0FieldIdentifier`` values, sdcflows names it after one of
         them (SDC-19), and fMRIPrep leaves a BOLD run whose ``B0FieldSource`` is another of
-        them without a field map; corrected, the run gets that estimator.
+        them without a field map; corrected, the run gets that estimator; PIPE-32: fMRIPrep
+        records every participant's estimators in sdcflows' one registry, so a second
+        participant with a ``B0FieldIdentifier`` an earlier one used (BIDS asks it to be
+        unique only within a participant) stops the run with sdcflows' ``KeyError``;
+        corrected, each call searches in a registry of its own (holding the earlier
+        participants' automatic names, so ``auto_NNNNN`` stay fMRIPrep's), then adds its
+        entries to ``registry`` where their names are free, with a warning for a shared one
+        (``registry`` keeps the first participant's sources under it; the estimators returned
+        hold their own).
 
     Returns
     -------
     tuple
         The estimators used, and each corrected BOLD file's estimator identifier.
     """
+    from larmorx.sdcflows import estimators as fm
     from larmorx.sdcflows.estimators import EstimatorType
     from larmorx.sdcflows.wrangler import find_estimators
 
@@ -207,6 +219,14 @@ def map_fieldmap_estimation(
     if not any((not ignore_fieldmaps, use_syn, force_syn)):
         return [], {}
 
+    shared = fm._registry(registry)
+    if upstream_defects == "reproduce":
+        reg = shared
+    else:  # PIPE-32: a registry of the participant's own, with the earlier automatic names
+        reg = fm.FieldmapRegistry()
+        for key, value in shared.estimators.items():
+            if key.startswith("auto_"):
+                reg.estimators[key] = value
     fmap_estimators = find_estimators(
         layout=layout,
         subject=subject_id,
@@ -214,10 +234,12 @@ def map_fieldmap_estimation(
         fmapless=bool(use_syn) or (ignore_fieldmaps and force_syn),
         force_fmapless=force_syn or (ignore_fieldmaps and bool(use_syn)),
         bids_filters=filters,
-        registry=registry,
+        registry=reg,
         sdcflows_version=sdcflows_version,
         upstream_defects=upstream_defects,
     )
+    if reg is not shared:
+        _merge_registry(reg, shared, subject_id)
 
     if not fmap_estimators:
         if use_syn:
@@ -242,7 +264,7 @@ def map_fieldmap_estimation(
     aliases = _aliases(fmap_estimators) if upstream_defects == "fix" else {}
     all_estimators = {}
     for bold_file in bold_files:
-        found = list(get_estimator(layout, bold_file, registry=registry))
+        found = list(get_estimator(layout, bold_file, registry=reg))
         keys = [fmap_id for fmap_id in found if fmap_id in all_ids]
         if aliases:
             fixed = list(
@@ -278,6 +300,29 @@ def map_fieldmap_estimation(
     }
     fmap_estimators = [f for f in fmap_estimators if f.bids_id in estimator_map.values()]
     return fmap_estimators, estimator_map
+
+
+def _merge_registry(own: Any, shared: Any, subject_id: str) -> None:
+    """PIPE-32: the participant's registry ``own`` added to ``shared`` where the names are
+    free (the automatic ones it already holds are the same entries); a name another
+    participant's sources hold stays theirs, with a warning."""
+    for key, value in own.estimators.items():
+        if key not in shared.estimators:
+            shared.estimators[key] = value
+        elif shared.estimators[key] != value:
+            warnings.warn(
+                _defects.UpstreamDefectWarning(
+                    "PIPE-32",
+                    "fMRIPrep",
+                    "fix",
+                    f"sub-{subject_id}'s B0FieldIdentifier {key!r} is already an earlier "
+                    "participant's: fMRIPrep stops with sdcflows' KeyError (one registry for "
+                    "every participant); here each participant's search has its own",
+                ),
+                stacklevel=3,
+            )
+    for path, ids in own.intents.items():
+        shared.intents[path] |= ids
 
 
 def _aliases(estimators: Sequence[Any]) -> dict[str, str]:

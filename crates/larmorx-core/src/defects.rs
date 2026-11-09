@@ -326,10 +326,54 @@ defects! {
         "the transforms of an ITK composite .h5 file are read in name order, so a composite of 10 or more transforms is misordered";
     PIPE_17 = "PIPE-17", "nitransforms", true,
         "the first group of an ITK .h5 file is skipped as if it were a composite: a file of one transform cannot be loaded (IndexError), a file of several transforms without a composite loses its first, and an empty composite fails";
+    PIPE_18 = "PIPE-18", "niworkflows IntraModalMerge", true,
+        "grand_mean_scaling indexes the series with a mask of the wrong shape, so every series of two or more volumes fails with numpy's IndexError";
+    PIPE_19 = "PIPE-19", "niworkflows IntraModalMerge", true,
+        "a 6- or 7-dimensional image passes the check for more than four dimensions and is averaged over its fourth axis";
+    PIPE_20 = "PIPE-20", "fMRIPrep DistortionParameters", true,
+        "a missing readout time or phase-encoding direction becomes undefined outputs, so the BOLD run is resampled without its field map although one is assigned to it (and the report still names the correction)";
+    PIPE_21 = "PIPE-21", "fMRIPrep ReconstructFieldmap", true,
+        "the field evaluated directly on a target is returned on the target projected into the field map's space and made positive (its voxels reversed along an axis that runs against its world axis), while the resampler reads it voxel for voxel on the target's own grid: a mirrored field";
+    PIPE_23 = "PIPE-23", "nipype is_outlier", true,
+        "a median absolute deviation of 0 (more than half of the values equal) makes the values at the median 0/0, NaN, which fail the threshold test and count as outliers, so NonsteadyStatesDetector calls every leading volume non-steady";
+    PIPE_24 = "PIPE-24", "niworkflows ValidateImage", true,
+        "the report names the translation's unit with nibabel's get_xyzt_units, which raises KeyError for a spatial unit code 4 to 7";
+    PIPE_25 = "PIPE-25", "fMRIPrep", true,
+        "a BOLD run whose B0FieldSource names an estimator by another of its sources' B0FieldIdentifier values (aliases) gets no field map, or not, as a Python set orders them";
+    PIPE_26 = "PIPE-26", "niworkflows DerivativesDataSink", true,
+        "with two or more list-valued entity inputs the files are matched to the names in the order of a Python set of the entity names, which changes between processes";
+    PIPE_27 = "PIPE-27", "niworkflows DerivativesDataSink", true,
+        "its warning about a changed data type names the original type twice";
+    PIPE_28 = "PIPE-28", "niworkflows DerivativesDataSink", true,
+        "compress with fewer values than files (but more than one) fails with Python's IndexError";
+    PIPE_29 = "PIPE-29", "niworkflows DerivativesDataSink", true,
+        "the data type coercion casts values out of the integer type's range and NaN with numpy's cast (undefined in C; on x86-64 a wrapped or arbitrary value)";
+    PIPE_30 = "PIPE-30", "niworkflows DerivativesDataSink", true,
+        "a RepetitionTime input for an image that is not 4-D makes the header fix set four voxel sizes on it, and nibabel's HeaderDataError stops the sink";
+    PIPE_31 = "PIPE-31", "fMRIPrep", true,
+        "a precomputed field map whose derivatives lack its field map, reference or coefficients file stops the graph's construction with a bare KeyError";
+    PIPE_32 = "PIPE-32", "fMRIPrep", true,
+        "every participant's field-map estimators go into sdcflows' one registry, so a second participant with a B0FieldIdentifier an earlier one used (BIDS asks it to be unique only within a participant) stops the run with KeyError";
+    PIPE_33 = "PIPE-33", "niworkflows IntensityClip", true,
+        "an image constant between its percentiles is divided by its maximum, 0: a NaN image, converted to int16 or uint8 by an undefined conversion (0 on x86-64)";
+    PIPE_34 = "PIPE-34", "niworkflows RobustAverage", true,
+        "a gathered volume whose mean is 0 after the clipping is divided by it: NaN or infinite voxels, registered and averaged";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
         "the spline prefilter's reflect boundary (modes reflect, grid-mirror and nearest) reads a coefficient it has already updated, so the splines do not interpolate on short axes";
+    SCI_09 = "SCI-09", "SciPy ndimage", true,
+        "on a 1-D input the rank, median and percentile filters take the footprint's whole window, its false elements included (the rank counted from the true ones), so a footprint with holes filters another neighbourhood";
+    SCI_10 = "SCI-10", "SciPy ndimage", true,
+        "a binary erosion, dilation or propagation of more than one pass reads the mask's truth in the first pass and the mask cast to int8 in the later ones (0.5 and 256 are false there)";
+    SCI_13 = "SCI-13", "SciPy watershed_ift", true,
+        "neighbours are found by adding the structure's offsets to the C-order index, checked only against the array's size, so the last element of a row neighbours the first of the next and an axis of length 1 has neighbours along it";
+    SCI_14 = "SCI-14", "SciPy watershed_ift", true,
+        "an element whose cost drops is taken out of its queue only when it has a neighbour there, so an element alone in its queue stays: queues join, elements are cut off every queue (never processed) or processed at the wrong level";
+    SCI_15 = "SCI-15", "SciPy watershed_ift", true,
+        "markers and labels are read as 32-bit C ints: an int64 marker 2**32 + 5 is 5, 2**31 a background marker";
+    SCI_16 = "SCI-16", "SciPy watershed_ift", true,
+        "the byte offsets are 32-bit C ints: above 2 GiB of input or output it reads and writes outside its arrays";
     SDC_01 = "SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,
@@ -350,6 +394,54 @@ defects! {
         "B0FieldTransform.fit with approx (the default of ApplyCoeffsField and of sdcflows' unwarping workflow), on a target not aligned with the coefficients, builds its intermediate grid around the target as given and resamples it at the target's own coordinates, so the data-to-field-map transform is ignored: the field is taken where the target lies before the registration (measured on ds002603's BOLD references, registrations of 2.5 to 3.7 mm: 7.7 to 8.5 Hz RMS, up to 87 Hz in the brain)";
     SDC_11 = "SDC-11", "sdcflows", true,
         "resample_to_zooms (BSplineApprox's resize to zooms_min) onto a grid of a single voxel fails with nitransforms' bare AssertionError (assert targets.ndim == 2 after numpy's squeeze of the one target point), so a field map whose whole extent is below zooms_min cannot be fitted";
+    SDC_12 = "SDC-12", "sdcflows", true,
+        "ReorientImageAndMetadata checks the upper-cased orientation code but reorients to the code as given, so a lower-case one fails in nibabel";
+    SDC_14 = "SDC-14", "sdcflows", true,
+        "_norm_lap of an image with no positive (or no negative) value after the median's subtraction fails with numpy's IndexError";
+    SDC_16 = "SDC-16", "sdcflows", true,
+        "the fieldmap-less registration's restriction puts the weight 1.0 at the position of the phase-encoding axis among the fixed image's voxel axes, while ANTs weighs the physical axes: a sagittal or coronal grid frees another axis and holds the phase encoding at 0.1";
+    SDC_17 = "SDC-17", "sdcflows", true,
+        "2.17.1 lacks three corrections of 2.15.2's estimator search: bids_filters also restrict the fieldmap-less estimation's anatomical reference and targets, no sessionless anatomical reference serves sessioned runs, and the acquisition and ceagent filters never reach the EPI field maps";
+    SDC_20 = "SDC-20", "sdcflows", true,
+        "get_identifier's KeyError for an unknown index table is the literal text '{by}'";
+    SDC_21 = "SDC-21", "sdcflows", true,
+        "the files whose B0FieldIdentifier is a list are found by a case-insensitive regular-expression search of every filter, so other subjects' (01 matches 010) or identifiers' files join the estimator";
+    SDC_22 = "SDC-22", "sdcflows", true,
+        "get_workflow and init_fmap_preproc_wf pass every keyword argument on to the estimator's workflow, which ignores the ones it does not take: a misspelt option is ignored without a word";
+    SDC_24 = "SDC-24", "sdcflows", true,
+        "_qwarp2ants squeezes every axis of length one before it adds the vector axis, so the warp of a one-slice image loses that spatial axis and is not a displacement field ANTs reads";
+    SDC_26 = "SDC-26", "sdcflows", true,
+        "init_unwarp_wf given both fmap2data_xfm and data2fmap_xfm, which ApplyCoeffsField declares exclusive, uses data2fmap_xfm and ignores the other without a word";
+    SDC_27 = "SDC-27", "sdcflows", true,
+        "match_histogram assigns the matched values into an integer image with numpy's cast: values its type cannot hold and NaN have an undefined conversion (on x86-64 a wrapped value)";
+    SDC_28 = "SDC-28", "sdcflows", true,
+        "epi_mask casts its watershed levels to uint16: a flat residual (0 / 0), a NaN or an infinity, or an overflow, gives an undefined conversion (0 on x86-64)";
+    SDC_29 = "SDC-29", "sdcflows", true,
+        "its BIDS app builds the fieldmap-less estimators of a participant without field maps without their inputs: they fail when run, after the other estimators' work has started";
+    SDC_30 = "SDC-30", "sdcflows", true,
+        "its BIDS app records --session-label and never uses it: every session is estimated";
+    SDC_31 = "SDC-31", "sdcflows", true,
+        "its BIDS app reads --bids-filter-file and never uses it";
+    SDC_32 = "SDC-32", "sdcflows", true,
+        "its BIDS app records --sloppy and --debug and builds every estimator without them";
+    SDC_33 = "SDC-33", "sdcflows", true,
+        "its BIDS app accepts option values it then fails on with a Python traceback: a --mem-gb unit it cannot look up, a --bids-filter-file that does not exist or is not JSON, a --use-plugin file that does not exist";
+    SDC_35 = "SDC-35", "sdcflows", true,
+        "its BIDS app reads --use-plugin's file with PyYAML's load without the Loader argument PyYAML 6 requires, so the option always stops the app with TypeError";
+    SDC_36 = "SDC-36", "sdcflows", true,
+        "its BIDS app records every participant's estimators in one registry, so two participants that share a B0FieldIdentifier stop it with KeyError";
+    SDC_37 = "SDC-37", "sdcflows", true,
+        "brain_masker's rough mask without a connected component makes the background the largest component, so the whole image is taken as the brain (a constant image divides 0 by 0)";
+    SDC_38 = "SDC-38", "sdcflows", true,
+        "brain_masker with no brain seed left after the rough mask's erosion takes the background's probability as the brain's";
+    SKI_01 = "SKI-01", "scikit-image random_walker", true,
+        "with a mask (negative labels or isolated seeds) the Laplacian's nodes are numbered by the remaining edges' ends but the labels by the mask, so a mask pixel without a neighbour in it shifts every later node and the system pairs labels with the wrong pixels";
+    SKI_02 = "SKI-02", "scikit-image match_histograms", true,
+        "an unsigned-integer image's reference values are counted with numpy's bincount, which refuses a reference with non-integer or negative values, and a uint64 image";
+    SKI_03 = "SKI-03", "scikit-image random_walker", true,
+        "labels that are not consecutive come back as their consecutive renumbering from 1, not the labels given";
+    SKI_04 = "SKI-04", "scikit-image random_walker", true,
+        "return_full_prob with no pixel to segment returns the seeds' boolean masks concatenated along the last axis, not the (nlabels, ...) probabilities";
     GLIBC_05 = "GLIBC-05", "glibc 2.35", true,
         "cbrtf is not correctly rounded: about one float in ten (10.6 %) gets a result one unit in the last place from the exact cube root, and 3dUnifize -EPI takes its radius from it (18.3 mm over the cube root of the voxel volume), so on some voxel sizes its ball of neighbours or the radius it prints is another than the exact cube root gives";
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,

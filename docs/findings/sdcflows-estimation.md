@@ -641,7 +641,9 @@ identical. `apps`: sdcflows 2.17.1's eight own runs' `fmapid`s: identical.
 every layout call sdcflows made replayed on larmorx's index) and sdcflows 2.15.2's wrangler
 against the default over 13 to 20 argument sets per dataset (sdcflows' tests' filters, sessions,
 `fmapless`, `force_fmapless`, `anat_suffix`; one shared registry as in fMRIPrep's process),
-sdcflows' identifier order fixed to the natural one (SDC-19): identical, but for the 14 cases of
+sdcflows' identifier order fixed to the natural one (SDC-19), and the lists the originals write
+in a set's order ("Multiple common", "Incompatible suffices", "Valid targets", ties of
+`get_<entity>s`) compared sorted: identical, but for the 14 cases of
 the `sdc21` tree that SDC-21's correction changes (counted apart). `image` 612: pybids 0.20.0,
 sdcflows 2.15.1 and fMRIPrep 25.2.6 inside fMRIPrep's image (index, wrangler, fMRIPrep's
 selection) against `pybids_version="0.20.0"`, `sdcflows_version="2.15"`, `reproduce`: identical.

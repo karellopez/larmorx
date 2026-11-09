@@ -110,9 +110,19 @@ class Ser:
     def s(self, text: str) -> str:
         for root, label in self.roots:
             text = text.replace(root, label)
-        # sdcflows names the identifiers in a set's order (per process): compared sorted
-        return re.sub(
+        # lists that sdcflows and pybids write in a set's order (per process): compared sorted
+        text = re.sub(
             r"(Multiple common ``B0FieldIdentifier``s found: <)([^>]*)(>)",
+            lambda m: m.group(1) + ", ".join(sorted(m.group(2).split(", "))) + m.group(3),
+            text,
+        )
+        text = re.sub(
+            r"(Incompatible suffices found: <)([^>]*)(>)",
+            lambda m: m.group(1) + ",".join(sorted(m.group(2).split(","))) + m.group(3),
+            text,
+        )
+        return re.sub(
+            r"(Valid targets are: \[)([^\]]*)(\])",
             lambda m: m.group(1) + ", ".join(sorted(m.group(2).split(", "))) + m.group(3),
             text,
         )
@@ -170,6 +180,35 @@ def _call(ser: Ser, fn: Any, *args: Any, **kwargs: Any) -> Any:
         return ser.error(err)
 
 
+def _display(item: Any) -> str:
+    if item and item[0] == "str":
+        return str(item[1])
+    if item and item[0] == "tuple" and all(x and x[0] == "str" for x in item[1]):
+        return str(tuple(x[1] for x in item[1]))
+    return json.dumps(item)
+
+
+def _natkey(text: str) -> list[Any]:
+    return [int(c) if c.isdigit() else c.lower() for c in re.split("([0-9]+)", text)]
+
+
+def ties_sorted(value: Any) -> Any:
+    """A serialized natural-sorted list with its ties (equal natural keys: ``'PE'`` and
+    ``'pe'``) in one fixed order: pybids breaks them by a set of strings' per-process order."""
+    if not (isinstance(value, list) and len(value) == 2 and value[0] == "list"):
+        return value
+    items = value[1]
+    out: list[Any] = []
+    group: list[Any] = []
+    for item in [*items, None]:
+        if group and (item is None or _natkey(_display(item)) != _natkey(_display(group[0]))):
+            out.extend(sorted(group, key=json.dumps))
+            group = []
+        if item is not None:
+            group.append(item)
+    return ["list", out]
+
+
 def dump_index(layout: Any, ser: Ser, query_cls: Any, parse: Any) -> dict[str, Any]:
     """Every file's entities and metadata, the layout's entities and the queries."""
     out: dict[str, Any] = {"files": {}, "queries": [], "targets": {}}
@@ -203,9 +242,9 @@ def dump_index(layout: Any, ser: Ser, query_cls: Any, parse: Any) -> dict[str, A
         except Exception as err:
             out["targets"][t] = ser.error(err)
             continue
-        out["targets"][t] = _call(ser, fn)
+        out["targets"][t] = ties_sorted(_call(ser, fn))
     for q in QUERIES:
-        out["queries"].append(_call(ser, layout.get, **with_markers(q, query_cls)))
+        out["queries"].append(ties_sorted(_call(ser, layout.get, **with_markers(q, query_cls))))
     return out
 
 

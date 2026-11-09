@@ -160,3 +160,41 @@ nibabel 5.4.2's `orientations.aff2axcodes` with sdcflows' unsigned labels and `a
 (MIT). The nodes run through larmorx's earlier ports (`lx.niworkflows.intensity_clip`, sdcflows'
 `BinaryDilation`, `Union`, `GetReadoutTime`, `DisplacementsField2Fieldmap`, `BSplineApprox`,
 `ApplyCoeffsField`; ANTs' `ImageMath`, `antsRegistration`, `antsApplyTransforms`).
+
+## Part B: the estimators of a BIDS dataset (relay 11)
+
+Into `python/larmorx/bids/` (`layout.py`, Apache-2.0 AND MIT): pybids 0.22.0 (MIT, Copyright (c)
+2016-2026 The PyBIDS Developers; tag `pybids-0.22.0`, sources under `src/bids`)
+`layout/layout.py` (`BIDSLayout`: `get`, `get_file`, `get_metadata`, `get_entities`,
+`parse_file_entities`, `add_derivatives`, `__getattr__`, `_in_scope`, `_get_layouts_in_scope`,
+`_sanitize_query_dtypes`, `_build_file_query`; `Query`), `layout/index.py` (`BIDSLayoutIndexer`,
+`_regexfy`, `_check_path_matches_patterns`, `_validate_path`, `_index_dir`, `_index_file`,
+`_index_metadata`, `_resolve_intent`), `layout/models.py` (`Config`, `Entity`, `Tag`,
+`_create_tag_dict`, `BIDSFile`, `BIDSDataFile`, `BIDSImageFile`, `BIDSJSONFile`),
+`layout/validation.py` (`validate_root`, `validate_derivative_path`, `validate_indexing_args`,
+`_sort_patterns`, `DEFAULT_LOCATIONS_TO_IGNORE`, `ALWAYS_IGNORE`), `layout/utils.py`
+(`BIDSMetadata`, `PaddedInt`, `parse_file_entities`), `layout/db.py` (the `regexp` function),
+`utils.py` (`listify`, `hashablefy`, `natural_sort`, `make_bidsfile`, `bids_sort` with
+bidsschematools 2.0.0's `rules.entities` order), `exceptions.py`; pybids 0.20.0 (tag `pybids-0.20.0`, sdist SHA-256
+`a68b577426942e50e6ac37e011463361d00a378d19b75df817619450357ebbb6`, the same files as fMRIPrep 25.2.6's image) for the step (`get_entities` unsorted, `index.py`'s
+`IntendedFor` join). Shipped unchanged:
+`python/larmorx/bids/config/bids.json` and `derivatives.json` (pybids 0.22.0, MIT; SHA-256
+`bc8d7ef6b9b5f922a4b435c66598b068d03ce2afdd1a826d2adca4dca4542ad0`,
+`9b05f472ba5ca236496abe1cb46b204f94cc54bed572bbd5fcc338d97b77314d`) and `nipreps.json` (niworkflows
+1.15.4, Apache-2.0, the same in 1.15.2; `40935adf9e3af887150874ab7481a3ed639946ae695f3b632592a630c788fc4d`).
+
+Into `python/larmorx/sdcflows/estimators.py` and `wrangler.py`: sdcflows 2.17.1 (Apache-2.0)
+`fieldmaps.py` (`MetadataError`, `EstimatorType`, `MODALITIES`, `FieldmapFile`,
+`FieldmapEstimation`, `get_identifier`, `clear_registry`; 2.15.1/2.15.2's path check as
+`sdcflows_version="2.15"`), `utils/bimap.py` (`bidict`, `EstimatorRegistry`; the same in 2.15.x),
+`utils/misc.py` (`create_logger`), `utils/wrangler.py` (`find_estimators`,
+`find_anatomical_estimators`, `_normalize_intent`, `_resolve_intent`, `_filter_metadata`,
+`_log_debug_estimation`, `_log_debug_estimator_fail`; = 2.15.1's) and sdcflows 2.15.2's
+`utils/wrangler.py` (tag `sdcflows-2.15.2`: the default search, SDC-17); niworkflows 1.15.4
+`utils/bids.py` (`relative_to_root`).
+
+Into `python/larmorx/pipelines/larmorprepx/estimators.py`: fMRIPrep 25.2.7 (Apache-2.0; the same
+on these paths in 25.2.6) `config.py` (`execution.init`'s ignore patterns), `workflows/base.py`
+(`map_fieldmap_estimation`, `get_estimator`, `init_single_subject_wf`'s precomputed field maps,
+"Setting up fieldmap" and PEPOLAR checks), `utils/bids.py` (`collect_fieldmaps`, `_get_layout`)
+and `data/fmap_spec.json` (its queries, as `FMAP_SPEC`).

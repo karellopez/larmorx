@@ -161,3 +161,30 @@ registration within 6.7e-13 of fMRIPrep's (its ANTs ran with 8 threads; its `"%g
 the 21 resampling workflows' `fmap_select`, `inverses`, `fmap2target`, `distortion_params` and
 field maps identical; PIPE-20's error, and `reproduce` = fMRIPrep's `ResampleSeries` without a
 readout time.
+
+## larmorprepx: the field-map estimators of a subject
+
+`larmorx.pipelines.larmorprepx.estimators` is fMRIPrep 25.2.7's choice of estimators
+(`workflows/base.py`, `config.py`, `utils/bids.py`; the same in 25.2.6), on
+[`lx.bids`](bids.md) and sdcflows' `find_estimators` ([sdcflows-fieldmap.md](sdcflows-fieldmap.md)).
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `fmriprep_layout(bids_dir, participant_label=None, *, bids_database_dir=None, pybids_version="0.22.0")` | `config.execution.init`'s `BIDSLayout` | ignores `code`, `stimuli`, `sourcedata`, `models`, the subjects' `beh`, `dwi`, `eeg`, `ieeg`, `meg`, `perf` folders and, with `participant_label` and no database folder, every other subject (fMRIPrep's `^\.` pattern never matches a `/`-rooted path: dot files are pybids' own `/\.` rule); the root's `dataset_description.json` checked |
+| `map_fieldmap_estimation(layout, subject_id, session_id, bold_data, ignore_fieldmaps, use_syn, force_syn, filters, *, logger=None, registry=None, sdcflows_version="2.17.1", upstream_defects="fix")` → `(estimators, {bold_file: estimator id})` | `map_fieldmap_estimation` | `--use-syn-sdc` (`True`/`"warn"`/`"error"`: the "PhaseEncodingDirection information appears to be absent" message, an error for `"error"`), `--force syn-sdc`, `--ignore fieldmaps` (only fieldmap-less estimators kept), each run's first estimator ("Several fieldmaps <...> are 'IntendedFor' <...>, using ..."), estimators no run uses dropped; the messages through `logger` (fMRIPrep: `nipype.workflow`); PIPE-25 |
+| `get_estimator(layout, fname, *, registry=None)` | `get_estimator` | `B0FieldSource`, else the estimators `IntendedFor` the file's path below `sub-<label>/` (`/` on every platform) |
+| `collect_fieldmaps(derivatives_dir, entities, spec=None)` | `utils/bids.collect_fieldmaps` | niworkflows' `nipreps.json` index of the derivatives; `FMAP_SPEC` = `data/fmap_spec.json`'s queries |
+| `split_precomputed(all_estimators, fmap_cache, *, logger=None)` | `init_single_subject_wf` | the estimators with precomputed field maps (identifier without non-alphanumerics) and those to run; fMRIPrep's "Precomputed B0 field inhomogeneity maps found ..." and "B0 field inhomogeneity map will be estimated with the following ..." messages |
+| `setting_up_message(estimator)`, `check_pepolar_scheme(estimator)` | `init_single_subject_wf` | the "Setting up fieldmap ..." line; `NotImplementedError('Sophisticated PEPOLAR schemes are unsupported.')` unless one modality or two `epi`/`bold`/`sbref` sources |
+
+| ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
+|---|---|---|---|---|
+| PIPE-25 | A | a BOLD run's `B0FieldSource` must equal the estimator's identifier; when the field map's sources list several `B0FieldIdentifier` values (aliases, as sdcflows' own test data has), sdcflows names the estimator after one of them, in a Python `set`'s order (SDC-19), so a run naming another alias is left without a field map (or not, from one process to the next) | the alias reaches the estimator whose sources list it (an `UpstreamDefectWarning` when that changes the run's estimator) | fMRIPrep's lookup |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_estimators.py`, `fmriprep`,
+`runs`, `image`): fMRIPrep 25.2.7's `map_fieldmap_estimation` and `get_estimator` (taken from its
+source) against these on every dataset of the index check for 24 combinations of the options and
+filters, with their log messages; `collect_fieldmaps` on sdcflows' eight own runs' derivatives;
+the 23 fMRIPrep oracle runs: the estimators set up, the "Several fieldmaps" and "estimated with
+the following" lines of each `fmriprep.log` and its `fmap_preproc_wf/wf_*` folders, identical
+(fMRIPrep 25.2.6's image, pybids 0.20.0, sdcflows 2.15.1: `reproduce`).

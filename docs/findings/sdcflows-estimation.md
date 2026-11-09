@@ -558,6 +558,95 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   not computed): `docs/api/sdcflows-fieldmap.md`. `_warp_dir`'s `Logger.warn` is not a defect:
   the deprecated alias still logs a warning in every Python larmorx supports.
 
+## The estimators of a BIDS dataset and fMRIPrep's choice (relay 11)
+
+`larmorx.bids` (pybids 0.22.0's index without its database), sdcflows' `fieldmaps.py`,
+`bimap.py` and `wrangler.py`, and fMRIPrep 25.2.7's estimator selection
+(`larmorx.pipelines.larmorprepx.estimators`); checked by
+`validation/investigations/sdcflows-fieldmap-b/check_estimators.py`.
+
+**What pybids' database decides, and the port keeps.** Entities are searched in the whole
+absolute path (a folder above the dataset called `sub-x` gives its label to every file); integer
+entities (`run`) are stored as text and an integer filter casts them as SQLite's `CAST` does
+(`run=1` and `run="1"` match `run-01`: the layout converts the filter to the entity's type
+first); within one folder pybids applies the matching sidecars in reverse natural order, so
+`sub-01_task-rest_bold.json` overrides `sub-01_task-rest_run-01_bold.json` (BIDS would have the
+more specific one win); metadata keys come back ordered by name (the database's index), integers
+as `PaddedInt`; `regex_search` is a case-insensitive `re.search` of every filter, the subject
+and the extension included; an empty list filter is no filter. fMRIPrep's ignore pattern `^\.`
+never matches (pybids matches `/`-rooted relative paths; dot files fall to pybids' own `/\.`),
+and on Windows none of fMRIPrep's or sdcflows' path patterns match (pybids writes the platform's
+separator; larmorx `/` everywhere, Linux's result). Where pybids orders by a Python `set`
+(`get_<entity>s` ties between strings, layouts and configurations with derivatives added), the
+order changes between processes; larmorx sorts.
+
+**Defects (decided by rules A-D; the register's entries wait for the defects relay):**
+
+- **SDC-17 (rule A, the upstream's own correction):** sdcflows 2.15.2 (2026-10-02, after 2.17.1
+  of 2026-09-29) corrected three things 2.17.1 lacks: `bids_filters` restricted the
+  fieldmap-less estimation's anatomical reference and targets too (`{"datatype": "fmap"}`: no
+  T1w, no SyN estimator), no sessionless T1w served sessioned runs, and `acquisition`/`ceagent`
+  filters never reached the EPI heuristics (`base_entities.get('acquisitions')`). By default
+  2.15.2's search; `reproduce` = 2.17.1's (= 2.15.1's, fMRIPrep 25.2.6's), with an
+  `UpstreamDefectWarning` when the answer differs (the alternative queries are computed for the
+  comparison; they are read-only).
+- **SDC-18 (rule C):** `bidict.add` takes the last free `auto_` index of `range(len(used)+1)`
+  (`{1}` used: `auto_00000`; `{0, 1, 5}`: `auto_00003`, not `auto_00002`). The names are in
+  derivatives and logs (`fmapid-auto00001`): kept.
+- **SDC-19 (nondeterminism, not reproduced):** step 1 iterates the `B0FieldIdentifier` values as a
+  `set` (`reduce(set.union, ...)`), whose order follows string hashing, randomized per process.
+  When several identifiers name the same files (a list of aliases, as `pepolar_b0ids` in
+  sdcflows' own tests: `["b0_pepolar", "b0_pepolar_dup"]`), the first one in that order names the
+  estimator and the others fail ("already in mapping"), so which name survives changes from one
+  run to the next. larmorx takes pybids' natural order (deterministic), in both modes; the check
+  fixes sdcflows' order the same way (`estimators_dump.natural_reduce`) to compare exactly.
+- **PIPE-25 (rule A):** fMRIPrep's `get_estimator` matches a BOLD run's `B0FieldSource` with the
+  estimator's identifier only; with aliases the run is left without a field map when its source
+  is not the surviving name (`sdc21` tree: `B0FieldSource: pe` and the sources'
+  `["pe", "x010"]`: fMRIPrep keeps no estimator when `x010` comes first, larmorx's `reproduce`
+  with the natural order keeps `pe`). By default an alias reaches the estimator whose sources list
+  it; `reproduce` = fMRIPrep's.
+- **SDC-20 (rule A, a message):** `get_identifier(..., by=<other>)` raises `KeyError("'{by}'")`
+  (a raw string meant as an f-string). By default the name; `reproduce` the literal text.
+- **SDC-21 (rule A):** step 1's query for list-valued `B0FieldIdentifier` (`'"<id>"'`,
+  `regex_search=True`) runs every filter as a case-insensitive expression: subject `01` matches
+  `010` and `101` (another subject's field maps join the estimator, whenever the index holds
+  several subjects: no participant filter, or fMRIPrep's `--bids-database-dir`), `part` `mag`
+  matches `imag`, and `pe` matches `"PE"` and `"pe2"`. Measured on the `sdc21` tree (subjects
+  `01` and `010`, an upper-case `PE` pair, a `part-imag` file): `PE` took all five sub-01 files
+  and sub-010's, `pe` failed. By default exact filters and list membership (`PE` = its two files,
+  `pe` = its two); `reproduce` = sdcflows'.
+
+Not defects: `FieldmapFile` reads only the sidecar beside the file (documented: "TODO: implement
+BIDS hierarchy"); the wrangler passes pybids' inherited metadata in, so estimators get both.
+A zero-byte or unreadable NIfTI whose readout time needs its header is nibabel's
+`ImageFileError` (not a `ValueError`, so sdcflows does not swallow it); larmorx's header reader
+raises a `ValueError`, so `estimators._get_trt` gives nibabel's error and messages.
+
+**Checked (newest environment; pybids 0.22.0 and sdcflows 2.17.1 are the same in both kept
+environments; fMRIPrep's image: pybids 0.20.0, sdcflows 2.15.1, fMRIPrep 25.2.6):**
+`index` 306 layouts (19 oracle datasets, `dsA`/`dsB`/`dsC`, 13 generated skeletons and 4 edge
+trees, with fMRIPrep's, sdcflows' app's, sdcflows' tests' and pybids' default indexers; every
+file's entities and metadata with types and order, the layouts' entities, 22 `get_<entity>s`,
+42 queries, the indexing errors): identical. `units` 577: `FieldmapFile` (every file of `dsA` and
+the edges tree, five metadata variants, both `find_meta`), `FieldmapEstimation` (11 source sets,
+with and without an identifier, and the registry after each), `get_identifier`, `bidict` (22
+operations), `EstimatorRegistry`, SDC-21's correction: identical. `fmriprep` 2,567 (24 option
+combinations on every dataset, `get_estimator` of every BOLD run, `collect_fieldmaps` on sdcflows'
+eight runs, `fmap_spec.json`): identical. `runs`: the 23 fMRIPrep oracle runs' "Setting up
+fieldmap" (19 estimators), "Several fieldmaps" (ds002603: two) and "estimated with the following"
+lines and their `fmap_preproc_wf/wf_*` folders, from larmorx with each run's options and session:
+identical. `apps`: sdcflows 2.17.1's eight own runs' `fmapid`s: identical.
+`wrangler` 2,790: sdcflows 2.17.1 against `reproduce` (estimators, registries, debug log, errors;
+every layout call sdcflows made replayed on larmorx's index) and sdcflows 2.15.2's wrangler
+against the default over 13 to 20 argument sets per dataset (sdcflows' tests' filters, sessions,
+`fmapless`, `force_fmapless`, `anat_suffix`; one shared registry as in fMRIPrep's process),
+sdcflows' identifier order fixed to the natural one (SDC-19): identical, but for the 14 cases of
+the `sdc21` tree that SDC-21's correction changes (counted apart). `image` 612: pybids 0.20.0,
+sdcflows 2.15.1 and fMRIPrep 25.2.6 inside fMRIPrep's image (index, wrangler, fMRIPrep's
+selection) against `pybids_version="0.20.0"`, `sdcflows_version="2.15"`, `reproduce`: identical.
+Logs `oracles/logs/fmapb-r11-est-*.log`.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background

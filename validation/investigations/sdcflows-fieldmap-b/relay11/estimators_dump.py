@@ -110,7 +110,12 @@ class Ser:
     def s(self, text: str) -> str:
         for root, label in self.roots:
             text = text.replace(root, label)
-        return text
+        # sdcflows names the identifiers in a set's order (per process): compared sorted
+        return re.sub(
+            r"(Multiple common ``B0FieldIdentifier``s found: <)([^>]*)(>)",
+            lambda m: m.group(1) + ", ".join(sorted(m.group(2).split(", "))) + m.group(3),
+            text,
+        )
 
     def __call__(self, v: Any) -> Any:
         name = type(v).__name__

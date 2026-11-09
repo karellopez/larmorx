@@ -1452,7 +1452,7 @@ What the first probes found (permanent cases: `relay27/make_permanent.py`, eleve
   (`docs/benchmarks/sdcflows-estimation.md`); checked bit for bit, both D13 modes, on 139 of the
   trial's brain_masker cases (every one of the 59 that timed out or took more than a minute, 80
   others: `relay28/replay_masker_cases.py`, `relay28/replay-*.txt`: all agree; the 8 timeouts now
-  take 70 to 199 s, sdcflows' own time), the 13 permanent cases, the golden case
+  take 73 to 199 s (14 replays at once), sdcflows' own time), the 13 permanent cases, the golden case
   `py.skimage.random_walker.nan` against scikit-image (both solvers, float32 and float64:
   `relay28/check_golden_paths.py`).
 - **Not ported (documented):** nipype's `requires` checks the command lines do not need

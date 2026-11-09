@@ -438,10 +438,12 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   (below). Every node of the five estimators, fed fMRIPrep's inputs, is identical: 27 checks x 5
   (fMRIPrep's files, or ANTs' one-thread result for N4, DenoiseImage and the registration, with
   the run's `ANTS_RANDOM_SEED`).
-- **The whole workflow against sdcflows' own graph** (the shared environment's sdcflows 2.17.1 and
-  niworkflows 1.15.3 run by nipype, ANTs' programs at one thread with correctly rounded maths and
+- **The whole workflow against sdcflows' own graph** (each kept environment's sdcflows 2.17.1 and
+  niworkflows 1.15.3 run by nipype: SciPy 1.15.3 / numpy 2.3.5 and SciPy 1.18.1 / numpy 2.5.4 /
+  nilearn 0.14.1, ANTs' programs at one thread with correctly rounded maths and
   AFNI's 3dvolreg as stand-ins through the oracle cache): every NIfTI file of the graph's
-  folders identical on the five estimators (105 files), the five registered series of
+  folders identical on the five estimators in both environments (105 files each), the five
+  registered series of
   `RobustAverage`'s 3dvolreg apart in `vox_offset` only (AFNI writes its history as a NIfTI
   extension, larmorx's replica does not: [fmriprep-oracle.md](fmriprep-oracle.md)). sdcflows'
   graph takes 118 to 155 s at one thread, larmorx 30 to 39 s on 6 threads (the same one-thread

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: B023 (every lambda runs at once, inside the loop that defines it)
 """Relay 21's probe: lx.ndimage's filters' argument handling against SciPy's, per case."""
 
 import sys
@@ -15,7 +17,11 @@ def run(f):
         try:
             r = f()
             if isinstance(r, tuple):
-                return ("ok", tuple(np.asarray(x).dtype.name for x in r), [str(x.message) for x in w])
+                return (
+                    "ok",
+                    tuple(np.asarray(x).dtype.name for x in r),
+                    [str(x.message) for x in w],
+                )
             r = np.asarray(r)
             return ("ok", r.dtype.name, r.tobytes().hex()[:64], [str(x.message) for x in w])
         except Exception as e:
@@ -102,6 +108,7 @@ def main():
     diffs = 0
     total = 0
     for fname, (call, base) in filters().items():
+
         def cmp(label, x, **kw):
             nonlocal diffs, total
             total += 1
@@ -125,12 +132,22 @@ def main():
             cmp(f"cval {k}", b, mode="constant", cval=v)
         for k, v in ORIGINS.items():
             cmp(f"origin {k}", b, origin=v)
-        for k, v in {"bogus": "bogus", "grid-wrap": "grid-wrap", "seq": ["reflect", "nearest"]}.items():
+        for k, v in {
+            "bogus": "bogus",
+            "grid-wrap": "grid-wrap",
+            "seq": ["reflect", "nearest"],
+        }.items():
             if base is None and k == "seq":
                 continue
             cmp(f"mode {k}", b, mode=v)
         if "1d" in fname and base is not None:
-            for k, v in {"float": 1.0, "npint": np.int64(0), "big": 5, "neg": -3, "True": True}.items():
+            for k, v in {
+                "float": 1.0,
+                "npint": np.int64(0),
+                "big": 5,
+                "neg": -3,
+                "True": True,
+            }.items():
                 cmp(f"axis {k}", b, axis=v)
         if "axes" not in fname and base is not None and "1d" not in fname:
             for k, v in {"float": (1.0,), "dup": (0, 0), "big": (5,), "int": 1}.items():

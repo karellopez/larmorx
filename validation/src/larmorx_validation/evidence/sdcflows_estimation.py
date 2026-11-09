@@ -121,9 +121,12 @@ def _workspace() -> Path:
 
 def _env(e: fcache.Entry, nc: bool = False) -> dict[str, str]:
     """The check scripts' environment, as the parity suites give it (``sdcflows_scripts``)."""
+    import tempfile
+
     repo = e.ctx.repo
-    tmp = e.dir / "tmp"
-    tmp.mkdir(parents=True, exist_ok=True)
+    # a short folder: sdcflows' multiprocessing manager's socket lives there (AF_UNIX paths
+    # are at most 107 bytes)
+    tmp = Path(tempfile.mkdtemp(prefix="lxse-"))
     env = {
         **ENV,
         "PYTHONPATH": f"{repo / 'python'}:{repo / 'validation' / 'src'}",
@@ -387,9 +390,283 @@ def entries(ctx: core.Context) -> list[fcache.Entry]:
     ]
 
 
-if __name__ == "__main__":  # compute the cache entries only
-    from larmorx_validation.figures.core import REPO, default_cache
 
-    c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
-    for x in entries(c):
-        print("done", x.dir, flush=True)
+
+# ------------------------------------------------------------------------- shared pieces
+
+
+def _stored(path: Path) -> np.ndarray:
+    """A file's values as stored; a 4-D image of one volume (sdcflows' field maps) as 3-D."""
+    import nibabel as nib
+
+    a = np.asanyarray(nib.load(str(path)).dataobj)
+    return a[..., 0] if a.ndim == 4 and a.shape[3] == 1 else a
+
+
+def _outputs_json(d: Path) -> dict:
+    return json.loads((d / "outputs.json").read_text(encoding="utf-8"))
+
+
+def _files(d: Path) -> dict[str, Path]:
+    return {k: d / v for k, v in _outputs_json(d)["files"].items()}
+
+
+def _data(ds: str, subject: str) -> dict:
+    """An example's credit facts from larmorx-testdata's catalog (``credits.attach`` checks
+    the licence again)."""
+    from larmorx_validation.evidence import credits
+
+    c = credits.credit(f"openneuro-{ds}")
+    return {"dataset": f"OpenNeuro {ds}", "subject": subject, "licence": c["licence"]}
+
+
+def _show(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
+    from scipy import ndimage
+
+    return ndimage.binary_dilation(mask > 0, iterations=iterations)
+
+
+def _findings_links(repo: Path) -> dict[str, str]:
+    """``SDC-xx``, ``PIPE-xx``, ``SCI-xx``, ``SKI-xx`` -> the at-a-glance table of the findings
+    (its section), or the section that names the entry first."""
+    out: dict[str, str] = {}
+    head = "Part B's register entries at a glance (relay 29)"
+    anchor = f"{FINDINGS}#{core.github_anchor(head)}"
+    for line in (repo / FINDINGS).read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\| ((?:SDC|PIPE|SCI|SKI)-\d+) \|", line)
+        if m:
+            out[m.group(1)] = anchor
+    return out
+
+
+def _link(links: dict[str, str], ids) -> list[dict]:
+    return [{"label": i, "href": links[i]} for i in ids if i in links]
+
+
+def _differs(x: dict, outputs: list[dict]) -> str:
+    """What differs in a comparison, output by output (values that differ, the largest)."""
+    labels = {o["id"]: o["label"] for o in outputs}
+    parts = []
+    for oid, m in x["metrics"].items():
+        if m["identical"]:
+            continue
+        parts.append(
+            f"{labels.get(oid, oid)}: {m['differ']:,} of {m['voxels']:,} values differ, at most "
+            f"{m['max_abs']:.3g} apart"
+        )
+    return "; ".join(parts)
+
+
+def _peak_view(ex, panel: str, output: str, inner: bool = True) -> list[int]:
+    """The default view: the axial slice with the most of the shown region, the crosshair
+    where ``panel``'s ``output`` is largest in magnitude inside it (its edge eroded)."""
+    from scipy import ndimage
+
+    v = np.abs(np.asarray(ex.values(ex.key(panel, output)), dtype=np.float64))
+    k = int(np.argmax(ex.m.sum(axis=(0, 1))))
+    region = ndimage.binary_erosion(ex.m, iterations=2) if inner else ex.m
+    region = region if region[..., k].any() else ex.m
+    sl = np.where(region[..., k], v[..., k], -1.0)
+    i, j = np.unravel_index(int(np.argmax(sl)), sl.shape)
+    return [int(i), int(j), k]
+
+
+def _diff_view(ex, a: str, b: str, output: str) -> list[int] | None:
+    """The voxel where ``a`` and ``b`` differ most in ``output`` (shown region), if they do."""
+    d = np.abs(
+        np.asarray(ex.values(ex.key(a, output)), dtype=np.float64)
+        - np.asarray(ex.values(ex.key(b, output)), dtype=np.float64)
+    )
+    d = np.where(ex.m, d, 0.0)
+    if not d.any():
+        return None
+    return [int(v) for v in np.unravel_index(int(np.argmax(d)), d.shape)]
+
+
+def _check_default(ex: dict) -> None:
+    """The viewer draws the default's panels and comparisons: every panel must exist and every
+    comparison must have images (``display``: both sides panels), or the viewer cannot draw."""
+    panels = {p["id"] for p in ex["panels"]}
+    drawn = {x["id"] for x in ex["diffs"] if x.get("display")}
+    d = ex["default"]
+    bad = [p for p in d["panels"] if p not in panels] + [x for x in d["diffs"] if x not in drawn]
+    bad += [v for v in (d["compare"]["a"], d["compare"]["b"]) if v not in panels]
+    if bad:
+        raise ValueError(f"{ex['id']}: the default view names what the viewer cannot draw: {bad}")
+
+
+def _verdicts(diffs: list[dict], outputs: list[dict], same: dict, named: list[str],
+              links: dict, reasons: dict[str, str],
+              explained: dict[str, tuple[str, str]] | None = None) -> None:  # fmt: skip
+    """Each comparison's verdict from its metrics: bit-identical (``reasons``), a correction the
+    default names (d13), a difference ``explained`` names with its verdict and reason, the
+    original's own rows (no verdict: their reason), else open."""
+    for x in diffs:
+        i = x["id"]
+        x["links"] = []
+        if x["kind"] == "variability":
+            x["verdict"] = None
+            x["reason"] = reasons[i] if same[i] else reasons[i + ":differ"] + " " + _differs(
+                x, outputs
+            ) + "."
+            continue
+        if same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = reasons[i]
+        elif i.startswith("lx14") and named:
+            x["verdict"] = "d13"
+            x["reason"] = f"The default mode corrects {', '.join(named)} and names it: " + _differs(
+                x, outputs
+            ) + "."
+            x["links"] += _link(links, named)
+        elif explained and i in explained:
+            x["verdict"], why = explained[i]
+            x["reason"] = why + " " + _differs(x, outputs) + "."
+        else:
+            x["verdict"] = "open"
+            x["reason"] = "Not accounted for by the other runs of this example: " + _differs(
+                x, outputs
+            ) + "."
+
+
+# ------------------------------------------------------------------- the brain mask (masker)
+
+MASKER_OUTPUTS = [
+    {"id": "probseg", "label": "Brain probability (random walker)", "unit": ""},
+    {"id": "mask", "label": "Brain mask", "unit": ""},
+    {"id": "brain", "label": "Masked magnitude", "unit": ""},
+]
+#: The masker example's panels of runs: id, role, label, sub.
+MASKER_PANELS = [
+    ("sdcflows", "original", "sdcflows 2.17.1",
+     "numpy 2.5.4, SciPy 1.18.1, scikit-image 0.26.0: LARMORX's reference"),
+    ("larmorx", "larmorx", "LARMORX (port), 1 thread", "reproduce mode"),
+    ("larmorx-14", "larmorx", "LARMORX (port), 14 threads", "default mode (D13 corrections)"),
+    ("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own files",
+     "sdcflows 2.15.1 in its image: numpy 2.2.6, SciPy 1.15.2"),
+    ("larmorx-fmriprep", "larmorx", "LARMORX (port), fMRIPrep's libraries",
+     "numpy 2.2.6's sums, SciPy 1.15.2's order; reproduce mode"),
+]  # fmt: skip
+
+
+def _masker_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("lx-sdc", "larmorx", "sdcflows", "main", "LARMORX − sdcflows 2.17.1", common.ROLE_LX),
+        d("lxf-fmriprep", "larmorx-fmriprep", "fmriprep", "fmriprep",
+          "LARMORX with fMRIPrep's libraries − fMRIPrep 25.2.6's own files", common.ROLE_FMRIPREP),
+        d("lx14-lx1", "larmorx-14", "larmorx", "check",
+          "LARMORX: 14 threads, default − 1 thread, reproduce", common.ROLE_SELF),
+        d("fmriprep-sdc", "fmriprep", "sdcflows", "variability",
+          "fMRIPrep's own files − sdcflows 2.17.1 with the newest releases", common.ROLE_ORIG),
+    ]  # fmt: skip
+
+
+def _example_masker(ctx: core.Context, links: dict) -> dict:
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+    from larmorx_validation.evidence.fsl_bet import window_of
+
+    e = masker_entry(ctx)
+    info = e.info()
+    run, wf = MASKER
+    node = common.fmriprep_run(run) / wf / "masker"
+    src = _masker_input()
+    img = nib.load(str(src))
+    own = {o["id"]: _stored(node / f"clipped_{'brainmasked' if o['id'] == 'brain' else o['id']}"
+                                    ".nii.gz") for o in MASKER_OUTPUTS}  # fmt: skip
+    show = _show(own["mask"], 2)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    raw, rs, ri = common.stored(src)
+    ex.add(exm.Panel("clipped", "input", "ds002603: magnitude, clipped and N4-corrected",
+                     "the masker node's input (niworkflows' IntensityClip, ANTs' N4, "
+                     "IntensityClip again)", {"all": raw}, scale=rs, inter=ri))  # fmt: skip
+    over = {"mask": {"on": "clipped", "window": window_of(ex, "clipped")}}
+    arrays = {"fmriprep": own}
+    for pid, *_ in MASKER_PANELS:
+        if pid != "fmriprep":
+            f = _files(e.dir / pid)
+            arrays[pid] = {o["id"]: _stored(f[o["id"]]) for o in MASKER_OUTPUTS}
+    for pid, role, label, sub in MASKER_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    diffs = _masker_diffs()
+    outputs = copy.deepcopy(MASKER_OUTPUTS)
+    common.compare_all(ex, diffs, outputs)
+    same = common.identical(diffs)
+    named = _outputs_json(e.dir / "larmorx-14").get("named", [])
+    reasons = {
+        "lx-sdc": "Every value of the three outputs is sdcflows': the grey closing and median, "
+        "Otsu's threshold, the binary opening and the largest component (SciPy's ndimage, "
+        "LARMORX's port of it), scikit-image's random walker (its Laplacian in SciPy 1.18's "
+        "order, its conjugate gradients with OpenBLAS's dot products), the probabilities cropped "
+        "back, the mask at 0.5.",
+        "lxf-fmriprep": "With numpy 2.2.6's sums and SciPy 1.15.2's Laplacian order (fMRIPrep's "
+        "image), LARMORX writes fMRIPrep's own masker files, every value.",
+        "lx14-lx1": "The same bytes at 1 and 14 threads and in both modes (no correction of the "
+        "register applies to this call).",
+        "fmriprep-sdc": "The libraries' step, a reference row (the original against itself): "
+        "fMRIPrep's image (numpy 2.2.6, SciPy 1.15.2) gives the same values as the newest "
+        "releases.",
+        "fmriprep-sdc:differ": "The libraries' step, a reference row (the original against "
+        "itself): fMRIPrep's image runs numpy 2.2.6 (its sums in chunks) and SciPy 1.15.2 (the "
+        "random walker's Laplacian in another row order), so its probabilities differ in their "
+        "last bits from sdcflows' with numpy 2.5.4 and SciPy 1.18.1; LARMORX follows both "
+        "(the row above).",
+    }
+    _verdicts(diffs, outputs, same, named, links, reasons)
+    at = _peak_view(ex, "sdcflows", "probseg")
+    near = _diff_view(ex, "fmriprep", "sdcflows", "probseg")
+    default = {
+        "output": "probseg",
+        "plane": "axial",
+        "voxel": near or at,
+        "panels": ["clipped", "sdcflows", "larmorx", "fmriprep"],
+        "diffs": ["lx-sdc", "lxf-fmriprep", "fmriprep-sdc"],
+        "compare": {"a": "sdcflows", "b": "larmorx"},
+    }
+    out = common.finish(
+        ctx, ex, diffs, outputs, default=default, window_panel="sdcflows",
+        caption="the crosshair where fMRIPrep's probabilities differ most from sdcflows' with "
+        "the newest releases; choose the output (the probability, the mask over the input, the "
+        "masked magnitude) above the images.",
+    )  # fmt: skip
+    n_vox = int(np.prod(img.shape[:3]))
+    t = {lab: _outputs_json(e.dir / lab)["seconds"] for lab, *_ in MASKER_RUNS}
+    return {
+        "id": "masker-ds002603",
+        "title": "The magnitude's brain mask: sdcflows' brain_masker on fMRIPrep's ds002603 call",
+        "summary": "sdcflows' `brain_masker` (its `BrainExtraction` interface, the `masker` node of "
+        "every magnitude's and PEPOLAR reference's brain extraction) on the input fMRIPrep "
+        "25.2.6 gave it for ds002603's phase-difference field map: a grey closing and median of "
+        "the inverted image, Otsu's threshold, a binary opening and the largest component, then "
+        "scikit-image's random walker between the eroded mask and the padded image's border; "
+        "its probability, its mask at 0.5 and the masked magnitude. sdcflows 2.17.1 and LARMORX "
+        "compute every output; fMRIPrep's own files are compared with LARMORX run on its "
+        "image's libraries.",
+        "facts": [
+            {"label": "Data", "text": f"{_data('ds002603', 'sub-01')['dataset']}, sub-01 (CC0-1.0): "
+             "the `acq-Mm2` magnitude as fMRIPrep's node was given it; shown inside fMRIPrep's "
+             "brain mask, dilated by 2 voxels, so no face shows"},
+            {"label": "Node", "text": f"fMRIPrep 25.2.6, `{info.get('node', '')}`"},
+            {"label": "Programs", "text": "sdcflows 2.17.1 in process (the newest environment); "
+             f"LARMORX's `lx.sdcflows.brain_masker` at commit `{info['larmorx_commit'][:12]}`; "
+             "numpy's OpenBLAS on its Haswell kernels, one thread"},
+            {"label": "Time", "text": f"sdcflows {t['sdcflows']:.1f} s; LARMORX {t['larmorx']:.1f} s "
+             f"at one thread, {t['larmorx-14']:.1f} s at 14 (informal: the benchmark below has "
+             "the medians)"},
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],  # fmt: skip
+        **out,
+        "chain": None,
+        "groups": [
+            ["main", "LARMORX against sdcflows"],
+            ["fmriprep", "LARMORX against fMRIPrep's own files"],
+            ["check", "LARMORX against itself: threads and modes"],
+            ["variability", "sdcflows against itself: the libraries' step"],
+        ],
+        "metrics_note": f"Δ is A − B over all {n_vox:,} voxels of each output file, not only "
+        "those shown.",
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [_data("ds002603", "sub-01")]),
+    }

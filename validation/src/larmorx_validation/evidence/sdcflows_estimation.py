@@ -18,6 +18,10 @@ files.
   fMRIPrep's ds002603 call, its probabilities and mask, fMRIPrep's own files beside.
 - **SciPy's watershed corrected by default** (SCI-13, SCI-14) in sdcflows' ``epi_mask`` on four
   BOLD references, against fMRIPrep's own brain masks.
+- **The fieldmap-less (SyN) estimation** (``syn_sdc_workflow``) of fMRIPrep's ds000228 estimator
+  (``--use-syn-sdc``) on fMRIPrep's own inputs: LARMORX beside ANTs 2.6.5 at one thread with
+  correctly rounded maths (its warp byte for byte), ANTs' own band for this call (glibc's maths
+  at one thread and twice at four) and fMRIPrep's own field (its four threads) against that band.
 - The records' cases (three suites), the originals' own step, the defects of the part, random
   testing's trials, the memory peaks (the memory rule's calls) and the benchmark.
 
@@ -86,6 +90,22 @@ EPI_RUNS = (
     "ds005040-sub-002-noreconall",
     "ds004958-sub-fsm64ps-noreconall",
 )
+#: The fieldmap-less (SyN) example: fMRIPrep's run and its estimator's working folder.
+SYN = (
+    "ds000228-sub-pixar008-noreconall-syn",
+    "work/fmriprep_25_2_wf/sub_pixar008_wf/fmap_preproc_wf/wf_auto_00000",
+)
+#: Why ANTs' four-thread runs are never cached: they measure the original's own spread.
+SYN_SPREAD = "the original's own spread: ANTs' registration at four threads, run to run"
+#: The SyN example's runs: label, implementation, threads, maths, D13 mode, never-cached reason.
+SYN_RUNS = [
+    ("larmorx", "larmorx", 14, "", "reproduce", ""),
+    ("larmorx-fix", "larmorx", 4, "", "fix", ""),
+    ("ants-cr1", "ants", 1, "cr", "reproduce", ""),
+    ("ants-g1", "ants", 1, "glibc", "reproduce", ""),
+    ("ants-g4a", "ants", 4, "glibc", "reproduce", SYN_SPREAD),
+    ("ants-g4b", "ants", 4, "glibc", "reproduce", SYN_SPREAD),
+]
 #: The memory rule's calls (``tests/parity/test_memory_peak.py``, ``FIELDMAP_B_CASES``).
 MEMORY_CALLS = ("masker", "clip", "ravg", "recon")
 ENV = {"OPENBLAS_CORETYPE": "Haswell", "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
@@ -382,6 +402,66 @@ def memory_entry(ctx: core.Context) -> fcache.Entry:
     )  # fmt: skip
 
 
+def _syn_wf() -> Path:
+    run, wf = SYN
+    return common.fmriprep_run(run) / wf
+
+
+def _compute_syn(e: fcache.Entry) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    wf = _syn_wf()
+    e.input("fMRIPrep's run (RUN_INFO.txt)", common.fmriprep_run(SYN[0]) / "RUN_INFO.txt")
+    e.input("the registration's command (syn/command.txt)", wf / "syn" / "command.txt")
+    e.input("fMRIPrep's warp (syn/fmap_syn0Warp.nii.gz)", wf / "syn" / "fmap_syn0Warp.nii.gz")
+    e.input("fMRIPrep's field (unwarp/clipped_field.nii.gz)",
+            wf / "unwarp" / "clipped_field.nii.gz")  # fmt: skip
+    env = {**_env(e), "LARMORX_PARITY_RUN_TIMEOUT": "14400"}
+
+    def argv(label: str, impl: str, threads: int, maths: str, mode: str, never: str) -> list:
+        a = [_python(), "-P", "-m", RUN_MODULE, "syn", str(wf), str(e.dir / label),
+             "--implementation", impl, "--threads", str(threads), "--defects", mode]  # fmt: skip
+        return a + (["--maths", maths] if maths else []) + (["--never", never] if never else [])
+
+    # the six runs side by side (1 + 1 + 4 + 4 ANTs threads, 14 + 4 LARMORX threads)
+    with ThreadPoolExecutor(len(SYN_RUNS)) as pool:
+        list(pool.map(lambda r: e.run(r[0], argv(*r), env=env, unset=UNSET, cwd=e.dir,
+                                      timeout=6 * 3600), SYN_RUNS))  # fmt: skip
+    order = {r[0]: i for i, r in enumerate(SYN_RUNS)}
+    e.runs.sort(key=lambda r: order.get(r.label, len(order)))
+    e.run("fmriprep", argv("fmriprep", "fmriprep", 4, "", "reproduce", ""), env=env,
+          unset=UNSET, cwd=e.dir)  # fmt: skip
+    e.run("warps", [_python(), "-P", "-m", RUN_MODULE, "syn-warps", str(e.dir),
+                    str(e.dir / "warps")], env=env, unset=UNSET, cwd=e.dir)  # fmt: skip
+    e.finish(
+        versions={
+            **_versions(),
+            "programs": "ANTs 2.6.5's antsRegistration (the GCC 14.3 build), through the oracle "
+            "cache: one thread with CORE-MATH's correctly rounded functions preloaded, one thread "
+            "and twice four threads with glibc's (never cached: the original's own spread); "
+            "fMRIPrep 25.2.6's image holds ANTs 2.6.2.dev1 (its own build)",
+        },
+        node=SYN[1].removeprefix("work/"),
+        settings="sdcflows' init_syn_sdc_wf as fMRIPrep 25.2.6 ran it for ds000228's estimator "
+        "(--use-syn-sdc): LARMORX's lx.sdcflows.syn_sdc_workflow on fMRIPrep's own inputs and "
+        "ANTS_RANDOM_SEED, fMRIPrep's image's numpy 2.2.6 for the clip (14 threads reproduce, 4 "
+        "default); ANTs 2.6.5 on fMRIPrep's own registration command and inputs, then sdcflows' "
+        "steps after it (extract_field, zooms_field, bs_filter, unwarp) by LARMORX's port in "
+        "reproduce mode (= sdcflows' nodes on these inputs, check_syn_sdc.py --sections nodes); "
+        "the same steps on fMRIPrep's own warp (its 4 threads); the newest environment",
+    )
+
+
+def syn_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(), TOOL, "syn-ds000228",
+        "The fieldmap-less (SyN) estimation of fMRIPrep's ds000228 estimator: LARMORX, ANTs "
+        "2.6.5 at one thread (correctly rounded maths, glibc's) and twice at four (glibc's), "
+        "fMRIPrep's own warp",
+        _compute_syn,
+    )  # fmt: skip
+
+
 def entries(ctx: core.Context) -> list[fcache.Entry]:
     return [
         *(app_entry(ctx, k) for k, *_ in APP),
@@ -389,6 +469,7 @@ def entries(ctx: core.Context) -> list[fcache.Entry]:
         masker_entry(ctx),
         epi_entry(ctx),
         memory_entry(ctx),
+        syn_entry(ctx),
     ]
 
 

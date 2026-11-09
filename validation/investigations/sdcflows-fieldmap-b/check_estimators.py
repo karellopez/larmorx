@@ -83,6 +83,9 @@ def oracle_datasets() -> list[tuple[str, Path, str, dict[str, Any]]]:
         if not info.is_file():
             continue
         text = info.read_text(encoding="utf-8")
+        if not re.search(r"^exit status: 0$", text, re.M):
+            print(f"skipped (not finished): {run.name}")
+            continue
         root = Path(re.search(r"^BIDS input: (\S+)", text, re.M).group(1))  # type: ignore[union-attr]
         sub = re.search(r"^participant: (\S+)", text, re.M).group(1)  # type: ignore[union-attr]
         args = re.search(r"^arguments: (.*)$", text, re.M).group(1)  # type: ignore[union-attr]

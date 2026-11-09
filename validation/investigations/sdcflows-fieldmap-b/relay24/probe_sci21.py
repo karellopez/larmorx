@@ -62,7 +62,9 @@ def one(py: str, mode: str, c: str) -> str:
     except subprocess.TimeoutExpired:
         return "hung"
     out = p.stdout.strip()
-    return f"{'result' if out else 'none'} exit {p.returncode}" + (f" {hash(out) & 0xffff:04x}" if out else "")
+    return f"{'result' if out else 'none'} exit {p.returncode}" + (
+        f" {hash(out) & 0xFFFF:04x}" if out else ""
+    )
 
 
 def main() -> int:

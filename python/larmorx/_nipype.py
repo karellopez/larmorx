@@ -49,9 +49,11 @@ __all__ = [
     "automask",
     "bet",
     "binary_maths",
+    "copyfile",
     "denoise_image",
     "ensure_list",
     "fname_presuffix",
+    "get_related_files",
     "image_math",
     "load_settings",
     "multi_image_maths",
@@ -136,6 +138,96 @@ def ensure_list(value: Any) -> list[Any] | None:
     if isinstance(value, (list, tuple)):
         return list(value)
     return [value]
+
+
+#: nipype's ``related_filetype_sets``: files that travel together.
+RELATED_FILETYPE_SETS = ((".hdr", ".img", ".mat"), (".nii", ".mat"), (".BRIK", ".HEAD"))
+
+
+def get_related_files(filename: str, include_this_file: bool = True) -> list[str]:
+    """nipype's ``get_related_files``: the NIfTI pair, SPM ``.mat`` and AFNI ``.HEAD`` files of
+    ``filename`` (``[filename]`` itself when it has none)."""
+    path, name, this_type = split_filename(filename)
+    related = [
+        os.path.join(path, f"{name}{related_type}")
+        for type_set in RELATED_FILETYPE_SETS
+        if this_type in type_set
+        for related_type in type_set
+        if include_this_file or related_type != this_type
+    ]
+    return related or [filename]
+
+
+def copyfile(
+    originalfile: str | os.PathLike[str],
+    newfile: str | os.PathLike[str],
+    *,
+    use_hardlink: bool = True,
+    copy_related_files: bool = True,
+) -> str:
+    """nipype's ``copyfile(originalfile, newfile, copy=True, use_hardlink=use_hardlink)`` with
+    the content hash: an existing ``newfile`` that is the same file or has the same content is
+    kept, else replaced; a hard link to the original's real path, else a copy; then the related
+    files that exist (:func:`get_related_files`) the same way. (niworkflows' sink removes
+    ``newfile`` first, so the comparison of an existing file never decides its result.)"""
+    import hashlib
+    import shutil
+
+    originalfile, newfile = os.fspath(originalfile), os.fspath(newfile)
+
+    def content_hash(p: str) -> str:
+        h = hashlib.md5()
+        with open(p, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    keep = False
+    if os.path.lexists(newfile):
+        if os.path.islink(newfile):
+            keep = False  # copy=True never keeps a link
+        elif os.path.samefile(newfile, originalfile):
+            keep = True
+        else:
+            keep = content_hash(newfile) == content_hash(originalfile)
+        if not keep:
+            os.unlink(newfile)
+    if not keep and use_hardlink:
+        try:
+            os.link(os.path.realpath(originalfile), newfile)
+        except OSError:
+            use_hardlink = False
+        else:
+            keep = True
+    if not keep:
+        with suppress_shutil_error():
+            shutil.copyfile(originalfile, newfile)
+    if copy_related_files:
+        pairs = zip(
+            get_related_files(originalfile, include_this_file=False),
+            get_related_files(newfile, include_this_file=False),
+            strict=False,
+        )
+        for alt_ofile, alt_nfile in pairs:
+            if os.path.exists(alt_ofile):
+                copyfile(alt_ofile, alt_nfile, use_hardlink=use_hardlink, copy_related_files=False)
+    return newfile
+
+
+class suppress_shutil_error:
+    """nipype's ``except shutil.Error as e: fmlogger.warning(str(e))``."""
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        import logging
+        import shutil
+
+        if exc_type is not None and issubclass(exc_type, shutil.Error):
+            logging.getLogger("larmorx.nipype").warning(str(exc))
+            return True
+        return False
 
 
 # ------------------------------------------------------------------------------------------

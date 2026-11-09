@@ -406,7 +406,7 @@ class FieldmapEstimation:
         For the :class:`FieldmapFile` objects it makes.
     """
 
-    __slots__ = ("_method", "bids_id", "registry", "sanitized_id", "sources")
+    __slots__ = ("_method", "_wf", "bids_id", "registry", "sanitized_id", "sources")
 
     def __init__(
         self,
@@ -423,6 +423,7 @@ class FieldmapEstimation:
             for f in _listify(sources)  # type: ignore[union-attr]
         ]
         object.__setattr__(self, "_method", EstimatorType.UNKNOWN)
+        object.__setattr__(self, "_wf", None)
         object.__setattr__(self, "bids_id", bids_id)
         self.registry = _registry(registry)
         self._post_init(sdcflows_version)
@@ -563,6 +564,13 @@ class FieldmapEstimation:
     def paths(self) -> tuple[str, ...]:
         """The sources' paths, sorted."""
         return tuple(sorted(str(f.path) for f in self.sources))
+
+    def get_workflow(self, set_inputs: bool = True, **kwargs: Any) -> Any:
+        """The estimator's workflow (sdcflows' ``get_workflow``):
+        :func:`larmorx.sdcflows.estimator_workflow`."""
+        from larmorx.sdcflows.base import estimator_workflow
+
+        return estimator_workflow(self, set_inputs, **kwargs)
 
     def __repr__(self) -> str:
         return (

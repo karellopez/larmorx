@@ -14,6 +14,7 @@ metadata by pybids' inheritance and query results, validated against pybids 0.22
 - :class:`Query`, :func:`parse_file_entities`, :class:`Config`, :class:`Entity`,
   :class:`PaddedInt`, :class:`BIDSMetadata`, :func:`listify`, :func:`natural_sort`; pybids'
   errors.
+- :func:`build_path`: pybids' ``build_path``, a file's path from entities and path patterns.
 """
 
 from larmorx.bids.layout import (
@@ -44,6 +45,7 @@ from larmorx.bids.layout import (
     natural_sort,
     parse_file_entities,
 )
+from larmorx.bids.writing import build_path
 
 __all__ = [
     "ALWAYS_IGNORE",
@@ -69,6 +71,7 @@ __all__ = [
     "PyBIDSError",
     "Query",
     "TargetError",
+    "build_path",
     "listify",
     "natural_sort",
     "parse_file_entities",

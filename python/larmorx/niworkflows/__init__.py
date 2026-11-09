@@ -21,8 +21,19 @@ and scikit-image arithmetic under them.
   nearest-neighbour :func:`resample_img_nearest`) and :func:`epi_reference_workflow`:
   ``ValidateImage``, ``NonsteadyStatesDetector``, ``Binarize``, ``GenerateSamplingReference``
   and ``init_epi_reference_wf``.
+- :func:`derivatives_data_sink`, :func:`copy_any`: ``DerivativesDataSink`` (a derivative named
+  by niworkflows' ``nipreps.json`` patterns, its header fixed, its JSON sidecar) and
+  ``_copy_any``.
 """
 
+from larmorx.niworkflows.bids import (
+    DEFAULT_DTYPES,
+    STANDARD_SPACES,
+    DerivativesDataSinkResult,
+    copy_any,
+    derivatives_data_sink,
+    get_tf_resolution,
+)
 from larmorx.niworkflows.bold import NonsteadyStatesResult, is_outlier, nonsteady_states_detector
 from larmorx.niworkflows.header import (
     SkullstripBoldResult,
@@ -66,9 +77,12 @@ from larmorx.niworkflows.sampling import (
 )
 
 __all__ = [
+    "DEFAULT_DTYPES",
+    "STANDARD_SPACES",
     "BinarizeResult",
     "BoundingBoxError",
     "ConcatenateXfmsResult",
+    "DerivativesDataSinkResult",
     "EpiReferenceResult",
     "IntensityClipResult",
     "IntraModalMergeResult",
@@ -83,11 +97,14 @@ __all__ = [
     "axcodes2ornt",
     "binarize",
     "concatenate_xfms",
+    "copy_any",
     "copy_header",
     "copy_xform",
+    "derivatives_data_sink",
     "epi_reference_workflow",
     "four_to_three",
     "generate_sampling_reference",
+    "get_tf_resolution",
     "intensity_clip",
     "intra_modal_merge",
     "is_outlier",

@@ -54,12 +54,26 @@ Rust (``larmorx-sdcflows``):
   :func:`find_estimators`, :func:`find_anatomical_estimators`: the estimators of a BIDS dataset
   (``fieldmaps.py``, ``utils/bimap.py``, ``utils/wrangler.py``), on a
   :class:`larmorx.bids.BIDSLayout`.
+- :func:`estimator_workflow` (:meth:`FieldmapEstimation.get_workflow`),
+  :func:`fmap_preproc_workflow`, :func:`fmap_derivatives_workflow`: each estimator's workflow,
+  a subject's estimators run with their derivatives (``init_fmap_preproc_wf``) and the
+  derivatives (``init_fmap_derivatives_wf``, with niworkflows' ``DerivativesDataSink``).
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
 """
 
 from larmorx.sdcflows.approx import BSplineApproxResult, bspline_approx
+from larmorx.sdcflows.base import (
+    EPI_LIKE_SUFFIXES,
+    EstimatorRun,
+    EstimatorWorkflow,
+    FmapPreprocResult,
+    check_readout,
+    estimator_workflow,
+    fmap_preproc_workflow,
+    workflow_options,
+)
 from larmorx.sdcflows.bspline import (
     DEFAULT_HF_ZOOMS_MM,
     DEFAULT_LF_ZOOMS_MM,
@@ -104,6 +118,15 @@ from larmorx.sdcflows.masks import (
     brain_extraction,
     brain_masker,
     union,
+)
+from larmorx.sdcflows.outputs import (
+    SDCFLOWS_OUT_PATH_BASE,
+    FmapDerivativesResult,
+    fmap_derivatives_workflow,
+    gendesc,
+    getname,
+    getsourcetype,
+    selectintent,
 )
 from larmorx.sdcflows.pepolar import (
     GetReadoutTimeResult,
@@ -181,9 +204,11 @@ __all__ = [
     "DEFAULT_HF_ZOOMS_MM",
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",
+    "EPI_LIKE_SUFFIXES",
     "MODALITIES",
     "NOT_ALIGNED",
     "REGISTRY",
+    "SDCFLOWS_OUT_PATH_BASE",
     "SDCFLOWS_VERSIONS",
     "ApplyCoeffsFieldResult",
     "B0FieldTransform",
@@ -196,10 +221,14 @@ __all__ = [
     "CsrMatrix",
     "DisplacementsResult",
     "EstimatorRegistry",
+    "EstimatorRun",
     "EstimatorType",
+    "EstimatorWorkflow",
     "FieldmapEstimation",
     "FieldmapFile",
     "FieldmapRegistry",
+    "FmapDerivativesResult",
+    "FmapPreprocResult",
     "FmapWorkflowResult",
     "GetReadoutTimeResult",
     "ImageFileError",
@@ -226,6 +255,7 @@ __all__ = [
     "bspline_approx",
     "bspline_grid",
     "check_b0_units",
+    "check_readout",
     "check_register",
     "clear_registry",
     "coeff2epi_workflow",
@@ -235,15 +265,21 @@ __all__ = [
     "deoblique_and_zooms",
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
+    "estimator_workflow",
     "find_anatomical_estimators",
     "find_estimators",
     "fmap_atlas",
     "fmap_atlas_affine",
+    "fmap_derivatives_workflow",
+    "fmap_preproc_workflow",
     "fmap_to_disp",
     "fmap_workflow",
+    "gendesc",
     "get_identifier",
     "get_readout_time",
     "get_trt",
+    "getname",
+    "getsourcetype",
     "grid_bspline_weights",
     "magnitude_workflow",
     "merge_meta",
@@ -263,6 +299,7 @@ __all__ = [
     "ridge_sparse_cg",
     "select_pe_volumes",
     "select_topup_config",
+    "selectintent",
     "set_dtype",
     "sort_pe_blips",
     "subtract_phases",
@@ -277,4 +314,5 @@ __all__ = [
     "uniform_grid",
     "union",
     "warp_dir",
+    "workflow_options",
 ]

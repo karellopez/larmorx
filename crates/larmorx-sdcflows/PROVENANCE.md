@@ -236,3 +236,12 @@ Into `python/larmorx/sdcflows/correction.py` (relay 14): sdcflows 2.17.1 (Apache
 in 2.15.1 and 2.15.2) `workflows/apply/correction.py` (`init_unwarp_wf`: the nodes and their
 wiring, `mem_per_thread` and the thread setting); `interfaces/bspline.py` (`ApplyCoeffsField`'s
 `_run_interface`: `data2fmap_xfm` before `fmap2data_xfm`, SDC-26); `utils/misc.py` (`front`).
+
+Into `python/larmorx/sdcflows/masks.py` (relay 15): sdcflows 2.17.1 (Apache-2.0; the same in
+2.15.1 and 2.15.2) `utils/epimanip.py` (`epi_mask`), with nibabel 5.4.2's `get_fdata(dtype=
+'float32')` and `Nifti1Image(..., hdr).to_filename` through `lx.io`, scikit-image 0.26.0's `ball`
+(`lx.skimage`), SciPy 1.18.1's `grey_opening`, `grey_closing`, `grey_erosion`, `center_of_mass`,
+`watershed_ift` and `binary_dilation` (`lx.ndimage`, `crates/larmorx-ndimage/PROVENANCE.md`) and
+numpy 2.5.4's and 2.3.5's `percentile` and `clip` (`larmorx_core::numpy`); numpy's float-to-integer
+casts on x86-64 (`astype(int)` of a NaN centre, `astype(np.uint16)` of NaN levels, SDC-28) made
+explicitly.

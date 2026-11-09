@@ -68,6 +68,58 @@ their rules A-D when the part registers them (`docs/findings/upstream-defects.md
    integer arithmetic and casts), while the running result is the caller's double (`_res += _ss[0]`
    in double): uint8 dilations wrap (`probe_int_casts.py`). Kept (SciPy's definition, rule C).
 
+8. **`watershed_ift` links elements across the array's edges** (provisionally SCI-W1).
+   `NI_WatershedIFT` adds each structure offset to the C-order index and checks only that the
+   sum lies in the array, so the last element of a row neighbours the first of the next (and,
+   through the other axes' offsets, the last row of a plane the first of the next), and an axis
+   of length 1 has neighbours along it. In a 3 x 4 image with a wall in column 1, markers 1 at
+   `(0, 0)` and 2 at `(2, 3)`, label 2 reaches column 0 through `(0, 3)` -> `(1, 0)`:
+   `[[1, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]]` (SciPy 1.15.3 and 1.18.1). larmorx takes a
+   neighbour only when every coordinate is inside (candidate: rule A; `reproduce` gives
+   SciPy's).
+9. **`watershed_ift` leaves an element alone in its queue there** (provisionally SCI-W2): it
+   takes an element whose cost drops out of its queue only `if (p->next || p->prev)`, so an
+   element alone in its queue stays, the queue's first and last pointing at it; an element
+   queued at that level later is linked behind it, joining two queues, cutting elements off
+   every queue (they keep their label and are never processed, nor are the elements only they
+   reach) or processing them at the wrong level. 1-D (no neighbour across an edge): image
+   `[1, 0, 0, 1, 1, 2]`, markers `[-1, 0, -1, 0, 0, 0]`: SciPy `[-1, -1, -1, -1, -1, 0]` (the
+   last element never reached), corrected all `-1`; in 37 of 20,000 seeded 1-D cases the labels
+   differ (`probe_watershed_queue.py`). larmorx always takes the element out (candidate: rule
+   A). With 8 they change sdcflows' `epi_mask` on three of four oracle runs' BOLD references
+   (ds000228's mask is the whole image in SciPy's run: `docs/findings/sdcflows-estimation.md`).
+10. **`watershed_ift` reads markers and labels as C `int`s** (provisionally SCI-W3): an int64
+    marker `2**32 + 5` is 5, `2**31` is `-2**31`, a background marker (`[[5, 5], [5, -2**31]]`
+    for a flat 2 x 2 image). larmorx keeps the 64 bits (candidate: rule A).
+11. **`watershed_ift`'s byte offsets are `int`s** (provisionally SCI-W4): above 2^31 bytes of
+    input or output (an int64 output from 2^28 elements) SciPy reads and writes outside its
+    arrays; larmorx's offsets are 64-bit in both modes and it warns (an out-of-bounds access is
+    never reproduced; not run: such arrays take tens of GB).
+
+    Kept as SciPy (no candidate): labels stored in the output's type (an `int8` output wraps
+    300 to 44, read back as such); a non-array `output` (a dtype) ignored, the markers' type
+    used; a 0-d array keeps its marker (SciPy writes `strides[-1]` on its stack there and
+    returns the same); the wrapper's checks and messages (`TypeError` for inputs other than
+    `uint8`/`uint16`, `RuntimeError` for unsigned or `longlong` markers, as its type list
+    compares numpy's type objects). `check_epi_mask.py`: 600 seeded cases (1-D to 4-D, every
+    marker and output type, random structures, Fortran-ordered, strided and big-endian arrays)
+    with `reproduce` = SciPy's labels and types, the corrected labels = an independent Python
+    implementation of the corrected transform, a warning exactly when they differ (in 209 of
+    the 600; among the causes candidate 8 in 205, 9 in 169, 10 in 17), and the wrapper's 13
+    errors, in both environments.
+
+**Speed without changing a bit (relay 15).** The minimum and maximum filters with a non-flat
+structure were 3.5 times slower than SciPy at one thread (each element's structure value cast,
+x86-64's NaN rules applied to every addition, the border positions' offsets computed element by
+element). Where no NaN can arise (an input without NaN, a finite structure, near the border a
+`cval` that is not NaN: SSE's and IEEE's results then agree), larmorx now adds with plain
+arithmetic and the structure cast once, visits a 3-D border position's elements in nested loops
+over the per-axis tables, and computes a contiguous last axis's interior positions together,
+element by element in the footprint's order. `check_ndimage.py`'s 39,436 cases and
+`check_epi_mask.py` stay identical in both environments; `grey_opening` with `ball(3)` 0.29 s
+(SciPy 0.29 s), `grey_closing` with `ball(2)` 0.10 s (0.10 s), `grey_erosion` with `ball(5)` of
+a Fortran-ordered 104 x 104 x 72 image 0.78 s (0.57 s: the per-point path) at one thread.
+
 **SciPy 1.15 to 1.18.** For a 1-D input shorter than half the footprint, SciPy 1.15's running
 rank returned before writing (all zeros, gh-23293: SciPy 1.15.3, the shared environment, 30 of 30
 such cases); SciPy 1.18 runs the n-dimensional filter. larmorx follows 1.18 (fixed upstream, as

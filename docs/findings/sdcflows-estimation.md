@@ -846,6 +846,54 @@ environments). Three behaviours:
   (`ValueError`); larmorx counts it with `unique` (the same quantiles and values: identical
   wherever scikit-image works).
 
+## `epi_mask` and SciPy's watershed (relay 15)
+
+sdcflows' `epi_mask` (`utils/epimanip.py`; the same text in 2.15.1; no workflow calls it) masks
+an EPI by grey-level morphology (a non-flat `ball(3)` opening and `ball(2)` closing, a window
+between the 30th percentile and the 90th of the positive values) and SciPy's `watershed_ift`
+from two markers: the object at the window's rounded centre of mass, the background at the
+single voxel `[0, 0, -1]`. Ported over `lx.ndimage` (`center_of_mass` and `watershed_ift`, new
+in this relay) and numpy's percentiles and `clip` (`larmorx_core::numpy`):
+`check_epi_mask.py` gives sdcflows' files bit for bit with `upstream_defects="reproduce"` on the
+BOLD references (`desc-hmc_boldref`) of four oracle runs and four synthetic images (a scaled
+int16 image, float64, an object touching the edges, one slice), and sdcflows' errors for a 4-D
+and a flat image, in both environments (numpy 2.3.5 / SciPy 1.15.3 and numpy 2.5.4 / SciPy
+1.18.1).
+
+- **SciPy's watershed defects change sdcflows' mask** (`docs/findings/scipy-ndimage-filters.md`,
+  candidates 8 and 9): corrected by default, the masks of three of the four references differ:
+
+  | run | voxels | sdcflows' mask | corrected | only sdcflows' | only corrected |
+  |---|---|---|---|---|---|
+  | ds000228 (a child) | 131,072 | 131,072 (the whole image) | 47,081 | 83,991 | 0 |
+  | ds003592 (multi-echo) | 176,128 | 12,843 | 51,162 | 0 | 38,319 |
+  | ds005040 | 163,840 | 15,882 | 16,106 | 0 | 224 |
+  | ds004958 (multiband 8) | 778,752 | 143 | 143 | 0 | 0 |
+
+  On ds000228 the object's label floods the whole image in SciPy's run (the background marker's
+  region is cut off its queue); on ds003592 the object's region stops early. The corrected
+  masks are brain-sized; ds004958's 143 voxels (the same in both) are the method's own result
+  on that low-contrast multiband reference.
+- **SDC-28** (D13's rule for undefined conversions): `np.round(1e3 * wshed / wshed.max())` cast
+  to `uint16` is undefined for NaN and infinities: a flat residual (`0 / 0`), a NaN or an
+  infinity in the image, or `1e3 * wshed` overflowing float32 above 3.4e35 (numpy on x86-64
+  gives 0 for all of them: `cvttss2si`'s `0x80000000` cut to 16 bits). larmorx clamps (NaN to 0,
+  infinity to 65,535) and warns; `reproduce` gives 0. No real image reaches it (a flat image
+  fails earlier, at the 90th percentile of nothing).
+- The centre of mass is cast to `int` by numpy (NaN to `-2**63` on x86-64, then numpy's
+  `IndexError` at `markers[cm] = 2`); larmorx makes the same conversion on every platform (an
+  image with infinities reaches it), and the same error.
+- Kept (sdcflows' design): the object marker overwritten by the background marker when the
+  centre of mass is voxel `[0, 0, -1]` (an empty mask); `grey_opening(..., structure=ball(3))`
+  is the non-flat opening of a full 7³ box (the ball's elements less 1), as `brain_masker`'s
+  closing (candidate SDC-g).
+- Speed (one thread, `check_epi_mask.py`'s timings, newest environment): 0.98 s against
+  sdcflows' 1.05 s on ds004958's 104 x 104 x 72 reference, 0.23-0.29 s against 0.18-0.25 s on the
+  64 x 64 x 32-43 ones (the first erosion reads nibabel's Fortran-ordered data on the per-point
+  path); the grey filters' NaN-free paths of this relay (`docs/api/ndimage-filters.md`) made
+  the `ball(3)` opening and `ball(2)` closing as fast as SciPy's (0.29 s and 0.10 s), the
+  watershed's two runs (SciPy's and the corrected) take 0.04 s against SciPy's 0.03 s.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -866,6 +914,7 @@ environments). Three behaviours:
   `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
   `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
   PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
-  `larmorx.pipelines.larmorprepx.estimators` (relay 13), SDC-12 to SDC-27 in `lx.sdcflows`
-  (relays 5 to 14) and SKI-02 in `lx.skimage` (relay 14); the register's entries and
+  `larmorx.pipelines.larmorprepx.estimators` (relay 13), SDC-12 to SDC-28 in `lx.sdcflows`
+  (relays 5 to 15), SKI-02 in `lx.skimage` (relay 14) and SciPy's watershed candidates
+  (provisionally SCI-W1 to SCI-W4, relay 15) in `lx.ndimage`; the register's entries and
   `larmorx_core::defects` wait for the part's defects relay.

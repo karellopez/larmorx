@@ -223,6 +223,26 @@ Checked node file by node file against sdcflows' own nipype graphs (`upstream_de
 ANTs' N4 at one thread with correctly rounded maths and FSL's PRELUDE through the oracle cache):
 `validation/investigations/sdcflows-fieldmap-b/check_workflows.py`.
 
+## A quick EPI mask: `epi_mask` (part B)
+
+sdcflows' `utils/epimanip.py: epi_mask(in_file, out_file=None)` (the same text in 2.15.1; no
+workflow calls it), in `python/larmorx/sdcflows/masks.py` over `lx.ndimage` and `lx.skimage`.
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `epi_mask(in_file, out_file=None, *, write=True, numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` → `EpiMaskResult(mask, centre, out_file)` | `epi_mask(in_file, out_file)` → `out_file` | the image as float32 (nibabel's `get_fdata`); `grey_opening` with the non-flat `ball(3)` structure (sdcflows passes `structure=`: a 7³ box, the ball's elements less 1), `grey_closing` with `ball(2)`; less its 30th percentile, clipped to `[0, p90]` of its positive values; the object marker (2) at the clipped image's rounded centre of mass (`center_of_mass`), the background marker (-1) at voxel `[0, 0, -1]`; `watershed_ift` of the opened image less the clipped one's `ball(5)` grey erosion, scaled to `0..1000` (`uint16`); the object dilated with `ball(2)`, `uint8`, with the input's header and affine, at `out_file` (default `mask.nii.gz` in the working directory, absolute); `centre` is the marker's voxel |
+| `numpy_version` | — | numpy's percentiles (2.2 and 2.3 in float32, 2.5 in float64) and the centre of mass's sums (pairwise from 2.3, chunks of 8192 before); `"2.3.5"` gives the shared environment's masks, `"2.2.6"` fMRIPrep 25.2.6's image's numpy |
+| errors | the same | an image that is not 3-D: SciPy's `RuntimeError` (`footprint.ndim (3) must match len(axes) (4)`); no positive value left after the 30th percentile (a flat image): numpy's `IndexError` (`index -1 is out of bounds for axis 0 with size 0`) |
+
+Corrected by default (`upstream_defects="reproduce"` gives sdcflows' mask bit for bit): SDC-28,
+and SciPy's `watershed_ift` defects (neighbours across the image's edges, a queue that keeps an
+element alone in it: `lx.ndimage.watershed_ift`, [ndimage-filters.md](ndimage-filters.md)). On
+the BOLD references of four oracle runs these change the mask of three: ds000228's (sdcflows:
+the whole image, 131,072 voxels; corrected 47,081), ds003592's (12,843; corrected 51,162) and
+ds005040's (15,882; corrected 16,106); ds004958's (143 voxels) is the same.
+`validation/investigations/sdcflows-fieldmap-b/check_epi_mask.py` (sdcflows' own function on
+those references and synthetic images, both environments): identical files with `reproduce`.
+
 ## The PEPOLAR estimation (part B)
 
 sdcflows' `init_topup_wf` and its steps (`python/larmorx/sdcflows/pepolar.py`), in **both
@@ -527,6 +547,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-25 | `init_unwarp_wf`'s `fieldwarp` output (the displacement field, says its docstring) is connected to nothing: nipype leaves it undefined | kept (rule C: no caller reads it): `None`; the displacement field of the same coefficients is `B0FieldTransform.to_displacements` | `unwarp_workflow` |
 | SDC-26 | `init_unwarp_wf` given both `fmap2data_xfm` and `data2fmap_xfm`: `ApplyCoeffsField` declares them exclusive, but the graph's connections set both (nipype's `xor` is not checked there) and `_run_interface` uses `data2fmap_xfm`, ignoring the other without a word | a `ValueError` (rule B) | `unwarp_workflow` |
 | SDC-27 | `match_histogram` assigns the matched float values into an integer image with numpy's cast: values its type cannot hold (a reference with a wider range, or negative values for an unsigned image) and NaN (a reference with NaN) have an undefined conversion (on x86-64 a wrapped value) | clamped to the type's range (NaN to 0) with a warning (D13's rule for undefined conversions) | `match_histogram` |
+| SDC-28 | `epi_mask` casts `np.round(1e3 * wshed / wshed.max())` to `uint16`: a flat residual (`0 / 0`), a NaN or an infinity in it, or `1e3 * wshed` overflowing float32, gives NaN or infinity, whose conversion is undefined (numpy on x86-64: 0) | clamped to the range (NaN to 0, infinity to 65535) with a warning (D13's rule for undefined conversions); `reproduce` gives x86-64's 0 | `epi_mask` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

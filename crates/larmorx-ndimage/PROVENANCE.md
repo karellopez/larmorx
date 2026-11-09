@@ -14,8 +14,16 @@ is re-expressed in Rust; no code was copied verbatim. Each source file reproduce
 | `filters::rank_filter_1d`, `Mediator` | `src/_rank_filter_1d.cpp` (`Mediator`, `MediatorInsert` and its heap helpers, `_rank_filter`; Copyright (c) 2011 ashelly.myopenid.com, MIT, modified in 2024 by Gideon Genadi Kogan) | MIT within BSD-3-Clause |
 | `morphology::binary_erosion`, `pass`, `propagate`, `center_is_true`, `dilation_arguments`, `generate_binary_structure`, `iterate_structure`, `MaskElement` | `src/ni_morphology.c` (`NI_BinaryErosion`, `CASE_NI_ERODE_POINT`, `NI_BinaryErosion2`, `CASE_ERODE_POINT2`), `_morphology.py` (`_binary_erosion`, `binary_dilation`, `_center_is_true`, `generate_binary_structure`, `iterate_structure`) | BSD-3-Clause |
 | `measurements::label` | `src/_ni_label.pyx` (`_label`, `label_line_with_neighbor`, `mark_for_merge`: the same components and numbers, by a union of earlier neighbours in C order), `_measurements.py` (`label`) | BSD-3-Clause |
+| `watershed::watershed_ift`, `watershed_ift_run`, `Queues`, `WatershedEvents` | `src/ni_measure.c` (`NI_WatershedIFT`, `NI_WatershedElement`, `WS_GET_INDEX`, `CASE_WINDEX1`-`3`: the per-level doubly linked queues, the markers' order, the `int` offsets and labels, the propagation; byte-identical in SciPy 1.15.3), `_measurements.py` (`watershed_ift`); the corrected run (neighbours inside the array, an element always taken out of its queue, 64-bit labels) is larmorx's | BSD-3-Clause |
 | `measurements::sum_labels_bincount` | `_measurements.py` (`_stats`'s `bincount` and `unique` paths, `sum_labels`) and numpy's `bincount` (sequential float64 sums) | BSD-3-Clause |
 | `NdElement`, `cvtt_i32`, `cvtt_i64`, `cvtt_u64` | C's double-to-integer casts as SciPy's x86-64 build compiles them (measured: `validation/investigations/sdcflows-fieldmap-b/probe_int_casts.py`) | — |
+
+`center_of_mass` is Python (`python/larmorx/_ndimage_filters.py`): `_measurements.py`
+(`center_of_mass`, `_stats`' `single_group`; the same in SciPy 1.15.3) with numpy's sums of
+contiguous float arrays in a chosen release's order (`larmorx_core::numpy::reduce`).
+The fast paths of `filters::min_or_max_filter` (`extreme_plain`, `extreme_plain_3d`,
+`lines_plain`, relay 15) are larmorx's: the same values as `NI_MinOrMaxFilter`'s where no NaN can
+arise.
 
 The Python wrappers (`python/larmorx/_ndimage_filters.py`) port `_filters.py`
 (`_min_or_max_filter`, `_rank_filter`, `minimum_filter1d`, `maximum_filter1d`, the `axes`,
@@ -26,7 +34,9 @@ origin and mode helpers), `_morphology.py` (`grey_*`, `binary_*`) and `_ni_suppo
 SciPy reads or writes outside its arrays (binary morphology with an origin before its structure,
 the `reflect` boundary two periods before a short axis, the 1-D rank filter's window running past
 a short input) or loops for ever (a binary erosion until nothing changes that alternates),
-larmorx gives the mode's own value or a clear error.
+larmorx gives the mode's own value or a clear error. `watershed_ift`'s defects (neighbours across
+the edges, an element left alone in its queue, 32-bit markers) are corrected by default with
+SciPy's labels on request (`upstream_defects`).
 
 ## scikit-image's `ball`, `threshold_otsu` and `random_walker` (`src/skimage/`)
 

@@ -235,6 +235,9 @@ def rw_cases(rng):
     l3n = l3.astype(np.int16) * 3
     l3n[l3n == 6] = 7
     cases.append(("3d non-consecutive labels", a3, l3n, {"spacing": zooms}))
+    cases.append(
+        ("3d non-consecutive labels reproduce", a3, l3n, {"spacing": zooms, "_reproduce": True})
+    )
     l3m = l3.astype(np.int32).copy()
     l3m[:, :3, :] = -1
     l3m[4, 1, 5] = 1  # a seed inside the pruned region: isolated
@@ -338,8 +341,29 @@ def sec_rw(t: Tally, nt: int) -> None:
             or "Random walker" in m
             or "isolated" in m
         ]
-        msgs2 = [str(x.message) for x in w2 if "SKI-01" not in str(x.message)]
+        msgs2 = [
+            str(x.message)
+            for x in w2
+            if not any(k in str(x.message) for k in ("SKI-01", "SKI-03", "SKI-04"))
+        ]
         ski01 = any("SKI-01" in str(x.message) for x in w2)
+        ski03 = any("SKI-03" in str(x.message) for x in w2)
+        ski04 = any("SKI-04" in str(x.message) for x in w2)
+        if (ski03 or ski04) and not reproduce and not isinstance(want, Exception):
+            # corrected (rule A): scikit-image's labels mapped back to the labels given (SKI-03),
+            # the seeds as (nlabels, ...) float probabilities (SKI-04)
+            values = np.unique(labels)
+            if ski04:
+                expected = np.stack([labels == v for v in values if v > 0]).astype(np.float64)
+            else:
+                expected = values[np.asarray(want) + int(np.searchsorted(values, 0))]
+                expected = expected.astype(labels.dtype)
+            t.add(
+                f"random_walker {'SKI-04' if ski04 else 'SKI-03'} corrected",
+                same(expected, got),
+                name,
+            )
+            continue
         if ski01 and not reproduce:
             # the defect changes the result: the default must differ, reproduce must agree
             t.add(

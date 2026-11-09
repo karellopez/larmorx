@@ -269,6 +269,9 @@ def filters(t: Tally, rng, quick: bool, nt: int) -> None:
                         )
                     n = int(fp.sum())
                     rank = int(rng.integers(-n, n))
+                    # SciPy's own results with upstream_defects="reproduce"; a 1-D footprint with
+                    # holes (SCI-09) corrected by default: SciPy's n-dimensional filter of the
+                    # same footprint along a second axis of length 2
                     compare(
                         t,
                         "rank_filter",
@@ -277,7 +280,14 @@ def filters(t: Tally, rng, quick: bool, nt: int) -> None:
                             a, rank, footprint=fp, mode=mode, cval=cval, origin=org
                         ),
                         lambda: lx.rank_filter(
-                            a, rank, footprint=fp, mode=mode, cval=cval, origin=org, n_threads=nt
+                            a,
+                            rank,
+                            footprint=fp,
+                            mode=mode,
+                            cval=cval,
+                            origin=org,
+                            n_threads=nt,
+                            upstream_defects="reproduce",
                         ),
                     )
                     compare(
@@ -286,9 +296,38 @@ def filters(t: Tally, rng, quick: bool, nt: int) -> None:
                         desc,
                         lambda: sp.median_filter(a, footprint=fp, mode=mode, cval=cval, origin=org),
                         lambda: lx.median_filter(
-                            a, footprint=fp, mode=mode, cval=cval, origin=org, n_threads=nt
+                            a,
+                            footprint=fp,
+                            mode=mode,
+                            cval=cval,
+                            origin=org,
+                            n_threads=nt,
+                            upstream_defects="reproduce",
                         ),
                     )
+                    if nd_ == 1 and not fp.all():
+                        compare(
+                            t,
+                            "rank_filter SCI-09 corrected",
+                            desc + f" rank={rank}",
+                            lambda: sp.rank_filter(
+                                np.stack([a, a]),
+                                rank,
+                                footprint=fp[None, :],
+                                mode=mode,
+                                cval=cval,
+                                origin=[0, *org],
+                            )[0],
+                            lambda: lx.rank_filter(
+                                a,
+                                rank,
+                                footprint=fp,
+                                mode=mode,
+                                cval=cval,
+                                origin=org,
+                                n_threads=nt,
+                            ),
+                        )
                     pct = float(rng.choice([0.0, 12.5, 50.0, 75.0, 100.0, -30.0]))
                     compare(
                         t,
@@ -512,6 +551,10 @@ def binary(t: Tally, rng, quick: bool, nt: int) -> None:
                             mask = rng.choice([0, 1, 256], size=shape).astype(np.int16)
                         bf = bool(rng.integers(0, 2))
                         desc = f"{np.dtype(dtype).name}{shape} {lname} st={None if st is None else np.asarray(st).astype(int).tolist()} it={iterations} bv={bv} origin={org} mask={None if mask is None else mask.dtype} bf={bf}"
+                        # SciPy's own results with upstream_defects="reproduce"; a float or int16
+                        # mask over several passes (SCI-10) corrected by default: SciPy's result
+                        # with the mask's truth as booleans
+                        truth = None if mask is None else mask != 0
                         for fn in ("binary_erosion", "binary_dilation"):
                             compare(
                                 t,
@@ -535,8 +578,34 @@ def binary(t: Tally, rng, quick: bool, nt: int) -> None:
                                     origin=org,
                                     brute_force=bf,
                                     n_threads=nt,
+                                    upstream_defects="reproduce",
                                 ),
                             )
+                            if mask is not None and mask.dtype != bool and iterations != 1:
+                                compare(
+                                    t,
+                                    fn + " SCI-10 corrected",
+                                    desc,
+                                    lambda fn=fn: getattr(sp, fn)(
+                                        a,
+                                        structure=st,
+                                        iterations=iterations,
+                                        mask=truth,
+                                        border_value=bv,
+                                        origin=org,
+                                        brute_force=bf,
+                                    ),
+                                    lambda fn=fn: getattr(lx, fn)(
+                                        a,
+                                        structure=st,
+                                        iterations=iterations,
+                                        mask=mask,
+                                        border_value=bv,
+                                        origin=org,
+                                        brute_force=bf,
+                                        n_threads=nt,
+                                    ),
+                                )
                         if iterations >= 1:
                             for fn in ("binary_opening", "binary_closing"):
                                 compare(

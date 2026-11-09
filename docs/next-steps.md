@@ -754,6 +754,10 @@ The items below keep their history.
     `validation/investigations/t2smap/`, the replica's suite module, difftest descriptor and permanent cases);
     the audit's tedana family (R07) is in place. Its brief also forbids the replica's record, evidence module and
     site page (their descriptions name a few things of tedana's source: decision log, the replica's entry).
+  - *First in the clean-room part* (the user, 2026-11-09; decision log): the main package's own `topup` settings
+    (`b02b0`, `b02b0_1`, `_2`, `_4`, `b02b0_7T`, `test_acqp`) from `specs/topup.md`'s tables, which the field maps'
+    part B adds with FSL's files in larmorx-nc; checked by `topup`'s result with each against larmorx-nc's file, bit
+    for bit; the implementer never opens FSL's files (the audit's FSL family).
   - *In the clean-room part:* fMRIPrep's runs `ds000210-sub-02-noreconall` and `ds000258-sub-21262-noreconall`
     were made with OpenBLAS's AVX-512 kernels at first (the main machine's own; the earlier runs had Haswell's, an
     AVX2 laptop) and made again with Haswell's on 2026-11-09 (the first ones archived; `docs/validation/oracle-runs.md`):

@@ -2114,3 +2114,28 @@ together at the end.
   random-testing cases and its site page's tables name a few things of tedana's source (a routine, a TODO, line numbers).
   They stay (the replica's evidence); the clean-room original's brief forbids the replica's record, permanent cases,
   evidence module and site page, and the audit's brief rules (R16) name the repository's ones, so a reading is flagged.
+
+## 2026-11-09: One agent at a time again (the user)
+
+The user, 2026-11-09: "We will do one agent at a time now, until I tell you the opposite." Relays go on one after the
+other; nothing runs beside the field maps' part B, and `t2smap`'s clean-room original starts after part B is merged.
+This replaces the two agents by role of 2026-11-06 until the user says otherwise.
+
+## 2026-11-09: FSL's `topup` settings files, a replica and a clean-room original (the user)
+
+sdcflows 2.17.1 picks one of FSL's `b02b0_1.cnf`, `b02b0_2.cnf` and `b02b0_4.cnf` (by the image's sizes) for every
+PEPOLAR estimate; they are FSL's files (FSL's Licence) inside sdcflows' sdist. Until now the main package read them
+from `$FSLDIR` or larmorx-nc's copy and gave a clear error without either (the interim of the field maps' part B,
+its decision D9). Asked whether the settings should get a replica and a clean-room original like every FSL program,
+the user: "Ye please go ahead":
+- **Replica:** FSL 6.0.7.23's `topup` settings files, byte for byte (`b02b0.cnf`, `b02b0_1.cnf`, `b02b0_2.cnf`,
+  `b02b0_4.cnf`, `b02b0_7T.cnf`, `test_acqp.cnf`: the three sdcflows needs and FSL's three others, so `--config=b02b0`
+  and the rest work without FSL), in larmorx-nc's `fsl-data/etc/flirtsch/` beside BET's standard files (the
+  2026-11-04 decision's place), with their MANIFEST rows and checksums, under FSL's Licence.
+- **Spec:** the field maps' part B's defects relay, named the spec writer for this, adds each file's settings to
+  `specs/topup.md` (tables, as the spec has for sdcflows' own `b02b0.cnf`).
+- **Clean-room original:** the main package's own settings, written from the spec by an agent that has never opened
+  FSL's files, at the start of `t2smap`'s clean-room part; checked by `topup`'s result with each setting against the
+  replica's file (bit for bit), and by the clean-room audit. The values are necessarily FSL's (a different number
+  gives a different field); what the clean-room version adds is an origin the audit proves. Until then the interim
+  stays (a clear error without FSL or larmorx-nc).

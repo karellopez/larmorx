@@ -1298,7 +1298,7 @@ Both are now SciPy 1.18.1's (`_filters.py`; the same code in 1.15.3):
 environment too (numpy 2.3.5, SciPy 1.15.3, `LARMORX_SDCFLOWS_LIBRARIES=shared`). On ds006736's
 PEPOLAR estimator the coefficient file (`desc-coeff_fieldmap.nii.gz`) differed from sdcflows' in
 its header alone: `quatern_d` -1.4631351e-16 against sdcflows' -1.463135e-16 (float32 bits
-`0xa5289c20` and `0xa5289c1f`), the data and every other file identical; the other seven runs
+`0xa528b020` and `0xa528b01f`), the data and every other file identical; the other seven runs
 were identical. The cause: the app's `shared` set passed numpy's and SciPy's releases to the
 workflows but left nibabel's `set_qform` arithmetic (`larmorx.io.nibabel_header`, the polar
 decomposition through numpy's LAPACK) on numpy 2.5.4's LAPACK 3.12.1, where numpy 2.3.5 runs

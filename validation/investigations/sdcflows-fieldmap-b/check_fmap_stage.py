@@ -914,7 +914,9 @@ def _n4_check(t: cw.Tally, run: Path, fnode: Path, mine_node: Path, scratch: Pat
     return ok_all
 
 
-def sec_fmriprep(t: cw.Tally, scratch: Path, datasets: list[str], nt: int) -> None:
+def sec_fmriprep(
+    t: cw.Tally, scratch: Path, datasets: list[str], nt: int, numpy_version: str = IMAGE_NUMPY
+) -> None:
     """``estimate_fieldmaps`` with fMRIPrep's own wiring (sdcflows 2.15's PEPOLAR graph,
     ``wiring='2.15'``), libraries (numpy 2.2.6, SciPy 1.15.2: :data:`IMAGE_NUMPY`) and data
     sinks (``set_qform`` on LAPACK 3.12.0, numpy 2.2.6's) against
@@ -952,7 +954,7 @@ def sec_fmriprep(t: cw.Tally, scratch: Path, datasets: list[str], nt: int) -> No
                 ests, {}, output_dir=base / "out", subject=sub, work_dir=base / "work" / subwf_name,
                 omp_nthreads=opts["omp_nthreads"], fallback_total_readout_time=opts["fallback"],
                 debug=opts["debug"], sloppy=opts["sloppy"], upstream_defects="reproduce", n_threads=nt,
-                numpy_version=IMAGE_NUMPY, scipy_version=IMAGE_SCIPY, fsldir=cp.fsldir(),
+                numpy_version=numpy_version, scipy_version=IMAGE_SCIPY, fsldir=cp.fsldir(),
                 prelude_implementation="replica", topup_implementation="replica",
                 volreg_implementation="replica", wiring="2.15",
             )  # fmt: skip
@@ -1043,6 +1045,8 @@ def main() -> int:
     ap.add_argument("--reference", default="")
     ap.add_argument("--scratch", required=True)
     ap.add_argument("--threads", type=int, default=8)
+    # fmriprep's numpy arithmetic (2.3.5: the step from the image's 2.2.6, relay 14's numbers)
+    ap.add_argument("--numpy-version", default=IMAGE_NUMPY)
     args = ap.parse_args()
     scratch = Path(args.scratch)
     scratch.mkdir(parents=True, exist_ok=True)
@@ -1054,7 +1058,7 @@ def main() -> int:
     if "run" in args.sections:
         sec_run(t, scratch, args.datasets, Path(args.reference), args.threads)
     if "fmriprep" in args.sections:
-        sec_fmriprep(t, scratch, args.datasets, args.threads)
+        sec_fmriprep(t, scratch, args.datasets, args.threads, args.numpy_version)
     bad = t.report()
     print("ALL OK" if not bad else f"DIFFERENCES: {bad}")
     return 1 if bad else 0

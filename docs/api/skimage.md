@@ -82,7 +82,14 @@ prob = lx.skimage.random_walker(
   scikit-image's error. Checked on 6 array cases and sdcflows' `match_histogram` on 12 files
   and 7 real ones (`validation/investigations/sdcflows-fieldmap-b/check_match_histogram.py`, both
   kept environments).
-- Candidates for the register (decided in the part's defects relay): the labels returned by
-  `random_walker` are the renumbered ones (consecutive from 1), not the input's values, when these
-  are not consecutive; `return_full_prob=True` without unlabeled pixels returns a boolean
-  concatenation along the last axis instead of `(nlabels, ...)` probabilities.
+- **SKI-03** (scikit-image's `random_walker` with labels that are not consecutive): it returns
+  its consecutive renumbering of them (from 1; the negative ones to -1, -2, ...), not the labels
+  given (labels 3 and 7 come back as 1 and 2), against its documentation (each pixel "labeled
+  according to the marker"). Rule A: larmorx returns the labels given, with a warning;
+  `upstream_defects='reproduce'` gives scikit-image's.
+- **SKI-04** (`return_full_prob=True` with no pixel to segment: no zero label, or every
+  unlabeled pixel isolated): scikit-image returns the seeds' boolean masks concatenated along
+  the last axis (`(..., nlabels)` for 2-D labels, the volumes side by side for 3-D), not the
+  documented `(nlabels, *labels.shape)` probabilities. Rule A: larmorx returns those
+  probabilities (1.0 on each label's seeds), with a warning; `reproduce` scikit-image's.
+  Neither reaches sdcflows' `brain_masker` (its labels are 1 and 2, with pixels to segment).

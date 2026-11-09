@@ -14,7 +14,7 @@ and against fMRIPrep's own files; the record comes with the part's records).
 
 | larmorx | niworkflows | Notes |
 |---|---|---|
-| `intensity_clip(in_file, p_min=35.0, p_max=99.98, nonnegative=True, dtype="int16", invert=False, *, out_dir=None, numpy_version="2.5.4", n_threads=1)` → `IntensityClipResult(image, out_file)` | `nibabel.IntensityClip` (`_advanced_clip`): the image squeezed, `median_filter(footprint=ball(3))`, the `p_min`/`p_max` percentiles of the positive (`nonnegative`) denoised values, the original clipped there, shifted to 0, divided by its maximum, inverted, `round(255 x)` for `int16`/`uint8`; `cal_max`; `clipped.nii.gz` | a non-3D image: `RuntimeError("<…> is not a 3D file.")`; `numpy_version` picks numpy's percentile arithmetic (2.2/2.3: `float32`; 2.5: `float64`) |
+| `intensity_clip(in_file, p_min=35.0, p_max=99.98, nonnegative=True, dtype="int16", invert=False, *, out_dir=None, numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` → `IntensityClipResult(image, out_file)` | `nibabel.IntensityClip` (`_advanced_clip`): the image squeezed, `median_filter(footprint=ball(3))`, the `p_min`/`p_max` percentiles of the positive (`nonnegative`) denoised values, the original clipped there, shifted to 0, divided by its maximum, inverted, `round(255 x)` for `int16`/`uint8`; `cal_max`; `clipped.nii.gz` | a non-3D image: `RuntimeError("<…> is not a 3D file.")`; `numpy_version` picks numpy's percentile arithmetic (2.2/2.3: `float32`; 2.5: `float64`) |
 
 ## `intra_modal_merge`: `IntraModalMerge`
 
@@ -44,6 +44,8 @@ Corrected by default (`upstream_defects="reproduce"` gives niworkflows' behaviou
 |---|---|---|
 | PIPE-18 | `grand_mean_scaling` fails with numpy's `IndexError` for every series of two or more volumes (a mask of the wrong shape) | each volume scaled by the largest median over its own inside the mask, with a warning |
 | PIPE-19 | a 6- or 7-dimensional image is averaged over its fourth axis | niworkflows' error for an image of more than four dimensions |
+| PIPE-33 | `IntensityClip` of an image constant between its percentiles divides it by its maximum, 0: a NaN image, converted to `int16` or `uint8` by an undefined conversion (0 on x86-64) | a `ValueError` (rule B); `reproduce` niworkflows' result with x86-64's NaN and casts on every platform (`intensity_clip(..., upstream_defects=)`) |
+| PIPE-34 | `RobustAverage` divides each gathered volume by its mean over the brightest's: a volume whose mean is 0 after the clipping (an empty volume) becomes NaN or infinite voxels, registered and averaged | a `ValueError` naming the volumes (rule B); `reproduce` niworkflows' arithmetic (`robust_average(..., upstream_defects=)`) |
 
 `as_closest_canonical(image)` and `reorient(in_file, newpath=None)` are available on their own.
 

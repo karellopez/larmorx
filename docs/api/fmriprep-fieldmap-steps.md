@@ -213,6 +213,7 @@ BOLD workflow reads (`FieldmapEstimates`, the input of `bold_fit_fieldmap` and
 | ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
 |---|---|---|---|---|
 | PIPE-31 | B | a precomputed field map whose derivatives lack its field map, reference or coefficients file (`collect_fieldmaps` finds only some of the three) stops the graph's construction with a bare `KeyError` (`'fieldmap'`, `'magnitude'` or `'coeffs'`) after the "Precomputed ... found" line | a `ValueError` naming the identifier, the missing files and the files found | fMRIPrep's `KeyError` |
+| PIPE-32 | A | every participant of a run is searched with sdcflows' one registry, so a second participant whose `B0FieldIdentifier` an earlier one used (BIDS asks it to be unique only within a participant) stops the run with `KeyError: "'<id>' is already  in mapping"` (fMRIPrep 25.2.7's own `map_fieldmap_estimation`, `relay17/probe_shared_identifier.py`) | `map_fieldmap_estimation` searches each participant in a registry of its own, which holds the earlier participants' automatic names (so `auto_NNNNN` stay fMRIPrep's), then adds its entries to `registry` where their names are free (a shared name keeps the first participant's sources there; the estimators returned hold their own), with an `UpstreamDefectWarning` | fMRIPrep's `KeyError` |
 
 Checked (`validation/investigations/sdcflows-fieldmap-b/check_fmap_stage.py`, shared
 environment): `graph`, fMRIPrep 25.2.7's own code of the stage (its source lines, the same in

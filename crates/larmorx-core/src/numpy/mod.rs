@@ -18,7 +18,8 @@
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
 //!   (for `reproduce`), and `clip` with scalar bounds.
 //! - [`dot`]: `np.dot` and `np.linalg.norm` of float32 and float64 vectors (OpenBLAS's Haswell
-//!   `sdot` and `ddot`), under SciPy's conjugate gradients.
+//!   `sdot` and `ddot`), under SciPy's conjugate gradients; `a.dot(x)` of a float64 matrix and a
+//!   vector (OpenBLAS's Haswell `dgemv_t`), under SciPy's Gaussian derivatives.
 //! - [`histograms`]: `numpy.linspace` and `numpy.histogram` with equal bins (scikit-image's Otsu
 //!   threshold).
 //!

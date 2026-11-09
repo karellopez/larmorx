@@ -842,6 +842,29 @@ fn numpy_exp_f64<'py>(
     to_py(py, &shape, out)
 }
 
+/// numpy's `a.dot(x)` of a float64 matrix and a float64 vector
+/// (`larmorx_core::numpy::dot::matvec_f64`: `cblas_matrixproduct`'s shapes, OpenBLAS's Haswell
+/// `dgemv_t` on one thread); the matrix is read in C order.
+#[pyfunction]
+fn numpy_matvec_f64<'py>(
+    py: Python<'py>,
+    a: numpy::PyReadonlyArray2<'py, f64>,
+    x: numpy::PyReadonlyArray1<'py, f64>,
+) -> PyResult<Bound<'py, numpy::PyArray1<f64>>> {
+    let view = a.as_array();
+    let (rows, cols) = view.dim();
+    let xv: Vec<f64> = x.as_array().iter().copied().collect();
+    if xv.len() != cols {
+        return Err(PyValueError::new_err(format!(
+            "shapes ({rows},{cols}) and ({},) not aligned",
+            xv.len()
+        )));
+    }
+    let av: Vec<f64> = view.iter().copied().collect();
+    let out = py.detach(|| np::dot::matvec_f64(&av, rows, cols, &xv));
+    Ok(numpy::PyArray1::from_vec(py, out))
+}
+
 /// `numpy.clip(a, a_min, a_max)` of a float32 array with float32 bounds, C-ordered.
 #[pyfunction]
 fn numpy_clip_f32<'py>(
@@ -872,6 +895,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(numpy_median, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_exp_f32, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_exp_f64, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_matvec_f64, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_correlate1d, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_clip_f32, m)?)?;
     Ok(())

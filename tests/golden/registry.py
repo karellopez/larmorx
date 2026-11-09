@@ -4191,7 +4191,9 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """correlate1d with a symmetric, an anti-symmetric and an asymmetric kernel (modes, an
     origin, an output type), the Gaussian filters (sigmas per axis with a zero, truncate, a
-    radius, axes, an integer input and output)."""
+    radius, axes, an integer input and output); Gaussian derivatives (orders 2, 3 and 5: numpy's
+    dot through every dgemv_t kernel and tail; radius 0: a dot product); complex inputs and
+    weights (complex64 and 128, a real input with complex weights, a complex cval)."""
     data = (ints(55, (14, 11, 9), -500, 500) / 8).astype(np.float64)
     out: dict[str, Any] = {}
     for name, w in (
@@ -4210,6 +4212,18 @@ def _(ctx: Context) -> dict[str, Any]:
     out["g.radius.axes"] = lx.ndimage.gaussian_filter(data, (1.0, 2.0), axes=(0, 2), radius=(2, 3))
     out["g.uint8"] = lx.ndimage.gaussian_filter(ints(56, (12, 10), 0, 256).astype(np.uint8), 0.8)
     out["g.zero"] = lx.ndimage.gaussian_filter(data, 0.0, output=np.float32)
+    out["g1d.order2"] = lx.ndimage.gaussian_filter1d(data, 1.25, axis=2, order=2)
+    out["g1d.order5"] = lx.ndimage.gaussian_filter1d(data, 0.8, axis=0, order=5, mode="wrap")
+    out["g1d.order2.radius0"] = lx.ndimage.gaussian_filter1d(data, 1.0, order=2, radius=0)
+    out["g.orders"] = lx.ndimage.gaussian_filter(data, (0.75, 1.0, 1.5), (1, 0, 3), mode="nearest")
+    cdata = data + 1j * (ints(57, data.shape, -300, 300) / 16)
+    out["corr.complex"] = lx.ndimage.correlate1d(
+        cdata, [0.5 + 0.25j, 1 - 1j, 0.125j], axis=1, mode="constant", cval=1 - 2j
+    )
+    out["corr.real.cweights"] = lx.ndimage.correlate1d(
+        data.astype(np.float32), [0.25j, 0.5, -0.75 + 0.5j, 0.125], axis=0, origin=1
+    )
+    out["g.complex64"] = lx.ndimage.gaussian_filter(cdata.astype(np.complex64), 1.1, (0, 1, 0))
     return out
 
 

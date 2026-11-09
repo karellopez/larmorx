@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
-//! numpy's dot product and vector norm of two contiguous `float32` or `float64` vectors, in the
-//! operation order of OpenBLAS's Haswell `sdot` and `ddot` kernels (OpenBLAS 0.3.34, the same in
-//! 0.3.30; BSD-3-Clause, notice below), the ones numpy's x86-64 wheels run on CPUs with AVX2 and
-//! FMA (`docs/findings/numpy-blas.md`). SciPy's conjugate gradients (`scipy.sparse.linalg.cg`)
+//! numpy's dot product and vector norm of two contiguous `float32` or `float64` vectors, and its
+//! product of a float64 matrix and a vector, in the operation order of OpenBLAS's Haswell
+//! `sdot`, `ddot` and `dgemv_t` kernels (OpenBLAS 0.3.34, the same in 0.3.30; BSD-3-Clause,
+//! notice below), the ones numpy's x86-64 wheels run on CPUs with AVX2 and FMA
+//! (`docs/findings/numpy-blas.md`). SciPy's conjugate gradients (`scipy.sparse.linalg.cg`)
 //! take every inner product and norm here (scikit-learn's ridge solver under sdcflows' B-spline
 //! fit, scikit-image's random walker under sdcflows' `brain_masker`), so the bits of their
 //! solutions depend on this order. (Moved here from `larmorx-sdcflows`' `blas` module, which
@@ -36,6 +37,15 @@
 //!   With several OpenBLAS threads, vectors of more than 10,000 elements are split between them
 //!   (`dot_thread_function`); larmorx follows the one-thread order (`OPENBLAS_NUM_THREADS=1`,
 //!   the validation environments').
+//! - **numpy's matrix-vector product** ([`matvec_f64`], `a.dot(x)` of a C-ordered float64 matrix,
+//!   SciPy's `_gaussian_kernel1d` for Gaussian derivatives): `cblas_dgemv` in row-major order,
+//!   OpenBLAS's transposed `dgemv_t` (`kernel/x86_64/dgemv_t_4.c` with
+//!   `dgemv_t_microk_haswell-4.c`, the same files in 0.3.30 and 0.3.34): the rows in blocks of
+//!   2048, four columns at a time through the assembly kernel (four lanes of fused multiply-adds
+//!   from +0, `(l0 + l2) + (l1 + l3)`), the last two and one columns through the SSE2 kernels (no
+//!   fused multiply-adds), the last `m & 3` rows through the C tails (compiled with
+//!   contractions). Measured against numpy 2.3.5 and 2.5.4 on the Haswell kernels
+//!   (`validation/investigations/sdcflows-fieldmap-b/check_regrid.py`, `matvec`).
 //!
 //! `f32::mul_add` and `f64::mul_add` are correctly rounded fused multiply-adds on every target,
 //! so they give the bits of `vfmadd231ps`/`vfmadd231pd` on every platform; on x86-64 CPUs with
@@ -205,6 +215,149 @@ pub fn dot_f64(x: &[f64], y: &[f64]) -> f64 {
     }
 }
 
+/// The 4 x 4 assembly kernel of `dgemv_t_microk_haswell-4.c` on one column: four lanes, each a
+/// chain of fused multiply-adds (`vfmadd231pd`) from +0 over the rows `4 t + l`, then
+/// `(l0 + l2) + (l1 + l3)` (`vextractf128`, `vaddpd`, `vhaddpd`). `a` and `x` hold the block's
+/// rows, a multiple of 4.
+#[inline(always)]
+fn dgemv_t_4x4(a: &[f64], x: &[f64]) -> f64 {
+    let mut acc = [0.0f64; 4];
+    for (ac, xc) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
+        for (l, lane) in acc.iter_mut().enumerate() {
+            *lane = ac[l].mul_add(xc[l], *lane);
+        }
+    }
+    (acc[0] + acc[2]) + (acc[1] + acc[3])
+}
+
+/// `dgemv_kernel_4x2` (`dgemv_t_4.c`, SSE2, no fused multiply-adds) on one of its two columns:
+/// the rounded products of the even rows added in order from +0, the odd rows' likewise, then
+/// their sum (`haddpd`).
+#[inline(always)]
+fn dgemv_t_4x2(a: &[f64], x: &[f64]) -> f64 {
+    let mut acc = [0.0f64; 2];
+    for (ac, xc) in a.as_chunks::<2>().0.iter().zip(x.as_chunks::<2>().0) {
+        for (l, lane) in acc.iter_mut().enumerate() {
+            *lane += ac[l] * xc[l];
+        }
+    }
+    acc[0] + acc[1]
+}
+
+/// `dgemv_kernel_4x1` (`dgemv_t_4.c`, SSE2, no fused multiply-adds): two registers of two lanes,
+/// the rows `4 t + l` in lane `l` (rounded products added in order from +0), the registers added,
+/// then the lanes: `(l0 + l2) + (l1 + l3)`.
+#[inline(always)]
+fn dgemv_t_4x1(a: &[f64], x: &[f64]) -> f64 {
+    let mut acc = [0.0f64; 4];
+    for (ac, xc) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
+        for (l, lane) in acc.iter_mut().enumerate() {
+            *lane += ac[l] * xc[l];
+        }
+    }
+    (acc[0] + acc[2]) + (acc[1] + acc[3])
+}
+
+/// OpenBLAS's `dgemv_t` with the Haswell kernel (`dgemv_t_4.c` with
+/// `dgemv_t_microk_haswell-4.c`, `KERNEL.HASWELL`), one thread, `alpha = 1`, `beta = 0` (`y`
+/// cleared to +0), unit strides: `y[j] = Σ_i a[j·m + i]·x[i]` for the `n` columns of the
+/// column-major `m × n` matrix `a` (leading dimension `m`).
+///
+/// The rows go in blocks of 2048, the last block the rest rounded down to a multiple of 4; per
+/// block, the columns `0 .. n & !3` through [`dgemv_t_4x4`], then two through
+/// [`dgemv_t_4x2`] when `n & 2`, one through [`dgemv_t_4x1`] when `n & 1`, each block's value
+/// added to `y` (`add_y`: `y + v·1`). The last `m & 3` rows are added per column as GCC compiled
+/// the C tails (with contractions, as in `numpy_linalg`): one row `fma(a0, x0, y)`, two
+/// `fma(a0, x0, a1·x1) + y`, three `fma(a2, x2, fma(a0, x0, a1·x1)) + y`.
+fn dgemv_t_haswell(m: usize, n: usize, a: &[f64], x: &[f64]) -> Vec<f64> {
+    const NBMAX: usize = 2048;
+    let mut y = vec![0.0f64; n];
+    if m == 0 || n == 0 {
+        return y;
+    }
+    let m3 = m & 3;
+    let mut m1 = (m & !3) as isize;
+    let m2 = (m & (NBMAX - 1)) - m3;
+    let n4 = n & !3;
+    let mut nb = NBMAX;
+    let mut row = 0usize;
+    while nb == NBMAX {
+        m1 -= NBMAX as isize;
+        if m1 < 0 {
+            if m2 == 0 {
+                break;
+            }
+            nb = m2;
+        }
+        let xb = &x[row..row + nb];
+        let col = |j: usize| &a[j * m + row..j * m + row + nb];
+        for (j, yj) in y.iter_mut().enumerate().take(n4) {
+            *yj += dgemv_t_4x4(col(j), xb);
+        }
+        if n & 2 != 0 {
+            for (j, yj) in y.iter_mut().enumerate().skip(n4).take(2) {
+                *yj += dgemv_t_4x2(col(j), xb);
+            }
+        }
+        if n & 1 != 0 {
+            y[n - 1] += dgemv_t_4x1(col(n - 1), xb);
+        }
+        row += nb;
+    }
+    if m3 == 0 {
+        return y;
+    }
+    let xt = &x[row..row + m3];
+    for (j, yj) in y.iter_mut().enumerate() {
+        let c = &a[j * m + row..j * m + row + m3];
+        *yj = match m3 {
+            1 => c[0].mul_add(xt[0], *yj),
+            2 => c[0].mul_add(xt[0], c[1] * xt[1]) + *yj,
+            _ => c[2].mul_add(xt[2], c[0].mul_add(xt[0], c[1] * xt[1])) + *yj,
+        };
+    }
+    y
+}
+
+/// `a.dot(x)` (or `np.dot(a, x)`) of a C-ordered float64 `rows × cols` matrix and a float64
+/// vector of `cols` elements, as numpy's `cblas_matrixproduct`
+/// (`numpy/_core/src/common/cblasfuncs.c`, numpy 2.5.4 and 2.3.5) computes it: a matrix of two or
+/// more rows and columns goes to `cblas_dgemv(CblasRowMajor, CblasNoTrans, ...)`, which OpenBLAS
+/// turns into the transposed column-major product, [`dgemv_t_haswell`] (one thread: OpenBLAS uses
+/// one below `115200 · GEMM_MULTITHREAD_THRESHOLD` = 460,800 elements, and the validation
+/// environments set `OPENBLAS_NUM_THREADS=1`); one row is a dot product of two vectors
+/// ([`dot_f64`]); one column makes `x` a scalar (`x0 · a[i] + 0` through `daxpy`, or the plain
+/// product for a 1 × 1 matrix); no columns give zeros. Returns `rows` values.
+///
+/// # Panics
+/// When `a` does not hold `rows × cols` values or `x` not `cols`.
+pub fn matvec_f64(a: &[f64], rows: usize, cols: usize, x: &[f64]) -> Vec<f64> {
+    assert_eq!(
+        a.len(),
+        rows * cols,
+        "matvec_f64: the matrix must hold rows × cols values"
+    );
+    assert_eq!(
+        x.len(),
+        cols,
+        "matvec_f64: the vector must hold cols values"
+    );
+    if cols == 0 || rows == 0 {
+        return vec![0.0; rows];
+    }
+    if cols == 1 {
+        return if rows == 1 {
+            vec![x[0] * a[0]]
+        } else {
+            a.iter().map(|&v| x[0] * v + 0.0).collect()
+        };
+    }
+    if rows == 1 {
+        return vec![dot_f64(a, x)];
+    }
+    dgemv_t_haswell(cols, rows, a, x)
+}
+
 /// `np.linalg.norm(x)` of a float32 vector: `sqrt(x.dot(x))` in float32.
 pub fn norm_f32(x: &[f32]) -> f32 {
     dot_f32(x, x).sqrt()
@@ -310,5 +463,44 @@ mod tests {
         assert_eq!(ddot(&x, &y).to_bits(), want.to_bits());
         assert_eq!(norm_f64(&[3.0, 4.0]), 5.0);
         assert_eq!(dot_f64(&[-0.0], &[2.0]).to_bits(), (-0.0f64).to_bits());
+    }
+
+    #[test]
+    fn matvec_follows_dgemv_t_haswell() {
+        // 7 rows (outputs: four through the 4 x 4 kernel, two through 4 x 2, one through 4 x 1)
+        // of 6 columns (one block of 4, a tail of 2).
+        let (rows, cols) = (7, 6);
+        let a: Vec<f64> = values(rows * cols, 7)
+            .iter()
+            .map(|&v| f64::from(v) / 3.0)
+            .collect();
+        let x: Vec<f64> = values(cols, 8)
+            .iter()
+            .map(|&v| f64::from(v) / 5.0)
+            .collect();
+        let got = matvec_f64(&a, rows, cols, &x);
+        for (j, g) in got.iter().enumerate() {
+            let r = &a[j * cols..(j + 1) * cols];
+            let block = if j < 4 {
+                let l: Vec<f64> = (0..4).map(|i| r[i].mul_add(x[i], 0.0)).collect();
+                (l[0] + l[2]) + (l[1] + l[3])
+            } else {
+                // 4 x 2 (even and odd rows) and 4 x 1 (rows mod 4) agree on one block of 4.
+                (r[0] * x[0] + r[2] * x[2]) + (r[1] * x[1] + r[3] * x[3])
+            };
+            let want = r[4].mul_add(x[4], r[5] * x[5]) + (0.0 + block);
+            assert_eq!(g.to_bits(), want.to_bits(), "row {j}");
+        }
+        // One row: a dot product; one column: x0 · a + 0; no columns: zeros.
+        assert_eq!(
+            matvec_f64(&a[..cols], 1, cols, &x),
+            vec![dot_f64(&a[..cols], &x)]
+        );
+        assert_eq!(matvec_f64(&[-0.0, 2.0], 2, 1, &[1.0]), vec![0.0, 2.0]);
+        assert_eq!(
+            matvec_f64(&[-0.0], 1, 1, &[1.0])[0].to_bits(),
+            (-0.0f64).to_bits()
+        );
+        assert_eq!(matvec_f64(&[], 3, 0, &[]), vec![0.0; 3]);
     }
 }

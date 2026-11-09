@@ -16,7 +16,12 @@ with numpy's AVX-512 dispatch off (``NPY_DISABLE_CPU_FEATURES``).
 - ``filters``: ``correlate1d`` (1-D to 3-D, every input type, symmetric, anti-symmetric,
   asymmetric and even kernels, origins, the eight modes, ``cval``, output types) and the
   Gaussian filters (sigmas per axis, zeros, ``truncate``, ``radius``, modes per axis, ``axes``,
-  output types), seeded, bit for bit.
+  output types), seeded, bit for bit; numpy's matrix-vector product against ``a.dot(x)``
+  (shapes to 33 x 21 and blocks of 2048 rows), SciPy's ``_gaussian_kernel1d`` for orders 0 to 9,
+  the Gaussian derivatives in both filters; complex inputs and weights (complex64 and 128, real
+  inputs with complex weights, complex ``cval``, the output rules and their warnings) and
+  ``correlate1d``'s argument handling (types, ``cval``, ``origin``, ``axis``, read-only and
+  big-endian outputs), the warnings compared too.
 - ``regrid``: ``RegridToZooms`` on synthetic files (int16, uint8, float32 and a scaled int16;
   plumb, oblique and LPS affines; every qform/sform code pair; finer, coarser and mixed zooms;
   orders 0, 1, 3 and 5; ``clip``; ``smooth`` False, True and 0.8), the written files compared
@@ -206,6 +211,280 @@ def sec_filters(t: cw.Tally, nt: int) -> None:
         lambda: snd.gaussian_filter1d(a, 1.0, radius=-1),
         lambda: lnd.gaussian_filter1d(a, 1.0, radius=-1),
     )
+    sec_derivatives(t, nt)
+    sec_complex(t, nt)
+
+
+def run_w(fn):
+    """As ``run``, with the warnings' categories and messages."""
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        try:
+            r = ("ok", fn())
+        except Exception as e:
+            r = (type(e).__name__, str(e))
+    return r, [(x.category.__name__, str(x.message)) for x in w]
+
+
+def both_w(t: cw.Tally, what: str, label: str, ref_fn, mine_fn) -> None:
+    """As ``both``, the warnings compared too, and an output array's identity: SciPy returns the
+    array it was given."""
+    (k1, v1), w1 = run_w(ref_fn)
+    (k2, v2), w2 = run_w(mine_fn)
+    if k1 != k2:
+        t.add(what, False, f"{label}: SciPy {k1} {v1!r:.120} / larmorx {k2} {v2!r:.120}")
+    elif w1 != w2:
+        t.add(what, False, f"{label}: warnings {w1} / {w2}")
+    elif k1 == "ok":
+        t.add(what, same(v1, v2), f"{label}: values differ")
+    else:
+        t.add(what, v1 == v2, f"{label}: {v1!r} / {v2!r}")
+
+
+def sec_derivatives(t: cw.Tally, nt: int) -> None:
+    """numpy's matrix-vector product (``_core.numpy_matvec_f64``) against ``a.dot(x)``; SciPy's
+    ``_gaussian_kernel1d`` for orders 0 to 9; the Gaussian derivatives in the filters."""
+    from scipy.ndimage._filters import _gaussian_kernel1d as sp_kernel
+
+    from larmorx import _core
+    from larmorx._ndimage_filters import _gaussian_kernel1d as lx_kernel
+
+    rng = np.random.default_rng(20261110)
+    shapes = [(r, c) for r in range(1, 34) for c in range(1, 22)]
+    shapes += [(5, 2047), (6, 2048), (7, 2049), (9, 2052), (3, 4099), (11, 4100), (13, 6147)]
+    for r, c in shapes:
+        for k in range(4):
+            a = rng.normal(size=(r, c)) * np.exp2(rng.integers(-40, 40, size=(r, c)))
+            x = rng.normal(size=c) * np.exp2(rng.integers(-40, 40, size=c))
+            if k == 3:  # integers: exact zeros and signed zeros
+                a, x = np.round(a * 4) % 7 - 3, np.round(x) % 5 - 2
+                a[a == 0] = -0.0
+            t.add("matvec", same(a.dot(x), _core.numpy_matvec_f64(a, x)), f"({r}, {c}) {k}")
+    sigmas = [0.3, 0.5, 1.0, 1.7, 2.5, 4.0, 7.3, 15.0, 1, np.float32(1.3), np.float64(0.9), 2]
+    for sg in sigmas:
+        for order in range(7):
+            for radius in (0, 1, 2, 3, 5, 8, 13, 31):
+                ref, mine = (
+                    run(lambda: sp_kernel(sg, order, radius)),
+                    run(lambda: lx_kernel(sg, order, radius, np.__version__)),
+                )
+                ok = ref[0] == mine[0] and (
+                    same(ref[1], mine[1]) if ref[0] == "ok" else ref[1] == mine[1]
+                )
+                t.add("_gaussian_kernel1d", ok, f"sigma {sg!r} order {order} radius {radius}")
+    for order, radius in ((1, 3000), (2, 1500), (3, 700), (4, 250), (9, 40)):
+        t.add(
+            "_gaussian_kernel1d",
+            same(sp_kernel(37.0, order, radius), lx_kernel(37.0, order, radius, np.__version__)),
+            f"sigma 37 order {order} radius {radius}",
+        )
+    vol = rng.normal(100, 30, (11, 9, 8))
+    line = rng.normal(size=23)
+    for dt in (np.float64, np.float32, np.int16, np.uint8):
+        v = vol.astype(dt)
+        for order in (1, 2, 3, 4):
+            for sg in (0.7, 1.6, 3.0):
+                for mode in ("reflect", "constant", "nearest", "wrap"):
+                    for axis in (0, 2):
+                        both(
+                            t,
+                            "gaussian_filter1d order > 0",
+                            f"{np.dtype(dt).name} order {order} sigma {sg} {mode} axis {axis}",
+                            lambda: snd.gaussian_filter1d(v, sg, axis, order, mode=mode, cval=2.0),
+                            lambda: lnd.gaussian_filter1d(
+                                v, sg, axis, order, mode=mode, cval=2.0, n_threads=nt
+                            ),
+                        )
+        for order in (1, 2, (0, 1, 2), (2, 0, 1), (1, 1, 1), (3, 0, 0)):
+            for extra in ({}, {"output": np.float32}, {"truncate": 2.0}, {"radius": 2}):
+                both(
+                    t,
+                    "gaussian_filter order > 0",
+                    f"{np.dtype(dt).name} order {order} {extra}",
+                    lambda: snd.gaussian_filter(v, (1.2, 0.8, 2.0), order, **extra),
+                    lambda: lnd.gaussian_filter(v, (1.2, 0.8, 2.0), order, n_threads=nt, **extra),
+                )
+    for label, kw in [
+        ("order 2 radius 0", {"order": 2, "radius": 0}),
+        ("order 5", {"order": 5}),
+        ("order 1 sigma float32", {"order": 1, "sigma": np.float32(1.3)}),
+        ("order 1 sigma int", {"order": 1, "sigma": 2}),
+        ("order -1", {"order": -1}),
+        ("order 1.0", {"order": 1.0}),
+        ("order 0.0", {"order": 0.0}),
+        ("order True", {"order": True}),
+        ("order 1 sigma 0", {"order": 1, "sigma": 0.0}),
+        ("order 1 sigma 1e-300", {"order": 1, "sigma": 1e-300}),
+    ]:
+        kw = dict(kw)
+        sg = kw.pop("sigma", 1.1)
+        both_w(
+            t,
+            "gaussian_filter1d order edges",
+            label,
+            lambda: snd.gaussian_filter1d(line, sg, **kw),
+            lambda: lnd.gaussian_filter1d(line, sg, n_threads=nt, **kw),
+        )
+
+
+def sec_complex(t: cw.Tally, nt: int) -> None:
+    """Complex inputs and weights in ``correlate1d`` and the Gaussian filters
+    (``_complex_via_real_components``, the conjugated weights, ``_get_output``'s complex
+    rules), and ``correlate1d``'s argument handling (``_get_output``, the C parser's ``"d"``
+    and ``"n"``, ``NI_InitLineBuffer``'s types)."""
+    rng = np.random.default_rng(20261111)
+    re = rng.normal(10, 20, (7, 9, 5))
+    im = rng.normal(-3, 15, (7, 9, 5))
+    c128 = re + 1j * im
+    inputs = {
+        "complex128": c128,
+        "complex64": c128.astype(np.complex64),
+        "float64": re,
+        "float32": re.astype(np.float32),
+        "int16": re.astype(np.int16),
+        "bool": re > 10,
+    }
+    kernels = {
+        "real sym": np.array([0.25, 0.5, 0.25]),
+        "real asym": np.array([0.3, -0.1, 0.7, 0.2]),
+        "complex128": np.array([0.2 + 0.1j, 0.5 - 0.3j, 0.25 + 0.0j, -0.1 + 0.4j, 0.05j]),
+        "complex64 sym": np.array([0.1 + 0.2j, 0.6 - 0.1j, 0.1 + 0.2j], dtype=np.complex64),
+        "complex anti": np.array([-0.5 + 0.5j, 0.0j, 0.5 - 0.5j]),
+    }
+    for iname, a in inputs.items():
+        for kname, w in kernels.items():
+            if not (np.iscomplexobj(a) or np.iscomplexobj(w)):
+                continue
+            for mode in MODES:
+                for axis in (0, 1, 2):
+                    for cval in (0.0, 2.5, 1.5 - 2j):
+                        lw = len(w)
+                        for origin in sorted({0, -(lw // 2), (lw - 1) // 2}):
+                            both_w(
+                                t,
+                                "correlate1d complex",
+                                f"{iname} {kname} {mode} axis {axis} cval {cval} o {origin}",
+                                lambda: snd.correlate1d(a, w, axis, None, mode, cval, origin),
+                                lambda: lnd.correlate1d(
+                                    a, w, axis, None, mode, cval, origin, n_threads=nt
+                                ),
+                            )
+    shape = c128.shape
+    outs = {
+        "type complex64": lambda: np.complex64,
+        "type float64": lambda: np.float64,
+        "type int16": lambda: np.int16,
+        "str complex64": lambda: "complex64",
+        "str float64": lambda: "float64",
+        "array complex64": lambda: np.zeros(shape, np.complex64),
+        "array complex128": lambda: np.zeros(shape, np.complex128),
+        "array big-endian complex128": lambda: np.zeros(shape, ">c16"),
+        "array float64": lambda: np.zeros(shape),
+        "array wrong shape": lambda: np.zeros((3, 3), np.complex128),
+        "read-only array": lambda: np.zeros(shape, np.complex128).copy().view(),
+    }
+    for iname in ("complex128", "complex64", "float32"):
+        a = inputs[iname]
+        w = kernels["complex128"] if iname == "float32" else kernels["real asym"]
+        for oname, mk in outs.items():
+
+            def call(f, mk=mk):
+                o = mk()
+                if oname == "read-only array":
+                    o.flags.writeable = False
+                return f(a, w, 1, o, "reflect", 0.5)
+
+            both_w(
+                t,
+                "correlate1d complex output",
+                f"{iname} {oname}",
+                lambda: call(snd.correlate1d),
+                lambda: call(lnd.correlate1d),
+            )
+    for iname in ("complex128", "complex64"):
+        a = inputs[iname]
+        for order in (0, 1, (0, 2, 1)):
+            for extra in (
+                {},
+                {"output": np.complex64},
+                {"mode": "constant", "cval": 1 + 2j},
+                {"output": np.complex128, "truncate": 2.5},
+            ):
+                both_w(
+                    t,
+                    "gaussian_filter complex",
+                    f"{iname} order {order} {extra}",
+                    lambda: snd.gaussian_filter(a, (1.1, 0.0, 0.7), order, **extra),
+                    lambda: lnd.gaussian_filter(a, (1.1, 0.0, 0.7), order, n_threads=nt, **extra),
+                )
+        for order in (0, 2):
+            both_w(
+                t,
+                "gaussian_filter1d complex",
+                f"{iname} order {order}",
+                lambda: snd.gaussian_filter1d(a, 1.4, 1, order, output=np.complex64),
+                lambda: lnd.gaussian_filter1d(a, 1.4, 1, order, output=np.complex64, n_threads=nt),
+            )
+    r = inputs["float64"]
+    gcases = {
+        "complex in, float64 out": (c128, 1.0, {"output": np.float64}),
+        "complex in, float64 out, no pass": (c128, 0.0, {"output": np.float64}),
+        "complex in, float64 array out": (c128, 1.0, {"output": np.zeros(shape)}),
+        "real in, complex out": (r, 1.0, {"output": np.complex128}),
+        "real in, complex out, no pass": (r, 0.0, {"output": np.complex64}),
+        "real in, complex cval": (r, 1.0, {"cval": 1j}),
+        "real in, bad mode, complex out": (r, 1.0, {"output": np.complex128, "mode": "bogus"}),
+        "real in, str bool out": (r, 1.0, {"output": "bool"}),
+        "real in, float16 out": (r, 1.0, {"output": np.float16}),
+    }
+    for label, (a, sg, kw) in gcases.items():
+        both_w(
+            t,
+            "gaussian_filter complex errors",
+            label,
+            lambda: snd.gaussian_filter(a, sg, **kw),
+            lambda: lnd.gaussian_filter(a, sg, **kw),
+        )
+    a = re[0]
+    w3 = [1.0, 2.0, 1.0]
+    ccases = {
+        "float16 input": (a.astype(np.float16), w3, {}),
+        "longdouble input": (a.astype(np.longdouble), w3, {}),
+        "object input": (a.astype(object), w3, {}),
+        "clongdouble input": (a.astype(np.clongdouble), w3, {}),
+        "longlong input": (a.astype(np.longlong), w3, {}),
+        "big-endian input": (a.astype(">f8"), w3, {}),
+        "float16 output type": (a, w3, {"output": np.float16}),
+        "big-endian output type": (a, w3, {"output": np.dtype(">f4")}),
+        "str bool output": (a, w3, {"output": "bool"}),
+        "type bool output": (a, w3, {"output": np.bool_}),
+        "str object output": (a, w3, {"output": "object"}),
+        "str U3 output": (a, w3, {"output": "U3"}),
+        "float16 output array": (a, w3, {"output": np.zeros(a.shape, np.float16)}),
+        "complex output type, real": (a, w3, {"output": np.complex128}),
+        "cval complex": (a, w3, {"cval": 1j}),
+        "cval numpy complex": (a, w3, {"cval": np.complex128(1.5 + 0j)}),
+        "cval str": (a, w3, {"cval": "x"}),
+        "cval None": (a, w3, {"cval": None}),
+        "cval numpy int": (a, w3, {"cval": np.int64(3)}),
+        "cval numpy str": (a, w3, {"cval": np.str_("3")}),
+        "origin float": (a, w3, {"origin": 1.0}),
+        "axis float": (a, w3, {"axis": 1.0}),
+        "axis out of range": (a, w3, {"axis": 2}),
+        "complex weights, complex cval, real input": (a, [1.0, 2j, 1.0], {"cval": 1j}),
+        "complex input, no weights": (c128, [], {}),
+        "complex input, bad origin": (c128, [1.0, 2.0, 3.0], {"origin": 2}),
+        "complex input, bad mode": (c128, w3, {"mode": "bogus"}),
+        "complex weights, 2-D": (a, [[1j]], {}),
+    }
+    for label, (a2, w, kw) in ccases.items():
+        both_w(
+            t,
+            "correlate1d arguments",
+            label,
+            lambda: snd.correlate1d(a2, w, **kw),
+            lambda: lnd.correlate1d(a2, w, **kw),
+        )
 
 
 def oblique(rot, zooms, t) -> np.ndarray:

@@ -2,8 +2,10 @@
 """SciPy-compatible filters, morphology and labelling for ``lx.ndimage`` (imported there).
 
 A replica of ``scipy.ndimage``'s ``correlate1d``, ``gaussian_filter1d`` and ``gaussian_filter``
-(order 0; the Gaussian kernel with numpy's float64 ``exp`` on its path without AVX-512, glibc's,
-and numpy's sum), minimum, maximum, rank, median and percentile filters, grey
+(complex inputs and weights through their parts, as SciPy's; the Gaussian kernel with numpy's
+float64 ``exp`` on its path without AVX-512, glibc's, and numpy's sum; its derivatives' polynomial
+with numpy's ``dot``, OpenBLAS's Haswell ``dgemv``), minimum, maximum, rank, median and percentile
+filters, grey
 and binary morphology, ``label``, ``sum_labels``, ``center_of_mass``, ``watershed_ift``,
 ``generate_binary_structure`` and ``iterate_structure`` (SciPy 1.18.1; the C and Cython code
 of these functions is the same in SciPy 1.15.3), computed in Rust (``larmorx_ndimage``) with SciPy's results bit for bit: the
@@ -13,7 +15,7 @@ SciPy's quickselect for the rank filters and C's casts. The argument handling an
 follow ``scipy/ndimage/_filters.py``, ``_morphology.py``, ``_measurements.py`` and
 ``_ni_support.py`` (BSD-3-Clause; SciPy's notice is in larmorx's NOTICE file).
 
-Differences from SciPy: complex inputs are not supported; ``output`` may be a dtype or an array
+Differences from SciPy: ``output`` may be a dtype or an array
 (the result is computed in the input's type and cast, which is SciPy's value except for
 integers beyond 2^53 cast to floats); the n-dimensional ``reflect`` boundary maps a coordinate
 two or more whole periods before an axis to index 0 where SciPy reads before the array (a
@@ -27,6 +29,7 @@ the thread count.
 
 from __future__ import annotations
 
+import math
 import numbers
 import operator
 import warnings
@@ -214,67 +217,219 @@ def _result(out: np.ndarray, target: np.dtype, output: Any) -> np.ndarray:
 # --- correlate1d and the Gaussian filters -----------------------------------------------------
 
 
+class _OutputOf:
+    """An output array of ``dtype`` and the input's shape, not yet allocated: SciPy's
+    ``gaussian_filter`` hands one output array to every pass; larmorx gives each pass a new one
+    (the same values: the lines of a pass are disjoint)."""
+
+    def __init__(self, dtype: Any) -> None:
+        self.dtype = np.dtype(dtype)
+
+
+def _get_output(
+    output: Any, input: np.ndarray, complex_output: bool = False
+) -> tuple[np.dtype, np.ndarray | None]:
+    """SciPy's ``_ni_support._get_output``: the output's element type and the array the result
+    is written into (``None``: a new array of that type)."""
+    shape = input.shape
+    if output is None:
+        if not complex_output:
+            return np.dtype(input.dtype.name), None
+        return np.promote_types(input.dtype, np.complex64), None
+    if isinstance(output, _OutputOf):
+        if complex_output and output.dtype.kind != "c":
+            raise RuntimeError("output must have complex dtype")
+        return output.dtype, None
+    if isinstance(output, type | np.dtype):
+        if complex_output and np.dtype(output).kind != "c":
+            warnings.warn("promoting specified output dtype to complex", stacklevel=3)
+            output = np.promote_types(output, np.complex64)
+        return np.zeros((), dtype=output).dtype, None
+    if isinstance(output, str):
+        dt = np.dtype(output)
+        if complex_output and dt.kind != "c":
+            raise RuntimeError("output must have complex dtype")
+        elif not issubclass(dt.type, np.number):
+            raise RuntimeError("output must have numeric dtype")
+        return dt, None
+    arr = np.asarray(output)
+    if arr.shape != shape:
+        raise RuntimeError("output shape not correct")
+    elif complex_output and arr.dtype.kind != "c":
+        raise RuntimeError("output must have complex dtype")
+    return arr.dtype, arr
+
+
+def _c_double(v: Any) -> float:
+    """``PyArg_ParseTuple``'s ``"d"``: CPython's ``PyFloat_AsDouble`` (the C slots ``nb_float``,
+    then ``nb_index``, else ``TypeError("must be real number, not ...")``), which ``math.ldexp``
+    applies to its first argument; ``ldexp(x, 0)`` is ``x`` exactly."""
+    return math.ldexp(v, 0)
+
+
+def _normalize_axis_index(axis: Any, ndim: int) -> Any:
+    """SciPy's ``normalize_axis_index`` (``scipy/_lib/_util.py``)."""
+    if axis < -ndim or axis >= ndim:
+        msg = f"axis {axis} is out of bounds for array of dimension {ndim}"
+        raise np.exceptions.AxisError(msg)
+    if axis < 0:
+        axis = axis + ndim
+    return axis
+
+
+def _line_type(dtype: np.dtype) -> np.dtype:
+    """``NI_InitLineBuffer``'s type check (the 1-D filters' input and output): the canonical
+    type larmorx computes in (bool as uint8), or SciPy's ``RuntimeError`` naming the dtype."""
+    if dtype == np.bool_:
+        return np.dtype(np.uint8)
+    if (dtype.kind in "iu" and dtype.itemsize in (1, 2, 4, 8)) or (
+        dtype.kind == "f" and dtype.itemsize in (4, 8)
+    ):
+        return np.dtype(f"{dtype.kind}{dtype.itemsize}")
+    raise RuntimeError(f"array type {dtype.newbyteorder('=')!r} not supported")
+
+
+def _write(out: np.ndarray, target: np.dtype, out_arr: np.ndarray | None) -> np.ndarray:
+    """The result computed in ``target`` as SciPy returns it: a new array, or written into the
+    output array."""
+    res = out.view(np.bool_) if target == np.bool_ else out
+    if out_arr is None:
+        return res if res.dtype == target else res.astype(target)
+    np.copyto(out_arr, res, casting="unsafe")
+    return out_arr
+
+
+def _complex_via_real_components(
+    func: Any, input: np.ndarray, weights: np.ndarray, output: np.ndarray, cval: Any, **kwargs: Any
+) -> np.ndarray:
+    """SciPy's ``_complex_via_real_components``: a complex correlation as real correlations of
+    the parts, combined with numpy's subtraction and addition in the output's part type."""
+    complex_input = input.dtype.kind == "c"
+    complex_weights = weights.dtype.kind == "c"
+    if complex_input and complex_weights:
+        func(input.real, weights.real, output=output.real, cval=np.real(cval), **kwargs)
+        output.real -= func(input.imag, weights.imag, output=None, cval=np.imag(cval), **kwargs)
+        func(input.real, weights.imag, output=output.imag, cval=np.real(cval), **kwargs)
+        output.imag += func(input.imag, weights.real, output=None, cval=np.imag(cval), **kwargs)
+    elif complex_input:
+        func(input.real, weights, output=output.real, cval=np.real(cval), **kwargs)
+        func(input.imag, weights, output=output.imag, cval=np.imag(cval), **kwargs)
+    else:
+        if np.iscomplexobj(cval):
+            raise ValueError("Cannot provide a complex-valued cval when the input is real.")
+        func(input, weights.real, output=output.real, cval=cval, **kwargs)
+        func(input, weights.imag, output=output.imag, cval=cval, **kwargs)
+    return output
+
+
 def correlate1d(
     input: Any,
     weights: Any,
     axis: int = -1,
     output: Any = None,
     mode: str = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     origin: int = 0,
     *,
     n_threads: int = 1,
 ) -> np.ndarray:
     """``scipy.ndimage.correlate1d``: the correlation of the lines along ``axis`` with
     ``weights`` (``NI_Correlate1D``: a symmetric or anti-symmetric kernel adds the mirrored pairs
-    first; C's cast to the output type)."""
-    a = np.asarray(input)
-    w = np.asarray(weights)
-    if a.dtype.kind == "c" or w.dtype.kind == "c":
-        raise NotImplementedError("complex inputs and weights are not supported")
-    a, dtype = _input(a)
-    target = _out_dtype(output, dtype, a.shape)
-    w = np.asarray(w, dtype=np.float64)
-    if w.ndim != 1 or w.shape[0] < 1:
+    first; C's cast to the output type). A complex input or complex weights (conjugated, as
+    SciPy's) are correlated through their real and imaginary parts."""
+    input = np.asarray(input)
+    weights = np.asarray(weights)
+    complex_input = input.dtype.kind == "c"
+    complex_weights = weights.dtype.kind == "c"
+    if complex_input or complex_weights:
+        if complex_weights:
+            weights = weights.conj()
+            weights = weights.astype(np.complex128, copy=False)
+        kwargs = dict(axis=axis, mode=mode, origin=origin, n_threads=n_threads)
+        target, out_arr = _get_output(output, input, complex_output=True)
+        if out_arr is None:
+            out_arr = np.zeros(input.shape, dtype=target)
+        return _complex_via_real_components(correlate1d, input, weights, out_arr, cval, **kwargs)
+
+    target, out_arr = _get_output(output, input)
+    weights = np.asarray(weights, dtype=np.float64)
+    if weights.ndim != 1 or weights.shape[0] < 1:
         raise RuntimeError("no filter weights given")
-    axis = operator.index(axis)
-    if not -a.ndim <= axis < a.ndim:
-        raise np.exceptions.AxisError(axis, a.ndim)
-    axis = axis % a.ndim
-    lw = len(w)
+    axis = _normalize_axis_index(axis, input.ndim)
+    lw = len(weights)
     if (origin < -(lw // 2)) or (origin > (lw - 1) // 2):
         raise ValueError(
             "Invalid origin; origin must satisfy -(len(weights) // 2) <= origin <= "
             "(len(weights)-1) // 2"
         )
+    mode = _mode(mode)
+    # _nd_image.correlate1d's arguments ("O&O&iO&idn"), in order
+    axis = operator.index(axis)
+    if out_arr is not None and not out_arr.flags.writeable:
+        raise ValueError("output array is read-only.")
+    cval = _c_double(cval)
+    origin = operator.index(origin)
+    # NI_Correlate1D's line buffers: the input's type, then the output's
+    in_type = _line_type(input.dtype)
+    out_type = _line_type(target)
+    a = input
+    if not a.dtype.isnative:
+        a = a.astype(a.dtype.newbyteorder("="))
+    if a.dtype != in_type:
+        a = a.view(in_type)
     out = _core.ndimage_correlate1d(
         a,
-        [float(v) for v in w],
+        [float(v) for v in weights],
         axis,
-        _mode(mode),
-        float(cval),
-        int(origin),
+        mode,
+        cval,
+        origin,
         int(n_threads),
-        target.name,
+        "bool" if target == np.bool_ else out_type.name,
     )
-    return _result(out, target, output)
+    return _write(out, target, out_arr)
 
 
-def _gaussian_kernel1d(sigma: Any, order: int, radius: int, numpy_version: str) -> np.ndarray:
-    """SciPy's ``_gaussian_kernel1d`` (order 0): ``exp(-0.5 / sigma**2 * x**2)`` for ``x`` from
+def _dot(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """``a.dot(b)`` of a 2-D and a 1-D array as numpy computes it in float64
+    (``_core.numpy_matvec_f64``: OpenBLAS's Haswell ``dgemv_t``)."""
+    return _core.numpy_matvec_f64(
+        np.ascontiguousarray(a, dtype=np.float64), np.ascontiguousarray(b, dtype=np.float64)
+    )
+
+
+def _gaussian_kernel1d(sigma: Any, order: Any, radius: int, numpy_version: str) -> np.ndarray:
+    """SciPy's ``_gaussian_kernel1d``: ``exp(-0.5 / sigma**2 * x**2)`` for ``x`` from
     ``-radius`` to ``radius``, divided by its sum, with numpy's float64 ``exp`` (glibc's, the
-    path without AVX-512) and its sum (``numpy_version``'s order)."""
+    path without AVX-512) and its sum (``numpy_version``'s order); for ``order > 0`` times the
+    derivative's polynomial, its coefficients ``q`` from ``order`` products with the matrix
+    ``D + P`` (``q' + q·p'``) and its values ``x**k · q``, numpy's ``dot`` (OpenBLAS's ``dgemv``)
+    both."""
     if order < 0:
         raise ValueError("order must be non-negative")
-    if order != 0:
-        raise NotImplementedError("Gaussian derivatives (order > 0) are not ported")
+    exponent_range = np.arange(order + 1)
     sigma2 = sigma * sigma
     x = np.arange(-radius, radius + 1)
     arg = np.asarray(-0.5 / sigma2 * x**2)
     if arg.dtype != np.float64:
         raise NotImplementedError(f"a Gaussian kernel computed in {arg.dtype} is not ported")
     phi_x = _core.numpy_exp_f64(np.ascontiguousarray(arg))
-    return phi_x / _core.numpy_add_reduce(phi_x, numpy_version)
+    phi_x = phi_x / _core.numpy_add_reduce(phi_x, numpy_version)
+    if order == 0:
+        return phi_x
+    q = np.zeros(order + 1)
+    q[0] = 1
+    D = np.diag(exponent_range[1:], 1)
+    P = np.diag(np.ones(order) / -sigma2, -1)
+    Q_deriv = D + P
+    if Q_deriv.dtype != np.float64:
+        raise NotImplementedError(
+            f"a Gaussian derivative computed in {Q_deriv.dtype} is not ported"
+        )
+    for _ in range(order):
+        q = _dot(Q_deriv, q)
+    q = _dot(x[:, None] ** exponent_range, q)
+    return q * phi_x
 
 
 def gaussian_filter1d(
@@ -284,15 +439,16 @@ def gaussian_filter1d(
     order: int = 0,
     output: Any = None,
     mode: str = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     truncate: float = 4.0,
     *,
     radius: int | None = None,
     numpy_version: str = NUMPY_NEWEST,
     n_threads: int = 1,
 ) -> np.ndarray:
-    """``scipy.ndimage.gaussian_filter1d`` (order 0): :func:`correlate1d` with the reversed
-    Gaussian kernel of ``int(truncate * sigma + 0.5)`` (or ``radius``) elements each side."""
+    """``scipy.ndimage.gaussian_filter1d``: :func:`correlate1d` with the reversed Gaussian kernel
+    (or its ``order``-th derivative) of ``int(truncate * sigma + 0.5)`` (or ``radius``) elements
+    each side."""
     sd = float(sigma)
     lw = int(truncate * sd + 0.5)
     if radius is not None:
@@ -309,7 +465,7 @@ def gaussian_filter(
     order: Any = 0,
     output: Any = None,
     mode: Any = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     truncate: float = 4.0,
     *,
     radius: Any = None,
@@ -317,14 +473,12 @@ def gaussian_filter(
     numpy_version: str = NUMPY_NEWEST,
     n_threads: int = 1,
 ) -> np.ndarray:
-    """``scipy.ndimage.gaussian_filter`` (order 0): :func:`gaussian_filter1d` along each axis
-    whose ``sigma`` exceeds 1e-15, in turn, each pass written in the output's type; a copy in
-    that type when none does."""
-    a = np.asarray(input)
-    if a.dtype.kind == "c":
-        raise NotImplementedError("complex inputs are not supported")
-    target = _out_dtype(output, a.dtype, a.shape)
-    axes = _check_axes(axes, a.ndim)
+    """``scipy.ndimage.gaussian_filter``: :func:`gaussian_filter1d` (each axis's ``order``)
+    along each axis whose ``sigma`` exceeds 1e-15, in turn, each pass written in the output's
+    type; a copy in that type when none does."""
+    input = np.asarray(input)
+    target, out_arr = _get_output(output, input)
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     orders = _normalize_sequence(order, num_axes)
     sigmas = _normalize_sequence(sigma, num_axes)
@@ -336,17 +490,17 @@ def gaussian_filter(
         if sigmas[ii] > 1e-15
     ]
     if not passes:
-        out = np.zeros(a.shape, dtype=target)
-        out[...] = a[...]
-        return _result(out, target, output)
-    cur = a
+        out = np.zeros(input.shape, dtype=target) if out_arr is None else out_arr
+        out[...] = input[...]
+        return out
+    cur = input
     for ax, sg, od, md, rd in passes:
         cur = gaussian_filter1d(
             cur,
             sg,
             ax,
             od,
-            target,
+            _OutputOf(target),
             md,
             cval,
             truncate,
@@ -354,7 +508,10 @@ def gaussian_filter(
             numpy_version=numpy_version,
             n_threads=n_threads,
         )
-    return _result(cur, target, output)
+    if out_arr is None:
+        return cur
+    np.copyto(out_arr, cur, casting="unsafe")
+    return out_arr
 
 
 # --- the minimum, maximum and rank filters ---------------------------------------------------

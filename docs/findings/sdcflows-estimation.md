@@ -1227,3 +1227,66 @@ reference LAPACK 3.12.0 of OpenBLAS's `lapack-netlib` and OpenBLAS's own routine
   either way (`probe_sci19_norm.py`, `oracles/logs/fmapb-r19-sci19-norm.log`). A message only:
   both modes SciPy's. **SCI-20** (class f, kept): the diagonal path prints the condition number
   `max|a| · max|1/a|` as "rcond" ("rcond = 2e+17"); its threshold is right.
+
+## SciPy's Gaussian derivatives and complex filters (relay 20)
+
+Relay 18 ported `correlate1d`, `gaussian_filter1d` and `gaussian_filter` for real inputs and
+order 0; derivatives (`order > 0`) and complex inputs or weights raised `NotImplementedError`.
+Both are now SciPy 1.18.1's (`_filters.py`; the same code in 1.15.3):
+
+- **The derivative kernel** (`_gaussian_kernel1d`): the Gaussian times a polynomial whose
+  coefficients `q` come from `order` products with the matrix `D + P` (`q' + q·p'`) and whose
+  values are `(x[:, None] ** exponent_range).dot(q)`. Both products are numpy's `ndarray.dot` of
+  a C-ordered float64 matrix and a vector, which numpy hands to `cblas_dgemv` in row-major order
+  (`numpy/_core/src/common/cblasfuncs.c`; a matrix of one row, the radius-0 kernel, goes to a
+  dot product instead), and OpenBLAS turns that into its transposed column-major `dgemv_t`. Its
+  Haswell kernel (`kernel/x86_64/dgemv_t_4.c` with `dgemv_t_microk_haswell-4.c`, the same files
+  in 0.3.30 and 0.3.34) takes the rows in blocks of 2048 (the last block the rest rounded down to
+  a multiple of 4) and, per block, four columns at a time through the assembly kernel (four lanes
+  of fused multiply-adds from +0, then `(l0 + l2) + (l1 + l3)`), the last two and one columns
+  through SSE2 kernels without fused multiply-adds (even and odd rows in two lanes; rows `4t + l`
+  in four lanes), each block's value added to `y`; the last `m & 3` rows go through the C tails
+  as GCC contracted them (one row `fma(a, x, y)`, two `fma(a0, x0, a1·x1) + y`, three
+  `fma(a2, x2, fma(a0, x0, a1·x1)) + y`). `larmorx_core::numpy::dot::matvec_f64` follows it, and
+  is numpy's `a.dot(x)` bit for bit on 2,800 seeded shapes (1 to 33 rows, 1 to 21 columns, and
+  blocks across 2,047 to 6,147 rows; wide exponents, signed zeros) in both environments (numpy
+  2.3.5 and 2.5.4 on the Haswell kernels), plus 5,898 more (`relay20/probe_matvec.py`); logs
+  `oracles/logs/fmapb-r20-filters-{shared,newest}.log`.
+- **Threads.** OpenBLAS runs `dgemv` on one thread below `115200 · GEMM_MULTITHREAD_THRESHOLD`
+  = 460,800 matrix elements; above, it splits the columns between threads, and a column's kernel
+  (the fused 4 x 4 one or an SSE2 one) depends on where it falls in its thread's share, so
+  SciPy's last bits would depend on the machine's thread count. larmorx follows one thread (the
+  validation environments' `OPENBLAS_NUM_THREADS=1`), as for `ddot`. For the Gaussian derivative
+  this needs `(2·radius + 1)·(order + 1) >= 460,800`, a radius of 57,600 or more for order 3: not
+  a defect of SciPy's, so no register entry.
+- **Complex inputs and weights**: SciPy's `_complex_via_real_components`, real correlations of
+  the parts (the weights conjugated and made complex128 first), combined by numpy's `-=` and `+=`
+  in the output's part type (a complex64 output keeps float32 parts, so a complex128 input's
+  parts are rounded to float32 before they are combined, as in SciPy); the output
+  `promote_types(input, complex64)` by default (an `int16` or `bool` input with complex weights
+  gives complex64), a real dtype promoted with SciPy's `UserWarning`, a real `str` or array
+  refused. `gaussian_filter` of a complex input filters each part (its real kernel), each pass
+  written in the output's type; a real output refused, except with no pass left (numpy's copy,
+  with numpy's `ComplexWarning`).
+- **The argument handling, found by the new checks** (relay 18's port differed in messages and in
+  four accepted inputs): `_get_output` (a `str` naming a non-numeric type, `"bool"` included, is
+  refused: "output must have numeric dtype"), `NI_InitLineBuffer`'s type check of the input and
+  then the output ("array type dtype('float16') not supported", the dtype's `repr`; a real input
+  with a complex output stops there), the C parser `"O&O&iO&idn"` in its order (a read-only
+  output array: "output array is read-only."; `cval` through CPython's `PyFloat_AsDouble`, the
+  `nb_float` and `nb_index` slots: a `str`, `None`, a Python complex and a `numpy.str_` are
+  refused with "must be real number, not ...", although `numpy.str_` has a Python-level
+  `__float__`; larmorx parses `cval` with `math.ldexp(cval, 0)`, which CPython's argument parser
+  converts the same way; `origin` through `__index__`: a float origin is refused), and SciPy's
+  `normalize_axis_index` (a float axis passes it and is refused by the parser).
+- **Measured** (`check_regrid.py --sections filters`, both environments, 1 and 8 threads): 15,995
+  cases identical (relay 18's 7,178; matvec 2,800; `_gaussian_kernel1d` 677 (sigmas from 0.3 to
+  37, Python and numpy floats and integers, orders 0 to 9, radii 0 to 3,000); derivatives in
+  `gaussian_filter1d` 384 and `gaussian_filter` 96 (four element types, modes, orders per axis,
+  output types, `truncate`, `radius`) and their edges 10 (order 5, radius 0, a float32 or integer
+  sigma, a negative, float, boolean order, sigma 0 and 1e-300); complex `correlate1d` 4,752 (six
+  input types, five kernels, every mode, axis and origin, real and complex `cval`), its outputs
+  33, the complex Gaussian filters 28 and their refusals 9; `correlate1d`'s arguments 28), values
+  with their signed zeros, dtypes, warnings and messages.
+- **Not ported**: a `sigma` with which numpy computes the kernel in another type than float64
+  (an `np.longdouble` sigma: x87 long double `exp`): `NotImplementedError`, as before.

@@ -32,7 +32,12 @@ origin and mode helpers), `_morphology.py` (`grey_*`, `binary_*`) and `_ni_suppo
 (`_normalize_sequence`, `_check_axes`, `_get_output`) with their messages; and (relay 18)
 `correlate1d`, `_gaussian_kernel1d` (order 0), `gaussian_filter1d` and `gaussian_filter` from
 `_filters.py` (the same in SciPy 1.15.3), the kernel's `exp` and sum through numpy's
-(`larmorx_core::numpy::umath::exp_f64`, `reduce::add_reduce_ordered`).
+(`larmorx_core::numpy::umath::exp_f64`, `reduce::add_reduce_ordered`); (relay 20) the
+derivatives of `_gaussian_kernel1d` (its `dot`s through `larmorx_core::numpy::dot::matvec_f64`),
+`_complex_via_real_components` and `correlate1d`'s complex path, `_ni_support._get_output`
+(with `complex_output`), `scipy/_lib/_util.py`'s `normalize_axis_index`, and the argument
+handling of `src/nd_image.c`'s `Py_Correlate1D` (`"O&O&iO&idn"`, `NI_ObjectToOutputArray`'s
+read-only check) and `src/ni_support.c`'s `NI_InitLineBuffer` type check (its message).
 
 **Deliberate differences** (`docs/api/ndimage-filters.md`, "Differences from SciPy"): where
 SciPy reads or writes outside its arrays (binary morphology with an origin before its structure,

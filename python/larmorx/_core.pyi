@@ -504,6 +504,10 @@ def numpy_exp_f32(a: np.ndarray) -> np.ndarray:
 def numpy_exp_f64(a: np.ndarray) -> np.ndarray:
     """numpy's float64 ``exp`` on its path without AVX-512 (glibc's), elementwise."""
 
+def numpy_matvec_f64(a: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """numpy's ``a.dot(x)`` of a 2-D float64 matrix and a float64 vector (``cblas_matrixproduct``'s
+    shapes; OpenBLAS's Haswell ``dgemv_t``, one thread)."""
+
 def numpy_clip_f32(a: np.ndarray, a_min: float, a_max: float) -> np.ndarray:
     """``numpy.clip`` of a float32 array with float32 bounds."""
 

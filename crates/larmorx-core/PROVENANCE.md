@@ -262,7 +262,13 @@ the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
   (`numpy/_core/src/multiarray/arraytypes.c.src`, `common/cblasfuncs.c`) over OpenBLAS 0.3.34's
   Haswell `sdot`/`ddot` (`kernel/x86_64/sdot.c`, `sdot_microk_haswell-2.c`, `ddot.c`,
   `ddot_microk_haswell-2.c`; BSD-3-Clause, the OpenBLAS notice in the file): the kernels' lane
-  order, the tails (the `ddot` tail measured unfused).
+  order, the tails (the `ddot` tail measured unfused). `matvec_f64` (field maps part B, relay 20):
+  `cblas_matrixproduct`'s matrix-vector shapes (`common/cblasfuncs.c`, numpy 2.5.4 and 2.3.5)
+  over OpenBLAS 0.3.34's `cblas_dgemv` (`interface/gemv.c`: row-major to the transposed
+  column-major product, one thread below 460,800 elements) and the Haswell `dgemv_t`
+  (`kernel/x86_64/dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`; the same files in 0.3.30): the
+  blocks of 2048 rows, the 4 x 4 assembly kernel's lanes, the SSE2 4 x 2 and 4 x 1 kernels,
+  `add_y`, the C tails' contractions (measured against numpy 2.3.5 and 2.5.4).
 - `numpy/histograms.rs` (field maps part B): `linspace` (`numpy/_core/function_base.py`) and
   `histogram`'s equal-bin path with `_get_outer_edges`, `_get_bin_edges`, `_unsigned_subtract`
   (`numpy/lib/_histograms_impl.py`), numpy 2.5.4 (the same values in 2.3.5).

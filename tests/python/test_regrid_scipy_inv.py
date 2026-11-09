@@ -139,12 +139,86 @@ def test_gaussian_filter():
     assert lx.ndimage.gaussian_filter(a.astype(np.int16), 1.0).dtype == np.int16
     with pytest.raises(ValueError, match="Radius must be a nonnegative integer"):
         lx.ndimage.gaussian_filter1d(a, 1.0, radius=-1)
-    with pytest.raises(NotImplementedError):
-        lx.ndimage.gaussian_filter1d(a, 1.0, order=1)
     with pytest.raises(RuntimeError, match="no filter weights given"):
         lx.ndimage.correlate1d(a, [])
     c = lx.ndimage.correlate1d(np.arange(5.0), [1.0, 0.0, -1.0], mode="nearest")
     assert c.tolist() == [-1.0, -2.0, -2.0, -2.0, -1.0]
+
+
+def _hex(values) -> list[float]:
+    return [float.fromhex(v) for v in values]
+
+
+def test_gaussian_derivatives():
+    """SciPy 1.18.1's values (numpy 2.5.4 and 2.3.5 alike): the derivative kernels (numpy's
+    dot through OpenBLAS's Haswell dgemv: the 4 x 4 kernel and the tails for order 3, every
+    column kernel and a two-row tail for order 5, a dot product for radius 0) and a filter."""
+    from larmorx._ndimage_filters import _gaussian_kernel1d
+
+    want = {
+        (1.5, 3, 2): ["-0x1.daf95d98e30e3p-5", "-0x1.e3964dba7c92bp-4", "0x0.0p+0",
+                      "0x1.e3964dba7c92bp-4", "0x1.daf95d98e30e3p-5"],
+        (0.8, 5, 3): ["0x1.748b02cfabf98p-2", "-0x1.6912234e19544p+0", "0x1.94fc40c9cdce9p+0",
+                      "0x0.0p+0", "-0x1.94fc40c9cdce9p+0", "0x1.6912234e19544p+0",
+                      "-0x1.748b02cfabf98p-2"],
+        (1.0, 2, 0): ["-0x1.0000000000000p+0"],
+    }  # fmt: skip
+    for (sigma, order, radius), values in want.items():
+        got = _gaussian_kernel1d(sigma, order, radius, "2.5.4")
+        assert got.tobytes() == np.array(_hex(values)).tobytes()
+    g = lx.ndimage.gaussian_filter1d(np.arange(9.0) ** 2, 1.0, order=1)
+    assert g.tobytes() == np.array(_hex([
+        "0x1.45b4963028e16p-1", "0x1.13405c3ef342cp+1", "0x1.00ef6dad9e59ep+2",
+        "0x1.8001b15c92e93p+2", "0x1.fff6901339537p+2", "0x1.3faf8cf3b08a0p+3",
+        "0x1.77ddac1c5ca50p+3", "0x1.6e12282e221e6p+3", "0x1.4bcd61001bc7dp+2",
+    ])).tobytes()  # fmt: skip
+    with pytest.raises(ValueError, match="order must be non-negative"):
+        lx.ndimage.gaussian_filter1d(g, 1.0, order=-1)
+    with pytest.raises(TypeError, match="expected a sequence of integers"):
+        lx.ndimage.gaussian_filter1d(g, 1.0, order=1.0)
+    m = np.arange(12.0).reshape(3, 4) - 5.5
+    assert lx._core.numpy_matvec_f64(m, np.array([1.0, -2.0, 0.5, 3.0])).tolist() == [
+        m[i] @ [1.0, -2.0, 0.5, 3.0] for i in range(3)
+    ]
+
+
+def test_complex_correlate():
+    """SciPy's complex correlation through the parts (the weights conjugated, a complex cval),
+    its output rules and the C parser's messages."""
+    c = lx.ndimage.correlate1d(
+        np.array([1 + 2j, 3 - 1j, -2 + 0.5j, 4j]),
+        np.array([0.5 + 0.25j, 1 - 1j, 0.125j]),
+        mode="constant",
+        cval=1 - 1j,
+    )
+    want = [(-0.875, 1.875), (5.0625, 3.0), (-0.75, -2.75), (-5.0, 4.625)]
+    assert c.dtype == np.complex128 and [(v.real, v.imag) for v in c] == want
+    a = np.arange(12.0).reshape(3, 4)
+    assert lx.ndimage.correlate1d(a.astype(np.float32), [1.0, 2j, 1.0]).dtype == np.complex64
+    assert lx.ndimage.correlate1d(a.astype(np.int16), [1.0, 2j, 1.0]).dtype == np.complex64
+    with pytest.warns(UserWarning, match="promoting specified output dtype to complex"):
+        out = lx.ndimage.correlate1d(a + 1j, [1.0, 2.0], output=np.float64)
+    assert out.dtype == np.complex128
+    with pytest.raises(RuntimeError, match="output must have complex dtype"):
+        lx.ndimage.correlate1d(a + 1j, [1.0, 2.0], output="float64")
+    with pytest.raises(ValueError, match="complex-valued cval when the input is real"):
+        lx.ndimage.correlate1d(a, [1.0, 2j], cval=1j)
+    with pytest.raises(TypeError, match="must be real number, not complex"):
+        lx.ndimage.correlate1d(a, [1.0, 2.0], cval=1j)
+    with pytest.raises(RuntimeError, match=r"array type dtype\('complex128'\) not supported"):
+        lx.ndimage.gaussian_filter(a, 1.0, output=np.complex128)
+    with pytest.raises(RuntimeError, match=r"array type dtype\('float16'\) not supported"):
+        lx.ndimage.correlate1d(a.astype(np.float16), [1.0])
+    with pytest.raises(RuntimeError, match="output must have numeric dtype"):
+        lx.ndimage.correlate1d(a, [1.0], output="bool")
+    ro = np.zeros_like(a)
+    ro.flags.writeable = False
+    with pytest.raises(ValueError, match="output array is read-only"):
+        lx.ndimage.correlate1d(a, [1.0], output=ro)
+    z = lx.ndimage.gaussian_filter((a + 2j * a).astype(np.complex64), 1.0, order=(0, 1))
+    assert z.dtype == np.complex64
+    re = lx.ndimage.gaussian_filter(a.astype(np.float32), 1.0, order=(0, 1))
+    assert np.array_equal(z.real, re) and np.array_equal(z.imag, 2 * re)
 
 
 def test_regrid_to_zooms(tmp_path):

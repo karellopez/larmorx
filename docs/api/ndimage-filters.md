@@ -29,6 +29,12 @@ environment (`check_regrid.py --sections filters`: 1- to 3-D, six element types,
 anti-symmetric, asymmetric and even kernels, every origin and mode, output types, sigmas per
 axis and zero, `truncate`, `radius`, `axes`, the errors), and through niworkflows'
 `RegridToZooms` on fMRIPrep's own nodes ([niworkflows-helpers.md](niworkflows-helpers.md)).
+Gaussian derivatives and complex inputs and weights (relay 20, 2026-11-09): SciPy's on 8,817
+more seeded cases per environment, 15,995 in all for these functions (numpy's matrix-vector
+product against `a.dot(x)` on 2,800 shapes up to blocks of 2,048 rows, SciPy's
+`_gaussian_kernel1d` for orders 0 to 9, derivatives per axis in both filters, complex64 and
+complex128 inputs, real inputs with complex weights, complex `cval`, the output rules with their
+warnings, and `correlate1d`'s argument handling), identical on 1 and 8 threads.
 
 ```python
 import numpy as np
@@ -51,8 +57,8 @@ contiguous); results are C-ordered, as SciPy's.
 
 | larmorx (`lx.ndimage.`) | SciPy (`scipy.ndimage.`) | Notes |
 |---|---|---|
-| `correlate1d` | the same | `weights` (float64), `axis`, `output`, `mode`, `cval`, `origin`; `NI_Correlate1D`: an odd kernel whose mirrored weights differ by at most `DBL_EPSILON` adds the mirrored pairs first (symmetric, or anti-symmetric with differences), from the outermost pair in, after the centre term; any other kernel the last term first, then the others in order; each line read into doubles and extended by `NI_ExtendLine`; C's cast to the output type. Complex input or weights: `NotImplementedError` |
-| `gaussian_filter1d`, `gaussian_filter` | the same | order 0 (`NotImplementedError` for derivatives); `sigma`, `mode`, `radius` per axis, `truncate`, `axes`, `output`; the kernel `exp(-0.5 / sigma**2 * x**2) / sum` with numpy's float64 `exp` on its path without AVX-512 (glibc's; on an AVX-512 CPU numpy takes Intel's SVML kernels, which differ in a few per cent of arguments: `larmorx_core::numpy::umath`) and numpy's sum (`numpy_version`, keyword); axes with `sigma <= 1e-15` skipped, each pass written in the output's type; none left: numpy's copy into the output's type |
+| `correlate1d` | the same | `weights` (float64), `axis`, `output`, `mode`, `cval`, `origin`; `NI_Correlate1D`: an odd kernel whose mirrored weights differ by at most `DBL_EPSILON` adds the mirrored pairs first (symmetric, or anti-symmetric with differences), from the outermost pair in, after the centre term; any other kernel the last term first, then the others in order; each line read into doubles and extended by `NI_ExtendLine`; C's cast to the output type. Complex input or weights: SciPy's `_complex_via_real_components` (the weights conjugated and made complex128; real correlations of the parts with `np.real(cval)` and `np.imag(cval)`, combined by numpy's `-=` and `+=` in the output's part type; the output `promote_types(input, complex64)` by default, a real dtype promoted with SciPy's warning, a real `str` or array refused; a complex `cval` with a real input refused). SciPy's argument order and messages: `_get_output` (a non-numeric `str` refused), the axis (`normalize_axis_index`), the origin, the mode, then the C parser's (`output array is read-only.`, `cval` through `PyFloat_AsDouble`: `must be real number, not ...`, `origin` through `__index__`) and `NI_InitLineBuffer`'s types, the input's then the output's (`array type dtype('float16') not supported`) |
+| `gaussian_filter1d`, `gaussian_filter` | the same | `order`, `sigma`, `mode`, `radius` per axis, `truncate`, `axes`, `output`; the kernel `exp(-0.5 / sigma**2 * x**2) / sum` with numpy's float64 `exp` on its path without AVX-512 (glibc's; on an AVX-512 CPU numpy takes Intel's SVML kernels, which differ in a few per cent of arguments: `larmorx_core::numpy::umath`) and numpy's sum (`numpy_version`, keyword); a derivative (`order > 0`) times SciPy's polynomial: its coefficients from `order` products `(D + P)·q` and its values `x**k · q`, numpy's `dot` both (OpenBLAS's Haswell `dgemv_t`, one thread: `larmorx_core::numpy::dot::matvec_f64`; a radius of 0 a dot product); complex inputs through `correlate1d`'s parts; axes with `sigma <= 1e-15` skipped, each pass written in the output's type (a complex input refuses a real output); none left: numpy's copy into the output's type. A `sigma` whose kernel numpy would compute in another type than float64 (`np.longdouble`): `NotImplementedError` |
 | `minimum_filter`, `maximum_filter` | the same | `size`, `footprint`, `output`, `mode`, `cval`, `origin`, `axes`; a full footprint or `size` is separable (one 1-D pass per axis, the first into the output's type), else `NI_MinOrMaxFilter` |
 | `minimum_filter1d`, `maximum_filter1d` | the same | `NI_MinOrMaxFilter1D` (Richard Harter's running minimum on the line extended by `NI_ExtendLine`) |
 | `rank_filter`, `median_filter`, `percentile_filter` | the same | the rank from the footprint's true elements; rank 0 and the last rank are the minimum and maximum filters; 1-D inputs use `_rank_filter_1d` (Ashelly's running rank, with the footprint's size) unless the footprint is too large for the input, as SciPy 1.18 decides; otherwise `NI_RankFilter` with SciPy's quickselect `NI_Select`; `upstream_defects` (SCI-09: a 1-D footprint with holes) |
@@ -144,7 +150,8 @@ part B, 2026-11-09):
 - `output` given as a dtype or array: the result is computed as SciPy computes it (a double per
   element, cast to the output's type by SciPy's own cast); integers beyond 2^53 follow the same
   path.
-- Complex inputs are not supported (`TypeError`, as SciPy's message for these functions).
+- Complex inputs are refused by the filters, morphology and measurements (`TypeError`, SciPy's
+  message for these functions); `correlate1d` and the Gaussian filters take them, as SciPy's.
 - `watershed_ift` is **corrected by default** (`upstream_defects="fix"`; `"reproduce"` gives
   SciPy's labels, an `UpstreamDefectWarning` names the defects whenever the two differ; SCI-13
   to SCI-16):

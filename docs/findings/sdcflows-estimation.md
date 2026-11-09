@@ -1290,3 +1290,21 @@ Both are now SciPy 1.18.1's (`_filters.py`; the same code in 1.15.3):
   with their signed zeros, dtypes, warnings and messages.
 - **Not ported**: a `sigma` with which numpy computes the kernel in another type than float64
   (an `np.longdouble` sigma: x87 long double `exp`): `NotImplementedError`, as before.
+
+## The records (relay 25)
+
+**A larmorx mistake found by the records and fixed.** The BIDS app's whole runs (the parity suite
+`sdcflows-estimation`'s full tier, one case per sdcflows 2.17.1 run) were made in the shared
+environment too (numpy 2.3.5, SciPy 1.15.3, `LARMORX_SDCFLOWS_LIBRARIES=shared`). On ds006736's
+PEPOLAR estimator the coefficient file (`desc-coeff_fieldmap.nii.gz`) differed from sdcflows' in
+its header alone: `quatern_d` -1.4631351e-16 against sdcflows' -1.463135e-16 (float32 bits
+`0xa5289c20` and `0xa5289c1f`), the data and every other file identical; the other seven runs
+were identical. The cause: the app's `shared` set passed numpy's and SciPy's releases to the
+workflows but left nibabel's `set_qform` arithmetic (`larmorx.io.nibabel_header`, the polar
+decomposition through numpy's LAPACK) on numpy 2.5.4's LAPACK 3.12.1, where numpy 2.3.5 runs
+3.12.0 (part A's finding: the quaternions of about 2 % of affines differ between the two). The
+check scripts choose the release themselves (`use_lapack`), so only the app's own runs showed it.
+Fixed: the app runs its workflows with the set's LAPACK (`_run_workflow`: `use_lapack` in a copy
+of the context, so it does not outlive the run); unit test
+`test_library_sets_choose_the_writers_lapack`; the eight shared runs again: see the record
+`sdcflows-estimation-app-shared`.

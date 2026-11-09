@@ -219,3 +219,23 @@ def test_command_line_routes(capsys: pytest.CaptureFixture[str]) -> None:
     # the Rust command line alone (the standalone binary) says it needs this package
     code, out, err = _core.cli_main(["larmorx", "sdcflows", "sdcflows", "--version"], [], None)
     assert code == 127 and out == "" and "is a Python program" in err
+
+
+def test_library_sets_choose_the_writers_lapack() -> None:
+    """``LARMORX_SDCFLOWS_LIBRARIES=shared`` runs the workflows with nibabel's ``set_qform``
+    arithmetic on numpy 2.3.5's LAPACK 3.12.0 (a quaternion of ds006736's coefficients differed
+    by one bit from sdcflows' with SciPy 1.15.3 and numpy 2.3.5 before; relay 25), ``newest`` on
+    3.12.1, and the choice does not outlive the run."""
+    from larmorx.io import nibabel_header
+    from larmorx.sdcflows import app
+
+    seen: list[str] = []
+
+    class Workflow:
+        def run(self) -> None:
+            seen.append(nibabel_header._LAPACK.get())
+
+    for libraries in ("shared", "newest"):
+        app._run_workflow(Workflow(), libraries)
+    assert seen == ["3.12.0", "3.12.1"]
+    assert nibabel_header._LAPACK.get() == "3.12.1"

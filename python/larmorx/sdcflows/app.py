@@ -113,9 +113,12 @@ EX_USAGE = 64
 EX_SOFTWARE = 70
 #: The environment variable that chooses the numpy and SciPy releases whose arithmetic the
 #: estimators reproduce: ``newest`` (numpy 2.5.4, SciPy 1.18.1, the default) or ``shared``
-#: (numpy 2.3.5, SciPy 1.15.3).
+#: (numpy 2.3.5, SciPy 1.15.3), numpy's LAPACK in nibabel's ``set_qform`` included (3.12.1 and
+#: 3.12.0: :func:`larmorx.io.nibabel_header.use_lapack`).
 LIBRARIES_ENV = "LARMORX_SDCFLOWS_LIBRARIES"
 _LIBRARIES = {"newest": ("2.5.4", "1.18.1"), "shared": ("2.3.5", "1.15.3")}
+#: The LAPACK release of each library set's numpy (OpenBLAS 0.3.34's and 0.3.30's).
+_LAPACK = {"newest": "3.12.1", "shared": "3.12.0"}
 _IMPLEMENTATION_ENV = "LARMORX_IMPLEMENTATION"
 
 # The modules of the originals' exceptions (a traceback's last line names them).
@@ -1196,9 +1199,24 @@ Running SDCFlows {SDCFLOWS_VERSION}:
             ny.omp_nthreads,
             nprocs,
         )
-    wf.run()
+    _run_workflow(wf, settings.libraries)
     logger.log(25, "Finished all workload")
     return 0
+
+
+def _run_workflow(wf: Any, libraries: str) -> None:
+    """``wf.run()`` with nibabel's ``set_qform`` arithmetic on the library set's LAPACK
+    (``use_lapack``, a context variable: set in a copy of the caller's context, so it does not
+    outlive the run)."""
+    import contextvars
+
+    from larmorx.io.nibabel_header import use_lapack
+
+    def run() -> None:
+        use_lapack(_LAPACK[libraries])
+        wf.run()
+
+    contextvars.copy_context().run(run)
 
 
 def _write_settings(settings: AppSettings) -> Path:

@@ -632,7 +632,7 @@ the program's name in them is `sdcflows`.
 | `--notrack` | - | recorded; larmorx never sends usage information |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | `fix` (default) or `reproduce` (D13) |
 | `LARMORX_IMPLEMENTATION` | `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=` | `auto` (default), `replica`, `original`: FSL's `prelude` and `topup`, AFNI's `3dvolreg` |
-| `LARMORX_SDCFLOWS_LIBRARIES` | `numpy_version=`, `scipy_version=` | `newest` (numpy 2.5.4, SciPy 1.18.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3) |
+| `LARMORX_SDCFLOWS_LIBRARIES` | `numpy_version=`, `scipy_version=`; nibabel's `set_qform` LAPACK (`larmorx.io.nibabel_header.use_lapack`, for the run) | `newest` (numpy 2.5.4, SciPy 1.18.1, LAPACK 3.12.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3, LAPACK 3.12.0) |
 | `FSLDIR` | `fsldir=` | FSL's topup configurations (decision D9: `topup_config_file`) |
 
 Exit statuses: 0; 2, argparse's errors (with the usage); 64 (`os.EX_USAGE`) when no estimator is

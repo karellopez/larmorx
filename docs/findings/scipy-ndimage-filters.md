@@ -170,6 +170,22 @@ SciPy's running rank of a 1-D input (`_rank_filter_1d`) has three defects of its
    they are the output's own and never writes past its end (the notice says how many bytes SciPy
    wrote there). 36 cases (12 type pairs, the three filters), each SciPy call in a process of its
    own: identical in both modes and both environments.
+   **What SciPy's process does after the write is random** (relay 24, `relay24/probe_sci21.py`:
+   each call 10 times per environment, 360 processes each, in three ways of starting them). Started
+   as the suites start them (address-space and hash randomisation on), a process printed its result
+   and exited normally, printed it and then crashed (SIGSEGV, SIGABRT, SIGBUS), crashed before
+   printing (1 to 2 calls in 10 for some type pairs) or hung (1 in 360): 15 of the 36 calls had more
+   than one outcome in each environment. With a fixed environment, hash seed and working folder
+   3 (SciPy 1.15.3) and 10 (1.18.1) calls still varied; with address-space randomisation off as well,
+   1 and 0, but there two calls of SciPy 1.18.1 (float64 into int16 and into uint8,
+   `percentile_filter`) crashed before printing in every process. Whenever a process printed, its
+   result was the same in all of them (the bytes within the output's extent and the warnings): those
+   bytes are SciPy's definition, the rest is the heap's. So the check runs each call in a new
+   process (through the oracle-output cache, never cached: memory SciPy never defines) until one
+   prints, up to 10 times, and counts every call as one case whatever its processes did (a call none
+   of whose processes printed would be checked for the output's type, size and notice alone, and
+   counted on an INFO line: none so far), so its counts are the same on every run (`relay24/
+   repeat_counts.py`).
 2. **Big-endian floats and `longlong` refused** (SCI-22, class c). The dispatch compares dtypes by
    equality with native ones, so `>f4`/`>f8` inputs fall to `RuntimeError("Unsupported array
    type")` (big-endian integers are cast to int64 and pass), and numpy's `longlong` equals int64

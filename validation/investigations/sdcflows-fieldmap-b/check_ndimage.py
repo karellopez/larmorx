@@ -850,23 +850,44 @@ def labels(t: Tally, rng, nt: int) -> None:
 # --- the filters' argument handling (relay 21) -------------------------------------------------
 
 
-def _outcome(f) -> tuple[tuple, list[str], list[str]]:
+class _Outcome(tuple):
+    """An outcome (:func:`_outcome`); ``step`` is its form for the originals' step digest when
+    that differs from the outcome itself (an object array: its elements' reprs, as its bytes are
+    the elements' addresses, which change from process to process)."""
+
+    step: tuple | None = None
+
+
+def _outcome(f) -> _Outcome:
     """``f()``'s result (type, shape, bytes) or exception (type, message), its warnings
     (category and text) and the upstream-defect entries larmorx's notices name."""
     from larmorx._defects import UpstreamDefectWarning
 
+    step = None
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         try:
             r = np.asarray(f())
             res: tuple = ("ok", r.dtype.str, r.shape, np.ascontiguousarray(r).tobytes())
+            if r.dtype == object:
+                step = ("ok", r.dtype.str, r.shape, [repr(v) for v in r.ravel()])
         except Exception as e:
             res = (type(e).__name__, str(e))
     msgs = [
         f"{x.category.__name__}: {x.message}" for x in w if x.category is not UpstreamDefectWarning
     ]
     ids = [x.message.entry for x in w if x.category is UpstreamDefectWarning]
-    return res, msgs, ids
+    out = _Outcome((res, msgs, ids))
+    if step is not None:
+        out.step = (step, msgs, ids)
+    return out
+
+
+def _oracle(o: _Outcome) -> _Outcome:
+    """SciPy's outcome ``o``, unchanged, its digest gathered for the originals' step
+    (``steplines.oracle``) in its step form: never what the comparisons see."""
+    steplines.oracle(tuple(o) if o.step is None else o.step)
+    return o
 
 
 def _show(o: tuple) -> str:
@@ -1071,7 +1092,7 @@ def arguments(t: Tally) -> None:
                     kk["upstream_defects"] = mode
                 return call(m, x, **kk)
 
-            want = steplines.oracle(_outcome(lambda: run(sp)))
+            want = _oracle(_outcome(lambda: run(sp)))
             fixed = _outcome(lambda: run(lx))
             if "rank" in fname or "median" in fname or "percentile" in fname:
                 repro = _outcome(lambda: run(lx, "reproduce"))
@@ -1093,11 +1114,11 @@ def arguments(t: Tally) -> None:
             )
     for label, call, into in _arg_extra():
         if into is None:
-            want, got = steplines.oracle(_outcome(lambda: call(sp))), _outcome(lambda: call(lx))
+            want, got = _oracle(_outcome(lambda: call(sp))), _outcome(lambda: call(lx))
         else:
             a1, a2 = _ARG_BASE.reshape(3, 4).copy(), _ARG_BASE.reshape(3, 4).copy()
             want, got = (
-                steplines.oracle(_outcome(lambda: (into(sp, a1), a1)[1])),
+                _oracle(_outcome(lambda: (into(sp, a1), a1)[1])),
                 _outcome(lambda: (into(lx, a2), a2)[1]),
             )
         t.add("arguments: sizes, ranks, outputs", want[:2] == got[:2] and not got[2],
@@ -1148,27 +1169,58 @@ def _scipy115_system_error(o: tuple) -> bool:
     )
 
 
-def _scipy_in_process(code: str) -> tuple[str, str]:
-    """SciPy's result of ``code`` (which prints it) in a process of its own: SCI-21's calls
-    write past their output's end, which corrupts the heap (the process may crash at exit,
-    after the result is printed)."""
-    import subprocess
+#: SCI-21's SciPy calls: how many processes one call may take, and each one's time limit (s).
+SCI21_ATTEMPTS = 10
+SCI21_TIMEOUT = 30
+#: The end of the line a SCI-21 process prints (a line without it was cut short by a crash).
+SCI21_END = " END"
 
-    try:
-        p = subprocess.run(
-            [sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=30
+
+def _scipy_in_process(code: str) -> tuple[str, str]:
+    """SciPy's result of ``code`` (which prints it, ending in :data:`SCI21_END`): SCI-21's calls
+    write past their output's end, which corrupts the heap, so each runs in a process of its own
+    (through the oracle-output cache, never cached: memory SciPy never defines). Such a process
+    may crash (a signal) or hang (its time limit) before it prints, at random, as the heap's
+    layout changes from process to process (address-space and hash randomisation); one that
+    printed gives the same result in every process (the bytes within the output's extent and
+    the warnings: ``relay24/probe_sci21.py``, 360 processes per environment and way of starting
+    them). So a call whose process printed nothing runs again, in a new process, up to
+    :data:`SCI21_ATTEMPTS` times. Returns (the printed result without its end, or ``""`` when no
+    process printed one; the last process's outcome)."""
+    from larmorx_validation import oracle_cache
+
+    policy = oracle_cache.Policy(
+        threads=1,
+        never="SCI-21: SciPy's running rank writes past its output's end, into memory it never "
+        "defines (D13); its process may crash or hang at random",
+    )
+    status = ""
+    for _ in range(SCI21_ATTEMPTS):
+        done = oracle_cache.run(
+            [sys.executable, "-I", "-c", code],
+            policy=policy,
+            timeout=SCI21_TIMEOUT,
+            runner="check-ndimage-sci21",
         )
-    except subprocess.TimeoutExpired:  # the corrupted heap can make the process hang
-        return "", "hung"
-    return p.stdout.strip(), f"exit {p.returncode}"
+        line = done.text().strip()
+        if line.endswith(SCI21_END):
+            return line.removesuffix(SCI21_END), f"exit {done.returncode}"
+        status = "hung (its time limit)" if done.timed_out else f"exit {done.returncode}"
+    return "", status
 
 
 def _sci21(t: Tally) -> None:
     """SCI-21: SciPy's running rank of a float32, float64 or int64 input writes the input
     type's values into an output of another type (another type or byte order), past its end
     when its items are smaller. ``reproduce`` = SciPy's bytes where they are its output's (each
-    case's SciPy in its own process); the default = the values cast into the output, with the
-    notice."""
+    call's SciPy in a process of its own: :func:`_scipy_in_process`); the default = the values
+    cast into the output, with the notice.
+
+    Every call is one case of both comparisons, whatever SciPy's processes did, so the counts
+    are the same in every run: a call none of whose processes printed a result (none in the
+    runs so far) is counted as such, its ``reproduce`` checked for its notice and the output's
+    type and size alone (SciPy's bytes unknown), and the INFO line counts those calls (0 when
+    every call gave SciPy's result)."""
     x = _ARG_LINE
     cases = {
         "float64 into float32": ("float64", "np.float32"),
@@ -1185,6 +1237,7 @@ def _sci21(t: Tally) -> None:
         # (into a strided float32 array SciPy's copy overflows and its process hangs)
         "float32 into a strided float64 array": ("float32", "np.full((9, 2), 7.0)[:, 0]"),
     }
+    crashed = 0
     for label, (src, out) in cases.items():
         for fn in ("median_filter(x, 3", "rank_filter(x, 1, 3", "percentile_filter(x, 50, 3"):
             code = (
@@ -1194,12 +1247,11 @@ def _sci21(t: Tally) -> None:
                 "    warnings.simplefilter('always')\n"
                 f"    r = sp.{fn}, output={out})\n"
                 "print(r.dtype.str, np.ascontiguousarray(r).tobytes().hex(), "
-                "repr([f'{type(m.message).__name__}: {m.message}' for m in w]), flush=True)\n"
+                "repr([f'{type(m.message).__name__}: {m.message}' for m in w]) "
+                f"+ {SCI21_END!r}, flush=True)\n"
             )
             sp_out, status = _scipy_in_process(code)
-            if not sp_out:
-                print(f"INFO SCI-21 {label} {fn}: SciPy's process gave no result ({status})")
-                continue
+            steplines.oracle(sp_out or "SciPy's processes gave no result")
             xs = x.astype(src)
             repro = _outcome(
                 lambda: eval(
@@ -1211,10 +1263,26 @@ def _sci21(t: Tally) -> None:
             mine = ""
             if repro[0][0] == "ok":
                 mine = f"{repro[0][1]} {repro[0][3].hex()} {[m for m in repro[1]]!r}"
-            t.add("arguments: SCI-21 reproduced (SciPy's own bytes)", sp_out == mine and repro[2] == ["SCI-21"],
-                  f"{label} {fn}: scipy {sp_out[:120]}; larmorx {mine[:120]} {repro[2]}")  # fmt: skip
+            if sp_out:
+                ok = sp_out == mine and repro[2] == ["SCI-21"]
+                what = f"scipy {sp_out[:120]}"
+            else:
+                # no process printed SciPy's result: only what does not depend on its bytes
+                crashed += 1
+                target = eval(out, {"np": np})
+                tdt = np.dtype(target.dtype if isinstance(target, np.ndarray) else target)
+                ok = (
+                    repro[0][0] == "ok"
+                    and repro[0][1] == tdt.str
+                    and len(repro[0][3]) == x.size * tdt.itemsize
+                    and repro[2] == ["SCI-21"]
+                )
+                what = f"SciPy's processes gave no result ({status})"
+            t.add("arguments: SCI-21 reproduced (SciPy's own bytes)", ok,
+                  f"{label} {fn}: {what}; larmorx {mine[:120]} {repro[2]}")  # fmt: skip
             # corrected: SciPy's own result of the input's type, cast into the output
             plain = getattr(sp, fn.split("(")[0])(xs, *eval("[" + fn.split(", ", 1)[1] + "]"))
+            steplines.oracle(plain)
             target = eval(out, {"np": np})
             if isinstance(target, np.ndarray):
                 target = target.copy()
@@ -1229,6 +1297,10 @@ def _sci21(t: Tally) -> None:
             )
             t.add("arguments: SCI-21 corrected (the values cast into the output)", ok and fixed[2] == ["SCI-21"] and not fixed[1],
                   f"{label} {fn}: larmorx {_show(fixed[0])} {fixed[1]} {fixed[2]}")  # fmt: skip
+    print(
+        "INFO SCI-21 calls whose SciPy processes all crashed or hung "
+        f"({SCI21_ATTEMPTS} each): {crashed}"
+    )
 
 
 def _sci22(t: Tally) -> None:
@@ -1242,7 +1314,7 @@ def _sci22(t: Tally) -> None:
         native = xs.astype(np.dtype(xs.dtype.kind + str(xs.dtype.itemsize)))
         for fn in ("median_filter", "rank_filter", "percentile_filter"):
             args = {"median_filter": (3,), "rank_filter": (1, 3), "percentile_filter": (50, 3)}[fn]
-            want = steplines.oracle(_outcome(lambda: getattr(sp, fn)(xs, *args)))
+            want = _oracle(_outcome(lambda: getattr(sp, fn)(xs, *args)))
             repro = _outcome(lambda: getattr(lx, fn)(xs, *args, upstream_defects="reproduce"))
             if label == "longlong" and _scipy115_system_error(want[0]):
                 t.add("arguments: SCI-24 (SciPy 1.15.3's SystemError; 1.18.1's error given)",
@@ -1251,7 +1323,7 @@ def _sci22(t: Tally) -> None:
                 t.add("arguments: SCI-22 reproduced (SciPy's error)", want[:2] == repro[:2],
                       f"{label} {fn}: scipy {_show(want[0])}; larmorx {_show(repro[0])}")  # fmt: skip
             fixed = _outcome(lambda: getattr(lx, fn)(xs, *args))
-            ref = steplines.oracle(_outcome(lambda: getattr(sp, fn)(native, *args)))
+            ref = _oracle(_outcome(lambda: getattr(sp, fn)(native, *args)))
             t.add("arguments: SCI-22 corrected (SciPy's result of the native copy)",
                   fixed[0] == ref[0] and fixed[2] == ["SCI-22"], f"{label} {fn}: {_show(fixed[0])} {fixed[2]}")  # fmt: skip
 
@@ -1270,7 +1342,7 @@ def _sci23(t: Tally) -> None:
         for dt in (np.float64, np.float32, np.int64):
             xs = x.astype(dt)
             o1, o2, o3 = (np.zeros((9, 2), dt)[:, 0] for _ in range(3))
-            want = steplines.oracle(_outcome(lambda: getattr(sp, fn)(xs, *args, output=o1)))
+            want = _oracle(_outcome(lambda: getattr(sp, fn)(xs, *args, output=o1)))
             repro = _outcome(
                 lambda: getattr(lx, fn)(xs, *args, output=o2, upstream_defects="reproduce")
             )

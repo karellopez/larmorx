@@ -101,11 +101,51 @@ CHANGES: dict[str, str] = {
     "scikit-image's random_walker adds the conjugate gradients' products in another order: "
     "the probabilities' last bits differ between the releases; larmorx follows each "
     "(scipy_version; docs/api/skimage.md, 'SciPy's row order')",
+    "NUMPY-2.4-SCALAR": "numpy 2.4 onwards (2.5.4 here) raises TypeError when an array of one "
+    "element with ndim > 0 is converted to a scalar ('only 0-dimensional arrays can be converted "
+    "to Python scalars'; to an index, 'only integer scalar arrays can be converted to a scalar "
+    "index'): numpy 1.25's deprecation expired (numpy/_core/src/multiarray/common.c, "
+    "check_is_convertible_to_scalar; numpy 2.4.0's release notes); numpy 2.3.5 warned "
+    "(DeprecationWarning) and took the element. So a one-element array as the filters' cval is "
+    "an error in the newest releases; larmorx converts cval as SciPy's C does, through the "
+    "running numpy's float() (_ndimage_filters._c_double), and follows each release",
+    "NUMPY-2.5-WRITEBACK-TEXT": "numpy 2.5 words the warning it gives when a WRITEBACKIFCOPY "
+    "copy is freed unresolved 'WRITEBACKIFCOPY detected in clearing of array.' "
+    "(numpy/_core/src/multiarray/arrayobject.c, _clear_array_attributes); numpy 2.3.5's "
+    "array_dealloc said 'WRITEBACKIFCOPY detected in array_dealloc.'; the values written back "
+    "are the same. larmorx's reproduce gives the running numpy's text (SCI-23, SCI-26; "
+    "docs/api/ndimage-filters.md)",
+    "SCIPY-1.16-SCI-17": "SciPy 1.16.1 onwards (gh-23293) runs the n-dimensional filter for a 1-D "
+    "input shorter than half the footprint, where 1.15.3's running rank returned zeros before "
+    "writing (SCI-17, fixed upstream): those inputs are compared in the newest releases and "
+    "counted apart ('1-D rank, SciPy 1.15 step') in the shared ones, so the comparison's cases "
+    "differ; larmorx follows 1.18 in both (docs/api/ndimage-filters.md)",
+    "SCIPY-1.18-SCI-24": "SciPy 1.15.3's running rank returns with a Python error set for an "
+    "unknown type number (numpy's longlong) and a cval its type cannot take, which CPython turns "
+    "into a SystemError (SCI-24, fixed in 1.18.1, whose TypeError larmorx gives in both): those "
+    "calls are counted under SCI-24's comparison in the shared releases and under the filter's "
+    "own (or SCI-22's) in the newest, so these comparisons' cases differ",
 }
 #: Which comparisons each change reaches: per case (``<suite>/<case>``) a regular expression of
 #: the comparison's name -> the key of :data:`CHANGES` (filled as the step's changes are
 #: measured; the next relay measures the rest: NOTES.md).
+#: check_ndimage's changes (relay 24: ``step_diff.py``, each comparison's first changed case
+#: in both environments read; the same in its quick and full runs).
+_NDIMAGE_REASONS: dict[str, str] = {
+    r"^1-D rank, short input$": "SCIPY-1.16-SCI-17",
+    r"^arguments: SCI-22 reproduced \(SciPy's error\)$": "SCIPY-1.18-SCI-24",
+    r"^arguments: SCI-2[13] reproduced ": "NUMPY-2.5-WRITEBACK-TEXT",
+    r"^arguments: SCI-25 family: reproduce = SciPy$": "NUMPY-2.5-WRITEBACK-TEXT",
+    r"^arguments: binary_(closing|dilation|erosion|fill_holes|opening|propagation) "
+    r"\(reproduce = SciPy\)$": "NUMPY-2.5-WRITEBACK-TEXT",
+    r"^arguments: (grey_(closing|dilation size|erosion structure|opening)|maximum_filter "
+    r"footprint|(minimum|maximum)_filter1d|(median|rank|percentile)_filter|minimum_filter "
+    r"size|minimum_filter1d 1-D|(median|rank|percentile)_filter 1-D)$": "NUMPY-2.4-SCALAR",
+    r"^arguments: (median|rank|percentile)_filter 1-D$": "SCIPY-1.18-SCI-24",
+}
 REASONS: dict[str, dict[str, str]] = {
+    "ndimage-skimage/ndimage-quick": _NDIMAGE_REASONS,
+    "ndimage-skimage/ndimage": _NDIMAGE_REASONS,
     "ndimage-skimage/scipy-inv-quick": {".*": "SCIPY-1.18-INV"},
     "ndimage-skimage/scipy-inv": {".*": "SCIPY-1.18-INV"},
     "ndimage-skimage/numpy": {r"^percentile \(Python q\)$": "NUMPY-2.5-PERCENTILE-RANGE"},

@@ -36,10 +36,39 @@ from larmorx._defects import UpstreamDefectWarning
 
 
 def _oracle(x):
-    """SciPy's side of a comparison, for the originals' step (``steplines``, when the
-    checking script has loaded it)."""
+    """SciPy's side of a comparison, unchanged, for the originals' step (``steplines``, when the
+    checking script has loaded it), in its step form (:func:`_step_form`)."""
     m = sys.modules.get("steplines")
-    return x if m is None else m.oracle(x)
+    if m is not None:
+        m.oracle(_step_form(x))
+    return x
+
+
+#: Whether numpy's long double is x86-64's 80-bit extended type, stored in 16 bytes of which
+#: the last 6 are never written (their contents are memory's).
+_EXTENDED = np.finfo(np.longdouble).nmant == 63 and np.dtype(np.longdouble).itemsize == 16
+
+
+def _step_form(x):
+    """``x`` (an :func:`outcome`) for the step's digest: a long double's bytes in ``describe``'s
+    hex without x86-64's 6 padding bytes per value (the comparisons keep them all)."""
+    if isinstance(x, tuple):
+        if (
+            _EXTENDED
+            and len(x) >= 3
+            and isinstance(x[0], str)
+            and x[0] in ("ndarray", "numpy")
+            and isinstance(x[1], str)
+            and x[1][1:] in ("f16", "c32")
+            and isinstance(x[-1], str)
+        ):
+            hx, little = x[-1], x[1][0] != ">"
+            parts = [hx[i : i + 32] for i in range(0, len(hx), 32)]
+            return (*x[:-1], "".join(p[:20] if little else p[12:] for p in parts))
+        return tuple(_step_form(v) for v in x)
+    if isinstance(x, list):
+        return [_step_form(v) for v in x]
+    return x
 
 
 #: The entries whose notices may accompany a corrected default.

@@ -296,7 +296,11 @@ file:
   fields identical in every voxel; 17.8 Hz apart before), `runwise_avg`, `setwise_avg`,
   `concat_blips`, `fix_coeff`, `from_las(_fmap)`, `ref_average` fMRIPrep's files, the BOLD
   steps (8 reconstructed fields, all through the resampled path) and fits identical in both
-  environments. The other re-made runs: the part's notes, as they finish.
+  environments. **And on ds005752's direct view** (relay 9): the B-spline fit's field (the
+  estimator's `fmap`) is fMRIPrep's in every voxel (0.067 Hz apart on the AVX-512 run), the
+  merges, `clipper_pre` and the brain mask fMRIPrep's files, the BOLD steps (8 fields, resampled
+  path) and fits identical in both environments. The three re-made SyN runs: the part's notes,
+  as they finish.
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 

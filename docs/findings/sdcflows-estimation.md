@@ -1442,3 +1442,16 @@ What the first probes found (permanent cases: `relay27/make_permanent.py`, eleve
 - **Not ported (documented):** nipype's `requires` checks the command lines do not need
   (`antsApplyTransforms`' `print_out_composite_warp_file` without `output_image`): random testing
   draws the valid combinations only.
+
+**The trial** (from the clean commit e88326b6, two boxed runs at once, 30 minutes each, one
+thread per case, 3 GiB per case: `oracles/difftest/2026-11-09-fieldmaps-b`, seed `fmapb-trial`,
+10 jobs; `oracles/difftest/2026-11-09-fieldmaps-b-noavx512`, seed `fmapb-trial-noavx512`, numpy's
+AVX-512 dispatch off, 6 jobs): **312,081 cases, 285,646 agree, no difference, no notice without a
+change, no crash, no memory case**; 26,427 skipped in the first run (the Gaussian kernels,
+`RegridToZooms` and the float64 random walker, all compared in the second: 131,539 of 131,539
+there agree or time out); 8 timeouts, all `brain_masker` cases whose random walker does not
+converge (8 of 518 brain_masker cases over 900 s: the speed follow-up above). Per tool:
+`ndimage-skimage` 173,684 cases (159,396 agree, 14,288 skipped), `niworkflows-helpers` 115,691
+(103,552 agree, 12,139 skipped), `sdcflows-estimation` 22,706 (22,698 agree, 8 timeouts). Triage:
+`validation/difftest/triage.toml`, block "field maps part B (2026-11-09)" (17 entries: the probes'
+differences and the timeouts).

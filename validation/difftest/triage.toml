@@ -4048,3 +4048,156 @@ signature = ["notice: SCI-02"]
 status = "harness"
 explanation = "1 case (sdc-trial 294008: apply of a uint8 series, order 2, grid-constant, cval -5): lx.ndimage names SCI-02 when the spline prefilter pads an integer input with a cval its type cannot hold, whether or not a sample point reaches the padding (a condition whose effect the comparison may not see); the suite's fix pass of apply accepts SCI-02 without a change (silent_ok), as it does no other defect"
 link = "validation/difftest/cases/sdcflows-fieldmap/sci02-padding-condition-notice.json"
+
+# ---------------------------------------------------------------- field maps part B (2026-11-09)
+# The difftest tools ndimage-skimage, niworkflows-helpers and sdcflows-estimation (relay 27). The
+# probes (seeds try1..try6 of r27/try_cases.py in-process; difftest seeds fmapb-try1, fmapb-try2
+# and fmapb-try2n, AVX-512 off) found the differences below, fixed in larmorx or registered;
+# permanent cases in validation/difftest/cases/<tool>/ (validation/investigations/sdcflows-fieldmap-b/
+# relay27/make_permanent.py). The trial: oracles/difftest/2026-11-09-fieldmaps-b (seed
+# fmapb-trial, 30 minutes, 10 jobs at one thread, 3 GiB per case, box 48 GiB) and
+# oracles/difftest/2026-11-09-fieldmaps-b-noavx512 (seed fmapb-trial-noavx512, numpy's AVX-512
+# dispatch off, 6 jobs, box 32 GiB), larmorx e88326b6, at once: 312,081 cases, 285,646 agree,
+# 26,427 skipped (the float64-exp calls of the first run, compared in the second), 8 timeouts
+# (brain_masker's random walker that does not converge, below), no difference, no notice.
+
+[[difference]]
+tool = "ndimage-skimage"
+implementation = "port"
+signature = ["binary: every output bit-identical"]
+status = "register"
+defect = "SCI-31"
+explanation = "an iterated binary_erosion with an int8 mask (try1 120): SciPy's propagation strategy uses the caller's int8 mask as its scratch (np.asarray to int8 does not copy it), so the larmorx side, given the same array after SciPy's call, saw another mask; each side now builds its own arguments, compared afterwards too, and SCI-31 is registered (rule A: the mask left as given; reproduce writes SciPy's values; binary_closing's erosion reads them)"
+link = "validation/difftest/cases/ndimage-skimage/binary-erosion-int8-mask-overwritten.json"
+
+[[difference]]
+tool = "ndimage-skimage"
+implementation = "port"
+signature = ["binary: every output bit-identical"]
+status = "register"
+defect = "SCI-32"
+explanation = "fmapb-try1 2984 (binary_propagation with origin [0, -1, 1]) and two worker deaths (fmapb-try1 2721: abort; malloc(): unsorted double linked list corrupted): SciPy's dilation propagation strategy with a non-zero origin reads and writes outside its arrays (relay27/probe_sci32.py, one process per case: results other than its brute force, aborts, segmentation faults; larmorx = the brute force); registered as SCI-32 (memory: never reproduced) and never drawn"
+link = "validation/investigations/sdcflows-fieldmap-b/relay27/probe_sci32.py"
+
+[[difference]]
+tool = "ndimage-skimage"
+implementation = "port"
+signature = ["skimage: the warnings"]
+status = "fixed"
+explanation = "random_walker(mode='cg_mg') with no label 0 (try3 380, AVX-512 off): scikit-image returns before it names the mode it replaces (its _solve_linear_system); larmorx warned about pyamg first: the mode warnings now follow the early returns"
+link = "validation/difftest/cases/ndimage-skimage/random-walker-cg-mg-without-zeros.json"
+
+[[difference]]
+tool = "ndimage-skimage"
+implementation = "port"
+signature = ["notice: SCI-10"]
+status = "fixed"
+explanation = "binary_opening with a uint16 mask (fmapb-try2 1211): its erosion step differs between the modes (SCI-10's int8 cast) but the opening does not; larmorx named the step's defect: binary_opening and binary_closing name their steps' defects only where the result (or the caller's mask) changes"
+link = "validation/difftest/cases/ndimage-skimage/binary-opening-step-notice-without-change.json"
+
+[[difference]]
+tool = "niworkflows-helpers"
+implementation = "port"
+signature = ["nipype: every output bit-identical"]
+status = "register"
+defect = "PIPE-38"
+explanation = "DenoiseImage without save_noise (try1 35, 41): nipype lists noise_image (<in>_noise) as it lists every name_source output, a file the program does not write; larmorx's formatter left it out; rule C: nipype's listing kept"
+link = "validation/difftest/cases/niworkflows-helpers/denoise-image-lists-noise-image.json"
+
+[[difference]]
+tool = "niworkflows-helpers"
+implementation = "port"
+signature = ["nipype: every output bit-identical"]
+status = "harness"
+explanation = "antsApplyTransforms with print_out_composite_warp_file and no output_image (fmapb-try1 284, 1719, 1782): nipype's requires check refuses it; larmorx._nipype documents that nipype's requires checks that do not change a line are not ported (nothing larmorx runs reaches them); the draw now gives the option with output_image only"
+link = "python/larmorx/_nipype.py"
+
+[[difference]]
+tool = "niworkflows-helpers"
+implementation = "port"
+signature = ["D13 fix pass"]
+status = "register"
+defect = "PIPE-40"
+explanation = "IntraModalMerge with to_ras, grand_mean_scaling and in_mask (fmapb-try1 114, 377): niworkflows reorients the series to RAS but not the mask (and its indexing fails anyway: PIPE-18); larmorx's fix raised a ValueError naming no defect; registered as PIPE-40 (rule A: the mask reoriented with the series, named)"
+link = "validation/difftest/cases/niworkflows-helpers/intra-modal-merge-ras-mask.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["readout_time: every output bit-identical"]
+status = "fixed"
+explanation = "GetReadoutTime of a string TotalReadoutTime and of an invalid PhaseEncodingDirection (try1 19, 30, 149): nipype's traits raise TraitError with its message, larmorx a TypeError of its own words or no error; larmorx now checks the outputs as traits do (larmorx._nipype.TraitError; DistortionParameters too), in declared order: nipype's order is a set's (PIPE-39, nondeterministic), so the comparison checks the original's own outputs in declared order"
+link = "validation/difftest/cases/sdcflows-estimation/readout-time-invalid-direction.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["select_pe: every output bit-identical", "sort_pe: every output bit-identical", "reorient: every output bit-identical"]
+status = "harness"
+explanation = "one input file or one direction (try1 36, 48, 115, 130): nipype's OutputMultiObject gives a list of one as its element; the comparison iterated it (a float, a string's characters); it now takes nipype's outputs as lists"
+link = "validation/src/larmorx_validation/parity/fieldmaps_b_random.py"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["uniform_grid: every output bit-identical"]
+status = "fixed"
+explanation = "UniformGrid of a 4-D image on another grid (try1 59, 103, 181): nitransforms' map_coordinates raises SciPy's RuntimeError('invalid shape for coordinate array'); larmorx refused with NotImplementedError: it now lets its map_coordinates raise SciPy's error"
+link = "validation/difftest/cases/sdcflows-estimation/uniform-grid-4d-off-the-grid.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["brain_masker: every output bit-identical"]
+status = "fixed"
+explanation = "brain_masker of an image with no positive value (try1 15, 183): numpy's IndexError of the empty array's percentile; larmorx's binding raised it as ValueError (SdcError::Index now)"
+link = "validation/difftest/cases/sdcflows-estimation/brain-masker-no-positive-value.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["brain_masker: every output bit-identical"]
+status = "register"
+defect = "SDC-46"
+explanation = "brain_masker with padding=0 (try1 104): sdcflows crops with [..., 0:-0, ...] and writes empty probability and mask images, the brain unmasked; larmorx wrote the whole image's; registered as SDC-46 (rule A, reproduce = sdcflows' files)"
+link = "validation/difftest/cases/sdcflows-estimation/brain-masker-padding-0.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["match_histogram: every output bit-identical"]
+status = "fixed"
+explanation = "match_histogram of an unsigned image with a float reference, reproduced (try1 134): numpy's bincount message names nibabel's dtype('<f4'), larmorx's native dtype('float32'); larmorx now keeps nibabel's data types (the header's byte order) for unscaled data"
+link = "validation/difftest/cases/sdcflows-estimation/match-histogram-message-dtype.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["notice: SCI-13, SCI-14", "notice: SCI-13"]
+status = "fixed"
+explanation = "epi_mask (fmapb-try1: 15 cases): the watershed's labels differ between the modes only where the brain's dilated label is the same, and larmorx named SCI-13, SCI-14 without a change; epi_mask now names them only when its mask changes (check_epi_mask's own rule)"
+link = "validation/difftest/cases/sdcflows-estimation/epi-mask-watershed-notice-without-change.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["D13 fix pass"]
+status = "harness"
+explanation = "the estimators below a folder named like a derivatives entity (try1 92, andres-lab): SDC-45's notice is about the entities parsed from the folders above a participant's, which need not change the estimators found; accepted without a change (silent_ok), as part A's SCI-02"
+link = "validation/src/larmorx_validation/parity/fieldmaps_b_random.py"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["reorient: every output bit-identical"]
+status = "fixed"
+explanation = "ReorientImageAndMetadata of an affine whose rotation has two equal candidates (fmapb-try2 725): nibabel's io_orientation (numpy's SVD, LAPACK 3.12.1 in the newest environment) picks the axis; larmorx used a platform-independent SVD (another axis: other directions and dim_info); it now uses lx.io.nibabel_header.io_orientation (aff2axcodes too)"
+link = "validation/difftest/cases/sdcflows-estimation/reorient-rotation-with-two-candidates.json"
+
+[[difference]]
+tool = "sdcflows-estimation"
+implementation = "port"
+signature = ["timeout"]
+status = "explained"
+explanation = "brain_masker cases whose random walker does not converge (fmapb-try1 216, 492): SciPy's conjugate gradients run to their limit (2 x 162,120 iterations), 23 s in sdcflows and 209 s in larmorx at one thread (relay27/slow_masker_*.py): no result within the 240 s limit; the limit is 900 s and brain_masker drawn less often; in the trial 8 of 518 brain_masker cases still had no result within 900 s (the walkers that do not converge); larmorx's speed there is a follow-up (relay 27's handoff)"
+link = "validation/investigations/sdcflows-fieldmap-b/relay27/slow_masker_larmorx.py"

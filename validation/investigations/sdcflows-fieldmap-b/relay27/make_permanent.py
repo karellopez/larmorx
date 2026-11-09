@@ -9,7 +9,8 @@ TOOL:SEED:N``), written as ``validation/difftest/cases/<tool>/<id>.json`` in the
 
 ``--check`` runs each case through its suite's runner and prints its checks (all must pass in
 the newest environment, the suites' own; in the shared one ``reorient-rotation-with-two-candidates``
-differs, as numpy's LAPACK 3.12.0 picks the other axis: the step LAPACK-3.12.1). A case whose
+differs as numpy's LAPACK 3.12.0 picks the other axis, until relay 28: the runner now follows the
+environment's LAPACK release, as nibabel does; ALL OK in both). A case whose
 file exists is checked as committed, never written again (relay 28: the draws changed in
 e88326b6, so the seeds of ``brain-masker-no-positive-value`` and ``brain-masker-padding-0`` now
 draw other calls).

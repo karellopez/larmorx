@@ -11,7 +11,7 @@ inputs, labels and indices; ``watershed_ift``'s inputs, markers and outputs; mas
 ``int8``'s range. Each case's result (or exception), the output array afterwards and the
 warnings are compared with SciPy's: ``upstream_defects="reproduce"`` must give SciPy's exactly;
 the default may differ only with the notice of a registered defect (SCI-10, SCI-13 to SCI-15,
-SCI-25, SCI-27, SCI-29, SCI-30), SCI-28's refusal (named in its message) or SCI-26 (numpy's
+SCI-25, SCI-27, SCI-29, SCI-30, SCI-31: the mask afterwards too, relay 28), SCI-28's refusal (named in its message) or SCI-26 (numpy's
 write-back warning, given with ``reproduce`` only). Two families besides: iterated erosions and
 dilations with a mask into output arrays of every type (SCI-25), and ``label`` into Fortran,
 strided and C-ordered outputs (the numbering along the output's axis of the smallest stride).
@@ -72,7 +72,7 @@ def _step_form(x):
 
 
 #: The entries whose notices may accompany a corrected default.
-KNOWN = {"SCI-10", "SCI-13", "SCI-14", "SCI-15", "SCI-25", "SCI-27", "SCI-29", "SCI-30"}
+KNOWN = {"SCI-10", "SCI-13", "SCI-14", "SCI-15", "SCI-25", "SCI-27", "SCI-29", "SCI-30", "SCI-31"}
 WRITEBACK = "WRITEBACKIFCOPY detected in"
 
 
@@ -225,14 +225,15 @@ STRUCTS = {
 
 def mk(fn_name, **kw):
     """A case calling ``m.<fn_name>(input, **kw)``; values that are factories are called per
-    module; an ndarray output is reported afterwards."""
+    module; an ndarray output is reported afterwards, and an ndarray mask (relay 28: SciPy's
+    iterated calls write into an ``int8`` mask, SCI-31)."""
 
     def case(m):
         k = {}
         for key, v in kw.items():
             k[key] = v() if callable(v) and not isinstance(v, type) else v
         x = k.pop("input")
-        given = [k["output"]] if isinstance(k.get("output"), np.ndarray) else []
+        given = [k[a] for a in ("output", "mask") if isinstance(k.get(a), np.ndarray)]
         return getattr(m, fn_name)(x, **k), given
 
     return case

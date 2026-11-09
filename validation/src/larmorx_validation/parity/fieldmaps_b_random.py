@@ -23,6 +23,7 @@ as ``check_regrid.py`` and ``check_skimage.py`` compare them; elsewhere they are
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import dataclasses
 import functools
 import gzip
@@ -1533,10 +1534,28 @@ CALLS: dict[str, Callable[[dict, dict, Path, int], _Call]] = {
 # --------------------------------------------------------------------------------------------
 
 
+def _numpy_lapack() -> str:
+    """The LAPACK release this environment's numpy bundles: "3.12.1" from OpenBLAS 0.3.31 on
+    (numpy 2.5.4's 0.3.34), else "3.12.0" (numpy 2.3.5's 0.3.30); as
+    ``validation/investigations/sdcflows-fieldmap/stepdigest.py``'s ``numpy_lapack``."""
+    version = np.show_config(mode="dicts")["Build Dependencies"]["blas"]["version"]
+    return "3.12.1" if tuple(int(x) for x in version.split(".")[:3]) >= (0, 3, 31) else "3.12.0"
+
+
 def run_case(case: Case, checks: CheckList) -> None:
-    """A random or permanent case of the three tools (payload ``("random", spec)``)."""
+    """A random or permanent case of the three tools (payload ``("random", spec)``), larmorx's
+    nibabel arithmetic (``io_orientation``'s and ``set_qform``'s SVD) following this
+    environment's LAPACK release, as the original's nibabel does (relay 28: the permanent case
+    ``reorient-rotation-with-two-candidates`` in the shared environment), for this case only."""
+    contextvars.copy_context().run(_run_case, case, checks)
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
+    from larmorx.io.nibabel_header import use_lapack
     from larmorx_validation.difftest import inputs
     from larmorx_validation.parity import defects
+
+    use_lapack(_numpy_lapack())
 
     spec = case.payload[1]
     recipe = spec["recipe"]

@@ -4,8 +4,8 @@ Findings of the field maps' part B, relay 2 (2026-11-08), from porting SciPy 1.1
 filters, morphology and labelling (`crates/larmorx-ndimage`, `lx.ndimage`,
 [docs/api/ndimage-filters.md](../api/ndimage-filters.md)) and numpy's percentiles, medians,
 `clip` and float32 `exp` (`larmorx_core::numpy`). The tools are in
-`validation/investigations/sdcflows-fieldmap-b/`. The defects below are registered (SCI-06 to SCI-17, `docs/findings/upstream-defects.md`), each
-with its rule A-D.
+`validation/investigations/sdcflows-fieldmap-b/`. The defects below are registered (SCI-06 to SCI-17 and, from relay 21,
+SCI-21 to SCI-24, `docs/findings/upstream-defects.md`), each with its rule A-D.
 
 ## numpy
 
@@ -134,6 +134,87 @@ a Fortran-ordered 104 x 104 x 72 image 0.78 s (0.57 s: the per-point path) at on
 rank returned before writing (all zeros, gh-23293: SciPy 1.15.3, the shared environment, 30 of 30
 such cases); SciPy 1.18 runs the n-dimensional filter. larmorx follows 1.18 (fixed upstream, as
 SCI-03).
+
+## The filters' argument handling and SciPy's 1-D running rank (relay 21, 2026-11-09)
+
+Relay 2's minimum, maximum and rank filters checked and converted their arguments in their own
+way (`_input`, `_out_dtype`: one `array type not supported` for every refused type, Python's
+`float()` for `cval`, `int()` for origins). They now follow SciPy 1.18.1 check for check
+(`_filters.py`, `_ni_support.py`, `nd_image.c`'s parsers, `_rank_filter_1d.cpp`; the same Python
+in SciPy 1.15.3): `_get_output` (`output must have numeric dtype` for a non-numeric `str`, `"bool"`
+included; numpy's `data type 'str96' not understood` for a string input), `normalize_axis_index`,
+the C parsers' conversions (`cval` through `PyFloat_AsDouble`: `must be real number, not
+numpy.str_`; sizes, axes and the 1-D origins through `__index__`: `'float' object cannot be
+interpreted as an integer`; the n-dimensional origins through numpy's `PyArray_IntpConverter`,
+which refuses a bool: `an integer is required`; `output array is read-only.`), the 1-D filters'
+`NI_InitLineBuffer` (`array type dtype('float16') not supported`, the input's then the output's)
+and the n-dimensional type switch (`array type not supported`, reached only for a non-empty
+input). What SciPy takes that larmorx refused: the separable path with no axis to filter
+(numpy's assignment, of any type: float16, objects), an empty float16 input to the n-dimensional
+filters, bool origins and sizes of the 1-D parsers, a list as the output, a float16 1-D rank
+filter (computed in float32). Before the change 169 of 560 probe cases differed (`relay21/` in
+the investigation folder has the probe); after it, `check_ndimage.py --sections arguments`: 964
+cases identical in both environments, every result, error and warning.
+
+SciPy's running rank of a 1-D input (`_rank_filter_1d`) has three defects of its own, and SciPy
+1.15.3 a fourth:
+
+1. **An output of another type gets the input type's bytes** (SCI-21, class a). For a float32,
+   float64 or int64 input SciPy passes the output array itself (`x_out = output`), and the C++
+   switches on the input's type and writes that type into the output's buffer: `median_filter(x,
+   3, output=np.float32)` of a float64 `x` writes 72 bytes into a 36-byte buffer (the heap
+   corrupted: the process crashed at exit, SIGSEGV; into a strided float32 array it hung), an
+   int16 or `">f8"` output gets the bytes reinterpreted, a float64 output of a float32 input gets
+   the float32 bytes in its first half. Rule A: larmorx casts the values into the output (what
+   SciPy does for every other input type), with a warning; `reproduce` gives SciPy's bytes where
+   they are the output's own and never writes past its end (the notice says how many bytes SciPy
+   wrote there). 36 cases (12 type pairs, the three filters), each SciPy call in a process of its
+   own: identical in both modes and both environments.
+2. **Big-endian floats and `longlong` refused** (SCI-22, class c). The dispatch compares dtypes by
+   equality with native ones, so `>f4`/`>f8` inputs fall to `RuntimeError("Unsupported array
+   type")` (big-endian integers are cast to int64 and pass), and numpy's `longlong` equals int64
+   but has another type number on Linux and macOS, which the C++ switch refuses
+   (`TypeError("Unsupported array type")`; on Windows `longlong` is numpy's int64 and passes). The
+   n-dimensional filters take both. Rule A: filtered by default (the native copy's result, a
+   warning); `reproduce` raises SciPy's errors.
+3. **numpy's write-back copy never resolved** (SCI-23, class f). Into a non-contiguous output of
+   the input's type the C++ writes into numpy's `WRITEBACKIFCOPY` copy and drops it without
+   `PyArray_ResolveWritebackIfCopy`: numpy writes it back and warns (`RuntimeWarning:
+   WRITEBACKIFCOPY detected in clearing of array.  Required call to ...`; numpy 2.3.5's text says
+   `in array_dealloc.`), and a read-only output gives numpy's `WRITEBACKIFCOPY base is read-only`.
+   Rule A for the warning (the values are right; the warning reports SciPy's own mistake): none by
+   default, numpy's text (by the running release) with `reproduce`; the read-only message is kept
+   in both modes (a clear error for an output that cannot be written).
+4. **SciPy 1.15.3 returns with an error set** (SCI-24, class f, fixed in 1.18.1): its C++ sets a Python
+   error (an unknown type number, a `cval` its type cannot take: `cval=np.array([2.0])` for an int8
+   input, which numpy's `int64()` keeps as a one-element array) and returns `None`, which CPython
+   turns into `SystemError: <built-in function rank_filter> returned a result with an exception
+   set`; 1.18.1 checks `PyErr_Occurred`. larmorx gives 1.18.1's error in both modes (as SCI-17).
+
+**A `numpy.longdouble` sigma** (the Gaussian filters). SciPy's `_gaussian_kernel1d` computes in
+the sigma's type: `-0.5 / sigma**2 * x**2`, `numpy.exp` and the sum in numpy's long double, which
+is x86-64's 80-bit extended precision on Linux and macOS Intel, IEEE quadruple precision on Linux
+aarch64 and float64 itself on Windows and Apple silicon: the weights differ between platforms.
+larmorx computes the kernel from the sigma as float64 everywhere (bit for bit SciPy's kernel of
+`float(sigma)`), with a `UserWarning` per kernel where the long double is wider than float64 (the
+orchestrator's decision, relay 20's note). The difference from SciPy's own 80-bit kernels on
+this machine (`check_regrid.py`'s long-double section, 48 sigmas from 0.05 to 12, orders 0 to
+3): 184 of 192 kernels differ, by at most 7.5e-16 of the kernel's largest weight; the order-0
+weights (the Gaussian's) by at most 12 units in the last place of float64. An explained
+difference; exactness in 80-bit arithmetic (glibc's `expl`, long double sums) was not cheap and
+is not attempted.
+
+**`random_walker(copy=False)`** (scikit-image 0.26.0's `_preprocess`): where some labels are
+negative or a seed is cut off from every unlabeled pixel, scikit-image sets the unlabeled pixels
+no seed reaches to -1 in the labels array it works on, which with `copy=False` is the caller's.
+larmorx did so only when every unlabeled pixel was isolated; it now marks the caller's array as
+scikit-image does (`check_skimage.py --sections rw`: the caller's labels afterwards, 27 of 27 in
+both environments).
+
+**Not yet as SciPy (the next relay):** binary morphology, `label` and `sum_labels` still take their
+arguments relay 2's way (`relay21/probe_binary.py`: 63 of 144 probe cases differ in message or
+acceptance: float16, long double, object and string inputs, read-only and list outputs, float and
+bool origins, a `str` or fractional `border_value`).
 
 ## numpy.linalg's `svd3` (the field maps' part A module, fixed here)
 

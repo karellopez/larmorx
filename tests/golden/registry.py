@@ -4224,6 +4224,34 @@ def _(ctx: Context) -> dict[str, Any]:
         data.astype(np.float32), [0.25j, 0.5, -0.75 + 0.5j, 0.125], axis=0, origin=1
     )
     out["g.complex64"] = lx.ndimage.gaussian_filter(cdata.astype(np.complex64), 1.1, (0, 1, 0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # numpy's long double is wider than float64 here
+        # a long-double sigma: the float64 kernel on every platform (relay 21)
+        out["g.longdouble"] = lx.ndimage.gaussian_filter(data, np.longdouble(1.3), (0, 2, 1))
+    return out
+
+
+@case("py.ndimage.rank1d", covers=("lx.ndimage.rank_filter", "lx.ndimage.median_filter", "lx.ndimage.percentile_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """SciPy's running rank of a 1-D input with its own type dispatch (relay 21): float16
+    through float32, an int8 input through int64, and SciPy's defects corrected: a float64
+    input into a float32 and a big-endian output (SCI-21, the values cast), big-endian float
+    and longlong inputs (SCI-22, filtered), a strided output of the input's type (SCI-23)."""
+    line = (ints(61, (37,), -60, 60) / 4).astype(np.float64)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-21 and SCI-22 notices
+        out["median.float16"] = lx.ndimage.median_filter(line.astype(np.float16), 5)
+        out["rank.int8"] = lx.ndimage.rank_filter(
+            line.astype(np.int8), 2, 4, mode="constant", cval=3
+        )
+        out["median.into.float32"] = lx.ndimage.median_filter(line, 3, output=np.float32)
+        out["percentile.into.>f8"] = lx.ndimage.percentile_filter(line.astype(np.float32), 50, 5, output=np.dtype(">f8"))  # fmt: skip
+        out["median.>f8"] = lx.ndimage.median_filter(line.astype(">f8"), 3, mode="nearest")
+        out["rank.longlong"] = lx.ndimage.rank_filter(line.astype(np.longlong), -2, 5, mode="wrap")
+        strided = np.zeros((37, 2))[:, 0]
+        lx.ndimage.median_filter(line, 7, output=strided, mode="mirror")
+        out["median.strided"] = strided.copy()
     return out
 
 

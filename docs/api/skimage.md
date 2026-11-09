@@ -41,7 +41,7 @@ prob = lx.skimage.random_walker(
 | `ball(radius, dtype, strict_radius=, decomposition=None)` | `lx.skimage.ball(...)` | `decomposition='sequence'`: `NotImplementedError` |
 | `threshold_otsu(image, nbins=256)` | `lx.skimage.threshold_otsu(image, nbins)` | float images: numpy's `histogram` with `nbins` bins; integer images: one bin per value (`nbins` ignored), as scikit-image |
 | `threshold_otsu(hist=counts)` / `hist=(counts, centres)` | the same | zero counts at both ends trimmed |
-| `random_walker(data, labels, beta=130, mode='cg_j', tol=1e-3, copy=True, return_full_prob=False, spacing=None, prob_tol=1e-3, channel_axis=None)` | `lx.skimage.random_walker(...)` | every argument; plus `scipy_version`, `upstream_defects`, `n_threads` |
+| `random_walker(data, labels, beta=130, mode='cg_j', tol=1e-3, copy=True, return_full_prob=False, spacing=None, prob_tol=1e-3, channel_axis=None)` | `lx.skimage.random_walker(...)` | every argument (`copy=False`: the isolated unlabeled pixels set to -1 in the caller's labels, as scikit-image's `_preprocess` does); plus `scipy_version`, `upstream_defects`, `n_threads` |
 | `mode='cg_j'` / `None` | the same | Jacobi-preconditioned conjugate gradients |
 | `mode='cg'` | the same | no preconditioner; scikit-image's UMFPACK warning |
 | `mode='cg_mg'` | falls back to `'cg_j'` with scikit-image's warning | scikit-image does the same without pyamg; pyamg's multigrid is not ported |

@@ -35,6 +35,12 @@ product against `a.dot(x)` on 2,800 shapes up to blocks of 2,048 rows, SciPy's
 `_gaussian_kernel1d` for orders 0 to 9, derivatives per axis in both filters, complex64 and
 complex128 inputs, real inputs with complex weights, complex `cval`, the output rules with their
 warnings, and `correlate1d`'s argument handling), identical on 1 and 8 threads.
+The minimum, maximum and rank filters' and grey morphology's argument handling (relay 21,
+2026-11-09): SciPy's on 964 cases per environment (`check_ndimage.py --sections arguments`:
+inputs, outputs, `cval`, origins, modes, axes, sizes, ranks and percentiles of every Python and
+numpy kind, empty inputs, outputs that are the input; the errors, results and warnings
+compared, and SCI-21 to SCI-23 in both modes, SciPy's writes past an output's end each in a
+process of its own); a `numpy.longdouble` sigma (`check_regrid.py`, below).
 
 ```python
 import numpy as np
@@ -58,10 +64,10 @@ contiguous); results are C-ordered, as SciPy's.
 | larmorx (`lx.ndimage.`) | SciPy (`scipy.ndimage.`) | Notes |
 |---|---|---|
 | `correlate1d` | the same | `weights` (float64), `axis`, `output`, `mode`, `cval`, `origin`; `NI_Correlate1D`: an odd kernel whose mirrored weights differ by at most `DBL_EPSILON` adds the mirrored pairs first (symmetric, or anti-symmetric with differences), from the outermost pair in, after the centre term; any other kernel the last term first, then the others in order; each line read into doubles and extended by `NI_ExtendLine`; C's cast to the output type. Complex input or weights: SciPy's `_complex_via_real_components` (the weights conjugated and made complex128; real correlations of the parts with `np.real(cval)` and `np.imag(cval)`, combined by numpy's `-=` and `+=` in the output's part type; the output `promote_types(input, complex64)` by default, a real dtype promoted with SciPy's warning, a real `str` or array refused; a complex `cval` with a real input refused). SciPy's argument order and messages: `_get_output` (a non-numeric `str` refused), the axis (`normalize_axis_index`), the origin, the mode, then the C parser's (`output array is read-only.`, `cval` through `PyFloat_AsDouble`: `must be real number, not ...`, `origin` through `__index__`) and `NI_InitLineBuffer`'s types, the input's then the output's (`array type dtype('float16') not supported`) |
-| `gaussian_filter1d`, `gaussian_filter` | the same | `order`, `sigma`, `mode`, `radius` per axis, `truncate`, `axes`, `output`; the kernel `exp(-0.5 / sigma**2 * x**2) / sum` with numpy's float64 `exp` on its path without AVX-512 (glibc's; on an AVX-512 CPU numpy takes Intel's SVML kernels, which differ in a few per cent of arguments: `larmorx_core::numpy::umath`) and numpy's sum (`numpy_version`, keyword); a derivative (`order > 0`) times SciPy's polynomial: its coefficients from `order` products `(D + P)·q` and its values `x**k · q`, numpy's `dot` both (OpenBLAS's Haswell `dgemv_t`, one thread: `larmorx_core::numpy::dot::matvec_f64`; a radius of 0 a dot product); complex inputs through `correlate1d`'s parts; axes with `sigma <= 1e-15` skipped, each pass written in the output's type (a complex input refuses a real output); none left: numpy's copy into the output's type. A `sigma` whose kernel numpy would compute in another type than float64 (`np.longdouble`): `NotImplementedError` |
-| `minimum_filter`, `maximum_filter` | the same | `size`, `footprint`, `output`, `mode`, `cval`, `origin`, `axes`; a full footprint or `size` is separable (one 1-D pass per axis, the first into the output's type), else `NI_MinOrMaxFilter` |
-| `minimum_filter1d`, `maximum_filter1d` | the same | `NI_MinOrMaxFilter1D` (Richard Harter's running minimum on the line extended by `NI_ExtendLine`) |
-| `rank_filter`, `median_filter`, `percentile_filter` | the same | the rank from the footprint's true elements; rank 0 and the last rank are the minimum and maximum filters; 1-D inputs use `_rank_filter_1d` (Ashelly's running rank, with the footprint's size) unless the footprint is too large for the input, as SciPy 1.18 decides; otherwise `NI_RankFilter` with SciPy's quickselect `NI_Select`; `upstream_defects` (SCI-09: a 1-D footprint with holes) |
+| `gaussian_filter1d`, `gaussian_filter` | the same | `order`, `sigma`, `mode`, `radius` per axis, `truncate`, `axes`, `output`; the kernel `exp(-0.5 / sigma**2 * x**2) / sum` with numpy's float64 `exp` on its path without AVX-512 (glibc's; on an AVX-512 CPU numpy takes Intel's SVML kernels, which differ in a few per cent of arguments: `larmorx_core::numpy::umath`) and numpy's sum (`numpy_version`, keyword); a derivative (`order > 0`) times SciPy's polynomial: its coefficients from `order` products `(D + P)·q` and its values `x**k · q`, numpy's `dot` both (OpenBLAS's Haswell `dgemv_t`, one thread: `larmorx_core::numpy::dot::matvec_f64`; a radius of 0 a dot product); complex inputs through `correlate1d`'s parts; axes with `sigma <= 1e-15` skipped, each pass written in the output's type (a complex input refuses a real output); none left: numpy's copy into the output's type. A `numpy.longdouble` sigma is taken as float64 (below) |
+| `minimum_filter`, `maximum_filter` | the same | `size`, `footprint`, `output`, `mode`, `cval`, `origin`, `axes`; a full footprint or `size` is separable (one 1-D pass per axis, each `minimum_filter1d`'s or `maximum_filter1d`'s, the first into the output's type; no axis longer than 1: numpy's assignment into the output, of any type), else `NI_MinOrMaxFilter` (its C parser `"O&O&O&O&idO&i"`: the output's write access, `cval` as a C double, the origins through numpy's `PyArray_IntpConverter`, which refuses a bool: `an integer is required`; its type switch, reached only for a non-empty input: `array type not supported`) |
+| `minimum_filter1d`, `maximum_filter1d` | the same | `NI_MinOrMaxFilter1D` (Richard Harter's running minimum on the line extended by `NI_ExtendLine`); SciPy's order: complex refused, `normalize_axis_index`, the size, `_get_output` (a non-numeric `str` refused: `output must have numeric dtype`), the origin, the mode, then the C parser `"O&niO&idni"` (the size, the axis and the origin through `__index__`: `'float' object cannot be interpreted as an integer`; `output array is read-only.`; `cval` through `PyFloat_AsDouble`: `must be real number, not ...`) and `NI_InitLineBuffer`'s types, the input's then the output's (`array type dtype('float16') not supported`) |
+| `rank_filter`, `median_filter`, `percentile_filter` | the same | the rank from the footprint's true elements; rank 0 and the last rank are the minimum and maximum filters; 1-D inputs use `_rank_filter_1d` (Ashelly's running rank, with the footprint's size) unless the footprint is too large for the input, as SciPy 1.18 decides, with its own type dispatch (float32, float64, int64 as they are; float16 through float32; booleans and other integers through int64; any other type `RuntimeError("Unsupported array type")`), `cval` in that type, its C parser `"OiiOiOi"` and its output (the output array itself for its three types: `WRITEBACKIFCOPY base is read-only` for a read-only one); otherwise `NI_RankFilter` with SciPy's quickselect `NI_Select` (its parser `"O&iO&O&idO&"`, as the minimum filter's); `upstream_defects` (SCI-09: a 1-D footprint with holes; SCI-21 to SCI-23: below) |
 | `grey_erosion`, `grey_dilation`, `grey_opening`, `grey_closing` | the same | `size`, `footprint`, `structure` (non-flat: added in the input's type, as SciPy's `CASE_MIN_OR_MAX_POINT`), the dilation's reversed footprint and origins |
 | `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing` | the same | `structure` (default `generate_binary_structure(rank, 1)`), `iterations` (below 1: until nothing changes), `mask`, `output`, `border_value`, `origin`, `brute_force`, `axes`; `upstream_defects` (SCI-10: the later passes' `int8` mask) |
 | `binary_propagation`, `binary_fill_holes`, `binary_hit_or_miss` | the same | built on the erosion as SciPy builds them; `binary_propagation`'s `upstream_defects` (SCI-10) |
@@ -147,6 +153,41 @@ part B, 2026-11-09):
   wrapping integer arithmetic: a `uint8` dilation wraps), SciPy's definition.
 - SciPy 1.15's 1-D rank filter of an input shorter than half the footprint returns zeros
   (**SCI-17**, gh-23293, fixed in SciPy 1.18): larmorx follows SciPy 1.18 in both modes.
+- The 1-D rank filter (`rank_filter`, `median_filter`, `percentile_filter` of a 1-D input)
+  gives SciPy's C++ the output array itself when the input is float32, float64 or int64, and
+  the C++ writes the input's type into it whatever the output's type: an output of another
+  type or byte order (`output=np.float32` for a float64 input, `">f8"`, an int16 array) gets
+  the input type's bytes, reinterpreted, and one of smaller items gets them past its end (the
+  heap corrupted: the process crashes or hangs). **SCI-21**, rule A, corrected by default (the
+  values cast into the output, as SciPy does for every other input type, with an
+  `UpstreamDefectWarning`); `upstream_defects="reproduce"` gives SciPy's bytes where they are
+  the output's own (the bytes past its end are never written; the warning says how many).
+- The same path compares types by equality with numpy's native ones: a big-endian float32 or
+  float64 input is refused (`RuntimeError("Unsupported array type")`) and numpy's `longlong`
+  (whose type number is not `int64`'s on Linux and macOS) is refused by the C++
+  (`TypeError("Unsupported array type")`), although the n-dimensional filters take both.
+  **SCI-22**, rule A: filtered by default (the native copy's result, with a warning);
+  `"reproduce"` raises SciPy's errors.
+- Into a non-contiguous output of the input's type the C++ writes into numpy's write-back copy
+  and never resolves it: numpy warns when the copy is freed (`RuntimeWarning: WRITEBACKIFCOPY
+  detected in clearing of array.  Required call to PyArray_ResolveWritebackIfCopy or
+  PyArray_DiscardWritebackIfCopy is missing.`; numpy 2.3's text says `array_dealloc`) and writes
+  it back. **SCI-23**, rule A (the values are right; the warning is SciPy's mistake): no warning
+  by default; `"reproduce"` emits numpy's warning, its text by the running numpy's release.
+- SciPy 1.15.3's running rank returns with a Python error set when its C++ raises one (a
+  `longlong` input, a `cval` its type cannot take: an int8 input with `cval=np.array([2.0])`),
+  which CPython turns into `SystemError: <built-in function rank_filter> returned a result with
+  an exception set`; SciPy 1.18.1 raises the error itself (**SCI-24**, fixed upstream): larmorx
+  gives 1.18.1's error in both modes.
+- A `numpy.longdouble` sigma (`gaussian_filter1d`, `gaussian_filter`): SciPy computes the
+  Gaussian kernel in numpy's long double, a different type per platform (x86-64's 80-bit
+  extended precision on Linux and macOS Intel, IEEE quadruple precision on Linux aarch64,
+  float64 itself on Windows and Apple silicon), so its weights differ between platforms in
+  their last bits. larmorx computes the kernel from the sigma as float64 on every platform
+  (SciPy's kernel of `float(sigma)`, bit for bit), with a `UserWarning` per kernel where the
+  long double is wider than float64. Measured on this machine (`check_regrid.py`, 48 sigmas,
+  orders 0 to 3): 184 of 192 kernels differ from SciPy's 80-bit ones, by at most 7.5e-16 of the
+  kernel's largest weight (the Gaussian's own weights at most 12 units in the last place).
 - `output` given as a dtype or array: the result is computed as SciPy computes it (a double per
   element, cast to the output's type by SciPy's own cast); integers beyond 2^53 follow the same
   path.

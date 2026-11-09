@@ -37,7 +37,21 @@ derivatives of `_gaussian_kernel1d` (its `dot`s through `larmorx_core::numpy::do
 `_complex_via_real_components` and `correlate1d`'s complex path, `_ni_support._get_output`
 (with `complex_output`), `scipy/_lib/_util.py`'s `normalize_axis_index`, and the argument
 handling of `src/nd_image.c`'s `Py_Correlate1D` (`"O&O&iO&idn"`, `NI_ObjectToOutputArray`'s
-read-only check) and `src/ni_support.c`'s `NI_InitLineBuffer` type check (its message).
+read-only check) and `src/ni_support.c`'s `NI_InitLineBuffer` type check (its message); (relay
+21) the minimum, maximum and rank filters' argument handling in SciPy 1.18.1's order:
+`_filters.py`'s `minimum_filter1d`, `maximum_filter1d`, `_min_or_max_filter` and `_rank_filter`
+(the 1-D running rank's type dispatch, `cval` in its type, the output it writes into),
+`src/nd_image.c`'s parsers of `Py_MinOrMaxFilter1D` (`"O&niO&idni"`), `Py_MinOrMaxFilter`
+(`"O&O&O&O&idO&i"`) and `Py_RankFilter` (`"O&iO&O&idO&"`), `src/_rank_filter_1d.cpp`'s
+`rank_filter` (`"OiiOiOi"`, its `PyArray_FROM_OTF` of the input and the output, its type switch,
+`PyFloat_AsDouble`/`PyLong_AsLongLong` of `cval`; SciPy 1.15.3's, without `PyErr_Occurred`, for
+SCI-24), `src/ni_filters.c`'s per-element type switches (`NI_MinOrMaxFilter`, `NI_RankFilter`: no
+error for an empty input); numpy 2.5.4's and 2.3.5's `PyArray_IntpConverter`,
+`PyArray_PyIntAsIntp_ErrMsg` and `dimension_from_scalar` (`numpy/_core/src/multiarray/
+conversion_utils.c`: the origins' conversion, a bool refused) and `_clear_array_attributes`'
+`WRITEBACKIFCOPY` warning text (`arrayobject.c`; numpy 2.3.5's `array_dealloc` text), and
+`PyArray_FailUnlessWriteable`'s message (SCI-21 to SCI-23); a `numpy.longdouble` sigma taken as
+float64 (larmorx's choice, `docs/api/ndimage-filters.md`).
 
 **Deliberate differences** (`docs/api/ndimage-filters.md`, "Differences from SciPy"): where
 SciPy reads or writes outside its arrays (binary morphology with an origin before its structure,
@@ -61,7 +75,8 @@ SciPy's labels on request (`upstream_defects`).
 
 The Python wrapper (`python/larmorx/skimage.py`) ports `random_walker`'s argument checks,
 `channel_as_last_axis`, `img_as_float` (`src/skimage/util/dtype.py`, `_convert`'s integer and
-boolean branches), the early returns and scikit-image's warnings. Not ported: `mode='bf'`
+boolean branches), the early returns and scikit-image's warnings, and (relay 21) `_preprocess`'s
+marks of the isolated unlabeled pixels in the caller's labels with `copy=False`. Not ported: `mode='bf'`
 (SciPy's `spsolve`), pyamg's `cg_mg` (scikit-image's own fallback to `cg_j` without pyamg is),
 `ball(decomposition='sequence')`.
 

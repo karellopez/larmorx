@@ -22,7 +22,10 @@ two or more whole periods before an axis to index 0 where SciPy reads before the
 footprint more than eight times the axis); a binary erosion or dilation iterated until nothing
 changes that alternates for ever raises instead of looping; ``watershed_ift`` corrects SciPy's
 neighbours across the array's edges, its queue that keeps an element alone in it and its 32-bit
-markers by default (``upstream_defects``; ``docs/api/ndimage-filters.md``).
+markers by default; the 1-D rank filters correct SciPy's writes of the input's type into an
+output of another type (SCI-21), its refusal of big-endian floats and ``longlong`` (SCI-22) and
+its write-back warning (SCI-23) by default (``upstream_defects``; ``docs/api/ndimage-filters.md``);
+a ``numpy.longdouble`` sigma's Gaussian kernel is computed from the sigma as float64.
 The work runs on ``n_threads`` threads with the GIL released; the result does not depend on
 the thread count.
 """
@@ -1106,7 +1109,16 @@ def rank_filter(
     :func:`median_filter` and :func:`percentile_filter`: on a 1-D input SciPy's running rank
     takes the footprint's whole window, its false elements included (the rank is counted from
     the true ones), so a 1-D footprint with holes filters another neighbourhood; larmorx filters
-    it with the n-dimensional filter, with a warning when that changes the result."""
+    it with the n-dimensional filter, with a warning when that changes the result.
+
+    SCI-21 to SCI-23 (rule A; the same switch), of SciPy's running rank of a 1-D input: a
+    float32, float64 or int64 input written into an output of another type or byte order gets
+    the input type's bytes (past the output's end when its items are smaller), which larmorx
+    corrects to the values cast into the output; big-endian float32 and float64 inputs and
+    numpy's ``longlong`` are refused by SciPy, filtered by larmorx; a non-contiguous output of
+    the input's type makes numpy warn about SciPy's unresolved write-back copy, which larmorx
+    does not (``reproduce``: SciPy's bytes where they are the output's own, its errors, numpy's
+    warning)."""
     rank = operator.index(rank)
     return _rank_filter(
         input,

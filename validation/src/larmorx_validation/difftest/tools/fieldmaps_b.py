@@ -782,7 +782,10 @@ ES_CALLS = (
     "match_histogram",
     "estimators",
 )
-ES_WEIGHTS = (2.0, 1.0, 1.5, 1.0, 1.5, 1.5, 1.0, 1.5, 1.0, 1.0)
+# brain_masker less often: about one case in twelve has a random walker that does not converge,
+# SciPy's conjugate gradients run to their limit: tens of seconds in sdcflows, minutes in
+# larmorx (relay 27's follow-up)
+ES_WEIGHTS = (2.0, 1.0, 1.5, 1.0, 1.5, 1.5, 0.3, 1.5, 1.0, 1.0)
 META_KEYS = (
     "TotalReadoutTime",
     "EstimatedTotalReadoutTime",

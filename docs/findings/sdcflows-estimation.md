@@ -1434,11 +1434,27 @@ What the first probes found (permanent cases: `relay27/make_permanent.py`, eleve
   nibabel's data types (`'<f4'`, the header's byte order, for unscaled data), so numpy's message
   names `dtype('<f4')`; `epi_mask` names SciPy's watershed defects (SCI-13, SCI-14) only when they
   change its mask (its labels may differ outside the dilated brain label alone).
-- **Speed (a follow-up, not a difference):** a brain mask whose random walker does not converge
-  (difftest case `sdcflows-estimation:fmapb-try1:492`, 15 x 20 x 15 voxels of 2.5 x 0.8 x 1.0 mm):
-  SciPy's conjugate gradients run to their limit, 2 x 162,120 iterations, 23 s in sdcflows, 209 s
-  in larmorx at one thread (`relay27/slow_masker_*.py`); the tool's time limit is
-  900 s for such cases.
+- **Speed (fixed in relay 28; not a difference):** a brain mask whose random walker does not
+  converge (difftest case `sdcflows-estimation:fmapb-try1:492`, 15 x 20 x 15 voxels of 2.5 x 0.8 x
+  1.0 mm): SciPy's conjugate gradients run to their limit, 2 x 162,120 iterations, 23 s in sdcflows,
+  209 s in larmorx at one thread (`relay27/slow_masker_*.py`); the tool's time limit is 900 s for
+  such cases. **The cause** (relay 28, a debugger's samples of the running call: every one in the
+  conjugate gradients' NaN paths): the image's grey closing is 0 everywhere (its values 0 to 3,
+  the background's percentile leaves two levels, the inverted image's closing fills them), so
+  sdcflows' `segtarget = 2 * closed / closed.max() - 1` is `0 / 0` (x86-64's default NaN), every
+  weight of the random walker a NaN, and the system NaN from its first iteration: the test
+  `norm(r) < atol` never passes and SciPy runs to `maxiter`; larmorx's kernels recomputed every
+  NaN element with SSE's NaN rules out of line (a call per element). **The change** (same bits):
+  once the residual holds a NaN and every element of the solution is one, no later iteration can
+  change the solution (SSE's `x + y` with a NaN `x` is `x`, already quiet) nor pass the test, so
+  larmorx stops there with SciPy's solution and `info = maxiter`; the NaN rules of the kernels'
+  slow paths are inlined (a NaN sum of a row stops at its first NaN). 209 s became 0.02 s
+  (`docs/benchmarks/sdcflows-estimation.md`); checked bit for bit, both D13 modes, on 139 of the
+  trial's brain_masker cases (every one of the 59 that timed out or took more than a minute, 80
+  others: `relay28/replay_masker_cases.py`, `relay28/replay-*.txt`: all agree; the 8 timeouts now
+  take 70 to 199 s, sdcflows' own time), the 13 permanent cases, the golden case
+  `py.skimage.random_walker.nan` against scikit-image (both solvers, float32 and float64:
+  `relay28/check_golden_paths.py`).
 - **Not ported (documented):** nipype's `requires` checks the command lines do not need
   (`antsApplyTransforms`' `print_out_composite_warp_file` without `output_image`): random testing
   draws the valid combinations only.

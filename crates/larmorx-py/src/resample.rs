@@ -336,7 +336,12 @@ fn linalg_scipy_inv4<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     use larmorx_transform::scipy_linalg::{self, Condition, Outcome, ScipyRelease};
     let m = mat4(&a)?;
-    let release = match scipy_version.split('.').take(2).collect::<Vec<_>>().as_slice() {
+    let release = match scipy_version
+        .split('.')
+        .take(2)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
         ["1", "15"] => ScipyRelease::V1_15,
         ["1", "18"] => ScipyRelease::V1_18,
         _ => {
@@ -352,7 +357,9 @@ fn linalg_scipy_inv4<'py>(
     let none = || py.None().into_bound(py);
     let (status, inverse, lu, rcond) = match outcome {
         Outcome::Inverse(x, Condition::WellConditioned) => ("ok", mat(&x), none(), 0.0),
-        Outcome::Inverse(x, Condition::IllConditioned(r)) => ("ill_conditioned", mat(&x), none(), r),
+        Outcome::Inverse(x, Condition::IllConditioned(r)) => {
+            ("ill_conditioned", mat(&x), none(), r)
+        }
         Outcome::Inverse(x, Condition::EstimateNeeded) => ("estimate_needed", mat(&x), none(), 0.0),
         Outcome::Singular => ("singular", none(), none(), 0.0),
         Outcome::NormOverflow { lu, inverse } => ("norm_overflow", mat(&inverse), mat(&lu), 0.0),

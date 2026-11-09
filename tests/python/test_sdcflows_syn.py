@@ -65,8 +65,6 @@ def test_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ValueError, match="SHA-256"):
         lx.sdcflows.fmap_atlas()
     assert Path(lx.sdcflows.fmap_atlas_affine()).stat().st_size == 193
-    with pytest.raises(NotImplementedError, match="RegridToZooms"):
-        lx.sdcflows.syn_preprocessing_workflow(p, [{}], p, p, p, out_dir=tmp_path / "s", debug=True)
     with pytest.raises(NotImplementedError, match="mri_robust_template"):
         lx.niworkflows.epi_reference_workflow([p, p], out_dir=tmp_path / "e")
     with pytest.raises(ValueError, match="xform_code"):

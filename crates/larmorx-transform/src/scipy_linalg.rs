@@ -422,7 +422,13 @@ mod tests {
         assert!(near_identity(&product(&lower, &x), 1e-15));
         assert!((0..4).all(|r| (r + 1..4).all(|c| x[r][c].to_bits() == 0)));
         let diag: Mat4 = std::array::from_fn(|i| {
-            std::array::from_fn(|j| if i == j { [2.0, -4.0, 0.5, 1.0][i] } else { 0.0 })
+            std::array::from_fn(|j| {
+                if i == j {
+                    [2.0, -4.0, 0.5, 1.0][i]
+                } else {
+                    0.0
+                }
+            })
         });
         let (s, x) = inverse(&diag, ScipyRelease::V1_18);
         assert_eq!(s, Structure::Diagonal);

@@ -422,7 +422,8 @@ def syn_preprocessing_workflow(
     ANTs reads from ``ANTS_RANDOM_SEED`` (fMRIPrep sets it). ``t1w_inversion`` is accepted and
     unused, as in sdcflows. ``debug`` (sdcflows' fast settings) regrids the anatomical image to
     2 mm with niworkflows' ``RegridToZooms`` (``smooth=True``; ``regrid_anat``), whose voxel
-    sizes the sampling grid then takes, and writes the registration's warped images.
+    sizes the sampling grid then takes, and writes the registration's warped images and every
+    fifth iteration's volumes (``--write-interval-volumes 5``).
     ``numpy_version``, ``scipy_version`` and ``nilearn_version`` select the libraries'
     arithmetic (the newest by default; fMRIPrep 25.2.6's image: numpy 2.2.6, SciPy 1.15.2,
     nilearn 0.11.1); ``niworkflows_version`` the version written into ``descrip``."""
@@ -503,6 +504,7 @@ def syn_preprocessing_workflow(
         fixed_image_masks=[anat_dil],
         moving_image_masks=["NULL", epi_dil],
         num_threads=max(int(omp_nthreads), 1),
+        **({"args": "--write-interval-volumes 5"} if debug else {}),
     )
     _nipype.run(
         reg,

@@ -539,7 +539,12 @@ pub fn correlate1d<T: NdElement>(
     let lines: Vec<Vec<f64>> = (0..n_lines)
         .into_par_iter()
         .map_init(
-            || (vec![0.0f64; before + len + after], vec![0usize; other.len()]),
+            || {
+                (
+                    vec![0.0f64; before + len + after],
+                    vec![0usize; other.len()],
+                )
+            },
             |(buf, idx), li| {
                 unravel(li, &other_shape, idx);
                 let base: usize = other

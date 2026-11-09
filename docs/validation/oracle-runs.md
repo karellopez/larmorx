@@ -325,17 +325,25 @@ new file with its SHA-256 and the original's in `RUN_INFO.txt`; no image data ch
 and every program node is classified by the pipeline-stage catalogue (the SyN nodes by a roadmap entry until the part
 ports them).
 
+The seven field-map runs were made again on 2026-11-09 with OpenBLAS's Haswell kernels (`OPENBLAS_CORETYPE=Haswell` in
+the container, the setting `scripts/run_fmriprep_oracle.sh` has passed since then), as every earlier run on the AVX2
+laptop had: on this machine's AVX-512 CPU the image otherwise picks OpenBLAS's AVX-512 kernels, which change numpy's and
+FSL's last bits (`topup`'s field up to 0.197 Hz on ds004958's PEPOLAR pair, measured by
+`validation/investigations/fmap-oracle-runs/topup_kernel_probe.sh`). Their RUN_INFO below is the new runs'; the first
+runs are archived (`<workspace>/archive/2026-11-08-fmriprep-runs-avx512-kernels/`, with a README). The table's minutes are
+the new runs'. The two multi-echo runs follow.
+
 | Run | What it adds | Minutes |
 |---|---|---:|
 | `ds000210-sub-02-noreconall` | three-echo BOLD (`t2smap`): the cued-SGT task and a rest run | 39 |
 | `ds000258-sub-21262-noreconall` | three-echo BOLD (`t2smap`; echoes 12, 28, 44 ms) | 35 |
-| `ds000228-sub-pixar008-noreconall-syn` | `--use-syn-sdc` on the panel's child (SyN field-map-less estimation) | 46 |
-| `ds004884-sub-M2079-noreconall-syn` | `--use-syn-sdc` on the panel's stroke | 68 |
-| `ds005003-sub-RS001-noreconall-syn` | `--use-syn-sdc` on the panel's glioma | 73 |
-| `ds006736-sub-004-noreconall` | PEPOLAR: two opposite-direction EPIs (view: `IntendedFor` narrowed to the one cached BOLD) | 45 |
-| `ds004958-sub-fsm64ps-noreconall-pepolar` | PEPOLAR: the spin-echo AP/PA pair linked to the rest BOLD (view) | 54 |
-| `ds002603-sub-01-noreconall-epi` | PEPOLAR from EPI and BOLD: the phase difference unlinked (view), two estimators | 51 |
-| `ds005752-sub-ON01016-noreconall-direct` | a direct field map in Hz linked to the two BOLD runs (view) | 39 |
+| `ds000228-sub-pixar008-noreconall-syn` | `--use-syn-sdc` on the panel's child (SyN field-map-less estimation) | 47 |
+| `ds004884-sub-M2079-noreconall-syn` | `--use-syn-sdc` on the panel's stroke | 74 |
+| `ds005003-sub-RS001-noreconall-syn` | `--use-syn-sdc` on the panel's glioma | 69 |
+| `ds006736-sub-004-noreconall` | PEPOLAR: two opposite-direction EPIs (view: `IntendedFor` narrowed to the one cached BOLD) | 40 |
+| `ds004958-sub-fsm64ps-noreconall-pepolar` | PEPOLAR: the spin-echo AP/PA pair linked to the rest BOLD (view) | 53 |
+| `ds002603-sub-01-noreconall-epi` | PEPOLAR from EPI and BOLD: the phase difference unlinked (view), two estimators | 50 |
+| `ds005752-sub-ON01016-noreconall-direct` | a direct field map in Hz linked to the two BOLD runs (view) | 38 |
 
 ### ds000210-sub-02-noreconall
 
@@ -387,11 +395,13 @@ BIDS input: <workspace>/oracles/bids-views/ds000228
 participant: pixar008
 arguments: /data /out participant --participant-label pixar008 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T13:52:23Z
-finished: 2026-11-08T14:37:54Z
+started: 2026-11-09T00:17:36Z
+finished: 2026-11-09T01:04:37Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds000228 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds000228-sub-pixar008-noreconall-syn
 ```
 
 ### ds004884-sub-M2079-noreconall-syn
@@ -406,11 +416,13 @@ BIDS input: <workspace>/oracles/bids-views/ds004884
 participant: M2079
 arguments: /data /out participant --participant-label M2079 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T14:38:05Z
-finished: 2026-11-08T15:45:47Z
+started: 2026-11-09T01:04:51Z
+finished: 2026-11-09T02:18:48Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds004884 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds004884-sub-M2079-noreconall-syn
 ```
 
 ### ds005003-sub-RS001-noreconall-syn
@@ -425,11 +437,13 @@ BIDS input: <workspace>/oracles/bids-views/ds005003
 participant: RS001
 arguments: /data /out participant --participant-label RS001 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall --use-syn-sdc
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T15:46:00Z
-finished: 2026-11-08T16:59:19Z
+started: 2026-11-09T02:19:01Z
+finished: 2026-11-09T03:27:49Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds005003 (the data panel's view, as its noreconall run); --use-syn-sdc for sdcflows' SyN path (field maps part B, 2026-11-08)
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds005003-sub-RS001-noreconall-syn
 ```
 
 ### ds006736-sub-004-noreconall
@@ -444,14 +458,16 @@ BIDS input: <workspace>/oracles/bids-views/ds006736
 participant: 004
 arguments: /data /out participant --participant-label 004 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T17:01:31Z
-finished: 2026-11-08T17:46:40Z
+started: 2026-11-08T21:16:07Z
+finished: 2026-11-08T21:56:11Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds006736 (field maps part B, 2026-11-08)
 BIDS view ds006736: the cached files of ds006736 (sub-004) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
 sub-004/fmap/sub-004_dir-AP_epi.json: original 073a417b7c5f1bd37552f144428ff212c84b6486219f6f70432bb5637707e32f, derived 08a27bd436206b9a7df8e503bfaf1aeca746ecd2c41129e8c74c955ba7908335, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
 sub-004/fmap/sub-004_dir-PA_epi.json: original 6486ded73a7c5856a6cabe9e9e0b306119509ee2cb5de68294171325c9533557, derived ff1cbb027ce505476f51e55877a01e0e454a51646a75cb1d55cc7e2e6e054864, IntendedFor = ['func/sub-004_task-freeRecall_bold.nii.gz']
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds006736-sub-004-noreconall
 ```
 
 ### ds004958-sub-fsm64ps-noreconall-pepolar
@@ -466,14 +482,16 @@ BIDS input: <workspace>/oracles/bids-views/ds004958-pepolar
 participant: fsm64ps
 arguments: /data /out participant --participant-label fsm64ps -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T17:46:54Z
-finished: 2026-11-08T18:40:50Z
+started: 2026-11-08T21:56:22Z
+finished: 2026-11-08T22:49:34Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds004958-pepolar (field maps part B, 2026-11-08)
 BIDS view ds004958-pepolar: the cached files of ds004958 (sub-fsm64ps) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
 sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-AP_epi.json: original 8f2e0f71e4a28022732d3781da1b74c6ac2143b37713be5825a054eebe624405, derived 1a326fc2f87ff6825e218a1e2f8df88adfba1861e84f16aff4c46285e82b9579, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
 sub-fsm64ps/fmap/sub-fsm64ps_acq-se_dir-PA_epi.json: original ad6fbf2230a58b40003559e17332c29d478a62580efe3a8562580f6a6957594a, derived 51cc4219571aa133b431f0266a7e224789a1bcb9f9ef945bfc627ccfa79a0302, IntendedFor = ['func/sub-fsm64ps_task-rest_bold.nii.gz']
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds004958-sub-fsm64ps-noreconall-pepolar
 ```
 
 ### ds002603-sub-01-noreconall-epi
@@ -488,13 +506,15 @@ BIDS input: <workspace>/oracles/bids-views/ds002603-epi
 participant: 01
 arguments: /data /out participant --participant-label 01 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T18:41:03Z
-finished: 2026-11-08T19:32:06Z
+started: 2026-11-08T22:49:47Z
+finished: 2026-11-08T23:39:23Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds002603-epi (field maps part B, 2026-11-08)
 BIDS view ds002603-epi: the cached files of ds002603 (sub-01) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
 sub-01/fmap/sub-01_acq-Mm2_phasediff.json: original 293096011449029bab0d56f4db67c4f0d6ff8a5d1c4651bc8d774ded4a11aba6, derived c5e7451597f19b03c78c12856a722440014599713d85e1339c6cb2a8d93cd1c8, IntendedFor removed
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds002603-sub-01-noreconall-epi
 ```
 
 ### ds005752-sub-ON01016-noreconall-direct
@@ -509,13 +529,15 @@ BIDS input: <workspace>/oracles/bids-views/ds005752-direct
 participant: ON01016
 arguments: /data /out participant --participant-label ON01016 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T19:32:17Z
-finished: 2026-11-08T20:11:16Z
+started: 2026-11-08T23:39:35Z
+finished: 2026-11-09T00:17:24Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds005752-direct (field maps part B, 2026-11-08)
 BIDS view ds005752-direct: the cached files of ds005752 (sub-ON01016) hard-linked; derived sidecars (larmorx validation/investigations/fmap-oracle-runs/derived_views.py):
 sub-ON01016/ses-01/fmap/sub-ON01016_ses-01_acq-bold_fieldmap.json: original 783eda358368a9063ac9e017412fbad5c5ced4961b5ad0fef94c6bac03d1aa01, derived 69d15efd91f16c8855792cd282f2079eb7d57a03d67925610d300b6dafc72b74, IntendedFor = ['ses-01/func/sub-ON01016_ses-01_task-rest_dir-forward_bold.nii.gz', 'ses-01/func/sub-ON01016_ses-01_task-rest_dir-reverse_bold.nii.gz']
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds005752-sub-ON01016-noreconall-direct
 ```
 
 ## sdcflows 2.17.1's own runs (2026-11-08)

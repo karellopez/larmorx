@@ -123,6 +123,25 @@ pub fn point_row(m: &Mat4, r: usize, p: [f64; 3]) -> f64 {
     (s + m[r][3]) + 0.0
 }
 
+/// `m.dot(q)` for the homogeneous points `q = (x, y, z, 1)` as the columns of a `4 × n` matrix
+/// (niworkflows' `resample_by_spacing`: `new_card.dot(np.vstack((grid, ones)))`): [`point_row`]
+/// for every point (`dgemm`) when `n` is 2 or more, [`point_row_single`] (`dgemv`) for one; in
+/// place, the first three rows. The fourth row of such a product is exactly 1.
+pub fn affine_points(m: &Mat4, points: &mut [[f64; 3]]) {
+    use rayon::prelude::*;
+    if points.len() == 1 {
+        let p = points[0];
+        points[0] = std::array::from_fn(|r| point_row_single(m, r, p));
+        return;
+    }
+    points.par_chunks_mut(4096).for_each(|chunk| {
+        for p in chunk {
+            let q = *p;
+            *p = std::array::from_fn(|r| point_row(m, r, q));
+        }
+    });
+}
+
 /// [`point_row`] for a single point: numpy then calls `dgemv` (`cblasfuncs.c`, a column
 /// operand), and OpenBLAS's Haswell `dgemv_t` kernel (`dgemv_t_microk_haswell-4.c`) multiplies
 /// the four terms in the lanes of one register and adds them pairwise into a `y` cleared to +0:

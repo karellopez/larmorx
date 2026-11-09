@@ -48,6 +48,18 @@ def inv(a: Any) -> np.ndarray:
     return out.reshape(a.shape)
 
 
+def affine_points(affine: Any, points: Any, *, n_threads: int = 1) -> np.ndarray:
+    """``affine.dot(np.vstack((points.T, ones)))[:3].T`` for ``(n, 3)`` points, as numpy
+    computes it with OpenBLAS's Haswell kernels: ``dgemm`` (a fused multiply-add chain per
+    entry) for two or more points, ``dgemv`` for one."""
+    pts = np.ascontiguousarray(points, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[1] != 3:
+        raise ValueError(f"points must have shape (n, 3), not {pts.shape}")
+    return _core.linalg_affine_points(
+        np.ascontiguousarray(affine, dtype=np.float64), pts, int(n_threads)
+    )
+
+
 class LinAlgWarning(RuntimeWarning):
     """SciPy's ``scipy.linalg.LinAlgWarning``: SciPy 1.18's ``inv`` of an ill-conditioned matrix."""
 

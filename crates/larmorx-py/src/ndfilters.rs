@@ -298,6 +298,63 @@ fn ndimage_min_or_max_filter1d<'py>(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn correlate1d_t<'py, T: NdElement + Element>(
+    input: PyReadonlyArrayDyn<'py, T>,
+    py: Python<'py>,
+    weights: &[f64],
+    axis: usize,
+    mode: Extend,
+    cval: f64,
+    origin: isize,
+    n_threads: usize,
+    output: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    let view = input.as_array();
+    let (data, layout) = strided(&view);
+    let out = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                nd::correlate1d::<T>(&data, &layout, weights, axis, mode, cval, origin)
+            })
+        })
+        .map_err(threads_err)?
+        .map_err(nd_err)?;
+    cast_out(py, &layout.shape, out, output, false)
+}
+
+/// `_nd_image.correlate1d(input, weights, axis, output, mode, cval, origin)`
+/// (`larmorx_ndimage::correlate1d`), the result cast to `output` (the input's type by default).
+#[pyfunction]
+#[pyo3(signature = (input, weights, axis, mode, cval, origin, n_threads = 1, output = None))]
+#[allow(clippy::too_many_arguments)]
+fn ndimage_correlate1d<'py>(
+    py: Python<'py>,
+    input: &Bound<'py, PyAny>,
+    weights: Vec<f64>,
+    axis: usize,
+    mode: &str,
+    cval: f64,
+    origin: isize,
+    n_threads: usize,
+    output: Option<&str>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let mode = extend(mode)?;
+    let out_name = output_name(input, output)?;
+    by_dtype!(
+        input,
+        correlate1d_t,
+        py,
+        &weights,
+        axis,
+        mode,
+        cval,
+        origin,
+        n_threads,
+        &out_name
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn rank_t<'py, T: NdElement + Element>(
     input: PyReadonlyArrayDyn<'py, T>,
     py: Python<'py>,
@@ -771,6 +828,20 @@ fn numpy_exp_f32<'py>(
     to_py(py, &shape, out)
 }
 
+/// numpy's float64 `exp` (`larmorx_core::numpy::umath::exp_f64`: glibc's, the path without
+/// AVX-512), elementwise, C-ordered.
+#[pyfunction]
+fn numpy_exp_f64<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArrayDyn<'py, f64>,
+) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
+    let view = a.as_array();
+    let shape = view.shape().to_vec();
+    let v: Vec<f64> = view.iter().copied().collect();
+    let out = py.detach(|| v.into_iter().map(np::umath::exp_f64).collect::<Vec<_>>());
+    to_py(py, &shape, out)
+}
+
 /// `numpy.clip(a, a_min, a_max)` of a float32 array with float32 bounds, C-ordered.
 #[pyfunction]
 fn numpy_clip_f32<'py>(
@@ -800,6 +871,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(numpy_add_reduce, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_median, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_exp_f32, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_exp_f64, m)?)?;
+    m.add_function(wrap_pyfunction!(ndimage_correlate1d, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_clip_f32, m)?)?;
     Ok(())
 }

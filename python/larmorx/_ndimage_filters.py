@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 """SciPy-compatible filters, morphology and labelling for ``lx.ndimage`` (imported there).
 
-A replica of ``scipy.ndimage``'s minimum, maximum, rank, median and percentile filters, grey
+A replica of ``scipy.ndimage``'s ``correlate1d``, ``gaussian_filter1d`` and ``gaussian_filter``
+(order 0; the Gaussian kernel with numpy's float64 ``exp`` on its path without AVX-512, glibc's,
+and numpy's sum), minimum, maximum, rank, median and percentile filters, grey
 and binary morphology, ``label``, ``sum_labels``, ``center_of_mass``, ``watershed_ift``,
 ``generate_binary_structure`` and ``iterate_structure`` (SciPy 1.18.1; the C and Cython code
 of these functions is the same in SciPy 1.15.3), computed in Rust (``larmorx_ndimage``) with SciPy's results bit for bit: the
@@ -25,6 +27,7 @@ the thread count.
 
 from __future__ import annotations
 
+import numbers
 import operator
 import warnings
 from collections.abc import Iterable
@@ -37,6 +40,9 @@ from larmorx._defects import UpstreamDefectsName
 
 __all__ = [
     "binary_closing",
+    "correlate1d",
+    "gaussian_filter",
+    "gaussian_filter1d",
     "binary_dilation",
     "binary_erosion",
     "binary_fill_holes",
@@ -203,6 +209,152 @@ def _result(out: np.ndarray, target: np.dtype, output: Any) -> np.ndarray:
         return res
     np.copyto(output, res, casting="unsafe")
     return output
+
+
+# --- correlate1d and the Gaussian filters -----------------------------------------------------
+
+
+def correlate1d(
+    input: Any,
+    weights: Any,
+    axis: int = -1,
+    output: Any = None,
+    mode: str = "reflect",
+    cval: float = 0.0,
+    origin: int = 0,
+    *,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``scipy.ndimage.correlate1d``: the correlation of the lines along ``axis`` with
+    ``weights`` (``NI_Correlate1D``: a symmetric or anti-symmetric kernel adds the mirrored pairs
+    first; C's cast to the output type)."""
+    a = np.asarray(input)
+    w = np.asarray(weights)
+    if a.dtype.kind == "c" or w.dtype.kind == "c":
+        raise NotImplementedError("complex inputs and weights are not supported")
+    a, dtype = _input(a)
+    target = _out_dtype(output, dtype, a.shape)
+    w = np.asarray(w, dtype=np.float64)
+    if w.ndim != 1 or w.shape[0] < 1:
+        raise RuntimeError("no filter weights given")
+    axis = operator.index(axis)
+    if not -a.ndim <= axis < a.ndim:
+        raise np.exceptions.AxisError(axis, a.ndim)
+    axis = axis % a.ndim
+    lw = len(w)
+    if (origin < -(lw // 2)) or (origin > (lw - 1) // 2):
+        raise ValueError(
+            "Invalid origin; origin must satisfy -(len(weights) // 2) <= origin <= "
+            "(len(weights)-1) // 2"
+        )
+    out = _core.ndimage_correlate1d(
+        a,
+        [float(v) for v in w],
+        axis,
+        _mode(mode),
+        float(cval),
+        int(origin),
+        int(n_threads),
+        target.name,
+    )
+    return _result(out, target, output)
+
+
+def _gaussian_kernel1d(sigma: Any, order: int, radius: int, numpy_version: str) -> np.ndarray:
+    """SciPy's ``_gaussian_kernel1d`` (order 0): ``exp(-0.5 / sigma**2 * x**2)`` for ``x`` from
+    ``-radius`` to ``radius``, divided by its sum, with numpy's float64 ``exp`` (glibc's, the
+    path without AVX-512) and its sum (``numpy_version``'s order)."""
+    if order < 0:
+        raise ValueError("order must be non-negative")
+    if order != 0:
+        raise NotImplementedError("Gaussian derivatives (order > 0) are not ported")
+    sigma2 = sigma * sigma
+    x = np.arange(-radius, radius + 1)
+    arg = np.asarray(-0.5 / sigma2 * x**2)
+    if arg.dtype != np.float64:
+        raise NotImplementedError(f"a Gaussian kernel computed in {arg.dtype} is not ported")
+    phi_x = _core.numpy_exp_f64(np.ascontiguousarray(arg))
+    return phi_x / _core.numpy_add_reduce(phi_x, numpy_version)
+
+
+def gaussian_filter1d(
+    input: Any,
+    sigma: float,
+    axis: int = -1,
+    order: int = 0,
+    output: Any = None,
+    mode: str = "reflect",
+    cval: float = 0.0,
+    truncate: float = 4.0,
+    *,
+    radius: int | None = None,
+    numpy_version: str = NUMPY_NEWEST,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``scipy.ndimage.gaussian_filter1d`` (order 0): :func:`correlate1d` with the reversed
+    Gaussian kernel of ``int(truncate * sigma + 0.5)`` (or ``radius``) elements each side."""
+    sd = float(sigma)
+    lw = int(truncate * sd + 0.5)
+    if radius is not None:
+        lw = radius
+    if not isinstance(lw, numbers.Integral) or lw < 0:
+        raise ValueError("Radius must be a nonnegative integer.")
+    weights = _gaussian_kernel1d(sigma, order, lw, numpy_version)[::-1]
+    return correlate1d(input, weights, axis, output, mode, cval, 0, n_threads=n_threads)
+
+
+def gaussian_filter(
+    input: Any,
+    sigma: Any,
+    order: Any = 0,
+    output: Any = None,
+    mode: Any = "reflect",
+    cval: float = 0.0,
+    truncate: float = 4.0,
+    *,
+    radius: Any = None,
+    axes: Any = None,
+    numpy_version: str = NUMPY_NEWEST,
+    n_threads: int = 1,
+) -> np.ndarray:
+    """``scipy.ndimage.gaussian_filter`` (order 0): :func:`gaussian_filter1d` along each axis
+    whose ``sigma`` exceeds 1e-15, in turn, each pass written in the output's type; a copy in
+    that type when none does."""
+    a = np.asarray(input)
+    if a.dtype.kind == "c":
+        raise NotImplementedError("complex inputs are not supported")
+    target = _out_dtype(output, a.dtype, a.shape)
+    axes = _check_axes(axes, a.ndim)
+    num_axes = len(axes)
+    orders = _normalize_sequence(order, num_axes)
+    sigmas = _normalize_sequence(sigma, num_axes)
+    modes = _normalize_sequence(mode, num_axes)
+    radiuses = _normalize_sequence(radius, num_axes)
+    passes = [
+        (axes[ii], sigmas[ii], orders[ii], modes[ii], radiuses[ii])
+        for ii in range(num_axes)
+        if sigmas[ii] > 1e-15
+    ]
+    if not passes:
+        out = np.zeros(a.shape, dtype=target)
+        out[...] = a[...]
+        return _result(out, target, output)
+    cur = a
+    for ax, sg, od, md, rd in passes:
+        cur = gaussian_filter1d(
+            cur,
+            sg,
+            ax,
+            od,
+            target,
+            md,
+            cval,
+            truncate,
+            radius=rd,
+            numpy_version=numpy_version,
+            n_threads=n_threads,
+        )
+    return _result(cur, target, output)
 
 
 # --- the minimum, maximum and rank filters ---------------------------------------------------

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 """SciPy-compatible spline interpolation, filters, morphology and labelling: ``lx.ndimage``.
 
-The filters (minimum, maximum, rank, median, percentile), grey and binary morphology,
+The filters (``correlate1d``, ``gaussian_filter1d``, ``gaussian_filter``, minimum, maximum,
+rank, median, percentile), grey and binary morphology,
 ``label``, ``sum_labels``, ``center_of_mass`` and ``watershed_ift`` are SciPy 1.18.1's, bit for
 bit, from ``larmorx._ndimage_filters`` (``docs/api/ndimage-filters.md``). The rest of this text is about the interpolation.
 
@@ -42,6 +43,9 @@ from larmorx._ndimage_filters import (
     binary_opening,
     binary_propagation,
     center_of_mass,
+    correlate1d,
+    gaussian_filter,
+    gaussian_filter1d,
     generate_binary_structure,
     grey_closing,
     grey_dilation,
@@ -72,6 +76,9 @@ __all__ = [
     "binary_opening",
     "binary_propagation",
     "center_of_mass",
+    "correlate1d",
+    "gaussian_filter",
+    "gaussian_filter1d",
     "generate_binary_structure",
     "grey_closing",
     "grey_dilation",

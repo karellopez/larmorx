@@ -21,6 +21,8 @@ and scikit-image arithmetic under them.
   nearest-neighbour :func:`resample_img_nearest`) and :func:`epi_reference_workflow`:
   ``ValidateImage``, ``NonsteadyStatesDetector``, ``Binarize``, ``GenerateSamplingReference``
   and ``init_epi_reference_wf``.
+- :func:`regrid_to_zooms` (with :func:`resample_by_spacing`): ``RegridToZooms``, an image on a
+  grid of new voxel sizes over the same field of view.
 - :func:`derivatives_data_sink`, :func:`copy_any`: ``DerivativesDataSink`` (a derivative named
   by niworkflows' ``nipreps.json`` patterns, its header fixed, its JSON sidecar) and
   ``_copy_any``.
@@ -73,6 +75,7 @@ from larmorx.niworkflows.nibabel import (
 from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
 from larmorx.niworkflows.participants import BIDSError, BIDSWarning, collect_participants
 from larmorx.niworkflows.refmap import EpiReferenceResult, epi_reference_workflow
+from larmorx.niworkflows.regrid import RegridToZoomsResult, regrid_to_zooms, resample_by_spacing
 from larmorx.niworkflows.sampling import (
     BoundingBoxError,
     generate_sampling_reference,
@@ -92,6 +95,7 @@ __all__ = [
     "IntensityClipResult",
     "IntraModalMergeResult",
     "NonsteadyStatesResult",
+    "RegridToZoomsResult",
     "RobustAverageResult",
     "SkullstripBoldResult",
     "ValidateImageResult",
@@ -120,7 +124,9 @@ __all__ = [
     "ornt_transform",
     "reorient",
     "reorient_file",
+    "regrid_to_zooms",
     "reorient_image",
+    "resample_by_spacing",
     "resample_img_nearest",
     "robust_average",
     "skullstrip_bold_workflow",

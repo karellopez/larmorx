@@ -77,7 +77,9 @@ pub mod skimage;
 mod tests;
 pub mod watershed;
 
-pub use filters::{Rank1d, min_or_max_filter, min_or_max_filter1d, rank_filter, rank_filter_1d};
+pub use filters::{
+    Rank1d, correlate1d, min_or_max_filter, min_or_max_filter1d, rank_filter, rank_filter_1d,
+};
 pub use measurements::{LabelValue, Labels, label, sum_labels_bincount};
 pub use morphology::{
     BinaryErosion, MaskElement, binary_erosion, center_is_true, dilation_arguments,

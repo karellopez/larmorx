@@ -477,6 +477,125 @@ fn extend_line(buffer: &mut [f64], len: usize, before: usize, after: usize, mode
     }
 }
 
+/// `NI_Correlate1D` (`correlate1d`, and so `gaussian_filter1d`): the correlation of every line
+/// along `axis` with `weights` (`size1 = len / 2 + origin` of them before the element), each line
+/// read into doubles and extended by `mode` (`NI_ExtendLine`, `cval` for the constant modes).
+/// An odd kernel whose mirrored weights differ by at most `DBL_EPSILON` is symmetric:
+/// `x[0]·w[0]`, then `+= (x[-j] + x[j])·w[-j]` from the outermost pair in; anti-symmetric
+/// (`|w[j] + w[-j]| <= DBL_EPSILON`) the same with `x[-j] - x[j]`; any other: the last term
+/// first, then the others from the first. Products and sums round separately (SciPy's C, no
+/// FMA). Returns the doubles SciPy casts to the output type (`CASE_COPY_LINE_TO_DATA`), C-ordered.
+#[allow(clippy::too_many_arguments)]
+pub fn correlate1d<T: NdElement>(
+    input: &[T],
+    layout: &Layout,
+    weights: &[f64],
+    axis: usize,
+    mode: Extend,
+    cval: f64,
+    origin: isize,
+) -> Result<Vec<f64>, NdimageError> {
+    if input.len() < layout.span() || axis >= layout.ndim().max(1) {
+        return Err(NdimageError::Shape(
+            "input buffer and layout disagree".into(),
+        ));
+    }
+    let filter_size = weights.len();
+    if filter_size < 1 {
+        return Err(NdimageError::Shape("no filter weights given".into()));
+    }
+    let size1 = (filter_size / 2) as isize;
+    let size2 = filter_size as isize - size1 - 1;
+    if size1 + origin < 0 || size2 - origin < 0 {
+        return Err(NdimageError::Origin);
+    }
+    let mut out = vec![0.0f64; layout.len()];
+    if layout.ndim() == 0 {
+        return Ok(out);
+    }
+    let len = layout.shape[axis];
+    if len == 0 || out.is_empty() {
+        return Ok(out);
+    }
+    let mut symmetric = 0i32;
+    if filter_size & 1 == 1 {
+        let s1 = size1 as usize;
+        symmetric = 1;
+        if (1..=s1).any(|i| (weights[s1 + i] - weights[s1 - i]).abs() > f64::EPSILON) {
+            symmetric = -1;
+            if (1..=s1).any(|i| (weights[s1 + i] + weights[s1 - i]).abs() > f64::EPSILON) {
+                symmetric = 0;
+            }
+        }
+    }
+    let before = (size1 + origin) as usize;
+    let after = (size2 - origin) as usize;
+    let s1 = size1 as usize;
+    let s2 = size2 as usize;
+    let ostrides = crate::c_strides(&layout.shape);
+    let other: Vec<usize> = (0..layout.ndim()).filter(|&d| d != axis).collect();
+    let other_shape: Vec<usize> = other.iter().map(|&d| layout.shape[d]).collect();
+    let n_lines: usize = other_shape.iter().product();
+    let lines: Vec<Vec<f64>> = (0..n_lines)
+        .into_par_iter()
+        .map_init(
+            || (vec![0.0f64; before + len + after], vec![0usize; other.len()]),
+            |(buf, idx), li| {
+                unravel(li, &other_shape, idx);
+                let base: usize = other
+                    .iter()
+                    .zip(idx.iter())
+                    .map(|(&d, &i)| i * layout.strides[d])
+                    .sum();
+                for j in 0..len {
+                    buf[before + j] = input[base + j * layout.strides[axis]].to_f64();
+                }
+                extend_line(buf, len, before, after, mode, cval);
+                (0..len)
+                    .map(|ll| {
+                        // iline = line + size1 + ll: buf[c + jj] is iline[jj].
+                        let c = s1 + ll;
+                        if symmetric > 0 {
+                            let mut v = buf[c] * weights[s1];
+                            for k in 0..s1 {
+                                let d = s1 - k;
+                                v += (buf[c - d] + buf[c + d]) * weights[k];
+                            }
+                            v
+                        } else if symmetric < 0 {
+                            let mut v = buf[c] * weights[s1];
+                            for k in 0..s1 {
+                                let d = s1 - k;
+                                v += (buf[c - d] - buf[c + d]) * weights[k];
+                            }
+                            v
+                        } else {
+                            let mut v = buf[c + s2] * weights[s1 + s2];
+                            for (k, w) in weights.iter().enumerate().take(filter_size - 1) {
+                                v += buf[c + k - s1] * w;
+                            }
+                            v
+                        }
+                    })
+                    .collect()
+            },
+        )
+        .collect();
+    let mut idx = vec![0usize; other.len()];
+    for (li, line) in lines.into_iter().enumerate() {
+        unravel(li, &other_shape, &mut idx);
+        let base: usize = other
+            .iter()
+            .zip(idx.iter())
+            .map(|(&d, &i)| i * ostrides[d])
+            .sum();
+        for (j, v) in line.into_iter().enumerate() {
+            out[base + j * ostrides[axis]] = v;
+        }
+    }
+    Ok(out)
+}
+
 /// `NI_MinOrMaxFilter1D` (`minimum_filter1d`, `maximum_filter1d`): the minimum or maximum over
 /// `size` elements along `axis` (`size / 2 + origin` of them before the element), every line
 /// read into doubles, extended by `mode` (`NI_ExtendLine`, `cval` for the constant modes),

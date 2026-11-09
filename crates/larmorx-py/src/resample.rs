@@ -368,6 +368,30 @@ fn linalg_scipy_inv4<'py>(
     PyTuple::new(py, items)
 }
 
+/// `affine.dot(np.vstack((points.T, ones)))[:3].T` as numpy computes it with OpenBLAS's Haswell
+/// kernels (`larmorx_transform::openblas::affine_points`) for `(n, 3)` float64 points.
+#[pyfunction]
+#[pyo3(signature = (affine, points, n_threads = 1))]
+fn linalg_affine_points<'py>(
+    py: Python<'py>,
+    affine: PyReadonlyArray2<'_, f64>,
+    points: PyReadonlyArray2<'_, f64>,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let m = mat4(&affine)?;
+    let a = points.as_array();
+    if a.ncols() != 3 {
+        return Err(PyValueError::new_err("points must have shape (n, 3)"));
+    }
+    let mut pts: Vec<[f64; 3]> = a.rows().into_iter().map(|r| [r[0], r[1], r[2]]).collect();
+    py.detach(|| parallel::with_threads(n_threads, || openblas::affine_points(&m, &mut pts)))
+        .map_err(value_err)?;
+    Ok(PyArray::from_owned_array(
+        py,
+        Array2::from_shape_fn((pts.len(), 3), |(i, j)| pts[i][j]),
+    ))
+}
+
 /// nibabel's `io_orientation` polar step for a 3×3 matrix of unit columns
 /// (`larmorx_transform::nitransforms::closest_orthogonal`).
 #[pyfunction]
@@ -392,6 +416,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(linalg_matmul4, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_inv4, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_scipy_inv4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_affine_points, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_closest_orthogonal, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_ndcoords, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_map, m)?)?;

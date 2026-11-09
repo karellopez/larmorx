@@ -493,7 +493,10 @@ def sec_settings(t: cw.Tally, scratch: Path, jobs: int) -> None:
 
     def original(item: Any, mode: str) -> dict[str, Any]:
         b, argv = prepare(item, mode, "sdcflows")
-        return finish(b, run_original(argv, b))
+        # The default: sdcflows 2.15.2's search (SDC-17) with the sessions and the filter
+        # file's fmap entry passed to it (SDC-30, SDC-31), as the dry runs' default
+        opts = ("--wrangler", "2.15.2", "--pass-filters") if mode == "fix" else ()
+        return finish(b, run_original(argv, b, *opts))
 
     def compare(item: Any, mode: str, a: dict[str, Any]) -> None:
         name, _, expect = item

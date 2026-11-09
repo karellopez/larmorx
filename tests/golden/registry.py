@@ -4376,6 +4376,31 @@ def _binary_float_outputs(blob: np.ndarray, mask: np.ndarray) -> dict[str, Any]:
     return out
 
 
+@case("py.ndimage.binary.int8_mask", covers=("lx.ndimage.binary_erosion", "lx.ndimage.binary_closing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: an iterated erosion and closing with an ``int8`` mask, corrected (the caller's
+    mask left as it is) and as SciPy computes them (SCI-31: the later passes write into the
+    caller's mask, and the closing's erosion reads what its dilation wrote there): the outputs
+    and the masks afterwards."""
+    g = np.indices((20, 18, 16)).sum(axis=0)
+    blob = ints(58, (20, 18, 16), 0, 100) < 55 + (g < 25) * 30
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-31 notices
+        for mode in ("fix", "reproduce"):
+            m = (ints(62, (20, 18, 16), 0, 4) > 0).astype(np.int8)
+            out[f"erosion.{mode}"] = lx.ndimage.binary_erosion(
+                blob, iterations=3, mask=m, upstream_defects=mode
+            )
+            out[f"erosion.{mode}.mask"] = m
+            m = (ints(63, (20, 18, 16), 0, 4) > 0).astype(np.int8)
+            out[f"closing.{mode}"] = lx.ndimage.binary_closing(
+                blob, iterations=2, mask=m, upstream_defects=mode
+            )
+            out[f"closing.{mode}.mask"] = m
+    return out
+
+
 @case("py.ndimage.label", covers=("lx.ndimage.label", "lx.ndimage.sum_labels", "lx.ndimage.sum"))
 def _(ctx: Context) -> dict[str, Any]:
     """Labelling (6- and 26-connectivity, a Fortran-ordered input) and the sums per label
@@ -6848,6 +6873,38 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("py.skimage.random_walker.nan", covers=("lx.skimage.random_walker",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: the random walker of an image with NaNs (sdcflows' ``brain_masker`` of an image
+    whose grey closing is 0 everywhere divides 0 by 0): every weight is a NaN, the conjugate
+    gradients' vectors turn NaN and never change again, SciPy runs them to ``maxiter`` and
+    larmorx stops there with the same result. A float32 system (float32 zooms) and a float64
+    one, both solvers; the NaN is x86-64's default NaN, given by its bits."""
+    shape = (12, 10, 9)
+    nan = np.array([0xFFC00000], np.uint32).view(np.float32)[0]
+    data = (ints(84, shape, 0, 1000) / 1000).astype(np.float32)
+    data[2:9, 3:8, 2:7] = nan
+    labels = np.zeros(shape, np.int8)
+    labels[0] = 2
+    labels[-1] = 2
+    labels[6, 5, 4] = 1
+    zooms = np.array([2.0, 2.0, 2.5], np.float32)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # convergence not achieved
+        for mode in ("cg", "cg_j"):
+            out[f"f32.{mode}"] = lx.skimage.random_walker(
+                data, labels, spacing=zooms, mode=mode, return_full_prob=True
+            )
+            out[f"f32.{mode}.labels"] = lx.skimage.random_walker(
+                data, labels, spacing=zooms, mode=mode
+            )
+        out["f64.cg_j"] = lx.skimage.random_walker(
+            data.astype(np.float64), labels, mode="cg_j", return_full_prob=True
+        )
+    return out
+
+
 @case(
     "py.sdcflows.masks",
     covers=(
@@ -6876,6 +6933,25 @@ def _(ctx: Context) -> dict[str, Any]:
         "dilated": Nifti(dil_path),
         "union": Nifti(uni_path),
     }
+
+
+@case("py.sdcflows.brain_masker.no_padding", covers=("lx.sdcflows.brain_masker",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: sdcflows' brain_masker with ``padding=0``, corrected (the probabilities of the
+    whole grid) and as sdcflows writes it (SDC-46: ``[..., 0:-0, ...]`` is empty, so the mask
+    and the probabilities are empty images and the brain is not masked)."""
+    head = _head_file(ctx)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SDC-46 notices
+        for mode in ("fix", "reproduce"):
+            r = lx.sdcflows.brain_masker(
+                head, ctx.out(f"{mode}_mask.nii.gz"), 0, upstream_defects=mode
+            )
+            out[f"{mode}.mask"] = Nifti(r.out_mask)
+            out[f"{mode}.probseg"] = Nifti(r.out_probseg)
+            out[f"{mode}.brain"] = Nifti(r.out_brain)
+    return out
 
 
 def _magnitude_files(
@@ -6935,6 +7011,33 @@ def _(ctx: Context) -> dict[str, Any]:
     out["canonical.affine"] = np.asarray(can.affine)
     os.makedirs(ctx.out("reor"), exist_ok=True)
     out["reorient"] = Nifti(lx.niworkflows.reorient(obl[1], newpath=ctx.out("reor")))
+    return out
+
+
+@case("py.niworkflows.intra_modal_merge.ras_mask", covers=("lx.niworkflows.intra_modal_merge",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: IntraModalMerge of an oblique pair reoriented to RAS with grand-mean scaling
+    inside a mask in the files' own orientation, corrected (PIPE-40: the mask reoriented with
+    the series; PIPE-18: the scaling indexed as intended) and as niworkflows computes it (the
+    mask not reoriented, numpy's IndexError of niworkflows' own indexing: its message)."""
+    obl = _magnitude_files(ctx, oblique=True, prefix="p40-")
+    mask = ctx.out("p40-mask.nii.gz")
+    brain = ellipsoid(SHAPE_HEAD, 3, 5, shift=3)
+    lx.save((brain.astype(np.uint8), affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=True)), mask)
+    kw: dict[str, Any] = {"hmc": False, "to_ras": True, "grand_mean_scaling": True}
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the PIPE-18 and PIPE-40 notices
+        r = lx.niworkflows.intra_modal_merge(obl, mask, **kw, out_dir=ctx.out("p40-fix"))
+        out["fix.merged"] = Nifti(r.out_file)
+        out["fix.avg"] = Nifti(r.out_avg)
+        try:
+            lx.niworkflows.intra_modal_merge(
+                obl, mask, **kw, upstream_defects=REPRODUCE, out_dir=ctx.out("p40-reproduce")
+            )
+            out["reproduce.error"] = ""
+        except IndexError as e:
+            out["reproduce.error"] = str(e)
     return out
 
 

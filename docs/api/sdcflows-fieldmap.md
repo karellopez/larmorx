@@ -14,7 +14,9 @@ field (Hz) that corrects susceptibility distortion. This page covers:
   orientation (`topup_coeff_reorient`, `transform_coefficients`, `reorient_pedir`);
 - the phase-difference preparation (`au2rads`, `subtract_phases`, `delta_te`, `phdiff2fmap`,
   `check_b0_units`, `check_register`, `phdiff_workflow`: `init_phdiff_wf` with PRELUDE
-  through `lx.fsl.prelude`).
+  through `lx.fsl.prelude`);
+- part B's estimation and correction (the sections marked "part B"), and sdcflows' BIDS app,
+  `larmorx sdcflows sdcflows` (`run_app`, `sdcflows_workflow`: [the command line](#command-line-sdcflows-bids-app-larmorx-sdcflows-sdcflows-part-b)).
 
 **Port.** sdcflows is Apache-2.0 (the NiPreps developers), so this is a port in the main
 package, bit for bit: sdcflows 2.17.1 (the newest release; fMRIPrep 25.2.6 runs 2.15.1, whose
@@ -548,6 +550,14 @@ changed) a result. Rules A to D and the evidence:
 | SDC-26 | `init_unwarp_wf` given both `fmap2data_xfm` and `data2fmap_xfm`: `ApplyCoeffsField` declares them exclusive, but the graph's connections set both (nipype's `xor` is not checked there) and `_run_interface` uses `data2fmap_xfm`, ignoring the other without a word | a `ValueError` (rule B) | `unwarp_workflow` |
 | SDC-27 | `match_histogram` assigns the matched float values into an integer image with numpy's cast: values its type cannot hold (a reference with a wider range, or negative values for an unsigned image) and NaN (a reference with NaN) have an undefined conversion (on x86-64 a wrapped value) | clamped to the type's range (NaN to 0) with a warning (D13's rule for undefined conversions) | `match_histogram` |
 | SDC-28 | `epi_mask` casts `np.round(1e3 * wshed / wshed.max())` to `uint16`: a flat residual (`0 / 0`), a NaN or an infinity in it, or `1e3 * wshed` overflowing float32, gives NaN or infinity, whose conversion is undefined (numpy on x86-64: 0) | clamped to the range (NaN to 0, infinity to 65535) with a warning (D13's rule for undefined conversions); `reproduce` gives x86-64's 0 | `epi_mask` |
+| SDC-29 | its BIDS app builds the fieldmap-less (SyN) estimators `find_estimators` gives a participant without field maps (the default, without `--no-fmapless`) without their inputs, whose preprocessing needs an anatomical preprocessing the app does not have: they fail when run (exit status 1), after the other estimators' work has started | the run stops before any work with a message naming them and `--no-fmapless` (rule B); `reproduce`: the estimators run in order and the first fieldmap-less one fails | `sdcflows_workflow`, the command line |
+| SDC-30 | `--session-label` is recorded and never used: every session is estimated | the sessions given (rule A) | the command line |
+| SDC-31 | `--bids-filter-file` is read and never used | its `fmap` entry restricts the field maps, as fMRIPrep applies the same file's `fmap` entry to the same search (rule A) | the command line |
+| SDC-32 | `--sloppy` and `--debug` are recorded, and every estimator is built with `sloppy=False, debug=False` | they reach the estimators' workflows (rule A) | the command line |
+| SDC-33 | option values the app accepts and then fails on with a Python traceback (exit status 1): a `--mem-gb` unit `_to_gb` does not know (`16g`, `1.5G`, `16 GB`: `KeyError`), a `--bids-filter-file` that does not exist or is not JSON, a `--use-plugin` file that does not exist | argparse's error (exit status 2: `invalid _to_gb value`, `Path does not exist: <...>.`, `JSON syntax error in: <...>.`) (rule B) | the command line |
+| SDC-34 | a non-integer `--nprocs`/`--omp-nthreads` is named by its converter's `functools.partial` representation (a memory address); participant labels not found, and the settings file's `analysis_level`, in a Python `set`'s order | `invalid _min_one value`; sorted (nondeterminism is never reproduced) | the command line |
+| SDC-35 | `--use-plugin` always stops the app: the file is read with PyYAML's `load` without the `Loader` argument PyYAML 6 requires (`TypeError`, exit status 1) | the file accepted (it must exist; nipype's plugins have no counterpart, so it changes nothing) (rule A) | the command line |
+| SDC-36 | every participant's estimators go into one registry (sdcflows' globals): two participants that share a `B0FieldIdentifier` (BIDS asks it to be unique only within a participant) stop the app with `KeyError: "'<id>' is already  in mapping"` | a registry per participant, which also holds the earlier participants' automatic names, so `auto_NNNNN` stay sdcflows' (rule A); the shared identifier's work folders under `sdcflows_wf/sub_<label>/` | `sdcflows_workflow`, the command line |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,
@@ -563,11 +573,77 @@ with `UpstreamDefects`, `LevelWeights`, `ExactLevel`, `Collocation`: `matvec_f32
 nitransforms' affine-resampling coordinates, nibabel's `apply_affine`), `unwarp`
 (`unwarp_volume`), `npy` (numpy's and Python's small rules: `floor_divide`, the float repr).
 
-## Command line
+## Command line: sdcflows' BIDS app, `larmorx sdcflows sdcflows` (part B)
 
-None for these interfaces (nipype interfaces have no program or original arguments), as for the
-resampler. sdcflows' own BIDS app (`sdcflows bids_dir output_dir participant`) runs whole
-workflows with part B's steps: it is ported at the end of part B.
+The nipype interfaces above have no program of their own (nipype has no original arguments for
+them), as for the resampler. sdcflows' BIDS app, the `sdcflows` program, is ported whole
+(`python/larmorx/sdcflows/app.py`: sdcflows 2.17.1's `cli/parser.py`, `cli/main.py`,
+`cli/workflow.py`, `config.py` and `workflows/fit/base.py`'s `init_sdcflows_wf`):
+
+```
+larmorx sdcflows sdcflows <bids_dir> <output_dir> participant [options]
+```
+
+It is a Python program: the `larmorx` (or `lx`) command the Python package installs runs it
+(`python -m larmorx` too); the standalone Rust binary lists it and says so (exit status 127).
+Every option of sdcflows' parser is there, through Python's own `argparse` as sdcflows uses it, so
+the usage, help and error messages are argparse's of the Python that runs it (as sdcflows' are);
+the program's name in them is `sdcflows`.
+
+| `sdcflows` | Python | What |
+|---|---|---|
+| `bids_dir` | `run_app([...])`; `sdcflows_workflow(layout, ...)` | the dataset (argparse's `Path does not exist: <...>.` otherwise), indexed with the app's ignore patterns (only `sub-<label>` folders, without `beh`, `pet`, `perf`, `meg`, `eeg`, `ieeg`, `micr`, `nirs`), without the BIDS validator; no `dataset_description.json`: pybids' `BIDSValidationError` (exit status 1) |
+| `output_dir` | `output_dir=` | the derivatives in `output_dir/sdcflows/sub-<label>/fmap/` (as `init_fmap_derivatives_wf` writes them, named by all the estimator's sources), and an empty `logs/`; the same folder as `bids_dir`: argparse's error with sdcflows' suggestion (`<bids_dir>/derivatives/sdcflows_2.17.1`) |
+| `analysis_level` (`participant`, `group`, one or more) | - | only `participant`; `group`: sdcflows' `ValueError: Analysis level can only be 'participant'` (exit status 1) |
+| `--version` | - | `SDCFlows 2.17.1` |
+| `-v`, `--verbose` (repeated) | `logger=` | the log level, 25 less 5 per `-v` (10 from `-vvv`): sdcflows' `cli` lines on standard output in its format (`<yymmdd-HH:MM:SS>,<ms> cli IMPORTANT:` then the message: "Running SDCFlows 2.17.1: ...", "Finished all workload"), the search's debug lines at `-vvv` |
+| `--participant-label` | `participant_label=` | labels with or without `sub-`, sorted and unique; labels not in the dataset: argparse's error (sorted: SDC-34); the indexed folders are those whose name starts with a label's (sdcflows' pattern: `01` also indexes `sub-010`) |
+| `--session-label` | `sessions=` | SDC-30 |
+| `--bids-filter-file PATH` | `bids_filters=` (the file's `fmap` entry) | SDC-31, SDC-33 |
+| `--bids-database-dir PATH` | - | must exist (argparse's error); pybids' database is not read: the dataset is indexed again, in memory, and no database is written (sdcflows writes one in `output_dir/.bids_db` or `work_dir/.bids_db-<run>`) |
+| `--bids-database-wipe` | - | recorded (no database) |
+| `--nprocs N` | - | at least 1 (argparse's `Argument can't be less than one.`; a non-integer: `invalid _min_one value`, SDC-34); recorded: the estimators run one after the other (nipype runs `N` processes at once; the results are the same); `1 < N < --omp-nthreads`: sdcflows' warning "Per-process threads (--omp-nthreads=...) exceed total threads (--nthreads/--n_cpus=...)" |
+| `--omp-nthreads N` | `omp_nthreads=`, `n_threads=` | each step's threads (default `OMP_NUM_THREADS`, else the CPUs) |
+| `--mem-gb` | - | sdcflows' units (`G` by default, `T`, `M`, `K`, `B`, powers of ten); recorded, nipype's memory limit has no counterpart; SDC-33 |
+| `--debug`, `--sloppy` | `debug=`, `sloppy=` | SDC-32 |
+| `--pdb` | - | an error prints Python's whole traceback (and a blank line), and opens `pdb` on it when standard input, output and error are terminals (niworkflows' `setup_exceptionhook`); nipype's `Linear` plugin recorded |
+| `-w`, `--work-dir` | `work_dir=` | default `./work`: the nodes' files (`sdcflows_wf/wf_<id>/`, `sdcflows_wf/fmap_derivatives_<id>/`) and the run's settings, `.sdcflows.<8 characters>.toml` (sdcflows' sections and keys, written as toml 0.10.2 writes them: `toml_dumps`; `[environment]` without nipype's and TemplateFlow's versions, with `larmorx_version`; `bids_database_dir` only when given); inside `bids_dir`: argparse's error |
+| `-n`, `--dry-run` | - | the estimators listed, as sdcflows lists them (each participant, each estimator, each source's phase-encoding direction and path), exit status 0 |
+| `--no-fmapless` | `fmapless=False` | no fieldmap-less estimators; with them (the default): SDC-29 |
+| `--use-plugin FILE` | - | SDC-35, SDC-33 |
+| `--notrack` | - | recorded; larmorx never sends usage information |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | `fix` (default) or `reproduce` (D13) |
+| `LARMORX_IMPLEMENTATION` | `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=` | `auto` (default), `replica`, `original`: FSL's `prelude` and `topup`, AFNI's `3dvolreg` |
+| `LARMORX_SDCFLOWS_LIBRARIES` | `numpy_version=`, `scipy_version=` | `newest` (numpy 2.5.4, SciPy 1.18.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3) |
+| `FSLDIR` | `fsldir=` | FSL's topup configurations (decision D9: `topup_config_file`) |
+
+Exit statuses: 0; 2, argparse's errors (with the usage); 64 (`os.EX_USAGE`) when no estimator is
+found, with sdcflows' "Workflow did not generate any jobs. Please check your inputs are valid."
+on standard error (sdcflows' parent process logs it before its loggers start, so without its
+format); 1 for an error: an exception sdcflows does not catch as the traceback's first and last
+lines (the exception with the original's module, `bids.exceptions.BIDSValidationError: ...`),
+SDC-29's message; 127, the standalone binary.
+
+| Python (`lx.sdcflows`) | sdcflows | Notes |
+|---|---|---|
+| `run_app(argv=None, *, upstream_defects=None, env=None)` → exit status | `sdcflows.cli.main:main` | `argv` without the program's name; `upstream_defects` defaults to `LARMORX_UPSTREAM_DEFECTS`; `env` the environment it reads (default `os.environ`) |
+| `sdcflows_workflow(layout, *, output_dir, participant_label=None, work_dir=None, fmapless=True, sessions=None, bids_filters=None, omp_nthreads=1, sloppy=False, debug=False, logger=None, upstream_defects="fix", n_threads=1, **workflow_options)` → `SdcflowsWorkflow(subjects, estimators, workflows, output_dir, work_dir, upstream_defects, n_threads)` (`.all_estimators`, `.run()` → one `EstimatorRun` per estimator) | `init_sdcflows_wf` | the participants (`lx.niworkflows.collect_participants`), their estimators (`find_estimators`; a registry per participant: SDC-36), each one's workflow (`estimator_workflow`); `.run()` runs them in order with their derivatives, the first failure stops it (nipype's `stop_on_first_crash`); the app gives `sessions`, `bids_filters`, `sloppy`, `debug` (SDC-30 to SDC-32) and the libraries, implementations and `fsldir` as `workflow_options` |
+| `larmorx.sdcflows.app.build_parser`, `parse_args`, `AppSettings` (`EnvironmentSettings`, `ExecutionSettings`, `WorkflowSettings`, `NipypeSettings`; `.get()`, `.dumps()`), `toml_dumps` | `cli/parser.py`'s `_parser`, `parse_args`; `config.py`'s sections, `get`, `dumps` | one settings object per run (no module-wide state) |
+| `lx.niworkflows.collect_participants(bids_dir, participant_label=None, strict=False, bids_validate=True)`, `BIDSError`, `BIDSWarning` | niworkflows 1.15.4 `utils/bids.py` | |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_app.py`, sdcflows 2.17.1's own
+program in its own process per run): the parser on 58 command lines, the settings file's text
+(toml 0.10.2), `parse_args`' checks and folders in 16 runs, `--dry-run`'s listing on 57 datasets
+and settings, the exit statuses, all identical with `reproduce` (the defaults as the corrections
+above say); whole runs on ds005752's direct field map and ds001600's four estimators (sdcflows'
+programs through the oracle cache, larmorx's replicas): all 25 derivative files byte for byte
+(the [findings](../findings/sdcflows-estimation.md)).
+
+Not reproduced, on purpose: nipype (its plugins, scheduler, node messages and crash files),
+pybids' database, the telemetry, the reports' figures (decision D7: larmorprepx's reports part).
+sdcflows replaces Python's `warnings.warn` for the whole run, and its warnings go nowhere: the
+ported libraries' warnings are hidden the same way, larmorx's notices of corrected or reproduced
+defects (D13) are shown on standard error.
 
 ## Differences and limits
 

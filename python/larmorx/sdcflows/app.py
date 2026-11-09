@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: Apache-2.0 AND MIT
 """sdcflows' BIDS app (the ``sdcflows`` program): the field maps of a BIDS dataset estimated and
 written as derivatives, run as ``larmorx sdcflows sdcflows <bids_dir> <output_dir> participant
 [options]`` (a Python program: the ``larmorx`` command of the Python package runs it; the
@@ -10,7 +10,9 @@ so the usage, help and error messages are argparse's of the Python that runs it,
 are), ``cli/main.py`` (the run, ``--dry-run``'s listing, the exit statuses), ``cli/workflow.py``
 (``build_workflow``'s message), ``config.py`` (the run's settings: :class:`AppSettings`, one
 object per run instead of sdcflows' module-wide singletons, written to the working directory as
-sdcflows writes them, with toml 0.10.2's ``dumps``: :func:`toml_dumps`) and
+sdcflows writes them, with toml 0.10.2's ``dumps``: :func:`toml_dumps`, ported from toml 0.10.2's
+``encoder.py``, MIT, Copyright 2013-2019 William Pearson, 2015-2016 Julien Enselme, 2016 Google
+Inc., 2017 Samuel Vasko, 2017 Nate Prewitt, 2017 Jack Evans, 2019 Filippo Broggini) and
 ``workflows/fit/base.py`` (``init_sdcflows_wf``: :func:`sdcflows_workflow`); niworkflows 1.15.4's
 ``utils/bids.py`` (:func:`larmorx.niworkflows.collect_participants`) and ``utils/debug.py``
 (``setup_exceptionhook``, ``--pdb``).

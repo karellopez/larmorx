@@ -259,6 +259,22 @@ def sec_toml(t: cw.Tally, scratch: Path) -> None:
         {"sec": {"key with space": 1, "dotted.key": 2, "ok_key-1": 3}},
         {"execution": {"bids_filters": {"fmap": {"acquisition": "A", "session": ["1", "2"], "x": None}, "bold": {"task": "rest"}}}},
     ]  # fmt: skip
+    from larmorx.sdcflows.app import parse_args
+
+    root = _tree(scratch / "toml", "bids", ("01", "02"))
+    filt = scratch / "toml" / "f.json"
+    filt.write_text(json.dumps({"fmap": {"acquisition": None, "x": [1, 2.5]}}), encoding="utf-8")
+    for extra in (
+        [],
+        ["--session-label", "a", "--mem-gb", "2T", "-vv", "--bids-filter-file", str(filt)],
+    ):
+        old = os.getcwd()
+        os.chdir(scratch / "toml")
+        try:
+            settings = parse_args([str(root), str(scratch / "toml" / "out"), "participant", *extra])
+        finally:
+            os.chdir(old)
+        samples.append(settings.get())
     for i, s in enumerate(samples):
         ok = toml.dumps(s) == toml_dumps(s)
         t.add("toml: dumps", ok, f"sample {i}:\n{toml.dumps(s)}\n---\n{toml_dumps(s)}")
@@ -653,6 +669,8 @@ def sec_exits(t: cw.Tally, scratch: Path) -> None:
         shutil.rmtree(base)
     base.mkdir(parents=True)
     ds228 = W / "oracles" / "bids-views" / "ds000228"
+    anat_only = _tree(base, "anat-only")
+    shutil.rmtree(anat_only / "sub-01" / "fmap")
     noreadout = _tree(base, "noreadout")
     for f in (noreadout / "sub-01" / "fmap").glob("*.json"):
         meta = json.loads(f.read_text(encoding="utf-8"))
@@ -666,7 +684,8 @@ def sec_exits(t: cw.Tally, scratch: Path) -> None:
             ("reproduce", "fix"),
         ),
         ("group", ds228, ["--participant-label", "pixar008", "--no-fmapless"], ("reproduce",)),
-        ("fieldmapless", ds228, ["--participant-label", "pixar008"], ("reproduce", "fix")),
+        ("no-estimators-fmapless", ds228, ["--participant-label", "pixar008"], ("reproduce",)),
+        ("fieldmapless", anat_only, [], ("reproduce", "fix")),
         ("no-readout", noreadout, ["--no-fmapless"], ("reproduce",)),
     ]
     for name, root, extra, modes in cases:
@@ -715,10 +734,18 @@ def sec_exits(t: cw.Tally, scratch: Path) -> None:
                         f"SDC-29: larmorx stops before any work: {m['err'].strip()[:160]}..."
                     )
                 continue
-            a = dict(a)
-            a["out"] = _no_times(a["out"])
-            m = dict(m)
-            m["out"] = _no_times(m["out"])
+            a = {
+                k: _no_times(v.replace(str(base / f"{name}-{mode}-sdcflows"), "<base>"))
+                if k in ("out", "err")
+                else v
+                for k, v in a.items()
+            }
+            m = {
+                k: _no_times(v.replace(str(base / f"{name}-{mode}-larmorx"), "<base>"))
+                if k in ("out", "err")
+                else v
+                for k, v in m.items()
+            }
             if name in ("fieldmapless", "no-readout"):
                 # sdcflows: nipype's node messages and crash report; compare the exit status and say what each wrote
                 ok = a["code"] == m["code"] == 1
@@ -809,8 +836,8 @@ def sec_run(t: cw.Tally, scratch: Path, datasets: list[str], threads: int) -> No
             a["code"] == m["code"] == 0,
             f"{name}: {a['code']} {m['code']}\n{a['err'][-1500:]}\n{m['err'][-1500:]}",
         )
-        cli_a = _cli_lines(a["out"])
-        cli_m = _cli_lines(m["out"])
+        cli_a = _cli_lines(a["out"].replace(str(roots[0]), "<base>"))
+        cli_m = _cli_lines(m["out"].replace(str(roots[1]), "<base>"))
         t.add("run: the cli logger's lines", cli_a == cli_m, f"{name}:\n{cli_a}\n{cli_m}")
         ref_out, mine_out = roots[0] / "out", roots[1] / "out"
         want = sorted(

@@ -894,6 +894,101 @@ and a flat image, in both environments (numpy 2.3.5 / SciPy 1.15.3 and numpy 2.5
   the `ball(3)` opening and `ball(2)` closing as fast as SciPy's (0.29 s and 0.10 s), the
   watershed's two runs (SciPy's and the corrected) take 0.04 s against SciPy's 0.03 s.
 
+## sdcflows' BIDS app: `larmorx sdcflows sdcflows` (relay 16)
+
+sdcflows 2.17.1's `sdcflows` program (`cli/parser.py`, `cli/main.py`, `cli/workflow.py`,
+`config.py`, `workflows/fit/base.py`'s `init_sdcflows_wf`) is ported as `lx.sdcflows.run_app` and
+`sdcflows_workflow` (`python/larmorx/sdcflows/app.py`), run by the Python package's `larmorx`
+command (`larmorx sdcflows sdcflows <bids> <out> participant ...`; the standalone Rust binary
+lists the tool and stops with 127, saying it needs the Python package). The parser is sdcflows'
+own `add_argument` calls on Python's `argparse` (as sdcflows uses it), so its usage, help and
+messages are argparse's of the Python that runs it. Its settings are one object per run (no
+module-wide state), written to the working folder as sdcflows writes them (toml 0.10.2's `dumps`
+ported: `toml_dumps`).
+
+**Checked** (`validation/investigations/sdcflows-fieldmap-b/check_app.py`, sdcflows' own program in
+its own process per run, `relay16/app_original.py`): the parser on 58 command lines (help, version,
+every option, abbreviations, the errors): `reproduce` 58 of 58 identical (exit status, standard
+output and error, the parsed values), the default 53 of 53 and the five SDC-33 units corrected; toml
+0.10.2's `dumps` against `toml_dumps` on seven tables (edge values and two real settings) 7 of 7
+identical texts; `parse_args`' checks in 16 runs (errors and messages, the folders, 11 settings
+files' `[execution]`, `[workflow]`, `[nipype]` tables and `[environment]` keys) 16 of 16 with
+`reproduce`, the default with SDC-33 (3) and SDC-35 (1) corrected; `--dry-run`'s listing on 57
+datasets and settings (sdcflows 2.17.1's eight app runs' datasets, ds000228's view, sdcflows' dsA,
+dsB, dsC, the generated trees; with and without `--no-fmapless`) 57 of 57 identical with
+`reproduce`, the default 52 of 52 against sdcflows with 2.15.2's search (SDC-17's four notices on
+standard error apart), the two SDC-21 trees corrected (sdcflows 2.15.2 fails, larmorx lists; then
+SDC-36) and 3 of 3 with the sessions and the filter file passed to sdcflows' own search (SDC-30,
+SDC-31); the exit statuses (no estimator, three ways: 64 and the message; `group`: 1; fieldmap-less
+estimators: both fail with `reproduce`, larmorx before any work by default; a missing readout time:
+both fail with the same `ValueError`); and whole runs at one thread (sdcflows with nipype's `Linear`
+plugin and ANTs' N4 at one thread with correctly rounded maths, FSL 6.0.7.23's `prelude` and
+`topup`, AFNI 26.3.05's `3dvolreg` through the oracle cache; larmorx with the replicas,
+`reproduce`): ds005752's direct field map 5 of 5 derivative files and ds001600's three
+phase-difference estimators and its PEPOLAR one 20 of 20 identical (uncompressed and gzip bytes,
+sidecars), the settings files and the `cli` lines (the run's own folder apart); sdcflows 26 s and
+242 s, larmorx 4 s and 208 s (the newest environment, 2026-11-09).
+
+**What sdcflows' app does that the inventory did not say.**
+
+- `--use-plugin` never works: sdcflows reads the file with `yaml.load(f)`, and PyYAML 6 (2021;
+  6.0.3 in both kept environments) requires the `Loader` argument, so every run with a plugin
+  file stops with `TypeError: load() missing 1 required positional argument: 'Loader'` before any
+  work (exit status 1). **SDC-35** (rule A): larmorx accepts the file (it must exist); nipype's
+  plugins have no counterpart, so it changes nothing; `reproduce` raises sdcflows' `TypeError`.
+  sdcflows' runs here use `--pdb` for nipype's `Linear` plugin instead.
+- Two participants that share a `B0FieldIdentifier` stop the app: `find_estimators` records every
+  participant's estimators in sdcflows' module-wide registry, whose names must be unique, and BIDS
+  asks an identifier to be unique only within a participant's files (a dataset whose every
+  participant names its field map `pepolar` is valid). Measured on a two-participant tree: sdcflows
+  2.17.1 stops with `KeyError: "'pepolar' is already  in mapping"` (its double space) in the dry
+  run and the run. **SDC-36** (rule A): one registry per participant, holding the earlier
+  participants' automatic names too, so every `auto_NNNNN` name is sdcflows' wherever sdcflows
+  runs (the dry runs: 52 of 52 listings identical with the correction, 2.15.2's search); the
+  shared identifier's work folders go under `sdcflows_wf/sub_<label>/`. fMRIPrep, which also
+  searches every participant of a run with the same registry, has the same defect
+  (`map_fieldmap_estimation`): a candidate for the defects relay (a PIPE- identifier).
+- The fieldmap-less estimators (`--no-fmapless` not given, a participant without field maps):
+  `init_sdcflows_wf` builds `init_syn_sdc_wf` without its inputs (the SyN preprocessing needs an
+  anatomical preprocessing the app does not have), and nipype stops at the first node that needs
+  one. **SDC-29** (rule B: rule A would need an anatomical preprocessing in the app): larmorx
+  stops before any work with a message naming the participants and estimators and `--no-fmapless`;
+  `reproduce` runs the estimators in order and fails on the first fieldmap-less one (exit status
+  1, as sdcflows). A dataset whose runs lack what the fieldmap-less search needs (ds000228's view:
+  no readout time) finds no estimator either way (exit status 64).
+- `--session-label` (**SDC-30**), `--bids-filter-file` (**SDC-31**), `--sloppy` and `--debug`
+  (**SDC-32**) are recorded in the settings and never used (`init_sdcflows_wf` passes
+  `sloppy=False, debug=False`; `find_estimators` gets neither sessions nor filters): rule A, each
+  takes effect (the filter file's `fmap` entry, as fMRIPrep applies it; the dry runs with the
+  sessions and the filters given to sdcflows' own search: 3 of 3 listings identical).
+- Option values that pass argparse and then fail with a traceback (exit status 1): `--mem-gb`
+  units `_to_gb` cannot look up (`16g`, `1.5G`, `16 GB`, `G16`, `3m`: `KeyError`), a
+  `--bids-filter-file` that does not exist (`FileNotFoundError`) or is not JSON
+  (`JSONDecodeError`), a `--use-plugin` file that does not exist. **SDC-33** (rule B): argparse's
+  usage error (exit status 2) with fMRIPrep's wording for the files.
+- **SDC-34** (nondeterminism, never reproduced): a non-integer `--nprocs` or `--omp-nthreads` is
+  reported by argparse as `invalid functools.partial(<function _parser.<locals>._min_one at
+  0x7f...>, parser=ArgumentParser(...)) value: 'abc'` (the converter has no `__name__`, so its
+  representation, with a memory address and the whole parser's, names it): here `invalid _min_one
+  value: 'abc'`; the participant labels not found, and the settings file's `analysis_level`, come
+  in a Python `set`'s order: sorted here.
+- Before it checks anything else, sdcflows builds pybids' database (`execution.init()` runs inside
+  `config.from_dict`): without `--participant-label` in `<output_dir>/.bids_db`, so with an
+  output folder equal to the dataset (refused next) it first writes the database into the
+  dataset. larmorx writes no database at all (a documented difference of `larmorx.bids`): a
+  candidate for the defects relay, without a switch (nothing to reproduce).
+- sdcflows' parent process logs "Workflow did not generate any jobs. Please check your inputs are
+  valid." before its loggers start: Python's last-resort handler prints it on standard error,
+  without the log format (reproduced); the "Running SDCFlows" lines come from its child process,
+  where the loggers have started (standard output, formatted).
+- `init_sdcflows_wf` passes `fmap_type=estim.method` (the `EstimatorType`) to the reports'
+  workflow, so the figures are named `desc-EstimatorType.PEPOLAR_fieldmap.svg` (the oracle runs'
+  `figures/`): for larmorprepx's reports part (D7), with `init_fmap_preproc_wf`'s
+  `str(estimator.method).rpartition('.')[-1].lower()`.
+- On a machine without `HOME` (Windows), sdcflows' `config` module fails when imported
+  (`os.path.join(os.getenv('HOME'), ...)` for TemplateFlow's folder): larmorx uses the home
+  folder Python finds. A candidate for the defects relay (a crash: never reproduced).
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -915,6 +1010,6 @@ and a flat image, in both environments (numpy 2.3.5 / SciPy 1.15.3 and numpy 2.5
   `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
   PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
   `larmorx.pipelines.larmorprepx.estimators` (relay 13), SDC-12 to SDC-28 in `lx.sdcflows`
-  (relays 5 to 15), SKI-02 in `lx.skimage` (relay 14) and SciPy's watershed candidates
+  (relays 5 to 15), SDC-29 to SDC-36 in `lx.sdcflows`' command line (relay 16), SKI-02 in `lx.skimage` (relay 14) and SciPy's watershed candidates
   (provisionally SCI-W1 to SCI-W4, relay 15) in `lx.ndimage`; the register's entries and
   `larmorx_core::defects` wait for the part's defects relay.

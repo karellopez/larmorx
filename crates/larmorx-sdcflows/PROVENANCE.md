@@ -245,3 +245,20 @@ Into `python/larmorx/sdcflows/masks.py` (relay 15): sdcflows 2.17.1 (Apache-2.0;
 numpy 2.5.4's and 2.3.5's `percentile` and `clip` (`larmorx_core::numpy`); numpy's float-to-integer
 casts on x86-64 (`astype(int)` of a NaN centre, `astype(np.uint16)` of NaN levels, SDC-28) made
 explicitly.
+
+## Part B: sdcflows' BIDS app (`python/larmorx/sdcflows/app.py`, relay 16)
+
+Into `python/larmorx/sdcflows/app.py`: sdcflows 2.17.1 (Apache-2.0, the NiPreps developers)
+`cli/parser.py` (`_parse_participant_labels`, `_parser`: every option, its help text, default and
+converter, `parse_args`: its checks and folders), `cli/main.py` (`main`: the settings file, the
+analysis level, the dry run's listing, the "no jobs" exit, the threads' warning, the final
+message), `cli/workflow.py` (`build_workflow`'s message), `config.py` (the `environment`,
+`execution`, `workflow` and `nipype` sections and their keys, `_Config.get`, `from_dict`,
+`execution.init`'s ignore patterns, `loggers`' format and level names, `get`, `dumps`) and
+`workflows/fit/base.py` (`init_sdcflows_wf`); niworkflows 1.15.4 (Apache-2.0) `utils/debug.py`
+(`setup_exceptionhook`, `is_interactive`); toml 0.10.2 (MIT, Copyright 2013-2019 William Pearson,
+2015-2016 Julien Enselme, 2016 Google Inc., 2017 Samuel Vasko, 2017 Nate Prewitt, 2017 Jack
+Evans, 2019 Filippo Broggini) `encoder.py` (`dumps`, `_dump_str`, `_dump_float`, `dump_list`,
+`dump_value`, `dump_sections`: `toml_dumps`). Into `python/larmorx/niworkflows/participants.py`:
+niworkflows 1.15.4 (the same in 1.15.2) `utils/bids.py` (`BIDSError`, `BIDSWarning`,
+`collect_participants`).

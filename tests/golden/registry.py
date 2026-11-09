@@ -8202,6 +8202,65 @@ def _(ctx: Context) -> dict[str, Any]:
 
 
 @case(
+    "cli.sdcflows.sdcflows",
+    covers=(
+        "cli:sdcflows sdcflows",
+        "lx.sdcflows.run_app",
+        "lx.sdcflows.sdcflows_workflow",
+        "lx.sdcflows.SdcflowsWorkflow.run",
+        "lx.niworkflows.collect_participants",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' BIDS app (``larmorx sdcflows sdcflows``) on a small dataset: the dry run's
+    listing of a direct field map and an EPI pair (the command line's route), the direct field
+    map estimated end to end and written as derivatives, ``init_sdcflows_wf`` built in Python."""
+    import contextlib
+    import io
+
+    from larmorx.cli import run
+
+    root = _fmap_bids(ctx)
+    env = {"OMP_NUM_THREADS": "1"}
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        code = run(["larmorx", "sdcflows", "sdcflows", str(root), ctx.out("dry"), "participant",
+                    "-w", ctx.out("dry-work"), "-n"])  # fmt: skip
+    text = buf.getvalue().replace(str(root), "<root>").replace("\\", "/")
+    out: dict[str, Any] = {
+        "dry.code": np.array([code]),
+        "dry.listing": np.frombuffer(text.encode(), np.uint8).copy(),
+    }
+    # the direct field map alone, estimated through the command line
+    mapped = _fmap_bids(ctx, "bids-mapped")
+    for f in (mapped / "sub-01" / "fmap").glob("*_epi.*"):
+        f.unlink()
+    deriv = Path(ctx.out("deriv"))
+    with contextlib.redirect_stdout(io.StringIO()):
+        code = lx.sdcflows.run_app(
+            [str(mapped), str(deriv), "participant", "-w", ctx.out("work"), "--no-fmapless",
+             "--nprocs", "1", "--omp-nthreads", "1", "--notrack"],
+            upstream_defects="fix", env=env,
+        )  # fmt: skip
+    out["run.code"] = np.array([code])
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(deriv).as_posix()
+            out[f"run.{rel}"] = _text(str(f), mapped) if f.suffix == ".json" else Nifti(str(f))
+    lay = lx.bids.BIDSLayout(str(root), validate=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wf = lx.sdcflows.sdcflows_workflow(lay, output_dir=ctx.out("py"), fmapless=False)
+    out["py.workflow"] = _portable(
+        [wf.subjects, [(e.method.name, e.bids_id, e.sources) for e in wf.all_estimators],
+         [(w.name, w.function, sorted(w.options.items())) for w in wf.workflows],
+         lx.niworkflows.collect_participants(lay)], root,
+    )  # fmt: skip
+    return out
+
+
+@case(
     "py.larmorprepx.fmap_estimation",
     covers=(
         "lx.pipelines.larmorprepx.estimators.precomputed_fieldmaps",

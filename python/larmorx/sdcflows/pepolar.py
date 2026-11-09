@@ -21,10 +21,13 @@ is installed), part A's ``TOPUPCoeffReorient`` and ``ApplyCoeffsField``, and
 an odd slice count padded, the set averaged again with head-motion correction, ``topup`` with
 sdcflows' own ``b02b0.cnf``).
 
-**FSL's configurations** (the user's D9, for now): the main package ships no FSL file.
-sdcflows' own configurations (``b02b0.cnf``, ``b02b0_quick.cnf``, ``b02b0_{1,2,4}_quick.cnf``,
-Apache-2.0) are in ``larmorx/sdcflows/data/flirtsch/``; FSL's ``b02b0_1/2/4.cnf`` are read from
-``fsldir``'s ``etc/flirtsch`` or from ``larmorx-nc``'s FSL files (:func:`topup_config_file`).
+**FSL's configurations** (the user's decisions D9 and of 2026-11-09): the main package ships
+no FSL file. sdcflows' own configurations (``b02b0.cnf``, ``b02b0_quick.cnf``,
+``b02b0_{1,2,4}_quick.cnf``, Apache-2.0) are in ``larmorx/sdcflows/data/flirtsch/``; FSL's
+``b02b0_1/2/4.cnf`` are read from ``fsldir``'s ``etc/flirtsch``, else from the copy ``larmorx-nc``
+carries (FSL 6.0.7.23's files, byte for byte), else refused (:func:`topup_config_file`). The main
+package's own settings, a clean-room original from ``specs/topup.md``, come with ``t2smap``'s
+clean-room part; this lookup is the one place that changes then.
 
 Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour):
 
@@ -476,8 +479,10 @@ def reorient_image_and_metadata(
 def topup_config_file(name: str, fsldir: str | os.PathLike[str] | None = None) -> str:
     """The path of the ``topup`` configuration ``name`` (D9, in one place): sdcflows' own
     configurations from larmorx's copy (:data:`SDCFLOWS_CONFIGS`); FSL's (:data:`FSL_CONFIGS`)
-    from ``fsldir``'s ``etc/flirtsch``, else from ``larmorx-nc``'s FSL files when it is
-    installed; otherwise ``FileNotFoundError`` naming both places."""
+    from ``fsldir``'s ``etc/flirtsch``, else from ``larmorx-nc``'s copy of FSL's files
+    (``share/larmorx-nc/fsl-data/etc/flirtsch``) when it is installed; otherwise
+    ``FileNotFoundError`` naming both places. The main package's own settings (a clean-room
+    original, the user's decision of 2026-11-09) come with ``t2smap``'s clean-room part."""
     if name in SDCFLOWS_CONFIGS:
         return str(_DATA / name)
     if name not in FSL_CONFIGS:
@@ -494,9 +499,11 @@ def topup_config_file(name: str, fsldir: str | os.PathLike[str] | None = None) -
             return str(p.resolve())
         tried.append(str(p))
     raise FileNotFoundError(
-        f"FSL's topup configuration {name} (FSL Licence; larmorx does not ship it) was not "
-        "found: give fsldir, an FSL installation whose etc/flirtsch holds it, or install "
-        f"larmorx-nc, which carries FSL's files (looked in: {', '.join(tried) or 'nowhere'})"
+        f"FSL's topup configuration {name} (FSL Licence; larmorx's main package does not ship "
+        "it, and its own clean-room settings come with t2smap's clean-room part, "
+        "docs/next-steps.md) was not found: give fsldir, an FSL installation whose etc/flirtsch "
+        "holds it, or install larmorx-nc, which carries FSL's files (looked in: "
+        f"{', '.join(tried) or 'nowhere'})"
     )
 
 

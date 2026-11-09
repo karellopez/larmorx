@@ -7956,3 +7956,186 @@ def _(ctx: Context) -> dict[str, Any]:
         refused = str(err)
     out["sophisticated"] = _portable(refused, root)
     return out
+
+
+def _text(path: str, root: Path) -> np.ndarray:
+    """A text file's bytes with the folder ``root`` and the platform's separator removed."""
+    text = Path(path).read_text(encoding="utf-8")
+    text = text.replace(json.dumps(str(root))[1:-1], "<root>").replace(str(root), "<root>")
+    text = text.replace("\\\\", "/")
+    return np.frombuffer(text.encode(), dtype=np.uint8).copy()
+
+
+@case(
+    "py.niworkflows.derivatives_data_sink",
+    covers=(
+        "lx.niworkflows.derivatives_data_sink",
+        "lx.niworkflows.copy_any",
+        "lx.niworkflows.get_tf_resolution",
+        "lx.bids.build_path",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' DerivativesDataSink on small files: a copy with compression, a header fix
+    (xform codes 0, time units), a float mask coerced to uint8, a non-NIfTI file, two files
+    named by a list-valued custom entity, the sidecar's metadata (meta_dict, constructor and
+    input metadata), a template's resolution; pybids' build_path on its own examples."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=True)
+    field = (ints(130, SHAPE_HEAD, 0, 2000).astype(np.float32) - np.float32(1000)) / np.float32(8)
+    plain = ctx.out("in_plain.nii")
+    lx.save((field, aff), plain)
+    series = ctx.out("in_series.nii.gz")
+    lx.save((np.stack([field, field * np.float32(2)], axis=-1), aff), series)
+    hdr = lx.io.load(series).header.replace(qform_code=0, sform_code=0, xyzt_units=10)
+    lx.save(lx.io.load(series).replace(header=hdr), series)
+    mask = ctx.out("in_mask.nii.gz")
+    lx.save((brain.astype(np.float32), aff), mask)
+    other = ctx.out("in_other.json")
+    Path(other).write_text('{"a": 1}', encoding="utf-8")
+    base = Path(ctx.out("deriv"))
+    src = "/bids/sub-01/ses-a/fmap/sub-01_ses-a_acq-x_run-02_fieldmap.nii.gz"
+    fm = {"suffix": "fieldmap", "datatype": "fmap", "desc": "preproc", "fmapid": "auto00000"}
+    tpl = {"res": {"02": {"zooms": [2.0, 2.0, 2.0]}}}
+    out: dict[str, Any] = {}
+    calls = {
+        "copy": dict(in_file=plain, compress=True, entities=fm, metadata={"Units": "Hz"}),
+        "fix": dict(in_file=series, compress=True, entities=fm, meta_dict={"B": 1, "C": 2},
+                    init_metadata={"C": 3}, metadata={"RepetitionTime": 2.0}),
+        "mask": dict(in_file=mask, compress=True, dismiss_entities=("run",),
+                     entities={"suffix": "mask", "datatype": "fmap", "desc": "brain"}),
+        "other": dict(in_file=other, entities={"suffix": "fieldmap", "datatype": "fmap"}),
+        "two": dict(in_file=[plain, mask], compress=[True], allowed_entities=("custom",),
+                    entities={**fm, "custom": ["a", "b"]}),
+        "template": dict(in_file=plain, entities={"suffix": "bold", "datatype": "func", "desc": "preproc", "space": "MNI152NLin2009cAsym", "resolution": "2"},
+                         template_metadata={"MNI152NLin2009cAsym": tpl}, templateflow_version="25.1.2"),
+    }  # fmt: skip
+    for name, kw in calls.items():
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = lx.niworkflows.derivatives_data_sink(
+                source_file=src, base_directory=base / name, **kw
+            )
+        rel = [Path(f).relative_to(base / name).as_posix() for f in res.out_file]
+        out[f"{name}.names"] = np.frombuffer(json.dumps([rel, res.compression, res.fixed_hdr]).encode(), dtype=np.uint8).copy()  # fmt: skip
+        for i, f in enumerate(res.out_file):
+            out[f"{name}.file{i}"] = Nifti(f) if ".nii" in f else File(f)
+        if res.out_meta:
+            out[f"{name}.json"] = _text(res.out_meta, base)
+    copied = ctx.out("copied.nii.gz")
+    lx.niworkflows.copy_any(plain, copied)
+    out["copy_any"] = Nifti(copied)
+    out["tf"] = np.frombuffer(
+        json.dumps([lx.niworkflows.get_tf_resolution("X", r, tpl, "1") for r in ("2", "02", "3")]).encode(),
+        dtype=np.uint8,
+    ).copy()  # fmt: skip
+    pats = [
+        "sub-{subject}[/ses-{session}]/anat/sub-{subject}[_ses-{session}][_acq-{acquisition}]_{suffix<T[12]w|inplaneT[12]>}{extension<.nii|.nii.gz|.json>|.nii.gz}",
+        "sub-{subject}[/ses-{session}]/anat/sub-{subject}[_space-{space}][_desc-{desc}]_{suffix<T1w|T2w|inplaneT[12]>}{extension<.nii|.nii.gz|.json>|.nii.gz}",
+        "sub-{subject}[/ses-{session}]/{datatype|dwi}/sub-{subject}_{suffix|dwi}{extension<.bval|.bvec|.json|.nii.gz|.nii>|.nii.gz}",
+    ]  # fmt: skip
+    ents = [
+        ({"extension": ".nii", "space": "MNI", "subject": "001", "suffix": "inplaneT2"}, False),
+        ({"extension": ".nii", "space": "MNI", "subject": "001", "suffix": "inplaneT2"}, True),
+        ({"extension": "", "subject": "001", "suffix": "inplaneT2", "space": None}, True),
+        ({"extension": ".bvec", "subject": ["01", "02", "03"]}, True),
+        ({"extension": ".nii", "subject": "001", "suffix": "bold"}, False),
+        ({"extension": ".nii", "subject": "001", "suffix": "T1w", "datatype": "anat"}, True),
+    ]
+    out["build_path"] = np.frombuffer(
+        json.dumps([lx.bids.build_path(e, pats, strict=s) for e, s in ents]).encode(),
+        dtype=np.uint8,
+    ).copy()
+    return out
+
+
+@case(
+    "py.sdcflows.fmap_preproc",
+    covers=(
+        "lx.sdcflows.fmap_preproc_workflow",
+        "lx.sdcflows.estimator_workflow",
+        "lx.sdcflows.check_readout",
+        "lx.sdcflows.workflow_options",
+        "lx.sdcflows.fmap_derivatives_workflow",
+        "lx.sdcflows.gendesc",
+        "lx.sdcflows.getname",
+        "lx.sdcflows.getsourcetype",
+        "lx.sdcflows.selectintent",
+        "lx.sdcflows.FieldmapEstimation.get_workflow",
+        "lx.sdcflows.EstimatorWorkflow.run",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_fmap_preproc_wf on a small BIDS dataset: a direct field map (Hz) with its
+    magnitude estimated and written as derivatives (field, reference, mask, coefficients,
+    sidecar); a PEPOLAR estimator's workflow built (inputs, readout check) and the helpers."""
+    root = Path(ctx.out("bids"))
+    (root / "sub-01" / "fmap").mkdir(parents=True)
+    (root / "sub-01" / "func").mkdir(parents=True)
+    (root / "dataset_description.json").write_text(
+        '{"Name": "golden", "BIDSVersion": "1.8.0"}', encoding="utf-8"
+    )
+    mags = _magnitude_files(ctx, zooms=(1.0, 1.0, 1.0))
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    i, j, k = np.indices(SHAPE_HEAD)
+    field = ((5 * i - 3 * j + 2 * k) - 40).astype(np.float32) / np.float32(4.0)
+    fmap = root / "sub-01" / "fmap"
+    lx.save((field, aff), str(fmap / "sub-01_fieldmap.nii.gz"))
+    shutil.copyfile(mags[0], fmap / "sub-01_magnitude.nii.gz")
+    intent = '"IntendedFor": ["func/sub-01_task-rest_bold.nii.gz"]'
+    (fmap / "sub-01_fieldmap.json").write_text(f'{{"Units": "Hz", {intent}}}', encoding="utf-8")
+    (fmap / "sub-01_magnitude.json").write_text("{}", encoding="utf-8")
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        shutil.copyfile(mags[1], fmap / f"sub-01_dir-{d}_epi.nii.gz")
+        (fmap / f"sub-01_dir-{d}_epi.json").write_text(
+            f'{{"PhaseEncodingDirection": "{pe}", "TotalReadoutTime": 0.05, {intent}}}',
+            encoding="utf-8",
+        )
+    lx.save((np.stack([field] * 2, axis=-1), aff), str(root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"))  # fmt: skip
+    (root / "sub-01" / "func" / "sub-01_task-rest_bold.json").write_text(
+        '{"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2.0}',
+        encoding="utf-8",
+    )
+    registry = lx.sdcflows.FieldmapRegistry()
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", fmapless=False, registry=registry
+        )
+    out: dict[str, Any] = {}
+    out["estimators"] = _portable([(e.method.name, e.bids_id, e.sources) for e in ests], root)
+    mapped = [e for e in ests if e.method == lx.sdcflows.EstimatorType.MAPPED]
+    pepolar = [e for e in ests if e.method == lx.sdcflows.EstimatorType.PEPOLAR]
+    wf = pepolar[0].get_workflow(sloppy=True, topup_config="b02b0.cnf")
+    lx.sdcflows.check_readout(pepolar[0])
+    out["pepolar.workflow"] = _portable(
+        [wf.name, wf.function, sorted(wf.options.items()), wf.inputs, wf.input_fields,
+         lx.sdcflows.estimator_workflow(pepolar[0]) is wf], root,
+    )  # fmt: skip
+    out["options"] = _portable(
+        {k: sorted(v) for k, v in lx.sdcflows.workflow_options().items()}, root
+    )
+    deriv = Path(ctx.out("deriv"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = lx.sdcflows.fmap_preproc_workflow(
+            mapped, omp_nthreads=1, output_dir=deriv, subject="01", work_dir=ctx.out("work")
+        )
+    out["outputs"] = _portable(
+        [[Path(f).relative_to(deriv).as_posix() for f in res.fmap + res.fmap_ref + res.fmap_mask],
+         [[Path(c).relative_to(deriv).as_posix() for c in cs] for cs in res.fmap_coeff],
+         res.fmap_id, res.method], root,
+    )  # fmt: skip
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(deriv).as_posix()
+            out[f"deriv.{rel}"] = _text(str(f), root) if f.suffix == ".json" else Nifti(str(f))
+    run = res.estimators[0].workflow.run(ctx.out("rerun"))
+    out["rerun.fmap"] = Nifti(str(run.fmap))
+    out["helpers"] = _portable(
+        [lx.sdcflows.gendesc("a"), lx.sdcflows.gendesc(["a", "b"]), lx.sdcflows.getname(["x/a.nii", "b"]),
+         lx.sdcflows.getsourcetype(["p/sub-01_epi.nii"]), lx.sdcflows.getsourcetype(["p/m.nii.gz"]),
+         lx.sdcflows.selectintent([{"IntendedFor": ["b", "a"]}, {"IntendedFor": "a"}, {}])], root,
+    )  # fmt: skip
+    return out

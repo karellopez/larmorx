@@ -493,10 +493,32 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   `anat_dilmsk`, `amask2epi`, `epi_umask`, `find_zooms` (numpy 2's float32 scalars, compared by
   their reprs), `warp_dir`, `vox_params` (numpy's float64 scalars), the registration's command
   line, `extract_field`, `zooms_field`, `zooms_bmask` (and their command lines), `bs_filter` and
-  `unwarp` are fMRIPrep's files and values. RESULTS_NODES
+  `unwarp` are fMRIPrep's files and values: 25 checks per estimator, about 6 s each, in both
+  kept environments. On the re-made (Haswell) runs every check is identical (ds000228's
+  estimator: RESULTS_HASWELL); on the five estimators of the first runs (AVX-512 kernels,
+  archived) all but `bs_filter`, whose ridge fit's dot products ran on the AVX-512 kernels there
+  (0 of 2,548 coefficients equal on pixar008's; the same cause as relay 6's and relay 9's notes).
+  The check found a mistake of larmorx's command lines: nipype's `Registration(from_file=...)`
+  sets the interface's own inputs again after reading the settings file, and connected inputs
+  come later still, so sdcflows' `transform_parameters` in voxels (`_mm2vox`: 10.2354 on
+  ds005003, whose anatomy is 0.977 mm along the phase encoding) replace the file's 10.0;
+  larmorx's `_nipype.registration` gave the file precedence. Fixed (no earlier caller passed a
+  key its settings file holds; every `antsRegistration` line of the oracle runs still identical).
 - **The registration** (sdcflows' `sd_syn.json`: two SyN stages with two Mattes metrics each,
-  80 % of the voxels sampled at random in the first): RESULTS_SYN
-- **The whole function against sdcflows' own graph**: RESULTS_WORKFLOW
+  80 % of the voxels sampled at random in the first): larmorx's `antsRegistration` on
+  fMRIPrep's inputs of ds004884's second estimator (the run's seed) gives ANTs 2.6.5's
+  one-thread warps with correctly rounded maths byte for byte, the forward and the inverse
+  (373 s on 8 threads against ANTs' 1,054 s on one). fMRIPrep's own warp, from 4 threads with
+  glibc's maths, is up to 0.74 mm away (3 % of the vectors equal; pixar008's: 0.76 mm): SyN's
+  sampled metric depends on the thread count, as the affine stage before it (relay 9). So
+  fMRIPrep's files after the registration are a 4-thread result; each node after it is checked
+  on fMRIPrep's own warp (above), and the whole workflow against sdcflows' graph (below).
+- **The whole function against sdcflows' own graph** (sdcflows 2.17.1's `init_syn_sdc_wf` run
+  by nipype on the estimator's inputs, ANTs' `antsRegistration`, `antsApplyTransforms` and
+  `ImageMath` at one thread with correctly rounded maths as stand-ins through the oracle cache):
+  every NIfTI file of the graph's folders identical (18 of 18 on ds004884's second estimator,
+  the registration included), `zooms_epi`'s regridded EPI the only file larmorx does not write
+  (SDC-15); sdcflows' graph 1,036 s at one thread, larmorx 333 s on 8 threads. RESULTS_NEWEST
 - **SDC-16 (`_warp_dir`'s axis, rule A)**: ANTs' `--restrict-deformation` weighs the
   deformation's physical components (x, y, z): on a fixed image whose voxel axes are S, R, A,
   the weights `1x0x0` move only physical x, in larmorx's port and in ANTs 2.6.5 itself, whose

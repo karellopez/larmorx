@@ -368,10 +368,12 @@ size), whose output sdcflows never connects (SDC-15); its port comes with `Regri
 
 Checked on fMRIPrep's five `--use-syn-sdc` estimators node by node (each node fed fMRIPrep's
 own inputs and, after the registration, fMRIPrep's own warp; header bytes as written): every
-file, value and command line is fMRIPrep's; the registration itself is ANTs 2.6.5's
-one-thread result with correctly rounded maths (fMRIPrep's own ran on 4 threads, on which SyN's
-sampled metric depends); and the whole function against sdcflows' own graph
-(`validation/investigations/sdcflows-fieldmap-b/check_syn_sdc.py`).
+file, value and command line is fMRIPrep's (the B-spline fit's on the runs made with
+OpenBLAS's Haswell kernels); the registration itself is ANTs 2.6.5's one-thread result with
+correctly rounded maths, byte for byte (fMRIPrep's own ran on 4 threads, on which SyN's sampled
+metric depends: up to 0.74 mm apart); and the whole function gives every file of sdcflows' own
+graph (`validation/investigations/sdcflows-fieldmap-b/check_syn_sdc.py`; 333 s on 8 threads
+where sdcflows' graph takes 1,036 s at one).
 
 ## Upstream defects (D13)
 

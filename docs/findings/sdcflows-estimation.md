@@ -299,11 +299,13 @@ file:
   environments. **And on ds005752's direct view** (relay 9): the B-spline fit's field (the
   estimator's `fmap`) is fMRIPrep's in every voxel (0.067 Hz apart on the AVX-512 run), the
   merges, `clipper_pre` and the brain mask fMRIPrep's files, the BOLD steps (8 fields, resampled
-  path) and fits identical in both environments. **And on two of the three SyN runs** (relay 10:
-  ds000228's and ds004884's, re-made): every node of the SyN preprocessing and estimation fed
-  fMRIPrep's inputs is fMRIPrep's file, the B-spline fit of the field included (none of its 2,548
-  coefficients equal on the AVX-512 run), and the BOLD steps (4 and 8 fields, resampled path) and
-  fits identical in both environments; ds005003's: the part's notes, when it finishes.
+  path) and fits identical in both environments. **And on the three SyN runs** (relays 10 and 11:
+  ds000228's, ds004884's and ds005003's, re-made): every node of the SyN preprocessing and
+  estimation fed fMRIPrep's inputs is fMRIPrep's file, the B-spline fit of the field included
+  (none of its 2,548 coefficients equal on the AVX-512 run), and the BOLD steps (4, 8 and 8
+  fields, resampled path) and fits identical in both environments (ds005003's second estimator's
+  `epi2anat` 0.0076 from fMRIPrep's 4-thread registration, 0.081 on the AVX-512 run: affine.json's
+  random sampling with threads; its later nodes fed fMRIPrep's own warp are its files).
 
 ## fMRIPrep's own field-map steps: `ReconstructFieldmap`, `DistortionParameters`, `ConcatenateXFMs` (relay 7)
 

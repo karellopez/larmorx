@@ -1,0 +1,73 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "ab5ffe99467a",
+  "larmorx_testdata_commit": "52e371aab0ac",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "nilearn": "0.14.1",
+   "nipype": "1.12.0",
+   "niworkflows": "1.15.3",
+   "numpy": "2.5.4",
+   "scikit-image": "0.26.0",
+   "scipy": "1.18.1",
+   "sdcflows": "2.17.1"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16",
+  "python_environment": "numpy 2.5.4 (OpenBLAS 0.3.34.106.0 (Haswell)), SciPy 1.18.1 (oracles/python-newest)"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {},
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 0,
+  "saved_seconds": 0.0,
+  "served": 0
+ },
+ "reference": "SciPy, numpy (on OpenBLAS's Haswell kernels, one thread) and scikit-image 0.26.0 in-process, in the environment's releases (numpy 2.5.4)",
+ "results": [
+  {
+   "case": "numpy-expf",
+   "category": "check_numpy",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "measured": {
+    "clip": "6/6",
+    "exp float32": "3/3",
+    "exp float32 all 2^32 (avx512off)": "1/1",
+    "exp float32 all 2^32 (default)": "1/1",
+    "median": "43/43",
+    "median (axis)": "40/40",
+    "percentile (Python q)": "819/819",
+    "percentile (list q)": "43/43",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: clip": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: exp float32": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: exp float32 all 2^32 (avx512off)": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: exp float32 all 2^32 (default)": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: median": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: median (axis)": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: percentile (Python q)": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: percentile (list q)": "identical",
+    "the script's exit status": 0
+   },
+   "reason": "",
+   "seconds": 190.866,
+   "status": "pass"
+  }
+ ],
+ "suite": "ndimage-skimage",
+ "summary": {
+  "both-error": 0,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 1,
+  "skipped": 0
+ },
+ "tier": "full"
+}

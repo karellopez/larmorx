@@ -1,0 +1,164 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "e81cf26b7a80",
+  "larmorx_testdata_commit": "52e371aab0ac",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "nilearn": "0.14.1",
+   "nipype": "1.12.0",
+   "niworkflows": "1.15.3",
+   "numpy": "2.5.4",
+   "scikit-image": "0.26.0",
+   "scipy": "1.18.1",
+   "sdcflows": "2.17.1"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16",
+  "python_environment": "numpy 2.5.4 (OpenBLAS 0.3.34.106.0 (Haswell)), SciPy 1.18.1 (oracles/python-newest)"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {},
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 0,
+  "saved_seconds": 0.0,
+  "served": 0
+ },
+ "reference": "niworkflows 1.15.3 (the environments' release; of its Python files only interfaces/confounds.py and the version differ from 1.15.4's, the port's source) and nipype 1.12.0 in-process (sdcflows 2.17.1's calls), and fMRIPrep 25.2.6's own files and command lines of the oracle runs (numpy 2.5.4)",
+ "results": [
+  {
+   "case": "merge",
+   "category": "check_merge",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "IntraModalMerge error (type, message)": "5/5",
+    "IntraModalMerge out_avg": "55/55",
+    "IntraModalMerge out_avg name": "55/55",
+    "IntraModalMerge out_file": "55/55",
+    "IntraModalMerge out_file name": "55/55",
+    "IntraModalMerge to_ras": "2/2",
+    "PIPE-18 fix: the intended scaling": "2/2",
+    "PIPE-18 fix: warned": "2/2",
+    "PIPE-18 reproduce: niworkflows' IndexError": "2/2",
+    "PIPE-19: a 6D image is an error by default": "1/1",
+    "reorient (_ras file)": "16/16",
+    "the script's exit status": 0
+   },
+   "reason": "",
+   "seconds": 2.196,
+   "status": "pass"
+  },
+  {
+   "case": "merge-hmc",
+   "category": "check_merge",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "IntraModalMerge out_avg": "8/8",
+    "IntraModalMerge out_avg = fMRIPrep's file": "8/8",
+    "IntraModalMerge out_avg name": "8/8",
+    "IntraModalMerge out_file": "8/8",
+    "IntraModalMerge out_file name": "8/8",
+    "hmc: average (descrip apart)": "2/2",
+    "hmc: matrices and parameters": "2/2",
+    "hmc: mcflirt's corrected series (replica; descrip apart)": "2/2",
+    "the script's exit status": 0
+   },
+   "reason": "",
+   "seconds": 2.681,
+   "status": "pass"
+  },
+  {
+   "case": "nipype-command-lines",
+   "category": "check_nipype",
+   "checks_passed": 26,
+   "checks_total": 26,
+   "failed_checks": [],
+   "measured": {
+    "3dAutomask (afni)": "54/54",
+    "3dAutomask (synthetic, nipype's own)": "1/1",
+    "3dvolreg (synthetic, nipype's own)": "2/2",
+    "DenoiseImage (ants)": "26/26",
+    "DenoiseImage (synthetic, nipype's own)": "1/1",
+    "DenoiseImage (utils)": "5/5",
+    "ImageMath (ants)": "631/631",
+    "ImageMath (synthetic, nipype's own)": "2/2",
+    "N4BiasFieldCorrection (ants)": "70/70",
+    "N4BiasFieldCorrection (fixes)": "36/36",
+    "N4BiasFieldCorrection (synthetic, nipype's own)": "1/1",
+    "antsApplyTransforms (fixes)": "740/740",
+    "antsApplyTransforms (synthetic, nipype's own)": "1/1",
+    "antsRegistration (fixes)": "87/87",
+    "antsRegistration (synthetic, nipype's own)": "2/2",
+    "bet (fsl)": "54/54",
+    "bet (synthetic, nipype's own)": "2/2",
+    "fslmaths (fsl)": "54/54",
+    "fslmaths (synthetic, nipype's own)": "1/1",
+    "the script's exit status": 0,
+    "topup (encoding file)": "6/6",
+    "topup (fsl)": "6/6",
+    "topup (synthetic, nipype's own)": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "INFO antsRegistration (norm)": "23 nodes of another interface, not compared"
+   },
+   "seconds": 2.15,
+   "status": "pass"
+  },
+  {
+   "case": "regrid",
+   "category": "check_regrid",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "RegridToZooms edge voxel sizes": "4/4",
+    "RegridToZooms synthetic": "576/576",
+    "fMRIPrep's res_target": "23/23",
+    "fMRIPrep's res_tmpl": "23/23",
+    "fMRIPrep's zooms_epi": "5/5",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: RegridToZooms edge voxel sizes": "identical",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: RegridToZooms synthetic": "identical",
+    "the script's exit status": 0
+   },
+   "reason": "",
+   "seconds": 51.14,
+   "status": "pass"
+  },
+  {
+   "case": "intensity-clip",
+   "category": "check_skimage",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "IntensityClip (clipper_post) = fMRIPrep's file": "14/14",
+    "IntensityClip (clipper_post) = niworkflows' in this environment": "14/14",
+    "IntensityClip (clipper_pre) = fMRIPrep's file": "14/14",
+    "IntensityClip (clipper_pre) = niworkflows' in this environment": "14/14",
+    "the script's exit status": 0
+   },
+   "reason": "",
+   "seconds": 20.29,
+   "status": "pass"
+  }
+ ],
+ "suite": "niworkflows-helpers",
+ "summary": {
+  "both-error": 0,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 5,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

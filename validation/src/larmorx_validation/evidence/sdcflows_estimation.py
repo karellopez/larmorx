@@ -524,7 +524,8 @@ def _verdicts(diffs: list[dict], outputs: list[dict], same: dict, named: list[st
         elif i.startswith("fix-") and named:
             x["verdict"] = "d13"
             x["reason"] = (
-                f"The default mode corrects {_named_text(named)} and names them: "
+                f"The default mode corrects {_named_text(named)} and names "
+                + ("it: " if len(named) == 1 else "them: ")
                 + _differs(x, outputs)
                 + "."
             )
@@ -1072,7 +1073,7 @@ def _example_app(ctx: core.Context, key: str, links: dict) -> dict:
             "fMRIPrep's N4 output, at one thread with correctly rounded maths LARMORX's (the "
             "cache entry's check_fmap_stage.py --sections fmriprep: every derivative identical, "
             "its data identical with only FSL's build string in `descrip`, or after such an N4 "
-            f"node: {len(n4)} files of this run); the reference, its brain probability and "
+            f"node: {len(n4)} file{'' if len(n4) == 1 else 's'} of this run); the reference, its brain probability and "
             "mask follow from N4's output:",
         )
     }

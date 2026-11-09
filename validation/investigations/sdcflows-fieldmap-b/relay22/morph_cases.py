@@ -34,6 +34,14 @@ from scipy import ndimage as snd
 from larmorx import ndimage as lnd
 from larmorx._defects import UpstreamDefectWarning
 
+
+def _oracle(x):
+    """SciPy's side of a comparison, for the originals' step (``steplines``, when the
+    checking script has loaded it)."""
+    m = sys.modules.get("steplines")
+    return x if m is None else m.oracle(x)
+
+
 #: The entries whose notices may accompany a corrected default.
 KNOWN = {"SCI-10", "SCI-13", "SCI-14", "SCI-15", "SCI-25", "SCI-27", "SCI-29", "SCI-30"}
 WRITEBACK = "WRITEBACKIFCOPY detected in"
@@ -572,7 +580,7 @@ def cases(names=()):
     for name, case in CASES.items():
         if names and not any(o in name for o in names):
             continue
-        s, f, r = outcome(case, snd), outcome(case, lnd), outcome(case, _Repro())
+        s, f, r = _oracle(outcome(case, snd)), outcome(case, lnd), outcome(case, _Repro())
         ok, cat = default_ok(s, f)
         yield (
             name,
@@ -599,7 +607,9 @@ def sci25_family(trials: int = 60):
                     kw = {"iterations": it, "mask": m, "brute_force": bf}
                     label = f"{fn} {np.dtype(dt).str} iterations={it} brute_force={bf}"
                     o1, o2, o3 = (np.zeros(shape, dt) for _ in range(3))
-                    s = outcome(lambda md, o=o1: (getattr(md, fn)(x, output=o, **kw), [o]), snd)
+                    s = _oracle(
+                        outcome(lambda md, o=o1: (getattr(md, fn)(x, output=o, **kw), [o]), snd)
+                    )
                     r = outcome(
                         lambda md, o=o2: (
                             getattr(md, fn)(x, output=o, **kw, upstream_defects="reproduce"),
@@ -675,7 +685,8 @@ def label_order_family(trials: int = 100):
             else:
                 o1 = np.zeros(shape[::-1], np.int16).T
                 o2, xi = np.zeros(shape[::-1], np.int16).T, x
-            a, b = snd.label(xi, output=o1), lnd.label(xi, output=o2)
+            a, b = _oracle((snd.label(xi, output=o1), o1)), lnd.label(xi, output=o2)
+            a = a[0]
             yield (
                 f"label numbering: {kind}",
                 a == b and o1.tobytes() == o2.tobytes() and np.array_equal(o1, o2),

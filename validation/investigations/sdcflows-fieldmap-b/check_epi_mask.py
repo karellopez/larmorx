@@ -52,6 +52,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import check_derivatives as cd  # noqa: E402
 import check_workflows as cw  # noqa: E402
+import steplines  # noqa: E402  (the originals' step: SciPy's and sdcflows' outputs)
 
 REAL_RUNS = (
     "ds005040-sub-002-noreconall",
@@ -220,7 +221,7 @@ def sec_watershed(t: cw.Tally, n: int) -> None:
         st = c["structure"]
         out_ref = None if c["output"] is None else c["output"].copy()
         out_mine = None if c["output"] is None else c["output"].copy()
-        want, e1 = _err(lambda: ndimage.watershed_ift(inp, mk, st, out_ref))  # noqa: B023
+        want, e1 = steplines.oracle(_err(lambda: ndimage.watershed_ift(inp, mk, st, out_ref)))  # noqa: B023
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             got, e2 = _err(
@@ -283,7 +284,7 @@ def sec_watershed(t: cw.Tally, n: int) -> None:
         ("longlong markers", lambda f: f(z8, zi.astype(np.longlong))),
     ]
     for lab, call in special:
-        want, e1 = _err(lambda call=call: call(ndimage.watershed_ift))
+        want, e1 = steplines.oracle(_err(lambda call=call: call(ndimage.watershed_ift)))
         got, e2 = _err(
             lambda call=call: call(
                 lambda *a, **k: lnd.watershed_ift(*a, upstream_defects="reproduce", **k)
@@ -339,7 +340,9 @@ def sec_com(t: cw.Tally) -> None:
         for cname, kw in calls:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                want, e1 = _err(lambda a=a, kw=kw: ndimage.center_of_mass(a, **kw))
+                want, e1 = steplines.oracle(
+                    _err(lambda a=a, kw=kw: ndimage.center_of_mass(a, **kw))
+                )
                 got, e2 = _err(lambda a=a, kw=kw: lnd.center_of_mass(a, numpy_version=ver, **kw))
             if e1 or e2:
                 t.add("com: the same error", e1 == e2, f"{name} {cname}: {e1!r} / {e2!r}")
@@ -418,7 +421,7 @@ def sec_files(t: cw.Tally, scratch: Path, cases: list[dict[str, Any]], what: str
         os.chdir(orig)
         try:
             t0 = time.perf_counter()
-            ref_out, ref_err = _err(lambda: sdc_epi_mask(c["in"]))  # noqa: B023
+            ref_out, ref_err = steplines.oracle(_err(lambda: sdc_epi_mask(c["in"])))  # noqa: B023
             t_ref = time.perf_counter() - t0
         finally:
             os.chdir(cwd)
@@ -481,7 +484,7 @@ def main() -> int:
     import scipy
 
     print(f"numpy {np.__version__}, SciPy {scipy.__version__}")
-    t = cw.Tally()
+    t = steplines.Noted(cw.Tally())
     sections = a.sections.split(",")
     if "watershed" in sections:
         sec_watershed(t, a.cases)
@@ -494,6 +497,7 @@ def main() -> int:
         if "real" in sections:
             sec_files(t, scratch, real_cases(), "real")
     bad = t.report()
+    steplines.lines()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1
 

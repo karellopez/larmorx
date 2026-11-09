@@ -36,12 +36,16 @@ from __future__ import annotations
 import argparse
 import sys
 import warnings
+from pathlib import Path
 
 import numpy as np
 import scipy
 from scipy import linalg
 
 from larmorx.transforms._linalg import scipy_inv
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import steplines  # the originals' step: SciPy's inverses by digest
 
 VERSION = scipy.__version__
 
@@ -151,7 +155,7 @@ WARNED: list[int] = [0]
 def compare(m) -> str:
     """'same', 'refused' or a description of the difference (SciPy's warnings counted in
     ``WARNED``)."""
-    k1, v1, w1 = outcome(linalg.inv, m)
+    k1, v1, w1 = steplines.oracle(outcome(linalg.inv, m))
     WARNED[0] += bool(w1)
     k2, v2, w2 = outcome(ours, m)
     if k2 == "refused":
@@ -338,6 +342,7 @@ def main() -> int:
         for m in gen:
             tot += 1
             r = compare(m)
+            steplines.note(name)
             rs = rcond_same(m)
             if rs is not None:
                 rtot += 1
@@ -362,19 +367,22 @@ def main() -> int:
         )
     for name, m in singles(rng):
         r = compare(m)
+        steplines.note(name)
         if not (r == "same" or r.startswith("refused")):
             fails += 1
         print(f"{name}: {r}")
     # An axis swap with a zero origin: symmetric for 1.18 (Bunch-Kaufman's 2 x 2 pivot).
     swap = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]])
     r = compare(swap)
+    steplines.note("symmetric axis swap")
     fails += r != "same"
     print(f"symmetric axis swap: {r}")
     # SCI-18: an overflowing norm (1.18 returns the LU factors; 1.15 the inverse).
     big = np.array([[1.7e308, 1.7e308, 0, 1], [0.5, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ref = linalg.inv(big)
+        ref = steplines.oracle(linalg.inv(big))
+        steplines.note("norm overflow (SCI-18)")
         rep = scipy_inv(big, scipy_version=VERSION, upstream_defects="reproduce")
         fix = scipy_inv(big, scipy_version=VERSION, upstream_defects="fix")
     ok = same(ref, rep)
@@ -391,6 +399,7 @@ def main() -> int:
             m = nb.load(path).affine
             tot += 1
             r = compare(m)
+            steplines.note("image affines")
             if rcond_same(m) is False:
                 r = "rcond differs"
             good += r == "same"
@@ -398,6 +407,7 @@ def main() -> int:
                 print(f"  {path}: {r}")
         fails += tot - good
         print(f"image affines: {tot} cases, {good} identical")
+    steplines.lines()
     print("ALL OK" if fails == 0 else f"FAIL {fails}")
     return 0 if fails == 0 else 1
 

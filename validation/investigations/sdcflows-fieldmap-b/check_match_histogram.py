@@ -45,6 +45,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import check_derivatives as cd  # noqa: E402
 import check_workflows as cw  # noqa: E402
+import steplines  # noqa: E402  (the originals' step: scikit-image's and sdcflows' outputs)
 
 SYN_RUNS = (
     "ds000228-sub-pixar008-noreconall-syn",
@@ -142,7 +143,7 @@ def sec_files(t: cw.Tally, scratch: Path, cases: list[dict[str, Any]], what: str
         cwd = os.getcwd()
         os.chdir(orig)
         try:
-            ref_out, ref_err = _err(lambda: sdc_match(*args))  # noqa: B023
+            ref_out, ref_err = steplines.oracle(_err(lambda: sdc_match(*args)))  # noqa: B023
         finally:
             os.chdir(cwd)
         modes = ("reproduce", "fix") if c.get("defect") else ("reproduce",)
@@ -211,7 +212,7 @@ def sec_arrays(t: cw.Tally) -> None:
         ("error: two channel axes", rgb, ref, {"channel_axis": (0, 1)}),
     ]  # fmt: skip
     for lab, img, r, kw in cases:
-        want, e1 = _err(lambda img=img, r=r, kw=kw: sk(img, r, **kw))
+        want, e1 = steplines.oracle(_err(lambda img=img, r=r, kw=kw: sk(img, r, **kw)))
         got, e2 = _err(lambda img=img, r=r, kw=kw: lx_mh(img, r, **kw))
         if e1 or e2:
             t.add("arrays: the same error", e1 == e2, f"{lab}: {e1!r} / {e2!r}")
@@ -231,7 +232,7 @@ def main() -> int:
     scratch = Path(a.scratch).absolute()
     scratch.mkdir(parents=True, exist_ok=True)
     print(f"numpy {np.__version__}")
-    t = cw.Tally()
+    t = steplines.Noted(cw.Tally())
     sections = a.sections.split(",")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -242,6 +243,7 @@ def main() -> int:
         if "real" in sections:
             sec_files(t, scratch, real_cases(), "real")
     bad = t.report()
+    steplines.lines()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1
 

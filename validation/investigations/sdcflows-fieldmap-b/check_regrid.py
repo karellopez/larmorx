@@ -61,6 +61,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import check_syn_preprocessing as csp  # noqa: E402
 import check_workflows as cw  # noqa: E402
+import steplines  # noqa: E402  (the originals' step: SciPy's and niworkflows' outputs)
 
 from larmorx import ndimage as lnd  # noqa: E402
 from larmorx import niworkflows as lnw  # noqa: E402
@@ -93,7 +94,7 @@ def run(fn):
 
 
 def both(t: cw.Tally, what: str, label: str, ref_fn, mine_fn) -> None:
-    k1, v1 = run(ref_fn)
+    k1, v1 = steplines.oracle(run(ref_fn))
     k2, v2 = run(mine_fn)
     if k1 != k2:
         t.add(what, False, f"{label}: SciPy {k1} {v1!r:.120} / larmorx {k2} {v2!r:.120}")
@@ -230,7 +231,7 @@ def run_w(fn):
 def both_w(t: cw.Tally, what: str, label: str, ref_fn, mine_fn) -> None:
     """As ``both``, the warnings compared too, and an output array's identity: SciPy returns the
     array it was given."""
-    (k1, v1), w1 = run_w(ref_fn)
+    (k1, v1), w1 = steplines.oracle(run_w(ref_fn))
     (k2, v2), w2 = run_w(mine_fn)
     if k1 != k2:
         t.add(what, False, f"{label}: SciPy {k1} {v1!r:.120} / larmorx {k2} {v2!r:.120}")
@@ -261,7 +262,7 @@ def sec_longdouble(t: cw.Tally, nt: int) -> None:
         ld = np.longdouble(sg)
         for order in range(4):
             radius = int(4.0 * float(ld) + 0.5)
-            ref = sp_kernel(float(ld), order, radius)
+            ref = steplines.oracle(sp_kernel(float(ld), order, radius))
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
                 mine = lx_kernel(ld, order, radius, np.__version__)
@@ -330,13 +331,14 @@ def sec_derivatives(t: cw.Tally, nt: int) -> None:
             if k == 3:  # integers: exact zeros and signed zeros
                 a, x = np.round(a * 4) % 7 - 3, np.round(x) % 5 - 2
                 a[a == 0] = -0.0
-            t.add("matvec", same(a.dot(x), _core.numpy_matvec_f64(a, x)), f"({r}, {c}) {k}")
+            want = steplines.oracle(a.dot(x))
+            t.add("matvec", same(want, _core.numpy_matvec_f64(a, x)), f"({r}, {c}) {k}")
     sigmas = [0.3, 0.5, 1.0, 1.7, 2.5, 4.0, 7.3, 15.0, 1, np.float32(1.3), np.float64(0.9), 2]
     for sg in sigmas:
         for order in range(7):
             for radius in (0, 1, 2, 3, 5, 8, 13, 31):
                 ref, mine = (
-                    run(lambda: sp_kernel(sg, order, radius)),
+                    steplines.oracle(run(lambda: sp_kernel(sg, order, radius))),
                     run(lambda: lx_kernel(sg, order, radius, np.__version__)),
                 )
                 ok = ref[0] == mine[0] and (
@@ -346,7 +348,10 @@ def sec_derivatives(t: cw.Tally, nt: int) -> None:
     for order, radius in ((1, 3000), (2, 1500), (3, 700), (4, 250), (9, 40)):
         t.add(
             "_gaussian_kernel1d",
-            same(sp_kernel(37.0, order, radius), lx_kernel(37.0, order, radius, np.__version__)),
+            same(
+                steplines.oracle(sp_kernel(37.0, order, radius)),
+                lx_kernel(37.0, order, radius, np.__version__),
+            ),
             f"sigma 37 order {order} radius {radius}",
         )
     vol = rng.normal(100, 30, (11, 9, 8))
@@ -622,8 +627,8 @@ def sec_regrid(t: cw.Tally, nt: int, tmp: Path) -> None:
                         if i % 3 and kw not in ({}, {"smooth": True}):
                             continue  # one in three of the rarer options, every combination of the rest
                         label = f"{dname} {aname} q{qc}s{sc} {zooms} {kw}"
-                        ok_ref, ref = run(
-                            lambda: regrid_ref(str(path), zooms, tmp / f"ref{i}", **kw)
+                        ok_ref, ref = steplines.oracle(
+                            run(lambda: regrid_ref(str(path), zooms, tmp / f"ref{i}", **kw))
                         )
                         ok_mine, mine = run(
                             lambda: (
@@ -646,7 +651,9 @@ def sec_regrid(t: cw.Tally, nt: int, tmp: Path) -> None:
         img.header["pixdim"][2] = pd
         path = tmp / f"edge_{name}.nii.gz"
         img.to_filename(path)
-        k1, v1 = run(lambda: regrid_ref(str(path), (2.0, 2.0, 2.0), tmp / f"ref_{name}"))
+        k1, v1 = steplines.oracle(
+            run(lambda: regrid_ref(str(path), (2.0, 2.0, 2.0), tmp / f"ref_{name}"))
+        )
         k2, v2 = run(
             lambda: (
                 lnw.regrid_to_zooms(path, (2.0, 2.0, 2.0), out_dir=tmp / f"mine_{name}").out_file
@@ -713,7 +720,7 @@ def main() -> int:
     args = ap.parse_args()
     sections = set(args.sections.split(","))
     print(f"SciPy {scipy.__version__}, numpy {np.__version__}, NPY_DISABLE_CPU_FEATURES set")
-    t = cw.Tally()
+    t = steplines.Noted(cw.Tally())
     with tempfile.TemporaryDirectory(prefix="lx-regrid-") as d:
         tmp = Path(d)
         if "filters" in sections:
@@ -723,6 +730,7 @@ def main() -> int:
         if "runs" in sections:
             sec_runs(t, args.threads, tmp, args.root)
     bad = t.report()
+    steplines.lines()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return int(bad > 0)
 

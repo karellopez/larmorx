@@ -30,12 +30,16 @@ import argparse
 import sys
 import warnings
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import scipy
 from scipy import ndimage as sp
 
 import larmorx.ndimage as lx
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import steplines  # the originals' step: SciPy's outputs by digest
 
 MODES = [
     "reflect",
@@ -69,6 +73,7 @@ class Tally:
         self.first: dict[str, str] = {}
 
     def add(self, name: str, ok: bool, what: str) -> None:
+        steplines.note(name)
         self.total[name] += 1
         if ok:
             self.same[name] += 1
@@ -122,10 +127,10 @@ def compare(t: Tally, name: str, desc: str, f_sp, f_lx) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            want = f_sp()
+            want = steplines.oracle(f_sp())
             werr = None
         except Exception as e:
-            want, werr = None, (type(e).__name__, str(e))
+            want, werr = None, steplines.oracle((type(e).__name__, str(e)))
         try:
             got = f_lx()
             gerr = None
@@ -439,6 +444,7 @@ def filters(t: Tally, rng, quick: bool, nt: int) -> None:
                     # is memory's); larmorx reads the mode's extension
                     t.add("1-D rank, SciPy reads outside (not compared)", True, "")
                     continue
+                steplines.oracle(want)
                 t.add("1-D rank, short input", same(want, got), f"n={n} size={size} {mode}")
     # errors
     a = values(rng, (6, 5), np.float32, False)
@@ -1065,7 +1071,7 @@ def arguments(t: Tally) -> None:
                     kk["upstream_defects"] = mode
                 return call(m, x, **kk)
 
-            want = _outcome(lambda: run(sp))
+            want = steplines.oracle(_outcome(lambda: run(sp)))
             fixed = _outcome(lambda: run(lx))
             if "rank" in fname or "median" in fname or "percentile" in fname:
                 repro = _outcome(lambda: run(lx, "reproduce"))
@@ -1087,11 +1093,11 @@ def arguments(t: Tally) -> None:
             )
     for label, call, into in _arg_extra():
         if into is None:
-            want, got = _outcome(lambda: call(sp)), _outcome(lambda: call(lx))
+            want, got = steplines.oracle(_outcome(lambda: call(sp))), _outcome(lambda: call(lx))
         else:
             a1, a2 = _ARG_BASE.reshape(3, 4).copy(), _ARG_BASE.reshape(3, 4).copy()
             want, got = (
-                _outcome(lambda: (into(sp, a1), a1)[1]),
+                steplines.oracle(_outcome(lambda: (into(sp, a1), a1)[1])),
                 _outcome(lambda: (into(lx, a2), a2)[1]),
             )
         t.add("arguments: sizes, ranks, outputs", want[:2] == got[:2] and not got[2],
@@ -1236,7 +1242,7 @@ def _sci22(t: Tally) -> None:
         native = xs.astype(np.dtype(xs.dtype.kind + str(xs.dtype.itemsize)))
         for fn in ("median_filter", "rank_filter", "percentile_filter"):
             args = {"median_filter": (3,), "rank_filter": (1, 3), "percentile_filter": (50, 3)}[fn]
-            want = _outcome(lambda: getattr(sp, fn)(xs, *args))
+            want = steplines.oracle(_outcome(lambda: getattr(sp, fn)(xs, *args)))
             repro = _outcome(lambda: getattr(lx, fn)(xs, *args, upstream_defects="reproduce"))
             if label == "longlong" and _scipy115_system_error(want[0]):
                 t.add("arguments: SCI-24 (SciPy 1.15.3's SystemError; 1.18.1's error given)",
@@ -1245,7 +1251,7 @@ def _sci22(t: Tally) -> None:
                 t.add("arguments: SCI-22 reproduced (SciPy's error)", want[:2] == repro[:2],
                       f"{label} {fn}: scipy {_show(want[0])}; larmorx {_show(repro[0])}")  # fmt: skip
             fixed = _outcome(lambda: getattr(lx, fn)(xs, *args))
-            ref = _outcome(lambda: getattr(sp, fn)(native, *args))
+            ref = steplines.oracle(_outcome(lambda: getattr(sp, fn)(native, *args)))
             t.add("arguments: SCI-22 corrected (SciPy's result of the native copy)",
                   fixed[0] == ref[0] and fixed[2] == ["SCI-22"], f"{label} {fn}: {_show(fixed[0])} {fixed[2]}")  # fmt: skip
 
@@ -1264,7 +1270,7 @@ def _sci23(t: Tally) -> None:
         for dt in (np.float64, np.float32, np.int64):
             xs = x.astype(dt)
             o1, o2, o3 = (np.zeros((9, 2), dt)[:, 0] for _ in range(3))
-            want = _outcome(lambda: getattr(sp, fn)(xs, *args, output=o1))
+            want = steplines.oracle(_outcome(lambda: getattr(sp, fn)(xs, *args, output=o1)))
             repro = _outcome(
                 lambda: getattr(lx, fn)(xs, *args, output=o2, upstream_defects="reproduce")
             )
@@ -1305,6 +1311,7 @@ def main() -> int:
     if "arguments" in sections:
         arguments(t)
     bad = t.report()
+    steplines.lines()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1
 

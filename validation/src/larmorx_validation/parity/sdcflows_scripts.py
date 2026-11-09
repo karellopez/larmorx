@@ -79,11 +79,39 @@ BOXED = Path(__file__).resolve().parents[4] / "scripts" / "orchestration" / "box
 STEP_LINES = "LARMORX_STEP_LINES"
 #: The originals' changes from the shared releases to the newest that a step line may show,
 #: each with its reason (``python_versions.CHANGES``'s and this part's; a change without one
-#: fails its check).
-CHANGES: dict[str, str] = dict(pv.CHANGES)
-#: Which comparisons each change reaches: a regular expression of the comparison's name ->
-#: the key of :data:`CHANGES` (filled as the step's changes are measured).
-REASONS: dict[str, str] = {}
+#: fails its check). ``validation/investigations/sdcflows-fieldmap-b/step_diff.py`` shows each
+#: change's first case in both environments.
+CHANGES: dict[str, str] = {
+    **pv.CHANGES,
+    "SCIPY-1.18-INV": "SciPy 1.18 rewrote scipy.linalg.inv: it detects the input's structure "
+    "(diagonal, triangular, symmetric, general) and inverts each with its own LAPACK routines "
+    "(trtri, potrf/potri, sytrf/sytri; getrf/getri otherwise), estimates the condition number "
+    "(gecon, trcon, pocon, sycon) behind a new LinAlgWarning, and words its errors anew "
+    "('A singular matrix detected: slice(s) [0] are singular.', 'Expected square matrix, got "
+    "a1.shape=...'); 1.15.3 ran getrf/getri on every input. Signed zeros, last bits, warnings "
+    "and messages differ; larmorx follows each release (scipy_inv's scipy_version; "
+    "docs/findings/scipy-ndimage-filters.md, relays 18 and 19)",
+    "NUMPY-2.5-PERCENTILE-RANGE": "numpy 2.5 checks percentile's q against [0, 100] before "
+    "dividing it by 100; numpy 2.3 checked the quotient (for a Python q in the array's type), "
+    "so a q just outside the range (100.000001 with a float32 array, 100.00000000000001, "
+    "-1e-320) passed as 100 or 0 in 2.3 and raises ValueError in 2.5; larmorx follows each "
+    "release (numpy_version; docs/api/ndimage-filters.md)",
+    "SCIPY-1.16-ROW-ORDER": "SciPy 1.16 onwards sorts every row of a sparse matrix built "
+    "through COO (1.15 stored the Laplacian's diagonal after each row's other entries), so "
+    "scikit-image's random_walker adds the conjugate gradients' products in another order: "
+    "the probabilities' last bits differ between the releases; larmorx follows each "
+    "(scipy_version; docs/api/skimage.md, 'SciPy's row order')",
+}
+#: Which comparisons each change reaches: per case (``<suite>/<case>``) a regular expression of
+#: the comparison's name -> the key of :data:`CHANGES` (filled as the step's changes are
+#: measured; the next relay measures the rest: NOTES.md).
+REASONS: dict[str, dict[str, str]] = {
+    "ndimage-skimage/scipy-inv-quick": {".*": "SCIPY-1.18-INV"},
+    "ndimage-skimage/scipy-inv": {".*": "SCIPY-1.18-INV"},
+    "ndimage-skimage/numpy": {r"^percentile \(Python q\)$": "NUMPY-2.5-PERCENTILE-RANGE"},
+    "ndimage-skimage/numpy-expf": {r"^percentile \(Python q\)$": "NUMPY-2.5-PERCENTILE-RANGE"},
+    "ndimage-skimage/skimage-random-walker": {r"^random_walker$": "SCIPY-1.16-ROW-ORDER"},
+}
 
 
 @dataclass(frozen=True)
@@ -308,6 +336,13 @@ SUITES: dict[str, dict[str, Script]] = {
             nc=True,
             timeout=7200,
         ),
+        "contract-audit": _s(
+            "relay22/audit_contract.py",
+            [],
+            "smoke",
+            "the part's contract: every registered _core function has its stub, every public "
+            "function of the part's families its API row, every source file its PROVENANCE line",
+        ),
         "qwarp-steps": _s(
             "check_qwarp_steps.py",
             [],
@@ -484,6 +519,7 @@ _TALLY = re.compile(
 _INV = re.compile(r"^(?P<name>.+?): (?P<n>\d+) cases, (?P<k>\d+) identical(?P<rest>.*)$")
 _SECTION = re.compile(r"^== (?P<name>.+?): (?P<k>\d+) identical, (?P<m>\d+) differ(?P<rest>.*)$")
 _SAME = re.compile(r"^(?P<name>[^:]+): (?P<what>same|refused\b.*)$")
+_GAPS = re.compile(r"^(?P<name>[a-z]+): (?P<rest>.*\b(?P<g>\d+) (?:gaps|not named))$")
 _FIRST = re.compile(r"^\s+first difference: (?P<what>.*)$")
 _STEP = re.compile(r"^STEP (?P<hex>[0-9a-f]{64}) (?P<name>.+)$")
 _FINAL_BAD = re.compile(r"^(FAIL \d+|FAILED \d+|DIFFERENCES: \d+)")
@@ -667,6 +703,10 @@ def parse(stdout: str) -> _Parsed:
             k, d = int(m["k"]), int(m["m"])
             out.add(f"== {m['name']}", passed=d == 0, value=f"{k}/{k + d}", compared=True)
             continue
+        if m := _GAPS.match(s):
+            out.add(f"contract: {m['name']}", passed=m["g"] == "0", value=m["rest"][:200],
+                    compared=True)  # fmt: skip
+            continue
         if m := _SAME.match(s):
             out.add(m["name"], passed=True, value=m["what"][:200], compared=True)
             continue
@@ -728,7 +768,7 @@ def run_case(case: Case, checks: CheckList) -> None:
                     detail=item.get("detail", ""),
                 )
             for name, hexdigest in parsed.steps:
-                _step(checks, name, hexdigest)
+                _step(checks, name, hexdigest, REASONS.get(f"{suite}/{cid}", {}))
         lines = [ln.strip() for ln in done.stdout.splitlines() if ln.strip()]
         final = next((ln for ln in reversed(lines) if ln == "ALL OK" or _FINAL_BAD.match(ln)), None)
         err_tail = " | ".join(done.stderr.strip().splitlines()[-6:])[:600]
@@ -766,7 +806,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             shutil.rmtree(folder, ignore_errors=True)
 
 
-def _step(checks: CheckList, name: str, hexdigest: str) -> None:
+def _step(checks: CheckList, name: str, hexdigest: str, reasons: dict[str, str]) -> None:
     """The originals' own step for comparison ``name`` (``python_versions``): recorded in a
     ``shared`` step run, compared with that record in a ``newest`` run; a change needs a
     known reason (:data:`CHANGES`)."""
@@ -789,8 +829,9 @@ def _step(checks: CheckList, name: str, hexdigest: str) -> None:
         )
         return
     changed = olds[0] != pv.digest(value)
-    why = [k for k in REASONS if re.search(k, name)] if changed else []
-    why = [REASONS[k] for k in why]
+    why = (
+        list(dict.fromkeys(v for k, v in reasons.items() if re.search(k, name))) if changed else []
+    )
     checks.add(
         Check(
             f"{pv.STEP_CHECK}: {name}",

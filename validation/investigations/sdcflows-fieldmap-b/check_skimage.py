@@ -46,6 +46,9 @@ import scipy
 import larmorx.skimage as lsk
 from larmorx import _core
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import steplines  # the originals' step: scikit-image's and numpy's outputs
+
 NP = np.__version__
 SP = scipy.__version__
 REL = ".".join(NP.split(".")[:2])
@@ -66,6 +69,7 @@ class Tally:
         self.t: dict[str, list] = {}
 
     def add(self, name: str, ok: bool, what: str = "") -> None:
+        steplines.note(name)
         e = self.t.setdefault(name, [0, 0, ""])
         e[0] += 1
         e[1] += int(ok)
@@ -90,7 +94,7 @@ def sec_ball(t: Tally) -> None:
 
     for r in [0, 1, 2, 3, 4, 5, 6, 1.5, 2.5, 1.7, 3.2, 0.4]:
         for strict in (True, False):
-            want = ball(r, strict_radius=strict)
+            want = steplines.oracle(ball(r, strict_radius=strict))
             got = lsk.ball(r, strict_radius=strict)
             t.add("ball", same(want, got), f"r={r} strict={strict}")
 
@@ -102,13 +106,15 @@ def sec_dot(t: Tally) -> None:
         for n in lengths:
             x = (rng.standard_normal(n) * rng.uniform(0.1, 100)).astype(dt)
             y = (rng.standard_normal(n) * rng.uniform(0.1, 100)).astype(dt)
-            want = np.dot(x, y)
+            want = steplines.oracle(np.dot(x, y))
             got = dt(_core.numpy_dot(x, y))
             t.add(f"np.dot {np.dtype(dt).name}", same(want, got), f"n={n}")
             if n > 0:
                 t.add(
                     f"np.linalg.norm {np.dtype(dt).name}",
-                    same(np.linalg.norm(x), dt(np.sqrt(dt(_core.numpy_dot(x, x))))),
+                    same(
+                        steplines.oracle(np.linalg.norm(x)), dt(np.sqrt(dt(_core.numpy_dot(x, x))))
+                    ),
                     f"n={n}",
                 )
 
@@ -130,8 +136,9 @@ def sec_hist(t: Tally) -> None:
     for a in arrays:
         for nb in (1, 2, 3, 7, 64, 255, 256, 300):
             try:
-                want = np.histogram(a, bins=nb)
+                want = steplines.oracle(np.histogram(a, bins=nb))
             except ValueError as e:
+                steplines.oracle(e)
                 try:
                     _core.numpy_histogram(a, nb)
                     t.add("np.histogram", False, f"numpy raised {e}")
@@ -164,7 +171,7 @@ def sec_otsu(t: Tally) -> None:
         imgs += [rng.integers(0 if it == np.uint8 else -500, 200, 2000).astype(it)]
     for img in imgs:
         for nb in (256, 64, 2):
-            want = threshold_otsu(img, nbins=nb)
+            want = steplines.oracle(threshold_otsu(img, nbins=nb))
             got = lsk.threshold_otsu(img, nbins=nb)
             t.add(
                 "threshold_otsu",
@@ -178,7 +185,7 @@ def sec_otsu(t: Tally) -> None:
         (rng.integers(0, 50, 100), np.linspace(0, 1, 100)),
     ]:
         hist = counts if centers is None else (counts, centers)
-        want = threshold_otsu(hist=hist)
+        want = steplines.oracle(threshold_otsu(hist=hist))
         got = lsk.threshold_otsu(hist=hist)
         t.add("threshold_otsu(hist=...)", same(want, got), f"{counts.size}")
 
@@ -342,6 +349,7 @@ def sec_rw(t: Tally, nt: int) -> None:
                                       n_threads=nt, **kw)  # fmt: skip
                 except Exception as e:
                     l1 = l2 = e
+            steplines.oracle(l1)
             t.add("random_walker copy=False: the caller's labels afterwards",
                   not isinstance(l1, Exception) and same(l1, l2), name)  # fmt: skip
         msgs1 = [str(x.message) for x in w1 if "random_walker" not in str(x.filename) or True]
@@ -372,6 +380,7 @@ def sec_rw(t: Tally, nt: int) -> None:
             else:
                 expected = values[np.asarray(want) + int(np.searchsorted(values, 0))]
                 expected = expected.astype(labels.dtype)
+            steplines.oracle(want)
             t.add(
                 f"random_walker {'SKI-04' if ski04 else 'SKI-03'} corrected",
                 same(expected, got),
@@ -393,7 +402,9 @@ def sec_rw(t: Tally, nt: int) -> None:
             ok = type(want) is type(got) and str(want) == str(got)
         else:
             ok = same(want, got)
+        steplines.oracle(want)
         t.add("random_walker", ok, name)
+        steplines.oracle(msgs1)
         t.add("random_walker warnings", msgs1 == msgs2, f"{name}: {msgs1} vs {msgs2}")
     print(
         f"random_walker: {skipped} float64 cases not compared (numpy's float64 exp is not the C library's here)"
@@ -547,6 +558,7 @@ def main() -> int:
     if "clip" in secs:
         sec_clip(t, args.threads)
     bad = t.report()
+    steplines.lines()
     print(f"time {time.perf_counter() - t0:.1f} s")
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1

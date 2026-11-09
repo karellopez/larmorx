@@ -31,6 +31,9 @@ import numpy as np
 
 from larmorx import _core
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import steplines  # the originals' step: numpy's outputs by digest
+
 NO_AVX512 = "X86_V4 AVX512F AVX512CD AVX512_SKX AVX512_CLX AVX512_CNL AVX512_ICL AVX512_SPR"
 REL = ".".join(np.__version__.split(".")[:2])
 
@@ -42,6 +45,7 @@ def same(a, b) -> bool:
 
 class Tally(dict):
     def add(self, name: str, ok: bool, what: str) -> None:
+        steplines.note(name)
         tot, good, first = self.get(name, (0, 0, None))
         self[name] = (tot + 1, good + int(ok), first if (ok or first) else what)
 
@@ -91,10 +95,10 @@ def percentiles(t: Tally, rng) -> None:
     for desc, a in arrays(rng):
         for q in qs:
             try:
-                want = np.percentile(a, q)
+                want = steplines.oracle(np.percentile(a, q))
                 werr = None
             except Exception as e:
-                want, werr = None, type(e).__name__
+                want, werr = None, steplines.oracle(type(e).__name__)
             try:
                 got = _core.numpy_percentile_weak(a, q, REL)
                 gerr = None
@@ -106,7 +110,7 @@ def percentiles(t: Tally, rng) -> None:
             g = np.asarray(got, dtype=a.dtype)
             t.add("percentile (Python q)", same(want, g), f"{desc} q={q}: {want!r} / {g!r}")
         ql = [0.0, 15.0, 50.0, 99.98, 100.0]
-        want = np.percentile(a, ql)
+        want = steplines.oracle(np.percentile(a, ql))
         got = np.asarray(_core.numpy_percentile(a, ql))
         t.add("percentile (list q)", same(want, got), f"{desc}: {want} / {got}")
     # the 4D series of RobustAverage (whole-array percentile of a Fortran-ordered array)
@@ -115,7 +119,7 @@ def percentiles(t: Tally, rng) -> None:
         t.add(
             "percentile (Python q)",
             same(
-                np.percentile(s, q),
+                steplines.oracle(np.percentile(s, q)),
                 np.asarray(_core.numpy_percentile_weak(s, q, REL), dtype=np.float32),
             ),
             f"4D q={q}",
@@ -124,14 +128,14 @@ def percentiles(t: Tally, rng) -> None:
 
 def medians(t: Tally, rng) -> None:
     for desc, a in arrays(rng):
-        t.add("median", same(np.median(a), _core.numpy_median(a)), desc)
+        t.add("median", same(steplines.oracle(np.median(a)), _core.numpy_median(a)), desc)
     for shape in ((7, 6, 5, 4), (5, 4, 3, 3), (6, 5, 4, 1), (3, 3, 3, 2), (17, 13, 11, 8)):
         for order in ("C", "F"):
             a = np.asarray(rng.normal(0, 3, shape).astype(np.float32), order=order)
             a[0, 0, 0, 0] = np.nan
             a[1, 1, 1, :] = -0.0
             for axis in range(4):
-                want = np.median(a, axis=axis)
+                want = steplines.oracle(np.median(a, axis=axis))
                 got = _core.numpy_median(a, axis)
                 t.add("median (axis)", same(want, got), f"{shape} {order} axis={axis}")
 
@@ -140,7 +144,7 @@ def clips(t: Tally, rng) -> None:
     a = rng.normal(0, 10, 1000).astype(np.float32)
     a[:4] = [np.nan, -0.0, np.inf, -np.inf]
     for lo, hi in ((0.0, 5.0), (-3.5, 3.5), (5.0, -5.0), (np.nan, 1.0), (0.0, np.nan), (-0.0, 0.0)):
-        want = np.clip(a, np.float32(lo), np.float32(hi))
+        want = steplines.oracle(np.clip(a, np.float32(lo), np.float32(hi)))
         got = _core.numpy_clip_f32(a, np.float32(lo), np.float32(hi))
         t.add("clip", same(want, got), f"[{lo}, {hi}]")
 
@@ -173,7 +177,7 @@ def exps(t: Tally, rng) -> None:
         ("small", rng.uniform(-1, 1, 200_000).astype(np.float32)),
     ]:
         with np.errstate(all="ignore"):
-            t.add("exp float32", same(np.exp(x), _core.numpy_exp_f32(x)), desc)
+            t.add("exp float32", same(steplines.oracle(np.exp(x)), _core.numpy_exp_f32(x)), desc)
 
 
 def expf_digests(path: Path) -> None:
@@ -207,6 +211,7 @@ def expf_all(t: Tally, work: Path) -> None:
             )
             mine = int(np.sum(bits * (2 * idx + 1), dtype=np.uint64))
             diffs += int(mine != d)
+        steplines.oracle(out.read_bytes())  # numpy's digests of every chunk
         t.add(
             f"exp float32 all 2^32 ({part})",
             diffs == 0,
@@ -240,6 +245,7 @@ def main() -> int:
         print(f"{name}: {tot} cases, identical {good}")
         if first:
             print(f"   first difference: {first}")
+    steplines.lines()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1
 

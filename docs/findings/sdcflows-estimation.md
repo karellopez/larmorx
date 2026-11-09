@@ -1308,3 +1308,20 @@ Fixed: the app runs its workflows with the set's LAPACK (`_run_workflow`: `use_l
 of the context, so it does not outlive the run); unit test
 `test_library_sets_choose_the_writers_lapack`; the eight shared runs again: see the record
 `sdcflows-estimation-app-shared`.
+
+**A defect of sdcflows found by the records (a candidate, SDC-45, for the next relay: rule A
+proposed).** A dataset stored below a folder whose name holds one of pybids' derivatives entities
+without a separator (`atlas-`, `roi-`, `label-`, `desc-`, `hemi-`, `seg-`, `res-`, `den-`,
+`model-`, `subset-`: pybids 0.22.0's `config/derivatives.json` gives these patterns no `_` or `/`
+before them, so `golden-clone`, `andres-lab` or `garden-2024` match) stops sdcflows'
+fieldmap-less search: `FieldmapFile` takes its entities from `parse_file_entities` on the file's
+absolute path (`fieldmaps.py` line 246; pybids matches `regex.search(f.path)`), so every file
+gets `den` (or `res`, ...) from the folder above the dataset, and `find_anatomical_estimators`
+queries the layout with them (`wrangler.py` line 615): `ValueError: 'den' is not a recognized
+entity`. larmorx's port reproduces it exactly (found when the golden case
+`py.sdcflows.estimators` ran in a scratch clone named `golden-clone`;
+`validation/investigations/sdcflows-fieldmap-b/relay25/probe_root_entities.py`: sdcflows and
+larmorx give the same error under `golden-clone/`, two estimators each under `plain/`). The input
+is a valid dataset, the result a crash: rule A (the entities from the path below the dataset's
+root, or from the BIDS part of the path), `reproduce` keeping sdcflows' error; fMRIPrep's
+`--use-syn-sdc` reaches the same call.

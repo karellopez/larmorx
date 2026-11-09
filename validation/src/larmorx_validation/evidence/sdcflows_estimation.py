@@ -1263,6 +1263,309 @@ def _example_app(ctx: core.Context, key: str, links: dict) -> dict:
     }
 
 
+# ------------------------------------------------------------------ the fieldmap-less (SyN)
+
+SYN_OUTPUTS = [
+    {"id": "fmap", "label": "Field map (Hz, the unwarp node's `_field`)", "unit": "Hz"},
+    {"id": "ref", "label": "Corrected EPI reference (`_sdc`)", "unit": ""},
+]
+#: The SyN example's panels of runs: id, role, label, sub.
+SYN_PANELS = [
+    ("larmorx", "larmorx", "LARMORX (port), 14 threads",
+     "lx.sdcflows.syn_sdc_workflow on fMRIPrep's inputs, reproduce mode; its antsRegistration "
+     "computes ANTs' one-thread result at any thread count"),
+    ("larmorx-fix", "larmorx", "LARMORX (port), 4 threads", "default mode (D13 corrections)"),
+    ("ants-cr1", "original", "ANTs 2.6.5, 1 thread, correctly rounded maths",
+     "the GCC 14.3 build with CORE-MATH's functions preloaded, on fMRIPrep's command line; "
+     "sdcflows' steps after it: LARMORX's reference"),
+    ("ants-g1", "original", "ANTs 2.6.5, 1 thread, glibc's maths",
+     "the same build with the C library's functions"),
+    ("ants-g4a", "original", "ANTs 2.6.5, 4 threads, glibc's maths",
+     "as fMRIPrep's node ran it (--omp-nthreads 4); the first run"),
+    ("ants-g4b", "original", "ANTs 2.6.5, 4 threads, glibc's maths",
+     "the same call again (never cached: the original's own spread)"),
+    ("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own files",
+     "its image's ANTs 2.6.2.dev1 at 4 threads, glibc's maths"),
+]  # fmt: skip
+
+
+def _syn_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("lx-ants", "larmorx", "ants-cr1", "main",
+          "LARMORX (14 threads) − ANTs 2.6.5 at one thread, correctly rounded maths",
+          common.ROLE_LX),
+        d("lx-fmriprep", "larmorx", "fmriprep", "fmriprep",
+          "LARMORX − fMRIPrep 25.2.6's own files", common.ROLE_FMRIPREP),
+        d("fix-lx", "larmorx-fix", "larmorx", "check",
+          "LARMORX: default mode (4 threads) − reproduce (14 threads)", common.ROLE_SELF),
+        d("g1-cr1", "ants-g1", "ants-cr1", "variability",
+          "ANTs 2.6.5 at one thread: glibc's maths − correctly rounded", common.ROLE_ORIG),
+        d("g4-g1", "ants-g4a", "ants-g1", "variability",
+          "ANTs 2.6.5 with glibc's maths: 4 threads − 1 thread", common.ROLE_ORIG),
+        d("g4b-g4a", "ants-g4b", "ants-g4a", "variability",
+          "ANTs 2.6.5 at 4 threads with glibc's maths: the second run − the first",
+          common.ROLE_ORIG),
+        d("fmriprep-g4", "fmriprep", "ants-g4a", "variability",
+          "fMRIPrep's own files (ANTs 2.6.2.dev1) − ANTs 2.6.5, both at 4 threads with glibc's "
+          "maths", common.ROLE_ORIG),
+    ]  # fmt: skip
+
+
+#: ANTs 2.6.5's runs of the call, as fMRIPrep's image runs ANTs (glibc's maths), and with
+#: correctly rounded maths: the original's own band is the largest difference between two of them.
+SYN_GLIBC = ("ants-g1", "ants-g4a", "ants-g4b")
+SYN_ALL = ("ants-cr1", *SYN_GLIBC)
+SYN_WORDS = {
+    "ants-cr1": "its one-thread run with correctly rounded maths",
+    "ants-g1": "its one-thread run",
+    "ants-g4a": "its first four-thread run",
+    "ants-g4b": "its second four-thread run",
+}
+
+
+def _band(arrays: dict, runs: tuple[str, ...]) -> tuple[float, float, str, str]:
+    """The largest difference of the field (Hz, over every voxel) between two of ``runs``: its
+    maximum, the root mean square of that pair, and the pair."""
+    import itertools
+
+    found = []
+    for a, b in itertools.combinations(runs, 2):
+        m = core.compare(arrays[a]["fmap"], arrays[b]["fmap"])
+        found.append((m["max_abs"], m["rms"], a, b))
+    return max(found)
+
+
+def _syn_warps(e: fcache.Entry) -> dict[tuple[str, str], dict]:
+    pairs = json.loads((e.dir / "warps" / "warps.json").read_text(encoding="utf-8"))
+    return {(p["a"], p["b"]): p for p in pairs}
+
+
+def _warp_pair(w: dict, a: str, b: str) -> dict:
+    return w.get((a, b)) or w[(b, a)]
+
+
+def _mm(p: dict) -> str:
+    if p["identical"]:
+        return f"byte for byte ({p['values']:,} values)"
+    return (
+        f"{p['differ']:,} of {p['values']:,} values differ, at most {p['max_abs_mm']:.3g} mm "
+        f"apart (99th percentile {p['p99_mm']:.3g} mm)"
+    )
+
+
+def _example_syn(ctx: core.Context, links: dict) -> dict:
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+
+    e = syn_entry(ctx)
+    info = e.info()
+    wf = _syn_wf()
+    own = {"fmap": _stored(wf / "unwarp" / "clipped_field.nii.gz"),
+           "ref": _stored(wf / "unwarp" / "clipped_sdc.nii.gz")}  # fmt: skip
+    chain = _files(e.dir / "fmriprep")
+    for k in ("fmap", "ref"):  # sdcflows' steps on fMRIPrep's own warp: its own files
+        if _stored(chain[k]).tobytes() != own[k].tobytes():
+            raise ValueError(f"the steps on fMRIPrep's warp do not give its {k}")
+    own_coeff = _stored(wf / "bs_filter" / "fmap_syn0Warp_Hz_trans_coeff000.nii.gz")
+    if _stored(chain["coeff"]).tobytes() != own_coeff.tobytes():
+        raise ValueError("the steps on fMRIPrep's warp do not give its coefficients")
+    fpath = wf / "unwarp" / "clipped_field.nii.gz"
+    img = nib.load(str(fpath))
+    pre = wf.parents[1] / "syn_preprocessing_auto_00000"
+    mask_in = _stored(wf / "zooms_bmask" / "sub-pixar008_desc-brain_mask_trans_uint8_trans.nii.gz")
+    epi_ref = (
+        pre
+        / "epi_reference_wf"
+        / "clip_bg_noise"
+        / "mapflow"
+        / "_clip_bg_noise0"
+        / "clipped.nii.gz"
+    )
+    epi_mask = _stored(pre / "epi_brain" / "clipped_mask.nii.gz")
+    show = _show(np.logical_or(mask_in > 0, epi_mask > 0), 2)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    raw, rs, ri = common.stored(epi_ref)
+    ex.add(exm.Panel("epi", "input", "ds000228: the EPI reference",
+                     "the workflow's epi_ref (syn_preprocessing's clip_bg_noise), as fMRIPrep "
+                     "gave it", {"all": raw}, scale=rs, inter=ri))  # fmt: skip
+    arrays = {"fmriprep": own}
+    for pid, *_ in SYN_PANELS:
+        if pid != "fmriprep":
+            f = _files(e.dir / pid)
+            arrays[pid] = {o["id"]: _stored(f[o["id"]]) for o in SYN_OUTPUTS}
+    for pid, role, label, sub in SYN_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
+    diffs = _syn_diffs()
+    outputs = copy.deepcopy(SYN_OUTPUTS)
+    common.compare_all(ex, diffs, outputs)
+    same = common.identical(diffs)
+    named = _outputs_json(e.dir / "larmorx-fix").get("named", [])
+    by = {x["id"]: x for x in diffs}
+    fm = by["lx-fmriprep"]["metrics"]["fmap"]
+    glibc, every = _band(arrays, SYN_GLIBC), _band(arrays, SYN_ALL)
+    w = _syn_warps(e)
+    reasons = {
+        "lx-ants": "Every value of both outputs is ANTs 2.6.5's at one thread with correctly "
+        "rounded maths followed by sdcflows' steps (the field in Hz from the displacements, its "
+        "B-spline resampling onto the EPI grid, the B-spline fit 16 × 16 × 10 mm apart, the "
+        "unwarping): LARMORX's warp is ANTs' "
+        + _mm(_warp_pair(w, "larmorx", "ants-cr1"))
+        + ", at 14 threads (its registration computes ANTs' one-thread sums whatever the thread "
+        "count).",
+        "fix-lx": "The same bytes in both modes, at 4 threads as at 14 (no correction of the "
+        "register changes this call: SDC-16's axis is the phase encoding's world axis here "
+        "too).",
+        "g1-cr1": "The original against itself, a reference row: ANTs at one thread gives the "
+        "same field with glibc's maths.",
+        "g1-cr1:differ": "The original against itself, a reference row: glibc's exp and log are "
+        "not always correctly rounded, and the registration's iterations grow those last bits "
+        "(its warp: " + _mm(_warp_pair(w, "ants-g1", "ants-cr1")) + "):",
+        "g4-g1": "The original against itself, a reference row: ANTs at four threads gives the "
+        "one-thread field.",
+        "g4-g1:differ": "The original against itself, a reference row: at four threads the "
+        "Mattes metrics sum their joint histograms per work unit, in another order (its warp: "
+        + _mm(_warp_pair(w, "ants-g4a", "ants-g1"))
+        + "):",
+        "g4b-g4a": "The original against itself, a reference row: ANTs at four threads repeats "
+        "itself, every value (its warp too: " + _mm(_warp_pair(w, "ants-g4b", "ants-g4a")) + ").",
+        "g4b-g4a:differ": "The original against itself, a reference row: ANTs at four threads "
+        "does not repeat itself: above one thread its metrics' sums per work unit change from "
+        "run to run (docs/findings/ants-registration.md; its warp: "
+        + _mm(_warp_pair(w, "ants-g4b", "ants-g4a"))
+        + "):",
+        "fmriprep-g4": "The originals against each other, a reference row: fMRIPrep's image's "
+        "ANTs gives the same field as ANTs 2.6.5 at the same threads and maths.",
+        "fmriprep-g4:differ": "The originals against each other, a reference row: fMRIPrep's "
+        "image holds ANTs 2.6.2.dev1 (its own build) where this machine's oracle is ANTs 2.6.5 "
+        "built with GCC 14.3; both at four threads with glibc's maths (its warp: "
+        + _mm(_warp_pair(w, "fmriprep", "ants-g4a"))
+        + "):",
+    }
+    if fm["max_abs"] <= glibc[0]:
+        band, which = glibc, "with glibc's maths, as fMRIPrep's image runs ANTs,"
+    else:
+        band, which = every, "with glibc's maths or correctly rounded ones"
+    within = fm["max_abs"] <= band[0]
+    explained = {
+        "lx-fmriprep": (
+            "within-variability" if within else "open",
+            "fMRIPrep's registration ran its image's ANTs 2.6.2.dev1 at four threads with glibc's "
+            "maths, LARMORX's gives ANTs 2.6.5's one-thread result with correctly rounded maths "
+            "(the first row); sdcflows' steps after the registration give fMRIPrep's own files "
+            "from fMRIPrep's own warp, every value (the cache entry's `fmriprep` run), so the "
+            "difference is the registration's alone. ANTs 2.6.5's own runs of this call "
+            f"{which} differ from each other by up to {band[0]:.3g} Hz (between "
+            f"{SYN_WORDS[band[2]]} and {SYN_WORDS[band[3]]}: root mean square "
+            f"{band[1]:.3g} Hz; the reference rows below), and fMRIPrep's field lies "
+            + ("within that band" if within else "outside that band")
+            + f" (at most {fm['max_abs']:.3g} Hz from LARMORX's, root mean square "
+            f"{fm['rms']:.3g} Hz; its warp: " + _mm(_warp_pair(w, "larmorx", "fmriprep")) + "):",
+        )
+    }
+    _verdicts(diffs, outputs, same, named, links, reasons, explained)
+    at, _k = common.largest_in_slice(ex, "fmriprep", "larmorx", "fmap")
+    default = {
+        "output": "fmap",
+        "plane": "axial",
+        "voxel": at,
+        "panels": ["epi", "larmorx", "ants-cr1", "fmriprep"],
+        "diffs": ["lx-ants", "lx-fmriprep", "g4-g1", "fmriprep-g4"],
+        "compare": {"a": "ants-cr1", "b": "larmorx"},
+    }
+    out = common.finish(
+        ctx, ex, diffs, outputs, default=default, window_panel="ants-cr1",
+        caption="the axial slice with the most brain, the crosshair where fMRIPrep's field "
+        "differs most from LARMORX's in it; choose the output (the field map, the corrected "
+        "reference) above the images.",
+    )  # fmt: skip
+    nc = _stored(_files(e.dir / "larmorx")["coeff"])
+    cr = _stored(_files(e.dir / "ants-cr1")["coeff"])
+    cshape = " × ".join(str(x) for x in nc.shape[:3])
+    same_c = "equal" if nc.tobytes() == cr.tobytes() else "differ from"
+    coeff_text = (
+        f"the {cshape} coefficients: LARMORX's {same_c} ANTs' one-thread run's; sdcflows' steps "
+        "on fMRIPrep's own warp give fMRIPrep's own coefficients, field and corrected reference, "
+        "every value"
+    )
+    secs = {lab: _outputs_json(e.dir / lab).get("seconds", 0.0) for lab, *_ in SYN_RUNS}
+    ants_s = {lab: _outputs_json(e.dir / lab).get("ants_seconds", 0.0)
+              for lab, *_ in SYN_RUNS if lab.startswith("ants")}  # fmt: skip
+    data = _data("ds000228", "sub-pixar008")
+    return {
+        "id": "syn-ds000228",
+        "title": "Fieldmap-less (SyN): sdcflows' syn_sdc_workflow on fMRIPrep's ds000228 estimator",
+        "summary": "sdcflows' fieldmap-less estimation (`init_syn_sdc_wf`, fMRIPrep's "
+        "`--use-syn-sdc`) on the inputs fMRIPrep 25.2.6 gave it for ds000228's BOLD reference "
+        "(a child of 3.5 years; the EPI 20.7° oblique): the reference clipped and registered "
+        "with ANTs' SyN to the anatomical reference brought into its space (two Mattes metrics "
+        "each, the image and its normalised Laplacian; the deformation restricted to the phase "
+        "encoding), the displacements turned into Hz, fitted by sdcflows' B-splines and "
+        "applied to the reference. LARMORX runs the whole workflow; ANTs 2.6.5 runs fMRIPrep's "
+        "own registration command at one thread with correctly rounded maths (LARMORX's "
+        "reference), and with glibc's maths at one thread and twice at four (the original's "
+        "own band), each followed by sdcflows' steps; fMRIPrep's own field is placed against "
+        "that band.",
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{data['dataset']}, sub-pixar008 ({data['licence']}): the BOLD "
+                "reference and the anatomical reference in its space, as fMRIPrep's workflow "
+                "was given them; shown inside the EPI's brain masks (fMRIPrep's and the "
+                "anatomical one resampled), dilated by 2 voxels, so no face shows",
+            },
+            {
+                "label": "Node",
+                "text": f"fMRIPrep 25.2.6, `{info.get('node', '')}` (`--use-syn-sdc`)",
+            },
+            {
+                "label": "Warp",
+                "text": "LARMORX's registration against ANTs 2.6.5 at one thread with correctly "
+                "rounded maths: "
+                + _mm(_warp_pair(w, "larmorx", "ants-cr1"))
+                + "; glibc's maths at one thread: "
+                + _mm(_warp_pair(w, "ants-g1", "ants-cr1"))
+                + "; four threads against one: "
+                + _mm(_warp_pair(w, "ants-g4a", "ants-g1"))
+                + "; four threads, run to run: "
+                + _mm(_warp_pair(w, "ants-g4b", "ants-g4a"))
+                + "; fMRIPrep's own warp against LARMORX's: "
+                + _mm(_warp_pair(w, "larmorx", "fmriprep")),
+            },
+            {"label": "Coefficients", "text": coeff_text},
+            {
+                "label": "Programs",
+                "text": "ANTs 2.6.5's antsRegistration (the GCC 14.3 build) through the oracle "
+                "cache, the four-thread runs never cached; sdcflows' steps after it by LARMORX's "
+                "port (= sdcflows' nodes on these inputs, the records' `syn-sdc` case); LARMORX "
+                f"at commit `{info['larmorx_commit'][:12]}`, fMRIPrep's image's numpy 2.2.6 "
+                "for the clip",
+            },
+            {
+                "label": "Time",
+                "text": f"LARMORX's whole workflow {secs['larmorx']:.0f} s at 14 threads; "
+                f"ANTs' registration {ants_s['ants-cr1']:.0f} s and {ants_s['ants-g1']:.0f} s "
+                f"at one thread, {ants_s['ants-g4a']:.0f} s and {ants_s['ants-g4b']:.0f} s at "
+                "four (the six runs side by side; informal)",
+            },
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "chain": None,
+        "groups": [
+            ["main", "LARMORX against ANTs 2.6.5 (one thread, correctly rounded maths)"],
+            ["fmriprep", "LARMORX against fMRIPrep's own files"],
+            ["check", "LARMORX against itself: modes and threads"],
+            ["variability", "ANTs against itself: maths, threads, runs, builds"],
+        ],
+        "metrics_note": f"Δ is A − B over all {int(np.prod(img.shape[:3])):,} voxels of each "
+        "output file, not only those shown (the field extrapolated over the whole grid).",
+        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+    }
+
+
 # ------------------------------------------------------------------------------ the tables
 
 
@@ -1290,7 +1593,7 @@ def _records_table(ctx: core.Context, recs) -> dict:
         step = [v for r in rec.results for v in _step_lines(r).values()]
         rows.append(
             {
-                "head": f"[{rec.name}](record:{rec.name})",
+                "head": f"[{rec.name}](repo:docs/validation/{rec.name}.md)",
                 "cells": [
                     common.cell(suite),
                     common.cell(tier),
@@ -1786,6 +2089,7 @@ def export(ctx: core.Context) -> dict:
     examples = [
         _example_app(ctx, "ds006736", links),
         _example_app(ctx, "ds005752", links),
+        _example_syn(ctx, links),
         _example_masker(ctx, links),
         _example_epi(ctx, links),
     ]

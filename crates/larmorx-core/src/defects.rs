@@ -382,6 +382,18 @@ defects! {
         "the 1-D rank, median and percentile filters refuse a big-endian float32 or float64 input (RuntimeError) and numpy's longlong (TypeError), which the n-dimensional filters take";
     SCI_23 = "SCI-23", "SciPy ndimage", true,
         "the 1-D rank, median and percentile filters into a non-contiguous output of the input's type never resolve numpy's write-back copy: numpy warns (RuntimeWarning) when the copy is freed";
+    SCI_25 = "SCI-25", "SciPy ndimage", true,
+        "a binary erosion of more than one pass (the propagation strategy: the structure's centre true, no brute_force) with a mask into a float32 or float64 output array erodes elements outside the mask in its later passes, as it marks them by the first byte of each output element, which is 0 for both 0.0 and 1.0 (binary_closing too)";
+    SCI_26 = "SCI-26", "SciPy ndimage", true,
+        "a binary erosion or dilation of more than one pass (the propagation strategy; binary_propagation and binary_fill_holes too) into a byte-swapped or misaligned output array never resolves numpy's write-back copy of it: numpy warns (RuntimeWarning) when the copy is freed";
+    SCI_27 = "SCI-27", "SciPy ndimage", true,
+        "label refuses a big-endian input or output (Cython's ValueError: Big-endian buffer not supported on little-endian compiler), which every other function of ndimage takes";
+    SCI_28 = "SCI-28", "SciPy ndimage", true,
+        "label writes the labels into a read-only output array";
+    SCI_29 = "SCI-29", "SciPy ndimage", true,
+        "label into a bool output writes the labels as their bytes (2, 3, ... up to 255): an invalid bool array, where labels that do not fit any other type are refused (RuntimeError)";
+    SCI_30 = "SCI-30", "SciPy ndimage", true,
+        "sum_labels (sum, center_of_mass) with a sequence index fails on a 0-d index array (TypeError: numpy.int64 does not support item assignment) and on an empty input (ValueError of labels.min(), or IndexError for uint64 labels)";
     SDC_01 ="SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,

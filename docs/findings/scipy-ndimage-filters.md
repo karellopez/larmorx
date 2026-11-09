@@ -211,10 +211,111 @@ larmorx did so only when every unlabeled pixel was isolated; it now marks the ca
 scikit-image does (`check_skimage.py --sections rw`: the caller's labels afterwards, 27 of 27 in
 both environments).
 
-**Not yet as SciPy (the next relay):** binary morphology, `label` and `sum_labels` still take their
-arguments relay 2's way (`relay21/probe_binary.py`: 63 of 144 probe cases differ in message or
-acceptance: float16, long double, object and string inputs, read-only and list outputs, float and
-bool origins, a `str` or fractional `border_value`).
+**Not yet as SciPy at relay 21:** binary morphology, `label` and `sum_labels` still took their
+arguments relay 2's way (`relay21/probe_binary.py`: 63 of 144 probe cases differed in message or
+acceptance); relay 22 did them (next section).
+
+## Binary morphology's, `label`'s and the sums' argument handling (relay 22, 2026-11-09)
+
+Relay 2's binary morphology, `label`, `sum_labels` and `center_of_mass` checked their arguments
+in their own way (`_input`'s `array type not supported` for every refused type, `int()` origins,
+`bool()` of `border_value`, an `output` dtype honoured, the sums per label in Rust). They now
+follow SciPy 1.18.1 check for check (`_morphology.py`, `_measurements.py`, `nd_image.c`'s
+`Py_BinaryErosion`, `Py_BinaryErosion2` and `Py_WatershedIFT`, `ni_morphology.c`'s type
+switches, `_ni_label.pyx`; the same Python and C in SciPy 1.15.3 but for 1.18.1's
+`ascontiguousarray` of a broadcast input, which gives the same result in 1.15.3): the type
+switches' `data type not supported` (the mask's, the input's, then the output's, none for an
+empty input), `border_value` as a C `int` (`'float' object cannot be interpreted as an integer`,
+`signed integer is greater than maximum`, numpy's bool refused), the origins through
+`_center_is_true`'s numpy indexing (a float origin: `IndexError: only integers, slices ...`) and
+`PyArray_IntpConverter` (a bool: `an integer is required`), `iterations - 1` as a C `int` for the
+propagation strategy (after the first pass wrote the output), an `output` that is not an array
+ignored (SciPy: a new bool array), `binary_hit_or_miss` and `binary_fill_holes` into an array
+returning `None`, 0-d and `longlong` inputs; `label`'s output made from a dtype first, Cython's
+`No matching signature found` (float16, long double, complex, object), `longlong` taken; the sums
+by SciPy's own `_stats` with numpy's `bincount`, `unique` and `searchsorted` (so a float index
+with `uint64` labels is compared by value, `bincount`'s refusal of a long double input is
+numpy's); `watershed_ift`'s read-only output refused by its parser (before `too many
+dimensions`). Before the change 353 of the probe's 1,531 cases differed from SciPy in the default
+mode (29 of them `watershed_ift`'s corrections, SCI-13 and SCI-14); after it,
+`relay22/morph_cases.py` (in `check_ndimage.py --sections arguments`): 1,655 cases with
+`reproduce` identical to SciPy and the default identical or a registered correction, in both
+environments.
+
+**A larmorx mistake found and fixed: `label`'s numbering into a non-C output.** `_ni_label` runs
+its lines along the output's axis of the smallest stride (numpy's `PyArray_IterAllButAxis` with
+`axis = -1`: the smallest positive stride, starting from the first non-zero stride counted as
+axis 0's), so the components are numbered by their first element in C order with that axis
+last: into a Fortran-ordered output, along axis 0 (`label([[0, 1], [1, 0]], output=F)` gives
+`[[0, 2], [1, 0]]`, a C output `[[0, 1], [2, 0]]`). larmorx numbered in C order whatever the
+output (428 of 1,800 probe cases differed: Fortran-ordered and transposed outputs); it now labels
+the input with that axis moved last and moves the labels back (500 cases identical in both
+environments: Fortran-ordered, strided, reversed and transposed outputs, a Fortran input).
+
+SciPy's defects on these paths (rules A and B, `docs/api/ndimage-filters.md`):
+
+1. **An iterated erosion into a float output erodes outside the mask** (SCI-25, class a). For
+   more than one pass with the structure's centre true and no `brute_force`, `NI_BinaryErosion2`
+   marks each element outside the mask by reading the first byte of the output element as a bool
+   (and writing the eroded value there), and restores that byte at the end. For bool and integer
+   outputs that byte is the value; for float32 and float64 it is 0 for both 0.0 and 1.0, so the
+   element stays "inside" and the later passes erode it: `binary_erosion(ones(5), iterations=4,
+   mask=[1, 1, 1, 0, 0], output=zeros(5))` gives `[0, 0, 0, 0, 1]` where a bool output gives
+   `[0, 0, 0, 1, 1]` (a dilation's marking flips that byte to 1, which no comparison takes, so
+   dilations are right). Rule A: corrected by default (the outside elements keep their values, as
+   in every other output type), with a warning when SciPy's result differs; `reproduce` gives
+   SciPy's (`larmorx_ndimage::binary_erosion_unprotected`). Measured (`morph_cases.py`'s SCI-25
+   family, 60 seeded masks and inputs, iterations 2, 3, 0 and -1, erosions, dilations and
+   closings into eight output types, both strategies): 600 of 2,520 results into float outputs
+   differ from SciPy's bool result, all erosions or closings with the propagation strategy;
+   `reproduce` = SciPy in 2,880 of 2,880, in both environments.
+2. **The erosion's write-back copy never resolved** (SCI-26, class f). The same strategy's second
+   C call takes the output through `NI_ObjectToInputOutputArray` (`NPY_ARRAY_WRITEBACKIFCOPY`) and
+   never calls `PyArray_ResolveWritebackIfCopy`, so a byte-swapped or misaligned output array
+   (and `binary_propagation`, `binary_fill_holes`, `binary_opening`, `binary_closing` into one)
+   gets numpy's warning when the copy is freed (`RuntimeWarning: WRITEBACKIFCOPY detected in
+   clearing of array. ...`; numpy 2.3.5: `in array_dealloc.`), which writes it back. Rule A as
+   SCI-23: no warning by default (the values are right), numpy's with `reproduce` (13 probe cases).
+3. **`label` refuses big-endian arrays** (SCI-27, class c). Cython's typed buffers
+   (`get_nonzero_line(input.take([0]))`, `get_read_line(output.take([0]))`) refuse a byte-swapped
+   input or output: `ValueError: Big-endian buffer not supported on little-endian compiler`, also
+   for `output=">i4"`; every other function of `ndimage` takes them, and a big-endian NIfTI file's
+   data are such an array. Rule A: labelled as the native copy by default (with a warning);
+   `reproduce` raises SciPy's error (5 probe cases).
+4. **`label` writes into a read-only output** (SCI-28, class f). `_ni_label` writes through the
+   array's data pointer without checking its flags (`label(x, output=ro)` returns the number and
+   fills `ro`). Rule B: `ValueError("output array is read-only. ...")` by default (SciPy's
+   message for its other functions); `reproduce` writes the labels as SciPy does, lifting numpy's
+   flag for the write where numpy allows it (an array whose memory numpy does not own as
+   writeable, a read-only memory map, is never written: the error stays, D13). SciPy's empty
+   input into a read-only output writes nothing and returns 0, as larmorx; its 0-d one is
+   numpy's own error in both.
+5. **`label` writes label bytes into a bool output** (SCI-29, class a). `_label` views a bool
+   output as `uint8` and its overflow check passes up to 255, so the labels are written as their
+   bytes (2, 3, ...): a `bool` array whose bytes are not 0 or 1 (37 probe cases: arrays,
+   `output=bool`, `"bool"`, the bool input itself). With more working labels than a byte holds
+   (they run from 2, one per element without an earlier neighbour, before merging) it retries in
+   `int32` and refuses, as for every other type the labels do not fit. Rule A: labels above 1 are
+   refused by default (`insufficient bit-depth in requested output type`, after the cast is
+   written, as SciPy's retry; one label is written as `True`), with a warning; `reproduce` writes
+   SciPy's bytes (the working labels counted as `_ni_label` counts them, so the refusal beyond
+   255 is reproduced: the 12 bool cases near 255 identical).
+6. **The sums per label fail on a 0-d index and on an empty input** (SCI-30, class f).
+   `sum_labels(x, labels, np.array(2))` (not a scalar for `np.isscalar`) indexes the sums with
+   the 0-d array, which gives a numpy scalar, then assigns into it: `TypeError: 'numpy.int64'
+   object does not support item assignment`; an empty input with a sequence index fails in
+   `labels.min()` (`ValueError: zero-size array to reduction operation minimum which has no
+   identity`) or, for `uint64` labels, in numpy's indexing of the empty unique labels
+   (`IndexError`). `sum`, `center_of_mass` (and SciPy's `mean`, `variance`, not ported) share
+   `_stats`. Rule A: the 0-d index gives its one label's sum as a scalar (the sequence path's
+   value), the empty input zero counts and sums of the index's shape, with a warning (one per
+   `center_of_mass` call); `reproduce` raises SciPy's errors (12 probe cases).
+
+Kept as SciPy (rule C, SciPy's explicit code): an `output` of binary morphology that is not an
+array is ignored (`else: output = bool`), and `binary_hit_or_miss` and `binary_fill_holes` into
+an array return `None`; `CPython`'s `"i"` conversion overflows at a C `long` with "Python int too
+large to convert to C long", the Linux and macOS text (a C `long` is 32-bit on Windows, where
+CPython says so already above 2^31 - 1: larmorx gives Linux's message on every platform).
 
 ## numpy.linalg's `svd3` (the field maps' part A module, fixed here)
 

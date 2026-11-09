@@ -13,7 +13,7 @@ is re-expressed in Rust; no code was copied verbatim. Each source file reproduce
 | `filters::correlate1d` (relay 18 of the field maps' part B) | `src/ni_filters.c` (`NI_Correlate1D`: the symmetry test, the three sums), `src/ni_support.c` (`NI_ExtendLine`, `NI_ArrayToLineBuffer`, `CASE_COPY_LINE_TO_DATA`) | BSD-3-Clause |
 | `filters::rank_filter`, `ni_select` | `src/ni_filters.c` (`NI_RankFilter`, `CASE_RANK_POINT`, `NI_Select`) | BSD-3-Clause |
 | `filters::rank_filter_1d`, `Mediator` | `src/_rank_filter_1d.cpp` (`Mediator`, `MediatorInsert` and its heap helpers, `_rank_filter`; Copyright (c) 2011 ashelly.myopenid.com, MIT, modified in 2024 by Gideon Genadi Kogan) | MIT within BSD-3-Clause |
-| `morphology::binary_erosion`, `pass`, `propagate`, `center_is_true`, `dilation_arguments`, `generate_binary_structure`, `iterate_structure`, `MaskElement` | `src/ni_morphology.c` (`NI_BinaryErosion`, `CASE_NI_ERODE_POINT`, `NI_BinaryErosion2`, `CASE_ERODE_POINT2`), `_morphology.py` (`_binary_erosion`, `binary_dilation`, `_center_is_true`, `generate_binary_structure`, `iterate_structure`) | BSD-3-Clause |
+| `morphology::binary_erosion`, `binary_erosion_unprotected` (SCI-25's reproduction, relay 22), `pass`, `propagate`, `center_is_true`, `dilation_arguments`, `generate_binary_structure`, `iterate_structure`, `MaskElement` | `src/ni_morphology.c` (`NI_BinaryErosion`, `CASE_NI_ERODE_POINT`, `NI_BinaryErosion2`, `CASE_ERODE_POINT2`), `_morphology.py` (`_binary_erosion`, `binary_dilation`, `_center_is_true`, `generate_binary_structure`, `iterate_structure`) | BSD-3-Clause |
 | `measurements::label` | `src/_ni_label.pyx` (`_label`, `label_line_with_neighbor`, `mark_for_merge`: the same components and numbers, by a union of earlier neighbours in C order), `_measurements.py` (`label`) | BSD-3-Clause |
 | `watershed::watershed_ift`, `watershed_ift_run`, `Queues`, `WatershedEvents` | `src/ni_measure.c` (`NI_WatershedIFT`, `NI_WatershedElement`, `WS_GET_INDEX`, `CASE_WINDEX1`-`3`: the per-level doubly linked queues, the markers' order, the `int` offsets and labels, the propagation; byte-identical in SciPy 1.15.3), `_measurements.py` (`watershed_ift`); the corrected run (neighbours inside the array, an element always taken out of its queue, 64-bit labels) is larmorx's | BSD-3-Clause |
 | `measurements::sum_labels_bincount` | `_measurements.py` (`_stats`'s `bincount` and `unique` paths, `sum_labels`) and numpy's `bincount` (sequential float64 sums) | BSD-3-Clause |
@@ -51,7 +51,26 @@ error for an empty input); numpy 2.5.4's and 2.3.5's `PyArray_IntpConverter`,
 conversion_utils.c`: the origins' conversion, a bool refused) and `_clear_array_attributes`'
 `WRITEBACKIFCOPY` warning text (`arrayobject.c`; numpy 2.3.5's `array_dealloc` text), and
 `PyArray_FailUnlessWriteable`'s message (SCI-21 to SCI-23); a `numpy.longdouble` sigma taken as
-float64 (larmorx's choice, `docs/api/ndimage-filters.md`).
+float64 (larmorx's choice, `docs/api/ndimage-filters.md`); (relay 22) binary morphology's,
+`label`'s, `sum_labels`', `center_of_mass`' and `watershed_ift`'s argument handling in SciPy
+1.18.1's order: `_morphology.py`'s `_binary_erosion` (its checks, `_center_is_true`, the output
+ignored unless an array, the mask cast to `int8` before the second C call), `binary_dilation`,
+`binary_opening`, `binary_closing`, `binary_hit_or_miss` and `binary_fill_holes` (their `None`
+into an output array), `src/nd_image.c`'s parsers of `Py_BinaryErosion` (`"O&O&O&O&iO&iii"`,
+`_validate_origin`), `Py_BinaryErosion2` (`"O&O&O&iO&iO"`, `NI_ObjectToInputOutputArray`'s
+unresolved write-back copy: SCI-26) and `Py_WatershedIFT` (`"O&O&O&O&"`), `src/ni_morphology.c`'s
+type switches (`CASE_GET_MASK`, `CASE_NI_ERODE_POINT`, `CASE_OUTPUT`: "data type not supported",
+none for an empty input) and `NI_BinaryErosion2`'s first-byte marking of the elements outside
+the mask (SCI-25), `_measurements.py`'s `label` (its output made first, scalars and empty
+arrays), `_safely_castable_to_int`, `_stats` (the `bincount` and `unique` paths through numpy
+itself), `sum_labels`, `sum` and `center_of_mass`, `src/_ni_label.pyx`'s `_label` (the symmetry
+assertion, the fused type `data_t`'s dispatch and Cython's buffer refusal of big-endian arrays:
+SCI-27; a bool output viewed as `uint8`: SCI-29; the working labels from 2, `NeedMoreBits`;
+writing into a read-only output: SCI-28), numpy 2.5.4's and 2.3.5's `PyArray_IterAllButAxis`
+(`numpy/_core/src/multiarray/iterators.c`: the axis of the smallest stride, along which
+`_label`'s lines run), and CPython 3.12's `PyArg_ParseTuple` `"i"` (`PyLong_AsLong` and the C
+`int` range: the messages of `border_value` and `iterations - 1`); the corrections of SCI-25 to
+SCI-30 are larmorx's (`docs/api/ndimage-filters.md`).
 
 **Deliberate differences** (`docs/api/ndimage-filters.md`, "Differences from SciPy"): where
 SciPy reads or writes outside its arrays (binary morphology with an origin before its structure,

@@ -462,15 +462,19 @@ def ndimage_binary_erosion(
     brute_force: bool,
     mask: np.ndarray | None = None,
     n_threads: int = 1,
+    protect_later: bool = True,
 ) -> np.ndarray:
     """``_binary_erosion`` after the wrapper's checks (``invert``: a dilation with the reversed
-    structure): uint8 0/1 values."""
+    structure): uint8 0/1 values. ``protect_later=False``: SciPy's later passes into a float
+    output array, which protect no element outside the mask (SCI-25 reproduced)."""
 
 def ndimage_label(input: np.ndarray, structure: np.ndarray) -> tuple[np.ndarray, int]:
     """``_ni_label._label`` with SciPy's default output: ``(int32 or int64 labels, number)``."""
 
 def ndimage_sum_labels(input: np.ndarray, labels: np.ndarray, index: list[int]) -> list[float]:
-    """``sum_labels`` for a sequence ``index``: the float64 sum per label, in C order."""
+    """``sum_labels``' ``bincount`` path for a sequence ``index``: the float64 sum per label, in
+    C order (``lx.ndimage.sum_labels`` runs SciPy's ``_stats`` with numpy itself since relay 22
+    of the field maps' part B; this binding stays the Rust function's own)."""
 
 def ndimage_watershed_ift(
     input: np.ndarray,

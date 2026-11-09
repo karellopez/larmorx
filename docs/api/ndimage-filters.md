@@ -41,6 +41,18 @@ inputs, outputs, `cval`, origins, modes, axes, sizes, ranks and percentiles of e
 numpy kind, empty inputs, outputs that are the input; the errors, results and warnings
 compared, and SCI-21 to SCI-23 in both modes, SciPy's writes past an output's end each in a
 process of its own); a `numpy.longdouble` sigma (`check_regrid.py`, below).
+Binary morphology's, `label`'s, `sum_labels`' (and `sum`'s), `center_of_mass`' and
+`watershed_ift`'s argument handling (relay 22, 2026-11-09): SciPy's on 1,655 cases per
+environment (`check_ndimage.py --sections arguments`, `relay22/morph_cases.py`: inputs, masks,
+outputs of every type, byte order and layout, read-only outputs, the input as output, origins,
+border values, iterations, structures and axes of every Python and numpy kind; `label`'s outputs,
+narrow types with many labels; `sum_labels`' inputs, labels and indices; `watershed_ift`'s
+inputs, markers and outputs; the errors, results, the output arrays afterwards and the warnings
+compared), `upstream_defects="reproduce"` = SciPy in every case and the default = SciPy's or a
+registered correction (SCI-10, SCI-13, SCI-14, SCI-25 to SCI-30); iterated erosions, dilations
+and closings with a mask into outputs of eight types (5,760 checks: SCI-25) and `label` into
+Fortran-ordered, strided, reversed and transposed outputs (500 cases), identical in both
+environments.
 
 ```python
 import numpy as np
@@ -69,13 +81,13 @@ contiguous); results are C-ordered, as SciPy's.
 | `minimum_filter1d`, `maximum_filter1d` | the same | `NI_MinOrMaxFilter1D` (Richard Harter's running minimum on the line extended by `NI_ExtendLine`); SciPy's order: complex refused, `normalize_axis_index`, the size, `_get_output` (a non-numeric `str` refused: `output must have numeric dtype`), the origin, the mode, then the C parser `"O&niO&idni"` (the size, the axis and the origin through `__index__`: `'float' object cannot be interpreted as an integer`; `output array is read-only.`; `cval` through `PyFloat_AsDouble`: `must be real number, not ...`) and `NI_InitLineBuffer`'s types, the input's then the output's (`array type dtype('float16') not supported`) |
 | `rank_filter`, `median_filter`, `percentile_filter` | the same | the rank from the footprint's true elements; rank 0 and the last rank are the minimum and maximum filters; 1-D inputs use `_rank_filter_1d` (Ashelly's running rank, with the footprint's size) unless the footprint is too large for the input, as SciPy 1.18 decides, with its own type dispatch (float32, float64, int64 as they are; float16 through float32; booleans and other integers through int64; any other type `RuntimeError("Unsupported array type")`), `cval` in that type, its C parser `"OiiOiOi"` and its output (the output array itself for its three types: `WRITEBACKIFCOPY base is read-only` for a read-only one); otherwise `NI_RankFilter` with SciPy's quickselect `NI_Select` (its parser `"O&iO&O&idO&"`, as the minimum filter's); `upstream_defects` (SCI-09: a 1-D footprint with holes; SCI-21 to SCI-23: below) |
 | `grey_erosion`, `grey_dilation`, `grey_opening`, `grey_closing` | the same | `size`, `footprint`, `structure` (non-flat: added in the input's type, as SciPy's `CASE_MIN_OR_MAX_POINT`), the dilation's reversed footprint and origins |
-| `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing` | the same | `structure` (default `generate_binary_structure(rank, 1)`), `iterations` (below 1: until nothing changes), `mask`, `output`, `border_value`, `origin`, `brute_force`, `axes`; `upstream_defects` (SCI-10: the later passes' `int8` mask) |
-| `binary_propagation`, `binary_fill_holes`, `binary_hit_or_miss` | the same | built on the erosion as SciPy builds them; `binary_propagation`'s `upstream_defects` (SCI-10) |
+| `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing` | the same | `structure` (default `generate_binary_structure(rank, 1)`), `iterations` (below 1: until nothing changes), `mask`, `output` (an array; anything else is ignored, as SciPy ignores it: a new `bool` array), `border_value`, `origin`, `brute_force`, `axes`; SciPy's order: `iterations` through `__index__` (`iterations parameter should be an integer`), complex refused, the axes, the structure, the mask's shape, the origins, `_center_is_true` (numpy's indexing: a float origin is an `IndexError`), a complex output refused, the output's shape, then `Py_BinaryErosion`'s parser (`output array is read-only.`, `border_value` as a C `int`: `'float' object cannot be interpreted as an integer`, `signed integer is greater than maximum`; the origins through `PyArray_IntpConverter`: `an integer is required` for a bool) and `NI_BinaryErosion`'s type switches, the mask's, the input's and the output's (`data type not supported` for float16, long double, object, strings; none for an empty input); the propagation strategy (more than one pass, the centre true, no `brute_force`) casts the mask to `int8` and takes `iterations - 1` as a C `int` (`signed integer is less than minimum`, after the first pass wrote the output); a 0-d input is its own neighbourhood; `upstream_defects` (SCI-10: the later passes' `int8` mask; SCI-25: a float output's later passes; SCI-26: the write-back warning) |
+| `binary_propagation`, `binary_fill_holes`, `binary_hit_or_miss` | the same | built on the erosion as SciPy builds them; `binary_fill_holes` and `binary_hit_or_miss` into an `output` array return `None`, as SciPy's; `binary_propagation`'s and `binary_fill_holes`' `upstream_defects` (SCI-10, SCI-26) |
 | `generate_binary_structure`, `iterate_structure` | the same | |
-| `label` | the same | `structure` (`3^n`, symmetric), `output`; labels numbered by each component's first element in C order (`int32`, or `intp` from `2^31 - 2` elements) |
-| `sum_labels`, `sum` | the same | a sequence `index`: float64 sums in C order (`bincount`); a scalar or no `index`, or no `labels`: numpy's own sum of the selection |
-| `center_of_mass` | the same | `labels`, `index`; `sum_labels(input * grid) / sum_labels(input)` per axis in float64; the whole-array and selected sums of float32 and float64 arrays contiguous in C or Fortran order in numpy `numpy_version`'s order (keyword; pairwise from numpy 2.3, chunks of 8192 before; the newest release by default), other layouts and types by the installed numpy, a sequence `index` by `bincount` |
-| `watershed_ift` | the same | `uint8`/`uint16` input, signed integer `markers` (positive: objects, negative: background, processed after them), `structure` (`3` per axis; faces by default), an integer `output` array (a non-array `output` is ignored, as SciPy does); `upstream_defects` (below) |
+| `label` | the same | `structure` (`3^n`, symmetric), `output` (an array, or a dtype: `numpy.empty(shape, output)` made before anything else, so a bad dtype fails first); labels numbered by each component's first element in C order with the output's axis of the smallest stride last (`_ni_label`'s lines run along it: a Fortran-ordered output numbers along axis 0), `int32`, or `intp` from `2^31 - 2` elements; `_ni_label`'s order: the symmetry (`AssertionError`), then Cython's fused types, the input's and the output's (`TypeError: No matching signature found` for float16, long double, complex, object; `longlong` taken); labels that do not fit the output's type: `insufficient bit-depth in requested output type`, after the cast was written; `upstream_defects` (SCI-27: big-endian arrays; SCI-28: a read-only output; SCI-29: a bool output) |
+| `sum_labels`, `sum` | the same | SciPy's `_stats` with numpy's own functions: a sequence `index` by `bincount` (float64 sums in C order; labels it cannot take, negative ones or ones above the size through `unique` and `searchsorted`, so a float index is compared by value), a scalar or no `index`, or no `labels`: numpy's own sum of the selection; numpy's errors (`bincount` refuses a long double or complex input); `upstream_defects` (SCI-30: a 0-d index array, an empty input) |
+| `center_of_mass` | the same | `labels`, `index`; `sum_labels(input * grid) / sum_labels(input)` per axis in float64; the whole-array and selected sums of float32 and float64 arrays contiguous in C or Fortran order in numpy `numpy_version`'s order (keyword; pairwise from numpy 2.3, chunks of 8192 before; the newest release by default), other layouts and types by the installed numpy, a sequence `index` by `bincount`; `upstream_defects` (SCI-30, one notice per call) |
+| `watershed_ift` | the same | `uint8`/`uint16` input, signed integer `markers` (positive: objects, negative: background, processed after them), `structure` (`3` per axis; faces by default), an integer `output` array (a non-array `output` is ignored, as SciPy does; a read-only one refused by `Py_WatershedIFT`'s parser, `output array is read-only.`, before `too many dimensions`); `upstream_defects` (below) |
 
 `mode` takes SciPy's eight names; for these filters `grid-wrap` is `wrap`, `grid-constant` is
 `constant` and `grid-mirror` is `reflect`, as in SciPy.
@@ -102,7 +114,10 @@ contiguous); results are C-ordered, as SciPy's.
   iterations with a true centre spread from the changed elements (`NI_BinaryErosion2`, the mask
   cast to `int8` there, as SciPy does), otherwise whole passes repeat.
 - **Labels.** Any union of the components gives the same sets; the numbers follow the first
-  element of each component in C order of the index, as `_ni_label` numbers them.
+  element of each component in C order of the index with the output's axis of the smallest
+  stride last (numpy's `PyArray_IterAllButAxis`: `_ni_label`'s lines run along that axis), as
+  `_ni_label` numbers them; the input is labelled with that axis moved last and the labels moved
+  back.
 - **The watershed.** `NI_WatershedIFT`'s queues are kept as SciPy keeps them: one doubly linked
   queue per cost level, the markers in C order (the first alone, objects at the front,
   background at the end), each level emptied from its front, a neighbour whose cost drops moved
@@ -188,9 +203,53 @@ part B, 2026-11-09):
   long double is wider than float64. Measured on this machine (`check_regrid.py`, 48 sigmas,
   orders 0 to 3): 184 of 192 kernels differ from SciPy's 80-bit ones, by at most 7.5e-16 of the
   kernel's largest weight (the Gaussian's own weights at most 12 units in the last place).
-- `output` given as a dtype or array: the result is computed as SciPy computes it (a double per
+- `output` given as a dtype or array (the filters; binary morphology takes only an array, as
+  SciPy): the result is computed as SciPy computes it (a double per
   element, cast to the output's type by SciPy's own cast); integers beyond 2^53 follow the same
   path.
+- An iterated binary erosion with a mask into a `float32` or `float64` output array (the
+  propagation strategy: more than one pass, the structure's centre true, no `brute_force`;
+  `binary_closing` too): SciPy's `NI_BinaryErosion2` marks the elements outside the mask by the
+  first byte of each output element (and restores it at the end), which is 0 for both 0.0 and
+  1.0, so its later passes erode elements outside the mask: `binary_erosion(ones(5),
+  iterations=4, mask=[1, 1, 1, 0, 0], output=zeros(5))` gives `[0, 0, 0, 0, 1]`, into a `bool`
+  output `[0, 0, 0, 1, 1]`. **SCI-25**, rule A: corrected by default (the outside elements keep
+  their values, as in every other output type, with an `UpstreamDefectWarning` when SciPy's result
+  differs); `"reproduce"` gives SciPy's. Measured on 2,520 seeded cases per environment: SciPy's
+  float outputs differ in 600.
+- The same strategy into a byte-swapped or misaligned output array (and `binary_propagation`,
+  `binary_fill_holes` into one): `NI_BinaryErosion2` works on numpy's write-back copy and never
+  resolves it, so numpy warns when the copy is freed (`RuntimeWarning: WRITEBACKIFCOPY detected
+  in clearing of array. ...`; numpy 2.3's text says `array_dealloc`) and writes it back.
+  **SCI-26**, rule A (the values are right): no warning by default; `"reproduce"` emits numpy's.
+- `label` of a big-endian input, or into a big-endian output (an array, or a dtype such as
+  `">i4"`): Cython's buffers refuse it (`ValueError: Big-endian buffer not supported on
+  little-endian compiler`), although every other function here takes byte-swapped arrays (a
+  big-endian NIfTI file's data are one). **SCI-27**, rule A: labelled as the native copy by
+  default (the labels written into the big-endian output), with a warning; `"reproduce"` raises
+  SciPy's error.
+- `label` into a read-only output array: `_ni_label` writes the labels into it. **SCI-28**,
+  rule B: `ValueError("output array is read-only. ...")` by default (SciPy's message for its
+  other functions); `"reproduce"` writes the labels as SciPy does (the array's flag lifted for
+  the write and set again), except where numpy refuses to make the array writeable (memory it
+  does not own as writeable: never reproduced). Where the labels do not fit and SciPy retries,
+  its first attempt's partial writes into the read-only array are not reproduced (numpy's
+  `assignment destination is read-only` follows in both).
+- `label` into a `bool` output (an array, `output=bool` or `"bool"`, the input itself when it is
+  `bool`): `_ni_label` views it as `uint8` and writes the labels as their bytes (2, 3, ... up to
+  255, while its working labels fit in a byte): a `bool` array holding bytes other than 0 and 1.
+  **SCI-29**, rule A: by default labels above 1 are refused as labels that do not fit any other
+  type (`RuntimeError: insufficient bit-depth in requested output type`, with a warning; one
+  label is written as `True`); `"reproduce"` writes SciPy's bytes (its working labels counted as
+  `_ni_label` counts them: beyond 255 SciPy refuses too).
+- `sum_labels`, `sum` and `center_of_mass` with a sequence `index` fail on a 0-d index array
+  (`TypeError: 'numpy.int64' object does not support item assignment`: SciPy indexes its sums
+  with it, which gives a scalar, then assigns into the scalar) and on an empty input (`ValueError:
+  zero-size array to reduction operation minimum which has no identity` from `labels.min()`, or
+  numpy's `IndexError` for `uint64` labels). **SCI-30**, rule A: by default the 0-d index gives
+  the sums per label of its one label as a scalar, the empty input zero counts and sums of the
+  index's shape, with a warning (one per `center_of_mass` call); `"reproduce"` raises SciPy's
+  errors.
 - Complex inputs are refused by the filters, morphology and measurements (`TypeError`, SciPy's
   message for these functions); `correlate1d` and the Gaussian filters take them, as SciPy's.
 - `watershed_ift` is **corrected by default** (`upstream_defects="fix"`; `"reproduce"` gives
@@ -243,7 +302,9 @@ let median: Vec<f32> = rank_filter::<f32, f32>(&data, &layout, ball.count() / 2,
 ```
 
 `min_or_max_filter`, `min_or_max_filter1d`, `rank_filter`, `rank_filter_1d`, `binary_erosion`
-(with `dilation_arguments` for a dilation), `label`, `sum_labels_bincount`,
+(with `dilation_arguments` for a dilation; `binary_erosion_unprotected`, SciPy's later passes
+into a float output, SCI-25), `label`, `sum_labels_bincount` (numpy's `bincount` path of
+`sum_labels`, which `lx.ndimage.sum_labels` runs with numpy itself since relay 22),
 `generate_binary_structure`, `iterate_structure`; they run on the current rayon pool
 (`larmorx_core::parallel::with_threads`). `watershed_ift(input, shape, markers, structure,
 output_bits, faithful)` (`uint8`/`uint16` input, `i8`..`i64` markers, C-ordered) runs SciPy's and

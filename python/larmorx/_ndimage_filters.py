@@ -25,7 +25,12 @@ neighbours across the array's edges, its queue that keeps an element alone in it
 markers by default; the 1-D rank filters correct SciPy's writes of the input's type into an
 output of another type (SCI-21), its refusal of big-endian floats and ``longlong`` (SCI-22) and
 its write-back warning (SCI-23) by default (``upstream_defects``; ``docs/api/ndimage-filters.md``);
-a ``numpy.longdouble`` sigma's Gaussian kernel is computed from the sigma as float64.
+a ``numpy.longdouble`` sigma's Gaussian kernel is computed from the sigma as float64. Binary
+morphology, ``label``, the sums and ``watershed_ift`` take their arguments as SciPy (relay 22) and
+correct by default an iterated erosion into a float output that erodes outside its mask (SCI-25),
+the erosion's write-back warning (SCI-26), ``label``'s refusal of big-endian arrays (SCI-27), its
+writes into a read-only output (SCI-28) and its label bytes in a bool output (SCI-29), and the
+sums' failures on a 0-d index array or an empty input (SCI-30).
 The work runs on ``n_threads`` threads with the GIL released; the result does not depend on
 the thread count.
 """
@@ -1863,13 +1868,10 @@ def _label_type(dtype: np.dtype) -> np.dtype:
 
 _BIG_ENDIAN = "Big-endian buffer not supported on little-endian compiler"
 _SCI27 = "SciPy's label refuses a big-endian {what} ({error}); labelled as its native copy"
-_SCI28 = (
-    "SciPy's label writes the labels into a read-only output array; "
-    "upstream_defects='reproduce' does where numpy lets the array be written"
-)
+_SCI28 = "SciPy's label writes the labels into a read-only output array"
 _SCI29 = (
-    "SciPy's label writes labels above 1 into a bool output as their bytes ({n} labels): an "
-    "invalid bool array; corrected, labels that do not fit are refused as in any other type"
+    "SciPy's label writes labels above 1 into a bool output as their bytes ({n} labels: a bool "
+    "array holding bytes other than 0 and 1)"
 )
 
 
